@@ -1,4 +1,5 @@
 {
+  "theme": "auto",
   "permissions": {
     "defaultMode": "bypassPermissions",
     "allow": [

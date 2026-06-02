@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 import base64
 import boxlite
@@ -16,13 +17,13 @@ from rich.markup import escape
 from rich.panel import Panel
 from rich.rule import Rule
 
-load_dotenv()
-
-console = Console()
-
-REPO_ROOT = Path(__file__).resolve().parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 DEVBOX_IMAGE = "orchestrix-devbox:v1"
 OCI_LAYOUT_DIR = REPO_ROOT / ".oci" / "orchestrix-devbox-v1"
+
+load_dotenv(REPO_ROOT / ".env")
+
+console = Console()
 
 ANTHROPIC_ENV_KEYS = (
     "ANTHROPIC_API_KEY",
@@ -1102,5 +1103,14 @@ async def main():
     finally:
         session_box = None
 
-if __name__ == "__main__":
+def run(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        prog="orchestrix",
+        description="Run the Orchestrix multi-agent workflow.",
+    )
+    parser.parse_args(argv)
     asyncio.run(main())
+
+
+if __name__ == "__main__":
+    run()

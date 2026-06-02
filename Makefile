@@ -14,13 +14,13 @@ devbox-oci: devbox-image
 	docker image inspect $(DEVBOX_IMAGE) --format='{{.Id}}' > $(IMAGE_ID_FILE)
 
 run:
-	uv run python orchestrator.py
+	uv run python -m orchestrix
 
 run-fresh: devbox-oci
-	uv run python orchestrator.py
+	uv run python -m orchestrix
 
 stop:
-	-pkill -f "python.*orchestrator.py" 2>/dev/null
+	-pkill -f "orchestrix|orchestrator.py" 2>/dev/null
 	-pkill -f "boxlite-shim" 2>/dev/null
 	-rm -f $(HOME)/.boxlite/.lock
 	@echo "Stopped orchestrator and BoxLite processes."

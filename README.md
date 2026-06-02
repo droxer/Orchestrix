@@ -76,7 +76,8 @@ echo "Implement JWT authentication middleware in src/api/middleware.ts. Ensure i
 
 ```bash
 make run
-# or: uv run python orchestrator.py  (auto-exports OCI layout when stale)
+# or: uv run python -m orchestrix  (auto-exports OCI layout when stale)
+# or: uv run orchestrix
 
 # After changing the devbox image (dockerfile), rebuild first:
 make run-fresh

@@ -1,7 +1,7 @@
 [project]
 name = "orchestrix"
 version = "0.1.0"
-description = "Add your description here"
+description = "Local-first multi-agent orchestration with BoxLite and LangGraph"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
@@ -10,3 +10,10 @@ dependencies = [
     "python-dotenv>=1.2.2",
     "rich>=14.0.0",
 ]
+
+[project.scripts]
+orchestrix = "orchestrix.orchestrator:run"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

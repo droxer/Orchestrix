@@ -1,7 +1,7 @@
 import json
 import unittest
 
-import orchestrator
+from orchestrix import orchestrator
 
 
 def codex_stdout(message: str) -> str:
