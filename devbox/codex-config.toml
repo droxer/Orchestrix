@@ -1,0 +1,3 @@
+# Headless devbox: full workspace read/write for implementation and review.
+[sandbox]
+default_mode = "danger-full-access"
