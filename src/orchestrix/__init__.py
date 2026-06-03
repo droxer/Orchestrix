@@ -1,2 +1,0 @@
-"""Orchestrix package."""
-

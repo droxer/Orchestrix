@@ -1,67 +1,44 @@
----
-name: karpathy-guidelines
-description: Behavioral guidelines to reduce common LLM coding mistakes. Use when writing, reviewing, or refactoring code to avoid overcomplication, make surgical changes, surface assumptions, and define verifiable success criteria.
-license: MIT
----
+# Orchestrix Agent Guide
 
-# Karpathy Guidelines
+This repository is a TypeScript/Node.js CLI. Do not add Python host code back to the project.
 
-Behavioral guidelines to reduce common LLM coding mistakes, derived from [Andrej Karpathy's observations](https://x.com/karpathy/status/2015883857489522876) on LLM coding pitfalls.
+## Project Shape
 
-**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
+- Runtime entrypoint: `src/index.ts`
+- Orchestrator implementation: `src/orchestrator.ts`
+- Tests: `tests/handoff.test.ts`
+- Package manager: npm
+- Local devbox image: `dockerfile`
+- Generated outputs: `dist/`, `node_modules/`, `.oci/`
 
-## 1. Think Before Coding
+## Commands
 
-**Don't assume. Don't hide confusion. Surface tradeoffs.**
+- Install dependencies: `npm install`
+- Build: `npm run build`
+- Test: `npm test` or `make test`
+- Run the orchestrator: `make run` or `npm run run`
+- Rebuild/export the devbox image only when the image changes: `make run-fresh`
+- Build/check/export devbox pieces manually: `make devbox-image`, `make devbox-check`, `make devbox-oci`
 
-Before implementing:
-- State your assumptions explicitly. If uncertain, ask.
-- If multiple interpretations exist, present them - don't pick silently.
-- If a simpler approach exists, say so. Push back when warranted.
-- If something is unclear, stop. Name what's confusing. Ask.
+Use `make run` for normal execution. Do not tell users to run `make run-fresh` unless `dockerfile` or the devbox image changed.
 
-## 2. Simplicity First
+## Implementation Notes
 
-**Minimum code that solves the problem. Nothing speculative.**
+- Keep the host orchestrator in TypeScript.
+- Use BoxLite's Node SDK (`@boxlite-ai/boxlite`) for VM lifecycle and command execution.
+- `execStream()` should stream stdout/stderr while also collecting output for routing and logs.
+- Claude uses `--output-format stream-json`; render JSONL through `JsonLineRenderer` instead of printing raw JSON.
+- Codex uses `exec --json`; render JSONL through `JsonLineRenderer` instead of printing raw JSON.
+- Pi versions differ: use `-P` only when `pi --help` advertises `-P` or `--print-streaming`; otherwise fall back to `-p`.
+- Keep terminal output readable: section headers, status labels, aligned startup fields, and no raw JSON events.
 
-- No features beyond what was asked.
-- No abstractions for single-use code.
-- No "flexibility" or "configurability" that wasn't requested.
-- No error handling for impossible scenarios.
-- If you write 200 lines and it could be 50, rewrite it.
+## Verification
 
-Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+For behavior changes, add or update tests in `tests/handoff.test.ts` and run `npm test`.
 
-## 3. Surgical Changes
+Before handing off, check:
 
-**Touch only what you must. Clean up only your own mess.**
-
-When editing existing code:
-- Don't "improve" adjacent code, comments, or formatting.
-- Don't refactor things that aren't broken.
-- Match existing style, even if you'd do it differently.
-- If you notice unrelated dead code, mention it - don't delete it.
-
-When your changes create orphans:
-- Remove imports/variables/functions that YOUR changes made unused.
-- Don't remove pre-existing dead code unless asked.
-
-The test: Every changed line should trace directly to the user's request.
-
-## 4. Goal-Driven Execution
-
-**Define success criteria. Loop until verified.**
-
-Transform tasks into verifiable goals:
-- "Add validation" → "Write tests for invalid inputs, then make them pass"
-- "Fix the bug" → "Write a test that reproduces it, then make it pass"
-- "Refactor X" → "Ensure tests pass before and after"
-
-For multi-step tasks, state a brief plan:
-```
-1. [Step] → verify: [check]
-2. [Step] → verify: [check]
-3. [Step] → verify: [check]
-```
-
-Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+1. TypeScript compiles.
+2. Existing handoff and provider tests pass.
+3. Terminal rendering tests still prove Claude/Codex JSONL is not printed raw.
+4. Pi command generation remains compatible with old and new Pi CLI versions.

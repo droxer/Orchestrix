@@ -1,12 +1,13 @@
-# Python-generated files
+# Generated files
 __pycache__/
 *.py[oc]
 build/
 dist/
 wheels/
 *.egg-info
+node_modules/
 
-# Virtual environments
+# Local environments
 .venv/
 
 # Environment & secrets

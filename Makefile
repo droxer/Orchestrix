@@ -4,7 +4,7 @@ DOCKERFILE := dockerfile
 IMAGE_ID_FILE := $(OCI_DIR)/.docker-image-id
 DOCKERFILE_MTIME_FILE := $(OCI_DIR)/.dockerfile-mtime
 
-.PHONY: devbox-image devbox-check devbox-oci run run-fresh stop
+.PHONY: devbox-image devbox-check devbox-oci build test run run-fresh stop
 
 devbox-image:
 	docker build -t $(DEVBOX_IMAGE) -f $(DOCKERFILE) .
@@ -16,16 +16,22 @@ devbox-oci: devbox-check
 	mkdir -p $(OCI_DIR)
 	docker save $(DEVBOX_IMAGE) | tar -xf - -C $(OCI_DIR)
 	docker image inspect $(DEVBOX_IMAGE) --format='{{.Id}}' > $(IMAGE_ID_FILE)
-	uv run python -c "from pathlib import Path; print(Path('$(DOCKERFILE)').stat().st_mtime_ns)" > $(DOCKERFILE_MTIME_FILE)
+	node -e "console.log(require('fs').statSync('$(DOCKERFILE)', { bigint: true }).mtimeNs.toString())" > $(DOCKERFILE_MTIME_FILE)
+
+build:
+	npm run build
+
+test:
+	npm test
 
 run:
-	uv run python -m orchestrix
+	npm run run
 
 run-fresh: devbox-oci
-	uv run python -m orchestrix
+	npm run run
 
 stop:
-	-pkill -f "orchestrix|orchestrator.py" 2>/dev/null
+	-pkill -f "orchestrix|dist/src/index.js" 2>/dev/null
 	-pkill -f "boxlite-shim" 2>/dev/null
 	-rm -f $(HOME)/.boxlite/.lock
 	@echo "Stopped orchestrator and BoxLite processes."

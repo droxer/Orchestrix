@@ -14,8 +14,6 @@ RUN apt-get update && apt-get install -y \
     grep \
     git \
     passwd \
-    python3 \
-    python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
 # Install agent CLIs

@@ -1,0 +1,24 @@
+{
+  "name": "orchestrix",
+  "version": "0.1.0",
+  "description": "Local-first multi-agent orchestration with BoxLite",
+  "type": "module",
+  "bin": {
+    "orchestrix": "./dist/src/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test dist/tests/*.test.js",
+    "run": "npm run build && node dist/src/index.js"
+  },
+  "dependencies": {
+    "@boxlite-ai/boxlite": "^0.9.5"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  }
+}
