@@ -12,10 +12,14 @@
     "run": "npm run build && node dist/src/index.js"
   },
   "dependencies": {
-    "@boxlite-ai/boxlite": "^0.9.5"
+    "@boxlite-ai/boxlite": "^0.9.5",
+    "ink": "^7.0.5",
+    "react": "^19.2.7"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "@types/react": "^19.2.16",
+    "ink-testing-library": "^4.0.0",
     "typescript": "^5.9.0"
   },
   "engines": {

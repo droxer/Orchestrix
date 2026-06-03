@@ -90,14 +90,10 @@ changes in `src/` or `tests/` do not require `make run-fresh`.
 
 ### 4. Prepare Workspace
 
-The orchestrator mounts `~/projects/air-platform` into the devbox at `/workspace`. Create the sample project layout and task plan:
+The orchestrator mounts `~/projects/air-platform` into the devbox at `/workspace`. Create or clone the project you want agents to work on there:
 
 ```bash
-mkdir -p ~/projects/air-platform/docs
-mkdir -p ~/projects/air-platform/src/api
-
-# Create the architecture plan
-echo "Implement JWT authentication middleware in src/api/middleware.ts. Ensure it checks for token expiration." > ~/projects/air-platform/docs/plan.md
+mkdir -p ~/projects/air-platform
 ```
 
 ### 5. Run the Orchestrator
@@ -105,6 +101,10 @@ echo "Implement JWT authentication middleware in src/api/middleware.ts. Ensure i
 ```bash
 make run
 # or: npm run run
+
+# In the TUI, type the task and assign it explicitly:
+# @claude <your task>
+# @claude @pi @codex <your task>
 
 # Only after editing dockerfile or changing the devbox image:
 make run-fresh

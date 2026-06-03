@@ -1,0 +1,184 @@
+import { Buffer } from "node:buffer";
+
+import {
+  ANTHROPIC_ENV_KEYS,
+  OPENAI_ENV_KEYS,
+  hostWorkspaceOwner,
+  openaiApiKey,
+  piApi,
+  piApiKey,
+  piBaseUrl,
+  piModel,
+  piProvider,
+} from "./env.js";
+import { AGENT_USER, GUEST_WORKSPACE } from "./state.js";
+import { shellQuote } from "./shell.js";
+
+export const GUEST_AGENT_SYNC_SCRIPT = `
+set -eu
+uid="\${ORCHESTRIX_HOST_UID:?}"
+gid="\${ORCHESTRIX_HOST_GID:?}"
+ws="/workspace"
+
+if ! getent group "$gid" >/dev/null 2>&1; then
+  groupadd -g "$gid" orchestrix-host
+fi
+
+if id -u agent >/dev/null 2>&1; then
+  usermod -o -u "$uid" -g "$gid" agent
+else
+  useradd -o -u "$uid" -g "$gid" -d /home/agent -s /bin/bash -m agent
+fi
+
+chown -R agent:agent /home/agent
+chown -R agent:agent "$ws"
+find "$ws" -type d -exec chmod u+rwx {} +
+find "$ws" -type f -exec chmod u+rw {} +
+`;
+
+export let sessionGuestEnv: Array<[string, string]> = [];
+
+export function setSessionGuestEnv(env: Array<[string, string]>): void {
+  sessionGuestEnv = env;
+}
+
+export function guestAgentEnv(hostWorkspace?: string | null): Array<[string, string]> {
+  const env: Array<[string, string]> = [];
+  for (const key of ANTHROPIC_ENV_KEYS) {
+    const value = process.env[key];
+    if (value) env.push([key, value]);
+  }
+  const openaiKey = openaiApiKey();
+  if (openaiKey) {
+    env.push(["OPENAI_API_KEY", openaiKey]);
+    env.push(["CODEX_API_KEY", openaiKey]);
+  }
+  for (const key of OPENAI_ENV_KEYS.slice(1)) {
+    const value = process.env[key];
+    if (value) env.push([key, value]);
+  }
+  for (const key of ["PI_API_KEY", "PI_BASE_URL", "PI_MODEL", "PI_PROVIDER", "PI_API"]) {
+    const value = process.env[key];
+    if (value) env.push([key, value]);
+  }
+  if (!process.env.PI_API_KEY) {
+    const value = piApiKey();
+    if (value) env.push(["PI_API_KEY", value]);
+  }
+  if (hostWorkspace !== undefined && hostWorkspace !== null) {
+    const [uid, gid] = hostWorkspaceOwner(hostWorkspace);
+    env.push(["ORCHESTRIX_HOST_UID", String(uid)]);
+    env.push(["ORCHESTRIX_HOST_GID", String(gid)]);
+  }
+  return env;
+}
+
+export function guestEnvExports(): string {
+  return sessionGuestEnv
+    .map(([key, value]) => `export ${key}=${shellQuote(value)}`)
+    .join(" && ");
+}
+
+export function guestCodexConfigToml(): string {
+  const lines = [
+    "[sandbox]",
+    'default_mode = "danger-full-access"',
+    'model_provider = "dashscope"',
+  ];
+  if (process.env.OPENAI_MODEL) {
+    lines.push(`model = ${JSON.stringify(process.env.OPENAI_MODEL)}`);
+  }
+  if (process.env.OPENAI_BASE_URL) {
+    lines.push(
+      "",
+      "[model_providers.dashscope]",
+      'name = "DashScope"',
+      `base_url = ${JSON.stringify(process.env.OPENAI_BASE_URL)}`,
+      'env_key = "OPENAI_API_KEY"',
+      "requires_openai_auth = false",
+    );
+  }
+  return `${lines.join("\n")}\n`;
+}
+
+export function guestCodexAuthJson(apiKey: string): string {
+  return JSON.stringify({ auth_mode: "apikey", OPENAI_API_KEY: apiKey });
+}
+
+export function guestPiAuthJson(): string {
+  const auth: Record<string, { type: "api_key"; key: string }> = {};
+  if (process.env.ANTHROPIC_API_KEY) {
+    auth.anthropic = { type: "api_key", key: process.env.ANTHROPIC_API_KEY };
+  }
+  const openaiKey = openaiApiKey();
+  if (openaiKey) auth.openai = { type: "api_key", key: openaiKey };
+  const piKey = piApiKey();
+  if (piKey) auth[piProvider()] = { type: "api_key", key: piKey };
+  return JSON.stringify(auth);
+}
+
+export function guestPiModelsJson(): string {
+  const provider = piProvider();
+  const model = piModel();
+  const baseUrl = piBaseUrl();
+  if (!baseUrl || !model) return JSON.stringify({ providers: {} });
+  const providerConfig: Record<string, unknown> = {
+    name: `${provider} compatible`,
+    baseUrl,
+    apiKey: "$PI_API_KEY",
+    api: piApi(),
+    models: [
+      {
+        id: model,
+        name: model,
+        reasoning: false,
+        input: ["text", "image"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 128000,
+        maxTokens: 4096,
+      },
+    ],
+  };
+  if (piApi() === "openai-completions") {
+    providerConfig.authHeader = true;
+    providerConfig.compat = {
+      supportsDeveloperRole: false,
+      supportsStore: false,
+      supportsUsageInStreaming: false,
+      maxTokensField: "max_tokens",
+    };
+  }
+  return JSON.stringify({ providers: { [provider]: providerConfig } });
+}
+
+export function codexCliConfigOverrides(): string[] {
+  const argv = ["-c", 'model_provider="dashscope"'];
+  if (process.env.OPENAI_MODEL) argv.push("-c", `model=${JSON.stringify(process.env.OPENAI_MODEL)}`);
+  if (process.env.OPENAI_BASE_URL) {
+    argv.push(
+      "-c",
+      `model_providers.dashscope.base_url=${JSON.stringify(process.env.OPENAI_BASE_URL)}`,
+      "-c",
+      "model_providers.dashscope.requires_openai_auth=false",
+    );
+  }
+  return argv;
+}
+
+export function runAsAgent(command: string): string {
+  const parts = [
+    "export HOME=/home/agent",
+    "export CODEX_HOME=/home/agent/.codex",
+    "export PI_CODING_AGENT_DIR=/home/agent/.pi/agent",
+    "export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    "umask 002",
+    guestEnvExports(),
+    `cd ${GUEST_WORKSPACE}`,
+    command,
+  ].filter(Boolean);
+  return `su ${AGENT_USER} -s /bin/bash -c ${shellQuote(parts.join(" && "))}`;
+}
+
+export function encodeBase64(value: string): string {
+  return Buffer.from(value).toString("base64");
+}

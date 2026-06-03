@@ -3,11 +3,13 @@ import { describe, it } from "node:test";
 
 import {
   type AgentState,
+  buildCodexImplementCommand,
   buildPiImplementCommand,
   buildPiPreflightCommand,
   claudeTaskPrompt,
   classifyCodexReview,
   ClaudeStreamRenderer,
+  codexImplementPrompt,
   CodexStreamRenderer,
   extractCodexFeedback,
   formatClaudeJsonLine,
@@ -95,6 +97,8 @@ describe("prompts", () => {
     );
 
     assert.match(prompt, /Fix auth/);
+    assert.doesNotMatch(prompt, /Read docs\/plan\.md/);
+    assert.doesNotMatch(prompt, /Run tests/);
     assert.match(prompt, /Token expiry is not checked\./);
   });
 
@@ -108,8 +112,24 @@ describe("prompts", () => {
     );
 
     assert.match(prompt, /Fix auth/);
-    assert.match(prompt, /current implementation/);
+    assert.doesNotMatch(prompt, /Read docs\/plan\.md/);
+    assert.doesNotMatch(prompt, /current implementation/);
+    assert.doesNotMatch(prompt, /run tests/);
     assert.match(prompt, /Token expiry is not checked\./);
+  });
+
+  it("Codex implementation prompt does not require a review verdict", () => {
+    const prompt = codexImplementPrompt(state({ task_goal: "Fix auth" }));
+    const command = buildCodexImplementCommand(state({ task_goal: "Fix auth" }));
+
+    assert.match(prompt, /Fix auth/);
+    assert.doesNotMatch(prompt, /Read docs\/plan\.md/);
+    assert.doesNotMatch(prompt, /Implement the requested changes/);
+    assert.doesNotMatch(prompt, /run tests/);
+    assert.doesNotMatch(prompt, /ORCHESTRIX_REVIEW_VERDICT/);
+    assert.match(command, /codex/);
+    assert.match(command, /exec/);
+    assert.doesNotMatch(command, /ORCHESTRIX_REVIEW_VERDICT/);
   });
 });
 
