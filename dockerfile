@@ -1,20 +1,25 @@
-# Use a stable Ubuntu base
-FROM ubuntu:24.04
+# Pi requires Node.js >=22.19.0.
+FROM node:22.19-bookworm-slim
 
 # Prevent interactive prompts during apt installations
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
+    bash \
+    ca-certificates \
+    coreutils \
     curl \
-    nodejs \
-    npm \
+    findutils \
+    grep \
+    git \
+    passwd \
     python3 \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
 # Install agent CLIs
-RUN npm install -g @anthropic-ai/claude-code @openai/codex
+RUN npm install -g @anthropic-ai/claude-code @openai/codex @earendil-works/pi-coding-agent
 
 # UID/GID are aligned to the host workspace owner at runtime (orchestrator boot).
 RUN useradd -m -s /bin/bash agent

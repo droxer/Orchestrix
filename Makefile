@@ -2,16 +2,21 @@ DEVBOX_IMAGE := orchestrix-devbox:v1
 OCI_DIR := .oci/orchestrix-devbox-v1
 DOCKERFILE := dockerfile
 IMAGE_ID_FILE := $(OCI_DIR)/.docker-image-id
+DOCKERFILE_MTIME_FILE := $(OCI_DIR)/.dockerfile-mtime
 
-.PHONY: devbox-image devbox-oci run run-fresh stop
+.PHONY: devbox-image devbox-check devbox-oci run run-fresh stop
 
 devbox-image:
 	docker build -t $(DEVBOX_IMAGE) -f $(DOCKERFILE) .
 
-devbox-oci: devbox-image
+devbox-check: devbox-image
+	docker run --rm $(DEVBOX_IMAGE) bash -lc 'node --version && command -v pi && pi --version && claude --version && codex --version'
+
+devbox-oci: devbox-check
 	mkdir -p $(OCI_DIR)
 	docker save $(DEVBOX_IMAGE) | tar -xf - -C $(OCI_DIR)
 	docker image inspect $(DEVBOX_IMAGE) --format='{{.Id}}' > $(IMAGE_ID_FILE)
+	uv run python -c "from pathlib import Path; print(Path('$(DOCKERFILE)').stat().st_mtime_ns)" > $(DOCKERFILE_MTIME_FILE)
 
 run:
 	uv run python -m orchestrix

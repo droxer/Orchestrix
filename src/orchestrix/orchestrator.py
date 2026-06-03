@@ -4,6 +4,7 @@ import base64
 import boxlite
 import json
 import os
+import re
 import shlex
 import subprocess
 from dataclasses import dataclass, field
@@ -20,6 +21,7 @@ from rich.rule import Rule
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEVBOX_IMAGE = "orchestrix-devbox:v1"
 OCI_LAYOUT_DIR = REPO_ROOT / ".oci" / "orchestrix-devbox-v1"
+DOCKERFILE = REPO_ROOT / "dockerfile"
 
 load_dotenv(REPO_ROOT / ".env")
 
@@ -41,7 +43,9 @@ AGENT_USER = "agent"
 GUEST_WORKSPACE = "/workspace"
 DEFAULT_HOST_WORKSPACE = "~/projects/air-platform"
 MAX_CLAUDE_FAILURES = 3
+MAX_PI_FAILURES = 2
 MAX_CODEX_FAILURES = 2
+PI_NATIVE_BASE_URL_PROVIDERS = {"minimax", "minimax-cn"}
 session_guest_env: list[tuple[str, str]] = []
 
 # Align guest agent UID/GID with the bind-mounted host workspace owner so new
@@ -95,6 +99,12 @@ def guest_agent_env(host_workspace: str | Path | None = None) -> list[tuple[str,
     for key in ("OPENAI_BASE_URL", "OPENAI_MODEL"):
         if value := os.environ.get(key):
             env.append((key, value))
+    for key in ("PI_API_KEY", "PI_BASE_URL", "PI_MODEL", "PI_PROVIDER", "PI_API"):
+        if value := os.environ.get(key):
+            env.append((key, value))
+    if not os.environ.get("PI_API_KEY"):
+        if value := pi_api_key():
+            env.append(("PI_API_KEY", value))
     if host_workspace is not None:
         uid, gid = host_workspace_owner(host_workspace)
         env.append(("ORCHESTRIX_HOST_UID", str(uid)))
@@ -118,6 +128,68 @@ def require_openai_api_key() -> str:
             "Set it in .env (DashScope: use your compatible-mode API key)."
         )
     return key
+
+
+def openai_api_key() -> str | None:
+    return os.environ.get("OPENAI_API_KEY") or os.environ.get("CODEX_API_KEY")
+
+
+def pi_api_key() -> str | None:
+    return (
+        os.environ.get("PI_API_KEY")
+        or openai_api_key()
+        or os.environ.get("ANTHROPIC_API_KEY")
+    )
+
+
+def pi_source_base_url() -> str | None:
+    return os.environ.get("PI_BASE_URL") or os.environ.get("OPENAI_BASE_URL")
+
+
+def pi_model() -> str | None:
+    return os.environ.get("PI_MODEL") or os.environ.get("OPENAI_MODEL")
+
+
+def pi_provider() -> str:
+    if provider := os.environ.get("PI_PROVIDER"):
+        return provider
+    base_url = pi_source_base_url()
+    if not base_url:
+        return "anthropic"
+    if "api.minimaxi.com" in base_url:
+        return "minimax-cn"
+    if "api.minimax.io" in base_url:
+        return "minimax"
+    return "openai"
+
+
+def pi_base_url() -> str | None:
+    if base_url := os.environ.get("PI_BASE_URL"):
+        return base_url
+    if pi_provider() in PI_NATIVE_BASE_URL_PROVIDERS:
+        return None
+    return os.environ.get("OPENAI_BASE_URL")
+
+
+def pi_api() -> str:
+    if value := os.environ.get("PI_API"):
+        return value
+    if pi_provider() in {"anthropic", "minimax", "minimax-cn"}:
+        return "anthropic-messages"
+    return "openai-completions"
+
+
+def require_pi_config() -> None:
+    if pi_base_url() and not pi_model():
+        raise RuntimeError(
+            "PI_MODEL or OPENAI_MODEL is required for Pi when using an "
+            "OpenAI/Anthropic-compatible base URL."
+        )
+    if not pi_api_key():
+        raise RuntimeError(
+            "Pi requires PI_API_KEY, OPENAI_API_KEY/CODEX_API_KEY, "
+            "or ANTHROPIC_API_KEY."
+        )
 
 
 def guest_codex_config_toml() -> str:
@@ -156,6 +228,66 @@ def guest_codex_auth_json(api_key: str) -> str:
     return json.dumps({"auth_mode": "apikey", "OPENAI_API_KEY": api_key})
 
 
+def guest_pi_auth_json() -> str:
+    auth: dict[str, dict[str, str]] = {}
+    if value := os.environ.get("ANTHROPIC_API_KEY"):
+        auth["anthropic"] = {"type": "api_key", "key": value}
+    if value := openai_api_key():
+        auth["openai"] = {"type": "api_key", "key": value}
+    if value := pi_api_key():
+        auth[pi_provider()] = {"type": "api_key", "key": value}
+    return json.dumps(auth)
+
+
+def guest_pi_models_json() -> str:
+    provider = pi_provider()
+    model = pi_model()
+    base_url = pi_base_url()
+    if not base_url or not model:
+        return json.dumps({"providers": {}})
+    provider_config: dict[str, object] = {
+        "name": f"{provider} compatible",
+        "baseUrl": base_url,
+        "apiKey": "$PI_API_KEY",
+        "api": pi_api(),
+        "models": [
+            {
+                "id": model,
+                "name": model,
+                "reasoning": False,
+                "input": ["text", "image"],
+                "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                },
+                "contextWindow": 128000,
+                "maxTokens": 4096,
+            }
+        ],
+    }
+    if pi_api() == "openai-completions":
+        provider_config.update(
+            {
+                "authHeader": True,
+                "compat": {
+                    "supportsDeveloperRole": False,
+                    "supportsStore": False,
+                    "supportsUsageInStreaming": False,
+                    "maxTokensField": "max_tokens",
+                },
+            }
+        )
+    return json.dumps(
+        {
+            "providers": {
+                provider: provider_config
+            }
+        }
+    )
+
+
 def codex_cli_config_overrides() -> list[str]:
     """CLI -c flags matching guest_codex_config_toml."""
     argv: list[str] = ["-c", 'model_provider="dashscope"']
@@ -178,6 +310,7 @@ def run_as_agent(command: str) -> str:
     parts = [
         "export HOME=/home/agent",
         "export CODEX_HOME=/home/agent/.codex",
+        "export PI_CODING_AGENT_DIR=/home/agent/.pi/agent",
         "export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
         "umask 002",
         guest_env_exports(),
@@ -203,18 +336,26 @@ async def prepare_guest_workspace(host_workspace: str | Path) -> tuple[int, int]
 
 
 async def prepare_guest_agent_auth() -> None:
-    """Write Codex auth.json and config.toml so API key + base URL reach the CLI."""
+    """Write agent auth/config files so API keys and base URLs reach CLIs."""
     api_key = require_openai_api_key()
+    require_pi_config()
     box = active_box()
     auth_b64 = base64.b64encode(guest_codex_auth_json(api_key).encode()).decode()
     config_b64 = base64.b64encode(guest_codex_config_toml().encode()).decode()
+    pi_auth_b64 = base64.b64encode(guest_pi_auth_json().encode()).decode()
+    pi_models_b64 = base64.b64encode(guest_pi_models_json().encode()).decode()
     script = (
         "set -eu; "
         "mkdir -p /home/agent/.codex; "
         f"printf %s {shlex.quote(auth_b64)} | base64 -d > /home/agent/.codex/auth.json; "
         f"printf %s {shlex.quote(config_b64)} | base64 -d > /home/agent/.codex/config.toml; "
         "chown -R agent:agent /home/agent/.codex; "
-        "chmod 600 /home/agent/.codex/auth.json"
+        "chmod 600 /home/agent/.codex/auth.json; "
+        "mkdir -p /home/agent/.pi/agent; "
+        f"printf %s {shlex.quote(pi_auth_b64)} | base64 -d > /home/agent/.pi/agent/auth.json; "
+        f"printf %s {shlex.quote(pi_models_b64)} | base64 -d > /home/agent/.pi/agent/models.json; "
+        "chown -R agent:agent /home/agent/.pi; "
+        "chmod 600 /home/agent/.pi/agent/auth.json"
     )
     result = await box.exec("bash", "-c", script)
     if result.exit_code != 0:
@@ -271,6 +412,20 @@ def codex_review_prompt(state: AgentState) -> str:
     )
 
 
+def append_codex_feedback(prompt: str, state: AgentState) -> str:
+    if feedback := state.get("codex_feedback"):
+        return f"{prompt}\n\nCodex review feedback to fix:\n{feedback}"
+    return prompt
+
+
+def shell_command(argv: list[str]) -> str:
+    return " ".join(shlex.quote(arg) for arg in argv) + " < /dev/null"
+
+
+def next_failure_count(failed: bool, current_count: int) -> int:
+    return current_count + 1 if failed else 0
+
+
 def build_codex_review_command(state: AgentState) -> str:
     """Run Codex via `exec` with a review prompt (not the `review` subcommand)."""
     argv = [
@@ -289,8 +444,7 @@ def build_codex_review_command(state: AgentState) -> str:
     if model := os.environ.get("OPENAI_MODEL"):
         argv.extend(["-m", model])
     argv.append(codex_review_prompt(state))
-    inner = " ".join(shlex.quote(arg) for arg in argv) + " < /dev/null"
-    return run_as_agent(inner)
+    return run_as_agent(shell_command(argv))
 
 
 def claude_task_prompt(state: AgentState) -> str:
@@ -298,9 +452,16 @@ def claude_task_prompt(state: AgentState) -> str:
         f"Read docs/plan.md. {state['task_goal']}. "
         "Run tests and fix any errors before exiting."
     )
-    if feedback := state.get("codex_feedback"):
-        prompt += f"\n\nCodex review feedback to fix:\n{feedback}"
-    return prompt
+    return append_codex_feedback(prompt, state)
+
+
+def pi_task_prompt(state: AgentState) -> str:
+    prompt = (
+        f"Read docs/plan.md. {state['task_goal']}. "
+        "Inspect the current implementation, improve or fix any gaps you find, "
+        "run tests, and leave the workspace in a passing state before exiting."
+    )
+    return append_codex_feedback(prompt, state)
 
 
 def build_claude_implement_command(state: AgentState) -> str:
@@ -322,8 +483,54 @@ def build_claude_implement_command(state: AgentState) -> str:
     if model := os.environ.get("ANTHROPIC_MODEL"):
         argv.extend(["--model", model])
     argv.append(claude_task_prompt(state))
-    inner = " ".join(shlex.quote(arg) for arg in argv) + " < /dev/null"
-    return run_as_agent(inner)
+    return run_as_agent(shell_command(argv))
+
+
+def build_pi_implement_command(state: AgentState) -> str:
+    argv = [
+        "stdbuf",
+        "-oL",
+        "-eL",
+        "pi",
+        "--no-session",
+    ]
+    if provider := pi_provider():
+        argv.extend(["--provider", provider])
+    if model := pi_model():
+        argv.extend(["--model", model])
+    argv.extend(["-p", pi_task_prompt(state)])
+    return run_as_agent(shell_command(argv))
+
+
+def build_pi_preflight_command() -> str:
+    list_models_argv = ["pi", "--list-models"]
+    provider = pi_provider()
+    model = pi_model()
+    if model:
+        list_models_argv.append(f"{provider} {model}")
+        list_models_command = shell_command(list_models_argv)
+        model_row_pattern = shlex.quote(
+            rf"^{re.escape(provider)}[[:space:]]+{re.escape(model)}([[:space:]]|$)"
+        )
+        model_check = (
+            "model_output=$("
+            f"{list_models_command} 2>&1"
+            "); "
+            'printf "%s\\n" "$model_output"; '
+            'printf "%s\\n" "$model_output" '
+            f"| grep -E {model_row_pattern}"
+        )
+    else:
+        model_check = shell_command(list_models_argv)
+    command = " && ".join(
+        [
+            "node --version",
+            "command -v pi",
+            "pi --version",
+            model_check,
+        ]
+    )
+    return run_as_agent(command)
 
 
 class ClaudeStreamRenderer:
@@ -810,14 +1017,27 @@ def ensure_local_devbox_oci() -> str:
 
     image_id = _docker_image_id(DEVBOX_IMAGE)
     stamp_file = OCI_LAYOUT_DIR / ".docker-image-id"
+    dockerfile_stamp = OCI_LAYOUT_DIR / ".dockerfile-mtime"
     oci_layout = OCI_LAYOUT_DIR / "oci-layout"
+    dockerfile_mtime = str(DOCKERFILE.stat().st_mtime_ns)
     if (
         oci_layout.exists()
         and stamp_file.exists()
+        and dockerfile_stamp.exists()
         and image_id is not None
         and stamp_file.read_text().strip() == image_id
+        and dockerfile_stamp.read_text().strip() == dockerfile_mtime
     ):
         return str(OCI_LAYOUT_DIR)
+
+    if oci_layout.exists() and (
+        not dockerfile_stamp.exists()
+        or dockerfile_stamp.read_text().strip() != dockerfile_mtime
+    ):
+        raise RuntimeError(
+            "The devbox dockerfile changed after the current image was built. "
+            "Rebuild it with: make run-fresh"
+        )
 
     if oci_layout.exists():
         console.print("[yellow]![/] Docker image changed — re-exporting OCI layout")
@@ -833,6 +1053,7 @@ def ensure_local_devbox_oci() -> str:
         )
     if image_id is not None:
         stamp_file.write_text(image_id + "\n")
+        dockerfile_stamp.write_text(dockerfile_mtime + "\n")
     return str(OCI_LAYOUT_DIR)
 
 # ---------------------------------------------------------
@@ -843,6 +1064,7 @@ class AgentState(TypedDict):
     agent_logs: Annotated[list, operator.add]
     last_exit_code: int
     claude_failures: int
+    pi_failures: int
     codex_failures: int
     codex_verdict: str
     codex_feedback: str
@@ -906,14 +1128,40 @@ async def claude_implement_node(state: AgentState):
         stdout_renderer=renderer,
     )
 
-    claude_failures = (
-        0 if result.exit_code == 0 else state.get("claude_failures", 0) + 1
+    claude_failures = next_failure_count(
+        result.exit_code != 0,
+        state.get("claude_failures", 0),
     )
     return {
         "agent_logs": [f"[Claude Code Exit {result.exit_code}]:\n{result.stdout[-500:]}"],
         "last_exit_code": result.exit_code,
         "claude_failures": claude_failures,
     }
+
+
+async def pi_implement_node(state: AgentState):
+    console.print(Rule("[bold #f97316]Pi[/] — implementation review"))
+
+    print_user_task(console, pi_task_prompt(state))
+
+    result = await exec_stream(
+        "bash",
+        "-c",
+        build_pi_implement_command(state),
+        cwd="/workspace",
+        stdout_style="#e2e8f0",
+    )
+
+    pi_failures = next_failure_count(
+        result.exit_code != 0,
+        state.get("pi_failures", 0),
+    )
+    return {
+        "agent_logs": [f"[Pi Exit {result.exit_code}]:\n{result.stdout[-500:]}"],
+        "last_exit_code": result.exit_code,
+        "pi_failures": pi_failures,
+    }
+
 
 async def codex_review_node(state: AgentState):
     console.print(Rule("[bold blue]Codex[/] — code review"))
@@ -928,13 +1176,12 @@ async def codex_review_node(state: AgentState):
         cwd="/workspace",
         stdout_renderer=renderer,
     )
-    
+
     feedback = extract_codex_feedback(result.stdout)
     verdict = classify_codex_review(result.exit_code, feedback)
-    codex_failures = (
-        state.get("codex_failures", 0) + 1
-        if verdict == "failed"
-        else 0
+    codex_failures = next_failure_count(
+        verdict == "failed",
+        state.get("codex_failures", 0),
     )
     return {
         "agent_logs": [f"[Codex Review Exit {result.exit_code}]:\n{result.stdout}"],
@@ -981,10 +1228,10 @@ def classify_codex_review(exit_code: int, feedback: str) -> str:
 # ---------------------------------------------------------
 # 3. Routing Logic
 # ---------------------------------------------------------
-def route_claude_handoff(state: AgentState) -> Literal["codex_review", "claude_implement", "__end__"]:
+def route_claude_handoff(state: AgentState) -> Literal["pi_implement", "claude_implement", "__end__"]:
     if state["last_exit_code"] == 0:
-        console.print("[green]✓[/] Claude succeeded → Codex review")
-        return "codex_review"
+        console.print("[green]✓[/] Claude succeeded → Pi implementation review")
+        return "pi_implement"
 
     if state["claude_failures"] < MAX_CLAUDE_FAILURES:
         console.print(
@@ -995,6 +1242,23 @@ def route_claude_handoff(state: AgentState) -> Literal["codex_review", "claude_i
 
     console.print(f"[red]✗[/] Claude failed {MAX_CLAUDE_FAILURES} times — halting")
     return "__end__"
+
+
+def route_pi_handoff(state: AgentState) -> Literal["codex_review", "pi_implement", "__end__"]:
+    if state["last_exit_code"] == 0:
+        console.print("[green]✓[/] Pi succeeded → Codex review")
+        return "codex_review"
+
+    if state["pi_failures"] < MAX_PI_FAILURES:
+        console.print(
+            f"[yellow]![/] Pi failed (exit {state['last_exit_code']}) "
+            f"— retry {state['pi_failures']}/{MAX_PI_FAILURES}"
+        )
+        return "pi_implement"
+
+    console.print(f"[red]✗[/] Pi failed {MAX_PI_FAILURES} times — halting")
+    return "__end__"
+
 
 def route_codex_handoff(state: AgentState) -> Literal["codex_review", "claude_implement", "__end__"]:
     verdict = state.get("codex_verdict", "failed")
@@ -1051,12 +1315,16 @@ async def main():
             synced_uid, synced_gid = await prepare_guest_workspace(host_workspace)
             await prepare_guest_agent_auth()
             base_url = os.environ.get("OPENAI_BASE_URL", "(default)")
+            pi_url = pi_base_url() or "(default)"
+            pi_model_name = pi_model() or "(default)"
             console.print(
                 f"[dim]workspace[/] {host_workspace}\n"
                 f"[dim]mount[/] {GUEST_WORKSPACE}  "
                 f"[dim]owner[/] uid={synced_uid} gid={synced_gid} "
                 f"(matches host user for IDE access)\n"
-                f"[dim]codex[/] provider=dashscope (HTTP)  base_url={base_url}"
+                f"[dim]codex[/] provider=dashscope (HTTP)  base_url={base_url}\n"
+                f"[dim]pi[/] provider={pi_provider()}  model={pi_model_name}  "
+                f"base_url={pi_url}"
             )
 
             preflight = await box.exec(
@@ -1079,12 +1347,27 @@ async def main():
                 detail = (codex_preflight.stderr or codex_preflight.stdout or "").strip()
                 raise RuntimeError(f"Codex auth preflight failed. {detail}")
 
+            pi_preflight = await box.exec(
+                "bash",
+                "-c",
+                build_pi_preflight_command(),
+            )
+            if pi_preflight.exit_code != 0:
+                detail = (pi_preflight.stderr or pi_preflight.stdout or "").strip()
+                raise RuntimeError(
+                    "Pi coding agent preflight failed. "
+                    "Rebuild with: make run-fresh. "
+                    f"{detail}"
+                )
+
             # Compile the LangGraph
             workflow = StateGraph(AgentState)
             workflow.add_node("claude_implement", claude_implement_node)
+            workflow.add_node("pi_implement", pi_implement_node)
             workflow.add_node("codex_review", codex_review_node)
             workflow.set_entry_point("claude_implement")
             workflow.add_conditional_edges("claude_implement", route_claude_handoff)
+            workflow.add_conditional_edges("pi_implement", route_pi_handoff)
             workflow.add_conditional_edges("codex_review", route_codex_handoff)
             orchestrator = workflow.compile()
 
@@ -1093,6 +1376,7 @@ async def main():
                 "agent_logs": [],
                 "last_exit_code": 0,
                 "claude_failures": 0,
+                "pi_failures": 0,
                 "codex_failures": 0,
                 "codex_verdict": "",
                 "codex_feedback": "",
