@@ -5,7 +5,20 @@ export function appendCodexFeedback(prompt: string, state: AgentState): string {
 }
 
 export function codexReviewPrompt(state: AgentState): string {
-  return state.task_goal;
+  return [
+    "Review the current workspace changes for the user's task.",
+    "",
+    "Focus on blocking bugs, regressions, unsafe behavior, and missing tests.",
+    "If changes are acceptable, say so briefly.",
+    "If changes are not acceptable, list the blocking issues clearly.",
+    "",
+    "End your response with exactly one of these lines:",
+    "RELAY_REVIEW_VERDICT: APPROVED",
+    "RELAY_REVIEW_VERDICT: REJECTED",
+    "",
+    "User task:",
+    state.task_goal,
+  ].join("\n");
 }
 
 export function codexImplementPrompt(state: AgentState): string {

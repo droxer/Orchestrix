@@ -26,6 +26,8 @@ import {
   codexReviewNode,
   piImplementNode,
 } from "./nodes.js";
+import { SessionController } from "./controller.js";
+import { LocalSessionStore, relayEvent } from "./session.js";
 import {
   routeClaudeHandoff,
   routeCodexHandoff,
@@ -83,6 +85,12 @@ export async function runAgentTask(
   mode: CodexTaskMode = "implement",
   options: AgentRunOptions = {},
 ): Promise<AgentState> {
+  if (options.sessionController && options.sessionId) {
+    return options.sessionController.runStep(options.sessionId, initialAgentState(taskGoal), {
+      agent,
+      mode,
+    }, options);
+  }
   let state = initialAgentState(taskGoal);
   if (agent === "claude") {
     state = mergeAgentState(state, await claudeImplementNode(state, options));
@@ -97,23 +105,33 @@ export async function runAgentTask(
 }
 
 export async function runWorkflow(initialState: AgentState, options: AgentRunOptions = {}): Promise<AgentState> {
+  const controller = options.sessionController ?? new SessionController(undefined, {
+    sink: options.sink,
+    signal: options.signal,
+    execStream: options.execStream,
+  });
+  const sessionId = options.sessionId ?? controller.createSession(initialState.task_goal).id;
   let state = initialState;
   let next: Route = "claude_implement";
   while (next !== "__end__") {
     if (next === "claude_implement") {
       await ensureAgentReady("claude", options.sink, options.signal);
-      state = mergeAgentState(state, await claudeImplementNode(state, options));
+      state = await controller.runStep(sessionId, state, { agent: "claude", mode: "implement", role: "implementer" }, options);
       next = routeClaudeHandoff(state, options.sink);
     } else if (next === "pi_implement") {
       await ensureAgentReady("pi", options.sink, options.signal);
-      state = mergeAgentState(state, await piImplementNode(state, options));
+      state = await controller.runStep(sessionId, state, { agent: "pi", mode: "implement", role: "tester" }, options);
       next = routePiHandoff(state, options.sink);
     } else {
       await ensureAgentReady("codex", options.sink, options.signal);
-      state = mergeAgentState(state, await codexReviewNode(state, options));
+      state = await controller.runStep(sessionId, state, { agent: "codex", mode: "review", role: "reviewer" }, options);
       next = routeCodexHandoff(state, options.sink);
     }
   }
+  const outcome = state.codex_verdict === "approved" ? "Default workflow completed and Codex approved." : "Default workflow halted.";
+  controller.store.appendEvent(sessionId, state.codex_verdict === "approved"
+    ? relayEvent("session.completed", sessionId, { outcome })
+    : relayEvent("session.failed", sessionId, { outcome }));
   return state;
 }
 
@@ -176,8 +194,13 @@ export async function withOrchestratorSession<T>(
 }
 
 export async function main(taskGoal: string): Promise<void> {
-  await withOrchestratorSession(async () => {
-    await runWorkflow(initialAgentState(taskGoal));
+  await withOrchestratorSession(async (session) => {
+    const controller = new SessionController(undefined, { workspacePath: session.hostWorkspace });
+    const relaySession = controller.createSession(taskGoal);
+    await runWorkflow(initialAgentState(taskGoal), {
+      sessionController: controller,
+      sessionId: relaySession.id,
+    });
   });
 }
 
@@ -188,6 +211,37 @@ export function run(argv: string[] = process.argv.slice(2)): void {
       throw new Error("Usage: relay run-workflow <task>");
     }
     main(taskGoal).catch((error: unknown) => {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 1;
+    });
+    return;
+  }
+  if (argv[0] === "sessions") {
+    const sessions = new LocalSessionStore().listSessions();
+    for (const session of sessions) {
+      console.log(`${session.id}  ${session.status.padEnd(16)}  ${session.updatedAt}  ${session.taskGoal}`);
+    }
+    return;
+  }
+  if (argv[0] === "show") {
+    const sessionId = argv[1];
+    if (!sessionId) throw new Error("Usage: relay show <session-id>");
+    const session = new LocalSessionStore().getSession(sessionId);
+    console.log(`session     ${session.id}`);
+    console.log(`status      ${session.status}`);
+    console.log(`phase       ${session.phase}`);
+    console.log(`workspace   ${session.workspacePath}`);
+    console.log(`task        ${session.taskGoal}`);
+    console.log(`runs        ${session.agentRuns.length}`);
+    console.log(`artifacts   ${session.artifacts.length}`);
+    if (session.reviewVerdict) console.log(`review      ${session.reviewVerdict}`);
+    if (session.finalOutcome) console.log(`outcome     ${session.finalOutcome}`);
+    return;
+  }
+  if (argv[0] === "serve") {
+    const portIndex = argv.indexOf("--port");
+    const port = portIndex >= 0 ? Number(argv[portIndex + 1]) : 8787;
+    import("./server.js").then(({ serveRelay }) => serveRelay({ port })).catch((error: unknown) => {
       console.error(error instanceof Error ? error.message : String(error));
       process.exitCode = 1;
     });

@@ -3,8 +3,10 @@ OCI_DIR := .oci/relay-devbox-v1
 DOCKERFILE := dockerfile
 IMAGE_ID_FILE := $(OCI_DIR)/.docker-image-id
 DOCKERFILE_MTIME_FILE := $(OCI_DIR)/.dockerfile-mtime
+PORT ?= 8787
+WORKSPACE ?=
 
-.PHONY: devbox-image devbox-check devbox-oci build test run run-fresh stop
+.PHONY: devbox-image devbox-check devbox-oci build test run serve web run-fresh stop
 
 devbox-image:
 	docker build -t $(DEVBOX_IMAGE) -f $(DOCKERFILE) .
@@ -25,10 +27,15 @@ test:
 	npm test
 
 run:
-	npm run run
+	RELAY_WORKSPACE="$(WORKSPACE)" npm run run
+
+serve: build
+	node dist/src/index.js serve --port $(PORT)
+
+web: serve
 
 run-fresh: devbox-oci
-	npm run run
+	RELAY_WORKSPACE="$(WORKSPACE)" npm run run
 
 stop:
 	-pkill -f "relay|dist/src/index.js" 2>/dev/null

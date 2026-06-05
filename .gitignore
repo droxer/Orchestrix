@@ -25,6 +25,9 @@ htmlcov/
 # BoxLite OCI export (generated from local Docker image)
 .oci/
 
+# Relay durable local sessions
+.relay/
+
 # IDE & OS
 .idea/
 .vscode/

@@ -1,7 +1,10 @@
 import type { AgentOutputSink } from "./format.js";
+import type { SessionController } from "./controller.js";
+import type { AgentEventSink } from "./session.js";
 
 export type AgentName = "claude" | "pi" | "codex";
 export type CodexTaskMode = "implement" | "review";
+export type CodexReviewVerdict = "approved" | "rejected" | "failed";
 export type { AgentOutputSink };
 
 export const AGENT_USER = "agent";
@@ -17,13 +20,19 @@ export interface AgentState {
   claude_failures: number;
   pi_failures: number;
   codex_failures: number;
-  codex_verdict: string;
+  codex_verdict: CodexReviewVerdict | "";
   codex_feedback: string;
 }
 
 export interface AgentRunOptions {
   sink?: AgentOutputSink;
   signal?: AbortSignal;
+  execStream?: AgentExecutor;
+  eventSink?: AgentEventSink;
+  runId?: string;
+  agent?: AgentName;
+  sessionController?: SessionController;
+  sessionId?: string;
 }
 
 export interface StreamExecResult {
@@ -32,6 +41,18 @@ export interface StreamExecResult {
   stderr: string;
   error_message?: string;
 }
+
+export type AgentExecutor = (
+  cmd: string,
+  args?: string[],
+  options?: {
+    cwd?: string;
+    stdoutRenderer?: (chunk: string) => string;
+    stderrRenderer?: (chunk: string) => string;
+    sink?: AgentOutputSink;
+    signal?: AbortSignal;
+  },
+) => Promise<StreamExecResult>;
 
 export function initialAgentState(taskGoal: string): AgentState {
   return {

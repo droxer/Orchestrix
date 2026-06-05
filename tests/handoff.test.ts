@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import {
@@ -11,15 +14,18 @@ import {
   classifyCodexReview,
   ClaudeStreamRenderer,
   collectExecution,
+  codexReviewNode,
   codexImplementPrompt,
   codexReviewPrompt,
   CodexStreamRenderer,
   extractCodexFeedback,
   formatClaudeJsonLine,
   formatCodexJsonLine,
+  ensureLocalDevboxOci,
   guestAgentEnv,
   guestPiAuthJson,
   guestPiModelsJson,
+  hostWorkspacePath,
   JsonLineRenderer,
   piTaskPrompt,
   PlainTextStreamRenderer,
@@ -27,7 +33,7 @@ import {
   routeCodexHandoff,
   routePiHandoff,
   StderrLineRenderer,
-} from "../src/orchestrator.js";
+} from "../src/relay.js";
 
 function codexStdout(message: string): string {
   return JSON.stringify({
@@ -88,8 +94,25 @@ describe("Codex review parsing", () => {
     );
   });
 
-  it("routes plain completed Codex review to end", () => {
-    assert.equal(routeCodexHandoff(state({ codex_verdict: "completed" })), "__end__");
+  it("does not treat a missing review verdict as success", () => {
+    assert.equal(routeCodexHandoff(state({ codex_verdict: "failed", codex_failures: 1 })), "codex_review");
+  });
+
+  it("classifies Codex review node output before routing", async () => {
+    const stdout = `${codexStdout("Blocking issue found.\nRELAY_REVIEW_VERDICT: REJECTED")}\n`;
+    const patch = await codexReviewNode(state({ task_goal: "Fix auth" }), {
+      sink: () => undefined,
+      execStream: async (cmd, args) => {
+        assert.equal(cmd, "bash");
+        assert.match(args?.[1] ?? "", /RELAY_REVIEW_VERDICT/);
+        return { exit_code: 0, stdout, stderr: "" };
+      },
+    });
+
+    assert.equal(patch.codex_verdict, "rejected");
+    assert.equal(patch.codex_failures, 0);
+    assert.match(patch.codex_feedback ?? "", /Blocking issue found/);
+    assert.equal(routeCodexHandoff(state(patch)), "claude_implement");
   });
 });
 
@@ -139,15 +162,16 @@ describe("prompts", () => {
     assert.doesNotMatch(command, /RELAY_REVIEW_VERDICT/);
   });
 
-  it("Codex review prompt uses only the user task", () => {
+  it("Codex review prompt defines the review contract and verdict marker", () => {
     const prompt = codexReviewPrompt(state({ task_goal: "Review this branch exactly how I asked" }));
     const command = buildCodexReviewCommand(state({ task_goal: "Review this branch exactly how I asked" }));
 
-    assert.equal(prompt, "Review this branch exactly how I asked");
+    assert.match(prompt, /Review this branch exactly how I asked/);
+    assert.match(prompt, /blocking bugs/);
+    assert.match(prompt, /RELAY_REVIEW_VERDICT: APPROVED/);
+    assert.match(prompt, /RELAY_REVIEW_VERDICT: REJECTED/);
     assert.match(command, /Review this branch exactly how I asked/);
-    assert.doesNotMatch(command, /You are reviewing code/);
-    assert.doesNotMatch(command, /blocking bugs/);
-    assert.doesNotMatch(command, /RELAY_REVIEW_VERDICT/);
+    assert.match(command, /RELAY_REVIEW_VERDICT/);
   });
 });
 
@@ -245,6 +269,62 @@ describe("execution cancellation", () => {
 
     assert.equal(killed, true);
     assert.equal(result.error_message, "Execution cancelled.");
+  });
+});
+
+describe("devbox OCI preparation", () => {
+  it("builds and exports the devbox when the local Docker image is missing", () => {
+    const temp = mkdtempSync(join(tmpdir(), "relay-devbox-"));
+    const dockerfile = join(temp, "dockerfile");
+    const ociLayoutDir = join(temp, "oci");
+    const calls: string[] = [];
+    let imageExists = false;
+
+    writeFileSync(dockerfile, "FROM scratch\n");
+    const runCommand = ((command: string, args: string[]) => {
+      calls.push([command, ...args].join(" "));
+      if (command === "docker" && args[0] === "image" && args[1] === "inspect" && args.includes("--format")) {
+        return { status: imageExists ? 0 : 1, stdout: imageExists ? "sha256:test\n" : "", stderr: "" };
+      }
+      if (command === "docker" && args[0] === "image" && args[1] === "inspect") {
+        return { status: imageExists ? 0 : 1, stdout: "", stderr: "" };
+      }
+      if (command === "make" && args[0] === "devbox-oci") {
+        imageExists = true;
+        return { status: 0, stdout: "", stderr: "" };
+      }
+      if (command === "sh") {
+        writeFileSync(join(ociLayoutDir, "oci-layout"), "{}\n");
+        return { status: 0, stdout: "", stderr: "" };
+      }
+      return { status: 1, stdout: "", stderr: "unexpected command" };
+    }) as any;
+
+    assert.equal(ensureLocalDevboxOci(undefined, { dockerfile, ociLayoutDir, runCommand }), ociLayoutDir);
+    assert.equal(calls.includes("make devbox-oci"), true);
+    assert.equal(existsSync(join(ociLayoutDir, ".docker-image-id")), true);
+  });
+
+  it("reports a build failure when the missing Docker image cannot be created", () => {
+    const temp = mkdtempSync(join(tmpdir(), "relay-devbox-"));
+    const dockerfile = join(temp, "dockerfile");
+    const ociLayoutDir = join(temp, "oci");
+    writeFileSync(dockerfile, "FROM scratch\n");
+
+    const runCommand = ((command: string, args: string[]) => {
+      if (command === "docker" && args[0] === "image" && args[1] === "inspect") {
+        return { status: 1, stdout: "", stderr: "" };
+      }
+      if (command === "make" && args[0] === "devbox-oci") {
+        return { status: 2, stdout: "", stderr: "build failed" };
+      }
+      return { status: 1, stdout: "", stderr: "unexpected command" };
+    }) as any;
+
+    assert.throws(
+      () => ensureLocalDevboxOci(undefined, { dockerfile, ociLayoutDir, runCommand }),
+      /Failed to build local devbox image/,
+    );
   });
 });
 
@@ -378,5 +458,15 @@ describe("Pi provider config", () => {
         assert.ok(guestEnv.some(([key, value]) => key === "PI_API_KEY" && value === "openai-key"));
       },
     );
+  });
+
+  it("uses RELAY_WORKSPACE for the host workspace path", () => {
+    const temp = mkdtempSync(join(tmpdir(), "relay-workspace-"));
+    const explicit = mkdtempSync(join(tmpdir(), "relay-explicit-workspace-"));
+
+    withEnv({ RELAY_WORKSPACE: temp }, () => {
+      assert.equal(hostWorkspacePath(), temp);
+      assert.equal(hostWorkspacePath(explicit), explicit);
+    });
   });
 });

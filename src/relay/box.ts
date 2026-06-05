@@ -24,6 +24,13 @@ import type { AgentName, AgentOutputSink, StreamExecResult } from "./state.js";
 
 type BoxLiteModule = typeof import("@boxlite-ai/boxlite");
 type StreamRenderer = (chunk: string) => string;
+type CommandRunner = typeof spawnSync;
+
+export interface DevboxOciOptions {
+  dockerfile?: string;
+  ociLayoutDir?: string;
+  runCommand?: CommandRunner;
+}
 
 let sessionBox: any | null = null;
 
@@ -185,25 +192,37 @@ export async function collectExecution(
   }
 }
 
-export function dockerImageId(image: string): string | undefined {
-  const inspect = spawnSync("docker", ["image", "inspect", image, "--format", "{{.Id}}"], {
+export function dockerImageId(image: string, options: DevboxOciOptions = {}): string | undefined {
+  const runCommand = options.runCommand ?? spawnSync;
+  const inspect = runCommand("docker", ["image", "inspect", image, "--format", "{{.Id}}"], {
     encoding: "utf8",
   });
   if (inspect.status !== 0) return undefined;
   return inspect.stdout.trim() || undefined;
 }
 
-export function ensureLocalDevboxOci(sink?: AgentOutputSink): string {
-  const inspect = spawnSync("docker", ["image", "inspect", DEVBOX_IMAGE], { encoding: "utf8" });
+export function ensureLocalDevboxOci(sink?: AgentOutputSink, options: DevboxOciOptions = {}): string {
+  const runCommand = options.runCommand ?? spawnSync;
+  const dockerfile = options.dockerfile ?? DOCKERFILE;
+  const ociLayoutDir = options.ociLayoutDir ?? OCI_LAYOUT_DIR;
+  let inspect = runCommand("docker", ["image", "inspect", DEVBOX_IMAGE], { encoding: "utf8" });
   if (inspect.status !== 0) {
-    throw new Error(`Local image ${JSON.stringify(DEVBOX_IMAGE)} not found. Build it with: make devbox-image`);
+    emitOrPrint(sink, status("info", `Local image ${DEVBOX_IMAGE} not found; building and exporting the devbox.`));
+    const built = runCommand("make", ["devbox-oci"], { encoding: "utf8", stdio: "inherit" });
+    if (built.status !== 0) {
+      throw new Error(`Failed to build local devbox image. Run make devbox-image and retry.`);
+    }
+    inspect = runCommand("docker", ["image", "inspect", DEVBOX_IMAGE], { encoding: "utf8" });
+    if (inspect.status !== 0) {
+      throw new Error(`Local image ${JSON.stringify(DEVBOX_IMAGE)} was not created by make devbox-oci.`);
+    }
   }
 
-  const imageId = dockerImageId(DEVBOX_IMAGE);
-  const stampFile = resolve(OCI_LAYOUT_DIR, ".docker-image-id");
-  const dockerfileStamp = resolve(OCI_LAYOUT_DIR, ".dockerfile-mtime");
-  const ociLayout = resolve(OCI_LAYOUT_DIR, "oci-layout");
-  const dockerfileMtime = String(statSync(DOCKERFILE, { bigint: true }).mtimeNs);
+  const imageId = dockerImageId(DEVBOX_IMAGE, { runCommand });
+  const stampFile = resolve(ociLayoutDir, ".docker-image-id");
+  const dockerfileStamp = resolve(ociLayoutDir, ".dockerfile-mtime");
+  const ociLayout = resolve(ociLayoutDir, "oci-layout");
+  const dockerfileMtime = String(statSync(dockerfile, { bigint: true }).mtimeNs);
   if (
     existsSync(ociLayout) &&
     existsSync(stampFile) &&
@@ -212,7 +231,7 @@ export function ensureLocalDevboxOci(sink?: AgentOutputSink): string {
     readFileSync(stampFile, "utf8").trim() === imageId &&
     readFileSync(dockerfileStamp, "utf8").trim() === dockerfileMtime
   ) {
-    return OCI_LAYOUT_DIR;
+    return ociLayoutDir;
   }
 
   const previousImageId = existsSync(stampFile) ? readFileSync(stampFile, "utf8").trim() : "";
@@ -226,9 +245,9 @@ export function ensureLocalDevboxOci(sink?: AgentOutputSink): string {
     );
   }
 
-  mkdirSync(OCI_LAYOUT_DIR, { recursive: true });
-  emitOrPrint(sink, status("info", `Exporting ${DEVBOX_IMAGE} to ${OCI_LAYOUT_DIR}.`));
-  const exported = spawnSync("sh", ["-c", `docker save ${shellQuote(DEVBOX_IMAGE)} | tar -xf - -C ${shellQuote(OCI_LAYOUT_DIR)}`], {
+  mkdirSync(ociLayoutDir, { recursive: true });
+  emitOrPrint(sink, status("info", `Exporting ${DEVBOX_IMAGE} to ${ociLayoutDir}.`));
+  const exported = runCommand("sh", ["-c", `docker save ${shellQuote(DEVBOX_IMAGE)} | tar -xf - -C ${shellQuote(ociLayoutDir)}`], {
     encoding: "utf8",
   });
   if (exported.status !== 0) {
@@ -239,5 +258,5 @@ export function ensureLocalDevboxOci(sink?: AgentOutputSink): string {
     writeFileSync(stampFile, `${imageId}\n`);
     writeFileSync(dockerfileStamp, `${dockerfileMtime}\n`);
   }
-  return OCI_LAYOUT_DIR;
+  return ociLayoutDir;
 }

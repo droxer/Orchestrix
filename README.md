@@ -1,115 +1,152 @@
 # Relay: Human and AI Agent Collaboration Platform
 
-A lightweight, local-first collaboration platform where humans and AI agents like Claude Code, Pi, and Codex share context, tools, and a live workspace for complex software engineering tasks.
+Relay is a local-first collaboration control plane for small software teams working with autonomous coding agents. Humans, Claude Code, Pi, and Codex share one isolated BoxLite workspace, while Relay records each assignment as a durable session with structured events, artifacts, decisions, and review outcomes.
 
-Instead of managing context windows and parsing text, **Relay** uses a small TypeScript state machine and **BoxLite** to provide a persistent, hardware-isolated micro-VM. Humans assign work from the terminal, and agents collaborate by reading and writing to a shared file system in real time.
+The goal is not to hide the terminal. Relay keeps agent streams readable while turning the work into a traceable timeline that can be inspected later from the TUI, CLI commands, or the read-only HTTP/SSE API.
 
----
+## What Relay Provides
 
-## 🎯 Features
+- **Durable collaboration sessions:** every run writes `.relay/sessions/<session-id>/events.jsonl`, `snapshot.json`, and artifact files.
+- **Explicit human gates:** TUI assignments create a pending session first; `/approve`, `/reject`, `/cancel`, `/rerun`, and `/summary` record human decisions.
+- **Bring your own agents:** Relay orchestrates Claude Code, Pi, and Codex CLI agents through the existing local toolchain.
+- **Shared isolated workspace:** BoxLite mounts the host workspace at `/workspace` and aligns the guest `agent` UID/GID with the host owner.
+- **Structured agent roles:** agents can act as implementers, reviewers, testers, planners, or fixers; v1 maps Claude to implementation, Pi to testing/follow-up, and Codex to implementation or review.
+- **Readable streams plus artifacts:** Claude and Codex JSONL streams render as terminal text and are also captured as session events and command-log artifacts.
+- **Web-ready service boundary:** `relay serve` exposes read-only session, artifact, and SSE event endpoints without adding a database.
 
-*   **True "Bring Your Own Agent" (BYOA):** Orchestrates fully autonomous CLI agents like Anthropic's `@claude-code`, Pi, and Codex.
-*   **Shared Reality:** All agents operate inside a single, persistent BoxLite micro-VM. If Claude installs a package, Pi and Codex can immediately use it to run tests.
-*   **Zero-Sync Workspace:** Mounts your local project directory directly into the VM. The guest `agent` user is aligned to your host UID/GID so files created in the VM are owned by your macOS/Linux user and open normally in your IDE.
-*   **Deterministic Routing:** Uses explicit TypeScript routing based on rigid Unix exit codes (`0` for success, `1` for failure) to manage agent handoffs and self-correction loops.
-*   **Readable terminal streams:** Claude and Codex JSONL events are rendered as human-readable terminal output, and Pi uses streaming print mode when the installed CLI supports it.
+## Prerequisites
 
----
+1. Node.js 22.19+
+2. npm
+3. Docker, with the local daemon running
+4. Hardware virtualization for BoxLite
+5. API keys for the agents you plan to run
 
-## 📋 Prerequisites
-
-The host machine only runs the lightweight orchestration layer. The actual execution happens securely inside BoxLite.
-
-1.  **Node.js 22.19+**
-2.  **npm**
-3.  **Docker** (Ensure the Docker daemon is running locally to build the OCI image).
-4.  **Hardware Virtualization:** 
-    *   *macOS:* Apple Silicon (M1/M2/M3/M4) with macOS 12+.
-    *   *Linux:* x86_64 or ARM64 with KVM enabled.
-5.  **API Keys:** Anthropic (for Claude Code and Pi by default) and OpenAI/Codex (for Codex CLI).
-
----
-
-## 🚀 Quick Start
-
-### 1. Install Host Dependencies
-
-Clone the repo and install dependencies with npm:
+Set credentials in `.env`:
 
 ```bash
-git clone <repo-url>
-cd relay
+ANTHROPIC_API_KEY=...
+OPENAI_API_KEY=...
+OPENAI_BASE_URL=...     # optional compatible endpoint
+OPENAI_MODEL=...        # optional
+PI_API_KEY=...          # optional override
+PI_BASE_URL=...         # optional override
+PI_MODEL=...            # optional override
+```
+
+## Setup
+
+```bash
 npm install
 npm test
+make devbox-oci
 ```
 
-The host project is TypeScript:
-
-```text
-src/index.ts          CLI entrypoint
-src/orchestrator.ts   BoxLite lifecycle, agent commands, routing, renderers
-tests/handoff.test.ts Unit tests for routing, prompts, provider config, and stream rendering
-```
-
-### 2. Configure Environment
-
-Copy the example env file and add your API keys (and optional proxy/base URLs):
+You only need to rebuild/export the devbox image when `dockerfile` changes:
 
 ```bash
-cp .env.example .env
-# ANTHROPIC_API_KEY, ANTHROPIC_BASE_URL, ANTHROPIC_MODEL (optional)
-# OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL (optional)
-# PI_API_KEY, PI_BASE_URL, PI_MODEL, PI_PROVIDER, PI_API (optional Pi overrides)
+make run-fresh
 ```
 
-Pi infers a native provider for known endpoints: `api.minimaxi.com` uses
-`minimax-cn`, `api.minimax.io` uses `minimax`, and other `OPENAI_BASE_URL`
-values use Pi's built-in `openai` provider. The orchestrator writes
-`/home/agent/.pi/agent/auth.json` and, when a generic compatible endpoint needs
-one, `models.json` in the devbox before the agent runs. Set `PI_*` values only
-when Pi should use a different provider, key, endpoint, model, or API transport
-than Codex. For Anthropic-compatible endpoints, set `PI_PROVIDER=anthropic` and
-optionally `PI_API=anthropic-messages`.
-
-Pi CLI versions are not fully uniform. Relay checks `pi --help` at runtime:
-if `-P` / `--print-streaming` is available, it uses streaming print mode; if not,
-it falls back to `-p` so older devbox images still run.
-
-### 3. Build the local devbox image
-
-BoxLite has its own OCI image store (separate from Docker). Build the image with Docker, then export it for BoxLite:
-
-```bash
-make devbox-image   # docker build -t relay-devbox:v1
-make devbox-check   # verify node, Pi, Claude, and Codex CLIs inside the image
-make devbox-oci     # docker save -> .oci/relay-devbox-v1/
-```
-
-You only need to rebuild/export the devbox when the image changes. Normal code
-changes in `src/` or `tests/` do not require `make run-fresh`.
-
-### 4. Prepare Workspace
-
-The orchestrator mounts `~/projects/air-platform` into the devbox at `/workspace`. Create or clone the project you want agents to work on there:
-
-```bash
-mkdir -p ~/projects/air-platform
-```
-
-### 5. Run the Orchestrator
+Normal source changes only need:
 
 ```bash
 make run
-# or: npm run run
-
-# In the TUI, type the task and assign it explicitly:
-# @claude <your task>
-# @claude @pi @codex <your task>
-
-# Only after editing dockerfile or changing the devbox image:
-make run-fresh
-# or: make devbox-oci && make run
 ```
+
+To mount a specific host workspace into the Relay devbox:
+
+```bash
+make run WORKSPACE=/path/to/workspace
+```
+
+## Running Relay
+
+Start the TUI:
+
+```bash
+relay
+# or
+npm run run
+```
+
+Create a session by assigning agents:
+
+```text
+@claude fix auth middleware
+@claude @pi @codex add tests for upload routing
+@codex inspect the current diff
+```
+
+Relay creates a pending session. Use slash commands to control it:
+
+```text
+/approve
+/reject missing tests around timeout handling
+/cancel
+/rerun codex
+/sessions
+/open <session-id>
+/summary
+```
+
+The scripted workflow is still available and now creates a durable session:
+
+```bash
+relay run-workflow "fix auth middleware"
+```
+
+List and inspect sessions:
+
+```bash
+relay sessions
+relay show <session-id>
+```
+
+Start the local HTTP API server:
+
+```bash
+make serve
+# or choose a port:
+make serve PORT=9000
+```
+
+Relay no longer serves a browser UI. `http://127.0.0.1:8787` returns a JSON API index, and task/session management is available through the HTTP endpoints.
+
+The API reads only real Relay task and session files from `.relay/tasks` and `.relay/sessions`. It does not seed, mock, or display dummy work.
+
+Task-management state is file-backed. Agent CLI execution still runs through the Relay orchestrator/TUI path so BoxLite lifecycle, credentials, readiness checks, streaming, and cancellation stay in one place.
+
+The server exposes:
+
+```text
+GET /
+GET /tasks
+POST /tasks
+GET /tasks/:id
+PATCH /tasks/:id
+POST /tasks/:id/assign
+POST /tasks/:id/pickup
+GET /tasks/:id/events
+GET /sessions
+GET /sessions/:id
+GET /sessions/:id/events
+GET /sessions/:id/artifacts/:artifactId
+```
+
+## Data Layout
+
+Relay writes local generated state under `.relay/`:
+
+```text
+.relay/sessions/<session-id>/events.jsonl
+.relay/sessions/<session-id>/snapshot.json
+.relay/sessions/<session-id>/artifacts/<artifact-id>.txt
+.relay/tasks/<task-id>/events.jsonl
+.relay/tasks/<task-id>/snapshot.json
+```
+
+The event log is the source of truth. The snapshot is a materialized view for fast reads.
 
 ## Development
 
@@ -119,11 +156,15 @@ npm test
 make test
 ```
 
-The CLI output is intentionally formatted for terminal use:
+Important source areas:
 
-- Startup metadata is shown as aligned key/value rows.
-- Agent phases are shown as section headers with the prompt.
-- Claude `stream-json` and Codex `--json` events are rendered into readable text.
-- Raw JSONL should not be printed during normal runs.
+```text
+src/relay/session.ts      durable session event model and local store
+src/relay/task.ts         backlog/Kanban task event model and local store
+src/relay/controller.ts   session-aware orchestration controller
+src/relay/workflow.ts     BoxLite lifecycle and CLI commands
+src/tui.tsx               Ink TUI and human commands
+src/relay/server.ts       read-only HTTP/SSE API
+```
 
-Set `NO_COLOR=1` to disable ANSI colors.
+Keep the host orchestrator in TypeScript. Do not add Python host code.

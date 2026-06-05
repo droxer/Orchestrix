@@ -1,3 +1,5 @@
+import type { CodexReviewVerdict } from "./state.js";
+
 export function extractCodexFeedback(stdout: string): string {
   const messages: string[] = [];
   for (const line of stdout.split(/\r?\n/)) {
@@ -15,7 +17,7 @@ export function extractCodexFeedback(stdout: string): string {
   return messages.length > 0 ? messages.join("\n\n") : stdout.trim().slice(-4000);
 }
 
-export function classifyCodexReview(exitCode: number, feedback: string): "approved" | "rejected" | "failed" {
+export function classifyCodexReview(exitCode: number, feedback: string): CodexReviewVerdict {
   if (exitCode !== 0) return "failed";
   let verdict = "";
   for (const rawLine of feedback.split(/\r?\n/)) {

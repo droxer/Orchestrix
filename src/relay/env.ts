@@ -53,7 +53,8 @@ function expandUser(path: string): string {
 }
 
 export function hostWorkspacePath(raw?: string | null): string {
-  const path = resolve(expandUser(raw ?? DEFAULT_HOST_WORKSPACE));
+  const selected = raw?.trim() || process.env.RELAY_WORKSPACE?.trim() || DEFAULT_HOST_WORKSPACE;
+  const path = resolve(expandUser(selected));
   mkdirSync(path, { recursive: true });
   return path;
 }

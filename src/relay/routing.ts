@@ -37,8 +37,8 @@ export function routePiHandoff(state: AgentState, sink?: AgentOutputSink): Route
 
 export function routeCodexHandoff(state: AgentState, sink?: AgentOutputSink): Route {
   const verdict = state.codex_verdict || "failed";
-  if (verdict === "approved" || verdict === "completed") {
-    emitOrPrint(sink, status("ok", verdict === "approved" ? "Codex approved; workflow complete." : "Codex finished; workflow complete."));
+  if (verdict === "approved") {
+    emitOrPrint(sink, status("ok", "Codex approved; workflow complete."));
     return "__end__";
   }
   if (verdict === "rejected") {
@@ -46,7 +46,10 @@ export function routeCodexHandoff(state: AgentState, sink?: AgentOutputSink): Ro
     return "claude_implement";
   }
   if (state.codex_failures < MAX_CODEX_FAILURES) {
-    emitOrPrint(sink, status("warn", `Codex review failed with exit ${state.last_exit_code}; retry ${state.codex_failures}/${MAX_CODEX_FAILURES}.`));
+    const reason = state.last_exit_code === 0
+      ? "Codex review did not produce a valid verdict"
+      : `Codex review failed with exit ${state.last_exit_code}`;
+    emitOrPrint(sink, status("warn", `${reason}; retry ${state.codex_failures}/${MAX_CODEX_FAILURES}.`));
     return "codex_review";
   }
   emitOrPrint(sink, status("error", `Codex review failed ${MAX_CODEX_FAILURES} times; halting.`));

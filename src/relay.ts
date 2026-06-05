@@ -18,7 +18,7 @@ export {
   piSourceBaseUrl,
   requireOpenaiApiKey,
   requirePiConfig,
-} from "./orchestrator/env.js";
+} from "./relay/env.js";
 
 export {
   AGENT_USER,
@@ -30,12 +30,63 @@ export {
   mergeAgentState,
   nextFailureCount,
   type AgentName,
+  type AgentExecutor,
   type AgentOutputSink,
   type AgentRunOptions,
   type AgentState,
+  type CodexReviewVerdict,
   type CodexTaskMode,
   type StreamExecResult,
-} from "./orchestrator/state.js";
+} from "./relay/state.js";
+
+export {
+  LocalSessionStore,
+  DEFAULT_RELAY_DATA_DIR,
+  materializeEvents,
+  newRelayId,
+  nowIso,
+  relayEvent,
+  roleForAgent,
+  type AgentEventSink,
+  type AgentRole,
+  type AgentRun,
+  type HumanDecision,
+  type HumanDecisionKind,
+  type RelayArtifact,
+  type RelayArtifactKind,
+  type RelayEvent,
+  type RelaySession,
+  type SessionStatus,
+  type SessionStore,
+} from "./relay/session.js";
+
+export {
+  LocalTaskStore,
+  materializeTaskEvents,
+  relayTaskEvent,
+  taskPriority,
+  taskStatus,
+  type RelayTask,
+  type RelayTaskActivity,
+  type RelayTaskEvent,
+  type TaskPriority,
+  type TaskStatus,
+  type TaskStore,
+} from "./relay/task.js";
+
+export {
+  SessionController,
+  type SessionControllerOptions,
+  type WorkflowStep,
+} from "./relay/controller.js";
+
+export {
+  handleRelayApiRequest,
+  routeRequest,
+  serveRelay,
+  type RelayApiResponse,
+  type RelayServerOptions,
+} from "./relay/server.js";
 
 export {
   codexCliConfigOverrides,
@@ -47,9 +98,9 @@ export {
   guestPiModelsJson,
   runAsAgent,
   sessionGuestEnv,
-} from "./orchestrator/guest.js";
+} from "./relay/guest.js";
 
-export { shellCommand, shellQuote } from "./orchestrator/shell.js";
+export { shellCommand, shellQuote } from "./relay/shell.js";
 
 export {
   appendCodexFeedback,
@@ -57,7 +108,7 @@ export {
   codexImplementPrompt,
   codexReviewPrompt,
   piTaskPrompt,
-} from "./orchestrator/prompts.js";
+} from "./relay/prompts.js";
 
 export {
   buildClaudeImplementCommand,
@@ -65,18 +116,18 @@ export {
   buildCodexReviewCommand,
   buildPiImplementCommand,
   buildPiPreflightCommand,
-} from "./orchestrator/commands.js";
+} from "./relay/commands.js";
 
 export {
   classifyCodexReview,
   extractCodexFeedback,
-} from "./orchestrator/codex-review.js";
+} from "./relay/codex-review.js";
 
 export {
   routeClaudeHandoff,
   routeCodexHandoff,
   routePiHandoff,
-} from "./orchestrator/routing.js";
+} from "./relay/routing.js";
 
 export {
   ClaudeStreamRenderer,
@@ -86,7 +137,7 @@ export {
   StderrLineRenderer,
   formatClaudeJsonLine,
   formatCodexJsonLine,
-} from "./orchestrator/renderers.js";
+} from "./relay/renderers.js";
 
 export {
   dockerImageId,
@@ -97,14 +148,14 @@ export {
   activeBox,
   prepareGuestAgentAuth,
   prepareGuestWorkspace,
-} from "./orchestrator/box.js";
+} from "./relay/box.js";
 
 export {
   claudeImplementNode,
   codexImplementNode,
   codexReviewNode,
   piImplementNode,
-} from "./orchestrator/nodes.js";
+} from "./relay/nodes.js";
 
 export {
   main,
@@ -114,4 +165,4 @@ export {
   ensureAgentReady,
   withOrchestratorSession,
   type OrchestratorSession,
-} from "./orchestrator/workflow.js";
+} from "./relay/workflow.js";

@@ -1,0 +1,399 @@
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, appendFileSync } from "node:fs";
+import { basename, join, resolve } from "node:path";
+
+import { REPO_ROOT } from "./env.js";
+import type { AgentName, CodexReviewVerdict } from "./state.js";
+
+export type AgentRole = "implementer" | "reviewer" | "planner" | "tester" | "fixer";
+export type SessionStatus = "pending_approval" | "running" | "waiting_for_human" | "completed" | "failed" | "cancelled";
+export type RelayArtifactKind = "plan" | "diff" | "review" | "test_output" | "command_log" | "summary" | "agent_output";
+export type HumanDecisionKind = "approve" | "reject" | "cancel" | "rerun" | "handoff" | "mark_done";
+
+export interface AgentRun {
+  id: string;
+  agent: AgentName;
+  role: AgentRole;
+  mode: "implement" | "review";
+  status: "running" | "completed" | "failed" | "cancelled";
+  startedAt: string;
+  completedAt?: string;
+  exitCode?: number;
+  artifactIds: string[];
+}
+
+export interface RelayArtifact {
+  id: string;
+  kind: RelayArtifactKind;
+  title: string;
+  path: string;
+  createdAt: string;
+  agentRunId?: string;
+  bytes?: number;
+}
+
+export interface HumanDecision {
+  id: string;
+  kind: HumanDecisionKind;
+  createdAt: string;
+  note?: string;
+  targetAgent?: AgentName;
+}
+
+export interface RelaySession {
+  id: string;
+  workspacePath: string;
+  taskGoal: string;
+  participants: string[];
+  status: SessionStatus;
+  phase: string;
+  createdAt: string;
+  updatedAt: string;
+  currentAgent?: AgentName;
+  pendingDecision?: "start" | "finalize" | "feedback";
+  agentRuns: AgentRun[];
+  artifacts: RelayArtifact[];
+  decisions: HumanDecision[];
+  events: RelayEvent[];
+  finalOutcome?: string;
+  reviewVerdict?: CodexReviewVerdict;
+}
+
+export type RelayEvent =
+  | {
+      id: string;
+      type: "session.created";
+      sessionId: string;
+      timestamp: string;
+      workspacePath: string;
+      taskGoal: string;
+      participants: string[];
+    }
+  | {
+      id: string;
+      type: "session.status";
+      sessionId: string;
+      timestamp: string;
+      status: SessionStatus;
+      phase: string;
+      pendingDecision?: RelaySession["pendingDecision"];
+    }
+  | {
+      id: string;
+      type: "agent.started";
+      sessionId: string;
+      timestamp: string;
+      runId: string;
+      agent: AgentName;
+      role: AgentRole;
+      mode: "implement" | "review";
+    }
+  | {
+      id: string;
+      type: "agent.output";
+      sessionId: string;
+      timestamp: string;
+      runId: string;
+      agent: AgentName;
+      stream: "stdout" | "stderr";
+      text: string;
+    }
+  | {
+      id: string;
+      type: "artifact.created";
+      sessionId: string;
+      timestamp: string;
+      artifact: RelayArtifact;
+    }
+  | {
+      id: string;
+      type: "human.decision";
+      sessionId: string;
+      timestamp: string;
+      decision: HumanDecision;
+    }
+  | {
+      id: string;
+      type: "agent.completed";
+      sessionId: string;
+      timestamp: string;
+      runId: string;
+      agent: AgentName;
+      status: AgentRun["status"];
+      exitCode: number;
+    }
+  | {
+      id: string;
+      type: "review.verdict";
+      sessionId: string;
+      timestamp: string;
+      runId: string;
+      verdict: CodexReviewVerdict;
+      feedback: string;
+    }
+  | {
+      id: string;
+      type: "session.completed";
+      sessionId: string;
+      timestamp: string;
+      outcome: string;
+    }
+  | {
+      id: string;
+      type: "session.failed";
+      sessionId: string;
+      timestamp: string;
+      outcome: string;
+    };
+
+export interface SessionStore {
+  createSession(input: {
+    workspacePath: string;
+    taskGoal: string;
+    participants?: string[];
+    status?: SessionStatus;
+    pendingDecision?: RelaySession["pendingDecision"];
+  }): RelaySession;
+  appendEvent(sessionId: string, event: RelayEvent): RelaySession;
+  getSession(sessionId: string): RelaySession;
+  listSessions(): RelaySession[];
+  writeArtifact(sessionId: string, input: {
+    kind: RelayArtifactKind;
+    title: string;
+    body: string;
+    extension?: string;
+    agentRunId?: string;
+  }): RelayArtifact;
+  artifactPath(sessionId: string, artifactId: string): string;
+  readArtifact(sessionId: string, artifactId: string): string;
+}
+
+export interface AgentEventSink {
+  agentOutput(runId: string, agent: AgentName, stream: "stdout" | "stderr", text: string): void;
+}
+
+export const DEFAULT_RELAY_DATA_DIR = resolve(REPO_ROOT, ".relay");
+
+export function nowIso(): string {
+  return new Date().toISOString();
+}
+
+export function newRelayId(prefix: string): string {
+  const random = Math.random().toString(36).slice(2, 8);
+  return `${prefix}_${Date.now().toString(36)}_${random}`;
+}
+
+export function roleForAgent(agent: AgentName, mode: "implement" | "review" = "implement"): AgentRole {
+  if (mode === "review") return "reviewer";
+  if (agent === "codex") return "implementer";
+  if (agent === "pi") return "tester";
+  return "implementer";
+}
+
+export class LocalSessionStore implements SessionStore {
+  private readonly sessionsDir: string;
+
+  constructor(private readonly rootDir = DEFAULT_RELAY_DATA_DIR) {
+    this.sessionsDir = join(this.rootDir, "sessions");
+    mkdirSync(this.sessionsDir, { recursive: true });
+  }
+
+  createSession(input: {
+    workspacePath: string;
+    taskGoal: string;
+    participants?: string[];
+    status?: SessionStatus;
+    pendingDecision?: RelaySession["pendingDecision"];
+  }): RelaySession {
+    const sessionId = newRelayId("ses");
+    const dir = this.sessionDir(sessionId);
+    mkdirSync(join(dir, "artifacts"), { recursive: true });
+    const event = relayEvent("session.created", sessionId, {
+      workspacePath: input.workspacePath,
+      taskGoal: input.taskGoal,
+      participants: input.participants ?? ["human"],
+    });
+    const events: RelayEvent[] = [event];
+    if (input.status || input.pendingDecision) {
+      events.push(relayEvent("session.status", sessionId, {
+        status: input.status ?? "running",
+        phase: input.pendingDecision ? `waiting:${input.pendingDecision}` : "created",
+        pendingDecision: input.pendingDecision,
+      }));
+    }
+    const session = materializeEvents(events);
+    writeFileSync(this.eventsPath(sessionId), events.map((item) => JSON.stringify(item)).join("\n") + "\n");
+    writeFileSync(this.snapshotPath(sessionId), `${JSON.stringify(session, null, 2)}\n`);
+    return session;
+  }
+
+  appendEvent(sessionId: string, event: RelayEvent): RelaySession {
+    mkdirSync(this.sessionDir(sessionId), { recursive: true });
+    appendFileSync(this.eventsPath(sessionId), `${JSON.stringify(event)}\n`);
+    const session = materializeEvents(this.readEvents(sessionId));
+    writeFileSync(this.snapshotPath(sessionId), `${JSON.stringify(session, null, 2)}\n`);
+    return session;
+  }
+
+  getSession(sessionId: string): RelaySession {
+    const snapshot = this.snapshotPath(sessionId);
+    if (existsSync(snapshot)) {
+      return JSON.parse(readFileSync(snapshot, "utf8")) as RelaySession;
+    }
+    return materializeEvents(this.readEvents(sessionId));
+  }
+
+  listSessions(): RelaySession[] {
+    if (!existsSync(this.sessionsDir)) return [];
+    return readdirSync(this.sessionsDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => this.getSession(entry.name))
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
+
+  writeArtifact(sessionId: string, input: {
+    kind: RelayArtifactKind;
+    title: string;
+    body: string;
+    extension?: string;
+    agentRunId?: string;
+  }): RelayArtifact {
+    const artifactId = newRelayId("art");
+    const extension = input.extension ?? "txt";
+    const artifactDir = join(this.sessionDir(sessionId), "artifacts");
+    mkdirSync(artifactDir, { recursive: true });
+    const path = join(artifactDir, `${artifactId}.${extension}`);
+    writeFileSync(path, input.body);
+    return {
+      id: artifactId,
+      kind: input.kind,
+      title: input.title,
+      path,
+      createdAt: nowIso(),
+      agentRunId: input.agentRunId,
+      bytes: Buffer.byteLength(input.body),
+    };
+  }
+
+  artifactPath(sessionId: string, artifactId: string): string {
+    const artifact = this.getSession(sessionId).artifacts.find((item) => item.id === artifactId);
+    if (!artifact) throw new Error(`Unknown artifact ${artifactId} in session ${sessionId}.`);
+    return artifact.path;
+  }
+
+  readArtifact(sessionId: string, artifactId: string): string {
+    return readFileSync(this.artifactPath(sessionId, artifactId), "utf8");
+  }
+
+  private readEvents(sessionId: string): RelayEvent[] {
+    const path = this.eventsPath(sessionId);
+    if (!existsSync(path)) throw new Error(`Unknown Relay session ${sessionId}.`);
+    return readFileSync(path, "utf8")
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as RelayEvent);
+  }
+
+  private sessionDir(sessionId: string): string {
+    return join(this.sessionsDir, basename(sessionId));
+  }
+
+  private eventsPath(sessionId: string): string {
+    return join(this.sessionDir(sessionId), "events.jsonl");
+  }
+
+  private snapshotPath(sessionId: string): string {
+    return join(this.sessionDir(sessionId), "snapshot.json");
+  }
+}
+
+export function relayEvent<T extends RelayEvent["type"]>(
+  type: T,
+  sessionId: string,
+  payload: Omit<Extract<RelayEvent, { type: T }>, "id" | "type" | "sessionId" | "timestamp">,
+): Extract<RelayEvent, { type: T }> {
+  return {
+    id: newRelayId("evt"),
+    type,
+    sessionId,
+    timestamp: nowIso(),
+    ...payload,
+  } as Extract<RelayEvent, { type: T }>;
+}
+
+export function materializeEvents(events: RelayEvent[]): RelaySession {
+  const created = events.find((event): event is Extract<RelayEvent, { type: "session.created" }> => event.type === "session.created");
+  if (!created) throw new Error("Relay session event log is missing session.created.");
+  const session: RelaySession = {
+    id: created.sessionId,
+    workspacePath: created.workspacePath,
+    taskGoal: created.taskGoal,
+    participants: created.participants,
+    status: "running",
+    phase: "created",
+    createdAt: created.timestamp,
+    updatedAt: created.timestamp,
+    agentRuns: [],
+    artifacts: [],
+    decisions: [],
+    events: [],
+  };
+
+  for (const event of events) {
+    session.events.push(event);
+    session.updatedAt = event.timestamp;
+    if (event.type === "session.status") {
+      session.status = event.status;
+      session.phase = event.phase;
+      session.pendingDecision = event.pendingDecision;
+      if (!event.pendingDecision) delete session.pendingDecision;
+    } else if (event.type === "agent.started") {
+      session.status = "running";
+      session.phase = `${event.agent}:${event.mode}`;
+      session.currentAgent = event.agent;
+      session.agentRuns.push({
+        id: event.runId,
+        agent: event.agent,
+        role: event.role,
+        mode: event.mode,
+        status: "running",
+        startedAt: event.timestamp,
+        artifactIds: [],
+      });
+    } else if (event.type === "agent.completed") {
+      const run = session.agentRuns.find((item) => item.id === event.runId);
+      if (run) {
+        run.status = event.status;
+        run.completedAt = event.timestamp;
+        run.exitCode = event.exitCode;
+      }
+      session.currentAgent = undefined;
+      session.phase = event.status === "completed" ? "agent_completed" : "agent_failed";
+    } else if (event.type === "artifact.created") {
+      session.artifacts.push(event.artifact);
+      if (event.artifact.agentRunId) {
+        const run = session.agentRuns.find((item) => item.id === event.artifact.agentRunId);
+        run?.artifactIds.push(event.artifact.id);
+      }
+    } else if (event.type === "human.decision") {
+      session.decisions.push(event.decision);
+      if (event.decision.kind === "cancel") {
+        session.status = "cancelled";
+        session.phase = "cancelled";
+      }
+    } else if (event.type === "review.verdict") {
+      session.reviewVerdict = event.verdict;
+      session.phase = `review:${event.verdict}`;
+    } else if (event.type === "session.completed") {
+      session.status = "completed";
+      session.phase = "completed";
+      session.finalOutcome = event.outcome;
+      session.currentAgent = undefined;
+    } else if (event.type === "session.failed") {
+      session.status = "failed";
+      session.phase = "failed";
+      session.finalOutcome = event.outcome;
+      session.currentAgent = undefined;
+    }
+  }
+  return session;
+}

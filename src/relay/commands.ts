@@ -10,14 +10,16 @@ import { escapeRegExp, shellCommand, shellQuote } from "./shell.js";
 import { GUEST_WORKSPACE, type AgentState } from "./state.js";
 
 export function buildCodexReviewCommand(state: AgentState): string {
-  return buildCodexCommand(codexReviewPrompt(state));
+  const argv = [...codexBaseArgv(), codexReviewPrompt(state)];
+  return runAsAgent(shellCommand(argv));
 }
 
 export function buildCodexImplementCommand(state: AgentState): string {
-  return buildCodexCommand(codexImplementPrompt(state));
+  const argv = [...codexBaseArgv(), codexImplementPrompt(state)];
+  return runAsAgent(shellCommand(argv));
 }
 
-function buildCodexCommand(prompt: string): string {
+function codexBaseArgv(): string[] {
   const argv = [
     "stdbuf",
     "-oL",
@@ -32,8 +34,7 @@ function buildCodexCommand(prompt: string): string {
     "--dangerously-bypass-approvals-and-sandbox",
   ];
   if (process.env.OPENAI_MODEL) argv.push("-m", process.env.OPENAI_MODEL);
-  argv.push(prompt);
-  return runAsAgent(shellCommand(argv));
+  return argv;
 }
 
 export function buildClaudeImplementCommand(state: AgentState): string {

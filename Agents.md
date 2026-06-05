@@ -5,7 +5,7 @@ This repository is a TypeScript/Node.js CLI. Do not add Python host code back to
 ## Project Shape
 
 - Runtime entrypoint: `src/index.ts`
-- Orchestrator implementation: `src/orchestrator.ts`
+- Relay implementation: `src/relay.ts`
 - Tests: `tests/handoff.test.ts`
 - Package manager: npm
 - Local devbox image: `dockerfile`

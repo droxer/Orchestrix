@@ -1,3 +1,3 @@
-import { run } from "./orchestrator.js";
+import { run } from "./relay.js";
 
 run();
