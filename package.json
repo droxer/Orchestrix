@@ -1,10 +1,10 @@
 {
-  "name": "orchestrix",
+  "name": "relay",
   "version": "0.1.0",
-  "description": "Local-first multi-agent orchestration with BoxLite",
+  "description": "Human and AI agent collaboration with a shared local workspace",
   "type": "module",
   "bin": {
-    "orchestrix": "./dist/src/index.js"
+    "relay": "./dist/src/index.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

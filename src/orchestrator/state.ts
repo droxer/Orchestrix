@@ -23,6 +23,7 @@ export interface AgentState {
 
 export interface AgentRunOptions {
   sink?: AgentOutputSink;
+  signal?: AbortSignal;
 }
 
 export interface StreamExecResult {

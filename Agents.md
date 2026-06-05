@@ -1,4 +1,4 @@
-# Orchestrix Agent Guide
+# Relay Agent Guide
 
 This repository is a TypeScript/Node.js CLI. Do not add Python host code back to the project.
 

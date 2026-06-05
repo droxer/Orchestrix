@@ -5,8 +5,8 @@ import { fileURLToPath } from "node:url";
 
 const currentFile = fileURLToPath(import.meta.url);
 export const REPO_ROOT = resolve(dirname(currentFile), "../../..");
-export const DEVBOX_IMAGE = "orchestrix-devbox:v1";
-export const OCI_LAYOUT_DIR = resolve(REPO_ROOT, ".oci/orchestrix-devbox-v1");
+export const DEVBOX_IMAGE = "relay-devbox:v1";
+export const OCI_LAYOUT_DIR = resolve(REPO_ROOT, ".oci/relay-devbox-v1");
 export const DOCKERFILE = resolve(REPO_ROOT, "dockerfile");
 
 export const ANTHROPIC_ENV_KEYS = [

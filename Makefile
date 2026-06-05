@@ -1,5 +1,5 @@
-DEVBOX_IMAGE := orchestrix-devbox:v1
-OCI_DIR := .oci/orchestrix-devbox-v1
+DEVBOX_IMAGE := relay-devbox:v1
+OCI_DIR := .oci/relay-devbox-v1
 DOCKERFILE := dockerfile
 IMAGE_ID_FILE := $(OCI_DIR)/.docker-image-id
 DOCKERFILE_MTIME_FILE := $(OCI_DIR)/.dockerfile-mtime
@@ -31,7 +31,7 @@ run-fresh: devbox-oci
 	npm run run
 
 stop:
-	-pkill -f "orchestrix|dist/src/index.js" 2>/dev/null
+	-pkill -f "relay|dist/src/index.js" 2>/dev/null
 	-pkill -f "boxlite-shim" 2>/dev/null
 	-rm -f $(HOME)/.boxlite/.lock
 	@echo "Stopped orchestrator and BoxLite processes."

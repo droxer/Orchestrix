@@ -5,15 +5,7 @@ export function appendCodexFeedback(prompt: string, state: AgentState): string {
 }
 
 export function codexReviewPrompt(state: AgentState): string {
-  return (
-    "You are reviewing code in /workspace. " +
-    `User task: ${state.task_goal}. ` +
-    "Read relevant files, check for blocking bugs or regressions, and report only blocking issues. " +
-    "If there are no blocking issues, reply with a brief approval. " +
-    "End your response with exactly one verdict line: " +
-    "ORCHESTRIX_REVIEW_VERDICT: APPROVED when there are no blocking issues, " +
-    "or ORCHESTRIX_REVIEW_VERDICT: REJECTED when blocking issues remain."
-  );
+  return state.task_goal;
 }
 
 export function codexImplementPrompt(state: AgentState): string {

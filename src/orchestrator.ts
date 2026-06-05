@@ -93,6 +93,8 @@ export {
   ensureLocalDevboxOci,
   ensureSingleOrchestrator,
   execStream,
+  collectExecution,
+  activeBox,
   prepareGuestAgentAuth,
   prepareGuestWorkspace,
 } from "./orchestrator/box.js";
@@ -109,6 +111,7 @@ export {
   run,
   runAgentTask,
   runWorkflow,
+  ensureAgentReady,
   withOrchestratorSession,
   type OrchestratorSession,
 } from "./orchestrator/workflow.js";

@@ -20,7 +20,7 @@ export function classifyCodexReview(exitCode: number, feedback: string): "approv
   let verdict = "";
   for (const rawLine of feedback.split(/\r?\n/)) {
     const line = rawLine.trim();
-    if (line.startsWith("ORCHESTRIX_REVIEW_VERDICT:")) {
+    if (line.startsWith("RELAY_REVIEW_VERDICT:")) {
       verdict = line.split(":", 2)[1].trim().toUpperCase();
     }
   }

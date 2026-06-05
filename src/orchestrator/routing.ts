@@ -37,8 +37,8 @@ export function routePiHandoff(state: AgentState, sink?: AgentOutputSink): Route
 
 export function routeCodexHandoff(state: AgentState, sink?: AgentOutputSink): Route {
   const verdict = state.codex_verdict || "failed";
-  if (verdict === "approved") {
-    emitOrPrint(sink, status("ok", "Codex approved; workflow complete."));
+  if (verdict === "approved" || verdict === "completed") {
+    emitOrPrint(sink, status("ok", verdict === "approved" ? "Codex approved; workflow complete." : "Codex finished; workflow complete."));
     return "__end__";
   }
   if (verdict === "rejected") {

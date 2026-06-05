@@ -10,6 +10,7 @@ import {
   GUEST_WORKSPACE,
   codexImplementNode,
   codexReviewNode,
+  ensureAgentReady,
   initialAgentState,
   mergeAgentState,
   piImplementNode,
@@ -75,8 +76,12 @@ export async function runAssignments(request: RunRequest): Promise<void> {
     }
     const mode = assignment.agent === "codex" ? assignment.codexMode ?? "implement" : "implement";
     request.onAgentStart?.(assignment);
-    request.log(`\nQueued ${assignment.agent}${assignment.agent === "codex" ? `:${mode}` : ""} for: ${request.task}\n`);
-    state = await runAssignedAgent(state, assignment.agent, mode, request.log);
+    await ensureAgentReady(assignment.agent, request.log, request.signal);
+    state = await runAssignedAgent(state, assignment.agent, mode, request.log, request.signal);
+    if (request.signal?.aborted) {
+      request.log("\nCancelled current agent.\n");
+      return;
+    }
   }
 }
 
@@ -85,23 +90,27 @@ async function runAssignedAgent(
   agent: AgentName,
   mode: CodexTaskMode,
   sink: AgentOutputSink,
+  signal?: AbortSignal,
 ): Promise<AgentState> {
   if (agent === "claude") {
-    return mergeAgentState(state, await claudeImplementNode(state, { sink }));
+    return mergeAgentState(state, await claudeImplementNode(state, { sink, signal }));
   }
   if (agent === "pi") {
-    return mergeAgentState(state, await piImplementNode(state, { sink }));
+    return mergeAgentState(state, await piImplementNode(state, { sink, signal }));
   }
   if (mode === "review") {
-    return mergeAgentState(state, await codexReviewNode(state, { sink }));
+    return mergeAgentState(state, await codexReviewNode(state, { sink, signal }));
   }
-  return mergeAgentState(state, await codexImplementNode(state, { sink }));
+  return mergeAgentState(state, await codexImplementNode(state, { sink, signal }));
 }
 
-export interface OrchestrixTuiProps {
+export interface RelayTuiProps {
   session?: OrchestratorSession;
   onExit?: () => void;
   runner?: AssignmentRunner;
+  ready?: boolean;
+  disabledMessage?: string;
+  bootLogLines?: string[];
 }
 
 type PendingCodexChoice = {
@@ -123,7 +132,14 @@ function pushLines(existing: string[], text: string): string[] {
   return merged.length > MAX_LOG_LINES ? merged.slice(merged.length - MAX_LOG_LINES) : merged;
 }
 
-export function OrchestrixTui({ session, onExit, runner = runAssignments }: OrchestrixTuiProps): React.ReactElement {
+export function RelayTui({
+  session,
+  onExit,
+  runner = runAssignments,
+  ready = true,
+  disabledMessage = "Starting Relay...",
+  bootLogLines = [],
+}: RelayTuiProps): React.ReactElement {
   const { exit } = useApp();
   const [input, setInput] = useState("");
   const [logLines, setLogLines] = useState<string[]>([
@@ -143,8 +159,8 @@ export function OrchestrixTui({ session, onExit, runner = runAssignments }: Orch
     abortRef.current?.abort();
   }, []);
 
-  const visibleLogs = useMemo(() => logLines.slice(-VISIBLE_LOG_LINES), [logLines]);
-  const queueLabel = isRunning ? "running" : pendingCodex ? "awaiting Codex mode" : "ready";
+  const visibleLogs = useMemo(() => [...bootLogLines, ...logLines].slice(-VISIBLE_LOG_LINES), [bootLogLines, logLines]);
+  const queueLabel = !ready ? "booting" : isRunning ? "running" : pendingCodex ? "awaiting Codex mode" : "ready";
   const workspace = session?.hostWorkspace ?? "(test workspace)";
   const inputWidth = Math.max(20, (process.stdout.columns ?? 80) - 6);
   const visibleInput = input.length <= inputWidth ? input : `…${input.slice(input.length - inputWidth + 1)}`;
@@ -201,7 +217,7 @@ export function OrchestrixTui({ session, onExit, runner = runAssignments }: Orch
         const controller = abortRef.current;
         if (controller && !controller.signal.aborted) {
           controller.abort();
-          appendLog("\nCancellation requested; will stop after the current agent.\n");
+          appendLog("\nCancellation requested; stopping current agent.\n");
           setMessage("Cancelling…");
           return;
         }
@@ -255,6 +271,10 @@ export function OrchestrixTui({ session, onExit, runner = runAssignments }: Orch
     }
     if (isRunning) return;
     if (key.return) {
+      if (!ready) {
+        setMessage(disabledMessage);
+        return;
+      }
       const parsed = parseAssignedTask(input);
       const error = validateParsedTask(parsed);
       if (error) {
@@ -270,7 +290,7 @@ export function OrchestrixTui({ session, onExit, runner = runAssignments }: Orch
       }
       return;
     }
-    if (key.backspace) {
+    if (key.backspace || key.delete) {
       setInput((value) => value.slice(0, -1));
       if (message) setMessage("");
       return;
@@ -283,11 +303,11 @@ export function OrchestrixTui({ session, onExit, runner = runAssignments }: Orch
 
   return (
     <Box flexDirection="column" height="100%" paddingX={1}>
-      <Box borderStyle="round" borderColor="cyan" paddingX={1} flexDirection="column">
-        <Text bold>Orchestrix</Text>
-        <Text>workspace {workspace}</Text>
-        <Text>mount {GUEST_WORKSPACE}</Text>
-        <Text>agent {currentAgent} | queue {queueLabel}</Text>
+      <Box flexDirection="column">
+        <Text color="cyan" bold>== Relay ======================================================</Text>
+        <Text><Text color="cyan" bold>INFO</Text> workspace {workspace}</Text>
+        <Text><Text color="cyan" bold>INFO</Text> mount {GUEST_WORKSPACE}</Text>
+        <Text><Text color={isRunning ? "yellow" : "green"} bold>{isRunning ? "RUN" : ready ? "OK" : "INFO"}</Text> agent {currentAgent} | queue {queueLabel}</Text>
       </Box>
       <Box marginTop={1} flexDirection="column" flexGrow={1}>
         {visibleLogs.map((line, index) => (
@@ -303,8 +323,8 @@ export function OrchestrixTui({ session, onExit, runner = runAssignments }: Orch
           </Text>
         </Box>
       ) : (
-        <Box borderStyle="single" borderColor={message ? "yellow" : "green"} paddingX={1}>
-          <Text>{isRunning ? "Running… (Esc to cancel)" : `> ${visibleInput}`}</Text>
+        <Box borderStyle="single" borderColor={!ready || message ? "yellow" : "green"} paddingX={1}>
+          <Text>{isRunning ? "Running... (Esc to cancel)" : ready ? `> ${visibleInput}` : input ? `${disabledMessage}  > ${visibleInput}` : disabledMessage}</Text>
         </Box>
       )}
       {message ? <Text color="yellow">{message}</Text> : null}
@@ -317,24 +337,70 @@ function formatAssignmentLabel(assignment: ParsedAssignment): string {
 }
 
 export async function runInteractiveTui(): Promise<void> {
-  await withOrchestratorSession(async (session) => {
-    await new Promise<void>((resolve) => {
-      let settled = false;
-      const finish = (): void => {
-        if (settled) return;
-        settled = true;
-        try {
-          instance.unmount();
-        } catch {
-          // already unmounted
-        }
-        resolve();
-      };
-      const instance = render(<OrchestrixTui session={session} onExit={finish} />, {
-        alternateScreen: true,
-        exitOnCtrlC: true,
-      });
-      instance.waitUntilExit().then(finish, finish);
+  await new Promise<void>((resolve) => {
+    let settled = false;
+    const finish = (): void => {
+      if (settled) return;
+      settled = true;
+      try {
+        instance.unmount();
+      } catch {
+        // already unmounted
+      }
+      resolve();
+    };
+    const instance = render(<RelayTuiHost onExit={finish} />, {
+      alternateScreen: true,
+      exitOnCtrlC: true,
     });
+    instance.waitUntilExit().then(finish, finish);
   });
+}
+
+function RelayTuiHost({ onExit }: { onExit: () => void }): React.ReactElement {
+  const [session, setSession] = useState<OrchestratorSession | undefined>();
+  const [bootError, setBootError] = useState("");
+  const [bootLogLines, setBootLogLines] = useState<string[]>([]);
+  const releaseSessionRef = useRef<(() => void) | null>(null);
+  const mountedRef = useRef(true);
+
+  const appendBootLog = (text: string): void => {
+    if (!mountedRef.current) return;
+    setBootLogLines((lines) => pushLines(lines, text));
+  };
+
+  useEffect(() => {
+    void withOrchestratorSession(async (readySession) => {
+      if (!mountedRef.current) return;
+      setSession(readySession);
+      appendBootLog("\nOK  VM ready. Assign a task with @claude, @pi, or @codex.\n");
+      await new Promise<void>((resolve) => {
+        releaseSessionRef.current = resolve;
+      });
+    }, appendBootLog).catch((error: unknown) => {
+      if (!mountedRef.current) return;
+      const detail = error instanceof Error ? error.message : String(error);
+      setBootError(detail);
+      appendBootLog(`\nERR  ${detail}\n`);
+    });
+    return () => {
+      mountedRef.current = false;
+      releaseSessionRef.current?.();
+    };
+  }, []);
+
+  const ready = Boolean(session) && !bootError;
+  const disabledMessage = bootError ? "Startup failed. Press Esc to exit." : "Starting Relay...";
+  return (
+    <RelayTui
+      session={session}
+      ready={ready}
+      disabledMessage={disabledMessage}
+      bootLogLines={bootLogLines}
+      onExit={() => {
+        releaseSessionRef.current?.();
+        onExit();
+      }}
+    />
+  );
 }

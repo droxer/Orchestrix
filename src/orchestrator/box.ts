@@ -9,7 +9,7 @@ import {
   requireOpenaiApiKey,
   requirePiConfig,
 } from "./env.js";
-import { status } from "./format.js";
+import { emitOrPrint, status } from "./format.js";
 import {
   GUEST_AGENT_SYNC_SCRIPT,
   encodeBase64,
@@ -20,7 +20,7 @@ import {
 } from "./guest.js";
 import { shellQuote } from "./shell.js";
 import { hostWorkspaceOwner } from "./env.js";
-import type { AgentOutputSink, StreamExecResult } from "./state.js";
+import type { AgentName, AgentOutputSink, StreamExecResult } from "./state.js";
 
 type BoxLiteModule = typeof import("@boxlite-ai/boxlite");
 type StreamRenderer = (chunk: string) => string;
@@ -38,7 +38,7 @@ export async function stopSessionBox(): Promise<void> {
 
 export function activeBox(): any {
   if (!sessionBox) {
-    throw new Error("BoxLite sandbox is not running. Stop any other Orchestrix process and run again.");
+    throw new Error("BoxLite sandbox is not running. Stop any other Relay process and run again.");
   }
   return sessionBox;
 }
@@ -49,7 +49,7 @@ export async function importBoxLite(): Promise<BoxLiteModule> {
 
 export function ensureSingleOrchestrator(): void {
   const ignored = new Set([process.pid, process.ppid]);
-  const result = spawnSync("pgrep", ["-fl", "orchestrix|orchestrator"], { encoding: "utf8" });
+  const result = spawnSync("pgrep", ["-fl", "relay|orchestrator"], { encoding: "utf8" });
   if (result.status !== 0) return;
   const others: string[] = [];
   for (const rawLine of result.stdout.split(/\r?\n/)) {
@@ -60,7 +60,7 @@ export function ensureSingleOrchestrator(): void {
   }
   if (others.length > 0) {
     throw new Error(
-      "Another Orchestrix orchestrator is already running:\n" +
+      "Another Relay orchestrator is already running:\n" +
         others.map((line) => `  ${line}`).join("\n") +
         "\nStop it first (only one BoxLite runtime can use ~/.boxlite).",
     );
@@ -77,41 +77,56 @@ export async function prepareGuestWorkspace(hostWorkspace: string): Promise<[num
   return [uid, gid];
 }
 
-export async function prepareGuestAgentAuth(): Promise<void> {
-  const apiKey = requireOpenaiApiKey();
-  requirePiConfig();
-  const authB64 = encodeBase64(guestCodexAuthJson(apiKey));
-  const configB64 = encodeBase64(guestCodexConfigToml());
-  const piAuthB64 = encodeBase64(guestPiAuthJson());
-  const piModelsB64 = encodeBase64(guestPiModelsJson());
+export async function prepareGuestAgentAuth(agents: Iterable<AgentName> = ["codex", "pi"], signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) throw new Error("Agent auth setup cancelled.");
+  const selectedAgents = new Set(agents);
   const script = [
     "set -eu",
-    "mkdir -p /home/agent/.codex",
-    `printf %s ${shellQuote(authB64)} | base64 -d > /home/agent/.codex/auth.json`,
-    `printf %s ${shellQuote(configB64)} | base64 -d > /home/agent/.codex/config.toml`,
-    "chown -R agent:agent /home/agent/.codex",
-    "chmod 600 /home/agent/.codex/auth.json",
-    "mkdir -p /home/agent/.pi/agent",
-    `printf %s ${shellQuote(piAuthB64)} | base64 -d > /home/agent/.pi/agent/auth.json`,
-    `printf %s ${shellQuote(piModelsB64)} | base64 -d > /home/agent/.pi/agent/models.json`,
-    "chown -R agent:agent /home/agent/.pi",
-    "chmod 600 /home/agent/.pi/agent/auth.json",
-  ].join("; ");
-  const result = await collectExecution(await activeBox().exec("bash", ["-c", script]));
+  ];
+  if (selectedAgents.has("codex")) {
+    const apiKey = requireOpenaiApiKey();
+    const authB64 = encodeBase64(guestCodexAuthJson(apiKey));
+    const configB64 = encodeBase64(guestCodexConfigToml());
+    script.push(
+      "mkdir -p /home/agent/.codex",
+      `printf %s ${shellQuote(authB64)} | base64 -d > /home/agent/.codex/auth.json`,
+      `printf %s ${shellQuote(configB64)} | base64 -d > /home/agent/.codex/config.toml`,
+      "chown -R agent:agent /home/agent/.codex",
+      "chmod 600 /home/agent/.codex/auth.json",
+    );
+  }
+  if (selectedAgents.has("pi")) {
+    requirePiConfig();
+    const piAuthB64 = encodeBase64(guestPiAuthJson());
+    const piModelsB64 = encodeBase64(guestPiModelsJson());
+    script.push(
+      "mkdir -p /home/agent/.pi/agent",
+      `printf %s ${shellQuote(piAuthB64)} | base64 -d > /home/agent/.pi/agent/auth.json`,
+      `printf %s ${shellQuote(piModelsB64)} | base64 -d > /home/agent/.pi/agent/models.json`,
+      "chown -R agent:agent /home/agent/.pi",
+      "chmod 600 /home/agent/.pi/agent/auth.json",
+    );
+  }
+  if (script.length === 1) return;
+  const command = script.join("; ");
+  const result = await collectExecution(await activeBox().exec("bash", ["-c", command]), false, undefined, undefined, undefined, signal);
   if (result.exit_code !== 0) {
     const detail = (result.stderr || result.stdout).trim();
-    throw new Error(`Failed to configure Codex auth in the guest. ${detail}`);
+    throw new Error(`Failed to configure agent auth in the guest. ${detail}`);
   }
 }
 
 export async function execStream(
   cmd: string,
   args: string[] = [],
-  options: { cwd?: string; stdoutRenderer?: StreamRenderer; stderrRenderer?: StreamRenderer; sink?: AgentOutputSink } = {},
+  options: { cwd?: string; stdoutRenderer?: StreamRenderer; stderrRenderer?: StreamRenderer; sink?: AgentOutputSink; signal?: AbortSignal } = {},
 ): Promise<StreamExecResult> {
+  if (options.signal?.aborted) {
+    return { exit_code: -1, stdout: "", stderr: "", error_message: "Execution cancelled before start." };
+  }
   const box = activeBox();
   const execution = await box.exec(cmd, args, null, false, null, null, options.cwd ?? null);
-  return collectExecution(execution, true, options.stdoutRenderer, options.stderrRenderer, options.sink);
+  return collectExecution(execution, true, options.stdoutRenderer, options.stderrRenderer, options.sink, options.signal);
 }
 
 export async function collectExecution(
@@ -120,9 +135,17 @@ export async function collectExecution(
   stdoutRenderer?: StreamRenderer,
   stderrRenderer?: StreamRenderer,
   sink?: AgentOutputSink,
+  signal?: AbortSignal,
 ): Promise<StreamExecResult> {
   const stdoutParts: string[] = [];
   const stderrParts: string[] = [];
+  let cancelled = false;
+  const abortExecution = (): void => {
+    cancelled = true;
+    void execution.kill?.().catch(() => undefined);
+  };
+  if (signal?.aborted) abortExecution();
+  signal?.addEventListener("abort", abortExecution, { once: true });
 
   async function readStream(name: "stdout" | "stderr", parts: string[]): Promise<void> {
     const reader = await execution[name]();
@@ -148,14 +171,18 @@ export async function collectExecution(
     }
   }
 
-  await Promise.all([readStream("stdout", stdoutParts), readStream("stderr", stderrParts)]);
-  const result = await execution.wait();
-  return {
-    exit_code: result.exitCode ?? -1,
-    stdout: stdoutParts.join(""),
-    stderr: stderrParts.join(""),
-    error_message: result.errorMessage,
-  };
+  try {
+    await Promise.all([readStream("stdout", stdoutParts), readStream("stderr", stderrParts)]);
+    const result = await execution.wait();
+    return {
+      exit_code: result.exitCode ?? -1,
+      stdout: stdoutParts.join(""),
+      stderr: stderrParts.join(""),
+      error_message: cancelled ? "Execution cancelled." : result.errorMessage,
+    };
+  } finally {
+    signal?.removeEventListener("abort", abortExecution);
+  }
 }
 
 export function dockerImageId(image: string): string | undefined {
@@ -166,7 +193,7 @@ export function dockerImageId(image: string): string | undefined {
   return inspect.stdout.trim() || undefined;
 }
 
-export function ensureLocalDevboxOci(): string {
+export function ensureLocalDevboxOci(sink?: AgentOutputSink): string {
   const inspect = spawnSync("docker", ["image", "inspect", DEVBOX_IMAGE], { encoding: "utf8" });
   if (inspect.status !== 0) {
     throw new Error(`Local image ${JSON.stringify(DEVBOX_IMAGE)} not found. Build it with: make devbox-image`);
@@ -200,11 +227,14 @@ export function ensureLocalDevboxOci(): string {
   }
 
   mkdirSync(OCI_LAYOUT_DIR, { recursive: true });
-  console.log(status("info", `Exporting ${DEVBOX_IMAGE} to ${OCI_LAYOUT_DIR}.`));
+  emitOrPrint(sink, status("info", `Exporting ${DEVBOX_IMAGE} to ${OCI_LAYOUT_DIR}.`));
   const exported = spawnSync("sh", ["-c", `docker save ${shellQuote(DEVBOX_IMAGE)} | tar -xf - -C ${shellQuote(OCI_LAYOUT_DIR)}`], {
-    stdio: "inherit",
+    encoding: "utf8",
   });
-  if (exported.status !== 0) throw new Error("Failed to export Docker image for BoxLite.");
+  if (exported.status !== 0) {
+    const detail = `${exported.stderr || ""}${exported.stdout || ""}`.trim();
+    throw new Error(`Failed to export Docker image for BoxLite.${detail ? ` ${detail}` : ""}`);
+  }
   if (imageId) {
     writeFileSync(stampFile, `${imageId}\n`);
     writeFileSync(dockerfileStamp, `${dockerfileMtime}\n`);

@@ -1,4 +1,5 @@
 import {
+  activeBox,
   collectExecution,
   ensureLocalDevboxOci,
   ensureSingleOrchestrator,
@@ -15,7 +16,6 @@ import {
   piBaseUrl,
   piModel,
   piProvider,
-  requireOpenaiApiKey,
 } from "./env.js";
 import { ansi, emitOrPrint, keyValue, section, status, type AgentOutputSink } from "./format.js";
 import { guestAgentEnv, runAsAgent, setSessionGuestEnv } from "./guest.js";
@@ -51,6 +51,32 @@ export interface OrchestratorSession {
   syncedGid: number;
 }
 
+const readyAgents = new Set<AgentName>();
+
+export function resetAgentReadiness(): void {
+  readyAgents.clear();
+}
+
+export async function ensureAgentReady(agent: AgentName, sink?: AgentOutputSink, signal?: AbortSignal): Promise<void> {
+  if (readyAgents.has(agent)) return;
+  if (signal?.aborted) throw new Error(`${agent} readiness cancelled.`);
+  if (agent === "codex" || agent === "pi") {
+    await prepareGuestAgentAuth([agent], signal);
+  }
+  const [name, command] = agent === "claude"
+    ? ["Claude Code", runAsAgent("claude --version")]
+    : agent === "codex"
+      ? ["Codex auth", runAsAgent("codex login status")]
+      : ["Pi coding agent", buildPiPreflightCommand()];
+  const result = await collectExecution(await activeBox().exec("bash", ["-c", command]), false, undefined, undefined, undefined, signal);
+  if (result.exit_code !== 0) {
+    const detail = (result.stderr || result.stdout).trim();
+    throw new Error(`${name} preflight failed. ${detail}`);
+  }
+  readyAgents.add(agent);
+  emitOrPrint(sink, status("ok", `${name} ready.`));
+}
+
 export async function runAgentTask(
   agent: AgentName,
   taskGoal: string,
@@ -75,12 +101,15 @@ export async function runWorkflow(initialState: AgentState, options: AgentRunOpt
   let next: Route = "claude_implement";
   while (next !== "__end__") {
     if (next === "claude_implement") {
+      await ensureAgentReady("claude", options.sink, options.signal);
       state = mergeAgentState(state, await claudeImplementNode(state, options));
       next = routeClaudeHandoff(state, options.sink);
     } else if (next === "pi_implement") {
+      await ensureAgentReady("pi", options.sink, options.signal);
       state = mergeAgentState(state, await piImplementNode(state, options));
       next = routePiHandoff(state, options.sink);
     } else {
+      await ensureAgentReady("codex", options.sink, options.signal);
       state = mergeAgentState(state, await codexReviewNode(state, options));
       next = routeCodexHandoff(state, options.sink);
     }
@@ -93,22 +122,21 @@ export async function withOrchestratorSession<T>(
   sink?: AgentOutputSink,
 ): Promise<T> {
   ensureSingleOrchestrator();
+  resetAgentReadiness();
   if (!sink) {
-    console.log(section("Orchestrix", ansi.cyan));
+    console.log(section("Relay", ansi.cyan));
     console.log(keyValue("image", DEVBOX_IMAGE));
     console.log(keyValue("mount", GUEST_WORKSPACE));
   } else {
-    sink(section("Orchestrix", ansi.cyan));
     sink(`${keyValue("image", DEVBOX_IMAGE)}\n`);
     sink(`${keyValue("mount", GUEST_WORKSPACE)}\n`);
   }
-  const rootfsPath = ensureLocalDevboxOci();
+  const rootfsPath = ensureLocalDevboxOci(sink);
   const hostWorkspace = hostWorkspacePath();
-  requireOpenaiApiKey();
 
   const { JsBoxlite } = await importBoxLite();
   const runtime = JsBoxlite.withDefaultConfig();
-  const boxName = "orchestrix";
+  const boxName = "relay";
   try {
     const [hostUid, hostGid] = hostWorkspaceOwner(hostWorkspace);
     const guestEnv = guestAgentEnv(hostWorkspace);
@@ -128,23 +156,9 @@ export async function withOrchestratorSession<T>(
     emitOrPrint(sink, keyValue("workspace", hostWorkspace));
 
     const [syncedUid, syncedGid] = await prepareGuestWorkspace(hostWorkspace);
-    await prepareGuestAgentAuth();
     emitOrPrint(sink, keyValue("owner", `uid=${syncedUid} gid=${syncedGid} (host uid=${hostUid} gid=${hostGid})`));
     emitOrPrint(sink, keyValue("codex", `provider=dashscope base_url=${process.env.OPENAI_BASE_URL || "(default)"}`));
     emitOrPrint(sink, keyValue("pi", `provider=${piProvider()} model=${piModel() || "(default)"} base_url=${piBaseUrl() || "(default)"}`));
-
-    for (const [name, command] of [
-      ["Claude Code", runAsAgent("claude --version")],
-      ["Codex auth", runAsAgent("codex login status")],
-      ["Pi coding agent", buildPiPreflightCommand()],
-    ] as const) {
-      const result = await collectExecution(await box.exec("bash", ["-c", command]));
-      if (result.exit_code !== 0) {
-        const detail = (result.stderr || result.stdout).trim();
-        throw new Error(`${name} preflight failed. ${detail}`);
-      }
-      emitOrPrint(sink, status("ok", `${name} preflight passed.`));
-    }
 
     return await action({
       rootfsPath,
@@ -156,6 +170,7 @@ export async function withOrchestratorSession<T>(
     });
   } finally {
     await stopSessionBox();
+    resetAgentReadiness();
     if (runtime.remove) await runtime.remove(boxName);
   }
 }
@@ -170,7 +185,7 @@ export function run(argv: string[] = process.argv.slice(2)): void {
   if (argv[0] === "run-workflow") {
     const taskGoal = argv.slice(1).join(" ").trim();
     if (!taskGoal) {
-      throw new Error("Usage: orchestrix run-workflow <task>");
+      throw new Error("Usage: relay run-workflow <task>");
     }
     main(taskGoal).catch((error: unknown) => {
       console.error(error instanceof Error ? error.message : String(error));

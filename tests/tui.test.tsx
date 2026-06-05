@@ -4,7 +4,7 @@ import React from "react";
 import { render } from "ink-testing-library";
 
 import {
-  OrchestrixTui,
+  RelayTui,
   parseAssignedTask,
   taskNeedsCodexMode,
   validateParsedTask,
@@ -60,20 +60,64 @@ describe("TUI task parsing", () => {
   });
 });
 
-describe("OrchestrixTui component", () => {
+describe("RelayTui component", () => {
   it("renders the header and input line", () => {
-    const { lastFrame } = render(<OrchestrixTui runner={async () => undefined} />);
+    const { lastFrame } = render(<RelayTui runner={async () => undefined} />);
 
     const frame = lastFrame() ?? "";
-    assert.match(frame, /Orchestrix/);
+    assert.match(frame, /== Relay/);
+    assert.match(frame, /INFO/);
     assert.match(frame, /workspace/);
     assert.match(frame, />/);
+  });
+
+  it("does not submit tasks before the session is ready", async () => {
+    const requests: RunRequest[] = [];
+    const { lastFrame, stdin } = render(
+      <RelayTui
+        ready={false}
+        disabledMessage="Starting Relay..."
+        runner={async (request) => {
+          requests.push(request);
+        }}
+      />,
+    );
+
+    stdin.write("@claude fix auth");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    stdin.write("\r");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    assert.equal(requests.length, 0);
+    assert.match(lastFrame() ?? "", /Starting Relay/);
+    assert.match(lastFrame() ?? "", /@claude fix auth/);
+  });
+
+  it("supports delete as an input erase key", async () => {
+    const requests: RunRequest[] = [];
+    const { stdin } = render(
+      <RelayTui
+        runner={async (request) => {
+          requests.push(request);
+        }}
+      />,
+    );
+
+    stdin.write("@claude typo");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    stdin.write("\u007f");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    stdin.write("\r");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0].task, "typ");
   });
 
   it("submits a non-Codex task to the runner", async () => {
     const requests: RunRequest[] = [];
     const { stdin } = render(
-      <OrchestrixTui
+      <RelayTui
         runner={async (request) => {
           requests.push(request);
         }}
@@ -93,7 +137,7 @@ describe("OrchestrixTui component", () => {
   it("asks for Codex mode before submitting Codex tasks", async () => {
     const requests: RunRequest[] = [];
     const { lastFrame, stdin } = render(
-      <OrchestrixTui
+      <RelayTui
         runner={async (request) => {
           requests.push(request);
         }}
@@ -121,7 +165,7 @@ describe("OrchestrixTui component", () => {
   it("asks for each Codex mention independently", async () => {
     const requests: RunRequest[] = [];
     const { stdin } = render(
-      <OrchestrixTui
+      <RelayTui
         runner={async (request) => {
           requests.push(request);
         }}
@@ -146,5 +190,33 @@ describe("OrchestrixTui component", () => {
       { agent: "codex", codexMode: "implement" },
     ]);
     assert.equal(requests[0].task, "fix auth");
+  });
+
+  it("aborts the active runner when Esc is pressed while running", async () => {
+    let seenSignal: AbortSignal | undefined;
+    let resolveRunner: (() => void) | undefined;
+    const { lastFrame, stdin } = render(
+      <RelayTui
+        runner={async (request) => {
+          seenSignal = request.signal;
+          await new Promise<void>((resolve) => {
+            resolveRunner = resolve;
+            request.signal?.addEventListener("abort", () => resolve(), { once: true });
+          });
+        }}
+      />,
+    );
+
+    stdin.write("@claude fix auth");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    stdin.write("\r");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    stdin.write("\u001b");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    resolveRunner?.();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    assert.equal(seenSignal?.aborted, true);
+    assert.match(lastFrame() ?? "", /Task cancelled|Cancelling/);
   });
 });

@@ -1,8 +1,8 @@
-# Orchestrix: Multi-Agent Collaboration Platform
+# Relay: Human and AI Agent Collaboration Platform
 
-A lightweight, local-first orchestration platform that coordinates multiple autonomous AI agents (like Claude Code, Pi, and custom OpenAI agents) to collaborate on complex software engineering tasks.
+A lightweight, local-first collaboration platform where humans and AI agents like Claude Code, Pi, and Codex share context, tools, and a live workspace for complex software engineering tasks.
 
-Instead of managing context windows and parsing text, **Orchestrix** uses a small TypeScript state machine and **BoxLite** to provide a persistent, hardware-isolated micro-VM. Agents communicate not by passing code back and forth, but by reading and writing to a shared file system in real-time.
+Instead of managing context windows and parsing text, **Relay** uses a small TypeScript state machine and **BoxLite** to provide a persistent, hardware-isolated micro-VM. Humans assign work from the terminal, and agents collaborate by reading and writing to a shared file system in real time.
 
 ---
 
@@ -38,7 +38,7 @@ Clone the repo and install dependencies with npm:
 
 ```bash
 git clone <repo-url>
-cd orchestrix
+cd relay
 npm install
 npm test
 ```
@@ -71,7 +71,7 @@ when Pi should use a different provider, key, endpoint, model, or API transport
 than Codex. For Anthropic-compatible endpoints, set `PI_PROVIDER=anthropic` and
 optionally `PI_API=anthropic-messages`.
 
-Pi CLI versions are not fully uniform. Orchestrix checks `pi --help` at runtime:
+Pi CLI versions are not fully uniform. Relay checks `pi --help` at runtime:
 if `-P` / `--print-streaming` is available, it uses streaming print mode; if not,
 it falls back to `-p` so older devbox images still run.
 
@@ -80,9 +80,9 @@ it falls back to `-p` so older devbox images still run.
 BoxLite has its own OCI image store (separate from Docker). Build the image with Docker, then export it for BoxLite:
 
 ```bash
-make devbox-image   # docker build -t orchestrix-devbox:v1
+make devbox-image   # docker build -t relay-devbox:v1
 make devbox-check   # verify node, Pi, Claude, and Codex CLIs inside the image
-make devbox-oci     # docker save → .oci/orchestrix-devbox-v1/
+make devbox-oci     # docker save -> .oci/relay-devbox-v1/
 ```
 
 You only need to rebuild/export the devbox when the image changes. Normal code

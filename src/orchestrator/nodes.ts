@@ -1,5 +1,5 @@
 import { execStream } from "./box.js";
-import { classifyCodexReview, extractCodexFeedback } from "./codex-review.js";
+import { extractCodexFeedback } from "./codex-review.js";
 import {
   buildClaudeImplementCommand,
   buildCodexImplementCommand,
@@ -35,6 +35,7 @@ export async function claudeImplementNode(state: AgentState, options: AgentRunOp
     stdoutRenderer: (chunk) => renderer.feed(chunk),
     stderrRenderer: (chunk) => stderrRenderer.feed(chunk),
     sink: options.sink,
+    signal: options.signal,
   });
   return {
     agent_logs: [`[Claude Code Exit ${result.exit_code}]:\n${result.stdout.slice(-500)}`],
@@ -52,6 +53,7 @@ export async function piImplementNode(state: AgentState, options: AgentRunOption
     stdoutRenderer: (chunk) => renderer.feed(chunk),
     stderrRenderer: (chunk) => stderrRenderer.feed(chunk),
     sink: options.sink,
+    signal: options.signal,
   });
   return {
     agent_logs: [`[Pi Exit ${result.exit_code}]:\n${result.stdout.slice(-500)}`],
@@ -69,14 +71,14 @@ export async function codexReviewNode(state: AgentState, options: AgentRunOption
     stdoutRenderer: (chunk) => renderer.feed(chunk),
     stderrRenderer: (chunk) => stderrRenderer.feed(chunk),
     sink: options.sink,
+    signal: options.signal,
   });
   const feedback = extractCodexFeedback(result.stdout);
-  const verdict = classifyCodexReview(result.exit_code, feedback);
   return {
     agent_logs: [`[Codex Review Exit ${result.exit_code}]:\n${result.stdout}`],
     last_exit_code: result.exit_code,
-    codex_failures: nextFailureCount(verdict === "failed", state.codex_failures),
-    codex_verdict: verdict,
+    codex_failures: nextFailureCount(result.exit_code !== 0, state.codex_failures),
+    codex_verdict: result.exit_code === 0 ? "completed" : "failed",
     codex_feedback: feedback,
   };
 }
@@ -90,6 +92,7 @@ export async function codexImplementNode(state: AgentState, options: AgentRunOpt
     stdoutRenderer: (chunk) => renderer.feed(chunk),
     stderrRenderer: (chunk) => stderrRenderer.feed(chunk),
     sink: options.sink,
+    signal: options.signal,
   });
   return {
     agent_logs: [`[Codex Implement Exit ${result.exit_code}]:\n${result.stdout.slice(-500)}`],

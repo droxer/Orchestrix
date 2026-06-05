@@ -16,12 +16,12 @@ import { shellQuote } from "./shell.js";
 
 export const GUEST_AGENT_SYNC_SCRIPT = `
 set -eu
-uid="\${ORCHESTRIX_HOST_UID:?}"
-gid="\${ORCHESTRIX_HOST_GID:?}"
+uid="\${RELAY_HOST_UID:?}"
+gid="\${RELAY_HOST_GID:?}"
 ws="/workspace"
 
 if ! getent group "$gid" >/dev/null 2>&1; then
-  groupadd -g "$gid" orchestrix-host
+  groupadd -g "$gid" relay-host
 fi
 
 if id -u agent >/dev/null 2>&1; then
@@ -67,8 +67,8 @@ export function guestAgentEnv(hostWorkspace?: string | null): Array<[string, str
   }
   if (hostWorkspace !== undefined && hostWorkspace !== null) {
     const [uid, gid] = hostWorkspaceOwner(hostWorkspace);
-    env.push(["ORCHESTRIX_HOST_UID", String(uid)]);
-    env.push(["ORCHESTRIX_HOST_GID", String(gid)]);
+    env.push(["RELAY_HOST_UID", String(uid)]);
+    env.push(["RELAY_HOST_GID", String(gid)]);
   }
   return env;
 }

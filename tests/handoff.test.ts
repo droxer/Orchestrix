@@ -4,12 +4,15 @@ import { describe, it } from "node:test";
 import {
   type AgentState,
   buildCodexImplementCommand,
+  buildCodexReviewCommand,
   buildPiImplementCommand,
   buildPiPreflightCommand,
   claudeTaskPrompt,
   classifyCodexReview,
   ClaudeStreamRenderer,
+  collectExecution,
   codexImplementPrompt,
+  codexReviewPrompt,
   CodexStreamRenderer,
   extractCodexFeedback,
   formatClaudeJsonLine,
@@ -63,7 +66,7 @@ function withEnv<T>(env: NodeJS.ProcessEnv, fn: () => T): T {
 describe("Codex review parsing", () => {
   it("routes rejected zero-exit verdict to Claude", () => {
     const feedback = extractCodexFeedback(
-      codexStdout("Blocking issue found.\nORCHESTRIX_REVIEW_VERDICT: REJECTED"),
+      codexStdout("Blocking issue found.\nRELAY_REVIEW_VERDICT: REJECTED"),
     );
 
     assert.equal(classifyCodexReview(0, feedback), "rejected");
@@ -71,7 +74,7 @@ describe("Codex review parsing", () => {
   });
 
   it("routes approved verdict to end", () => {
-    const feedback = extractCodexFeedback(codexStdout("Looks good.\nORCHESTRIX_REVIEW_VERDICT: APPROVED"));
+    const feedback = extractCodexFeedback(codexStdout("Looks good.\nRELAY_REVIEW_VERDICT: APPROVED"));
 
     assert.equal(classifyCodexReview(0, feedback), "approved");
     assert.equal(routeCodexHandoff(state({ codex_verdict: "approved", codex_feedback: feedback })), "__end__");
@@ -83,6 +86,10 @@ describe("Codex review parsing", () => {
       routeCodexHandoff(state({ last_exit_code: 1, codex_failures: 1, codex_verdict: "failed", codex_feedback: "auth failed" })),
       "codex_review",
     );
+  });
+
+  it("routes plain completed Codex review to end", () => {
+    assert.equal(routeCodexHandoff(state({ codex_verdict: "completed" })), "__end__");
   });
 });
 
@@ -126,10 +133,21 @@ describe("prompts", () => {
     assert.doesNotMatch(prompt, /Read docs\/plan\.md/);
     assert.doesNotMatch(prompt, /Implement the requested changes/);
     assert.doesNotMatch(prompt, /run tests/);
-    assert.doesNotMatch(prompt, /ORCHESTRIX_REVIEW_VERDICT/);
+    assert.doesNotMatch(prompt, /RELAY_REVIEW_VERDICT/);
     assert.match(command, /codex/);
     assert.match(command, /exec/);
-    assert.doesNotMatch(command, /ORCHESTRIX_REVIEW_VERDICT/);
+    assert.doesNotMatch(command, /RELAY_REVIEW_VERDICT/);
+  });
+
+  it("Codex review prompt uses only the user task", () => {
+    const prompt = codexReviewPrompt(state({ task_goal: "Review this branch exactly how I asked" }));
+    const command = buildCodexReviewCommand(state({ task_goal: "Review this branch exactly how I asked" }));
+
+    assert.equal(prompt, "Review this branch exactly how I asked");
+    assert.match(command, /Review this branch exactly how I asked/);
+    assert.doesNotMatch(command, /You are reviewing code/);
+    assert.doesNotMatch(command, /blocking bugs/);
+    assert.doesNotMatch(command, /RELAY_REVIEW_VERDICT/);
   });
 });
 
@@ -159,7 +177,7 @@ describe("agent stream rendering", () => {
     const output = renderer.feed(
       [
         JSON.stringify({ type: "turn.started" }),
-        codexStdout("Looks good.\nORCHESTRIX_REVIEW_VERDICT: APPROVED"),
+        codexStdout("Looks good.\nRELAY_REVIEW_VERDICT: APPROVED"),
         JSON.stringify({ type: "turn.completed" }),
       ].join("\n") + "\n",
     );
@@ -196,6 +214,37 @@ describe("agent stream rendering", () => {
     );
 
     assert.equal(output, "");
+  });
+});
+
+describe("execution cancellation", () => {
+  it("kills the active BoxLite execution when aborted", async () => {
+    const controller = new AbortController();
+    let killed = false;
+    const execution = {
+      stdout: async () => ({
+        next: async () => {
+          await new Promise((resolve) => setTimeout(resolve, 20));
+          return null;
+        },
+      }),
+      stderr: async () => ({
+        next: async () => {
+          await new Promise((resolve) => setTimeout(resolve, 20));
+          return null;
+        },
+      }),
+      wait: async () => ({ exitCode: killed ? 143 : 0 }),
+      kill: async () => {
+        killed = true;
+      },
+    };
+
+    setTimeout(() => controller.abort(), 1);
+    const result = await collectExecution(execution, false, undefined, undefined, undefined, controller.signal);
+
+    assert.equal(killed, true);
+    assert.equal(result.error_message, "Execution cancelled.");
   });
 });
 
