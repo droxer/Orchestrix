@@ -11,6 +11,8 @@ import {
   GUEST_WORKSPACE,
   LocalSessionStore,
   SessionController as RelaySessionController,
+  assignmentFailureOutcome,
+  assignmentSucceeded,
   ensureAgentReady,
   initialAgentState,
   withOrchestratorSession,
@@ -40,17 +42,18 @@ export interface RunRequest {
 
 export type AssignmentRunner = (request: RunRequest) => Promise<void>;
 
-type PendingCodexChoice = {
-  parsed: ParsedTask;
-  codexIndex: number;
-  selected: CodexTaskMode;
-};
-
 const leadingMentionPattern = /^@(claude|pi|codex)\b/i;
 const MAX_LOG_LINES = 200;
 const VISIBLE_LOG_LINES = 18;
 const AGENT_SHORTCUTS = ["@claude", "@pi", "@codex"] as const;
-const COMMAND_SHORTCUTS = ["/approve", "/reject", "/cancel", "/rerun", "/handoff", "/sessions", "/open", "/summary"] as const;
+const COMMAND_SHORTCUTS = ["/approve", "/reject", "/cancel", "/rerun", "/handoff", "/sessions", "/open", "/summary", "/quit"] as const;
+const RELAY_ACCENT = "#D97757";
+const RELAY_DIM = "gray";
+const RELAY_OK = "green";
+const RELAY_WARN = "yellow";
+const BRAND_MARK = "✻";
+const SPINNER_FRAMES = ["·", "✢", "*", "✳", "✶", "✻", "✽"] as const;
+const MARKDOWN_RULE = "------------------------------------------------------------";
 
 export interface CompletionResult {
   input: string;
@@ -80,6 +83,14 @@ export function validateParsedTask(parsed: ParsedTask): string | null {
   if (!parsed.task) return "Enter a task after the @mentions.";
   if (parsed.assignments.length === 0) return "Assign the task with @claude, @pi, or @codex.";
   return null;
+}
+
+export function withDefaultAssignments(parsed: ParsedTask, defaultAssignments: ParsedAssignment[]): ParsedTask {
+  if (parsed.assignments.length > 0 || defaultAssignments.length === 0) return parsed;
+  return {
+    ...parsed,
+    assignments: defaultAssignments.map((assignment) => ({ ...assignment })),
+  };
 }
 
 export function completeShortcutInput(input: string): CompletionResult {
@@ -151,6 +162,13 @@ export async function runAssignments(request: RunRequest): Promise<void> {
         sink: request.log,
         signal: request.signal,
       });
+      if (!assignmentSucceeded({ agent: assignment.agent, mode }, state)) {
+        const outcome = assignmentFailureOutcome({ agent: assignment.agent, mode }, state);
+        controller.failSession(sessionId, outcome);
+        terminalRecorded = true;
+        request.log(`\n${outcome}\n`);
+        return;
+      }
       if (request.signal?.aborted) {
         request.log("\nCancelled current agent.\n");
         failCancelled("Task cancelled during agent execution.");
@@ -208,12 +226,19 @@ export function RelayTui({
   ]);
   const [currentAgent, setCurrentAgent] = useState("idle");
   const [isRunning, setIsRunning] = useState(false);
-  const [pendingCodex, setPendingCodex] = useState<PendingCodexChoice | null>(null);
-  const [pendingStart, setPendingStart] = useState<ParsedTask | null>(null);
   const [activeSession, setActiveSession] = useState<RelaySession | null>(null);
+  const [defaultAssignments, setDefaultAssignments] = useState<ParsedAssignment[]>([]);
   const [message, setMessage] = useState("");
   const [shortcutIndex, setShortcutIndex] = useState(0);
   const [hiddenShortcutToken, setHiddenShortcutToken] = useState("");
+  const [spinnerTick, setSpinnerTick] = useState(0);
+
+  useEffect(() => {
+    if (!isRunning) return;
+    const handle = setInterval(() => setSpinnerTick((tick) => tick + 1), 120);
+    return () => clearInterval(handle);
+  }, [isRunning]);
+  const spinnerFrame = SPINNER_FRAMES[spinnerTick % SPINNER_FRAMES.length];
 
   const runnerRef = useRef(runner);
   runnerRef.current = runner;
@@ -226,46 +251,37 @@ export function RelayTui({
   }, []);
 
   const visibleLogs = useMemo(() => [...bootLogLines, ...logLines].slice(-VISIBLE_LOG_LINES), [bootLogLines, logLines]);
-  const queueLabel = !ready ? "booting" : isRunning ? "running" : pendingCodex ? "awaiting Codex mode" : pendingStart ? "awaiting approval" : "ready";
+  const queueLabel = !ready ? "booting" : isRunning ? "running" : "ready";
   const workspace = session?.hostWorkspace ?? "(test workspace)";
   const inputWidth = Math.max(20, (process.stdout.columns ?? 80) - 6);
   const visibleInput = input.length <= inputWidth ? input : `…${input.slice(input.length - inputWidth + 1)}`;
   const shortcutMenu = shortcutSuggestions(input);
   const showShortcutMenu = Boolean(shortcutMenu && input !== hiddenShortcutToken);
   const selectedShortcutIndex = shortcutMenu ? Math.min(shortcutIndex, shortcutMenu.candidates.length - 1) : 0;
+  const defaultAssignmentLabel = formatAssignmentsLabel(defaultAssignments);
 
   const appendLog = (text: string): void => {
     if (!text || !mountedRef.current) return;
     setLogLines((lines) => pushLines(lines, text));
   };
 
-  const createPendingSession = (parsed: ParsedTask): void => {
+  const startParsedTask = (parsed: ParsedTask): void => {
     const controller = new RelaySessionController(sessionStore, {
       workspacePath: session?.hostWorkspace ?? workspace,
       onUpdate: setActiveSession,
     });
     controllerRef.current = controller;
-    const created = controller.createSession(parsed.task, ["human", ...parsed.assignments.map((assignment) => assignment.agent)], true);
+    const created = controller.createSession(parsed.task, ["human", ...parsed.assignments.map((assignment) => assignment.agent)]);
     setActiveSession(created);
-    setPendingStart(parsed);
-    setMessage(`Session ${created.id} is waiting for /approve.`);
-  };
-
-  const startWithCodexModeSelection = (parsed: ParsedTask): void => {
-    const codexIndex = parsed.assignments.findIndex((assignment) => assignment.agent === "codex" && !assignment.codexMode);
-    if (codexIndex >= 0) {
-      setPendingCodex({ parsed, codexIndex, selected: "implement" });
-      setMessage("");
-      return;
-    }
-    createPendingSession(parsed);
+    setDefaultAssignments(parsed.assignments.map((assignment) => ({ ...assignment })));
+    executeParsedTask(parsed, created.id);
   };
 
   const executeParsedTask = (parsed: ParsedTask, sessionId?: string): void => {
     const controller = new AbortController();
     abortRef.current = controller;
     setIsRunning(true);
-    setCurrentAgent("starting");
+    setCurrentAgent(parsed.assignments[0] ? formatAssignmentLabel(parsed.assignments[0]) : "starting");
     setMessage("");
     void runnerRef.current({
       assignments: parsed.assignments,
@@ -295,7 +311,6 @@ export function RelayTui({
       })
       .finally(() => {
         if (!mountedRef.current) return;
-        setCurrentAgent("idle");
         setIsRunning(false);
         abortRef.current = null;
       });
@@ -306,11 +321,6 @@ export function RelayTui({
       if (showShortcutMenu) {
         setHiddenShortcutToken(input);
         setShortcutIndex(0);
-        return;
-      }
-      if (pendingCodex) {
-        setPendingCodex(null);
-        setMessage("Codex mode selection cancelled.");
         return;
       }
       if (isRunning) {
@@ -327,48 +337,6 @@ export function RelayTui({
       onExit?.();
       return;
     }
-    if (pendingCodex) {
-      if (typed === "i" || typed === "r") {
-        setPendingCodex((pending) =>
-          pending
-            ? {
-                ...pending,
-                selected: typed === "i" ? "implement" : "review",
-              }
-            : pending,
-        );
-        return;
-      }
-      if (key.leftArrow || key.rightArrow) {
-        setPendingCodex((pending) =>
-          pending
-            ? {
-                ...pending,
-                selected: pending.selected === "implement" ? "review" : "implement",
-              }
-            : pending,
-        );
-        return;
-      }
-      if (key.return) {
-        const choice = pendingCodex;
-        const assignments = choice.parsed.assignments.map((assignment, index) =>
-          index === choice.codexIndex ? { ...assignment, codexMode: choice.selected } : assignment,
-        );
-        const parsed = { ...choice.parsed, assignments };
-        const nextCodexIndex = assignments.findIndex(
-          (assignment, index) => index > choice.codexIndex && assignment.agent === "codex" && !assignment.codexMode,
-        );
-        if (nextCodexIndex >= 0) {
-          setPendingCodex({ parsed, codexIndex: nextCodexIndex, selected: "implement" });
-        } else {
-          setPendingCodex(null);
-          createPendingSession(parsed);
-        }
-        return;
-      }
-      return;
-    }
     if (isRunning) return;
     if (key.tab) {
       if (shortcutMenu) {
@@ -380,8 +348,8 @@ export function RelayTui({
       setMessage("No shortcut suggestions.");
       return;
     }
-    if ((key.upArrow || key.downArrow) && shortcutMenu) {
-      const direction = key.upArrow ? -1 : 1;
+    if ((key.upArrow || key.downArrow || key.leftArrow || key.rightArrow) && shortcutMenu) {
+      const direction = key.upArrow || key.leftArrow ? -1 : 1;
       setShortcutIndex((index) => (index + direction + shortcutMenu.candidates.length) % shortcutMenu.candidates.length);
       setHiddenShortcutToken("");
       setMessage("");
@@ -413,14 +381,14 @@ export function RelayTui({
         setInput("");
         return;
       }
-      const parsed = parseAssignedTask(input);
+      const parsed = withDefaultAssignments(parseAssignedTask(input), defaultAssignments);
       const error = validateParsedTask(parsed);
       if (error) {
         setMessage(error);
         return;
       }
       setInput("");
-      startWithCodexModeSelection(parsed);
+      startParsedTask(parsed);
       return;
     }
     if (key.backspace || key.delete) {
@@ -442,6 +410,11 @@ export function RelayTui({
     const [name, ...rest] = command.split(/\s+/);
     const detail = rest.join(" ");
     const current = activeSession;
+    if (name === "/quit") {
+      exit();
+      onExit?.();
+      return;
+    }
     if (name === "/sessions") {
       const sessions = sessionStore.listSessions().slice(0, 6);
       appendLog(`\n${sessions.map((item) => `${item.id}  ${item.status}  ${item.taskGoal}`).join("\n") || "No sessions yet."}\n`);
@@ -473,14 +446,7 @@ export function RelayTui({
       return;
     }
     if (name === "/approve") {
-      if (!current || !pendingStart) {
-        setMessage("No pending session to approve.");
-        return;
-      }
-      controllerRef.current.recordDecision(current.id, "approve");
-      const parsed = pendingStart;
-      setPendingStart(null);
-      executeParsedTask(parsed, current.id);
+      setMessage("Approval is not required; prompts run immediately.");
       return;
     }
     if (name === "/reject") {
@@ -489,14 +455,12 @@ export function RelayTui({
         return;
       }
       setActiveSession(controllerRef.current.recordDecision(current.id, "reject", detail || "Rejected by human."));
-      setPendingStart(null);
       setMessage("Feedback recorded.");
       return;
     }
     if (name === "/cancel") {
       abortRef.current?.abort();
       if (current) setActiveSession(controllerRef.current.recordDecision(current.id, "cancel", "Cancelled by human."));
-      setPendingStart(null);
       setMessage("Cancellation requested.");
       return;
     }
@@ -518,60 +482,310 @@ export function RelayTui({
         return;
       }
       const note = noteParts.join(" ").trim();
+      const assignment = { agent, codexMode: agent === "codex" ? "review" as const : undefined };
+      const defaultAssignment = { agent };
       const task = note ? `${current.taskGoal}\n\nHandoff note:\n${note}` : current.taskGoal;
-      setActiveSession(controllerRef.current.recordDecision(current.id, "handoff", note || "Handoff requested.", agent));
-      executeParsedTask({
-        assignments: [{ agent, codexMode: agent === "codex" ? "review" : undefined }],
-        task,
-      }, current.id);
+      setActiveSession(controllerRef.current.recordDecision(current.id, "handoff", note || `Handoff to ${agent}.`, agent));
+      setCurrentAgent(formatAssignmentLabel(assignment));
+      setDefaultAssignments([defaultAssignment]);
+      executeParsedTask({ assignments: [assignment], task }, current.id);
       return;
     }
     setMessage(`Unknown command: ${name}`);
   };
 
+  const statusTone = statusColor(queueLabel);
+  const statusMark = queueLabel === "running" || queueLabel === "booting" ? spinnerFrame : statusGlyphMark(queueLabel);
+
   return (
-    <Box flexDirection="column" height="100%" paddingX={1}>
-      <Box flexDirection="column">
-        <Text color="cyan" bold>== Relay ======================================================</Text>
-        <Text><Text color="cyan" bold>INFO</Text> workspace {workspace}</Text>
-        <Text><Text color="cyan" bold>INFO</Text> mount {GUEST_WORKSPACE}</Text>
-        <Text><Text color={isRunning ? "yellow" : "green"} bold>{isRunning ? "RUN" : ready ? "OK" : "INFO"}</Text> agent {currentAgent} | queue {queueLabel}</Text>
-        {activeSession ? (
-          <Text><Text color="cyan" bold>SESSION</Text> {activeSession.id} {activeSession.status} {activeSession.phase} | runs {activeSession.agentRuns.length} | artifacts {activeSession.artifacts.length}</Text>
+    <Box flexDirection="column" height="100%" paddingX={1} paddingY={1}>
+      <Box borderStyle="round" borderColor={RELAY_DIM} paddingX={1} flexDirection="column">
+        <Box>
+          <Text color={RELAY_ACCENT} bold>{BRAND_MARK} Relay</Text>
+          <Text dimColor>  agent orchestration</Text>
+        </Box>
+        <Text>
+          <Text dimColor>cwd </Text>
+          <Text>{workspace}</Text>
+          <Text dimColor>   mount </Text>
+          <Text>{GUEST_WORKSPACE}</Text>
+        </Text>
+      </Box>
+      <Box flexDirection="column" flexGrow={1} paddingX={1} marginTop={1}>
+        {renderMarkdownTranscript(visibleLogs)}
+      </Box>
+      <Box
+        borderStyle="round"
+        borderColor={showShortcutMenu ? RELAY_ACCENT : RELAY_DIM}
+        paddingX={1}
+        flexDirection="column"
+        marginTop={1}
+      >
+        <PromptLine
+          isRunning={isRunning}
+          ready={ready}
+          disabledMessage={disabledMessage}
+          visibleInput={visibleInput}
+          input={input}
+          spinnerFrame={spinnerFrame}
+          currentAgent={currentAgent}
+        />
+        {showShortcutMenu && shortcutMenu ? (
+          <Box marginTop={0}>
+            <Text>
+              {shortcutMenu.candidates.map((candidate, index) => {
+                const selected = index === selectedShortcutIndex;
+                return (
+                  <Text key={candidate}>
+                    {index > 0 ? <Text dimColor>  </Text> : null}
+                    <Text color={selected ? RELAY_ACCENT : undefined} inverse={selected}>
+                      {` ${candidate} `}
+                    </Text>
+                  </Text>
+                );
+              })}
+            </Text>
+          </Box>
         ) : null}
       </Box>
-      <Box marginTop={1} flexDirection="column" flexGrow={1}>
-        {visibleLogs.map((line, index) => (
-          <Text key={index}>{line.length > 0 ? line : " "}</Text>
-        ))}
-      </Box>
-      {pendingCodex ? (
-        <Box borderStyle="single" borderColor="yellow" paddingX={1}>
-          <Text>
-            Codex mode:{" "}
-            <Text inverse={pendingCodex.selected === "implement"}>implement</Text>{" "}
-            <Text inverse={pendingCodex.selected === "review"}>review</Text> for #{pendingCodex.codexIndex + 1} Enter to continue
-          </Text>
-        </Box>
-      ) : (
-        <Box borderStyle="single" borderColor={!ready || message ? "yellow" : showShortcutMenu ? "cyan" : "green"} paddingX={1} flexDirection="column">
-          <Text>{isRunning ? "Running... (Esc to cancel)" : pendingStart ? `Pending approval (/approve, /reject, /cancel)  > ${visibleInput}` : ready ? `> ${visibleInput}` : input ? `${disabledMessage}  > ${visibleInput}` : disabledMessage}</Text>
-          {showShortcutMenu && shortcutMenu ? (
-            <Text>
-              {shortcutMenu.candidates.map((candidate, index) => (
-                <Text key={candidate} inverse={index === selectedShortcutIndex}> {candidate} </Text>
-              ))}
-            </Text>
+      <Box paddingX={1} justifyContent="space-between">
+        <PromptHintText isRunning={isRunning} ready={ready} showShortcutMenu={showShortcutMenu} />
+        <Text>
+          <Text color={statusTone}>{statusMark}</Text>
+          <Text dimColor> {queueLabel}</Text>
+          <Text dimColor> · {currentAgent}</Text>
+          {defaultAssignments.length > 0 ? (
+            <Text dimColor> · {defaultAssignmentLabel}</Text>
           ) : null}
+          {activeSession ? (
+            <>
+              <Text dimColor> · </Text>
+              <Text color={RELAY_ACCENT}>{activeSession.id}</Text>
+              <Text dimColor> {activeSession.status}/{activeSession.phase}</Text>
+            </>
+          ) : null}
+        </Text>
+      </Box>
+      {message ? (
+        <Box paddingX={1}>
+          <Text color={RELAY_ACCENT}>{BRAND_MARK} </Text>
+          <Text dimColor>{message}</Text>
         </Box>
-      )}
-      {message ? <Text color="yellow">{message}</Text> : null}
+      ) : null}
     </Box>
   );
 }
 
+function renderMarkdownTranscript(lines: string[]): React.ReactElement[] {
+  let inCodeBlock = false;
+  return lines.map((line, index) => {
+    const key = `log-${index}`;
+    if (/^\s*```/.test(line)) {
+      inCodeBlock = !inCodeBlock;
+      const language = line.replace(/^\s*```/, "").trim();
+      return (
+        <Text key={key} dimColor>
+          {language ? `code ${language}` : "code"}
+        </Text>
+      );
+    }
+    return renderMarkdownLine(line, key, inCodeBlock);
+  });
+}
+
+function renderMarkdownLine(line: string, key: string, inCodeBlock: boolean): React.ReactElement {
+  if (line.length === 0) return <Text key={key}> </Text>;
+  if (inCodeBlock) {
+    return (
+      <Text key={key} color="green">
+        <Text dimColor>| </Text>
+        {line}
+      </Text>
+    );
+  }
+
+  const heading = /^(#{1,6})\s+(.+)$/.exec(line);
+  if (heading) {
+    const level = heading[1].length;
+    return (
+      <Text key={key} color={level <= 2 ? RELAY_ACCENT : undefined} bold>
+        {heading[2]}
+      </Text>
+    );
+  }
+
+  if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) {
+    return (
+      <Text key={key} dimColor>
+        {MARKDOWN_RULE}
+      </Text>
+    );
+  }
+
+  const blockquote = /^\s*>\s?(.*)$/.exec(line);
+  if (blockquote) {
+    return (
+      <Text key={key}>
+        <Text color={RELAY_ACCENT} dimColor>| </Text>
+        <Text italic dimColor>{renderInlineMarkdown(blockquote[1], key)}</Text>
+      </Text>
+    );
+  }
+
+  const unordered = /^(\s*)[-*+]\s+(.+)$/.exec(line);
+  if (unordered) {
+    return (
+      <Text key={key}>
+        <Text dimColor>{`${unordered[1]}- `}</Text>
+        {renderInlineMarkdown(unordered[2], key)}
+      </Text>
+    );
+  }
+
+  const ordered = /^(\s*)(\d+)\.\s+(.+)$/.exec(line);
+  if (ordered) {
+    return (
+      <Text key={key}>
+        <Text dimColor>{`${ordered[1]}${ordered[2]}. `}</Text>
+        {renderInlineMarkdown(ordered[3], key)}
+      </Text>
+    );
+  }
+
+  return <Text key={key}>{renderInlineMarkdown(line, key)}</Text>;
+}
+
+function renderInlineMarkdown(text: string, keyPrefix: string): React.ReactNode[] {
+  const segments: React.ReactNode[] = [];
+  const pattern = /(`[^`]+`|\[[^\]]+\]\([^)]+\)|\*\*[^*]+\*\*|__[^_]+__|\*[^*]+\*|_[^_]+_)/g;
+  let cursor = 0;
+  let segmentIndex = 0;
+
+  for (const match of text.matchAll(pattern)) {
+    const start = match.index ?? 0;
+    if (start > cursor) segments.push(text.slice(cursor, start));
+    const token = match[0];
+    const key = `${keyPrefix}-segment-${segmentIndex++}`;
+
+    if (token.startsWith("`")) {
+      segments.push(
+        <Text key={key} color="yellow">
+          {token.slice(1, -1)}
+        </Text>,
+      );
+    } else if (token.startsWith("[")) {
+      const link = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(token);
+      if (link) {
+        segments.push(
+          <Text key={key}>
+            <Text color="blue" underline>{link[1]}</Text>
+            <Text dimColor>{` (${link[2]})`}</Text>
+          </Text>,
+        );
+      } else {
+        segments.push(token);
+      }
+    } else if (token.startsWith("**") || token.startsWith("__")) {
+      segments.push(
+        <Text key={key} bold>
+          {token.slice(2, -2)}
+        </Text>,
+      );
+    } else {
+      segments.push(
+        <Text key={key} italic>
+          {token.slice(1, -1)}
+        </Text>,
+      );
+    }
+    cursor = start + token.length;
+  }
+
+  if (cursor < text.length) segments.push(text.slice(cursor));
+  return segments.length > 0 ? segments : [text];
+}
+
+function statusColor(queueLabel: string): string {
+  if (queueLabel === "ready") return RELAY_ACCENT;
+  if (queueLabel === "booting") return RELAY_ACCENT;
+  if (queueLabel === "running") return RELAY_ACCENT;
+  return RELAY_WARN;
+}
+
+function statusGlyphMark(_queueLabel: string): string {
+  return BRAND_MARK;
+}
+
+function PromptLine({
+  isRunning,
+  ready,
+  disabledMessage,
+  visibleInput,
+  input,
+  spinnerFrame,
+  currentAgent,
+}: {
+  isRunning: boolean;
+  ready: boolean;
+  disabledMessage: string;
+  visibleInput: string;
+  input: string;
+  spinnerFrame: string;
+  currentAgent: string;
+}): React.ReactElement {
+  if (isRunning) {
+    return (
+      <Text>
+        <Text color={RELAY_ACCENT}>{spinnerFrame}</Text>
+        <Text> {currentAgent}…</Text>
+        <Text dimColor>  (esc to interrupt)</Text>
+      </Text>
+    );
+  }
+  if (!ready) {
+    return (
+      <Text>
+        <Text dimColor>{disabledMessage}</Text>
+        {input ? (
+          <>
+            <Text dimColor>  </Text>
+            <Text dimColor>{"> "}</Text>
+            <Text>{visibleInput}</Text>
+          </>
+        ) : null}
+      </Text>
+    );
+  }
+  return (
+    <Text>
+      <Text dimColor>{"> "}</Text>
+      <Text>{visibleInput}</Text>
+    </Text>
+  );
+}
+
+function PromptHintText({
+  isRunning,
+  ready,
+  showShortcutMenu,
+}: {
+  isRunning: boolean;
+  ready: boolean;
+  showShortcutMenu: boolean;
+}): React.ReactElement {
+  if (isRunning) return <Text dimColor>esc to interrupt</Text>;
+  if (!ready) return <Text dimColor>esc to exit</Text>;
+  if (showShortcutMenu) return <Text dimColor>enter accept · tab/←→ choose · esc hide</Text>;
+  return <Text dimColor>enter send · tab shortcuts · esc exit</Text>;
+}
+
 function formatAssignmentLabel(assignment: ParsedAssignment): string {
-  return assignment.agent === "codex" ? `codex:${assignment.codexMode ?? "implement"}` : assignment.agent;
+  return assignment.agent;
+}
+
+function formatAssignmentsLabel(assignments: ParsedAssignment[]): string {
+  if (assignments.length === 0) return "none";
+  return assignments.map((assignment) => `@${formatAssignmentLabel(assignment)}`).join(" ");
 }
 
 export async function runInteractiveTui(): Promise<void> {
@@ -588,7 +802,7 @@ export async function runInteractiveTui(): Promise<void> {
       resolve();
     };
     const instance = render(<RelayTuiHost onExit={finish} />, {
-      alternateScreen: true,
+      alternateScreen: false,
       exitOnCtrlC: true,
     });
     instance.waitUntilExit().then(finish, finish);

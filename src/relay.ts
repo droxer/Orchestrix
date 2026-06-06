@@ -76,6 +76,8 @@ export {
 
 export {
   SessionController,
+  assignmentFailureOutcome,
+  assignmentSucceeded,
   type SessionControllerOptions,
   type WorkflowStep,
 } from "./relay/controller.js";

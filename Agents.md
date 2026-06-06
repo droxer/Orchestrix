@@ -1,44 +1,192 @@
 # Relay Agent Guide
 
-This repository is a TypeScript/Node.js CLI. Do not add Python host code back to the project.
+This repository is a TypeScript/Node.js CLI. Keep the host orchestrator in
+TypeScript; do not add Python host code back to the project.
+
+<!-- context7 -->
+## Context7
+
+Use Context7 MCP to fetch current documentation whenever the user asks about a
+library, framework, SDK, API, CLI tool, or cloud service, including well-known
+tools such as React, Next.js, Prisma, Express, Tailwind, Django, or Spring Boot.
+This includes API syntax, configuration, version migration, library-specific
+debugging, setup instructions, and CLI tool usage. Prefer Context7 over web
+search for library docs.
+
+Do not use Context7 for refactoring, writing scripts from scratch, debugging
+business logic, code review, or general programming concepts.
+
+Steps:
+
+1. Always start with `resolve-library-id` using the library name and the user's
+   question, unless the user provides an exact library ID in `/org/project`
+   format.
+2. Pick the best match by exact name match, description relevance, code snippet
+   count, source reputation, and benchmark score. Use version-specific IDs when
+   the user mentions a version.
+3. Run `query-docs` with the selected library ID and the user's full question.
+4. Answer using the fetched docs.
+<!-- context7 -->
+
+<!-- CODEGRAPH_START -->
+## CodeGraph
+
+This project has a CodeGraph MCP server (`codegraph_*` tools) configured.
+CodeGraph is a tree-sitter-parsed knowledge graph of every symbol, edge, and
+file. Use it for structural questions.
+
+Prefer CodeGraph for:
+
+- `codegraph_search`: where a symbol is defined.
+- `codegraph_callers`: what calls a function.
+- `codegraph_callees`: what a function calls.
+- `codegraph_impact`: what changing a symbol could affect.
+- `codegraph_node`: a symbol's signature, source, or docstring.
+- `codegraph_context`: focused context for a task or area.
+- `codegraph_explore`: several related symbols' source at once.
+- `codegraph_files`: files under a path.
+- `codegraph_status`: index health.
+
+Use native search such as `rg` for literal text queries, comments, log messages,
+or after you already have a specific file open.
+
+Rules of thumb:
+
+- For architecture or trace questions, start with `codegraph_context`, then use
+  one focused `codegraph_explore` if source is needed.
+- Do not grep first when looking up a symbol by name.
+- Do not chain many `codegraph_node` calls; use `codegraph_explore` for grouped
+  source.
+- The index watcher can lag writes by about 500 ms, so do not re-query
+  immediately after editing a file.
+
+If `.codegraph/` does not exist and the MCP server reports "not initialized,"
+ask the user whether to run `codegraph init -i`.
+<!-- CODEGRAPH_END -->
 
 ## Project Shape
 
-- Runtime entrypoint: `src/index.ts`
-- Relay implementation: `src/relay.ts`
-- Tests: `tests/handoff.test.ts`
-- Package manager: npm
-- Local devbox image: `dockerfile`
-- Generated outputs: `dist/`, `node_modules/`, `.oci/`
+- Runtime entrypoint: `src/index.ts`.
+- TUI: `src/tui.tsx`.
+- Public re-export surface: `src/relay.ts`.
+- Relay implementation modules: `src/relay/`.
+- Tests: `tests/handoff.test.ts`, `tests/session.test.ts`,
+  `tests/tui.test.tsx`.
+- Package manager: npm.
+- Local devbox image: `dockerfile`.
+- Generated outputs: `dist/`, `node_modules/`, `.oci/`, `.relay/`.
+
+Node.js 22.19 or newer is required.
 
 ## Commands
 
-- Install dependencies: `npm install`
-- Build: `npm run build`
-- Test: `npm test` or `make test`
-- Run the orchestrator: `make run` or `npm run run`
-- Rebuild/export the devbox image only when the image changes: `make run-fresh`
-- Build/check/export devbox pieces manually: `make devbox-image`, `make devbox-check`, `make devbox-oci`
+- Install dependencies: `npm install`.
+- Build: `npm run build` or `make build`.
+- Test: `npm test` or `make test`.
+- Run one built test file: `node --test dist/tests/handoff.test.js` after a
+  build.
+- Run the orchestrator TUI: `make run` or `npm run run`.
+- Run the TUI against another workspace: `make run WORKSPACE=/path/to/workspace`.
+- Run the read-only API server: `make serve`; default port is `8787`, override
+  with `PORT=9000`.
+- Stop Relay and BoxLite processes: `make stop`.
+- Rebuild/export the devbox image only when the image changes: `make run-fresh`.
+- Build/check/export devbox pieces manually: `make devbox-image`,
+  `make devbox-check`, `make devbox-oci`.
 
-Use `make run` for normal execution. Do not tell users to run `make run-fresh` unless `dockerfile` or the devbox image changed.
+Use `make run` for normal execution. Do not tell users to run `make run-fresh`
+unless `dockerfile` or the devbox image changed.
+
+## Architecture
+
+Relay is a local-first orchestration control plane that lets a human and the
+Claude Code, Pi, and Codex CLIs collaborate inside one isolated BoxLite VM.
+
+Key modules:
+
+- `src/index.ts`: CLI entrypoint. Routes `relay`, `relay run-workflow`,
+  `relay sessions`, `relay show`, and `relay serve`.
+- `src/tui.tsx`: Ink-based TUI. Owns input parsing for `@claude`, `@pi`,
+  `@codex`, `/approve`, `/reject`, `/cancel`, `/rerun`, `/handoff`,
+  `/sessions`, `/open`, `/summary`, and `/quit`.
+- `src/relay/workflow.ts`: VM lifecycle, agent readiness preflight, and the
+  default Claude to Pi to Codex workflow.
+- `src/relay/controller.ts`: `SessionController`, the only object that mutates
+  sessions. Each `runStep` emits events through the store and notifies the TUI
+  through `onUpdate`.
+- `src/relay/session.ts` and `src/relay/task.ts`: event-sourced stores.
+- `src/relay/nodes.ts`: single-agent execution units. Each agent CLI runs in
+  BoxLite through `execStream`.
+- `src/relay/commands.ts` and `src/relay/prompts.ts`: shell argv and prompt
+  construction for agents and modes.
+- `src/relay/routing.ts`: default-workflow transition function used by
+  `relay run-workflow`. TUI assignments do not go through this router.
+- `src/relay/box.ts`, `src/relay/guest.ts`, and `src/relay/env.ts`: BoxLite VM
+  setup, guest auth provisioning, and env loading.
+- `src/relay/renderers.ts`: streaming JSONL to terminal text converters.
+- `src/relay/format.ts`: ANSI formatting helpers.
+- `src/relay/server.ts`: read-only HTTP/SSE API over `.relay/`.
 
 ## Implementation Notes
 
-- Keep the host orchestrator in TypeScript.
-- Use BoxLite's Node SDK (`@boxlite-ai/boxlite`) for VM lifecycle and command execution.
-- `execStream()` should stream stdout/stderr while also collecting output for routing and logs.
-- Claude uses `--output-format stream-json`; render JSONL through `JsonLineRenderer` instead of printing raw JSON.
-- Codex uses `exec --json`; render JSONL through `JsonLineRenderer` instead of printing raw JSON.
-- Pi versions differ: use `-P` only when `pi --help` advertises `-P` or `--print-streaming`; otherwise fall back to `-p`.
-- Keep terminal output readable: section headers, status labels, aligned startup fields, and no raw JSON events.
+- Use BoxLite's Node SDK (`@boxlite-ai/boxlite`) for VM lifecycle and command
+  execution.
+- `execStream()` should stream stdout/stderr while also collecting output for
+  routing and logs.
+- Claude uses `--output-format stream-json`; render JSONL through
+  `JsonLineRenderer` instead of printing raw JSON.
+- Codex uses `exec --json`; render JSONL through `JsonLineRenderer` instead of
+  printing raw JSON.
+- Pi versions differ: use `-P` only when `pi --help` advertises `-P` or
+  `--print-streaming`; otherwise fall back to `-p`.
+- Keep terminal output readable: section headers, status labels, aligned startup
+  fields, and no raw JSON events.
+- `ensureAgentReady` is silent on success. Preflight failures throw; do not
+  re-add success narration.
+
+## Invariants
+
+- Event logs are authoritative. All session/task state changes go through
+  `SessionStore.appendEvent` or `TaskStore.appendEvent`; snapshots are derived.
+- Preserve immutable session/task updates through helpers such as
+  `mergeAgentState` and object spreads.
+- TUI assignments use `SessionController.runStep` directly. Routing handoff
+  narration only applies to `relay run-workflow`.
+- Agent names are currently `claude`, `pi`, and `codex`. Adding another agent
+  requires parser, validation, command, prompt, routing, and renderer changes.
+- Never mock or seed data in the read-only server; it reads real files under
+  `.relay/`.
+
+## Data Layout
+
+Generated state lives under `.relay/` in the host workspace:
+
+```text
+.relay/sessions/<session-id>/events.jsonl
+.relay/sessions/<session-id>/snapshot.json
+.relay/sessions/<session-id>/artifacts/*.txt
+.relay/tasks/<task-id>/events.jsonl
+.relay/tasks/<task-id>/snapshot.json
+```
+
+The host workspace mounts into the BoxLite guest at `/workspace`
+(`GUEST_WORKSPACE`). The guest `agent` user's UID/GID is aligned to the host
+owner so file ownership stays sane.
 
 ## Verification
 
-For behavior changes, add or update tests in `tests/handoff.test.ts` and run `npm test`.
+For behavior changes, add or update focused tests and run `npm test`.
 
 Before handing off, check:
 
 1. TypeScript compiles.
-2. Existing handoff and provider tests pass.
+2. Existing handoff, provider, session, and TUI tests pass.
 3. Terminal rendering tests still prove Claude/Codex JSONL is not printed raw.
 4. Pi command generation remains compatible with old and new Pi CLI versions.
+
+Test focus:
+
+- `tests/handoff.test.ts`: routing, prompt construction, stream rendering, and
+  Codex review verdict parsing.
+- `tests/session.test.ts`: controller, event store behavior, and HTTP API.
+- `tests/tui.test.tsx`: Ink rendering through `ink-testing-library`.

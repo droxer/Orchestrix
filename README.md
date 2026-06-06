@@ -1,26 +1,110 @@
-# Relay: Human and AI Agent Collaboration Platform
+# Relay
 
-Relay is a local-first collaboration control plane for small software teams working with autonomous coding agents. Humans, Claude Code, Pi, and Codex share one isolated BoxLite workspace, while Relay records each assignment as a durable session with structured events, artifacts, decisions, and review outcomes.
+Every Employee. Amplified.
 
-The goal is not to hide the terminal. Relay keeps agent streams readable while turning the work into a traceable timeline that can be inspected later from the TUI, CLI commands, or the read-only HTTP/SSE API.
+Relay is an AI Workforce Intelligence Platform. Its product direction is to give
+every employee a long-term AI Partner that connects organizational knowledge,
+business workflows, tools, and agent execution so people can create value faster.
 
-## What Relay Provides
+This repository contains the current local-first developer MVP: a TypeScript
+CLI/TUI that orchestrates Claude Code, Pi, and Codex inside an isolated BoxLite
+workspace, persists task/session history under `.relay/`, and exposes a local
+read-only JSON/SSE API.
 
-- **Durable collaboration sessions:** every run writes `.relay/sessions/<session-id>/events.jsonl`, `snapshot.json`, and artifact files.
-- **Explicit human gates:** TUI assignments create a pending session first; `/approve`, `/reject`, `/cancel`, `/rerun`, and `/summary` record human decisions.
-- **Bring your own agents:** Relay orchestrates Claude Code, Pi, and Codex CLI agents through the existing local toolchain.
-- **Shared isolated workspace:** BoxLite mounts the host workspace at `/workspace` and aligns the guest `agent` UID/GID with the host owner.
-- **Structured agent roles:** agents can act as implementers, reviewers, testers, planners, or fixers; v1 maps Claude to implementation, Pi to testing/follow-up, and Codex to implementation or review.
-- **Readable streams plus artifacts:** Claude and Codex JSONL streams render as terminal text and are also captured as session events and command-log artifacts.
-- **Web-ready service boundary:** `relay serve` exposes read-only session, artifact, and SSE event endpoints without adding a database.
+Relay is not designed as a chatbot plus tool calls, and it is not an employee
+replacement system. The architecture is control-plane-first: Relay owns task
+identity, workflow state, approval gates, audit trails, memory writeback,
+sandbox lifecycle, and tool policy while agent CLIs act as execution engines.
+
+## Documentation Map
+
+- [Product Design](docs/Product-Design.md): product strategy, users, scenarios,
+  positioning, roadmap, and business model.
+- [Architecture Design](docs/Architecture-Design.md): target architecture,
+  planes, runtime layers, sandbox strategy, MCP gateway, memory, and governance.
+- [Technical Implementation Design](docs/Technical-Implementation-Design.md):
+  deployable components, data model, APIs, runtime flows, security,
+  observability, implementation phases, and current local implementation map.
+- [Visual Design](docs/Design.md): marketing/UI design language and visual
+  system direction.
+
+## Product Direction
+
+Relay's long-term product has three forms:
+
+- **Personal Relay:** an AI Partner for each employee, with personal work
+  assistance, knowledge assistance, task execution, and personal memory.
+- **Team Relay:** team status, cross-person collaboration, project risks, and
+  shared best practices.
+- **Organization Relay:** organizational knowledge, expert experience assets,
+  capability graphs, governance analytics, and memory writeback.
+
+Initial high-value scenarios include sales value creation, customer success and
+renewal growth, product and engineering collaboration, organizational knowledge
+assistance, and expert experience capture.
+
+## Current Local MVP
+
+The current repository implements a local developer channel for engineering
+collaboration:
+
+- **Durable tasks and sessions:** append-only event logs and derived snapshots
+  under `.relay/tasks` and `.relay/sessions`.
+- **Human approval gates:** TUI assignments create pending sessions that can be
+  approved, rejected, cancelled, rerun, opened, or summarized.
+- **Multi-agent orchestration:** Claude, Pi, and Codex run as CLI agents inside
+  BoxLite.
+- **Readable streams:** Claude `stream-json` and Codex `exec --json` output are
+  rendered into human-readable terminal text instead of raw JSONL.
+- **Artifacts:** command output, assignment plans, logs, and review output are
+  persisted with the session.
+- **Local API:** `relay serve` exposes real task/session state from `.relay/`.
+
+The scripted default workflow is:
+
+```text
+Claude implement -> Pi implement/test follow-up -> Codex review
+```
+
+Codex review must emit:
+
+```text
+RELAY_REVIEW_VERDICT: APPROVED
+```
+
+or:
+
+```text
+RELAY_REVIEW_VERDICT: REJECTED
+```
+
+## Target Architecture
+
+The target system is organized around four architectural planes:
+
+- **Control Plane:** tenants, users, workspaces, tasks, sessions, assignments,
+  approvals, policy decisions, workflow state, and audit authority.
+- **Execution Plane:** sandboxed commands, agent CLIs, file processing, browser
+  automation, stream forwarding, and isolated tool adapters.
+- **Memory Plane:** personal, task, project, team, and organization memory,
+  retrieval, source links, indexing, and reviewed writeback.
+- **Governance Plane:** identity, permissions, audit, retention, tool policy,
+  approval rules, and compliance controls.
+
+The recommended enterprise stack includes a web/API control plane, PostgreSQL,
+Redis, Temporal, Relay Runtime, BoxLite/Kubernetes sandbox workers, MCP Gateway,
+Secret Broker, object storage, and vector/search storage as needed.
+
+The current local MVP intentionally keeps persistence file-backed under
+`.relay/`, but the event model is meant to map cleanly to PostgreSQL later.
 
 ## Prerequisites
 
-1. Node.js 22.19+
-2. npm
-3. Docker, with the local daemon running
-4. Hardware virtualization for BoxLite
-5. API keys for the agents you plan to run
+- Node.js 22.19 or newer
+- npm
+- Docker with the local daemon running
+- Hardware virtualization for BoxLite
+- API keys for the agents you plan to run
 
 Set credentials in `.env`:
 
@@ -34,11 +118,20 @@ PI_BASE_URL=...         # optional override
 PI_MODEL=...            # optional override
 ```
 
+Do not put long-lived secrets into prompts, events, artifacts, or memory.
+
 ## Setup
+
+Install dependencies and run the test suite:
 
 ```bash
 npm install
 npm test
+```
+
+Build and export the BoxLite devbox image:
+
+```bash
 make devbox-oci
 ```
 
@@ -65,12 +158,12 @@ make run WORKSPACE=/path/to/workspace
 Start the TUI:
 
 ```bash
-relay
+make run
 # or
 npm run run
 ```
 
-Create a session by assigning agents:
+Assign agents from the TUI:
 
 ```text
 @claude fix auth middleware
@@ -78,19 +171,21 @@ Create a session by assigning agents:
 @codex inspect the current diff
 ```
 
-Relay creates a pending session. Use slash commands to control it:
+Useful slash commands:
 
 ```text
 /approve
 /reject missing tests around timeout handling
 /cancel
 /rerun codex
+/handoff claude
 /sessions
 /open <session-id>
 /summary
+/quit
 ```
 
-The scripted workflow is still available and now creates a durable session:
+Run the scripted workflow:
 
 ```bash
 relay run-workflow "fix auth middleware"
@@ -103,7 +198,15 @@ relay sessions
 relay show <session-id>
 ```
 
-Start the local HTTP API server:
+Stop Relay and BoxLite processes:
+
+```bash
+make stop
+```
+
+## Local API
+
+Start the local JSON/SSE API:
 
 ```bash
 make serve
@@ -111,13 +214,11 @@ make serve
 make serve PORT=9000
 ```
 
-Relay no longer serves a browser UI. `http://127.0.0.1:8787` returns a JSON API index, and task/session management is available through the HTTP endpoints.
+By default, the server listens on `127.0.0.1:8787`. It reads real task and
+session files from `.relay/tasks` and `.relay/sessions`; it does not seed,
+mock, or display dummy work.
 
-The API reads only real Relay task and session files from `.relay/tasks` and `.relay/sessions`. It does not seed, mock, or display dummy work.
-
-Task-management state is file-backed. Agent CLI execution still runs through the Relay orchestrator/TUI path so BoxLite lifecycle, credentials, readiness checks, streaming, and cancellation stay in one place.
-
-The server exposes:
+Current routes include:
 
 ```text
 GET /
@@ -134,19 +235,52 @@ GET /sessions/:id/events
 GET /sessions/:id/artifacts/:artifactId
 ```
 
+The local API can create tasks, create pending sessions, attach assignment-plan
+artifacts, record decisions, and expose historical events/artifacts. Agent CLI
+execution still runs through the orchestrator/TUI path so BoxLite lifecycle,
+credentials, readiness checks, streaming, and cancellation stay centralized.
+
 ## Data Layout
 
 Relay writes local generated state under `.relay/`:
 
 ```text
-.relay/sessions/<session-id>/events.jsonl
-.relay/sessions/<session-id>/snapshot.json
-.relay/sessions/<session-id>/artifacts/<artifact-id>.txt
-.relay/tasks/<task-id>/events.jsonl
-.relay/tasks/<task-id>/snapshot.json
+.relay/
+  tasks/
+    <task-id>/
+      events.jsonl
+      snapshot.json
+  sessions/
+    <session-id>/
+      events.jsonl
+      snapshot.json
+      artifacts/
+        <artifact-id>.<ext>
 ```
 
-The event log is the source of truth. The snapshot is a materialized view for fast reads.
+The event log is the source of truth. The snapshot is a materialized view rebuilt
+from events.
+
+## Source Map
+
+```text
+src/index.ts                CLI entrypoint
+src/tui.tsx                 Ink TUI and human commands
+src/relay.ts                public re-export surface
+src/relay/controller.ts     session-aware orchestration controller
+src/relay/session.ts        durable session event model and local store
+src/relay/task.ts           backlog/task event model and local store
+src/relay/nodes.ts          Claude, Pi, and Codex execution nodes
+src/relay/commands.ts       agent command builders
+src/relay/prompts.ts        agent prompt builders
+src/relay/renderers.ts      stream-json and JSONL renderers
+src/relay/routing.ts        default workflow routing
+src/relay/workflow.ts       BoxLite lifecycle and runtime entrypoints
+src/relay/server.ts         local JSON/SSE API
+```
+
+Keep new public API exports in `src/relay.ts`. Keep runtime dispatch in
+`src/relay/workflow.ts`; `src/index.ts` should stay minimal.
 
 ## Development
 
@@ -156,15 +290,51 @@ npm test
 make test
 ```
 
-Important source areas:
+Test coverage is organized as:
 
-```text
-src/relay/session.ts      durable session event model and local store
-src/relay/task.ts         backlog/Kanban task event model and local store
-src/relay/controller.ts   session-aware orchestration controller
-src/relay/workflow.ts     BoxLite lifecycle and CLI commands
-src/tui.tsx               Ink TUI and human commands
-src/relay/server.ts       read-only HTTP/SSE API
-```
+- `tests/session.test.ts`: event stores, artifacts, controller behavior, linked
+  task updates, and HTTP API routes.
+- `tests/handoff.test.ts`: routing, prompt contracts, Codex verdict parsing,
+  command generation, stream renderers, and BoxLite helpers.
+- `tests/tui.test.tsx`: TUI parsing, shortcuts, rendering, cancellation,
+  session state updates, and slash commands.
 
-Keep the host orchestrator in TypeScript. Do not add Python host code.
+For behavior changes, add or update focused tests and run `npm test`.
+
+## Implementation Rules
+
+- Keep the host orchestrator in TypeScript/Node.js. Do not add Python host code.
+- Use BoxLite's Node SDK (`@boxlite-ai/boxlite`) for VM lifecycle and command
+  execution.
+- Keep durable state append-only; add events instead of mutating history.
+- Keep snapshots derived from event logs.
+- Keep tasks and sessions loosely coupled through `task.session_linked`.
+- Keep API state real: no seeded demo tasks, fake agent runs, or dummy artifacts.
+- Keep agent execution isolated to `nodes.ts`, command construction to
+  `commands.ts`, and workflow lifecycle to `workflow.ts` / `box.ts`.
+- Route future execution endpoints through `SessionController` and the same
+  orchestrator readiness flow used by the CLI/TUI.
+- Claude uses `--output-format stream-json`; Codex uses `exec --json`; render
+  both through the stream renderers instead of printing raw JSON.
+- Pi versions differ: use `-P` only when `pi --help` advertises `-P` or
+  `--print-streaming`; otherwise fall back to `-p`.
+
+## Roadmap
+
+The technical implementation plan phases are:
+
+1. **Local Relay hardening:** stabilize TypeScript orchestration, BoxLite
+   lifecycle, event stores, command redaction, and artifacts.
+2. **Execution service boundary:** extract `ExecutionManager` interfaces while
+   keeping control-plane authority outside the sandbox.
+3. **Durable backend:** move `.relay` stores to PostgreSQL-backed repositories
+   with Redis fanout and object storage.
+4. **Temporal runtime:** add durable workflow state machines, approval waits,
+   cancellation signals, retries, and resumable sessions.
+5. **MCP Gateway and governance:** add Tool Registry, Policy Engine, Secret
+   Broker, audit, and approval gates for high-risk writes.
+6. **Memory plane:** add retrieval, memory candidate extraction, reviewed
+   writeback, vector indexing, and keyword search.
+7. **Enterprise readiness:** tenant policies, audit export, retention controls,
+   admin UI, private deployment, and sandbox tiering across BoxLite,
+   Kubernetes/gVisor, E2B/Kata, and Cloud Workstations.

@@ -6,19 +6,13 @@ import {
   buildCodexReviewCommand,
   buildPiImplementCommand,
 } from "./commands.js";
-import { ansi, emitOrPrint, promptBlock } from "./format.js";
+import { ansi } from "./format.js";
 import {
   ClaudeStreamRenderer,
   CodexStreamRenderer,
   PlainTextStreamRenderer,
   StderrLineRenderer,
 } from "./renderers.js";
-import {
-  claudeTaskPrompt,
-  codexImplementPrompt,
-  codexReviewPrompt,
-  piTaskPrompt,
-} from "./prompts.js";
 import {
   GUEST_WORKSPACE,
   nextFailureCount,
@@ -27,7 +21,6 @@ import {
 } from "./state.js";
 
 export async function claudeImplementNode(state: AgentState, options: AgentRunOptions = {}): Promise<Partial<AgentState>> {
-  emitOrPrint(options.sink, promptBlock("Claude Code - implementation", claudeTaskPrompt(state), ansi.magenta));
   const execute = options.execStream ?? execStream;
   const renderer = new ClaudeStreamRenderer();
   const stderrRenderer = new StderrLineRenderer();
@@ -53,7 +46,6 @@ export async function claudeImplementNode(state: AgentState, options: AgentRunOp
 }
 
 export async function piImplementNode(state: AgentState, options: AgentRunOptions = {}): Promise<Partial<AgentState>> {
-  emitOrPrint(options.sink, promptBlock("Pi - implementation review", piTaskPrompt(state), ansi.yellow));
   const execute = options.execStream ?? execStream;
   const renderer = new PlainTextStreamRenderer("Pi", ansi.yellow);
   const stderrRenderer = new StderrLineRenderer();
@@ -79,7 +71,6 @@ export async function piImplementNode(state: AgentState, options: AgentRunOption
 }
 
 export async function codexReviewNode(state: AgentState, options: AgentRunOptions = {}): Promise<Partial<AgentState>> {
-  emitOrPrint(options.sink, promptBlock("Codex - code review", codexReviewPrompt(state), ansi.blue));
   const execute = options.execStream ?? execStream;
   const renderer = new CodexStreamRenderer();
   const stderrRenderer = new StderrLineRenderer();
@@ -109,7 +100,6 @@ export async function codexReviewNode(state: AgentState, options: AgentRunOption
 }
 
 export async function codexImplementNode(state: AgentState, options: AgentRunOptions = {}): Promise<Partial<AgentState>> {
-  emitOrPrint(options.sink, promptBlock("Codex - implementation", codexImplementPrompt(state), ansi.blue));
   const execute = options.execStream ?? execStream;
   const renderer = new CodexStreamRenderer();
   const stderrRenderer = new StderrLineRenderer();

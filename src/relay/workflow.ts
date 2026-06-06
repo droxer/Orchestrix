@@ -76,7 +76,6 @@ export async function ensureAgentReady(agent: AgentName, sink?: AgentOutputSink,
     throw new Error(`${name} preflight failed. ${detail}`);
   }
   readyAgents.add(agent);
-  emitOrPrint(sink, status("ok", `${name} ready.`));
 }
 
 export async function runAgentTask(

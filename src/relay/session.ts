@@ -346,6 +346,7 @@ export function materializeEvents(events: RelayEvent[]): RelaySession {
       session.phase = event.phase;
       session.pendingDecision = event.pendingDecision;
       if (!event.pendingDecision) delete session.pendingDecision;
+      if (event.status !== "completed" && event.status !== "failed") delete session.finalOutcome;
     } else if (event.type === "agent.started") {
       session.status = "running";
       session.phase = `${event.agent}:${event.mode}`;
@@ -376,6 +377,9 @@ export function materializeEvents(events: RelayEvent[]): RelaySession {
       }
     } else if (event.type === "human.decision") {
       session.decisions.push(event.decision);
+      if (event.decision.kind === "handoff" && event.decision.targetAgent) {
+        session.currentAgent = event.decision.targetAgent;
+      }
       if (event.decision.kind === "cancel") {
         session.status = "cancelled";
         session.phase = "cancelled";

@@ -44,6 +44,23 @@ export interface SessionControllerOptions {
   onUpdate?: (session: RelaySession) => void;
 }
 
+export function assignmentSucceeded(step: WorkflowStep, state: AgentState): boolean {
+  if (state.last_exit_code !== 0) return false;
+  if (step.agent === "codex" && step.mode === "review") return state.codex_verdict === "approved";
+  return true;
+}
+
+export function assignmentFailureOutcome(step: WorkflowStep, state: AgentState): string {
+  if (state.last_exit_code !== 0) {
+    return `${step.agent} ${step.mode} failed with exit code ${state.last_exit_code}.`;
+  }
+  if (step.agent === "codex" && step.mode === "review") {
+    if (state.codex_verdict === "rejected") return "Codex rejected the work.";
+    return "Codex review did not approve the work.";
+  }
+  return `${step.agent} ${step.mode} failed.`;
+}
+
 export class SessionController implements AgentEventSink {
   private activeSessionId = "";
 
@@ -101,6 +118,11 @@ export class SessionController implements AgentEventSink {
         status: "waiting_for_human",
         phase: "feedback",
         pendingDecision: "feedback",
+      }));
+    } else if (kind === "handoff" && targetAgent) {
+      session = this.store.appendEvent(sessionId, relayEvent("session.status", sessionId, {
+        status: "running",
+        phase: `handoff:${targetAgent}`,
       }));
     }
     this.emitUpdate(session);
@@ -199,6 +221,10 @@ export class SessionController implements AgentEventSink {
         return state;
       }
       state = await this.runStep(sessionId, state, assignment, options);
+      if (!assignmentSucceeded(assignment, state)) {
+        this.failSession(sessionId, assignmentFailureOutcome(assignment, state));
+        return state;
+      }
       if (options.signal?.aborted) {
         this.failSession(sessionId, "Task cancelled during agent execution.");
         return state;

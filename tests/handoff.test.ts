@@ -191,7 +191,7 @@ describe("agent stream rendering", () => {
       ].join("\n") + "\n",
     );
 
-    assert.match(output, /Claude \| Implemented auth\./);
+    assert.match(output, /● Implemented auth\./);
     assert.match(output, /Claude finished/);
     assert.doesNotMatch(output, /\{"type":"stream_event"/);
   });
@@ -207,7 +207,7 @@ describe("agent stream rendering", () => {
     );
 
     assert.match(output, /Codex is reviewing/);
-    assert.match(output, /Codex \| Looks good/);
+    assert.match(output, /● Looks good/);
     assert.match(output, /Codex finished/);
     assert.doesNotMatch(output, /\{"type":"item.completed"/);
   });
@@ -223,12 +223,12 @@ describe("agent stream rendering", () => {
     assert.doesNotMatch(output, /\{"type":"item.completed"/);
   });
 
-  it("renders Pi plain text chunks with a stable stream prefix", () => {
+  it("renders Pi plain text chunks with a block marker and indented continuation", () => {
     const renderer = new PlainTextStreamRenderer("Pi", "");
     const output = renderer.feed("First chunk") + renderer.feed(" continues\nNext line\n");
 
-    assert.match(output, /Pi \| First chunk continues/);
-    assert.match(output, /Pi \| Next line/);
+    assert.match(output, /● First chunk continues/);
+    assert.match(output, /\n {2}Next line/);
   });
 
   it("filters noisy seccomp stderr warnings", () => {

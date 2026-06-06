@@ -11,7 +11,6 @@ export type Route = "claude_implement" | "pi_implement" | "codex_review" | "__en
 
 export function routeClaudeHandoff(state: AgentState, sink?: AgentOutputSink): Route {
   if (state.last_exit_code === 0) {
-    emitOrPrint(sink, status("ok", "Claude finished; handing off to Pi."));
     return "pi_implement";
   }
   if (state.claude_failures < MAX_CLAUDE_FAILURES) {
@@ -24,7 +23,6 @@ export function routeClaudeHandoff(state: AgentState, sink?: AgentOutputSink): R
 
 export function routePiHandoff(state: AgentState, sink?: AgentOutputSink): Route {
   if (state.last_exit_code === 0) {
-    emitOrPrint(sink, status("ok", "Pi finished; handing off to Codex review."));
     return "codex_review";
   }
   if (state.pi_failures < MAX_PI_FAILURES) {

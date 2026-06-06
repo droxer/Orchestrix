@@ -1,25 +1,53 @@
-import { agentLabel, ansi, color, status } from "./format.js";
+import { ansi, color, status } from "./format.js";
 import { asRecord, parseJsonObject } from "./shell.js";
 
-export class PlainTextStreamRenderer {
+const TEXT_MARK = "●";
+const THINK_MARK = "○";
+const TOOL_MARK = "⏺";
+const CONTINUATION_INDENT = "  ";
+
+export class BlockStreamRenderer {
   private atLineStart = true;
+  private blockStarted = false;
 
   constructor(
-    private readonly name: string,
-    private readonly accent: string,
+    private readonly marker: string,
+    private readonly markerColor: string,
+    private readonly bodyStyles: readonly string[] = [],
   ) {}
+
+  resetBlock(): void {
+    this.blockStarted = false;
+    this.atLineStart = true;
+  }
 
   feed(chunk: string): string {
     let output = "";
     for (const char of chunk) {
-      if (this.atLineStart && char !== "\n" && char !== "\r") {
-        output += `${agentLabel(this.name, this.accent)} ${color("|", ansi.dim)} `;
+      if (char === "\r") continue;
+      if (this.atLineStart && char !== "\n") {
+        output += this.blockStarted
+          ? CONTINUATION_INDENT
+          : `${color(this.marker, this.markerColor)} `;
+        this.blockStarted = true;
+        if (this.bodyStyles.length > 0) output += this.bodyStyles.join("");
         this.atLineStart = false;
       }
-      output += char;
-      if (char === "\n") this.atLineStart = true;
+      if (char === "\n") {
+        if (this.bodyStyles.length > 0) output += ansi.reset;
+        output += "\n";
+        this.atLineStart = true;
+      } else {
+        output += char;
+      }
     }
     return output;
+  }
+}
+
+export class PlainTextStreamRenderer extends BlockStreamRenderer {
+  constructor(_name: string, accent: string) {
+    super(TEXT_MARK, accent);
   }
 }
 
@@ -64,15 +92,18 @@ export class JsonLineRenderer {
   }
 }
 
+function toolLine(accent: string, label: string, target: string): string {
+  return `\n${color(TOOL_MARK, accent)} ${color(label, ansi.dim)} ${color(target, accent)}\n`;
+}
+
 export class ClaudeStreamRenderer {
-  private readonly text = new PlainTextStreamRenderer("Claude", ansi.magenta);
-  private readonly thinking = new PlainTextStreamRenderer("Claude thinking", ansi.magenta);
+  private readonly text = new BlockStreamRenderer(TEXT_MARK, ansi.brand);
+  private readonly thinking = new BlockStreamRenderer(THINK_MARK, ansi.dim, [ansi.dim, ansi.italic]);
+  private readonly lines = new JsonLineRenderer((line) => this.formatLine(line));
 
   feed(chunk: string): string {
     return this.lines.feed(chunk);
   }
-
-  private readonly lines = new JsonLineRenderer((line) => this.formatLine(line));
 
   private formatLine(line: string): string {
     const event = parseJsonObject(line);
@@ -84,11 +115,19 @@ export class ClaudeStreamRenderer {
       const contentBlock = asRecord(streamEvent.content_block);
       if (streamEvent.type === "content_block_start") {
         if (contentBlock.type === "tool_use") {
-          return `\n${agentLabel("Claude", ansi.magenta)} ${color("tool", ansi.dim)} ${String(contentBlock.name ?? "unknown")}\n`;
+          this.text.resetBlock();
+          this.thinking.resetBlock();
+          return toolLine(ansi.brand, "tool", String(contentBlock.name ?? "unknown"));
         }
+        if (contentBlock.type === "thinking") this.thinking.resetBlock();
+        else this.text.resetBlock();
         return "";
       }
-      if (streamEvent.type === "content_block_stop") return "\n";
+      if (streamEvent.type === "content_block_stop") {
+        this.text.resetBlock();
+        this.thinking.resetBlock();
+        return "\n";
+      }
       if (delta.type === "text_delta") return this.text.feed(String(delta.text ?? ""));
       if (delta.type === "thinking_delta") return this.thinking.feed(String(delta.thinking ?? ""));
       return "";
@@ -107,14 +146,13 @@ export class ClaudeStreamRenderer {
 }
 
 export class CodexStreamRenderer {
-  private readonly text = new PlainTextStreamRenderer("Codex", ansi.blue);
-  private readonly reasoning = new PlainTextStreamRenderer("Codex reasoning", ansi.blue);
+  private readonly text = new BlockStreamRenderer(TEXT_MARK, ansi.blue);
+  private readonly reasoning = new BlockStreamRenderer(THINK_MARK, ansi.dim, [ansi.dim, ansi.italic]);
+  private readonly lines = new JsonLineRenderer((line) => this.formatLine(line));
 
   feed(chunk: string): string {
     return this.lines.feed(chunk);
   }
-
-  private readonly lines = new JsonLineRenderer((line) => this.formatLine(line));
 
   private formatLine(line: string): string {
     const event = parseJsonObject(line);
@@ -131,15 +169,19 @@ export class CodexStreamRenderer {
     if (typeof event.type === "string" && event.type.startsWith("item.")) {
       const item = asRecord(event.item);
       if (item.type === "agent_message" && event.type === "item.completed") {
-        const text = String(item.text ?? "");
-        return text.trim() ? `\n${this.text.feed(`${text.trim()}\n`)}` : "";
+        const text = String(item.text ?? "").trim();
+        if (!text) return "";
+        this.text.resetBlock();
+        return `\n${this.text.feed(`${text}\n`)}`;
       }
       if (item.type === "reasoning" && event.type === "item.completed") {
-        const text = String(item.text ?? "");
-        return text.trim() ? `\n${this.reasoning.feed(`${text.trim()}\n`)}` : "";
+        const text = String(item.text ?? "").trim();
+        if (!text) return "";
+        this.reasoning.resetBlock();
+        return `\n${this.reasoning.feed(`${text}\n`)}`;
       }
       if (item.type === "command_execution" && event.type === "item.started") {
-        return `\n${agentLabel("Codex", ansi.blue)} ${color("command", ansi.dim)} ${String(item.command ?? "command")}\n`;
+        return toolLine(ansi.blue, "command", String(item.command ?? "command"));
       }
       if (item.type === "file_change" && event.type === "item.completed") {
         return `\n${status("info", "Codex changed files.")}\n`;

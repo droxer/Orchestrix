@@ -14,6 +14,16 @@ import {
   relayEvent,
 } from "../src/relay.js";
 
+function codexReviewStdout(message: string): string {
+  return JSON.stringify({
+    type: "item.completed",
+    item: {
+      type: "agent_message",
+      text: message,
+    },
+  }) + "\n";
+}
+
 describe("Relay session store", () => {
   it("persists append-only events and materialized snapshots", () => {
     const store = new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-sessions-")));
@@ -112,6 +122,22 @@ describe("Relay session controller", () => {
     assert.equal(updated.events.some((event) => event.type === "agent.completed"), true);
   });
 
+  it("reopens a completed session when it is handed off", () => {
+    const store = new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-handoff-agent-")));
+    const controller = new SessionController(store);
+    const session = controller.createSession("fix auth");
+    controller.completeSession(session.id, "Assignments completed.");
+
+    const updated = controller.recordDecision(session.id, "handoff", "Review the fix.", "codex");
+
+    assert.equal(updated.status, "running");
+    assert.equal(updated.phase, "handoff:codex");
+    assert.equal(updated.pendingDecision, undefined);
+    assert.equal(updated.currentAgent, "codex");
+    assert.equal(updated.finalOutcome, undefined);
+    assert.equal(updated.decisions.at(-1)?.targetAgent, "codex");
+  });
+
   it("updates linked task state from agent execution events", async () => {
     const root = mkdtempSync(join(tmpdir(), "relay-linked-task-"));
     const sessionStore = new LocalSessionStore(root);
@@ -142,6 +168,32 @@ describe("Relay session controller", () => {
     assert.deepEqual(updated.linkedSessionIds, [session.id]);
     assert.equal(updated.activity.some((item) => item.message.includes("codex implement started")), true);
     assert.equal(updated.activity.some((item) => item.message.includes("Assignments completed")), true);
+  });
+
+  it("does not complete assignments after a rejected Codex handoff review", async () => {
+    const store = new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-rejected-review-")));
+    const controller = new SessionController(store, {
+      execStream: async (_cmd, _args, options) => {
+        const stdout = codexReviewStdout("Blocking issue found.\nRELAY_REVIEW_VERDICT: REJECTED");
+        options?.stdoutRenderer?.(stdout);
+        return {
+          exit_code: 0,
+          stdout,
+          stderr: "",
+        };
+      },
+    });
+    const session = controller.createSession("review auth fix");
+
+    const state = await controller.runAssignments(session.id, session.taskGoal, [{ agent: "codex", mode: "review" }]);
+    const updated = store.getSession(session.id);
+
+    assert.equal(state.codex_verdict, "rejected");
+    assert.equal(updated.status, "failed");
+    assert.equal(updated.phase, "failed");
+    assert.equal(updated.reviewVerdict, "rejected");
+    assert.equal(updated.finalOutcome, "Codex rejected the work.");
+    assert.equal(updated.events.some((event) => event.type === "session.completed"), false);
   });
 });
 
