@@ -1,5 +1,9 @@
 # Relay
 
+<p align="center">
+  <img src="assets/brand/relay-logo.svg" alt="Relay logo" width="380">
+</p>
+
 Every Employee. Amplified.
 
 Relay is an AI Workforce Intelligence Platform. Its product direction is to give
@@ -27,6 +31,8 @@ sandbox lifecycle, and tool policy while agent CLIs act as execution engines.
   observability, implementation phases, and current local implementation map.
 - [Visual Design](docs/Design.md): marketing/UI design language and visual
   system direction.
+- [Brand Assets](assets/brand/README.md): logo files, usage notes, and color
+  tokens.
 
 ## Product Direction
 

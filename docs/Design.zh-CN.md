@@ -1,23 +1,23 @@
 ---
 version: alpha
 name: Relay-design-zh-CN
-description: Relay 视觉系统采用安静、可信、金融级的品牌语言。基础画布以白色为主，Coinbase Blue (`#0052ff`) 作为唯一强品牌电压，谨慎用于主 CTA、品牌符号和少量内联强调。字体建议使用 CoinbaseDisplay/CoinbaseSans 的替代组合，展示文字保持轻字重，强调编辑感和机构信任，而不是夸张的科技感。
+description: Relay 视觉系统采用安静、可信、机构级企业软件的品牌语言。基础画布以白色为主，Relay Blue (`#0052ff`) 作为唯一强品牌电压，谨慎用于主 CTA、品牌符号和少量内联强调。字体建议使用 Inter，展示文字保持轻字重，强调编辑感和机构信任，而不是夸张的 AI 平台感。
 colors:
   primary: "#0052ff"
   primary-active: "#003ecc"
   primary-disabled: "#a8b8cc"
-  ink: "#0a0b0d"
+  ink: "#18232d"
   body: "#5b616e"
-  body-strong: "#0a0b0d"
+  body-strong: "#18232d"
   muted: "#7c828a"
   muted-soft: "#a8acb3"
   hairline: "#dee1e6"
   hairline-soft: "#eef0f3"
   canvas: "#ffffff"
-  surface-soft: "#f7f7f7"
+  surface-soft: "#f7f6f1"
   surface-card: "#ffffff"
   surface-strong: "#eef0f3"
-  surface-dark: "#0a0b0d"
+  surface-dark: "#18232d"
   surface-dark-elevated: "#16181c"
   on-primary: "#ffffff"
   on-dark: "#ffffff"
@@ -29,9 +29,13 @@ colors:
 
 # Relay 视觉设计
 
+<p align="center">
+  <img src="../assets/brand/relay-logo.svg" alt="Relay logo" width="360">
+</p>
+
 ## 概览
 
-Relay 的营销和产品视觉应呈现“安静可信的机构级平台”，而不是喧闹的 AI 工具或炫技型开发者产品。整体基调接近成熟金融服务品牌：白色画布、克制蓝色、清晰排版、充足留白，以及少量深色 full-bleed hero 承载产品 UI mockup。
+Relay 的营销和产品视觉应呈现“安静可信的机构级平台”，而不是喧闹的 AI 工具或炫技型开发者产品。整体基调是成熟企业软件品牌：白色画布、克制的品牌蓝、清晰排版、充足留白，以及少量深色 full-bleed hero 承载产品 UI mockup。
 
 核心特征：
 
@@ -46,22 +50,22 @@ Relay 的营销和产品视觉应呈现“安静可信的机构级平台”，�
 
 ### 品牌与强调色
 
-- **Primary Blue (`#0052ff`)**：唯一品牌主色。用于主 CTA、品牌 glyph 和内联强调。
-- **Primary Active (`#003ecc`)**：主按钮按下状态。
-- **Primary Disabled (`#a8b8cc`)**：禁用状态。
+- **Relay Blue (`#0052ff`)**：唯一品牌主色。用于主 CTA、品牌 glyph 和内联强调。
+- **Relay Blue Active (`#003ecc`)**：主按钮按下状态。
+- **Relay Blue Disabled (`#a8b8cc`)**：禁用状态。
 - **Accent Yellow (`#f4b000`)**：少量插图或资产符号点缀，不作为操作色。
 
 ### 表面
 
 - **Canvas (`#ffffff`)**：默认页面背景。
-- **Surface Soft (`#f7f7f7`)**：轻微分区背景。
+- **Surface Soft (`#f7f6f1`)**：轻微分区背景。
 - **Surface Strong (`#eef0f3`)**：次级按钮、搜索 pill、图标底板。
-- **Surface Dark (`#0a0b0d`)**：深色 hero 和 CTA band。
+- **Surface Dark (`#18232d`)**：深色 hero 和 CTA band。
 - **Surface Dark Elevated (`#16181c`)**：深色 hero 中浮动 UI 卡片。
 
 ### 文本与边线
 
-- **Ink (`#0a0b0d`)**：标题和强强调。
+- **Ink (`#18232d`)**：标题和强强调。
 - **Body (`#5b616e`)**：正文。
 - **Muted (`#7c828a`)**：辅助说明、页脚。
 - **Hairline (`#dee1e6`)**：默认 1px 分割线。
@@ -75,11 +79,10 @@ Relay 的营销和产品视觉应呈现“安静可信的机构级平台”，�
 
 ## 字体
 
-英文设计稿中的 CoinbaseDisplay、CoinbaseSans、CoinbaseMono 是授权字体。实现时可使用：
+字体使用开放、稳定、工程友好的组合：
 
-- CoinbaseDisplay 替代：Inter，font-weight 400。
-- CoinbaseSans 替代：Inter，font-weight 400/600。
-- CoinbaseMono 替代：JetBrains Mono、Geist Mono 或系统等宽字体。
+- Display / Body：Inter，font-weight 400/600。
+- Mono：JetBrains Mono、Geist Mono 或系统等宽字体。
 
 原则：
 
@@ -127,12 +130,12 @@ Relay 的营销和产品视觉应呈现“安静可信的机构级平台”，�
 
 ### 按钮
 
-- Primary button：蓝色 pill，白字，高 44px，padding 12px 20px。
-- Primary hero CTA：更高的蓝色 pill，高 56px，padding 16px 32px。
+- Primary button：品牌蓝 pill，白字，高 44px，padding 12px 20px。
+- Primary hero CTA：更高的品牌蓝 pill，高 56px，padding 16px 32px。
 - Secondary light：浅灰 pill，深色文字。
 - Secondary dark：深色 elevated surface，白字。
 - Outline on dark：透明 pill，白色描边。
-- Tertiary：透明背景，蓝色文字。
+- Tertiary：透明背景，品牌蓝文字。
 
 ### Hero
 
@@ -152,7 +155,7 @@ Hero 不应只是抽象渐变或装饰图形，必须传达真实产品、工作
 
 ### 表单与搜索
 
-- Text input：白底、12px 圆角、48px 高，focus 时使用蓝色边框。
+- Text input：白底、12px 圆角、48px 高，focus 时使用品牌蓝边框。
 - Search input：浅灰 pill，高 44px。
 - Badge：浅灰小 pill，适合 section label。
 

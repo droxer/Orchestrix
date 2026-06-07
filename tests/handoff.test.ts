@@ -89,6 +89,19 @@ describe("Codex review parsing", () => {
     assert.equal(routeCodexHandoff(state({ codex_verdict: "approved", codex_feedback: feedback })), "__end__");
   });
 
+  it("extracts review verdicts from newer Codex assistant message events", () => {
+    const feedback = extractCodexFeedback(
+      JSON.stringify({
+        type: "message",
+        role: "assistant",
+        content: [{ type: "output_text", text: "Looks good.\nRELAY_REVIEW_VERDICT: APPROVED" }],
+      }) + "\n",
+    );
+
+    assert.equal(feedback, "Looks good.\nRELAY_REVIEW_VERDICT: APPROVED");
+    assert.equal(classifyCodexReview(0, feedback), "approved");
+  });
+
   it("retries Codex runtime failure instead of Claude", () => {
     assert.equal(classifyCodexReview(1, "auth failed"), "failed");
     assert.equal(
@@ -263,10 +276,24 @@ describe("agent stream rendering", () => {
       ].join("\n") + "\n",
     );
 
-    assert.match(output, /Codex is reviewing/);
+    assert.match(output, /Codex started/);
     assert.match(output, /● Looks good/);
     assert.match(output, /Codex finished/);
     assert.doesNotMatch(output, /\{"type":"item.completed"/);
+  });
+
+  it("renders Codex assistant message content from newer JSON event shapes", () => {
+    const renderer = new CodexStreamRenderer();
+    const output = renderer.feed(
+      JSON.stringify({
+        type: "message",
+        role: "assistant",
+        content: [{ type: "output_text", text: "New Codex response shape." }],
+      }) + "\n",
+    );
+
+    assert.match(output, /● New Codex response shape\./);
+    assert.doesNotMatch(output, /\{"type":"message"/);
   });
 
   it("buffers partial JSON lines before rendering", () => {
@@ -436,7 +463,7 @@ describe("Pi provider config", () => {
     );
   });
 
-  it("uses native Minimax provider for known OpenAI env", () => {
+  it("uses OpenAI-compatible Pi config for MiniMax-compatible OpenAI env", () => {
     withEnv(
       {
         OPENAI_API_KEY: "test-key",
@@ -449,12 +476,35 @@ describe("Pi provider config", () => {
         const command = buildPiImplementCommand(state());
         const preflight = buildPiPreflightCommand();
 
+        assert.equal(auth.openai.key, "test-key");
+        const provider = models.providers.openai;
+        assert.equal(provider.baseUrl, "https://api.minimaxi.com/v1");
+        assert.equal(provider.api, "openai-completions");
+        assert.equal(provider.models[0].id, "MiniMax-M2.7");
+        assert.match(command, /--provider openai/);
+        assert.match(command, /--model MiniMax-M2\.7/);
+        assert.match(preflight, /pi --list-models/);
+        assert.match(preflight, /openai MiniMax-M2\.7/);
+      },
+    );
+  });
+
+  it("still allows explicit native MiniMax Pi provider config", () => {
+    withEnv(
+      {
+        PI_API_KEY: "test-key",
+        PI_PROVIDER: "minimax-cn",
+        PI_MODEL: "MiniMax-M2.7",
+      },
+      () => {
+        const auth = JSON.parse(guestPiAuthJson());
+        const models = JSON.parse(guestPiModelsJson());
+        const command = buildPiImplementCommand(state());
+
         assert.equal(auth["minimax-cn"].key, "test-key");
         assert.deepEqual(models, { providers: {} });
         assert.match(command, /--provider minimax-cn/);
         assert.match(command, /--model MiniMax-M2\.7/);
-        assert.match(preflight, /pi --list-models/);
-        assert.match(preflight, /minimax-cn MiniMax-M2\.7/);
       },
     );
   });

@@ -1,5 +1,9 @@
 # Relay
 
+<p align="center">
+  <img src="assets/brand/relay-logo.svg" alt="Relay logo" width="380">
+</p>
+
 每一位员工，都被 AI 放大。
 
 Relay 是一个面向企业的 AI Workforce Intelligence Platform。它的产品方向是为每位员工提供一个长期协作的 AI Partner，把组织知识、业务流程、工具系统和 Agent 执行能力连接起来，让员工更快创造价值。
@@ -14,6 +18,7 @@ Relay 不是“聊天机器人加工具调用”，也不是员工替代系统�
 - [架构设计](docs/Architecture-Design.zh-CN.md)：目标架构、平面划分、运行时层、沙箱策略、MCP Gateway、记忆与治理。
 - [技术实现设计](docs/Technical-Implementation-Design.zh-CN.md)：组件边界、数据模型、API、运行流程、安全、可观测性、实施阶段和当前本地实现映射。
 - [视觉设计](docs/Design.zh-CN.md)：营销与 UI 设计语言、视觉系统方向。
+- [品牌资产](assets/brand/README.md)：logo 文件、使用说明和颜色 token。
 
 英文版本仍保留在同名 `.md` 文件中。
 

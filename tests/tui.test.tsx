@@ -12,6 +12,7 @@ import {
   createDaemonAssignmentRunner,
   shortcutSuggestions,
   parseAssignedTask,
+  replayDaemonAgentOutput,
   validateParsedTask,
   withDefaultAssignments,
   type RunRequest,
@@ -138,13 +139,22 @@ describe("TUI daemon runner", () => {
             runId: "run_daemon",
             agent: "codex",
             stream: "stdout",
-            text: JSON.stringify({
-              type: "item.completed",
-              item: {
-                type: "agent_message",
-                text: "AI response from daemon",
-              },
-            }) + "\n",
+            text: `event: agent.output\ndata: ${JSON.stringify({
+              id: "evt_inner_output_1",
+              type: "agent.output",
+              sessionId: "ses_daemon",
+              timestamp: "2026-06-07T00:00:01.000Z",
+              runId: "run_daemon",
+              agent: "codex",
+              stream: "stdout",
+              text: JSON.stringify({
+                type: "item.completed",
+                item: {
+                  type: "agent_message",
+                  text: "# Review\n- **AI response** from daemon",
+                },
+              }) + "\n",
+            })}\n\n`,
           },
         ],
         decisions: [],
@@ -183,8 +193,164 @@ describe("TUI daemon runner", () => {
     });
     assert.equal(updatedSession, "ses_daemon");
     assert.match(log, /Submitting task to Relay daemon/);
-    assert.match(log, /AI response from daemon/);
+    assert.match(log, /● # Review/);
+    assert.match(log, /- \*\*AI response\*\* from daemon/);
+    assert.doesNotMatch(log, /event: agent\.output/);
+    assert.doesNotMatch(log, /data: /);
+    assert.doesNotMatch(log, /"type":"agent.output"/);
+    assert.doesNotMatch(log, /"text":"\{\\"type\\":\\"item.completed\\"/);
     assert.doesNotMatch(log, /\{"type":"item.completed"/);
+  });
+
+  it("creates and polls daemon sessions while a Codex run is still in flight", async () => {
+    const calls: string[] = [];
+    const outputEvent = {
+      id: "evt_polled_output",
+      type: "agent.output",
+      sessionId: "ses_poll",
+      timestamp: "2026-06-07T00:00:01.000Z",
+      runId: "run_poll",
+      agent: "codex",
+      stream: "stdout",
+      text: JSON.stringify({
+        type: "item.completed",
+        item: {
+          type: "agent_message",
+          text: "Polled Codex output",
+        },
+      }) + "\n",
+    };
+    const session = {
+      id: "ses_poll",
+      workspacePath: "/workspace/alice",
+      taskGoal: "review auth",
+      status: "completed",
+      phase: "completed",
+      participants: ["human", "codex"],
+      currentAgent: undefined,
+      pendingDecision: undefined,
+      createdAt: "2026-06-07T00:00:00.000Z",
+      updatedAt: "2026-06-07T00:00:01.000Z",
+      events: [outputEvent],
+      decisions: [],
+      agentRuns: [{ id: "run_poll", agent: "codex", role: "reviewer", mode: "review", status: "completed" }],
+      artifacts: [],
+    };
+    const fetchFn = async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
+      calls.push(String(url));
+      if (String(url) === "http://daemon.local/sessions" && init?.method === "POST") {
+        return new Response(JSON.stringify({ ...session, events: [] }), {
+          status: 201,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      if (String(url) === "http://daemon.local/sessions/ses_poll") {
+        return new Response(JSON.stringify(session), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      await new Promise((resolve) => setTimeout(resolve, 450));
+      return new Response(JSON.stringify(session), {
+        status: 202,
+        headers: { "Content-Type": "application/json" },
+      });
+    };
+    const { RelayDaemonClient } = await import("../packages/relay-daemon/src/index.js");
+    const client = new RelayDaemonClient({ baseUrl: "http://daemon.local", fetchFn });
+    const runner = createDaemonAssignmentRunner(client, "sbx_alice");
+    let log = "";
+
+    await runner({
+      assignments: [{ agent: "codex", codexMode: "review" }],
+      task: "review auth",
+      log: (text) => {
+        log += text;
+      },
+    });
+
+    assert.ok(calls.includes("http://daemon.local/sessions"));
+    assert.ok(calls.includes("http://daemon.local/sessions/ses_poll"));
+    assert.match(log, /Polled Codex output/);
+  });
+
+  it("replays daemon Pi output as readable transcript text", async () => {
+    const events = [{
+      id: "evt_pi_output",
+      type: "agent.output" as const,
+      sessionId: "ses_pi",
+      timestamp: "2026-06-07T00:00:01.000Z",
+      runId: "run_pi",
+      agent: "pi" as const,
+      stream: "stdout" as const,
+      text: "Pi response line\nnext line\n",
+    }];
+    let log = "";
+
+    replayDaemonAgentOutput(events, new Set(), (text) => {
+      log += text;
+    });
+
+    assert.match(log, /● Pi response line/);
+    assert.match(log, /next line/);
+  });
+
+  it("replays mixed daemon agent output with readable styled markers", async () => {
+    const events = [
+      {
+        id: "evt_claude_output",
+        type: "agent.output" as const,
+        sessionId: "ses_mixed",
+        timestamp: "2026-06-07T00:00:01.000Z",
+        runId: "run_claude",
+        agent: "claude" as const,
+        stream: "stdout" as const,
+        text: JSON.stringify({
+          type: "stream_event",
+          event: {
+            type: "content_block_delta",
+            delta: { type: "text_delta", text: "Claude implemented it." },
+          },
+        }) + "\n",
+      },
+      {
+        id: "evt_pi_output",
+        type: "agent.output" as const,
+        sessionId: "ses_mixed",
+        timestamp: "2026-06-07T00:00:02.000Z",
+        runId: "run_pi",
+        agent: "pi" as const,
+        stream: "stdout" as const,
+        text: "Pi verified it.\n",
+      },
+      {
+        id: "evt_codex_output",
+        type: "agent.output" as const,
+        sessionId: "ses_mixed",
+        timestamp: "2026-06-07T00:00:03.000Z",
+        runId: "run_codex",
+        agent: "codex" as const,
+        stream: "stdout" as const,
+        text: JSON.stringify({
+          type: "item.completed",
+          item: {
+            type: "agent_message",
+            text: "Codex approved it.",
+          },
+        }) + "\n",
+      },
+    ];
+    let log = "";
+
+    replayDaemonAgentOutput(events, new Set(), (text) => {
+      log += text;
+    });
+
+    assert.match(log, /● Claude implemented it\./);
+    assert.match(log, /● Pi verified it\./);
+    assert.match(log, /● Codex approved it\./);
+    assert.doesNotMatch(log, /stream_event/);
+    assert.doesNotMatch(log, /item\.completed/);
   });
 });
 
@@ -425,7 +591,7 @@ describe("RelayTui component", () => {
       <RelayTui
         sessionStore={testSessionStore()}
         runner={async (request) => {
-          request.log("\n# Plan\n- Use **tests** and `build`\n> shipped\n```ts\nconst ok = true;\n```\n");
+          request.log("\n# Plan\n- Use **tests** and `build`\n> shipped\n```json\n{\"ok\":true}\n```\n");
         }}
       />,
     );
@@ -439,11 +605,89 @@ describe("RelayTui component", () => {
     assert.match(frame, /Plan/);
     assert.match(frame, /- Use tests and build/);
     assert.match(frame, /│ shipped/);
-    assert.match(frame, /│ const ok = true;/);
+    assert.match(frame, /│ \{"ok":true\}/);
     assert.doesNotMatch(frame, /# Plan/);
     assert.doesNotMatch(frame, /\*\*tests\*\*/);
     assert.doesNotMatch(frame, /`build`/);
-    assert.doesNotMatch(frame, /```ts/);
+    assert.doesNotMatch(frame, /```json/);
+  });
+
+  it("parses raw SSE and JSON transcript events into markdown output", async () => {
+    const { lastFrame, stdin } = render(
+      <RelayTui
+        sessionStore={testSessionStore()}
+        runner={async (request) => {
+          request.log(`event: agent.output\ndata: ${JSON.stringify({
+            type: "agent.output",
+            text: JSON.stringify({
+              type: "item.completed",
+              item: {
+                type: "agent_message",
+                text: "# Review\n- **AI response** from JSON",
+              },
+            }) + "\n",
+          })}\n\n`);
+          request.log(JSON.stringify({
+            type: "item.completed",
+            item: {
+              type: "agent_message",
+              text: "## Direct\n- Use `build`",
+            },
+          }) + "\n");
+          request.log(JSON.stringify({
+            type: "message",
+            role: "assistant",
+            content: [{ type: "output_text", text: "Top-level Codex message" }],
+          }) + "\n");
+          request.log(`● Hi${JSON.stringify({
+            type: "streamevent",
+            event: {
+              type: "contentblockdelta",
+              index: 1,
+              delta: { type: "textdelta", text: "!" },
+            },
+            sessionid: "ses_json",
+          })}${JSON.stringify({
+            type: "streamevent",
+            event: {
+              type: "contentblockdelta",
+              index: 1,
+              delta: { type: "textdelta", text: "\nHow" },
+            },
+            sessionid: "ses_json",
+          })}${JSON.stringify({
+            type: "streamevent",
+            event: {
+              type: "contentblockdelta",
+              index: 1,
+              delta: { type: "textdelta", text: "\ncan" },
+            },
+            sessionid: "ses_json",
+          })}\n`);
+        }}
+      />,
+    );
+
+    stdin.write("@claude parse raw json");
+    await waitForInput();
+    stdin.write("\r");
+    await waitForInput();
+
+    const frame = lastFrame() ?? "";
+    assert.match(frame, /Review/);
+    assert.match(frame, /- AI response from JSON/);
+    assert.match(frame, /Direct/);
+    assert.match(frame, /- Use build/);
+    assert.match(frame, /Top-level Codex message/);
+    assert.match(frame, /● Hi!/);
+    assert.match(frame, /How/);
+    assert.match(frame, /can/);
+    assert.doesNotMatch(frame, /event: agent\.output/);
+    assert.doesNotMatch(frame, /data: /);
+    assert.doesNotMatch(frame, /streamevent/);
+    assert.doesNotMatch(frame, /contentblockdelta/);
+    assert.doesNotMatch(frame, /"type":"agent.output"/);
+    assert.doesNotMatch(frame, /\{"type":"item.completed"/);
   });
 
   it("strips the renderers' inline ANSI from AI responses", async () => {

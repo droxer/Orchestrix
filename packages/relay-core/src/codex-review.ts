@@ -4,12 +4,9 @@ export function extractCodexFeedback(stdout: string): string {
   const messages: string[] = [];
   for (const line of stdout.split(/\r?\n/)) {
     try {
-      const event = JSON.parse(line) as { type?: string; item?: { type?: string; text?: unknown } };
-      if (event.type !== "item.completed") continue;
-      if (event.item?.type === "agent_message") {
-        const text = String(event.item.text ?? "").trim();
-        if (text) messages.push(text);
-      }
+      const event = JSON.parse(line) as unknown;
+      const text = codexMessageText(event).trim();
+      if (text) messages.push(text);
     } catch {
       continue;
     }
@@ -29,4 +26,36 @@ export function classifyCodexReview(exitCode: number, feedback: string): CodexRe
   if (verdict === "APPROVED") return "approved";
   if (verdict === "REJECTED") return "rejected";
   return "failed";
+}
+
+function codexMessageText(value: unknown): string {
+  if (value === null || typeof value !== "object") return "";
+  const event = value as Record<string, unknown>;
+  if (event.type === "item.completed") {
+    const item = event.item;
+    if (item !== null && typeof item === "object") {
+      const itemRecord = item as Record<string, unknown>;
+      if (itemRecord.type === "agent_message") return textFromRecord(itemRecord);
+    }
+  }
+  if (event.type === "message" || event.type === "assistant_message") {
+    return textFromRecord(event);
+  }
+  return "";
+}
+
+function textFromRecord(record: Record<string, unknown>): string {
+  if (typeof record.text === "string") return record.text;
+  if (typeof record.content === "string") return record.content;
+  if (!Array.isArray(record.content)) return "";
+  return record.content
+    .map((chunk) => {
+      if (chunk === null || typeof chunk !== "object") return "";
+      const chunkRecord = chunk as Record<string, unknown>;
+      if (typeof chunkRecord.text === "string") return chunkRecord.text;
+      if (typeof chunkRecord.content === "string") return chunkRecord.content;
+      return "";
+    })
+    .filter(Boolean)
+    .join("\n");
 }

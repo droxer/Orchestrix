@@ -20,6 +20,13 @@ export interface RunSandboxInput {
   signal?: AbortSignal;
 }
 
+export interface CreateSessionInput {
+  taskGoal: string;
+  assignments?: SandboxRunAssignment[];
+  workspacePath?: string;
+  signal?: AbortSignal;
+}
+
 export class RelayDaemonClient {
   private readonly baseUrl: string;
   private readonly fetchFn: typeof fetch;
@@ -40,6 +47,22 @@ export class RelayDaemonClient {
 
   async getSandbox(sandboxId: string): Promise<SandboxRecord> {
     return this.request<SandboxRecord>(`/sandboxes/${encodeURIComponent(sandboxId)}`);
+  }
+
+  async createSession(input: CreateSessionInput): Promise<RelaySession> {
+    return this.request<RelaySession>("/sessions", {
+      method: "POST",
+      signal: input.signal,
+      body: {
+        taskGoal: input.taskGoal,
+        assignments: input.assignments,
+        workspacePath: input.workspacePath,
+      },
+    });
+  }
+
+  async getSession(sessionId: string, signal?: AbortSignal): Promise<RelaySession> {
+    return this.request<RelaySession>(`/sessions/${encodeURIComponent(sessionId)}`, { signal });
   }
 
   async runSandbox(input: RunSandboxInput): Promise<RelaySession> {

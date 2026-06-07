@@ -101,6 +101,7 @@ export {
 } from "./relay/server.js";
 
 export {
+  LocalDaemonStore,
   LocalDaemonNodeStorage,
   LocalSandboxBackend,
   DaemonNodeRegistry,
@@ -108,11 +109,16 @@ export {
   handleRelayDaemonRequest,
   routeDaemonRequest,
   serveRelayDaemon,
+  type DaemonCommandRecord,
+  type DaemonCommandStatus,
+  type DaemonEvent,
   type RelayDaemonOptions,
   type RelayDaemonResponse,
   type DaemonNodeActiveRun,
   type DaemonNodeMonitorRecord,
-  type DaemonNodeStorage,
+  type DaemonRunRecord,
+  type DaemonRunStatus,
+  type DaemonStore,
   type SandboxBackend,
   type SandboxRecord,
   type SandboxRunAssignment,
@@ -138,6 +144,7 @@ export {
 export {
   RelayDaemonClient,
   normalizeBaseUrl,
+  type CreateSessionInput,
   type ProvisionSandboxInput,
   type RelayDaemonClientOptions,
   type RunSandboxInput,

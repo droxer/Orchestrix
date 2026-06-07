@@ -1,5 +1,9 @@
 # Relay 产品计划 V1.0
 
+<p align="center">
+  <img src="../assets/brand/relay-logo.svg" alt="Relay logo" width="360">
+</p>
+
 每一位员工，都被 AI 放大。
 
 Relay 是面向 AI 时代的企业 Workforce Intelligence Platform。目标是最大化员工生产力和价值创造，而不是替代员工。

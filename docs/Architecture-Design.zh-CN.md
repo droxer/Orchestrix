@@ -1,5 +1,9 @@
 # Relay 架构设计 V2.0
 
+<p align="center">
+  <img src="../assets/brand/relay-logo.svg" alt="Relay logo" width="360">
+</p>
+
 企业 AI Workforce Platform / Agent Runtime / Sandbox / Memory / Governance
 
 本文定义 Relay 的目标架构、战略技术选择和架构决策方向。实现级边界、数据模型、API、运行流程和工程阶段见 [Technical-Implementation-Design.zh-CN.md](Technical-Implementation-Design.zh-CN.md)。

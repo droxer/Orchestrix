@@ -61,12 +61,15 @@ const RELAY_OK = "green";
 const RELAY_WARN = "yellow";
 const RELAY_ERR = "red";
 const RELAY_INFO = "cyan";
-const RELAY_THINK = "magenta";
+const RELAY_THINK = "gray";
+const RELAY_TOOL = "magenta";
+const RELAY_CODE = "cyan";
 const BRAND_MARK = "✻";
 const TEXT_MARK = "●";
 const THINK_MARK = "○";
 const TOOL_MARK = "⏺";
 const SPINNER_FRAMES = ["·", "✢", "*", "✳", "✶", "✻", "✽"] as const;
+const DAEMON_POLL_INTERVAL_MS = 400;
 const STATUS_LABELS: Record<string, string> = {
   OK: RELAY_OK,
   WARN: RELAY_WARN,
@@ -217,19 +220,93 @@ export function createDaemonAssignmentRunner(
       throw new Error("Assign the task with @claude, @pi, or @codex.");
     }
     request.log("\nSubmitting task to Relay daemon.\n");
-    const session = await client.runSandbox({
+    const assignments = request.assignments.map((assignment) => ({
+      agent: assignment.agent,
+      mode: assignment.agent === "codex" ? assignment.codexMode ?? "implement" : "implement",
+    }));
+    const sessionId = request.sessionId ?? (await client.createSession({
+      taskGoal: request.task,
+      workspacePath: request.workspacePath,
+      assignments,
+      signal: request.signal,
+    })).id;
+    if (!request.sessionId) {
+      request.onSessionUpdate?.(await client.getSession(sessionId, request.signal));
+    }
+    const run = client.runSandbox({
       sandboxId,
       taskGoal: request.task,
-      sessionId: request.sessionId,
+      sessionId,
       signal: request.signal,
-      assignments: request.assignments.map((assignment) => ({
-        agent: assignment.agent,
-        mode: assignment.agent === "codex" ? assignment.codexMode ?? "implement" : "implement",
-      })),
+      assignments,
+    });
+    const session = await pollDaemonRunOutput(client, sessionId, run, {
+      deliveredEventIds,
+      log: request.log,
+      renderers,
+      signal: request.signal,
+      onSessionUpdate: request.onSessionUpdate,
     });
     replayDaemonAgentOutput(session.events, deliveredEventIds, request.log, renderers);
     request.onSessionUpdate?.(session);
   };
+}
+
+async function pollDaemonRunOutput(
+  client: RelayDaemonClient,
+  sessionId: string,
+  run: Promise<RelaySession>,
+  options: {
+    deliveredEventIds: Set<string>;
+    log: (text: string) => void;
+    renderers: Map<string, { feed(chunk: string): string }>;
+    signal?: AbortSignal;
+    onSessionUpdate?: (session: RelaySession) => void;
+  },
+): Promise<RelaySession> {
+  let settled = false;
+  let finalSession: RelaySession | undefined;
+  let failure: unknown;
+  const trackedRun = run.then(
+    (session) => {
+      settled = true;
+      finalSession = session;
+    },
+    (error: unknown) => {
+      settled = true;
+      failure = error;
+    },
+  );
+
+  while (!settled) {
+    await delay(DAEMON_POLL_INTERVAL_MS, options.signal);
+    if (settled) break;
+    if (options.signal?.aborted) break;
+    try {
+      const session = await client.getSession(sessionId, options.signal);
+      replayDaemonAgentOutput(session.events, options.deliveredEventIds, options.log, options.renderers);
+      options.onSessionUpdate?.(session);
+    } catch (error) {
+      if (options.signal?.aborted) break;
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes("Not found")) throw error;
+    }
+  }
+
+  await trackedRun;
+  if (failure) throw failure;
+  return finalSession ?? client.getSession(sessionId, options.signal);
+}
+
+function delay(ms: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) return Promise.resolve();
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener("abort", () => {
+      clearTimeout(timer);
+      resolve();
+    }, { once: true });
+  });
 }
 
 export function replayDaemonAgentOutput(
@@ -241,9 +318,55 @@ export function replayDaemonAgentOutput(
   for (const event of events) {
     if (event.type !== "agent.output" || deliveredEventIds.has(event.id)) continue;
     deliveredEventIds.add(event.id);
-    const rendered = rendererForDaemonOutput(event, renderers).feed(event.text);
+    const rendered = rendererForDaemonOutput(event, renderers).feed(daemonRendererInput(event.text));
     if (rendered) log(rendered);
   }
+}
+
+function daemonRendererInput(text: string): string {
+  const output: string[] = [];
+  let unwrapped = false;
+
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (trimmed.startsWith("event:")) {
+      unwrapped = true;
+      continue;
+    }
+    if (trimmed.startsWith("data:")) {
+      unwrapped = true;
+      const payload = trimmed.slice("data:".length).trimStart();
+      output.push(withTrailingNewline(agentOutputTextPayload(payload) ?? payload));
+      continue;
+    }
+    const payload = agentOutputTextPayload(trimmed);
+    if (payload !== undefined) {
+      unwrapped = true;
+      output.push(withTrailingNewline(payload));
+    } else if (unwrapped) {
+      output.push(`${line}\n`);
+    }
+  }
+
+  return unwrapped ? output.join("") : text;
+}
+
+function agentOutputTextPayload(value: string): string | undefined {
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (parsed === null || typeof parsed !== "object") return undefined;
+    const record = parsed as Record<string, unknown>;
+    return record.type === "agent.output" && typeof record.text === "string"
+      ? record.text
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function withTrailingNewline(value: string): string {
+  return value.endsWith("\n") ? value : `${value}\n`;
 }
 
 function rendererForDaemonOutput(
@@ -285,11 +408,205 @@ function pushLines(existing: string[], text: string): string[] {
   // The TUI renders styling through Ink, so drop the renderers' inline ANSI
   // before it lands in the transcript buffer — otherwise the escape codes
   // fight Ink's own colours and corrupt width/markdown parsing.
-  const incoming = splitToLines(stripAnsi(text));
+  const incoming = splitToLines(stripAnsi(normalizeTranscriptText(text)));
   const merged = existing.length === 0
     ? incoming
     : [...existing.slice(0, -1), `${existing[existing.length - 1]}${incoming[0]}`, ...incoming.slice(1)];
   return merged.length > MAX_LOG_LINES ? merged.slice(merged.length - MAX_LOG_LINES) : merged;
+}
+
+function normalizeTranscriptText(text: string): string {
+  const output: string[] = [];
+  let sawTransportOrJson = false;
+
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      output.push(line);
+      continue;
+    }
+    if (trimmed.startsWith("event:")) {
+      sawTransportOrJson = true;
+      continue;
+    }
+    if (trimmed.startsWith("data:")) {
+      sawTransportOrJson = true;
+      const payload = trimmed.slice("data:".length).trimStart();
+      const display = displayTextFromJson(payload);
+      if (display) output.push(display);
+      continue;
+    }
+
+    const display = displayTextFromJson(trimmed);
+    if (display !== undefined) {
+      sawTransportOrJson = true;
+      if (display) output.push(display);
+      continue;
+    }
+
+    const mixedDisplay = displayTextFromMixedLine(line);
+    if (mixedDisplay !== undefined) {
+      sawTransportOrJson = true;
+      if (mixedDisplay) output.push(mixedDisplay);
+      continue;
+    }
+
+    output.push(line);
+  }
+
+  if (!sawTransportOrJson) return text;
+  return output.join("\n");
+}
+
+function displayTextFromJson(value: string): string | undefined {
+  try {
+    return displayTextFromValue(JSON.parse(value));
+  } catch {
+    return undefined;
+  }
+}
+
+function displayTextFromMixedLine(line: string): string | undefined {
+  let output = "";
+  let cursor = 0;
+  let sawDisplayJson = false;
+
+  while (cursor < line.length) {
+    const start = line.indexOf("{", cursor);
+    if (start < 0) {
+      output += line.slice(cursor);
+      break;
+    }
+
+    output += line.slice(cursor, start);
+    const end = jsonObjectEnd(line, start);
+    if (end < 0) {
+      output += line.slice(start);
+      break;
+    }
+
+    const json = line.slice(start, end + 1);
+    const display = displayTextFromJson(json);
+    if (display === undefined) {
+      output += json;
+    } else {
+      sawDisplayJson = true;
+      output += display;
+    }
+    cursor = end + 1;
+  }
+
+  return sawDisplayJson ? output : undefined;
+}
+
+function jsonObjectEnd(value: string, start: number): number {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let index = start; index < value.length; index += 1) {
+    const char = value[index];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === "\"") inString = false;
+      continue;
+    }
+    if (char === "\"") {
+      inString = true;
+    } else if (char === "{") {
+      depth += 1;
+    } else if (char === "}") {
+      depth -= 1;
+      if (depth === 0) return index;
+    }
+  }
+
+  return -1;
+}
+
+function displayTextFromValue(value: unknown): string | undefined {
+  if (value === null || typeof value !== "object") return undefined;
+  const record = value as Record<string, unknown>;
+  const type = normalizedEventType(record.type);
+
+  if (type === "agent.output" && typeof record.text === "string") {
+    return normalizeTranscriptText(record.text);
+  }
+
+  if (type === "streamevent") {
+    const event = record.event;
+    if (event !== null && typeof event === "object") {
+      const eventRecord = event as Record<string, unknown>;
+      const eventType = normalizedEventType(eventRecord.type);
+      const delta = eventRecord.delta;
+      if (eventType === "contentblockdelta" && delta !== null && typeof delta === "object") {
+        const deltaRecord = delta as Record<string, unknown>;
+        const deltaType = normalizedEventType(deltaRecord.type);
+        if (deltaType === "textdelta" && typeof deltaRecord.text === "string") return deltaRecord.text;
+        if (deltaType === "thinkingdelta" && typeof deltaRecord.thinking === "string") return deltaRecord.thinking;
+      }
+      if (eventType === "contentblockstart" || eventType === "contentblockstop") return "";
+    }
+  }
+
+  if (type === "item.completed" || type === "item.started") {
+    const item = record.item;
+    if (item !== null && typeof item === "object") {
+      const itemRecord = item as Record<string, unknown>;
+      if (
+        (itemRecord.type === "agent_message" || itemRecord.type === "reasoning")
+        && typeof itemRecord.text === "string"
+      ) {
+        return itemRecord.text;
+      }
+    }
+  }
+
+  if (typeof record.delta === "string") return record.delta;
+  if (typeof record.text === "string") return record.text;
+  if (typeof record.content === "string") return record.content;
+  const topLevelContent = textFromContentArray(record.content);
+  if (topLevelContent) return topLevelContent;
+  if (typeof record.message === "string") return record.message;
+
+  const item = record.item;
+  if (item !== null && typeof item === "object") {
+    const itemRecord = item as Record<string, unknown>;
+    if (typeof itemRecord.text === "string") return itemRecord.text;
+    if (typeof itemRecord.content === "string") return itemRecord.content;
+    const content = textFromContentArray(itemRecord.content);
+    if (content) return content;
+  }
+
+  const message = record.message;
+  if (message !== null && typeof message === "object") {
+    const messageRecord = message as Record<string, unknown>;
+    if (typeof messageRecord.text === "string") return messageRecord.text;
+    if (typeof messageRecord.content === "string") return messageRecord.content;
+    const content = textFromContentArray(messageRecord.content);
+    if (content) return content;
+  }
+
+  return typeof record.type === "string" ? "" : undefined;
+}
+
+function textFromContentArray(value: unknown): string {
+  if (!Array.isArray(value)) return "";
+  return value
+    .map((chunk) => {
+      if (chunk === null || typeof chunk !== "object") return "";
+      const chunkRecord = chunk as Record<string, unknown>;
+      if (typeof chunkRecord.text === "string") return chunkRecord.text;
+      if (typeof chunkRecord.content === "string") return chunkRecord.content;
+      return "";
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
+function normalizedEventType(value: unknown): string {
+  return typeof value === "string" ? value.replace(/_/g, "").toLowerCase() : "";
 }
 
 export function RelayTui({
@@ -334,7 +651,9 @@ export function RelayTui({
     abortRef.current?.abort();
   }, []);
 
-  const visibleLogs = useMemo(() => [...bootLogLines, ...logLines].slice(-VISIBLE_LOG_LINES), [bootLogLines, logLines]);
+  const allLogs = useMemo(() => [...bootLogLines, ...logLines], [bootLogLines, logLines]);
+  const visibleLogs = useMemo(() => allLogs.slice(-VISIBLE_LOG_LINES), [allLogs]);
+  const hiddenLogCount = Math.max(0, allLogs.length - visibleLogs.length);
   const queueLabel = !ready ? "booting" : isRunning ? "running" : "ready";
   const workspace = workspacePath ?? session?.hostWorkspace ?? "(test workspace)";
   const inputWidth = Math.max(20, (process.stdout.columns ?? 80) - 6);
@@ -623,7 +942,7 @@ export function RelayTui({
         </Text>
       </Box>
       <Box flexDirection="column" flexGrow={1} paddingX={1} marginTop={1}>
-        {renderMarkdownTranscript(visibleLogs)}
+        {renderMarkdownTranscript(visibleLogs, hiddenLogCount)}
       </Box>
       <Box
         borderStyle="round"
@@ -686,30 +1005,51 @@ export function RelayTui({
   );
 }
 
-function renderMarkdownTranscript(lines: string[]): React.ReactElement[] {
+function renderMarkdownTranscript(lines: string[], hiddenCount: number): React.ReactElement[] {
+  const output: React.ReactElement[] = [];
+  if (hiddenCount > 0) {
+    output.push(
+      <Text key="truncation-header" dimColor>
+        {truncationRule(hiddenCount)}
+      </Text>,
+    );
+  }
   let inCodeBlock = false;
-  return lines.map((line, index) => {
+  lines.forEach((line, index) => {
     const key = `log-${index}`;
     if (/^\s*```/.test(line)) {
       inCodeBlock = !inCodeBlock;
       const language = line.replace(/^\s*```/, "").trim();
-      return (
-        <Text key={key} dimColor>
-          {language ? `code ${language}` : "code"}
-        </Text>
+      output.push(
+        <Text key={key}>
+          <Text color={RELAY_CODE} inverse>{` ${language || "code"} `}</Text>
+          <Text dimColor>{"  ─────────"}</Text>
+        </Text>,
       );
+      return;
     }
-    return renderMarkdownLine(line, key, inCodeBlock);
+    output.push(renderMarkdownLine(line, key, inCodeBlock));
   });
+  return output;
+}
+
+function truncationRule(hiddenCount: number): string {
+  const width = Math.max(8, Math.min((process.stdout.columns ?? 80) - 6, 80));
+  const label = ` ${hiddenCount} earlier line${hiddenCount === 1 ? "" : "s"} hidden `;
+  if (label.length + 6 >= width) return label.trim();
+  const dashes = width - label.length;
+  const left = Math.floor(dashes / 2);
+  const right = dashes - left;
+  return `${"─".repeat(left)}${label}${"─".repeat(right)}`;
 }
 
 function renderMarkdownLine(line: string, key: string, inCodeBlock: boolean): React.ReactElement {
   if (line.length === 0) return <Text key={key}> </Text>;
   if (inCodeBlock) {
     return (
-      <Text key={key} color="green">
+      <Text key={key}>
         <Text dimColor>│ </Text>
-        {line}
+        <Text>{line}</Text>
       </Text>
     );
   }
@@ -795,7 +1135,7 @@ function renderAgentMarkerLine(line: string, key: string): React.ReactElement | 
     return (
       <Text key={key}>
         <Text color={RELAY_THINK} dimColor>{`${THINK_MARK} `}</Text>
-        <Text dimColor italic>{thinking[1]}</Text>
+        <Text color={RELAY_THINK} dimColor italic>{thinking[1]}</Text>
       </Text>
     );
   }
@@ -804,9 +1144,14 @@ function renderAgentMarkerLine(line: string, key: string): React.ReactElement | 
   if (tool) {
     return (
       <Text key={key}>
-        <Text color={RELAY_ACCENT}>{`${TOOL_MARK} `}</Text>
-        <Text dimColor>{tool[1]}</Text>
-        {tool[2] ? <Text color={RELAY_ACCENT}>{` ${tool[2]}`}</Text> : null}
+        <Text color={RELAY_TOOL}>{`${TOOL_MARK} `}</Text>
+        <Text color={RELAY_TOOL} bold>{tool[1]}</Text>
+        {tool[2] ? (
+          <>
+            <Text dimColor>{" · "}</Text>
+            <Text>{tool[2]}</Text>
+          </>
+        ) : null}
       </Text>
     );
   }
@@ -821,9 +1166,9 @@ function renderStatusLine(line: string, key: string): React.ReactElement | null 
   const tone = STATUS_LABELS[match[1]];
   return (
     <Text key={key}>
-      <Text color={tone} bold>{match[1]}</Text>
+      <Text color={tone} bold inverse>{` ${match[1]} `}</Text>
       <Text>{"  "}</Text>
-      <Text dimColor>{match[2]}</Text>
+      <Text>{match[2]}</Text>
     </Text>
   );
 }
@@ -842,7 +1187,7 @@ function renderInlineMarkdown(text: string, keyPrefix: string): React.ReactNode[
 
     if (token.startsWith("`")) {
       segments.push(
-        <Text key={key} color="yellow">
+        <Text key={key} inverse>
           {token.slice(1, -1)}
         </Text>,
       );

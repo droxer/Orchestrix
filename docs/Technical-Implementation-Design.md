@@ -1,5 +1,9 @@
 # Relay Technical Implementation Design V1.0
 
+<p align="center">
+  <img src="../assets/brand/relay-logo.svg" alt="Relay logo" width="360">
+</p>
+
 Enterprise AI Workforce Platform / Control Plane / Agent Runtime / Execution Plane / Memory / Governance
 
 This document translates Relay's product and architecture strategy into an implementation blueprint. It is intentionally more concrete than the architecture deep dive: it defines deployable services, ownership boundaries, data models, runtime flows, integration contracts, and phased delivery.

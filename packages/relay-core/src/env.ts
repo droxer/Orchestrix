@@ -120,15 +120,15 @@ export function piModel(): string | undefined {
 export function piProvider(): string {
   if (process.env.PI_PROVIDER) return process.env.PI_PROVIDER;
   const baseUrl = piSourceBaseUrl();
-  if (!baseUrl) return "anthropic";
-  if (baseUrl.includes("api.minimaxi.com")) return "minimax-cn";
-  if (baseUrl.includes("api.minimax.io")) return "minimax";
-  return "openai";
+  if (baseUrl) return "openai";
+  if (anthropicApiKey()) return "anthropic";
+  if (openaiApiKey()) return "openai";
+  return "anthropic";
 }
 
 export function piBaseUrl(): string | undefined {
   if (process.env.PI_BASE_URL) return process.env.PI_BASE_URL;
-  if (PI_NATIVE_BASE_URL_PROVIDERS.has(piProvider())) return undefined;
+  if (process.env.PI_PROVIDER && PI_NATIVE_BASE_URL_PROVIDERS.has(process.env.PI_PROVIDER)) return undefined;
   return openaiBaseUrl();
 }
 

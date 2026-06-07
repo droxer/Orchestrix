@@ -1,5 +1,9 @@
 # Relay Product Plan V1.0
 
+<p align="center">
+  <img src="../assets/brand/relay-logo.svg" alt="Relay logo" width="360">
+</p>
+
 Every Employee. Amplified.
 
 An enterprise Workforce Intelligence Platform for the AI era.

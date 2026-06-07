@@ -1,8 +1,10 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { assignmentFailureOutcome, SessionController, type WorkflowStep } from "./controller.js";
+import { handleRelayApiRequest } from "./server.js";
 import {
   DEFAULT_RELAY_DATA_DIR,
   LocalSessionStore,
@@ -28,6 +30,7 @@ import {
   type CodexTaskMode,
 } from "relay-core";
 import { ensureAgentReady, withOrchestratorSession } from "./workflow.js";
+import { LocalTaskStore } from "./task.js";
 
 export type SandboxStatus = "provisioning" | "ready" | "running" | "stopped" | "failed";
 
@@ -40,6 +43,7 @@ export interface SandboxRecord {
   status: SandboxStatus;
   agents: Record<AgentName, "unknown" | "ready" | "failed">;
   token?: string;
+  tokenHash?: string;
   createdAt: string;
   updatedAt: string;
   lastSeenAt?: string;
@@ -75,7 +79,7 @@ export interface DaemonNodeActiveRun {
   startedAt: string;
 }
 
-export interface DaemonNodeMonitorRecord extends Omit<SandboxRecord, "token"> {
+export interface DaemonNodeMonitorRecord extends Omit<SandboxRecord, "token" | "tokenHash"> {
   queuedCommandCount: number;
   activeRuns: DaemonNodeActiveRun[];
 }
@@ -84,9 +88,75 @@ interface TrackedDaemonNodeActiveRun extends DaemonNodeActiveRun {
   sandboxId: string;
 }
 
-export interface DaemonNodeStorage {
-  load(): SandboxRecord[];
-  save(sandbox: SandboxRecord): void;
+const DAEMON_RUN_TIMEOUT_MS = 15 * 60 * 1000;
+
+export type DaemonCommandStatus = "queued" | "dispatched" | "completed" | "failed";
+export type DaemonRunStatus = "running" | "completed" | "failed";
+
+export interface DaemonCommandRecord {
+  id: string;
+  nodeId: string;
+  command: DaemonNodeCommand;
+  status: DaemonCommandStatus;
+  createdAt: string;
+  updatedAt: string;
+  dispatchedAt?: string;
+  completedAt?: string;
+  error?: string;
+}
+
+export interface DaemonRunRecord extends DaemonNodeActiveRun {
+  nodeId: string;
+  status: DaemonRunStatus;
+  completedAt?: string;
+  exitCode?: number;
+  error?: string;
+}
+
+export type DaemonEvent =
+  | {
+      id: string;
+      type: "daemon.node.registered";
+      timestamp: string;
+      node: SandboxRecord;
+    }
+  | {
+      id: string;
+      type: "daemon.node.seen";
+      timestamp: string;
+      nodeId: string;
+      patch: Pick<Partial<SandboxRecord>, "status" | "lastError" | "lastSeenAt">;
+    }
+  | {
+      id: string;
+      type: "daemon.command.queued" | "daemon.command.dispatched";
+      timestamp: string;
+      nodeId: string;
+      commandId: string;
+    }
+  | {
+      id: string;
+      type: "daemon.command.completed" | "daemon.command.failed";
+      timestamp: string;
+      nodeId: string;
+      commandId: string;
+      runId?: string;
+      exitCode?: number;
+      error?: string;
+    };
+
+export interface DaemonStore {
+  registerNode(input: SandboxRecord): SandboxRecord;
+  markNodeSeen(nodeId: string, patch?: Pick<Partial<SandboxRecord>, "status" | "lastError">): SandboxRecord | undefined;
+  getNode(nodeId: string): SandboxRecord | undefined;
+  listNodes(): SandboxRecord[];
+  enqueueCommand(nodeId: string, command: DaemonNodeCommand): DaemonCommandRecord;
+  takeQueuedCommands(nodeId: string, limit?: number): DaemonCommandRecord[];
+  queuedCommandCount(nodeId: string): number;
+  listActiveRuns(nodeId?: string): DaemonRunRecord[];
+  markCommandCompleted(nodeId: string, event: Extract<DaemonNodeEvent, { type: "run.completed" }>): void;
+  markCommandFailed(nodeId: string, event: Extract<DaemonNodeEvent, { type: "run.failed" }>): void;
+  appendDaemonEvent(event: DaemonEvent): void;
 }
 
 export interface RelayDaemonOptions {
@@ -94,7 +164,7 @@ export interface RelayDaemonOptions {
   host?: string;
   backend?: SandboxBackend;
   daemonNodeMode?: "reverse" | "local";
-  daemonNodeStorage?: DaemonNodeStorage;
+  daemonStore?: DaemonStore;
   store?: SessionStore;
   sink?: AgentOutputSink;
   execStream?: AgentExecutor;
@@ -108,7 +178,7 @@ export interface RelayDaemonResponse {
 
 export function serveRelayDaemon(options: RelayDaemonOptions = {}): void {
   const store = options.store ?? new LocalSessionStore();
-  const daemonNodeRegistry = new DaemonNodeRegistry(store, options.daemonNodeStorage);
+  const daemonNodeRegistry = new DaemonNodeRegistry(store, options.daemonStore);
   const backend = options.backend ?? (options.daemonNodeMode === "local"
     ? new LocalSandboxBackend({
         store,
@@ -197,6 +267,16 @@ export async function handleRelayDaemonRequest(
     reverseRegistry.handleEvent(parts[1], daemonNodeEvent(body), authToken);
     return jsonResponse(202, { ok: true });
   }
+  if (parts[0] === "sessions") {
+    if (!reverseRegistry) return jsonResponse(404, { error: "Session store is not available." });
+    return handleRelayApiRequest(
+      reverseRegistry.store,
+      method,
+      pathname,
+      body,
+      new LocalTaskStore(dataDirForSessionStore(reverseRegistry.store)),
+    );
+  }
   if (method === "GET" && parts.length === 1 && parts[0] === "sandboxes") {
     return jsonResponse(200, { sandboxes: backend.list() });
   }
@@ -239,7 +319,6 @@ export async function handleRelayDaemonRequest(
 
 export class DaemonNodeRegistry {
   private readonly sandboxes = new Map<string, SandboxRecord>();
-  private readonly commands = new Map<string, DaemonNodeCommand[]>();
   private readonly activeCommands = new Map<string, TrackedDaemonNodeActiveRun>();
   private readonly completions = new Map<string, {
     resolve: (event: Extract<DaemonNodeEvent, { type: "run.completed" | "run.failed" }>) => void;
@@ -251,10 +330,13 @@ export class DaemonNodeRegistry {
 
   constructor(
     public readonly store: SessionStore = new LocalSessionStore(),
-    private readonly nodeStorage: DaemonNodeStorage = new LocalDaemonNodeStorage(dataDirForSessionStore(store)),
+    private readonly daemonStore: DaemonStore = new LocalDaemonStore(dataDirForSessionStore(store)),
   ) {
-    for (const sandbox of nodeStorage.load()) {
+    for (const sandbox of daemonStore.listNodes()) {
       this.sandboxes.set(sandbox.id, offlineSandboxRecord(sandbox));
+    }
+    for (const run of daemonStore.listActiveRuns()) {
+      this.activeCommands.set(run.commandId, { ...run, sandboxId: run.nodeId });
     }
   }
 
@@ -273,12 +355,13 @@ export class DaemonNodeRegistry {
       status: input.status === "busy" ? "running" : input.status === "stopped" ? "stopped" : "ready",
       agents,
       token: input.token,
+      tokenHash: hashDaemonNodeToken(input.token),
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
       lastSeenAt: now,
     };
     this.sandboxes.set(sandbox.id, sandbox);
-    this.nodeStorage.save(sandbox);
+    this.daemonStore.registerNode(sandbox);
     return sandbox;
   }
 
@@ -291,7 +374,7 @@ export class DaemonNodeRegistry {
       updatedAt: new Date().toISOString(),
     };
     this.sandboxes.set(sandboxId, updated);
-    this.nodeStorage.save(updated);
+    this.daemonStore.markNodeSeen(sandboxId, patch);
   }
 
   get(sandboxId: string): SandboxRecord | undefined {
@@ -304,13 +387,11 @@ export class DaemonNodeRegistry {
 
   monitorNodes(): DaemonNodeMonitorRecord[] {
     return this.list().map((sandbox) => {
-      const { token: _token, ...node } = sandbox;
+      const { token: _token, tokenHash: _tokenHash, ...node } = sandbox;
       return {
         ...node,
-        queuedCommandCount: this.commands.get(sandbox.id)?.length ?? 0,
-        activeRuns: [...this.activeCommands.values()]
-          .filter((command) => command.sandboxId === sandbox.id)
-          .map(({ sandboxId: _sandboxId, ...command }) => command),
+        queuedCommandCount: this.daemonStore.queuedCommandCount(sandbox.id),
+        activeRuns: this.daemonStore.listActiveRuns(sandbox.id).map(daemonActiveRun),
       };
     });
   }
@@ -323,16 +404,15 @@ export class DaemonNodeRegistry {
   }
 
   enqueue(sandboxId: string, command: DaemonNodeCommand): void {
-    this.commands.set(sandboxId, [...(this.commands.get(sandboxId) ?? []), command]);
+    this.daemonStore.enqueueCommand(sandboxId, command);
   }
 
   takeCommands(sandboxId: string, token?: string): DaemonNodeCommand[] {
     this.assertAuthorized(sandboxId, token);
     this.markSeen(sandboxId);
-    const commands = this.commands.get(sandboxId) ?? [];
-    this.commands.set(sandboxId, []);
-    const startedAt = new Date().toISOString();
-    for (const command of commands) {
+    const records = this.daemonStore.takeQueuedCommands(sandboxId);
+    for (const record of records) {
+      const command = record.command;
       if (command.type === "run.start") {
         this.activeCommands.set(command.id, {
           sandboxId,
@@ -343,16 +423,28 @@ export class DaemonNodeRegistry {
           mode: command.mode,
           taskGoal: command.taskGoal,
           workspacePath: command.workspacePath,
-          startedAt,
+          startedAt: record.dispatchedAt ?? new Date().toISOString(),
         });
       }
     }
-    return commands;
+    return records.map((record) => record.command);
   }
 
-  waitForCompletion(commandId: string, timeoutMs = 30000): Promise<Extract<DaemonNodeEvent, { type: "run.completed" | "run.failed" }>> {
+  waitForCompletion(commandId: string, timeoutMs = DAEMON_RUN_TIMEOUT_MS): Promise<Extract<DaemonNodeEvent, { type: "run.completed" | "run.failed" }>> {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
+        const active = this.activeCommands.get(commandId);
+        if (active) {
+          this.daemonStore.markCommandFailed(active.sandboxId, {
+            type: "run.failed",
+            commandId,
+            sessionId: active.sessionId,
+            runId: active.runId,
+            agent: active.agent,
+            mode: active.mode,
+            error: `Daemon node command ${commandId} timed out after ${timeoutMs}ms.`,
+          });
+        }
         this.completions.delete(commandId);
         this.activeCommands.delete(commandId);
         reject(new Error(`Daemon node command ${commandId} timed out after ${timeoutMs}ms.`));
@@ -379,6 +471,11 @@ export class DaemonNodeRegistry {
       return;
     }
     this.activeCommands.delete(event.commandId);
+    if (event.type === "run.completed") {
+      this.daemonStore.markCommandCompleted(sandboxId, event);
+    } else {
+      this.daemonStore.markCommandFailed(sandboxId, event);
+    }
     const completion = this.completions.get(event.commandId);
     if (completion) {
       clearTimeout(completion.timer);
@@ -394,7 +491,7 @@ export class DaemonNodeRegistry {
   private assertAuthorized(sandboxId: string, token?: string): void {
     const sandbox = this.sandboxes.get(sandboxId);
     if (!sandbox) throw new Error(`Unknown sandbox ${sandboxId}.`);
-    if (!sandbox.token || token !== sandbox.token) throw new Error("Unauthorized daemon node request.");
+    if (!daemonNodeTokenMatches(sandbox, token)) throw new Error("Unauthorized daemon node request.");
   }
 
   private markSeen(sandboxId: string): void {
@@ -403,19 +500,63 @@ export class DaemonNodeRegistry {
     const now = new Date().toISOString();
     const updated = { ...sandbox, updatedAt: now, lastSeenAt: now };
     this.sandboxes.set(sandboxId, updated);
-    this.nodeStorage.save(updated);
+    this.daemonStore.markNodeSeen(sandboxId);
   }
 }
 
-export class LocalDaemonNodeStorage implements DaemonNodeStorage {
+export class LocalDaemonStore implements DaemonStore {
   private readonly nodesDir: string;
+  private readonly commandsDir: string;
+  private readonly runsDir: string;
+  private readonly eventsDir: string;
 
   constructor(rootDir = DEFAULT_RELAY_DATA_DIR) {
     this.nodesDir = join(rootDir, "daemon", "nodes");
+    this.commandsDir = join(rootDir, "daemon", "commands");
+    this.runsDir = join(rootDir, "daemon", "runs");
+    this.eventsDir = join(rootDir, "daemon", "events");
     mkdirSync(this.nodesDir, { recursive: true });
+    mkdirSync(this.commandsDir, { recursive: true });
+    mkdirSync(this.runsDir, { recursive: true });
+    mkdirSync(this.eventsDir, { recursive: true });
   }
 
-  load(): SandboxRecord[] {
+  registerNode(input: SandboxRecord): SandboxRecord {
+    const node = { ...input, token: undefined, tokenHash: input.tokenHash ?? hashDaemonNodeToken(input.token ?? "") };
+    this.writeNode(node);
+    this.appendDaemonEvent(daemonEvent("daemon.node.registered", { node }));
+    return node;
+  }
+
+  markNodeSeen(nodeId: string, patch: Pick<Partial<SandboxRecord>, "status" | "lastError"> = {}): SandboxRecord | undefined {
+    const node = this.getNode(nodeId);
+    if (!node) return undefined;
+    const now = new Date().toISOString();
+    const updated = {
+      ...node,
+      ...patch,
+      updatedAt: now,
+      lastSeenAt: now,
+    };
+    this.writeNode(updated);
+    this.appendDaemonEvent(daemonEvent("daemon.node.seen", {
+      nodeId,
+      patch: {
+        status: patch.status,
+        lastError: patch.lastError,
+        lastSeenAt: now,
+      },
+    }));
+    return updated;
+  }
+
+  getNode(nodeId: string): SandboxRecord | undefined {
+    const path = join(this.nodesDir, `${safeDaemonNodeFileName(nodeId)}.json`);
+    if (!existsSync(path)) return undefined;
+    return sandboxRecord(JSON.parse(readFileSync(path, "utf8")) as unknown);
+  }
+
+  listNodes(): SandboxRecord[] {
     if (!existsSync(this.nodesDir)) return [];
     return readdirSync(this.nodesDir, { withFileTypes: true })
       .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
@@ -426,12 +567,176 @@ export class LocalDaemonNodeStorage implements DaemonNodeStorage {
       });
   }
 
-  save(sandbox: SandboxRecord): void {
+  enqueueCommand(nodeId: string, command: DaemonNodeCommand): DaemonCommandRecord {
+    const now = new Date().toISOString();
+    const record: DaemonCommandRecord = {
+      id: command.id,
+      nodeId,
+      command,
+      status: "queued",
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.writeCommand(record);
+    if (command.type === "run.start") {
+      this.writeRun({
+        nodeId,
+        commandId: command.id,
+        sessionId: command.sessionId,
+        runId: command.runId,
+        agent: command.agent,
+        mode: command.mode,
+        taskGoal: command.taskGoal,
+        workspacePath: command.workspacePath,
+        status: "running",
+        startedAt: now,
+      });
+    }
+    this.appendDaemonEvent(daemonEvent("daemon.command.queued", { nodeId, commandId: command.id }));
+    return record;
+  }
+
+  takeQueuedCommands(nodeId: string, limit = Number.MAX_SAFE_INTEGER): DaemonCommandRecord[] {
+    const now = new Date().toISOString();
+    const records = this.listCommands()
+      .filter((record) => record.nodeId === nodeId && record.status === "queued")
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+      .slice(0, limit)
+      .map((record) => ({
+        ...record,
+        status: "dispatched" as const,
+        updatedAt: now,
+        dispatchedAt: now,
+      }));
+    for (const record of records) {
+      this.writeCommand(record);
+      this.writeRun({ ...this.runForCommand(record), status: "running", startedAt: now });
+      this.appendDaemonEvent(daemonEvent("daemon.command.dispatched", { nodeId, commandId: record.id }));
+    }
+    return records;
+  }
+
+  queuedCommandCount(nodeId: string): number {
+    return this.listCommands().filter((record) => record.nodeId === nodeId && record.status === "queued").length;
+  }
+
+  listActiveRuns(nodeId?: string): DaemonRunRecord[] {
+    if (!existsSync(this.runsDir)) return [];
+    return readdirSync(this.runsDir, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
+      .flatMap((entry) => {
+        const record = daemonRunRecord(JSON.parse(readFileSync(join(this.runsDir, entry.name), "utf8")) as unknown);
+        return record && record.status === "running" && (!nodeId || record.nodeId === nodeId) ? [record] : [];
+      });
+  }
+
+  markCommandCompleted(nodeId: string, event: Extract<DaemonNodeEvent, { type: "run.completed" }>): void {
+    const now = new Date().toISOString();
+    const command = this.getCommand(event.commandId);
+    if (command) {
+      this.writeCommand({ ...command, status: "completed", updatedAt: now, completedAt: now });
+    }
+    const run = this.getRun(event.runId) ?? daemonRunFromEvent(nodeId, event, "completed");
+    this.writeRun({
+      ...run,
+      status: "completed",
+      completedAt: now,
+      exitCode: event.exitCode,
+    });
+    this.appendDaemonEvent(daemonEvent("daemon.command.completed", {
+      nodeId,
+      commandId: event.commandId,
+      runId: event.runId,
+      exitCode: event.exitCode,
+    }));
+  }
+
+  markCommandFailed(nodeId: string, event: Extract<DaemonNodeEvent, { type: "run.failed" }>): void {
+    const now = new Date().toISOString();
+    const command = this.getCommand(event.commandId);
+    if (command) {
+      this.writeCommand({ ...command, status: "failed", updatedAt: now, completedAt: now, error: event.error });
+    }
+    const run = this.getRun(event.runId) ?? daemonRunFromEvent(nodeId, event, "failed");
+    this.writeRun({
+      ...run,
+      status: "failed",
+      completedAt: now,
+      error: event.error,
+    });
+    this.appendDaemonEvent(daemonEvent("daemon.command.failed", {
+      nodeId,
+      commandId: event.commandId,
+      runId: event.runId,
+      error: event.error,
+    }));
+  }
+
+  appendDaemonEvent(event: DaemonEvent): void {
+    mkdirSync(this.eventsDir, { recursive: true });
+    appendFileSync(join(this.eventsDir, "events.jsonl"), `${JSON.stringify(event)}\n`);
+  }
+
+  private listCommands(): DaemonCommandRecord[] {
+    if (!existsSync(this.commandsDir)) return [];
+    return readdirSync(this.commandsDir, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
+      .flatMap((entry) => {
+        const record = daemonCommandRecord(JSON.parse(readFileSync(join(this.commandsDir, entry.name), "utf8")) as unknown);
+        return record ? [record] : [];
+      });
+  }
+
+  private getCommand(commandId: string): DaemonCommandRecord | undefined {
+    const path = join(this.commandsDir, `${safeDaemonNodeFileName(commandId)}.json`);
+    if (!existsSync(path)) return undefined;
+    return daemonCommandRecord(JSON.parse(readFileSync(path, "utf8")) as unknown);
+  }
+
+  private getRun(runId: string): DaemonRunRecord | undefined {
+    const path = join(this.runsDir, `${safeDaemonNodeFileName(runId)}.json`);
+    if (!existsSync(path)) return undefined;
+    return daemonRunRecord(JSON.parse(readFileSync(path, "utf8")) as unknown);
+  }
+
+  private runForCommand(record: DaemonCommandRecord): DaemonRunRecord {
+    if (record.command.type === "run.start") {
+      return this.getRun(record.command.runId) ?? {
+        nodeId: record.nodeId,
+        commandId: record.command.id,
+        sessionId: record.command.sessionId,
+        runId: record.command.runId,
+        agent: record.command.agent,
+        mode: record.command.mode,
+        taskGoal: record.command.taskGoal,
+        workspacePath: record.command.workspacePath,
+        status: "running",
+        startedAt: record.dispatchedAt ?? record.createdAt,
+      };
+    }
+    throw new Error(`Unsupported daemon command ${record.id}.`);
+  }
+
+  private writeNode(sandbox: SandboxRecord): void {
     mkdirSync(this.nodesDir, { recursive: true });
     const path = join(this.nodesDir, `${safeDaemonNodeFileName(sandbox.id)}.json`);
     writeFileSync(path, `${JSON.stringify(sandbox, null, 2)}\n`, { mode: 0o600 });
   }
+
+  private writeCommand(record: DaemonCommandRecord): void {
+    mkdirSync(this.commandsDir, { recursive: true });
+    const path = join(this.commandsDir, `${safeDaemonNodeFileName(record.id)}.json`);
+    writeFileSync(path, `${JSON.stringify(record, null, 2)}\n`);
+  }
+
+  private writeRun(record: DaemonRunRecord): void {
+    mkdirSync(this.runsDir, { recursive: true });
+    const path = join(this.runsDir, `${safeDaemonNodeFileName(record.runId)}.json`);
+    writeFileSync(path, `${JSON.stringify(record, null, 2)}\n`);
+  }
 }
+
+export const LocalDaemonNodeStorage = LocalDaemonStore;
 
 export class ReverseDaemonNodeBackend implements SandboxBackend {
   constructor(private readonly registry: DaemonNodeRegistry) {}
@@ -812,9 +1117,9 @@ function bearerToken(value: string | string[] | undefined): string | undefined {
 }
 
 function sandboxAuthError(sandbox: SandboxRecord, token?: string): string | null {
-  if (!sandbox.token) return null;
+  if (!sandbox.token && !sandbox.tokenHash) return null;
   if (!token) return "Sandbox token is required.";
-  if (token !== sandbox.token) return "Invalid sandbox token.";
+  if (!daemonNodeTokenMatches(sandbox, token)) return "Invalid sandbox token.";
   return null;
 }
 
@@ -825,6 +1130,7 @@ function dataDirForSessionStore(store: SessionStore): string {
 function offlineSandboxRecord(sandbox: SandboxRecord): SandboxRecord {
   return {
     ...sandbox,
+    token: undefined,
     status: "stopped",
     agents: { claude: "unknown", pi: "unknown", codex: "unknown" },
     updatedAt: new Date().toISOString(),
@@ -849,11 +1155,132 @@ function sandboxRecord(value: unknown): SandboxRecord | undefined {
       codex: agentStatus(agents.codex),
     },
     token: stringField(input, "token") || undefined,
+    tokenHash: stringField(input, "tokenHash") || undefined,
     createdAt: stringField(input, "createdAt") || new Date().toISOString(),
     updatedAt: stringField(input, "updatedAt") || new Date().toISOString(),
     lastSeenAt: stringField(input, "lastSeenAt") || undefined,
     lastError: stringField(input, "lastError") || undefined,
   };
+}
+
+function daemonCommandRecord(value: unknown): DaemonCommandRecord | undefined {
+  const input = asRecord(value);
+  const id = stringField(input, "id");
+  const nodeId = stringField(input, "nodeId");
+  const command = daemonNodeCommand(input.command);
+  if (!id || !nodeId || !command) return undefined;
+  const status = input.status === "queued" || input.status === "dispatched" || input.status === "completed" || input.status === "failed"
+    ? input.status
+    : "queued";
+  return {
+    id,
+    nodeId,
+    command,
+    status,
+    createdAt: stringField(input, "createdAt") || new Date().toISOString(),
+    updatedAt: stringField(input, "updatedAt") || new Date().toISOString(),
+    dispatchedAt: stringField(input, "dispatchedAt") || undefined,
+    completedAt: stringField(input, "completedAt") || undefined,
+    error: stringField(input, "error") || undefined,
+  };
+}
+
+function daemonNodeCommand(value: unknown): DaemonNodeCommand | undefined {
+  const input = asRecord(value);
+  const id = stringField(input, "id");
+  const type = stringField(input, "type");
+  const sessionId = stringField(input, "sessionId");
+  const runId = stringField(input, "runId");
+  const taskGoal = stringField(input, "taskGoal");
+  const agent = agentName(input.agent);
+  if (!id || type !== "run.start" || !sessionId || !runId || !taskGoal || !agent) return undefined;
+  return {
+    id,
+    type,
+    sessionId,
+    runId,
+    taskGoal,
+    agent,
+    mode: input.mode === "review" ? "review" : "implement",
+    workspacePath: stringField(input, "workspacePath") || undefined,
+  };
+}
+
+function daemonRunRecord(value: unknown): DaemonRunRecord | undefined {
+  const input = asRecord(value);
+  const nodeId = stringField(input, "nodeId");
+  const commandId = stringField(input, "commandId");
+  const sessionId = stringField(input, "sessionId");
+  const runId = stringField(input, "runId");
+  const agent = agentName(input.agent);
+  if (!nodeId || !commandId || !sessionId || !runId || !agent) return undefined;
+  const status = input.status === "completed" || input.status === "failed" ? input.status : "running";
+  return {
+    nodeId,
+    commandId,
+    sessionId,
+    runId,
+    agent,
+    mode: input.mode === "review" ? "review" : "implement",
+    taskGoal: stringField(input, "taskGoal"),
+    workspacePath: stringField(input, "workspacePath") || undefined,
+    startedAt: stringField(input, "startedAt") || new Date().toISOString(),
+    status,
+    completedAt: stringField(input, "completedAt") || undefined,
+    exitCode: typeof input.exitCode === "number" ? input.exitCode : undefined,
+    error: stringField(input, "error") || undefined,
+  };
+}
+
+function daemonRunFromEvent(
+  nodeId: string,
+  event: Extract<DaemonNodeEvent, { type: "run.completed" | "run.failed" }>,
+  status: DaemonRunStatus,
+): DaemonRunRecord {
+  return {
+    nodeId,
+    commandId: event.commandId,
+    sessionId: event.sessionId,
+    runId: event.runId,
+    agent: event.agent,
+    mode: event.mode,
+    taskGoal: "",
+    status,
+    startedAt: new Date().toISOString(),
+  };
+}
+
+function daemonActiveRun(run: DaemonRunRecord): DaemonNodeActiveRun {
+  return {
+    commandId: run.commandId,
+    sessionId: run.sessionId,
+    runId: run.runId,
+    agent: run.agent,
+    mode: run.mode,
+    taskGoal: run.taskGoal,
+    workspacePath: run.workspacePath,
+    startedAt: run.startedAt,
+  };
+}
+
+function daemonEvent(type: DaemonEvent["type"], payload: Record<string, unknown>): DaemonEvent {
+  return {
+    id: newRelayId("devt"),
+    type,
+    timestamp: new Date().toISOString(),
+    ...payload,
+  } as DaemonEvent;
+}
+
+function hashDaemonNodeToken(token: string): string | undefined {
+  if (!token) return undefined;
+  return `sha256:${createHash("sha256").update(token).digest("hex")}`;
+}
+
+function daemonNodeTokenMatches(sandbox: SandboxRecord, token?: string): boolean {
+  if (!token) return false;
+  if (sandbox.token) return sandbox.token === token;
+  return sandbox.tokenHash === hashDaemonNodeToken(token);
 }
 
 function sandboxStatus(value: unknown): SandboxStatus {
@@ -964,7 +1391,7 @@ function daemonControlPanelHtml(): string {
     /* Top nav --------------------------------------------------------- */
 
     .top-nav {
-      height: 48px;
+      height: 56px;
       padding: 0 24px;
       border-bottom: 1px solid var(--hairline);
       display: flex;
@@ -976,18 +1403,20 @@ function daemonControlPanelHtml(): string {
     .wordmark {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
       color: var(--ink);
-      font-size: 15px;
-      font-weight: 600;
-      letter-spacing: -0.01em;
+      font-size: 18px;
+      font-weight: 400;
+      letter-spacing: -0.4px;
+      line-height: 1;
     }
 
-    .wordmark .dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 9999px;
-      background: var(--primary);
+    .wordmark svg {
+      display: block;
+      width: 48px;
+      height: 32px;
+      flex: none;
+      shape-rendering: geometricPrecision;
     }
 
     .nav-meta {
@@ -1369,7 +1798,23 @@ function daemonControlPanelHtml(): string {
 </head>
 <body>
   <nav class="top-nav">
-    <span class="wordmark"><span class="dot" aria-hidden="true"></span>Relay</span>
+    <span class="wordmark">
+      <svg viewBox="0 0 96 64" role="img" aria-label="Relay" xmlns="http://www.w3.org/2000/svg">
+        <g fill="none" stroke="#18232d" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10 14 H22 L32 24 H40"/>
+          <path d="M10 50 H22 L32 40 H40"/>
+        </g>
+        <g fill="#18232d">
+          <circle cx="10" cy="14" r="4"/>
+          <circle cx="10" cy="50" r="4"/>
+        </g>
+        <g stroke="#0052ff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none">
+          <line x1="32" y1="32" x2="76" y2="32"/>
+          <polyline points="68,24 80,32 68,40"/>
+        </g>
+      </svg>
+      Relay
+    </span>
     <span class="nav-meta"><span class="badge">Daemon</span><span>Control panel</span></span>
   </nav>
 

@@ -1,5 +1,9 @@
 # Relay Architecture Design V2.0
 
+<p align="center">
+  <img src="../assets/brand/relay-logo.svg" alt="Relay logo" width="360">
+</p>
+
 Enterprise AI Workforce Platform / Agent Runtime / Sandbox / Memory / Governance
 
 This document defines Relay's target architecture, strategic technology choices, and architectural decision direction. It explains what the system should become and why.

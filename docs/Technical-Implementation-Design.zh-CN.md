@@ -1,5 +1,9 @@
 # Relay 技术实现设计 V1.0
 
+<p align="center">
+  <img src="../assets/brand/relay-logo.svg" alt="Relay logo" width="360">
+</p>
+
 企业 AI Workforce Platform / Control Plane / Agent Runtime / Execution Plane / Memory / Governance
 
 本文把 Relay 的产品与架构策略翻译为实现蓝图，定义可部署服务、职责边界、数据模型、运行流程、集成契约和分阶段交付。阅读顺序建议：先读 [Architecture-Design.zh-CN.md](Architecture-Design.zh-CN.md)，再读本文。

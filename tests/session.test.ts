@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
@@ -22,6 +22,7 @@ import {
   readDaemonNodeToken,
   relayEvent,
 } from "../packages/relay-daemon/src/index.js";
+import { createDaemonNodeLogger } from "../packages/relay-daemon-node/src/index.js";
 
 function codexReviewStdout(message: string): string {
   return JSON.stringify({
@@ -190,6 +191,54 @@ describe("Relay daemon node tokens", () => {
 
     assert.deepEqual(requestBody, { employeeId: "alice" });
     assert.equal(authorization, "Bearer tok_alice");
+  });
+});
+
+describe("Relay daemon node logging", () => {
+  it("writes node and run scoped JSONL logs", () => {
+    const workspacePath = mkdtempSync(join(tmpdir(), "relay-daemon-node-logs-"));
+    const logger = createDaemonNodeLogger({ workspacePath, sandboxId: "sbx/logs" });
+
+    logger.info("daemon node registered", { sandboxId: "sbx/logs", employeeId: "alice" });
+    logger.output({
+      sandboxId: "sbx/logs",
+      commandId: "cmd_1",
+      sessionId: "ses_1",
+      runId: "run_1",
+      agent: "codex",
+      mode: "review",
+      stream: "stdout",
+      sequence: 0,
+      text: "Codex output\n",
+    });
+    logger.error("run failed", {
+      sandboxId: "sbx/logs",
+      commandId: "cmd_1",
+      sessionId: "ses_1",
+      runId: "run_1",
+      agent: "codex",
+      mode: "review",
+      error: "missing key",
+    });
+
+    const nodeLogPath = join(workspacePath, ".relay", "daemon-nodes", "logs", "sbx_logs.jsonl");
+    const runLogPath = join(workspacePath, ".relay", "daemon-nodes", "logs", "run_1.jsonl");
+    const nodeEntries = readFileSync(nodeLogPath, "utf8")
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    const runEntries = readFileSync(runLogPath, "utf8")
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+
+    assert.equal(logger.logPath, nodeLogPath);
+    assert.equal(existsSync(runLogPath), true);
+    assert.equal(nodeEntries.length, 3);
+    assert.equal(nodeEntries[1].level, "output");
+    assert.equal(nodeEntries[1].text, "Codex output\n");
+    assert.equal(runEntries.length, 2);
+    assert.deepEqual(runEntries.map((entry) => entry.message), ["agent output", "run failed"]);
   });
 });
 
@@ -509,6 +558,24 @@ describe("Relay daemon API", () => {
     assert.equal(handoff.agentRuns[1].mode, "review");
   });
 
+  it("serves session API routes from the host daemon", async () => {
+    const store = new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-daemon-session-api-")));
+    const registry = new DaemonNodeRegistry(store);
+    const backend = new ReverseDaemonNodeBackend(registry);
+
+    const created = await handleRelayDaemonRequest(backend, "POST", "/sessions", {
+      taskGoal: "review auth",
+      workspacePath: "/workspace/alice",
+      assignments: [{ agent: "codex", mode: "review" }],
+    }, registry);
+    assert.equal(created.status, 201);
+    const session = JSON.parse(created.body);
+
+    const detail = await handleRelayDaemonRequest(backend, "GET", `/sessions/${session.id}`, undefined, registry);
+    assert.equal(detail.status, 200);
+    assert.equal(JSON.parse(detail.body).id, session.id);
+  });
+
   it("requires the sandbox token for existing daemon node sandboxes", async () => {
     const store = new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-token-auth-")));
     const registry = new DaemonNodeRegistry(store);
@@ -595,6 +662,78 @@ describe("Relay daemon API", () => {
     assert.equal(session.workspacePath, "/workspace/carol");
     assert.equal(session.events.some((event: any) => event.type === "agent.output"), true);
     assert.equal(session.reviewVerdict, "approved");
+  });
+
+  it("runs Claude, Pi, and Codex assignments through one reverse daemon node", async () => {
+    const store = new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-reverse-all-agents-")));
+    const registry = new DaemonNodeRegistry(store);
+    const backend = new ReverseDaemonNodeBackend(registry);
+    registry.register({
+      sandboxId: "sbx_all_agents",
+      employeeId: "all-agents",
+      token: "tok_all_agents",
+      workspacePath: "/workspace/all-agents",
+      protocolVersion: 1,
+      supportedAgents: ["claude", "pi", "codex"],
+      status: "ready",
+    });
+
+    const pending = backend.run("sbx_all_agents", {
+      taskGoal: "implement and verify auth",
+      assignments: [
+        { agent: "claude", mode: "implement" },
+        { agent: "pi", mode: "implement" },
+        { agent: "codex", mode: "review" },
+      ],
+    });
+
+    const takeNextCommand = async () => {
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        const [command] = registry.takeCommands("sbx_all_agents", "tok_all_agents");
+        if (command) return command;
+        await new Promise((resolve) => setTimeout(resolve, 1));
+      }
+      throw new Error("Timed out waiting for daemon node command.");
+    };
+    const completeNext = async (agent: "claude" | "pi" | "codex", text: string): Promise<void> => {
+      const command = await takeNextCommand();
+      assert.equal(command.agent, agent);
+      registry.handleEvent("sbx_all_agents", {
+        type: "run.output",
+        commandId: command.id,
+        sessionId: command.sessionId,
+        runId: command.runId,
+        agent,
+        stream: "stdout",
+        text,
+        sequence: 0,
+      }, "tok_all_agents");
+      registry.handleEvent("sbx_all_agents", {
+        type: "run.completed",
+        commandId: command.id,
+        sessionId: command.sessionId,
+        runId: command.runId,
+        agent,
+        mode: command.mode,
+        exitCode: 0,
+        agentLog: `${agent} completed.`,
+        codexVerdict: agent === "codex" ? "approved" : "",
+        codexFeedback: agent === "codex" ? "Approved." : "",
+      }, "tok_all_agents");
+    };
+
+    await completeNext("claude", "Claude implemented auth.\n");
+    await completeNext("pi", "Pi checked auth.\n");
+    await completeNext("codex", codexReviewStdout("Approved.\nRELAY_REVIEW_VERDICT: APPROVED"));
+    const session = await pending;
+
+    assert.equal(session.status, "completed");
+    assert.deepEqual(session.agentRuns.map((run: any) => run.agent), ["claude", "pi", "codex"]);
+    assert.deepEqual(session.agentRuns.map((run: any) => run.mode), ["implement", "implement", "review"]);
+    assert.equal(session.events.filter((event: any) => event.type === "agent.output").length, 3);
+    assert.equal(session.artifacts.length, 3);
+    assert.equal(session.reviewVerdict, "approved");
+    assert.equal(registry.get("sbx_all_agents")?.status, "ready");
   });
 
   it("runs multiple daemon nodes concurrently with isolated command queues", async () => {
@@ -775,7 +914,8 @@ describe("Relay daemon API", () => {
     assert.equal(loaded?.employeeId, "persisted");
     assert.equal(loaded?.workspacePath, "/workspace/persisted");
     assert.equal(loaded?.status, "stopped");
-    assert.equal(loaded?.token, "tok_persisted");
+    assert.equal(loaded?.token, undefined);
+    assert.equal(typeof loaded?.tokenHash, "string");
     assert.equal(provisioned.id, "sbx_persisted");
     assert.equal(provisioned.status, "stopped");
     await assert.rejects(
@@ -785,6 +925,121 @@ describe("Relay daemon API", () => {
       }),
       /daemon node is not ready/,
     );
+  });
+
+  it("persists queued daemon node commands across registry restarts", () => {
+    const root = mkdtempSync(join(tmpdir(), "relay-daemon-queued-command-"));
+    const first = new DaemonNodeRegistry(new LocalSessionStore(root));
+    first.register({
+      sandboxId: "sbx_queue",
+      employeeId: "queue",
+      token: "tok_queue",
+      protocolVersion: 1,
+      supportedAgents: ["codex"],
+      status: "ready",
+    });
+    first.enqueue("sbx_queue", {
+      id: "cmd_queue",
+      type: "run.start",
+      sessionId: "ses_queue",
+      runId: "run_queue",
+      taskGoal: "queued review",
+      agent: "codex",
+      mode: "review",
+    });
+
+    const restarted = new DaemonNodeRegistry(new LocalSessionStore(root));
+    const [command] = restarted.takeCommands("sbx_queue", "tok_queue");
+    const afterTake = restarted.takeCommands("sbx_queue", "tok_queue");
+
+    assert.equal(command.id, "cmd_queue");
+    assert.equal(command.sessionId, "ses_queue");
+    assert.equal(command.runId, "run_queue");
+    assert.deepEqual(afterTake, []);
+  });
+
+  it("does not redispatch completed daemon node commands after restart", () => {
+    const root = mkdtempSync(join(tmpdir(), "relay-daemon-completed-command-"));
+    const store = new LocalSessionStore(root);
+    const session = store.createSession({ workspacePath: "/workspace", taskGoal: "completed command" });
+    const first = new DaemonNodeRegistry(store);
+    first.register({
+      sandboxId: "sbx_done",
+      employeeId: "done",
+      token: "tok_done",
+      protocolVersion: 1,
+      supportedAgents: ["codex"],
+      status: "ready",
+    });
+    first.enqueue("sbx_done", {
+      id: "cmd_done",
+      type: "run.start",
+      sessionId: session.id,
+      runId: "run_done",
+      taskGoal: "completed review",
+      agent: "codex",
+      mode: "review",
+    });
+    const [command] = first.takeCommands("sbx_done", "tok_done");
+    first.handleEvent("sbx_done", {
+      type: "run.completed",
+      commandId: command.id,
+      sessionId: command.sessionId,
+      runId: command.runId,
+      agent: "codex",
+      mode: "review",
+      exitCode: 0,
+      agentLog: "Approved.",
+      codexVerdict: "approved",
+      codexFeedback: "Approved.",
+    }, "tok_done");
+
+    const restarted = new DaemonNodeRegistry(new LocalSessionStore(root));
+
+    assert.deepEqual(restarted.takeCommands("sbx_done", "tok_done"), []);
+  });
+
+  it("keeps daemon run output in session events without duplicating it into daemon monitor records", () => {
+    const root = mkdtempSync(join(tmpdir(), "relay-daemon-output-storage-"));
+    const store = new LocalSessionStore(root);
+    const session = store.createSession({ workspacePath: "/workspace", taskGoal: "stream output" });
+    const registry = new DaemonNodeRegistry(store);
+    registry.register({
+      sandboxId: "sbx_output",
+      employeeId: "output",
+      token: "tok_output",
+      protocolVersion: 1,
+      supportedAgents: ["codex"],
+      status: "ready",
+    });
+    registry.enqueue("sbx_output", {
+      id: "cmd_output",
+      type: "run.start",
+      sessionId: session.id,
+      runId: "run_output",
+      taskGoal: "stream output",
+      agent: "codex",
+      mode: "implement",
+    });
+    const [command] = registry.takeCommands("sbx_output", "tok_output");
+
+    registry.handleEvent("sbx_output", {
+      type: "run.output",
+      commandId: command.id,
+      sessionId: command.sessionId,
+      runId: command.runId,
+      agent: "codex",
+      stream: "stdout",
+      text: "hello",
+      sequence: 1,
+    }, "tok_output");
+
+    const outputEvent = store.getSession(session.id).events.find((event) => event.type === "agent.output");
+    const activeRun = registry.monitorNodes()[0].activeRuns[0];
+
+    assert.equal(outputEvent?.type, "agent.output");
+    assert.equal(outputEvent && "text" in outputEvent ? outputEvent.text : "", "hello");
+    assert.equal("text" in activeRun, false);
   });
 
   it("lists sanitized daemon node monitor records without tokens", async () => {
@@ -813,6 +1068,7 @@ describe("Relay daemon API", () => {
     assert.equal(body.nodes[0].queuedCommandCount, 0);
     assert.deepEqual(body.nodes[0].activeRuns, []);
     assert.equal("token" in body.nodes[0], false);
+    assert.equal("tokenHash" in body.nodes[0], false);
     assert.equal(typeof body.nodes[0].lastSeenAt, "string");
   });
 
@@ -866,6 +1122,42 @@ describe("Relay daemon API", () => {
     const session = await pending;
     assert.equal(session.status, "completed");
     assert.equal(registry.monitorNodes()[0].activeRuns.length, 0);
+  });
+
+  it("clears persisted daemon active runs after command timeout", async () => {
+    const root = mkdtempSync(join(tmpdir(), "relay-monitor-timeout-"));
+    const store = new LocalSessionStore(root);
+    const registry = new DaemonNodeRegistry(store);
+    registry.register({
+      sandboxId: "sbx_timeout",
+      employeeId: "timeout",
+      token: "tok_timeout",
+      workspacePath: "/workspace/timeout",
+      protocolVersion: 1,
+      supportedAgents: ["pi"],
+      status: "ready",
+    });
+    const session = store.createSession({ workspacePath: "/workspace/timeout", taskGoal: "timeout run" });
+    registry.enqueue("sbx_timeout", {
+      id: "cmd_timeout",
+      type: "run.start",
+      sessionId: session.id,
+      runId: "run_timeout",
+      taskGoal: "timeout run",
+      agent: "pi",
+      mode: "implement",
+      workspacePath: "/workspace/timeout",
+    });
+    const [command] = registry.takeCommands("sbx_timeout", "tok_timeout");
+
+    await assert.rejects(
+      registry.waitForCompletion(command.id, 1),
+      /timed out/,
+    );
+
+    assert.equal(registry.monitorNodes()[0].activeRuns.length, 0);
+    const restarted = new DaemonNodeRegistry(new LocalSessionStore(root));
+    assert.equal(restarted.monitorNodes()[0].activeRuns.length, 0);
   });
 
   it("keeps the daemon node ready after a reported run failure", async () => {

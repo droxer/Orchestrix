@@ -177,7 +177,7 @@ export class CodexStreamRenderer {
     const event = parseJsonObject(line);
     if (!event) return this.text.feed(`${line}\n`);
 
-    if (event.type === "turn.started") return `\n${status("info", "Codex is reviewing.")}\n`;
+    if (event.type === "turn.started") return `\n${status("info", "Codex started.")}\n`;
     if (event.type === "turn.completed") return `\n${status("ok", "Codex finished.")}\n`;
     if (event.type === "turn.failed") {
       const error = asRecord(event.error);
@@ -188,13 +188,13 @@ export class CodexStreamRenderer {
     if (typeof event.type === "string" && event.type.startsWith("item.")) {
       const item = asRecord(event.item);
       if (item.type === "agent_message" && event.type === "item.completed") {
-        const text = String(item.text ?? "").trim();
+        const text = textFromContentRecord(item).trim();
         if (!text) return "";
         this.text.resetBlock();
         return `\n${this.text.feed(`${text}\n`)}`;
       }
       if (item.type === "reasoning" && event.type === "item.completed") {
-        const text = String(item.text ?? "").trim();
+        const text = textFromContentRecord(item).trim();
         if (!text) return "";
         this.reasoning.resetBlock();
         return `\n${this.reasoning.feed(`${text}\n`)}`;
@@ -206,8 +206,30 @@ export class CodexStreamRenderer {
         return `\n${status("info", "Codex changed files.")}\n`;
       }
     }
+    if (event.type === "message" || event.type === "assistant_message") {
+      const text = textFromContentRecord(event).trim();
+      if (!text) return "";
+      this.text.resetBlock();
+      return `\n${this.text.feed(`${text}\n`)}`;
+    }
     return "";
   }
+}
+
+function textFromContentRecord(record: Record<string, unknown>): string {
+  if (typeof record.text === "string") return record.text;
+  if (typeof record.content === "string") return record.content;
+  const content = record.content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .map((chunk) => {
+      const chunkRecord = asRecord(chunk);
+      if (typeof chunkRecord.text === "string") return chunkRecord.text;
+      if (typeof chunkRecord.content === "string") return chunkRecord.content;
+      return "";
+    })
+    .filter(Boolean)
+    .join("\n");
 }
 
 export function formatClaudeJsonLine(line: string): string {
