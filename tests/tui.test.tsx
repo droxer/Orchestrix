@@ -438,12 +438,40 @@ describe("RelayTui component", () => {
     const frame = lastFrame() ?? "";
     assert.match(frame, /Plan/);
     assert.match(frame, /- Use tests and build/);
-    assert.match(frame, /\| shipped/);
-    assert.match(frame, /\| const ok = true;/);
+    assert.match(frame, /│ shipped/);
+    assert.match(frame, /│ const ok = true;/);
     assert.doesNotMatch(frame, /# Plan/);
     assert.doesNotMatch(frame, /\*\*tests\*\*/);
     assert.doesNotMatch(frame, /`build`/);
     assert.doesNotMatch(frame, /```ts/);
+  });
+
+  it("strips the renderers' inline ANSI from AI responses", async () => {
+    const { lastFrame, stdin } = render(
+      <RelayTui
+        sessionStore={testSessionStore()}
+        runner={async (request) => {
+          // Mirror what the stream renderers emit in a TTY: a coloured turn
+          // marker followed by spoken text and a reasoning line.
+          request.log("\x1b[38;5;173m●\x1b[0m Shipping the fix now\n");
+          request.log("\x1b[2m\x1b[3m○ weighing options\x1b[0m\n");
+          request.log("\nOK  Claude finished.\n");
+        }}
+      />,
+    );
+
+    stdin.write("@claude ship it");
+    await waitForInput();
+    stdin.write("\r");
+    await waitForInput();
+
+    const frame = lastFrame() ?? "";
+    assert.match(frame, /● Shipping the fix now/);
+    assert.match(frame, /○ weighing options/);
+    assert.match(frame, /OK\s+Claude finished\./);
+    // No raw escape sequences from the renderers should survive into the frame.
+    assert.doesNotMatch(frame, /38;5;173/);
+    assert.doesNotMatch(frame, /\x1b\[2m/);
   });
 
   it("runs Codex tasks immediately without asking for a mode", async () => {

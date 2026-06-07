@@ -21,6 +21,15 @@ export function color(text: string, ...codes: string[]): string {
   return `${codes.join("")}${text}${ansi.reset}`;
 }
 
+// CSI/SGR escape sequences (colours, cursor moves). The TUI owns its own
+// styling via Ink, so agent output captured for the transcript must be
+// stripped of the renderers' inline ANSI before it is re-rendered.
+const ANSI_PATTERN = /\x1b\[[0-9;]*m/g;
+
+export function stripAnsi(text: string): string {
+  return text.replace(ANSI_PATTERN, "");
+}
+
 export function section(title: string, accent: string): string {
   return `\n${color(`== ${title} `, ansi.bold, accent)}${color("=".repeat(Math.max(8, 58 - title.length)), accent)}\n`;
 }

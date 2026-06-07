@@ -5,6 +5,7 @@ export {
   keyValue,
   section,
   status,
+  stripAnsi,
 } from "relay-core";
 
 export {
