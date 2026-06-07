@@ -21,6 +21,7 @@ import {
   assignmentSucceeded,
   ensureAgentReady,
   initialAgentState,
+  stripAnsi,
   type RelayEvent,
   type SandboxRecord,
 } from "relay-daemon";
@@ -58,9 +59,20 @@ const RELAY_ACCENT = "#D97757";
 const RELAY_DIM = "gray";
 const RELAY_OK = "green";
 const RELAY_WARN = "yellow";
+const RELAY_ERR = "red";
+const RELAY_INFO = "cyan";
+const RELAY_THINK = "magenta";
 const BRAND_MARK = "✻";
+const TEXT_MARK = "●";
+const THINK_MARK = "○";
+const TOOL_MARK = "⏺";
 const SPINNER_FRAMES = ["·", "✢", "*", "✳", "✶", "✻", "✽"] as const;
-const MARKDOWN_RULE = "------------------------------------------------------------";
+const STATUS_LABELS: Record<string, string> = {
+  OK: RELAY_OK,
+  WARN: RELAY_WARN,
+  ERR: RELAY_ERR,
+  INFO: RELAY_INFO,
+};
 
 export interface CompletionResult {
   input: string;
@@ -270,7 +282,10 @@ function splitToLines(text: string): string[] {
 
 function pushLines(existing: string[], text: string): string[] {
   if (!text) return existing;
-  const incoming = splitToLines(text);
+  // The TUI renders styling through Ink, so drop the renderers' inline ANSI
+  // before it lands in the transcript buffer — otherwise the escape codes
+  // fight Ink's own colours and corrupt width/markdown parsing.
+  const incoming = splitToLines(stripAnsi(text));
   const merged = existing.length === 0
     ? incoming
     : [...existing.slice(0, -1), `${existing[existing.length - 1]}${incoming[0]}`, ...incoming.slice(1)];
@@ -590,14 +605,20 @@ export function RelayTui({
   return (
     <Box flexDirection="column" height="100%" paddingX={1} paddingY={1}>
       <Box borderStyle="round" borderColor={RELAY_DIM} paddingX={1} flexDirection="column">
-        <Box>
-          <Text color={RELAY_ACCENT} bold>{BRAND_MARK} Relay</Text>
-          <Text dimColor>  agent orchestration</Text>
+        <Box justifyContent="space-between">
+          <Text>
+            <Text color={RELAY_ACCENT} bold>{BRAND_MARK} Relay</Text>
+            <Text dimColor>  ·  agent orchestration</Text>
+          </Text>
+          <Text>
+            <Text color={statusTone}>{statusMark}</Text>
+            <Text dimColor> {queueLabel}</Text>
+          </Text>
         </Box>
         <Text>
-          <Text dimColor>cwd </Text>
-          <Text>{workspace}</Text>
-          <Text dimColor>   mount </Text>
+          <Text dimColor>{"cwd   "}</Text>
+          <Text>{shortenPath(workspace)}</Text>
+          <Text dimColor>{"   mount "}</Text>
           <Text>{GUEST_WORKSPACE}</Text>
         </Text>
       </Box>
@@ -618,6 +639,7 @@ export function RelayTui({
           visibleInput={visibleInput}
           input={input}
           spinnerFrame={spinnerFrame}
+          currentAgent={currentAgent}
         />
         {showShortcutMenu && shortcutMenu ? (
           <Box marginTop={0}>
@@ -640,11 +662,11 @@ export function RelayTui({
       <Box paddingX={1} justifyContent="space-between">
         <PromptHintText isRunning={isRunning} ready={ready} showShortcutMenu={showShortcutMenu} />
         <Text>
-          <Text color={statusTone}>{statusMark}</Text>
-          <Text dimColor> {queueLabel}</Text>
           {defaultAssignments.length > 0 ? (
-            <Text dimColor> · {defaultAssignmentLabel}</Text>
-          ) : null}
+            <Text dimColor>· {defaultAssignmentLabel}</Text>
+          ) : (
+            <Text dimColor>no agent yet</Text>
+          )}
           {activeSession ? (
             <>
               <Text dimColor> · </Text>
@@ -686,11 +708,17 @@ function renderMarkdownLine(line: string, key: string, inCodeBlock: boolean): Re
   if (inCodeBlock) {
     return (
       <Text key={key} color="green">
-        <Text dimColor>| </Text>
+        <Text dimColor>│ </Text>
         {line}
       </Text>
     );
   }
+
+  const agentMarker = renderAgentMarkerLine(line, key);
+  if (agentMarker) return agentMarker;
+
+  const statusLine = renderStatusLine(line, key);
+  if (statusLine) return statusLine;
 
   const heading = /^(#{1,6})\s+(.+)$/.exec(line);
   if (heading) {
@@ -705,7 +733,7 @@ function renderMarkdownLine(line: string, key: string, inCodeBlock: boolean): Re
   if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) {
     return (
       <Text key={key} dimColor>
-        {MARKDOWN_RULE}
+        {horizontalRule()}
       </Text>
     );
   }
@@ -714,7 +742,7 @@ function renderMarkdownLine(line: string, key: string, inCodeBlock: boolean): Re
   if (blockquote) {
     return (
       <Text key={key}>
-        <Text color={RELAY_ACCENT} dimColor>| </Text>
+        <Text color={RELAY_ACCENT}>│ </Text>
         <Text italic dimColor>{renderInlineMarkdown(blockquote[1], key)}</Text>
       </Text>
     );
@@ -741,6 +769,63 @@ function renderMarkdownLine(line: string, key: string, inCodeBlock: boolean): Re
   }
 
   return <Text key={key}>{renderInlineMarkdown(line, key)}</Text>;
+}
+
+function horizontalRule(): string {
+  const width = Math.max(8, Math.min((process.stdout.columns ?? 80) - 6, 80));
+  return "─".repeat(width);
+}
+
+// Agent stream renderers prefix each turn with a marker glyph: ● for spoken
+// text, ○ for thinking/reasoning, ⏺ for a tool/command line. Re-style those
+// markers through Ink instead of leaving the renderers' (now-stripped) ANSI.
+function renderAgentMarkerLine(line: string, key: string): React.ReactElement | null {
+  const text = /^●\s+(.*)$/.exec(line);
+  if (text) {
+    return (
+      <Text key={key}>
+        <Text color={RELAY_ACCENT} bold>{`${TEXT_MARK} `}</Text>
+        {renderInlineMarkdown(text[1], key)}
+      </Text>
+    );
+  }
+
+  const thinking = /^○\s+(.*)$/.exec(line);
+  if (thinking) {
+    return (
+      <Text key={key}>
+        <Text color={RELAY_THINK} dimColor>{`${THINK_MARK} `}</Text>
+        <Text dimColor italic>{thinking[1]}</Text>
+      </Text>
+    );
+  }
+
+  const tool = /^⏺\s+(\S+)\s*(.*)$/.exec(line);
+  if (tool) {
+    return (
+      <Text key={key}>
+        <Text color={RELAY_ACCENT}>{`${TOOL_MARK} `}</Text>
+        <Text dimColor>{tool[1]}</Text>
+        {tool[2] ? <Text color={RELAY_ACCENT}>{` ${tool[2]}`}</Text> : null}
+      </Text>
+    );
+  }
+
+  return null;
+}
+
+// Status lines emitted via format.status(): "OK …", "WARN …", "ERR …", "INFO …".
+function renderStatusLine(line: string, key: string): React.ReactElement | null {
+  const match = /^(OK|WARN|ERR|INFO)\s{1,2}(.*)$/.exec(line);
+  if (!match) return null;
+  const tone = STATUS_LABELS[match[1]];
+  return (
+    <Text key={key}>
+      <Text color={tone} bold>{match[1]}</Text>
+      <Text>{"  "}</Text>
+      <Text dimColor>{match[2]}</Text>
+    </Text>
+  );
 }
 
 function renderInlineMarkdown(text: string, keyPrefix: string): React.ReactNode[] {
@@ -794,14 +879,20 @@ function renderInlineMarkdown(text: string, keyPrefix: string): React.ReactNode[
 }
 
 function statusColor(queueLabel: string): string {
-  if (queueLabel === "ready") return RELAY_ACCENT;
-  if (queueLabel === "booting") return RELAY_ACCENT;
+  if (queueLabel === "ready") return RELAY_OK;
   if (queueLabel === "running") return RELAY_ACCENT;
+  if (queueLabel === "booting") return RELAY_WARN;
   return RELAY_WARN;
 }
 
 function statusGlyphMark(_queueLabel: string): string {
-  return BRAND_MARK;
+  return "●";
+}
+
+function shortenPath(path: string): string {
+  const home = process.env.HOME;
+  if (home && path.startsWith(home)) return `~${path.slice(home.length)}`;
+  return path;
 }
 
 function PromptLine({
@@ -811,6 +902,7 @@ function PromptLine({
   visibleInput,
   input,
   spinnerFrame,
+  currentAgent,
 }: {
   isRunning: boolean;
   ready: boolean;
@@ -818,12 +910,16 @@ function PromptLine({
   visibleInput: string;
   input: string;
   spinnerFrame: string;
+  currentAgent: string;
 }): React.ReactElement {
   if (isRunning) {
+    const agent = currentAgent && currentAgent !== "idle" ? currentAgent : "agent";
     return (
       <Text>
-        <Text color={RELAY_ACCENT}>{spinnerFrame}</Text>
-        <Text dimColor>  (esc to interrupt)</Text>
+        <Text color={RELAY_ACCENT}>{spinnerFrame} </Text>
+        <Text color={RELAY_ACCENT} bold>{agent}</Text>
+        <Text dimColor> working…</Text>
+        <Text dimColor>   esc to interrupt</Text>
       </Text>
     );
   }
@@ -834,7 +930,7 @@ function PromptLine({
         {input ? (
           <>
             <Text dimColor>  </Text>
-            <Text dimColor>{"> "}</Text>
+            <Text color={RELAY_ACCENT}>{"> "}</Text>
             <Text>{visibleInput}</Text>
           </>
         ) : null}
@@ -843,8 +939,10 @@ function PromptLine({
   }
   return (
     <Text>
-      <Text dimColor>{"> "}</Text>
-      <Text>{visibleInput}</Text>
+      <Text color={RELAY_ACCENT}>{"> "}</Text>
+      {visibleInput
+        ? <Text>{visibleInput}</Text>
+        : <Text dimColor>type @claude, @pi, or @codex and a task…</Text>}
     </Text>
   );
 }

@@ -5,6 +5,7 @@ export {
   keyValue,
   section,
   status,
+  stripAnsi,
   type AgentOutputSink,
 } from "./format.js";
 
