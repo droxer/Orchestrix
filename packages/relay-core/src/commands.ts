@@ -1,5 +1,5 @@
-import { piModel, piProvider } from "./env.js";
-import { codexCliConfigOverrides, runAsAgent } from "./guest.js";
+import { anthropicModel, openaiModel, piModel, piProvider } from "./env.js";
+import { agentWorkspacePath, codexCliConfigOverrides, runAsAgent } from "./guest.js";
 import {
   claudeTaskPrompt,
   codexImplementPrompt,
@@ -7,7 +7,7 @@ import {
   piTaskPrompt,
 } from "./prompts.js";
 import { escapeRegExp, shellCommand, shellQuote } from "./shell.js";
-import { GUEST_WORKSPACE, type AgentState } from "./state.js";
+import type { AgentState } from "./state.js";
 
 export function buildCodexReviewCommand(state: AgentState): string {
   const argv = [...codexBaseArgv(), codexReviewPrompt(state)];
@@ -20,6 +20,7 @@ export function buildCodexImplementCommand(state: AgentState): string {
 }
 
 function codexBaseArgv(): string[] {
+  const workspace = agentWorkspacePath();
   const argv = [
     "stdbuf",
     "-oL",
@@ -27,17 +28,19 @@ function codexBaseArgv(): string[] {
     "codex",
     ...codexCliConfigOverrides(),
     "-C",
-    GUEST_WORKSPACE,
+    workspace,
     "exec",
     "--json",
     "--skip-git-repo-check",
     "--dangerously-bypass-approvals-and-sandbox",
   ];
-  if (process.env.OPENAI_MODEL) argv.push("-m", process.env.OPENAI_MODEL);
+  const model = openaiModel();
+  if (model) argv.push("-m", model);
   return argv;
 }
 
 export function buildClaudeImplementCommand(state: AgentState): string {
+  const workspace = agentWorkspacePath();
   const argv = [
     "stdbuf",
     "-oL",
@@ -47,13 +50,14 @@ export function buildClaudeImplementCommand(state: AgentState): string {
     "--permission-mode",
     "bypassPermissions",
     "--add-dir",
-    GUEST_WORKSPACE,
+    workspace,
     "--verbose",
     "--output-format",
     "stream-json",
     "--include-partial-messages",
   ];
-  if (process.env.ANTHROPIC_MODEL) argv.push("--model", process.env.ANTHROPIC_MODEL);
+  const model = anthropicModel();
+  if (model) argv.push("--model", model);
   argv.push(claudeTaskPrompt(state));
   return runAsAgent(shellCommand(argv));
 }

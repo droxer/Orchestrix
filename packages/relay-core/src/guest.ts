@@ -1,10 +1,13 @@
 import { Buffer } from "node:buffer";
 
 import {
-  ANTHROPIC_ENV_KEYS,
-  OPENAI_ENV_KEYS,
+  anthropicApiKey,
+  anthropicBaseUrl,
+  anthropicModel,
   hostWorkspaceOwner,
+  openaiBaseUrl,
   openaiApiKey,
+  openaiModel,
   piApi,
   piApiKey,
   piBaseUrl,
@@ -44,19 +47,16 @@ export function setSessionGuestEnv(env: Array<[string, string]>): void {
 
 export function guestAgentEnv(hostWorkspace?: string | null): Array<[string, string]> {
   const env: Array<[string, string]> = [];
-  for (const key of ANTHROPIC_ENV_KEYS) {
-    const value = process.env[key];
-    if (value) env.push([key, value]);
-  }
+  pushEnv(env, "ANTHROPIC_API_KEY", anthropicApiKey());
+  pushEnv(env, "ANTHROPIC_BASE_URL", anthropicBaseUrl());
+  pushEnv(env, "ANTHROPIC_MODEL", anthropicModel());
   const openaiKey = openaiApiKey();
   if (openaiKey) {
     env.push(["OPENAI_API_KEY", openaiKey]);
     env.push(["CODEX_API_KEY", openaiKey]);
   }
-  for (const key of OPENAI_ENV_KEYS.slice(1)) {
-    const value = process.env[key];
-    if (value) env.push([key, value]);
-  }
+  pushEnv(env, "OPENAI_BASE_URL", openaiBaseUrl());
+  pushEnv(env, "OPENAI_MODEL", openaiModel());
   for (const key of ["PI_API_KEY", "PI_BASE_URL", "PI_MODEL", "PI_PROVIDER", "PI_API"]) {
     const value = process.env[key];
     if (value) env.push([key, value]);
@@ -85,15 +85,17 @@ export function guestCodexConfigToml(): string {
     'default_mode = "danger-full-access"',
     'model_provider = "dashscope"',
   ];
-  if (process.env.OPENAI_MODEL) {
-    lines.push(`model = ${JSON.stringify(process.env.OPENAI_MODEL)}`);
+  const model = openaiModel();
+  const baseUrl = openaiBaseUrl();
+  if (model) {
+    lines.push(`model = ${JSON.stringify(model)}`);
   }
-  if (process.env.OPENAI_BASE_URL) {
+  if (baseUrl) {
     lines.push(
       "",
       "[model_providers.dashscope]",
       'name = "DashScope"',
-      `base_url = ${JSON.stringify(process.env.OPENAI_BASE_URL)}`,
+      `base_url = ${JSON.stringify(baseUrl)}`,
       'env_key = "OPENAI_API_KEY"',
       "requires_openai_auth = false",
     );
@@ -107,9 +109,8 @@ export function guestCodexAuthJson(apiKey: string): string {
 
 export function guestPiAuthJson(): string {
   const auth: Record<string, { type: "api_key"; key: string }> = {};
-  if (process.env.ANTHROPIC_API_KEY) {
-    auth.anthropic = { type: "api_key", key: process.env.ANTHROPIC_API_KEY };
-  }
+  const anthropicKey = anthropicApiKey();
+  if (anthropicKey) auth.anthropic = { type: "api_key", key: anthropicKey };
   const openaiKey = openaiApiKey();
   if (openaiKey) auth.openai = { type: "api_key", key: openaiKey };
   const piKey = piApiKey();
@@ -153,11 +154,13 @@ export function guestPiModelsJson(): string {
 
 export function codexCliConfigOverrides(): string[] {
   const argv = ["-c", 'model_provider="dashscope"'];
-  if (process.env.OPENAI_MODEL) argv.push("-c", `model=${JSON.stringify(process.env.OPENAI_MODEL)}`);
-  if (process.env.OPENAI_BASE_URL) {
+  const model = openaiModel();
+  const baseUrl = openaiBaseUrl();
+  if (model) argv.push("-c", `model=${JSON.stringify(model)}`);
+  if (baseUrl) {
     argv.push(
       "-c",
-      `model_providers.dashscope.base_url=${JSON.stringify(process.env.OPENAI_BASE_URL)}`,
+      `model_providers.dashscope.base_url=${JSON.stringify(baseUrl)}`,
       "-c",
       "model_providers.dashscope.requires_openai_auth=false",
     );
@@ -165,7 +168,23 @@ export function codexCliConfigOverrides(): string[] {
   return argv;
 }
 
+function pushEnv(env: Array<[string, string]>, key: string, value: string | undefined): void {
+  if (value) env.push([key, value]);
+}
+
 export function runAsAgent(command: string): string {
+  const workspace = agentWorkspacePath();
+  const home = agentHomePath();
+  if (process.env.RELAY_RUN_AS_CURRENT_USER === "1") {
+    return [
+      `export HOME=${shellQuote(home)}`,
+      `export CODEX_HOME=${shellQuote(`${home}/.codex`)}`,
+      `export PI_CODING_AGENT_DIR=${shellQuote(`${home}/.pi/agent`)}`,
+      guestEnvExports(),
+      `cd ${shellQuote(workspace)}`,
+      command,
+    ].filter(Boolean).join(" && ");
+  }
   const parts = [
     "export HOME=/home/agent",
     "export CODEX_HOME=/home/agent/.codex",
@@ -173,10 +192,18 @@ export function runAsAgent(command: string): string {
     "export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
     "umask 002",
     guestEnvExports(),
-    `cd ${GUEST_WORKSPACE}`,
+    `cd ${shellQuote(workspace)}`,
     command,
   ].filter(Boolean);
   return `su ${AGENT_USER} -s /bin/bash -c ${shellQuote(parts.join(" && "))}`;
+}
+
+export function agentWorkspacePath(): string {
+  return process.env.RELAY_AGENT_WORKSPACE || GUEST_WORKSPACE;
+}
+
+export function agentHomePath(): string {
+  return process.env.RELAY_AGENT_HOME || "/home/agent";
 }
 
 export function encodeBase64(value: string): string {

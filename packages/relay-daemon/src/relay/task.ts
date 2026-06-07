@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, append
 import { basename, join } from "node:path";
 
 import { DEFAULT_RELAY_DATA_DIR, newRelayId, nowIso } from "./session.js";
-import type { AgentName } from "./state.js";
+import type { AgentName } from "relay-core";
 
 export type TaskPriority = "low" | "normal" | "high";
 export type TaskStatus = "backlog" | "assigned" | "running" | "waiting_for_human" | "review" | "done" | "blocked";

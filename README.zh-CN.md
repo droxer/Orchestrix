@@ -229,22 +229,28 @@ Relay 在 `.relay/` 下写入本地生成状态：
 ## 源码地图
 
 ```text
-src/index.ts                CLI 入口
-src/tui.tsx                 Ink TUI 和人工命令
-src/relay.ts                public re-export surface
-src/relay/controller.ts     session-aware orchestration controller
-src/relay/session.ts        session 事件模型和本地 store
-src/relay/task.ts           backlog/task 事件模型和本地 store
-src/relay/nodes.ts          Claude、Pi、Codex 执行节点
-src/relay/commands.ts       Agent 命令构造
-src/relay/prompts.ts        Agent prompt 构造
-src/relay/renderers.ts      stream-json 与 JSONL 渲染器
-src/relay/routing.ts        默认工作流路由
-src/relay/workflow.ts       BoxLite 生命周期和运行入口
-src/relay/server.ts         本地 JSON/SSE API
+packages/relay-daemon/src/cli.ts              兼容 CLI 入口
+packages/relay-daemon/src/daemon-cli.ts       host daemon binary 入口
+packages/relay-core/src/index.ts              shared protocol and agent runtime exports
+packages/relay-daemon-node/src/cli.ts          daemon node binary 入口
+packages/relay-daemon-node/src/index.ts        sandbox-side daemon node runtime
+packages/relay-daemon/src/index.ts            public daemon re-export surface
+packages/relay-daemon/src/relay/controller.ts session-aware orchestration controller
+packages/relay-daemon/src/relay/session.ts    session 事件模型和本地 store
+packages/relay-daemon/src/relay/task.ts       backlog/task 事件模型和本地 store
+packages/relay-core/src/nodes.ts      Claude、Pi、Codex 执行节点
+packages/relay-core/src/commands.ts   Agent 命令构造
+packages/relay-core/src/prompts.ts    Agent prompt 构造
+packages/relay-core/src/renderers.ts  stream-json 与 JSONL 渲染器
+packages/relay-daemon/src/relay/routing.ts    默认工作流路由
+packages/relay-daemon/src/relay/workflow.ts   BoxLite 生命周期和运行入口
+packages/relay-daemon/src/relay/server.ts     本地 JSON/SSE API
+packages/relay-tui/src/cli.ts                 TUI binary 入口
+packages/relay-tui/src/tui.tsx                Ink TUI 和人工命令
 ```
 
-新的 public API export 放在 `src/relay.ts`。运行时 dispatch 留在 `src/relay/workflow.ts`，`src/index.ts` 应保持很薄。
+新的 daemon public API export 放在 `packages/relay-daemon/src/index.ts`。运行时 dispatch 留在
+`packages/relay-daemon/src/relay/workflow.ts`，package binary wrapper 应保持很薄。
 
 ## 开发
 

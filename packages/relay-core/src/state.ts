@@ -1,6 +1,4 @@
 import type { AgentOutputSink } from "./format.js";
-import type { SessionController } from "./controller.js";
-import type { AgentEventSink } from "./session.js";
 
 export type AgentName = "claude" | "pi" | "codex";
 export type CodexTaskMode = "implement" | "review";
@@ -31,8 +29,25 @@ export interface AgentRunOptions {
   eventSink?: AgentEventSink;
   runId?: string;
   agent?: AgentName;
-  sessionController?: SessionController;
+  sessionController?: SessionStepRunner;
   sessionId?: string;
+}
+
+export interface AgentEventSink {
+  agentOutput(runId: string, agent: AgentName, stream: "stdout" | "stderr", text: string): void;
+}
+
+export interface SessionStepRunner {
+  store: {
+    appendEvent(sessionId: string, event: unknown): unknown;
+  };
+  createSession(taskGoal: string): { id: string };
+  runStep(
+    sessionId: string,
+    state: AgentState,
+    step: { agent: AgentName; mode: CodexTaskMode; role?: string },
+    options?: Pick<AgentRunOptions, "signal" | "sink" | "execStream">,
+  ): Promise<AgentState>;
 }
 
 export interface StreamExecResult {

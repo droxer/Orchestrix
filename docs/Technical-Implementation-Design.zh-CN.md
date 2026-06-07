@@ -312,12 +312,16 @@ Audit/SIEM export
 
 | 入口 | 文件 | 行为 |
 | :- | :- | :- |
-| `relay` | `src/index.ts` -> `src/relay/workflow.ts` | 无参数时启动 Ink TUI |
-| `relay run-workflow <task>` | `src/relay/workflow.ts` | 启动 BoxLite 并运行 Claude -> Pi -> Codex 默认工作流 |
-| `relay sessions` | `src/relay/workflow.ts` | 列出 `.relay/sessions` 中的 persisted sessions |
-| `relay show <session-id>` | `src/relay/workflow.ts` | 打印紧凑 session summary |
-| `relay serve --port <port>` | `src/relay/workflow.ts` -> `src/relay/server.ts` | 提供本地 JSON/SSE API |
-| Library exports | `src/relay.ts` | re-export public types、stores、controller、command builders、renderers、workflow helpers |
+| `relay-core` | `packages/relay-core/src/index.ts` | shared protocol、agent state、prompt、command builders、renderer、guest helpers 和 agent execution units |
+| `relay-tui` | `packages/relay-tui/src/cli.ts` -> `packages/relay-tui/src/tui.tsx` | 启动 Ink TUI |
+| `relay-daemon` | `packages/relay-daemon/src/daemon-cli.ts` -> `packages/relay-daemon/src/relay/daemon.ts` | 启动 host daemon |
+| `relay-daemon-node` | `packages/relay-daemon-node/src/cli.ts` -> `packages/relay-daemon-node/src/index.ts` | 启动 daemon node |
+| `relay` | `packages/relay-daemon/src/cli.ts` -> `packages/relay-daemon/src/relay/workflow.ts` | workflow、session、API、daemon subcommand 的兼容 CLI |
+| `relay run-workflow <task>` | `packages/relay-daemon/src/relay/workflow.ts` | 启动 BoxLite 并运行 Claude -> Pi -> Codex 默认工作流 |
+| `relay sessions` | `packages/relay-daemon/src/relay/workflow.ts` | 列出 `.relay/sessions` 中的 persisted sessions |
+| `relay show <session-id>` | `packages/relay-daemon/src/relay/workflow.ts` | 打印紧凑 session summary |
+| `relay serve --port <port>` | `packages/relay-daemon/src/relay/workflow.ts` -> `packages/relay-daemon/src/relay/server.ts` | 提供本地 JSON/SSE API |
+| Daemon library exports | `packages/relay-daemon/src/index.ts` | re-export public types、stores、controller、command builders、renderers、workflow helpers |
 
 ### 10.2 本地数据模型
 
@@ -347,7 +351,7 @@ Audit/SIEM export
 
 ### 10.4 Agent Execution
 
-Agent-specific execution 位于 `src/relay/nodes.ts`：
+Agent-specific execution 位于 `packages/relay-core/src/nodes.ts`：
 
 | Node | Command Builder | Renderer |
 | :- | :- | :- |
@@ -382,7 +386,7 @@ TUI 支持 `@claude`、`@pi`、`@codex` 等前置 mention，以及 `/approve`、
 
 ### 10.7 环境、认证与测试
 
-`src/relay/env.ts` 管环境，`src/relay/guest.ts` 管 guest setup。Host 配置会转换成 guest 文件/env，包括 `/home/agent/.codex`、`/home/agent/.pi/agent`、`/workspace` 挂载和 `runAsAgent()` 执行。
+`packages/relay-core/src/env.ts` 管环境，`packages/relay-core/src/guest.ts` 管 guest setup。Host 配置会转换成 guest 文件/env，包括 `/home/agent/.codex`、`/home/agent/.pi/agent`、`/workspace` 挂载和 `runAsAgent()` 执行。
 
 运行测试：
 

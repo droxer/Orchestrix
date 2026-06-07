@@ -133,6 +133,25 @@ export class ClaudeStreamRenderer {
       return "";
     }
 
+    if (event.type === "assistant") {
+      const message = asRecord(event.message);
+      const content = Array.isArray(message.content) ? message.content : [];
+      const output: string[] = [];
+      for (const item of content) {
+        const block = asRecord(item);
+        if (block.type === "text") {
+          const text = String(block.text ?? "").trim();
+          if (text) {
+            this.text.resetBlock();
+            output.push(this.text.feed(`${text}\n`));
+          }
+        } else if (block.type === "tool_use") {
+          output.push(toolLine(ansi.brand, "tool", String(block.name ?? "unknown")));
+        }
+      }
+      return output.join("");
+    }
+
     if (event.type === "result") {
       return event.is_error
         ? `\n${status("error", `Claude error: ${String(event.result ?? "unknown error")}`)}\n`

@@ -16,16 +16,16 @@ import {
   piBaseUrl,
   piModel,
   piProvider,
-} from "./env.js";
-import { ansi, emitOrPrint, keyValue, section, status, type AgentOutputSink } from "./format.js";
-import { guestAgentEnv, runAsAgent, setSessionGuestEnv } from "./guest.js";
-import { buildPiPreflightCommand } from "./commands.js";
+} from "relay-core";
+import { ansi, emitOrPrint, keyValue, section, status, type AgentOutputSink } from "relay-core";
+import { guestAgentEnv, runAsAgent, setSessionGuestEnv } from "relay-core";
+import { buildPiPreflightCommand } from "relay-core";
 import {
   claudeImplementNode,
   codexImplementNode,
   codexReviewNode,
   piImplementNode,
-} from "./nodes.js";
+} from "relay-core";
 import { SessionController } from "./controller.js";
 import { LocalSessionStore, relayEvent } from "./session.js";
 import {
@@ -42,7 +42,7 @@ import {
   type AgentRunOptions,
   type AgentState,
   type CodexTaskMode,
-} from "./state.js";
+} from "relay-core";
 
 export interface OrchestratorSession {
   rootfsPath: string;
@@ -51,6 +51,11 @@ export interface OrchestratorSession {
   hostGid: number;
   syncedUid: number;
   syncedGid: number;
+}
+
+export interface OrchestratorSessionOptions {
+  boxName?: string;
+  workspacePath?: string;
 }
 
 const readyAgents = new Set<AgentName>();
@@ -137,6 +142,7 @@ export async function runWorkflow(initialState: AgentState, options: AgentRunOpt
 export async function withOrchestratorSession<T>(
   action: (session: OrchestratorSession) => Promise<T>,
   sink?: AgentOutputSink,
+  options: OrchestratorSessionOptions = {},
 ): Promise<T> {
   ensureSingleOrchestrator();
   resetAgentReadiness();
@@ -149,26 +155,25 @@ export async function withOrchestratorSession<T>(
     sink(`${keyValue("mount", GUEST_WORKSPACE)}\n`);
   }
   const rootfsPath = ensureLocalDevboxOci(sink);
-  const hostWorkspace = hostWorkspacePath();
+  const hostWorkspace = options.workspacePath ?? hostWorkspacePath();
 
   const { JsBoxlite } = await importBoxLite();
   const runtime = JsBoxlite.withDefaultConfig();
-  const boxName = "relay";
+  const boxName = options.boxName ?? "relay";
   try {
     const [hostUid, hostGid] = hostWorkspaceOwner(hostWorkspace);
     const guestEnv = guestAgentEnv(hostWorkspace);
     setSessionGuestEnv(guestEnv);
     const env = guestEnv.map(([key, value]) => ({ key, value }));
-    const box = await runtime.create(
-      {
-        rootfsPath,
-        volumes: [{ hostPath: hostWorkspace, guestPath: GUEST_WORKSPACE, readOnly: false }],
-        env,
-        workingDir: GUEST_WORKSPACE,
-      },
-      boxName,
-    );
+    const box = await createSessionBox(runtime, {
+      rootfsPath,
+      volumes: [{ hostPath: hostWorkspace, guestPath: GUEST_WORKSPACE, readOnly: false }],
+      env,
+      workingDir: GUEST_WORKSPACE,
+      autoRemove: true,
+    }, boxName);
     setSessionBox(box);
+    emitOrPrint(sink, keyValue("box", boxName));
     emitOrPrint(sink, keyValue("rootfs", rootfsPath));
     emitOrPrint(sink, keyValue("workspace", hostWorkspace));
 
@@ -188,8 +193,43 @@ export async function withOrchestratorSession<T>(
   } finally {
     await stopSessionBox();
     resetAgentReadiness();
-    if (runtime.remove) await runtime.remove(boxName);
+    if (runtime.remove) {
+      await runtime.remove(boxName, true).catch((error: unknown) => {
+        if (!isMissingBoxError(error)) throw error;
+      });
+    }
   }
+}
+
+async function createSessionBox(runtime: any, options: unknown, boxName: string): Promise<any> {
+  if (runtime.getOrCreate) {
+    try {
+      const result = await runtime.getOrCreate(options, boxName);
+      return result.box;
+    } catch (error) {
+      if (!isExistingBoxError(error) || !runtime.remove) throw error;
+      await runtime.remove(boxName, true).catch(() => undefined);
+      const result = await runtime.getOrCreate(options, boxName);
+      return result.box;
+    }
+  }
+  try {
+    return await runtime.create(options, boxName);
+  } catch (error) {
+    if (!isExistingBoxError(error) || !runtime.remove) throw error;
+    await runtime.remove(boxName, true).catch(() => undefined);
+    return runtime.create(options, boxName);
+  }
+}
+
+function isExistingBoxError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /box with name .+ already exists/i.test(message) || /already exists/i.test(message);
+}
+
+function isMissingBoxError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /box not found/i.test(message) || /not found/i.test(message);
 }
 
 export async function main(taskGoal: string): Promise<void> {
@@ -246,11 +286,19 @@ export function run(argv: string[] = process.argv.slice(2)): void {
     });
     return;
   }
+  if (argv[0] === "daemon") {
+    const portIndex = argv.indexOf("--port");
+    const port = portIndex >= 0 ? Number(argv[portIndex + 1]) : 8790;
+    const daemonNodeModeIndex = argv.indexOf("--daemon-node-mode");
+    const daemonNodeMode = daemonNodeModeIndex >= 0 && argv[daemonNodeModeIndex + 1] === "local" ? "local" : "reverse";
+    import("./daemon.js").then(({ serveRelayDaemon }) => serveRelayDaemon({ port, daemonNodeMode })).catch((error: unknown) => {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 1;
+    });
+    return;
+  }
   if (argv.length > 0) {
     throw new Error(`Unknown arguments: ${argv.join(" ")}`);
   }
-  import("../tui.js").then(({ runInteractiveTui }) => runInteractiveTui()).catch((error: unknown) => {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  });
+  throw new Error("Usage: relay-daemon <daemon|serve|sessions|show|run-workflow> ...");
 }

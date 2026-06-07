@@ -264,23 +264,29 @@ from events.
 ## Source Map
 
 ```text
-src/index.ts                CLI entrypoint
-src/tui.tsx                 Ink TUI and human commands
-src/relay.ts                public re-export surface
-src/relay/controller.ts     session-aware orchestration controller
-src/relay/session.ts        durable session event model and local store
-src/relay/task.ts           backlog/task event model and local store
-src/relay/nodes.ts          Claude, Pi, and Codex execution nodes
-src/relay/commands.ts       agent command builders
-src/relay/prompts.ts        agent prompt builders
-src/relay/renderers.ts      stream-json and JSONL renderers
-src/relay/routing.ts        default workflow routing
-src/relay/workflow.ts       BoxLite lifecycle and runtime entrypoints
-src/relay/server.ts         local JSON/SSE API
+packages/relay-daemon/src/cli.ts              compatibility CLI entrypoint
+packages/relay-daemon/src/daemon-cli.ts       host daemon binary entrypoint
+packages/relay-core/src/index.ts              shared protocol and agent runtime exports
+packages/relay-daemon-node/src/cli.ts          daemon node binary entrypoint
+packages/relay-daemon-node/src/index.ts        sandbox-side daemon node runtime
+packages/relay-daemon/src/index.ts            public daemon re-export surface
+packages/relay-daemon/src/relay/controller.ts session-aware orchestration controller
+packages/relay-daemon/src/relay/session.ts    durable session event model and local store
+packages/relay-daemon/src/relay/task.ts       backlog/task event model and local store
+packages/relay-core/src/nodes.ts      Claude, Pi, and Codex execution nodes
+packages/relay-core/src/commands.ts   agent command builders
+packages/relay-core/src/prompts.ts    agent prompt builders
+packages/relay-core/src/renderers.ts  stream-json and JSONL renderers
+packages/relay-daemon/src/relay/routing.ts    default workflow routing
+packages/relay-daemon/src/relay/workflow.ts   BoxLite lifecycle and runtime entrypoints
+packages/relay-daemon/src/relay/server.ts     local JSON/SSE API
+packages/relay-tui/src/cli.ts                 TUI binary entrypoint
+packages/relay-tui/src/tui.tsx                Ink TUI and human commands
 ```
 
-Keep new public API exports in `src/relay.ts`. Keep runtime dispatch in
-`src/relay/workflow.ts`; `src/index.ts` should stay minimal.
+Keep new daemon public API exports in `packages/relay-daemon/src/index.ts`.
+Keep runtime dispatch in `packages/relay-daemon/src/relay/workflow.ts`; package
+binary wrappers should stay minimal.
 
 ## Development
 

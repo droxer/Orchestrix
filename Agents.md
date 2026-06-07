@@ -66,15 +66,22 @@ ask the user whether to run `codegraph init -i`.
 
 ## Project Shape
 
-- Runtime entrypoint: `src/index.ts`.
-- TUI: `src/tui.tsx`.
-- Public re-export surface: `src/relay.ts`.
-- Relay implementation modules: `src/relay/`.
+- Workspace packages: `packages/relay-core/`, `packages/relay-daemon/`,
+  `packages/relay-daemon-node/`, and `packages/relay-tui/`.
+- Daemon CLI entrypoints: `packages/relay-daemon/src/cli.ts` and
+  `packages/relay-daemon/src/daemon-cli.ts`.
+- Daemon node CLI entrypoint: `packages/relay-daemon-node/src/cli.ts`.
+- TUI CLI entrypoint: `packages/relay-tui/src/cli.ts`.
+- Public daemon re-export surface: `packages/relay-daemon/src/index.ts`.
+- Shared protocol and agent runtime modules: `packages/relay-core/src/`.
+- Relay implementation modules: `packages/relay-daemon/src/relay/`.
+- TUI implementation: `packages/relay-tui/src/tui.tsx`.
 - Tests: `tests/handoff.test.ts`, `tests/session.test.ts`,
   `tests/tui.test.tsx`.
 - Package manager: npm.
 - Local devbox image: `dockerfile`.
-- Generated outputs: `dist/`, `node_modules/`, `.oci/`, `.relay/`.
+- Generated outputs: `dist/`, `packages/*/dist/`, `node_modules/`, `.oci/`,
+  `.relay/`.
 
 Node.js 22.19 or newer is required.
 
@@ -104,28 +111,35 @@ Claude Code, Pi, and Codex CLIs collaborate inside one isolated BoxLite VM.
 
 Key modules:
 
-- `src/index.ts`: CLI entrypoint. Routes `relay`, `relay run-workflow`,
-  `relay sessions`, `relay show`, and `relay serve`.
-- `src/tui.tsx`: Ink-based TUI. Owns input parsing for `@claude`, `@pi`,
+- `packages/relay-core/src/index.ts`: shared protocol, agent state, prompts,
+  command builders, stream renderers, guest helpers, and agent execution units.
+- `packages/relay-daemon/src/cli.ts`: compatibility CLI for `relay`
+  subcommands.
+- `packages/relay-daemon/src/daemon-cli.ts`: host daemon binary entrypoint.
+- `packages/relay-daemon-node/src/cli.ts`: daemon node binary entrypoint.
+- `packages/relay-daemon-node/src/index.ts`: sandbox-side daemon node runtime.
+- `packages/relay-tui/src/tui.tsx`: Ink-based TUI. Owns input parsing for `@claude`, `@pi`,
   `@codex`, `/approve`, `/reject`, `/cancel`, `/rerun`, `/handoff`,
   `/sessions`, `/open`, `/summary`, and `/quit`.
-- `src/relay/workflow.ts`: VM lifecycle, agent readiness preflight, and the
+- `packages/relay-daemon/src/relay/workflow.ts`: VM lifecycle, agent readiness preflight, and the
   default Claude to Pi to Codex workflow.
-- `src/relay/controller.ts`: `SessionController`, the only object that mutates
+- `packages/relay-daemon/src/relay/controller.ts`: `SessionController`, the only object that mutates
   sessions. Each `runStep` emits events through the store and notifies the TUI
   through `onUpdate`.
-- `src/relay/session.ts` and `src/relay/task.ts`: event-sourced stores.
-- `src/relay/nodes.ts`: single-agent execution units. Each agent CLI runs in
+- `packages/relay-daemon/src/relay/session.ts` and
+  `packages/relay-daemon/src/relay/task.ts`: event-sourced stores.
+- `packages/relay-core/src/nodes.ts`: single-agent execution units. Each agent CLI runs in
   BoxLite through `execStream`.
-- `src/relay/commands.ts` and `src/relay/prompts.ts`: shell argv and prompt
-  construction for agents and modes.
-- `src/relay/routing.ts`: default-workflow transition function used by
+- `packages/relay-core/src/commands.ts` and
+  `packages/relay-core/src/prompts.ts`: shell argv and prompt construction for agents and modes.
+- `packages/relay-daemon/src/relay/routing.ts`: default-workflow transition function used by
   `relay run-workflow`. TUI assignments do not go through this router.
-- `src/relay/box.ts`, `src/relay/guest.ts`, and `src/relay/env.ts`: BoxLite VM
-  setup, guest auth provisioning, and env loading.
-- `src/relay/renderers.ts`: streaming JSONL to terminal text converters.
-- `src/relay/format.ts`: ANSI formatting helpers.
-- `src/relay/server.ts`: read-only HTTP/SSE API over `.relay/`.
+- `packages/relay-daemon/src/relay/box.ts`,
+  `packages/relay-core/src/guest.ts`, and
+  `packages/relay-core/src/env.ts`: BoxLite VM setup, guest auth provisioning, and env loading.
+- `packages/relay-core/src/renderers.ts`: streaming JSONL to terminal text converters.
+- `packages/relay-core/src/format.ts`: ANSI formatting helpers.
+- `packages/relay-daemon/src/relay/server.ts`: read-only HTTP/SSE API over `.relay/`.
 
 ## Implementation Notes
 

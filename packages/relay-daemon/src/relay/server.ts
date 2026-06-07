@@ -15,7 +15,7 @@ import {
   taskStatus,
   type TaskStore,
 } from "./task.js";
-import type { AgentName, CodexTaskMode } from "./state.js";
+import type { AgentName, CodexTaskMode } from "relay-core";
 
 export interface RelayServerOptions {
   port?: number;

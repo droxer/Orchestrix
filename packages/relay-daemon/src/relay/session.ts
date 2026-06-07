@@ -1,8 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, appendFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 
-import { REPO_ROOT } from "./env.js";
-import type { AgentName, CodexReviewVerdict } from "./state.js";
+import { REPO_ROOT } from "relay-core";
+import type { AgentName, CodexReviewVerdict } from "relay-core";
 
 export type AgentRole = "implementer" | "reviewer" | "planner" | "tester" | "fixer";
 export type SessionStatus = "pending_approval" | "running" | "waiting_for_human" | "completed" | "failed" | "cancelled";
@@ -192,7 +192,7 @@ export function roleForAgent(agent: AgentName, mode: "implement" | "review" = "i
 export class LocalSessionStore implements SessionStore {
   private readonly sessionsDir: string;
 
-  constructor(private readonly rootDir = DEFAULT_RELAY_DATA_DIR) {
+  constructor(public readonly rootDir = DEFAULT_RELAY_DATA_DIR) {
     this.sessionsDir = join(this.rootDir, "sessions");
     mkdirSync(this.sessionsDir, { recursive: true });
   }

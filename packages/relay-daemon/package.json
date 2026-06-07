@@ -1,0 +1,24 @@
+{
+  "name": "relay-daemon",
+  "version": "0.1.0",
+  "description": "Relay host daemon and orchestration protocol",
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "relay-daemon": "./dist/daemon-cli.js",
+    "relay": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@boxlite-ai/boxlite": "^0.9.5",
+    "relay-core": "0.1.0"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  }
+}

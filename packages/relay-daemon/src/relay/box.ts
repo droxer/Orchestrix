@@ -8,8 +8,8 @@ import {
   OCI_LAYOUT_DIR,
   requireOpenaiApiKey,
   requirePiConfig,
-} from "./env.js";
-import { emitOrPrint, status } from "./format.js";
+} from "relay-core";
+import { emitOrPrint, status } from "relay-core";
 import {
   GUEST_AGENT_SYNC_SCRIPT,
   encodeBase64,
@@ -17,10 +17,10 @@ import {
   guestCodexConfigToml,
   guestPiAuthJson,
   guestPiModelsJson,
-} from "./guest.js";
-import { shellQuote } from "./shell.js";
-import { hostWorkspaceOwner } from "./env.js";
-import type { AgentName, AgentOutputSink, StreamExecResult } from "./state.js";
+} from "relay-core";
+import { shellQuote } from "relay-core";
+import { hostWorkspaceOwner } from "relay-core";
+import type { AgentName, AgentOutputSink, StreamExecResult } from "relay-core";
 
 type BoxLiteModule = typeof import("@boxlite-ai/boxlite");
 type StreamRenderer = (chunk: string) => string;

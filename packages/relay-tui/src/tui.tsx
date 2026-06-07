@@ -9,14 +9,21 @@ import {
   type SessionStore,
   type OrchestratorSession,
   GUEST_WORKSPACE,
+  ansi,
+  ClaudeStreamRenderer,
+  CodexStreamRenderer,
   LocalSessionStore,
+  PlainTextStreamRenderer,
+  RelayDaemonClient,
   SessionController as RelaySessionController,
+  StderrLineRenderer,
   assignmentFailureOutcome,
   assignmentSucceeded,
   ensureAgentReady,
   initialAgentState,
-  withOrchestratorSession,
-} from "./relay.js";
+  type RelayEvent,
+  type SandboxRecord,
+} from "relay-daemon";
 
 export interface ParsedAssignment {
   agent: AgentName;
@@ -187,14 +194,74 @@ export async function runAssignments(request: RunRequest): Promise<void> {
   controller.completeSession(sessionId, "Assignments completed.");
 }
 
+export function createDaemonAssignmentRunner(
+  client: RelayDaemonClient,
+  sandboxId: string,
+): AssignmentRunner {
+  const deliveredEventIds = new Set<string>();
+  const renderers = new Map<string, { feed(chunk: string): string }>();
+  return async (request) => {
+    if (request.assignments.length === 0) {
+      throw new Error("Assign the task with @claude, @pi, or @codex.");
+    }
+    request.log("\nSubmitting task to Relay daemon.\n");
+    const session = await client.runSandbox({
+      sandboxId,
+      taskGoal: request.task,
+      sessionId: request.sessionId,
+      signal: request.signal,
+      assignments: request.assignments.map((assignment) => ({
+        agent: assignment.agent,
+        mode: assignment.agent === "codex" ? assignment.codexMode ?? "implement" : "implement",
+      })),
+    });
+    replayDaemonAgentOutput(session.events, deliveredEventIds, request.log, renderers);
+    request.onSessionUpdate?.(session);
+  };
+}
+
+export function replayDaemonAgentOutput(
+  events: RelayEvent[],
+  deliveredEventIds: Set<string>,
+  log: (text: string) => void,
+  renderers = new Map<string, { feed(chunk: string): string }>(),
+): void {
+  for (const event of events) {
+    if (event.type !== "agent.output" || deliveredEventIds.has(event.id)) continue;
+    deliveredEventIds.add(event.id);
+    const rendered = rendererForDaemonOutput(event, renderers).feed(event.text);
+    if (rendered) log(rendered);
+  }
+}
+
+function rendererForDaemonOutput(
+  event: Extract<RelayEvent, { type: "agent.output" }>,
+  renderers: Map<string, { feed(chunk: string): string }>,
+): { feed(chunk: string): string } {
+  const key = `${event.runId}:${event.agent}:${event.stream}`;
+  const existing = renderers.get(key);
+  if (existing) return existing;
+  const renderer = event.stream === "stderr"
+    ? new StderrLineRenderer()
+    : event.agent === "claude"
+      ? new ClaudeStreamRenderer()
+      : event.agent === "codex"
+        ? new CodexStreamRenderer()
+        : new PlainTextStreamRenderer("Pi", ansi.yellow);
+  renderers.set(key, renderer);
+  return renderer;
+}
+
 export interface RelayTuiProps {
   session?: OrchestratorSession;
+  workspacePath?: string;
   onExit?: () => void;
   runner?: AssignmentRunner;
   ready?: boolean;
   disabledMessage?: string;
   bootLogLines?: string[];
   sessionStore?: SessionStore;
+  localSessionControl?: boolean;
 }
 
 function splitToLines(text: string): string[] {
@@ -212,12 +279,14 @@ function pushLines(existing: string[], text: string): string[] {
 
 export function RelayTui({
   session,
+  workspacePath,
   onExit,
   runner = runAssignments,
   ready = true,
   disabledMessage = "Starting Relay...",
   bootLogLines = [],
   sessionStore = new LocalSessionStore(),
+  localSessionControl = true,
 }: RelayTuiProps): React.ReactElement {
   const { exit } = useApp();
   const [input, setInput] = useState("");
@@ -252,7 +321,7 @@ export function RelayTui({
 
   const visibleLogs = useMemo(() => [...bootLogLines, ...logLines].slice(-VISIBLE_LOG_LINES), [bootLogLines, logLines]);
   const queueLabel = !ready ? "booting" : isRunning ? "running" : "ready";
-  const workspace = session?.hostWorkspace ?? "(test workspace)";
+  const workspace = workspacePath ?? session?.hostWorkspace ?? "(test workspace)";
   const inputWidth = Math.max(20, (process.stdout.columns ?? 80) - 6);
   const visibleInput = input.length <= inputWidth ? input : `…${input.slice(input.length - inputWidth + 1)}`;
   const shortcutMenu = shortcutSuggestions(input);
@@ -266,15 +335,19 @@ export function RelayTui({
   };
 
   const startParsedTask = (parsed: ParsedTask): void => {
-    const controller = new RelaySessionController(sessionStore, {
-      workspacePath: session?.hostWorkspace ?? workspace,
-      onUpdate: setActiveSession,
-    });
-    controllerRef.current = controller;
-    const created = controller.createSession(parsed.task, ["human", ...parsed.assignments.map((assignment) => assignment.agent)]);
-    setActiveSession(created);
+    let sessionId: string | undefined;
+    if (localSessionControl) {
+      const controller = new RelaySessionController(sessionStore, {
+        workspacePath: workspace,
+        onUpdate: setActiveSession,
+      });
+      controllerRef.current = controller;
+      const created = controller.createSession(parsed.task, ["human", ...parsed.assignments.map((assignment) => assignment.agent)]);
+      sessionId = created.id;
+      setActiveSession(created);
+    }
     setDefaultAssignments(parsed.assignments.map((assignment) => ({ ...assignment })));
-    executeParsedTask(parsed, created.id);
+    executeParsedTask(parsed, sessionId);
   };
 
   const executeParsedTask = (parsed: ParsedTask, sessionId?: string): void => {
@@ -289,7 +362,7 @@ export function RelayTui({
       log: appendLog,
       controller: controllerRef.current,
       sessionId,
-      workspacePath: session?.hostWorkspace,
+      workspacePath: workspace,
       onSessionUpdate: setActiveSession,
       onAgentStart: (assignment) => {
         if (!mountedRef.current) return;
@@ -416,12 +489,21 @@ export function RelayTui({
       return;
     }
     if (name === "/sessions") {
+      if (!localSessionControl) {
+        appendLog("\nSession listing is served by the host daemon API.\n");
+        setMessage("Use the daemon API for session listings.");
+        return;
+      }
       const sessions = sessionStore.listSessions().slice(0, 6);
       appendLog(`\n${sessions.map((item) => `${item.id}  ${item.status}  ${item.taskGoal}`).join("\n") || "No sessions yet."}\n`);
       setMessage("Listed recent sessions.");
       return;
     }
     if (name === "/open") {
+      if (!localSessionControl) {
+        setMessage("Use the daemon API to open sessions in daemon mode.");
+        return;
+      }
       if (!detail) {
         setMessage("Usage: /open <session-id>");
         return;
@@ -454,13 +536,17 @@ export function RelayTui({
         setMessage("No active session.");
         return;
       }
-      setActiveSession(controllerRef.current.recordDecision(current.id, "reject", detail || "Rejected by human."));
+      if (localSessionControl) {
+        setActiveSession(controllerRef.current.recordDecision(current.id, "reject", detail || "Rejected by human."));
+      }
       setMessage("Feedback recorded.");
       return;
     }
     if (name === "/cancel") {
       abortRef.current?.abort();
-      if (current) setActiveSession(controllerRef.current.recordDecision(current.id, "cancel", "Cancelled by human."));
+      if (current && localSessionControl) {
+        setActiveSession(controllerRef.current.recordDecision(current.id, "cancel", "Cancelled by human."));
+      }
       setMessage("Cancellation requested.");
       return;
     }
@@ -470,7 +556,9 @@ export function RelayTui({
         setMessage("Usage: /rerun <claude|pi|codex>");
         return;
       }
-      setActiveSession(controllerRef.current.recordDecision(current.id, "rerun", "Rerun requested.", agent));
+      if (localSessionControl) {
+        setActiveSession(controllerRef.current.recordDecision(current.id, "rerun", "Rerun requested.", agent));
+      }
       executeParsedTask({ assignments: [{ agent }], task: current.taskGoal }, current.id);
       return;
     }
@@ -485,7 +573,9 @@ export function RelayTui({
       const assignment = { agent, codexMode: agent === "codex" ? "review" as const : undefined };
       const defaultAssignment = { agent };
       const task = note ? `${current.taskGoal}\n\nHandoff note:\n${note}` : current.taskGoal;
-      setActiveSession(controllerRef.current.recordDecision(current.id, "handoff", note || `Handoff to ${agent}.`, agent));
+      if (localSessionControl) {
+        setActiveSession(controllerRef.current.recordDecision(current.id, "handoff", note || `Handoff to ${agent}.`, agent));
+      }
       setCurrentAgent(formatAssignmentLabel(assignment));
       setDefaultAssignments([defaultAssignment]);
       executeParsedTask({ assignments: [assignment], task }, current.id);
@@ -528,7 +618,6 @@ export function RelayTui({
           visibleInput={visibleInput}
           input={input}
           spinnerFrame={spinnerFrame}
-          currentAgent={currentAgent}
         />
         {showShortcutMenu && shortcutMenu ? (
           <Box marginTop={0}>
@@ -553,7 +642,6 @@ export function RelayTui({
         <Text>
           <Text color={statusTone}>{statusMark}</Text>
           <Text dimColor> {queueLabel}</Text>
-          <Text dimColor> · {currentAgent}</Text>
           {defaultAssignments.length > 0 ? (
             <Text dimColor> · {defaultAssignmentLabel}</Text>
           ) : null}
@@ -723,7 +811,6 @@ function PromptLine({
   visibleInput,
   input,
   spinnerFrame,
-  currentAgent,
 }: {
   isRunning: boolean;
   ready: boolean;
@@ -731,13 +818,11 @@ function PromptLine({
   visibleInput: string;
   input: string;
   spinnerFrame: string;
-  currentAgent: string;
 }): React.ReactElement {
   if (isRunning) {
     return (
       <Text>
         <Text color={RELAY_ACCENT}>{spinnerFrame}</Text>
-        <Text> {currentAgent}…</Text>
         <Text dimColor>  (esc to interrupt)</Text>
       </Text>
     );
@@ -810,10 +895,10 @@ export async function runInteractiveTui(): Promise<void> {
 }
 
 function RelayTuiHost({ onExit }: { onExit: () => void }): React.ReactElement {
-  const [session, setSession] = useState<OrchestratorSession | undefined>();
+  const [sandbox, setSandbox] = useState<SandboxRecord | undefined>();
+  const [runner, setRunner] = useState<AssignmentRunner | undefined>();
   const [bootError, setBootError] = useState("");
   const [bootLogLines, setBootLogLines] = useState<string[]>([]);
-  const releaseSessionRef = useRef<(() => void) | null>(null);
   const mountedRef = useRef(true);
 
   const appendBootLog = (text: string): void => {
@@ -822,35 +907,35 @@ function RelayTuiHost({ onExit }: { onExit: () => void }): React.ReactElement {
   };
 
   useEffect(() => {
-    void withOrchestratorSession(async (readySession) => {
+    const client = new RelayDaemonClient();
+    const employeeId = process.env.RELAY_EMPLOYEE_ID || process.env.USER || "local";
+    void client.provisionSandbox({ employeeId }).then((readySandbox) => {
       if (!mountedRef.current) return;
-      setSession(readySession);
-      appendBootLog("\nOK  VM ready. Assign a task with @claude, @pi, or @codex.\n");
-      await new Promise<void>((resolve) => {
-        releaseSessionRef.current = resolve;
-      });
-    }, appendBootLog).catch((error: unknown) => {
+      setSandbox(readySandbox);
+      setRunner(() => createDaemonAssignmentRunner(client, readySandbox.id));
+      appendBootLog(`\nOK  Host daemon ready. Sandbox ${readySandbox.id} assigned to ${readySandbox.employeeId}.\n`);
+    }).catch((error: unknown) => {
       if (!mountedRef.current) return;
       const detail = error instanceof Error ? error.message : String(error);
       setBootError(detail);
-      appendBootLog(`\nERR  ${detail}\n`);
+      appendBootLog(`\nERR  ${detail}\nStart the host daemon with: relay daemon --port 8790\n`);
     });
     return () => {
       mountedRef.current = false;
-      releaseSessionRef.current?.();
     };
   }, []);
 
-  const ready = Boolean(session) && !bootError;
-  const disabledMessage = bootError ? "Startup failed. Press Esc to exit." : "Starting Relay...";
+  const ready = Boolean(sandbox && runner) && !bootError;
+  const disabledMessage = bootError ? "Daemon unavailable. Press Esc to exit." : "Connecting to Relay daemon...";
   return (
     <RelayTui
-      session={session}
+      workspacePath={sandbox?.workspacePath}
+      runner={runner}
       ready={ready}
       disabledMessage={disabledMessage}
       bootLogLines={bootLogLines}
+      localSessionControl={false}
       onExit={() => {
-        releaseSessionRef.current?.();
         onExit();
       }}
     />

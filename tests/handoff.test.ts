@@ -6,10 +6,12 @@ import { describe, it } from "node:test";
 
 import {
   type AgentState,
+  buildClaudeImplementCommand,
   buildCodexImplementCommand,
   buildCodexReviewCommand,
   buildPiImplementCommand,
   buildPiPreflightCommand,
+  claudeImplementNode,
   claudeTaskPrompt,
   classifyCodexReview,
   ClaudeStreamRenderer,
@@ -22,6 +24,7 @@ import {
   formatClaudeJsonLine,
   formatCodexJsonLine,
   ensureLocalDevboxOci,
+  guestCodexConfigToml,
   guestAgentEnv,
   guestPiAuthJson,
   guestPiModelsJson,
@@ -33,7 +36,7 @@ import {
   routeCodexHandoff,
   routePiHandoff,
   StderrLineRenderer,
-} from "../src/relay.js";
+} from "../packages/relay-daemon/src/index.js";
 
 function codexStdout(message: string): string {
   return JSON.stringify({
@@ -173,6 +176,39 @@ describe("prompts", () => {
     assert.match(command, /Review this branch exactly how I asked/);
     assert.match(command, /RELAY_REVIEW_VERDICT/);
   });
+
+  it("builds Claude command against the daemon node host workspace when configured", () => {
+    withEnv({
+      RELAY_AGENT_HOME: "/tmp/relay-agent-home",
+      RELAY_AGENT_WORKSPACE: "/tmp/relay-host-workspace",
+      RELAY_RUN_AS_CURRENT_USER: "1",
+    }, () => {
+      const command = buildClaudeImplementCommand(state());
+
+      assert.match(command, /export HOME=\/tmp\/relay-agent-home/);
+      assert.match(command, /CODEX_HOME=\/tmp\/relay-agent-home\/\.codex/);
+      assert.match(command, /PI_CODING_AGENT_DIR=\/tmp\/relay-agent-home\/\.pi\/agent/);
+      assert.match(command, /cd \/tmp\/relay-host-workspace/);
+      assert.match(command, /--add-dir \/tmp\/relay-host-workspace/);
+      assert.doesNotMatch(command, /su agent/);
+    });
+  });
+});
+
+describe("agent failure logging", () => {
+  it("includes executor spawn errors in Claude agent logs", async () => {
+    const patch = await claudeImplementNode(state(), {
+      execStream: async () => ({
+        exit_code: -1,
+        stdout: "",
+        stderr: "",
+        error_message: "spawn cwd /workspace ENOENT",
+      }),
+    });
+
+    assert.equal(patch.last_exit_code, -1);
+    assert.match(patch.agent_logs?.[0] ?? "", /spawn cwd \/workspace ENOENT/);
+  });
 });
 
 describe("agent stream rendering", () => {
@@ -194,6 +230,27 @@ describe("agent stream rendering", () => {
     assert.match(output, /● Implemented auth\./);
     assert.match(output, /Claude finished/);
     assert.doesNotMatch(output, /\{"type":"stream_event"/);
+  });
+
+  it("renders Claude assistant stream-json messages without raw JSON", () => {
+    const renderer = new ClaudeStreamRenderer();
+    const output = renderer.feed(
+      [
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [
+              { type: "text", text: "Implemented the requested daemon fix." },
+            ],
+          },
+        }),
+        JSON.stringify({ type: "result", is_error: false }),
+      ].join("\n") + "\n",
+    );
+
+    assert.match(output, /● Implemented the requested daemon fix\./);
+    assert.match(output, /Claude finished/);
+    assert.doesNotMatch(output, /\{"type":"assistant"/);
   });
 
   it("renders Codex json events without raw JSON", () => {
@@ -456,6 +513,32 @@ describe("Pi provider config", () => {
       () => {
         const guestEnv = guestAgentEnv();
         assert.ok(guestEnv.some(([key, value]) => key === "PI_API_KEY" && value === "openai-key"));
+      },
+    );
+  });
+
+  it("normalizes common LLM env aliases for agent credentials", () => {
+    withEnv(
+      {
+        LLM_API_KEY: "llm-key",
+        LLM_BASE_URL: "https://llm.example.com/v1",
+        LLM_MODEL: "llm-model",
+        CLAUDE_API_KEY: "claude-key",
+        CLAUDE_MODEL: "claude-model",
+      },
+      () => {
+        const guestEnv = guestAgentEnv();
+        const codexConfig = guestCodexConfigToml();
+        const codexCommand = buildCodexImplementCommand(state());
+        const claudeCommand = buildClaudeImplementCommand(state());
+
+        assert.ok(guestEnv.some(([key, value]) => key === "OPENAI_API_KEY" && value === "llm-key"));
+        assert.ok(guestEnv.some(([key, value]) => key === "CODEX_API_KEY" && value === "llm-key"));
+        assert.ok(guestEnv.some(([key, value]) => key === "ANTHROPIC_API_KEY" && value === "claude-key"));
+        assert.match(codexConfig, /https:\/\/llm\.example\.com\/v1/);
+        assert.match(codexConfig, /llm-model/);
+        assert.match(codexCommand, /-m llm-model/);
+        assert.match(claudeCommand, /--model claude-model/);
       },
     );
   });

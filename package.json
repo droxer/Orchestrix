@@ -1,25 +1,28 @@
 {
-  "name": "relay",
+  "name": "relay-workspace",
   "version": "0.1.0",
+  "private": true,
   "description": "Human and AI agent collaboration with a shared local workspace",
   "type": "module",
-  "bin": {
-    "relay": "./dist/src/index.js"
-  },
+  "workspaces": [
+    "packages/relay-core",
+    "packages/relay-daemon",
+    "packages/relay-daemon-node",
+    "packages/relay-tui"
+  ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "npm run build -w relay-core && npm run build -w relay-daemon && npm run build -w relay-daemon-node && npm run build -w relay-tui && tsc -p tsconfig.json",
     "test": "npm run build && node --test dist/tests/*.test.js",
-    "run": "npm run build && node dist/src/index.js"
+    "run": "npm run build && node packages/relay-tui/dist/cli.js"
   },
-  "dependencies": {
-    "@boxlite-ai/boxlite": "^0.9.5",
-    "ink": "^7.0.5",
-    "react": "^19.2.7"
-  },
+  "dependencies": {},
   "devDependencies": {
+    "@boxlite-ai/boxlite": "^0.9.5",
     "@types/node": "^24.0.0",
     "@types/react": "^19.2.16",
+    "ink": "^7.0.5",
     "ink-testing-library": "^4.0.0",
+    "react": "^19.2.7",
     "typescript": "^5.9.0"
   },
   "engines": {

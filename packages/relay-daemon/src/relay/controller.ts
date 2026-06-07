@@ -3,7 +3,7 @@ import {
   codexImplementNode,
   codexReviewNode,
   piImplementNode,
-} from "./nodes.js";
+} from "relay-core";
 import { routeClaudeHandoff, routeCodexHandoff, routePiHandoff, type Route } from "./routing.js";
 import {
   GUEST_WORKSPACE,
@@ -14,7 +14,7 @@ import {
   type AgentRunOptions,
   type AgentState,
   type CodexTaskMode,
-} from "./state.js";
+} from "relay-core";
 import {
   LocalSessionStore,
   newRelayId,

@@ -4,7 +4,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const currentFile = fileURLToPath(import.meta.url);
-export const REPO_ROOT = resolve(dirname(currentFile), "../../..");
+export const REPO_ROOT = resolve(dirname(currentFile), "../../..", "..");
 export const DEVBOX_IMAGE = "relay-devbox:v1";
 export const OCI_LAYOUT_DIR = resolve(REPO_ROOT, ".oci/relay-devbox-v1");
 export const DOCKERFILE = resolve(REPO_ROOT, "dockerfile");
@@ -17,6 +17,7 @@ export const ANTHROPIC_ENV_KEYS = [
 
 export const OPENAI_ENV_KEYS = [
   "OPENAI_API_KEY",
+  "CODEX_API_KEY",
   "OPENAI_BASE_URL",
   "OPENAI_MODEL",
 ] as const;
@@ -44,13 +45,17 @@ function loadDotEnv(path: string): void {
   }
 }
 
-loadDotEnv(resolve(REPO_ROOT, ".env"));
-
 function expandUser(path: string): string {
   if (path === "~") return homedir();
   if (path.startsWith("~/")) return resolve(homedir(), path.slice(2));
   return path;
 }
+
+loadDotEnv(resolve(REPO_ROOT, ".env"));
+if (process.env.RELAY_WORKSPACE) {
+  loadDotEnv(resolve(expandUser(process.env.RELAY_WORKSPACE), ".env"));
+}
+loadDotEnv(resolve(process.cwd(), ".env"));
 
 export function hostWorkspacePath(raw?: string | null): string {
   const selected = raw?.trim() || process.env.RELAY_WORKSPACE?.trim() || DEFAULT_HOST_WORKSPACE;
@@ -66,7 +71,27 @@ export function hostWorkspaceOwner(path: string): [number, number] {
 }
 
 export function openaiApiKey(): string | undefined {
-  return process.env.OPENAI_API_KEY || process.env.CODEX_API_KEY;
+  return process.env.OPENAI_API_KEY || process.env.CODEX_API_KEY || process.env.LLM_API_KEY;
+}
+
+export function openaiBaseUrl(): string | undefined {
+  return process.env.OPENAI_BASE_URL || process.env.LLM_BASE_URL;
+}
+
+export function openaiModel(): string | undefined {
+  return process.env.OPENAI_MODEL || process.env.LLM_MODEL;
+}
+
+export function anthropicApiKey(): string | undefined {
+  return process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY;
+}
+
+export function anthropicBaseUrl(): string | undefined {
+  return process.env.ANTHROPIC_BASE_URL || process.env.CLAUDE_BASE_URL;
+}
+
+export function anthropicModel(): string | undefined {
+  return process.env.ANTHROPIC_MODEL || process.env.CLAUDE_MODEL;
 }
 
 export function requireOpenaiApiKey(): string {
@@ -81,15 +106,15 @@ export function requireOpenaiApiKey(): string {
 }
 
 export function piApiKey(): string | undefined {
-  return process.env.PI_API_KEY || openaiApiKey() || process.env.ANTHROPIC_API_KEY;
+  return process.env.PI_API_KEY || openaiApiKey() || anthropicApiKey();
 }
 
 export function piSourceBaseUrl(): string | undefined {
-  return process.env.PI_BASE_URL || process.env.OPENAI_BASE_URL;
+  return process.env.PI_BASE_URL || openaiBaseUrl();
 }
 
 export function piModel(): string | undefined {
-  return process.env.PI_MODEL || process.env.OPENAI_MODEL;
+  return process.env.PI_MODEL || openaiModel();
 }
 
 export function piProvider(): string {
@@ -104,7 +129,7 @@ export function piProvider(): string {
 export function piBaseUrl(): string | undefined {
   if (process.env.PI_BASE_URL) return process.env.PI_BASE_URL;
   if (PI_NATIVE_BASE_URL_PROVIDERS.has(piProvider())) return undefined;
-  return process.env.OPENAI_BASE_URL;
+  return openaiBaseUrl();
 }
 
 export function piApi(): string {

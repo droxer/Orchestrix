@@ -6,13 +6,22 @@ import { describe, it } from "node:test";
 
 import {
   type AgentState,
+  type SandboxBackend,
+  type SandboxRecord,
+  type SandboxRunRequest,
   LocalSessionStore,
   LocalTaskStore,
+  DaemonNodeRegistry,
+  ReverseDaemonNodeBackend,
   SessionController,
+  handleRelayDaemonRequest,
   handleRelayApiRequest,
+  RelayDaemonClient,
+  ensureDaemonNodeToken,
   initialAgentState,
+  readDaemonNodeToken,
   relayEvent,
-} from "../src/relay.js";
+} from "../packages/relay-daemon/src/index.js";
 
 function codexReviewStdout(message: string): string {
   return JSON.stringify({
@@ -22,6 +31,60 @@ function codexReviewStdout(message: string): string {
       text: message,
     },
   }) + "\n";
+}
+
+class FakeSandboxBackend implements SandboxBackend {
+  private sandboxes = new Map<string, SandboxRecord>();
+
+  constructor(private readonly store: LocalSessionStore) {}
+
+  async provision(input: { employeeId: string; workspacePath?: string }): Promise<SandboxRecord> {
+    const now = new Date().toISOString();
+    const sandbox: SandboxRecord = {
+      id: `sbx_${input.employeeId}`,
+      employeeId: input.employeeId,
+      workspacePath: input.workspacePath,
+      status: "ready",
+      agents: { claude: "unknown", pi: "unknown", codex: "unknown" },
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.sandboxes.set(sandbox.id, sandbox);
+    return sandbox;
+  }
+
+  get(sandboxId: string): SandboxRecord | undefined {
+    return this.sandboxes.get(sandboxId);
+  }
+
+  list(): SandboxRecord[] {
+    return [...this.sandboxes.values()];
+  }
+
+  async run(sandboxId: string, request: SandboxRunRequest) {
+    const sandbox = this.sandboxes.get(sandboxId);
+    if (!sandbox) throw new Error("Sandbox not found.");
+    const controller = new SessionController(this.store, {
+      workspacePath: sandbox.workspacePath,
+      execStream: async (_cmd, _args, options) => {
+        const stdout = JSON.stringify({
+          type: "item.completed",
+          item: { type: "agent_message", text: "Done." },
+        }) + "\n";
+        options?.stdoutRenderer?.(stdout);
+        return { exit_code: 0, stdout, stderr: "" };
+      },
+    });
+    const sessionId = request.sessionId ?? controller.createSession(
+      request.taskGoal,
+      ["human", ...request.assignments.map((item) => item.agent)],
+    ).id;
+    await controller.runAssignments(sessionId, request.taskGoal, request.assignments.map((assignment) => ({
+      agent: assignment.agent,
+      mode: assignment.mode ?? "implement",
+    })));
+    return this.store.getSession(sessionId);
+  }
 }
 
 describe("Relay session store", () => {
@@ -86,6 +149,47 @@ describe("Relay task store", () => {
     assert.deepEqual(updated.linkedSessionIds, ["ses_test"]);
     assert.equal(updated.activity.some((item) => item.message.includes("Assigned to codex")), true);
     assert.equal(store.getTask(created.id).events.some((event) => event.type === "task.session_linked"), true);
+  });
+});
+
+describe("Relay daemon node tokens", () => {
+  it("generates and reuses a workspace token when no explicit token is provided", () => {
+    const workspacePath = mkdtempSync(join(tmpdir(), "relay-node-token-"));
+    const generated = ensureDaemonNodeToken({ workspacePath, employeeId: "alice" });
+    const reused = ensureDaemonNodeToken({ workspacePath, employeeId: "alice" });
+
+    assert.equal(generated.source, "generated");
+    assert.match(generated.token, /^tok_/);
+    assert.equal(readDaemonNodeToken(workspacePath, "alice"), generated.token);
+    assert.equal(reused.source, "file");
+    assert.equal(reused.token, generated.token);
+  });
+
+  it("sends the provided token when the daemon client provisions without a workspace", async () => {
+    let authorization: string | null = null;
+    let requestBody: any;
+    const client = new RelayDaemonClient({
+      baseUrl: "http://relay-daemon.test",
+      token: "tok_alice",
+      fetchFn: (async (_input, init) => {
+        authorization = new Headers(init?.headers).get("authorization");
+        requestBody = JSON.parse(String(init?.body));
+        return new Response(JSON.stringify({
+          id: "sbx_alice",
+          employeeId: "alice",
+          workspacePath: "/workspace/alice",
+          status: "ready",
+          agents: { claude: "ready", pi: "ready", codex: "ready" },
+          createdAt: "2026-06-07T00:00:00.000Z",
+          updatedAt: "2026-06-07T00:00:00.000Z",
+        }), { status: 201, headers: { "Content-Type": "application/json" } });
+      }) as typeof fetch,
+    });
+
+    await client.provisionSandbox({ employeeId: "alice" });
+
+    assert.deepEqual(requestBody, { employeeId: "alice" });
+    assert.equal(authorization, "Bearer tok_alice");
   });
 });
 
@@ -315,5 +419,523 @@ describe("Relay read-only HTTP API", () => {
     assert.equal(events.sse, true);
     assert.match(events.body, /event: session\.created/);
     assert.equal(body.body, "API ready.");
+  });
+});
+
+describe("Relay daemon API", () => {
+  it("advertises and serves the read-only daemon control panel", async () => {
+    const store = new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-daemon-control-")));
+    const registry = new DaemonNodeRegistry(store);
+    const backend = new ReverseDaemonNodeBackend(registry);
+
+    const root = JSON.parse((await handleRelayDaemonRequest(backend, "GET", "/", undefined, registry)).body);
+    const panel = await handleRelayDaemonRequest(backend, "GET", "/control", undefined, registry);
+    const version = JSON.parse((await handleRelayDaemonRequest(backend, "GET", "/control/version", undefined, registry)).body);
+
+    assert.equal(root.ui, true);
+    assert.equal(root.uiPath, "/control");
+    assert.equal(root.endpoints.includes("GET /control"), true);
+    assert.equal(root.endpoints.includes("GET /control/version"), true);
+    assert.equal(root.endpoints.includes("GET /daemon-nodes"), true);
+    assert.equal(panel.status, 200);
+    assert.equal(panel.contentType, "text/html; charset=utf-8");
+    assert.match(panel.body, /Relay Daemon Control/);
+    assert.match(panel.body, /\/daemon-nodes/);
+    assert.match(panel.body, /\/control\/version/);
+    assert.match(panel.body, /window\.location\.reload/);
+    assert.equal(typeof version.version, "string");
+    assert.notEqual(version.version, "");
+  });
+
+  it("provisions employee sandboxes and runs assignments through a sandbox backend", async () => {
+    const store = new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-daemon-")));
+    const backend = new FakeSandboxBackend(store);
+
+    const created = JSON.parse((await handleRelayDaemonRequest(backend, "POST", "/sandboxes", {
+      employeeId: "alice",
+      workspacePath: "/workspace/alice",
+    }, undefined, "tok_alice")).body);
+    assert.equal(created.employeeId, "alice");
+    assert.equal(created.status, "ready");
+
+    const listed = JSON.parse((await handleRelayDaemonRequest(backend, "GET", "/sandboxes")).body);
+    assert.equal(listed.sandboxes.length, 1);
+
+    const run = JSON.parse((await handleRelayDaemonRequest(backend, "POST", `/sandboxes/${created.id}/runs`, {
+      taskGoal: "implement search",
+      assignments: [{ agent: "codex", mode: "implement" }],
+    }, undefined, "tok_alice")).body);
+    assert.equal(run.status, "completed");
+    assert.equal(run.workspacePath, "/workspace/alice");
+    assert.equal(run.agentRuns[0].agent, "codex");
+  });
+
+  it("rejects daemon runs without a task and valid assignment", async () => {
+    const store = new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-daemon-invalid-")));
+    const backend = new FakeSandboxBackend(store);
+    const created = JSON.parse((await handleRelayDaemonRequest(backend, "POST", "/sandboxes", {
+      employeeId: "bob",
+    })).body);
+
+    const response = await handleRelayDaemonRequest(backend, "POST", `/sandboxes/${created.id}/runs`, {
+      taskGoal: " ",
+      assignments: [{ agent: "codex" }],
+    });
+
+    assert.equal(response.status, 400);
+    assert.match(response.body, /taskGoal/);
+  });
+
+  it("runs daemon handoffs against an existing session id", async () => {
+    const store = new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-daemon-handoff-")));
+    const backend = new FakeSandboxBackend(store);
+    const created = JSON.parse((await handleRelayDaemonRequest(backend, "POST", "/sandboxes", {
+      employeeId: "carol",
+    })).body);
+    const first = JSON.parse((await handleRelayDaemonRequest(backend, "POST", `/sandboxes/${created.id}/runs`, {
+      taskGoal: "fix auth",
+      assignments: [{ agent: "claude" }],
+    })).body);
+
+    const handoff = JSON.parse((await handleRelayDaemonRequest(backend, "POST", `/sandboxes/${created.id}/runs`, {
+      taskGoal: "fix auth\n\nHandoff note:\nverify the fix",
+      sessionId: first.id,
+      assignments: [{ agent: "codex", mode: "review" }],
+    })).body);
+
+    assert.equal(handoff.id, first.id);
+    assert.equal(handoff.agentRuns.length, 2);
+    assert.equal(handoff.agentRuns[1].agent, "codex");
+    assert.equal(handoff.agentRuns[1].mode, "review");
+  });
+
+  it("requires the sandbox token for existing daemon node sandboxes", async () => {
+    const store = new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-token-auth-")));
+    const registry = new DaemonNodeRegistry(store);
+    const backend = new ReverseDaemonNodeBackend(registry);
+    registry.register({
+      sandboxId: "sbx_token",
+      employeeId: "token",
+      token: "tok_token",
+      workspacePath: "/workspace/token",
+      protocolVersion: 1,
+      supportedAgents: ["codex"],
+      status: "ready",
+    });
+
+    const missing = await handleRelayDaemonRequest(backend, "POST", "/sandboxes", {
+      employeeId: "token",
+      workspacePath: "/workspace/token",
+    }, registry);
+    const wrong = await handleRelayDaemonRequest(backend, "POST", "/sandboxes/sbx_token/runs", {
+      taskGoal: "review auth",
+      assignments: [{ agent: "codex", mode: "review" }],
+    }, registry, "wrong");
+    const ok = await handleRelayDaemonRequest(backend, "POST", "/sandboxes", {
+      employeeId: "token",
+      workspacePath: "/workspace/token",
+    }, registry, "tok_token");
+
+    assert.equal(missing.status, 401);
+    assert.equal(wrong.status, 401);
+    assert.equal(ok.status, 201);
+    assert.equal(JSON.parse(ok.body).id, "sbx_token");
+  });
+
+  it("runs through a reverse-registered daemon node", async () => {
+    const store = new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-reverse-daemon-node-")));
+    const registry = new DaemonNodeRegistry(store);
+    const backend = new ReverseDaemonNodeBackend(registry);
+    registry.register({
+      sandboxId: "sbx_carol",
+      employeeId: "carol",
+      token: "tok_carol",
+      workspacePath: "/workspace/carol",
+      protocolVersion: 1,
+      supportedAgents: ["codex"],
+      status: "ready",
+    });
+
+    const sandbox = await backend.provision({ employeeId: "carol", workspacePath: "/workspace/carol", token: "tok_carol" });
+    const pending = backend.run(sandbox.id, {
+      taskGoal: "review auth",
+      assignments: [{ agent: "codex", mode: "review" }],
+    });
+    const [command] = registry.takeCommands("sbx_carol", "tok_carol");
+
+    assert.equal(command.type, "run.start");
+    assert.equal(command.agent, "codex");
+    assert.equal(command.mode, "review");
+
+    registry.handleEvent("sbx_carol", {
+      type: "run.output",
+      commandId: command.id,
+      sessionId: command.sessionId,
+      runId: command.runId,
+      agent: "codex",
+      stream: "stdout",
+      text: codexReviewStdout("Looks good.\nRELAY_REVIEW_VERDICT: APPROVED"),
+      sequence: 0,
+    }, "tok_carol");
+    registry.handleEvent("sbx_carol", {
+      type: "run.completed",
+      commandId: command.id,
+      sessionId: command.sessionId,
+      runId: command.runId,
+      agent: "codex",
+      mode: "review",
+      exitCode: 0,
+      agentLog: "Looks good.",
+      codexVerdict: "approved",
+      codexFeedback: "Looks good.",
+    }, "tok_carol");
+    const session = await pending;
+
+    assert.equal(session.status, "completed");
+    assert.equal(session.workspacePath, "/workspace/carol");
+    assert.equal(session.events.some((event: any) => event.type === "agent.output"), true);
+    assert.equal(session.reviewVerdict, "approved");
+  });
+
+  it("runs multiple daemon nodes concurrently with isolated command queues", async () => {
+    const store = new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-concurrent-daemon-nodes-")));
+    const registry = new DaemonNodeRegistry(store);
+    const backend = new ReverseDaemonNodeBackend(registry);
+    registry.register({
+      sandboxId: "sbx_alice",
+      employeeId: "alice",
+      token: "tok_alice",
+      workspacePath: "/workspace/alice",
+      protocolVersion: 1,
+      supportedAgents: ["codex"],
+      status: "ready",
+    });
+    registry.register({
+      sandboxId: "sbx_bob",
+      employeeId: "bob",
+      token: "tok_bob",
+      workspacePath: "/workspace/bob",
+      protocolVersion: 1,
+      supportedAgents: ["codex"],
+      status: "ready",
+    });
+
+    const aliceRun = backend.run("sbx_alice", {
+      taskGoal: "review alice",
+      assignments: [{ agent: "codex", mode: "review" }],
+    });
+    const bobRun = backend.run("sbx_bob", {
+      taskGoal: "review bob",
+      assignments: [{ agent: "codex", mode: "review" }],
+    });
+    const [aliceCommand] = registry.takeCommands("sbx_alice", "tok_alice");
+    const [bobCommand] = registry.takeCommands("sbx_bob", "tok_bob");
+
+    assert.equal(registry.get("sbx_alice")?.status, "running");
+    assert.equal(registry.get("sbx_bob")?.status, "running");
+    assert.equal(aliceCommand.taskGoal, "review alice");
+    assert.equal(bobCommand.taskGoal, "review bob");
+    assert.equal(registry.takeCommands("sbx_alice", "tok_alice").length, 0);
+    assert.equal(registry.takeCommands("sbx_bob", "tok_bob").length, 0);
+
+    registry.handleEvent("sbx_bob", {
+      type: "run.completed",
+      commandId: bobCommand.id,
+      sessionId: bobCommand.sessionId,
+      runId: bobCommand.runId,
+      agent: "codex",
+      mode: "review",
+      exitCode: 0,
+      agentLog: "Bob approved.",
+      codexVerdict: "approved",
+      codexFeedback: "Bob approved.",
+    }, "tok_bob");
+    registry.handleEvent("sbx_alice", {
+      type: "run.completed",
+      commandId: aliceCommand.id,
+      sessionId: aliceCommand.sessionId,
+      runId: aliceCommand.runId,
+      agent: "codex",
+      mode: "review",
+      exitCode: 0,
+      agentLog: "Alice approved.",
+      codexVerdict: "approved",
+      codexFeedback: "Alice approved.",
+    }, "tok_alice");
+
+    const [aliceSession, bobSession] = await Promise.all([aliceRun, bobRun]);
+    assert.equal(aliceSession.workspacePath, "/workspace/alice");
+    assert.equal(bobSession.workspacePath, "/workspace/bob");
+    assert.equal(aliceSession.reviewVerdict, "approved");
+    assert.equal(bobSession.reviewVerdict, "approved");
+    assert.equal(registry.get("sbx_alice")?.status, "ready");
+    assert.equal(registry.get("sbx_bob")?.status, "ready");
+  });
+
+  it("rejects concurrent runs on the same daemon node", async () => {
+    const store = new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-same-daemon-node-")));
+    const registry = new DaemonNodeRegistry(store);
+    const backend = new ReverseDaemonNodeBackend(registry);
+    registry.register({
+      sandboxId: "sbx_single",
+      employeeId: "single",
+      token: "tok_single",
+      protocolVersion: 1,
+      supportedAgents: ["codex"],
+      status: "ready",
+    });
+
+    const firstRun = backend.run("sbx_single", {
+      taskGoal: "first",
+      assignments: [{ agent: "codex", mode: "review" }],
+    });
+    const [command] = registry.takeCommands("sbx_single", "tok_single");
+    await assert.rejects(
+      backend.run("sbx_single", {
+        taskGoal: "second",
+        assignments: [{ agent: "codex", mode: "review" }],
+      }),
+      /daemon node is not ready/,
+    );
+
+    registry.handleEvent("sbx_single", {
+      type: "run.completed",
+      commandId: command.id,
+      sessionId: command.sessionId,
+      runId: command.runId,
+      agent: "codex",
+      mode: "review",
+      exitCode: 0,
+      agentLog: "Approved.",
+      codexVerdict: "approved",
+      codexFeedback: "Approved.",
+    }, "tok_single");
+    const session = await firstRun;
+    assert.equal(session.status, "completed");
+    assert.equal(registry.get("sbx_single")?.status, "ready");
+  });
+
+  it("rejects unauthorized reverse daemon node command polling", () => {
+    const registry = new DaemonNodeRegistry(new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-auth-"))));
+    registry.register({
+      sandboxId: "sbx_auth",
+      employeeId: "auth",
+      token: "secret",
+      protocolVersion: 1,
+      supportedAgents: ["codex"],
+      status: "ready",
+    });
+
+    assert.throws(() => registry.takeCommands("sbx_auth", "wrong"), /Unauthorized/);
+  });
+
+  it("allows authorized daemon node command polling through the HTTP route", async () => {
+    const registry = new DaemonNodeRegistry(new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-auth-route-"))));
+    const backend = new ReverseDaemonNodeBackend(registry);
+    await handleRelayDaemonRequest(backend, "POST", "/daemon-nodes/register", {
+      sandboxId: "sbx_route",
+      employeeId: "route",
+      token: "route_secret",
+      protocolVersion: 1,
+      supportedAgents: ["codex"],
+      status: "ready",
+    }, registry);
+
+    const response = await handleRelayDaemonRequest(
+      backend,
+      "GET",
+      "/daemon-nodes/sbx_route/commands",
+      undefined,
+      registry,
+      "route_secret",
+    );
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(JSON.parse(response.body), { commands: [] });
+  });
+
+  it("persists daemon node registrations across daemon registry restarts", async () => {
+    const root = mkdtempSync(join(tmpdir(), "relay-daemon-node-storage-"));
+    const first = new DaemonNodeRegistry(new LocalSessionStore(root));
+    first.register({
+      sandboxId: "sbx_persisted",
+      employeeId: "persisted",
+      token: "tok_persisted",
+      workspacePath: "/workspace/persisted",
+      protocolVersion: 1,
+      supportedAgents: ["claude", "codex"],
+      status: "ready",
+    });
+
+    const restarted = new DaemonNodeRegistry(new LocalSessionStore(root));
+    const backend = new ReverseDaemonNodeBackend(restarted);
+    const loaded = restarted.get("sbx_persisted");
+    const provisioned = await backend.provision({ employeeId: "persisted", token: "tok_persisted" });
+
+    assert.equal(loaded?.employeeId, "persisted");
+    assert.equal(loaded?.workspacePath, "/workspace/persisted");
+    assert.equal(loaded?.status, "stopped");
+    assert.equal(loaded?.token, "tok_persisted");
+    assert.equal(provisioned.id, "sbx_persisted");
+    assert.equal(provisioned.status, "stopped");
+    await assert.rejects(
+      backend.run("sbx_persisted", {
+        taskGoal: "review after restart",
+        assignments: [{ agent: "codex", mode: "review" }],
+      }),
+      /daemon node is not ready/,
+    );
+  });
+
+  it("lists sanitized daemon node monitor records without tokens", async () => {
+    const registry = new DaemonNodeRegistry(new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-monitor-list-"))));
+    const backend = new ReverseDaemonNodeBackend(registry);
+    await handleRelayDaemonRequest(backend, "POST", "/daemon-nodes/register", {
+      sandboxId: "sbx_monitor",
+      employeeId: "monitor",
+      token: "monitor_secret",
+      workspacePath: "/workspace/monitor",
+      protocolVersion: 1,
+      supportedAgents: ["claude", "codex"],
+      status: "ready",
+    }, registry);
+
+    const response = await handleRelayDaemonRequest(backend, "GET", "/daemon-nodes", undefined, registry);
+    const body = JSON.parse(response.body);
+
+    assert.equal(response.status, 200);
+    assert.equal(body.nodes.length, 1);
+    assert.equal(body.nodes[0].id, "sbx_monitor");
+    assert.equal(body.nodes[0].employeeId, "monitor");
+    assert.equal(body.nodes[0].workspacePath, "/workspace/monitor");
+    assert.equal(body.nodes[0].agents.claude, "ready");
+    assert.equal(body.nodes[0].agents.codex, "ready");
+    assert.equal(body.nodes[0].queuedCommandCount, 0);
+    assert.deepEqual(body.nodes[0].activeRuns, []);
+    assert.equal("token" in body.nodes[0], false);
+    assert.equal(typeof body.nodes[0].lastSeenAt, "string");
+  });
+
+  it("tracks daemon node command polling and in-flight runs for monitoring", async () => {
+    const store = new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-monitor-active-")));
+    const registry = new DaemonNodeRegistry(store);
+    const backend = new ReverseDaemonNodeBackend(registry);
+    registry.register({
+      sandboxId: "sbx_active",
+      employeeId: "active",
+      token: "tok_active",
+      workspacePath: "/workspace/active",
+      protocolVersion: 1,
+      supportedAgents: ["codex"],
+      status: "ready",
+    });
+
+    const registeredLastSeenAt = registry.monitorNodes()[0].lastSeenAt;
+    await new Promise((resolve) => setTimeout(resolve, 2));
+    const pending = backend.run("sbx_active", {
+      taskGoal: "review active run",
+      assignments: [{ agent: "codex", mode: "review" }],
+    });
+    const queued = registry.monitorNodes()[0];
+    const [command] = registry.takeCommands("sbx_active", "tok_active");
+    const active = registry.monitorNodes()[0];
+
+    assert.equal(queued.queuedCommandCount, 1);
+    assert.equal(active.queuedCommandCount, 0);
+    assert.notEqual(active.lastSeenAt, registeredLastSeenAt);
+    assert.equal(active.activeRuns.length, 1);
+    assert.equal(active.activeRuns[0].commandId, command.id);
+    assert.equal(active.activeRuns[0].sessionId, command.sessionId);
+    assert.equal(active.activeRuns[0].agent, "codex");
+    assert.equal(active.activeRuns[0].mode, "review");
+    assert.equal(active.activeRuns[0].taskGoal, "review active run");
+
+    registry.handleEvent("sbx_active", {
+      type: "run.completed",
+      commandId: command.id,
+      sessionId: command.sessionId,
+      runId: command.runId,
+      agent: "codex",
+      mode: "review",
+      exitCode: 0,
+      agentLog: "Approved.",
+      codexVerdict: "approved",
+      codexFeedback: "Approved.",
+    }, "tok_active");
+
+    const session = await pending;
+    assert.equal(session.status, "completed");
+    assert.equal(registry.monitorNodes()[0].activeRuns.length, 0);
+  });
+
+  it("keeps the daemon node ready after a reported run failure", async () => {
+    const store = new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-run-failed-ready-")));
+    const registry = new DaemonNodeRegistry(store);
+    const backend = new ReverseDaemonNodeBackend(registry);
+    registry.register({
+      sandboxId: "sbx_failed_ready",
+      employeeId: "failed-ready",
+      token: "tok_failed_ready",
+      protocolVersion: 1,
+      supportedAgents: ["codex"],
+      status: "ready",
+    });
+    const pending = backend.run("sbx_failed_ready", {
+      taskGoal: "implement auth",
+      assignments: [{ agent: "codex", mode: "implement" }],
+    });
+    const [command] = registry.takeCommands("sbx_failed_ready", "tok_failed_ready");
+    registry.handleEvent("sbx_failed_ready", {
+      type: "run.failed",
+      commandId: command.id,
+      sessionId: command.sessionId,
+      runId: command.runId,
+      agent: "codex",
+      mode: "implement",
+      error: "Missing OPENAI_API_KEY.",
+    }, "tok_failed_ready");
+
+    const session = await pending;
+    assert.equal(session.status, "failed");
+    assert.equal(registry.get("sbx_failed_ready")?.status, "ready");
+    assert.equal(registry.get("sbx_failed_ready")?.lastError, "Missing OPENAI_API_KEY.");
+  });
+
+  it("fails reverse Codex review sessions when the verdict is rejected", async () => {
+    const store = new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-reverse-rejected-")));
+    const registry = new DaemonNodeRegistry(store);
+    const backend = new ReverseDaemonNodeBackend(registry);
+    registry.register({
+      sandboxId: "sbx_review",
+      employeeId: "review",
+      token: "tok_review",
+      workspacePath: "/workspace/review",
+      protocolVersion: 1,
+      supportedAgents: ["codex"],
+      status: "ready",
+    });
+    const pending = backend.run("sbx_review", {
+      taskGoal: "review auth",
+      assignments: [{ agent: "codex", mode: "review" }],
+    });
+    const [command] = registry.takeCommands("sbx_review", "tok_review");
+    registry.handleEvent("sbx_review", {
+      type: "run.completed",
+      commandId: command.id,
+      sessionId: command.sessionId,
+      runId: command.runId,
+      agent: "codex",
+      mode: "review",
+      exitCode: 0,
+      agentLog: "Blocking issue.",
+      codexVerdict: "rejected",
+      codexFeedback: "Blocking issue.",
+    }, "tok_review");
+
+    const session = await pending;
+    assert.equal(session.status, "failed");
+    assert.equal(session.reviewVerdict, "rejected");
+    assert.equal(session.finalOutcome, "Codex rejected the work.");
+    assert.equal(registry.get("sbx_review")?.status, "ready");
   });
 });

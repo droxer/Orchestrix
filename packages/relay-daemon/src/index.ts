@@ -1,4 +1,13 @@
 export {
+  ansi,
+  color,
+  emitOrPrint,
+  keyValue,
+  section,
+  status,
+} from "relay-core";
+
+export {
   ANTHROPIC_ENV_KEYS,
   DEFAULT_HOST_WORKSPACE,
   DEVBOX_IMAGE,
@@ -18,7 +27,7 @@ export {
   piSourceBaseUrl,
   requireOpenaiApiKey,
   requirePiConfig,
-} from "./relay/env.js";
+} from "relay-core";
 
 export {
   AGENT_USER,
@@ -37,7 +46,7 @@ export {
   type CodexReviewVerdict,
   type CodexTaskMode,
   type StreamExecResult,
-} from "./relay/state.js";
+} from "relay-core";
 
 export {
   LocalSessionStore,
@@ -91,6 +100,50 @@ export {
 } from "./relay/server.js";
 
 export {
+  LocalDaemonNodeStorage,
+  LocalSandboxBackend,
+  DaemonNodeRegistry,
+  ReverseDaemonNodeBackend,
+  handleRelayDaemonRequest,
+  routeDaemonRequest,
+  serveRelayDaemon,
+  type RelayDaemonOptions,
+  type RelayDaemonResponse,
+  type DaemonNodeActiveRun,
+  type DaemonNodeMonitorRecord,
+  type DaemonNodeStorage,
+  type SandboxBackend,
+  type SandboxRecord,
+  type SandboxRunAssignment,
+  type SandboxRunRequest,
+  type SandboxStatus,
+} from "./relay/daemon.js";
+
+export {
+  type DaemonNodeCommand,
+  type DaemonNodeEvent,
+  type DaemonNodeRegistration,
+  type DaemonNodeRunCommand,
+  type DaemonNodeStatus,
+  daemonNodeTokenPath,
+  ensureDaemonNodeToken,
+  readDaemonNodeToken,
+  writeDaemonNodeToken,
+  type DaemonNodeTokenResolution,
+  type DaemonNodeTokenSource,
+  type EnsureDaemonNodeTokenInput,
+} from "relay-core";
+
+export {
+  RelayDaemonClient,
+  normalizeBaseUrl,
+  type ProvisionSandboxInput,
+  type RelayDaemonClientOptions,
+  type RunSandboxInput,
+} from "./relay/daemon-client.js";
+
+export {
+  encodeBase64,
   codexCliConfigOverrides,
   guestAgentEnv,
   guestCodexAuthJson,
@@ -100,9 +153,9 @@ export {
   guestPiModelsJson,
   runAsAgent,
   sessionGuestEnv,
-} from "./relay/guest.js";
+} from "relay-core";
 
-export { shellCommand, shellQuote } from "./relay/shell.js";
+export { shellCommand, shellQuote } from "relay-core";
 
 export {
   appendCodexFeedback,
@@ -110,7 +163,7 @@ export {
   codexImplementPrompt,
   codexReviewPrompt,
   piTaskPrompt,
-} from "./relay/prompts.js";
+} from "relay-core";
 
 export {
   buildClaudeImplementCommand,
@@ -118,12 +171,12 @@ export {
   buildCodexReviewCommand,
   buildPiImplementCommand,
   buildPiPreflightCommand,
-} from "./relay/commands.js";
+} from "relay-core";
 
 export {
   classifyCodexReview,
   extractCodexFeedback,
-} from "./relay/codex-review.js";
+} from "relay-core";
 
 export {
   routeClaudeHandoff,
@@ -139,7 +192,7 @@ export {
   StderrLineRenderer,
   formatClaudeJsonLine,
   formatCodexJsonLine,
-} from "./relay/renderers.js";
+} from "relay-core";
 
 export {
   dockerImageId,
@@ -157,7 +210,7 @@ export {
   codexImplementNode,
   codexReviewNode,
   piImplementNode,
-} from "./relay/nodes.js";
+} from "relay-core";
 
 export {
   main,
@@ -167,4 +220,5 @@ export {
   ensureAgentReady,
   withOrchestratorSession,
   type OrchestratorSession,
+  type OrchestratorSessionOptions,
 } from "./relay/workflow.js";

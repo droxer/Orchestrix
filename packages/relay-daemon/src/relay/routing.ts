@@ -1,11 +1,11 @@
-import { emitOrPrint, status } from "./format.js";
+import { emitOrPrint, status } from "relay-core";
 import {
   MAX_CLAUDE_FAILURES,
   MAX_CODEX_FAILURES,
   MAX_PI_FAILURES,
   type AgentOutputSink,
   type AgentState,
-} from "./state.js";
+} from "relay-core";
 
 export type Route = "claude_implement" | "pi_implement" | "codex_review" | "__end__";
 
