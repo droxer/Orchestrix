@@ -107,6 +107,7 @@ export async function runRelayDaemonNode(options: DaemonNodeRuntimeOptions = {})
     logger.info("daemon node generated token", { sandboxId, employeeId, path: tokenResolution.path });
     console.log(`Relay daemon node generated token for ${employeeId}: ${tokenResolution.path}`);
   }
+  const activeRuns = new Map<string, AbortController>();
 
   while (true) {
     const response = await getJson(fetchFn, `${daemonUrl}/daemon-nodes/${encodeURIComponent(sandboxId)}/commands`, token);
@@ -119,7 +120,9 @@ export async function runRelayDaemonNode(options: DaemonNodeRuntimeOptions = {})
     for (const command of body.commands ?? []) {
       if (command.type === "run.start") {
         logger.info("command received", commandLogFields(sandboxId, command));
-        await executeCommand(daemonUrl, sandboxId, token, command, fetchFn, logger).catch((error: unknown) => {
+        const controller = new AbortController();
+        activeRuns.set(command.id, controller);
+        void executeCommand(daemonUrl, sandboxId, token, command, fetchFn, logger, controller.signal).catch((error: unknown) => {
           const message = error instanceof Error ? error.message : String(error);
           logger.error("command failed before completion", { ...commandLogFields(sandboxId, command), error: message });
           return postJson(fetchFn, `${daemonUrl}/daemon-nodes/${encodeURIComponent(sandboxId)}/events`, {
@@ -131,7 +134,19 @@ export async function runRelayDaemonNode(options: DaemonNodeRuntimeOptions = {})
             mode: command.mode,
             error: message,
           } satisfies DaemonNodeEvent, token);
+        }).finally(() => {
+          activeRuns.delete(command.id);
         });
+      } else if (command.type === "run.cancel") {
+        logger.info("cancel command received", {
+          sandboxId,
+          commandId: command.commandId,
+          sessionId: command.sessionId,
+          runId: command.runId,
+          agent: command.agent,
+          mode: command.mode,
+        });
+        activeRuns.get(command.commandId)?.abort(command.reason);
       }
     }
     await delay(pollIntervalMs);
@@ -145,11 +160,16 @@ async function executeCommand(
   command: DaemonNodeRunCommand,
   fetchFn: typeof fetch,
   logger: DaemonNodeLogger,
+  signal?: AbortSignal,
 ): Promise<void> {
   const eventUrl = `${daemonUrl}/daemon-nodes/${encodeURIComponent(sandboxId)}/events`;
   const state = initialAgentState(command.taskGoal);
   logger.info("run starting", commandLogFields(sandboxId, command));
-  await ensureDaemonNodeAgentReady(command.agent, localProcessExecStream);
+  await ensureDaemonNodeAgentReady(command.agent, localProcessExecStream, signal);
+  if (signal?.aborted) {
+    await postRunCancelled(fetchFn, eventUrl, command, token, signal.reason);
+    return;
+  }
   logger.info("agent ready", commandLogFields(sandboxId, command));
   let outputSequence = 0;
   let outputPostChain: Promise<void> = Promise.resolve();
@@ -183,6 +203,7 @@ async function executeCommand(
     eventSink,
     runId: command.runId,
     agent: command.agent,
+    signal,
   };
   const patch = command.agent === "claude"
     ? await claudeImplementNode(state, options)
@@ -193,6 +214,14 @@ async function executeCommand(
         : await codexImplementNode(state, options);
   const next = mergeAgentState(state, patch);
   await outputPostChain;
+  if (signal?.aborted) {
+    logger.info("run cancelled", {
+      ...commandLogFields(sandboxId, command),
+      exitCode: next.last_exit_code,
+    });
+    await postRunCancelled(fetchFn, eventUrl, command, token, signal.reason);
+    return;
+  }
   logger.info("run completed", {
     ...commandLogFields(sandboxId, command),
     exitCode: next.last_exit_code,
@@ -213,7 +242,25 @@ async function executeCommand(
   } satisfies DaemonNodeEvent, token);
 }
 
-async function ensureDaemonNodeAgentReady(agent: AgentName, execStream: AgentExecutor): Promise<void> {
+async function postRunCancelled(
+  fetchFn: typeof fetch,
+  eventUrl: string,
+  command: DaemonNodeRunCommand,
+  token: string,
+  reason: unknown,
+): Promise<void> {
+  await postJson(fetchFn, eventUrl, {
+    type: "run.cancelled",
+    commandId: command.id,
+    sessionId: command.sessionId,
+    runId: command.runId,
+    agent: command.agent,
+    mode: command.mode,
+    reason: typeof reason === "string" && reason ? reason : "Cancelled by human.",
+  } satisfies DaemonNodeEvent, token);
+}
+
+async function ensureDaemonNodeAgentReady(agent: AgentName, execStream: AgentExecutor, signal?: AbortSignal): Promise<void> {
   const script = ["set -eu"];
   const home = agentHomePath();
   const codexHome = `${home}/.codex`;
@@ -237,7 +284,8 @@ async function ensureDaemonNodeAgentReady(agent: AgentName, execStream: AgentExe
     );
   }
   if (script.length === 1) return;
-  const result = await execStream("bash", ["-c", script.join("; ")]);
+  const result = await execStream("bash", ["-c", script.join("; ")], { signal });
+  if (signal?.aborted) return;
   if (result.exit_code !== 0) {
     throw new Error(`Daemon node auth setup failed. ${(result.stderr || result.stdout).trim()}`);
   }
@@ -254,6 +302,14 @@ export async function localProcessExecStream(
     signal?: AbortSignal;
   } = {},
 ): Promise<StreamExecResult> {
+  if (options.signal?.aborted) {
+    return {
+      exit_code: -1,
+      stdout: "",
+      stderr: "",
+      error_message: "Execution cancelled before start.",
+    };
+  }
   return new Promise((resolve) => {
     const child = spawn(cmd, args, {
       cwd: options.cwd,
@@ -265,6 +321,7 @@ export async function localProcessExecStream(
       child.kill("SIGTERM");
     };
     options.signal?.addEventListener("abort", abort, { once: true });
+    if (options.signal?.aborted) abort();
     child.stdout.on("data", (chunk) => {
       const text = String(chunk);
       stdoutParts.push(text);

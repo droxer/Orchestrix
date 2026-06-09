@@ -23,7 +23,18 @@ export interface DaemonNodeRunCommand {
   workspacePath?: string;
 }
 
-export type DaemonNodeCommand = DaemonNodeRunCommand;
+export interface DaemonNodeCancelCommand {
+  id: string;
+  type: "run.cancel";
+  commandId: string;
+  sessionId: string;
+  runId: string;
+  agent: AgentName;
+  mode: CodexTaskMode;
+  reason: string;
+}
+
+export type DaemonNodeCommand = DaemonNodeRunCommand | DaemonNodeCancelCommand;
 
 export type DaemonNodeEvent =
   | {
@@ -56,4 +67,13 @@ export type DaemonNodeEvent =
       agent: AgentName;
       mode: CodexTaskMode;
       error: string;
+    }
+  | {
+      type: "run.cancelled";
+      commandId: string;
+      sessionId: string;
+      runId: string;
+      agent: AgentName;
+      mode: CodexTaskMode;
+      reason: string;
     };

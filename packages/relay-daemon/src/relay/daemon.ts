@@ -66,6 +66,7 @@ export interface SandboxBackend {
   get(sandboxId: string): SandboxRecord | undefined;
   list(): SandboxRecord[];
   run(sandboxId: string, request: SandboxRunRequest): Promise<RelaySession>;
+  cancelRun?(sandboxId: string, sessionId: string, reason: string): Promise<RelaySession>;
 }
 
 export interface DaemonNodeActiveRun {
@@ -89,9 +90,10 @@ interface TrackedDaemonNodeActiveRun extends DaemonNodeActiveRun {
 }
 
 const DAEMON_RUN_TIMEOUT_MS = 15 * 60 * 1000;
+type DaemonCompletionEvent = Extract<DaemonNodeEvent, { type: "run.completed" | "run.failed" | "run.cancelled" }>;
 
-export type DaemonCommandStatus = "queued" | "dispatched" | "completed" | "failed";
-export type DaemonRunStatus = "running" | "completed" | "failed";
+export type DaemonCommandStatus = "queued" | "dispatched" | "completed" | "failed" | "cancelled";
+export type DaemonRunStatus = "running" | "completed" | "failed" | "cancelled";
 
 export interface DaemonCommandRecord {
   id: string;
@@ -136,7 +138,7 @@ export type DaemonEvent =
     }
   | {
       id: string;
-      type: "daemon.command.completed" | "daemon.command.failed";
+      type: "daemon.command.completed" | "daemon.command.failed" | "daemon.command.cancelled";
       timestamp: string;
       nodeId: string;
       commandId: string;
@@ -156,6 +158,7 @@ export interface DaemonStore {
   listActiveRuns(nodeId?: string): DaemonRunRecord[];
   markCommandCompleted(nodeId: string, event: Extract<DaemonNodeEvent, { type: "run.completed" }>): void;
   markCommandFailed(nodeId: string, event: Extract<DaemonNodeEvent, { type: "run.failed" }>): void;
+  markCommandCancelled(nodeId: string, event: Extract<DaemonNodeEvent, { type: "run.cancelled" }>): void;
   appendDaemonEvent(event: DaemonEvent): void;
 }
 
@@ -314,6 +317,15 @@ export async function handleRelayDaemonRequest(
     }
     return jsonResponse(202, await backend.run(parts[1], request));
   }
+  if (method === "POST" && parts.length === 5 && parts[0] === "sandboxes" && parts[2] === "runs" && parts[4] === "cancel") {
+    const sandbox = backend.get(parts[1]);
+    if (!sandbox) return jsonResponse(404, { error: "Sandbox not found." });
+    const authError = sandboxAuthError(sandbox, authToken);
+    if (authError) return jsonResponse(401, { error: authError });
+    if (!backend.cancelRun) return jsonResponse(400, { error: "Sandbox backend does not support cancellation." });
+    const input = asRecord(body);
+    return jsonResponse(202, await backend.cancelRun(parts[1], parts[3], stringField(input, "reason") || "Cancelled by human."));
+  }
   return jsonResponse(404, { error: "Not found" });
 }
 
@@ -321,7 +333,7 @@ export class DaemonNodeRegistry {
   private readonly sandboxes = new Map<string, SandboxRecord>();
   private readonly activeCommands = new Map<string, TrackedDaemonNodeActiveRun>();
   private readonly completions = new Map<string, {
-    resolve: (event: Extract<DaemonNodeEvent, { type: "run.completed" | "run.failed" }>) => void;
+    resolve: (event: DaemonCompletionEvent) => void;
     reject: (error: Error) => void;
     timer: NodeJS.Timeout;
   }>();
@@ -405,6 +417,19 @@ export class DaemonNodeRegistry {
 
   enqueue(sandboxId: string, command: DaemonNodeCommand): void {
     this.daemonStore.enqueueCommand(sandboxId, command);
+    if (command.type === "run.start") {
+      this.activeCommands.set(command.id, {
+        sandboxId,
+        commandId: command.id,
+        sessionId: command.sessionId,
+        runId: command.runId,
+        agent: command.agent,
+        mode: command.mode,
+        taskGoal: command.taskGoal,
+        workspacePath: command.workspacePath,
+        startedAt: new Date().toISOString(),
+      });
+    }
   }
 
   takeCommands(sandboxId: string, token?: string): DaemonNodeCommand[] {
@@ -430,7 +455,7 @@ export class DaemonNodeRegistry {
     return records.map((record) => record.command);
   }
 
-  waitForCompletion(commandId: string, timeoutMs = DAEMON_RUN_TIMEOUT_MS): Promise<Extract<DaemonNodeEvent, { type: "run.completed" | "run.failed" }>> {
+  waitForCompletion(commandId: string, timeoutMs = DAEMON_RUN_TIMEOUT_MS): Promise<DaemonCompletionEvent> {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         const active = this.activeCommands.get(commandId);
@@ -453,6 +478,24 @@ export class DaemonNodeRegistry {
     });
   }
 
+  cancelActiveRun(sandboxId: string, sessionId: string, reason: string): TrackedDaemonNodeActiveRun | undefined {
+    const active = [...this.activeCommands.values()].find((run) =>
+      run.sandboxId === sandboxId && run.sessionId === sessionId
+    );
+    if (!active) return undefined;
+    this.enqueue(sandboxId, {
+      id: newRelayId("cmd"),
+      type: "run.cancel",
+      commandId: active.commandId,
+      sessionId: active.sessionId,
+      runId: active.runId,
+      agent: active.agent,
+      mode: active.mode,
+      reason,
+    });
+    return active;
+  }
+
   handleEvent(sandboxId: string, event: DaemonNodeEvent, token?: string): void {
     this.assertAuthorized(sandboxId, token);
     this.markSeen(sandboxId);
@@ -473,6 +516,8 @@ export class DaemonNodeRegistry {
     this.activeCommands.delete(event.commandId);
     if (event.type === "run.completed") {
       this.daemonStore.markCommandCompleted(sandboxId, event);
+    } else if (event.type === "run.cancelled") {
+      this.daemonStore.markCommandCancelled(sandboxId, event);
     } else {
       this.daemonStore.markCommandFailed(sandboxId, event);
     }
@@ -609,8 +654,12 @@ export class LocalDaemonStore implements DaemonStore {
         dispatchedAt: now,
       }));
     for (const record of records) {
-      this.writeCommand(record);
-      this.writeRun({ ...this.runForCommand(record), status: "running", startedAt: now });
+      if (record.command.type === "run.start") {
+        this.writeCommand(record);
+        this.writeRun({ ...this.runForCommand(record), status: "running", startedAt: now });
+      } else {
+        this.writeCommand({ ...record, status: "completed", completedAt: now });
+      }
       this.appendDaemonEvent(daemonEvent("daemon.command.dispatched", { nodeId, commandId: record.id }));
     }
     return records;
@@ -669,6 +718,27 @@ export class LocalDaemonStore implements DaemonStore {
       commandId: event.commandId,
       runId: event.runId,
       error: event.error,
+    }));
+  }
+
+  markCommandCancelled(nodeId: string, event: Extract<DaemonNodeEvent, { type: "run.cancelled" }>): void {
+    const now = new Date().toISOString();
+    const command = this.getCommand(event.commandId);
+    if (command) {
+      this.writeCommand({ ...command, status: "cancelled", updatedAt: now, completedAt: now, error: event.reason });
+    }
+    const run = this.getRun(event.runId) ?? daemonRunFromEvent(nodeId, event, "cancelled");
+    this.writeRun({
+      ...run,
+      status: "cancelled",
+      completedAt: now,
+      error: event.reason,
+    });
+    this.appendDaemonEvent(daemonEvent("daemon.command.cancelled", {
+      nodeId,
+      commandId: event.commandId,
+      runId: event.runId,
+      error: event.reason,
     }));
   }
 
@@ -816,7 +886,7 @@ export class ReverseDaemonNodeBackend implements SandboxBackend {
           workspacePath: sandbox.workspacePath,
         };
         this.registry.enqueue(sandboxId, command);
-        let completed: Extract<DaemonNodeEvent, { type: "run.completed" | "run.failed" }>;
+        let completed: DaemonCompletionEvent;
         try {
           completed = await this.registry.waitForCompletion(command.id);
         } catch (error) {
@@ -840,6 +910,24 @@ export class ReverseDaemonNodeBackend implements SandboxBackend {
           }));
           this.registry.store.appendEvent(sessionId, relayEvent("session.failed", sessionId, { outcome: completed.error }));
           this.registry.updateStatus(sandboxId, { status: "ready", lastError: completed.error });
+          return this.registry.store.getSession(sessionId);
+        }
+        if (completed.type === "run.cancelled") {
+          this.registry.store.appendEvent(sessionId, relayEvent("agent.completed", sessionId, {
+            runId,
+            agent: assignment.agent,
+            status: "cancelled",
+            exitCode: 130,
+          }));
+          this.registry.store.appendEvent(sessionId, relayEvent("human.decision", sessionId, {
+            decision: {
+              id: newRelayId("dec"),
+              kind: "cancel",
+              createdAt: new Date().toISOString(),
+              note: completed.reason,
+            },
+          }));
+          this.registry.updateStatus(sandboxId, { status: "ready", lastError: completed.reason });
           return this.registry.store.getSession(sessionId);
         }
         state = mergeAgentState(state, {
@@ -895,6 +983,14 @@ export class ReverseDaemonNodeBackend implements SandboxBackend {
       });
       throw error;
     }
+  }
+
+  async cancelRun(sandboxId: string, sessionId: string, reason: string): Promise<RelaySession> {
+    const sandbox = this.registry.get(sandboxId);
+    if (!sandbox) throw new Error(`Sandbox ${sandboxId} has no registered daemon node.`);
+    const active = this.registry.cancelActiveRun(sandboxId, sessionId, reason);
+    if (!active) throw new Error(`Session ${sessionId} has no active daemon node run.`);
+    return this.registry.store.getSession(sessionId);
   }
 }
 
@@ -1107,6 +1203,17 @@ function daemonNodeEvent(value: unknown): DaemonNodeEvent {
       error: stringField(input, "error") || "Daemon node command failed.",
     };
   }
+  if (type === "run.cancelled") {
+    return {
+      type,
+      commandId,
+      sessionId,
+      runId,
+      agent,
+      mode,
+      reason: stringField(input, "reason") || "Cancelled by human.",
+    };
+  }
   throw new Error("unknown daemon node event type.");
 }
 
@@ -1169,7 +1276,7 @@ function daemonCommandRecord(value: unknown): DaemonCommandRecord | undefined {
   const nodeId = stringField(input, "nodeId");
   const command = daemonNodeCommand(input.command);
   if (!id || !nodeId || !command) return undefined;
-  const status = input.status === "queued" || input.status === "dispatched" || input.status === "completed" || input.status === "failed"
+  const status = input.status === "queued" || input.status === "dispatched" || input.status === "completed" || input.status === "failed" || input.status === "cancelled"
     ? input.status
     : "queued";
   return {
@@ -1193,7 +1300,22 @@ function daemonNodeCommand(value: unknown): DaemonNodeCommand | undefined {
   const runId = stringField(input, "runId");
   const taskGoal = stringField(input, "taskGoal");
   const agent = agentName(input.agent);
-  if (!id || type !== "run.start" || !sessionId || !runId || !taskGoal || !agent) return undefined;
+  if (!id || !sessionId || !runId || !agent) return undefined;
+  if (type === "run.cancel") {
+    const commandId = stringField(input, "commandId");
+    if (!commandId) return undefined;
+    return {
+      id,
+      type,
+      commandId,
+      sessionId,
+      runId,
+      agent,
+      mode: input.mode === "review" ? "review" : "implement",
+      reason: stringField(input, "reason") || "Cancelled by human.",
+    };
+  }
+  if (type !== "run.start" || !taskGoal) return undefined;
   return {
     id,
     type,
@@ -1214,7 +1336,7 @@ function daemonRunRecord(value: unknown): DaemonRunRecord | undefined {
   const runId = stringField(input, "runId");
   const agent = agentName(input.agent);
   if (!nodeId || !commandId || !sessionId || !runId || !agent) return undefined;
-  const status = input.status === "completed" || input.status === "failed" ? input.status : "running";
+  const status = input.status === "completed" || input.status === "failed" || input.status === "cancelled" ? input.status : "running";
   return {
     nodeId,
     commandId,
@@ -1234,7 +1356,7 @@ function daemonRunRecord(value: unknown): DaemonRunRecord | undefined {
 
 function daemonRunFromEvent(
   nodeId: string,
-  event: Extract<DaemonNodeEvent, { type: "run.completed" | "run.failed" }>,
+  event: DaemonCompletionEvent,
   status: DaemonRunStatus,
 ): DaemonRunRecord {
   return {

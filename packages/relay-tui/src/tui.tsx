@@ -20,6 +20,7 @@ import {
   assignmentFailureOutcome,
   assignmentSucceeded,
   ensureAgentReady,
+  hostWorkspacePath,
   initialAgentState,
   stripAnsi,
   type RelayEvent,
@@ -233,22 +234,40 @@ export function createDaemonAssignmentRunner(
     if (!request.sessionId) {
       request.onSessionUpdate?.(await client.getSession(sessionId, request.signal));
     }
+    let cancelPosted = false;
+    const requestDaemonCancel = (): void => {
+      if (cancelPosted) return;
+      cancelPosted = true;
+      void client.cancelSandboxRun({
+        sandboxId,
+        sessionId,
+        reason: "Cancelled by human.",
+      }).catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        request.log(`\nERR  ${message}\n`);
+      });
+    };
+    request.signal?.addEventListener("abort", requestDaemonCancel, { once: true });
+    if (request.signal?.aborted) requestDaemonCancel();
     const run = client.runSandbox({
       sandboxId,
       taskGoal: request.task,
       sessionId,
-      signal: request.signal,
       assignments,
     });
-    const session = await pollDaemonRunOutput(client, sessionId, run, {
-      deliveredEventIds,
-      log: request.log,
-      renderers,
-      signal: request.signal,
-      onSessionUpdate: request.onSessionUpdate,
-    });
-    replayDaemonAgentOutput(session.events, deliveredEventIds, request.log, renderers);
-    request.onSessionUpdate?.(session);
+    try {
+      const session = await pollDaemonRunOutput(client, sessionId, run, {
+        deliveredEventIds,
+        log: request.log,
+        renderers,
+        signal: request.signal,
+        onSessionUpdate: request.onSessionUpdate,
+      });
+      replayDaemonAgentOutput(session.events, deliveredEventIds, request.log, renderers);
+      request.onSessionUpdate?.(session);
+    } finally {
+      request.signal?.removeEventListener("abort", requestDaemonCancel);
+    }
   };
 }
 
@@ -1337,12 +1356,13 @@ export async function runInteractiveTui(): Promise<void> {
   });
 }
 
-function RelayTuiHost({ onExit }: { onExit: () => void }): React.ReactElement {
+export function RelayTuiHost({ onExit }: { onExit: () => void }): React.ReactElement {
   const [sandbox, setSandbox] = useState<SandboxRecord | undefined>();
   const [runner, setRunner] = useState<AssignmentRunner | undefined>();
   const [bootError, setBootError] = useState("");
   const [bootLogLines, setBootLogLines] = useState<string[]>([]);
   const mountedRef = useRef(true);
+  const workspacePath = useMemo(() => hostWorkspacePath(), []);
 
   const appendBootLog = (text: string): void => {
     if (!mountedRef.current) return;
@@ -1352,27 +1372,38 @@ function RelayTuiHost({ onExit }: { onExit: () => void }): React.ReactElement {
   useEffect(() => {
     const client = new RelayDaemonClient();
     const employeeId = process.env.RELAY_EMPLOYEE_ID || process.env.USER || "local";
-    void client.provisionSandbox({ employeeId }).then((readySandbox) => {
-      if (!mountedRef.current) return;
-      setSandbox(readySandbox);
-      setRunner(() => createDaemonAssignmentRunner(client, readySandbox.id));
-      appendBootLog(`\nOK  Host daemon ready. Sandbox ${readySandbox.id} assigned to ${readySandbox.employeeId}.\n`);
-    }).catch((error: unknown) => {
-      if (!mountedRef.current) return;
+    let cancelled = false;
+    const waitForReadySandbox = async (): Promise<void> => {
+      let current = await client.provisionSandbox({ employeeId, workspacePath });
+      while (!cancelled && current.status !== "ready") {
+        if (mountedRef.current) {
+          setSandbox(current);
+        }
+        await delay(DAEMON_POLL_INTERVAL_MS);
+        current = await client.getSandbox(current.id);
+      }
+      if (cancelled || !mountedRef.current) return;
+      setSandbox(current);
+      setRunner(() => createDaemonAssignmentRunner(client, current.id));
+      appendBootLog(`\nOK  Host daemon ready. Sandbox ${current.id} assigned to ${current.employeeId}.\n`);
+    };
+    void waitForReadySandbox().catch((error: unknown) => {
+      if (!mountedRef.current || cancelled) return;
       const detail = error instanceof Error ? error.message : String(error);
       setBootError(detail);
       appendBootLog(`\nERR  ${detail}\nStart the host daemon with: relay daemon --port 8790\n`);
     });
     return () => {
+      cancelled = true;
       mountedRef.current = false;
     };
-  }, []);
+  }, [workspacePath]);
 
-  const ready = Boolean(sandbox && runner) && !bootError;
+  const ready = Boolean(sandbox && runner && sandbox.status === "ready") && !bootError;
   const disabledMessage = bootError ? "Daemon unavailable. Press Esc to exit." : "Connecting to Relay daemon...";
   return (
     <RelayTui
-      workspacePath={sandbox?.workspacePath}
+      workspacePath={sandbox?.workspacePath ?? workspacePath}
       runner={runner}
       ready={ready}
       disabledMessage={disabledMessage}

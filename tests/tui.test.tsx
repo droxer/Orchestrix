@@ -8,6 +8,7 @@ import { render } from "ink-testing-library";
 
 import {
   RelayTui,
+  RelayTuiHost,
   completeShortcutInput,
   createDaemonAssignmentRunner,
   shortcutSuggestions,
@@ -272,6 +273,82 @@ describe("TUI daemon runner", () => {
     assert.ok(calls.includes("http://daemon.local/sessions"));
     assert.ok(calls.includes("http://daemon.local/sessions/ses_poll"));
     assert.match(log, /Polled Codex output/);
+  });
+
+  it("sends a daemon cancel request when the daemon runner signal is aborted", async () => {
+    let cancelSeen = false;
+    let resolveRun: (() => void) | undefined;
+    const calls: Array<{ url: string; body?: unknown }> = [];
+    const session = {
+      id: "ses_cancel",
+      workspacePath: "/workspace/alice",
+      taskGoal: "cancel auth",
+      status: "running",
+      phase: "running",
+      participants: ["human", "claude"],
+      currentAgent: "claude",
+      pendingDecision: undefined,
+      createdAt: "2026-06-07T00:00:00.000Z",
+      updatedAt: "2026-06-07T00:00:00.000Z",
+      events: [],
+      decisions: [],
+      agentRuns: [{ id: "run_cancel", agent: "claude", role: "implementer", mode: "implement", status: "running" }],
+      artifacts: [],
+    };
+    const cancelledSession = {
+      ...session,
+      status: "cancelled",
+      phase: "cancelled",
+      currentAgent: undefined,
+      decisions: [{ id: "dec_cancel", kind: "cancel", createdAt: "2026-06-07T00:00:01.000Z", note: "Cancelled by human." }],
+      agentRuns: [{ ...session.agentRuns[0], status: "cancelled" }],
+    };
+    const fetchFn = async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
+      const body = init?.body ? JSON.parse(String(init.body)) : undefined;
+      calls.push({ url: String(url), body });
+      if (String(url) === "http://daemon.local/sessions" && init?.method === "POST") {
+        return new Response(JSON.stringify(session), { status: 201, headers: { "Content-Type": "application/json" } });
+      }
+      if (String(url) === "http://daemon.local/sessions/ses_cancel") {
+        return new Response(JSON.stringify(cancelSeen ? cancelledSession : session), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      if (String(url) === "http://daemon.local/sandboxes/sbx_alice/runs/ses_cancel/cancel") {
+        cancelSeen = true;
+        resolveRun?.();
+        return new Response(JSON.stringify(cancelledSession), { status: 202, headers: { "Content-Type": "application/json" } });
+      }
+      await new Promise<void>((resolve) => {
+        resolveRun = resolve;
+      });
+      return new Response(JSON.stringify(cancelledSession), { status: 202, headers: { "Content-Type": "application/json" } });
+    };
+    const { RelayDaemonClient } = await import("../packages/relay-daemon/src/index.js");
+    const client = new RelayDaemonClient({ baseUrl: "http://daemon.local", fetchFn });
+    const runner = createDaemonAssignmentRunner(client, "sbx_alice");
+    const controller = new AbortController();
+    let updatedStatus = "";
+
+    const running = runner({
+      assignments: [{ agent: "claude" }],
+      task: "cancel auth",
+      log: () => undefined,
+      signal: controller.signal,
+      onSessionUpdate: (updated) => {
+        updatedStatus = updated.status;
+      },
+    });
+    await waitForInput();
+    controller.abort();
+    await running;
+
+    assert.equal(cancelSeen, true);
+    assert.equal(updatedStatus, "cancelled");
+    assert.ok(calls.some((call) =>
+      call.url === "http://daemon.local/sandboxes/sbx_alice/runs/ses_cancel/cancel" &&
+      typeof call.body === "object" &&
+      call.body !== null &&
+      (call.body as { reason?: string }).reason === "Cancelled by human."
+    ));
   });
 
   it("replays daemon Pi output as readable transcript text", async () => {
@@ -972,5 +1049,62 @@ describe("RelayTui component", () => {
     assert.equal(seenSignal?.aborted, true);
     assert.equal(store.getSession(sessionId).status, "failed");
     assert.match(lastFrame() ?? "", /Task cancelled|Cancelling/);
+  });
+
+  it("keeps daemon host booting until the workspace-backed sandbox is ready", async () => {
+    const oldFetch = globalThis.fetch;
+    const oldWorkspace = process.env.RELAY_WORKSPACE;
+    const workspace = mkdtempSync(join(tmpdir(), "relay-tui-host-workspace-"));
+    const bodies: unknown[] = [];
+    let sandboxPolls = 0;
+    process.env.RELAY_WORKSPACE = workspace;
+    globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
+      if (init?.body) bodies.push(JSON.parse(String(init.body)));
+      if (String(url) === "http://127.0.0.1:8790/sandboxes" && init?.method === "POST") {
+        return new Response(JSON.stringify({
+          id: "sbx_host",
+          employeeId: "host",
+          workspacePath: workspace,
+          status: "provisioning",
+          agents: { claude: "unknown", pi: "unknown", codex: "unknown" },
+          createdAt: "2026-06-07T00:00:00.000Z",
+          updatedAt: "2026-06-07T00:00:00.000Z",
+        }), { status: 201, headers: { "Content-Type": "application/json" } });
+      }
+      if (String(url) === "http://127.0.0.1:8790/sandboxes/sbx_host") {
+        sandboxPolls += 1;
+        return new Response(JSON.stringify({
+          id: "sbx_host",
+          employeeId: "host",
+          workspacePath: workspace,
+          status: sandboxPolls >= 1 ? "ready" : "provisioning",
+          agents: { claude: "ready", pi: "ready", codex: "ready" },
+          createdAt: "2026-06-07T00:00:00.000Z",
+          updatedAt: "2026-06-07T00:00:01.000Z",
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      return new Response(JSON.stringify({ error: "unexpected request" }), { status: 500, headers: { "Content-Type": "application/json" } });
+    }) as typeof fetch;
+    try {
+      const { lastFrame, unmount } = render(<RelayTuiHost onExit={() => undefined} />);
+      await waitForInput();
+      assert.match(lastFrame() ?? "", /Connecting to Relay daemon/);
+      await new Promise((resolve) => setTimeout(resolve, 450));
+
+      assert.match(lastFrame() ?? "", /Host daemon ready/);
+      assert.ok(bodies.some((body) =>
+        typeof body === "object" &&
+        body !== null &&
+        (body as { workspacePath?: string }).workspacePath === workspace
+      ));
+      unmount();
+    } finally {
+      globalThis.fetch = oldFetch;
+      if (oldWorkspace === undefined) {
+        delete process.env.RELAY_WORKSPACE;
+      } else {
+        process.env.RELAY_WORKSPACE = oldWorkspace;
+      }
+    }
   });
 });

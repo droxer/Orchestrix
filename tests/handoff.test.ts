@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
@@ -70,6 +71,34 @@ function withEnv<T>(env: NodeJS.ProcessEnv, fn: () => T): T {
   } finally {
     process.env = oldEnv;
   }
+}
+
+function runShellCommand(command: string, env: NodeJS.ProcessEnv = process.env) {
+  const result = spawnSync("bash", ["-c", command], {
+    cwd: env.RELAY_AGENT_WORKSPACE,
+    env: env as Record<string, string>,
+    encoding: "utf8",
+  });
+  return {
+    exit_code: result.status ?? -1,
+    stdout: result.stdout,
+    stderr: result.stderr,
+    error_message: result.error?.message,
+  };
+}
+
+function writeFakePi(path: string): void {
+  writeFileSync(path, [
+    "#!/bin/sh",
+    "if [ \"$1\" = \"--help\" ]; then printf '%s\\n' \"$PI_HELP_TEXT\"; exit 0; fi",
+    "flag=",
+    "for arg in \"$@\"; do",
+    "  case \"$arg\" in -P|--print-streaming) flag=streaming ;; -p|--print) flag=print ;; esac",
+    "done",
+    "printf '%s\\n' \"$flag\"",
+    "test -n \"$flag\"",
+  ].join("\n"));
+  chmodSync(path, 0o755);
 }
 
 describe("Codex review parsing", () => {
@@ -221,6 +250,84 @@ describe("agent failure logging", () => {
 
     assert.equal(patch.last_exit_code, -1);
     assert.match(patch.agent_logs?.[0] ?? "", /spawn cwd \/workspace ENOENT/);
+  });
+});
+
+describe("agent command invocation", () => {
+  it("falls back to Pi -p when pi --help does not advertise streaming print", () => {
+    const temp = mkdtempSync(join(tmpdir(), "relay-pi-invoke-"));
+    const workspace = mkdtempSync(join(tmpdir(), "relay-pi-workspace-"));
+    writeFakePi(join(temp, "pi"));
+
+    withEnv({
+      PATH: `${temp}:${process.env.PATH ?? ""}`,
+      RELAY_AGENT_HOME: join(temp, "home"),
+      RELAY_AGENT_WORKSPACE: workspace,
+      RELAY_RUN_AS_CURRENT_USER: "1",
+      PI_HELP_TEXT: "Options:\n  --print, -p  Non-interactive mode",
+    }, () => {
+      const result = runShellCommand(buildPiImplementCommand(state()), process.env);
+
+      assert.equal(result.exit_code, 0, result.stderr || result.error_message);
+      assert.equal(result.stdout, "print\n");
+    });
+  });
+
+  it("uses Pi -P when pi --help advertises streaming print", () => {
+    const temp = mkdtempSync(join(tmpdir(), "relay-pi-invoke-"));
+    const workspace = mkdtempSync(join(tmpdir(), "relay-pi-workspace-"));
+    writeFakePi(join(temp, "pi"));
+
+    withEnv({
+      PATH: `${temp}:${process.env.PATH ?? ""}`,
+      RELAY_AGENT_HOME: join(temp, "home"),
+      RELAY_AGENT_WORKSPACE: workspace,
+      RELAY_RUN_AS_CURRENT_USER: "1",
+      PI_HELP_TEXT: "Options:\n  --print-streaming, -P  Stream print output",
+    }, () => {
+      const result = runShellCommand(buildPiImplementCommand(state()), process.env);
+
+      assert.equal(result.exit_code, 0, result.stderr || result.error_message);
+      assert.equal(result.stdout, "streaming\n");
+    });
+  });
+
+  it("invokes Codex exec with JSON output inside the configured agent home and workspace", () => {
+    const temp = mkdtempSync(join(tmpdir(), "relay-codex-invoke-"));
+    const fakeCodex = join(temp, "codex");
+    const workspace = mkdtempSync(join(tmpdir(), "relay-codex-workspace-"));
+    const argsPath = join(temp, "codex-args.txt");
+    const homePath = join(temp, "codex-home.txt");
+    writeFileSync(fakeCodex, [
+      "#!/bin/sh",
+      "printf '%s\\n' \"$CODEX_HOME\" > \"$CODEX_HOME_OUT\"",
+      "printf '%s\\n' \"$@\" > \"$CODEX_ARGS_OUT\"",
+      "printf '%s\\n' '{\"type\":\"turn.completed\"}'",
+    ].join("\n"));
+    chmodSync(fakeCodex, 0o755);
+
+    withEnv({
+      PATH: `${temp}:${process.env.PATH ?? ""}`,
+      RELAY_AGENT_HOME: join(temp, "home"),
+      RELAY_AGENT_WORKSPACE: workspace,
+      RELAY_RUN_AS_CURRENT_USER: "1",
+      CODEX_ARGS_OUT: argsPath,
+      CODEX_HOME_OUT: homePath,
+    }, () => {
+      const result = runShellCommand(buildCodexImplementCommand(state({ task_goal: "Implement invocation fix" })), process.env);
+      const args = readFileSync(argsPath, "utf8").split(/\n/).filter(Boolean);
+
+      assert.equal(result.exit_code, 0, result.stderr || result.error_message);
+      assert.equal(readFileSync(homePath, "utf8").trim(), join(temp, "home", ".codex"));
+      assert.ok(args.includes("exec"));
+      assert.ok(args.includes("--json"));
+      assert.ok(args.includes("--skip-git-repo-check"));
+      assert.ok(args.includes("--dangerously-bypass-approvals-and-sandbox"));
+      assert.equal(args[args.indexOf("-C") + 1], workspace);
+      assert.ok(args.indexOf("exec") > args.indexOf(workspace));
+      assert.ok(args.indexOf("--json") > args.indexOf("exec"));
+      assert.match(args.at(-1) ?? "", /Implement invocation fix/);
+    });
   });
 });
 

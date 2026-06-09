@@ -145,6 +145,7 @@ export {
   RelayDaemonClient,
   normalizeBaseUrl,
   type CreateSessionInput,
+  type CancelSandboxRunInput,
   type ProvisionSandboxInput,
   type RelayDaemonClientOptions,
   type RunSandboxInput,

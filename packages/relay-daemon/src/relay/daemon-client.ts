@@ -20,6 +20,12 @@ export interface RunSandboxInput {
   signal?: AbortSignal;
 }
 
+export interface CancelSandboxRunInput {
+  sandboxId: string;
+  sessionId: string;
+  reason?: string;
+}
+
 export interface CreateSessionInput {
   taskGoal: string;
   assignments?: SandboxRunAssignment[];
@@ -75,6 +81,18 @@ export class RelayDaemonClient {
         sessionId: input.sessionId,
       },
     });
+  }
+
+  async cancelSandboxRun(input: CancelSandboxRunInput): Promise<RelaySession> {
+    return this.request<RelaySession>(
+      `/sandboxes/${encodeURIComponent(input.sandboxId)}/runs/${encodeURIComponent(input.sessionId)}/cancel`,
+      {
+        method: "POST",
+        body: {
+          reason: input.reason,
+        },
+      },
+    );
   }
 
   private async request<T>(

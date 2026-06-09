@@ -736,6 +736,52 @@ describe("Relay daemon API", () => {
     assert.equal(registry.get("sbx_all_agents")?.status, "ready");
   });
 
+  it("cancels an active reverse daemon node run", async () => {
+    const store = new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-reverse-cancel-")));
+    const registry = new DaemonNodeRegistry(store);
+    const backend = new ReverseDaemonNodeBackend(registry);
+    registry.register({
+      sandboxId: "sbx_cancel",
+      employeeId: "cancel",
+      token: "tok_cancel",
+      workspacePath: "/workspace/cancel",
+      protocolVersion: 1,
+      supportedAgents: ["claude", "pi", "codex"],
+      status: "ready",
+    });
+
+    const pending = backend.run("sbx_cancel", {
+      taskGoal: "long running task",
+      assignments: [{ agent: "claude", mode: "implement" }],
+    });
+    const [startCommand] = registry.takeCommands("sbx_cancel", "tok_cancel");
+    assert.equal(startCommand.type, "run.start");
+
+    await backend.cancelRun("sbx_cancel", startCommand.sessionId, "Cancelled by test.");
+    const [cancelCommand] = registry.takeCommands("sbx_cancel", "tok_cancel");
+    assert.equal(cancelCommand.type, "run.cancel");
+    assert.equal(cancelCommand.commandId, startCommand.id);
+    assert.equal(cancelCommand.reason, "Cancelled by test.");
+
+    registry.handleEvent("sbx_cancel", {
+      type: "run.cancelled",
+      commandId: startCommand.id,
+      sessionId: startCommand.sessionId,
+      runId: startCommand.runId,
+      agent: "claude",
+      mode: "implement",
+      reason: "Cancelled by test.",
+    }, "tok_cancel");
+    const session = await pending;
+
+    assert.equal(session.status, "cancelled");
+    assert.equal(session.agentRuns[0].status, "cancelled");
+    assert.equal(session.decisions.at(-1)?.kind, "cancel");
+    assert.equal(registry.get("sbx_cancel")?.status, "ready");
+    assert.equal(registry.get("sbx_cancel")?.lastError, "Cancelled by test.");
+    assert.equal(registry.monitorNodes()[0].activeRuns.length, 0);
+  });
+
   it("runs multiple daemon nodes concurrently with isolated command queues", async () => {
     const store = new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-concurrent-daemon-nodes-")));
     const registry = new DaemonNodeRegistry(store);
@@ -772,6 +818,8 @@ describe("Relay daemon API", () => {
 
     assert.equal(registry.get("sbx_alice")?.status, "running");
     assert.equal(registry.get("sbx_bob")?.status, "running");
+    assert.equal(aliceCommand.type, "run.start");
+    assert.equal(bobCommand.type, "run.start");
     assert.equal(aliceCommand.taskGoal, "review alice");
     assert.equal(bobCommand.taskGoal, "review bob");
     assert.equal(registry.takeCommands("sbx_alice", "tok_alice").length, 0);
