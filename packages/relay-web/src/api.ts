@@ -51,10 +51,13 @@ export function listSessions(signal?: AbortSignal): Promise<SessionsResponse> {
 }
 
 export function provisionSandbox(employeeId: string, token?: string): Promise<SandboxRecord> {
+  // No workspacePath: the daemon matches by employee, so we attach to the
+  // employee's registered daemon node (whatever workspace it runs in) instead
+  // of provisioning a dead placeholder under a fabricated path.
   return apiJson<SandboxRecord>("/sandboxes", {
     method: "POST",
     token,
-    body: { employeeId, workspacePath: `/workspace/${employeeId}` },
+    body: { employeeId },
   });
 }
 

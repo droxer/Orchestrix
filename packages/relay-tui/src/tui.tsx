@@ -20,6 +20,7 @@ import {
   assignmentFailureOutcome,
   assignmentSucceeded,
   ensureAgentReady,
+  ensureDaemonNodeToken,
   hostWorkspacePath,
   initialAgentState,
   stripAnsi,
@@ -1480,8 +1481,17 @@ export function RelayTuiHost({ onExit }: { onExit: () => void }): React.ReactEle
   };
 
   useEffect(() => {
-    const client = new RelayDaemonClient();
     const employeeId = process.env.RELAY_EMPLOYEE_ID || process.env.USER || "local";
+    // Share the daemon-node token contract: explicit env token wins, otherwise
+    // use (or create) the per-employee token file in the workspace that the
+    // daemon node reads when it registers.
+    const client = new RelayDaemonClient({
+      token: ensureDaemonNodeToken({
+        workspacePath,
+        employeeId,
+        token: process.env.RELAY_DAEMON_NODE_TOKEN,
+      }).token,
+    });
     let cancelled = false;
     const waitForReadySandbox = async (): Promise<void> => {
       let current = await client.provisionSandbox({ employeeId, workspacePath });
@@ -1490,7 +1500,12 @@ export function RelayTuiHost({ onExit }: { onExit: () => void }): React.ReactEle
           setSandbox(current);
         }
         await delay(DAEMON_POLL_INTERVAL_MS);
-        current = await client.getSandbox(current.id);
+        // A "stopped" sandbox is an offline placeholder waiting for a daemon
+        // node; re-provision so we attach to whichever node registers for this
+        // employee, even when it registers under a different sandbox id.
+        current = current.status === "stopped"
+          ? await client.provisionSandbox({ employeeId, workspacePath })
+          : await client.getSandbox(current.id);
       }
       if (cancelled || !mountedRef.current) return;
       setSandbox(current);
