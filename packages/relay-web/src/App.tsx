@@ -1108,15 +1108,7 @@ function SettingsDrawer({
   );
 }
 
-function EmployeeAvatar({
-  employeeId,
-  running,
-  size = "normal",
-}: {
-  employeeId: string;
-  running: boolean;
-  size?: "normal" | "large";
-}) {
+function EmployeeAvatar({ employeeId, running }: { employeeId: string; running: boolean }) {
   const initials = employeeId
     .split(/[._-\s]+/)
     .filter(Boolean)
@@ -1124,7 +1116,7 @@ function EmployeeAvatar({
     .map((part) => part.charAt(0).toUpperCase())
     .join("") || "?";
   return (
-    <span className={`employee-avatar ${size} ${running ? "running" : ""}`} aria-hidden="true">
+    <span className={`employee-avatar ${running ? "running" : ""}`} aria-hidden="true">
       {initials}
     </span>
   );
