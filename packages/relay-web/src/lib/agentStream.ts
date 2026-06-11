@@ -1,4 +1,4 @@
-import type { AgentName } from "../types";
+import type { AgentName, Tone } from "../types";
 
 export type AgentSegment =
   | { kind: "text"; text: string }
@@ -8,7 +8,7 @@ export type AgentSegment =
   | { kind: "status"; tone: StatusTone; text: string }
   | { kind: "raw"; text: string };
 
-type StatusTone = "ok" | "error" | "warn" | "info";
+type StatusTone = Exclude<Tone, "neutral">;
 
 const ANSI_PATTERN = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g;
 
@@ -182,9 +182,9 @@ function parseClaude(raw: string): AgentSegment[] {
       text.flush(out, "text");
       thinking.flush(out, "thinking");
       if (event.is_error) {
-        out.push({ kind: "status", tone: "error", text: String(event.result ?? "Claude error") });
+        out.push({ kind: "status", tone: "bad", text: String(event.result ?? "Claude error") });
       } else {
-        out.push({ kind: "status", tone: "ok", text: "Claude finished." });
+        out.push({ kind: "status", tone: "good", text: "Claude finished." });
       }
       continue;
     }
@@ -214,16 +214,16 @@ function parseCodex(raw: string): AgentSegment[] {
       continue;
     }
     if (event.type === "turn.completed") {
-      out.push({ kind: "status", tone: "ok", text: "Codex finished." });
+      out.push({ kind: "status", tone: "good", text: "Codex finished." });
       continue;
     }
     if (event.type === "turn.failed") {
       const error = asRecord(event.error);
-      out.push({ kind: "status", tone: "error", text: `Codex failed: ${String(error.message ?? "turn failed")}` });
+      out.push({ kind: "status", tone: "bad", text: `Codex failed: ${String(error.message ?? "turn failed")}` });
       continue;
     }
     if (event.type === "error") {
-      out.push({ kind: "status", tone: "error", text: `Codex error: ${String(event.message ?? "unknown")}` });
+      out.push({ kind: "status", tone: "bad", text: `Codex error: ${String(event.message ?? "unknown")}` });
       continue;
     }
     if (typeof event.type === "string" && event.type.startsWith("item.")) {

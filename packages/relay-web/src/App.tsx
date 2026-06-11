@@ -35,6 +35,7 @@ import type {
   DaemonNodeMonitorRecord,
   RelaySession,
   SandboxRecord,
+  Tone,
 } from "./types";
 import { Badge } from "@/components/ui/badge";
 import { AgentStream } from "./components/AgentStream";
@@ -52,7 +53,6 @@ const agentDescriptors: Record<AgentName, { tone: string; role: string; blurb: s
 };
 
 type TokenMap = Record<string, string>;
-type StatusTone = "info" | "good" | "warn" | "bad";
 type MobileView = "threads" | "chat";
 
 type DerivedMessage =
@@ -77,10 +77,22 @@ type DerivedMessage =
       kind: "system";
       id: string;
       timestamp: string;
-      tone: "neutral" | "good" | "bad" | "accent";
+      tone: Tone;
       label: string;
       detail?: string;
     };
+
+/** A continuation block from the same agent renders without avatar/header, Slack-style. */
+function isGroupedContinuation(messages: DerivedMessage[], index: number): boolean {
+  const message = messages[index];
+  if (message.kind !== "agent") return false;
+  for (let i = index - 1; i >= 0; i -= 1) {
+    const prev = messages[i];
+    if (prev.kind === "system") continue;
+    return prev.kind === "agent" && prev.agent === message.agent;
+  }
+  return false;
+}
 
 interface EmployeeContact {
   id: string;
@@ -138,13 +150,25 @@ export function App() {
   const [handoffNote, setHandoffNote] = useState("");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
-  const [status, setStatus] = useState<{ tone: StatusTone; message: string }>({
+  const [status, setStatus] = useState<{ tone: Tone; message: string }>({
     tone: "info",
     message: "Open an employee workspace to begin.",
   });
+  const [toastVisible, setToastVisible] = useState(false);
+  const statusSeenRef = useRef(false);
 
   const transcriptRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
+
+  useEffect(() => {
+    if (!statusSeenRef.current) {
+      statusSeenRef.current = true;
+      return;
+    }
+    setToastVisible(true);
+    const timer = window.setTimeout(() => setToastVisible(false), 4000);
+    return () => window.clearTimeout(timer);
+  }, [status]);
 
   const selectedSandbox = useMemo(
     () => sandboxes.find((sandbox) => sandbox.employeeId === selectedEmployee),
@@ -594,7 +618,7 @@ export function App() {
             const lastAgent = contact.lastSession?.agentRuns[contact.lastSession.agentRuns.length - 1]?.agent;
             return (
               <button
-                className={`conversation-row ${selectedEmployee === contact.id ? "active" : ""}`}
+                className={`conversation-row ${selectedEmployee === contact.id ? "active" : ""} ${contact.activeRun ? "has-activity" : ""}`}
                 key={contact.id}
                 type="button"
                 aria-pressed={selectedEmployee === contact.id}
@@ -607,9 +631,15 @@ export function App() {
                       <span className={`status-dot status-dot-${statusTone(status)}`} aria-hidden="true" />
                       <strong translate="no">{contact.id}</strong>
                     </span>
-                    <span className="conversation-stamp mono">
-                      {contact.sessionCount > 0 ? `${contact.sessionCount.toString().padStart(2, "0")}` : "—"}
-                    </span>
+                    {contact.activeRun ? (
+                      <span className="conversation-badge mono" aria-label="Agent running">
+                        {Math.max(contact.sessionCount, 1)}
+                      </span>
+                    ) : (
+                      <span className="conversation-stamp mono">
+                        {contact.sessionCount > 0 ? `${contact.sessionCount.toString().padStart(2, "0")}` : "—"}
+                      </span>
+                    )}
                   </span>
                   <span className="conversation-preview">
                     {contact.activeRun
@@ -687,7 +717,6 @@ export function App() {
               ))}
             </div>
             {activeSession ? <StatusPill value={activeSession.status} /> : null}
-            <div className={`toast ${status.tone}`} role="status" aria-live="polite">{status.message}</div>
             <button
               className="icon-button"
               type="button"
@@ -711,12 +740,26 @@ export function App() {
           </div>
         </header>
 
+        <div
+          className={`toast ${status.tone}`}
+          data-visible={toastVisible}
+          role="status"
+          aria-live="polite"
+        >
+          {toastVisible ? status.message : null}
+        </div>
+
         <div className="transcript" ref={transcriptRef} onScroll={handleTranscriptScroll}>
           <div className="transcript-inner">
             {activeSession ? (
               <>
-                {messages.map((message) => (
-                  <MessageBlock key={message.id} message={message} employeeId={selectedEmployee} />
+                {messages.map((message, index) => (
+                  <MessageBlock
+                    key={message.id}
+                    message={message}
+                    employeeId={selectedEmployee}
+                    grouped={isGroupedContinuation(messages, index)}
+                  />
                 ))}
                 {awaitingDecision ? (
                   <div className="decision-bar">
@@ -1122,7 +1165,15 @@ function EmployeeAvatar({ employeeId, running }: { employeeId: string; running: 
   );
 }
 
-function MessageBlock({ message, employeeId }: { message: DerivedMessage; employeeId: string }) {
+function MessageBlock({
+  message,
+  employeeId,
+  grouped = false,
+}: {
+  message: DerivedMessage;
+  employeeId: string;
+  grouped?: boolean;
+}) {
   if (message.kind === "user") {
     return (
       <article className="msg msg-user">
@@ -1138,7 +1189,7 @@ function MessageBlock({ message, employeeId }: { message: DerivedMessage; employ
   }
   if (message.kind === "agent") {
     return (
-      <article className={`msg msg-agent ${message.streaming ? "streaming" : ""}`}>
+      <article className={`msg msg-agent ${message.streaming ? "streaming" : ""} ${grouped ? "grouped" : ""}`}>
         <span className={`agent-avatar tone-${agentDescriptors[message.agent].tone}`} aria-hidden="true">
           <Bot size={15} />
         </span>
@@ -1188,7 +1239,7 @@ function MessageBlock({ message, employeeId }: { message: DerivedMessage; employ
   );
 }
 
-function statusTone(value: string): "good" | "info" | "bad" | "warn" {
+function statusTone(value: string): Tone {
   if (value === "ready" || value === "completed" || value === "done") return "good";
   if (value === "running") return "info";
   if (value === "failed" || value === "blocked" || value === "cancelled") return "bad";
@@ -1318,7 +1369,7 @@ function projectMessages(session: RelaySession | undefined): DerivedMessage[] {
           kind: "system",
           id: event.id,
           timestamp: event.timestamp,
-          tone: "accent",
+          tone: "info",
           label: `you - ${event.decision.kind.replace("_", " ")}`,
           detail: event.decision.note,
         });

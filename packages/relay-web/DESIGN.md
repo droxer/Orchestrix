@@ -67,17 +67,22 @@ via the `.mono` utility or `font-family: var(--font-number)`.
 | `--shadow-lift` | Hovered cards. The lower of exactly two elevation tiers |
 | `--shadow-overlay` | Floating layers: popovers, mention list, settings drawer |
 
-Status tones map one way everywhere: **good/ok → semantic-up**,
-**bad/error → semantic-down**, **info → primary**, **warn → accent-yellow
-dot + muted text**. Tone is never conveyed by a background fill.
+Every status surface (toasts, pills, dots, agent stream status lines,
+system rows) shares one tone vocabulary, the `Tone` type in
+`src/types.ts`: **good → semantic-up**, **bad → semantic-down**,
+**info → primary**, **warn → accent-yellow dot + muted text**, and
+**neutral → default ink/muted**. Tone is never conveyed by a background
+fill, with one exception: the conversation-list activity badge uses a
+primary fill because it is a navigation affordance, not a status.
 
 ## Tier 3 — shadcn/ui bridge
 
 The `@theme inline` block plus the `--background`/`--foreground`/…
 aliases expose tokens to Tailwind utilities consumed by
-`src/components/ui/*`. Keep this mapping in sync if primitives change;
-do not reference these aliases from hand-written component CSS — use the
-tier‑1/2 tokens directly.
+`src/components/ui/*` (currently only `badge.tsx`; add other shadcn
+components via the CLI as needed). Keep this mapping in sync if
+primitives change; do not reference these aliases from hand-written
+component CSS — use the tier‑1/2 tokens directly.
 
 ## Layout
 
@@ -93,6 +98,18 @@ tier‑1/2 tokens directly.
 - Transcript content is centered at `min(100%, 960px)`.
 - Below 820px the shell collapses to a single pane with a top bar
   switching between conversations and chat.
+
+### Conversation patterns
+
+- **Message grouping** — consecutive transcript blocks from the same
+  agent render as continuations (`.msg-agent.grouped`): no avatar or
+  header, gutter preserved so text stays aligned.
+- **Activity badge** — when an agent is running in a conversation, the
+  list row shows a Relay Blue count badge (`.conversation-badge`) and
+  the preview line darkens (`.has-activity`).
+- **Status toast** — global feedback surfaces as a transient pill
+  (`.toast`) floated below the chat header, auto-dismissing after 4s.
+  It is the only floating status element; nothing lives in the header.
 
 ## Rules
 

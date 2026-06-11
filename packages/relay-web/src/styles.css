@@ -694,6 +694,25 @@ button:disabled {
   color: var(--color-muted);
 }
 
+/* Activity state: an agent is running in this conversation. */
+.conversation-badge {
+  flex-shrink: 0;
+  min-width: 22px;
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.conversation-row.has-activity .conversation-preview {
+  color: var(--color-ink);
+  font-weight: 500;
+}
+
 .status-dot {
   flex-shrink: 0;
   width: 6px;
@@ -771,6 +790,7 @@ button:disabled {
 /* ============================ chat panel ============================ */
 
 .chat-panel {
+  position: relative;
   min-width: 0;
   min-height: 0;
   display: grid;
@@ -884,21 +904,35 @@ button:disabled {
   color: var(--color-on-dark);
 }
 
+/* Transient status toast, floated over the transcript below the header. */
 .toast {
-  max-width: 320px;
-  min-height: 32px;
+  position: absolute;
+  top: calc(var(--header-h) + var(--space-sm));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 25;
+  max-width: min(420px, calc(100% - var(--space-xl)));
+  min-height: 36px;
   display: flex;
   align-items: center;
-  padding: 0 var(--space-sm);
+  padding: 0 var(--space-base);
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-pill);
   background: var(--color-canvas);
+  box-shadow: var(--shadow-overlay);
   color: var(--color-body);
   font-size: var(--text-sm);
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.toast[data-visible="false"] {
+  opacity: 0;
+  transform: translate(-50%, -6px);
 }
 
 .toast.good { color: var(--color-semantic-up); }
@@ -984,6 +1018,20 @@ button:disabled {
   display: grid;
   grid-row: 1 / span 2;
   margin-top: 2px;
+}
+
+/* Slack-style grouping: a continuation from the same agent drops its
+   avatar and header but keeps the gutter so text stays aligned. */
+.msg-agent.grouped > .agent-avatar {
+  visibility: hidden;
+}
+
+.msg-agent.grouped .bubble > header {
+  display: none;
+}
+
+.msg-agent + .msg-agent.grouped {
+  margin-top: calc(var(--space-sm) - var(--space-md));
 }
 
 .bubble {
@@ -1278,10 +1326,10 @@ button:disabled {
   flex-shrink: 0;
 }
 
-.agent-status-ok    { color: var(--color-semantic-up); }
-.agent-status-ok    > svg { color: var(--color-semantic-up); }
-.agent-status-error { color: var(--color-semantic-down); }
-.agent-status-error > svg { color: var(--color-semantic-down); }
+.agent-status-good    { color: var(--color-semantic-up); }
+.agent-status-good    > svg { color: var(--color-semantic-up); }
+.agent-status-bad { color: var(--color-semantic-down); }
+.agent-status-bad > svg { color: var(--color-semantic-down); }
 .agent-status-warn  { color: var(--color-muted); }
 .agent-status-warn  > svg { color: var(--color-accent-yellow); }
 .agent-status-info  { color: var(--color-primary); }
@@ -1404,7 +1452,7 @@ button:disabled {
 
 .msg-system.tone-good .msg-system-label { color: var(--color-semantic-up); }
 .msg-system.tone-bad .msg-system-label { color: var(--color-semantic-down); }
-.msg-system.tone-accent .msg-system-label { color: var(--color-primary); }
+.msg-system.tone-info .msg-system-label { color: var(--color-primary); }
 
 /* ============================ decision bar / handoff ============================ */
 
@@ -1991,8 +2039,6 @@ button:disabled {
     width: min(360px, 100vw);
     box-shadow: var(--shadow-overlay);
   }
-
-  .toast { display: none; }
 }
 
 @media (max-width: 1040px) {
