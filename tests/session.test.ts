@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
@@ -928,6 +928,149 @@ describe("Relay daemon API", () => {
     });
 
     assert.throws(() => registry.takeCommands("sbx_auth", "wrong"), /Unauthorized/);
+  });
+
+  it("rejects daemon node re-registration with a mismatched token", async () => {
+    const registry = new DaemonNodeRegistry(new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-reregister-"))));
+    const backend = new ReverseDaemonNodeBackend(registry);
+    registry.register({
+      sandboxId: "sbx_takeover",
+      employeeId: "takeover",
+      token: "tok_original",
+      protocolVersion: 1,
+      supportedAgents: ["codex"],
+      status: "ready",
+    });
+
+    assert.throws(() => registry.register({
+      sandboxId: "sbx_takeover",
+      employeeId: "attacker",
+      token: "tok_attacker",
+      protocolVersion: 1,
+      supportedAgents: ["codex"],
+      status: "ready",
+    }), /Unauthorized/);
+    assert.equal(registry.get("sbx_takeover")?.employeeId, "takeover");
+    assert.equal(registry.takeCommands("sbx_takeover", "tok_original").length, 0);
+    assert.throws(() => registry.takeCommands("sbx_takeover", "tok_attacker"), /Unauthorized/);
+
+    const reRegistered = registry.register({
+      sandboxId: "sbx_takeover",
+      employeeId: "takeover",
+      token: "tok_original",
+      protocolVersion: 1,
+      supportedAgents: ["codex"],
+      status: "ready",
+    });
+    assert.equal(reRegistered.status, "ready");
+
+    const response = await handleRelayDaemonRequest(backend, "POST", "/daemon-nodes/register", {
+      sandboxId: "sbx_takeover",
+      employeeId: "attacker",
+      token: "tok_attacker",
+      protocolVersion: 1,
+      supportedAgents: ["codex"],
+      status: "ready",
+    }, registry);
+    assert.equal(response.status, 401);
+  });
+
+  it("rejects daemon node events that target another sandbox's command", () => {
+    const store = new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-cross-sandbox-")));
+    const session = store.createSession({ workspacePath: "/workspace", taskGoal: "cross sandbox" });
+    const registry = new DaemonNodeRegistry(store);
+    for (const name of ["alpha", "beta"]) {
+      registry.register({
+        sandboxId: `sbx_${name}`,
+        employeeId: name,
+        token: `tok_${name}`,
+        protocolVersion: 1,
+        supportedAgents: ["codex"],
+        status: "ready",
+      });
+    }
+    registry.enqueue("sbx_alpha", {
+      id: "cmd_alpha",
+      type: "run.start",
+      sessionId: session.id,
+      runId: "run_alpha",
+      taskGoal: "cross sandbox",
+      agent: "codex",
+      mode: "implement",
+    });
+    const [command] = registry.takeCommands("sbx_alpha", "tok_alpha");
+
+    assert.throws(() => registry.handleEvent("sbx_beta", {
+      type: "run.completed",
+      commandId: command.id,
+      sessionId: command.sessionId,
+      runId: command.runId,
+      agent: "codex",
+      mode: "implement",
+      exitCode: 0,
+      agentLog: "forged",
+    }, "tok_beta"), /Unauthorized/);
+    assert.equal(registry.monitorNodes().find((node) => node.id === "sbx_alpha")?.activeRuns.length, 1);
+
+    // Events for commands the daemon is not tracking are dropped, not applied.
+    registry.handleEvent("sbx_beta", {
+      type: "run.output",
+      commandId: "cmd_unknown",
+      sessionId: session.id,
+      runId: "run_unknown",
+      agent: "codex",
+      stream: "stdout",
+      text: "injected",
+      sequence: 0,
+    }, "tok_beta");
+    assert.equal(store.getSession(session.id).events.some((event) => event.type === "agent.output"), false);
+  });
+
+  it("enqueues a cancel command when a daemon node run times out", async () => {
+    const store = new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-timeout-cancel-")));
+    const session = store.createSession({ workspacePath: "/workspace", taskGoal: "timeout cancel" });
+    const registry = new DaemonNodeRegistry(store);
+    registry.register({
+      sandboxId: "sbx_timeout_cancel",
+      employeeId: "timeout-cancel",
+      token: "tok_timeout_cancel",
+      protocolVersion: 1,
+      supportedAgents: ["claude"],
+      status: "ready",
+    });
+    registry.enqueue("sbx_timeout_cancel", {
+      id: "cmd_timeout_cancel",
+      type: "run.start",
+      sessionId: session.id,
+      runId: "run_timeout_cancel",
+      taskGoal: "timeout cancel",
+      agent: "claude",
+      mode: "implement",
+    });
+    const [command] = registry.takeCommands("sbx_timeout_cancel", "tok_timeout_cancel");
+
+    await assert.rejects(registry.waitForCompletion(command.id, 1), /timed out/);
+
+    const [cancel] = registry.takeCommands("sbx_timeout_cancel", "tok_timeout_cancel");
+    assert.equal(cancel?.type, "run.cancel");
+    assert.equal(cancel?.type === "run.cancel" ? cancel.commandId : undefined, command.id);
+  });
+
+  it("skips corrupt daemon store records instead of failing polls", () => {
+    const root = mkdtempSync(join(tmpdir(), "relay-corrupt-store-"));
+    const registry = new DaemonNodeRegistry(new LocalSessionStore(root));
+    registry.register({
+      sandboxId: "sbx_corrupt",
+      employeeId: "corrupt",
+      token: "tok_corrupt",
+      protocolVersion: 1,
+      supportedAgents: ["codex"],
+      status: "ready",
+    });
+    mkdirSync(join(root, "daemon", "commands"), { recursive: true });
+    writeFileSync(join(root, "daemon", "commands", "cmd_torn.json"), '{"id": "cmd_torn", "nodeId": "sbx');
+
+    assert.deepEqual(registry.takeCommands("sbx_corrupt", "tok_corrupt"), []);
   });
 
   it("allows authorized daemon node command polling through the HTTP route", async () => {

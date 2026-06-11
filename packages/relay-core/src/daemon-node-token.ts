@@ -39,6 +39,10 @@ export function writeDaemonNodeToken(workspacePath: string, employeeId: string, 
   return path;
 }
 
+export function newDaemonNodeToken(): string {
+  return `tok_${randomBytes(24).toString("base64url")}`;
+}
+
 export function ensureDaemonNodeToken(input: EnsureDaemonNodeTokenInput): DaemonNodeTokenResolution {
   const explicit = input.token?.trim();
   if (explicit) {
@@ -51,7 +55,7 @@ export function ensureDaemonNodeToken(input: EnsureDaemonNodeTokenInput): Daemon
     return { token: existing, source: "file", path };
   }
 
-  const generated = `tok_${randomBytes(24).toString("base64url")}`;
+  const generated = newDaemonNodeToken();
   writeDaemonNodeToken(input.workspacePath, input.employeeId, generated);
   return { token: generated, source: "generated", path };
 }

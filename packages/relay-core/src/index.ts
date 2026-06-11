@@ -69,6 +69,7 @@ export {
 export {
   daemonNodeTokenPath,
   ensureDaemonNodeToken,
+  newDaemonNodeToken,
   readDaemonNodeToken,
   writeDaemonNodeToken,
   type DaemonNodeTokenResolution,
