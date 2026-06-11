@@ -185,6 +185,8 @@ export interface RelayDaemonResponse {
   status: number;
   contentType: string;
   body: string;
+  /** Raw bytes for binary assets; takes precedence over `body` when set. */
+  bodyBytes?: Buffer;
 }
 
 export function serveRelayDaemon(options: RelayDaemonOptions = {}): void {
@@ -224,7 +226,7 @@ export async function routeDaemonRequest(
   const authToken = bearerToken(request.headers.authorization);
   const routed = await handleRelayDaemonRequest(backend, method, url.pathname, body, reverseRegistry, authToken);
   response.writeHead(routed.status, { "Content-Type": routed.contentType });
-  response.end(routed.body);
+  response.end(routed.bodyBytes ?? routed.body);
 }
 
 export async function handleRelayDaemonRequest(
@@ -273,18 +275,28 @@ export async function handleRelayDaemonRequest(
   }
   if (method === "POST" && parts.length === 2 && isDaemonNodeRoute && parts[1] === "register") {
     if (!reverseRegistry) return jsonResponse(404, { error: "Reverse daemon node registry is not enabled." });
-    return daemonNodeRouteResponse(() => jsonResponse(200, reverseRegistry.register(daemonNodeRegistration(body, authToken))));
+    try {
+      return jsonResponse(200, reverseRegistry.register(daemonNodeRegistration(body, authToken)));
+    } catch (error) {
+      return daemonNodeRouteError(error);
+    }
   }
   if (method === "GET" && parts.length === 3 && isDaemonNodeRoute && parts[2] === "commands") {
     if (!reverseRegistry) return jsonResponse(404, { error: "Reverse daemon node registry is not enabled." });
-    return daemonNodeRouteResponse(() => jsonResponse(200, { commands: reverseRegistry.takeCommands(parts[1], authToken) }));
+    try {
+      return jsonResponse(200, { commands: reverseRegistry.takeCommands(parts[1], authToken) });
+    } catch (error) {
+      return daemonNodeRouteError(error);
+    }
   }
   if (method === "POST" && parts.length === 3 && isDaemonNodeRoute && parts[2] === "events") {
     if (!reverseRegistry) return jsonResponse(404, { error: "Reverse daemon node registry is not enabled." });
-    return daemonNodeRouteResponse(() => {
+    try {
       reverseRegistry.handleEvent(parts[1], daemonNodeEvent(body), authToken);
-      return jsonResponse(202, { ok: true });
-    });
+    } catch (error) {
+      return daemonNodeRouteError(error);
+    }
+    return jsonResponse(202, { ok: true });
   }
   if (parts[0] === "sessions") {
     if (!reverseRegistry) return jsonResponse(404, { error: "Session store is not available." });
@@ -372,7 +384,9 @@ export class DaemonNodeRegistry {
     const now = new Date().toISOString();
     const existing = this.sandboxes.get(input.sandboxId);
     if (existing?.tokenHash && !daemonNodeTokenMatches(existing, input.token)) {
-      throw new Error("Unauthorized daemon node registration: token does not match the existing sandbox token.");
+      throw new Error(
+        `Unauthorized daemon node registration for ${input.sandboxId}: token does not match the token issued at provisioning.`,
+      );
     }
     const agents: SandboxRecord["agents"] = {
       claude: input.supportedAgents.includes("claude") ? "ready" : "unknown",
@@ -431,10 +445,17 @@ export class DaemonNodeRegistry {
   }
 
   findByEmployee(employeeId: string, workspacePath?: string): SandboxRecord | undefined {
-    return this.list().find((sandbox) =>
+    const matches = this.list().filter((sandbox) =>
       sandbox.employeeId === employeeId &&
       (!workspacePath || !sandbox.workspacePath || sandbox.workspacePath === workspacePath)
     );
+    // Prefer the live daemon node over offline placeholders so re-provisioning
+    // converges on whichever node actually registered for this employee.
+    const rank = (sandbox: SandboxRecord): number =>
+      sandbox.status === "ready" ? 0 : sandbox.status === "running" ? 1 : 2;
+    return matches.sort((a, b) =>
+      rank(a) - rank(b) || (b.lastSeenAt ?? "").localeCompare(a.lastSeenAt ?? "")
+    )[0];
   }
 
   enqueue(sandboxId: string, command: DaemonNodeCommand): void {
@@ -596,9 +617,17 @@ export class DaemonNodeRegistry {
     const sandbox = this.sandboxes.get(sandboxId);
     if (!sandbox) return;
     const now = new Date().toISOString();
-    const updated = { ...sandbox, updatedAt: now, lastSeenAt: now };
+    // An authorized poll proves the daemon node is alive again. Offline
+    // placeholders ("stopped", e.g. after a daemon restart) and stale
+    // "provisioning"/"failed" records become schedulable without requiring a
+    // re-registration; "running" is left to the run lifecycle.
+    const revived = sandbox.status === "stopped" || sandbox.status === "provisioning" || sandbox.status === "failed";
+    const patch: Pick<Partial<SandboxRecord>, "status" | "lastError"> = revived
+      ? { status: "ready", lastError: undefined }
+      : {};
+    const updated = { ...sandbox, ...patch, updatedAt: now, lastSeenAt: now };
     this.sandboxes.set(sandboxId, updated);
-    this.daemonStore.markNodeSeen(sandboxId);
+    this.daemonStore.markNodeSeen(sandboxId, patch);
   }
 }
 
@@ -1165,17 +1194,6 @@ async function readJsonBody(request: IncomingMessage): Promise<unknown> {
   return JSON.parse(raw);
 }
 
-async function daemonNodeRouteResponse(handler: () => RelayDaemonResponse | Promise<RelayDaemonResponse>): Promise<RelayDaemonResponse> {
-  try {
-    return await handler();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (/unauthorized/i.test(message)) return jsonResponse(401, { error: message });
-    if (/unknown sandbox/i.test(message)) return jsonResponse(404, { error: message });
-    throw error;
-  }
-}
-
 function positiveIntEnv(name: string): number | undefined {
   const value = Number(process.env[name]);
   return Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined;
@@ -1334,6 +1352,13 @@ function daemonNodeEvent(value: unknown): DaemonNodeEvent {
 
 function codexTaskMode(value: unknown): CodexTaskMode | undefined {
   return value === "review" || value === "implement" ? value : undefined;
+}
+
+function daemonNodeRouteError(error: unknown): RelayDaemonResponse {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/unauthorized/i.test(message)) return jsonResponse(401, { error: message });
+  if (/unknown sandbox/i.test(message)) return jsonResponse(404, { error: message });
+  return jsonResponse(400, { error: message });
 }
 
 function bearerToken(value: string | string[] | undefined): string | undefined {
@@ -1591,10 +1616,20 @@ function webUiAssetResponse(parts: string[]): RelayDaemonResponse {
   if (!selectedPath || !existsSync(selectedPath) || !statSync(selectedPath).isFile()) {
     return jsonResponse(404, { error: "Web UI asset not found." });
   }
+  const contentType = contentTypeForPath(selectedPath);
+  if (contentType.startsWith("text/") || contentType.startsWith("application/json")) {
+    return {
+      status: 200,
+      contentType,
+      body: readFileSync(selectedPath, "utf8"),
+    };
+  }
+  const bytes = readFileSync(selectedPath);
   return {
     status: 200,
-    contentType: contentTypeForPath(selectedPath),
-    body: readFileSync(selectedPath, "utf8"),
+    contentType,
+    body: bytes.toString("latin1"),
+    bodyBytes: bytes,
   };
 }
 
@@ -1616,6 +1651,12 @@ function contentTypeForPath(path: string): string {
   if (extension === ".json") return "application/json; charset=utf-8";
   if (extension === ".svg") return "image/svg+xml; charset=utf-8";
   if (extension === ".txt") return "text/plain; charset=utf-8";
+  if (extension === ".png") return "image/png";
+  if (extension === ".ico") return "image/x-icon";
+  if (extension === ".jpg" || extension === ".jpeg") return "image/jpeg";
+  if (extension === ".webp") return "image/webp";
+  if (extension === ".woff") return "font/woff";
+  if (extension === ".woff2") return "font/woff2";
   return "application/octet-stream";
 }
 
