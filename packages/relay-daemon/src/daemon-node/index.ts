@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { appendFileSync, mkdirSync } from "node:fs";
+import { appendFileSync, chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import type {
@@ -7,7 +7,6 @@ import type {
   DaemonNodeEvent,
   DaemonNodeRegistration,
   DaemonNodeRunCommand,
-  AgentExecutor,
   AgentName,
   CodexTaskMode,
   StreamExecResult,
@@ -19,7 +18,6 @@ import {
   piImplementNode,
   initialAgentState,
   mergeAgentState,
-  encodeBase64,
   guestCodexAuthJson,
   guestCodexConfigToml,
   guestPiAuthJson,
@@ -37,6 +35,7 @@ export interface DaemonNodeRuntimeOptions {
   employeeId?: string;
   workspacePath?: string;
   pollIntervalMs?: number;
+  heartbeatIntervalMs?: number;
   fetchFn?: typeof fetch;
   token?: string;
   logDir?: string;
@@ -90,67 +89,89 @@ export async function runRelayDaemonNode(options: DaemonNodeRuntimeOptions = {})
     sandboxId,
     logDir: options.logDir,
   });
+  const heartbeatIntervalMs = options.heartbeatIntervalMs ?? positiveIntEnv("RELAY_DAEMON_NODE_HEARTBEAT_MS") ?? 30_000;
   logger.info("daemon node starting", { sandboxId, employeeId, workspacePath, daemonUrl });
-  const registration: DaemonNodeRegistration = {
-    sandboxId,
-    employeeId,
-    token,
-    workspacePath,
-    protocolVersion: DAEMON_NODE_PROTOCOL_VERSION,
-    supportedAgents: ["claude", "pi", "codex"],
-    status: "ready",
-  };
-  await postJson(fetchFn, `${daemonUrl}/daemon-nodes/register`, registration);
-  logger.info("daemon node registered", { sandboxId, employeeId, workspacePath, daemonUrl, logPath: logger.logPath });
-  console.log(`Relay daemon node registered sandbox ${sandboxId} at ${daemonUrl}`);
-  if (logger.logPath) console.log(`Relay daemon node log: ${logger.logPath}`);
-  if (tokenResolution.source === "generated" && tokenResolution.path) {
-    logger.info("daemon node generated token", { sandboxId, employeeId, path: tokenResolution.path });
-    console.log(`Relay daemon node generated token for ${employeeId}: ${tokenResolution.path}`);
-  }
   const activeRuns = new Map<string, AbortController>();
-
-  while (true) {
-    const response = await getJson(fetchFn, `${daemonUrl}/daemon-nodes/${encodeURIComponent(sandboxId)}/commands`, token);
-    if (!response.ok) {
-      const detail = `Command poll failed: ${response.status} ${await response.text()}`;
-      logger.error("command poll failed", { sandboxId, error: detail });
-      throw new Error(detail);
+  let announced = false;
+  const register = async (): Promise<void> => {
+    const registration: DaemonNodeRegistration = {
+      sandboxId,
+      employeeId,
+      token,
+      workspacePath,
+      protocolVersion: DAEMON_NODE_PROTOCOL_VERSION,
+      supportedAgents: ["claude", "pi", "codex"],
+      status: activeRuns.size > 0 ? "busy" : "ready",
+    };
+    await postJson(fetchFn, `${daemonUrl}/daemon-nodes/register`, registration);
+    if (announced) return;
+    announced = true;
+    logger.info("daemon node registered", { sandboxId, employeeId, workspacePath, daemonUrl, logPath: logger.logPath });
+    console.log(`Relay daemon node registered sandbox ${sandboxId} at ${daemonUrl}`);
+    if (logger.logPath) console.log(`Relay daemon node log: ${logger.logPath}`);
+    if (tokenResolution.source === "generated" && tokenResolution.path) {
+      logger.info("daemon node generated token", { sandboxId, employeeId, path: tokenResolution.path });
+      console.log(`Relay daemon node generated token for ${employeeId}: ${tokenResolution.path}`);
     }
-    const body = await response.json() as { commands?: DaemonNodeCommand[] };
-    for (const command of body.commands ?? []) {
-      if (command.type === "run.start") {
-        logger.info("command received", commandLogFields(sandboxId, command));
-        const controller = new AbortController();
-        activeRuns.set(command.id, controller);
-        void executeCommand(daemonUrl, sandboxId, token, command, fetchFn, logger, controller.signal).catch((error: unknown) => {
-          const message = error instanceof Error ? error.message : String(error);
-          const exitCode = error instanceof DaemonNodeAgentReadyError ? error.exitCode : undefined;
-          logger.error("command failed before completion", { ...commandLogFields(sandboxId, command), error: message, exitCode });
-          return postJson(fetchFn, `${daemonUrl}/daemon-nodes/${encodeURIComponent(sandboxId)}/events`, {
-            type: "run.failed",
-            commandId: command.id,
+  };
+
+  let lastRegisteredAt = 0;
+  let consecutiveFailures = 0;
+  while (true) {
+    try {
+      // Register before the first poll and re-register on a heartbeat so a
+      // restarted daemon learns this node is still alive and ready.
+      if (Date.now() - lastRegisteredAt >= heartbeatIntervalMs) {
+        await register();
+        lastRegisteredAt = Date.now();
+      }
+      const response = await getJson(fetchFn, `${daemonUrl}/daemon-nodes/${encodeURIComponent(sandboxId)}/commands`, token);
+      if (!response.ok) {
+        throw new Error(`Command poll failed: ${response.status} ${await response.text()}`);
+      }
+      const body = await response.json() as { commands?: DaemonNodeCommand[] };
+      for (const command of body.commands ?? []) {
+        if (command.type === "run.start") {
+          logger.info("command received", commandLogFields(sandboxId, command));
+          const controller = new AbortController();
+          activeRuns.set(command.id, controller);
+          void executeCommand(daemonUrl, sandboxId, token, command, fetchFn, logger, workspacePath, controller.signal).catch((error: unknown) => {
+            const message = error instanceof Error ? error.message : String(error);
+            logger.error("command failed before completion", { ...commandLogFields(sandboxId, command), error: message });
+            return postJson(fetchFn, `${daemonUrl}/daemon-nodes/${encodeURIComponent(sandboxId)}/events`, {
+              type: "run.failed",
+              commandId: command.id,
+              sessionId: command.sessionId,
+              runId: command.runId,
+              agent: command.agent,
+              mode: command.mode,
+              error: message,
+            } satisfies DaemonNodeEvent, token);
+          }).finally(() => {
+            activeRuns.delete(command.id);
+          });
+        } else if (command.type === "run.cancel") {
+          logger.info("cancel command received", {
+            sandboxId,
+            commandId: command.commandId,
             sessionId: command.sessionId,
             runId: command.runId,
             agent: command.agent,
             mode: command.mode,
-            error: message,
-            ...(exitCode !== undefined ? { exitCode } : {}),
-          } satisfies DaemonNodeEvent, token);
-        }).finally(() => {
-          activeRuns.delete(command.id);
-        });
-      } else if (command.type === "run.cancel") {
-        logger.info("cancel command received", {
-          sandboxId,
-          commandId: command.commandId,
-          sessionId: command.sessionId,
-          runId: command.runId,
-          agent: command.agent,
-          mode: command.mode,
-        });
-        activeRuns.get(command.commandId)?.abort(command.reason);
+          });
+          activeRuns.get(command.commandId)?.abort(command.reason);
+        }
       }
+      consecutiveFailures = 0;
+    } catch (error) {
+      // A daemon restart or a transient network failure must not kill the
+      // node; back off, then re-register and resume polling.
+      consecutiveFailures += 1;
+      lastRegisteredAt = 0;
+      const message = error instanceof Error ? error.message : String(error);
+      logger.warn("daemon poll failed; retrying", { sandboxId, error: message, attempt: consecutiveFailures });
+      await delay(Math.min(pollIntervalMs * 2 ** Math.min(consecutiveFailures, 5), MAX_POLL_BACKOFF_MS));
+      continue;
     }
     await delay(pollIntervalMs);
   }
@@ -163,12 +184,18 @@ async function executeCommand(
   command: DaemonNodeRunCommand,
   fetchFn: typeof fetch,
   logger: DaemonNodeLogger,
+  nodeWorkspacePath: string,
   signal?: AbortSignal,
 ): Promise<void> {
   const eventUrl = `${daemonUrl}/daemon-nodes/${encodeURIComponent(sandboxId)}/events`;
   const state = initialAgentState(command.taskGoal);
   logger.info("run starting", commandLogFields(sandboxId, command));
-  await ensureDaemonNodeAgentReady(command.agent, localProcessExecStream, signal);
+  if (command.workspacePath && command.workspacePath !== nodeWorkspacePath) {
+    throw new Error(
+      `Daemon node workspace mismatch: command expects ${command.workspacePath} but this node serves ${nodeWorkspacePath}.`,
+    );
+  }
+  ensureDaemonNodeAgentReady(command.agent);
   if (signal?.aborted) {
     await postRunCancelled(fetchFn, eventUrl, command, token, signal.reason);
     return;
@@ -229,9 +256,6 @@ async function executeCommand(
         : await codexImplementNode(state, options);
   const next = mergeAgentState(state, patch);
   await outputPostChain;
-  if (outputPostFailure) {
-    throw new Error(`Daemon node lost agent output: ${outputPostFailure.message}`);
-  }
   if (signal?.aborted) {
     logger.info("run cancelled", {
       ...commandLogFields(sandboxId, command),
@@ -239,6 +263,9 @@ async function executeCommand(
     });
     await postRunCancelled(fetchFn, eventUrl, command, token, signal.reason);
     return;
+  }
+  if (outputPostFailure) {
+    throw new Error(`Daemon node lost agent output: ${outputPostFailure.message}`);
   }
   logger.info("run completed", {
     ...commandLogFields(sandboxId, command),
@@ -252,7 +279,7 @@ async function executeCommand(
     sessionId: command.sessionId,
     runId: command.runId,
     agent: command.agent,
-    mode: command.mode as CodexTaskMode,
+    mode: command.mode,
     exitCode: next.last_exit_code,
     agentLog: next.agent_logs.slice(-1)[0] ?? "",
     codexVerdict: next.codex_verdict,
@@ -278,45 +305,29 @@ async function postRunCancelled(
   } satisfies DaemonNodeEvent, token);
 }
 
-class DaemonNodeAgentReadyError extends Error {
-  constructor(message: string, public readonly exitCode: number) {
-    super(message);
-    this.name = "DaemonNodeAgentReadyError";
-  }
-}
-
-async function ensureDaemonNodeAgentReady(agent: AgentName, execStream: AgentExecutor, signal?: AbortSignal): Promise<void> {
-  const script = ["set -eu"];
+function ensureDaemonNodeAgentReady(agent: AgentName): void {
+  // Auth material is written directly from this process; never pass it
+  // through a shell where it would be visible in the process table.
   const home = agentHomePath();
-  const codexHome = `${home}/.codex`;
-  const piHome = `${home}/.pi/agent`;
   if (agent === "codex") {
     const apiKey = openaiApiKey();
     if (!apiKey) throw new Error("OPENAI_API_KEY or CODEX_API_KEY is required for Codex daemon node runs.");
-    script.push(
-      `mkdir -p ${shellArg(codexHome)}`,
-      `printf %s ${shellArg(encodeBase64(guestCodexAuthJson(apiKey)))} | base64 -d > ${shellArg(`${codexHome}/auth.json`)}`,
-      `printf %s ${shellArg(encodeBase64(guestCodexConfigToml()))} | base64 -d > ${shellArg(`${codexHome}/config.toml`)}`,
-      `chmod 600 ${shellArg(`${codexHome}/auth.json`)}`,
-    );
+    const codexHome = join(home, ".codex");
+    mkdirSync(codexHome, { recursive: true });
+    writeSecretFile(join(codexHome, "auth.json"), guestCodexAuthJson(apiKey));
+    writeFileSync(join(codexHome, "config.toml"), guestCodexConfigToml());
   }
   if (agent === "pi") {
-    script.push(
-      `mkdir -p ${shellArg(piHome)}`,
-      `printf %s ${shellArg(encodeBase64(guestPiAuthJson()))} | base64 -d > ${shellArg(`${piHome}/auth.json`)}`,
-      `printf %s ${shellArg(encodeBase64(guestPiModelsJson()))} | base64 -d > ${shellArg(`${piHome}/models.json`)}`,
-      `chmod 600 ${shellArg(`${piHome}/auth.json`)}`,
-    );
+    const piHome = join(home, ".pi", "agent");
+    mkdirSync(piHome, { recursive: true });
+    writeSecretFile(join(piHome, "auth.json"), guestPiAuthJson());
+    writeFileSync(join(piHome, "models.json"), guestPiModelsJson());
   }
-  if (script.length === 1) return;
-  const result = await execStream("bash", ["-c", script.join("; ")], { signal });
-  if (signal?.aborted) return;
-  if (result.exit_code !== 0) {
-    throw new DaemonNodeAgentReadyError(
-      `Daemon node auth setup failed. ${(result.stderr || result.stdout).trim()}`,
-      result.exit_code,
-    );
-  }
+}
+
+function writeSecretFile(path: string, content: string): void {
+  writeFileSync(path, content, { mode: 0o600 });
+  chmodSync(path, 0o600);
 }
 
 export async function localProcessExecStream(
@@ -345,8 +356,12 @@ export async function localProcessExecStream(
     });
     const stdoutParts: string[] = [];
     const stderrParts: string[] = [];
+    let killTimer: NodeJS.Timeout | undefined;
     const abort = (): void => {
       child.kill("SIGTERM");
+      // Escalate in case the agent ignores SIGTERM.
+      killTimer = setTimeout(() => child.kill("SIGKILL"), SIGKILL_DELAY_MS);
+      killTimer.unref?.();
     };
     options.signal?.addEventListener("abort", abort, { once: true });
     if (options.signal?.aborted) abort();
@@ -363,6 +378,7 @@ export async function localProcessExecStream(
       if (rendered) options.sink?.(rendered);
     });
     child.on("close", (code) => {
+      if (killTimer) clearTimeout(killTimer);
       options.signal?.removeEventListener("abort", abort);
       resolve({
         exit_code: code ?? -1,
@@ -371,6 +387,7 @@ export async function localProcessExecStream(
       });
     });
     child.on("error", (error) => {
+      if (killTimer) clearTimeout(killTimer);
       options.signal?.removeEventListener("abort", abort);
       resolve({
         exit_code: -1,
@@ -386,9 +403,9 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function shellArg(value: string): string {
-  if (/^[A-Za-z0-9_@%+=:,./-]+$/.test(value)) return value;
-  return `'${value.replace(/'/g, `'\\''`)}'`;
+function positiveIntEnv(name: string): number | undefined {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined;
 }
 
 export function createDaemonNodeLogger(input: {
@@ -454,7 +471,16 @@ function safeLogFileName(value: string): string {
   return value.replace(/[^A-Za-z0-9._-]+/g, "_") || "daemon-node";
 }
 
-async function postJson(fetchFn: typeof fetch, url: string, body: unknown, token?: string): Promise<void> {
+const REQUEST_TIMEOUT_MS = 30_000;
+const MAX_POLL_BACKOFF_MS = 30_000;
+const SIGKILL_DELAY_MS = 5_000;
+
+function requestSignal(signal?: AbortSignal): AbortSignal {
+  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  return signal ? AbortSignal.any([signal, timeout]) : timeout;
+}
+
+async function postJson(fetchFn: typeof fetch, url: string, body: unknown, token?: string, signal?: AbortSignal): Promise<void> {
   const response = await fetchFn(url, {
     method: "POST",
     headers: {
@@ -462,6 +488,7 @@ async function postJson(fetchFn: typeof fetch, url: string, body: unknown, token
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify(body),
+    signal: requestSignal(signal),
   });
   if (!response.ok) throw new Error(`POST ${url} failed: ${response.status} ${await response.text()}`);
 }
@@ -479,7 +506,7 @@ async function postJsonWithRetry(
   for (let attempt = 0; attempt <= EVENT_POST_RETRY_DELAYS_MS.length; attempt += 1) {
     if (signal?.aborted) throw new Error("Aborted before event post.");
     try {
-      await postJson(fetchFn, url, body, token);
+      await postJson(fetchFn, url, body, token, signal);
       return;
     } catch (error) {
       lastError = error;
@@ -493,6 +520,7 @@ async function postJsonWithRetry(
 async function getJson(fetchFn: typeof fetch, url: string, token?: string): Promise<Response> {
   return fetchFn(url, {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    signal: requestSignal(),
   });
 }
 
