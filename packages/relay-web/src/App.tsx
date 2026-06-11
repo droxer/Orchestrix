@@ -338,7 +338,11 @@ export function App() {
     if (!nextEmployee) return;
     setSelectedEmployee(nextEmployee);
     setMobileView("chat");
-    const token = tokenInput.trim() || tokens[nextEmployee];
+    // The token field tracks the previously selected employee; only trust it
+    // when re-opening that same employee, otherwise use the saved token.
+    const token = nextEmployee === selectedEmployee
+      ? tokenInput.trim() || tokens[nextEmployee]
+      : tokens[nextEmployee];
     try {
       setStatus({ tone: "info", message: `Opening ${nextEmployee}'s Relay workspace.` });
       const sandbox = await provisionSandbox(nextEmployee, token);
@@ -748,6 +752,7 @@ export function App() {
                     key={message.id}
                     message={message}
                     employeeId={selectedEmployee}
+                    sessionId={activeSession.id}
                     grouped={isGroupedContinuation(messages, index)}
                   />
                 ))}
@@ -1158,10 +1163,12 @@ function EmployeeAvatar({ employeeId, running }: { employeeId: string; running: 
 function MessageBlock({
   message,
   employeeId,
+  sessionId,
   grouped = false,
 }: {
   message: DerivedMessage;
   employeeId: string;
+  sessionId: string;
   grouped?: boolean;
 }) {
   if (message.kind === "user") {
@@ -1200,7 +1207,7 @@ function MessageBlock({
                 <a
                   key={artifact.id}
                   className="attachment-card"
-                  href={`/sessions/artifacts/${encodeURIComponent(artifact.id)}`}
+                  href={`/sessions/${encodeURIComponent(sessionId)}/artifacts/${encodeURIComponent(artifact.id)}`}
                   target="_blank"
                   rel="noreferrer"
                 >

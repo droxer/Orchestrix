@@ -63,10 +63,14 @@ export class RelayDaemonClient {
   }
 
   async provisionSandbox(input: ProvisionSandboxInput): Promise<SandboxRecord> {
-    return this.request<SandboxRecord>("/sandboxes", {
+    const sandbox = await this.request<SandboxRecord>("/sandboxes", {
       method: "POST",
       body: input,
     });
+    // A fresh provision returns the plaintext sandbox token exactly once; the
+    // daemon keeps only the hash. Adopt it so follow-up requests authenticate.
+    if (sandbox.token) this.token = sandbox.token;
+    return sandbox;
   }
 
   async getSandbox(sandboxId: string): Promise<SandboxRecord> {

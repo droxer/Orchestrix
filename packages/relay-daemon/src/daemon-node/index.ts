@@ -91,16 +91,19 @@ export async function runRelayDaemonNode(options: DaemonNodeRuntimeOptions = {})
     logDir: options.logDir,
   });
   logger.info("daemon node starting", { sandboxId, employeeId, workspacePath, daemonUrl });
-  const registration: DaemonNodeRegistration = {
+  const activeRuns = new Map<string, AbortController>();
+  const buildRegistration = (): DaemonNodeRegistration => ({
     sandboxId,
     employeeId,
     token,
     workspacePath,
     protocolVersion: DAEMON_NODE_PROTOCOL_VERSION,
     supportedAgents: ["claude", "pi", "codex"],
-    status: "ready",
-  };
-  await postJson(fetchFn, `${daemonUrl}/daemon-nodes/register`, registration);
+    status: activeRuns.size > 0 ? "busy" : "ready",
+  });
+  const register = (): Promise<void> =>
+    postJson(fetchFn, `${daemonUrl}/daemon-nodes/register`, buildRegistration());
+  await withDaemonReconnect(register, logger, { sandboxId, what: "registration" });
   logger.info("daemon node registered", { sandboxId, employeeId, workspacePath, daemonUrl, logPath: logger.logPath });
   console.log(`Relay daemon node registered sandbox ${sandboxId} at ${daemonUrl}`);
   if (logger.logPath) console.log(`Relay daemon node log: ${logger.logPath}`);
@@ -108,16 +111,21 @@ export async function runRelayDaemonNode(options: DaemonNodeRuntimeOptions = {})
     logger.info("daemon node generated token", { sandboxId, employeeId, path: tokenResolution.path });
     console.log(`Relay daemon node generated token for ${employeeId}: ${tokenResolution.path}`);
   }
-  const activeRuns = new Map<string, AbortController>();
 
   while (true) {
-    const response = await getJson(fetchFn, `${daemonUrl}/daemon-nodes/${encodeURIComponent(sandboxId)}/commands`, token);
-    if (!response.ok) {
-      const detail = `Command poll failed: ${response.status} ${await response.text()}`;
-      logger.error("command poll failed", { sandboxId, error: detail });
-      throw new Error(detail);
-    }
-    const body = await response.json() as { commands?: DaemonNodeCommand[] };
+    const body = await withDaemonReconnect(async () => {
+      const response = await getJson(fetchFn, `${daemonUrl}/daemon-nodes/${encodeURIComponent(sandboxId)}/commands`, token);
+      if (!response.ok) {
+        // The daemon may have restarted with fresh state or demoted this node;
+        // re-register before treating the rejection as fatal.
+        const detail = `Command poll failed: ${response.status} ${await response.text()}`;
+        logger.warn("command poll rejected; re-registering", { sandboxId, error: detail });
+        await register();
+        logger.info("daemon node re-registered", { sandboxId });
+        return { commands: [] };
+      }
+      return await response.json() as { commands?: DaemonNodeCommand[] };
+    }, logger, { sandboxId, what: "command poll" });
     for (const command of body.commands ?? []) {
       if (command.type === "run.start") {
         logger.info("command received", commandLogFields(sandboxId, command));
@@ -454,6 +462,43 @@ function safeLogFileName(value: string): string {
   return value.replace(/[^A-Za-z0-9._-]+/g, "_") || "daemon-node";
 }
 
+export class DaemonNodeHttpError extends Error {
+  constructor(message: string, public readonly status: number) {
+    super(message);
+    this.name = "DaemonNodeHttpError";
+  }
+}
+
+// Retries `action` while the daemon is unreachable (network errors) or
+// answering with 5xx, with capped exponential backoff. Client errors (4xx,
+// e.g. a rejected token) are fatal and propagate immediately.
+const DAEMON_RECONNECT_MAX_DELAY_MS = 10_000;
+
+async function withDaemonReconnect<T>(
+  action: () => Promise<T>,
+  logger: DaemonNodeLogger,
+  context: { sandboxId: string; what: string },
+): Promise<T> {
+  let attempt = 0;
+  while (true) {
+    try {
+      return await action();
+    } catch (error) {
+      if (error instanceof DaemonNodeHttpError && error.status < 500) throw error;
+      attempt += 1;
+      const message = error instanceof Error ? error.message : String(error);
+      const backoff = Math.min(1000 * 2 ** Math.min(attempt - 1, 4), DAEMON_RECONNECT_MAX_DELAY_MS);
+      logger.warn(`${context.what} failed; retrying`, {
+        sandboxId: context.sandboxId,
+        error: message,
+        attempt,
+        backoffMs: backoff,
+      });
+      await delay(backoff);
+    }
+  }
+}
+
 async function postJson(fetchFn: typeof fetch, url: string, body: unknown, token?: string): Promise<void> {
   const response = await fetchFn(url, {
     method: "POST",
@@ -463,7 +508,9 @@ async function postJson(fetchFn: typeof fetch, url: string, body: unknown, token
     },
     body: JSON.stringify(body),
   });
-  if (!response.ok) throw new Error(`POST ${url} failed: ${response.status} ${await response.text()}`);
+  if (!response.ok) {
+    throw new DaemonNodeHttpError(`POST ${url} failed: ${response.status} ${await response.text()}`, response.status);
+  }
 }
 
 const EVENT_POST_RETRY_DELAYS_MS = [200, 400, 800, 1600, 3200] as const;

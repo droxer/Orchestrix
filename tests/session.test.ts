@@ -1292,4 +1292,120 @@ describe("Relay daemon API", () => {
     assert.equal(session.finalOutcome, "Codex rejected the work.");
     assert.equal(registry.get("sbx_review")?.status, "ready");
   });
+
+  it("adopts the one-time provision token for follow-up daemon client requests", async () => {
+    const headersSeen: Array<string | null> = [];
+    const client = new RelayDaemonClient({
+      baseUrl: "http://relay-daemon.test",
+      fetchFn: (async (input, init) => {
+        headersSeen.push(new Headers(init?.headers).get("authorization"));
+        if (String(input).endsWith("/sandboxes")) {
+          return new Response(JSON.stringify({
+            id: "sbx_adopt",
+            employeeId: "adopt",
+            status: "stopped",
+            agents: { claude: "unknown", pi: "unknown", codex: "unknown" },
+            token: "tok_issued_once",
+            createdAt: "2026-06-07T00:00:00.000Z",
+            updatedAt: "2026-06-07T00:00:00.000Z",
+          }), { status: 201, headers: { "Content-Type": "application/json" } });
+        }
+        return new Response(JSON.stringify({
+          id: "sbx_adopt",
+          employeeId: "adopt",
+          status: "ready",
+          agents: { claude: "ready", pi: "ready", codex: "ready" },
+          createdAt: "2026-06-07T00:00:00.000Z",
+          updatedAt: "2026-06-07T00:00:01.000Z",
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }) as typeof fetch,
+    });
+
+    await client.provisionSandbox({ employeeId: "adopt" });
+    await client.getSandbox("sbx_adopt");
+
+    assert.equal(headersSeen[0], null);
+    assert.equal(headersSeen[1], "Bearer tok_issued_once");
+  });
+
+  it("rejects daemon node re-registration with a mismatched token", async () => {
+    const store = new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-register-mismatch-")));
+    const registry = new DaemonNodeRegistry(store);
+    const backend = new ReverseDaemonNodeBackend(registry);
+    registry.register({
+      sandboxId: "sbx_mismatch",
+      employeeId: "mismatch",
+      token: "tok_original",
+      protocolVersion: 1,
+      supportedAgents: ["claude"],
+      status: "ready",
+    });
+
+    const rejected = await handleRelayDaemonRequest(backend, "POST", "/daemon-nodes/register", {
+      sandboxId: "sbx_mismatch",
+      employeeId: "mismatch",
+      token: "tok_hijack",
+      protocolVersion: 1,
+      supportedAgents: ["claude"],
+    }, registry);
+    const accepted = await handleRelayDaemonRequest(backend, "POST", "/daemon-nodes/register", {
+      sandboxId: "sbx_mismatch",
+      employeeId: "mismatch",
+      token: "tok_original",
+      protocolVersion: 1,
+      supportedAgents: ["claude"],
+    }, registry);
+
+    assert.equal(rejected.status, 401);
+    assert.equal(accepted.status, 200);
+    // The hijack attempt must not replace the original token.
+    assert.deepEqual(registry.takeCommands("sbx_mismatch", "tok_original"), []);
+    assert.throws(() => registry.takeCommands("sbx_mismatch", "tok_hijack"), /Unauthorized/);
+  });
+
+  it("revives a persisted daemon node when it polls after a daemon restart", async () => {
+    const root = mkdtempSync(join(tmpdir(), "relay-daemon-revive-"));
+    const first = new DaemonNodeRegistry(new LocalSessionStore(root));
+    first.register({
+      sandboxId: "sbx_revive",
+      employeeId: "revive",
+      token: "tok_revive",
+      protocolVersion: 1,
+      supportedAgents: ["claude"],
+      status: "ready",
+    });
+
+    const restarted = new DaemonNodeRegistry(new LocalSessionStore(root));
+    assert.equal(restarted.get("sbx_revive")?.status, "stopped");
+
+    // The still-running daemon node keeps polling for commands; an authorized
+    // poll proves it is alive and must make the sandbox schedulable again.
+    restarted.takeCommands("sbx_revive", "tok_revive");
+
+    assert.equal(restarted.get("sbx_revive")?.status, "ready");
+    assert.equal(restarted.get("sbx_revive")?.lastError, undefined);
+  });
+
+  it("re-provisions onto the live daemon node instead of an offline placeholder", async () => {
+    const store = new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-placeholder-converge-")));
+    const registry = new DaemonNodeRegistry(store);
+    const backend = new ReverseDaemonNodeBackend(registry);
+
+    const placeholder = await backend.provision({ employeeId: "late", workspacePath: "/workspace/late", token: "tok_late" });
+    assert.notEqual(placeholder.status, "ready");
+
+    registry.register({
+      sandboxId: "sbx_late_node",
+      employeeId: "late",
+      token: "tok_late",
+      workspacePath: "/workspace/late",
+      protocolVersion: 1,
+      supportedAgents: ["claude", "pi", "codex"],
+      status: "ready",
+    });
+
+    const reprovisioned = await backend.provision({ employeeId: "late", workspacePath: "/workspace/late", token: "tok_late" });
+    assert.equal(reprovisioned.id, "sbx_late_node");
+    assert.equal(reprovisioned.status, "ready");
+  });
 });

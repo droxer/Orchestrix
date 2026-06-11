@@ -4,7 +4,8 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const currentFile = fileURLToPath(import.meta.url);
-export const REPO_ROOT = resolve(dirname(currentFile), "../../..", "..");
+// packages/relay-core/dist/env.js -> packages/relay-core/dist -> relay-core -> packages -> repo root
+export const REPO_ROOT = resolve(dirname(currentFile), "../../..");
 export const DEVBOX_IMAGE = "relay-devbox:v1";
 export const OCI_LAYOUT_DIR = resolve(REPO_ROOT, ".oci/relay-devbox-v1");
 export const DOCKERFILE = resolve(REPO_ROOT, "dockerfile");
