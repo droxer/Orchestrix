@@ -1562,29 +1562,6 @@ button:disabled {
   flex-wrap: wrap;
 }
 
-.mode-switch {
-  display: inline-flex;
-  padding: 3px;
-  border-radius: var(--radius-sm);
-  background: var(--color-surface-strong);
-}
-
-.mode-switch button {
-  min-height: 36px;
-  padding: 0 var(--space-sm);
-  border-radius: 6px;
-  color: var(--color-body);
-  font-size: var(--text-base);
-  font-weight: 600;
-  background: transparent;
-  transition: background 140ms ease, color 140ms ease;
-}
-
-.mode-switch button.active {
-  background: var(--color-ink);
-  color: var(--color-on-dark);
-}
-
 .agent-picker-wrap { position: relative; }
 
 .agent-picker-trigger,

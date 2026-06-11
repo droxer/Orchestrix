@@ -42,7 +42,6 @@ import { AgentStream } from "./components/AgentStream";
 
 const quickUsers = ["alice", "bob", "carol"];
 const agents: AgentName[] = ["claude", "pi", "codex"];
-const modes: CodexTaskMode[] = ["implement", "review"];
 const tokenStorageKey = "relay-web.tokens";
 const selectedEmployeeKey = "relay-web.selectedEmployee";
 
@@ -51,6 +50,10 @@ const agentDescriptors: Record<AgentName, { role: string; blurb: string }> = {
   pi:     { role: "Planner",  blurb: "Explores trade-offs and shapes the next reliable step." },
   codex:  { role: "Reviewer", blurb: "Reads diffs, checks behavior, and calls out risks." },
 };
+
+function defaultModeForAgent(agent: AgentName): CodexTaskMode {
+  return agent === "codex" ? "review" : "implement";
+}
 
 type TokenMap = Record<string, string>;
 type MobileView = "threads" | "chat";
@@ -128,11 +131,6 @@ export function App() {
   const [hydrated, setHydrated] = useState(false);
   const [tokenInput, setTokenInput] = useState("");
   const [activeAgent, setActiveAgent] = useState<AgentName>("claude");
-  const [modeByAgent, setModeByAgent] = useState<Record<AgentName, CodexTaskMode>>({
-    claude: "implement",
-    pi: "implement",
-    codex: "review",
-  });
   const [composerText, setComposerText] = useState("");
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionQuery, setMentionQuery] = useState("");
@@ -146,7 +144,6 @@ export function App() {
   const [agentPickerOpen, setAgentPickerOpen] = useState(false);
   const [handoffOpen, setHandoffOpen] = useState(false);
   const [handoffAgent, setHandoffAgent] = useState<AgentName>("codex");
-  const [handoffMode, setHandoffMode] = useState<CodexTaskMode>("review");
   const [handoffNote, setHandoffNote] = useState("");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
@@ -392,7 +389,7 @@ export function App() {
         {
           sandboxId: selectedSandbox.id,
           taskGoal: goal,
-          assignments: [{ agent: routedAgent, mode: modeByAgent[routedAgent] }],
+          assignments: [{ agent: routedAgent, mode: defaultModeForAgent(routedAgent) }],
         },
         selectedToken,
       );
@@ -480,7 +477,7 @@ export function App() {
   async function sendHandoff() {
     if (!activeSession) return;
     try {
-      const session = await recordHandoff(activeSession.id, handoffAgent, handoffMode, handoffNote.trim() || undefined);
+      const session = await recordHandoff(activeSession.id, handoffAgent, defaultModeForAgent(handoffAgent), handoffNote.trim() || undefined);
       setSelectedSessionId(session.id);
       setHandoffNote("");
       setHandoffOpen(false);
@@ -782,9 +779,6 @@ export function App() {
                       <select id="handoff-agent" name="handoff-agent" value={handoffAgent} onChange={(event) => setHandoffAgent(event.target.value as AgentName)}>
                         {agents.map((agent) => <option key={agent} value={agent}>{agent}</option>)}
                       </select>
-                      <select id="handoff-mode" name="handoff-mode" aria-label="Handoff mode" value={handoffMode} onChange={(event) => setHandoffMode(event.target.value as CodexTaskMode)}>
-                        {modes.map((mode) => <option key={mode} value={mode}>{mode}</option>)}
-                      </select>
                     </div>
                     <input
                       aria-label="Handoff note"
@@ -822,19 +816,6 @@ export function App() {
           }}
         >
           <div className="composer-toolbar">
-            <div className="mode-switch" aria-label="Mode">
-              {modes.map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  aria-pressed={modeByAgent[activeAgent] === mode}
-                  className={modeByAgent[activeAgent] === mode ? "active" : ""}
-                  onClick={() => setModeByAgent((current) => ({ ...current, [activeAgent]: mode }))}
-                >
-                  {mode}
-                </button>
-              ))}
-            </div>
             <div className="agent-picker-wrap">
               <button
                 type="button"
