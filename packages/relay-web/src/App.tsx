@@ -46,10 +46,10 @@ const modes: CodexTaskMode[] = ["implement", "review"];
 const tokenStorageKey = "relay-web.tokens";
 const selectedEmployeeKey = "relay-web.selectedEmployee";
 
-const agentDescriptors: Record<AgentName, { tone: string; role: string; blurb: string }> = {
-  claude: { tone: "claude", role: "Builder",  blurb: "Turns requests into implementation work with methodical context." },
-  pi:     { tone: "pi",     role: "Planner",  blurb: "Explores trade-offs and shapes the next reliable step." },
-  codex:  { tone: "codex",  role: "Reviewer", blurb: "Reads diffs, checks behavior, and calls out risks." },
+const agentDescriptors: Record<AgentName, { role: string; blurb: string }> = {
+  claude: { role: "Builder",  blurb: "Turns requests into implementation work with methodical context." },
+  pi:     { role: "Planner",  blurb: "Explores trade-offs and shapes the next reliable step." },
+  codex:  { role: "Reviewer", blurb: "Reads diffs, checks behavior, and calls out risks." },
 };
 
 type TokenMap = Record<string, string>;
@@ -577,9 +577,8 @@ export function App() {
       <aside className="thread-panel" aria-label="Employee conversations">
         <div className="conversation-header">
           <div className="conversation-heading">
-            <p className="eyebrow">Conversations</p>
             <h1>
-              Employees
+              Conversations
               <small className="mono conversation-heading-count">{filteredEmployees.length.toString().padStart(2, "0")}</small>
             </h1>
           </div>
@@ -698,7 +697,7 @@ export function App() {
                 ) : null}
               </p>
               <h2>
-                {activeSession ? activeSession.taskGoal : agentDescriptors[activeAgent].blurb}
+                {activeSession ? activeSession.taskGoal : "New conversation"}
               </h2>
             </div>
           </div>
@@ -717,15 +716,6 @@ export function App() {
               ))}
             </div>
             {activeSession ? <StatusPill value={activeSession.status} /> : null}
-            <button
-              className="icon-button"
-              type="button"
-              aria-label="Refresh"
-              title="Refresh"
-              onClick={() => void refresh()}
-            >
-              <RefreshCw size={16} className={isRefreshing ? "spin" : ""} />
-            </button>
             <button
               className={`icon-button ${settingsOpen ? "active" : ""}`}
               type="button"
@@ -807,7 +797,7 @@ export function App() {
                 ) : null}
               </>
             ) : (
-              <div className="transcript-empty" data-agent={activeAgent}>
+              <div className="transcript-empty">
                 <MessageCircle size={28} />
                 <p className="eyebrow">New workspace session</p>
                 <h2>
@@ -862,7 +852,7 @@ export function App() {
                       className={agent === activeAgent ? "active" : ""}
                       onClick={() => pickAgent(agent)}
                     >
-                      <span className={`agent-avatar tone-${agentDescriptors[agent].tone}`} aria-hidden="true">
+                      <span className="agent-avatar" aria-hidden="true">
                         <Bot size={13} />
                       </span>
                       <span translate="no">{agent}</span>
@@ -902,7 +892,7 @@ export function App() {
                       insertMention(agent);
                     }}
                   >
-                    <span className={`agent-avatar tone-${agentDescriptors[agent].tone}`} aria-hidden="true">
+                    <span className="agent-avatar" aria-hidden="true">
                       <Bot size={13} />
                     </span>
                     <span translate="no">@{agent}</span>
@@ -1190,7 +1180,7 @@ function MessageBlock({
   if (message.kind === "agent") {
     return (
       <article className={`msg msg-agent ${message.streaming ? "streaming" : ""} ${grouped ? "grouped" : ""}`}>
-        <span className={`agent-avatar tone-${agentDescriptors[message.agent].tone}`} aria-hidden="true">
+        <span className="agent-avatar" aria-hidden="true">
           <Bot size={15} />
         </span>
         <div className="bubble">
