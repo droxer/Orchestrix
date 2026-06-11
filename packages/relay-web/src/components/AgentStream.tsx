@@ -72,9 +72,9 @@ function SegmentView({ segment }: { segment: AgentSegment }) {
   return <pre className="agent-raw">{segment.text}</pre>;
 }
 
-function StatusIcon({ tone }: { tone: "ok" | "error" | "warn" | "info" }) {
-  if (tone === "ok") return <Check size={13} aria-hidden="true" />;
-  if (tone === "error") return <CircleAlert size={13} aria-hidden="true" />;
+function StatusIcon({ tone }: { tone: "good" | "bad" | "warn" | "info" }) {
+  if (tone === "good") return <Check size={13} aria-hidden="true" />;
+  if (tone === "bad") return <CircleAlert size={13} aria-hidden="true" />;
   if (tone === "warn") return <TriangleAlert size={13} aria-hidden="true" />;
   return <Info size={13} aria-hidden="true" />;
 }
