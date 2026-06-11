@@ -7,13 +7,14 @@
   "workspaces": [
     "packages/relay-core",
     "packages/relay-daemon",
-    "packages/relay-daemon-node",
-    "packages/relay-tui"
+    "packages/relay-tui",
+    "packages/relay-web"
   ],
   "scripts": {
-    "build": "npm run build -w relay-core && npm run build -w relay-daemon && npm run build -w relay-daemon-node && npm run build -w relay-tui && tsc -p tsconfig.json",
+    "build": "npm run build -w relay-core && npm run build -w relay-daemon && npm run build -w relay-tui && npm run build -w relay-web && tsc -p tsconfig.json",
     "test": "npm run build && node --test dist/tests/*.test.js",
-    "run": "npm run build && node packages/relay-tui/dist/cli.js"
+    "run": "npm run build && node packages/relay-tui/dist/cli.js",
+    "web": "npm run dev -w relay-web"
   },
   "dependencies": {},
   "devDependencies": {

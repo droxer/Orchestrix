@@ -39,7 +39,7 @@ daemon: build
 
 daemon-node: build
 	@echo "Starting daemon node on host for protocol/debug use. In production this process runs inside the employee sandbox."
-	RELAY_DAEMON_URL="$(RELAY_DAEMON_URL)" RELAY_EMPLOYEE_ID="$(EMPLOYEE_ID)" RELAY_DAEMON_NODE_TOKEN="$(DAEMON_NODE_TOKEN)" RELAY_WORKSPACE="$(WORKSPACE)" node packages/relay-daemon-node/dist/cli.js --sandbox-id $(SANDBOX_ID)
+	RELAY_DAEMON_URL="$(RELAY_DAEMON_URL)" RELAY_EMPLOYEE_ID="$(EMPLOYEE_ID)" RELAY_DAEMON_NODE_TOKEN="$(DAEMON_NODE_TOKEN)" RELAY_WORKSPACE="$(WORKSPACE)" node packages/relay-daemon/dist/daemon-node-cli.js --sandbox-id $(SANDBOX_ID)
 
 run-with-daemon: build
 	@set -e; \
@@ -47,7 +47,7 @@ run-with-daemon: build
 	if [ -z "$$token" ]; then token="tok_$$(node -e 'console.log(require("node:crypto").randomBytes(24).toString("base64url"))')"; fi; \
 	node packages/relay-daemon/dist/daemon-cli.js --port $(DAEMON_PORT) & \
 	daemon_pid=$$!; \
-	RELAY_DAEMON_URL="$(RELAY_DAEMON_URL)" RELAY_EMPLOYEE_ID="$(EMPLOYEE_ID)" RELAY_DAEMON_NODE_TOKEN="$$token" RELAY_WORKSPACE="$(WORKSPACE)" node packages/relay-daemon-node/dist/cli.js --sandbox-id $(SANDBOX_ID) & \
+	RELAY_DAEMON_URL="$(RELAY_DAEMON_URL)" RELAY_EMPLOYEE_ID="$(EMPLOYEE_ID)" RELAY_DAEMON_NODE_TOKEN="$$token" RELAY_WORKSPACE="$(WORKSPACE)" node packages/relay-daemon/dist/daemon-node-cli.js --sandbox-id $(SANDBOX_ID) & \
 	daemon_node_pid=$$!; \
 	trap 'kill $$daemon_pid $$daemon_node_pid 2>/dev/null || true' EXIT INT TERM; \
 	sleep 1; \
@@ -56,14 +56,15 @@ run-with-daemon: build
 serve: build
 	node packages/relay-daemon/dist/cli.js serve --port $(PORT)
 
-web: serve
+web:
+	RELAY_DAEMON_URL="$(RELAY_DAEMON_URL)" npm run dev -w relay-web
 
 run-fresh: devbox-oci
 	RELAY_WORKSPACE="$(WORKSPACE)" npm run run
 
 stop:
 	-pkill -f "node packages/relay-daemon/dist/daemon-cli.js" 2>/dev/null
-	-pkill -f "node packages/relay-daemon-node/dist/cli.js" 2>/dev/null
+	-pkill -f "node packages/relay-daemon/dist/daemon-node-cli.js" 2>/dev/null
 	-pkill -f "node packages/relay-tui/dist/cli.js$$" 2>/dev/null
 	-pkill -f "npm run run" 2>/dev/null
 	-pkill -f "boxlite-shim" 2>/dev/null

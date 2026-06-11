@@ -57,6 +57,8 @@ export {
 } from "./state.js";
 
 export {
+  DAEMON_NODE_PROTOCOL_VERSION,
+  DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS,
   type DaemonNodeCommand,
   type DaemonNodeEvent,
   type DaemonNodeRegistration,

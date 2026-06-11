@@ -244,7 +244,10 @@ export function createDaemonAssignmentRunner(
         reason: "Cancelled by human.",
       }).catch((error: unknown) => {
         const message = error instanceof Error ? error.message : String(error);
-        request.log(`\nERR  ${message}\n`);
+        // Make the cancel failure loud — the daemon may still be running the
+        // agent. Reset cancelPosted so a subsequent /cancel retries.
+        cancelPosted = false;
+        request.log(`\nERR daemon cancel failed: ${message}. Press /cancel again to retry.\n`);
       });
     };
     request.signal?.addEventListener("abort", requestDaemonCancel, { once: true });
@@ -297,24 +300,36 @@ async function pollDaemonRunOutput(
     },
   );
 
+  const MAX_CONSECUTIVE_POLL_FAILURES = 5;
+  let consecutivePollFailures = 0;
   while (!settled) {
     await delay(DAEMON_POLL_INTERVAL_MS, options.signal);
     if (settled) break;
     if (options.signal?.aborted) break;
     try {
       const session = await client.getSession(sessionId, options.signal);
+      consecutivePollFailures = 0;
       replayDaemonAgentOutput(session.events, options.deliveredEventIds, options.log, options.renderers);
       options.onSessionUpdate?.(session);
     } catch (error) {
       if (options.signal?.aborted) break;
       const message = error instanceof Error ? error.message : String(error);
-      if (!message.includes("Not found")) throw error;
+      if (message.includes("Not found")) continue;
+      consecutivePollFailures += 1;
+      options.log(`\nWARN poll failed (${consecutivePollFailures}/${MAX_CONSECUTIVE_POLL_FAILURES}): ${message}\n`);
+      if (consecutivePollFailures >= MAX_CONSECUTIVE_POLL_FAILURES) throw error;
     }
   }
 
   await trackedRun;
   if (failure) throw failure;
-  return finalSession ?? client.getSession(sessionId, options.signal);
+  if (finalSession) return finalSession;
+  try {
+    return await client.getSession(sessionId, options.signal);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Daemon run settled but final session fetch failed: ${message}`);
+  }
 }
 
 function delay(ms: number, signal?: AbortSignal): Promise<void> {
@@ -335,10 +350,38 @@ export function replayDaemonAgentOutput(
   renderers = new Map<string, { feed(chunk: string): string }>(),
 ): void {
   for (const event of events) {
-    if (event.type !== "agent.output" || deliveredEventIds.has(event.id)) continue;
-    deliveredEventIds.add(event.id);
-    const rendered = rendererForDaemonOutput(event, renderers).feed(daemonRendererInput(event.text));
-    if (rendered) log(rendered);
+    if (deliveredEventIds.has(event.id)) continue;
+    if (event.type === "agent.output") {
+      deliveredEventIds.add(event.id);
+      const rendered = rendererForDaemonOutput(event, renderers).feed(daemonRendererInput(event.text));
+      if (rendered) log(rendered);
+      continue;
+    }
+    if (event.type === "agent.started") {
+      deliveredEventIds.add(event.id);
+      log(`\n[${event.agent}] started\n`);
+      continue;
+    }
+    if (event.type === "agent.completed") {
+      deliveredEventIds.add(event.id);
+      log(`\n[${event.agent}] ${event.status} (exit ${event.exitCode})\n`);
+      continue;
+    }
+    if (event.type === "artifact.created") {
+      deliveredEventIds.add(event.id);
+      log(`\n[artifact] ${event.artifact.kind}: ${event.artifact.title}\n`);
+      continue;
+    }
+    if (event.type === "review.verdict") {
+      deliveredEventIds.add(event.id);
+      log(`\n[review] ${event.verdict}\n`);
+      continue;
+    }
+    if (event.type === "session.failed") {
+      deliveredEventIds.add(event.id);
+      log(`\n[session.failed] ${event.outcome}\n`);
+      continue;
+    }
   }
 }
 
@@ -416,6 +459,22 @@ export interface RelayTuiProps {
   bootLogLines?: string[];
   sessionStore?: SessionStore;
   localSessionControl?: boolean;
+  remoteSessionControl?: RemoteSessionControl;
+}
+
+export interface RemoteSessionControl {
+  recordDecision(input: {
+    sessionId: string;
+    kind: "approve" | "reject" | "cancel" | "rerun" | "mark_done";
+    note?: string;
+    targetAgent?: AgentName;
+  }): Promise<RelaySession>;
+  recordHandoff(input: {
+    sessionId: string;
+    targetAgent: AgentName;
+    note?: string;
+    mode?: "implement" | "review";
+  }): Promise<RelaySession>;
 }
 
 function splitToLines(text: string): string[] {
@@ -638,6 +697,7 @@ export function RelayTui({
   bootLogLines = [],
   sessionStore = new LocalSessionStore(),
   localSessionControl = true,
+  remoteSessionControl,
 }: RelayTuiProps): React.ReactElement {
   const { exit } = useApp();
   const [input, setInput] = useState("");
@@ -880,8 +940,35 @@ export function RelayTui({
       setMessage("Summary appended.");
       return;
     }
+    const runRemoteDecision = (
+      kind: "approve" | "reject" | "cancel" | "rerun" | "mark_done",
+      note?: string,
+      targetAgent?: AgentName,
+    ): void => {
+      if (!remoteSessionControl || !current) return;
+      void remoteSessionControl
+        .recordDecision({ sessionId: current.id, kind, note, targetAgent })
+        .then((updated) => {
+          setActiveSession(updated);
+        })
+        .catch((error: unknown) => {
+          const detail = error instanceof Error ? error.message : String(error);
+          setMessage(`Failed to record ${kind} on daemon: ${detail}`);
+          appendLog(`\nERR daemon ${kind} failed: ${detail}\n`);
+        });
+    };
+
     if (name === "/approve") {
-      setMessage("Approval is not required; prompts run immediately.");
+      if (!current) {
+        setMessage("No active session.");
+        return;
+      }
+      if (localSessionControl) {
+        setMessage("Approval is not required; prompts run immediately.");
+        return;
+      }
+      runRemoteDecision("approve", detail || undefined);
+      setMessage("Approval sent to daemon.");
       return;
     }
     if (name === "/reject") {
@@ -891,14 +978,20 @@ export function RelayTui({
       }
       if (localSessionControl) {
         setActiveSession(controllerRef.current.recordDecision(current.id, "reject", detail || "Rejected by human."));
+      } else {
+        runRemoteDecision("reject", detail || "Rejected by human.");
       }
       setMessage("Feedback recorded.");
       return;
     }
     if (name === "/cancel") {
       abortRef.current?.abort();
-      if (current && localSessionControl) {
-        setActiveSession(controllerRef.current.recordDecision(current.id, "cancel", "Cancelled by human."));
+      if (current) {
+        if (localSessionControl) {
+          setActiveSession(controllerRef.current.recordDecision(current.id, "cancel", "Cancelled by human."));
+        } else {
+          runRemoteDecision("cancel", "Cancelled by human.");
+        }
       }
       setMessage("Cancellation requested.");
       return;
@@ -911,6 +1004,8 @@ export function RelayTui({
       }
       if (localSessionControl) {
         setActiveSession(controllerRef.current.recordDecision(current.id, "rerun", "Rerun requested.", agent));
+      } else {
+        runRemoteDecision("rerun", "Rerun requested.", agent);
       }
       executeParsedTask({ assignments: [{ agent }], task: current.taskGoal }, current.id);
       return;
@@ -928,6 +1023,20 @@ export function RelayTui({
       const task = note ? `${current.taskGoal}\n\nHandoff note:\n${note}` : current.taskGoal;
       if (localSessionControl) {
         setActiveSession(controllerRef.current.recordDecision(current.id, "handoff", note || `Handoff to ${agent}.`, agent));
+      } else if (remoteSessionControl) {
+        void remoteSessionControl
+          .recordHandoff({
+            sessionId: current.id,
+            targetAgent: agent,
+            note: note || `Handoff to ${agent}.`,
+            mode: agent === "codex" ? "review" : "implement",
+          })
+          .then((updated) => setActiveSession(updated))
+          .catch((error: unknown) => {
+            const detail = error instanceof Error ? error.message : String(error);
+            setMessage(`Failed to record handoff on daemon: ${detail}`);
+            appendLog(`\nERR daemon handoff failed: ${detail}\n`);
+          });
       }
       setCurrentAgent(formatAssignmentLabel(assignment));
       setDefaultAssignments([defaultAssignment]);
@@ -1359,6 +1468,7 @@ export async function runInteractiveTui(): Promise<void> {
 export function RelayTuiHost({ onExit }: { onExit: () => void }): React.ReactElement {
   const [sandbox, setSandbox] = useState<SandboxRecord | undefined>();
   const [runner, setRunner] = useState<AssignmentRunner | undefined>();
+  const [remoteSessionControl, setRemoteSessionControl] = useState<RemoteSessionControl | undefined>();
   const [bootError, setBootError] = useState("");
   const [bootLogLines, setBootLogLines] = useState<string[]>([]);
   const mountedRef = useRef(true);
@@ -1385,6 +1495,10 @@ export function RelayTuiHost({ onExit }: { onExit: () => void }): React.ReactEle
       if (cancelled || !mountedRef.current) return;
       setSandbox(current);
       setRunner(() => createDaemonAssignmentRunner(client, current.id));
+      setRemoteSessionControl({
+        recordDecision: (input) => client.recordDecision(input),
+        recordHandoff: (input) => client.recordHandoff(input),
+      });
       appendBootLog(`\nOK  Host daemon ready. Sandbox ${current.id} assigned to ${current.employeeId}.\n`);
     };
     void waitForReadySandbox().catch((error: unknown) => {
@@ -1409,6 +1523,7 @@ export function RelayTuiHost({ onExit }: { onExit: () => void }): React.ReactEle
       disabledMessage={disabledMessage}
       bootLogLines={bootLogLines}
       localSessionControl={false}
+      remoteSessionControl={remoteSessionControl}
       onExit={() => {
         onExit();
       }}

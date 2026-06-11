@@ -6,6 +6,37 @@ const THINK_MARK = "○";
 const TOOL_MARK = "⏺";
 const CONTINUATION_INDENT = "  ";
 
+// Strip ANSI escape sequences and disallowed control chars from untrusted
+// agent output (e.g. when a streaming JSONL line fails to parse and falls
+// back to plain text). We keep \t (0x09) and \n (0x0a).
+export function sanitizeUntrustedText(value: string): string {
+  let result = "";
+  let i = 0;
+  while (i < value.length) {
+    const code = value.charCodeAt(i);
+    if (code === 0x1b) {
+      i += 1;
+      const next = value.charCodeAt(i);
+      if (next === 0x5b || next === 0x5d) {
+        i += 1;
+        while (i < value.length) {
+          const c = value.charCodeAt(i);
+          if ((c >= 0x40 && c <= 0x7e) || c === 0x07) { i += 1; break; }
+          i += 1;
+        }
+      } else if (Number.isFinite(next)) {
+        i += 1;
+      }
+      continue;
+    }
+    if (code === 0x09 || code === 0x0a || (code >= 0x20 && code !== 0x7f)) {
+      result += value[i];
+    }
+    i += 1;
+  }
+  return result;
+}
+
 export class BlockStreamRenderer {
   private atLineStart = true;
   private blockStarted = false;
@@ -107,7 +138,7 @@ export class ClaudeStreamRenderer {
 
   private formatLine(line: string): string {
     const event = parseJsonObject(line);
-    if (!event) return this.text.feed(`${line}\n`);
+    if (!event) return this.text.feed(`${sanitizeUntrustedText(line)}\n`);
 
     if (event.type === "stream_event") {
       const streamEvent = asRecord(event.event);
@@ -175,7 +206,7 @@ export class CodexStreamRenderer {
 
   private formatLine(line: string): string {
     const event = parseJsonObject(line);
-    if (!event) return this.text.feed(`${line}\n`);
+    if (!event) return this.text.feed(`${sanitizeUntrustedText(line)}\n`);
 
     if (event.type === "turn.started") return `\n${status("info", "Codex started.")}\n`;
     if (event.type === "turn.completed") return `\n${status("ok", "Codex finished.")}\n`;

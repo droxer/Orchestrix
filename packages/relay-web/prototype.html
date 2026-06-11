@@ -1,0 +1,1011 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Relay — Roster (prototype)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,300..900,30..100,0..1&family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400..600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --paper:        #f1ebdc;
+    --paper-deep:   #ebe3cf;
+    --paper-soft:   #f6f1e3;
+    --ink:          #14110d;
+    --ink-soft:     #3b342a;
+    --ink-mute:     #6a6253;
+    --ink-faint:    #95897a;
+    --rule:         #d6cdb5;
+    --rule-soft:    #e3dbc4;
+    --oxblood:      #6b1f1d;
+    --oxblood-deep: #4a1614;
+    --gold:         #b8821a;
+
+    --claude:       #2d4a3a;   /* forest */
+    --pi:           #b8552e;   /* terracotta */
+    --codex:        #1f3556;   /* indigo */
+
+    --serif:  "Fraunces", "Instrument Serif", Georgia, serif;
+    --sans:   "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+    --mono:   "JetBrains Mono", ui-monospace, monospace;
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--sans);
+    font-size:15px;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+    /* paper grain */
+    background-image:
+      radial-gradient(1200px 600px at 8% -10%, rgba(184,130,26,.08), transparent 60%),
+      radial-gradient(900px 500px at 110% 110%, rgba(107,31,29,.06), transparent 60%),
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.08  0 0 0 0 0.07  0 0 0 0 0.05  0 0 0 .35 0'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='.18'/></svg>");
+  }
+
+  ::selection{ background:var(--ink); color:var(--paper);}
+
+  /* ----------------------- shell ----------------------- */
+
+  .shell{
+    display:grid;
+    grid-template-columns: 280px 360px minmax(0,1fr);
+    height:100vh;
+    overflow:hidden;
+  }
+
+  /* ----------------------- people rail ----------------------- */
+
+  .people{
+    border-right:1px solid var(--rule);
+    padding:28px 22px 22px;
+    display:grid;
+    grid-template-rows:auto auto auto 1fr auto;
+    gap:22px;
+    min-height:0;
+    background:linear-gradient(180deg, var(--paper) 0%, var(--paper-soft) 100%);
+  }
+
+  .mast{
+    display:flex; align-items:baseline; gap:10px;
+  }
+  .mast .mark{
+    font-family:var(--serif);
+    font-weight:500;
+    font-size:42px;
+    line-height:.85;
+    letter-spacing:-0.03em;
+    color:var(--ink);
+    font-variation-settings:"opsz" 144, "SOFT" 50, "WONK" 1;
+  }
+  .mast .mark em{
+    font-style:italic;
+    color:var(--oxblood);
+    font-variation-settings:"opsz" 144, "SOFT" 100, "WONK" 1;
+  }
+  .mast .vol{
+    font-family:var(--mono);
+    font-size:10px;
+    letter-spacing:.18em;
+    text-transform:uppercase;
+    color:var(--ink-mute);
+    border-left:1px solid var(--rule);
+    padding-left:10px;
+  }
+
+  .colophon{
+    font-family:var(--serif);
+    font-style:italic;
+    font-size:13px;
+    color:var(--ink-mute);
+    line-height:1.45;
+    border-top:1px solid var(--rule);
+    border-bottom:1px solid var(--rule);
+    padding:10px 0;
+  }
+  .colophon b{ color:var(--ink); font-style:normal; font-weight:600; font-family:var(--sans);}
+
+  .kicker{
+    font-family:var(--mono);
+    font-size:10px;
+    letter-spacing:.22em;
+    text-transform:uppercase;
+    color:var(--ink-mute);
+    display:flex; align-items:center; gap:10px;
+  }
+  .kicker::after{
+    content:""; flex:1; height:1px; background:var(--rule);
+  }
+
+  .roster{
+    min-height:0; overflow:auto;
+    display:flex; flex-direction:column; gap:2px;
+    padding-right:4px;
+  }
+
+  .person{
+    display:grid;
+    grid-template-columns:auto 1fr auto;
+    gap:14px;
+    align-items:center;
+    padding:12px 10px;
+    text-align:left;
+    color:inherit;
+    background:transparent;
+    border:0;
+    border-radius:0;
+    border-bottom:1px solid var(--rule-soft);
+    cursor:pointer;
+    transition:background .2s ease;
+    font:inherit;
+  }
+  .person:hover{ background:rgba(20,17,13,.04); }
+  .person.on{
+    background:rgba(20,17,13,.06);
+  }
+
+  .portrait{
+    width:38px; height:48px;
+    border-radius:2px;
+    display:grid; place-items:center;
+    color:var(--paper);
+    font-family:var(--serif);
+    font-style:italic;
+    font-size:20px;
+    font-weight:500;
+    letter-spacing:-0.02em;
+    box-shadow: 1px 1px 0 rgba(20,17,13,.18);
+    position:relative;
+    transform:rotate(-1.5deg);
+    background:var(--ink);
+  }
+  .person:nth-child(3n) .portrait{ transform:rotate(1.2deg); background:var(--oxblood);}
+  .person:nth-child(3n+1) .portrait{ background:var(--ink-soft);}
+  .portrait::after{
+    content:"";
+    position:absolute; inset:3px;
+    border:1px solid rgba(241,235,220,.25);
+    border-radius:1px;
+  }
+  .portrait .live{
+    position:absolute;
+    right:-3px; top:-3px;
+    width:9px; height:9px;
+    border-radius:50%;
+    background:#d1a32c;
+    box-shadow:0 0 0 2px var(--paper);
+  }
+
+  .person .name{
+    display:block;
+    font-family:var(--serif);
+    font-weight:500;
+    font-size:18px;
+    letter-spacing:-0.01em;
+    color:var(--ink);
+    font-variation-settings:"opsz" 24, "SOFT" 30;
+  }
+  .person .meta{
+    display:block;
+    font-size:12px;
+    color:var(--ink-mute);
+    line-height:1.3;
+    margin-top:2px;
+    overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
+    max-width:180px;
+  }
+  .person .meta em{ font-style:italic; color:var(--pi);}
+
+  .person .num{
+    font-family:var(--mono);
+    font-size:10px;
+    color:var(--ink-mute);
+    align-self:start;
+    margin-top:2px;
+  }
+
+  .settings-btn{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 12px;
+    border:1px solid var(--rule);
+    background:transparent;
+    font:inherit;
+    color:var(--ink);
+    cursor:pointer;
+    text-align:left;
+  }
+  .settings-btn .label{
+    font-family:var(--mono);
+    font-size:10px;
+    letter-spacing:.22em;
+    text-transform:uppercase;
+    color:var(--ink-mute);
+  }
+  .settings-btn:hover{ background:rgba(20,17,13,.04);}
+
+  /* ----------------------- thread rail (the personality roster) ----------------------- */
+
+  .agents{
+    border-right:1px solid var(--rule);
+    padding:32px 26px 22px;
+    min-height:0;
+    overflow-y:auto;
+    background:
+      linear-gradient(180deg, var(--paper) 0%, var(--paper) 60%, var(--paper-deep) 100%);
+  }
+
+  .agents-head{
+    display:grid; gap:6px;
+    margin-bottom:24px;
+  }
+  .agents-head .eyebrow{
+    font-family:var(--mono);
+    font-size:10px;
+    letter-spacing:.24em;
+    text-transform:uppercase;
+    color:var(--ink-mute);
+  }
+  .agents-head h1{
+    font-family:var(--serif);
+    font-weight:400;
+    font-style:italic;
+    font-size:46px;
+    line-height:.95;
+    margin:0;
+    letter-spacing:-0.03em;
+    color:var(--ink);
+    font-variation-settings:"opsz" 96, "SOFT" 80, "WONK" 1;
+  }
+  .agents-head h1 b{
+    font-style:normal;
+    font-weight:500;
+    color:var(--oxblood);
+    font-variation-settings:"opsz" 96, "SOFT" 30, "WONK" 0;
+  }
+  .agents-head .sub{
+    font-family:var(--serif);
+    font-style:italic;
+    font-size:14px;
+    color:var(--ink-mute);
+    margin-top:6px;
+  }
+
+  .agent-card{
+    display:grid;
+    grid-template-columns:64px 1fr;
+    gap:18px;
+    padding:18px 4px 22px;
+    border-top:1px solid var(--rule);
+    cursor:pointer;
+    position:relative;
+    transition:transform .25s ease;
+  }
+  .agent-card:last-child{ border-bottom:1px solid var(--rule); }
+  .agent-card:hover{ transform:translateX(2px); }
+
+  /* asymmetry: offset every other card */
+  .agent-card.offset{ padding-left:22px; }
+  .agent-card.offset .ord{ transform:rotate(-4deg);}
+
+  .ord{
+    width:64px; height:84px;
+    border-radius:2px;
+    display:flex; flex-direction:column; align-items:center; justify-content:space-between;
+    padding:8px 0 10px;
+    color:var(--paper);
+    box-shadow: 2px 2px 0 rgba(20,17,13,.22);
+    transform:rotate(2deg);
+    transition:transform .25s ease;
+    position:relative;
+  }
+  .agent-card:hover .ord{ transform:rotate(0);}
+  .agent-card.claude .ord{ background:var(--claude);}
+  .agent-card.pi     .ord{ background:var(--pi);}
+  .agent-card.codex  .ord{ background:var(--codex);}
+
+  .ord .roman{
+    font-family:var(--serif);
+    font-style:italic;
+    font-size:13px;
+    letter-spacing:.18em;
+    opacity:.7;
+  }
+  .ord .glyph{
+    font-family:var(--serif);
+    font-weight:500;
+    font-size:42px;
+    line-height:1;
+    letter-spacing:-0.04em;
+    font-variation-settings:"opsz" 144, "SOFT" 100, "WONK" 1;
+  }
+  .ord .tag{
+    font-family:var(--mono);
+    font-size:9px;
+    letter-spacing:.18em;
+    text-transform:uppercase;
+    opacity:.85;
+  }
+
+  .agent-body .who{
+    display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;
+  }
+  .agent-body .who h3{
+    margin:0;
+    font-family:var(--serif);
+    font-weight:500;
+    font-style:italic;
+    font-size:28px;
+    line-height:1;
+    letter-spacing:-0.02em;
+    color:var(--ink);
+    font-variation-settings:"opsz" 48, "SOFT" 60, "WONK" 1;
+  }
+  .agent-body .who .role{
+    font-family:var(--mono);
+    font-size:10px;
+    letter-spacing:.2em;
+    text-transform:uppercase;
+    color:var(--ink-mute);
+  }
+  .agent-body .pull{
+    font-family:var(--serif);
+    font-size:15px;
+    line-height:1.45;
+    color:var(--ink-soft);
+    margin:8px 0 0;
+    max-width:38ch;
+  }
+  .agent-body .pull::first-letter{
+    font-family:var(--serif);
+    font-style:italic;
+    font-size:1.5em;
+    line-height:1;
+    margin-right:2px;
+    color:var(--oxblood);
+  }
+  .agent-body .last{
+    display:flex; align-items:center; gap:10px;
+    margin-top:12px;
+    font-family:var(--mono);
+    font-size:10px;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+  }
+  .agent-body .last .dot{
+    width:6px; height:6px; border-radius:50%; background:var(--ink-faint);
+  }
+  .agent-card.live .agent-body .last .dot{
+    background:#d1a32c;
+    box-shadow:0 0 0 3px rgba(209,163,44,.18);
+    animation:pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse{ 50%{ box-shadow:0 0 0 6px rgba(209,163,44,0);} }
+
+  /* ----------------------- chat panel ----------------------- */
+
+  .chat{
+    display:grid;
+    grid-template-rows:auto 1fr auto;
+    min-height:0;
+    position:relative;
+  }
+  .chat::before{
+    /* deckled paper edge on the left */
+    content:"";
+    position:absolute; left:0; top:0; bottom:0; width:6px;
+    background:
+      linear-gradient(90deg, rgba(20,17,13,.07), transparent);
+    pointer-events:none;
+  }
+
+  .chat-head{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:22px 36px 18px;
+    border-bottom:1px solid var(--rule);
+    background:transparent;
+  }
+  .chat-head .id{
+    display:grid; gap:2px;
+  }
+  .chat-head .crumbs{
+    font-family:var(--mono);
+    font-size:10px;
+    letter-spacing:.22em;
+    text-transform:uppercase;
+    color:var(--ink-mute);
+    display:flex; gap:8px; align-items:center;
+  }
+  .chat-head .crumbs em{ color:var(--ink); font-style:normal;}
+  .chat-head .crumbs .at{ color:var(--oxblood); font-family:var(--serif); font-style:italic; font-size:13px; letter-spacing:0; text-transform:none;}
+  .chat-head .title{
+    font-family:var(--serif);
+    font-weight:500;
+    font-style:italic;
+    font-size:22px;
+    letter-spacing:-0.01em;
+    margin:0;
+    font-variation-settings:"opsz" 48, "SOFT" 60;
+  }
+  .chat-head .tools{
+    display:flex; gap:8px; align-items:center;
+  }
+  .pill{
+    display:inline-flex; align-items:center; gap:6px;
+    padding:5px 10px;
+    border:1px solid var(--rule);
+    font-family:var(--mono);
+    font-size:10px;
+    letter-spacing:.18em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    background:var(--paper-soft);
+  }
+  .pill::before{
+    content:""; width:6px; height:6px; border-radius:50%; background:var(--ink-faint);
+  }
+  .pill.live{ color:var(--oxblood);}
+  .pill.live::before{ background:#c8331f;}
+  .icon-btn{
+    width:34px; height:34px;
+    border:1px solid var(--rule);
+    background:transparent;
+    cursor:pointer;
+    display:grid; place-items:center;
+    color:var(--ink-soft);
+  }
+  .icon-btn:hover{ background:rgba(20,17,13,.05);}
+
+  .transcript{
+    overflow-y:auto;
+    padding:36px 36px 24px;
+    min-height:0;
+    position:relative;
+  }
+  /* vellum fade at top */
+  .transcript::before{
+    content:""; position:sticky; top:0; display:block; height:24px;
+    background:linear-gradient(180deg, var(--paper), transparent);
+    margin:-36px -36px 0;
+    z-index:2;
+  }
+
+  .empty{
+    max-width:680px;
+    margin:24px auto 0;
+    display:grid;
+    grid-template-columns: 200px 1fr;
+    gap:36px;
+    align-items:start;
+  }
+  .empty .plate{
+    position:relative;
+    aspect-ratio: 4/5;
+    background:var(--ink);
+    border-radius:2px;
+    box-shadow: 4px 4px 0 var(--oxblood);
+    overflow:hidden;
+    display:grid; place-items:center;
+    color:var(--paper);
+  }
+  .empty .plate::after{
+    content:""; position:absolute; inset:8px;
+    border:1px solid rgba(241,235,220,.25);
+  }
+  .empty .plate .glyph{
+    font-family:var(--serif);
+    font-style:italic;
+    font-weight:500;
+    font-size:130px;
+    line-height:.85;
+    letter-spacing:-0.05em;
+    color:var(--paper);
+    font-variation-settings:"opsz" 144, "SOFT" 100, "WONK" 1;
+    text-shadow: 2px 2px 0 var(--oxblood);
+  }
+  .empty .plate .stamp{
+    position:absolute;
+    bottom:14px; left:14px; right:14px;
+    display:flex; justify-content:space-between;
+    font-family:var(--mono);
+    font-size:9px;
+    letter-spacing:.18em;
+    text-transform:uppercase;
+    color:rgba(241,235,220,.6);
+  }
+  .empty .copy .eyebrow{
+    font-family:var(--mono);
+    font-size:10px;
+    letter-spacing:.24em;
+    text-transform:uppercase;
+    color:var(--ink-mute);
+  }
+  .empty .copy h2{
+    margin:8px 0 14px;
+    font-family:var(--serif);
+    font-weight:400;
+    font-size:48px;
+    line-height:.95;
+    letter-spacing:-0.025em;
+    color:var(--ink);
+    font-variation-settings:"opsz" 96, "SOFT" 80, "WONK" 1;
+  }
+  .empty .copy h2 em{
+    font-style:italic;
+    color:var(--oxblood);
+  }
+  .empty .copy p{
+    margin:0 0 18px;
+    font-family:var(--serif);
+    font-size:16px;
+    line-height:1.5;
+    color:var(--ink-soft);
+    max-width:42ch;
+  }
+  .empty .copy p:first-of-type::first-letter{
+    font-family:var(--serif);
+    font-style:italic;
+    font-weight:500;
+    font-size:3.2em;
+    line-height:.8;
+    float:left;
+    margin:8px 8px 0 0;
+    color:var(--oxblood);
+    font-variation-settings:"opsz" 144, "SOFT" 100, "WONK" 1;
+  }
+  .empty .copy .prompts{
+    display:flex; flex-wrap:wrap; gap:8px; margin-top:12px;
+  }
+  .empty .copy .prompts button{
+    border:1px solid var(--ink);
+    background:transparent;
+    padding:7px 12px;
+    font:inherit;
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  .empty .copy .prompts button:hover{ background:var(--ink); color:var(--paper);}
+
+  /* messages */
+
+  .stack{
+    display:flex; flex-direction:column; gap:26px;
+    max-width:780px;
+    margin:0 auto;
+  }
+
+  .msg{ display:grid; gap:6px; }
+  .msg .byline{
+    display:flex; align-items:baseline; gap:10px;
+    font-family:var(--mono);
+    font-size:10px;
+    letter-spacing:.18em;
+    text-transform:uppercase;
+    color:var(--ink-mute);
+  }
+  .msg .byline .who{
+    font-family:var(--serif);
+    font-style:italic;
+    font-weight:500;
+    font-size:18px;
+    letter-spacing:-0.01em;
+    text-transform:none;
+    font-variation-settings:"opsz" 24, "SOFT" 60, "WONK" 1;
+  }
+  .msg.claude .byline .who{ color:var(--claude);}
+  .msg.pi     .byline .who{ color:var(--pi);}
+  .msg.codex  .byline .who{ color:var(--codex);}
+  .msg.you    .byline .who{ color:var(--ink);}
+  .msg .byline .time{ margin-left:auto; color:var(--ink-faint);}
+
+  .msg .body{
+    font-family:var(--serif);
+    font-size:17px;
+    line-height:1.55;
+    color:var(--ink);
+    padding-left:14px;
+    border-left:2px solid var(--rule);
+  }
+  .msg.claude .body{ border-left-color:var(--claude);}
+  .msg.pi     .body{ border-left-color:var(--pi);}
+  .msg.codex  .body{ border-left-color:var(--codex);}
+  .msg.you    .body{
+    border-left:0;
+    background:var(--ink);
+    color:var(--paper);
+    padding:14px 18px;
+    font-family:var(--sans);
+    font-size:15px;
+    line-height:1.5;
+    align-self:flex-end;
+    max-width:60ch;
+    border-radius:2px;
+    box-shadow: 2px 2px 0 var(--rule);
+  }
+  .msg.you{ align-items:flex-end;}
+  .msg.you .byline{ justify-content:flex-end;}
+
+  .msg .body code, .msg .body pre{
+    font-family:var(--mono);
+    font-size:13px;
+    background:rgba(20,17,13,.06);
+    padding:1px 5px;
+  }
+
+  .marginalia{
+    display:flex; align-items:center; gap:10px;
+    color:var(--ink-mute);
+    font-family:var(--serif);
+    font-style:italic;
+    font-size:13px;
+  }
+  .marginalia::before, .marginalia::after{
+    content:""; flex:1; height:1px; background:var(--rule);
+  }
+  .marginalia b{ font-family:var(--mono); font-style:normal; font-size:10px; letter-spacing:.18em; text-transform:uppercase; color:var(--ink-soft); font-weight:600;}
+
+  /* composer */
+
+  .composer{
+    border-top:1px solid var(--rule);
+    padding:18px 36px 24px;
+    background:linear-gradient(180deg, transparent 0%, var(--paper-soft) 100%);
+  }
+  .composer .meta{
+    display:flex; align-items:center; gap:10px;
+    margin-bottom:10px;
+    flex-wrap:wrap;
+  }
+  .composer .meta .seg{
+    display:inline-flex; border:1px solid var(--ink);
+  }
+  .composer .meta .seg button{
+    border:0; background:transparent; cursor:pointer;
+    padding:6px 12px;
+    font-family:var(--mono);
+    font-size:10px;
+    letter-spacing:.18em;
+    text-transform:uppercase;
+    color:var(--ink);
+  }
+  .composer .meta .seg button.on{ background:var(--ink); color:var(--paper);}
+  .composer .meta .to{
+    font-family:var(--serif);
+    font-style:italic;
+    font-size:14px;
+    color:var(--ink-mute);
+  }
+  .composer .meta .to b{ color:var(--oxblood); font-style:normal; font-weight:500;}
+
+  .composer .field{
+    display:grid;
+    grid-template-columns: 1fr auto;
+    border:1px solid var(--ink);
+    background:var(--paper-soft);
+    align-items:end;
+  }
+  .composer textarea{
+    border:0; outline:0; background:transparent;
+    resize:none;
+    min-height:80px;
+    padding:14px 16px;
+    font-family:var(--serif);
+    font-size:16px;
+    line-height:1.5;
+    color:var(--ink);
+  }
+  .composer textarea::placeholder{
+    color:var(--ink-faint);
+    font-style:italic;
+  }
+  .composer .send{
+    background:var(--oxblood);
+    color:var(--paper);
+    border:0;
+    padding:0 22px;
+    align-self:stretch;
+    cursor:pointer;
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:.22em;
+    text-transform:uppercase;
+    transition:background .15s ease;
+  }
+  .composer .send:hover{ background:var(--oxblood-deep);}
+  .composer .hint{
+    margin-top:8px;
+    font-family:var(--mono);
+    font-size:10px;
+    letter-spacing:.18em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+    display:flex; gap:14px;
+  }
+  .composer .hint kbd{
+    font-family:var(--mono);
+    font-size:10px;
+    padding:1px 5px;
+    border:1px solid var(--rule);
+    border-bottom-width:2px;
+    color:var(--ink-soft);
+  }
+</style>
+</head>
+<body>
+
+<main class="shell">
+
+  <!-- ============ PEOPLE RAIL ============ -->
+  <aside class="people">
+    <div class="mast">
+      <span class="mark">Re<em>lay</em></span>
+      <span class="vol">Vol.&nbsp;III &middot; №&nbsp;42</span>
+    </div>
+
+    <p class="colophon">
+      A correspondence with three&nbsp;<b>agents in residence</b> &mdash;
+      <i>set in workspaces, on call by appointment.</i>
+    </p>
+
+    <div class="kicker">The desk</div>
+
+    <div class="roster">
+
+      <button class="person on">
+        <span class="portrait">
+          A
+          <span class="live"></span>
+        </span>
+        <span>
+          <span class="name">alice</span>
+          <span class="meta"><em>codex</em> is reviewing the diff</span>
+        </span>
+        <span class="num">14</span>
+      </button>
+
+      <button class="person">
+        <span class="portrait">B</span>
+        <span>
+          <span class="name">bob</span>
+          <span class="meta">Refactor the daemon protocol</span>
+        </span>
+        <span class="num">07</span>
+      </button>
+
+      <button class="person">
+        <span class="portrait">C</span>
+        <span>
+          <span class="name">carol</span>
+          <span class="meta">Open their agent workspace</span>
+        </span>
+        <span class="num">02</span>
+      </button>
+
+      <button class="person">
+        <span class="portrait">DH</span>
+        <span>
+          <span class="name">droxer.he</span>
+          <span class="meta">Polish TUI chrome &amp; AI response</span>
+        </span>
+        <span class="num">31</span>
+      </button>
+
+      <button class="person">
+        <span class="portrait">M</span>
+        <span>
+          <span class="name">mira</span>
+          <span class="meta">Sandbox unprovisioned</span>
+        </span>
+        <span class="num">&mdash;</span>
+      </button>
+
+    </div>
+
+    <button class="settings-btn">
+      <span>Workspace settings</span>
+      <span class="label">⌘ ,</span>
+    </button>
+  </aside>
+
+  <!-- ============ AGENTS RAIL ============ -->
+  <aside class="agents">
+    <div class="agents-head">
+      <div class="eyebrow">Direct message &middot; @alice</div>
+      <h1>The <b>roster</b><br/><i>in residence</i></h1>
+      <p class="sub">Three correspondents, one workspace. Choose your interlocutor.</p>
+    </div>
+
+    <div class="agent-card claude">
+      <div class="ord">
+        <span class="roman">I.</span>
+        <span class="glyph">C</span>
+        <span class="tag">Builder</span>
+      </div>
+      <div class="agent-body">
+        <div class="who">
+          <h3>claude</h3>
+          <span class="role">The Builder</span>
+        </div>
+        <p class="pull">Turns requests into implementation work &mdash; patient, methodical, fond of footnotes.</p>
+        <div class="last"><span class="dot"></span> Idle &middot; last seen 14:02</div>
+      </div>
+    </div>
+
+    <div class="agent-card pi live offset">
+      <div class="ord">
+        <span class="roman">II.</span>
+        <span class="glyph">π</span>
+        <span class="tag">Planner</span>
+      </div>
+      <div class="agent-body">
+        <div class="who">
+          <h3>pi</h3>
+          <span class="role">The Planner</span>
+        </div>
+        <p class="pull">Explores the room before committing. Narrates trade-offs in the margins.</p>
+        <div class="last"><span class="dot"></span> Currently drafting &mdash; <em>est. 40s remaining</em></div>
+      </div>
+    </div>
+
+    <div class="agent-card codex">
+      <div class="ord">
+        <span class="roman">III.</span>
+        <span class="glyph">𝓏</span>
+        <span class="tag">Reviewer</span>
+      </div>
+      <div class="agent-body">
+        <div class="who">
+          <h3>codex</h3>
+          <span class="role">The Reviewer</span>
+        </div>
+        <p class="pull">Reads diffs the way an editor reads galleys. Spares no comma.</p>
+        <div class="last"><span class="dot"></span> Awaiting handoff</div>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- ============ CHAT PANEL ============ -->
+  <section class="chat">
+    <header class="chat-head">
+      <div class="id">
+        <div class="crumbs">
+          <span class="at">@alice</span>
+          <span>&middot;</span>
+          <em>pi</em>
+          <span>&middot;</span>
+          <span>session&nbsp;a3f9c</span>
+        </div>
+        <h2 class="title">Refactor the daemon protocol</h2>
+      </div>
+      <div class="tools">
+        <span class="pill live">live</span>
+        <button class="icon-btn" aria-label="Refresh">↻</button>
+        <button class="icon-btn" aria-label="Settings">⋯</button>
+      </div>
+    </header>
+
+    <div class="transcript">
+      <div class="stack">
+
+        <!-- Empty-state portrait (shown as a hero card before any message) -->
+        <article class="empty">
+          <div class="plate">
+            <span class="glyph">π</span>
+            <span class="stamp">
+              <span>Vol. III</span>
+              <span>№ 42</span>
+            </span>
+          </div>
+          <div class="copy">
+            <div class="eyebrow">A new correspondence</div>
+            <h2>Write to <em>pi</em>,<br/>@alice&rsquo;s planner.</h2>
+            <p>
+              Pi tends to think aloud before it commits &mdash; expect a paragraph
+              of trade-offs before the diff arrives. Keep prompts short; it will
+              ask if it needs more.
+            </p>
+            <div class="prompts">
+              <button>Draft the plan</button>
+              <button>Compare two approaches</button>
+              <button>Estimate the work</button>
+            </div>
+          </div>
+        </article>
+
+        <!-- Conversation excerpt -->
+
+        <div class="marginalia"><b>Session opened &middot; 14:02:11</b></div>
+
+        <article class="msg you">
+          <div class="byline">
+            <span class="who">you</span>
+            <span class="time">14:02</span>
+          </div>
+          <div class="body">
+            Take the daemon protocol from <code>daemon-node-protocol.ts</code> and
+            propose two refactor paths &mdash; one conservative, one with a clean break.
+          </div>
+        </article>
+
+        <article class="msg pi">
+          <div class="byline">
+            <span class="who">pi</span>
+            <span style="font-family:var(--mono); letter-spacing:.18em; text-transform:uppercase; color:var(--ink-mute);">planner &middot; implement</span>
+            <span class="time">14:02</span>
+          </div>
+          <div class="body">
+            Two roads, then. The conservative path keeps the message envelope and
+            only renames the discriminants &mdash; safe, but the legacy
+            <code>RunBegan</code> shape stays. The cleaner break replaces the union
+            with a tagged event log; richer to reason about, but every daemon
+            client has to migrate in lockstep.
+          </div>
+        </article>
+
+        <article class="msg claude">
+          <div class="byline">
+            <span class="who">claude</span>
+            <span style="font-family:var(--mono); letter-spacing:.18em; text-transform:uppercase; color:var(--ink-mute);">builder &middot; on standby</span>
+            <span class="time">14:03</span>
+          </div>
+          <div class="body">
+            I can draft the migration shims for the conservative path in about
+            ninety seconds &mdash; say the word and I&rsquo;ll begin with
+            <code>daemon-client.ts</code>.
+          </div>
+        </article>
+
+        <div class="marginalia"><b>Handoff requested &middot; pi → codex</b></div>
+
+        <article class="msg codex">
+          <div class="byline">
+            <span class="who">codex</span>
+            <span style="font-family:var(--mono); letter-spacing:.18em; text-transform:uppercase; color:var(--ink-mute);">reviewer &middot; review</span>
+            <span class="time">14:04</span>
+          </div>
+          <div class="body">
+            Before any code moves &mdash; the tagged-event proposal needs a
+            versioning strategy or this will turn into a rolling outage. I&rsquo;d
+            ask pi to sketch the schema header first.
+          </div>
+        </article>
+
+      </div>
+    </div>
+
+    <footer class="composer">
+      <div class="meta">
+        <div class="seg" role="tablist">
+          <button class="on">implement</button>
+          <button>review</button>
+        </div>
+        <span class="to">
+          to <b>@alice&rsquo;s pi</b> &mdash; she&rsquo;ll see the reply in her workspace
+        </span>
+      </div>
+      <div class="field">
+        <textarea placeholder="Write to pi&hellip; (it prefers a question over a directive)"></textarea>
+        <button class="send">Send ↵</button>
+      </div>
+      <div class="hint">
+        <span><kbd>⌘</kbd>&nbsp;<kbd>↵</kbd> &nbsp;send</span>
+        <span><kbd>@</kbd> &nbsp;route to another agent</span>
+        <span><kbd>/</kbd> &nbsp;commands</span>
+      </div>
+    </footer>
+  </section>
+
+</main>
+
+</body>
+</html>

@@ -21,8 +21,8 @@ import {
   initialAgentState,
   readDaemonNodeToken,
   relayEvent,
+  createDaemonNodeLogger,
 } from "../packages/relay-daemon/src/index.js";
-import { createDaemonNodeLogger } from "../packages/relay-daemon-node/src/index.js";
 
 function codexReviewStdout(message: string): string {
   return JSON.stringify({
@@ -483,8 +483,10 @@ describe("Relay daemon API", () => {
 
     assert.equal(root.ui, true);
     assert.equal(root.uiPath, "/control");
+    assert.equal(root.webUiPath, "/web");
     assert.equal(root.endpoints.includes("GET /control"), true);
     assert.equal(root.endpoints.includes("GET /control/version"), true);
+    assert.equal(root.endpoints.includes("GET /web"), true);
     assert.equal(root.endpoints.includes("GET /daemon-nodes"), true);
     assert.equal(panel.status, 200);
     assert.equal(panel.contentType, "text/html; charset=utf-8");
@@ -494,6 +496,18 @@ describe("Relay daemon API", () => {
     assert.match(panel.body, /window\.location\.reload/);
     assert.equal(typeof version.version, "string");
     assert.notEqual(version.version, "");
+  });
+
+  it("serves the exported Next.js web UI under /web", async () => {
+    const store = new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-web-ui-")));
+    const registry = new DaemonNodeRegistry(store);
+    const backend = new ReverseDaemonNodeBackend(registry);
+
+    const web = await handleRelayDaemonRequest(backend, "GET", "/web", undefined, registry);
+
+    assert.equal(web.status, 200);
+    assert.equal(web.contentType, "text/html; charset=utf-8");
+    assert.match(web.body, /Relay Web UI|__next/);
   });
 
   it("provisions employee sandboxes and runs assignments through a sandbox backend", async () => {

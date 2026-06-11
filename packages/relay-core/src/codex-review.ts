@@ -14,18 +14,19 @@ export function extractCodexFeedback(stdout: string): string {
   return messages.length > 0 ? messages.join("\n\n") : stdout.trim().slice(-4000);
 }
 
+const VERDICT_LINE = /^\s*RELAY_REVIEW_VERDICT:\s*(APPROVED|REJECTED)\s*[.!]?\s*$/i;
+
 export function classifyCodexReview(exitCode: number, feedback: string): CodexReviewVerdict {
   if (exitCode !== 0) return "failed";
-  let verdict = "";
+  let verdict: CodexReviewVerdict | undefined;
   for (const rawLine of feedback.split(/\r?\n/)) {
-    const line = rawLine.trim();
-    if (line.startsWith("RELAY_REVIEW_VERDICT:")) {
-      verdict = line.split(":", 2)[1].trim().toUpperCase();
-    }
+    const match = VERDICT_LINE.exec(rawLine);
+    if (!match) continue;
+    const value = match[1].toUpperCase();
+    if (value === "APPROVED") verdict = "approved";
+    else if (value === "REJECTED") verdict = "rejected";
   }
-  if (verdict === "APPROVED") return "approved";
-  if (verdict === "REJECTED") return "rejected";
-  return "failed";
+  return verdict ?? "failed";
 }
 
 function codexMessageText(value: unknown): string {

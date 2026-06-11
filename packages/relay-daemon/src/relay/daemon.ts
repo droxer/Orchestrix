@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { createHash } from "node:crypto";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { createHash, timingSafeEqual } from "node:crypto";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { extname, join, resolve } from "node:path";
 
 import { assignmentFailureOutcome, SessionController, type WorkflowStep } from "./controller.js";
 import { handleRelayApiRequest } from "./server.js";
@@ -20,6 +20,7 @@ import type {
   DaemonNodeRegistration,
   DaemonNodeRunCommand,
 } from "relay-core";
+import { DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS, REPO_ROOT } from "relay-core";
 import {
   initialAgentState,
   mergeAgentState,
@@ -35,6 +36,12 @@ import { LocalTaskStore } from "./task.js";
 export type SandboxStatus = "provisioning" | "ready" | "running" | "stopped" | "failed";
 
 const CONTROL_PANEL_VERSION = process.env.RELAY_CONTROL_PANEL_VERSION ?? Date.now().toString(36);
+const WEB_UI_PATH = "/web";
+const WEB_UI_DIST_DIR_CANDIDATES = [
+  process.env.RELAY_WEB_UI_DIST_DIR,
+  resolve(process.cwd(), "packages/relay-web/out"),
+  resolve(REPO_ROOT, "packages/relay-web/out"),
+].filter((path): path is string => Boolean(path));
 
 export interface SandboxRecord {
   id: string;
@@ -200,6 +207,7 @@ export function serveRelayDaemon(options: RelayDaemonOptions = {}): void {
     const baseUrl = `http://${host}:${port}`;
     console.log(`Relay daemon listening on ${baseUrl}`);
     console.log(`Relay daemon control panel: ${baseUrl}/control`);
+    console.log(`Relay web UI: ${baseUrl}${WEB_UI_PATH}`);
   });
 }
 
@@ -233,11 +241,15 @@ export async function handleRelayDaemonRequest(
   if (method === "GET" && parts.length === 2 && parts[0] === "control" && parts[1] === "version") {
     return jsonResponse(200, { version: CONTROL_PANEL_VERSION });
   }
+  if (method === "GET" && parts[0] === "web") {
+    return webUiAssetResponse(parts.slice(1));
+  }
   if (method === "GET" && parts.length === 0) {
     return jsonResponse(200, {
       name: "Relay daemon",
       ui: true,
       uiPath: "/control",
+      webUiPath: WEB_UI_PATH,
       endpoints: [
         "GET /sandboxes",
         "POST /sandboxes",
@@ -245,6 +257,7 @@ export async function handleRelayDaemonRequest(
         "POST /sandboxes/:id/runs",
         "GET /control",
         "GET /control/version",
+        "GET /web",
         "GET /daemon-nodes",
         "POST /daemon-nodes/register",
         "GET /daemon-nodes/:sandboxId/commands",
@@ -366,8 +379,11 @@ export class DaemonNodeRegistry {
       workspacePath: input.workspacePath,
       status: input.status === "busy" ? "running" : input.status === "stopped" ? "stopped" : "ready",
       agents,
-      token: input.token,
-      tokenHash: hashDaemonNodeToken(input.token),
+      // Plaintext token is intentionally NOT retained in the in-memory record.
+      // Only the hash is kept; the plaintext is returned to the provisioner once
+      // and forwarded to the daemon-node out-of-band.
+      token: undefined,
+      tokenHash: hashDaemonNodeToken(input.token) ?? existing?.tokenHash,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
       lastSeenAt: now,
@@ -836,11 +852,14 @@ export class ReverseDaemonNodeBackend implements SandboxBackend {
       employeeId: input.employeeId,
       token: sandbox.token ?? "",
       workspacePath: input.workspacePath,
-      protocolVersion: 1,
+      protocolVersion: DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS[0],
       supportedAgents: [],
       status: "stopped",
     });
-    return { ...sandbox, ...(this.registry.get(sandboxId) ?? {}) };
+    // Return the plaintext token to the caller exactly once. The registry
+    // intentionally keeps only the hash in memory.
+    const stored = this.registry.get(sandboxId) ?? {};
+    return { ...sandbox, ...stored, token: sandbox.token };
   }
 
   get(sandboxId: string): SandboxRecord | undefined {
@@ -906,7 +925,7 @@ export class ReverseDaemonNodeBackend implements SandboxBackend {
             runId,
             agent: assignment.agent,
             status: "failed",
-            exitCode: 1,
+            exitCode: completed.exitCode ?? 1,
           }));
           this.registry.store.appendEvent(sessionId, relayEvent("session.failed", sessionId, { outcome: completed.error }));
           this.registry.updateStatus(sandboxId, { status: "ready", lastError: completed.error });
@@ -1140,12 +1159,20 @@ function daemonNodeRegistration(value: unknown, authToken?: string): DaemonNodeR
   if (!sandboxId || !employeeId) {
     throw new Error("daemon node registration requires sandboxId and employeeId.");
   }
+  const protocolVersion = typeof input.protocolVersion === "number" ? input.protocolVersion : NaN;
+  if (!DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS.includes(protocolVersion)) {
+    throw new Error(
+      `daemon node protocolVersion ${String(input.protocolVersion)} is not supported. Supported: ${DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS.join(", ")}.`,
+    );
+  }
+  const token = stringField(input, "token") || authToken || "";
+  if (!token) throw new Error("daemon node registration requires a token.");
   return {
     sandboxId,
     employeeId,
-    token: stringField(input, "token") || authToken || "",
+    token,
     workspacePath: stringField(input, "workspacePath") || undefined,
-    protocolVersion: 1,
+    protocolVersion,
     supportedAgents: Array.isArray(input.supportedAgents)
       ? input.supportedAgents.flatMap((item) => agentName(item) ?? [])
       : [],
@@ -1154,7 +1181,10 @@ function daemonNodeRegistration(value: unknown, authToken?: string): DaemonNodeR
 }
 
 function daemonNodeEvent(value: unknown): DaemonNodeEvent {
-  const input = asRecord(value);
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("daemon node event must be a JSON object.");
+  }
+  const input = value as Record<string, unknown>;
   const type = stringField(input, "type");
   const commandId = stringField(input, "commandId");
   const sessionId = stringField(input, "sessionId");
@@ -1163,20 +1193,29 @@ function daemonNodeEvent(value: unknown): DaemonNodeEvent {
   if (!commandId || !sessionId || !runId || !agent) {
     throw new Error("daemon node event requires commandId, sessionId, runId, and agent.");
   }
-  const mode = input.mode === "review" ? "review" : "implement";
+  const mode = codexTaskMode(input.mode);
   if (type === "run.output") {
-    return {
-      type,
-      commandId,
-      sessionId,
-      runId,
-      agent,
-      stream: input.stream === "stderr" ? "stderr" : "stdout",
-      text: stringField(input, "text"),
-      sequence: typeof input.sequence === "number" ? input.sequence : 0,
-    };
+    const stream = input.stream;
+    if (stream !== "stdout" && stream !== "stderr") {
+      throw new Error(`daemon node run.output stream must be "stdout" or "stderr".`);
+    }
+    if (typeof input.sequence !== "number" || !Number.isFinite(input.sequence)) {
+      throw new Error("daemon node run.output sequence must be a finite number.");
+    }
+    if (typeof input.text !== "string") {
+      throw new Error("daemon node run.output text must be a string.");
+    }
+    return { type, commandId, sessionId, runId, agent, stream, text: input.text, sequence: input.sequence };
   }
+  if (!mode) throw new Error(`daemon node event mode must be "review" or "implement".`);
   if (type === "run.completed") {
+    if (typeof input.exitCode !== "number" || !Number.isFinite(input.exitCode)) {
+      throw new Error("daemon node run.completed exitCode must be a finite number.");
+    }
+    const codexVerdictInput = input.codexVerdict;
+    const codexVerdict = codexVerdictInput === "approved" || codexVerdictInput === "rejected" || codexVerdictInput === "failed" || codexVerdictInput === "" || codexVerdictInput === undefined
+      ? (codexVerdictInput ?? "")
+      : (() => { throw new Error(`invalid codexVerdict ${String(codexVerdictInput)}.`); })();
     return {
       type,
       commandId,
@@ -1184,15 +1223,14 @@ function daemonNodeEvent(value: unknown): DaemonNodeEvent {
       runId,
       agent,
       mode,
-      exitCode: typeof input.exitCode === "number" ? input.exitCode : 0,
+      exitCode: input.exitCode,
       agentLog: stringField(input, "agentLog"),
-      codexVerdict: input.codexVerdict === "approved" || input.codexVerdict === "rejected" || input.codexVerdict === "failed"
-        ? input.codexVerdict
-        : "",
+      codexVerdict,
       codexFeedback: stringField(input, "codexFeedback"),
     };
   }
   if (type === "run.failed") {
+    const exitCode = typeof input.exitCode === "number" && Number.isFinite(input.exitCode) ? input.exitCode : undefined;
     return {
       type,
       commandId,
@@ -1201,6 +1239,7 @@ function daemonNodeEvent(value: unknown): DaemonNodeEvent {
       agent,
       mode,
       error: stringField(input, "error") || "Daemon node command failed.",
+      ...(exitCode !== undefined ? { exitCode } : {}),
     };
   }
   if (type === "run.cancelled") {
@@ -1214,7 +1253,11 @@ function daemonNodeEvent(value: unknown): DaemonNodeEvent {
       reason: stringField(input, "reason") || "Cancelled by human.",
     };
   }
-  throw new Error("unknown daemon node event type.");
+  throw new Error(`unknown daemon node event type ${type}.`);
+}
+
+function codexTaskMode(value: unknown): CodexTaskMode | undefined {
+  return value === "review" || value === "implement" ? value : undefined;
 }
 
 function bearerToken(value: string | string[] | undefined): string | undefined {
@@ -1224,7 +1267,7 @@ function bearerToken(value: string | string[] | undefined): string | undefined {
 }
 
 function sandboxAuthError(sandbox: SandboxRecord, token?: string): string | null {
-  if (!sandbox.token && !sandbox.tokenHash) return null;
+  if (!sandbox.tokenHash && !sandbox.token) return null;
   if (!token) return "Sandbox token is required.";
   if (!daemonNodeTokenMatches(sandbox, token)) return "Invalid sandbox token.";
   return null;
@@ -1401,8 +1444,13 @@ function hashDaemonNodeToken(token: string): string | undefined {
 
 function daemonNodeTokenMatches(sandbox: SandboxRecord, token?: string): boolean {
   if (!token) return false;
-  if (sandbox.token) return sandbox.token === token;
-  return sandbox.tokenHash === hashDaemonNodeToken(token);
+  const expected = sandbox.tokenHash ?? (sandbox.token ? hashDaemonNodeToken(sandbox.token) : undefined);
+  if (!expected) return false;
+  const provided = hashDaemonNodeToken(token);
+  if (!provided) return false;
+  const a = Buffer.from(expected);
+  const b = Buffer.from(provided);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 function sandboxStatus(value: unknown): SandboxStatus {
@@ -1449,6 +1497,52 @@ function htmlResponse(status: number, body: string): RelayDaemonResponse {
   };
 }
 
+function webUiAssetResponse(parts: string[]): RelayDaemonResponse {
+  const distDir = webUiDistDir();
+  if (!distDir) {
+    return htmlResponse(404, "Relay web UI has not been built. Run `npm run build -w relay-web`.\n");
+  }
+  const requested = parts.length === 0 ? "index.html" : parts.join("/");
+  const fallback = requested.endsWith("/") || !extname(requested);
+  const assetPath = safeWebUiAssetPath(distDir, fallback ? `${requested.replace(/\/+$/, "")}/index.html` : requested)
+    ?? safeWebUiAssetPath(distDir, requested);
+  const indexPath = safeWebUiAssetPath(distDir, "index.html");
+  const selectedPath = assetPath && existsSync(assetPath) && statSync(assetPath).isFile()
+    ? assetPath
+    : fallback && indexPath
+      ? indexPath
+      : undefined;
+  if (!selectedPath || !existsSync(selectedPath) || !statSync(selectedPath).isFile()) {
+    return jsonResponse(404, { error: "Web UI asset not found." });
+  }
+  return {
+    status: 200,
+    contentType: contentTypeForPath(selectedPath),
+    body: readFileSync(selectedPath, "utf8"),
+  };
+}
+
+function webUiDistDir(): string | undefined {
+  return WEB_UI_DIST_DIR_CANDIDATES.find((path) => existsSync(path) && statSync(path).isDirectory());
+}
+
+function safeWebUiAssetPath(distDir: string, requested: string): string | undefined {
+  const assetPath = resolve(distDir, requested);
+  if (assetPath !== distDir && !assetPath.startsWith(`${distDir}/`)) return undefined;
+  return assetPath;
+}
+
+function contentTypeForPath(path: string): string {
+  const extension = extname(path);
+  if (extension === ".html") return "text/html; charset=utf-8";
+  if (extension === ".css") return "text/css; charset=utf-8";
+  if (extension === ".js" || extension === ".mjs") return "text/javascript; charset=utf-8";
+  if (extension === ".json") return "application/json; charset=utf-8";
+  if (extension === ".svg") return "image/svg+xml; charset=utf-8";
+  if (extension === ".txt") return "text/plain; charset=utf-8";
+  return "application/octet-stream";
+}
+
 function jsonResponse(status: number, body: unknown): RelayDaemonResponse {
   return {
     status,
@@ -1466,27 +1560,62 @@ function daemonControlPanelHtml(): string {
   <title>Relay Daemon Control Panel</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,300..900,30..100,0..1&family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=JetBrains+Mono:wght@400;500;600&display=swap">
   <style>
+    /* =====================================================================
+       Daemon control panel — editorial broadsheet
+       Shares the same token vocabulary as relay-web.
+       ===================================================================== */
     :root {
       color-scheme: light;
-      --primary: #0052ff;
-      --primary-active: #003ecc;
-      --ink: #0a0b0d;
-      --body: #5b616e;
-      --muted: #7c828a;
-      --muted-soft: #a8acb3;
-      --hairline: #dee1e6;
-      --hairline-soft: #eef0f3;
-      --canvas: #ffffff;
-      --surface-soft: #f7f7f7;
-      --surface-strong: #eef0f3;
-      --surface-dark: #0a0b0d;
-      --surface-dark-elevated: #16181c;
-      --on-dark: #ffffff;
-      --on-dark-soft: #a8acb3;
-      --up: #05b169;
-      --down: #cf202f;
+      /* paper canvas */
+      --paper:         #f1ebdc;
+      --paper-deep:    #ebe3cf;
+      --paper-soft:    #f6f1e3;
+      --paper-vellum:  #faf6ed;
+      /* ink */
+      --ink:           #14110d;
+      --ink-soft:      #3b342a;
+      --ink-mute:      #6a6253;
+      --ink-faint:     #95897a;
+      /* rules */
+      --rule:          #d6cdb5;
+      --rule-soft:     #e3dbc4;
+      /* accents */
+      --oxblood:       #6b1f1d;
+      --oxblood-deep:  #4a1614;
+      --gold:          #b8821a;
+      /* signal */
+      --signal-live:   #d1a32c;
+      --signal-good:   #2d4a3a;
+      --signal-bad:    #8a2a26;
+      /* agent tones */
+      --tone-claude:   #2d4a3a;
+      --tone-pi:       #b8552e;
+      --tone-codex:    #1f3556;
+
+      /* legacy aliases (kept for the existing markup/JS) */
+      --primary:        var(--oxblood);
+      --primary-active: var(--oxblood-deep);
+      --body:           var(--ink-soft);
+      --muted:          var(--ink-mute);
+      --muted-soft:     var(--ink-faint);
+      --hairline:       var(--rule);
+      --hairline-soft:  var(--rule-soft);
+      --canvas:         var(--paper);
+      --surface-soft:   var(--paper-soft);
+      --surface-strong: var(--paper-deep);
+      --surface-dark:   var(--ink);
+      --surface-dark-elevated: var(--ink-soft);
+      --on-dark:        var(--paper);
+      --on-dark-soft:   var(--paper-soft);
+      --up:             var(--signal-good);
+      --down:           var(--signal-bad);
+
+      /* type stacks */
+      --font-display: "Fraunces", Georgia, serif;
+      --font-body:    "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+      --font-num:     "JetBrains Mono", ui-monospace, monospace;
     }
 
     * { box-sizing: border-box; }
@@ -1495,68 +1624,95 @@ function daemonControlPanelHtml(): string {
 
     body {
       min-height: 100vh;
-      background: var(--canvas);
+      background: var(--paper);
       color: var(--ink);
-      font-family: "Inter", -apple-system, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      font-size: 16px;
+      font-family: var(--font-body);
+      font-size: 15px;
       line-height: 1.5;
       -webkit-font-smoothing: antialiased;
       text-rendering: optimizeLegibility;
+      background-image:
+        radial-gradient(1400px 700px at 6% -10%, rgba(184,130,26,0.07), transparent 60%),
+        radial-gradient(1000px 600px at 110% 110%, rgba(107,31,29,0.05), transparent 60%),
+        url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.08  0 0 0 0 0.07  0 0 0 0 0.05  0 0 0 .35 0'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='.16'/></svg>");
+      background-attachment: fixed;
     }
 
+    ::selection { background: var(--ink); color: var(--paper); }
+
     .mono {
-      font-family: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+      font-family: var(--font-num);
+      font-feature-settings: "tnum" 1;
       font-weight: 500;
       letter-spacing: 0;
     }
 
-    /* Top nav --------------------------------------------------------- */
+    /* Top nav — masthead ---------------------------------------------- */
 
     .top-nav {
-      height: 56px;
-      padding: 0 24px;
-      border-bottom: 1px solid var(--hairline);
+      height: 64px;
+      padding: 0 32px;
+      border-bottom: 1px solid var(--rule);
       display: flex;
-      align-items: center;
+      align-items: baseline;
       justify-content: space-between;
-      background: var(--canvas);
+      background: transparent;
     }
 
     .wordmark {
       display: inline-flex;
-      align-items: center;
-      gap: 10px;
+      align-items: baseline;
+      gap: 14px;
       color: var(--ink);
-      font-size: 18px;
-      font-weight: 400;
-      letter-spacing: -0.4px;
+      font-family: var(--font-display);
+      font-size: 34px;
+      font-weight: 500;
+      letter-spacing: -0.03em;
       line-height: 1;
+      font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 1;
     }
 
-    .wordmark svg {
-      display: block;
-      width: 48px;
-      height: 32px;
-      flex: none;
-      shape-rendering: geometricPrecision;
+    /* hide the legacy SVG mark and render "Re-lay" typographically */
+    .wordmark svg { display: none; }
+    .wordmark {
+      /* the literal "Relay" text node — we wrap it with pseudo to italicise the tail */
+      font-size: 0;
+    }
+    .wordmark::before {
+      content: "Re";
+      font-size: 34px;
+      color: var(--ink);
+    }
+    .wordmark::after {
+      content: "lay";
+      font-style: italic;
+      font-size: 34px;
+      color: var(--oxblood);
+      font-variation-settings: "opsz" 144, "SOFT" 100, "WONK" 1;
     }
 
     .nav-meta {
       display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      color: var(--muted);
-      font-size: 13px;
+      align-items: baseline;
+      gap: 12px;
+      color: var(--ink-mute);
+      font-family: var(--font-num);
+      font-size: 10px;
       font-weight: 500;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
     }
 
     .nav-meta .badge {
-      padding: 2px 10px;
-      border-radius: 100px;
-      background: var(--surface-strong);
+      padding: 3px 10px;
+      border: 1px solid var(--ink);
+      background: transparent;
       color: var(--ink);
-      font-size: 11px;
+      font-family: var(--font-num);
+      font-size: 10px;
       font-weight: 600;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
     }
 
     /* Layout ---------------------------------------------------------- */
@@ -1564,155 +1720,183 @@ function daemonControlPanelHtml(): string {
     main {
       width: min(1280px, calc(100% - 32px));
       margin: 0 auto;
-      padding: 16px 0 20px;
+      padding: 32px 0 40px;
     }
 
     .hero {
       display: flex;
-      align-items: baseline;
+      align-items: end;
       justify-content: space-between;
       gap: 16px;
-      margin-bottom: 14px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--rule);
+      margin-bottom: 24px;
     }
 
     .hero-left {
-      display: inline-flex;
-      align-items: baseline;
-      gap: 14px;
+      display: grid;
+      gap: 6px;
     }
 
     .eyebrow {
       display: inline-block;
-      padding: 3px 10px;
-      border-radius: 100px;
-      background: var(--surface-strong);
-      color: var(--ink);
-      font-size: 11px;
-      font-weight: 600;
+      font-family: var(--font-num);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: var(--ink-mute);
+      padding: 0;
+      background: transparent;
     }
 
     h1 {
       margin: 0;
-      font-size: 26px;
+      font-family: var(--font-display);
+      font-style: italic;
       font-weight: 400;
-      line-height: 1;
-      letter-spacing: -0.6px;
+      font-size: 56px;
+      line-height: 0.92;
+      letter-spacing: -0.03em;
       color: var(--ink);
+      font-variation-settings: "opsz" 144, "SOFT" 80, "WONK" 1;
     }
 
     .refresh {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-      padding: 5px 12px;
-      border-radius: 100px;
-      background: var(--surface-strong);
-      color: var(--body);
-      font-size: 12px;
+      gap: 10px;
+      padding: 6px 12px;
+      border: 1px solid var(--rule);
+      border-radius: 2px;
+      background: var(--paper-vellum);
+      color: var(--ink-soft);
+      font-family: var(--font-num);
+      font-size: 10px;
       font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
       white-space: nowrap;
     }
 
     .refresh .dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 9999px;
-      background: var(--up);
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--signal-good);
+      box-shadow: 0 0 0 3px rgba(45, 74, 58, 0.15);
       flex: none;
     }
 
-    .refresh.offline .dot { background: var(--down); }
+    .refresh.offline .dot {
+      background: var(--signal-bad);
+      box-shadow: 0 0 0 3px rgba(138, 42, 38, 0.15);
+    }
 
-    /* Metric strip ---------------------------------------------------- */
+    /* Metric strip — broadsheet ledger ------------------------------- */
 
     .metrics {
       display: grid;
       grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 0;
-      border-top: 1px solid var(--hairline);
-      border-bottom: 1px solid var(--hairline);
-      padding: 10px 0;
-      margin-bottom: 14px;
+      border-top: 2px solid var(--ink);
+      border-bottom: 1px solid var(--rule);
+      padding: 16px 0 18px;
+      margin-bottom: 28px;
+      position: relative;
+    }
+    .metrics::before {
+      content: "";
+      position: absolute;
+      top: -6px; left: 0; right: 0;
+      border-top: 1px solid var(--rule);
     }
 
     .metric {
-      display: flex;
-      align-items: baseline;
-      gap: 10px;
-      padding: 0 16px;
-      border-left: 1px solid var(--hairline);
+      display: grid;
+      gap: 6px;
+      padding: 0 20px;
+      border-left: 1px solid var(--rule);
     }
 
-    .metric:first-child { border-left: 0; }
+    .metric:first-child { border-left: 0; padding-left: 0; }
 
     .metric-label {
-      color: var(--muted);
-      font-size: 12px;
+      color: var(--ink-mute);
+      font-family: var(--font-num);
+      font-size: 10px;
       font-weight: 500;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
     }
 
     .metric-value {
-      font-family: "JetBrains Mono", ui-monospace, monospace;
-      font-size: 22px;
+      font-family: var(--font-num);
+      font-size: 38px;
       font-weight: 500;
-      letter-spacing: -0.2px;
+      letter-spacing: -0.02em;
       line-height: 1;
       color: var(--ink);
+      font-feature-settings: "tnum" 1;
     }
 
-    .metric-value.ready { color: var(--up); }
-    .metric-value.running { color: var(--primary); }
-    .metric-value.failed { color: var(--down); }
+    .metric-value.ready   { color: var(--signal-good); }
+    .metric-value.running { color: var(--oxblood); }
+    .metric-value.failed  { color: var(--signal-bad); }
 
-    /* Sections -------------------------------------------------------- */
+    /* Columns — broadsheet ------------------------------------------- */
 
     .columns {
       display: grid;
       grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
-      gap: 14px;
+      gap: 32px;
       align-items: start;
     }
 
     .stack {
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      gap: 28px;
       min-width: 0;
     }
 
-    section.block {
-      min-width: 0;
-    }
+    section.block { min-width: 0; }
 
     .block-head {
       display: flex;
       align-items: baseline;
       justify-content: space-between;
       gap: 12px;
-      margin-bottom: 6px;
+      margin-bottom: 10px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--ink);
     }
 
     .block-head h2 {
       margin: 0;
-      font-size: 16px;
-      font-weight: 600;
-      line-height: 1.25;
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: 22px;
+      font-weight: 500;
+      line-height: 1.1;
+      letter-spacing: -0.015em;
       color: var(--ink);
+      font-variation-settings: "opsz" 48, "SOFT" 60, "WONK" 1;
     }
 
     .count {
-      color: var(--muted);
-      font-size: 11px;
+      color: var(--ink-mute);
+      font-family: var(--font-num);
+      font-size: 10px;
       font-weight: 500;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
     }
 
-    /* Node table ------------------------------------------------------ */
+    /* Node table — hairline newspaper -------------------------------- */
 
     .table-card {
-      border: 1px solid var(--hairline);
-      border-radius: 12px;
-      overflow: hidden;
-      background: var(--canvas);
+      background: transparent;
     }
 
     table {
@@ -1721,24 +1905,29 @@ function daemonControlPanelHtml(): string {
     }
 
     thead th {
-      padding: 8px 12px;
+      padding: 6px 12px;
       text-align: left;
-      border-bottom: 1px solid var(--hairline);
-      background: var(--surface-soft);
-      color: var(--muted);
-      font-size: 11px;
+      border-bottom: 1px solid var(--ink);
+      background: transparent;
+      color: var(--ink-mute);
+      font-family: var(--font-num);
+      font-size: 10px;
       font-weight: 600;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
     }
 
     tbody td {
-      padding: 8px 12px;
-      border-bottom: 1px solid var(--hairline-soft);
+      padding: 14px 12px;
+      border-bottom: 1px solid var(--rule-soft);
       vertical-align: middle;
+      font-family: var(--font-body);
       font-size: 13px;
       color: var(--ink);
     }
 
-    tbody tr:last-child td { border-bottom: 0; }
+    tbody tr:last-child td { border-bottom: 1px solid var(--rule); }
+    tbody tr:hover { background: rgba(20, 17, 13, 0.03); }
 
     .col-node { width: 36%; }
     .col-status { width: 18%; }
@@ -1747,26 +1936,31 @@ function daemonControlPanelHtml(): string {
 
     .node-name {
       display: block;
-      font-size: 13px;
-      font-weight: 600;
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: 18px;
+      font-weight: 500;
       color: var(--ink);
-      line-height: 1.25;
+      line-height: 1.15;
+      letter-spacing: -0.01em;
+      font-variation-settings: "opsz" 24, "SOFT" 60, "WONK" 1;
     }
 
     .node-id {
       display: block;
-      margin-top: 2px;
-      font-family: "JetBrains Mono", ui-monospace, monospace;
-      font-size: 11px;
-      font-weight: 400;
-      color: var(--muted);
+      margin-top: 4px;
+      font-family: var(--font-num);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      color: var(--ink-mute);
       word-break: break-all;
       line-height: 1.3;
     }
 
     .meta-time {
       display: block;
-      font-family: "JetBrains Mono", ui-monospace, monospace;
+      font-family: var(--font-num);
       font-size: 12px;
       font-weight: 500;
       color: var(--ink);
@@ -1775,9 +1969,13 @@ function daemonControlPanelHtml(): string {
 
     .meta-sub {
       display: block;
-      margin-top: 2px;
-      font-size: 11px;
-      color: var(--muted);
+      margin-top: 4px;
+      font-family: var(--font-num);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--ink-mute);
     }
 
     /* Status pill ----------------------------------------------------- */
@@ -1786,114 +1984,153 @@ function daemonControlPanelHtml(): string {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 3px 10px;
-      border-radius: 100px;
-      background: var(--surface-strong);
-      color: var(--ink);
-      font-size: 11px;
-      font-weight: 600;
+      padding: 3px 8px;
+      border: 1px solid var(--rule);
+      border-radius: 2px;
+      background: var(--paper-vellum);
+      color: var(--ink-soft);
+      font-family: var(--font-num);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
     }
 
     .status::before {
       content: "";
       width: 6px;
       height: 6px;
-      border-radius: 9999px;
-      background: var(--muted-soft);
+      border-radius: 50%;
+      background: var(--ink-faint);
       flex: none;
     }
 
-    .status.ready::before { background: var(--up); }
-    .status.running::before, .status.provisioning::before { background: var(--primary); }
-    .status.failed::before, .status.stale::before { background: var(--down); }
+    .status.ready { color: var(--signal-good); border-color: rgba(45, 74, 58, 0.3); }
+    .status.ready::before { background: var(--signal-good); }
+    .status.running, .status.provisioning {
+      color: var(--oxblood);
+      border-color: rgba(107, 31, 29, 0.3);
+    }
+    .status.running::before, .status.provisioning::before { background: var(--oxblood); }
+    .status.failed, .status.stale {
+      color: var(--signal-bad);
+      border-color: rgba(138, 42, 38, 0.35);
+    }
+    .status.failed::before, .status.stale::before { background: var(--signal-bad); }
 
     .status.running::before {
       animation: pulse 1.6s ease-in-out infinite;
+      box-shadow: 0 0 0 3px rgba(107, 31, 29, 0.18);
     }
 
     @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.4; transform: scale(0.7); }
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
     }
 
-    /* Agent chips ----------------------------------------------------- */
+    /* Agent chips — tone-coded --------------------------------------- */
 
     .agents {
       display: flex;
       flex-wrap: wrap;
-      gap: 4px;
+      gap: 6px;
     }
 
     .agent {
       display: inline-flex;
       align-items: center;
-      gap: 5px;
-      padding: 2px 8px 2px 7px;
-      border-radius: 100px;
-      background: var(--surface-strong);
-      color: var(--ink);
-      font-size: 11px;
-      font-weight: 600;
+      gap: 6px;
+      padding: 3px 8px;
+      border: 1px solid var(--rule);
+      border-radius: 2px;
+      background: transparent;
+      color: var(--ink-soft);
+      font-family: var(--font-num);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
     }
 
     .agent::before {
       content: "";
       width: 5px;
       height: 5px;
-      border-radius: 9999px;
-      background: var(--muted-soft);
+      border-radius: 50%;
+      background: var(--ink-faint);
       flex: none;
     }
 
-    .agent.ready::before { background: var(--up); }
-    .agent.failed::before { background: var(--down); }
+    .agent.ready { color: var(--ink); border-color: var(--ink); }
+    .agent.ready::before  { background: var(--signal-good); }
+    .agent.failed { color: var(--signal-bad); border-color: rgba(138, 42, 38, 0.35); }
+    .agent.failed::before { background: var(--signal-bad); }
 
-    /* Side cards (runs + attention) ---------------------------------- */
+    /* Side cards (runs + attention) — column inches ------------------ */
 
     .card-grid {
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 0;
     }
 
     .feature-card {
-      background: var(--canvas);
-      border: 1px solid var(--hairline);
-      border-radius: 10px;
-      padding: 10px 12px;
+      background: transparent;
+      border: 0;
+      border-bottom: 1px solid var(--rule-soft);
+      padding: 14px 0;
+      position: relative;
+    }
+    .feature-card:last-child { border-bottom: 1px solid var(--rule); }
+    .feature-card::before {
+      content: "";
+      position: absolute;
+      left: -10px; top: 18px;
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      background: var(--oxblood);
     }
 
     .feature-card .row-title {
-      margin: 0 0 2px;
-      font-size: 13px;
-      font-weight: 600;
-      line-height: 1.25;
+      margin: 0 0 4px;
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: 17px;
+      font-weight: 500;
+      line-height: 1.2;
+      letter-spacing: -0.01em;
       color: var(--ink);
+      font-variation-settings: "opsz" 24, "SOFT" 60, "WONK" 1;
     }
 
     .feature-card .row-meta {
-      margin: 0 0 4px;
-      font-family: "JetBrains Mono", ui-monospace, monospace;
-      font-size: 11px;
-      font-weight: 400;
-      color: var(--muted);
+      margin: 0 0 6px;
+      font-family: var(--font-num);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      color: var(--ink-mute);
       word-break: break-all;
-      line-height: 1.3;
+      line-height: 1.4;
+      text-transform: uppercase;
     }
 
     .feature-card .row-body {
       margin: 0;
-      color: var(--body);
-      font-size: 12px;
-      line-height: 1.4;
+      color: var(--ink-soft);
+      font-family: var(--font-display);
+      font-size: 14px;
+      line-height: 1.5;
     }
 
     .empty {
-      padding: 14px;
-      border: 1px dashed var(--hairline);
-      border-radius: 10px;
-      color: var(--muted);
-      font-size: 12px;
+      padding: 22px;
+      border: 1px dashed var(--rule);
+      border-radius: 2px;
+      color: var(--ink-mute);
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: 14px;
       text-align: center;
     }
 
@@ -1904,16 +2141,19 @@ function daemonControlPanelHtml(): string {
     }
 
     @media (max-width: 720px) {
-      main { padding: 12px 0 16px; }
-      .top-nav { padding: 0 16px; }
-      .hero { flex-direction: column; align-items: flex-start; gap: 8px; margin-bottom: 10px; }
-      .metrics { grid-template-columns: repeat(2, 1fr); row-gap: 8px; padding: 10px 0; }
-      .metric { padding: 0 12px; }
-      .metric:nth-child(odd) { border-left: 0; }
+      main { padding: 20px 0 24px; }
+      .top-nav { padding: 0 16px; height: 56px; }
+      .wordmark::before, .wordmark::after { font-size: 26px; }
+      .hero { flex-direction: column; align-items: flex-start; gap: 12px; margin-bottom: 18px; }
+      h1 { font-size: 40px; }
+      .metrics { grid-template-columns: repeat(2, 1fr); row-gap: 16px; padding: 14px 0; }
+      .metric { padding: 0 14px; }
+      .metric:nth-child(odd) { border-left: 0; padding-left: 0; }
+      .metric-value { font-size: 28px; }
       thead { display: none; }
-      tbody tr { display: block; padding: 8px 0; border-bottom: 1px solid var(--hairline-soft); }
+      tbody tr { display: block; padding: 12px 0; border-bottom: 1px solid var(--rule-soft); }
       tbody tr:last-child { border-bottom: 0; }
-      tbody td { display: block; width: auto !important; padding: 3px 12px; border: 0; text-align: left !important; }
+      tbody td { display: block; width: auto !important; padding: 4px 0; border: 0; text-align: left !important; }
       .col-meta { text-align: left; }
     }
   </style>
@@ -1937,14 +2177,14 @@ function daemonControlPanelHtml(): string {
       </svg>
       Relay
     </span>
-    <span class="nav-meta"><span class="badge">Daemon</span><span>Control panel</span></span>
+    <span class="nav-meta"><span class="badge">Daemon</span><span>Vol. III &middot; &#8470;&nbsp;42</span></span>
   </nav>
 
   <main>
     <section class="hero">
       <div class="hero-left">
-        <span class="eyebrow">Node operations</span>
-        <h1>Control panel</h1>
+        <span class="eyebrow">Node operations &middot; the desk</span>
+        <h1>The control room</h1>
       </div>
       <div class="refresh" id="refreshState"><span class="dot" aria-hidden="true"></span>waiting for nodes…</div>
     </section>
@@ -1960,7 +2200,7 @@ function daemonControlPanelHtml(): string {
     <div class="columns">
       <section class="block">
         <div class="block-head">
-          <h2>Nodes</h2>
+          <h2>The roster</h2>
           <span class="count" id="nodeCount">0 nodes</span>
         </div>
         <div class="table-card" id="nodeTable"></div>
@@ -1969,7 +2209,7 @@ function daemonControlPanelHtml(): string {
       <div class="stack">
         <section class="block">
           <div class="block-head">
-            <h2>Active runs</h2>
+            <h2>In progress</h2>
             <span class="count" id="runCount">0 running</span>
           </div>
           <div class="card-grid" id="activeRuns"></div>
@@ -1977,7 +2217,7 @@ function daemonControlPanelHtml(): string {
 
         <section class="block">
           <div class="block-head">
-            <h2>Attention</h2>
+            <h2>Wants attention</h2>
             <span class="count" id="attentionCount">0 items</span>
           </div>
           <div class="card-grid" id="attention"></div>

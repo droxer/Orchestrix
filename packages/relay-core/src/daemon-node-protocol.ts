@@ -2,12 +2,15 @@ import type { AgentName, CodexReviewVerdict, CodexTaskMode } from "./state.js";
 
 export type DaemonNodeStatus = "ready" | "busy" | "stopped";
 
+export const DAEMON_NODE_PROTOCOL_VERSION = 1 as const;
+export const DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS: readonly number[] = [1];
+
 export interface DaemonNodeRegistration {
   sandboxId: string;
   employeeId: string;
   token: string;
   workspacePath?: string;
-  protocolVersion: 1;
+  protocolVersion: number;
   supportedAgents: AgentName[];
   status?: DaemonNodeStatus;
 }
@@ -67,6 +70,7 @@ export type DaemonNodeEvent =
       agent: AgentName;
       mode: CodexTaskMode;
       error: string;
+      exitCode?: number;
     }
   | {
       type: "run.cancelled";

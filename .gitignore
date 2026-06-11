@@ -6,6 +6,8 @@ dist/
 wheels/
 *.egg-info
 node_modules/
+.next/
+out/
 
 # Local environments
 .venv/

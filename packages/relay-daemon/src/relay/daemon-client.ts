@@ -1,5 +1,23 @@
+import type { AgentName, CodexTaskMode } from "relay-core";
+
 import type { RelaySession } from "./session.js";
 import type { SandboxRecord, SandboxRunAssignment } from "./daemon.js";
+
+export type RemoteDecisionKind = "approve" | "reject" | "cancel" | "rerun" | "mark_done";
+
+export interface RecordDecisionInput {
+  sessionId: string;
+  kind: RemoteDecisionKind;
+  note?: string;
+  targetAgent?: AgentName;
+}
+
+export interface RecordHandoffInput {
+  sessionId: string;
+  targetAgent: AgentName;
+  note?: string;
+  mode?: CodexTaskMode;
+}
 
 export interface RelayDaemonClientOptions {
   baseUrl?: string;
@@ -81,6 +99,34 @@ export class RelayDaemonClient {
         sessionId: input.sessionId,
       },
     });
+  }
+
+  async recordDecision(input: RecordDecisionInput): Promise<RelaySession> {
+    return this.request<RelaySession>(
+      `/sessions/${encodeURIComponent(input.sessionId)}/decisions`,
+      {
+        method: "POST",
+        body: {
+          kind: input.kind,
+          note: input.note,
+          targetAgent: input.targetAgent,
+        },
+      },
+    );
+  }
+
+  async recordHandoff(input: RecordHandoffInput): Promise<RelaySession> {
+    return this.request<RelaySession>(
+      `/sessions/${encodeURIComponent(input.sessionId)}/handoffs`,
+      {
+        method: "POST",
+        body: {
+          targetAgent: input.targetAgent,
+          note: input.note,
+          mode: input.mode,
+        },
+      },
+    );
   }
 
   async cancelSandboxRun(input: CancelSandboxRunInput): Promise<RelaySession> {

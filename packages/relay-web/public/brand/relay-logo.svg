@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 64" role="img" aria-label="Relay" shape-rendering="geometricPrecision">
+  <title>Relay</title>
+  <g>
+    <g fill="none" stroke="#18232d" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10 14 H22 L32 24 H40"/>
+      <path d="M10 50 H22 L32 40 H40"/>
+    </g>
+    <g fill="#18232d">
+      <circle cx="10" cy="14" r="4"/>
+      <circle cx="10" cy="50" r="4"/>
+    </g>
+    <g stroke="#0052ff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none">
+      <line x1="32" y1="32" x2="76" y2="32"/>
+      <polyline points="68,24 80,32 68,40"/>
+    </g>
+  </g>
+  <text x="110" y="44"
+        font-family="'Inter', -apple-system, system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+        font-size="42"
+        font-weight="400"
+        letter-spacing="-1"
+        fill="#18232d">Relay</text>
+</svg>

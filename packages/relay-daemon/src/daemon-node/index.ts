@@ -28,6 +28,7 @@ import {
   GUEST_WORKSPACE,
   agentHomePath,
   openaiApiKey,
+  DAEMON_NODE_PROTOCOL_VERSION,
 } from "relay-core";
 
 export interface DaemonNodeRuntimeOptions {
@@ -95,7 +96,7 @@ export async function runRelayDaemonNode(options: DaemonNodeRuntimeOptions = {})
     employeeId,
     token,
     workspacePath,
-    protocolVersion: 1,
+    protocolVersion: DAEMON_NODE_PROTOCOL_VERSION,
     supportedAgents: ["claude", "pi", "codex"],
     status: "ready",
   };
@@ -124,7 +125,8 @@ export async function runRelayDaemonNode(options: DaemonNodeRuntimeOptions = {})
         activeRuns.set(command.id, controller);
         void executeCommand(daemonUrl, sandboxId, token, command, fetchFn, logger, controller.signal).catch((error: unknown) => {
           const message = error instanceof Error ? error.message : String(error);
-          logger.error("command failed before completion", { ...commandLogFields(sandboxId, command), error: message });
+          const exitCode = error instanceof DaemonNodeAgentReadyError ? error.exitCode : undefined;
+          logger.error("command failed before completion", { ...commandLogFields(sandboxId, command), error: message, exitCode });
           return postJson(fetchFn, `${daemonUrl}/daemon-nodes/${encodeURIComponent(sandboxId)}/events`, {
             type: "run.failed",
             commandId: command.id,
@@ -133,6 +135,7 @@ export async function runRelayDaemonNode(options: DaemonNodeRuntimeOptions = {})
             agent: command.agent,
             mode: command.mode,
             error: message,
+            ...(exitCode !== undefined ? { exitCode } : {}),
           } satisfies DaemonNodeEvent, token);
         }).finally(() => {
           activeRuns.delete(command.id);
@@ -173,6 +176,7 @@ async function executeCommand(
   logger.info("agent ready", commandLogFields(sandboxId, command));
   let outputSequence = 0;
   let outputPostChain: Promise<void> = Promise.resolve();
+  let outputPostFailure: Error | undefined;
   const eventSink = {
     agentOutput: (_runId: string, agent: AgentName, stream: "stdout" | "stderr", text: string): void => {
       const sequence = outputSequence++;
@@ -183,19 +187,30 @@ async function executeCommand(
         text,
         sequence,
       });
-      outputPostChain = outputPostChain.then(() =>
-        postJson(fetchFn, eventUrl, {
-          type: "run.output",
-          commandId: command.id,
-          sessionId: command.sessionId,
-          runId: command.runId,
-          agent,
-          stream,
-          text,
-          sequence,
-        } satisfies DaemonNodeEvent, token)
-      );
-      void outputPostChain.catch(() => undefined);
+      outputPostChain = outputPostChain.then(async () => {
+        if (outputPostFailure) return;
+        try {
+          await postJsonWithRetry(fetchFn, eventUrl, {
+            type: "run.output",
+            commandId: command.id,
+            sessionId: command.sessionId,
+            runId: command.runId,
+            agent,
+            stream,
+            text,
+            sequence,
+          } satisfies DaemonNodeEvent, token, signal);
+        } catch (error) {
+          outputPostFailure = error instanceof Error ? error : new Error(String(error));
+          logger.error("event post exhausted retries", {
+            ...commandLogFields(sandboxId, command),
+            agent,
+            stream,
+            sequence,
+            error: outputPostFailure.message,
+          });
+        }
+      });
     },
   };
   const options = {
@@ -214,6 +229,9 @@ async function executeCommand(
         : await codexImplementNode(state, options);
   const next = mergeAgentState(state, patch);
   await outputPostChain;
+  if (outputPostFailure) {
+    throw new Error(`Daemon node lost agent output: ${outputPostFailure.message}`);
+  }
   if (signal?.aborted) {
     logger.info("run cancelled", {
       ...commandLogFields(sandboxId, command),
@@ -260,6 +278,13 @@ async function postRunCancelled(
   } satisfies DaemonNodeEvent, token);
 }
 
+class DaemonNodeAgentReadyError extends Error {
+  constructor(message: string, public readonly exitCode: number) {
+    super(message);
+    this.name = "DaemonNodeAgentReadyError";
+  }
+}
+
 async function ensureDaemonNodeAgentReady(agent: AgentName, execStream: AgentExecutor, signal?: AbortSignal): Promise<void> {
   const script = ["set -eu"];
   const home = agentHomePath();
@@ -287,7 +312,10 @@ async function ensureDaemonNodeAgentReady(agent: AgentName, execStream: AgentExe
   const result = await execStream("bash", ["-c", script.join("; ")], { signal });
   if (signal?.aborted) return;
   if (result.exit_code !== 0) {
-    throw new Error(`Daemon node auth setup failed. ${(result.stderr || result.stdout).trim()}`);
+    throw new DaemonNodeAgentReadyError(
+      `Daemon node auth setup failed. ${(result.stderr || result.stdout).trim()}`,
+      result.exit_code,
+    );
   }
 }
 
@@ -436,6 +464,30 @@ async function postJson(fetchFn: typeof fetch, url: string, body: unknown, token
     body: JSON.stringify(body),
   });
   if (!response.ok) throw new Error(`POST ${url} failed: ${response.status} ${await response.text()}`);
+}
+
+const EVENT_POST_RETRY_DELAYS_MS = [200, 400, 800, 1600, 3200] as const;
+
+async function postJsonWithRetry(
+  fetchFn: typeof fetch,
+  url: string,
+  body: unknown,
+  token: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= EVENT_POST_RETRY_DELAYS_MS.length; attempt += 1) {
+    if (signal?.aborted) throw new Error("Aborted before event post.");
+    try {
+      await postJson(fetchFn, url, body, token);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt === EVENT_POST_RETRY_DELAYS_MS.length) break;
+      await delay(EVENT_POST_RETRY_DELAYS_MS[attempt]);
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
 async function getJson(fetchFn: typeof fetch, url: string, token?: string): Promise<Response> {

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { runRelayDaemonNode } from "./index.js";
+import { runRelayDaemonNode } from "./daemon-node/index.js";
 
 const sandboxIndex = process.argv.indexOf("--sandbox-id");
 const sandboxId = sandboxIndex >= 0 ? process.argv[sandboxIndex + 1] : undefined;

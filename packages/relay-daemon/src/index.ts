@@ -127,6 +127,15 @@ export {
 } from "./relay/daemon.js";
 
 export {
+  createDaemonNodeLogger,
+  localProcessExecStream,
+  runRelayDaemonNode,
+  type DaemonNodeLogFields,
+  type DaemonNodeLogger,
+  type DaemonNodeRuntimeOptions,
+} from "./daemon-node/index.js";
+
+export {
   type DaemonNodeCommand,
   type DaemonNodeEvent,
   type DaemonNodeRegistration,
