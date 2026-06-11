@@ -99,6 +99,21 @@ export class SessionController implements AgentEventSink {
     return session;
   }
 
+  cancelSession(sessionId: string, note = "Cancelled by human."): RelaySession {
+    const current = this.store.getSession(sessionId);
+    if (current.status === "cancelled") return current;
+    const session = this.append(sessionId, relayEvent("human.decision", sessionId, {
+      decision: {
+        id: newRelayId("dec"),
+        kind: "cancel",
+        createdAt: new Date().toISOString(),
+        note,
+      },
+    }));
+    this.updateTaskStatus("blocked", note, { sessionId });
+    return session;
+  }
+
   recordDecision(sessionId: string, kind: HumanDecisionKind, note?: string, targetAgent?: AgentName): RelaySession {
     const decision = {
       id: newRelayId("dec"),
@@ -171,7 +186,7 @@ export class SessionController implements AgentEventSink {
     }
 
     const next = mergeAgentState(state, patch);
-    const status = next.last_exit_code === 0 ? "completed" : "failed";
+    const status = runOptions.signal?.aborted ? "cancelled" : next.last_exit_code === 0 ? "completed" : "failed";
     const artifact = this.store.writeArtifact(sessionId, {
       kind: step.mode === "review" ? "review" : "command_log",
       title: `${step.agent} ${step.mode} output`,
@@ -217,16 +232,16 @@ export class SessionController implements AgentEventSink {
     let state = initialAgentState(taskGoal);
     for (const assignment of assignments) {
       if (options.signal?.aborted) {
-        this.failSession(sessionId, "Task cancelled before the next agent started.");
+        this.cancelSession(sessionId, abortReason(options.signal) ?? "Task cancelled before the next agent started.");
         return state;
       }
       state = await this.runStep(sessionId, state, assignment, options);
-      if (!assignmentSucceeded(assignment, state)) {
-        this.failSession(sessionId, assignmentFailureOutcome(assignment, state));
+      if (options.signal?.aborted) {
+        this.cancelSession(sessionId, abortReason(options.signal) ?? "Task cancelled during agent execution.");
         return state;
       }
-      if (options.signal?.aborted) {
-        this.failSession(sessionId, "Task cancelled during agent execution.");
+      if (!assignmentSucceeded(assignment, state)) {
+        this.failSession(sessionId, assignmentFailureOutcome(assignment, state));
         return state;
       }
     }
@@ -294,4 +309,8 @@ export class SessionController implements AgentEventSink {
     this.options.taskStore.appendEvent(this.options.taskId, relayTaskEvent("task.status", this.options.taskId, { status }));
     this.options.taskStore.recordActivity(this.options.taskId, message, input);
   }
+}
+
+function abortReason(signal: AbortSignal): string | undefined {
+  return typeof signal.reason === "string" && signal.reason ? signal.reason : undefined;
 }

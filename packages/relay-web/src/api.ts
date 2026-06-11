@@ -1,11 +1,12 @@
 import type {
+  CreateSessionInput,
   DaemonNodesResponse,
   RelaySession,
   RunInput,
   SandboxesResponse,
   SandboxRecord,
   SessionsResponse,
-} from "./types";
+} from "./types.js";
 
 export class RelayApiError extends Error {
   constructor(
@@ -58,6 +59,17 @@ export function provisionSandbox(employeeId: string, token?: string): Promise<Sa
     method: "POST",
     token,
     body: { employeeId },
+  });
+}
+
+export function createSession(input: CreateSessionInput): Promise<RelaySession> {
+  return apiJson<RelaySession>("/sessions", {
+    method: "POST",
+    body: {
+      taskGoal: input.taskGoal,
+      assignments: input.assignments,
+      workspacePath: input.workspacePath,
+    },
   });
 }
 

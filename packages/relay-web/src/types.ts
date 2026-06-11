@@ -33,6 +33,12 @@ export interface RunInput {
   sessionId?: string;
 }
 
+export interface CreateSessionInput {
+  taskGoal: string;
+  assignments: RunInput["assignments"];
+  workspacePath?: string;
+}
+
 export interface ApiErrorBody {
   error?: string;
 }

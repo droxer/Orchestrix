@@ -179,6 +179,8 @@ export interface RelayDaemonOptions {
   store?: SessionStore;
   sink?: AgentOutputSink;
   execStream?: AgentExecutor;
+  withOrchestratorSession?: typeof withOrchestratorSession;
+  ensureAgentReady?: typeof ensureAgentReady;
 }
 
 export interface RelayDaemonResponse {
@@ -250,6 +252,7 @@ export async function handleRelayDaemonRequest(
   if (method === "GET" && parts.length === 0) {
     return jsonResponse(200, {
       name: "Relay daemon",
+      daemonNodeMode: daemonNodeModeForBackend(backend),
       ui: true,
       uiPath: "/control",
       webUiPath: WEB_UI_PATH,
@@ -355,6 +358,10 @@ export async function handleRelayDaemonRequest(
     return jsonResponse(202, await backend.cancelRun(parts[1], parts[3], stringField(input, "reason") || "Cancelled by human."));
   }
   return jsonResponse(404, { error: "Not found" });
+}
+
+function daemonNodeModeForBackend(backend: SandboxBackend): "local" | "reverse" {
+  return backend instanceof LocalSandboxBackend ? "local" : "reverse";
 }
 
 export class DaemonNodeRegistry {
@@ -1085,9 +1092,13 @@ export class ReverseDaemonNodeBackend implements SandboxBackend {
 
 export class LocalSandboxBackend implements SandboxBackend {
   private readonly sandboxes = new Map<string, SandboxRecord>();
+  private readonly activeRuns = new Map<string, {
+    controller: AbortController;
+    sessionController: SessionController;
+  }>();
   private readonly store: SessionStore;
 
-  constructor(private readonly options: Pick<RelayDaemonOptions, "store" | "sink" | "execStream"> = {}) {
+  constructor(private readonly options: Pick<RelayDaemonOptions, "store" | "sink" | "execStream" | "withOrchestratorSession" | "ensureAgentReady"> = {}) {
     this.store = options.store ?? new LocalSessionStore();
   }
 
@@ -1135,10 +1146,13 @@ export class LocalSandboxBackend implements SandboxBackend {
       request.taskGoal,
       ["human", ...new Set(request.assignments.map((item) => item.agent))],
     ).id;
+    const abortController = new AbortController();
+    const runKey = localRunKey(sandboxId, sessionId);
+    this.activeRuns.set(runKey, { controller: abortController, sessionController: controller });
     try {
-      await withOrchestratorSession(async () => {
+      await (this.options.withOrchestratorSession ?? withOrchestratorSession)(async () => {
         for (const agent of new Set(request.assignments.map((assignment) => assignment.agent))) {
-          await ensureAgentReady(agent, this.options.sink);
+          await (this.options.ensureAgentReady ?? ensureAgentReady)(agent, this.options.sink, abortController.signal);
         }
         await controller.runAssignments(sessionId, request.taskGoal, request.assignments.map((assignment) => ({
           agent: assignment.agent,
@@ -1146,6 +1160,7 @@ export class LocalSandboxBackend implements SandboxBackend {
         })), {
           sink: this.options.sink,
           execStream: this.options.execStream,
+          signal: abortController.signal,
         });
       }, this.options.sink, {
         boxName: sandboxBoxName(sandboxId),
@@ -1154,13 +1169,28 @@ export class LocalSandboxBackend implements SandboxBackend {
       this.markAgentsReady(sandboxId, request.assignments.map((assignment) => assignment.agent));
       this.updateSandbox(sandboxId, { status: "ready" });
     } catch (error) {
+      if (abortController.signal.aborted) {
+        const reason = abortReason(abortController.signal);
+        controller.cancelSession(sessionId, reason);
+        this.updateSandbox(sandboxId, { status: "ready", lastError: reason });
+        return this.store.getSession(sessionId);
+      }
       this.updateSandbox(sandboxId, {
         status: "failed",
         lastError: error instanceof Error ? error.message : String(error),
       });
       throw error;
+    } finally {
+      this.activeRuns.delete(runKey);
     }
     return this.store.getSession(sessionId);
+  }
+
+  async cancelRun(sandboxId: string, sessionId: string, reason: string): Promise<RelaySession> {
+    const active = this.activeRuns.get(localRunKey(sandboxId, sessionId));
+    if (!active) throw new Error(`Session ${sessionId} has no active local sandbox run.`);
+    active.controller.abort(reason);
+    return active.sessionController.cancelSession(sessionId, reason);
   }
 
   private markAgentsReady(sandboxId: string, agents: AgentName[]): void {
@@ -1180,6 +1210,14 @@ export class LocalSandboxBackend implements SandboxBackend {
       updatedAt: new Date().toISOString(),
     });
   }
+}
+
+function localRunKey(sandboxId: string, sessionId: string): string {
+  return `${sandboxId}\0${sessionId}`;
+}
+
+function abortReason(signal: AbortSignal): string {
+  return typeof signal.reason === "string" && signal.reason ? signal.reason : "Cancelled by human.";
 }
 
 async function readJsonBody(request: IncomingMessage): Promise<unknown> {

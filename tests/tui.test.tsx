@@ -18,6 +18,7 @@ import {
   withDefaultAssignments,
   type RunRequest,
 } from "../packages/relay-tui/src/tui.js";
+import { daemonArgs, localDaemonCompatibilityError, resolveLocalRunConfig } from "../packages/relay-tui/src/local-run.js";
 import { LocalSessionStore } from "../packages/relay-daemon/src/index.js";
 
 function testSessionStore(): LocalSessionStore {
@@ -116,6 +117,64 @@ describe("TUI task parsing", () => {
 });
 
 describe("TUI daemon runner", () => {
+  it("propagates one local daemon config to the daemon and TUI", () => {
+    const workspace = mkdtempSync(join(tmpdir(), "relay-local-run-workspace-"));
+    const config = resolveLocalRunConfig({
+      RELAY_DAEMON_URL: "http://127.0.0.1:8790/",
+      RELAY_WORKSPACE: workspace,
+      RELAY_EMPLOYEE_ID: "alice",
+      RELAY_DAEMON_NODE_TOKEN: "tok_test",
+    });
+
+    assert.equal(config.daemonUrl, "http://127.0.0.1:8790");
+    assert.equal(config.workspacePath, workspace);
+    assert.equal(config.employeeId, "alice");
+    assert.equal(config.token, "tok_test");
+    assert.equal(config.sandboxId, "sbx_alice");
+    assert.equal(config.childEnv.RELAY_DAEMON_URL, "http://127.0.0.1:8790");
+    assert.equal(config.childEnv.RELAY_WORKSPACE, workspace);
+    assert.equal(config.childEnv.RELAY_EMPLOYEE_ID, "alice");
+    assert.equal(config.childEnv.RELAY_DAEMON_NODE_TOKEN, "tok_test");
+  });
+
+  it("starts the local daemon in BoxLite-backed local mode", () => {
+    assert.deepEqual(daemonArgs(new URL("http://127.0.0.1:8790")), [
+      "--port",
+      "8790",
+      "--daemon-node-mode",
+      "local",
+    ]);
+  });
+
+  it("rejects an already-running non-local daemon for local TUI startup", () => {
+    assert.equal(
+      localDaemonCompatibilityError({ responding: true, daemonNodeMode: "local" }, "http://127.0.0.1:8790"),
+      undefined,
+    );
+    assert.match(
+      localDaemonCompatibilityError({ responding: true, daemonNodeMode: "reverse" }, "http://127.0.0.1:8790") ?? "",
+      /requires local mode/,
+    );
+    assert.match(
+      localDaemonCompatibilityError({ responding: true }, "http://127.0.0.1:8790") ?? "",
+      /unknown mode/,
+    );
+  });
+
+  it("ignores blank workspace values when resolving local daemon config", () => {
+    const workspace = mkdtempSync(join(tmpdir(), "relay-local-run-workspace-"));
+    const config = resolveLocalRunConfig({
+      RELAY_WORKSPACE: "",
+      WORKSPACE: workspace,
+      USER: "relay user",
+      RELAY_DAEMON_NODE_TOKEN: "tok_test",
+    });
+
+    assert.equal(config.workspacePath, workspace);
+    assert.equal(config.sandboxId, "sbx_relay_user");
+    assert.equal(config.childEnv.RELAY_WORKSPACE, workspace);
+  });
+
   it("submits assignments to the host daemon sandbox", async () => {
     const calls: Array<{ url: string; init: RequestInit }> = [];
     const fetchFn = async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {

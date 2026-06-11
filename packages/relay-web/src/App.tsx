@@ -21,6 +21,7 @@ import {
 
 import {
   cancelRun,
+  createSession,
   listDaemonNodes,
   listSandboxes,
   listSessions,
@@ -385,20 +386,34 @@ export function App() {
     }
     setIsRunning(true);
     try {
-      const session = await runSandbox(
-        {
-          sandboxId: selectedSandbox.id,
-          taskGoal: goal,
-          assignments: [{ agent: routedAgent, mode: defaultModeForAgent(routedAgent) }],
-        },
-        selectedToken,
-      );
+      const assignment = { agent: routedAgent, mode: defaultModeForAgent(routedAgent) };
+      const session = await createSession({
+        taskGoal: goal,
+        assignments: [assignment],
+        workspacePath: selectedSandbox.workspacePath,
+      });
       setSelectedSessionId(session.id);
       setComposerText("");
       setMentionOpen(false);
       setMobileView("chat");
       atBottomRef.current = true;
-      setStatus({ tone: "good", message: `Message sent to ${selectedEmployee}'s ${routedAgent} agent.` });
+      await refresh();
+      const refreshTimer = window.setInterval(() => void refresh(), 1000);
+      try {
+        const completed = await runSandbox(
+          {
+            sandboxId: selectedSandbox.id,
+            taskGoal: goal,
+            assignments: [assignment],
+            sessionId: session.id,
+          },
+          selectedToken,
+        );
+        setSelectedSessionId(completed.id);
+        setStatus({ tone: "good", message: `Message sent to ${selectedEmployee}'s ${routedAgent} agent.` });
+      } finally {
+        window.clearInterval(refreshTimer);
+      }
       await refresh();
     } catch (error) {
       setStatus({ tone: "bad", message: error instanceof Error ? error.message : String(error) });

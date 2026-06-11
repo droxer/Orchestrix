@@ -10,6 +10,7 @@ import {
   type SandboxRecord,
   type SandboxRunRequest,
   LocalSessionStore,
+  LocalSandboxBackend,
   LocalTaskStore,
   DaemonNodeRegistry,
   ReverseDaemonNodeBackend,
@@ -23,6 +24,11 @@ import {
   relayEvent,
   createDaemonNodeLogger,
 } from "../packages/relay-daemon/src/index.js";
+import {
+  createSession as createWebSession,
+  provisionSandbox as provisionWebSandbox,
+  runSandbox as runWebSandbox,
+} from "../packages/relay-web/src/api.js";
 
 function codexReviewStdout(message: string): string {
   return JSON.stringify({
@@ -87,6 +93,19 @@ class FakeSandboxBackend implements SandboxBackend {
     return this.store.getSession(sessionId);
   }
 }
+
+describe("Project command scripts", () => {
+  it("builds before running dist-backed entrypoints", () => {
+    const packageJson = JSON.parse(readFileSync("package.json", "utf8")) as { scripts: Record<string, string> };
+    const makefile = readFileSync("Makefile", "utf8");
+
+    assert.equal(packageJson.scripts.run, "npm run build && node packages/relay-tui/dist/local-run.js");
+    assert.match(makefile, /^test:\n\tnpm test$/m);
+    assert.match(makefile, /^daemon: build$/m);
+    assert.match(makefile, /^daemon-node: build$/m);
+    assert.match(makefile, /^serve: build$/m);
+  });
+});
 
 describe("Relay session store", () => {
   it("persists append-only events and materialized snapshots", () => {
@@ -471,6 +490,65 @@ describe("Relay read-only HTTP API", () => {
   });
 });
 
+describe("Relay web API helpers", () => {
+  it("omits synthetic workspace paths and starts runs with an existing session", async () => {
+    const oldFetch = globalThis.fetch;
+    const calls: Array<{ url: string; init?: RequestInit; body?: unknown }> = [];
+    const assignment = { agent: "claude" as const, mode: "implement" as const };
+    globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
+      const body = init?.body ? JSON.parse(String(init.body)) as unknown : undefined;
+      calls.push({ url: String(url), init, body });
+      if (String(url) === "/sandboxes") {
+        return new Response(JSON.stringify({
+          id: "sbx_alice",
+          employeeId: "alice",
+          status: "ready",
+          agents: { claude: "unknown", pi: "unknown", codex: "unknown" },
+          createdAt: "2026-06-07T00:00:00.000Z",
+          updatedAt: "2026-06-07T00:00:00.000Z",
+        }), { status: 201, headers: { "Content-Type": "application/json" } });
+      }
+      if (String(url) === "/sessions") {
+        return new Response(JSON.stringify({ id: "ses_web" }), { status: 201, headers: { "Content-Type": "application/json" } });
+      }
+      if (String(url) === "/sandboxes/sbx_alice/runs") {
+        return new Response(JSON.stringify({ id: "ses_web", status: "completed" }), { status: 202, headers: { "Content-Type": "application/json" } });
+      }
+      return new Response(JSON.stringify({ error: "unexpected request" }), { status: 500, headers: { "Content-Type": "application/json" } });
+    }) as typeof fetch;
+    try {
+      await provisionWebSandbox("alice", "tok_web");
+      await createWebSession({
+        taskGoal: "fix auth",
+        assignments: [assignment],
+        workspacePath: "/host/workspace",
+      });
+      await runWebSandbox({
+        sandboxId: "sbx_alice",
+        taskGoal: "fix auth",
+        assignments: [assignment],
+        sessionId: "ses_web",
+      }, "tok_web");
+
+      assert.deepEqual(calls.map((call) => call.url), ["/sandboxes", "/sessions", "/sandboxes/sbx_alice/runs"]);
+      assert.deepEqual(calls[0].body, { employeeId: "alice" });
+      assert.equal((calls[0].init?.headers as Record<string, string>).Authorization, "Bearer tok_web");
+      assert.deepEqual(calls[1].body, {
+        taskGoal: "fix auth",
+        assignments: [assignment],
+        workspacePath: "/host/workspace",
+      });
+      assert.deepEqual(calls[2].body, {
+        taskGoal: "fix auth",
+        assignments: [assignment],
+        sessionId: "ses_web",
+      });
+    } finally {
+      globalThis.fetch = oldFetch;
+    }
+  });
+});
+
 describe("Relay daemon API", () => {
   it("advertises and serves the read-only daemon control panel", async () => {
     const store = new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-daemon-control-")));
@@ -478,9 +556,12 @@ describe("Relay daemon API", () => {
     const backend = new ReverseDaemonNodeBackend(registry);
 
     const root = JSON.parse((await handleRelayDaemonRequest(backend, "GET", "/", undefined, registry)).body);
+    const localRoot = JSON.parse((await handleRelayDaemonRequest(new LocalSandboxBackend({ store }), "GET", "/", undefined, registry)).body);
     const panel = await handleRelayDaemonRequest(backend, "GET", "/control", undefined, registry);
     const version = JSON.parse((await handleRelayDaemonRequest(backend, "GET", "/control/version", undefined, registry)).body);
 
+    assert.equal(root.daemonNodeMode, "reverse");
+    assert.equal(localRoot.daemonNodeMode, "local");
     assert.equal(root.ui, true);
     assert.equal(root.uiPath, "/control");
     assert.equal(root.webUiPath, "/web");
@@ -496,6 +577,65 @@ describe("Relay daemon API", () => {
     assert.match(panel.body, /window\.location\.reload/);
     assert.equal(typeof version.version, "string");
     assert.notEqual(version.version, "");
+  });
+
+  it("cancels an active local daemon run", async () => {
+    const workspace = mkdtempSync(join(tmpdir(), "relay-local-cancel-workspace-"));
+    const store = new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-local-cancel-")));
+    let seenSignal: AbortSignal | undefined;
+    let resolveRunStarted!: () => void;
+    const runStarted = new Promise<void>((resolve) => {
+      resolveRunStarted = resolve;
+    });
+    const backend = new LocalSandboxBackend({
+      store,
+      withOrchestratorSession: async (action) => action({
+        rootfsPath: "test-rootfs",
+        hostWorkspace: workspace,
+        hostUid: 501,
+        hostGid: 20,
+        syncedUid: 501,
+        syncedGid: 20,
+      }),
+      ensureAgentReady: async (_agent, _sink, signal) => {
+        assert.equal(signal?.aborted, false);
+      },
+      execStream: async (_cmd, _args, options) => {
+        seenSignal = options?.signal;
+        resolveRunStarted();
+        await new Promise<void>((resolve) => {
+          if (options?.signal?.aborted) {
+            resolve();
+            return;
+          }
+          options?.signal?.addEventListener("abort", () => resolve(), { once: true });
+        });
+        return { exit_code: 130, stdout: "", stderr: "", error_message: "Execution cancelled." };
+      },
+    });
+    const sandbox = await backend.provision({ employeeId: "local", workspacePath: workspace });
+
+    const pending = backend.run(sandbox.id, {
+      taskGoal: "long running local task",
+      assignments: [{ agent: "claude", mode: "implement" }],
+    });
+    await runStarted;
+    const sessionId = store.listSessions()[0].id;
+
+    const cancelled = await backend.cancelRun(sandbox.id, sessionId, "Cancelled by local test.");
+    assert.equal(seenSignal?.aborted, true);
+    assert.equal(cancelled.status, "cancelled");
+    assert.equal(cancelled.decisions.at(-1)?.kind, "cancel");
+
+    const final = await pending;
+    assert.equal(final.status, "cancelled");
+    assert.equal(final.phase, "cancelled");
+    assert.equal(final.agentRuns[0].status, "cancelled");
+    assert.equal(backend.get(sandbox.id)?.status, "ready");
+    await assert.rejects(
+      backend.cancelRun(sandbox.id, "missing-session", "Cancelled by local test."),
+      /no active local sandbox run/,
+    );
   });
 
   it("serves the exported Next.js web UI under /web", async () => {

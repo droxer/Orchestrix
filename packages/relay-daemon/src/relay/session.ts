@@ -368,7 +368,9 @@ export function materializeEvents(events: RelayEvent[]): RelaySession {
         run.exitCode = event.exitCode;
       }
       session.currentAgent = undefined;
-      session.phase = event.status === "completed" ? "agent_completed" : "agent_failed";
+      session.phase = event.status === "completed"
+        ? "agent_completed"
+        : event.status === "cancelled" ? "cancelled" : "agent_failed";
     } else if (event.type === "artifact.created") {
       session.artifacts.push(event.artifact);
       if (event.artifact.agentRunId) {
