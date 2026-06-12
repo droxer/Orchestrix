@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 import { spawn, type ChildProcess } from "node:child_process";
-import { randomBytes } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { hostWorkspacePath, normalizeBaseUrl } from "relay-backend";
+import { ensureDaemonNodeToken } from "relay-core";
 
-const DEFAULT_DAEMON_URL = "http://127.0.0.1:8790";
+const DEFAULT_BACKEND_URL = "http://127.0.0.1:8790";
 const STARTUP_TIMEOUT_MS = 15_000;
 const CHILD_LOG_LIMIT = 64_000;
 
@@ -17,31 +17,32 @@ interface ManagedChild {
 }
 
 export interface LocalRunConfig {
-  daemonUrl: string;
-  daemonEndpoint: URL;
+  backendUrl: string;
+  backendEndpoint: URL;
   workspacePath: string;
   employeeId: string;
   token: string;
   uiToken: string;
   sandboxId: string;
+  sandboxMode: string;
   childEnv: NodeJS.ProcessEnv;
 }
 
-export interface DaemonStatus {
+export interface BackendStatus {
   responding: boolean;
-  daemonNodeMode?: string;
 }
 
 const currentFile = fileURLToPath(import.meta.url);
 const distDir = dirname(currentFile);
 const backendCli = resolve(distDir, "../../relay-backend/dist/backend-cli.js");
+const daemonCli = resolve(distDir, "../../relay-daemon/dist/cli.js");
 const tuiCli = resolve(distDir, "cli.js");
 
 async function main(): Promise<void> {
-  const { daemonUrl, daemonEndpoint, childEnv } = resolveLocalRunConfig();
+  const { backendUrl, backendEndpoint, employeeId, sandboxId, sandboxMode, childEnv } = resolveLocalRunConfig();
 
   const children: ManagedChild[] = [];
-  let ownsDaemon = false;
+  let ownsBackend = false;
   let shuttingDown = false;
   const cleanup = (): void => {
     if (shuttingDown) return;
@@ -56,18 +57,20 @@ async function main(): Promise<void> {
   process.once("exit", cleanup);
 
   try {
-    const initialStatus = await daemonStatus(daemonUrl);
-    const initialCompatibilityError = localDaemonCompatibilityError(initialStatus, daemonUrl);
+    const initialStatus = await backendStatus(backendUrl);
     if (!initialStatus.responding) {
-      const daemon = startChild("backend", backendCli, daemonArgs(daemonEndpoint), childEnv);
-      children.push(daemon);
-      ownsDaemon = true;
-      await waitFor(async () => {
-        const status = await daemonStatus(daemonUrl);
-        return status.responding && status.daemonNodeMode === "local";
-      }, "Relay daemon", [daemon]);
-    } else if (initialCompatibilityError) {
-      throw new Error(initialCompatibilityError);
+      const backend = startChild("backend", backendCli, backendArgs(backendEndpoint), childEnv);
+      children.push(backend);
+      ownsBackend = true;
+      await waitFor(async () => (await backendStatus(backendUrl)).responding, "Relay backend", [backend]);
+    }
+
+    // The daemon owns the sandbox and runs the agent CLIs. Skip starting one
+    // when a live daemon for this employee is already registered (e.g. from a
+    // previous local run or a remote sandbox) so two pollers never compete
+    // for the same command queue.
+    if (!(await liveDaemonExists(backendUrl, employeeId))) {
+      children.push(startChild("daemon", daemonCli, daemonArgs(sandboxId, sandboxMode), childEnv));
     }
 
     const tui = spawn(process.execPath, [tuiCli], {
@@ -81,52 +84,63 @@ async function main(): Promise<void> {
     cleanup();
     const detail = error instanceof Error ? error.message : String(error);
     console.error(detail);
-    if (!ownsDaemon) {
-      console.error(`A daemon is already listening at ${daemonUrl}; check its /cp page or run make stop before retrying.`);
+    if (!ownsBackend) {
+      console.error(`A backend is already listening at ${backendUrl}; check its /cp page or run make stop before retrying.`);
     }
     process.exitCode = 1;
   }
 }
 
 export function resolveLocalRunConfig(env: NodeJS.ProcessEnv = process.env): LocalRunConfig {
-  const daemonUrl = normalizeBaseUrl(envValue(env, "RELAY_BACKEND_URL") ?? envValue(env, "RELAY_DAEMON_URL") ?? DEFAULT_DAEMON_URL);
-  const daemonEndpoint = new URL(daemonUrl);
+  const backendUrl = normalizeBaseUrl(envValue(env, "RELAY_BACKEND_URL") ?? envValue(env, "RELAY_DAEMON_URL") ?? DEFAULT_BACKEND_URL);
+  const backendEndpoint = new URL(backendUrl);
   const workspacePath = hostWorkspacePath(envValue(env, "RELAY_WORKSPACE") ?? envValue(env, "WORKSPACE"));
   const employeeId = envValue(env, "RELAY_EMPLOYEE_ID") ?? envValue(env, "EMPLOYEE_ID") ?? envValue(env, "USER") ?? "local";
-  const token = envValue(env, "RELAY_DAEMON_TOKEN") ?? envValue(env, "RELAY_DAEMON_NODE_TOKEN") ?? `tok_${randomBytes(24).toString("base64url")}`;
-  const uiToken = envValue(env, "RELAY_DAEMON_UI_TOKEN") ?? `tok_${randomBytes(24).toString("base64url")}`;
+  // Prefer the durable per-employee token file over a random token so a
+  // restarted daemon re-registers with the hash the backend already persisted.
+  const token = ensureDaemonNodeToken({
+    workspacePath,
+    employeeId,
+    token: envValue(env, "RELAY_DAEMON_TOKEN") ?? envValue(env, "RELAY_DAEMON_NODE_TOKEN"),
+  }).token;
+  const uiToken = ensureDaemonNodeToken({
+    workspacePath,
+    employeeId: `${employeeId}.ui`,
+    token: envValue(env, "RELAY_DAEMON_UI_TOKEN"),
+  }).token;
   const sandboxId = envValue(env, "RELAY_SANDBOX_ID") ?? envValue(env, "SANDBOX_ID") ?? `sbx_${safeId(employeeId)}`;
+  const sandboxMode = envValue(env, "RELAY_SANDBOX_MODE") ?? "boxlite";
   return {
-    daemonUrl,
-    daemonEndpoint,
+    backendUrl,
+    backendEndpoint,
     workspacePath,
     employeeId,
     token,
     uiToken,
     sandboxId,
+    sandboxMode,
     childEnv: {
       ...env,
-      RELAY_BACKEND_URL: daemonUrl,
-      RELAY_DAEMON_URL: daemonUrl,
+      RELAY_BACKEND_URL: backendUrl,
+      RELAY_DAEMON_URL: backendUrl,
       RELAY_EMPLOYEE_ID: employeeId,
       RELAY_DAEMON_TOKEN: token,
       RELAY_DAEMON_NODE_TOKEN: token,
       RELAY_DAEMON_UI_TOKEN: uiToken,
+      RELAY_SANDBOX_ID: sandboxId,
+      RELAY_SANDBOX_MODE: sandboxMode,
       RELAY_WORKSPACE: workspacePath,
     },
   };
 }
 
-export function daemonArgs(daemonEndpoint: URL): string[] {
-  const port = daemonEndpoint.port || (daemonEndpoint.protocol === "https:" ? "443" : "80");
-  return ["--port", port, "--daemon-node-mode", "local"];
+export function backendArgs(backendEndpoint: URL): string[] {
+  const port = backendEndpoint.port || (backendEndpoint.protocol === "https:" ? "443" : "80");
+  return ["--port", port];
 }
 
-export function localDaemonCompatibilityError(status: DaemonStatus, daemonUrl: string): string | undefined {
-  if (!status.responding) return undefined;
-  if (status.daemonNodeMode === "local") return undefined;
-  const mode = status.daemonNodeMode ?? "unknown";
-  return `Relay daemon at ${daemonUrl} is running in ${mode} mode, but the local TUI requires local mode. Run make stop, then make tui-local.`;
+export function daemonArgs(sandboxId: string, sandboxMode: string): string[] {
+  return ["--sandbox-id", sandboxId, "--sandbox", sandboxMode];
 }
 
 function envValue(env: NodeJS.ProcessEnv, name: string): string | undefined {
@@ -153,17 +167,23 @@ function startChild(name: string, script: string, args: string[], env: NodeJS.Pr
   return { name, child, log: () => log.trim() };
 }
 
-async function daemonStatus(daemonUrl: string): Promise<DaemonStatus> {
+async function backendStatus(backendUrl: string): Promise<BackendStatus> {
   try {
-    const response = await fetch(daemonUrl, { signal: AbortSignal.timeout(500) });
-    if (!response.ok) return { responding: false };
-    const body = await response.json() as { daemonNodeMode?: unknown };
-    return {
-      responding: true,
-      daemonNodeMode: typeof body.daemonNodeMode === "string" ? body.daemonNodeMode : undefined,
-    };
+    const response = await fetch(backendUrl, { signal: AbortSignal.timeout(500) });
+    return { responding: response.ok };
   } catch {
     return { responding: false };
+  }
+}
+
+async function liveDaemonExists(backendUrl: string, employeeId: string): Promise<boolean> {
+  try {
+    const response = await fetch(`${backendUrl}/cp/daemon-nodes`, { signal: AbortSignal.timeout(1000) });
+    if (!response.ok) return false;
+    const body = await response.json() as { nodes?: Array<{ employeeId?: string; online?: boolean; stale?: boolean }> };
+    return (body.nodes ?? []).some((node) => node.employeeId === employeeId && node.online !== false && node.stale !== true);
+  } catch {
+    return false;
   }
 }
 

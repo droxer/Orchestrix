@@ -11,6 +11,8 @@ import type {
   CodexTaskMode,
   StreamExecResult,
 } from "relay-core";
+import { startOrchestratorSession, ensureAgentReady as ensureSandboxAgentReady, type ActiveOrchestratorSession } from "./sandbox-session.js";
+import { defaultExecutionManager } from "./execution.js";
 import {
   claudeImplementNode,
   codexImplementNode,
@@ -29,9 +31,17 @@ import {
   DAEMON_NODE_PROTOCOL_VERSION,
 } from "relay-core";
 
+export type DaemonSandboxMode = "none" | "boxlite";
+
 export interface DaemonRuntimeOptions {
   backendUrl?: string;
   sandboxId?: string;
+  /**
+   * How agent CLIs are executed: "boxlite" boots a BoxLite VM owned by this
+   * daemon and runs agents inside the guest; "none" runs them as local
+   * processes (for daemons that already live inside a sandbox).
+   */
+  sandbox?: DaemonSandboxMode;
   employeeId?: string;
   workspacePath?: string;
   pollIntervalMs?: number;
@@ -71,10 +81,17 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
   if (!sandboxId) throw new Error("RELAY_SANDBOX_ID is required for the relay daemon.");
   const employeeId = options.employeeId ?? process.env.RELAY_EMPLOYEE_ID ?? process.env.USER ?? "local";
   const workspacePath = firstNonBlank(options.workspacePath, process.env.RELAY_WORKSPACE, process.env.WORKSPACE) ?? process.cwd();
-  process.env.RELAY_AGENT_WORKSPACE = workspacePath;
-  if (workspacePath !== GUEST_WORKSPACE) {
-    process.env.RELAY_RUN_AS_CURRENT_USER ??= "1";
-    process.env.RELAY_AGENT_HOME ??= join(workspacePath, ".relay", "daemon-node-home");
+  const sandboxMode = resolveSandboxMode(options.sandbox ?? process.env.RELAY_SANDBOX_MODE);
+  if (sandboxMode === "boxlite") {
+    // Agent commands run inside the BoxLite guest, where the host workspace
+    // is mounted at GUEST_WORKSPACE.
+    process.env.RELAY_AGENT_WORKSPACE = GUEST_WORKSPACE;
+  } else {
+    process.env.RELAY_AGENT_WORKSPACE = workspacePath;
+    if (workspacePath !== GUEST_WORKSPACE) {
+      process.env.RELAY_RUN_AS_CURRENT_USER ??= "1";
+      process.env.RELAY_AGENT_HOME ??= join(workspacePath, ".relay", "daemon-node-home");
+    }
   }
   const tokenResolution = ensureDaemonNodeToken({
     workspacePath,
@@ -90,7 +107,14 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
     logDir: options.logDir,
   });
   const heartbeatIntervalMs = options.heartbeatIntervalMs ?? positiveIntEnv("RELAY_DAEMON_HEARTBEAT_MS") ?? positiveIntEnv("RELAY_DAEMON_NODE_HEARTBEAT_MS") ?? 30_000;
-  logger.info("daemon starting", { sandboxId, employeeId, workspacePath, backendUrl });
+  const environment = createExecutionEnvironment(sandboxMode, sandboxId, workspacePath, logger);
+  const shutdown = (signal: NodeJS.Signals): void => {
+    logger.info("daemon stopping", { sandboxId, signal });
+    void environment.close().finally(() => process.exit(0));
+  };
+  process.once("SIGINT", () => shutdown("SIGINT"));
+  process.once("SIGTERM", () => shutdown("SIGTERM"));
+  logger.info("daemon starting", { sandboxId, employeeId, workspacePath, backendUrl, sandboxMode });
   const activeRuns = new Map<string, AbortController>();
   const buildRegistration = (): DaemonNodeRegistration => ({
     sandboxId,
@@ -106,7 +130,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
   await withBackendReconnect(register, logger, { sandboxId, what: "registration" });
   let lastRegisteredAt = Date.now();
   logger.info("daemon registered", { sandboxId, employeeId, workspacePath, backendUrl, logPath: logger.logPath });
-  console.log(`Relay daemon registered sandbox ${sandboxId} with backend at ${backendUrl}`);
+  console.log(`Relay daemon registered sandbox ${sandboxId} with backend at ${backendUrl} (sandbox: ${sandboxMode})`);
   if (logger.logPath) console.log(`Relay daemon log: ${logger.logPath}`);
   if (tokenResolution.source === "generated" && tokenResolution.path) {
     logger.info("daemon generated token", { sandboxId, employeeId, path: tokenResolution.path });
@@ -140,7 +164,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
         logger.info("command received", commandLogFields(sandboxId, command));
         const controller = new AbortController();
         activeRuns.set(command.id, controller);
-        void executeCommand(backendUrl, sandboxId, token, command, fetchFn, logger, workspacePath, controller.signal).catch((error: unknown) => {
+        void executeCommand(backendUrl, sandboxId, token, command, fetchFn, logger, workspacePath, environment, controller.signal).catch((error: unknown) => {
           const message = error instanceof Error ? error.message : String(error);
           logger.error("command failed before completion", { ...commandLogFields(sandboxId, command), error: message });
           return postJson(fetchFn, `${backendUrl}/daemon-nodes/${encodeURIComponent(sandboxId)}/events`, {
@@ -183,6 +207,7 @@ async function executeCommand(
   fetchFn: typeof fetch,
   logger: DaemonLogger,
   nodeWorkspacePath: string,
+  environment: DaemonExecutionEnvironment,
   signal?: AbortSignal,
 ): Promise<void> {
   const eventUrl = `${backendUrl}/daemon-nodes/${encodeURIComponent(sandboxId)}/events`;
@@ -193,7 +218,7 @@ async function executeCommand(
       `Daemon workspace mismatch: command expects ${command.workspacePath} but this daemon serves ${nodeWorkspacePath}.`,
     );
   }
-  ensureDaemonNodeAgentReady(command.agent);
+  await environment.ensureAgentReady(command.agent, signal);
   if (signal?.aborted) {
     await postRunCancelled(fetchFn, eventUrl, command, token, signal.reason);
     return;
@@ -239,7 +264,7 @@ async function executeCommand(
     },
   };
   const options = {
-    execStream: localProcessExecStream,
+    execStream: environment.execStream,
     eventSink,
     runId: command.runId,
     agent: command.agent,
@@ -303,7 +328,7 @@ async function postRunCancelled(
   } satisfies DaemonNodeEvent, token);
 }
 
-function ensureDaemonNodeAgentReady(agent: AgentName): void {
+function ensureHostAgentReady(agent: AgentName): void {
   // Auth material is written directly from this process; never pass it
   // through a shell where it would be visible in the process table.
   const home = agentHomePath();
@@ -326,6 +351,86 @@ function ensureDaemonNodeAgentReady(agent: AgentName): void {
 function writeSecretFile(path: string, content: string): void {
   writeFileSync(path, content, { mode: 0o600 });
   chmodSync(path, 0o600);
+}
+
+export interface DaemonExecutionEnvironment {
+  readonly sandboxMode: DaemonSandboxMode;
+  ensureAgentReady(agent: AgentName, signal?: AbortSignal): Promise<void>;
+  execStream: typeof localProcessExecStream;
+  close(): Promise<void>;
+}
+
+export function resolveSandboxMode(value: string | undefined): DaemonSandboxMode {
+  const trimmed = value?.trim();
+  if (!trimmed || trimmed === "none") return "none";
+  if (trimmed === "boxlite") return "boxlite";
+  throw new Error(`Unknown sandbox mode ${JSON.stringify(trimmed)}. Use "boxlite" or "none".`);
+}
+
+function createExecutionEnvironment(
+  mode: DaemonSandboxMode,
+  sandboxId: string,
+  workspacePath: string,
+  logger: DaemonLogger,
+): DaemonExecutionEnvironment {
+  if (mode === "boxlite") return createBoxliteEnvironment(sandboxId, workspacePath, logger);
+  return {
+    sandboxMode: "none",
+    ensureAgentReady: async (agent) => ensureHostAgentReady(agent),
+    execStream: localProcessExecStream,
+    close: async () => undefined,
+  };
+}
+
+function createBoxliteEnvironment(
+  sandboxId: string,
+  workspacePath: string,
+  logger: DaemonLogger,
+): DaemonExecutionEnvironment {
+  let starting: Promise<ActiveOrchestratorSession> | undefined;
+  // The sandbox boots lazily on the first run command and stays up for the
+  // daemon's lifetime so consecutive agent runs share one VM.
+  const start = (): Promise<ActiveOrchestratorSession> => {
+    starting ??= startOrchestratorSession((text) => {
+      logger.info("sandbox", { sandboxId, text: text.trimEnd() });
+    }, {
+      boxName: boxNameForSandbox(sandboxId),
+      workspacePath,
+      // The backend and TUI run beside this daemon; only refuse to start when
+      // another daemon or BoxLite shim already owns the runtime.
+      singleInstancePattern: "relay-daemon/dist/cli\\.js|boxlite-shim",
+    }).catch((error: unknown) => {
+      starting = undefined;
+      throw error;
+    });
+    return starting;
+  };
+  return {
+    sandboxMode: "boxlite",
+    async ensureAgentReady(agent, signal) {
+      await start();
+      await ensureSandboxAgentReady(agent, undefined, signal);
+    },
+    execStream: async (cmd, args = [], options = {}) => {
+      await start();
+      return defaultExecutionManager.execStream(cmd, args, options);
+    },
+    async close() {
+      if (!starting) return;
+      const pending = starting;
+      starting = undefined;
+      try {
+        const active = await pending;
+        await active.close();
+      } catch {
+        // The sandbox never came up; nothing to tear down.
+      }
+    },
+  };
+}
+
+function boxNameForSandbox(sandboxId: string): string {
+  return `relay-${sandboxId.replace(/[^a-zA-Z0-9_-]+/g, "-").slice(0, 48)}`;
 }
 
 export async function localProcessExecStream(
@@ -587,3 +692,38 @@ async function getJson(fetchFn: typeof fetch, url: string, token?: string): Prom
 function normalizeBaseUrl(value: string): string {
   return value.replace(/\/+$/, "");
 }
+
+export {
+  activeBox,
+  collectExecution,
+  dockerImageId,
+  ensureLocalDevboxOci,
+  ensureSingleOrchestrator,
+  execStream,
+  importBoxLite,
+  prepareGuestAgentAuth,
+  prepareGuestWorkspace,
+  setSessionBox,
+  stopSessionBox,
+  type BoxLiteModule,
+  type DevboxOciOptions,
+} from "./box.js";
+
+export {
+  BoxLiteExecutionManager,
+  defaultExecutionManager,
+  type CreateSandboxInput,
+  type ExecutionManager,
+  type ExecutionSandbox,
+  type SandboxMount,
+} from "./execution.js";
+
+export {
+  ensureAgentReady,
+  resetAgentReadiness,
+  startOrchestratorSession,
+  withOrchestratorSession,
+  type ActiveOrchestratorSession,
+  type OrchestratorSession,
+  type OrchestratorSessionOptions,
+} from "./sandbox-session.js";

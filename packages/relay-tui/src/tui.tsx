@@ -9,7 +9,6 @@ import {
   type RelaySession,
   type SessionController,
   type SessionStore,
-  type OrchestratorSession,
   GUEST_WORKSPACE,
   ansi,
   ClaudeStreamRenderer,
@@ -21,7 +20,6 @@ import {
   StderrLineRenderer,
   assignmentFailureOutcome,
   assignmentSucceeded,
-  ensureAgentReady,
   hostWorkspacePath,
   initialAgentState,
   stripAnsi,
@@ -30,6 +28,7 @@ import {
   type ControlPanelDaemonNodeRecord,
 } from "relay-backend";
 import { ensureDaemonNodeToken } from "relay-core";
+import { ensureAgentReady, type OrchestratorSession } from "relay-daemon";
 
 export interface ParsedAssignment {
   agent: AgentName;

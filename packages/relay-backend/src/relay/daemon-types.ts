@@ -4,10 +4,8 @@ import type {
   DaemonNodeCommand,
   DaemonNodeEvent,
 } from "relay-core";
-import type { withOrchestratorSession, ensureAgentReady } from "./workflow.js";
 import type { SessionStore } from "./session.js";
 import type { TaskStore } from "./task.js";
-import type { AgentExecutor, AgentOutputSink, AgentState } from "relay-core";
 
 export type SandboxStatus = "provisioning" | "ready" | "running" | "stopped" | "failed";
 
@@ -158,14 +156,9 @@ export interface RelayDaemonOptions {
   port?: number;
   host?: string;
   backend?: SandboxBackend;
-  daemonNodeMode?: "server" | "local" | "reverse";
   daemonStore?: DaemonStore;
   store?: SessionStore;
   taskStore?: TaskStore;
-  sink?: AgentOutputSink;
-  execStream?: AgentExecutor;
-  withOrchestratorSession?: typeof withOrchestratorSession;
-  ensureAgentReady?: typeof ensureAgentReady;
 }
 
 export interface RelayDaemonResponse {

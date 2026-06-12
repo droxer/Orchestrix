@@ -113,7 +113,6 @@ export {
   createPostgresStoreSet,
   createPostgresTaskStore,
   requireDatabaseUrl,
-  LocalSandboxBackend,
   DaemonNodeRegistry,
   ServerDaemonNodeBackend,
   createRelayDaemonRuntime,
@@ -204,26 +203,6 @@ export {
 } from "relay-core";
 
 export {
-  dockerImageId,
-  ensureLocalDevboxOci,
-  ensureSingleOrchestrator,
-  execStream,
-  collectExecution,
-  activeBox,
-  prepareGuestAgentAuth,
-  prepareGuestWorkspace,
-} from "./relay/box.js";
-
-export {
-  BoxLiteExecutionManager,
-  defaultExecutionManager,
-  type CreateSandboxInput,
-  type ExecutionManager,
-  type ExecutionSandbox,
-  type SandboxMount,
-} from "./relay/execution.js";
-
-export {
   claudeImplementNode,
   codexImplementNode,
   codexReviewNode,
@@ -235,9 +214,4 @@ export {
   run,
   runAgentTask,
   runWorkflow,
-  ensureAgentReady,
-  resetAgentReadiness,
-  withOrchestratorSession,
-  type OrchestratorSession,
-  type OrchestratorSessionOptions,
 } from "./relay/workflow.js";

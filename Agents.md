@@ -68,11 +68,11 @@ ask the user whether to run `codegraph init -i`.
 
 - Workspace packages: `packages/relay-core/`, `packages/relay-backend/`,
   `packages/relay-daemon/`, and `packages/relay-tui/`.
-- Daemon CLI entrypoints: `packages/relay-backend/src/cli.ts` and
+- Backend CLI entrypoints: `packages/relay-backend/src/cli.ts` and
   `packages/relay-backend/src/backend-cli.ts`.
-- Daemon node CLI entrypoint: `packages/relay-daemon/src/cli.ts`.
+- Daemon CLI entrypoint: `packages/relay-daemon/src/cli.ts`.
 - TUI CLI entrypoint: `packages/relay-tui/src/cli.ts`.
-- Public daemon re-export surface: `packages/relay-backend/src/index.ts`.
+- Public backend re-export surface: `packages/relay-backend/src/index.ts`.
 - Shared protocol and agent runtime modules: `packages/relay-core/src/`.
 - Relay implementation modules: `packages/relay-backend/src/relay/`.
 - TUI implementation: `packages/relay-tui/src/tui.tsx`.
@@ -106,8 +106,11 @@ unless `dockerfile` or the devbox image changed.
 
 ## Architecture
 
-Relay is a local-first orchestration control plane that lets a human and the
-Claude Code, Pi, and Codex CLIs collaborate inside one isolated BoxLite VM.
+Relay is a local-first orchestration system split into a backend (control
+plane) and daemons (execution plane). The backend owns sessions, tasks, and
+the daemon registry and never executes agents; each daemon registers with the
+backend, owns its sandbox (BoxLite VM or none), and runs the Claude Code, Pi,
+and Codex CLIs inside it.
 
 Key modules:
 
@@ -115,14 +118,17 @@ Key modules:
   command builders, stream renderers, guest helpers, and agent execution units.
 - `packages/relay-backend/src/cli.ts`: compatibility CLI for `relay`
   subcommands.
-- `packages/relay-backend/src/backend-cli.ts`: host daemon binary entrypoint.
-- `packages/relay-daemon/src/cli.ts`: daemon node binary entrypoint.
-- `packages/relay-daemon/src/index.ts`: sandbox-side daemon node runtime.
+- `packages/relay-backend/src/backend-cli.ts`: backend binary entrypoint.
+- `packages/relay-daemon/src/cli.ts`: daemon binary entrypoint.
+- `packages/relay-daemon/src/index.ts`: daemon runtime — registers with the
+  backend, polls for commands, owns the sandbox, and runs agent CLIs.
 - `packages/relay-tui/src/tui.tsx`: Ink-based TUI. Owns input parsing for `@claude`, `@pi`,
   `@codex`, `/approve`, `/reject`, `/cancel`, `/rerun`, `/handoff`,
   `/sessions`, `/open`, `/summary`, and `/quit`.
-- `packages/relay-backend/src/relay/workflow.ts`: VM lifecycle, agent readiness preflight, and the
-  default Claude to Pi to Codex workflow.
+- `packages/relay-backend/src/relay/workflow.ts`: CLI dispatch and the default
+  Claude to Pi to Codex workflow (`relay run-workflow`).
+- `packages/relay-daemon/src/sandbox-session.ts`: sandbox session lifecycle and
+  agent readiness preflight (`ensureAgentReady`).
 - `packages/relay-backend/src/relay/controller.ts`: `SessionController`, the only object that mutates
   sessions. Each `runStep` emits events through the store and notifies the TUI
   through `onUpdate`.
@@ -134,7 +140,7 @@ Key modules:
   `packages/relay-core/src/prompts.ts`: shell argv and prompt construction for agents and modes.
 - `packages/relay-backend/src/relay/routing.ts`: default-workflow transition function used by
   `relay run-workflow`. TUI assignments do not go through this router.
-- `packages/relay-backend/src/relay/box.ts`,
+- `packages/relay-daemon/src/box.ts`,
   `packages/relay-core/src/guest.ts`, and
   `packages/relay-core/src/env.ts`: BoxLite VM setup, guest auth provisioning, and env loading.
 - `packages/relay-core/src/renderers.ts`: streaming JSONL to terminal text converters.

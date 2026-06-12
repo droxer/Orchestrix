@@ -54,9 +54,9 @@ export async function importBoxLite(): Promise<BoxLiteModule> {
   return import("@boxlite-ai/boxlite");
 }
 
-export function ensureSingleOrchestrator(): void {
+export function ensureSingleOrchestrator(pattern = "relay|orchestrator"): void {
   const ignored = new Set([process.pid, process.ppid]);
-  const result = spawnSync("pgrep", ["-fl", "relay|orchestrator"], { encoding: "utf8" });
+  const result = spawnSync("pgrep", ["-fl", pattern], { encoding: "utf8" });
   if (result.status !== 0) return;
   const others: string[] = [];
   for (const rawLine of result.stdout.split(/\r?\n/)) {

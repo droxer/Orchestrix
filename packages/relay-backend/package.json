@@ -15,10 +15,10 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@boxlite-ai/boxlite": "^0.9.5",
     "@types/pg": "^8.20.0",
     "pg": "^8.21.0",
-    "relay-core": "0.1.0"
+    "relay-core": "0.1.0",
+    "relay-daemon": "0.1.0"
   },
   "engines": {
     "node": ">=22.19.0"

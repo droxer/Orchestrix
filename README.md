@@ -273,11 +273,14 @@ from events.
 
 ```text
 packages/relay-backend/src/cli.ts              compatibility CLI entrypoint
-packages/relay-backend/src/backend-cli.ts       host daemon binary entrypoint
+packages/relay-backend/src/backend-cli.ts      backend binary entrypoint
 packages/relay-core/src/index.ts              shared protocol and agent runtime exports
-packages/relay-daemon/src/cli.ts          daemon node binary entrypoint
-packages/relay-daemon/src/index.ts        sandbox-side daemon node runtime
-packages/relay-backend/src/index.ts            public daemon re-export surface
+packages/relay-daemon/src/cli.ts              daemon binary entrypoint
+packages/relay-daemon/src/index.ts            daemon runtime (registers with the backend, owns the sandbox, runs agents)
+packages/relay-daemon/src/box.ts              BoxLite VM setup
+packages/relay-daemon/src/execution.ts        BoxLite execution manager
+packages/relay-daemon/src/sandbox-session.ts  sandbox session lifecycle and agent preflight
+packages/relay-backend/src/index.ts            public backend re-export surface
 packages/relay-backend/src/relay/controller.ts session-aware orchestration controller
 packages/relay-backend/src/relay/session.ts    durable session event model and local store
 packages/relay-backend/src/relay/task.ts       backlog/task event model and local store
@@ -286,15 +289,16 @@ packages/relay-core/src/commands.ts   agent command builders
 packages/relay-core/src/prompts.ts    agent prompt builders
 packages/relay-core/src/renderers.ts  stream-json and JSONL renderers
 packages/relay-backend/src/relay/routing.ts    default workflow routing
-packages/relay-backend/src/relay/workflow.ts   BoxLite lifecycle and runtime entrypoints
+packages/relay-backend/src/relay/workflow.ts   CLI dispatch and the default run-workflow
 packages/relay-backend/src/relay/server.ts     local JSON/SSE API
 packages/relay-tui/src/cli.ts                 TUI binary entrypoint
 packages/relay-tui/src/tui.tsx                Ink TUI and human commands
 ```
 
-Keep new daemon public API exports in `packages/relay-backend/src/index.ts`.
-Keep runtime dispatch in `packages/relay-backend/src/relay/workflow.ts`; package
-binary wrappers should stay minimal.
+Keep new backend public API exports in `packages/relay-backend/src/index.ts`
+and sandbox/execution exports in `packages/relay-daemon/src/index.ts`. Keep CLI
+dispatch in `packages/relay-backend/src/relay/workflow.ts`; package binary
+wrappers should stay minimal.
 
 ## Development
 
@@ -325,7 +329,8 @@ For behavior changes, add or update focused tests and run `npm test`.
 - Keep tasks and sessions loosely coupled through `task.session_linked`.
 - Keep API state real: no seeded demo tasks, fake agent runs, or dummy artifacts.
 - Keep agent execution isolated to `nodes.ts`, command construction to
-  `commands.ts`, and workflow lifecycle to `workflow.ts` / `box.ts`.
+  `commands.ts`, and sandbox lifecycle to `relay-daemon` (`sandbox-session.ts`
+  / `box.ts`). The backend must never execute agents in-process.
 - Route future execution endpoints through `SessionController` and the same
   orchestrator readiness flow used by the CLI/TUI.
 - Claude uses `--output-format stream-json`; Codex uses `exec --json`; render

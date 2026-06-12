@@ -77,21 +77,23 @@ describe("Relay Postgres storage startup", () => {
     assert.ok(pool.queries.length > 0);
   });
 
-  it("does not require Postgres defaults for local daemon mode", async () => {
-    assert.equal(shouldUsePostgresDefaults({ daemonNodeMode: "local" }), false);
-    assert.equal(shouldUsePostgresDefaults({ daemonNodeMode: "server" }), true);
-    assert.equal(shouldUsePostgresDefaults({}), true);
+  it("uses Postgres defaults only when DATABASE_URL is configured", async () => {
+    assert.equal(shouldUsePostgresDefaults({}, {}), false);
+    assert.equal(shouldUsePostgresDefaults({}, { DATABASE_URL: " " }), false);
+    assert.equal(shouldUsePostgresDefaults({}, { DATABASE_URL: "postgresql://relay@localhost/relay" }), true);
+    assert.equal(shouldUsePostgresDefaults({ store: {} as never }, { DATABASE_URL: "postgresql://relay@localhost/relay" }), false);
   });
 
-  it("constructs local daemon mode without DATABASE_URL but rejects default daemon mode", async () => {
+  it("falls back to local file-backed stores without DATABASE_URL", async () => {
     const previous = process.env.DATABASE_URL;
     delete process.env.DATABASE_URL;
     try {
-      const runtime = createRelayDaemonRuntime({ daemonNodeMode: "local" });
+      const runtime = createRelayDaemonRuntime({});
       await runtime.ready;
 
-      assert.equal((await runtime.backend.list()).length, 0);
-      assert.throws(() => createRelayDaemonRuntime({}), /DATABASE_URL is required/);
+      // Default stores are file-backed under the repo data dir, so only
+      // assert the runtime is usable without Postgres configured.
+      assert.ok(Array.isArray(await runtime.backend.list()));
     } finally {
       if (previous === undefined) {
         delete process.env.DATABASE_URL;
