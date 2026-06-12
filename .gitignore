@@ -36,3 +36,4 @@ htmlcov/
 *.swp
 *.swo
 .DS_Store
+daemon.log

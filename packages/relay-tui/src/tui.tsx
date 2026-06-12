@@ -9,7 +9,6 @@ import {
   type RelaySession,
   type SessionController,
   type SessionStore,
-  type OrchestratorSession,
   GUEST_WORKSPACE,
   ansi,
   ClaudeStreamRenderer,
@@ -21,15 +20,15 @@ import {
   StderrLineRenderer,
   assignmentFailureOutcome,
   assignmentSucceeded,
-  ensureAgentReady,
   hostWorkspacePath,
   initialAgentState,
   stripAnsi,
   type RelayEvent,
   type SandboxRecord,
   type ControlPanelDaemonNodeRecord,
-} from "relay-daemon";
+} from "relay-backend";
 import { ensureDaemonNodeToken } from "relay-core";
+import { ensureAgentReady, type OrchestratorSession } from "relay-daemon";
 
 export interface ParsedAssignment {
   agent: AgentName;
@@ -1513,7 +1512,7 @@ export function RelayTuiHost({ onExit }: { onExit: () => void }): React.ReactEle
       const nodeToken = liveNode?.nodeToken ?? ensureDaemonNodeToken({
         workspacePath,
         employeeId,
-        token: process.env.RELAY_DAEMON_NODE_TOKEN,
+        token: process.env.RELAY_DAEMON_TOKEN ?? process.env.RELAY_DAEMON_NODE_TOKEN,
       }).token;
       const uiToken = ensureDaemonNodeToken({
         workspacePath,
@@ -1535,7 +1534,7 @@ export function RelayTuiHost({ onExit }: { onExit: () => void }): React.ReactEle
           lastWaitingStatus = waitingStatus;
 	          appendBootLog(
 	            `\nINFO Waiting for daemon node ${current.id} (${current.status}). ${current.lastError ?? "Start the sandbox worker."}\n` +
-	              `Run: \`make daemon-node EMPLOYEE_ID=${employeeId} SANDBOX_ID=${current.id} DAEMON_NODE_TOKEN=${nodeToken}\`\n`,
+	              `Run: \`make daemon EMPLOYEE_ID=${employeeId} SANDBOX_ID=${current.id} DAEMON_TOKEN=${nodeToken}\`\n`,
 	          );
         }
         await delay(DAEMON_POLL_INTERVAL_MS);
@@ -1562,7 +1561,7 @@ export function RelayTuiHost({ onExit }: { onExit: () => void }): React.ReactEle
       if (!mountedRef.current || cancelled) return;
       const detail = error instanceof Error ? error.message : String(error);
       setBootError(detail);
-      appendBootLog(`\nERR  ${detail}\nStart the host daemon with: relay daemon --port 8790\n`);
+      appendBootLog(`\nERR  ${detail}\nStart the Relay backend with: relay-backend --port 8790\n`);
     });
     return () => {
       cancelled = true;

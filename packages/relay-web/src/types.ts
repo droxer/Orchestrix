@@ -5,7 +5,7 @@ import type {
   DaemonNodeMonitorRecord,
   RelaySession,
   SandboxRecord,
-} from "relay-daemon";
+} from "relay-backend";
 
 export type { AgentName, CodexTaskMode, ControlPanelDaemonNodeRecord, DaemonNodeMonitorRecord, RelaySession, SandboxRecord };
 

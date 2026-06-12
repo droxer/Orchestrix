@@ -36,7 +36,7 @@ import {
   stringField,
   workspacePathsMatch,
 } from "./daemon-registry.js";
-import { LocalSandboxBackend, ServerDaemonNodeBackend } from "./daemon-backends.js";
+import { ServerDaemonNodeBackend } from "./daemon-backends.js";
 import {
   CONTROL_PANEL_VERSION,
   daemonControlPanelHtml,
@@ -70,8 +70,8 @@ export async function serveRelayDaemon(options: RelayDaemonOptions = {}): Promis
     server.listen(port, host, () => {
       server.off("error", onError);
       const baseUrl = `http://${host}:${port}`;
-      console.log(`Relay daemon listening on ${baseUrl}`);
-      console.log(`Relay daemon control panel: ${baseUrl}/cp`);
+      console.log(`Relay backend listening on ${baseUrl}`);
+      console.log(`Relay backend control panel: ${baseUrl}/cp`);
       console.log(`Relay web UI: ${baseUrl}${WEB_UI_PATH}`);
       resolve();
     });
@@ -85,18 +85,14 @@ export function createRelayDaemonRuntime(options: RelayDaemonOptions = {}): Rela
   const taskStore = options.taskStore ?? defaults?.taskStore ?? new LocalTaskStore();
   const daemonStore = options.daemonStore ?? defaults?.daemonStore;
   const daemonNodeRegistry = new DaemonNodeRegistry(store, daemonStore);
-  const backend = options.backend ?? (options.daemonNodeMode === "local"
-    ? new LocalSandboxBackend({
-        store,
-        sink: options.sink,
-        execStream: options.execStream,
-      })
-    : new ServerDaemonNodeBackend(daemonNodeRegistry));
+  const backend = options.backend ?? new ServerDaemonNodeBackend(daemonNodeRegistry);
   return { backend, daemonNodeRegistry, ready: defaults?.storage.ready ?? Promise.resolve(), taskStore };
 }
 
-export function shouldUsePostgresDefaults(options: RelayDaemonOptions): boolean {
-  return options.daemonNodeMode !== "local" && !options.store && !options.taskStore && !options.daemonStore;
+// Postgres becomes the default storage only when DATABASE_URL is configured;
+// otherwise the backend stays local-first with file-backed stores.
+export function shouldUsePostgresDefaults(options: RelayDaemonOptions, env: NodeJS.ProcessEnv = process.env): boolean {
+  return !options.store && !options.taskStore && !options.daemonStore && Boolean(env.DATABASE_URL?.trim());
 }
 
 export async function routeDaemonRequest(
@@ -140,8 +136,7 @@ export async function handleRelayDaemonRequest(
   }
   if (method === "GET" && parts.length === 0) {
     return jsonResponse(200, {
-      name: "Relay daemon",
-      daemonNodeMode: daemonNodeModeForBackend(backend),
+      name: "Relay backend",
       ui: true,
       uiPath: "/cp",
       webUiPath: WEB_UI_PATH,
@@ -248,10 +243,6 @@ export async function handleRelayDaemonRequest(
     return jsonResponse(202, await backend.cancelRun(parts[1], parts[3], stringField(input, "reason") || "Cancelled by human."));
   }
   return jsonResponse(404, { error: "Not found" });
-}
-
-function daemonNodeModeForBackend(backend: SandboxBackend): "local" | "server" {
-  return backend instanceof LocalSandboxBackend ? "local" : "server";
 }
 
 export function sendJson(response: ServerResponse, status: number, body: unknown): void {

@@ -11,7 +11,6 @@ import {
   type SandboxRunRequest,
   LocalSessionStore,
   LocalDaemonStore,
-  LocalSandboxBackend,
   LocalTaskStore,
   DaemonNodeRegistry,
   ServerDaemonNodeBackend,
@@ -21,8 +20,8 @@ import {
   RelayDaemonClient,
   initialAgentState,
   relayEvent,
-} from "../packages/relay-daemon/src/index.js";
-import { createDaemonNodeLogger } from "../packages/relay-daemon-node/src/index.js";
+} from "../packages/relay-backend/src/index.js";
+import { createDaemonLogger } from "../packages/relay-daemon/src/index.js";
 import { ensureDaemonNodeToken, readDaemonNodeToken } from "../packages/relay-core/src/index.js";
 import {
   createSession as createWebSession,
@@ -135,10 +134,10 @@ describe("Project command scripts", () => {
     assert.match(makefile, /^run: tui$/m);
     assert.match(makefile, /node packages\/relay-tui\/dist\/local-run\.js/);
     assert.match(makefile, /node packages\/relay-tui\/dist\/cli\.js/);
-    assert.match(makefile, /^daemon-local:$/m);
-    assert.match(makefile, /^daemon-server:$/m);
-    assert.match(makefile, /^daemon: daemon-server$/m);
-    assert.match(makefile, /^daemon-node:$/m);
+    assert.match(makefile, /^backend:$/m);
+    assert.match(makefile, /^daemon:$/m);
+    assert.match(makefile, /node packages\/relay-backend\/dist\/backend-cli\.js/);
+    assert.match(makefile, /node packages\/relay-daemon\/dist\/cli\.js/);
     assert.match(makefile, /^serve:$/m);
   });
 });
@@ -253,7 +252,7 @@ describe("Relay daemon node tokens", () => {
 describe("Relay daemon node logging", () => {
   it("writes node and run scoped JSONL logs", async () => {
     const workspacePath = mkdtempSync(join(tmpdir(), "relay-daemon-node-logs-"));
-    const logger = createDaemonNodeLogger({ workspacePath, sandboxId: "sbx/logs" });
+    const logger = createDaemonLogger({ workspacePath, sandboxId: "sbx/logs" });
 
     logger.info("daemon node registered", { sandboxId: "sbx/logs", employeeId: "alice" });
     logger.output({
@@ -626,13 +625,11 @@ describe("Relay daemon API", () => {
     const backend = new ServerDaemonNodeBackend(registry);
 
     const root = JSON.parse((await handleRelayDaemonRequest(backend, "GET", "/", undefined, registry)).body);
-    const localRoot = JSON.parse((await handleRelayDaemonRequest(new LocalSandboxBackend({ store }), "GET", "/", undefined, registry)).body);
     const panel = await handleRelayDaemonRequest(backend, "GET", "/cp", undefined, registry);
     const version = JSON.parse((await handleRelayDaemonRequest(backend, "GET", "/cp/version", undefined, registry)).body);
     const oldPanel = await handleRelayDaemonRequest(backend, "GET", "/control", undefined, registry);
 
-    assert.equal(root.daemonNodeMode, "server");
-    assert.equal(localRoot.daemonNodeMode, "local");
+    assert.equal(root.name, "Relay backend");
     assert.equal(root.ui, true);
     assert.equal(root.uiPath, "/cp");
     assert.equal(root.webUiPath, "/web");
@@ -657,79 +654,23 @@ describe("Relay daemon API", () => {
     assert.notEqual(version.version, "");
   });
 
-  it("cancels an active local daemon run", async () => {
-    const workspace = mkdtempSync(join(tmpdir(), "relay-local-cancel-workspace-"));
-    const store = new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-local-cancel-")));
-    let seenSignal: AbortSignal | undefined;
-    let resolveRunStarted!: () => void;
-    const runStarted = new Promise<void>((resolve) => {
-      resolveRunStarted = resolve;
-    });
-    const backend = new LocalSandboxBackend({
-      store,
-      withOrchestratorSession: async (action) => action({
-        rootfsPath: "test-rootfs",
-        hostWorkspace: workspace,
-        hostUid: 501,
-        hostGid: 20,
-        syncedUid: 501,
-        syncedGid: 20,
-      }),
-      ensureAgentReady: async (_agent, _sink, signal) => {
-        assert.equal(signal?.aborted, false);
-      },
-      execStream: async (_cmd, _args, options) => {
-        seenSignal = options?.signal;
-        resolveRunStarted();
-        await new Promise<void>((resolve) => {
-          if (options?.signal?.aborted) {
-            resolve();
-            return;
-          }
-          options?.signal?.addEventListener("abort", () => resolve(), { once: true });
-        });
-        return { exit_code: 130, stdout: "", stderr: "", error_message: "Execution cancelled." };
-      },
-    });
-    const sandbox = await backend.provision({ employeeId: "local", workspacePath: workspace, token: "ui_local" });
-
-    const pending = backend.run(sandbox.id, {
-      taskGoal: "long running local task",
-      assignments: [{ agent: "claude", mode: "implement" }],
-    });
-    await runStarted;
-    const sessionId = (await store.listSessions())[0].id;
-
-    const cancelled = await backend.cancelRun(sandbox.id, sessionId, "Cancelled by local test.");
-    assert.equal(seenSignal?.aborted, true);
-    assert.equal(cancelled.status, "cancelled");
-    assert.equal(cancelled.decisions.at(-1)?.kind, "cancel");
-
-    const final = await pending;
-    assert.equal(final.status, "cancelled");
-    assert.equal(final.phase, "cancelled");
-    assert.equal(final.agentRuns[0].status, "cancelled");
-    assert.equal((await backend.get(sandbox.id))?.status, "ready");
-    await assert.rejects(
-      backend.cancelRun(sandbox.id, "missing-session", "Cancelled by local test."),
-      /no active local sandbox run/,
-    );
-  });
-
-  it("requires a UI token for local daemon sandbox provisioning and listing", async () => {
-    const store = new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-local-auth-")));
-    const backend = new LocalSandboxBackend({ store });
+  it("requires a UI token for sandbox provisioning and listing", async () => {
+    const store = new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-auth-")));
+    const registry = new DaemonNodeRegistry(store);
+    const backend = new ServerDaemonNodeBackend(registry);
 
     const missing = await handleRelayDaemonRequest(backend, "POST", "/sandboxes", {
       employeeId: "local",
       workspacePath: "/workspace/local",
-    });
+      nodeToken: "node_local",
+    }, registry);
     const created = await handleRelayDaemonRequest(backend, "POST", "/sandboxes", {
       employeeId: "local",
       workspacePath: "/workspace/local",
-    }, undefined, "ui_local");
-    const missingList = await handleRelayDaemonRequest(backend, "GET", "/sandboxes");
-    const listed = await handleRelayDaemonRequest(backend, "GET", "/sandboxes", undefined, undefined, "ui_local");
+      nodeToken: "node_local",
+    }, registry, "ui_local");
+    const missingList = await handleRelayDaemonRequest(backend, "GET", "/sandboxes", undefined, registry);
+    const listed = await handleRelayDaemonRequest(backend, "GET", "/sandboxes", undefined, registry, "ui_local");
     const body = JSON.parse(listed.body);
 
     assert.equal(missing.status, 401);

@@ -1,21 +1,17 @@
 import { DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS } from "relay-core";
-import type { AgentName, AgentState, CodexTaskMode } from "relay-core";
+import type { AgentName, AgentState } from "relay-core";
 import { initialAgentState } from "relay-core";
 import { assignmentFailureOutcome, SessionController, type WorkflowStep } from "./controller.js";
 import {
-  LocalSessionStore,
   newRelayId,
   relayEvent,
   roleForAgent,
   type RelaySession,
   type SessionStore,
 } from "./session.js";
-import { ensureAgentReady, withOrchestratorSession } from "./workflow.js";
-import { defaultExecutionManager } from "./execution.js";
 import type { SandboxBackend, SandboxRecord, SandboxRunRequest } from "./daemon-types.js";
 import {
   DaemonNodeRegistry,
-  hashDaemonNodeToken,
   newSandboxId,
   sandboxNodeAuthError,
   sandboxUiAuthError,
@@ -218,142 +214,6 @@ export class ServerDaemonNodeBackend implements SandboxBackend {
   }
 }
 
-export class LocalSandboxBackend implements SandboxBackend {
-  private readonly sandboxes = new Map<string, SandboxRecord>();
-  private readonly activeRuns = new Map<string, {
-    controller: AbortController;
-    sessionController: SessionController;
-  }>();
-  private readonly store: SessionStore;
-
-  constructor(private readonly options: Pick<import("./daemon-types.js").RelayDaemonOptions, "store" | "sink" | "execStream" | "withOrchestratorSession" | "ensureAgentReady"> = {}) {
-    this.store = options.store ?? new LocalSessionStore();
-  }
-
-  async provision(input: { employeeId: string; workspacePath?: string; token?: string }): Promise<SandboxRecord> {
-    if (!input.token) throw new Error("Sandbox token is required.");
-    const now = new Date().toISOString();
-    const tokenHash = hashDaemonNodeToken(input.token);
-    const sandbox: SandboxRecord = {
-      id: newSandboxId(input.employeeId),
-      employeeId: input.employeeId,
-      workspacePath: input.workspacePath,
-      token: undefined,
-      tokenHash,
-      uiTokenHash: tokenHash,
-      status: "ready",
-      agents: {
-        claude: "unknown",
-        pi: "unknown",
-        codex: "unknown",
-      },
-      createdAt: now,
-      updatedAt: now,
-    };
-    this.sandboxes.set(sandbox.id, sandbox);
-    return { ...sandbox, token: input.token };
-  }
-
-  async get(sandboxId: string): Promise<SandboxRecord | undefined> {
-    return this.sandboxes.get(sandboxId);
-  }
-
-  async list(): Promise<SandboxRecord[]> {
-    return [...this.sandboxes.values()];
-  }
-
-  async run(sandboxId: string, request: SandboxRunRequest): Promise<RelaySession> {
-    const sandbox = this.sandboxes.get(sandboxId);
-    if (!sandbox) throw new Error("Sandbox not found.");
-    if (sandbox.status === "running") {
-      throw new Error(`Sandbox ${sandboxId} is already running a task.`);
-    }
-    this.updateSandbox(sandboxId, { status: "running", lastError: undefined });
-    const controller = new SessionController(this.store, {
-      workspacePath: sandbox.workspacePath,
-      sink: this.options.sink,
-      execStream: this.options.execStream ?? defaultExecutionManager.execStream.bind(defaultExecutionManager),
-    });
-    const sessionId = request.sessionId ?? (await controller.createSession(
-      request.taskGoal,
-      ["human", ...new Set(request.assignments.map((item) => item.agent))],
-    )).id;
-    const abortController = new AbortController();
-    const runKey = localRunKey(sandboxId, sessionId);
-    this.activeRuns.set(runKey, { controller: abortController, sessionController: controller });
-    try {
-      await (this.options.withOrchestratorSession ?? withOrchestratorSession)(async () => {
-        for (const agent of new Set(request.assignments.map((assignment) => assignment.agent))) {
-          await (this.options.ensureAgentReady ?? ensureAgentReady)(agent, this.options.sink, abortController.signal);
-        }
-        await controller.runAssignments(sessionId, request.taskGoal, request.assignments.map((assignment) => ({
-          agent: assignment.agent,
-          mode: assignment.mode ?? "implement",
-        })), {
-          sink: this.options.sink,
-          execStream: this.options.execStream ?? defaultExecutionManager.execStream.bind(defaultExecutionManager),
-          signal: abortController.signal,
-        });
-      }, this.options.sink, {
-        boxName: sandboxBoxName(sandboxId),
-        workspacePath: sandbox.workspacePath,
-      });
-      this.markAgentsReady(sandboxId, request.assignments.map((assignment) => assignment.agent));
-      this.updateSandbox(sandboxId, { status: "ready" });
-    } catch (error) {
-      if (abortController.signal.aborted) {
-        const reason = abortReason(abortController.signal);
-        await controller.cancelSession(sessionId, reason);
-        this.updateSandbox(sandboxId, { status: "ready", lastError: reason });
-        return this.store.getSession(sessionId);
-      }
-      const outcome = error instanceof Error ? error.message : String(error);
-      await failSessionIfOpen(this.store, sessionId, outcome);
-      this.updateSandbox(sandboxId, {
-        status: "failed",
-        lastError: outcome,
-      });
-      throw error;
-    } finally {
-      this.activeRuns.delete(runKey);
-    }
-    return this.store.getSession(sessionId);
-  }
-
-  async cancelRun(sandboxId: string, sessionId: string, reason: string): Promise<RelaySession> {
-    const active = this.activeRuns.get(localRunKey(sandboxId, sessionId));
-    if (!active) throw new Error(`Session ${sessionId} has no active local sandbox run.`);
-    active.controller.abort(reason);
-    return active.sessionController.cancelSession(sessionId, reason);
-  }
-
-  private markAgentsReady(sandboxId: string, agents: AgentName[]): void {
-    const sandbox = this.sandboxes.get(sandboxId);
-    if (!sandbox) return;
-    const nextAgents = { ...sandbox.agents };
-    for (const agent of agents) nextAgents[agent] = "ready";
-    this.updateSandbox(sandboxId, { agents: nextAgents });
-  }
-
-  private updateSandbox(sandboxId: string, patch: Partial<SandboxRecord>): void {
-    const sandbox = this.sandboxes.get(sandboxId);
-    if (!sandbox) return;
-    this.sandboxes.set(sandboxId, {
-      ...sandbox,
-      ...patch,
-      updatedAt: new Date().toISOString(),
-    });
-  }
-}
-
-function localRunKey(sandboxId: string, sessionId: string): string {
-  return `${sandboxId}\0${sessionId}`;
-}
-
-function abortReason(signal: AbortSignal): string {
-  return typeof signal.reason === "string" && signal.reason ? signal.reason : "Cancelled by human.";
-}
-
 async function failSessionIfOpen(store: SessionStore, sessionId: string, outcome: string): Promise<void> {
   try {
     const session = await store.getSession(sessionId);
@@ -368,6 +228,3 @@ function agentsReadyInSandbox(sandbox: SandboxRecord): AgentName[] {
   return (["claude", "pi", "codex"] as const).filter((agent) => sandbox.agents[agent] === "ready");
 }
 
-function sandboxBoxName(sandboxId: string): string {
-  return `relay-${sandboxId.replace(/[^a-zA-Z0-9_-]+/g, "-").slice(0, 48)}`;
-}

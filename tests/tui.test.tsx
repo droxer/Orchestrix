@@ -18,8 +18,8 @@ import {
   withDefaultAssignments,
   type RunRequest,
 } from "../packages/relay-tui/src/tui.js";
-import { daemonArgs, localDaemonCompatibilityError, resolveLocalRunConfig } from "../packages/relay-tui/src/local-run.js";
-import { LocalSessionStore } from "../packages/relay-daemon/src/index.js";
+import { backendArgs, daemonArgs, resolveLocalRunConfig } from "../packages/relay-tui/src/local-run.js";
+import { LocalSessionStore } from "../packages/relay-backend/src/index.js";
 
 function testSessionStore(): LocalSessionStore {
   return new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-tui-")));
@@ -117,60 +117,57 @@ describe("TUI task parsing", () => {
 });
 
 describe("TUI daemon runner", () => {
-  it("propagates one local daemon config to the daemon and TUI", async () => {
+  it("propagates one local run config to the backend, daemon, and TUI", async () => {
     const workspace = mkdtempSync(join(tmpdir(), "relay-local-run-workspace-"));
     const config = resolveLocalRunConfig({
-      RELAY_DAEMON_URL: "http://127.0.0.1:8790/",
+      RELAY_BACKEND_URL: "http://127.0.0.1:8790/",
       RELAY_WORKSPACE: workspace,
       RELAY_EMPLOYEE_ID: "alice",
-      RELAY_DAEMON_NODE_TOKEN: "tok_test",
+      RELAY_DAEMON_TOKEN: "tok_test",
       RELAY_DAEMON_UI_TOKEN: "ui_test",
     });
 
-    assert.equal(config.daemonUrl, "http://127.0.0.1:8790");
+    assert.equal(config.backendUrl, "http://127.0.0.1:8790");
     assert.equal(config.workspacePath, workspace);
     assert.equal(config.employeeId, "alice");
     assert.equal(config.token, "tok_test");
     assert.equal(config.uiToken, "ui_test");
     assert.equal(config.sandboxId, "sbx_alice");
-    assert.equal(config.childEnv.RELAY_DAEMON_URL, "http://127.0.0.1:8790");
+    assert.equal(config.sandboxMode, "boxlite");
+    assert.equal(config.childEnv.RELAY_BACKEND_URL, "http://127.0.0.1:8790");
     assert.equal(config.childEnv.RELAY_WORKSPACE, workspace);
     assert.equal(config.childEnv.RELAY_EMPLOYEE_ID, "alice");
-    assert.equal(config.childEnv.RELAY_DAEMON_NODE_TOKEN, "tok_test");
+    assert.equal(config.childEnv.RELAY_DAEMON_TOKEN, "tok_test");
     assert.equal(config.childEnv.RELAY_DAEMON_UI_TOKEN, "ui_test");
+    assert.equal(config.childEnv.RELAY_SANDBOX_ID, "sbx_alice");
+    assert.equal(config.childEnv.RELAY_SANDBOX_MODE, "boxlite");
   });
 
-  it("starts the local daemon in BoxLite-backed local mode", async () => {
-    assert.deepEqual(daemonArgs(new URL("http://127.0.0.1:8790")), [
-      "--port",
-      "8790",
-      "--daemon-node-mode",
-      "local",
-    ]);
+  it("accepts legacy env names for backend URL and daemon token", async () => {
+    const workspace = mkdtempSync(join(tmpdir(), "relay-local-run-workspace-"));
+    const config = resolveLocalRunConfig({
+      RELAY_DAEMON_URL: "http://127.0.0.1:9999/",
+      RELAY_WORKSPACE: workspace,
+      RELAY_EMPLOYEE_ID: "alice",
+      RELAY_DAEMON_NODE_TOKEN: "tok_legacy",
+    });
+
+    assert.equal(config.backendUrl, "http://127.0.0.1:9999");
+    assert.equal(config.token, "tok_legacy");
   });
 
-  it("rejects an already-running non-local daemon for local TUI startup", async () => {
-    assert.equal(
-      localDaemonCompatibilityError({ responding: true, daemonNodeMode: "local" }, "http://127.0.0.1:8790"),
-      undefined,
-    );
-    assert.match(
-      localDaemonCompatibilityError({ responding: true, daemonNodeMode: "server" }, "http://127.0.0.1:8790") ?? "",
-      /Run make stop, then make tui-local\./,
-    );
-    assert.match(
-      localDaemonCompatibilityError({ responding: true }, "http://127.0.0.1:8790") ?? "",
-      /unknown mode/,
-    );
+  it("starts the backend on the configured port and the daemon with its sandbox", async () => {
+    assert.deepEqual(backendArgs(new URL("http://127.0.0.1:8790")), ["--port", "8790"]);
+    assert.deepEqual(daemonArgs("sbx_alice", "boxlite"), ["--sandbox-id", "sbx_alice", "--sandbox", "boxlite"]);
   });
 
-  it("ignores blank workspace values when resolving local daemon config", async () => {
+  it("ignores blank workspace values when resolving local run config", async () => {
     const workspace = mkdtempSync(join(tmpdir(), "relay-local-run-workspace-"));
     const config = resolveLocalRunConfig({
       RELAY_WORKSPACE: "",
       WORKSPACE: workspace,
       USER: "relay user",
-      RELAY_DAEMON_NODE_TOKEN: "tok_test",
+      RELAY_DAEMON_TOKEN: "tok_test",
     });
 
     assert.equal(config.workspacePath, workspace);
@@ -228,7 +225,7 @@ describe("TUI daemon runner", () => {
         headers: { "Content-Type": "application/json" },
       });
     };
-    const { RelayDaemonClient } = await import("../packages/relay-daemon/src/index.js");
+    const { RelayDaemonClient } = await import("../packages/relay-backend/src/index.js");
     const client = new RelayDaemonClient({ baseUrl: "http://daemon.local", fetchFn });
     const runner = createDaemonAssignmentRunner(client, "sbx_alice");
     let updatedSession = "";
@@ -319,7 +316,7 @@ describe("TUI daemon runner", () => {
         headers: { "Content-Type": "application/json" },
       });
     };
-    const { RelayDaemonClient } = await import("../packages/relay-daemon/src/index.js");
+    const { RelayDaemonClient } = await import("../packages/relay-backend/src/index.js");
     const client = new RelayDaemonClient({ baseUrl: "http://daemon.local", fetchFn });
     const runner = createDaemonAssignmentRunner(client, "sbx_alice");
     let log = "";
@@ -384,7 +381,7 @@ describe("TUI daemon runner", () => {
       });
       return new Response(JSON.stringify(cancelledSession), { status: 202, headers: { "Content-Type": "application/json" } });
     };
-    const { RelayDaemonClient } = await import("../packages/relay-daemon/src/index.js");
+    const { RelayDaemonClient } = await import("../packages/relay-backend/src/index.js");
     const client = new RelayDaemonClient({ baseUrl: "http://daemon.local", fetchFn });
     const runner = createDaemonAssignmentRunner(client, "sbx_alice");
     const controller = new AbortController();
@@ -1158,7 +1155,7 @@ describe("RelayTui component", () => {
       assert.match(bootFrame, /Waiting for daemon node|Connecting to Relay daemon/);
       assert.match(bootFrame, /EMPLOYEE_ID=host/);
       assert.match(bootFrame, /SANDBOX_ID=sbx_host/);
-      assert.match(bootFrame, /DAEMON_NODE_TOKEN=tok_has_under_score/);
+      assert.match(bootFrame, /DAEMON_TOKEN=tok_has_under_score/);
       assert.doesNotMatch(bootFrame, /WORKSPACE=/);
       await new Promise((resolve) => setTimeout(resolve, 450));
 

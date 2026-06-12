@@ -1,0 +1,26 @@
+{
+  "name": "relay-backend",
+  "version": "0.1.0",
+  "description": "Relay backend control plane (HTTP API, session/task stores, daemon registry)",
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "relay-backend": "./dist/backend-cli.js",
+    "relay": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@types/pg": "^8.20.0",
+    "pg": "^8.21.0",
+    "relay-core": "0.1.0",
+    "relay-daemon": "0.1.0"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  }
+}

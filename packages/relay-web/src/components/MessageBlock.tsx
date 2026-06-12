@@ -1,7 +1,7 @@
 import { Paperclip } from "lucide-react";
 import { AgentStream } from "./AgentStream";
 import type { AgentName, RelaySession, Tone } from "../types";
-import type { RelayArtifact } from "relay-daemon";
+import type { RelayArtifact } from "relay-backend";
 
 export type DerivedMessage =
   | {

@@ -688,17 +688,17 @@ This section maps the current local TypeScript implementation to the target impl
 | :- | :- | :- |
 | `relay-core` | `packages/relay-core/src/index.ts` | Shared protocol, agent state, prompts, command builders, renderers, guest helpers, and agent execution units. |
 | `relay-tui` | `packages/relay-tui/src/cli.ts` -> `packages/relay-tui/src/tui.tsx` | Starts the Ink TUI. |
-| `relay-daemon` | `packages/relay-daemon/src/daemon-cli.ts` -> `packages/relay-daemon/src/relay/daemon.ts` | Starts the host daemon. |
-| `relay-daemon-node` | `packages/relay-daemon-node/src/cli.ts` -> `packages/relay-daemon-node/src/index.ts` | Starts the daemon node. |
-| `relay` | `packages/relay-daemon/src/cli.ts` -> `packages/relay-daemon/src/relay/workflow.ts` | Compatibility CLI for workflow, session, API, and daemon subcommands. |
-| `relay run-workflow <task>` | `packages/relay-daemon/src/relay/workflow.ts` | Starts BoxLite and runs the default Claude -> Pi -> Codex workflow. |
-| `relay sessions` | `packages/relay-daemon/src/relay/workflow.ts` | Lists persisted sessions from `.relay/sessions`. |
-| `relay show <session-id>` | `packages/relay-daemon/src/relay/workflow.ts` | Prints a compact session summary. |
-| `relay serve --port <port>` | `packages/relay-daemon/src/relay/workflow.ts` -> `packages/relay-daemon/src/relay/server.ts` | Serves the local JSON/SSE API. |
-| Daemon library exports | `packages/relay-daemon/src/index.ts` | Re-exports public types, stores, controller, command builders, renderers, and workflow helpers. |
+| `relay-backend` | `packages/relay-backend/src/backend-cli.ts` -> `packages/relay-backend/src/relay/daemon.ts` | Starts the host daemon. |
+| `relay-daemon` | `packages/relay-daemon/src/cli.ts` -> `packages/relay-daemon/src/index.ts` | Starts the daemon node. |
+| `relay` | `packages/relay-backend/src/cli.ts` -> `packages/relay-backend/src/relay/workflow.ts` | Compatibility CLI for workflow, session, API, and daemon subcommands. |
+| `relay run-workflow <task>` | `packages/relay-backend/src/relay/workflow.ts` | Starts BoxLite and runs the default Claude -> Pi -> Codex workflow. |
+| `relay sessions` | `packages/relay-backend/src/relay/workflow.ts` | Lists persisted sessions from `.relay/sessions`. |
+| `relay show <session-id>` | `packages/relay-backend/src/relay/workflow.ts` | Prints a compact session summary. |
+| `relay serve --port <port>` | `packages/relay-backend/src/relay/workflow.ts` -> `packages/relay-backend/src/relay/server.ts` | Serves the local JSON/SSE API. |
+| Daemon library exports | `packages/relay-backend/src/index.ts` | Re-exports public types, stores, controller, command builders, renderers, and workflow helpers. |
 
-Keep new daemon public API exports in `packages/relay-daemon/src/index.ts`.
-Keep runtime dispatch in `packages/relay-daemon/src/relay/workflow.ts`;
+Keep new daemon public API exports in `packages/relay-backend/src/index.ts`.
+Keep runtime dispatch in `packages/relay-backend/src/relay/workflow.ts`;
 package binary wrappers should stay minimal.
 
 ### 10.2 Local Data Model
@@ -724,15 +724,15 @@ Both models are event-sourced. The event log is authoritative; `snapshot.json` i
         <artifact-id>.<ext>
 ```
 
-`LocalTaskStore` in `packages/relay-daemon/src/relay/task.ts` owns task persistence and materialization. It emits events such as `task.created`, `task.updated`, `task.assigned`, `task.status`, `task.session_linked`, and `task.activity`.
+`LocalTaskStore` in `packages/relay-backend/src/relay/task.ts` owns task persistence and materialization. It emits events such as `task.created`, `task.updated`, `task.assigned`, `task.status`, `task.session_linked`, and `task.activity`.
 
-`LocalSessionStore` in `packages/relay-daemon/src/relay/session.ts` owns session persistence, artifact files, and session materialization. It emits events such as `session.created`, `session.status`, `agent.started`, `agent.output`, `artifact.created`, `human.decision`, `agent.completed`, `review.verdict`, `session.completed`, and `session.failed`.
+`LocalSessionStore` in `packages/relay-backend/src/relay/session.ts` owns session persistence, artifact files, and session materialization. It emits events such as `session.created`, `session.status`, `agent.started`, `agent.output`, `artifact.created`, `human.decision`, `agent.completed`, `review.verdict`, `session.completed`, and `session.failed`.
 
 When adding a new event type, update the materializer and tests together.
 
 ### 10.3 Execution Controller
 
-`SessionController` in `packages/relay-daemon/src/relay/controller.ts` is the local boundary between durable state and agent execution.
+`SessionController` in `packages/relay-backend/src/relay/controller.ts` is the local boundary between durable state and agent execution.
 
 Responsibilities:
 
@@ -769,7 +769,7 @@ Execution contracts:
 
 ### 10.5 Workflow and BoxLite Runtime
 
-`withOrchestratorSession()` in `packages/relay-daemon/src/relay/workflow.ts` wraps agent execution:
+`withOrchestratorSession()` in `packages/relay-backend/src/relay/workflow.ts` wraps agent execution:
 
 1. Ensures only one Relay orchestrator is active.
 2. Ensures the devbox image is exported as OCI.
@@ -796,7 +796,7 @@ The default scripted workflow is:
 Claude implement -> Pi implement/test follow-up -> Codex review
 ```
 
-Routing functions live in `packages/relay-daemon/src/relay/routing.ts`.
+Routing functions live in `packages/relay-backend/src/relay/routing.ts`.
 
 - Claude success routes to Pi.
 - Pi success routes to Codex review.
@@ -813,7 +813,7 @@ The TUI in `packages/relay-tui/src/tui.tsx` accepts leading agent mentions such 
 
 Slash commands include `/approve`, `/reject`, `/cancel`, `/rerun`, `/handoff`, `/sessions`, `/open`, `/summary`, and `/quit`.
 
-The local API in `packages/relay-daemon/src/relay/server.ts` exposes task/session endpoints on `127.0.0.1:8787` by default. Current API routes can create tasks, create pending sessions, attach assignment-plan artifacts, record decisions, and expose historical events/artifacts. They do not start BoxLite or execute agents.
+The local API in `packages/relay-backend/src/relay/server.ts` exposes task/session endpoints on `127.0.0.1:8787` by default. Current API routes can create tasks, create pending sessions, attach assignment-plan artifacts, record decisions, and expose historical events/artifacts. They do not start BoxLite or execute agents.
 
 Future execution endpoints must call the same `SessionController` and orchestrator readiness flow used by the CLI/TUI.
 

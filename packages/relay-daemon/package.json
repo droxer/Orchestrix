@@ -1,23 +1,20 @@
 {
   "name": "relay-daemon",
   "version": "0.1.0",
-  "description": "Relay host daemon and orchestration protocol",
+  "description": "Relay daemon: sandbox-side service that runs agents and connects them to the backend",
   "type": "module",
   "exports": {
     ".": "./dist/index.js"
   },
   "types": "./dist/index.d.ts",
   "bin": {
-    "relay-daemon": "./dist/daemon-cli.js",
-    "relay": "./dist/cli.js"
+    "relay-daemon": "./dist/cli.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
     "@boxlite-ai/boxlite": "^0.9.5",
-    "@types/pg": "^8.20.0",
-    "pg": "^8.21.0",
     "relay-core": "0.1.0"
   },
   "engines": {
