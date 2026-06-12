@@ -1,0 +1,13 @@
+# Relay Architecture Decision Records
+
+This directory records durable architecture decisions for Relay.
+
+The ADR numbering follows the decisions referenced in
+[`docs/system-architecture.md`](../system-architecture.md) and should be kept in
+sync with [`docs/implementation-plan.md`](../implementation-plan.md).
+
+| ADR | Decision |
+| :- | :- |
+| [ADR-007](007-governed-enterprise-authority.md) | Governed enterprise authority instead of opaque agent autonomy |
+| [ADR-008](008-boxlite-lightweight-execution.md) | BoxLite-first lightweight execution boundary |
+| [ADR-009](009-control-plane-outside-sandbox.md) | Durable control plane remains outside sandbox |

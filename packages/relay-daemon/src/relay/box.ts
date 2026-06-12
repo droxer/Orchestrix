@@ -22,7 +22,7 @@ import { shellQuote } from "relay-core";
 import { hostWorkspaceOwner } from "relay-core";
 import type { AgentName, AgentOutputSink, StreamExecResult } from "relay-core";
 
-type BoxLiteModule = typeof import("@boxlite-ai/boxlite");
+export type BoxLiteModule = typeof import("@boxlite-ai/boxlite");
 type StreamRenderer = (chunk: string) => string;
 type CommandRunner = typeof spawnSync;
 

@@ -70,7 +70,7 @@ export async function runRelayDaemonNode(options: DaemonNodeRuntimeOptions = {})
   const sandboxId = options.sandboxId ?? process.env.RELAY_SANDBOX_ID;
   if (!sandboxId) throw new Error("RELAY_SANDBOX_ID is required for relay daemon node.");
   const employeeId = options.employeeId ?? process.env.RELAY_EMPLOYEE_ID ?? process.env.USER ?? "local";
-  const workspacePath = options.workspacePath ?? process.env.RELAY_WORKSPACE ?? process.cwd();
+  const workspacePath = firstNonBlank(options.workspacePath, process.env.RELAY_WORKSPACE, process.env.WORKSPACE) ?? process.cwd();
   process.env.RELAY_AGENT_WORKSPACE = workspacePath;
   if (workspacePath !== GUEST_WORKSPACE) {
     process.env.RELAY_RUN_AS_CURRENT_USER ??= "1";
@@ -169,6 +169,10 @@ export async function runRelayDaemonNode(options: DaemonNodeRuntimeOptions = {})
     }
     await delay(pollIntervalMs);
   }
+}
+
+function firstNonBlank(...values: Array<string | undefined>): string | undefined {
+  return values.find((value) => value?.trim());
 }
 
 async function executeCommand(
@@ -344,17 +348,30 @@ export async function localProcessExecStream(
     };
   }
   return new Promise((resolve) => {
+    const detached = process.platform !== "win32";
     const child = spawn(cmd, args, {
       cwd: options.cwd,
       stdio: ["ignore", "pipe", "pipe"],
+      detached,
     });
     const stdoutParts: string[] = [];
     const stderrParts: string[] = [];
     let killTimer: NodeJS.Timeout | undefined;
+    const terminate = (signal: NodeJS.Signals): void => {
+      if (detached && child.pid) {
+        try {
+          process.kill(-child.pid, signal);
+          return;
+        } catch {
+          // Fall back to the direct child below if the process group is gone.
+        }
+      }
+      child.kill(signal);
+    };
     const abort = (): void => {
-      child.kill("SIGTERM");
+      terminate("SIGTERM");
       // Escalate in case the agent ignores SIGTERM.
-      killTimer = setTimeout(() => child.kill("SIGKILL"), SIGKILL_DELAY_MS);
+      killTimer = setTimeout(() => terminate("SIGKILL"), SIGKILL_DELAY_MS);
       killTimer.unref?.();
     };
     options.signal?.addEventListener("abort", abort, { once: true });

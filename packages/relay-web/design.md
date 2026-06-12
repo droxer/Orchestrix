@@ -3,9 +3,9 @@
 Relay web is a **Slack-style collaboration surface for working with AI agents**:
 a three-pane shell (nav rail → conversation list → chat) where each
 "employee" sandbox is a contact and each agent run renders as a message
-thread. The visual language follows the Relay brand (`docs/Design.md`) —
+thread. The visual language follows the Relay brand (`docs/design-system.md`) —
 white canvas, ink text, a single Relay Blue accent — but this document is
-the source of truth for the **product UI**; `docs/Design.md` covers
+the source of truth for the **product UI**; `docs/design-system.md` covers
 marketing surfaces only.
 
 All tokens live at the top of `src/styles.css` in three tiers.

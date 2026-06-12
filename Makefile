@@ -11,7 +11,7 @@ SANDBOX_ID ?= sbx_$(EMPLOYEE_ID)
 DAEMON_NODE_TOKEN ?=
 WORKSPACE ?=
 
-.PHONY: devbox-image devbox-check devbox-oci build test run daemon daemon-node run-with-daemon serve web run-fresh stop
+.PHONY: devbox-image devbox-check devbox-oci build test run tui tui-local daemon daemon-local daemon-server daemon-node run-with-daemon serve web run-fresh stop
 
 devbox-image:
 	docker build -t $(DEVBOX_IMAGE) -f $(DOCKERFILE) .
@@ -31,26 +31,36 @@ build:
 test:
 	npm test
 
-run:
-	RELAY_DAEMON_URL="$(RELAY_DAEMON_URL)" RELAY_EMPLOYEE_ID="$(EMPLOYEE_ID)" RELAY_DAEMON_NODE_TOKEN="$(DAEMON_NODE_TOKEN)" WORKSPACE="$(WORKSPACE)" npm run run
+tui-local:
+	RELAY_DAEMON_URL="$(RELAY_DAEMON_URL)" RELAY_EMPLOYEE_ID="$(EMPLOYEE_ID)" RELAY_DAEMON_NODE_TOKEN="$(DAEMON_NODE_TOKEN)" RELAY_WORKSPACE="$(WORKSPACE)" WORKSPACE="$(WORKSPACE)" node packages/relay-tui/dist/local-run.js
 
-daemon: build
+tui:
+	RELAY_DAEMON_URL="$(RELAY_DAEMON_URL)" RELAY_EMPLOYEE_ID="$(EMPLOYEE_ID)" RELAY_DAEMON_NODE_TOKEN="$(DAEMON_NODE_TOKEN)" RELAY_WORKSPACE="$(WORKSPACE)" WORKSPACE="$(WORKSPACE)" node packages/relay-tui/dist/cli.js
+
+run: tui
+
+daemon-local:
+	node packages/relay-daemon/dist/daemon-cli.js --port $(DAEMON_PORT) --daemon-node-mode local
+
+daemon-server:
 	node packages/relay-daemon/dist/daemon-cli.js --port $(DAEMON_PORT)
 
-daemon-node: build
+daemon: daemon-server
+
+daemon-node:
 	@echo "Starting daemon node on host for protocol/debug use. In production this process runs inside the employee sandbox."
 	RELAY_DAEMON_URL="$(RELAY_DAEMON_URL)" RELAY_EMPLOYEE_ID="$(EMPLOYEE_ID)" RELAY_DAEMON_NODE_TOKEN="$(DAEMON_NODE_TOKEN)" RELAY_WORKSPACE="$(WORKSPACE)" node packages/relay-daemon/dist/daemon-node-cli.js --sandbox-id $(SANDBOX_ID)
 
 run-with-daemon: run
 
-serve: build
+serve:
 	node packages/relay-daemon/dist/cli.js serve --port $(PORT)
 
 web:
 	RELAY_DAEMON_URL="$(RELAY_DAEMON_URL)" npm run dev -w relay-web
 
 run-fresh: devbox-oci
-	RELAY_WORKSPACE="$(WORKSPACE)" npm run run
+	RELAY_WORKSPACE="$(WORKSPACE)" node packages/relay-tui/dist/local-run.js
 
 stop:
 	-pkill -f "node packages/relay-daemon/dist/daemon-cli.js" 2>/dev/null

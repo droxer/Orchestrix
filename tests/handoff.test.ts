@@ -7,6 +7,7 @@ import { describe, it } from "node:test";
 
 import {
   type AgentState,
+  BoxLiteExecutionManager,
   buildClaudeImplementCommand,
   buildCodexImplementCommand,
   buildCodexReviewCommand,
@@ -25,12 +26,16 @@ import {
   formatClaudeJsonLine,
   formatCodexJsonLine,
   ensureLocalDevboxOci,
+  ensureAgentReady,
+  resetAgentReadiness,
+  type ExecutionManager,
   guestCodexConfigToml,
   guestAgentEnv,
   guestPiAuthJson,
   guestPiModelsJson,
   hostWorkspacePath,
   JsonLineRenderer,
+  localProcessExecStream,
   piTaskPrompt,
   PlainTextStreamRenderer,
   routeClaudeHandoff,
@@ -433,6 +438,27 @@ describe("agent stream rendering", () => {
 });
 
 describe("execution cancellation", () => {
+  it("kills shell child processes when local process execution is cancelled", async () => {
+    const workspace = mkdtempSync(join(tmpdir(), "relay-process-cancel-"));
+    const marker = join(workspace, "survived.txt");
+    const controller = new AbortController();
+    const pending = localProcessExecStream("bash", [
+      "-c",
+      `(sleep 1; printf survived > ${JSON.stringify(marker)}) & wait`,
+    ], {
+      cwd: workspace,
+      signal: controller.signal,
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    controller.abort("stop test process");
+    const result = await pending;
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+
+    assert.notEqual(result.exit_code, 0);
+    assert.equal(existsSync(marker), false);
+  });
+
   it("kills the active BoxLite execution when aborted", async () => {
     const controller = new AbortController();
     let killed = false;
@@ -516,6 +542,67 @@ describe("devbox OCI preparation", () => {
       () => ensureLocalDevboxOci(undefined, { dockerfile, ociLayoutDir, runCommand }),
       /Failed to build local devbox image/,
     );
+  });
+});
+
+describe("execution manager boundary", () => {
+  it("recreates a stale BoxLite sandbox through the execution boundary", async () => {
+    const manager = new BoxLiteExecutionManager();
+    const box = { id: "box" };
+    const calls: string[] = [];
+    const runtime = {
+      getOrCreate: async () => {
+        calls.push("getOrCreate");
+        if (!calls.includes("remove")) throw new Error("box with name relay already exists");
+        return { box };
+      },
+      remove: async (name: string, force: boolean) => {
+        calls.push("remove");
+        assert.equal(name, "relay");
+        assert.equal(force, true);
+      },
+    };
+
+    const sandbox = await manager.createSandbox(runtime, {
+      rootfsPath: "/tmp/rootfs",
+      boxName: "relay",
+      volumes: [],
+      env: [],
+      workingDir: "/workspace",
+      autoRemove: true,
+    });
+
+    assert.equal(sandbox.name, "relay");
+    assert.equal(sandbox.raw, box);
+    assert.deepEqual(calls, ["getOrCreate", "remove", "getOrCreate"]);
+  });
+
+  it("runs agent readiness through the execution manager", async () => {
+    resetAgentReadiness();
+    const calls: string[] = [];
+    const manager: ExecutionManager = {
+      ensureImage: () => "/tmp/rootfs",
+      createSandbox: async () => ({ name: "relay", raw: {} }),
+      setActiveSandbox: () => undefined,
+      stopActiveSandbox: async () => undefined,
+      removeSandbox: async () => undefined,
+      prepareWorkspace: async () => [501, 20],
+      prepareAgentAuth: async (agents) => {
+        calls.push(`auth:${[...agents].join(",")}`);
+      },
+      execStream: async () => ({ exit_code: 0, stdout: "", stderr: "" }),
+      runShell: async (command) => {
+        calls.push(`shell:${command}`);
+        return { exit_code: 0, stdout: "ok\n", stderr: "" };
+      },
+    };
+
+    await ensureAgentReady("codex", undefined, undefined, manager);
+    await ensureAgentReady("codex", undefined, undefined, manager);
+
+    assert.equal(calls[0], "auth:codex");
+    assert.match(calls[1] ?? "", /^shell:su agent .*codex login status/);
+    assert.equal(calls.length, 2);
   });
 });
 
@@ -703,10 +790,17 @@ describe("Pi provider config", () => {
   it("uses RELAY_WORKSPACE for the host workspace path", () => {
     const temp = mkdtempSync(join(tmpdir(), "relay-workspace-"));
     const explicit = mkdtempSync(join(tmpdir(), "relay-explicit-workspace-"));
+    const makeWorkspace = mkdtempSync(join(tmpdir(), "relay-make-workspace-"));
 
     withEnv({ RELAY_WORKSPACE: temp }, () => {
       assert.equal(hostWorkspacePath(), temp);
       assert.equal(hostWorkspacePath(explicit), explicit);
+    });
+    withEnv({ WORKSPACE: makeWorkspace }, () => {
+      assert.equal(hostWorkspacePath(), makeWorkspace);
+    });
+    withEnv({ RELAY_WORKSPACE: temp, WORKSPACE: makeWorkspace }, () => {
+      assert.equal(hostWorkspacePath(), temp);
     });
   });
 });

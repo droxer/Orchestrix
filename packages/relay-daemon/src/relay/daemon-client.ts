@@ -23,6 +23,7 @@ export interface RelayDaemonClientOptions {
   baseUrl?: string;
   fetchFn?: typeof fetch;
   token?: string;
+  nodeToken?: string;
 }
 
 export interface ProvisionSandboxInput {
@@ -55,17 +56,26 @@ export class RelayDaemonClient {
   private readonly baseUrl: string;
   private readonly fetchFn: typeof fetch;
   private token?: string;
+  private readonly nodeToken?: string;
 
   constructor(options: RelayDaemonClientOptions = {}) {
     this.baseUrl = normalizeBaseUrl(options.baseUrl ?? process.env.RELAY_DAEMON_URL ?? "http://127.0.0.1:8790");
     this.fetchFn = options.fetchFn ?? fetch;
-    this.token = options.token ?? process.env.RELAY_DAEMON_NODE_TOKEN;
+    this.token = options.token ?? process.env.RELAY_DAEMON_UI_TOKEN;
+    this.nodeToken = options.nodeToken ?? process.env.RELAY_DAEMON_NODE_TOKEN;
+  }
+
+  currentToken(): string | undefined {
+    return this.token;
   }
 
   async provisionSandbox(input: ProvisionSandboxInput): Promise<SandboxRecord> {
     const sandbox = await this.request<SandboxRecord>("/sandboxes", {
       method: "POST",
-      body: input,
+      body: {
+        ...input,
+        nodeToken: this.nodeToken,
+      },
     });
     // A fresh provision returns the plaintext sandbox token exactly once; the
     // daemon keeps only the hash. Adopt it so follow-up requests authenticate.

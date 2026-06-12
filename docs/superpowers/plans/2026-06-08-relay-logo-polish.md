@@ -21,7 +21,7 @@
 | `packages/relay-daemon/src/relay/daemon.ts` | Daemon control panel HTML — inlines the mark inside the `.wordmark` span at lines ~1786–1809 | Replace inline `<svg>` block |
 | `assets/brand/README.md` | Brand asset usage notes | Append "Usage" section |
 
-No other files change. READMEs (`README.md`, `README.zh-CN.md`) already reference `assets/brand/relay-logo.svg` by path; the rewrite propagates automatically.
+No other files change. `README.md` already references `assets/brand/relay-logo.svg` by path; the rewrite propagates automatically.
 
 ---
 
@@ -271,7 +271,7 @@ Expected: the extracted SVG renders identically to `final-mark-96.png` from Step
 - [ ] **Step 3: Confirm READMEs still reference the lockup**
 
 ```bash
-grep -n 'relay-logo\|relay-mark' README.md README.zh-CN.md
+grep -n 'relay-logo\|relay-mark' README.md
 ```
 
 Expected: both files reference `assets/brand/relay-logo.svg` exactly. No changes needed; the file path is stable, the contents now resolve to the new lockup.

@@ -14,7 +14,7 @@
 
    Visual language: white canvas, ink text, Relay Blue as the single
    action color, neutral hairlines, Inter for UI, JetBrains Mono for
-   numbers and code. See packages/relay-web/DESIGN.md.
+   numbers and code. See packages/relay-web/design.md.
    ===================================================================== */
 
 @theme inline {
@@ -143,6 +143,25 @@
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-ink: #e4e8ed;
+    --color-body: #8d96a0;
+    --color-muted: #606870;
+    --color-muted-soft: #434b55;
+    --color-on-dark: #e4e8ed;
+    --color-canvas: #0e1318;
+    --color-surface-soft: #141b22;
+    --color-surface-strong: #1b2430;
+    --color-hairline: #263040;
+    --color-hairline-soft: #1b2430;
+
+    color-scheme: dark;
+    background: var(--color-canvas);
+    color: var(--color-ink);
+  }
 }
 
 * { box-sizing: border-box; }
@@ -482,6 +501,21 @@ button:disabled {
   font-size: var(--text-sm);
 }
 
+.agent-avatar[data-agent="claude"] {
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface-strong));
+  color: var(--color-primary);
+}
+
+.agent-avatar[data-agent="pi"] {
+  background: color-mix(in srgb, var(--color-semantic-up) 10%, var(--color-surface-strong));
+  color: var(--color-semantic-up);
+}
+
+.agent-avatar[data-agent="codex"] {
+  background: color-mix(in srgb, var(--color-accent-yellow) 15%, var(--color-surface-strong));
+  color: color-mix(in srgb, var(--color-accent-yellow) 80%, var(--color-ink));
+}
+
 .people-settings {
   grid-row: 5;
   display: inline-flex;
@@ -608,7 +642,7 @@ button:disabled {
 }
 
 .conversation-row.active {
-  background: var(--color-canvas);
+  background: color-mix(in srgb, var(--color-primary) 5%, var(--color-canvas));
 }
 
 .conversation-row.active::before {
@@ -976,16 +1010,22 @@ button:disabled {
   line-height: 1.5;
 }
 
+.empty-brand-mark {
+  width: 64px;
+  height: auto;
+  opacity: 0.75;
+}
+
 .msg {
   display: grid;
   gap: var(--space-xs);
-  animation: message-in 180ms ease-out both;
+  animation: message-in 220ms ease-out both;
 }
 
 @keyframes message-in {
   from {
     opacity: 0;
-    transform: translateY(4px);
+    transform: translateY(10px);
   }
 }
 
@@ -1049,8 +1089,7 @@ button:disabled {
   column-gap: var(--space-sm);
 }
 
-.msg-user::before {
-  content: "Y";
+.user-avatar {
   display: grid;
   place-items: center;
   width: 32px;
@@ -1061,6 +1100,8 @@ button:disabled {
   color: var(--color-on-primary);
   font-size: var(--text-xs);
   font-weight: 600;
+  flex-shrink: 0;
+  align-self: start;
 }
 
 .msg-user p {
@@ -1157,6 +1198,13 @@ button:disabled {
   background: transparent;
   padding: 0;
 }
+
+/* Syntax highlight token colors */
+.hl-keyword { color: var(--color-primary); font-weight: 500; }
+.hl-string  { color: var(--color-semantic-up); }
+.hl-number  { color: var(--color-accent-yellow); }
+.hl-comment { color: var(--color-muted); font-style: italic; }
+.hl-plain   { /* inherits agent-code color */ }
 
 .agent-code-lang {
   display: block;

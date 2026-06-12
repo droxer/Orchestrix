@@ -1,13 +1,6 @@
 import {
-  activeBox,
-  collectExecution,
-  ensureLocalDevboxOci,
   ensureSingleOrchestrator,
   importBoxLite,
-  prepareGuestAgentAuth,
-  prepareGuestWorkspace,
-  setSessionBox,
-  stopSessionBox,
 } from "./box.js";
 import {
   DEVBOX_IMAGE,
@@ -17,7 +10,7 @@ import {
   piModel,
   piProvider,
 } from "relay-core";
-import { ansi, emitOrPrint, keyValue, section, status, type AgentOutputSink } from "relay-core";
+import { ansi, emitOrPrint, keyValue, section, type AgentOutputSink } from "relay-core";
 import { guestAgentEnv, runAsAgent, setSessionGuestEnv } from "relay-core";
 import { buildPiPreflightCommand } from "relay-core";
 import {
@@ -43,6 +36,7 @@ import {
   type AgentState,
   type CodexTaskMode,
 } from "relay-core";
+import { defaultExecutionManager, type ExecutionManager } from "./execution.js";
 
 export interface OrchestratorSession {
   rootfsPath: string;
@@ -56,6 +50,7 @@ export interface OrchestratorSession {
 export interface OrchestratorSessionOptions {
   boxName?: string;
   workspacePath?: string;
+  executionManager?: ExecutionManager;
 }
 
 const readyAgents = new Set<AgentName>();
@@ -64,18 +59,23 @@ export function resetAgentReadiness(): void {
   readyAgents.clear();
 }
 
-export async function ensureAgentReady(agent: AgentName, sink?: AgentOutputSink, signal?: AbortSignal): Promise<void> {
+export async function ensureAgentReady(
+  agent: AgentName,
+  sink?: AgentOutputSink,
+  signal?: AbortSignal,
+  executionManager: ExecutionManager = defaultExecutionManager,
+): Promise<void> {
   if (readyAgents.has(agent)) return;
   if (signal?.aborted) throw new Error(`${agent} readiness cancelled.`);
   if (agent === "codex" || agent === "pi") {
-    await prepareGuestAgentAuth([agent], signal);
+    await executionManager.prepareAgentAuth([agent], signal);
   }
   const [name, command] = agent === "claude"
     ? ["Claude Code", runAsAgent("claude --version")]
     : agent === "codex"
       ? ["Codex auth", runAsAgent("codex login status")]
       : ["Pi coding agent", buildPiPreflightCommand()];
-  const result = await collectExecution(await activeBox().exec("bash", ["-c", command]), false, undefined, undefined, undefined, signal);
+  const result = await executionManager.runShell(command, signal);
   if (result.exit_code !== 0) {
     const detail = (result.stderr || result.stdout).trim();
     throw new Error(`${name} preflight failed. ${detail}`);
@@ -154,7 +154,8 @@ export async function withOrchestratorSession<T>(
     sink(`${keyValue("image", DEVBOX_IMAGE)}\n`);
     sink(`${keyValue("mount", GUEST_WORKSPACE)}\n`);
   }
-  const rootfsPath = ensureLocalDevboxOci(sink);
+  const executionManager = options.executionManager ?? defaultExecutionManager;
+  const rootfsPath = executionManager.ensureImage(sink);
   const hostWorkspace = options.workspacePath ?? hostWorkspacePath();
 
   const { JsBoxlite } = await importBoxLite();
@@ -165,19 +166,20 @@ export async function withOrchestratorSession<T>(
     const guestEnv = guestAgentEnv(hostWorkspace);
     setSessionGuestEnv(guestEnv);
     const env = guestEnv.map(([key, value]) => ({ key, value }));
-    const box = await createSessionBox(runtime, {
+    const sandbox = await executionManager.createSandbox(runtime, {
       rootfsPath,
+      boxName,
       volumes: [{ hostPath: hostWorkspace, guestPath: GUEST_WORKSPACE, readOnly: false }],
       env,
       workingDir: GUEST_WORKSPACE,
       autoRemove: true,
-    }, boxName);
-    setSessionBox(box);
+    });
+    executionManager.setActiveSandbox(sandbox);
     emitOrPrint(sink, keyValue("box", boxName));
     emitOrPrint(sink, keyValue("rootfs", rootfsPath));
     emitOrPrint(sink, keyValue("workspace", hostWorkspace));
 
-    const [syncedUid, syncedGid] = await prepareGuestWorkspace(hostWorkspace);
+    const [syncedUid, syncedGid] = await executionManager.prepareWorkspace(hostWorkspace);
     emitOrPrint(sink, keyValue("owner", `uid=${syncedUid} gid=${syncedGid} (host uid=${hostUid} gid=${hostGid})`));
     emitOrPrint(sink, keyValue("codex", `provider=dashscope base_url=${process.env.OPENAI_BASE_URL || "(default)"}`));
     emitOrPrint(sink, keyValue("pi", `provider=${piProvider()} model=${piModel() || "(default)"} base_url=${piBaseUrl() || "(default)"}`));
@@ -191,45 +193,10 @@ export async function withOrchestratorSession<T>(
       syncedGid,
     });
   } finally {
-    await stopSessionBox();
+    await executionManager.stopActiveSandbox();
     resetAgentReadiness();
-    if (runtime.remove) {
-      await runtime.remove(boxName, true).catch((error: unknown) => {
-        if (!isMissingBoxError(error)) throw error;
-      });
-    }
+    await executionManager.removeSandbox(runtime, boxName);
   }
-}
-
-async function createSessionBox(runtime: any, options: unknown, boxName: string): Promise<any> {
-  if (runtime.getOrCreate) {
-    try {
-      const result = await runtime.getOrCreate(options, boxName);
-      return result.box;
-    } catch (error) {
-      if (!isExistingBoxError(error) || !runtime.remove) throw error;
-      await runtime.remove(boxName, true).catch(() => undefined);
-      const result = await runtime.getOrCreate(options, boxName);
-      return result.box;
-    }
-  }
-  try {
-    return await runtime.create(options, boxName);
-  } catch (error) {
-    if (!isExistingBoxError(error) || !runtime.remove) throw error;
-    await runtime.remove(boxName, true).catch(() => undefined);
-    return runtime.create(options, boxName);
-  }
-}
-
-function isExistingBoxError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return /box with name .+ already exists/i.test(message) || /already exists/i.test(message);
-}
-
-function isMissingBoxError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return /box not found/i.test(message) || /not found/i.test(message);
 }
 
 export async function main(taskGoal: string): Promise<void> {
@@ -290,7 +257,8 @@ export function run(argv: string[] = process.argv.slice(2)): void {
     const portIndex = argv.indexOf("--port");
     const port = portIndex >= 0 ? Number(argv[portIndex + 1]) : 8790;
     const daemonNodeModeIndex = argv.indexOf("--daemon-node-mode");
-    const daemonNodeMode = daemonNodeModeIndex >= 0 && argv[daemonNodeModeIndex + 1] === "local" ? "local" : "reverse";
+    const daemonNodeModeArg = daemonNodeModeIndex >= 0 ? argv[daemonNodeModeIndex + 1] : undefined;
+    const daemonNodeMode = daemonNodeModeArg === "local" ? "local" : "server";
     import("./daemon.js").then(({ serveRelayDaemon }) => serveRelayDaemon({ port, daemonNodeMode })).catch((error: unknown) => {
       console.error(error instanceof Error ? error.message : String(error));
       process.exitCode = 1;

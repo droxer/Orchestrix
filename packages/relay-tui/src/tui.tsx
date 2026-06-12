@@ -167,7 +167,12 @@ export async function runAssignments(request: RunRequest): Promise<void> {
   const sessionId = request.sessionId ?? controller.createSession(request.task).id;
   let state = initialAgentState(request.task);
   let terminalRecorded = false;
-  const failCancelled = (outcome: string): void => {
+  const recordCancelled = (outcome: string): void => {
+    if (terminalRecorded) return;
+    controller.cancelSession(sessionId, outcome);
+    terminalRecorded = true;
+  };
+  const recordFailed = (outcome: string): void => {
     if (terminalRecorded) return;
     controller.failSession(sessionId, outcome);
     terminalRecorded = true;
@@ -176,7 +181,7 @@ export async function runAssignments(request: RunRequest): Promise<void> {
     for (const assignment of request.assignments) {
       if (request.signal?.aborted) {
         request.log("\nCancelled before next agent started.\n");
-        failCancelled("Task cancelled before the next agent started.");
+        recordCancelled("Task cancelled before the next agent started.");
         return;
       }
       const mode = assignment.agent === "codex" ? assignment.codexMode ?? "implement" : "implement";
@@ -195,16 +200,18 @@ export async function runAssignments(request: RunRequest): Promise<void> {
       }
       if (request.signal?.aborted) {
         request.log("\nCancelled current agent.\n");
-        failCancelled("Task cancelled during agent execution.");
+        recordCancelled("Task cancelled during agent execution.");
         return;
       }
     }
   } catch (error: unknown) {
     if (request.signal?.aborted) {
       request.log("\nCancelled current agent.\n");
-      failCancelled("Task cancelled during agent execution.");
+      recordCancelled("Task cancelled during agent execution.");
       return;
     }
+    const outcome = error instanceof Error ? error.message : String(error);
+    recordFailed(outcome);
     throw error;
   }
   terminalRecorded = true;
@@ -1485,19 +1492,35 @@ export function RelayTuiHost({ onExit }: { onExit: () => void }): React.ReactEle
     // Share the daemon-node token contract: explicit env token wins, otherwise
     // use (or create) the per-employee token file in the workspace that the
     // daemon node reads when it registers.
+    const nodeToken = ensureDaemonNodeToken({
+      workspacePath,
+      employeeId,
+      token: process.env.RELAY_DAEMON_NODE_TOKEN,
+    }).token;
+    const uiToken = ensureDaemonNodeToken({
+      workspacePath,
+      employeeId: `${employeeId}.ui`,
+      token: process.env.RELAY_DAEMON_UI_TOKEN,
+    }).token;
     const client = new RelayDaemonClient({
-      token: ensureDaemonNodeToken({
-        workspacePath,
-        employeeId,
-        token: process.env.RELAY_DAEMON_NODE_TOKEN,
-      }).token,
+      token: uiToken,
+      nodeToken,
     });
     let cancelled = false;
     const waitForReadySandbox = async (): Promise<void> => {
       let current = await client.provisionSandbox({ employeeId, workspacePath });
+      let lastWaitingStatus = "";
       while (!cancelled && current.status !== "ready") {
         if (mountedRef.current) {
           setSandbox(current);
+        }
+        const waitingStatus = `${current.id}:${current.status}:${current.lastError ?? ""}`;
+        if (waitingStatus !== lastWaitingStatus) {
+          lastWaitingStatus = waitingStatus;
+	          appendBootLog(
+	            `\nINFO Waiting for daemon node ${current.id} (${current.status}). ${current.lastError ?? "Start the sandbox worker."}\n` +
+	              `Run: \`make daemon-node EMPLOYEE_ID=${employeeId} SANDBOX_ID=${current.id} DAEMON_NODE_TOKEN=${nodeToken} WORKSPACE=${workspacePath}\`\n`,
+	          );
         }
         await delay(DAEMON_POLL_INTERVAL_MS);
         // A "stopped" sandbox is an offline placeholder waiting for a daemon
@@ -1529,7 +1552,11 @@ export function RelayTuiHost({ onExit }: { onExit: () => void }): React.ReactEle
   }, [workspacePath]);
 
   const ready = Boolean(sandbox && runner && sandbox.status === "ready") && !bootError;
-  const disabledMessage = bootError ? "Daemon unavailable. Press Esc to exit." : "Connecting to Relay daemon...";
+  const disabledMessage = bootError
+    ? "Daemon unavailable. Press Esc to exit."
+    : sandbox && sandbox.status !== "ready"
+      ? `Waiting for daemon node (${sandbox.status})...`
+      : "Connecting to Relay daemon...";
   return (
     <RelayTui
       workspacePath={sandbox?.workspacePath ?? workspacePath}

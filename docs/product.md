@@ -19,7 +19,7 @@ Goal: maximize employee productivity and value creation, not replace employees.
 
 This document defines Relay's product direction: target users, market thesis, positioning, scenarios, capability system, business model, roadmap, and product risks. It should stay focused on product planning and product strategy.
 
-For technical architecture, see [Architecture-Design.md](Architecture-Design.md). For build-level implementation details, see [Technical-Implementation-Design.md](Technical-Implementation-Design.md).
+For technical architecture, see [system-architecture.md](system-architecture.md). For build-level implementation details, see [implementation-plan.md](implementation-plan.md).
 
 ---
 

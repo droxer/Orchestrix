@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import type { AgentName } from "../types";
 import { parseAgentStream, parseAgentStderr, type AgentSegment } from "../lib/agentStream";
+import { tokenize } from "../lib/highlight";
 
 type AgentStreamProps = {
   agent: AgentName;
@@ -86,7 +87,13 @@ function renderProse(text: string): ReactNode {
       return (
         <pre className="agent-code" key={i}>
           {part.lang ? <span className="agent-code-lang">{part.lang}</span> : null}
-          <code>{part.text}</code>
+          <code>
+            {tokenize(part.text).map((token, j) => (
+              <span key={j} className={`hl-${token.kind}`}>
+                {token.text}
+              </span>
+            ))}
+          </code>
         </pre>
       );
     }

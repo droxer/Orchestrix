@@ -22,14 +22,16 @@ sandbox lifecycle, and tool policy while agent CLIs act as execution engines.
 
 ## Documentation Map
 
-- [Product Design](docs/Product-Design.md): product strategy, users, scenarios,
+- [Product Design](docs/product.md): product strategy, users, scenarios,
   positioning, roadmap, and business model.
-- [Architecture Design](docs/Architecture-Design.md): target architecture,
+- [Architecture Design](docs/system-architecture.md): target architecture,
   planes, runtime layers, sandbox strategy, MCP gateway, memory, and governance.
-- [Technical Implementation Design](docs/Technical-Implementation-Design.md):
+- [Technical Implementation Design](docs/implementation-plan.md):
   deployable components, data model, APIs, runtime flows, security,
   observability, implementation phases, and current local implementation map.
-- [Visual Design](docs/Design.md): marketing/UI design language and visual
+- [Architecture Decision Records](docs/adr/README.md): accepted technical
+  decisions for governance, sandboxing, and control-plane boundaries.
+- [Visual Design](docs/design-system.md): marketing/UI design language and visual
   system direction.
 - [Brand Assets](assets/brand/README.md): logo files, usage notes, and color
   tokens.

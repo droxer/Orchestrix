@@ -8,7 +8,7 @@ Enterprise AI Workforce Platform / Agent Runtime / Sandbox / Memory / Governance
 
 This document defines Relay's target architecture, strategic technology choices, and architectural decision direction. It explains what the system should become and why.
 
-For implementation-level service boundaries, data models, APIs, runtime flows, and phased engineering work, see [Technical-Implementation-Design.md](Technical-Implementation-Design.md).
+For implementation-level service boundaries, data models, APIs, runtime flows, and phased engineering work, see [implementation-plan.md](implementation-plan.md).
 
 ## 0. Executive Summary
 
@@ -106,6 +106,6 @@ For the MVP, Relay should hold strict boundaries and focus on closed-loop value 
 
 ## 6. Conclusion and Architecture Decision Updates
 
-- **[New ADR-008]**: For lightweight and low-to-medium-risk agent task execution, prioritize evaluating BoxLite as a replacement for native Kubernetes Pods to achieve faster startup and a better serverless-agent experience while remaining compatible with existing enterprise OCI infrastructure.
-- **[Strengthened ADR-007]**: Maintain the design philosophy of "issuing an enterprise badge, not building a mechanical hand." All tasks involving writes to external systems or sensitive internal reads must enforce multi-layer permission checks and route through the Approval Service.
-- **[New ADR-009]**: Keep the durable Relay daemon and control-plane authority outside the sandbox. A sandbox may run only a minimal guest worker for approved command execution, stream forwarding, exit-status reporting, and local file operations.
+- **[New ADR-008](adr/008-boxlite-lightweight-execution.md)**: For lightweight and low-to-medium-risk agent task execution, prioritize evaluating BoxLite as a replacement for native Kubernetes Pods to achieve faster startup and a better serverless-agent experience while remaining compatible with existing enterprise OCI infrastructure.
+- **[Strengthened ADR-007](adr/007-governed-enterprise-authority.md)**: Maintain the design philosophy of "issuing an enterprise badge, not building a mechanical hand." All tasks involving writes to external systems or sensitive internal reads must enforce multi-layer permission checks and route through the Approval Service.
+- **[New ADR-009](adr/009-control-plane-outside-sandbox.md)**: Keep the durable Relay daemon and control-plane authority outside the sandbox. A sandbox may run only a minimal guest worker for approved command execution, stream forwarding, exit-status reporting, and local file operations.

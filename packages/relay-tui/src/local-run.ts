@@ -22,6 +22,7 @@ export interface LocalRunConfig {
   workspacePath: string;
   employeeId: string;
   token: string;
+  uiToken: string;
   sandboxId: string;
   childEnv: NodeJS.ProcessEnv;
 }
@@ -93,6 +94,7 @@ export function resolveLocalRunConfig(env: NodeJS.ProcessEnv = process.env): Loc
   const workspacePath = hostWorkspacePath(envValue(env, "RELAY_WORKSPACE") ?? envValue(env, "WORKSPACE"));
   const employeeId = envValue(env, "RELAY_EMPLOYEE_ID") ?? envValue(env, "EMPLOYEE_ID") ?? envValue(env, "USER") ?? "local";
   const token = envValue(env, "RELAY_DAEMON_NODE_TOKEN") ?? `tok_${randomBytes(24).toString("base64url")}`;
+  const uiToken = envValue(env, "RELAY_DAEMON_UI_TOKEN") ?? `tok_${randomBytes(24).toString("base64url")}`;
   const sandboxId = envValue(env, "RELAY_SANDBOX_ID") ?? envValue(env, "SANDBOX_ID") ?? `sbx_${safeId(employeeId)}`;
   return {
     daemonUrl,
@@ -100,12 +102,14 @@ export function resolveLocalRunConfig(env: NodeJS.ProcessEnv = process.env): Loc
     workspacePath,
     employeeId,
     token,
+    uiToken,
     sandboxId,
     childEnv: {
       ...env,
       RELAY_DAEMON_URL: daemonUrl,
       RELAY_EMPLOYEE_ID: employeeId,
       RELAY_DAEMON_NODE_TOKEN: token,
+      RELAY_DAEMON_UI_TOKEN: uiToken,
       RELAY_WORKSPACE: workspacePath,
     },
   };
@@ -120,7 +124,7 @@ export function localDaemonCompatibilityError(status: DaemonStatus, daemonUrl: s
   if (!status.responding) return undefined;
   if (status.daemonNodeMode === "local") return undefined;
   const mode = status.daemonNodeMode ?? "unknown";
-  return `Relay daemon at ${daemonUrl} is running in ${mode} mode, but the local TUI requires local mode. Run make stop, then make run.`;
+  return `Relay daemon at ${daemonUrl} is running in ${mode} mode, but the local TUI requires local mode. Run make stop, then make tui-local.`;
 }
 
 function envValue(env: NodeJS.ProcessEnv, name: string): string | undefined {

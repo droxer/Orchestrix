@@ -275,9 +275,7 @@ function decisionResponse(store: SessionStore, sessionId: string, body: unknown)
       pendingDecision: "feedback",
     }));
   } else if (kind === "cancel") {
-    session = store.appendEvent(sessionId, relayEvent("session.failed", sessionId, {
-      outcome: decision.note || "Cancelled from Relay API.",
-    }));
+    // The human.decision event materializes the session as cancelled.
   } else if (kind === "mark_done") {
     session = store.appendEvent(sessionId, relayEvent("session.completed", sessionId, {
       outcome: decision.note || "Marked done from Relay API.",

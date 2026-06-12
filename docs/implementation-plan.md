@@ -8,7 +8,7 @@ Enterprise AI Workforce Platform / Control Plane / Agent Runtime / Execution Pla
 
 This document translates Relay's product and architecture strategy into an implementation blueprint. It is intentionally more concrete than the architecture deep dive: it defines deployable services, ownership boundaries, data models, runtime flows, integration contracts, and phased delivery.
 
-Use this document after reading [Architecture-Design.md](Architecture-Design.md). The architecture document explains target system direction and strategic choices; this document explains how to build the system.
+Use this document after reading [system-architecture.md](system-architecture.md). The architecture document explains target system direction and strategic choices; this document explains how to build the system.
 
 ## Document Map
 
@@ -24,6 +24,16 @@ Use this document after reading [Architecture-Design.md](Architecture-Design.md)
 | 9 | phased build plan |
 | 10 | current local implementation map |
 | 11-13 | decisions, open questions, and next steps |
+
+## Architecture Decision Records
+
+This implementation blueprint follows the current accepted ADRs:
+
+| ADR | Implementation Impact |
+| :- | :- |
+| [ADR-007: Governed Enterprise Authority](adr/007-governed-enterprise-authority.md) | Tool calls, sensitive reads, writes, approvals, secrets, and audit must flow through governed Relay boundaries. |
+| [ADR-008: BoxLite-First Lightweight Execution](adr/008-boxlite-lightweight-execution.md) | BoxLite is the current lightweight execution implementation, but orchestration should depend on execution-plane interfaces rather than BoxLite directly. |
+| [ADR-009: Durable Control Plane Outside Sandbox](adr/009-control-plane-outside-sandbox.md) | Durable task/session state, permissions, approvals, memory, and workflow authority stay outside sandbox guest workers. |
 
 ## 0. Design Position
 
@@ -869,8 +879,8 @@ Test coverage is organized as:
 
 ## 13. Immediate Next Steps
 
-1. Add ADRs for control-plane placement and sandbox guest-worker scope.
-2. Define TypeScript interfaces for `ExecutionManager`, `SandboxHandle`, and `ExecutionHandle`.
-3. Move direct BoxLite usage behind the execution interface without changing behavior.
+1. Keep ADRs current for control-plane placement, sandbox guest-worker scope, and governed tool authority.
+2. Continue expanding the TypeScript `ExecutionManager` boundary toward `SandboxHandle` and `ExecutionHandle` contracts.
+3. Move remaining direct BoxLite usage behind the execution interface without changing behavior.
 4. Keep current `SessionController` as the local durable orchestration boundary.
 5. Add tests proving agent execution still streams, captures artifacts, supports cancellation, and never moves task authority into the sandbox.

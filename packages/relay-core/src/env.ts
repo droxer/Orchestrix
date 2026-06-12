@@ -59,7 +59,7 @@ if (process.env.RELAY_WORKSPACE) {
 loadDotEnv(resolve(process.cwd(), ".env"));
 
 export function hostWorkspacePath(raw?: string | null): string {
-  const selected = raw?.trim() || process.env.RELAY_WORKSPACE?.trim() || DEFAULT_HOST_WORKSPACE;
+  const selected = raw?.trim() || process.env.RELAY_WORKSPACE?.trim() || process.env.WORKSPACE?.trim() || DEFAULT_HOST_WORKSPACE;
   const path = resolve(expandUser(selected));
   mkdirSync(path, { recursive: true });
   return path;

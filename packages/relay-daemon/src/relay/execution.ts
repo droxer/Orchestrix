@@ -1,0 +1,154 @@
+import type { AgentName, AgentOutputSink, StreamExecResult } from "relay-core";
+
+import {
+  activeBox,
+  collectExecution,
+  ensureLocalDevboxOci,
+  prepareGuestAgentAuth,
+  prepareGuestWorkspace,
+  setSessionBox,
+  stopSessionBox,
+  type DevboxOciOptions,
+} from "./box.js";
+
+type BoxLiteRuntime = any;
+type BoxLiteBox = any;
+type StreamRenderer = (chunk: string) => string;
+
+export interface SandboxMount {
+  hostPath: string;
+  guestPath: string;
+  readOnly: boolean;
+}
+
+export interface CreateSandboxInput {
+  rootfsPath: string;
+  boxName: string;
+  volumes: SandboxMount[];
+  env: Array<{ key: string; value: string }>;
+  workingDir: string;
+  autoRemove: boolean;
+}
+
+export interface ExecutionSandbox {
+  name: string;
+  raw: BoxLiteBox;
+}
+
+export interface ExecutionManager {
+  ensureImage(sink?: AgentOutputSink, options?: DevboxOciOptions): string;
+  createSandbox(runtime: BoxLiteRuntime, input: CreateSandboxInput): Promise<ExecutionSandbox>;
+  setActiveSandbox(sandbox: ExecutionSandbox | null): void;
+  stopActiveSandbox(): Promise<void>;
+  removeSandbox(runtime: BoxLiteRuntime, boxName: string): Promise<void>;
+  prepareWorkspace(hostWorkspace: string): Promise<[number, number]>;
+  prepareAgentAuth(agents: Iterable<AgentName>, signal?: AbortSignal): Promise<void>;
+  execStream(
+    cmd: string,
+    args?: string[],
+    options?: {
+      cwd?: string;
+      stdoutRenderer?: StreamRenderer;
+      stderrRenderer?: StreamRenderer;
+      sink?: AgentOutputSink;
+      signal?: AbortSignal;
+    },
+  ): Promise<StreamExecResult>;
+  runShell(command: string, signal?: AbortSignal): Promise<StreamExecResult>;
+}
+
+export class BoxLiteExecutionManager implements ExecutionManager {
+  ensureImage(sink?: AgentOutputSink, options?: DevboxOciOptions): string {
+    return ensureLocalDevboxOci(sink, options);
+  }
+
+  async createSandbox(runtime: BoxLiteRuntime, input: CreateSandboxInput): Promise<ExecutionSandbox> {
+    const box = await createSessionBox(runtime, {
+      rootfsPath: input.rootfsPath,
+      volumes: input.volumes,
+      env: input.env,
+      workingDir: input.workingDir,
+      autoRemove: input.autoRemove,
+    }, input.boxName);
+    return { name: input.boxName, raw: box };
+  }
+
+  setActiveSandbox(sandbox: ExecutionSandbox | null): void {
+    setSessionBox(sandbox?.raw ?? null);
+  }
+
+  async stopActiveSandbox(): Promise<void> {
+    await stopSessionBox();
+  }
+
+  async removeSandbox(runtime: BoxLiteRuntime, boxName: string): Promise<void> {
+    if (!runtime.remove) return;
+    await runtime.remove(boxName, true).catch((error: unknown) => {
+      if (!isMissingBoxError(error)) throw error;
+    });
+  }
+
+  async prepareWorkspace(hostWorkspace: string): Promise<[number, number]> {
+    return prepareGuestWorkspace(hostWorkspace);
+  }
+
+  async prepareAgentAuth(agents: Iterable<AgentName>, signal?: AbortSignal): Promise<void> {
+    await prepareGuestAgentAuth(agents, signal);
+  }
+
+  async execStream(
+    cmd: string,
+    args: string[] = [],
+    options: {
+      cwd?: string;
+      stdoutRenderer?: StreamRenderer;
+      stderrRenderer?: StreamRenderer;
+      sink?: AgentOutputSink;
+      signal?: AbortSignal;
+    } = {},
+  ): Promise<StreamExecResult> {
+    if (options.signal?.aborted) {
+      return { exit_code: -1, stdout: "", stderr: "", error_message: "Execution cancelled before start." };
+    }
+    const execution = await activeBox().exec(cmd, args, null, false, null, null, options.cwd ?? null);
+    return collectExecution(execution, true, options.stdoutRenderer, options.stderrRenderer, options.sink, options.signal);
+  }
+
+  async runShell(command: string, signal?: AbortSignal): Promise<StreamExecResult> {
+    const execution = await activeBox().exec("bash", ["-c", command]);
+    return collectExecution(execution, false, undefined, undefined, undefined, signal);
+  }
+}
+
+async function createSessionBox(runtime: BoxLiteRuntime, options: unknown, boxName: string): Promise<BoxLiteBox> {
+  if (runtime.getOrCreate) {
+    try {
+      const result = await runtime.getOrCreate(options, boxName);
+      return result.box;
+    } catch (error) {
+      if (!isExistingBoxError(error) || !runtime.remove) throw error;
+      await runtime.remove(boxName, true).catch(() => undefined);
+      const result = await runtime.getOrCreate(options, boxName);
+      return result.box;
+    }
+  }
+  try {
+    return await runtime.create(options, boxName);
+  } catch (error) {
+    if (!isExistingBoxError(error) || !runtime.remove) throw error;
+    await runtime.remove(boxName, true).catch(() => undefined);
+    return runtime.create(options, boxName);
+  }
+}
+
+function isExistingBoxError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /box with name .+ already exists/i.test(message) || /already exists/i.test(message);
+}
+
+function isMissingBoxError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /box not found/i.test(message) || /not found/i.test(message);
+}
+
+export const defaultExecutionManager = new BoxLiteExecutionManager();

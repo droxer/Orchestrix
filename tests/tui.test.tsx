@@ -124,17 +124,20 @@ describe("TUI daemon runner", () => {
       RELAY_WORKSPACE: workspace,
       RELAY_EMPLOYEE_ID: "alice",
       RELAY_DAEMON_NODE_TOKEN: "tok_test",
+      RELAY_DAEMON_UI_TOKEN: "ui_test",
     });
 
     assert.equal(config.daemonUrl, "http://127.0.0.1:8790");
     assert.equal(config.workspacePath, workspace);
     assert.equal(config.employeeId, "alice");
     assert.equal(config.token, "tok_test");
+    assert.equal(config.uiToken, "ui_test");
     assert.equal(config.sandboxId, "sbx_alice");
     assert.equal(config.childEnv.RELAY_DAEMON_URL, "http://127.0.0.1:8790");
     assert.equal(config.childEnv.RELAY_WORKSPACE, workspace);
     assert.equal(config.childEnv.RELAY_EMPLOYEE_ID, "alice");
     assert.equal(config.childEnv.RELAY_DAEMON_NODE_TOKEN, "tok_test");
+    assert.equal(config.childEnv.RELAY_DAEMON_UI_TOKEN, "ui_test");
   });
 
   it("starts the local daemon in BoxLite-backed local mode", () => {
@@ -152,8 +155,8 @@ describe("TUI daemon runner", () => {
       undefined,
     );
     assert.match(
-      localDaemonCompatibilityError({ responding: true, daemonNodeMode: "reverse" }, "http://127.0.0.1:8790") ?? "",
-      /requires local mode/,
+      localDaemonCompatibilityError({ responding: true, daemonNodeMode: "server" }, "http://127.0.0.1:8790") ?? "",
+      /Run make stop, then make tui-local\./,
     );
     assert.match(
       localDaemonCompatibilityError({ responding: true }, "http://127.0.0.1:8790") ?? "",
@@ -1087,7 +1090,7 @@ describe("RelayTui component", () => {
             resolveRunner = resolve;
             request.signal?.addEventListener("abort", () => {
               if (request.sessionId) {
-                request.controller?.failSession(request.sessionId, "Task cancelled during agent execution.");
+                request.controller?.cancelSession(request.sessionId, "Task cancelled during agent execution.");
               }
               resolve();
             }, { once: true });
@@ -1106,17 +1109,21 @@ describe("RelayTui component", () => {
     await new Promise((resolve) => setTimeout(resolve, 20));
 
     assert.equal(seenSignal?.aborted, true);
-    assert.equal(store.getSession(sessionId).status, "failed");
+    assert.equal(store.getSession(sessionId).status, "cancelled");
     assert.match(lastFrame() ?? "", /Task cancelled|Cancelling/);
   });
 
   it("keeps daemon host booting until the workspace-backed sandbox is ready", async () => {
     const oldFetch = globalThis.fetch;
     const oldWorkspace = process.env.RELAY_WORKSPACE;
+    const oldEmployeeId = process.env.RELAY_EMPLOYEE_ID;
+    const oldToken = process.env.RELAY_DAEMON_NODE_TOKEN;
     const workspace = mkdtempSync(join(tmpdir(), "relay-tui-host-workspace-"));
     const bodies: unknown[] = [];
     let sandboxPolls = 0;
     process.env.RELAY_WORKSPACE = workspace;
+    process.env.RELAY_EMPLOYEE_ID = "host";
+    process.env.RELAY_DAEMON_NODE_TOKEN = "tok_has_under_score";
     globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
       if (init?.body) bodies.push(JSON.parse(String(init.body)));
       if (String(url) === "http://127.0.0.1:8790/sandboxes" && init?.method === "POST") {
@@ -1147,7 +1154,12 @@ describe("RelayTui component", () => {
     try {
       const { lastFrame, unmount } = render(<RelayTuiHost onExit={() => undefined} />);
       await waitForInput();
-      assert.match(lastFrame() ?? "", /Connecting to Relay daemon/);
+      const bootFrame = lastFrame() ?? "";
+      assert.match(bootFrame, /Waiting for daemon node|Connecting to Relay daemon/);
+      assert.match(bootFrame, /EMPLOYEE_ID=host/);
+      assert.match(bootFrame, /SANDBOX_ID=sbx_host/);
+      assert.match(bootFrame, /DAEMON_NODE_TOKEN=tok_has_under_score/);
+      assert.match(bootFrame, /WORKSPACE=/);
       await new Promise((resolve) => setTimeout(resolve, 450));
 
       assert.match(lastFrame() ?? "", /Host daemon ready/);
@@ -1163,6 +1175,16 @@ describe("RelayTui component", () => {
         delete process.env.RELAY_WORKSPACE;
       } else {
         process.env.RELAY_WORKSPACE = oldWorkspace;
+      }
+      if (oldEmployeeId === undefined) {
+        delete process.env.RELAY_EMPLOYEE_ID;
+      } else {
+        process.env.RELAY_EMPLOYEE_ID = oldEmployeeId;
+      }
+      if (oldToken === undefined) {
+        delete process.env.RELAY_DAEMON_NODE_TOKEN;
+      } else {
+        process.env.RELAY_DAEMON_NODE_TOKEN = oldToken;
       }
     }
   });

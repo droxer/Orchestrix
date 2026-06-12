@@ -12,7 +12,7 @@ Polish the existing circuit-X mark into a single, product-grade lockup that:
 2. Communicates Relay's actual function (multiple agents handing off into one coordinated forward action) rather than a generic "network".
 3. Stays inside the existing brand tokens (ink `#18232d`, Relay Blue `#0052ff`, Inter weight 400).
 
-Non-goals: changing the wordmark typography, introducing a new brand color, redesigning the wider design system in `docs/Design.md`.
+Non-goals: changing the wordmark typography, introducing a new brand color, redesigning the wider design system in `docs/design-system.md`.
 
 ## Concept
 
@@ -41,7 +41,7 @@ All coordinates are integers. Stroke-width 4 in a 96-wide viewBox lands at clean
 - Wordmark text element at `x=110 y=44`:
   - `font-family`: `'Inter', -apple-system, system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif`
   - `font-size`: 42
-  - `font-weight`: 400 (per `docs/Design.md` — display weights stay at 400)
+  - `font-weight`: 400 (per `docs/design-system.md` — display weights stay at 400)
   - `letter-spacing`: -1
   - `fill`: `#18232d`
   - Content: `Relay`
@@ -72,7 +72,7 @@ All coordinates are integers. Stroke-width 4 in a 96-wide viewBox lands at clean
 | `assets/brand/relay-mark.svg` | Rewrite to V3 geometry. |
 | `assets/brand/relay-logo.svg` | Rewrite with V3 mark group + wordmark text. |
 | `packages/relay-daemon/src/relay/daemon.ts` | Replace the inline SVG inside the `.wordmark` span (`top-nav`) with V3 markup. CSS stays as-is (`width: 48px; height: 32px; shape-rendering: geometricPrecision`). |
-| `README.md` / `README.zh-CN.md` | No change — already reference `assets/brand/relay-logo.svg`, which will resolve to the new lockup. |
+| `README.md` | No change — already references `assets/brand/relay-logo.svg`, which will resolve to the new lockup. |
 | `assets/brand/README.md` | Add a short usage note: mark vs. logo, clear-space, color swap on dark. |
 
 ## Verification
@@ -89,4 +89,4 @@ After implementation:
 - Animated logo variants.
 - Monochrome / single-color fallback variants beyond the dark-mode swap rule.
 - Marketing-site brand pages.
-- Updates to `docs/Design.md` — the design tokens used here are unchanged.
+- Updates to `docs/design-system.md` — the design tokens used here are unchanged.

@@ -175,14 +175,30 @@ export class SessionController implements AgentEventSink {
     };
 
     let patch: Partial<AgentState>;
-    if (step.agent === "claude") {
-      patch = await claudeImplementNode(state, runOptions);
-    } else if (step.agent === "pi") {
-      patch = await piImplementNode(state, runOptions);
-    } else if (step.mode === "review") {
-      patch = await codexReviewNode(state, runOptions);
-    } else {
-      patch = await codexImplementNode(state, runOptions);
+    try {
+      if (step.agent === "claude") {
+        patch = await claudeImplementNode(state, runOptions);
+      } else if (step.agent === "pi") {
+        patch = await piImplementNode(state, runOptions);
+      } else if (step.mode === "review") {
+        patch = await codexReviewNode(state, runOptions);
+      } else {
+        patch = await codexImplementNode(state, runOptions);
+      }
+    } catch (error) {
+      const status = runOptions.signal?.aborted ? "cancelled" : "failed";
+      this.append(sessionId, relayEvent("agent.completed", sessionId, {
+        runId,
+        agent: step.agent,
+        status,
+        exitCode: status === "cancelled" ? 130 : 1,
+      }));
+      const message = error instanceof Error ? error.message : String(error);
+      this.updateTaskStatus("blocked", message, {
+        agent: step.agent,
+        sessionId,
+      });
+      throw error;
     }
 
     const next = mergeAgentState(state, patch);

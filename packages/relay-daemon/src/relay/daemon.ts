@@ -20,7 +20,7 @@ import type {
   DaemonNodeRegistration,
   DaemonNodeRunCommand,
 } from "relay-core";
-import { DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS, newDaemonNodeToken, REPO_ROOT } from "relay-core";
+import { DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS, REPO_ROOT } from "relay-core";
 import {
   initialAgentState,
   mergeAgentState,
@@ -31,6 +31,7 @@ import {
   type CodexTaskMode,
 } from "relay-core";
 import { ensureAgentReady, withOrchestratorSession } from "./workflow.js";
+import { defaultExecutionManager } from "./execution.js";
 import { LocalTaskStore } from "./task.js";
 
 export type SandboxStatus = "provisioning" | "ready" | "running" | "stopped" | "failed";
@@ -49,8 +50,12 @@ export interface SandboxRecord {
   workspacePath?: string;
   status: SandboxStatus;
   agents: Record<AgentName, "unknown" | "ready" | "failed">;
+  /** Plaintext UI token returned only during provisioning. */
   token?: string;
+  /** Deprecated UI-token hash retained for compatibility with persisted records. */
   tokenHash?: string;
+  uiTokenHash?: string;
+  nodeTokenHash?: string;
   createdAt: string;
   updatedAt: string;
   lastSeenAt?: string;
@@ -69,7 +74,7 @@ export interface SandboxRunRequest {
 }
 
 export interface SandboxBackend {
-  provision(input: { employeeId: string; workspacePath?: string; token?: string }): Promise<SandboxRecord>;
+  provision(input: { employeeId: string; workspacePath?: string; token?: string; nodeToken?: string }): Promise<SandboxRecord>;
   get(sandboxId: string): SandboxRecord | undefined;
   list(): SandboxRecord[];
   run(sandboxId: string, request: SandboxRunRequest): Promise<RelaySession>;
@@ -87,7 +92,7 @@ export interface DaemonNodeActiveRun {
   startedAt: string;
 }
 
-export interface DaemonNodeMonitorRecord extends Omit<SandboxRecord, "token" | "tokenHash"> {
+export interface DaemonNodeMonitorRecord extends Omit<SandboxRecord, "token" | "tokenHash" | "uiTokenHash" | "nodeTokenHash"> {
   queuedCommandCount: number;
   activeRuns: DaemonNodeActiveRun[];
 }
@@ -174,7 +179,7 @@ export interface RelayDaemonOptions {
   port?: number;
   host?: string;
   backend?: SandboxBackend;
-  daemonNodeMode?: "reverse" | "local";
+  daemonNodeMode?: "server" | "local" | "reverse";
   daemonStore?: DaemonStore;
   store?: SessionStore;
   sink?: AgentOutputSink;
@@ -200,7 +205,7 @@ export function serveRelayDaemon(options: RelayDaemonOptions = {}): void {
         sink: options.sink,
         execStream: options.execStream,
       })
-    : new ReverseDaemonNodeBackend(daemonNodeRegistry));
+    : new ServerDaemonNodeBackend(daemonNodeRegistry));
   const port = options.port ?? 8790;
   const host = options.host ?? "127.0.0.1";
   const server = createServer((request, response) => {
@@ -220,13 +225,13 @@ export async function routeDaemonRequest(
   backend: SandboxBackend,
   request: IncomingMessage,
   response: ServerResponse,
-  reverseRegistry?: DaemonNodeRegistry,
+  serverRegistry?: DaemonNodeRegistry,
 ): Promise<void> {
   const method = request.method ?? "GET";
   const url = new URL(request.url ?? "/", "http://relay-daemon.local");
   const body = method === "GET" ? undefined : await readJsonBody(request);
   const authToken = bearerToken(request.headers.authorization);
-  const routed = await handleRelayDaemonRequest(backend, method, url.pathname, body, reverseRegistry, authToken);
+  const routed = await handleRelayDaemonRequest(backend, method, url.pathname, body, serverRegistry, authToken);
   response.writeHead(routed.status, { "Content-Type": routed.contentType });
   response.end(routed.bodyBytes ?? routed.body);
 }
@@ -236,7 +241,7 @@ export async function handleRelayDaemonRequest(
   method: string,
   pathname: string,
   body?: unknown,
-  reverseRegistry?: DaemonNodeRegistry,
+  serverRegistry?: DaemonNodeRegistry,
   authToken?: string,
 ): Promise<RelayDaemonResponse> {
   const parts = pathname.split("/").filter(Boolean);
@@ -273,57 +278,57 @@ export async function handleRelayDaemonRequest(
   }
   const isDaemonNodeRoute = parts[0] === "daemon-nodes";
   if (method === "GET" && parts.length === 1 && isDaemonNodeRoute) {
-    if (!reverseRegistry) return jsonResponse(404, { error: "Reverse daemon node registry is not enabled." });
-    return jsonResponse(200, { nodes: reverseRegistry.monitorNodes() });
+    if (!serverRegistry) return jsonResponse(404, { error: "Server mode daemon node registry is not enabled." });
+    const nodes = serverRegistry.monitorNodesForToken(authToken);
+    if (!nodes) return jsonResponse(401, { error: authToken ? "Invalid sandbox token." : "Sandbox token is required." });
+    return jsonResponse(200, { nodes });
   }
   if (method === "POST" && parts.length === 2 && isDaemonNodeRoute && parts[1] === "register") {
-    if (!reverseRegistry) return jsonResponse(404, { error: "Reverse daemon node registry is not enabled." });
+    if (!serverRegistry) return jsonResponse(404, { error: "Server mode daemon node registry is not enabled." });
     try {
-      return jsonResponse(200, reverseRegistry.register(daemonNodeRegistration(body, authToken)));
+      return jsonResponse(200, serverRegistry.register(daemonNodeRegistration(body, authToken)));
     } catch (error) {
       return daemonNodeRouteError(error);
     }
   }
   if (method === "GET" && parts.length === 3 && isDaemonNodeRoute && parts[2] === "commands") {
-    if (!reverseRegistry) return jsonResponse(404, { error: "Reverse daemon node registry is not enabled." });
+    if (!serverRegistry) return jsonResponse(404, { error: "Server mode daemon node registry is not enabled." });
     try {
-      return jsonResponse(200, { commands: reverseRegistry.takeCommands(parts[1], authToken) });
+      return jsonResponse(200, { commands: serverRegistry.takeCommands(parts[1], authToken) });
     } catch (error) {
       return daemonNodeRouteError(error);
     }
   }
   if (method === "POST" && parts.length === 3 && isDaemonNodeRoute && parts[2] === "events") {
-    if (!reverseRegistry) return jsonResponse(404, { error: "Reverse daemon node registry is not enabled." });
+    if (!serverRegistry) return jsonResponse(404, { error: "Server mode daemon node registry is not enabled." });
     try {
-      reverseRegistry.handleEvent(parts[1], daemonNodeEvent(body), authToken);
+      serverRegistry.handleEvent(parts[1], daemonNodeEvent(body), authToken);
     } catch (error) {
       return daemonNodeRouteError(error);
     }
     return jsonResponse(202, { ok: true });
   }
   if (parts[0] === "sessions") {
-    if (!reverseRegistry) return jsonResponse(404, { error: "Session store is not available." });
-    return handleRelayApiRequest(
-      reverseRegistry.store,
-      method,
-      pathname,
-      body,
-      new LocalTaskStore(dataDirForSessionStore(reverseRegistry.store)),
-    );
+    if (!serverRegistry) return jsonResponse(404, { error: "Session store is not available." });
+    return handleAuthenticatedSessionRequest(serverRegistry, method, pathname, body, authToken);
   }
   if (method === "GET" && parts.length === 1 && parts[0] === "sandboxes") {
-    return jsonResponse(200, { sandboxes: backend.list() });
+    const sandboxes = sandboxesForToken(backend, authToken);
+    if (!sandboxes) return jsonResponse(401, { error: authToken ? "Invalid sandbox token." : "Sandbox token is required." });
+    return jsonResponse(200, { sandboxes });
   }
   if (method === "POST" && parts.length === 1 && parts[0] === "sandboxes") {
     const input = asRecord(body);
     const employeeId = stringField(input, "employeeId");
     if (!employeeId) return jsonResponse(400, { error: "employeeId is required." });
     try {
-      return jsonResponse(201, await backend.provision({
+      const sandbox = await backend.provision({
         employeeId,
         workspacePath: stringField(input, "workspacePath") || undefined,
         token: authToken,
-      }));
+        nodeToken: stringField(input, "nodeToken") || undefined,
+      });
+      return jsonResponse(201, provisionedSandboxRecord(sandbox));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (/token/i.test(message)) return jsonResponse(401, { error: message });
@@ -333,14 +338,14 @@ export async function handleRelayDaemonRequest(
   if (method === "GET" && parts.length === 2 && parts[0] === "sandboxes") {
     const sandbox = backend.get(parts[1]);
     if (!sandbox) return jsonResponse(404, { error: "Sandbox not found." });
-    const authError = sandboxAuthError(sandbox, authToken);
+    const authError = sandboxUiAuthError(sandbox, authToken);
     if (authError) return jsonResponse(401, { error: authError });
-    return jsonResponse(200, sandbox);
+    return jsonResponse(200, publicSandboxRecord(sandbox));
   }
   if (method === "POST" && parts.length === 3 && parts[0] === "sandboxes" && parts[2] === "runs") {
     const sandbox = backend.get(parts[1]);
     if (!sandbox) return jsonResponse(404, { error: "Sandbox not found." });
-    const authError = sandboxAuthError(sandbox, authToken);
+    const authError = sandboxUiAuthError(sandbox, authToken);
     if (authError) return jsonResponse(401, { error: authError });
     const request = sandboxRunRequest(body);
     if (!request) {
@@ -351,7 +356,7 @@ export async function handleRelayDaemonRequest(
   if (method === "POST" && parts.length === 5 && parts[0] === "sandboxes" && parts[2] === "runs" && parts[4] === "cancel") {
     const sandbox = backend.get(parts[1]);
     if (!sandbox) return jsonResponse(404, { error: "Sandbox not found." });
-    const authError = sandboxAuthError(sandbox, authToken);
+    const authError = sandboxUiAuthError(sandbox, authToken);
     if (authError) return jsonResponse(401, { error: authError });
     if (!backend.cancelRun) return jsonResponse(400, { error: "Sandbox backend does not support cancellation." });
     const input = asRecord(body);
@@ -360,8 +365,8 @@ export async function handleRelayDaemonRequest(
   return jsonResponse(404, { error: "Not found" });
 }
 
-function daemonNodeModeForBackend(backend: SandboxBackend): "local" | "reverse" {
-  return backend instanceof LocalSandboxBackend ? "local" : "reverse";
+function daemonNodeModeForBackend(backend: SandboxBackend): "local" | "server" {
+  return backend instanceof LocalSandboxBackend ? "local" : "server";
 }
 
 export class DaemonNodeRegistry {
@@ -387,14 +392,17 @@ export class DaemonNodeRegistry {
     }
   }
 
-  register(input: DaemonNodeRegistration): SandboxRecord {
+  register(input: DaemonNodeRegistration, uiToken?: string): SandboxRecord {
     const now = new Date().toISOString();
     const existing = this.sandboxes.get(input.sandboxId);
-    if (existing?.tokenHash && !daemonNodeTokenMatches(existing, input.token)) {
+    if ((existing?.nodeTokenHash || existing?.tokenHash) && !daemonNodeTokenMatches(existing, input.token)) {
       throw new Error(
         `Unauthorized daemon node registration for ${input.sandboxId}: token does not match the token issued at provisioning.`,
       );
     }
+    const nextUiTokenHash = uiToken
+      ? hashDaemonNodeToken(uiToken)
+      : existing?.uiTokenHash ?? existing?.tokenHash;
     const agents: SandboxRecord["agents"] = {
       claude: input.supportedAgents.includes("claude") ? "ready" : "unknown",
       pi: input.supportedAgents.includes("pi") ? "ready" : "unknown",
@@ -406,11 +414,12 @@ export class DaemonNodeRegistry {
       workspacePath: input.workspacePath,
       status: input.status === "busy" ? "running" : input.status === "stopped" ? "stopped" : "ready",
       agents,
-      // Plaintext token is intentionally NOT retained in the in-memory record.
-      // Only the hash is kept; the plaintext is returned to the provisioner once
-      // and forwarded to the daemon-node out-of-band.
+      // Plaintext tokens are intentionally NOT retained in the registry record.
+      // The UI token and daemon-node token are stored as separate hashes.
       token: undefined,
-      tokenHash: hashDaemonNodeToken(input.token) ?? existing?.tokenHash,
+      tokenHash: nextUiTokenHash,
+      uiTokenHash: nextUiTokenHash,
+      nodeTokenHash: hashDaemonNodeToken(input.token) ?? existing?.nodeTokenHash ?? existing?.tokenHash,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
       lastSeenAt: now,
@@ -442,13 +451,22 @@ export class DaemonNodeRegistry {
 
   monitorNodes(): DaemonNodeMonitorRecord[] {
     return this.list().map((sandbox) => {
-      const { token: _token, tokenHash: _tokenHash, ...node } = sandbox;
+      const { token: _token, tokenHash: _tokenHash, uiTokenHash: _uiTokenHash, nodeTokenHash: _nodeTokenHash, ...node } = sandbox;
       return {
         ...node,
         queuedCommandCount: this.daemonStore.queuedCommandCount(sandbox.id),
         activeRuns: this.daemonStore.listActiveRuns(sandbox.id).map(daemonActiveRun),
       };
     });
+  }
+
+  monitorNodesForToken(token?: string): DaemonNodeMonitorRecord[] | undefined {
+    if (!token) return undefined;
+    const allowed = new Set(this.list()
+      .filter((sandbox) => sandboxUiTokenMatches(sandbox, token))
+      .map((sandbox) => sandbox.id));
+    if (allowed.size === 0) return undefined;
+    return this.monitorNodes().filter((node) => allowed.has(node.id));
   }
 
   findByEmployee(employeeId: string, workspacePath?: string): SandboxRecord | undefined {
@@ -656,7 +674,14 @@ export class LocalDaemonStore implements DaemonStore {
   }
 
   registerNode(input: SandboxRecord): SandboxRecord {
-    const node = { ...input, token: undefined, tokenHash: input.tokenHash ?? hashDaemonNodeToken(input.token ?? "") };
+    const uiTokenHash = input.uiTokenHash ?? input.tokenHash ?? hashDaemonNodeToken(input.token ?? "");
+    const node = {
+      ...input,
+      token: undefined,
+      tokenHash: uiTokenHash,
+      uiTokenHash,
+      nodeTokenHash: input.nodeTokenHash,
+    };
     this.writeNode(node);
     this.appendDaemonEvent(daemonEvent("daemon.node.registered", { node }));
     return node;
@@ -896,16 +921,30 @@ export class LocalDaemonStore implements DaemonStore {
 
 export const LocalDaemonNodeStorage = LocalDaemonStore;
 
-export class ReverseDaemonNodeBackend implements SandboxBackend {
+export class ServerDaemonNodeBackend implements SandboxBackend {
   constructor(private readonly registry: DaemonNodeRegistry) {}
 
-  async provision(input: { employeeId: string; workspacePath?: string; token?: string }): Promise<SandboxRecord> {
+  async provision(input: { employeeId: string; workspacePath?: string; token?: string; nodeToken?: string }): Promise<SandboxRecord> {
     const existing = this.registry.findByEmployee(input.employeeId, input.workspacePath);
     if (existing) {
-      const authError = sandboxAuthError(existing, input.token);
-      if (authError) throw new Error(authError);
-      return existing;
+      const uiAuthError = sandboxUiAuthError(existing, input.token);
+      if (!uiAuthError) return existing;
+      const nodeAuthError = sandboxNodeAuthError(existing, input.nodeToken);
+      if (!nodeAuthError && input.token) {
+        return this.registry.register({
+          sandboxId: existing.id,
+          employeeId: existing.employeeId,
+          token: input.nodeToken ?? "",
+          workspacePath: existing.workspacePath,
+          protocolVersion: DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS[0],
+          supportedAgents: agentsReadyInSandbox(existing),
+          status: existing.status === "running" ? "busy" : existing.status === "stopped" ? "stopped" : "ready",
+        }, input.token);
+      }
+      throw new Error(nodeAuthError ?? uiAuthError);
     }
+    if (!input.token) throw new Error("Sandbox token is required.");
+    if (!input.nodeToken) throw new Error("Daemon node token is required.");
     const sandboxId = newSandboxId(input.employeeId);
     const now = new Date().toISOString();
     const sandbox: SandboxRecord = {
@@ -914,7 +953,7 @@ export class ReverseDaemonNodeBackend implements SandboxBackend {
       workspacePath: input.workspacePath,
       status: "provisioning",
       agents: { claude: "unknown", pi: "unknown", codex: "unknown" },
-      token: input.token || newDaemonNodeToken(),
+      token: input.token,
       createdAt: now,
       updatedAt: now,
       lastError: "Waiting for daemon node registration.",
@@ -922,16 +961,16 @@ export class ReverseDaemonNodeBackend implements SandboxBackend {
     this.registry.register({
       sandboxId,
       employeeId: input.employeeId,
-      token: sandbox.token ?? "",
+      token: input.nodeToken,
       workspacePath: input.workspacePath,
       protocolVersion: DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS[0],
       supportedAgents: [],
       status: "stopped",
-    });
+    }, sandbox.token);
     // Return the plaintext token to the caller exactly once. The registry
     // intentionally keeps only the hash in memory.
     const stored = this.registry.get(sandboxId) ?? {};
-    return { ...sandbox, ...stored, token: sandbox.token };
+    return { ...sandbox, ...stored, token: input.token };
   }
 
   get(sandboxId: string): SandboxRecord | undefined {
@@ -1073,6 +1112,11 @@ export class ReverseDaemonNodeBackend implements SandboxBackend {
       this.registry.updateStatus(sandboxId, { status: "ready", lastError: undefined });
       return this.registry.store.getSession(sessionId);
     } catch (error) {
+      failSessionIfOpen(
+        this.registry.store,
+        sessionId,
+        error instanceof Error ? error.message : String(error),
+      );
       this.registry.updateStatus(sandboxId, {
         status: "failed",
         lastError: error instanceof Error ? error.message : String(error),
@@ -1090,6 +1134,8 @@ export class ReverseDaemonNodeBackend implements SandboxBackend {
   }
 }
 
+export { ServerDaemonNodeBackend as ReverseDaemonNodeBackend };
+
 export class LocalSandboxBackend implements SandboxBackend {
   private readonly sandboxes = new Map<string, SandboxRecord>();
   private readonly activeRuns = new Map<string, {
@@ -1103,12 +1149,16 @@ export class LocalSandboxBackend implements SandboxBackend {
   }
 
   async provision(input: { employeeId: string; workspacePath?: string; token?: string }): Promise<SandboxRecord> {
+    if (!input.token) throw new Error("Sandbox token is required.");
     const now = new Date().toISOString();
+    const tokenHash = hashDaemonNodeToken(input.token);
     const sandbox: SandboxRecord = {
       id: newSandboxId(input.employeeId),
       employeeId: input.employeeId,
       workspacePath: input.workspacePath,
-      token: input.token,
+      token: undefined,
+      tokenHash,
+      uiTokenHash: tokenHash,
       status: "ready",
       agents: {
         claude: "unknown",
@@ -1119,7 +1169,7 @@ export class LocalSandboxBackend implements SandboxBackend {
       updatedAt: now,
     };
     this.sandboxes.set(sandbox.id, sandbox);
-    return sandbox;
+    return { ...sandbox, token: input.token };
   }
 
   get(sandboxId: string): SandboxRecord | undefined {
@@ -1140,7 +1190,7 @@ export class LocalSandboxBackend implements SandboxBackend {
     const controller = new SessionController(this.store, {
       workspacePath: sandbox.workspacePath,
       sink: this.options.sink,
-      execStream: this.options.execStream,
+      execStream: this.options.execStream ?? defaultExecutionManager.execStream.bind(defaultExecutionManager),
     });
     const sessionId = request.sessionId ?? controller.createSession(
       request.taskGoal,
@@ -1159,7 +1209,7 @@ export class LocalSandboxBackend implements SandboxBackend {
           mode: assignment.mode ?? "implement",
         })), {
           sink: this.options.sink,
-          execStream: this.options.execStream,
+          execStream: this.options.execStream ?? defaultExecutionManager.execStream.bind(defaultExecutionManager),
           signal: abortController.signal,
         });
       }, this.options.sink, {
@@ -1175,9 +1225,11 @@ export class LocalSandboxBackend implements SandboxBackend {
         this.updateSandbox(sandboxId, { status: "ready", lastError: reason });
         return this.store.getSession(sessionId);
       }
+      const outcome = error instanceof Error ? error.message : String(error);
+      failSessionIfOpen(this.store, sessionId, outcome);
       this.updateSandbox(sandboxId, {
         status: "failed",
-        lastError: error instanceof Error ? error.message : String(error),
+        lastError: outcome,
       });
       throw error;
     } finally {
@@ -1218,6 +1270,16 @@ function localRunKey(sandboxId: string, sessionId: string): string {
 
 function abortReason(signal: AbortSignal): string {
   return typeof signal.reason === "string" && signal.reason ? signal.reason : "Cancelled by human.";
+}
+
+function failSessionIfOpen(store: SessionStore, sessionId: string, outcome: string): void {
+  try {
+    const session = store.getSession(sessionId);
+    if (session.status === "completed" || session.status === "failed" || session.status === "cancelled") return;
+    store.appendEvent(sessionId, relayEvent("session.failed", sessionId, { outcome }));
+  } catch {
+    // If the session cannot be read here, preserve the original execution error.
+  }
 }
 
 async function readJsonBody(request: IncomingMessage): Promise<unknown> {
@@ -1405,11 +1467,98 @@ function bearerToken(value: string | string[] | undefined): string | undefined {
   return match?.[1];
 }
 
-function sandboxAuthError(sandbox: SandboxRecord, token?: string): string | null {
-  if (!sandbox.tokenHash && !sandbox.token) return null;
+function sandboxUiAuthError(sandbox: SandboxRecord, token?: string): string | null {
+  if (!sandbox.uiTokenHash && !sandbox.tokenHash && !sandbox.token) {
+    return sandbox.nodeTokenHash ? "Sandbox token is required." : null;
+  }
   if (!token) return "Sandbox token is required.";
-  if (!daemonNodeTokenMatches(sandbox, token)) return "Invalid sandbox token.";
+  if (!sandboxUiTokenMatches(sandbox, token)) return "Invalid sandbox token.";
   return null;
+}
+
+function sandboxNodeAuthError(sandbox: SandboxRecord, token?: string): string | null {
+  if (!sandbox.nodeTokenHash && !sandbox.tokenHash && !sandbox.token) return null;
+  if (!token) return "Daemon node token is required.";
+  if (!daemonNodeTokenMatches(sandbox, token)) return "Invalid daemon node token.";
+  return null;
+}
+
+function sandboxesForToken(backend: SandboxBackend, token?: string): SandboxRecord[] | undefined {
+  if (!token) return undefined;
+  const sandboxes = backend.list().filter((sandbox) => sandboxUiTokenMatches(sandbox, token));
+  return sandboxes.length === 0 ? undefined : sandboxes.map(publicSandboxRecord);
+}
+
+function handleAuthenticatedSessionRequest(
+  registry: DaemonNodeRegistry,
+  method: string,
+  pathname: string,
+  body: unknown,
+  authToken?: string,
+): RelayDaemonResponse {
+  const sandbox = authorizedSandboxForToken(registry, authToken);
+  if (!sandbox) return jsonResponse(401, { error: authToken ? "Invalid sandbox token." : "Sandbox token is required." });
+
+  const parts = pathname.split("/").filter(Boolean);
+  const taskStore = new LocalTaskStore(dataDirForSessionStore(registry.store));
+
+  if (method === "GET" && parts.length === 1 && parts[0] === "sessions") {
+    return jsonResponse(200, {
+      sessions: registry.store.listSessions().filter((session) => sessionBelongsToSandbox(session, sandbox)),
+    });
+  }
+
+  if (method === "POST" && parts.length === 1 && parts[0] === "sessions") {
+    const input = asRecord(body);
+    const requestedWorkspace = stringField(input, "workspacePath");
+    if (sandbox.workspacePath && requestedWorkspace && requestedWorkspace !== sandbox.workspacePath) {
+      return jsonResponse(403, { error: "Session workspace does not match the authenticated sandbox." });
+    }
+    const scopedBody = sandbox.workspacePath && !requestedWorkspace
+      ? { ...input, workspacePath: sandbox.workspacePath }
+      : body;
+    return handleRelayApiRequest(registry.store, method, pathname, scopedBody, taskStore);
+  }
+
+  const sessionId = parts[0] === "sessions" ? parts[1] : undefined;
+  if (sessionId) {
+    let session: RelaySession;
+    try {
+      session = registry.store.getSession(sessionId);
+    } catch {
+      return jsonResponse(404, { error: "Session not found." });
+    }
+    if (!sessionBelongsToSandbox(session, sandbox)) {
+      return jsonResponse(403, { error: "Session does not belong to the authenticated sandbox." });
+    }
+  }
+
+  return handleRelayApiRequest(registry.store, method, pathname, body, taskStore);
+}
+
+function authorizedSandboxForToken(registry: DaemonNodeRegistry, token?: string): SandboxRecord | undefined {
+  if (!token) return undefined;
+  return registry.list().find((sandbox) => sandboxUiTokenMatches(sandbox, token));
+}
+
+function sessionBelongsToSandbox(session: RelaySession, sandbox: SandboxRecord): boolean {
+  return !sandbox.workspacePath || session.workspacePath === sandbox.workspacePath;
+}
+
+function agentsReadyInSandbox(sandbox: SandboxRecord): AgentName[] {
+  return (["claude", "pi", "codex"] as const).filter((agent) => sandbox.agents[agent] === "ready");
+}
+
+function publicSandboxRecord(sandbox: SandboxRecord): SandboxRecord {
+  const { token: _token, tokenHash: _tokenHash, uiTokenHash: _uiTokenHash, nodeTokenHash: _nodeTokenHash, ...publicSandbox } = sandbox;
+  return publicSandbox;
+}
+
+function provisionedSandboxRecord(sandbox: SandboxRecord): SandboxRecord {
+  return {
+    ...publicSandboxRecord(sandbox),
+    ...(sandbox.token ? { token: sandbox.token } : {}),
+  };
 }
 
 function dataDirForSessionStore(store: SessionStore): string {
@@ -1445,6 +1594,8 @@ function sandboxRecord(value: unknown): SandboxRecord | undefined {
     },
     token: stringField(input, "token") || undefined,
     tokenHash: stringField(input, "tokenHash") || undefined,
+    uiTokenHash: stringField(input, "uiTokenHash") || undefined,
+    nodeTokenHash: stringField(input, "nodeTokenHash") || undefined,
     createdAt: stringField(input, "createdAt") || new Date().toISOString(),
     updatedAt: stringField(input, "updatedAt") || new Date().toISOString(),
     lastSeenAt: stringField(input, "lastSeenAt") || undefined,
@@ -1581,10 +1732,16 @@ function hashDaemonNodeToken(token: string): string | undefined {
   return `sha256:${createHash("sha256").update(token).digest("hex")}`;
 }
 
+function sandboxUiTokenMatches(sandbox: SandboxRecord, token?: string): boolean {
+  return sandboxTokenHashMatches(sandbox.uiTokenHash ?? sandbox.tokenHash ?? (sandbox.token ? hashDaemonNodeToken(sandbox.token) : undefined), token);
+}
+
 function daemonNodeTokenMatches(sandbox: SandboxRecord, token?: string): boolean {
-  if (!token) return false;
-  const expected = sandbox.tokenHash ?? (sandbox.token ? hashDaemonNodeToken(sandbox.token) : undefined);
-  if (!expected) return false;
+  return sandboxTokenHashMatches(sandbox.nodeTokenHash ?? sandbox.tokenHash ?? (sandbox.token ? hashDaemonNodeToken(sandbox.token) : undefined), token);
+}
+
+function sandboxTokenHashMatches(expected: string | undefined, token?: string): boolean {
+  if (!token || !expected) return false;
   const provided = hashDaemonNodeToken(token);
   if (!provided) return false;
   const a = Buffer.from(expected);
@@ -1816,58 +1973,37 @@ function daemonControlPanelHtml(): string {
 
     .wordmark {
       display: inline-flex;
-      align-items: baseline;
-      gap: 14px;
+      align-items: center;
+      gap: 8px;
       color: var(--ink);
-      font-family: var(--font-display);
-      font-size: 34px;
-      font-weight: 500;
-      letter-spacing: -0.03em;
-      line-height: 1;
-      font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 1;
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
     }
 
-    /* hide the legacy SVG mark and render "Re-lay" typographically */
-    .wordmark svg { display: none; }
-    .wordmark {
-      /* the literal "Relay" text node — we wrap it with pseudo to italicise the tail */
-      font-size: 0;
-    }
-    .wordmark::before {
-      content: "Re";
-      font-size: 34px;
-      color: var(--ink);
-    }
-    .wordmark::after {
-      content: "lay";
-      font-style: italic;
-      font-size: 34px;
-      color: var(--oxblood);
-      font-variation-settings: "opsz" 144, "SOFT" 100, "WONK" 1;
+    .wordmark .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 9999px;
+      background: var(--primary);
     }
 
     .nav-meta {
       display: inline-flex;
-      align-items: baseline;
-      gap: 12px;
-      color: var(--ink-mute);
-      font-family: var(--font-num);
-      font-size: 10px;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 13px;
       font-weight: 500;
-      letter-spacing: 0.22em;
-      text-transform: uppercase;
     }
 
     .nav-meta .badge {
-      padding: 3px 10px;
-      border: 1px solid var(--ink);
-      background: transparent;
+      padding: 2px 10px;
+      border-radius: 100px;
+      background: var(--surface-strong);
       color: var(--ink);
-      font-family: var(--font-num);
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 600;
-      letter-spacing: 0.22em;
-      text-transform: uppercase;
     }
 
     /* Layout ---------------------------------------------------------- */
@@ -2298,7 +2434,6 @@ function daemonControlPanelHtml(): string {
     @media (max-width: 720px) {
       main { padding: 20px 0 24px; }
       .top-nav { padding: 0 16px; height: 56px; }
-      .wordmark::before, .wordmark::after { font-size: 26px; }
       .hero { flex-direction: column; align-items: flex-start; gap: 12px; margin-bottom: 18px; }
       h1 { font-size: 40px; }
       .metrics { grid-template-columns: repeat(2, 1fr); row-gap: 16px; padding: 14px 0; }
@@ -2315,31 +2450,15 @@ function daemonControlPanelHtml(): string {
 </head>
 <body>
   <nav class="top-nav">
-    <span class="wordmark">
-      <svg viewBox="0 0 96 64" role="img" aria-label="Relay" xmlns="http://www.w3.org/2000/svg">
-        <g fill="none" stroke="#18232d" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M10 14 H22 L32 24 H40"/>
-          <path d="M10 50 H22 L32 40 H40"/>
-        </g>
-        <g fill="#18232d">
-          <circle cx="10" cy="14" r="4"/>
-          <circle cx="10" cy="50" r="4"/>
-        </g>
-        <g stroke="#0052ff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none">
-          <line x1="32" y1="32" x2="76" y2="32"/>
-          <polyline points="68,24 80,32 68,40"/>
-        </g>
-      </svg>
-      Relay
-    </span>
-    <span class="nav-meta"><span class="badge">Daemon</span><span>Vol. III &middot; &#8470;&nbsp;42</span></span>
+    <span class="wordmark"><span class="dot" aria-hidden="true"></span>Relay</span>
+    <span class="nav-meta"><span class="badge">Daemon</span><span>Control panel</span></span>
   </nav>
 
   <main>
     <section class="hero">
       <div class="hero-left">
-        <span class="eyebrow">Node operations &middot; the desk</span>
-        <h1>The control room</h1>
+        <span class="eyebrow">Node operations</span>
+        <h1>Control panel</h1>
       </div>
       <div class="refresh" id="refreshState"><span class="dot" aria-hidden="true"></span>waiting for nodes…</div>
     </section>

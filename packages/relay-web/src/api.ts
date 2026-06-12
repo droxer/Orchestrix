@@ -39,16 +39,16 @@ export async function apiJson<T>(
   return parsed as T;
 }
 
-export function listSandboxes(signal?: AbortSignal): Promise<SandboxesResponse> {
-  return apiJson<SandboxesResponse>("/sandboxes", { signal });
+export function listSandboxes(token?: string, signal?: AbortSignal): Promise<SandboxesResponse> {
+  return apiJson<SandboxesResponse>("/sandboxes", { token, signal });
 }
 
-export function listDaemonNodes(signal?: AbortSignal): Promise<DaemonNodesResponse> {
-  return apiJson<DaemonNodesResponse>("/daemon-nodes", { signal });
+export function listDaemonNodes(token?: string, signal?: AbortSignal): Promise<DaemonNodesResponse> {
+  return apiJson<DaemonNodesResponse>("/daemon-nodes", { token, signal });
 }
 
-export function listSessions(signal?: AbortSignal): Promise<SessionsResponse> {
-  return apiJson<SessionsResponse>("/sessions", { signal });
+export function listSessions(token?: string, signal?: AbortSignal): Promise<SessionsResponse> {
+  return apiJson<SessionsResponse>("/sessions", { token, signal });
 }
 
 export function provisionSandbox(employeeId: string, token?: string): Promise<SandboxRecord> {
@@ -62,9 +62,10 @@ export function provisionSandbox(employeeId: string, token?: string): Promise<Sa
   });
 }
 
-export function createSession(input: CreateSessionInput): Promise<RelaySession> {
+export function createSession(input: CreateSessionInput, token?: string): Promise<RelaySession> {
   return apiJson<RelaySession>("/sessions", {
     method: "POST",
+    token,
     body: {
       taskGoal: input.taskGoal,
       assignments: input.assignments,
@@ -97,9 +98,11 @@ export function recordDecision(
   sessionId: string,
   kind: "approve" | "reject" | "rerun" | "mark_done",
   note?: string,
+  token?: string,
 ): Promise<RelaySession> {
   return apiJson<RelaySession>(`/sessions/${encodeURIComponent(sessionId)}/decisions`, {
     method: "POST",
+    token,
     body: { kind, note },
   });
 }
@@ -109,9 +112,11 @@ export function recordHandoff(
   targetAgent: "claude" | "pi" | "codex",
   mode: "implement" | "review",
   note?: string,
+  token?: string,
 ): Promise<RelaySession> {
   return apiJson<RelaySession>(`/sessions/${encodeURIComponent(sessionId)}/handoffs`, {
     method: "POST",
+    token,
     body: { targetAgent, mode, note },
   });
 }

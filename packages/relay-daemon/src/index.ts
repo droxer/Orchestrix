@@ -105,6 +105,7 @@ export {
   LocalDaemonNodeStorage,
   LocalSandboxBackend,
   DaemonNodeRegistry,
+  ServerDaemonNodeBackend,
   ReverseDaemonNodeBackend,
   handleRelayDaemonRequest,
   routeDaemonRequest,
@@ -224,6 +225,15 @@ export {
 } from "./relay/box.js";
 
 export {
+  BoxLiteExecutionManager,
+  defaultExecutionManager,
+  type CreateSandboxInput,
+  type ExecutionManager,
+  type ExecutionSandbox,
+  type SandboxMount,
+} from "./relay/execution.js";
+
+export {
   claudeImplementNode,
   codexImplementNode,
   codexReviewNode,
@@ -236,6 +246,7 @@ export {
   runAgentTask,
   runWorkflow,
   ensureAgentReady,
+  resetAgentReadiness,
   withOrchestratorSession,
   type OrchestratorSession,
   type OrchestratorSessionOptions,
