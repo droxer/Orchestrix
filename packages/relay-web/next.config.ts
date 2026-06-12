@@ -10,8 +10,17 @@ const nextConfig = (phase: string): NextConfig => {
     ...(!isDev ? { output: "export" as const } : {}),
     ...(isDev
       ? {
+          async redirects() {
+            return [
+              { source: "/", destination: "/web", permanent: false, basePath: false },
+              { source: "/login", destination: "/web", permanent: false, basePath: false },
+              { source: "/channels", destination: "/web", permanent: false, basePath: false },
+            ];
+          },
           async rewrites() {
             return [
+              { source: "/cp", destination: `${daemonUrl}/cp`, basePath: false },
+              { source: "/cp/:path*", destination: `${daemonUrl}/cp/:path*`, basePath: false },
               { source: "/sandboxes/:path*", destination: `${daemonUrl}/sandboxes/:path*`, basePath: false },
               { source: "/sessions/:path*", destination: `${daemonUrl}/sessions/:path*`, basePath: false },
               { source: "/daemon-nodes/:path*", destination: `${daemonUrl}/daemon-nodes/:path*`, basePath: false },

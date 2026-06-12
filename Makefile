@@ -49,7 +49,7 @@ daemon: daemon-server
 
 daemon-node:
 	@echo "Starting daemon node on host for protocol/debug use. In production this process runs inside the employee sandbox."
-	RELAY_DAEMON_URL="$(RELAY_DAEMON_URL)" RELAY_EMPLOYEE_ID="$(EMPLOYEE_ID)" RELAY_DAEMON_NODE_TOKEN="$(DAEMON_NODE_TOKEN)" RELAY_WORKSPACE="$(WORKSPACE)" node packages/relay-daemon/dist/daemon-node-cli.js --sandbox-id $(SANDBOX_ID)
+	RELAY_DAEMON_URL="$(RELAY_DAEMON_URL)" RELAY_EMPLOYEE_ID="$(EMPLOYEE_ID)" RELAY_DAEMON_NODE_TOKEN="$(DAEMON_NODE_TOKEN)" RELAY_WORKSPACE="$(WORKSPACE)" node packages/relay-daemon-node/dist/cli.js --sandbox-id $(SANDBOX_ID)
 
 run-with-daemon: run
 
@@ -64,7 +64,7 @@ run-fresh: devbox-oci
 
 stop:
 	-pkill -f "node packages/relay-daemon/dist/daemon-cli.js" 2>/dev/null
-	-pkill -f "node packages/relay-daemon/dist/daemon-node-cli.js" 2>/dev/null
+	-pkill -f "node packages/relay-daemon-node/dist/cli.js" 2>/dev/null
 	-pkill -f "node packages/relay-tui/dist/cli.js$$" 2>/dev/null
 	-pkill -f "npm run run" 2>/dev/null
 	-pkill -f "boxlite-shim" 2>/dev/null

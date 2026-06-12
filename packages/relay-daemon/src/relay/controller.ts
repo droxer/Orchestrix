@@ -13,6 +13,7 @@ import {
   type AgentOutputSink,
   type AgentRunOptions,
   type AgentState,
+  type CodexReviewVerdict,
   type CodexTaskMode,
 } from "relay-core";
 import {
@@ -21,7 +22,10 @@ import {
   relayEvent,
   roleForAgent,
   type AgentEventSink,
+  type AgentRole,
   type HumanDecisionKind,
+  type RelayArtifact,
+  type RelayArtifactKind,
   type RelaySession,
   type SessionStore,
 } from "./session.js";
@@ -63,14 +67,15 @@ export function assignmentFailureOutcome(step: WorkflowStep, state: AgentState):
 
 export class SessionController implements AgentEventSink {
   private activeSessionId = "";
+  private readonly pendingOutputWrites = new Set<Promise<void>>();
 
   constructor(
     public readonly store: SessionStore = new LocalSessionStore(),
     private readonly options: Omit<SessionControllerOptions, "store"> = {},
   ) {}
 
-  createSession(taskGoal: string, participants: string[] = ["human"], pendingStart = false): RelaySession {
-    const session = this.store.createSession({
+  async createSession(taskGoal: string, participants: string[] = ["human"], pendingStart = false): Promise<RelaySession> {
+    const session = await this.store.createSession({
       workspacePath: this.options.workspacePath ?? GUEST_WORKSPACE,
       taskGoal,
       participants,
@@ -83,26 +88,26 @@ export class SessionController implements AgentEventSink {
     return session;
   }
 
-  getSession(sessionId = this.activeSessionId): RelaySession {
+  async getSession(sessionId = this.activeSessionId): Promise<RelaySession> {
     return this.store.getSession(sessionId);
   }
 
-  completeSession(sessionId: string, outcome: string): RelaySession {
-    const session = this.append(sessionId, relayEvent("session.completed", sessionId, { outcome }));
-    this.updateTaskStatus("done", outcome, { sessionId });
+  async completeSession(sessionId: string, outcome: string): Promise<RelaySession> {
+    const session = await this.append(sessionId, relayEvent("session.completed", sessionId, { outcome }));
+    await this.updateTaskStatus("done", outcome, { sessionId });
     return session;
   }
 
-  failSession(sessionId: string, outcome: string): RelaySession {
-    const session = this.append(sessionId, relayEvent("session.failed", sessionId, { outcome }));
-    this.updateTaskStatus("blocked", outcome, { sessionId });
+  async failSession(sessionId: string, outcome: string): Promise<RelaySession> {
+    const session = await this.append(sessionId, relayEvent("session.failed", sessionId, { outcome }));
+    await this.updateTaskStatus("blocked", outcome, { sessionId });
     return session;
   }
 
-  cancelSession(sessionId: string, note = "Cancelled by human."): RelaySession {
-    const current = this.store.getSession(sessionId);
+  async cancelSession(sessionId: string, note = "Cancelled by human."): Promise<RelaySession> {
+    const current = await this.store.getSession(sessionId);
     if (current.status === "cancelled") return current;
-    const session = this.append(sessionId, relayEvent("human.decision", sessionId, {
+    const session = await this.append(sessionId, relayEvent("human.decision", sessionId, {
       decision: {
         id: newRelayId("dec"),
         kind: "cancel",
@@ -110,11 +115,11 @@ export class SessionController implements AgentEventSink {
         note,
       },
     }));
-    this.updateTaskStatus("blocked", note, { sessionId });
+    await this.updateTaskStatus("blocked", note, { sessionId });
     return session;
   }
 
-  recordDecision(sessionId: string, kind: HumanDecisionKind, note?: string, targetAgent?: AgentName): RelaySession {
+  async recordDecision(sessionId: string, kind: HumanDecisionKind, note?: string, targetAgent?: AgentName): Promise<RelaySession> {
     const decision = {
       id: newRelayId("dec"),
       kind,
@@ -122,26 +127,186 @@ export class SessionController implements AgentEventSink {
       note,
       targetAgent,
     };
-    let session = this.store.appendEvent(sessionId, relayEvent("human.decision", sessionId, { decision }));
+    await this.append(sessionId, relayEvent("human.decision", sessionId, { decision }));
     if (kind === "approve") {
-      session = this.store.appendEvent(sessionId, relayEvent("session.status", sessionId, {
+      return this.append(sessionId, relayEvent("session.status", sessionId, {
         status: "running",
         phase: "approved",
       }));
-    } else if (kind === "reject") {
-      session = this.store.appendEvent(sessionId, relayEvent("session.status", sessionId, {
+    }
+    if (kind === "reject") {
+      return this.append(sessionId, relayEvent("session.status", sessionId, {
         status: "waiting_for_human",
         phase: "feedback",
         pendingDecision: "feedback",
       }));
-    } else if (kind === "handoff" && targetAgent) {
-      session = this.store.appendEvent(sessionId, relayEvent("session.status", sessionId, {
+    }
+    if (kind === "cancel") {
+      return this.cancelSession(sessionId, note);
+    }
+    if (kind === "mark_done") {
+      return this.completeSession(sessionId, note || "Marked done from Relay API.");
+    }
+    if (kind === "rerun") {
+      return this.append(sessionId, relayEvent("session.status", sessionId, {
+        status: "pending_approval",
+        phase: targetAgent ? `rerun:${targetAgent}` : "rerun",
+        pendingDecision: "start",
+      }));
+    }
+    if (kind === "handoff" && targetAgent) {
+      return this.append(sessionId, relayEvent("session.status", sessionId, {
         status: "running",
         phase: `handoff:${targetAgent}`,
       }));
     }
-    this.emitUpdate(session);
+    return this.getSession(sessionId);
+  }
+
+  async handoffSession(sessionId: string, targetAgent: AgentName, assignments: WorkflowStep[] = [{ agent: targetAgent, mode: "implement" }], note?: string): Promise<RelaySession> {
+    const decision = {
+      id: newRelayId("dec"),
+      kind: "handoff" as const,
+      createdAt: new Date().toISOString(),
+      note,
+      targetAgent,
+    };
+    await this.append(sessionId, relayEvent("human.decision", sessionId, { decision }));
+    await this.assignSession(sessionId, assignments);
+    return this.append(sessionId, relayEvent("session.status", sessionId, {
+      status: "pending_approval",
+      phase: `handoff:${targetAgent}`,
+      pendingDecision: "start",
+    }));
+  }
+
+  async assignSession(sessionId: string, assignments: WorkflowStep[]): Promise<RelaySession> {
+    const body = JSON.stringify({ assignments }, null, 2);
+    await this.createArtifact(sessionId, {
+      kind: "plan",
+      title: "Assignment plan",
+      body,
+      extension: "json",
+    });
+    return this.append(sessionId, relayEvent("session.status", sessionId, {
+      status: "pending_approval",
+      phase: "waiting:start",
+      pendingDecision: "start",
+    }));
+  }
+
+  async setPendingStart(sessionId: string): Promise<RelaySession> {
+    return this.append(sessionId, relayEvent("session.status", sessionId, {
+      status: "pending_approval",
+      phase: "waiting:start",
+      pendingDecision: "start",
+    }));
+  }
+
+  async createArtifact(
+    sessionId: string,
+    input: {
+      kind: RelayArtifactKind;
+      title: string;
+      body: string;
+      extension?: string;
+      agentRunId?: string;
+    },
+  ): Promise<RelayArtifact> {
+    const artifact = await this.store.writeArtifact(sessionId, input);
+    await this.append(sessionId, relayEvent("artifact.created", sessionId, { artifact }));
+    return artifact;
+  }
+
+  async recordAgentStarted(sessionId: string, step: { runId: string; agent: AgentName; role?: AgentRole; mode: CodexTaskMode }): Promise<RelaySession> {
+    this.activeSessionId = sessionId;
+    await this.linkTaskSession(sessionId);
+    const role = step.role ?? roleForAgent(step.agent, step.mode);
+    const session = await this.append(sessionId, relayEvent("agent.started", sessionId, {
+      runId: step.runId,
+      agent: step.agent,
+      role,
+      mode: step.mode,
+    }));
+    await this.updateTaskStatus(step.mode === "review" ? "review" : "running", `${step.agent} ${step.mode} started.`, {
+      agent: step.agent,
+      sessionId,
+    });
     return session;
+  }
+
+  async recordAgentOutput(sessionId: string, runId: string, agent: AgentName, stream: "stdout" | "stderr", text: string): Promise<void> {
+    await this.append(sessionId, relayEvent("agent.output", sessionId, {
+      runId,
+      agent,
+      stream,
+      text,
+    }));
+  }
+
+  async recordAgentCompleted(
+    sessionId: string,
+    state: AgentState,
+    input: {
+      runId: string;
+      agent: AgentName;
+      mode: CodexTaskMode;
+      status: "completed" | "failed" | "cancelled";
+      exitCode: number;
+      agentLog: string;
+      codexVerdict?: CodexReviewVerdict | "";
+      codexFeedback?: string;
+    },
+  ): Promise<AgentState> {
+    this.activeSessionId = sessionId;
+    const statePatch: Partial<AgentState> = {
+      agent_logs: [input.agentLog],
+      last_exit_code: input.exitCode,
+    };
+    if (input.agent === "codex" && input.mode === "review") {
+      statePatch.codex_verdict = input.codexVerdict ?? "";
+      statePatch.codex_feedback = input.codexFeedback ?? "";
+    }
+    await this.waitForPendingOutputWrites();
+    await this.createArtifact(sessionId, {
+      kind: input.mode === "review" ? "review" : "command_log",
+      title: `${input.agent} ${input.mode} output`,
+      body: input.agentLog,
+      agentRunId: input.runId,
+    });
+    await this.append(sessionId, relayEvent("agent.completed", sessionId, {
+      runId: input.runId,
+      agent: input.agent,
+      status: input.status,
+      exitCode: input.exitCode,
+    }));
+    if (input.status === "failed") {
+      await this.updateTaskStatus("blocked", `${input.agent} ${input.mode} failed with exit code ${input.exitCode}.`, {
+        agent: input.agent,
+        sessionId,
+      });
+    } else if (input.mode === "review") {
+      await this.updateTaskStatus("review", `${input.agent} review completed.`, { agent: input.agent, sessionId });
+    } else {
+      await this.updateTaskStatus("waiting_for_human", `${input.agent} ${input.mode} completed.`, {
+        agent: input.agent,
+        sessionId,
+      });
+    }
+    if (input.agent === "codex" && input.mode === "review") {
+      const verdict = input.codexVerdict || "failed";
+      await this.append(sessionId, relayEvent("review.verdict", sessionId, {
+        runId: input.runId,
+        verdict,
+        feedback: input.codexFeedback ?? "",
+      }));
+      if (verdict === "approved") {
+        await this.updateTaskStatus("done", "Codex approved the work.", { agent: input.agent, sessionId });
+      } else if (verdict === "rejected") {
+        await this.updateTaskStatus("blocked", "Codex rejected the work.", { agent: input.agent, sessionId });
+      }
+    }
+    return mergeAgentState(state, statePatch);
   }
 
   async runStep(
@@ -151,16 +316,16 @@ export class SessionController implements AgentEventSink {
     options: Pick<AgentRunOptions, "signal" | "sink" | "execStream"> = {},
   ): Promise<AgentState> {
     this.activeSessionId = sessionId;
-    this.linkTaskSession(sessionId);
+    await this.linkTaskSession(sessionId);
     const runId = newRelayId("run");
     const role = step.role ?? roleForAgent(step.agent, step.mode);
-    this.append(sessionId, relayEvent("agent.started", sessionId, {
+    await this.append(sessionId, relayEvent("agent.started", sessionId, {
       runId,
       agent: step.agent,
       role,
       mode: step.mode,
     }));
-    this.updateTaskStatus(step.mode === "review" ? "review" : "running", `${step.agent} ${step.mode} started.`, {
+    await this.updateTaskStatus(step.mode === "review" ? "review" : "running", `${step.agent} ${step.mode} started.`, {
       agent: step.agent,
       sessionId,
     });
@@ -187,14 +352,15 @@ export class SessionController implements AgentEventSink {
       }
     } catch (error) {
       const status = runOptions.signal?.aborted ? "cancelled" : "failed";
-      this.append(sessionId, relayEvent("agent.completed", sessionId, {
+      await this.waitForPendingOutputWrites();
+      await this.append(sessionId, relayEvent("agent.completed", sessionId, {
         runId,
         agent: step.agent,
         status,
         exitCode: status === "cancelled" ? 130 : 1,
       }));
       const message = error instanceof Error ? error.message : String(error);
-      this.updateTaskStatus("blocked", message, {
+      await this.updateTaskStatus("blocked", message, {
         agent: step.agent,
         sessionId,
       });
@@ -203,42 +369,43 @@ export class SessionController implements AgentEventSink {
 
     const next = mergeAgentState(state, patch);
     const status = runOptions.signal?.aborted ? "cancelled" : next.last_exit_code === 0 ? "completed" : "failed";
-    const artifact = this.store.writeArtifact(sessionId, {
+    await this.waitForPendingOutputWrites();
+    const artifact = await this.store.writeArtifact(sessionId, {
       kind: step.mode === "review" ? "review" : "command_log",
       title: `${step.agent} ${step.mode} output`,
       body: next.agent_logs.slice(-1)[0] ?? "",
       agentRunId: runId,
     });
-    this.append(sessionId, relayEvent("artifact.created", sessionId, { artifact }));
-    this.append(sessionId, relayEvent("agent.completed", sessionId, {
+    await this.append(sessionId, relayEvent("artifact.created", sessionId, { artifact }));
+    await this.append(sessionId, relayEvent("agent.completed", sessionId, {
       runId,
       agent: step.agent,
       status,
       exitCode: next.last_exit_code,
     }));
     if (status === "failed") {
-      this.updateTaskStatus("blocked", `${step.agent} ${step.mode} failed with exit code ${next.last_exit_code}.`, {
+      await this.updateTaskStatus("blocked", `${step.agent} ${step.mode} failed with exit code ${next.last_exit_code}.`, {
         agent: step.agent,
         sessionId,
       });
     } else if (step.mode === "review") {
-      this.updateTaskStatus("review", `${step.agent} review completed.`, { agent: step.agent, sessionId });
+      await this.updateTaskStatus("review", `${step.agent} review completed.`, { agent: step.agent, sessionId });
     } else {
-      this.updateTaskStatus("waiting_for_human", `${step.agent} ${step.mode} completed.`, {
+      await this.updateTaskStatus("waiting_for_human", `${step.agent} ${step.mode} completed.`, {
         agent: step.agent,
         sessionId,
       });
     }
     if (step.agent === "codex" && step.mode === "review") {
-      this.append(sessionId, relayEvent("review.verdict", sessionId, {
+      await this.append(sessionId, relayEvent("review.verdict", sessionId, {
         runId,
         verdict: next.codex_verdict || "failed",
         feedback: next.codex_feedback,
       }));
       if (next.codex_verdict === "approved") {
-        this.updateTaskStatus("done", "Codex approved the work.", { agent: step.agent, sessionId });
+        await this.updateTaskStatus("done", "Codex approved the work.", { agent: step.agent, sessionId });
       } else if (next.codex_verdict === "rejected") {
-        this.updateTaskStatus("blocked", "Codex rejected the work.", { agent: step.agent, sessionId });
+        await this.updateTaskStatus("blocked", "Codex rejected the work.", { agent: step.agent, sessionId });
       }
     }
     return next;
@@ -248,20 +415,20 @@ export class SessionController implements AgentEventSink {
     let state = initialAgentState(taskGoal);
     for (const assignment of assignments) {
       if (options.signal?.aborted) {
-        this.cancelSession(sessionId, abortReason(options.signal) ?? "Task cancelled before the next agent started.");
+        await this.cancelSession(sessionId, abortReason(options.signal) ?? "Task cancelled before the next agent started.");
         return state;
       }
       state = await this.runStep(sessionId, state, assignment, options);
       if (options.signal?.aborted) {
-        this.cancelSession(sessionId, abortReason(options.signal) ?? "Task cancelled during agent execution.");
+        await this.cancelSession(sessionId, abortReason(options.signal) ?? "Task cancelled during agent execution.");
         return state;
       }
       if (!assignmentSucceeded(assignment, state)) {
-        this.failSession(sessionId, assignmentFailureOutcome(assignment, state));
+        await this.failSession(sessionId, assignmentFailureOutcome(assignment, state));
         return state;
       }
     }
-    this.completeSession(sessionId, "Assignments completed.");
+    await this.completeSession(sessionId, "Assignments completed.");
     return state;
   }
 
@@ -282,25 +449,22 @@ export class SessionController implements AgentEventSink {
     }
     const outcome = state.codex_verdict === "approved" ? "Default workflow completed and Codex approved." : "Default workflow halted.";
     if (state.codex_verdict === "approved") {
-      this.completeSession(sessionId, outcome);
+      await this.completeSession(sessionId, outcome);
     } else {
-      this.failSession(sessionId, outcome);
+      await this.failSession(sessionId, outcome);
     }
     return state;
   }
 
   agentOutput(runId: string, agent: AgentName, stream: "stdout" | "stderr", text: string): void {
     if (!this.activeSessionId) return;
-    this.append(this.activeSessionId, relayEvent("agent.output", this.activeSessionId, {
-      runId,
-      agent,
-      stream,
-      text,
-    }));
+    const pending = this.recordAgentOutput(this.activeSessionId, runId, agent, stream, text);
+    this.pendingOutputWrites.add(pending);
+    pending.finally(() => this.pendingOutputWrites.delete(pending));
   }
 
-  private append(sessionId: string, event: Parameters<SessionStore["appendEvent"]>[1]): RelaySession {
-    const session = this.store.appendEvent(sessionId, event);
+  private async append(sessionId: string, event: Parameters<SessionStore["appendEvent"]>[1]): Promise<RelaySession> {
+    const session = await this.store.appendEvent(sessionId, event);
     this.emitUpdate(session);
     return session;
   }
@@ -309,21 +473,26 @@ export class SessionController implements AgentEventSink {
     this.options.onUpdate?.(session);
   }
 
-  private linkTaskSession(sessionId: string): void {
+  private async linkTaskSession(sessionId: string): Promise<void> {
     if (!this.options.taskStore || !this.options.taskId) return;
-    const task = this.options.taskStore.getTask(this.options.taskId);
+    const task = await this.options.taskStore.getTask(this.options.taskId);
     if (task.linkedSessionIds.includes(sessionId)) return;
-    this.options.taskStore.linkSession(this.options.taskId, sessionId);
+    await this.options.taskStore.linkSession(this.options.taskId, sessionId);
   }
 
-  private updateTaskStatus(
+  private async updateTaskStatus(
     status: "assigned" | "running" | "waiting_for_human" | "review" | "done" | "blocked",
     message: string,
     input: { agent?: AgentName; sessionId?: string } = {},
-  ): void {
+  ): Promise<void> {
     if (!this.options.taskStore || !this.options.taskId) return;
-    this.options.taskStore.appendEvent(this.options.taskId, relayTaskEvent("task.status", this.options.taskId, { status }));
-    this.options.taskStore.recordActivity(this.options.taskId, message, input);
+    await this.options.taskStore.appendEvent(this.options.taskId, relayTaskEvent("task.status", this.options.taskId, { status }));
+    await this.options.taskStore.recordActivity(this.options.taskId, message, input);
+  }
+
+  private async waitForPendingOutputWrites(): Promise<void> {
+    if (this.pendingOutputWrites.size === 0) return;
+    await Promise.all([...this.pendingOutputWrites]);
   }
 }
 

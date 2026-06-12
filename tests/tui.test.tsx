@@ -30,41 +30,41 @@ async function waitForInput(): Promise<void> {
 }
 
 describe("TUI task parsing", () => {
-  it("parses a single Claude assignment", () => {
+  it("parses a single Claude assignment", async () => {
     const parsed = parseAssignedTask("@claude fix auth middleware");
 
     assert.deepEqual(parsed.assignments, [{ agent: "claude" }]);
     assert.equal(parsed.task, "fix auth middleware");
   });
 
-  it("parses multiple assignments in mention order", () => {
+  it("parses multiple assignments in mention order", async () => {
     const parsed = parseAssignedTask("@claude @pi fix auth middleware");
 
     assert.deepEqual(parsed.assignments, [{ agent: "claude" }, { agent: "pi" }]);
     assert.equal(parsed.task, "fix auth middleware");
   });
 
-  it("keeps non-leading mentions in task text", () => {
+  it("keeps non-leading mentions in task text", async () => {
     const parsed = parseAssignedTask("@claude update README to explain @codex review mode");
 
     assert.deepEqual(parsed.assignments, [{ agent: "claude" }]);
     assert.equal(parsed.task, "update README to explain @codex review mode");
   });
 
-  it("keeps unknown leading mentions in task text", () => {
+  it("keeps unknown leading mentions in task text", async () => {
     const parsed = parseAssignedTask("@gemini @claude fix auth middleware");
 
     assert.deepEqual(parsed.assignments, []);
     assert.equal(parsed.task, "@gemini @claude fix auth middleware");
   });
 
-  it("rejects empty task text after mentions", () => {
+  it("rejects empty task text after mentions", async () => {
     const parsed = parseAssignedTask("@claude @pi");
 
     assert.equal(validateParsedTask(parsed), "Enter a task after the @mentions.");
   });
 
-  it("rejects tasks without an explicit agent assignment", () => {
+  it("rejects tasks without an explicit agent assignment", async () => {
     const parsed = parseAssignedTask("fix auth middleware");
 
     assert.deepEqual(parsed.assignments, []);
@@ -72,7 +72,7 @@ describe("TUI task parsing", () => {
     assert.equal(validateParsedTask(parsed), "Assign the task with @claude, @pi, or @codex.");
   });
 
-  it("applies default assignments only when the task has no leading mention", () => {
+  it("applies default assignments only when the task has no leading mention", async () => {
     assert.deepEqual(withDefaultAssignments(parseAssignedTask("fix auth middleware"), [{ agent: "claude" }]), {
       assignments: [{ agent: "claude" }],
       task: "fix auth middleware",
@@ -83,7 +83,7 @@ describe("TUI task parsing", () => {
     });
   });
 
-  it("completes agent mention shortcuts", () => {
+  it("completes agent mention shortcuts", async () => {
     assert.deepEqual(completeShortcutInput("@c"), {
       input: "@claude",
       completed: true,
@@ -93,7 +93,7 @@ describe("TUI task parsing", () => {
     assert.equal(completeShortcutInput("@claude @p").input, "@claude @pi");
   });
 
-  it("completes slash command shortcuts", () => {
+  it("completes slash command shortcuts", async () => {
     assert.deepEqual(completeShortcutInput("/h"), {
       input: "/handoff",
       completed: true,
@@ -108,7 +108,7 @@ describe("TUI task parsing", () => {
     assert.equal(completeShortcutInput("fix auth").completed, false);
   });
 
-  it("finds shortcut dropdown suggestions for the current token", () => {
+  it("finds shortcut dropdown suggestions for the current token", async () => {
     assert.deepEqual(shortcutSuggestions("@c")?.candidates, ["@claude", "@codex"]);
     assert.deepEqual(shortcutSuggestions("@claude /r")?.candidates, ["/reject", "/rerun"]);
     assert.equal(shortcutSuggestions("@unknown"), null);
@@ -117,7 +117,7 @@ describe("TUI task parsing", () => {
 });
 
 describe("TUI daemon runner", () => {
-  it("propagates one local daemon config to the daemon and TUI", () => {
+  it("propagates one local daemon config to the daemon and TUI", async () => {
     const workspace = mkdtempSync(join(tmpdir(), "relay-local-run-workspace-"));
     const config = resolveLocalRunConfig({
       RELAY_DAEMON_URL: "http://127.0.0.1:8790/",
@@ -140,7 +140,7 @@ describe("TUI daemon runner", () => {
     assert.equal(config.childEnv.RELAY_DAEMON_UI_TOKEN, "ui_test");
   });
 
-  it("starts the local daemon in BoxLite-backed local mode", () => {
+  it("starts the local daemon in BoxLite-backed local mode", async () => {
     assert.deepEqual(daemonArgs(new URL("http://127.0.0.1:8790")), [
       "--port",
       "8790",
@@ -149,7 +149,7 @@ describe("TUI daemon runner", () => {
     ]);
   });
 
-  it("rejects an already-running non-local daemon for local TUI startup", () => {
+  it("rejects an already-running non-local daemon for local TUI startup", async () => {
     assert.equal(
       localDaemonCompatibilityError({ responding: true, daemonNodeMode: "local" }, "http://127.0.0.1:8790"),
       undefined,
@@ -164,7 +164,7 @@ describe("TUI daemon runner", () => {
     );
   });
 
-  it("ignores blank workspace values when resolving local daemon config", () => {
+  it("ignores blank workspace values when resolving local daemon config", async () => {
     const workspace = mkdtempSync(join(tmpdir(), "relay-local-run-workspace-"));
     const config = resolveLocalRunConfig({
       RELAY_WORKSPACE: "",
@@ -494,7 +494,7 @@ describe("TUI daemon runner", () => {
 });
 
 describe("RelayTui component", () => {
-  it("renders the header and input line", () => {
+  it("renders the header and input line", async () => {
     const { lastFrame } = render(<RelayTui sessionStore={testSessionStore()} runner={async () => undefined} />);
 
     const frame = lastFrame() ?? "";
@@ -1109,11 +1109,11 @@ describe("RelayTui component", () => {
     await new Promise((resolve) => setTimeout(resolve, 20));
 
     assert.equal(seenSignal?.aborted, true);
-    assert.equal(store.getSession(sessionId).status, "cancelled");
+    assert.equal((await store.getSession(sessionId)).status, "cancelled");
     assert.match(lastFrame() ?? "", /Task cancelled|Cancelling/);
   });
 
-  it("keeps daemon host booting until the workspace-backed sandbox is ready", async () => {
+  it("keeps daemon host booting until the daemon-node sandbox is ready", async () => {
     const oldFetch = globalThis.fetch;
     const oldWorkspace = process.env.RELAY_WORKSPACE;
     const oldEmployeeId = process.env.RELAY_EMPLOYEE_ID;
@@ -1159,14 +1159,92 @@ describe("RelayTui component", () => {
       assert.match(bootFrame, /EMPLOYEE_ID=host/);
       assert.match(bootFrame, /SANDBOX_ID=sbx_host/);
       assert.match(bootFrame, /DAEMON_NODE_TOKEN=tok_has_under_score/);
-      assert.match(bootFrame, /WORKSPACE=/);
+      assert.doesNotMatch(bootFrame, /WORKSPACE=/);
       await new Promise((resolve) => setTimeout(resolve, 450));
 
       assert.match(lastFrame() ?? "", /Host daemon ready/);
+      assert.ok(bodies.every((body) =>
+        typeof body === "object" &&
+        body !== null &&
+        !("workspacePath" in body)
+      ));
+      unmount();
+    } finally {
+      globalThis.fetch = oldFetch;
+      if (oldWorkspace === undefined) {
+        delete process.env.RELAY_WORKSPACE;
+      } else {
+        process.env.RELAY_WORKSPACE = oldWorkspace;
+      }
+      if (oldEmployeeId === undefined) {
+        delete process.env.RELAY_EMPLOYEE_ID;
+      } else {
+        process.env.RELAY_EMPLOYEE_ID = oldEmployeeId;
+      }
+      if (oldToken === undefined) {
+        delete process.env.RELAY_DAEMON_NODE_TOKEN;
+      } else {
+        process.env.RELAY_DAEMON_NODE_TOKEN = oldToken;
+      }
+    }
+  });
+
+  it("uses the available live daemon node token instead of a stale TUI token", async () => {
+    const oldFetch = globalThis.fetch;
+    const oldWorkspace = process.env.RELAY_WORKSPACE;
+    const oldEmployeeId = process.env.RELAY_EMPLOYEE_ID;
+    const oldToken = process.env.RELAY_DAEMON_NODE_TOKEN;
+    const workspace = mkdtempSync(join(tmpdir(), "relay-tui-live-node-"));
+    const bodies: unknown[] = [];
+    process.env.RELAY_WORKSPACE = workspace;
+    process.env.RELAY_EMPLOYEE_ID = "alice";
+    process.env.RELAY_DAEMON_NODE_TOKEN = "tok_stale";
+    globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
+      if (init?.body) bodies.push(JSON.parse(String(init.body)));
+      if (String(url) === "http://127.0.0.1:8790/cp/daemon-nodes") {
+        return new Response(JSON.stringify({
+          nodes: [{
+            id: "sbx_alice_live",
+            employeeId: "alice",
+            workspacePath: "/workspace/live",
+            status: "ready",
+            agents: { claude: "ready", pi: "ready", codex: "ready" },
+            createdAt: "2026-06-07T00:00:00.000Z",
+            updatedAt: "2026-06-07T00:00:01.000Z",
+            lastSeenAt: "2026-06-07T00:00:01.000Z",
+            queuedCommandCount: 0,
+            activeRuns: [],
+            online: true,
+            stale: false,
+            nodeToken: "tok_live",
+          }],
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      if (String(url) === "http://127.0.0.1:8790/sandboxes" && init?.method === "POST") {
+        return new Response(JSON.stringify({
+          id: "sbx_alice_live",
+          employeeId: "alice",
+          workspacePath: "/workspace/live",
+          status: "ready",
+          agents: { claude: "ready", pi: "ready", codex: "ready" },
+          createdAt: "2026-06-07T00:00:00.000Z",
+          updatedAt: "2026-06-07T00:00:01.000Z",
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      return new Response(JSON.stringify({ error: "unexpected request" }), { status: 500, headers: { "Content-Type": "application/json" } });
+    }) as typeof fetch;
+    try {
+      const { lastFrame, unmount } = render(<RelayTuiHost onExit={() => undefined} />);
+      await new Promise((resolve) => setTimeout(resolve, 250));
+
+      assert.match(lastFrame() ?? "", /Host daemon ready/);
+      assert.match(lastFrame() ?? "", /\/workspace\/live/);
       assert.ok(bodies.some((body) =>
         typeof body === "object" &&
         body !== null &&
-        (body as { workspacePath?: string }).workspacePath === workspace
+        (body as { employeeId?: string; nodeToken?: string; workspacePath?: string }).employeeId === "alice" &&
+        (body as { nodeToken?: string }).nodeToken === "tok_live" &&
+        !("workspacePath" in body)
       ));
       unmount();
     } finally {

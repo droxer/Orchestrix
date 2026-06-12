@@ -35,7 +35,6 @@ import {
   guestPiModelsJson,
   hostWorkspacePath,
   JsonLineRenderer,
-  localProcessExecStream,
   piTaskPrompt,
   PlainTextStreamRenderer,
   routeClaudeHandoff,
@@ -43,6 +42,7 @@ import {
   routePiHandoff,
   StderrLineRenderer,
 } from "../packages/relay-daemon/src/index.js";
+import { localProcessExecStream } from "../packages/relay-daemon-node/src/index.js";
 
 function codexStdout(message: string): string {
   return JSON.stringify({

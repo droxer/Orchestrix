@@ -85,14 +85,14 @@ export interface TaskStore {
     priority?: TaskPriority;
     status?: TaskStatus;
     assignedAgent?: AgentName;
-  }): RelayTask;
-  appendEvent(taskId: string, event: RelayTaskEvent): RelayTask;
-  getTask(taskId: string): RelayTask;
-  listTasks(): RelayTask[];
-  updateTask(taskId: string, input: { title?: string; description?: string; priority?: TaskPriority; status?: TaskStatus }): RelayTask;
-  assignTask(taskId: string, agent: AgentName): RelayTask;
-  linkSession(taskId: string, sessionId: string): RelayTask;
-  recordActivity(taskId: string, message: string, input?: { agent?: AgentName; sessionId?: string }): RelayTask;
+  }): Promise<RelayTask>;
+  appendEvent(taskId: string, event: RelayTaskEvent): Promise<RelayTask>;
+  getTask(taskId: string): Promise<RelayTask>;
+  listTasks(): Promise<RelayTask[]>;
+  updateTask(taskId: string, input: { title?: string; description?: string; priority?: TaskPriority; status?: TaskStatus }): Promise<RelayTask>;
+  assignTask(taskId: string, agent: AgentName): Promise<RelayTask>;
+  linkSession(taskId: string, sessionId: string): Promise<RelayTask>;
+  recordActivity(taskId: string, message: string, input?: { agent?: AgentName; sessionId?: string }): Promise<RelayTask>;
 }
 
 export class LocalTaskStore implements TaskStore {
@@ -103,13 +103,13 @@ export class LocalTaskStore implements TaskStore {
     mkdirSync(this.tasksDir, { recursive: true });
   }
 
-  createTask(input: {
+  async createTask(input: {
     title: string;
     description?: string;
     priority?: TaskPriority;
     status?: TaskStatus;
     assignedAgent?: AgentName;
-  }): RelayTask {
+  }): Promise<RelayTask> {
     const taskId = newRelayId("task");
     const dir = this.taskDir(taskId);
     mkdirSync(dir, { recursive: true });
@@ -132,7 +132,7 @@ export class LocalTaskStore implements TaskStore {
     return task;
   }
 
-  appendEvent(taskId: string, event: RelayTaskEvent): RelayTask {
+  async appendEvent(taskId: string, event: RelayTaskEvent): Promise<RelayTask> {
     mkdirSync(this.taskDir(taskId), { recursive: true });
     appendFileSync(this.eventsPath(taskId), `${JSON.stringify(event)}\n`);
     const task = materializeTaskEvents(this.readEvents(taskId));
@@ -140,7 +140,7 @@ export class LocalTaskStore implements TaskStore {
     return task;
   }
 
-  getTask(taskId: string): RelayTask {
+  async getTask(taskId: string): Promise<RelayTask> {
     const snapshot = this.snapshotPath(taskId);
     if (existsSync(snapshot)) {
       return JSON.parse(readFileSync(snapshot, "utf8")) as RelayTask;
@@ -148,38 +148,38 @@ export class LocalTaskStore implements TaskStore {
     return materializeTaskEvents(this.readEvents(taskId));
   }
 
-  listTasks(): RelayTask[] {
+  async listTasks(): Promise<RelayTask[]> {
     if (!existsSync(this.tasksDir)) return [];
     return readdirSync(this.tasksDir, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
-      .map((entry) => this.getTask(entry.name))
+      .map((entry) => this.getTaskSync(entry.name))
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 
-  updateTask(taskId: string, input: { title?: string; description?: string; priority?: TaskPriority; status?: TaskStatus }): RelayTask {
-    let task = this.appendEvent(taskId, relayTaskEvent("task.updated", taskId, {
+  async updateTask(taskId: string, input: { title?: string; description?: string; priority?: TaskPriority; status?: TaskStatus }): Promise<RelayTask> {
+    let task = await this.appendEvent(taskId, relayTaskEvent("task.updated", taskId, {
       title: input.title,
       description: input.description,
       priority: input.priority,
     }));
     if (input.status) {
-      task = this.appendEvent(taskId, relayTaskEvent("task.status", taskId, { status: input.status }));
+      task = await this.appendEvent(taskId, relayTaskEvent("task.status", taskId, { status: input.status }));
     }
     return task;
   }
 
-  assignTask(taskId: string, agent: AgentName): RelayTask {
-    let task = this.appendEvent(taskId, relayTaskEvent("task.assigned", taskId, { agent }));
-    task = this.appendEvent(taskId, relayTaskEvent("task.status", taskId, { status: "assigned" }));
+  async assignTask(taskId: string, agent: AgentName): Promise<RelayTask> {
+    let task = await this.appendEvent(taskId, relayTaskEvent("task.assigned", taskId, { agent }));
+    task = await this.appendEvent(taskId, relayTaskEvent("task.status", taskId, { status: "assigned" }));
     return this.recordActivity(taskId, `Assigned to ${agent}.`, { agent });
   }
 
-  linkSession(taskId: string, sessionId: string): RelayTask {
-    const task = this.appendEvent(taskId, relayTaskEvent("task.session_linked", taskId, { sessionId }));
+  async linkSession(taskId: string, sessionId: string): Promise<RelayTask> {
+    const task = await this.appendEvent(taskId, relayTaskEvent("task.session_linked", taskId, { sessionId }));
     return this.recordActivity(task.id, `Linked session ${sessionId}.`, { sessionId });
   }
 
-  recordActivity(taskId: string, message: string, input: { agent?: AgentName; sessionId?: string } = {}): RelayTask {
+  async recordActivity(taskId: string, message: string, input: { agent?: AgentName; sessionId?: string } = {}): Promise<RelayTask> {
     return this.appendEvent(taskId, relayTaskEvent("task.activity", taskId, {
       activity: {
         id: newRelayId("act"),
@@ -206,6 +206,14 @@ export class LocalTaskStore implements TaskStore {
       .split(/\r?\n/)
       .filter(Boolean)
       .map((line) => JSON.parse(line) as RelayTaskEvent);
+  }
+
+  private getTaskSync(taskId: string): RelayTask {
+    const snapshot = this.snapshotPath(taskId);
+    if (existsSync(snapshot)) {
+      return JSON.parse(readFileSync(snapshot, "utf8")) as RelayTask;
+    }
+    return materializeTaskEvents(this.readEvents(taskId));
   }
 
   private taskDir(taskId: string): string {

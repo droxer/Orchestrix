@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { appendFileSync, chmodSync, mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 import type {
   DaemonNodeCommand,
@@ -186,9 +186,9 @@ async function executeCommand(
   signal?: AbortSignal,
 ): Promise<void> {
   const eventUrl = `${daemonUrl}/daemon-nodes/${encodeURIComponent(sandboxId)}/events`;
-  const state = initialAgentState(command.taskGoal);
+  const state = command.state ?? initialAgentState(command.taskGoal);
   logger.info("run starting", commandLogFields(sandboxId, command));
-  if (command.workspacePath && command.workspacePath !== nodeWorkspacePath) {
+  if (command.workspacePath && !workspacePathsMatch(command.workspacePath, nodeWorkspacePath)) {
     throw new Error(
       `Daemon node workspace mismatch: command expects ${command.workspacePath} but this node serves ${nodeWorkspacePath}.`,
     );
@@ -480,6 +480,17 @@ function commandLogFields(sandboxId: string, command: DaemonNodeRunCommand): Dae
 
 function safeLogFileName(value: string): string {
   return value.replace(/[^A-Za-z0-9._-]+/g, "_") || "daemon-node";
+}
+
+function workspacePathsMatch(a?: string, b?: string): boolean {
+  const left = normalizeWorkspacePath(a);
+  const right = normalizeWorkspacePath(b);
+  return Boolean(left && right && left === right);
+}
+
+function normalizeWorkspacePath(value?: string): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? resolve(trimmed) : undefined;
 }
 
 const REQUEST_TIMEOUT_MS = 30_000;

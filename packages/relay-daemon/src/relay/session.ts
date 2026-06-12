@@ -152,23 +152,23 @@ export interface SessionStore {
     participants?: string[];
     status?: SessionStatus;
     pendingDecision?: RelaySession["pendingDecision"];
-  }): RelaySession;
-  appendEvent(sessionId: string, event: RelayEvent): RelaySession;
-  getSession(sessionId: string): RelaySession;
-  listSessions(): RelaySession[];
+  }): Promise<RelaySession>;
+  appendEvent(sessionId: string, event: RelayEvent): Promise<RelaySession>;
+  getSession(sessionId: string): Promise<RelaySession>;
+  listSessions(): Promise<RelaySession[]>;
   writeArtifact(sessionId: string, input: {
     kind: RelayArtifactKind;
     title: string;
     body: string;
     extension?: string;
     agentRunId?: string;
-  }): RelayArtifact;
-  artifactPath(sessionId: string, artifactId: string): string;
-  readArtifact(sessionId: string, artifactId: string): string;
+  }): Promise<RelayArtifact>;
+  artifactPath(sessionId: string, artifactId: string): Promise<string>;
+  readArtifact(sessionId: string, artifactId: string): Promise<string>;
 }
 
 export interface AgentEventSink {
-  agentOutput(runId: string, agent: AgentName, stream: "stdout" | "stderr", text: string): void;
+  agentOutput(runId: string, agent: AgentName, stream: "stdout" | "stderr", text: string): void | Promise<void>;
 }
 
 export const DEFAULT_RELAY_DATA_DIR = resolve(REPO_ROOT, ".relay");
@@ -197,13 +197,13 @@ export class LocalSessionStore implements SessionStore {
     mkdirSync(this.sessionsDir, { recursive: true });
   }
 
-  createSession(input: {
+  async createSession(input: {
     workspacePath: string;
     taskGoal: string;
     participants?: string[];
     status?: SessionStatus;
     pendingDecision?: RelaySession["pendingDecision"];
-  }): RelaySession {
+  }): Promise<RelaySession> {
     const sessionId = newRelayId("ses");
     const dir = this.sessionDir(sessionId);
     mkdirSync(join(dir, "artifacts"), { recursive: true });
@@ -226,7 +226,7 @@ export class LocalSessionStore implements SessionStore {
     return session;
   }
 
-  appendEvent(sessionId: string, event: RelayEvent): RelaySession {
+  async appendEvent(sessionId: string, event: RelayEvent): Promise<RelaySession> {
     mkdirSync(this.sessionDir(sessionId), { recursive: true });
     appendFileSync(this.eventsPath(sessionId), `${JSON.stringify(event)}\n`);
     const session = materializeEvents(this.readEvents(sessionId));
@@ -234,7 +234,7 @@ export class LocalSessionStore implements SessionStore {
     return session;
   }
 
-  getSession(sessionId: string): RelaySession {
+  async getSession(sessionId: string): Promise<RelaySession> {
     const snapshot = this.snapshotPath(sessionId);
     if (existsSync(snapshot)) {
       return JSON.parse(readFileSync(snapshot, "utf8")) as RelaySession;
@@ -242,21 +242,21 @@ export class LocalSessionStore implements SessionStore {
     return materializeEvents(this.readEvents(sessionId));
   }
 
-  listSessions(): RelaySession[] {
+  async listSessions(): Promise<RelaySession[]> {
     if (!existsSync(this.sessionsDir)) return [];
     return readdirSync(this.sessionsDir, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
-      .map((entry) => this.getSession(entry.name))
+      .map((entry) => this.getSessionSync(entry.name))
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 
-  writeArtifact(sessionId: string, input: {
+  async writeArtifact(sessionId: string, input: {
     kind: RelayArtifactKind;
     title: string;
     body: string;
     extension?: string;
     agentRunId?: string;
-  }): RelayArtifact {
+  }): Promise<RelayArtifact> {
     const artifactId = newRelayId("art");
     const extension = input.extension ?? "txt";
     const artifactDir = join(this.sessionDir(sessionId), "artifacts");
@@ -274,14 +274,22 @@ export class LocalSessionStore implements SessionStore {
     };
   }
 
-  artifactPath(sessionId: string, artifactId: string): string {
-    const artifact = this.getSession(sessionId).artifacts.find((item) => item.id === artifactId);
+  async artifactPath(sessionId: string, artifactId: string): Promise<string> {
+    const artifact = this.getSessionSync(sessionId).artifacts.find((item) => item.id === artifactId);
     if (!artifact) throw new Error(`Unknown artifact ${artifactId} in session ${sessionId}.`);
     return artifact.path;
   }
 
-  readArtifact(sessionId: string, artifactId: string): string {
-    return readFileSync(this.artifactPath(sessionId, artifactId), "utf8");
+  async readArtifact(sessionId: string, artifactId: string): Promise<string> {
+    return readFileSync(await this.artifactPath(sessionId, artifactId), "utf8");
+  }
+
+  private getSessionSync(sessionId: string): RelaySession {
+    const snapshot = this.snapshotPath(sessionId);
+    if (existsSync(snapshot)) {
+      return JSON.parse(readFileSync(snapshot, "utf8")) as RelaySession;
+    }
+    return materializeEvents(this.readEvents(sessionId));
   }
 
   private readEvents(sessionId: string): RelayEvent[] {

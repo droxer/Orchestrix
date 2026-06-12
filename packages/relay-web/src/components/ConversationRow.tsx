@@ -1,6 +1,8 @@
-import { Plus } from "lucide-react";
+import { X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { EmployeeAvatar } from "./EmployeeAvatar";
 import type { DaemonNodeMonitorRecord, SandboxRecord, RelaySession, Tone } from "../types";
+import { conversationDaemonStatus } from "../lib/conversationStatus";
 
 type EmployeeContact = {
   id: string;
@@ -17,85 +19,87 @@ function statusTone(value: string): Tone {
   if (value === "ready" || value === "completed" || value === "done") return "good";
   if (value === "running") return "info";
   if (value === "failed" || value === "blocked" || value === "cancelled") return "bad";
-  return "warn";
+  if (value === "stale") return "warn";
+  return "neutral"; // provisioning, stopped — grey, not alarming
 }
 
 type ConversationRowProps = {
   contact: EmployeeContact;
   selected: boolean;
   onSelect: (id: string) => void;
+  onRemove?: (id: string) => void;
 };
 
-export function ConversationRow({ contact, selected, onSelect }: ConversationRowProps) {
-  const status = contact.sandbox?.status ?? "provisioning";
+export function ConversationRow({ contact, selected, onSelect, onRemove }: ConversationRowProps) {
+  const { t } = useTranslation();
+  const status = conversationDaemonStatus(contact);
   const lastAgent =
     contact.lastSession?.agentRuns[contact.lastSession.agentRuns.length - 1]?.agent;
+  function handleRemove() {
+    if (!onRemove) return;
+    if (window.confirm(t("conversation.remove_confirm", { id: contact.id }))) {
+      onRemove(contact.id);
+    }
+  }
+
   return (
-    <button
-      className={`conversation-row ${selected ? "active" : ""} ${contact.activeRun ? "has-activity" : ""}`}
-      type="button"
-      aria-pressed={selected}
-      onClick={() => onSelect(contact.id)}
-    >
-      <EmployeeAvatar employeeId={contact.id} running={Boolean(contact.activeRun)} />
-      <span className="conversation-copy">
-        <span className="conversation-topline">
-          <span className="conversation-name">
-            <span
-              className={`status-dot status-dot-${statusTone(status)}`}
-              aria-hidden="true"
-            />
-            <strong translate="no">{contact.id}</strong>
+    // Wrapper div — keeps the remove button as a sibling of the row button (no nested buttons)
+    <div className={`conversation-row ${selected ? "active" : ""} ${contact.activeRun ? "has-activity" : ""}`}>
+      <button
+        className="conversation-row-inner"
+        type="button"
+        aria-pressed={selected}
+        onClick={() => onSelect(contact.id)}
+      >
+        <EmployeeAvatar employeeId={contact.id} running={Boolean(contact.activeRun)} />
+        <span className="conversation-copy">
+          <span className="conversation-topline">
+            <span className="conversation-name">
+              <span
+                className={`status-dot status-dot-${statusTone(status)}`}
+                aria-hidden="true"
+              />
+              <strong translate="no">{contact.id}</strong>
+            </span>
+            <span className="conversation-topline-actions">
+              {contact.activeRun ? (
+                <span className="conversation-badge mono" aria-label="Agent running">
+                  {Math.max(contact.sessionCount, 1)}
+                </span>
+              ) : (
+                <span className="conversation-stamp mono">
+                  {contact.sessionCount > 0
+                    ? `${contact.sessionCount.toString().padStart(2, "0")}`
+                    : "—"}
+                </span>
+              )}
+            </span>
           </span>
-          {contact.activeRun ? (
-            <span className="conversation-badge mono" aria-label="Agent running">
-              {Math.max(contact.sessionCount, 1)}
+          <span className="conversation-preview">
+            {contact.activeRun
+              ? t("conversation.agent_working", { agent: contact.activeRun.agent })
+              : (contact.lastSession?.taskGoal ?? t("conversation.open_workspace"))}
+          </span>
+          <span className="conversation-meta">
+            <span className="conversation-meta-status">
+              {t(`status.${status}`, { defaultValue: status })}
             </span>
-          ) : (
-            <span className="conversation-stamp mono">
-              {contact.sessionCount > 0
-                ? `${contact.sessionCount.toString().padStart(2, "0")}`
-                : "—"}
-            </span>
-          )}
-        </span>
-        <span className="conversation-preview">
-          {contact.activeRun
-            ? `${contact.activeRun.agent} is working`
-            : (contact.lastSession?.taskGoal ?? "Open their agent workspace")}
-        </span>
-        <span className="conversation-meta">
-          <span className="conversation-meta-status">{status}</span>
-          <span className="conversation-meta-sep" aria-hidden="true" />
-          <span>{lastAgent ?? "no agent yet"}</span>
-        </span>
-      </span>
-    </button>
-  );
-}
-
-type NewConversationRowProps = { employeeQuery: string; onSelect: (id: string) => void };
-
-export function NewConversationRow({ employeeQuery, onSelect }: NewConversationRowProps) {
-  return (
-    <button
-      className="conversation-row conversation-row-new"
-      type="button"
-      onClick={() => onSelect(employeeQuery)}
-    >
-      <span className="conversation-new-avatar" aria-hidden="true">
-        <Plus size={16} />
-      </span>
-      <span className="conversation-copy">
-        <span className="conversation-topline">
-          <span className="conversation-name">
-            <strong>Start @{employeeQuery || "new-employee"}</strong>
+            <span className="conversation-meta-sep" aria-hidden="true" />
+            <span>{lastAgent ?? t("conversation.no_agent_yet")}</span>
           </span>
         </span>
-        <span className="conversation-preview">
-          Create a sandbox-backed employee conversation.
-        </span>
-      </span>
-    </button>
+      </button>
+      {onRemove ? (
+        <button
+          className="conversation-remove-btn"
+          type="button"
+          aria-label={t("conversation.remove", { id: contact.id })}
+          title={t("conversation.remove", { id: contact.id })}
+          onClick={handleRemove}
+        >
+          <X size={11} />
+        </button>
+      ) : null}
+    </div>
   );
 }

@@ -15,7 +15,11 @@ import {
   taskStatus,
   type TaskStore,
 } from "./task.js";
+import { SessionController, type WorkflowStep } from "./controller.js";
+import { createPostgresStoreSet } from "./postgres-store.js";
 import type { AgentName, CodexTaskMode } from "relay-core";
+
+const MAX_BODY_BYTES = 10 * 1024 * 1024;
 
 export interface RelayServerOptions {
   port?: number;
@@ -31,9 +35,11 @@ export interface RelayApiResponse {
   sse?: boolean;
 }
 
-export function serveRelay(options: RelayServerOptions = {}): void {
-  const store = options.store ?? new LocalSessionStore();
-  const taskStore = options.taskStore ?? new LocalTaskStore();
+export async function serveRelay(options: RelayServerOptions = {}): Promise<void> {
+  const defaults = !options.store && !options.taskStore ? createPostgresStoreSet() : undefined;
+  const store = options.store ?? defaults?.sessionStore ?? new LocalSessionStore();
+  const taskStore = options.taskStore ?? defaults?.taskStore ?? new LocalTaskStore();
+  if (defaults) await defaults.storage.ready;
   const port = options.port ?? 8787;
   const host = options.host ?? "127.0.0.1";
   const server = createServer((request, response) => {
@@ -50,7 +56,7 @@ export async function routeRequest(store: SessionStore, taskStore: TaskStore, re
   const method = request.method ?? "GET";
   const url = new URL(request.url ?? "/", "http://relay.local");
   const body = method === "GET" ? undefined : await readJsonBody(request);
-  const routed = handleRelayApiRequest(store, method, url.pathname, body, taskStore);
+  const routed = await handleRelayApiRequest(store, taskStore, method, url.pathname, body);
   response.writeHead(routed.status, {
     "Content-Type": routed.contentType,
     ...(routed.sse
@@ -63,19 +69,25 @@ export async function routeRequest(store: SessionStore, taskStore: TaskStore, re
   response.end(routed.body);
 }
 
-export function handleRelayApiRequest(store: SessionStore, method: string, pathname: string, body?: unknown, taskStore: TaskStore = new LocalTaskStore()): RelayApiResponse {
+export async function handleRelayApiRequest(
+  store: SessionStore,
+  taskStore: TaskStore,
+  method: string,
+  pathname: string,
+  body?: unknown,
+): Promise<RelayApiResponse> {
   const parts = pathname.split("/").filter(Boolean);
   if (method === "GET" && parts.length === 0) {
     return apiRootResponse();
   }
   if (method === "GET" && parts.length === 1 && parts[0] === "tasks") {
-    return jsonResponse(200, { tasks: taskStore.listTasks() });
+    return jsonResponse(200, { tasks: await taskStore.listTasks() });
   }
   if (method === "POST" && parts.length === 1 && parts[0] === "tasks") {
     return createTaskResponse(store, taskStore, body);
   }
   if (method === "GET" && parts.length === 2 && parts[0] === "tasks") {
-    return jsonResponse(200, taskStore.getTask(parts[1]));
+    return jsonResponse(200, await taskStore.getTask(parts[1]));
   }
   if (method === "PATCH" && parts.length === 2 && parts[0] === "tasks") {
     return updateTaskResponse(taskStore, parts[1], body);
@@ -87,39 +99,31 @@ export function handleRelayApiRequest(store: SessionStore, method: string, pathn
     return pickupTaskResponse(store, taskStore, parts[1], body);
   }
   if (method === "GET" && parts.length === 3 && parts[0] === "tasks" && parts[2] === "events") {
-    return jsonResponse(200, { events: taskStore.getTask(parts[1]).events });
+    return jsonResponse(200, { events: (await taskStore.getTask(parts[1])).events });
   }
   if (method === "GET" && parts.length === 1 && parts[0] === "sessions") {
-    return jsonResponse(200, { sessions: store.listSessions() });
+    return jsonResponse(200, { sessions: await store.listSessions() });
   }
   if (method === "POST" && parts.length === 1 && parts[0] === "sessions") {
-    return createSessionResponse(store, body);
+    return createSessionResponse(store, taskStore, body);
   }
   if (method === "GET" && parts.length === 2 && parts[0] === "sessions") {
-    return jsonResponse(200, store.getSession(parts[1]));
+    return jsonResponse(200, await store.getSession(parts[1]));
   }
   if (method === "POST" && parts.length === 3 && parts[0] === "sessions" && parts[2] === "assignments") {
-    return assignSessionResponse(store, parts[1], body);
+    return assignSessionResponse(store, taskStore, parts[1], body);
   }
   if (method === "POST" && parts.length === 3 && parts[0] === "sessions" && parts[2] === "decisions") {
-    return decisionResponse(store, parts[1], body);
+    return decisionResponse(store, taskStore, parts[1], body);
   }
   if (method === "POST" && parts.length === 3 && parts[0] === "sessions" && parts[2] === "handoffs") {
-    return handoffResponse(store, parts[1], body);
+    return handoffResponse(store, taskStore, parts[1], body);
   }
   if (method === "GET" && parts.length === 3 && parts[0] === "sessions" && parts[2] === "events") {
-    const session = store.getSession(parts[1]);
-    let body = "";
-    for (const event of session.events) {
-      body += `event: ${event.type}\n`;
-      body += `data: ${JSON.stringify(event)}\n\n`;
-    }
-    body += "event: heartbeat\n";
-    body += `data: ${JSON.stringify({ timestamp: new Date().toISOString() })}\n\n`;
-    return { status: 200, contentType: "text/event-stream; charset=utf-8", body, sse: true };
+    return sseEventsResponse(store, parts[1]);
   }
   if (method === "GET" && parts.length === 4 && parts[0] === "sessions" && parts[2] === "artifacts") {
-    return { status: 200, contentType: "text/plain; charset=utf-8", body: store.readArtifact(parts[1], parts[3]) };
+    return { status: 200, contentType: "text/plain; charset=utf-8", body: await store.readArtifact(parts[1], parts[3]) };
   }
   return jsonResponse(404, { error: "Not found" });
 }
@@ -131,7 +135,12 @@ function sendJson(response: ServerResponse, status: number, body: unknown): void
 
 async function readJsonBody(request: IncomingMessage): Promise<unknown> {
   let raw = "";
+  let bytes = 0;
   for await (const chunk of request) {
+    bytes += Buffer.byteLength(chunk);
+    if (bytes > MAX_BODY_BYTES) {
+      throw new Error("Request body exceeds 10 MB limit.");
+    }
     raw += String(chunk);
   }
   if (!raw.trim()) return undefined;
@@ -144,185 +153,136 @@ interface AssignmentInput {
   mode?: CodexTaskMode;
 }
 
-function createTaskResponse(store: SessionStore, taskStore: TaskStore, body: unknown): RelayApiResponse {
+async function createTaskResponse(store: SessionStore, taskStore: TaskStore, body: unknown): Promise<RelayApiResponse> {
   const input = asRecord(body);
   const title = stringField(input, "title") || stringField(input, "taskGoal");
   if (!title) return jsonResponse(400, { error: "title is required." });
-  let task = taskStore.createTask({
+  let task = await taskStore.createTask({
     title,
     description: stringField(input, "description"),
     priority: taskPriority(input.priority) ?? "normal",
   });
   const agent = agentName(input.assignedAgent);
   if (agent) {
-    task = taskStore.assignTask(task.id, agent);
+    task = await taskStore.assignTask(task.id, agent);
   }
   if (input.createSession === true || Array.isArray(input.assignments)) {
-    const sessionResponse = createSessionResponse(store, {
-      taskGoal: task.description ? `${task.title}\n\n${task.description}` : task.title,
-      assignments: Array.isArray(input.assignments) ? input.assignments : agent ? [{ agent }] : [],
-    });
-    const session = JSON.parse(sessionResponse.body);
-    task = taskStore.linkSession(task.id, session.id);
+    const workspacePath = stringField(input, "workspacePath") || "/workspace";
+    const controller = new SessionController(store, { taskStore, taskId: task.id, workspacePath });
+    const session = await controller.createSession(
+      task.description ? `${task.title}\n\n${task.description}` : task.title,
+      [...new Set(["human", ...(Array.isArray(input.assignments) ? input.assignments.map((item: unknown) => agentName(asRecord(item).agent)) : agent ? [agent] : []).filter(Boolean)])] as string[],
+      true,
+    );
+    const assignments = assignmentList(input.assignments);
+    if (assignments.length > 0) {
+      await controller.assignSession(session.id, assignments);
+    }
+    task = await taskStore.linkSession(task.id, session.id);
   }
   return jsonResponse(201, task);
 }
 
-function updateTaskResponse(taskStore: TaskStore, taskId: string, body: unknown): RelayApiResponse {
+async function updateTaskResponse(taskStore: TaskStore, taskId: string, body: unknown): Promise<RelayApiResponse> {
   const input = asRecord(body);
-  const patch = {
-    title: stringField(input, "title") || undefined,
-    description: typeof input.description === "string" ? input.description : undefined,
-    priority: taskPriority(input.priority),
-    status: taskStatus(input.status),
-  };
-  if (!patch.title && patch.description === undefined && !patch.priority && !patch.status) {
+  const title = stringField(input, "title");
+  const description = typeof input.description === "string" ? input.description : undefined;
+  const priority = taskPriority(input.priority);
+  const status = taskStatus(input.status);
+  if (!title && description === undefined && !priority && !status) {
     return jsonResponse(400, { error: "PATCH requires title, description, priority, or status." });
   }
-  const task = taskStore.updateTask(taskId, patch);
+  const task = await taskStore.updateTask(taskId, {
+    title: title || undefined,
+    description,
+    priority,
+    status,
+  });
   return jsonResponse(200, task);
 }
 
-function assignTaskResponse(taskStore: TaskStore, taskId: string, body: unknown): RelayApiResponse {
+async function assignTaskResponse(taskStore: TaskStore, taskId: string, body: unknown): Promise<RelayApiResponse> {
   const input = asRecord(body);
   const agent = agentName(input.agent);
   if (!agent) return jsonResponse(400, { error: "agent must be claude, pi, or codex." });
-  return jsonResponse(200, taskStore.assignTask(taskId, agent));
+  return jsonResponse(200, await taskStore.assignTask(taskId, agent));
 }
 
-function pickupTaskResponse(store: SessionStore, taskStore: TaskStore, taskId: string, body: unknown): RelayApiResponse {
+async function pickupTaskResponse(store: SessionStore, taskStore: TaskStore, taskId: string, body: unknown): Promise<RelayApiResponse> {
   const input = asRecord(body);
-  const current = taskStore.getTask(taskId);
+  const current = await taskStore.getTask(taskId);
   const agent = agentName(input.agent) ?? current.assignedAgent;
   if (!agent) return jsonResponse(400, { error: "agent must be claude, pi, or codex." });
-  let task = current.assignedAgent === agent ? current : taskStore.assignTask(taskId, agent);
+  let task = current.assignedAgent === agent ? current : await taskStore.assignTask(taskId, agent);
   if (task.status !== "assigned") {
-    task = taskStore.appendEvent(taskId, relayTaskEvent("task.status", taskId, { status: "assigned" }));
+    task = await taskStore.appendEvent(taskId, relayTaskEvent("task.status", taskId, { status: "assigned" }));
   }
   const mode = input.mode === "review" || agent === "codex" && input.mode !== "implement" ? "review" : "implement";
-  const session = store.createSession({
-    workspacePath: stringField(input, "workspacePath") || "/workspace",
-    taskGoal: task.description ? `${task.title}\n\n${task.description}` : task.title,
-    participants: ["human", agent],
-    status: "pending_approval",
-    pendingDecision: "start",
-  });
-  const artifact = store.writeArtifact(session.id, {
-    kind: "plan",
-    title: "Assignment plan",
-    body: JSON.stringify({ assignments: [{ agent, mode }] }, null, 2),
-    extension: "json",
-  });
-  store.appendEvent(session.id, relayEvent("artifact.created", session.id, { artifact }));
-  task = taskStore.linkSession(task.id, session.id);
-  task = taskStore.recordActivity(task.id, `${agent} picked up the task.`, { agent, sessionId: session.id });
-  return jsonResponse(200, { task, session: store.getSession(session.id) });
+  const workspacePath = stringField(input, "workspacePath") || "/workspace";
+  const controller = new SessionController(store, { taskStore, taskId: task.id, workspacePath });
+  const session = await controller.createSession(
+    task.description ? `${task.title}\n\n${task.description}` : task.title,
+    ["human", agent],
+    true,
+  );
+  await controller.assignSession(session.id, [{ agent, mode }]);
+  task = await taskStore.recordActivity(task.id, `${agent} picked up the task.`, { agent, sessionId: session.id });
+  return jsonResponse(200, { task, session: await store.getSession(session.id) });
 }
 
-function createSessionResponse(store: SessionStore, body: unknown): RelayApiResponse {
+async function createSessionResponse(store: SessionStore, taskStore: TaskStore, body: unknown): Promise<RelayApiResponse> {
   const input = asRecord(body);
   const taskGoal = stringField(input, "taskGoal");
   if (!taskGoal) return jsonResponse(400, { error: "taskGoal is required." });
   const assignments = assignmentList(input.assignments);
   const participants = ["human", ...assignments.map((assignment) => assignment.agent)];
-  let session = store.createSession({
-    workspacePath: stringField(input, "workspacePath") || "/workspace",
-    taskGoal,
-    participants: [...new Set(participants)],
-    status: "pending_approval",
-    pendingDecision: "start",
-  });
+  const workspacePath = stringField(input, "workspacePath") || "/workspace";
+  const controller = new SessionController(store, { taskStore, taskId: typeof input.taskId === "string" ? input.taskId : undefined, workspacePath });
+  const session = await controller.createSession(taskGoal, [...new Set(participants)], true);
   if (assignments.length > 0) {
-    session = appendAssignmentPlan(store, session.id, assignments);
+    await controller.assignSession(session.id, assignments);
   }
-  return jsonResponse(201, session);
+  return jsonResponse(201, await store.getSession(session.id));
 }
 
-function assignSessionResponse(store: SessionStore, sessionId: string, body: unknown): RelayApiResponse {
+async function assignSessionResponse(store: SessionStore, taskStore: TaskStore, sessionId: string, body: unknown): Promise<RelayApiResponse> {
   const input = asRecord(body);
   const assignments = assignmentList(input.assignments);
   if (assignments.length === 0) return jsonResponse(400, { error: "assignments must include at least one agent." });
-  let session = appendAssignmentPlan(store, sessionId, assignments);
-  session = store.appendEvent(sessionId, relayEvent("session.status", sessionId, {
-    status: "pending_approval",
-    phase: "waiting:start",
-    pendingDecision: "start",
-  }));
-  return jsonResponse(200, session);
+  const controller = new SessionController(store, { taskStore });
+  await controller.assignSession(sessionId, assignments);
+  return jsonResponse(200, await store.getSession(sessionId));
 }
 
-function decisionResponse(store: SessionStore, sessionId: string, body: unknown): RelayApiResponse {
+async function decisionResponse(store: SessionStore, taskStore: TaskStore, sessionId: string, body: unknown): Promise<RelayApiResponse> {
   const input = asRecord(body);
   const kind = decisionKind(input.kind);
   if (!kind) return jsonResponse(400, { error: "kind must be approve, reject, cancel, rerun, handoff, or mark_done." });
-  const decision = {
-    id: `dec_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
-    kind,
-    createdAt: new Date().toISOString(),
-    note: stringField(input, "note") || undefined,
-    targetAgent: agentName(input.targetAgent),
-  };
-  let session = store.appendEvent(sessionId, relayEvent("human.decision", sessionId, { decision }));
-  if (kind === "approve") {
-    session = store.appendEvent(sessionId, relayEvent("session.status", sessionId, {
-      status: "running",
-      phase: "approved",
-    }));
-  } else if (kind === "reject") {
-    session = store.appendEvent(sessionId, relayEvent("session.status", sessionId, {
-      status: "waiting_for_human",
-      phase: "feedback",
-      pendingDecision: "feedback",
-    }));
-  } else if (kind === "cancel") {
-    // The human.decision event materializes the session as cancelled.
-  } else if (kind === "mark_done") {
-    session = store.appendEvent(sessionId, relayEvent("session.completed", sessionId, {
-      outcome: decision.note || "Marked done from Relay API.",
-    }));
-  } else if (kind === "rerun") {
-    session = store.appendEvent(sessionId, relayEvent("session.status", sessionId, {
-      status: "pending_approval",
-      phase: decision.targetAgent ? `rerun:${decision.targetAgent}` : "rerun",
-      pendingDecision: "start",
-    }));
-  }
+  const controller = new SessionController(store, { taskStore });
+  const session = await controller.recordDecision(sessionId, kind, stringField(input, "note") || undefined, agentName(input.targetAgent));
   return jsonResponse(200, session);
 }
 
-function handoffResponse(store: SessionStore, sessionId: string, body: unknown): RelayApiResponse {
+async function handoffResponse(store: SessionStore, taskStore: TaskStore, sessionId: string, body: unknown): Promise<RelayApiResponse> {
   const input = asRecord(body);
   const targetAgent = agentName(input.targetAgent);
   if (!targetAgent) return jsonResponse(400, { error: "targetAgent must be claude, pi, or codex." });
-  const note = stringField(input, "note") || `Handoff to ${targetAgent}.`;
-  let session = JSON.parse(decisionResponse(store, sessionId, {
-    kind: "handoff",
-    targetAgent,
-    note,
-  }).body);
   const mode = input.mode === "review" || targetAgent === "codex" && input.mode !== "implement" ? "review" : "implement";
-  session = appendAssignmentPlan(store, session.id, [{
-    agent: targetAgent,
-    mode,
-    role: roleName(input.role),
-  }]);
-  session = store.appendEvent(sessionId, relayEvent("session.status", sessionId, {
-    status: "pending_approval",
-    phase: `handoff:${targetAgent}`,
-    pendingDecision: "start",
-  }));
+  const controller = new SessionController(store, { taskStore });
+  const session = await controller.handoffSession(sessionId, targetAgent, [{ agent: targetAgent, mode, role: roleName(input.role) }], stringField(input, "note") || undefined);
   return jsonResponse(200, session);
 }
 
-function appendAssignmentPlan(store: SessionStore, sessionId: string, assignments: AssignmentInput[]) {
-  const body = JSON.stringify({ assignments }, null, 2);
-  const artifact: RelayArtifact = store.writeArtifact(sessionId, {
-    kind: "plan",
-    title: "Assignment plan",
-    body,
-    extension: "json",
-  });
-  return store.appendEvent(sessionId, relayEvent("artifact.created", sessionId, { artifact }));
+async function sseEventsResponse(store: SessionStore, sessionId: string): Promise<RelayApiResponse> {
+  const session = await store.getSession(sessionId);
+  let body = "";
+  for (const event of session.events) {
+    body += `event: ${event.type}\n`;
+    body += `data: ${JSON.stringify(event)}\n\n`;
+  }
+  body += "event: heartbeat\n";
+  body += `data: ${JSON.stringify({ timestamp: new Date().toISOString() })}\n\n`;
+  return { status: 200, contentType: "text/event-stream; charset=utf-8", body, sse: true };
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -334,7 +294,7 @@ function stringField(value: Record<string, unknown>, key: string): string {
   return typeof field === "string" ? field.trim() : "";
 }
 
-function assignmentList(value: unknown): AssignmentInput[] {
+function assignmentList(value: unknown): WorkflowStep[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((item) => {
     const record = asRecord(item);

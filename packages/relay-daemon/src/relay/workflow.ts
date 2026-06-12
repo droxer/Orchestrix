@@ -20,7 +20,7 @@ import {
   piImplementNode,
 } from "relay-core";
 import { SessionController } from "./controller.js";
-import { LocalSessionStore, relayEvent } from "./session.js";
+import { relayEvent } from "./session.js";
 import {
   routeClaudeHandoff,
   routeCodexHandoff,
@@ -37,6 +37,7 @@ import {
   type CodexTaskMode,
 } from "relay-core";
 import { defaultExecutionManager, type ExecutionManager } from "./execution.js";
+import { createPostgresSessionStore } from "./postgres-store.js";
 
 export interface OrchestratorSession {
   rootfsPath: string;
@@ -109,12 +110,12 @@ export async function runAgentTask(
 }
 
 export async function runWorkflow(initialState: AgentState, options: AgentRunOptions = {}): Promise<AgentState> {
-  const controller = options.sessionController ?? new SessionController(undefined, {
+  const controller = options.sessionController ?? new SessionController(createPostgresSessionStore(), {
     sink: options.sink,
     signal: options.signal,
     execStream: options.execStream,
   });
-  const sessionId = options.sessionId ?? controller.createSession(initialState.task_goal).id;
+  const sessionId = options.sessionId ?? (await controller.createSession(initialState.task_goal)).id;
   let state = initialState;
   let next: Route = "claude_implement";
   while (next !== "__end__") {
@@ -133,7 +134,7 @@ export async function runWorkflow(initialState: AgentState, options: AgentRunOpt
     }
   }
   const outcome = state.codex_verdict === "approved" ? "Default workflow completed and Codex approved." : "Default workflow halted.";
-  controller.store.appendEvent(sessionId, state.codex_verdict === "approved"
+  await controller.store.appendEvent(sessionId, state.codex_verdict === "approved"
     ? relayEvent("session.completed", sessionId, { outcome })
     : relayEvent("session.failed", sessionId, { outcome }));
   return state;
@@ -201,8 +202,8 @@ export async function withOrchestratorSession<T>(
 
 export async function main(taskGoal: string): Promise<void> {
   await withOrchestratorSession(async (session) => {
-    const controller = new SessionController(undefined, { workspacePath: session.hostWorkspace });
-    const relaySession = controller.createSession(taskGoal);
+    const controller = new SessionController(createPostgresSessionStore(), { workspacePath: session.hostWorkspace });
+    const relaySession = await controller.createSession(taskGoal);
     await runWorkflow(initialAgentState(taskGoal), {
       sessionController: controller,
       sessionId: relaySession.id,
@@ -223,31 +224,41 @@ export function run(argv: string[] = process.argv.slice(2)): void {
     return;
   }
   if (argv[0] === "sessions") {
-    const sessions = new LocalSessionStore().listSessions();
-    for (const session of sessions) {
+    void createPostgresSessionStore().listSessions().then((sessions) => {
+      for (const session of sessions) {
       console.log(`${session.id}  ${session.status.padEnd(16)}  ${session.updatedAt}  ${session.taskGoal}`);
-    }
+      }
+    }).catch((error: unknown) => {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 1;
+    });
     return;
   }
   if (argv[0] === "show") {
     const sessionId = argv[1];
     if (!sessionId) throw new Error("Usage: relay show <session-id>");
-    const session = new LocalSessionStore().getSession(sessionId);
-    console.log(`session     ${session.id}`);
-    console.log(`status      ${session.status}`);
-    console.log(`phase       ${session.phase}`);
-    console.log(`workspace   ${session.workspacePath}`);
-    console.log(`task        ${session.taskGoal}`);
-    console.log(`runs        ${session.agentRuns.length}`);
-    console.log(`artifacts   ${session.artifacts.length}`);
-    if (session.reviewVerdict) console.log(`review      ${session.reviewVerdict}`);
-    if (session.finalOutcome) console.log(`outcome     ${session.finalOutcome}`);
+    void createPostgresSessionStore().getSession(sessionId).then((session) => {
+      console.log(`session     ${session.id}`);
+      console.log(`status      ${session.status}`);
+      console.log(`phase       ${session.phase}`);
+      console.log(`workspace   ${session.workspacePath}`);
+      console.log(`task        ${session.taskGoal}`);
+      console.log(`runs        ${session.agentRuns.length}`);
+      console.log(`artifacts   ${session.artifacts.length}`);
+      if (session.reviewVerdict) console.log(`review      ${session.reviewVerdict}`);
+      if (session.finalOutcome) console.log(`outcome     ${session.finalOutcome}`);
+    }).catch((error: unknown) => {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 1;
+    });
     return;
   }
   if (argv[0] === "serve") {
     const portIndex = argv.indexOf("--port");
     const port = portIndex >= 0 ? Number(argv[portIndex + 1]) : 8787;
-    import("./server.js").then(({ serveRelay }) => serveRelay({ port })).catch((error: unknown) => {
+    import("./server.js").then(async ({ serveRelay }) => {
+      await serveRelay({ port });
+    }).catch((error: unknown) => {
       console.error(error instanceof Error ? error.message : String(error));
       process.exitCode = 1;
     });
@@ -259,7 +270,9 @@ export function run(argv: string[] = process.argv.slice(2)): void {
     const daemonNodeModeIndex = argv.indexOf("--daemon-node-mode");
     const daemonNodeModeArg = daemonNodeModeIndex >= 0 ? argv[daemonNodeModeIndex + 1] : undefined;
     const daemonNodeMode = daemonNodeModeArg === "local" ? "local" : "server";
-    import("./daemon.js").then(({ serveRelayDaemon }) => serveRelayDaemon({ port, daemonNodeMode })).catch((error: unknown) => {
+    import("./daemon.js").then(async ({ serveRelayDaemon }) => {
+      await serveRelayDaemon({ port, daemonNodeMode });
+    }).catch((error: unknown) => {
       console.error(error instanceof Error ? error.message : String(error));
       process.exitCode = 1;
     });

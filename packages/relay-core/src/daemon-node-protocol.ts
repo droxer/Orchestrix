@@ -1,4 +1,4 @@
-import type { AgentName, CodexReviewVerdict, CodexTaskMode } from "./state.js";
+import type { AgentName, AgentState, CodexReviewVerdict, CodexTaskMode } from "./state.js";
 
 export type DaemonNodeStatus = "ready" | "busy" | "stopped";
 
@@ -24,6 +24,7 @@ export interface DaemonNodeRunCommand {
   agent: AgentName;
   mode: CodexTaskMode;
   workspacePath?: string;
+  state?: AgentState;
 }
 
 export interface DaemonNodeCancelCommand {

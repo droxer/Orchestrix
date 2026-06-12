@@ -79,7 +79,7 @@ All coordinates are integers. Stroke-width 4 in a 96-wide viewBox lands at clean
 
 After implementation:
 
-1. Open the daemon control panel (`make serve`, then `http://localhost:<port>/control`) and confirm the mark renders cleanly at nav scale.
+1. Open the daemon control panel (`make serve`, then `http://localhost:<port>/cp`) and confirm the mark renders cleanly at nav scale.
 2. Render `relay-mark.svg` and `relay-logo.svg` to PNG via `sips` at 1×, 2×, and favicon sizes; visually confirm strokes stay crisp.
 3. Confirm READMEs still resolve their logo image correctly on GitHub.
 4. Typecheck: `npx tsc -p packages/relay-daemon/tsconfig.json --noEmit`.

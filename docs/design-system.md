@@ -334,7 +334,7 @@ The page rhythm rotates three modes: bright white editorial sections, soft-gray 
 - **Surface Soft** (`{colors.surface-soft}` — #f7f6f1): Subtle alternating band surface.
 - **Surface Strong** (`{colors.surface-strong}` — #eef0f3): The light-gray fill behind secondary buttons, search pills, asset-icon plates.
 - **Surface Dark** (`{colors.surface-dark}` — #18232d): Deep near-black canvas for full-bleed dark heroes, CTA bands. Same hex as `{colors.ink}` — page-floor and text-color share the value.
-- **Surface Dark Elevated** (`{colors.surface-dark-elevated}` — #16181c): One step lighter, used for floating product-UI mockup cards inside dark heroes.
+- **Surface Dark Elevated** (`{colors.surface-dark-elevated}` — #16181c): One step deeper than the dark canvas, used for floating product-UI mockup cards inside dark heroes.
 
 ### Hairlines
 - **Hairline** (`{colors.hairline}` — #dee1e6): Default 1px divider on white surfaces.
@@ -506,7 +506,7 @@ Pill for interactive, card-radius (24px) for containers, full circle for icons. 
 
 ### CTA / Footer
 
-**`cta-band-dark`** — Pre-footer "Take control of your money" band. Background `{colors.surface-dark}`, text `{colors.on-dark}`, vertical padding 96px. Centered headline + two CTAs.
+**`cta-band-dark`** — Pre-footer "Bring every agent workflow under control" band. Background `{colors.surface-dark}`, text `{colors.on-dark}`, vertical padding 96px. Centered headline + two CTAs.
 
 **`footer-light`** — Closing white-canvas footer. Background `{colors.canvas}`, text `{colors.body}`. 6-column link list.
 
@@ -529,7 +529,7 @@ Pill for interactive, card-radius (24px) for containers, full circle for icons. 
 - Don't bold display copy — display sits at weight 400; bolding shifts the brand voice.
 - Don't add drop shadow tiers — system has one shadow tier.
 - Don't use sharp `{rounded.none}` (0px) on CTAs.
-- Don't mix Inter and Inter inside the same headline.
+- Don't mix display treatments inside the same headline.
 - Don't use semantic green/red as a button background.
 - Don't extract a CTA color from a third-party widget (cookie consent, OneTrust). The brand's CTA color is what appears on actual product CTAs, not on injected modals.
 

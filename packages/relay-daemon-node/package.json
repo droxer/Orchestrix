@@ -1,0 +1,22 @@
+{
+  "name": "relay-daemon-node",
+  "version": "0.1.0",
+  "description": "Relay sandbox-side daemon node",
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "relay-daemon-node": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "relay-core": "0.1.0"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  }
+}

@@ -1,7 +1,7 @@
 {
   "name": "relay-daemon",
   "version": "0.1.0",
-  "description": "Relay host daemon, sandbox daemon node, and orchestration protocol",
+  "description": "Relay host daemon and orchestration protocol",
   "type": "module",
   "exports": {
     ".": "./dist/index.js"
@@ -9,7 +9,6 @@
   "types": "./dist/index.d.ts",
   "bin": {
     "relay-daemon": "./dist/daemon-cli.js",
-    "relay-daemon-node": "./dist/daemon-node-cli.js",
     "relay": "./dist/cli.js"
   },
   "scripts": {
@@ -17,6 +16,8 @@
   },
   "dependencies": {
     "@boxlite-ai/boxlite": "^0.9.5",
+    "@types/pg": "^8.20.0",
+    "pg": "^8.21.0",
     "relay-core": "0.1.0"
   },
   "engines": {

@@ -82,7 +82,7 @@ async function main(): Promise<void> {
     const detail = error instanceof Error ? error.message : String(error);
     console.error(detail);
     if (!ownsDaemon) {
-      console.error(`A daemon is already listening at ${daemonUrl}; check its /control page or run make stop before retrying.`);
+      console.error(`A daemon is already listening at ${daemonUrl}; check its /cp page or run make stop before retrying.`);
     }
     process.exitCode = 1;
   }

@@ -1,5 +1,6 @@
 import type {
   CreateSessionInput,
+  ControlPanelDaemonNodesResponse,
   DaemonNodesResponse,
   RelaySession,
   RunInput,
@@ -47,18 +48,25 @@ export function listDaemonNodes(token?: string, signal?: AbortSignal): Promise<D
   return apiJson<DaemonNodesResponse>("/daemon-nodes", { token, signal });
 }
 
+export function listControlPanelDaemonNodes(signal?: AbortSignal): Promise<ControlPanelDaemonNodesResponse> {
+  return apiJson<ControlPanelDaemonNodesResponse>("/cp/daemon-nodes", { signal });
+}
+
 export function listSessions(token?: string, signal?: AbortSignal): Promise<SessionsResponse> {
   return apiJson<SessionsResponse>("/sessions", { token, signal });
 }
 
-export function provisionSandbox(employeeId: string, token?: string): Promise<SandboxRecord> {
+export function provisionSandbox(employeeId: string, token?: string, nodeToken?: string): Promise<SandboxRecord> {
   // No workspacePath: the daemon matches by employee, so we attach to the
   // employee's registered daemon node (whatever workspace it runs in) instead
   // of provisioning a dead placeholder under a fabricated path.
   return apiJson<SandboxRecord>("/sandboxes", {
     method: "POST",
     token,
-    body: { employeeId },
+    body: {
+      employeeId,
+      ...(nodeToken ? { nodeToken } : {}),
+    },
   });
 }
 

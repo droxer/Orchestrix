@@ -34,14 +34,14 @@ export interface AgentRunOptions {
 }
 
 export interface AgentEventSink {
-  agentOutput(runId: string, agent: AgentName, stream: "stdout" | "stderr", text: string): void;
+  agentOutput(runId: string, agent: AgentName, stream: "stdout" | "stderr", text: string): void | Promise<void>;
 }
 
 export interface SessionStepRunner {
   store: {
-    appendEvent(sessionId: string, event: unknown): unknown;
+    appendEvent(sessionId: string, event: unknown): unknown | Promise<unknown>;
   };
-  createSession(taskGoal: string): { id: string };
+  createSession(taskGoal: string): Promise<{ id: string }>;
   runStep(
     sessionId: string,
     state: AgentState,

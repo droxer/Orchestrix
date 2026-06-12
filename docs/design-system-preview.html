@@ -1,0 +1,1131 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Relay Design System Preview</title>
+    <style>
+      :root {
+        --primary: #0052ff;
+        --primary-active: #003ecc;
+        --primary-disabled: #a8b8cc;
+        --ink: #18232d;
+        --body: #5b616e;
+        --muted: #7c828a;
+        --muted-soft: #a8acb3;
+        --hairline: #dee1e6;
+        --hairline-soft: #eef0f3;
+        --canvas: #ffffff;
+        --surface-soft: #f7f6f1;
+        --surface-strong: #eef0f3;
+        --surface-dark: #18232d;
+        --surface-dark-elevated: #16181c;
+        --on-primary: #ffffff;
+        --on-dark: #ffffff;
+        --on-dark-soft: #a8acb3;
+        --semantic-up: #05b169;
+        --semantic-down: #cf202f;
+        --accent-yellow: #f4b000;
+        --radius-md: 12px;
+        --radius-lg: 16px;
+        --radius-xl: 24px;
+        --radius-pill: 100px;
+        --radius-full: 9999px;
+        --shadow-soft: 0 4px 12px rgba(0, 0, 0, 0.04);
+        --max: 1200px;
+        color-scheme: light;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--canvas);
+        color: var(--ink);
+        font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        font-size: 16px;
+        line-height: 1.5;
+      }
+
+      button,
+      input {
+        font: inherit;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .page {
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+
+      .container {
+        width: min(var(--max), calc(100% - 48px));
+        margin: 0 auto;
+      }
+
+      .top-nav {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        height: 64px;
+        border-bottom: 1px solid var(--hairline-soft);
+        background: rgba(255, 255, 255, 0.94);
+        backdrop-filter: blur(14px);
+      }
+
+      .top-nav__inner {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        gap: 24px;
+        height: 64px;
+      }
+
+      .logo {
+        width: 126px;
+        height: auto;
+        display: block;
+      }
+
+      .nav-links {
+        display: flex;
+        justify-content: center;
+        gap: 22px;
+        color: var(--ink);
+        font-size: 14px;
+        font-weight: 500;
+      }
+
+      .nav-actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      .icon-button {
+        display: inline-grid;
+        place-items: center;
+        width: 44px;
+        height: 44px;
+        border: 0;
+        border-radius: var(--radius-full);
+        background: transparent;
+        color: var(--ink);
+        cursor: pointer;
+      }
+
+      .icon-button:hover {
+        background: var(--surface-strong);
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 44px;
+        border: 0;
+        border-radius: var(--radius-pill);
+        padding: 12px 20px;
+        font-size: 16px;
+        font-weight: 600;
+        line-height: 1.15;
+        white-space: nowrap;
+        cursor: pointer;
+      }
+
+      .button--primary {
+        background: var(--primary);
+        color: var(--on-primary);
+      }
+
+      .button--primary:hover,
+      .button--primary:active {
+        background: var(--primary-active);
+      }
+
+      .button--primary:disabled {
+        background: var(--primary-disabled);
+        cursor: not-allowed;
+      }
+
+      .button--secondary {
+        background: var(--surface-strong);
+        color: var(--ink);
+      }
+
+      .button--dark {
+        background: var(--surface-dark-elevated);
+        color: var(--on-dark);
+      }
+
+      .button--outline-dark {
+        border: 1px solid rgba(255, 255, 255, 0.58);
+        background: transparent;
+        color: var(--on-dark);
+      }
+
+      .button--hero {
+        min-height: 56px;
+        padding: 16px 32px;
+      }
+
+      .hero {
+        position: relative;
+        background: var(--surface-dark);
+        color: var(--on-dark);
+        padding: 96px 0 76px;
+      }
+
+      .hero__grid {
+        display: grid;
+        grid-template-columns: minmax(0, 0.95fr) minmax(420px, 1.05fr);
+        gap: 72px;
+        align-items: center;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        min-height: 28px;
+        border-radius: var(--radius-pill);
+        padding: 4px 12px;
+        background: rgba(238, 240, 243, 0.11);
+        color: var(--on-dark-soft);
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1.5;
+      }
+
+      .hero h1,
+      .section-heading h2,
+      .cta h2 {
+        margin: 0;
+        font-weight: 400;
+        letter-spacing: 0;
+      }
+
+      .hero h1 {
+        margin-top: 22px;
+        max-width: 760px;
+        font-size: clamp(40px, 7vw, 80px);
+        line-height: 1;
+      }
+
+      .hero p {
+        max-width: 560px;
+        margin: 26px 0 0;
+        color: var(--on-dark-soft);
+      }
+
+      .hero__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 36px;
+      }
+
+      .mockup-stack {
+        position: relative;
+        min-height: 520px;
+      }
+
+      .product-card {
+        border-radius: var(--radius-xl);
+        padding: 32px;
+        background: var(--surface-dark-elevated);
+        color: var(--on-dark);
+      }
+
+      .product-card--main {
+        position: relative;
+        min-height: 420px;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      .product-card--floating {
+        position: absolute;
+        right: -4px;
+        bottom: 10px;
+        width: min(360px, 62%);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 18px 42px rgba(0, 0, 0, 0.22);
+        transform: rotate(-2deg);
+      }
+
+      .card-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 24px;
+      }
+
+      .card-title {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+        line-height: 1.33;
+      }
+
+      .card-meta {
+        color: var(--on-dark-soft);
+        font-size: 13px;
+      }
+
+      .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin-bottom: 26px;
+      }
+
+      .metric {
+        min-height: 104px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: var(--radius-lg);
+        padding: 16px;
+        background: rgba(255, 255, 255, 0.025);
+      }
+
+      .metric span {
+        color: var(--on-dark-soft);
+        font-size: 13px;
+      }
+
+      .metric strong {
+        display: block;
+        margin-top: 12px;
+        font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+        font-size: 18px;
+        font-weight: 500;
+        line-height: 1.4;
+      }
+
+      .workflow-list {
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .workflow-row {
+        display: grid;
+        grid-template-columns: 32px 1fr auto auto;
+        align-items: center;
+        gap: 14px;
+        min-height: 68px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .glyph {
+        display: inline-grid;
+        place-items: center;
+        width: 32px;
+        height: 32px;
+        border-radius: var(--radius-full);
+        background: var(--surface-strong);
+        color: var(--ink);
+      }
+
+      .glyph--yellow {
+        background: var(--accent-yellow);
+      }
+
+      .row-label {
+        display: grid;
+        gap: 2px;
+      }
+
+      .row-label strong {
+        font-size: 16px;
+        font-weight: 600;
+        line-height: 1.25;
+      }
+
+      .row-label span {
+        color: var(--on-dark-soft);
+        font-size: 13px;
+      }
+
+      .number {
+        font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+        font-size: 18px;
+        font-weight: 500;
+      }
+
+      .up {
+        color: var(--semantic-up);
+      }
+
+      .down {
+        color: var(--semantic-down);
+      }
+
+      .section {
+        padding: 96px 0;
+      }
+
+      .section--soft {
+        background: var(--surface-soft);
+      }
+
+      .section-heading {
+        display: grid;
+        grid-template-columns: minmax(0, 0.8fr) minmax(280px, 0.55fr);
+        gap: 48px;
+        align-items: end;
+        margin-bottom: 48px;
+      }
+
+      .section-heading h2 {
+        font-size: clamp(36px, 4.6vw, 52px);
+        line-height: 1;
+      }
+
+      .section-heading p {
+        margin: 0;
+        color: var(--body);
+      }
+
+      .swatch-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .swatch {
+        min-height: 160px;
+        border: 1px solid var(--hairline);
+        border-radius: var(--radius-xl);
+        overflow: hidden;
+        background: var(--canvas);
+      }
+
+      .swatch__color {
+        height: 86px;
+      }
+
+      .swatch__body {
+        padding: 16px;
+      }
+
+      .swatch__body strong {
+        display: block;
+        font-size: 16px;
+        font-weight: 600;
+      }
+
+      .swatch__body code {
+        color: var(--muted);
+        font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+        font-size: 13px;
+      }
+
+      .type-specimen {
+        display: grid;
+        gap: 16px;
+      }
+
+      .type-row {
+        display: grid;
+        grid-template-columns: minmax(150px, 0.32fr) 1fr auto;
+        align-items: baseline;
+        gap: 24px;
+        border-bottom: 1px solid var(--hairline);
+        padding: 20px 0;
+      }
+
+      .type-name {
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .type-sample {
+        margin: 0;
+        font-weight: 400;
+        line-height: 1.08;
+      }
+
+      .type-detail {
+        color: var(--muted);
+        font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+        font-size: 13px;
+      }
+
+      .component-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 24px;
+      }
+
+      .component-panel {
+        border: 1px solid var(--hairline);
+        border-radius: var(--radius-xl);
+        padding: 32px;
+        background: var(--canvas);
+      }
+
+      .component-panel h3 {
+        margin: 0 0 18px;
+        font-size: 18px;
+        font-weight: 600;
+        line-height: 1.33;
+      }
+
+      .button-stack,
+      .form-stack,
+      .badge-stack {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .input {
+        width: 100%;
+        height: 48px;
+        border: 1px solid var(--hairline);
+        border-radius: var(--radius-md);
+        padding: 14px 16px;
+        color: var(--ink);
+        background: var(--canvas);
+      }
+
+      .input:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 1px var(--primary);
+        outline: 0;
+      }
+
+      .search-pill {
+        width: 100%;
+        height: 44px;
+        border: 0;
+        border-radius: var(--radius-pill);
+        padding: 12px 20px;
+        background: var(--surface-strong);
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        min-height: 26px;
+        border-radius: var(--radius-pill);
+        padding: 4px 12px;
+        background: var(--surface-strong);
+        color: var(--ink);
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .pricing-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 24px;
+      }
+
+      .pricing-card {
+        border: 1px solid var(--hairline);
+        border-radius: var(--radius-xl);
+        padding: 32px;
+        background: var(--canvas);
+      }
+
+      .pricing-card--featured {
+        border-color: var(--surface-dark);
+        background: var(--surface-dark);
+        color: var(--on-dark);
+      }
+
+      .pricing-card h3 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+      }
+
+      .price {
+        margin: 18px 0 4px;
+        font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+        font-size: 28px;
+        font-weight: 500;
+      }
+
+      .pricing-card p,
+      .pricing-card li {
+        color: var(--body);
+      }
+
+      .pricing-card--featured p,
+      .pricing-card--featured li {
+        color: var(--on-dark-soft);
+      }
+
+      .pricing-card ul {
+        display: grid;
+        gap: 10px;
+        margin: 24px 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .review-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 24px;
+      }
+
+      .review-card {
+        border: 1px solid var(--hairline);
+        border-radius: var(--radius-xl);
+        padding: 32px;
+        background: var(--canvas);
+      }
+
+      .review-card h3 {
+        margin: 0 0 14px;
+        font-size: 18px;
+        font-weight: 600;
+      }
+
+      .review-card p {
+        margin: 0;
+        color: var(--body);
+      }
+
+      .cta {
+        background: var(--surface-dark);
+        color: var(--on-dark);
+        padding: 96px 0;
+        text-align: center;
+      }
+
+      .cta h2 {
+        max-width: 780px;
+        margin: 0 auto;
+        font-size: clamp(36px, 4vw, 44px);
+        line-height: 1.09;
+      }
+
+      .cta p {
+        max-width: 620px;
+        margin: 22px auto 0;
+        color: var(--on-dark-soft);
+      }
+
+      .cta .hero__actions {
+        justify-content: center;
+      }
+
+      .footer {
+        padding: 64px 0 30px;
+        color: var(--body);
+      }
+
+      .footer__grid {
+        display: grid;
+        grid-template-columns: 1.2fr repeat(4, 1fr);
+        gap: 32px;
+      }
+
+      .footer h3,
+      .footer h4 {
+        margin: 0 0 14px;
+        color: var(--ink);
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .footer a,
+      .footer p {
+        display: block;
+        margin: 0 0 10px;
+        color: var(--body);
+        font-size: 14px;
+      }
+
+      .legal {
+        border-top: 1px solid var(--hairline-soft);
+        margin-top: 42px;
+        padding-top: 22px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      @media (max-width: 1024px) {
+        .hero__grid,
+        .section-heading,
+        .footer__grid {
+          grid-template-columns: 1fr;
+        }
+
+        .mockup-stack {
+          min-height: 480px;
+        }
+
+        .swatch-grid,
+        .component-grid,
+        .pricing-grid,
+        .review-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .nav-links {
+          display: none;
+        }
+      }
+
+      @media (max-width: 700px) {
+        .container {
+          width: min(100% - 32px, var(--max));
+        }
+
+        .top-nav__inner {
+          grid-template-columns: auto 1fr;
+        }
+
+        .nav-actions .button--secondary,
+        .nav-actions .icon-button:not(.menu-toggle) {
+          display: none;
+        }
+
+        .hero,
+        .section,
+        .cta {
+          padding: 64px 0;
+        }
+
+        .hero__grid {
+          gap: 42px;
+        }
+
+        .mockup-stack {
+          min-height: auto;
+        }
+
+        .product-card--floating {
+          position: static;
+          width: 100%;
+          margin-top: 16px;
+          transform: none;
+        }
+
+        .metric-grid,
+        .swatch-grid,
+        .component-grid,
+        .pricing-grid,
+        .review-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .workflow-row {
+          grid-template-columns: 32px 1fr;
+          padding: 16px 0;
+        }
+
+        .workflow-row .number {
+          grid-column: 2;
+        }
+
+        .type-row {
+          grid-template-columns: 1fr;
+          gap: 8px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="top-nav">
+        <div class="container top-nav__inner">
+          <a href="#top" aria-label="Relay home">
+            <img class="logo" src="../assets/brand/relay-logo.svg" alt="Relay" />
+          </a>
+          <nav class="nav-links" aria-label="Primary navigation">
+            <a href="#tokens">Tokens</a>
+            <a href="#components">Components</a>
+            <a href="#pricing">Pricing</a>
+            <a href="#review">Review</a>
+          </nav>
+          <div class="nav-actions">
+            <button class="icon-button" type="button" aria-label="Search">
+              <svg width="19" height="19" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m21 21-4.3-4.3m1.3-5.2a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+              </svg>
+            </button>
+            <button class="icon-button" type="button" aria-label="Language">
+              <svg width="19" height="19" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0 0c2-2.4 3-5.4 3-9s-1-6.6-3-9m0 18c-2-2.4-3-5.4-3-9s1-6.6 3-9M3.6 9h16.8M3.6 15h16.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+              </svg>
+            </button>
+            <a class="button button--secondary" href="#components">Sign in</a>
+            <a class="button button--primary" href="#review">Sign up</a>
+            <button class="icon-button menu-toggle" type="button" aria-label="Menu">
+              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main id="top">
+        <section class="hero" aria-labelledby="hero-title">
+          <div class="container hero__grid">
+            <div>
+              <span class="eyebrow">INSTITUTIONAL CONTROL PLANE</span>
+              <h1 id="hero-title">Orchestrate agents with quiet operational control.</h1>
+              <p>
+                A preview of the Relay design language: white-canvas editorial spacing, scarce Relay Blue,
+                full-bleed dark heroes, and layered product surfaces for serious team workflows.
+              </p>
+              <div class="hero__actions">
+                <a class="button button--primary button--hero" href="#tokens">Review tokens</a>
+                <a class="button button--outline-dark button--hero" href="#components">Inspect components</a>
+              </div>
+            </div>
+
+            <div class="mockup-stack" aria-label="Layered product UI mockup">
+              <article class="product-card product-card--main">
+                <div class="card-head">
+                  <div>
+                    <h2 class="card-title">Workflow readiness</h2>
+                    <span class="card-meta">Live control-plane overview</span>
+                  </div>
+                  <span class="badge" style="background: rgba(255,255,255,0.1); color: var(--on-dark)">REGULATED</span>
+                </div>
+
+                <div class="metric-grid">
+                  <div class="metric">
+                    <span>Sessions</span>
+                    <strong>128</strong>
+                  </div>
+                  <div class="metric">
+                    <span>Ready agents</span>
+                    <strong>3 / 3</strong>
+                  </div>
+                  <div class="metric">
+                    <span>Review queue</span>
+                    <strong>12</strong>
+                  </div>
+                </div>
+
+                <div class="workflow-list">
+                  <div class="workflow-row">
+                    <span class="glyph">
+                      <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                      </svg>
+                    </span>
+                    <span class="row-label"><strong>Claude to Pi to Codex</strong><span>Release plan handoff</span></span>
+                    <span class="number">04:18</span>
+                    <span class="number up">+8%</span>
+                  </div>
+                  <div class="workflow-row">
+                    <span class="glyph glyph--yellow">
+                      <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M12 3v18M3 12h18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                      </svg>
+                    </span>
+                    <span class="row-label"><strong>Manual review</strong><span>Governed approval step</span></span>
+                    <span class="number">17</span>
+                    <span class="number down">-3%</span>
+                  </div>
+                  <div class="workflow-row">
+                    <span class="glyph">
+                      <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M4 7h16M7 12h10M10 17h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                      </svg>
+                    </span>
+                    <span class="row-label"><strong>Daemon node</strong><span>BoxLite guest health</span></span>
+                    <span class="number">99.9</span>
+                    <span class="number up">+0.2</span>
+                  </div>
+                </div>
+              </article>
+
+              <article class="product-card product-card--floating">
+                <div class="card-head">
+                  <div>
+                    <h2 class="card-title">Agent preflight</h2>
+                    <span class="card-meta">Silent on success</span>
+                  </div>
+                </div>
+                <div class="workflow-list">
+                  <div class="workflow-row">
+                    <span class="glyph">
+                      <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                      </svg>
+                    </span>
+                    <span class="row-label"><strong>Claude</strong><span>stream-json renderer</span></span>
+                  </div>
+                  <div class="workflow-row">
+                    <span class="glyph">
+                      <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                      </svg>
+                    </span>
+                    <span class="row-label"><strong>Codex</strong><span>JSON events rendered</span></span>
+                  </div>
+                </div>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="section" id="tokens" aria-labelledby="tokens-title">
+          <div class="container">
+            <div class="section-heading">
+              <h2 id="tokens-title">Tokens with one brand voltage.</h2>
+              <p>
+                Relay Blue is reserved for primary action and signature accents. Most of the system
+                stays white, ink, and neutral with operational numbers in mono.
+              </p>
+            </div>
+
+            <div class="swatch-grid">
+              <article class="swatch">
+                <div class="swatch__color" style="background: var(--primary)"></div>
+                <div class="swatch__body"><strong>Relay Blue</strong><code>#0052ff</code></div>
+              </article>
+              <article class="swatch">
+                <div class="swatch__color" style="background: var(--ink)"></div>
+                <div class="swatch__body"><strong>Ink / Dark</strong><code>#18232d</code></div>
+              </article>
+              <article class="swatch">
+                <div class="swatch__color" style="background: var(--surface-soft)"></div>
+                <div class="swatch__body"><strong>Surface Soft</strong><code>#f7f6f1</code></div>
+              </article>
+              <article class="swatch">
+                <div class="swatch__color" style="background: var(--surface-strong)"></div>
+                <div class="swatch__body"><strong>Surface Strong</strong><code>#eef0f3</code></div>
+              </article>
+              <article class="swatch">
+                <div class="swatch__color" style="background: var(--semantic-up)"></div>
+                <div class="swatch__body"><strong>Semantic Up</strong><code>#05b169</code></div>
+              </article>
+              <article class="swatch">
+                <div class="swatch__color" style="background: var(--semantic-down)"></div>
+                <div class="swatch__body"><strong>Semantic Down</strong><code>#cf202f</code></div>
+              </article>
+              <article class="swatch">
+                <div class="swatch__color" style="background: var(--accent-yellow)"></div>
+                <div class="swatch__body"><strong>Accent Yellow</strong><code>#f4b000</code></div>
+              </article>
+              <article class="swatch">
+                <div class="swatch__color" style="background: var(--surface-dark-elevated)"></div>
+                <div class="swatch__body"><strong>Dark Elevated</strong><code>#16181c</code></div>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="section section--soft" aria-labelledby="type-title">
+          <div class="container">
+            <div class="section-heading">
+              <h2 id="type-title">Calm display, precise numbers.</h2>
+              <p>
+                Display remains weight 400. Numerical and operational cells use a mono stack to make
+                timelines, deltas, and counts scan cleanly.
+              </p>
+            </div>
+
+            <div class="type-specimen">
+              <div class="type-row">
+                <span class="type-name">display-mega</span>
+                <p class="type-sample" style="font-size: clamp(40px, 7vw, 80px)">Quiet confidence</p>
+                <span class="type-detail">80 / 400</span>
+              </div>
+              <div class="type-row">
+                <span class="type-name">display-lg</span>
+                <p class="type-sample" style="font-size: clamp(36px, 4.6vw, 52px)">Institutional rhythm</p>
+                <span class="type-detail">52 / 400</span>
+              </div>
+              <div class="type-row">
+                <span class="type-name">title-md</span>
+                <p class="type-sample" style="font-size: 18px; font-weight: 600">Component titles and row labels</p>
+                <span class="type-detail">18 / 600</span>
+              </div>
+              <div class="type-row">
+                <span class="type-name">number-display</span>
+                <p class="type-sample number">128.42 +05.8%</p>
+                <span class="type-detail">18 / 500</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section" id="components" aria-labelledby="components-title">
+          <div class="container">
+            <div class="section-heading">
+              <h2 id="components-title">Component checks.</h2>
+              <p>
+                The preview exercises the documented pill geometry, input focus treatment, badges,
+                semantic text-only deltas, and dark-surface controls.
+              </p>
+            </div>
+
+            <div class="component-grid">
+              <article class="component-panel">
+                <h3>Buttons</h3>
+                <div class="button-stack">
+                  <button class="button button--primary" type="button">Primary</button>
+                  <button class="button button--secondary" type="button">Secondary</button>
+                  <button class="button button--primary" type="button" disabled>Disabled</button>
+                </div>
+              </article>
+              <article class="component-panel">
+                <h3>Forms</h3>
+                <div class="form-stack">
+                  <input class="input" value="relay daemon node" aria-label="Text input preview" />
+                  <input class="search-pill" value="Search sessions" aria-label="Search input preview" />
+                </div>
+              </article>
+              <article class="component-panel">
+                <h3>Badges</h3>
+                <div class="badge-stack">
+                  <span class="badge">INSTITUTIONAL</span>
+                  <span class="badge">GOVERNED</span>
+                  <span class="badge">LOCAL-FIRST</span>
+                </div>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="section section--soft" id="pricing" aria-labelledby="pricing-title">
+          <div class="container">
+            <div class="section-heading">
+              <h2 id="pricing-title">Pricing cards and inversion.</h2>
+              <p>
+                The highlighted tier uses dark inversion, not a colored ribbon. Feature text stays
+                restrained and the CTA remains the only blue action.
+              </p>
+            </div>
+
+            <div class="pricing-grid">
+              <article class="pricing-card">
+                <h3>Developer</h3>
+                <div class="price">$0</div>
+                <p>Local workflow prototyping.</p>
+                <ul>
+                  <li>Single workspace</li>
+                  <li>Local session history</li>
+                  <li>Manual handoffs</li>
+                </ul>
+                <a class="button button--secondary" href="#review">Start</a>
+              </article>
+              <article class="pricing-card pricing-card--featured">
+                <h3>Team</h3>
+                <div class="price">$29</div>
+                <p>Shared orchestration and reviews.</p>
+                <ul>
+                  <li>Governed approvals</li>
+                  <li>Read-only API surface</li>
+                  <li>Agent readiness checks</li>
+                </ul>
+                <a class="button button--primary" href="#review">Start</a>
+              </article>
+              <article class="pricing-card">
+                <h3>Enterprise</h3>
+                <div class="price">Custom</div>
+                <p>Controlled agent workflows at scale.</p>
+                <ul>
+                  <li>Policy integrations</li>
+                  <li>Audit retention</li>
+                  <li>Dedicated support</li>
+                </ul>
+                <a class="button button--secondary" href="#review">Contact</a>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="section" id="review" aria-labelledby="review-title">
+          <div class="container">
+            <div class="section-heading">
+              <h2 id="review-title">Design document review notes.</h2>
+              <p>
+                The system direction is coherent: single accent, calm type, large section rhythm,
+                and one memorable dark product-mockup pattern.
+              </p>
+            </div>
+
+            <div class="review-grid">
+              <article class="review-card">
+                <h3>Strong foundation</h3>
+                <p>
+                  The color, shape, and section-rhythm rules are specific enough to produce consistent
+                  marketing pages without over-specifying every layout.
+                </p>
+              </article>
+              <article class="review-card">
+                <h3>Copy alignment</h3>
+                <p>
+                  CTA language now stays in Relay's orchestration/control-plane domain rather than
+                  borrowing finance-oriented phrasing from an earlier reference.
+                </p>
+              </article>
+              <article class="review-card">
+                <h3>Token clarity</h3>
+                <p>
+                  `surface-dark-elevated` is documented as a deeper product-card surface, matching
+                  the visual relationship between `#16181c` and `#18232d`.
+                </p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="cta" aria-labelledby="cta-title">
+          <div class="container">
+            <h2 id="cta-title">A restrained visual system for serious agent operations.</h2>
+            <p>
+              Keep Relay Blue rare, keep display type quiet, and make the dark product surface the
+              signature moment users remember.
+            </p>
+            <div class="hero__actions">
+              <a class="button button--primary button--hero" href="#top">Back to top</a>
+              <a class="button button--dark button--hero" href="design-system.md">Open source doc</a>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <div class="container">
+          <div class="footer__grid">
+            <div>
+              <h3>Relay</h3>
+              <p>Local-first orchestration for human-directed agent workflows.</p>
+            </div>
+            <div>
+              <h4>Product</h4>
+              <a href="#tokens">Tokens</a>
+              <a href="#components">Components</a>
+            </div>
+            <div>
+              <h4>Platform</h4>
+              <a href="#pricing">Pricing</a>
+              <a href="#review">Review</a>
+            </div>
+            <div>
+              <h4>Docs</h4>
+              <a href="design-system.md">Design system</a>
+              <a href="product.md">Product</a>
+            </div>
+            <div>
+              <h4>Company</h4>
+              <a href="#top">Overview</a>
+              <a href="#review">Governance</a>
+            </div>
+          </div>
+          <div class="legal">Preview generated from docs/design-system.md. Static HTML, no runtime dependencies.</div>
+        </div>
+      </footer>
+    </div>
+  </body>
+</html>

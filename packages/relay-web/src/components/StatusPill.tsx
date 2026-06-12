@@ -1,4 +1,4 @@
-import { Badge } from "@/components/ui/badge";
+import { useTranslation } from "react-i18next";
 import type { Tone } from "../types";
 
 function statusTone(value: string): Tone {
@@ -13,9 +13,10 @@ export { statusTone };
 type StatusPillProps = { value: string };
 
 export function StatusPill({ value }: StatusPillProps) {
+  const { t } = useTranslation();
   return (
-    <Badge variant="outline" className={`pill ${statusTone(value)}`}>
-      {value}
-    </Badge>
+    <span className={`pill ${statusTone(value)}`}>
+      {t(`status.${value}`, { defaultValue: value })}
+    </span>
   );
 }

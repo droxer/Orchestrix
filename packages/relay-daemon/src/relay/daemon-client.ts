@@ -1,7 +1,7 @@
 import type { AgentName, CodexTaskMode } from "relay-core";
 
 import type { RelaySession } from "./session.js";
-import type { SandboxRecord, SandboxRunAssignment } from "./daemon.js";
+import type { ControlPanelDaemonNodeRecord, SandboxRecord, SandboxRunAssignment } from "./daemon.js";
 
 export type RemoteDecisionKind = "approve" | "reject" | "cancel" | "rerun" | "mark_done";
 
@@ -81,6 +81,11 @@ export class RelayDaemonClient {
     // daemon keeps only the hash. Adopt it so follow-up requests authenticate.
     if (sandbox.token) this.token = sandbox.token;
     return sandbox;
+  }
+
+  async listControlPanelDaemonNodes(): Promise<ControlPanelDaemonNodeRecord[]> {
+    const body = await this.request<{ nodes?: ControlPanelDaemonNodeRecord[] }>("/cp/daemon-nodes");
+    return Array.isArray(body.nodes) ? body.nodes : [];
   }
 
   async getSandbox(sandboxId: string): Promise<SandboxRecord> {

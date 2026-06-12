@@ -1,15 +1,17 @@
-import { CircleStop, KeyRound, UserRound, X } from "lucide-react";
+import { CircleStop, KeyRound, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { EmployeeAvatar } from "./EmployeeAvatar";
 import { StatusPill } from "./StatusPill";
 import type { DaemonNodeMonitorRecord, SandboxRecord } from "../types";
+import { conversationDaemonStatus } from "../lib/conversationStatus";
 
 export type SettingsDrawerProps = {
   open: boolean;
   onClose: () => void;
-  quickUsers: string[];
+  registeredEmployees: string[];
   selectedEmployee: string;
-  customEmployee: string;
-  setCustomEmployee: (value: string) => void;
   selectEmployee: (employeeId: string) => Promise<void>;
   tokenInput: string;
   setTokenInput: (value: string) => void;
@@ -23,10 +25,8 @@ export type SettingsDrawerProps = {
 export function SettingsDrawer({
   open,
   onClose,
-  quickUsers,
+  registeredEmployees,
   selectedEmployee,
-  customEmployee,
-  setCustomEmployee,
   selectEmployee,
   tokenInput,
   setTokenInput,
@@ -36,25 +36,32 @@ export function SettingsDrawer({
   activeRun,
   onCancelRun,
 }: SettingsDrawerProps) {
+  const { t } = useTranslation();
   if (!open) return null;
+  const daemonStatus = conversationDaemonStatus({
+    node: selectedNode,
+    sandbox: selectedSandbox,
+    activeRun,
+  });
+  const selectedEmployeeLabel = selectedEmployee ? `@${selectedEmployee}` : t("thread.no_employee_selected");
   return (
     <aside id="settings-drawer" className="settings-drawer" aria-labelledby="settings-title">
       <div className="settings-header">
         <div>
-          <p className="eyebrow">Employee workspace</p>
-          <h3 id="settings-title" translate="no">
-            @{selectedEmployee}
+          <p className="eyebrow">{t("settings.employee_workspace")}</p>
+          <h3 id="settings-title" translate={selectedEmployee ? "no" : undefined}>
+            {selectedEmployeeLabel}
           </h3>
         </div>
-        <button type="button" className="icon-button" aria-label="Close" onClick={onClose}>
+        <Button variant="ghost" size="icon" aria-label={t("settings.close")} onClick={onClose}>
           <X size={16} />
-        </button>
+        </Button>
       </div>
 
       <section className="settings-section">
-        <div className="panel-kicker">Known employees</div>
+        <div className="panel-kicker">{t("settings.registered_nodes")}</div>
         <div className="settings-user-list">
-          {quickUsers.map((employeeId) => (
+          {registeredEmployees.map((employeeId) => (
             <button
               className={`settings-user ${selectedEmployee === employeeId ? "active" : ""}`}
               key={employeeId}
@@ -65,35 +72,16 @@ export function SettingsDrawer({
               <span translate="no">@{employeeId}</span>
             </button>
           ))}
+          {registeredEmployees.length === 0 ? <p className="settings-hint">{t("settings.no_nodes")}</p> : null}
         </div>
-        <form
-          className="settings-inline"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void selectEmployee(customEmployee);
-            setCustomEmployee("");
-          }}
-        >
-          <UserRound size={15} />
-          <input
-            aria-label="Custom employee ID"
-            name="custom-employee-id"
-            autoComplete="off"
-            spellCheck={false}
-            placeholder="alice…"
-            value={customEmployee}
-            onChange={(event) => setCustomEmployee(event.target.value)}
-          />
-          <button type="submit">Open Employee</button>
-        </form>
       </section>
 
       <section className="settings-section">
-        <div className="panel-kicker">Sandbox token</div>
+        <div className="panel-kicker">{t("settings.sandbox_token")}</div>
         <div className="settings-inline">
           <KeyRound size={15} />
-          <input
-            aria-label="Sandbox token"
+          <Input
+            aria-label={t("settings.sandbox_token")}
             name="sandbox-token"
             type="password"
             autoComplete="off"
@@ -102,54 +90,55 @@ export function SettingsDrawer({
             value={tokenInput}
             onChange={(event) => setTokenInput(event.target.value)}
           />
-          <button type="button" onClick={saveToken}>
-            Save Token
-          </button>
+          <Button size="sm" type="button" onClick={saveToken}>
+            {t("settings.save_token")}
+          </Button>
         </div>
-        <p className="settings-hint">Saved locally in this browser for the selected employee.</p>
+        <p className="settings-hint">{t("settings.token_hint")}</p>
       </section>
 
       <section className="settings-section">
-        <div className="panel-kicker">Live sandbox</div>
+        <div className="panel-kicker">{t("settings.live_sandbox")}</div>
         <p className="settings-id" translate="no">
-          {selectedSandbox?.id ?? "No sandbox selected"}
+          {selectedSandbox?.id ?? t("settings.no_sandbox")}
         </p>
-        <StatusPill value={selectedSandbox?.status ?? "provisioning"} />
+        <StatusPill value={daemonStatus} />
         <dl className="settings-dl">
           <div>
-            <dt>workspace</dt>
+            <dt>{t("settings.workspace_label")}</dt>
             <dd>{selectedSandbox?.workspacePath ?? "none"}</dd>
           </div>
           <div>
-            <dt>node</dt>
+            <dt>{t("settings.node_label")}</dt>
             <dd>
               {selectedNode ? (
                 <>
-                  <span className="mono">{selectedNode.queuedCommandCount}</span> queued
+                  <span className="mono">{selectedNode.queuedCommandCount}</span> {t("settings.queued")}
                 </>
               ) : (
-                "not registered"
+                t("settings.not_registered")
               )}
             </dd>
           </div>
           <div>
-            <dt>run</dt>
+            <dt>{t("settings.run_label")}</dt>
             <dd>
               {activeRun ? (
                 <span className="settings-run">
                   <span className="mono" translate="no">
                     {activeRun.agent}
                   </span>
-                  <button
-                    type="button"
+                  <Button
+                    variant="destructive"
+                    size="sm"
                     className="settings-cancel"
                     onClick={() => void onCancelRun()}
                   >
-                    <CircleStop size={12} /> Cancel
-                  </button>
+                    <CircleStop size={12} /> {t("settings.cancel")}
+                  </Button>
                 </span>
               ) : (
-                "idle"
+                t("settings.idle")
               )}
             </dd>
           </div>
