@@ -21,8 +21,8 @@ import {
   RelayDaemonClient,
   initialAgentState,
   relayEvent,
-} from "../packages/relay-daemon/src/index.js";
-import { createDaemonNodeLogger } from "../packages/relay-daemon-node/src/index.js";
+} from "../packages/relay-backend/src/index.js";
+import { createDaemonLogger } from "../packages/relay-daemon/src/index.js";
 import { ensureDaemonNodeToken, readDaemonNodeToken } from "../packages/relay-core/src/index.js";
 import {
   createSession as createWebSession,
@@ -135,10 +135,10 @@ describe("Project command scripts", () => {
     assert.match(makefile, /^run: tui$/m);
     assert.match(makefile, /node packages\/relay-tui\/dist\/local-run\.js/);
     assert.match(makefile, /node packages\/relay-tui\/dist\/cli\.js/);
-    assert.match(makefile, /^daemon-local:$/m);
-    assert.match(makefile, /^daemon-server:$/m);
-    assert.match(makefile, /^daemon: daemon-server$/m);
-    assert.match(makefile, /^daemon-node:$/m);
+    assert.match(makefile, /^backend:$/m);
+    assert.match(makefile, /^daemon:$/m);
+    assert.match(makefile, /node packages\/relay-backend\/dist\/backend-cli\.js/);
+    assert.match(makefile, /node packages\/relay-daemon\/dist\/cli\.js/);
     assert.match(makefile, /^serve:$/m);
   });
 });
@@ -253,7 +253,7 @@ describe("Relay daemon node tokens", () => {
 describe("Relay daemon node logging", () => {
   it("writes node and run scoped JSONL logs", async () => {
     const workspacePath = mkdtempSync(join(tmpdir(), "relay-daemon-node-logs-"));
-    const logger = createDaemonNodeLogger({ workspacePath, sandboxId: "sbx/logs" });
+    const logger = createDaemonLogger({ workspacePath, sandboxId: "sbx/logs" });
 
     logger.info("daemon node registered", { sandboxId: "sbx/logs", employeeId: "alice" });
     logger.output({

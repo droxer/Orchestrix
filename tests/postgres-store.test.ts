@@ -17,7 +17,7 @@ import {
   relayEvent,
   relayTaskEvent,
   shouldUsePostgresDefaults,
-} from "../packages/relay-daemon/src/index.js";
+} from "../packages/relay-backend/src/index.js";
 
 const { Pool } = pg;
 

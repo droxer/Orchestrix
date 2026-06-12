@@ -16,7 +16,7 @@
   "dependencies": {
     "ink": "^7.0.5",
     "react": "^19.2.7",
-    "relay-daemon": "0.1.0"
+    "relay-backend": "0.1.0"
   },
   "engines": {
     "node": ">=22.19.0"

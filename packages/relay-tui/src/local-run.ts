@@ -4,7 +4,7 @@ import { randomBytes } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { hostWorkspacePath, normalizeBaseUrl } from "relay-daemon";
+import { hostWorkspacePath, normalizeBaseUrl } from "relay-backend";
 
 const DEFAULT_DAEMON_URL = "http://127.0.0.1:8790";
 const STARTUP_TIMEOUT_MS = 15_000;
@@ -34,7 +34,7 @@ export interface DaemonStatus {
 
 const currentFile = fileURLToPath(import.meta.url);
 const distDir = dirname(currentFile);
-const daemonCli = resolve(distDir, "../../relay-daemon/dist/daemon-cli.js");
+const backendCli = resolve(distDir, "../../relay-backend/dist/backend-cli.js");
 const tuiCli = resolve(distDir, "cli.js");
 
 async function main(): Promise<void> {
@@ -59,7 +59,7 @@ async function main(): Promise<void> {
     const initialStatus = await daemonStatus(daemonUrl);
     const initialCompatibilityError = localDaemonCompatibilityError(initialStatus, daemonUrl);
     if (!initialStatus.responding) {
-      const daemon = startChild("daemon", daemonCli, daemonArgs(daemonEndpoint), childEnv);
+      const daemon = startChild("backend", backendCli, daemonArgs(daemonEndpoint), childEnv);
       children.push(daemon);
       ownsDaemon = true;
       await waitFor(async () => {
@@ -89,11 +89,11 @@ async function main(): Promise<void> {
 }
 
 export function resolveLocalRunConfig(env: NodeJS.ProcessEnv = process.env): LocalRunConfig {
-  const daemonUrl = normalizeBaseUrl(envValue(env, "RELAY_DAEMON_URL") ?? DEFAULT_DAEMON_URL);
+  const daemonUrl = normalizeBaseUrl(envValue(env, "RELAY_BACKEND_URL") ?? envValue(env, "RELAY_DAEMON_URL") ?? DEFAULT_DAEMON_URL);
   const daemonEndpoint = new URL(daemonUrl);
   const workspacePath = hostWorkspacePath(envValue(env, "RELAY_WORKSPACE") ?? envValue(env, "WORKSPACE"));
   const employeeId = envValue(env, "RELAY_EMPLOYEE_ID") ?? envValue(env, "EMPLOYEE_ID") ?? envValue(env, "USER") ?? "local";
-  const token = envValue(env, "RELAY_DAEMON_NODE_TOKEN") ?? `tok_${randomBytes(24).toString("base64url")}`;
+  const token = envValue(env, "RELAY_DAEMON_TOKEN") ?? envValue(env, "RELAY_DAEMON_NODE_TOKEN") ?? `tok_${randomBytes(24).toString("base64url")}`;
   const uiToken = envValue(env, "RELAY_DAEMON_UI_TOKEN") ?? `tok_${randomBytes(24).toString("base64url")}`;
   const sandboxId = envValue(env, "RELAY_SANDBOX_ID") ?? envValue(env, "SANDBOX_ID") ?? `sbx_${safeId(employeeId)}`;
   return {
@@ -106,8 +106,10 @@ export function resolveLocalRunConfig(env: NodeJS.ProcessEnv = process.env): Loc
     sandboxId,
     childEnv: {
       ...env,
+      RELAY_BACKEND_URL: daemonUrl,
       RELAY_DAEMON_URL: daemonUrl,
       RELAY_EMPLOYEE_ID: employeeId,
+      RELAY_DAEMON_TOKEN: token,
       RELAY_DAEMON_NODE_TOKEN: token,
       RELAY_DAEMON_UI_TOKEN: uiToken,
       RELAY_WORKSPACE: workspacePath,

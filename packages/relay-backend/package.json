@@ -1,19 +1,23 @@
 {
-  "name": "relay-daemon-node",
+  "name": "relay-backend",
   "version": "0.1.0",
-  "description": "Relay sandbox-side daemon node",
+  "description": "Relay backend control plane (HTTP API, session/task stores, daemon registry)",
   "type": "module",
   "exports": {
     ".": "./dist/index.js"
   },
   "types": "./dist/index.d.ts",
   "bin": {
-    "relay-daemon-node": "./dist/cli.js"
+    "relay-backend": "./dist/backend-cli.js",
+    "relay": "./dist/cli.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@boxlite-ai/boxlite": "^0.9.5",
+    "@types/pg": "^8.20.0",
+    "pg": "^8.21.0",
     "relay-core": "0.1.0"
   },
   "engines": {

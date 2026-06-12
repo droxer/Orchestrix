@@ -14,8 +14,8 @@
     "baseUrl": ".",
     "paths": {
       "relay-core": ["packages/relay-core/src/index.ts"],
+      "relay-backend": ["packages/relay-backend/src/index.ts"],
       "relay-daemon": ["packages/relay-daemon/src/index.ts"],
-      "relay-daemon-node": ["packages/relay-daemon-node/src/index.ts"],
       "relay-tui": ["packages/relay-tui/src/tui.tsx"]
     }
   },

@@ -41,8 +41,8 @@ import {
   routeCodexHandoff,
   routePiHandoff,
   StderrLineRenderer,
-} from "../packages/relay-daemon/src/index.js";
-import { localProcessExecStream } from "../packages/relay-daemon-node/src/index.js";
+} from "../packages/relay-backend/src/index.js";
+import { localProcessExecStream } from "../packages/relay-daemon/src/index.js";
 
 function codexStdout(message: string): string {
   return JSON.stringify({

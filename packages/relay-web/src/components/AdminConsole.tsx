@@ -5,7 +5,7 @@ import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { listControlPanelDaemonNodes } from "../api";
 import type { ControlPanelDaemonNodeRecord, Tone } from "../types";
-import type { DaemonNodeActiveRun } from "relay-daemon";
+import type { DaemonNodeActiveRun } from "relay-backend";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 

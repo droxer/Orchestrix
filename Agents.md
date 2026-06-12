@@ -66,15 +66,15 @@ ask the user whether to run `codegraph init -i`.
 
 ## Project Shape
 
-- Workspace packages: `packages/relay-core/`, `packages/relay-daemon/`,
-  `packages/relay-daemon-node/`, and `packages/relay-tui/`.
-- Daemon CLI entrypoints: `packages/relay-daemon/src/cli.ts` and
-  `packages/relay-daemon/src/daemon-cli.ts`.
-- Daemon node CLI entrypoint: `packages/relay-daemon-node/src/cli.ts`.
+- Workspace packages: `packages/relay-core/`, `packages/relay-backend/`,
+  `packages/relay-daemon/`, and `packages/relay-tui/`.
+- Daemon CLI entrypoints: `packages/relay-backend/src/cli.ts` and
+  `packages/relay-backend/src/backend-cli.ts`.
+- Daemon node CLI entrypoint: `packages/relay-daemon/src/cli.ts`.
 - TUI CLI entrypoint: `packages/relay-tui/src/cli.ts`.
-- Public daemon re-export surface: `packages/relay-daemon/src/index.ts`.
+- Public daemon re-export surface: `packages/relay-backend/src/index.ts`.
 - Shared protocol and agent runtime modules: `packages/relay-core/src/`.
-- Relay implementation modules: `packages/relay-daemon/src/relay/`.
+- Relay implementation modules: `packages/relay-backend/src/relay/`.
 - TUI implementation: `packages/relay-tui/src/tui.tsx`.
 - Tests: `tests/handoff.test.ts`, `tests/session.test.ts`,
   `tests/tui.test.tsx`.
@@ -113,33 +113,33 @@ Key modules:
 
 - `packages/relay-core/src/index.ts`: shared protocol, agent state, prompts,
   command builders, stream renderers, guest helpers, and agent execution units.
-- `packages/relay-daemon/src/cli.ts`: compatibility CLI for `relay`
+- `packages/relay-backend/src/cli.ts`: compatibility CLI for `relay`
   subcommands.
-- `packages/relay-daemon/src/daemon-cli.ts`: host daemon binary entrypoint.
-- `packages/relay-daemon-node/src/cli.ts`: daemon node binary entrypoint.
-- `packages/relay-daemon-node/src/index.ts`: sandbox-side daemon node runtime.
+- `packages/relay-backend/src/backend-cli.ts`: host daemon binary entrypoint.
+- `packages/relay-daemon/src/cli.ts`: daemon node binary entrypoint.
+- `packages/relay-daemon/src/index.ts`: sandbox-side daemon node runtime.
 - `packages/relay-tui/src/tui.tsx`: Ink-based TUI. Owns input parsing for `@claude`, `@pi`,
   `@codex`, `/approve`, `/reject`, `/cancel`, `/rerun`, `/handoff`,
   `/sessions`, `/open`, `/summary`, and `/quit`.
-- `packages/relay-daemon/src/relay/workflow.ts`: VM lifecycle, agent readiness preflight, and the
+- `packages/relay-backend/src/relay/workflow.ts`: VM lifecycle, agent readiness preflight, and the
   default Claude to Pi to Codex workflow.
-- `packages/relay-daemon/src/relay/controller.ts`: `SessionController`, the only object that mutates
+- `packages/relay-backend/src/relay/controller.ts`: `SessionController`, the only object that mutates
   sessions. Each `runStep` emits events through the store and notifies the TUI
   through `onUpdate`.
-- `packages/relay-daemon/src/relay/session.ts` and
-  `packages/relay-daemon/src/relay/task.ts`: event-sourced stores.
+- `packages/relay-backend/src/relay/session.ts` and
+  `packages/relay-backend/src/relay/task.ts`: event-sourced stores.
 - `packages/relay-core/src/nodes.ts`: single-agent execution units. Each agent CLI runs in
   BoxLite through `execStream`.
 - `packages/relay-core/src/commands.ts` and
   `packages/relay-core/src/prompts.ts`: shell argv and prompt construction for agents and modes.
-- `packages/relay-daemon/src/relay/routing.ts`: default-workflow transition function used by
+- `packages/relay-backend/src/relay/routing.ts`: default-workflow transition function used by
   `relay run-workflow`. TUI assignments do not go through this router.
-- `packages/relay-daemon/src/relay/box.ts`,
+- `packages/relay-backend/src/relay/box.ts`,
   `packages/relay-core/src/guest.ts`, and
   `packages/relay-core/src/env.ts`: BoxLite VM setup, guest auth provisioning, and env loading.
 - `packages/relay-core/src/renderers.ts`: streaming JSONL to terminal text converters.
 - `packages/relay-core/src/format.ts`: ANSI formatting helpers.
-- `packages/relay-daemon/src/relay/server.ts`: read-only HTTP/SSE API over `.relay/`.
+- `packages/relay-backend/src/relay/server.ts`: read-only HTTP/SSE API over `.relay/`.
 
 ## Implementation Notes
 

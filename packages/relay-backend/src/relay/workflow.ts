@@ -264,7 +264,7 @@ export function run(argv: string[] = process.argv.slice(2)): void {
     });
     return;
   }
-  if (argv[0] === "daemon") {
+  if (argv[0] === "backend") {
     const portIndex = argv.indexOf("--port");
     const port = portIndex >= 0 ? Number(argv[portIndex + 1]) : 8790;
     const daemonNodeModeIndex = argv.indexOf("--daemon-node-mode");
@@ -281,5 +281,5 @@ export function run(argv: string[] = process.argv.slice(2)): void {
   if (argv.length > 0) {
     throw new Error(`Unknown arguments: ${argv.join(" ")}`);
   }
-  throw new Error("Usage: relay-daemon <daemon|serve|sessions|show|run-workflow> ...");
+  throw new Error("Usage: relay <backend|serve|sessions|show|run-workflow> ...");
 }

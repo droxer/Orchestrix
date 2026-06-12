@@ -19,7 +19,7 @@ import {
   type RunRequest,
 } from "../packages/relay-tui/src/tui.js";
 import { daemonArgs, localDaemonCompatibilityError, resolveLocalRunConfig } from "../packages/relay-tui/src/local-run.js";
-import { LocalSessionStore } from "../packages/relay-daemon/src/index.js";
+import { LocalSessionStore } from "../packages/relay-backend/src/index.js";
 
 function testSessionStore(): LocalSessionStore {
   return new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-tui-")));
@@ -228,7 +228,7 @@ describe("TUI daemon runner", () => {
         headers: { "Content-Type": "application/json" },
       });
     };
-    const { RelayDaemonClient } = await import("../packages/relay-daemon/src/index.js");
+    const { RelayDaemonClient } = await import("../packages/relay-backend/src/index.js");
     const client = new RelayDaemonClient({ baseUrl: "http://daemon.local", fetchFn });
     const runner = createDaemonAssignmentRunner(client, "sbx_alice");
     let updatedSession = "";
@@ -319,7 +319,7 @@ describe("TUI daemon runner", () => {
         headers: { "Content-Type": "application/json" },
       });
     };
-    const { RelayDaemonClient } = await import("../packages/relay-daemon/src/index.js");
+    const { RelayDaemonClient } = await import("../packages/relay-backend/src/index.js");
     const client = new RelayDaemonClient({ baseUrl: "http://daemon.local", fetchFn });
     const runner = createDaemonAssignmentRunner(client, "sbx_alice");
     let log = "";
@@ -384,7 +384,7 @@ describe("TUI daemon runner", () => {
       });
       return new Response(JSON.stringify(cancelledSession), { status: 202, headers: { "Content-Type": "application/json" } });
     };
-    const { RelayDaemonClient } = await import("../packages/relay-daemon/src/index.js");
+    const { RelayDaemonClient } = await import("../packages/relay-backend/src/index.js");
     const client = new RelayDaemonClient({ baseUrl: "http://daemon.local", fetchFn });
     const runner = createDaemonAssignmentRunner(client, "sbx_alice");
     const controller = new AbortController();
@@ -1158,7 +1158,7 @@ describe("RelayTui component", () => {
       assert.match(bootFrame, /Waiting for daemon node|Connecting to Relay daemon/);
       assert.match(bootFrame, /EMPLOYEE_ID=host/);
       assert.match(bootFrame, /SANDBOX_ID=sbx_host/);
-      assert.match(bootFrame, /DAEMON_NODE_TOKEN=tok_has_under_score/);
+      assert.match(bootFrame, /DAEMON_TOKEN=tok_has_under_score/);
       assert.doesNotMatch(bootFrame, /WORKSPACE=/);
       await new Promise((resolve) => setTimeout(resolve, 450));
 

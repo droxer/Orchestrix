@@ -5,12 +5,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 - Install: `npm install` (npm workspaces).
-- Build: `npm run build` (or `make build`) — builds `relay-core` → `relay-daemon` → `relay-tui` → `relay-web`, then compiles `tests/` via the root `tsconfig.json` to `dist/`.
+- Build: `npm run build` (or `make build`) — builds `relay-core` → `relay-backend` → `relay-tui` → `relay-web`, then compiles `tests/` via the root `tsconfig.json` to `dist/`.
 - Test: `npm test` (or `make test`) — builds first, then runs `node --test dist/tests/*.test.js`.
 - Run a single test file: `node --test dist/tests/handoff.test.js` (build first).
-- Run the host daemon: `make daemon` (default port `8790`). Serves the control panel at `/control` and the exported web UI at `/web`.
-- Run a daemon node: `make daemon-node` (registers against `RELAY_DAEMON_URL`, polls for commands, executes agent CLIs locally).
-- Run the TUI: `make run` (or `npm run run`). The TUI connects to the daemon (`RELAY_DAEMON_URL`, default `http://127.0.0.1:8790`).
+- Run the host daemon: `make backend` (default port `8790`). Serves the control panel at `/control` and the exported web UI at `/web`.
+- Run a daemon node: `make daemon` (registers against `RELAY_BACKEND_URL`, polls for commands, executes agent CLIs locally).
+- Run the TUI: `make run` (or `npm run run`). The TUI connects to the daemon (`RELAY_BACKEND_URL`, default `http://127.0.0.1:8790`).
 - Run daemon + daemon node + TUI together with a shared token: `make run-with-daemon`.
 - Run the web UI in dev mode (proxies API to the daemon): `make web`.
 - Run the read-only API server: `make serve` (default port `8787`, override with `PORT=9000`).
@@ -28,7 +28,7 @@ Relay is a **local-first orchestration control plane** that lets a human and the
 ### Workspace layout (`packages/`)
 
 - **`relay-core`** — Shared protocol and pure helpers. `state.ts` (agent state, `AgentName`), `commands.ts`/`prompts.ts` (agent CLI argv + prompt text), `nodes.ts` (single-agent execution units), `renderers.ts` (streaming JSONL → terminal text), `codex-review.ts` (verdict parsing, `RELAY_REVIEW_VERDICT:` marker), `guest.ts`/`env.ts` (guest auth provisioning, env/`REPO_ROOT`), `daemon-node-protocol.ts` (daemon ⇄ daemon-node command/event types), `daemon-node-token.ts` (per-employee token file under `<workspace>/.relay/daemon-nodes/<employee>.token`), `format.ts` (ANSI helpers).
-- **`relay-daemon`** — Host daemon and daemon-node runtime.
+- **`relay-backend`** — Host daemon and daemon-node runtime.
   - `relay/daemon.ts` — HTTP daemon (`/sandboxes`, `/daemon-nodes`, `/sessions`, `/control`, `/web`), `DaemonNodeRegistry`, `ServerDaemonNodeBackend` (queues `run.start`/`run.cancel` commands for polling nodes), `LocalDaemonStore` (persisted nodes/commands/runs under `.relay/daemon/`).
   - `daemon-node/index.ts` — Daemon node loop: registers with the daemon, polls for commands, runs agent CLIs as local processes, posts `run.output`/`run.completed`/`run.failed`/`run.cancelled` events back. Survives daemon restarts by retrying with backoff and re-registering when a poll is rejected.
   - `relay/daemon-client.ts` — `RelayDaemonClient` used by the TUI; adopts the one-time plaintext token returned by a fresh provision.
@@ -42,7 +42,7 @@ Relay is a **local-first orchestration control plane** that lets a human and the
 
 ### Daemon / daemon-node / client token contract
 
-- The per-employee token lives at `<workspace>/.relay/daemon-nodes/<employee>.token` (created by whichever side starts first via `ensureDaemonNodeToken`); `RELAY_DAEMON_NODE_TOKEN` overrides it. The daemon stores only a SHA-256 hash; a fresh provision returns the plaintext exactly once.
+- The per-employee token lives at `<workspace>/.relay/daemon-nodes/<employee>.token` (created by whichever side starts first via `ensureDaemonNodeToken`); `RELAY_DAEMON_TOKEN` overrides it. The daemon stores only a SHA-256 hash; a fresh provision returns the plaintext exactly once.
 - Re-registering a sandbox with a different token is rejected (401) — registration cannot rotate or hijack tokens.
 - An authorized command poll revives a `stopped`/`failed` node record to `ready` (covers daemon restarts); provisioning by employee prefers the live node over offline placeholders.
 
