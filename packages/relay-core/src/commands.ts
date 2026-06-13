@@ -4,8 +4,10 @@ import {
   claudeTaskPrompt,
   codexImplementPrompt,
   codexReviewPrompt,
+  kimiTaskPrompt,
   piTaskPrompt,
 } from "./prompts.js";
+import { kimiModel } from "./env.js";
 import { escapeRegExp, shellCommand, shellQuote } from "./shell.js";
 import type { AgentState } from "./state.js";
 
@@ -76,6 +78,16 @@ export function buildPiImplementCommand(state: AgentState): string {
   return runAsAgent(
     `if ${supportsStreamingPrint}; then ${streamingCommand}; else ${printCommand}; fi`,
   );
+}
+
+// Kimi (Moonshot AI) CLI. The exact flags are provisional — confirm `-p`/model
+// flags against the installed Kimi CLI version before relying on this in prod.
+export function buildKimiImplementCommand(state: AgentState): string {
+  const argv = ["stdbuf", "-oL", "-eL", "kimi", "-p"];
+  const model = kimiModel();
+  if (model) argv.push("--model", model);
+  argv.push(kimiTaskPrompt(state));
+  return runAsAgent(shellCommand(argv));
 }
 
 export function buildPiPreflightCommand(): string {

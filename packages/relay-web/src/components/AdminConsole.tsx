@@ -100,7 +100,7 @@ function MetricCard({ label, value, tone }: { label: string; value: number; tone
 function AgentChips({ agents }: { agents: ControlPanelDaemonNodeRecord["agents"] }) {
   return (
     <div className="ac-agents">
-      {(["claude", "pi", "codex"] as const).map((name) => {
+      {(Object.keys(agents) as Array<keyof typeof agents>).map((name) => {
         const status = agents[name] ?? "unknown";
         const tone = agentStatusTone(status);
         return (

@@ -6,10 +6,13 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import {
+  AGENT_NAMES,
   type AgentState,
+  agentNameList,
   buildClaudeImplementCommand,
   buildCodexImplementCommand,
   buildCodexReviewCommand,
+  buildKimiImplementCommand,
   buildPiImplementCommand,
   buildPiPreflightCommand,
   claudeImplementNode,
@@ -21,13 +24,16 @@ import {
   codexReviewPrompt,
   CodexStreamRenderer,
   extractCodexFeedback,
+  failureCount,
   formatClaudeJsonLine,
   formatCodexJsonLine,
+  getAgent,
   guestCodexConfigToml,
   guestAgentEnv,
   guestPiAuthJson,
   guestPiModelsJson,
   hostWorkspacePath,
+  isAgentName,
   JsonLineRenderer,
   piTaskPrompt,
   PlainTextStreamRenderer,
@@ -35,6 +41,7 @@ import {
   routeCodexHandoff,
   routePiHandoff,
   StderrLineRenderer,
+  withFailure,
 } from "../packages/relay-backend/src/index.js";
 import {
   BoxLiteExecutionManager,
@@ -61,9 +68,7 @@ function state(overrides: Partial<AgentState> = {}): AgentState {
     task_goal: "task",
     agent_logs: [],
     last_exit_code: 0,
-    claude_failures: 0,
-    pi_failures: 0,
-    codex_failures: 0,
+    agent_failures: {},
     codex_verdict: "",
     codex_feedback: "",
     ...overrides,
@@ -141,13 +146,13 @@ describe("Codex review parsing", () => {
   it("retries Codex runtime failure instead of Claude", () => {
     assert.equal(classifyCodexReview(1, "auth failed"), "failed");
     assert.equal(
-      routeCodexHandoff(state({ last_exit_code: 1, codex_failures: 1, codex_verdict: "failed", codex_feedback: "auth failed" })),
+      routeCodexHandoff(state({ last_exit_code: 1, agent_failures: { codex: 1 }, codex_verdict: "failed", codex_feedback: "auth failed" })),
       "codex_review",
     );
   });
 
   it("does not treat a missing review verdict as success", () => {
-    assert.equal(routeCodexHandoff(state({ codex_verdict: "failed", codex_failures: 1 })), "codex_review");
+    assert.equal(routeCodexHandoff(state({ codex_verdict: "failed", agent_failures: { codex: 1 } })), "codex_review");
   });
 
   it("classifies Codex review node output before routing", async () => {
@@ -162,7 +167,7 @@ describe("Codex review parsing", () => {
     });
 
     assert.equal(patch.codex_verdict, "rejected");
-    assert.equal(patch.codex_failures, 0);
+    assert.equal(patch.agent_failures?.codex, 0);
     assert.match(patch.codex_feedback ?? "", /Blocking issue found/);
     assert.equal(routeCodexHandoff(state(patch)), "claude_implement");
   });
@@ -618,7 +623,7 @@ describe("handoff routing", () => {
   });
 
   it("retries Pi failure", () => {
-    assert.equal(routePiHandoff(state({ last_exit_code: 1, pi_failures: 1 })), "pi_implement");
+    assert.equal(routePiHandoff(state({ last_exit_code: 1, agent_failures: { pi: 1 } })), "pi_implement");
   });
 });
 
@@ -804,5 +809,44 @@ describe("Pi provider config", () => {
     withEnv({ RELAY_WORKSPACE: temp, WORKSPACE: makeWorkspace }, () => {
       assert.equal(hostWorkspacePath(), temp);
     });
+  });
+});
+
+describe("agent registry", () => {
+  it("validates agent names through the registry", () => {
+    assert.equal(isAgentName("claude"), true);
+    assert.equal(isAgentName("kimi"), true);
+    assert.equal(isAgentName("gpt"), false);
+    assert.equal(isAgentName(42), false);
+  });
+
+  it("includes the four registered agents in a stable order", () => {
+    assert.deepEqual(AGENT_NAMES, ["claude", "pi", "codex", "kimi"]);
+    assert.equal(agentNameList(), "claude, pi, codex, kimi");
+  });
+
+  it("exposes review capability only for review-capable agents", () => {
+    assert.equal(getAgent("codex").capabilities.review, true);
+    assert.equal(getAgent("claude").capabilities.review, false);
+    assert.equal(getAgent("kimi").capabilities.review, false);
+  });
+
+  it("embeds the task goal in the Kimi implement command without leaking raw JSONL", () => {
+    const command = buildKimiImplementCommand(state({ task_goal: "Wire up Kimi" }));
+    assert.match(command, /kimi/);
+    assert.match(command, /Wire up Kimi/);
+    assert.doesNotMatch(command, /stream-json/);
+  });
+
+  it("tracks failures per agent and resets on success", () => {
+    const base = state();
+    const afterFail = withFailure(base, "kimi", true);
+    assert.equal(afterFail.kimi, 1);
+    const afterSecond = withFailure({ ...base, agent_failures: afterFail }, "kimi", true);
+    assert.equal(afterSecond.kimi, 2);
+    const afterPass = withFailure({ ...base, agent_failures: afterSecond }, "kimi", false);
+    assert.equal(afterPass.kimi, 0);
+    assert.equal(failureCount({ ...base, agent_failures: { codex: 3 } }, "codex"), 3);
+    assert.equal(failureCount(base, "pi"), 0);
   });
 });

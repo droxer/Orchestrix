@@ -1,7 +1,7 @@
-import { DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS } from "relay-core";
+import { AGENT_NAMES, DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS } from "relay-core";
 import type { AgentName, AgentState } from "relay-core";
 import { initialAgentState } from "relay-core";
-import { assignmentFailureOutcome, SessionController, type WorkflowStep } from "./controller.js";
+import { assignmentFailureOutcome, isReviewAssignment, SessionController, type WorkflowStep } from "./controller.js";
 import {
   newRelayId,
   relayEvent,
@@ -49,7 +49,7 @@ export class ServerDaemonNodeBackend implements SandboxBackend {
       employeeId: input.employeeId,
       workspacePath: input.workspacePath,
       status: "provisioning",
-      agents: { claude: "unknown", pi: "unknown", codex: "unknown" },
+      agents: Object.fromEntries(AGENT_NAMES.map((agent) => [agent, "unknown"])) as SandboxRecord["agents"],
       token: input.token,
       createdAt: now,
       updatedAt: now,
@@ -175,7 +175,7 @@ export class ServerDaemonNodeBackend implements SandboxBackend {
           codexVerdict: completed.codexVerdict,
           codexFeedback: completed.codexFeedback,
         });
-        if (assignment.agent === "codex" && mode === "review" && completed.codexVerdict !== "approved") {
+        if (isReviewAssignment(assignment.agent, mode) && completed.codexVerdict !== "approved") {
           const outcome = completed.codexVerdict === "rejected"
             ? "Codex rejected the work."
             : "Codex review did not approve the work.";
@@ -225,6 +225,6 @@ async function failSessionIfOpen(store: SessionStore, sessionId: string, outcome
 }
 
 function agentsReadyInSandbox(sandbox: SandboxRecord): AgentName[] {
-  return (["claude", "pi", "codex"] as const).filter((agent) => sandbox.agents[agent] === "ready");
+  return AGENT_NAMES.filter((agent) => sandbox.agents[agent] === "ready");
 }
 

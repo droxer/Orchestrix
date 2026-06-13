@@ -57,7 +57,11 @@ export function guestAgentEnv(hostWorkspace?: string | null): Array<[string, str
   }
   pushEnv(env, "OPENAI_BASE_URL", openaiBaseUrl());
   pushEnv(env, "OPENAI_MODEL", openaiModel());
-  for (const key of ["PI_API_KEY", "PI_BASE_URL", "PI_MODEL", "PI_PROVIDER", "PI_API"]) {
+  for (const key of [
+    "PI_API_KEY", "PI_BASE_URL", "PI_MODEL", "PI_PROVIDER", "PI_API",
+    "KIMI_API_KEY", "KIMI_BASE_URL", "KIMI_MODEL",
+    "MOONSHOT_API_KEY", "MOONSHOT_BASE_URL", "MOONSHOT_MODEL",
+  ]) {
     const value = process.env[key];
     if (value) env.push([key, value]);
   }

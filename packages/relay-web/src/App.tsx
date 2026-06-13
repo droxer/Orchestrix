@@ -29,12 +29,15 @@ import { useRelayData } from "./hooks/useRelayData";
 import { mergeVisibleDaemonNodes, shouldClaimLocalDaemonNode } from "./lib/daemonNodes";
 import "./i18n";
 
-const agents: AgentName[] = ["claude", "pi", "codex"];
+// Mirrors AGENT_REGISTRY in relay-core. Kept as a local literal so the browser
+// bundle never imports relay-backend's node-only runtime; the Record<AgentName, …>
+// types below fail to compile if this drifts from the AgentName union.
+const agents: AgentName[] = ["claude", "pi", "codex", "kimi"];
 const tokenStorageKey = "relay-web.tokens";
 const selectedEmployeeKey = "relay-web.selectedEmployee";
 const themeStorageKey = "relay-web.theme";
 const languageStorageKey = "relay-web.language";
-const AGENT_INITIALS: Record<AgentName, string> = { claude: "C", pi: "π", codex: "X" };
+const AGENT_INITIALS: Record<AgentName, string> = { claude: "C", pi: "π", codex: "X", kimi: "K" };
 
 function defaultModeForAgent(agent: AgentName): CodexTaskMode {
   return agent === "codex" ? "review" : "implement";
@@ -234,6 +237,7 @@ export function App() {
     claude: { role: t("agent.claude.role"), blurb: t("agent.claude.blurb") },
     pi: { role: t("agent.pi.role"), blurb: t("agent.pi.blurb") },
     codex: { role: t("agent.codex.role"), blurb: t("agent.codex.blurb") },
+    kimi: { role: t("agent.kimi.role"), blurb: t("agent.kimi.blurb") },
   }), [t]);
 
   useEffect(() => {
@@ -486,7 +490,7 @@ export function App() {
       setStatus({ tone: "warn", message: t("toast.no_node_selected") });
       return;
     }
-    const mm = /^@(claude|pi|codex)(?:\s+|$)/i.exec(raw);
+    const mm = new RegExp(`^@(${agents.join("|")})(?:\\s+|$)`, "i").exec(raw);
     const routedAgent: AgentName = (mm?.[1].toLowerCase() as AgentName | undefined) ?? activeAgent;
     const goal = mm ? raw.slice(mm[0].length).trim() : raw;
     if (!goal) { setStatus({ tone: "warn", message: t("toast.add_task", { agent: routedAgent }) }); return; }

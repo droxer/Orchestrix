@@ -17,6 +17,7 @@ import {
 } from "./task.js";
 import { SessionController, type WorkflowStep } from "./controller.js";
 import { createPostgresStoreSet } from "./postgres-store.js";
+import { agentNameList, isAgentName } from "relay-core";
 import type { AgentName, CodexTaskMode } from "relay-core";
 
 const MAX_BODY_BYTES = 10 * 1024 * 1024;
@@ -204,7 +205,7 @@ async function updateTaskResponse(taskStore: TaskStore, taskId: string, body: un
 async function assignTaskResponse(taskStore: TaskStore, taskId: string, body: unknown): Promise<RelayApiResponse> {
   const input = asRecord(body);
   const agent = agentName(input.agent);
-  if (!agent) return jsonResponse(400, { error: "agent must be claude, pi, or codex." });
+  if (!agent) return jsonResponse(400, { error: `agent must be one of: ${agentNameList()}.` });
   return jsonResponse(200, await taskStore.assignTask(taskId, agent));
 }
 
@@ -212,7 +213,7 @@ async function pickupTaskResponse(store: SessionStore, taskStore: TaskStore, tas
   const input = asRecord(body);
   const current = await taskStore.getTask(taskId);
   const agent = agentName(input.agent) ?? current.assignedAgent;
-  if (!agent) return jsonResponse(400, { error: "agent must be claude, pi, or codex." });
+  if (!agent) return jsonResponse(400, { error: `agent must be one of: ${agentNameList()}.` });
   let task = current.assignedAgent === agent ? current : await taskStore.assignTask(taskId, agent);
   if (task.status !== "assigned") {
     task = await taskStore.appendEvent(taskId, relayTaskEvent("task.status", taskId, { status: "assigned" }));
@@ -266,7 +267,7 @@ async function decisionResponse(store: SessionStore, taskStore: TaskStore, sessi
 async function handoffResponse(store: SessionStore, taskStore: TaskStore, sessionId: string, body: unknown): Promise<RelayApiResponse> {
   const input = asRecord(body);
   const targetAgent = agentName(input.targetAgent);
-  if (!targetAgent) return jsonResponse(400, { error: "targetAgent must be claude, pi, or codex." });
+  if (!targetAgent) return jsonResponse(400, { error: `targetAgent must be one of: ${agentNameList()}.` });
   const mode = input.mode === "review" || targetAgent === "codex" && input.mode !== "implement" ? "review" : "implement";
   const controller = new SessionController(store, { taskStore });
   const session = await controller.handoffSession(sessionId, targetAgent, [{ agent: targetAgent, mode, role: roleName(input.role) }], stringField(input, "note") || undefined);
@@ -309,7 +310,7 @@ function assignmentList(value: unknown): WorkflowStep[] {
 }
 
 function agentName(value: unknown): AgentName | undefined {
-  return value === "claude" || value === "pi" || value === "codex" ? value : undefined;
+  return isAgentName(value) ? value : undefined;
 }
 
 function roleName(value: unknown): AgentRole | undefined {

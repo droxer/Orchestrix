@@ -1,23 +1,19 @@
 import type { AgentOutputSink } from "./format.js";
 
-export type AgentName = "claude" | "pi" | "codex";
+export type AgentName = "claude" | "pi" | "codex" | "kimi";
 export type CodexTaskMode = "implement" | "review";
 export type CodexReviewVerdict = "approved" | "rejected" | "failed";
 export type { AgentOutputSink };
 
 export const AGENT_USER = "agent";
 export const GUEST_WORKSPACE = "/workspace";
-export const MAX_CLAUDE_FAILURES = 3;
-export const MAX_PI_FAILURES = 2;
-export const MAX_CODEX_FAILURES = 2;
 
 export interface AgentState {
   task_goal: string;
   agent_logs: string[];
   last_exit_code: number;
-  claude_failures: number;
-  pi_failures: number;
-  codex_failures: number;
+  /** Per-agent consecutive failure counts; absent entries mean zero. */
+  agent_failures: Partial<Record<AgentName, number>>;
   codex_verdict: CodexReviewVerdict | "";
   codex_feedback: string;
 }
@@ -74,9 +70,7 @@ export function initialAgentState(taskGoal: string): AgentState {
     task_goal: taskGoal,
     agent_logs: [],
     last_exit_code: 0,
-    claude_failures: 0,
-    pi_failures: 0,
-    codex_failures: 0,
+    agent_failures: {},
     codex_verdict: "",
     codex_feedback: "",
   };
@@ -87,9 +81,19 @@ export function mergeAgentState(state: AgentState, patch: Partial<AgentState>): 
     ...state,
     ...patch,
     agent_logs: [...state.agent_logs, ...(patch.agent_logs ?? [])],
+    agent_failures: { ...state.agent_failures, ...(patch.agent_failures ?? {}) },
   };
 }
 
 export function nextFailureCount(failed: boolean, currentCount: number): number {
   return failed ? currentCount + 1 : 0;
+}
+
+export function failureCount(state: AgentState, agent: AgentName): number {
+  return state.agent_failures[agent] ?? 0;
+}
+
+/** Returns the next per-agent failure map after a run: incremented on failure, reset to 0 on success. */
+export function withFailure(state: AgentState, agent: AgentName, failed: boolean): Partial<Record<AgentName, number>> {
+  return { ...state.agent_failures, [agent]: nextFailureCount(failed, failureCount(state, agent)) };
 }

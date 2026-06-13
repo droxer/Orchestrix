@@ -1,20 +1,22 @@
-import { emitOrPrint, status } from "relay-core";
+import { emitOrPrint, failureCount, getAgent, status } from "relay-core";
 import {
-  MAX_CLAUDE_FAILURES,
-  MAX_CODEX_FAILURES,
-  MAX_PI_FAILURES,
   type AgentOutputSink,
   type AgentState,
 } from "relay-core";
 
 export type Route = "claude_implement" | "pi_implement" | "codex_review" | "__end__";
 
+const MAX_CLAUDE_FAILURES = getAgent("claude").maxFailures;
+const MAX_PI_FAILURES = getAgent("pi").maxFailures;
+const MAX_CODEX_FAILURES = getAgent("codex").maxFailures;
+
 export function routeClaudeHandoff(state: AgentState, sink?: AgentOutputSink): Route {
   if (state.last_exit_code === 0) {
     return "pi_implement";
   }
-  if (state.claude_failures < MAX_CLAUDE_FAILURES) {
-    emitOrPrint(sink, status("warn", `Claude failed with exit ${state.last_exit_code}; retry ${state.claude_failures}/${MAX_CLAUDE_FAILURES}.`));
+  const failures = failureCount(state, "claude");
+  if (failures < MAX_CLAUDE_FAILURES) {
+    emitOrPrint(sink, status("warn", `Claude failed with exit ${state.last_exit_code}; retry ${failures}/${MAX_CLAUDE_FAILURES}.`));
     return "claude_implement";
   }
   emitOrPrint(sink, status("error", `Claude failed ${MAX_CLAUDE_FAILURES} times; halting.`));
@@ -25,8 +27,9 @@ export function routePiHandoff(state: AgentState, sink?: AgentOutputSink): Route
   if (state.last_exit_code === 0) {
     return "codex_review";
   }
-  if (state.pi_failures < MAX_PI_FAILURES) {
-    emitOrPrint(sink, status("warn", `Pi failed with exit ${state.last_exit_code}; retry ${state.pi_failures}/${MAX_PI_FAILURES}.`));
+  const failures = failureCount(state, "pi");
+  if (failures < MAX_PI_FAILURES) {
+    emitOrPrint(sink, status("warn", `Pi failed with exit ${state.last_exit_code}; retry ${failures}/${MAX_PI_FAILURES}.`));
     return "pi_implement";
   }
   emitOrPrint(sink, status("error", `Pi failed ${MAX_PI_FAILURES} times; halting.`));
@@ -43,11 +46,12 @@ export function routeCodexHandoff(state: AgentState, sink?: AgentOutputSink): Ro
     emitOrPrint(sink, status("warn", "Codex rejected the change; handing feedback back to Claude."));
     return "claude_implement";
   }
-  if (state.codex_failures < MAX_CODEX_FAILURES) {
+  const failures = failureCount(state, "codex");
+  if (failures < MAX_CODEX_FAILURES) {
     const reason = state.last_exit_code === 0
       ? "Codex review did not produce a valid verdict"
       : `Codex review failed with exit ${state.last_exit_code}`;
-    emitOrPrint(sink, status("warn", `${reason}; retry ${state.codex_failures}/${MAX_CODEX_FAILURES}.`));
+    emitOrPrint(sink, status("warn", `${reason}; retry ${failures}/${MAX_CODEX_FAILURES}.`));
     return "codex_review";
   }
   emitOrPrint(sink, status("error", `Codex review failed ${MAX_CODEX_FAILURES} times; halting.`));

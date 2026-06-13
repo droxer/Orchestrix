@@ -171,7 +171,7 @@ describePostgres("Relay Postgres store contracts", () => {
       employeeId: "contract",
       workspacePath: "/workspace/contract",
       status: "ready",
-      agents: { claude: "ready", pi: "unknown", codex: "ready" },
+      agents: { claude: "ready", pi: "unknown", codex: "ready", kimi: "unknown" },
       token: undefined,
       tokenHash: "sha256:test",
       createdAt: new Date().toISOString(),

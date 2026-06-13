@@ -32,3 +32,7 @@ export function claudeTaskPrompt(state: AgentState): string {
 export function piTaskPrompt(state: AgentState): string {
   return appendCodexFeedback(state.task_goal, state);
 }
+
+export function kimiTaskPrompt(state: AgentState): string {
+  return appendCodexFeedback(state.task_goal, state);
+}

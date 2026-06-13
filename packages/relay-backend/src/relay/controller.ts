@@ -1,8 +1,6 @@
 import {
-  claudeImplementNode,
-  codexImplementNode,
-  codexReviewNode,
-  piImplementNode,
+  getAgent,
+  runAgentNode,
 } from "relay-core";
 import { routeClaudeHandoff, routeCodexHandoff, routePiHandoff, type Route } from "./routing.js";
 import {
@@ -48,9 +46,14 @@ export interface SessionControllerOptions {
   onUpdate?: (session: RelaySession) => void;
 }
 
+/** A review-mode assignment given to a review-capable agent (today only Codex). */
+export function isReviewAssignment(agent: AgentName, mode: CodexTaskMode): boolean {
+  return mode === "review" && getAgent(agent).capabilities.review;
+}
+
 export function assignmentSucceeded(step: WorkflowStep, state: AgentState): boolean {
   if (state.last_exit_code !== 0) return false;
-  if (step.agent === "codex" && step.mode === "review") return state.codex_verdict === "approved";
+  if (isReviewAssignment(step.agent, step.mode)) return state.codex_verdict === "approved";
   return true;
 }
 
@@ -58,7 +61,7 @@ export function assignmentFailureOutcome(step: WorkflowStep, state: AgentState):
   if (state.last_exit_code !== 0) {
     return `${step.agent} ${step.mode} failed with exit code ${state.last_exit_code}.`;
   }
-  if (step.agent === "codex" && step.mode === "review") {
+  if (isReviewAssignment(step.agent, step.mode)) {
     if (state.codex_verdict === "rejected") return "Codex rejected the work.";
     return "Codex review did not approve the work.";
   }
@@ -263,7 +266,7 @@ export class SessionController implements AgentEventSink {
       agent_logs: [input.agentLog],
       last_exit_code: input.exitCode,
     };
-    if (input.agent === "codex" && input.mode === "review") {
+    if (isReviewAssignment(input.agent, input.mode)) {
       statePatch.codex_verdict = input.codexVerdict ?? "";
       statePatch.codex_feedback = input.codexFeedback ?? "";
     }
@@ -293,7 +296,7 @@ export class SessionController implements AgentEventSink {
         sessionId,
       });
     }
-    if (input.agent === "codex" && input.mode === "review") {
+    if (isReviewAssignment(input.agent, input.mode)) {
       const verdict = input.codexVerdict || "failed";
       await this.append(sessionId, relayEvent("review.verdict", sessionId, {
         runId: input.runId,
@@ -341,15 +344,7 @@ export class SessionController implements AgentEventSink {
 
     let patch: Partial<AgentState>;
     try {
-      if (step.agent === "claude") {
-        patch = await claudeImplementNode(state, runOptions);
-      } else if (step.agent === "pi") {
-        patch = await piImplementNode(state, runOptions);
-      } else if (step.mode === "review") {
-        patch = await codexReviewNode(state, runOptions);
-      } else {
-        patch = await codexImplementNode(state, runOptions);
-      }
+      patch = await runAgentNode(step.agent, step.mode, state, runOptions);
     } catch (error) {
       const status = runOptions.signal?.aborted ? "cancelled" : "failed";
       await this.waitForPendingOutputWrites();
@@ -396,7 +391,7 @@ export class SessionController implements AgentEventSink {
         sessionId,
       });
     }
-    if (step.agent === "codex" && step.mode === "review") {
+    if (isReviewAssignment(step.agent, step.mode)) {
       await this.append(sessionId, relayEvent("review.verdict", sessionId, {
         runId,
         verdict: next.codex_verdict || "failed",

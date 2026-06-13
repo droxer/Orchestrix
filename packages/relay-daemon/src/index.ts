@@ -14,10 +14,9 @@ import type {
 import { startOrchestratorSession, ensureAgentReady as ensureSandboxAgentReady, type ActiveOrchestratorSession } from "./sandbox-session.js";
 import { defaultExecutionManager } from "./execution.js";
 import {
-  claudeImplementNode,
-  codexImplementNode,
-  codexReviewNode,
-  piImplementNode,
+  AGENT_NAMES,
+  getAgent,
+  runAgentNode,
   initialAgentState,
   mergeAgentState,
   guestCodexAuthJson,
@@ -122,7 +121,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
     token,
     workspacePath,
     protocolVersion: DAEMON_NODE_PROTOCOL_VERSION,
-    supportedAgents: ["claude", "pi", "codex"],
+    supportedAgents: AGENT_NAMES,
     status: activeRuns.size > 0 ? "busy" : "ready",
   });
   const register = (): Promise<void> =>
@@ -270,13 +269,7 @@ async function executeCommand(
     agent: command.agent,
     signal,
   };
-  const patch = command.agent === "claude"
-    ? await claudeImplementNode(state, options)
-    : command.agent === "pi"
-      ? await piImplementNode(state, options)
-      : command.mode === "review"
-        ? await codexReviewNode(state, options)
-        : await codexImplementNode(state, options);
+  const patch = await runAgentNode(command.agent, command.mode, state, options);
   const next = mergeAgentState(state, patch);
   await outputPostChain;
   if (signal?.aborted) {

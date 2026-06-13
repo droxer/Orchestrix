@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, appendFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 
-import { REPO_ROOT } from "relay-core";
+import { REPO_ROOT, getAgent } from "relay-core";
 import type { AgentName, CodexReviewVerdict } from "relay-core";
 
 export type AgentRole = "implementer" | "reviewer" | "planner" | "tester" | "fixer";
@@ -184,9 +184,7 @@ export function newRelayId(prefix: string): string {
 
 export function roleForAgent(agent: AgentName, mode: "implement" | "review" = "implement"): AgentRole {
   if (mode === "review") return "reviewer";
-  if (agent === "codex") return "implementer";
-  if (agent === "pi") return "tester";
-  return "implementer";
+  return getAgent(agent).implementRole;
 }
 
 export class LocalSessionStore implements SessionStore {

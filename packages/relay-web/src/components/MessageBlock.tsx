@@ -49,7 +49,7 @@ function formatTime(value: string): string {
   }).format(new Date(value));
 }
 
-const AGENT_INITIALS: Record<AgentName, string> = { claude: "C", pi: "π", codex: "X" };
+const AGENT_INITIALS: Record<AgentName, string> = { claude: "C", pi: "π", codex: "X", kimi: "K" };
 
 function AgentAvatarIcon({ agent }: { agent: AgentName }) {
   return (
