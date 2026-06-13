@@ -85,9 +85,16 @@ export class ServerDaemonNodeBackend implements SandboxBackend {
     if (!sandbox) throw new Error(`Sandbox ${sandboxId} has no registered daemon node.`);
     if (sandbox.status !== "ready") throw new Error(`Sandbox ${sandboxId} daemon node is not ready.`);
     if (!await this.registry.isLive(sandboxId)) throw new Error(`Sandbox ${sandboxId} daemon node heartbeat expired.`);
+    // Authorization seam: an employee's agent may only act on sessions its
+    // employee owns. This is the single checkpoint the future MCP Gateway /
+    // policy engine will extend (task scope, tool policy, approval rules).
+    if (request.sessionId) {
+      await assertSessionOwnedByEmployee(this.registry.store, request.sessionId, sandbox.employeeId);
+    }
     await this.registry.updateStatus(sandboxId, { status: "running", lastError: undefined });
     const controller = new SessionController(this.registry.store, {
       workspacePath: sandbox.workspacePath,
+      ownerEmployeeId: sandbox.employeeId,
     });
     const resolvedSessionId = request.sessionId ?? (await controller.createSession(
       request.taskGoal,
@@ -226,5 +233,29 @@ async function failSessionIfOpen(store: SessionStore, sessionId: string, outcome
 
 function agentsReadyInSandbox(sandbox: SandboxRecord): AgentName[] {
   return AGENT_NAMES.filter((agent) => sandbox.agents[agent] === "ready");
+}
+
+/**
+ * Reject a run that targets an existing session owned by a different employee.
+ * Legacy sessions without an owner are allowed (they pre-date ownership), and
+ * the first employee to act on such a session is not retroactively bound here.
+ */
+export async function assertSessionOwnedByEmployee(
+  store: SessionStore,
+  sessionId: string,
+  employeeId: string,
+): Promise<void> {
+  let session: RelaySession;
+  try {
+    session = await store.getSession(sessionId);
+  } catch {
+    // Unknown session id: let the normal run path surface the error.
+    return;
+  }
+  if (session.ownerEmployeeId && session.ownerEmployeeId !== employeeId) {
+    throw new Error(
+      `Session ${sessionId} is owned by ${session.ownerEmployeeId}; ${employeeId} is not authorized to run it.`,
+    );
+  }
 }
 

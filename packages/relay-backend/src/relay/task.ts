@@ -21,6 +21,8 @@ export interface RelayTask {
   description: string;
   priority: TaskPriority;
   status: TaskStatus;
+  /** Employee who owns this task; their agent carries it out on their behalf. */
+  ownerEmployeeId?: string;
   assignedAgent?: AgentName;
   linkedSessionIds: string[];
   activity: RelayTaskActivity[];
@@ -38,6 +40,7 @@ export type RelayTaskEvent =
       title: string;
       description: string;
       priority: TaskPriority;
+      ownerEmployeeId?: string;
     }
   | {
       id: string;
@@ -85,6 +88,7 @@ export interface TaskStore {
     priority?: TaskPriority;
     status?: TaskStatus;
     assignedAgent?: AgentName;
+    ownerEmployeeId?: string;
   }): Promise<RelayTask>;
   appendEvent(taskId: string, event: RelayTaskEvent): Promise<RelayTask>;
   getTask(taskId: string): Promise<RelayTask>;
@@ -109,6 +113,7 @@ export class LocalTaskStore implements TaskStore {
     priority?: TaskPriority;
     status?: TaskStatus;
     assignedAgent?: AgentName;
+    ownerEmployeeId?: string;
   }): Promise<RelayTask> {
     const taskId = newRelayId("task");
     const dir = this.taskDir(taskId);
@@ -118,6 +123,7 @@ export class LocalTaskStore implements TaskStore {
         title: input.title,
         description: input.description ?? "",
         priority: input.priority ?? "normal",
+        ...(input.ownerEmployeeId ? { ownerEmployeeId: input.ownerEmployeeId } : {}),
       }),
     ];
     if (input.assignedAgent) {
@@ -251,6 +257,7 @@ export function materializeTaskEvents(events: RelayTaskEvent[]): RelayTask {
     title: created.title,
     description: created.description,
     priority: created.priority,
+    ...(created.ownerEmployeeId ? { ownerEmployeeId: created.ownerEmployeeId } : {}),
     status: "backlog",
     linkedSessionIds: [],
     activity: [],

@@ -50,6 +50,7 @@ Relay splits into a **backend** (control plane) and **daemons** (execution plane
 ### Key invariants
 
 - **The backend never executes agents.** All agent execution flows through daemon commands (`ServerDaemonNodeBackend.run` → registry queue → daemon poll). Do not reintroduce in-process execution paths into `relay-backend`.
+- **Sessions and tasks carry an owner.** `RelaySession.ownerEmployeeId` / `RelayTask.ownerEmployeeId` (set from the `session.created` / `task.created` events) attribute work to the employee whose agent runs it; `HumanDecision.actorEmployeeId` records who approved/rejected/handed off. `ServerDaemonNodeBackend.run` threads the sandbox's `employeeId` into the owner, and `assertSessionOwnedByEmployee` is the authorization seam — an employee's agent may only act on sessions its employee owns (ownerless legacy sessions are allowed). This is where the future task-scope / tool-policy / approval checks belong; keep it the single checkpoint rather than scattering ownership checks.
 - **Event log is authoritative.** All session/task state changes go through `SessionStore.appendEvent` / `TaskStore.appendEvent`. Snapshots are derived. Never mutate snapshot fields directly outside the store's replay.
 - **Immutability.** Session/task mutations return new objects (`mergeAgentState`, spread updates). Existing pattern; preserve it.
 - **One controller per assignment flow.** The TUI creates a fresh `SessionController` per task; the controller owns the active session id and the `AgentEventSink` wiring back to the store.

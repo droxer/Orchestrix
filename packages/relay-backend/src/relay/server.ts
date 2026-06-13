@@ -158,10 +158,12 @@ async function createTaskResponse(store: SessionStore, taskStore: TaskStore, bod
   const input = asRecord(body);
   const title = stringField(input, "title") || stringField(input, "taskGoal");
   if (!title) return jsonResponse(400, { error: "title is required." });
+  const ownerEmployeeId = stringField(input, "ownerEmployeeId") || stringField(input, "employeeId") || undefined;
   let task = await taskStore.createTask({
     title,
     description: stringField(input, "description"),
     priority: taskPriority(input.priority) ?? "normal",
+    ownerEmployeeId,
   });
   const agent = agentName(input.assignedAgent);
   if (agent) {
@@ -169,7 +171,7 @@ async function createTaskResponse(store: SessionStore, taskStore: TaskStore, bod
   }
   if (input.createSession === true || Array.isArray(input.assignments)) {
     const workspacePath = stringField(input, "workspacePath") || "/workspace";
-    const controller = new SessionController(store, { taskStore, taskId: task.id, workspacePath });
+    const controller = new SessionController(store, { taskStore, taskId: task.id, workspacePath, ownerEmployeeId });
     const session = await controller.createSession(
       task.description ? `${task.title}\n\n${task.description}` : task.title,
       [...new Set(["human", ...(Array.isArray(input.assignments) ? input.assignments.map((item: unknown) => agentName(asRecord(item).agent)) : agent ? [agent] : []).filter(Boolean)])] as string[],
@@ -238,7 +240,8 @@ async function createSessionResponse(store: SessionStore, taskStore: TaskStore, 
   const assignments = assignmentList(input.assignments);
   const participants = ["human", ...assignments.map((assignment) => assignment.agent)];
   const workspacePath = stringField(input, "workspacePath") || "/workspace";
-  const controller = new SessionController(store, { taskStore, taskId: typeof input.taskId === "string" ? input.taskId : undefined, workspacePath });
+  const ownerEmployeeId = stringField(input, "ownerEmployeeId") || stringField(input, "employeeId") || undefined;
+  const controller = new SessionController(store, { taskStore, taskId: typeof input.taskId === "string" ? input.taskId : undefined, workspacePath, ownerEmployeeId });
   const session = await controller.createSession(taskGoal, [...new Set(participants)], true);
   if (assignments.length > 0) {
     await controller.assignSession(session.id, assignments);

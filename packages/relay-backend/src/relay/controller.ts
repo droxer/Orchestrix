@@ -40,6 +40,7 @@ export interface SessionControllerOptions {
   taskStore?: TaskStore;
   taskId?: string;
   workspacePath?: string;
+  ownerEmployeeId?: string;
   sink?: AgentOutputSink;
   signal?: AbortSignal;
   execStream?: AgentRunOptions["execStream"];
@@ -80,6 +81,7 @@ export class SessionController implements AgentEventSink {
   async createSession(taskGoal: string, participants: string[] = ["human"], pendingStart = false): Promise<RelaySession> {
     const session = await this.store.createSession({
       workspacePath: this.options.workspacePath ?? GUEST_WORKSPACE,
+      ownerEmployeeId: this.options.ownerEmployeeId,
       taskGoal,
       participants,
       status: pendingStart ? "pending_approval" : "running",
@@ -116,6 +118,7 @@ export class SessionController implements AgentEventSink {
         kind: "cancel",
         createdAt: new Date().toISOString(),
         note,
+        ...(this.options.ownerEmployeeId ? { actorEmployeeId: this.options.ownerEmployeeId } : {}),
       },
     }));
     await this.updateTaskStatus("blocked", note, { sessionId });
@@ -129,6 +132,7 @@ export class SessionController implements AgentEventSink {
       createdAt: new Date().toISOString(),
       note,
       targetAgent,
+      ...(this.options.ownerEmployeeId ? { actorEmployeeId: this.options.ownerEmployeeId } : {}),
     };
     await this.append(sessionId, relayEvent("human.decision", sessionId, { decision }));
     if (kind === "approve") {
@@ -173,6 +177,7 @@ export class SessionController implements AgentEventSink {
       createdAt: new Date().toISOString(),
       note,
       targetAgent,
+      ...(this.options.ownerEmployeeId ? { actorEmployeeId: this.options.ownerEmployeeId } : {}),
     };
     await this.append(sessionId, relayEvent("human.decision", sessionId, { decision }));
     await this.assignSession(sessionId, assignments);

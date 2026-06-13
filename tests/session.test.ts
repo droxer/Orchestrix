@@ -14,6 +14,7 @@ import {
   LocalTaskStore,
   DaemonNodeRegistry,
   ServerDaemonNodeBackend,
+  assertSessionOwnedByEmployee,
   SessionController,
   handleRelayDaemonRequest,
   handleRelayApiRequest,
@@ -99,6 +100,7 @@ class FakeSandboxBackend implements SandboxBackend {
     if (!sandbox) throw new Error("Sandbox not found.");
     const controller = new SessionController(this.store, {
       workspacePath: sandbox.workspacePath,
+      ownerEmployeeId: sandbox.employeeId,
       execStream: async (_cmd, _args, options) => {
         const stdout = JSON.stringify({
           type: "item.completed",
@@ -714,6 +716,7 @@ describe("Relay daemon API", () => {
     }, undefined, "tok_alice")).body);
     assert.equal(run.status, "completed");
     assert.equal(run.workspacePath, "/workspace/alice");
+    assert.equal(run.ownerEmployeeId, "alice");
     assert.equal(run.agentRuns[0].agent, "codex");
   });
 
@@ -1900,5 +1903,40 @@ describe("Relay daemon API", () => {
     assert.equal(matched.status, "ready");
     assert.equal(detail.status, 200);
     assert.equal(body.workspacePath, "/workspace/live");
+  });
+});
+
+describe("session ownership and authorization", () => {
+  it("records the owning employee on a session created with an owner", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "relay-owner-"));
+    const store = new LocalSessionStore(dir);
+    const controller = new SessionController(store, { workspacePath: "/workspace/alice", ownerEmployeeId: "alice" });
+    const session = await controller.createSession("ship feature");
+    assert.equal(session.ownerEmployeeId, "alice");
+    // Owner survives a fresh store reading the persisted event log.
+    const reloaded = await new LocalSessionStore(dir).getSession(session.id);
+    assert.equal(reloaded.ownerEmployeeId, "alice");
+  });
+
+  it("attributes human decisions to the session owner", async () => {
+    const store = new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-actor-")));
+    const controller = new SessionController(store, { workspacePath: "/workspace/bob", ownerEmployeeId: "bob" });
+    const session = await controller.createSession("review change", ["human", "codex"], true);
+    const updated = await controller.recordDecision(session.id, "approve", "looks good");
+    const decision = updated.decisions.find((item) => item.kind === "approve");
+    assert.equal(decision?.actorEmployeeId, "bob");
+  });
+
+  it("rejects a run that targets a session owned by another employee", async () => {
+    const store = new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-authz-")));
+    const owned = await store.createSession({ workspacePath: "/workspace/alice", ownerEmployeeId: "alice", taskGoal: "alice work" });
+    await assert.rejects(
+      () => assertSessionOwnedByEmployee(store, owned.id, "mallory"),
+      /owned by alice/,
+    );
+    // Same owner and legacy ownerless sessions are allowed.
+    await assertSessionOwnedByEmployee(store, owned.id, "alice");
+    const legacy = await store.createSession({ workspacePath: "/workspace/x", taskGoal: "legacy" });
+    await assertSessionOwnedByEmployee(store, legacy.id, "anyone");
   });
 });

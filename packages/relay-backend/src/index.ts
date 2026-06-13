@@ -120,6 +120,7 @@ export {
   requireDatabaseUrl,
   DaemonNodeRegistry,
   ServerDaemonNodeBackend,
+  assertSessionOwnedByEmployee,
   createRelayDaemonRuntime,
   handleRelayDaemonRequest,
   routeDaemonRequest,

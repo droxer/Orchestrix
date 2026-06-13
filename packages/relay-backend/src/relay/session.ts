@@ -37,11 +37,15 @@ export interface HumanDecision {
   createdAt: string;
   note?: string;
   targetAgent?: AgentName;
+  /** Employee who made the decision, for governance/audit attribution. */
+  actorEmployeeId?: string;
 }
 
 export interface RelaySession {
   id: string;
   workspacePath: string;
+  /** Employee who owns this session; their agent runs the work on their behalf. */
+  ownerEmployeeId?: string;
   taskGoal: string;
   participants: string[];
   status: SessionStatus;
@@ -65,6 +69,7 @@ export type RelayEvent =
       sessionId: string;
       timestamp: string;
       workspacePath: string;
+      ownerEmployeeId?: string;
       taskGoal: string;
       participants: string[];
     }
@@ -148,6 +153,7 @@ export type RelayEvent =
 export interface SessionStore {
   createSession(input: {
     workspacePath: string;
+    ownerEmployeeId?: string;
     taskGoal: string;
     participants?: string[];
     status?: SessionStatus;
@@ -197,6 +203,7 @@ export class LocalSessionStore implements SessionStore {
 
   async createSession(input: {
     workspacePath: string;
+    ownerEmployeeId?: string;
     taskGoal: string;
     participants?: string[];
     status?: SessionStatus;
@@ -207,6 +214,7 @@ export class LocalSessionStore implements SessionStore {
     mkdirSync(join(dir, "artifacts"), { recursive: true });
     const event = relayEvent("session.created", sessionId, {
       workspacePath: input.workspacePath,
+      ...(input.ownerEmployeeId ? { ownerEmployeeId: input.ownerEmployeeId } : {}),
       taskGoal: input.taskGoal,
       participants: input.participants ?? ["human"],
     });
@@ -332,6 +340,7 @@ export function materializeEvents(events: RelayEvent[]): RelaySession {
   const session: RelaySession = {
     id: created.sessionId,
     workspacePath: created.workspacePath,
+    ...(created.ownerEmployeeId ? { ownerEmployeeId: created.ownerEmployeeId } : {}),
     taskGoal: created.taskGoal,
     participants: created.participants,
     status: "running",
