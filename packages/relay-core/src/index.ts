@@ -93,6 +93,7 @@ export {
 export {
   encodeBase64,
   codexCliConfigOverrides,
+  agentCredentialEnv,
   GUEST_AGENT_SYNC_SCRIPT,
   guestAgentEnv,
   guestCodexAuthJson,

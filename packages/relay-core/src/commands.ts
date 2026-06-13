@@ -13,12 +13,12 @@ import type { AgentState } from "./state.js";
 
 export function buildCodexReviewCommand(state: AgentState): string {
   const argv = [...codexBaseArgv(), codexReviewPrompt(state)];
-  return runAsAgent(shellCommand(argv));
+  return runAsAgent(shellCommand(argv), "codex");
 }
 
 export function buildCodexImplementCommand(state: AgentState): string {
   const argv = [...codexBaseArgv(), codexImplementPrompt(state)];
-  return runAsAgent(shellCommand(argv));
+  return runAsAgent(shellCommand(argv), "codex");
 }
 
 function codexBaseArgv(): string[] {
@@ -61,7 +61,7 @@ export function buildClaudeImplementCommand(state: AgentState): string {
   const model = anthropicModel();
   if (model) argv.push("--model", model);
   argv.push(claudeTaskPrompt(state));
-  return runAsAgent(shellCommand(argv));
+  return runAsAgent(shellCommand(argv), "claude");
 }
 
 export function buildPiImplementCommand(state: AgentState): string {
@@ -77,6 +77,7 @@ export function buildPiImplementCommand(state: AgentState): string {
     "pi --help 2>&1 | grep -Eq '(^|[[:space:]])(-P|--print-streaming)([=,[:space:]]|$)'";
   return runAsAgent(
     `if ${supportsStreamingPrint}; then ${streamingCommand}; else ${printCommand}; fi`,
+    "pi",
   );
 }
 
@@ -87,7 +88,7 @@ export function buildKimiImplementCommand(state: AgentState): string {
   const model = kimiModel();
   if (model) argv.push("--model", model);
   argv.push(kimiTaskPrompt(state));
-  return runAsAgent(shellCommand(argv));
+  return runAsAgent(shellCommand(argv), "kimi");
 }
 
 export function buildPiPreflightCommand(): string {
@@ -109,5 +110,5 @@ export function buildPiPreflightCommand(): string {
   } else {
     modelCheck = shellCommand(listModelsArgv);
   }
-  return runAsAgent(["node --version", "command -v pi", "pi --version", modelCheck].join(" && "));
+  return runAsAgent(["node --version", "command -v pi", "pi --version", modelCheck].join(" && "), "pi");
 }

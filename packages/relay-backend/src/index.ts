@@ -159,6 +159,7 @@ export {
 export {
   encodeBase64,
   codexCliConfigOverrides,
+  agentCredentialEnv,
   guestAgentEnv,
   guestCodexAuthJson,
   guestCodexConfigToml,
