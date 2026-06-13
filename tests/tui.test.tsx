@@ -69,7 +69,7 @@ describe("TUI task parsing", () => {
 
     assert.deepEqual(parsed.assignments, []);
     assert.equal(parsed.task, "fix auth middleware");
-    assert.equal(validateParsedTask(parsed), "Assign the task with @claude, @pi, or @codex.");
+    assert.equal(validateParsedTask(parsed), "Assign the task with @claude, @pi, @codex, @kimi.");
   });
 
   it("applies default assignments only when the task has no leading mention", async () => {

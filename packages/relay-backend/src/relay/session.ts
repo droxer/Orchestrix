@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, appendFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 
-import { REPO_ROOT } from "relay-core";
+import { REPO_ROOT, getAgent } from "relay-core";
 import type { AgentName, CodexReviewVerdict } from "relay-core";
 
 export type AgentRole = "implementer" | "reviewer" | "planner" | "tester" | "fixer";
@@ -37,11 +37,15 @@ export interface HumanDecision {
   createdAt: string;
   note?: string;
   targetAgent?: AgentName;
+  /** Employee who made the decision, for governance/audit attribution. */
+  actorEmployeeId?: string;
 }
 
 export interface RelaySession {
   id: string;
   workspacePath: string;
+  /** Employee who owns this session; their agent runs the work on their behalf. */
+  ownerEmployeeId?: string;
   taskGoal: string;
   participants: string[];
   status: SessionStatus;
@@ -65,6 +69,7 @@ export type RelayEvent =
       sessionId: string;
       timestamp: string;
       workspacePath: string;
+      ownerEmployeeId?: string;
       taskGoal: string;
       participants: string[];
     }
@@ -148,6 +153,7 @@ export type RelayEvent =
 export interface SessionStore {
   createSession(input: {
     workspacePath: string;
+    ownerEmployeeId?: string;
     taskGoal: string;
     participants?: string[];
     status?: SessionStatus;
@@ -184,9 +190,7 @@ export function newRelayId(prefix: string): string {
 
 export function roleForAgent(agent: AgentName, mode: "implement" | "review" = "implement"): AgentRole {
   if (mode === "review") return "reviewer";
-  if (agent === "codex") return "implementer";
-  if (agent === "pi") return "tester";
-  return "implementer";
+  return getAgent(agent).implementRole;
 }
 
 export class LocalSessionStore implements SessionStore {
@@ -199,6 +203,7 @@ export class LocalSessionStore implements SessionStore {
 
   async createSession(input: {
     workspacePath: string;
+    ownerEmployeeId?: string;
     taskGoal: string;
     participants?: string[];
     status?: SessionStatus;
@@ -209,6 +214,7 @@ export class LocalSessionStore implements SessionStore {
     mkdirSync(join(dir, "artifacts"), { recursive: true });
     const event = relayEvent("session.created", sessionId, {
       workspacePath: input.workspacePath,
+      ...(input.ownerEmployeeId ? { ownerEmployeeId: input.ownerEmployeeId } : {}),
       taskGoal: input.taskGoal,
       participants: input.participants ?? ["human"],
     });
@@ -334,6 +340,7 @@ export function materializeEvents(events: RelayEvent[]): RelaySession {
   const session: RelaySession = {
     id: created.sessionId,
     workspacePath: created.workspacePath,
+    ...(created.ownerEmployeeId ? { ownerEmployeeId: created.ownerEmployeeId } : {}),
     taskGoal: created.taskGoal,
     participants: created.participants,
     status: "running",

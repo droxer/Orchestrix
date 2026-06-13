@@ -23,6 +23,9 @@ export {
   anthropicModel,
   hostWorkspaceOwner,
   hostWorkspacePath,
+  kimiApiKey,
+  kimiBaseUrl,
+  kimiModel,
   openaiBaseUrl,
   openaiApiKey,
   openaiModel,
@@ -39,12 +42,11 @@ export {
 export {
   AGENT_USER,
   GUEST_WORKSPACE,
-  MAX_CLAUDE_FAILURES,
-  MAX_CODEX_FAILURES,
-  MAX_PI_FAILURES,
+  failureCount,
   initialAgentState,
   mergeAgentState,
   nextFailureCount,
+  withFailure,
   type AgentEventSink,
   type AgentName,
   type AgentExecutor,
@@ -55,6 +57,17 @@ export {
   type SessionStepRunner,
   type StreamExecResult,
 } from "./state.js";
+
+export {
+  AGENT_NAMES,
+  AGENT_REGISTRY,
+  agentNameList,
+  getAgent,
+  isAgentName,
+  type AgentDefinition,
+  type AgentImplementRole,
+  type StreamRenderer,
+} from "./agents.js";
 
 export {
   DAEMON_NODE_PROTOCOL_VERSION,
@@ -101,6 +114,7 @@ export {
   claudeTaskPrompt,
   codexImplementPrompt,
   codexReviewPrompt,
+  kimiTaskPrompt,
   piTaskPrompt,
 } from "./prompts.js";
 
@@ -108,6 +122,7 @@ export {
   buildClaudeImplementCommand,
   buildCodexImplementCommand,
   buildCodexReviewCommand,
+  buildKimiImplementCommand,
   buildPiImplementCommand,
   buildPiPreflightCommand,
 } from "./commands.js";
@@ -132,4 +147,5 @@ export {
   codexImplementNode,
   codexReviewNode,
   piImplementNode,
+  runAgentNode,
 } from "./nodes.js";

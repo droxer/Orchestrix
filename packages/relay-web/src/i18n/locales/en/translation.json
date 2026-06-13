@@ -205,6 +205,7 @@
   "agent": {
     "claude": { "role": "Builder",  "blurb": "Turns requests into implementation work with methodical context." },
     "pi":     { "role": "Planner",  "blurb": "Explores trade-offs and shapes the next reliable step." },
-    "codex":  { "role": "Reviewer", "blurb": "Reads diffs, checks behavior, and calls out risks." }
+    "codex":  { "role": "Reviewer", "blurb": "Reads diffs, checks behavior, and calls out risks." },
+    "kimi":   { "role": "Builder",  "blurb": "Long-context implementation help from the Kimi agent." }
   }
 }

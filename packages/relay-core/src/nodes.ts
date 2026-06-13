@@ -1,128 +1,85 @@
+import { getAgent } from "./agents.js";
 import { classifyCodexReview, extractCodexFeedback } from "./codex-review.js";
-import {
-  buildClaudeImplementCommand,
-  buildCodexImplementCommand,
-  buildCodexReviewCommand,
-  buildPiImplementCommand,
-} from "./commands.js";
-import { ansi } from "./format.js";
-import {
-  ClaudeStreamRenderer,
-  CodexStreamRenderer,
-  PlainTextStreamRenderer,
-  StderrLineRenderer,
-} from "./renderers.js";
+import { StderrLineRenderer } from "./renderers.js";
 import {
   agentWorkspacePath,
 } from "./guest.js";
 import {
-  nextFailureCount,
+  withFailure,
+  type AgentName,
   type AgentRunOptions,
   type AgentState,
+  type CodexTaskMode,
 } from "./state.js";
 
-export async function claudeImplementNode(state: AgentState, options: AgentRunOptions = {}): Promise<Partial<AgentState>> {
+/**
+ * Run one agent assignment. Command construction, rendering, failure accounting,
+ * and review-verdict parsing are all driven by the agent registry, so adding an
+ * agent never requires a new node function — only a registry entry.
+ */
+export async function runAgentNode(
+  agent: AgentName,
+  mode: CodexTaskMode,
+  state: AgentState,
+  options: AgentRunOptions = {},
+): Promise<Partial<AgentState>> {
+  const def = getAgent(agent);
   const execute = requiredExecStream(options);
-  const renderer = new ClaudeStreamRenderer();
+  const renderer = def.createRenderer(mode);
   const stderrRenderer = new StderrLineRenderer();
   const runId = options.runId;
-  const result = await execute("bash", ["-c", buildClaudeImplementCommand(state)], {
+  const reviewMode = mode === "review" && def.capabilities.review;
+  const command = reviewMode && def.buildReviewCommand
+    ? def.buildReviewCommand(state)
+    : def.buildImplementCommand(state);
+  const result = await execute("bash", ["-c", command], {
     cwd: agentWorkspacePath(),
     stdoutRenderer: (chunk) => {
-      if (runId) options.eventSink?.agentOutput(runId, "claude", "stdout", chunk);
+      if (runId) options.eventSink?.agentOutput(runId, agent, "stdout", chunk);
       return renderer.feed(chunk);
     },
     stderrRenderer: (chunk) => {
-      if (runId) options.eventSink?.agentOutput(runId, "claude", "stderr", chunk);
+      if (runId) options.eventSink?.agentOutput(runId, agent, "stderr", chunk);
       return stderrRenderer.feed(chunk);
     },
     sink: options.sink,
     signal: options.signal,
   });
+
+  if (reviewMode) {
+    const feedback = extractCodexFeedback(result.stdout);
+    const verdict = classifyCodexReview(result.exit_code, feedback);
+    return {
+      agent_logs: [agentResultLog(def.reviewLabel ?? `${def.displayName} Review`, result, 4000)],
+      last_exit_code: result.exit_code,
+      agent_failures: withFailure(state, agent, verdict === "failed"),
+      codex_verdict: verdict,
+      codex_feedback: feedback,
+    };
+  }
+
   return {
-    agent_logs: [agentResultLog("Claude Code", result)],
+    agent_logs: [agentResultLog(def.implementLabel, result)],
     last_exit_code: result.exit_code,
-    claude_failures: nextFailureCount(result.exit_code !== 0, state.claude_failures),
+    agent_failures: withFailure(state, agent, result.exit_code !== 0),
   };
 }
 
-export async function piImplementNode(state: AgentState, options: AgentRunOptions = {}): Promise<Partial<AgentState>> {
-  const execute = requiredExecStream(options);
-  const renderer = new PlainTextStreamRenderer("Pi", ansi.yellow);
-  const stderrRenderer = new StderrLineRenderer();
-  const runId = options.runId;
-  const result = await execute("bash", ["-c", buildPiImplementCommand(state)], {
-    cwd: agentWorkspacePath(),
-    stdoutRenderer: (chunk) => {
-      if (runId) options.eventSink?.agentOutput(runId, "pi", "stdout", chunk);
-      return renderer.feed(chunk);
-    },
-    stderrRenderer: (chunk) => {
-      if (runId) options.eventSink?.agentOutput(runId, "pi", "stderr", chunk);
-      return stderrRenderer.feed(chunk);
-    },
-    sink: options.sink,
-    signal: options.signal,
-  });
-  return {
-    agent_logs: [agentResultLog("Pi", result)],
-    last_exit_code: result.exit_code,
-    pi_failures: nextFailureCount(result.exit_code !== 0, state.pi_failures),
-  };
+// Backwards-compatible thin wrappers around the registry-driven node.
+export function claudeImplementNode(state: AgentState, options: AgentRunOptions = {}): Promise<Partial<AgentState>> {
+  return runAgentNode("claude", "implement", state, options);
 }
 
-export async function codexReviewNode(state: AgentState, options: AgentRunOptions = {}): Promise<Partial<AgentState>> {
-  const execute = requiredExecStream(options);
-  const renderer = new CodexStreamRenderer();
-  const stderrRenderer = new StderrLineRenderer();
-  const runId = options.runId;
-  const result = await execute("bash", ["-c", buildCodexReviewCommand(state)], {
-    cwd: agentWorkspacePath(),
-    stdoutRenderer: (chunk) => {
-      if (runId) options.eventSink?.agentOutput(runId, "codex", "stdout", chunk);
-      return renderer.feed(chunk);
-    },
-    stderrRenderer: (chunk) => {
-      if (runId) options.eventSink?.agentOutput(runId, "codex", "stderr", chunk);
-      return stderrRenderer.feed(chunk);
-    },
-    sink: options.sink,
-    signal: options.signal,
-  });
-  const feedback = extractCodexFeedback(result.stdout);
-  const verdict = classifyCodexReview(result.exit_code, feedback);
-  return {
-    agent_logs: [agentResultLog("Codex Review", result, 4000)],
-    last_exit_code: result.exit_code,
-    codex_failures: nextFailureCount(verdict === "failed", state.codex_failures),
-    codex_verdict: verdict,
-    codex_feedback: feedback,
-  };
+export function piImplementNode(state: AgentState, options: AgentRunOptions = {}): Promise<Partial<AgentState>> {
+  return runAgentNode("pi", "implement", state, options);
 }
 
-export async function codexImplementNode(state: AgentState, options: AgentRunOptions = {}): Promise<Partial<AgentState>> {
-  const execute = requiredExecStream(options);
-  const renderer = new CodexStreamRenderer();
-  const stderrRenderer = new StderrLineRenderer();
-  const runId = options.runId;
-  const result = await execute("bash", ["-c", buildCodexImplementCommand(state)], {
-    cwd: agentWorkspacePath(),
-    stdoutRenderer: (chunk) => {
-      if (runId) options.eventSink?.agentOutput(runId, "codex", "stdout", chunk);
-      return renderer.feed(chunk);
-    },
-    stderrRenderer: (chunk) => {
-      if (runId) options.eventSink?.agentOutput(runId, "codex", "stderr", chunk);
-      return stderrRenderer.feed(chunk);
-    },
-    sink: options.sink,
-    signal: options.signal,
-  });
-  return {
-    agent_logs: [agentResultLog("Codex Implement", result)],
-    last_exit_code: result.exit_code,
-    codex_failures: nextFailureCount(result.exit_code !== 0, state.codex_failures),
-  };
+export function codexImplementNode(state: AgentState, options: AgentRunOptions = {}): Promise<Partial<AgentState>> {
+  return runAgentNode("codex", "implement", state, options);
+}
+
+export function codexReviewNode(state: AgentState, options: AgentRunOptions = {}): Promise<Partial<AgentState>> {
+  return runAgentNode("codex", "review", state, options);
 }
 
 function requiredExecStream(options: AgentRunOptions) {

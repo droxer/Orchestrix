@@ -1,4 +1,5 @@
 import type {
+  AgentName,
   CreateSessionInput,
   ControlPanelDaemonNodesResponse,
   DaemonNodesResponse,
@@ -117,7 +118,7 @@ export function recordDecision(
 
 export function recordHandoff(
   sessionId: string,
-  targetAgent: "claude" | "pi" | "codex",
+  targetAgent: AgentName,
   mode: "implement" | "review",
   note?: string,
   token?: string,

@@ -36,7 +36,7 @@ export {
   requireDatabaseUrl,
 } from "./postgres-store.js";
 export { DaemonNodeRegistry } from "./daemon-registry.js";
-export { ServerDaemonNodeBackend } from "./daemon-backends.js";
+export { ServerDaemonNodeBackend, assertSessionOwnedByEmployee } from "./daemon-backends.js";
 export {
   createRelayDaemonRuntime,
   serveRelayDaemon,

@@ -6,8 +6,8 @@ import {
   DEVBOX_IMAGE,
   GUEST_WORKSPACE,
   ansi,
-  buildPiPreflightCommand,
   emitOrPrint,
+  getAgent,
   guestAgentEnv,
   hostWorkspaceOwner,
   hostWorkspacePath,
@@ -15,7 +15,6 @@ import {
   piBaseUrl,
   piModel,
   piProvider,
-  runAsAgent,
   section,
   setSessionGuestEnv,
   type AgentName,
@@ -63,18 +62,14 @@ export async function ensureAgentReady(
 ): Promise<void> {
   if (readyAgents.has(agent)) return;
   if (signal?.aborted) throw new Error(`${agent} readiness cancelled.`);
-  if (agent === "codex" || agent === "pi") {
+  const def = getAgent(agent);
+  if (def.needsGuestAuth) {
     await executionManager.prepareAgentAuth([agent], signal);
   }
-  const [name, command] = agent === "claude"
-    ? ["Claude Code", runAsAgent("claude --version")]
-    : agent === "codex"
-      ? ["Codex auth", runAsAgent("codex login status")]
-      : ["Pi coding agent", buildPiPreflightCommand()];
-  const result = await executionManager.runShell(command, signal);
+  const result = await executionManager.runShell(def.preflight.command(), signal);
   if (result.exit_code !== 0) {
     const detail = (result.stderr || result.stdout).trim();
-    throw new Error(`${name} preflight failed. ${detail}`);
+    throw new Error(`${def.preflight.label} preflight failed. ${detail}`);
   }
   readyAgents.add(agent);
 }

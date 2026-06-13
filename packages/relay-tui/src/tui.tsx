@@ -10,11 +10,7 @@ import {
   type SessionController,
   type SessionStore,
   GUEST_WORKSPACE,
-  ansi,
-  ClaudeStreamRenderer,
-  CodexStreamRenderer,
   LocalSessionStore,
-  PlainTextStreamRenderer,
   RelayDaemonClient,
   SessionController as RelaySessionController,
   StderrLineRenderer,
@@ -27,7 +23,7 @@ import {
   type SandboxRecord,
   type ControlPanelDaemonNodeRecord,
 } from "relay-backend";
-import { ensureDaemonNodeToken } from "relay-core";
+import { AGENT_NAMES, ensureDaemonNodeToken, getAgent, isAgentName } from "relay-core";
 import { ensureAgentReady, type OrchestratorSession } from "relay-daemon";
 
 export interface ParsedAssignment {
@@ -54,10 +50,12 @@ export interface RunRequest {
 
 export type AssignmentRunner = (request: RunRequest) => Promise<void>;
 
-const leadingMentionPattern = /^@(claude|pi|codex)\b/i;
+const leadingMentionPattern = new RegExp(`^@(${AGENT_NAMES.join("|")})\\b`, "i");
 const MAX_LOG_LINES = 200;
 const VISIBLE_LOG_LINES = 18;
-const AGENT_SHORTCUTS = ["@claude", "@pi", "@codex"] as const;
+const AGENT_SHORTCUTS = AGENT_NAMES.map((agent) => `@${agent}`);
+// "@claude, @pi, @codex, or @kimi" — derived from the registry for user-facing hints.
+const AGENT_MENTION_HINT = AGENT_NAMES.map((agent) => `@${agent}`).join(", ");
 const COMMAND_SHORTCUTS = ["/approve", "/reject", "/cancel", "/rerun", "/handoff", "/sessions", "/open", "/summary", "/quit"] as const;
 const RELAY_ACCENT = "#D97757";
 const RELAY_DIM = "gray";
@@ -107,7 +105,7 @@ export function parseAssignedTask(input: string): ParsedTask {
 
 export function validateParsedTask(parsed: ParsedTask): string | null {
   if (!parsed.task) return "Enter a task after the @mentions.";
-  if (parsed.assignments.length === 0) return "Assign the task with @claude, @pi, or @codex.";
+  if (parsed.assignments.length === 0) return `Assign the task with ${AGENT_MENTION_HINT}.`;
   return null;
 }
 
@@ -158,7 +156,7 @@ export function applyShortcutSelection(input: string, suggestions: ShortcutSugge
 
 export async function runAssignments(request: RunRequest): Promise<void> {
   if (request.assignments.length === 0) {
-    throw new Error("Assign the task with @claude, @pi, or @codex.");
+    throw new Error(`Assign the task with ${AGENT_MENTION_HINT}.`);
   }
   const controller = request.controller ?? new RelaySessionController(undefined, {
     workspacePath: request.workspacePath,
@@ -228,7 +226,7 @@ export function createDaemonAssignmentRunner(
   const renderers = new Map<string, { feed(chunk: string): string }>();
   return async (request) => {
     if (request.assignments.length === 0) {
-      throw new Error("Assign the task with @claude, @pi, or @codex.");
+      throw new Error(`Assign the task with ${AGENT_MENTION_HINT}.`);
     }
     request.log("\nSubmitting task to Relay daemon.\n");
     const assignments = request.assignments.map((assignment) => ({
@@ -450,11 +448,7 @@ function rendererForDaemonOutput(
   if (existing) return existing;
   const renderer = event.stream === "stderr"
     ? new StderrLineRenderer()
-    : event.agent === "claude"
-      ? new ClaudeStreamRenderer()
-      : event.agent === "codex"
-        ? new CodexStreamRenderer()
-        : new PlainTextStreamRenderer("Pi", ansi.yellow);
+    : getAgent(event.agent).createRenderer("implement");
   renderers.set(key, renderer);
   return renderer;
 }
@@ -712,7 +706,7 @@ export function RelayTui({
   const { exit } = useApp();
   const [input, setInput] = useState("");
   const [logLines, setLogLines] = useState<string[]>([
-    "Ready. Type @claude, @pi, or @codex followed by a task.",
+    `Ready. Type ${AGENT_MENTION_HINT} followed by a task.`,
   ]);
   const [currentAgent, setCurrentAgent] = useState("idle");
   const [isRunning, setIsRunning] = useState(false);
@@ -1019,8 +1013,8 @@ export function RelayTui({
     }
     if (name === "/rerun") {
       const agent = detail as AgentName;
-      if (!current || !["claude", "pi", "codex"].includes(agent)) {
-        setMessage("Usage: /rerun <claude|pi|codex>");
+      if (!current || !isAgentName(agent)) {
+        setMessage(`Usage: /rerun <${AGENT_NAMES.join("|")}>`);
         return;
       }
       if (localSessionControl) {
@@ -1034,8 +1028,8 @@ export function RelayTui({
     if (name === "/handoff") {
       const [agentText, ...noteParts] = rest;
       const agent = agentText as AgentName;
-      if (!current || !["claude", "pi", "codex"].includes(agent)) {
-        setMessage("Usage: /handoff <claude|pi|codex> [note]");
+      if (!current || !isAgentName(agent)) {
+        setMessage(`Usage: /handoff <${AGENT_NAMES.join("|")}> [note]`);
         return;
       }
       const note = noteParts.join(" ").trim();
@@ -1436,7 +1430,7 @@ function PromptLine({
       <Text color={RELAY_ACCENT}>{"> "}</Text>
       {visibleInput
         ? <Text>{visibleInput}</Text>
-        : <Text dimColor>type @claude, @pi, or @codex and a task…</Text>}
+        : <Text dimColor>type {AGENT_MENTION_HINT} and a task…</Text>}
     </Text>
   );
 }

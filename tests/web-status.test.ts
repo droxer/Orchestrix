@@ -14,7 +14,7 @@ import type {
 function daemonNode(input: Partial<DaemonNodeMonitorRecord> & { id: string; employeeId: string }): DaemonNodeMonitorRecord {
   return {
     status: "ready",
-    agents: { claude: "ready", pi: "ready", codex: "ready" },
+    agents: { claude: "ready", pi: "ready", codex: "ready", kimi: "unknown" },
     createdAt: "2026-06-12T00:00:00.000Z",
     updatedAt: "2026-06-12T00:00:00.000Z",
     queuedCommandCount: 0,
@@ -52,7 +52,7 @@ describe("Relay web conversation status", () => {
         id: "sbx_alice",
         employeeId: "alice",
         status: "ready",
-        agents: { claude: "ready", pi: "ready", codex: "ready" },
+        agents: { claude: "ready", pi: "ready", codex: "ready", kimi: "unknown" },
         createdAt: "2026-06-12T00:00:00.000Z",
         updatedAt: "2026-06-12T00:00:00.000Z",
         queuedCommandCount: 0,
@@ -70,7 +70,7 @@ describe("Relay web conversation status", () => {
         id: "sbx_alice",
         employeeId: "alice",
         status: "ready",
-        agents: { claude: "ready", pi: "ready", codex: "ready" },
+        agents: { claude: "ready", pi: "ready", codex: "ready", kimi: "unknown" },
         createdAt: "2026-06-12T00:00:00.000Z",
         updatedAt: "2026-06-12T00:00:00.000Z",
         queuedCommandCount: 0,

@@ -1,7 +1,7 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { resolve } from "node:path";
 
-import { DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS } from "relay-core";
+import { AGENT_NAMES, DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS, isAgentName } from "relay-core";
 import type { AgentName, CodexTaskMode, DaemonNodeCommand, DaemonNodeEvent, DaemonNodeRegistration } from "relay-core";
 import {
   DEFAULT_RELAY_DATA_DIR,
@@ -64,11 +64,9 @@ export class DaemonNodeRegistry {
     const nextUiTokenHash = uiToken
       ? hashDaemonNodeToken(uiToken)
       : existing?.uiTokenHash ?? existing?.tokenHash;
-    const agents: SandboxRecord["agents"] = {
-      claude: input.supportedAgents.includes("claude") ? "ready" : "unknown",
-      pi: input.supportedAgents.includes("pi") ? "ready" : "unknown",
-      codex: input.supportedAgents.includes("codex") ? "ready" : "unknown",
-    };
+    const agents = agentStatusRecord((agent) =>
+      input.supportedAgents.includes(agent) ? "ready" : "unknown",
+    );
     const sandbox: SandboxRecord = {
       id: input.sandboxId,
       employeeId: input.employeeId,
@@ -557,11 +555,7 @@ export function sandboxRecord(value: unknown): SandboxRecord | undefined {
     employeeId,
     workspacePath: stringField(input, "workspacePath") || undefined,
     status: sandboxStatus(input.status),
-    agents: {
-      claude: agentStatus(agents.claude),
-      pi: agentStatus(agents.pi),
-      codex: agentStatus(agents.codex),
-    },
+    agents: agentStatusRecord((agent) => agentStatus(agents[agent])),
     token: stringField(input, "token") || undefined,
     tokenHash: stringField(input, "tokenHash") || undefined,
     uiTokenHash: stringField(input, "uiTokenHash") || undefined,
@@ -575,7 +569,13 @@ export function sandboxRecord(value: unknown): SandboxRecord | undefined {
 }
 
 export function agentsReadyInSandbox(sandbox: SandboxRecord): AgentName[] {
-  return (["claude", "pi", "codex"] as const).filter((agent) => sandbox.agents[agent] === "ready");
+  return AGENT_NAMES.filter((agent) => sandbox.agents[agent] === "ready");
+}
+
+function agentStatusRecord(
+  value: (agent: AgentName) => SandboxRecord["agents"][AgentName],
+): SandboxRecord["agents"] {
+  return Object.fromEntries(AGENT_NAMES.map((agent) => [agent, value(agent)])) as SandboxRecord["agents"];
 }
 
 export function publicSandboxRecord(sandbox: SandboxRecord): SandboxRecord {
@@ -602,7 +602,7 @@ export function offlineSandboxRecord(sandbox: SandboxRecord): SandboxRecord {
     ...sandbox,
     token: undefined,
     status: "stopped",
-    agents: { claude: "unknown", pi: "unknown", codex: "unknown" },
+    agents: agentStatusRecord(() => "unknown"),
     updatedAt: new Date().toISOString(),
     lastError: "Waiting for daemon node registration.",
   };
@@ -620,7 +620,7 @@ export function normalizeWorkspacePath(value?: string): string | undefined {
 }
 
 export function agentName(value: unknown): AgentName | undefined {
-  return value === "claude" || value === "pi" || value === "codex" ? value : undefined;
+  return isAgentName(value) ? value : undefined;
 }
 
 export function asRecord(value: unknown): Record<string, unknown> {

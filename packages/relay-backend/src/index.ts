@@ -31,14 +31,19 @@ export {
 } from "relay-core";
 
 export {
+  AGENT_NAMES,
+  AGENT_REGISTRY,
   AGENT_USER,
   GUEST_WORKSPACE,
-  MAX_CLAUDE_FAILURES,
-  MAX_CODEX_FAILURES,
-  MAX_PI_FAILURES,
+  agentNameList,
+  failureCount,
+  getAgent,
   initialAgentState,
+  isAgentName,
   mergeAgentState,
   nextFailureCount,
+  withFailure,
+  type AgentDefinition,
   type AgentName,
   type AgentExecutor,
   type AgentOutputSink,
@@ -115,6 +120,7 @@ export {
   requireDatabaseUrl,
   DaemonNodeRegistry,
   ServerDaemonNodeBackend,
+  assertSessionOwnedByEmployee,
   createRelayDaemonRuntime,
   handleRelayDaemonRequest,
   routeDaemonRequest,
@@ -177,6 +183,7 @@ export {
   buildClaudeImplementCommand,
   buildCodexImplementCommand,
   buildCodexReviewCommand,
+  buildKimiImplementCommand,
   buildPiImplementCommand,
   buildPiPreflightCommand,
 } from "relay-core";
@@ -207,6 +214,7 @@ export {
   codexImplementNode,
   codexReviewNode,
   piImplementNode,
+  runAgentNode,
 } from "relay-core";
 
 export {
