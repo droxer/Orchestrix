@@ -1,0 +1,48 @@
+default_stages: [pre-commit]
+default_language_version:
+  python: python3.12
+exclude: '^(\.claude/|\.codegraph/|\.cursor/|\.git/|\.next/|\.oci/|\.pytest_cache/|\.relay/|\.ruff_cache/|\.uv-cache/|__pycache__/|backend/\.venv/|dist/|node_modules/|packages/\.relay/|web/\.next/|web/out/)'
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+      - id: check-ast
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: mixed-line-ending
+
+  - repo: local
+    hooks:
+      - id: uv-lock-check
+        name: Check uv.lock is up to date
+        entry: uv
+        args: ['lock', '--project', 'backend', '--locked']
+        language: system
+        files: ^backend/pyproject\.toml$
+        pass_filenames: false
+        require_serial: true
+
+      - id: typecheck-packages
+        name: TypeScript typecheck (packages)
+        entry: ./node_modules/.bin/tsc
+        args: ['-p', 'packages/tsconfig.json', '--noEmit']
+        language: system
+        types_or: [ts, tsx]
+        files: ^(packages|web/tests)/
+        pass_filenames: false
+
+      - id: typecheck-web
+        name: TypeScript typecheck (web)
+        entry: ./node_modules/.bin/tsc
+        args: ['-p', 'web/tsconfig.json', '--noEmit']
+        language: system
+        types_or: [ts, tsx]
+        files: ^web/
+        pass_filenames: false

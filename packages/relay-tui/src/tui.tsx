@@ -22,8 +22,11 @@ import {
   type RelayEvent,
   type SandboxRecord,
   type ControlPanelDaemonNodeRecord,
-} from "relay-backend";
-import { AGENT_NAMES, ensureDaemonNodeToken, getAgent, isAgentName } from "relay-core";
+  AGENT_NAMES,
+  ensureDaemonNodeToken,
+  getAgent,
+  isAgentName,
+} from "relay-core";
 import { ensureAgentReady, type OrchestratorSession } from "relay-daemon";
 
 export interface ParsedAssignment {
@@ -1555,7 +1558,7 @@ export function RelayTuiHost({ onExit }: { onExit: () => void }): React.ReactEle
       if (!mountedRef.current || cancelled) return;
       const detail = error instanceof Error ? error.message : String(error);
       setBootError(detail);
-      appendBootLog(`\nERR  ${detail}\nStart the Relay backend with: relay-backend --port 8790\n`);
+      appendBootLog(`\nERR  ${detail}\nStart the Relay backend with: backend --port 8790\n`);
     });
     return () => {
       cancelled = true;

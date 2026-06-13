@@ -3,8 +3,10 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { hostWorkspacePath, normalizeBaseUrl } from "relay-backend";
+import { hostWorkspacePath, loadPackageEnv, normalizeBaseUrl } from "relay-core";
 import { ensureDaemonNodeToken } from "relay-core";
+
+loadPackageEnv("relay-tui");
 
 const DEFAULT_BACKEND_URL = "http://127.0.0.1:8790";
 const STARTUP_TIMEOUT_MS = 15_000;
@@ -34,7 +36,8 @@ export interface BackendStatus {
 
 const currentFile = fileURLToPath(import.meta.url);
 const distDir = dirname(currentFile);
-const backendCli = resolve(distDir, "../../relay-backend/dist/backend-cli.js");
+const repoRoot = resolve(distDir, "../../../..");
+const pythonBackendProject = repoRoot;
 const daemonCli = resolve(distDir, "../../relay-daemon/dist/cli.js");
 const tuiCli = resolve(distDir, "cli.js");
 
@@ -59,7 +62,7 @@ async function main(): Promise<void> {
   try {
     const initialStatus = await backendStatus(backendUrl);
     if (!initialStatus.responding) {
-      const backend = startChild("backend", backendCli, backendArgs(backendEndpoint), childEnv);
+      const backend = startChild("backend", "uv", ["run", "--project", pythonBackendProject, "backend", "backend", ...backendArgs(backendEndpoint)], childEnv);
       children.push(backend);
       ownsBackend = true;
       await waitFor(async () => (await backendStatus(backendUrl)).responding, "Relay backend", [backend]);
@@ -70,7 +73,7 @@ async function main(): Promise<void> {
     // previous local run or a remote sandbox) so two pollers never compete
     // for the same command queue.
     if (!(await liveDaemonExists(backendUrl, employeeId))) {
-      children.push(startChild("daemon", daemonCli, daemonArgs(sandboxId, sandboxMode), childEnv));
+      children.push(startChild("daemon", process.execPath, [daemonCli, ...daemonArgs(sandboxId, sandboxMode)], childEnv));
     }
 
     const tui = spawn(process.execPath, [tuiCli], {
@@ -152,8 +155,8 @@ function safeId(value: string): string {
   return value.replace(/[^A-Za-z0-9._-]+/g, "_") || "local";
 }
 
-function startChild(name: string, script: string, args: string[], env: NodeJS.ProcessEnv): ManagedChild {
-  const child = spawn(process.execPath, [script, ...args], {
+function startChild(name: string, command: string, args: string[], env: NodeJS.ProcessEnv): ManagedChild {
+  const child = spawn(command, args, {
     env,
     stdio: ["ignore", "pipe", "pipe"],
   });

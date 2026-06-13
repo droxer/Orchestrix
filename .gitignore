@@ -11,6 +11,7 @@ out/
 
 # Local environments
 .venv/
+.uv-cache/
 
 # Environment & secrets
 .env

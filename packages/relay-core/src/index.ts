@@ -18,6 +18,7 @@ export {
   OPENAI_ENV_KEYS,
   PI_NATIVE_BASE_URL_PROVIDERS,
   REPO_ROOT,
+  RELAY_CORE_ROOT,
   anthropicApiKey,
   anthropicBaseUrl,
   anthropicModel,
@@ -26,6 +27,7 @@ export {
   kimiApiKey,
   kimiBaseUrl,
   kimiModel,
+  loadPackageEnv,
   openaiBaseUrl,
   openaiApiKey,
   openaiModel,
@@ -150,3 +152,73 @@ export {
   piImplementNode,
   runAgentNode,
 } from "./nodes.js";
+
+export {
+  LocalSessionStore,
+  DEFAULT_RELAY_DATA_DIR,
+  materializeEvents,
+  newRelayId,
+  nowIso,
+  relayEvent,
+  roleForAgent,
+  type AgentRole,
+  type AgentRun,
+  type HumanDecision,
+  type HumanDecisionKind,
+  type RelayArtifact,
+  type RelayArtifactKind,
+  type RelayEvent,
+  type RelaySession,
+  type SessionStatus,
+  type SessionStore,
+} from "./session-store.js";
+
+export {
+  LocalTaskStore,
+  materializeTaskEvents,
+  relayTaskEvent,
+  taskPriority,
+  taskStatus,
+  type RelayTask,
+  type RelayTaskActivity,
+  type RelayTaskEvent,
+  type TaskPriority,
+  type TaskStatus,
+  type TaskStore,
+} from "./task-store.js";
+
+export {
+  SessionController,
+  assignmentFailureOutcome,
+  assignmentSucceeded,
+  type SessionControllerOptions,
+  type WorkflowStep,
+} from "./session-controller.js";
+
+export {
+  RelayDaemonClient,
+  normalizeBaseUrl,
+  type CancelSandboxRunInput,
+  type CreateSessionInput,
+  type ProvisionSandboxInput,
+  type RecordDecisionInput,
+  type RecordHandoffInput,
+  type RelayDaemonClientOptions,
+  type RunSandboxInput,
+} from "./daemon-client.js";
+
+export {
+  routeClaudeHandoff,
+  routeCodexHandoff,
+  routePiHandoff,
+  type Route,
+} from "./routing.js";
+
+export type {
+  ControlPanelDaemonNodeRecord,
+  DaemonNodeActiveRun,
+  DaemonNodeMonitorRecord,
+  SandboxRecord,
+  SandboxRunAssignment,
+  SandboxStatus,
+} from "./daemon-protocol.js";

@@ -1,0 +1,456 @@
+# Local Development
+
+This guide covers the local Relay developer workflow: prerequisites, setup,
+service commands, data layout, and test organization.
+
+## Prerequisites
+
+- Node.js 22.19 or newer
+- npm
+- Python 3.12 or newer
+- uv
+- Docker with the local daemon running
+- Hardware virtualization for BoxLite
+- API keys for the agents you plan to run
+
+## Environment Files
+
+Relay uses project-local env files at each runtime boundary:
+
+- `backend/.env`: Python backend settings and migration database URL.
+- `web/.env.local`: Next.js development proxy settings.
+- `packages/relay-core/.env`: shared TypeScript runtime and agent credential
+  defaults.
+- `packages/relay-daemon/.env`: daemon connection, sandbox, workspace, and
+  optional agent credential overrides.
+- `packages/relay-tui/.env`: TUI and local-run connection, workspace, and
+  sandbox settings.
+- `packages/.env`: repository-wide fallback values.
+
+Create backend settings from the example:
+
+```bash
+cp backend/.env.example backend/.env
+```
+
+Create web settings from the example:
+
+```bash
+cp web/.env.example web/.env.local
+```
+
+Create package settings from the examples:
+
+```bash
+cp packages/.env.example packages/.env
+cp packages/relay-core/.env.example packages/relay-core/.env
+cp packages/relay-daemon/.env.example packages/relay-daemon/.env
+cp packages/relay-tui/.env.example packages/relay-tui/.env
+```
+
+Set agent credentials in `packages/.env`, `packages/relay-core/.env`,
+`packages/relay-daemon/.env`, or another package-local `.env` file:
+
+```bash
+ANTHROPIC_API_KEY=...
+OPENAI_API_KEY=...
+OPENAI_BASE_URL=...     # optional compatible endpoint
+OPENAI_MODEL=...        # optional
+PI_API_KEY=...          # optional override
+PI_BASE_URL=...         # optional override
+PI_MODEL=...            # optional override
+```
+
+Shell environment values always win. Package-local env files override
+`packages/.env` fallback values for that package.
+
+Do not put long-lived secrets into prompts, events, artifacts, or memory.
+
+## Setup
+
+Install Node dependencies:
+
+```bash
+npm install
+```
+
+Run the active test suite:
+
+```bash
+npm test
+```
+
+Run only the TypeScript tests:
+
+```bash
+npm run test:ts
+```
+
+Run only the Python backend tests:
+
+```bash
+npm run test:py
+```
+
+`test:py` uses `UV_CACHE_DIR=.uv-cache` so dependency downloads and builds stay
+inside the repository workspace.
+
+## Pre-commit hooks
+
+Relay uses [pre-commit](https://pre-commit.com/) to run lightweight checks before
+every commit. The configuration lives in `.pre-commit-config.yaml`.
+
+Install the Git hooks once after cloning (this also syncs the backend dev
+environment):
+
+```bash
+make pre-commit-install
+```
+
+Run all hooks against the entire repository:
+
+```bash
+make pre-commit-run
+```
+
+By default the hooks run:
+
+- `trailing-whitespace`, `end-of-file-fixer`, and syntax checks for YAML, TOML,
+  JSON, and Python AST.
+- `check-added-large-files`, `check-merge-conflict`, `detect-private-key`, and
+  `mixed-line-ending`.
+- A check that `backend/uv.lock` is in sync with `backend/pyproject.toml`.
+- TypeScript type checks for workspace packages (`packages/tsconfig.json`) and
+  the web app (`web/tsconfig.json`) when matching `.ts` or `.tsx` files change.
+
+## Backend Database Migrations
+
+Alembic migration files live under `backend/migrations/`. The initial migration
+creates the PostgreSQL storage tables for sessions, tasks, artifacts, daemon
+nodes, daemon commands, daemon runs, daemon events, auth users, and auth
+sessions, and employees.
+
+Run migrations with the database URL in `backend/.env`:
+
+```bash
+make backend-migrate
+```
+
+Or override the URL for one run:
+
+```bash
+make backend-migrate DATABASE_URL=postgresql+psycopg://relay:relay@localhost:5432/relay
+```
+
+Or call Alembic directly:
+
+```bash
+RELAY_DATABASE_URL=postgresql+psycopg://relay:relay@localhost:5432/relay \
+  UV_CACHE_DIR=.uv-cache uv run --project backend --extra dev alembic -c backend/alembic.ini upgrade head
+```
+
+`RELAY_DATABASE_URL` takes precedence over `DATABASE_URL`; both override the
+placeholder URL in `backend/alembic.ini`. Values from the shell take precedence over
+values loaded from `backend/.env`.
+
+Set `RELAY_STORAGE=postgres` to store backend operational state in PostgreSQL:
+sessions, session events, task state, task events, daemon nodes, daemon commands,
+daemon runs, daemon events, auth users, browser sessions, and employees. Session
+tokens and daemon node tokens are stored as hashes; raw tokens are returned only
+once when created. Artifact file bodies still live on disk, with metadata stored
+in the database.
+
+Without `RELAY_STORAGE=postgres`, the backend keeps using local `.relay/*.json`
+files for development. The older `RELAY_AUTH_STORE=database` and
+`RELAY_DAEMON_STORE=database` switches still work for targeted compatibility,
+but new product deployments should use `RELAY_STORAGE=postgres`.
+
+## BoxLite Devbox
+
+Build and export the BoxLite devbox image:
+
+```bash
+make devbox-oci
+```
+
+You only need to rebuild and export the devbox image when `dockerfile` changes:
+
+```bash
+make run-fresh
+```
+
+Normal source changes only need:
+
+```bash
+make run
+```
+
+To mount a specific host workspace into the Relay devbox:
+
+```bash
+make run WORKSPACE=/path/to/workspace
+```
+
+The host workspace mounts into the BoxLite guest at `/workspace`
+(`GUEST_WORKSPACE`). The guest `agent` user's UID/GID is aligned to the host
+owner so generated files keep sane ownership.
+
+## Running Services
+
+Start the Python backend:
+
+```bash
+make backend
+```
+
+The backend loads `backend/.env` and listens on `BACKEND_PORT`, defaulting to
+`8790`. Override with:
+
+```bash
+make backend BACKEND_PORT=9000
+```
+
+Start a daemon connected to the backend:
+
+```bash
+make daemon
+```
+
+The daemon reads `packages/relay-daemon/.env`. If no `RELAY_SANDBOX_ID` is set
+there, pass one for a single run:
+
+```bash
+make daemon SANDBOX_ID=sbx_local
+```
+
+Start the TUI:
+
+```bash
+make run
+# or
+npm run run
+```
+
+The TUI and `local-run` read `packages/relay-tui/.env`.
+
+Run the web UI in dev mode:
+
+```bash
+make web
+```
+
+The web dev server reads `web/.env.local`; set `RELAY_BACKEND_URL` there to
+change the backend proxy target. You can also override it for one run:
+
+```bash
+make web RELAY_BACKEND_URL=http://127.0.0.1:9000
+```
+
+Stop Relay and BoxLite processes:
+
+```bash
+make stop
+```
+
+## TUI Usage
+
+Assign agents from the TUI:
+
+```text
+@claude fix auth middleware
+@claude @pi @codex add tests for upload routing
+@codex inspect the current diff
+```
+
+Useful slash commands:
+
+```text
+/approve
+/reject missing tests around timeout handling
+/cancel
+/rerun codex
+/handoff claude
+/sessions
+/open <session-id>
+/summary
+/quit
+```
+
+## Local API And Web UI
+
+Start the local server mode:
+
+```bash
+make serve
+# or choose a port:
+make serve PORT=9000
+```
+
+By default, `make serve` listens on `127.0.0.1:8787`. It reads real task and
+session files from `.relay/tasks` and `.relay/sessions`; it does not seed,
+mock, or display dummy work.
+
+Core routes:
+
+```text
+GET /
+GET /tasks
+POST /tasks
+GET /tasks/:id
+PATCH /tasks/:id
+POST /tasks/:id/assign
+POST /tasks/:id/pickup
+GET /tasks/:id/events
+GET /sessions
+POST /sessions
+GET /sessions/:id
+GET /sessions/:id/events
+GET /sessions/:id/artifacts/:artifactId
+GET /sandboxes
+POST /sandboxes
+POST /daemon-nodes/register
+GET /daemon-nodes/:id/commands
+POST /daemon-nodes/:id/events
+GET /cp
+GET /cp/version
+GET /auth/status
+POST /auth/bootstrap
+POST /auth/login
+POST /auth/logout
+GET /auth/me
+GET /cp/departments
+POST /cp/departments
+GET /cp/employees
+GET /cp/daemon-nodes
+POST /cp/daemon-nodes
+GET /web
+```
+
+The backend serves the exported web UI from `web/out` at `/web`. In development,
+`make web` starts Next.js and proxies API routes to the backend.
+
+### Admin authentication
+
+The control panel data API (`/cp/*`) requires an admin session. For local
+development, initialize the first admin explicitly with the helper script:
+
+```bash
+script/init_users.sh
+```
+
+By default this creates `admin` / `admin` with the `admin` role and binds it to
+employee `admin` in department `administration`. Pass `--username`,
+`--password`, `--role`, `--email`, `--employee-id`, `--department-id`, or
+`--department-name` to create a different initial user.
+
+For a token-gated bootstrap instead, set `RELAY_ADMIN_TOKEN` and create the
+first admin explicitly:
+
+```bash
+curl -X POST http://127.0.0.1:8790/auth/bootstrap \
+  -H "Content-Type: application/json" \
+  -d '{"token":"$RELAY_ADMIN_TOKEN","username":"admin","password":"secret123"}'
+```
+
+After bootstrap, log in to receive an `httpOnly` session cookie:
+
+```bash
+curl -X POST http://127.0.0.1:8790/auth/login \
+  -c cookies.txt -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"secret123"}'
+```
+
+Then use the cookie for control-panel requests:
+
+```bash
+curl -b cookies.txt http://127.0.0.1:8790/cp/daemon-nodes
+```
+
+## Data Layout
+
+Relay writes generated state under `.relay/`:
+
+```text
+.relay/
+  tasks/
+    <task-id>/
+      events.jsonl
+      snapshot.json
+  sessions/
+    <session-id>/
+      events.jsonl
+      snapshot.json
+      artifacts/
+        <artifact-id>.<ext>
+  daemon-nodes/
+    <employee-id>.token
+```
+
+The event log is the source of truth. Snapshots are materialized views rebuilt
+from events.
+
+## Source Map
+
+```text
+backend/relay/cli.py                          relay binary entrypoint
+backend/relay/app.py                          FastAPI backend application
+backend/relay/controller.py                   session mutation controller
+backend/relay/stores.py                       durable session/task/daemon stores
+backend/relay/daemon.py                       daemon registry and scheduler
+backend/migrations/                     Alembic backend storage migrations
+packages/relay-core/src/index.ts               shared protocol and agent runtime exports
+packages/relay-core/src/daemon-client.ts        TypeScript backend HTTP client
+packages/relay-core/src/daemon-protocol.ts      TypeScript backend protocol types
+packages/relay-core/src/commands.ts             agent command builders
+packages/relay-core/src/prompts.ts              agent prompt builders
+packages/relay-core/src/renderers.ts            stream-json and JSONL renderers
+packages/relay-core/src/routing.ts              default workflow routing helpers
+packages/relay-daemon/src/cli.ts                daemon binary entrypoint
+packages/relay-daemon/src/index.ts              daemon runtime
+packages/relay-daemon/src/box.ts                BoxLite VM setup
+packages/relay-daemon/src/execution.ts          BoxLite execution manager
+packages/relay-daemon/src/sandbox-session.ts    sandbox session lifecycle and agent preflight
+packages/relay-tui/src/cli.ts                   TUI binary entrypoint
+packages/relay-tui/src/tui.tsx                  Ink TUI and human commands
+web/                                            Next.js web frontend
+```
+
+Keep backend runtime code in `backend/`, TypeScript protocol/client exports in
+`packages/relay-core/src/`, daemon execution code in `packages/relay-daemon/`,
+TUI code in `packages/relay-tui/`, and frontend code in `web/`.
+
+## Testing
+
+```bash
+npm run build
+npm run test:ts
+npm run test:py
+npm test
+```
+
+Test coverage is organized as:
+
+- `backend/tests/`: Python event stores, artifacts, controller behavior, linked
+  task updates, daemon registry behavior, and HTTP API routes.
+- `packages/relay-core/tests/handoff.test.ts`: routing, prompt contracts, Codex verdict
+  parsing, command generation, stream renderers, and BoxLite helpers.
+- `packages/relay-tui/tests/tui.test.tsx`: TUI parsing, shortcuts, rendering,
+  cancellation, session state updates, and slash commands.
+- `web/tests/status.test.ts`: web status derivation for daemon nodes and
+  conversations.
+
+Use focused tests for behavior changes, then run the relevant layer before the
+full `npm test`.
+
+## Implementation Notes
+
+- The backend is the control plane and must not execute agent CLIs in-process.
+- Durable state is append-only; add events instead of mutating history.
+- Snapshots are derived from event logs.
+- Keep API state real: no seeded demo tasks, fake agent runs, or dummy
+  artifacts.
+- Agent execution belongs in the daemon and shared TypeScript runtime.
+- Claude uses `--output-format stream-json`; Codex uses `exec --json`; render
+  both through stream renderers instead of printing raw JSON.
+- Pi versions differ: use `-P` only when `pi --help` advertises `-P` or
+  `--print-streaming`; otherwise fall back to `-p`.

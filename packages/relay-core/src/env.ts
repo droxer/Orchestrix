@@ -6,9 +6,11 @@ import { fileURLToPath } from "node:url";
 const currentFile = fileURLToPath(import.meta.url);
 // packages/relay-core/dist/env.js -> packages/relay-core/dist -> relay-core -> packages -> repo root
 export const REPO_ROOT = resolve(dirname(currentFile), "../../..");
+export const RELAY_CORE_ROOT = resolve(dirname(currentFile), "..");
 export const DEVBOX_IMAGE = "relay-devbox:v1";
 export const OCI_LAYOUT_DIR = resolve(REPO_ROOT, ".oci/relay-devbox-v1");
 export const DOCKERFILE = resolve(REPO_ROOT, "dockerfile");
+const ORIGINAL_ENV_KEYS = new Set(Object.keys(process.env));
 
 export const ANTHROPIC_ENV_KEYS = [
   "ANTHROPIC_API_KEY",
@@ -26,7 +28,7 @@ export const OPENAI_ENV_KEYS = [
 export const DEFAULT_HOST_WORKSPACE = "~/projects/air-platform";
 export const PI_NATIVE_BASE_URL_PROVIDERS = new Set(["minimax", "minimax-cn"]);
 
-function loadDotEnv(path: string): void {
+function loadDotEnv(path: string, options: { overrideLoaded?: boolean } = {}): void {
   if (!existsSync(path)) return;
   for (const rawLine of readFileSync(path, "utf8").split(/\r?\n/)) {
     const line = rawLine.trim();
@@ -34,7 +36,7 @@ function loadDotEnv(path: string): void {
     const match = /^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/.exec(line);
     if (!match) continue;
     const [, key, rawValue] = match;
-    if (process.env[key] !== undefined) continue;
+    if (process.env[key] !== undefined && (!options.overrideLoaded || ORIGINAL_ENV_KEYS.has(key))) continue;
     let value = rawValue.trim();
     if (
       (value.startsWith('"') && value.endsWith('"')) ||
@@ -46,13 +48,20 @@ function loadDotEnv(path: string): void {
   }
 }
 
+export function loadPackageEnv(packageName: string): void {
+  const packageRoot = resolve(REPO_ROOT, "packages", packageName);
+  loadDotEnv(resolve(packageRoot, ".env"), { overrideLoaded: true });
+  loadDotEnv(resolve(packageRoot, ".env.local"), { overrideLoaded: true });
+}
+
 function expandUser(path: string): string {
   if (path === "~") return homedir();
   if (path.startsWith("~/")) return resolve(homedir(), path.slice(2));
   return path;
 }
 
-loadDotEnv(resolve(REPO_ROOT, ".env"));
+loadDotEnv(resolve(REPO_ROOT, "packages/.env"));
+loadPackageEnv("relay-core");
 if (process.env.RELAY_WORKSPACE) {
   loadDotEnv(resolve(expandUser(process.env.RELAY_WORKSPACE), ".env"));
 }
@@ -100,7 +109,7 @@ export function requireOpenaiApiKey(): string {
   if (!key) {
     throw new Error(
       "OPENAI_API_KEY (or CODEX_API_KEY) is required for Codex. " +
-        "Set it in .env (DashScope: use your compatible-mode API key).",
+        "Set it in packages/.env or a package-local .env file.",
     );
   }
   return key;
