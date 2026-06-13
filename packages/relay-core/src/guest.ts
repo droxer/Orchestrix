@@ -14,7 +14,7 @@ import {
   piModel,
   piProvider,
 } from "./env.js";
-import { AGENT_USER, GUEST_WORKSPACE } from "./state.js";
+import { AGENT_USER, GUEST_WORKSPACE, type AgentName } from "./state.js";
 import { shellQuote } from "./shell.js";
 
 export const GUEST_AGENT_SYNC_SCRIPT = `
@@ -45,30 +45,71 @@ export function setSessionGuestEnv(env: Array<[string, string]>): void {
   sessionGuestEnv = env;
 }
 
+/**
+ * Per-agent credential resolvers. Each entry returns ONLY the secrets and
+ * provider settings that agent needs at runtime, so a run is never handed
+ * another provider's API key. The `Record<AgentName, …>` type forces an entry
+ * when a new agent is added to the registry. Resolution reads `process.env`
+ * (and the `.env`-derived fallbacks in env.ts) at call time so injection is
+ * scoped to the single command invocation rather than the VM's lifetime.
+ */
+const AGENT_CREDENTIAL_ENV: Record<AgentName, () => Array<[string, string]>> = {
+  claude: () => {
+    const env: Array<[string, string]> = [];
+    pushEnv(env, "ANTHROPIC_API_KEY", anthropicApiKey());
+    pushEnv(env, "ANTHROPIC_BASE_URL", anthropicBaseUrl());
+    pushEnv(env, "ANTHROPIC_MODEL", anthropicModel());
+    return env;
+  },
+  codex: () => {
+    const env: Array<[string, string]> = [];
+    const openaiKey = openaiApiKey();
+    if (openaiKey) {
+      env.push(["OPENAI_API_KEY", openaiKey]);
+      env.push(["CODEX_API_KEY", openaiKey]);
+    }
+    pushEnv(env, "OPENAI_BASE_URL", openaiBaseUrl());
+    pushEnv(env, "OPENAI_MODEL", openaiModel());
+    return env;
+  },
+  pi: () => {
+    const env: Array<[string, string]> = [];
+    for (const key of ["PI_API_KEY", "PI_BASE_URL", "PI_MODEL", "PI_PROVIDER", "PI_API"]) {
+      const value = process.env[key];
+      if (value) env.push([key, value]);
+    }
+    if (!process.env.PI_API_KEY) {
+      const value = piApiKey();
+      if (value) env.push(["PI_API_KEY", value]);
+    }
+    return env;
+  },
+  kimi: () => {
+    const env: Array<[string, string]> = [];
+    for (const key of [
+      "KIMI_API_KEY", "KIMI_BASE_URL", "KIMI_MODEL",
+      "MOONSHOT_API_KEY", "MOONSHOT_BASE_URL", "MOONSHOT_MODEL",
+    ]) {
+      const value = process.env[key];
+      if (value) env.push([key, value]);
+    }
+    return env;
+  },
+};
+
+/** The credential/provider env a single agent run needs — nothing else. */
+export function agentCredentialEnv(agent: AgentName): Array<[string, string]> {
+  return AGENT_CREDENTIAL_ENV[agent]();
+}
+
+/**
+ * Non-secret infrastructure env handed to the sandbox at creation. API keys are
+ * deliberately excluded here: baking them into the box would make them resident
+ * for the VM's whole lifetime and visible to every process and every agent.
+ * Credentials are injected per run via {@link runAsAgent} instead.
+ */
 export function guestAgentEnv(hostWorkspace?: string | null): Array<[string, string]> {
   const env: Array<[string, string]> = [];
-  pushEnv(env, "ANTHROPIC_API_KEY", anthropicApiKey());
-  pushEnv(env, "ANTHROPIC_BASE_URL", anthropicBaseUrl());
-  pushEnv(env, "ANTHROPIC_MODEL", anthropicModel());
-  const openaiKey = openaiApiKey();
-  if (openaiKey) {
-    env.push(["OPENAI_API_KEY", openaiKey]);
-    env.push(["CODEX_API_KEY", openaiKey]);
-  }
-  pushEnv(env, "OPENAI_BASE_URL", openaiBaseUrl());
-  pushEnv(env, "OPENAI_MODEL", openaiModel());
-  for (const key of [
-    "PI_API_KEY", "PI_BASE_URL", "PI_MODEL", "PI_PROVIDER", "PI_API",
-    "KIMI_API_KEY", "KIMI_BASE_URL", "KIMI_MODEL",
-    "MOONSHOT_API_KEY", "MOONSHOT_BASE_URL", "MOONSHOT_MODEL",
-  ]) {
-    const value = process.env[key];
-    if (value) env.push([key, value]);
-  }
-  if (!process.env.PI_API_KEY) {
-    const value = piApiKey();
-    if (value) env.push(["PI_API_KEY", value]);
-  }
   if (hostWorkspace !== undefined && hostWorkspace !== null) {
     const [uid, gid] = hostWorkspaceOwner(hostWorkspace);
     env.push(["RELAY_HOST_UID", String(uid)]);
@@ -77,10 +118,14 @@ export function guestAgentEnv(hostWorkspace?: string | null): Array<[string, str
   return env;
 }
 
-export function guestEnvExports(): string {
-  return sessionGuestEnv
+function envExports(env: Array<[string, string]>): string {
+  return env
     .map(([key, value]) => `export ${key}=${shellQuote(value)}`)
     .join(" && ");
+}
+
+export function guestEnvExports(): string {
+  return envExports(sessionGuestEnv);
 }
 
 export function guestCodexConfigToml(): string {
@@ -176,15 +221,23 @@ function pushEnv(env: Array<[string, string]>, key: string, value: string | unde
   if (value) env.push([key, value]);
 }
 
-export function runAsAgent(command: string): string {
+/**
+ * Wrap a command so it runs as the guest `agent` user with the right HOME and
+ * working directory. When `agent` is given, only that agent's credentials are
+ * exported inline — they live in the command's shell process and are gone once
+ * it exits, so no provider key persists in the VM or leaks across agents. The
+ * agentless form falls back to the (non-secret) session env for legacy callers.
+ */
+export function runAsAgent(command: string, agent?: AgentName): string {
   const workspace = agentWorkspacePath();
   const home = agentHomePath();
+  const credentialExports = agent ? envExports(agentCredentialEnv(agent)) : guestEnvExports();
   if (process.env.RELAY_RUN_AS_CURRENT_USER === "1") {
     return [
       `export HOME=${shellQuote(home)}`,
       `export CODEX_HOME=${shellQuote(`${home}/.codex`)}`,
       `export PI_CODING_AGENT_DIR=${shellQuote(`${home}/.pi/agent`)}`,
-      guestEnvExports(),
+      credentialExports,
       `cd ${shellQuote(workspace)}`,
       command,
     ].filter(Boolean).join(" && ");
@@ -195,7 +248,7 @@ export function runAsAgent(command: string): string {
     "export PI_CODING_AGENT_DIR=/home/agent/.pi/agent",
     "export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
     "umask 002",
-    guestEnvExports(),
+    credentialExports,
     `cd ${shellQuote(workspace)}`,
     command,
   ].filter(Boolean);

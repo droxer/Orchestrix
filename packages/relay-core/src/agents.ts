@@ -61,7 +61,7 @@ export const AGENT_REGISTRY: Record<AgentName, AgentDefinition> = {
     createRenderer: () => new ClaudeStreamRenderer(),
     implementLabel: "Claude Code",
     needsGuestAuth: false,
-    preflight: { label: "Claude Code", command: () => runAsAgent("claude --version") },
+    preflight: { label: "Claude Code", command: () => runAsAgent("claude --version", "claude") },
   },
   pi: {
     name: "pi",
@@ -91,7 +91,7 @@ export const AGENT_REGISTRY: Record<AgentName, AgentDefinition> = {
     implementLabel: "Codex Implement",
     reviewLabel: "Codex Review",
     needsGuestAuth: true,
-    preflight: { label: "Codex auth", command: () => runAsAgent("codex login status") },
+    preflight: { label: "Codex auth", command: () => runAsAgent("codex login status", "codex") },
   },
   kimi: {
     name: "kimi",
@@ -105,7 +105,7 @@ export const AGENT_REGISTRY: Record<AgentName, AgentDefinition> = {
     createRenderer: () => new PlainTextStreamRenderer("Kimi", ansi.magenta),
     implementLabel: "Kimi",
     needsGuestAuth: false,
-    preflight: { label: "Kimi", command: () => runAsAgent("kimi --version") },
+    preflight: { label: "Kimi", command: () => runAsAgent("kimi --version", "kimi") },
   },
 };
 

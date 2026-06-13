@@ -28,6 +28,7 @@ import {
   formatClaudeJsonLine,
   formatCodexJsonLine,
   getAgent,
+  agentCredentialEnv,
   guestCodexConfigToml,
   guestAgentEnv,
   guestPiAuthJson,
@@ -762,8 +763,8 @@ describe("Pi provider config", () => {
         OPENAI_MODEL: "test-model",
       },
       () => {
-        const guestEnv = guestAgentEnv();
-        assert.ok(guestEnv.some(([key, value]) => key === "PI_API_KEY" && value === "openai-key"));
+        const piEnv = agentCredentialEnv("pi");
+        assert.ok(piEnv.some(([key, value]) => key === "PI_API_KEY" && value === "openai-key"));
       },
     );
   });
@@ -778,14 +779,15 @@ describe("Pi provider config", () => {
         CLAUDE_MODEL: "claude-model",
       },
       () => {
-        const guestEnv = guestAgentEnv();
+        const codexEnv = agentCredentialEnv("codex");
+        const claudeEnv = agentCredentialEnv("claude");
         const codexConfig = guestCodexConfigToml();
         const codexCommand = buildCodexImplementCommand(state());
         const claudeCommand = buildClaudeImplementCommand(state());
 
-        assert.ok(guestEnv.some(([key, value]) => key === "OPENAI_API_KEY" && value === "llm-key"));
-        assert.ok(guestEnv.some(([key, value]) => key === "CODEX_API_KEY" && value === "llm-key"));
-        assert.ok(guestEnv.some(([key, value]) => key === "ANTHROPIC_API_KEY" && value === "claude-key"));
+        assert.ok(codexEnv.some(([key, value]) => key === "OPENAI_API_KEY" && value === "llm-key"));
+        assert.ok(codexEnv.some(([key, value]) => key === "CODEX_API_KEY" && value === "llm-key"));
+        assert.ok(claudeEnv.some(([key, value]) => key === "ANTHROPIC_API_KEY" && value === "claude-key"));
         assert.match(codexConfig, /https:\/\/llm\.example\.com\/v1/);
         assert.match(codexConfig, /llm-model/);
         assert.match(codexCommand, /-m llm-model/);
@@ -808,6 +810,69 @@ describe("Pi provider config", () => {
     });
     withEnv({ RELAY_WORKSPACE: temp, WORKSPACE: makeWorkspace }, () => {
       assert.equal(hostWorkspacePath(), temp);
+    });
+  });
+});
+
+describe("credential scoping", () => {
+  const allProviderEnv = {
+    ANTHROPIC_API_KEY: "anthropic-secret",
+    OPENAI_API_KEY: "openai-secret",
+    PI_API_KEY: "pi-secret",
+    KIMI_API_KEY: "kimi-secret",
+    MOONSHOT_API_KEY: "moonshot-secret",
+  };
+
+  it("keeps API keys out of the sandbox (VM-lifetime) env", () => {
+    withEnv(allProviderEnv, () => {
+      const guestEnv = guestAgentEnv();
+      const keys = guestEnv.map(([key]) => key);
+      for (const secretKey of Object.keys(allProviderEnv)) {
+        assert.ok(!keys.includes(secretKey), `${secretKey} must not be baked into the sandbox env`);
+      }
+      const serialized = JSON.stringify(guestEnv);
+      for (const secret of Object.values(allProviderEnv)) {
+        assert.ok(!serialized.includes(secret), `secret ${secret} leaked into the sandbox env`);
+      }
+    });
+  });
+
+  it("injects only the running agent's provider credentials", () => {
+    withEnv(allProviderEnv, () => {
+      const claudeCommand = buildClaudeImplementCommand(state());
+      assert.ok(claudeCommand.includes("anthropic-secret"));
+      for (const other of ["openai-secret", "pi-secret", "kimi-secret", "moonshot-secret"]) {
+        assert.ok(!claudeCommand.includes(other), `Claude run exposed ${other}`);
+      }
+
+      const codexCommand = buildCodexImplementCommand(state());
+      assert.ok(codexCommand.includes("openai-secret"));
+      for (const other of ["anthropic-secret", "pi-secret", "kimi-secret", "moonshot-secret"]) {
+        assert.ok(!codexCommand.includes(other), `Codex run exposed ${other}`);
+      }
+
+      const kimiCommand = buildKimiImplementCommand(state());
+      assert.ok(kimiCommand.includes("kimi-secret"));
+      assert.ok(kimiCommand.includes("moonshot-secret"));
+      for (const other of ["anthropic-secret", "openai-secret", "pi-secret"]) {
+        assert.ok(!kimiCommand.includes(other), `Kimi run exposed ${other}`);
+      }
+    });
+  });
+
+  it("scopes credential resolution per agent", () => {
+    withEnv(allProviderEnv, () => {
+      const claudeKeys = agentCredentialEnv("claude").map(([key]) => key);
+      const codexKeys = agentCredentialEnv("codex").map(([key]) => key);
+      const piKeys = agentCredentialEnv("pi").map(([key]) => key);
+      const kimiKeys = agentCredentialEnv("kimi").map(([key]) => key);
+
+      assert.deepEqual(claudeKeys, ["ANTHROPIC_API_KEY"]);
+      assert.ok(codexKeys.includes("OPENAI_API_KEY") && codexKeys.includes("CODEX_API_KEY"));
+      assert.ok(!codexKeys.includes("ANTHROPIC_API_KEY"));
+      assert.ok(piKeys.includes("PI_API_KEY") && !piKeys.includes("OPENAI_API_KEY"));
+      assert.ok(kimiKeys.includes("KIMI_API_KEY") && kimiKeys.includes("MOONSHOT_API_KEY"));
+      assert.ok(!kimiKeys.includes("ANTHROPIC_API_KEY"));
     });
   });
 });
