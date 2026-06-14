@@ -175,7 +175,6 @@ export function AdminConsole() {
     window.setTimeout(() => setHighlightedEmployeeId((prev) => (prev === result.employee.id ? null : prev)), 2400);
     setOnboardOpen(false);
     setView("people");
-    setCredentialsNodeId(result.node.id);
   }
 
   if (!authChecked) {

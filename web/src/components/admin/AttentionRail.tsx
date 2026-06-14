@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import type { ControlPanelDaemonNodeRecord } from "../../types";
 import type { DaemonNodeActiveRun } from "relay-core";
-import { buildAttentionItems, formatRelativeTime, isStale, type AttentionItem } from "./helpers";
+import { buildAttentionItems, isStale, type AttentionItem } from "./helpers";
 
 interface AttentionRailProps {
   nodes: ControlPanelDaemonNodeRecord[];
@@ -94,7 +94,6 @@ export function AttentionRail({ nodes }: AttentionRailProps) {
           ))}
         </ul>
       )}
-      <p className="adm-rail-foot mono">{t("admin.v2.rail_foot", { time: formatRelativeTime(new Date().toISOString(), t) })}</p>
     </aside>
   );
 }

@@ -36,15 +36,37 @@ export function Drawer({
   useEffect(() => {
     if (!open) return;
     previouslyFocused.current = document.activeElement as HTMLElement | null;
-    const focusable = panelRef.current?.querySelector<HTMLElement>(
-      'input, button, select, textarea, [tabindex]:not([tabindex="-1"])',
-    );
-    (focusable ?? panelRef.current)?.focus();
+    const FOCUSABLE = 'input:not([disabled]), button:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
+    const initial = panelRef.current?.querySelector<HTMLElement>(FOCUSABLE);
+    (initial ?? panelRef.current)?.focus();
 
     function handleKey(event: KeyboardEvent) {
       if (event.key === "Escape") {
         event.preventDefault();
         onClose();
+        return;
+      }
+      if (event.key !== "Tab" || !panelRef.current) return;
+      const nodes = panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE);
+      if (nodes.length === 0) {
+        event.preventDefault();
+        panelRef.current.focus();
+        return;
+      }
+      const first = nodes[0];
+      const last = nodes[nodes.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (event.shiftKey) {
+        if (active === first || !panelRef.current.contains(active)) {
+          event.preventDefault();
+          last.focus();
+        }
+      } else if (active === last) {
+        event.preventDefault();
+        first.focus();
+      } else if (!panelRef.current.contains(active)) {
+        event.preventDefault();
+        first.focus();
       }
     }
     document.addEventListener("keydown", handleKey);
@@ -76,7 +98,7 @@ export function Drawer({
         aria-label={ariaLabel}
         tabIndex={-1}
         className={`adm-drawer ${variant === "dark" ? "dark" : "light"}`}
-        style={{ width }}
+        style={{ "--adm-drawer-w": `${width}px` } as React.CSSProperties}
       >
         <header className="adm-drawer-head">
           <div className="adm-drawer-head-text">

@@ -5110,12 +5110,36 @@ button:disabled {
   color: var(--color-muted);
 }
 
-.adm-rail-foot {
-  padding: var(--space-sm) var(--space-base);
-  border-top: 1px solid var(--color-hairline);
-  font-size: 11px;
-  color: var(--color-muted-soft);
-  margin: 0;
+/* ── Mode tabs (drawer) ───────────────────────────────────────────── */
+.adm-mode-tabs {
+  display: inline-flex;
+  gap: 0;
+  padding: 2px;
+  margin-bottom: var(--space-lg);
+  background: var(--color-surface-strong);
+  border-radius: var(--radius-pill);
+}
+
+.adm-mode-tab {
+  height: 32px;
+  padding: 0 var(--space-base);
+  border: none;
+  background: transparent;
+  color: var(--color-muted);
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: color 160ms ease, background 160ms ease;
+}
+
+.adm-mode-tab:hover:not(:disabled) { color: var(--color-ink); }
+.adm-mode-tab:disabled { color: var(--color-muted-soft); cursor: not-allowed; }
+
+.adm-mode-tab.active {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  box-shadow: inset 0 0 0 1px var(--color-hairline);
 }
 
 /* ── Empty states ─────────────────────────────────────────────────── */
@@ -5126,7 +5150,7 @@ button:disabled {
   gap: var(--space-base);
   padding: var(--space-section) 0;
   max-width: 480px;
-  border-left: 2px solid var(--color-hairline);
+  border-left: 2px solid var(--color-primary);
   padding-left: var(--space-xl);
 }
 
@@ -5167,6 +5191,7 @@ button:disabled {
 }
 
 .adm-drawer {
+  width: var(--adm-drawer-w, 480px);
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -5485,15 +5510,15 @@ select.adm-input {
     display: none;
   }
   .adm-pulse {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    display: flex;
+    flex-wrap: wrap;
     gap: var(--space-base) 0;
   }
-  .adm-pulse-cell:nth-child(3) { border-right: none; }
-  .adm-pulse-cell:nth-child(n+4) {
-    border-top: 1px solid var(--color-hairline-soft);
-    padding-top: var(--space-base);
-    margin-top: var(--space-base);
+  .adm-pulse-cell {
+    flex: 1 1 calc(33.333% - var(--space-base));
+    min-width: 120px;
   }
+  .adm-pulse-cell:nth-child(3n) { border-right: none; }
 }
 
 @media (max-width: 768px) {
@@ -5529,5 +5554,5 @@ select.adm-input {
   .adm-pulse { padding: var(--space-base); grid-template-columns: repeat(2, 1fr); }
   .adm-content-main { padding: var(--space-base); }
   .adm-emp-row { grid-template-columns: 1fr; gap: var(--space-xs); }
-  .adm-drawer { width: 100% !important; }
+  .adm-drawer { width: 100%; }
 }
