@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 revision = "20260613_0003"
 down_revision = "20260613_0002"
@@ -20,14 +21,21 @@ def timestamp() -> sa.DateTime:
     return sa.DateTime(timezone=True)
 
 
+def uuid_pk() -> sa.Column:
+    return sa.Column("id", postgresql.UUID(as_uuid=False), primary_key=True, server_default=sa.text("gen_random_uuid()"))
+
+
 def upgrade() -> None:
+    op.execute("create extension if not exists pgcrypto")
     op.create_table(
         "auth_users",
-        sa.Column("id", sa.Text(), primary_key=True),
+        uuid_pk(),
+        sa.Column("public_id", sa.Text(), nullable=False, unique=True),
         sa.Column("username", sa.Text(), nullable=False),
         sa.Column("email", sa.Text(), nullable=True),
         sa.Column("role", sa.Text(), nullable=False),
-        sa.Column("employee_id", sa.Text(), nullable=True),
+        sa.Column("employee_id", postgresql.UUID(as_uuid=False), nullable=True),
+        sa.Column("employee_public_id", sa.Text(), nullable=True),
         sa.Column("password_hash", sa.Text(), nullable=False),
         sa.Column("created_at", timestamp(), nullable=False),
         sa.Column("updated_at", timestamp(), nullable=False),
@@ -39,9 +47,11 @@ def upgrade() -> None:
 
     op.create_table(
         "auth_sessions",
-        sa.Column("id", sa.Text(), primary_key=True),
+        uuid_pk(),
+        sa.Column("public_id", sa.Text(), nullable=False, unique=True),
         sa.Column("token_hash", sa.Text(), nullable=False),
-        sa.Column("user_id", sa.Text(), sa.ForeignKey("auth_users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("user_id", postgresql.UUID(as_uuid=False), sa.ForeignKey("auth_users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("user_public_id", sa.Text(), nullable=False),
         sa.Column("created_at", timestamp(), nullable=False),
         sa.Column("expires_at", timestamp(), nullable=False),
         sa.UniqueConstraint("token_hash", name="uq_auth_sessions_token_hash"),

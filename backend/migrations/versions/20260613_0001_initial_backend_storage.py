@@ -25,10 +25,16 @@ def timestamp() -> sa.DateTime:
     return sa.DateTime(timezone=True)
 
 
+def uuid_pk() -> sa.Column:
+    return sa.Column("id", postgresql.UUID(as_uuid=False), primary_key=True, server_default=sa.text("gen_random_uuid()"))
+
+
 def upgrade() -> None:
+    op.execute("create extension if not exists pgcrypto")
     op.create_table(
         "relay_sessions",
-        sa.Column("id", sa.Text(), primary_key=True),
+        uuid_pk(),
+        sa.Column("public_id", sa.Text(), nullable=False, unique=True),
         sa.Column("workspace_path", sa.Text(), nullable=False),
         sa.Column("owner_employee_id", sa.Text(), nullable=True),
         sa.Column("task_goal", sa.Text(), nullable=False),
@@ -50,8 +56,9 @@ def upgrade() -> None:
 
     op.create_table(
         "relay_session_events",
-        sa.Column("id", sa.Text(), primary_key=True),
-        sa.Column("session_id", sa.Text(), sa.ForeignKey("relay_sessions.id", ondelete="CASCADE"), nullable=False),
+        uuid_pk(),
+        sa.Column("public_id", sa.Text(), nullable=False, unique=True),
+        sa.Column("session_id", postgresql.UUID(as_uuid=False), sa.ForeignKey("relay_sessions.id", ondelete="CASCADE"), nullable=False),
         sa.Column("sequence", sa.BigInteger(), nullable=False),
         sa.Column("type", sa.Text(), nullable=False),
         sa.Column("timestamp", timestamp(), nullable=False),
@@ -63,8 +70,9 @@ def upgrade() -> None:
 
     op.create_table(
         "relay_session_artifacts",
-        sa.Column("id", sa.Text(), primary_key=True),
-        sa.Column("session_id", sa.Text(), sa.ForeignKey("relay_sessions.id", ondelete="CASCADE"), nullable=False),
+        uuid_pk(),
+        sa.Column("public_id", sa.Text(), nullable=False, unique=True),
+        sa.Column("session_id", postgresql.UUID(as_uuid=False), sa.ForeignKey("relay_sessions.id", ondelete="CASCADE"), nullable=False),
         sa.Column("agent_run_id", sa.Text(), nullable=True),
         sa.Column("kind", sa.Text(), nullable=False),
         sa.Column("title", sa.Text(), nullable=False),
@@ -78,7 +86,8 @@ def upgrade() -> None:
 
     op.create_table(
         "relay_tasks",
-        sa.Column("id", sa.Text(), primary_key=True),
+        uuid_pk(),
+        sa.Column("public_id", sa.Text(), nullable=False, unique=True),
         sa.Column("title", sa.Text(), nullable=False),
         sa.Column("description", sa.Text(), nullable=False, server_default=""),
         sa.Column("priority", sa.Text(), nullable=False),
@@ -97,8 +106,9 @@ def upgrade() -> None:
 
     op.create_table(
         "relay_task_events",
-        sa.Column("id", sa.Text(), primary_key=True),
-        sa.Column("task_id", sa.Text(), sa.ForeignKey("relay_tasks.id", ondelete="CASCADE"), nullable=False),
+        uuid_pk(),
+        sa.Column("public_id", sa.Text(), nullable=False, unique=True),
+        sa.Column("task_id", postgresql.UUID(as_uuid=False), sa.ForeignKey("relay_tasks.id", ondelete="CASCADE"), nullable=False),
         sa.Column("sequence", sa.BigInteger(), nullable=False),
         sa.Column("type", sa.Text(), nullable=False),
         sa.Column("timestamp", timestamp(), nullable=False),
@@ -110,14 +120,17 @@ def upgrade() -> None:
 
     op.create_table(
         "relay_task_sessions",
-        sa.Column("task_id", sa.Text(), sa.ForeignKey("relay_tasks.id", ondelete="CASCADE"), primary_key=True),
-        sa.Column("session_id", sa.Text(), sa.ForeignKey("relay_sessions.id", ondelete="CASCADE"), primary_key=True),
+        uuid_pk(),
+        sa.Column("task_id", postgresql.UUID(as_uuid=False), sa.ForeignKey("relay_tasks.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("session_public_id", sa.Text(), nullable=False),
         sa.Column("created_at", timestamp(), nullable=False),
+        sa.UniqueConstraint("task_id", "session_public_id", name="uq_relay_task_sessions_task_session_public"),
     )
 
     op.create_table(
         "relay_daemon_nodes",
-        sa.Column("id", sa.Text(), primary_key=True),
+        uuid_pk(),
+        sa.Column("public_id", sa.Text(), nullable=False, unique=True),
         sa.Column("employee_id", sa.Text(), nullable=False),
         sa.Column("workspace_path", sa.Text(), nullable=True),
         sa.Column("status", sa.Text(), nullable=False),
@@ -136,8 +149,10 @@ def upgrade() -> None:
 
     op.create_table(
         "relay_daemon_commands",
-        sa.Column("id", sa.Text(), primary_key=True),
-        sa.Column("node_id", sa.Text(), sa.ForeignKey("relay_daemon_nodes.id", ondelete="CASCADE"), nullable=False),
+        uuid_pk(),
+        sa.Column("public_id", sa.Text(), nullable=False, unique=True),
+        sa.Column("node_id", postgresql.UUID(as_uuid=False), sa.ForeignKey("relay_daemon_nodes.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("node_public_id", sa.Text(), nullable=False),
         sa.Column("type", sa.Text(), nullable=False),
         sa.Column("status", sa.Text(), nullable=False),
         sa.Column("command", jsonb(), nullable=False),
@@ -153,10 +168,13 @@ def upgrade() -> None:
 
     op.create_table(
         "relay_daemon_runs",
-        sa.Column("run_id", sa.Text(), primary_key=True),
-        sa.Column("node_id", sa.Text(), sa.ForeignKey("relay_daemon_nodes.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("command_id", sa.Text(), sa.ForeignKey("relay_daemon_commands.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("session_id", sa.Text(), sa.ForeignKey("relay_sessions.id", ondelete="CASCADE"), nullable=False),
+        uuid_pk(),
+        sa.Column("public_id", sa.Text(), nullable=False, unique=True),
+        sa.Column("node_id", postgresql.UUID(as_uuid=False), sa.ForeignKey("relay_daemon_nodes.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("node_public_id", sa.Text(), nullable=False),
+        sa.Column("command_id", postgresql.UUID(as_uuid=False), sa.ForeignKey("relay_daemon_commands.id", ondelete="SET NULL"), nullable=True),
+        sa.Column("command_public_id", sa.Text(), nullable=True),
+        sa.Column("session_public_id", sa.Text(), nullable=False),
         sa.Column("agent", sa.Text(), nullable=False),
         sa.Column("mode", sa.Text(), nullable=False),
         sa.Column("task_goal", sa.Text(), nullable=False),
@@ -168,14 +186,18 @@ def upgrade() -> None:
         sa.Column("completed_at", timestamp(), nullable=True),
     )
     op.create_index("ix_relay_daemon_runs_node_status", "relay_daemon_runs", ["node_id", "status"])
-    op.create_index("ix_relay_daemon_runs_session_id", "relay_daemon_runs", ["session_id"])
+    op.create_index("ix_relay_daemon_runs_session_public_id", "relay_daemon_runs", ["session_public_id"])
 
     op.create_table(
         "relay_daemon_events",
-        sa.Column("id", sa.Text(), primary_key=True),
-        sa.Column("node_id", sa.Text(), nullable=True),
-        sa.Column("command_id", sa.Text(), nullable=True),
-        sa.Column("run_id", sa.Text(), nullable=True),
+        uuid_pk(),
+        sa.Column("public_id", sa.Text(), nullable=False, unique=True),
+        sa.Column("node_id", postgresql.UUID(as_uuid=False), nullable=True),
+        sa.Column("node_public_id", sa.Text(), nullable=True),
+        sa.Column("command_id", postgresql.UUID(as_uuid=False), nullable=True),
+        sa.Column("command_public_id", sa.Text(), nullable=True),
+        sa.Column("run_id", postgresql.UUID(as_uuid=False), nullable=True),
+        sa.Column("run_public_id", sa.Text(), nullable=True),
         sa.Column("type", sa.Text(), nullable=False),
         sa.Column("timestamp", timestamp(), nullable=False),
         sa.Column("payload", jsonb(), nullable=False),
@@ -189,7 +211,7 @@ def downgrade() -> None:
     op.drop_index("ix_relay_daemon_events_timestamp", table_name="relay_daemon_events")
     op.drop_table("relay_daemon_events")
 
-    op.drop_index("ix_relay_daemon_runs_session_id", table_name="relay_daemon_runs")
+    op.drop_index("ix_relay_daemon_runs_session_public_id", table_name="relay_daemon_runs")
     op.drop_index("ix_relay_daemon_runs_node_status", table_name="relay_daemon_runs")
     op.drop_table("relay_daemon_runs")
 

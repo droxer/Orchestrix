@@ -3,6 +3,7 @@ from __future__ import annotations
 import random
 import string
 import time
+import uuid
 from datetime import datetime, timezone
 
 
@@ -24,6 +25,10 @@ def _base36(value: int) -> str:
 def new_relay_id(prefix: str) -> str:
     suffix = "".join(random.choice(string.ascii_lowercase + string.digits) for _ in range(6))
     return f"{prefix}_{_base36(int(time.time() * 1000))}_{suffix}"
+
+
+def new_database_id() -> str:
+    return str(uuid.uuid4())
 
 
 def new_sandbox_id(employee_id: str) -> str:

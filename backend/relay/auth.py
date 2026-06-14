@@ -9,10 +9,10 @@ from typing import Any, Literal
 
 from fastapi import HTTPException, Request
 from loguru import logger
-from sqlalchemy import CheckConstraint, Column, DateTime, ForeignKey, MetaData, Table, Text, create_engine, delete, insert, select, update
+from sqlalchemy import CheckConstraint, Column, DateTime, ForeignKey, MetaData, Table, Text, Uuid, create_engine, delete, insert, select, update
 from sqlalchemy.exc import IntegrityError
 
-from .ids import new_relay_id, now_iso
+from .ids import new_database_id, new_relay_id, now_iso
 from .storage_config import database_url_from_env, use_postgres_storage
 
 DEFAULT_SESSION_TTL_SECONDS = 7 * 24 * 60 * 60  # 1 week
@@ -20,6 +20,10 @@ USER_COOKIE_NAME = "relay_session"
 PW_HASH_ALGORITHM = "pbkdf2_sha256"
 PW_HASH_ITERATIONS = 600_000
 UserRole = Literal["admin", "user"]
+
+
+def database_id_column() -> Column[Any]:
+    return Column("id", Uuid(as_uuid=False), primary_key=True, default=new_database_id)
 
 
 def _parse_iso(value: str | None) -> datetime | None:
@@ -105,6 +109,7 @@ class UserAuthStore:
         role: UserRole = "user",
         email: str | None = None,
         employee_id: str | None = None,
+        display_name: str | None = None,
         department_id: str | None = None,
         department_name: str | None = None,
     ) -> dict[str, Any]:
@@ -124,6 +129,7 @@ class UserAuthStore:
             "email": email.strip() if email else None,
             "role": role,
             "employeeId": employee_id.strip() if employee_id else None,
+            "displayName": display_name.strip() if display_name else None,
             "departmentId": department_id.strip() if department_id else None,
             "departmentName": department_name.strip() if department_name else None,
             "passwordHash": hash_password(password),
@@ -224,6 +230,7 @@ class UserAuthStore:
             "email": user.get("email"),
             "role": user["role"],
             "employeeId": user.get("employeeId"),
+            "displayName": user.get("displayName"),
             "createdAt": user["createdAt"],
         }
 
@@ -234,30 +241,36 @@ class DatabaseUserAuthStore:
     departments = Table(
         "departments",
         metadata,
-        Column("id", Text, primary_key=True),
+        database_id_column(),
+        Column("public_id", Text, nullable=False, unique=True),
         Column("name", Text, nullable=False),
-        Column("parent_department_id", Text, ForeignKey("departments.id", ondelete="SET NULL"), nullable=True),
+        Column("parent_department_id", Uuid(as_uuid=False), ForeignKey("departments.id", ondelete="SET NULL"), nullable=True),
+        Column("parent_department_public_id", Text, nullable=True),
         Column("created_at", DateTime(timezone=True), nullable=False),
         Column("updated_at", DateTime(timezone=True), nullable=False),
     )
     employees = Table(
         "employees",
         metadata,
-        Column("id", Text, primary_key=True),
+        database_id_column(),
+        Column("public_id", Text, nullable=False, unique=True),
         Column("display_name", Text, nullable=False),
         Column("email", Text, nullable=True),
-        Column("department_id", Text, ForeignKey("departments.id", ondelete="SET NULL"), nullable=True),
+        Column("department_id", Uuid(as_uuid=False), ForeignKey("departments.id", ondelete="SET NULL"), nullable=True),
+        Column("department_public_id", Text, nullable=True),
         Column("created_at", DateTime(timezone=True), nullable=False),
         Column("updated_at", DateTime(timezone=True), nullable=False),
     )
     users = Table(
         "auth_users",
         metadata,
-        Column("id", Text, primary_key=True),
+        database_id_column(),
+        Column("public_id", Text, nullable=False, unique=True),
         Column("username", Text, nullable=False, unique=True),
         Column("email", Text, nullable=True),
         Column("role", Text, nullable=False),
-        Column("employee_id", Text, ForeignKey("employees.id", ondelete="SET NULL"), nullable=True),
+        Column("employee_id", Uuid(as_uuid=False), ForeignKey("employees.id", ondelete="SET NULL"), nullable=True),
+        Column("employee_public_id", Text, nullable=True),
         Column("password_hash", Text, nullable=False),
         Column("created_at", DateTime(timezone=True), nullable=False),
         Column("updated_at", DateTime(timezone=True), nullable=False),
@@ -266,9 +279,11 @@ class DatabaseUserAuthStore:
     sessions = Table(
         "auth_sessions",
         metadata,
-        Column("id", Text, primary_key=True),
+        database_id_column(),
+        Column("public_id", Text, nullable=False, unique=True),
         Column("token_hash", Text, nullable=False, unique=True),
-        Column("user_id", Text, ForeignKey("auth_users.id", ondelete="CASCADE"), nullable=False),
+        Column("user_id", Uuid(as_uuid=False), ForeignKey("auth_users.id", ondelete="CASCADE"), nullable=False),
+        Column("user_public_id", Text, nullable=False),
         Column("created_at", DateTime(timezone=True), nullable=False),
         Column("expires_at", DateTime(timezone=True), nullable=False),
     )
@@ -296,6 +311,7 @@ class DatabaseUserAuthStore:
         role: UserRole = "user",
         email: str | None = None,
         employee_id: str | None = None,
+        display_name: str | None = None,
         department_id: str | None = None,
         department_name: str | None = None,
     ) -> dict[str, Any]:
@@ -307,6 +323,7 @@ class DatabaseUserAuthStore:
         if role not in ("admin", "user"):
             raise ValueError("role must be admin or user.")
         employee_id = employee_id.strip() if employee_id else username
+        display_name = display_name.strip() if display_name else username
         department_id = department_id.strip() if department_id else None
         department_name = department_name.strip() if department_name else None
         email = email.strip() if email else None
@@ -324,8 +341,8 @@ class DatabaseUserAuthStore:
         }
         try:
             with self.engine.begin() as conn:
-                self._ensure_employee(conn, employee_id, display_name=username, email=email, department_id=department_id, department_name=department_name)
-                conn.execute(insert(self.users).values(**database_user_to_row(user)))
+                self._ensure_employee(conn, employee_id, display_name=display_name, email=email, department_id=department_id, department_name=department_name)
+                conn.execute(insert(self.users).values(**database_user_to_row(user, employee_pk=self._employee_pk(conn, employee_id))))
         except IntegrityError as error:
             raise ValueError("username already exists.") from error
         logger.info("User created", user_id=user["id"], username=username, role=role)
@@ -361,8 +378,8 @@ class DatabaseUserAuthStore:
     def list_employees(self) -> list[dict[str, Any]]:
         with self.engine.begin() as conn:
             department_rows = conn.execute(select(self.departments)).mappings().all()
-            departments = {row["id"]: row_to_department(row) for row in department_rows}
-            rows = conn.execute(select(self.employees).order_by(self.employees.c.id)).mappings().all()
+            departments = {row["public_id"]: row_to_department(row) for row in department_rows}
+            rows = conn.execute(select(self.employees).order_by(self.employees.c.public_id)).mappings().all()
         return [employee_with_department(row_to_employee(row), departments) for row in rows]
 
     def authenticate(self, username: str, password: str) -> dict[str, Any] | None:
@@ -396,7 +413,7 @@ class DatabaseUserAuthStore:
             "expiresAt": _format_iso(expires_at),
         }
         with self.engine.begin() as conn:
-            conn.execute(insert(self.sessions).values(**database_session_to_row(session)))
+            conn.execute(insert(self.sessions).values(**database_session_to_row(session, user_pk=self._user_pk(conn, user_id))))
         return session
 
     def get_session_by_token(self, token: str | None) -> dict[str, Any] | None:
@@ -415,7 +432,7 @@ class DatabaseUserAuthStore:
 
     def get_user_by_id(self, user_id: str) -> dict[str, Any] | None:
         with self.engine.begin() as conn:
-            row = conn.execute(select(self.users).where(self.users.c.id == user_id)).mappings().first()
+            row = conn.execute(select(self.users).where(self.users.c.public_id == user_id)).mappings().first()
         return row_to_database_user(row) if row else None
 
     def delete_session(self, token: str) -> bool:
@@ -444,19 +461,21 @@ class DatabaseUserAuthStore:
         now = datetime.now(timezone.utc)
         if parent_department_id:
             self._ensure_department(conn, parent_department_id)
-        row = conn.execute(select(self.departments).where(self.departments.c.id == department_id)).mappings().first()
+        row = conn.execute(select(self.departments).where(self.departments.c.public_id == department_id)).mappings().first()
         if row:
+            department_pk = row["id"]
             patch: dict[str, Any] = {"updated_at": now}
             if name:
                 patch["name"] = name
             if parent_department_id:
-                patch["parent_department_id"] = parent_department_id
+                patch["parent_department_id"] = self._department_pk(conn, parent_department_id)
+                patch["parent_department_public_id"] = parent_department_id
             if len(patch) > 1:
-                conn.execute(update(self.departments).where(self.departments.c.id == department_id).values(**patch))
+                conn.execute(update(self.departments).where(self.departments.c.id == department_pk).values(**patch))
                 return {
                     **row_to_department(row),
                     "name": patch.get("name", row["name"]),
-                    "parentDepartmentId": patch.get("parent_department_id", row["parent_department_id"]),
+                    "parentDepartmentId": patch.get("parent_department_public_id", row["parent_department_public_id"]),
                     "updatedAt": _format_iso(now),
                 }
             return row_to_department(row)
@@ -468,7 +487,8 @@ class DatabaseUserAuthStore:
             "createdAt": _format_iso(now),
             "updatedAt": _format_iso(now),
         }
-        conn.execute(insert(self.departments).values(**department_to_row(department)))
+        parent_department_pk = self._department_pk(conn, parent_department_id) if parent_department_id else None
+        conn.execute(insert(self.departments).values(**department_to_row(department, parent_department_pk=parent_department_pk)))
         return department
 
     def _ensure_employee(
@@ -485,17 +505,19 @@ class DatabaseUserAuthStore:
         department_id = department_id.strip() if department_id else None
         if department_id:
             self._ensure_department(conn, department_id, name=department_name)
-        row = conn.execute(select(self.employees).where(self.employees.c.id == employee_id)).mappings().first()
+        row = conn.execute(select(self.employees).where(self.employees.c.public_id == employee_id)).mappings().first()
         if row:
+            employee_pk = row["id"]
             patch: dict[str, Any] = {"updated_at": now}
             if display_name:
                 patch["display_name"] = display_name
             if email:
                 patch["email"] = email
             if department_id:
-                patch["department_id"] = department_id
+                patch["department_id"] = self._department_pk(conn, department_id)
+                patch["department_public_id"] = department_id
             if len(patch) > 1:
-                conn.execute(update(self.employees).where(self.employees.c.id == employee_id).values(**patch))
+                conn.execute(update(self.employees).where(self.employees.c.id == employee_pk).values(**patch))
                 return {
                     **row_to_employee(row),
                     **({"displayName": display_name} if display_name else {}),
@@ -513,8 +535,27 @@ class DatabaseUserAuthStore:
             "createdAt": _format_iso(now),
             "updatedAt": _format_iso(now),
         }
-        conn.execute(insert(self.employees).values(**employee_to_row(employee)))
+        department_pk = self._department_pk(conn, department_id) if department_id else None
+        conn.execute(insert(self.employees).values(**employee_to_row(employee, department_pk=department_pk)))
         return employee
+
+    def _user_pk(self, conn: Any, user_id: str) -> str:
+        user_pk = conn.scalar(select(self.users.c.id).where(self.users.c.public_id == user_id))
+        if not user_pk:
+            raise KeyError(user_id)
+        return user_pk
+
+    def _employee_pk(self, conn: Any, employee_id: str) -> str:
+        employee_pk = conn.scalar(select(self.employees.c.id).where(self.employees.c.public_id == employee_id))
+        if not employee_pk:
+            raise KeyError(employee_id)
+        return employee_pk
+
+    def _department_pk(self, conn: Any, department_id: str) -> str:
+        department_pk = conn.scalar(select(self.departments.c.id).where(self.departments.c.public_id == department_id))
+        if not department_pk:
+            raise KeyError(department_id)
+        return department_pk
 
 
 def auth_store_from_env(root_dir: str | Path) -> Any:
@@ -526,35 +567,41 @@ def auth_store_from_env(root_dir: str | Path) -> Any:
     return DatabaseUserAuthStore(database_url)
 
 
-def database_user_to_row(user: dict[str, Any]) -> dict[str, Any]:
+def database_user_to_row(user: dict[str, Any], *, employee_pk: str | None = None) -> dict[str, Any]:
     return {
-        "id": user["id"],
+        "id": new_database_id(),
+        "public_id": user["id"],
         "username": user["username"],
         "email": user.get("email"),
         "role": user["role"],
-        "employee_id": user.get("employeeId"),
+        "employee_id": employee_pk,
+        "employee_public_id": user.get("employeeId"),
         "password_hash": user["passwordHash"],
         "created_at": _parse_iso(user["createdAt"]),
         "updated_at": _parse_iso(user["updatedAt"]),
     }
 
 
-def employee_to_row(employee: dict[str, Any]) -> dict[str, Any]:
+def employee_to_row(employee: dict[str, Any], *, department_pk: str | None = None) -> dict[str, Any]:
     return {
-        "id": employee["id"],
+        "id": new_database_id(),
+        "public_id": employee["id"],
         "display_name": employee["displayName"],
         "email": employee.get("email"),
-        "department_id": employee.get("departmentId"),
+        "department_id": department_pk,
+        "department_public_id": employee.get("departmentId"),
         "created_at": _parse_iso(employee["createdAt"]),
         "updated_at": _parse_iso(employee["updatedAt"]),
     }
 
 
-def department_to_row(department: dict[str, Any]) -> dict[str, Any]:
+def department_to_row(department: dict[str, Any], *, parent_department_pk: str | None = None) -> dict[str, Any]:
     return {
-        "id": department["id"],
+        "id": new_database_id(),
+        "public_id": department["id"],
         "name": department["name"],
-        "parent_department_id": department.get("parentDepartmentId"),
+        "parent_department_id": parent_department_pk,
+        "parent_department_public_id": department.get("parentDepartmentId"),
         "created_at": _parse_iso(department["createdAt"]),
         "updated_at": _parse_iso(department["updatedAt"]),
     }
@@ -562,9 +609,9 @@ def department_to_row(department: dict[str, Any]) -> dict[str, Any]:
 
 def row_to_department(row: Any) -> dict[str, Any]:
     return {
-        "id": row["id"],
+        "id": row["public_id"],
         "name": row["name"],
-        "parentDepartmentId": row["parent_department_id"],
+        "parentDepartmentId": row["parent_department_public_id"],
         "createdAt": _format_iso(row["created_at"]),
         "updatedAt": _format_iso(row["updated_at"]),
     }
@@ -572,10 +619,10 @@ def row_to_department(row: Any) -> dict[str, Any]:
 
 def row_to_employee(row: Any) -> dict[str, Any]:
     return {
-        "id": row["id"],
+        "id": row["public_id"],
         "displayName": row["display_name"],
         "email": row["email"],
-        "departmentId": row["department_id"],
+        "departmentId": row["department_public_id"],
         "createdAt": _format_iso(row["created_at"]),
         "updatedAt": _format_iso(row["updated_at"]),
     }
@@ -590,22 +637,24 @@ def employee_with_department(employee: dict[str, Any], departments: dict[str, di
 
 def row_to_database_user(row: Any) -> dict[str, Any]:
     return {
-        "id": row["id"],
+        "id": row["public_id"],
         "username": row["username"],
         "email": row["email"],
         "role": row["role"],
-        "employeeId": row["employee_id"],
+        "employeeId": row["employee_public_id"],
         "passwordHash": row["password_hash"],
         "createdAt": _format_iso(row["created_at"]),
         "updatedAt": _format_iso(row["updated_at"]),
     }
 
 
-def database_session_to_row(session: dict[str, Any]) -> dict[str, Any]:
+def database_session_to_row(session: dict[str, Any], *, user_pk: str) -> dict[str, Any]:
     return {
-        "id": session["id"],
+        "id": new_database_id(),
+        "public_id": session["id"],
         "token_hash": hash_session_token(session["token"]),
-        "user_id": session["userId"],
+        "user_id": user_pk,
+        "user_public_id": session["userId"],
         "created_at": _parse_iso(session["createdAt"]),
         "expires_at": _parse_iso(session["expiresAt"]),
     }
@@ -613,9 +662,9 @@ def database_session_to_row(session: dict[str, Any]) -> dict[str, Any]:
 
 def row_to_database_session(row: Any, token: str) -> dict[str, Any]:
     return {
-        "id": row["id"],
+        "id": row["public_id"],
         "token": token,
-        "userId": row["user_id"],
+        "userId": row["user_public_id"],
         "createdAt": _format_iso(row["created_at"]),
         "expiresAt": _format_iso(row["expires_at"]),
     }

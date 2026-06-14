@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import {
   ActionAddPerson, ActionApprove, ActionHandoff, ActionMention, ActionSearch,
   ActionSend, ActionStop, NavAdmin, NavCollapse, NavConversations, NavLogout, NavMcp,
-  NavPreferences, NavRefresh, NavSandboxes, NavSkills,
+  NavPreferences, NavRefresh, NavSkills,
 } from "./components/icons";
 import { AgentMark } from "./components/AgentMark";
 import {
@@ -24,7 +24,6 @@ import { AdminConsole } from "./components/AdminConsole";
 import { LoginScreen } from "./components/LoginScreen";
 import { McpPage } from "./components/McpPage";
 import { SkillsPage } from "./components/SkillsPage";
-import { SettingsDrawer } from "./components/SettingsDrawer";
 import { PreferencesDialog } from "./components/PreferencesDialog";
 import { SUPPORTED_LANGUAGES, type Theme, type Language } from "./components/PreferencesPanel";
 import { ConversationRow } from "./components/ConversationRow";
@@ -217,7 +216,6 @@ export function App() {
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [tokens, setTokens] = useState<TokenMap>({});
   const [hydrated, setHydrated] = useState(false);
-  const [tokenInput, setTokenInput] = useState("");
   const [activeAgent, setActiveAgent] = useState<AgentName>("claude");
   const [composerText, setComposerText] = useState("");
   const [mentionOpen, setMentionOpen] = useState(false);
@@ -227,7 +225,6 @@ export function App() {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [employeeQuery, setEmployeeQuery] = useState("");
   const [selectedSessionId, setSelectedSessionId] = useState<string | undefined>();
-  const [sandboxesOpen, setSandboxesOpen] = useState(false);
   const [prefsOpen, setPrefsOpen] = useState(false);
   const [mobileView, setMobileView] = useState<MobileView>("chat");
   const [route, setRoute] = useState<AppRoute>("main");
@@ -337,8 +334,6 @@ export function App() {
       return a.id.localeCompare(b.id);
     });
   }, [visibleNodes, sandboxes, selectedEmployee, sessions, tokens]);
-  const registeredEmployeeIds = useMemo(() => employeeContacts.map((contact) => contact.id), [employeeContacts]);
-
   const filteredEmployees = useMemo(() => {
     const q = employeeQuery.trim().toLowerCase();
     if (!q) return employeeContacts;
@@ -407,7 +402,7 @@ export function App() {
     const nextTokens = { ...tokens };
     const adoptedSandboxes: SandboxRecord[] = [];
     for (const node of claimable) {
-      if (!node.nodeToken) continue;
+      if (!node.employeeId || !node.nodeToken) continue;
       const uiToken = newBrowserSandboxToken();
       try {
         const sandbox = await provisionSandbox(node.employeeId, uiToken, node.nodeToken);
@@ -474,12 +469,10 @@ export function App() {
     if (!hydrated) return;
     if (selectedEmployee) {
       localStorage.setItem(selectedEmployeeKey, selectedEmployee);
-      setTokenInput(tokens[selectedEmployee] ?? "");
     } else {
       localStorage.removeItem(selectedEmployeeKey);
-      setTokenInput("");
     }
-  }, [selectedEmployee, tokens, hydrated]);
+  }, [selectedEmployee, hydrated]);
   useEffect(() => {
     if (!hydrated || employeeContacts.length === 0) return;
     if (!employeeContacts.some((contact) => contact.id === selectedEmployee)) {
@@ -517,7 +510,7 @@ export function App() {
     const next = employeeId.trim().replace(/^@/, "");
     if (!next) return;
     setSelectedEmployee(next); setMobileView("chat");
-    const token = next === selectedEmployee ? tokenInput.trim() || tokens[next] : tokens[next];
+    const token = tokens[next];
     try {
       setStatus({ tone: "info", message: t("toast.opening_workspace", { employee: next }) });
       const { sandbox, token: savedToken } = await provisionEmployeeSandbox(next, token);
@@ -540,15 +533,6 @@ export function App() {
     }
     setTokens(nextTokens); writeTokens(nextTokens);
     if (selectedEmployee === employeeId) setSelectedEmployee("");
-  }
-
-  function saveToken() {
-    const token = tokenInput.trim();
-    const nextTokens = { ...tokens };
-    if (selectedSandbox) nextTokens[selectedSandbox.id] = token;
-    nextTokens[selectedEmployee] = token;
-    setTokens(nextTokens); writeTokens(nextTokens);
-    setStatus({ tone: "info", message: token ? t("toast.token_saved") : t("toast.token_cleared") });
   }
 
   async function sendMessage() {
@@ -684,7 +668,7 @@ export function App() {
   }
 
   return (
-    <main className="messenger-shell" data-settings={sandboxesOpen ? "open" : "closed"} data-mobile-view={mobileView} data-route={route} data-sidenav={sidenavExpanded ? "open" : "closed"}>
+    <main className="messenger-shell" data-settings="closed" data-mobile-view={mobileView} data-route={route} data-sidenav={sidenavExpanded ? "open" : "closed"}>
       <a className="skip-link" href="#chat-panel">{t("skip_to_conversation")}</a>
 
       <div className="mobile-topbar" aria-label={t("nav.conversations")}>
@@ -711,6 +695,10 @@ export function App() {
             className="sidenav-btn sidenav-toggle"
             onClick={() => setSidenavExpanded((v) => !v)}
             title={sidenavExpanded ? t("nav.collapse_sidebar") : t("nav.expand_sidebar")}
+            onMouseEnter={(e) => showNavTooltip(sidenavExpanded ? t("nav.collapse_sidebar") : t("nav.expand_sidebar"), e.currentTarget)}
+            onMouseLeave={hideNavTooltip}
+            onFocus={(e) => showNavTooltip(sidenavExpanded ? t("nav.collapse_sidebar") : t("nav.expand_sidebar"), e.currentTarget)}
+            onBlur={hideNavTooltip}
           >
             <NavCollapse size={16} className={sidenavExpanded ? "sidenav-chevron-open" : ""} />
             <span className="sidenav-toggle-label">{sidenavExpanded ? t("nav.collapse") : t("nav.expand")}</span>
@@ -731,7 +719,7 @@ export function App() {
             onBlur={hideNavTooltip}
           >
             <NavConversations size={18} />
-            <span>{t("nav.conversations")}</span>
+            <span className="sidenav-label">{t("nav.conversations")}</span>
           </button>
           <button
             className={`sidenav-btn ${route === "mcp" ? "active" : ""}`}
@@ -747,7 +735,7 @@ export function App() {
             onBlur={hideNavTooltip}
           >
             <NavMcp size={18} />
-            <span>{t("nav.mcp")}</span>
+            <span className="sidenav-label">{t("nav.mcp")}</span>
           </button>
           <button
             className={`sidenav-btn ${route === "skills" ? "active" : ""}`}
@@ -763,7 +751,7 @@ export function App() {
             onBlur={hideNavTooltip}
           >
             <NavSkills size={18} />
-            <span>{t("nav.skills")}</span>
+            <span className="sidenav-label">{t("nav.skills")}</span>
           </button>
           {user.role === "admin" ? (
             <button
@@ -780,7 +768,7 @@ export function App() {
               onBlur={hideNavTooltip}
             >
               <NavAdmin size={18} />
-              <span>{t("nav.admin")}</span>
+              <span className="sidenav-label">{t("nav.admin")}</span>
             </button>
           ) : null}
         </nav>
@@ -800,7 +788,7 @@ export function App() {
             onBlur={hideNavTooltip}
           >
             <NavPreferences size={18} />
-            <span>{t("nav.settings")}</span>
+            <span className="sidenav-label">{t("nav.settings")}</span>
           </button>
           <button
             type="button"
@@ -815,7 +803,7 @@ export function App() {
             onBlur={hideNavTooltip}
           >
             <NavLogout size={18} />
-            <span>{t("nav.logout")}</span>
+            <span className="sidenav-label">{t("nav.logout")}</span>
           </button>
         </div>
         {navTooltip ? (
@@ -900,9 +888,6 @@ export function App() {
             <button className="icon-button" type="button" aria-label={t("nav.refresh")} title={t("nav.refresh")} onClick={() => void refresh()}>
               <NavRefresh size={16} className={isRefreshing ? "spin" : ""} />
             </button>
-            <button className={`icon-button ${sandboxesOpen ? "active" : ""}`} type="button" aria-label={t("nav.sandboxes")} aria-controls="settings-drawer" aria-expanded={sandboxesOpen} title={t("nav.sandboxes")} onClick={() => setSandboxesOpen((v) => !v)}>
-              <NavSandboxes size={16} />
-            </button>
           </div>
         </header>
 
@@ -979,23 +964,6 @@ export function App() {
       </section>
 
       </>)}
-
-      <SettingsDrawer
-        open={sandboxesOpen && route === "main"}
-        onClose={() => setSandboxesOpen(false)}
-        sandboxes={{
-          registeredEmployees: registeredEmployeeIds,
-          selectedEmployee,
-          selectEmployee,
-          tokenInput,
-          setTokenInput,
-          saveToken,
-          selectedSandbox,
-          selectedNode,
-          activeRun,
-          onCancelRun: cancelActiveRun,
-        }}
-      />
 
       <PreferencesDialog
         open={prefsOpen}

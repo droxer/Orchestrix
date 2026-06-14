@@ -26,11 +26,11 @@ def test_database_auth_store_persists_users_and_hashes_session_tokens() -> None:
         engine = create_engine(database_url, future=True)
         with engine.begin() as conn:
             row = conn.execute(text("select token_hash from auth_sessions")).mappings().one()
-            employee = conn.execute(text("select id, display_name, email from employees")).mappings().one()
+            employee = conn.execute(text("select public_id, display_name, email from employees")).mappings().one()
 
         assert row["token_hash"] == hash_session_token(session["token"])
         assert row["token_hash"] != session["token"]
-        assert dict(employee) == {"id": "emp_1", "display_name": "alice", "email": "alice@example.com"}
+        assert dict(employee) == {"public_id": "emp_1", "display_name": "alice", "email": "alice@example.com"}
         assert store.delete_session(session["token"]) is True
         assert store.get_session_by_token(session["token"]) is None
 

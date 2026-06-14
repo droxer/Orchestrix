@@ -15,6 +15,8 @@ from sqlalchemy import (
     MetaData,
     Table,
     Text,
+    UniqueConstraint,
+    Uuid,
     create_engine,
     insert,
     select,
@@ -23,11 +25,15 @@ from sqlalchemy import (
 
 from loguru import logger
 
-from .ids import new_relay_id, now_iso
+from .ids import new_database_id, new_relay_id, now_iso
 from .models import AGENT_NAMES, AgentName, TaskPriority, TaskStatus
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_RELAY_DATA_DIR = REPO_ROOT / ".relay"
+
+
+def database_id_column() -> Column[Any]:
+    return Column("id", Uuid(as_uuid=False), primary_key=True, default=new_database_id)
 
 
 def _parse_iso(value: str | None) -> Any:
@@ -298,7 +304,8 @@ class DatabaseSessionStore:
     sessions = Table(
         "sessions",
         metadata,
-        Column("id", Text, primary_key=True),
+        database_id_column(),
+        Column("public_id", Text, nullable=False, unique=True),
         Column("workspace_path", Text, nullable=False),
         Column("owner_employee_id", Text, nullable=True),
         Column("task_goal", Text, nullable=False),
@@ -317,8 +324,9 @@ class DatabaseSessionStore:
     events = Table(
         "session_events",
         metadata,
-        Column("id", Text, primary_key=True),
-        Column("session_id", Text, ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False),
+        database_id_column(),
+        Column("public_id", Text, nullable=False, unique=True),
+        Column("session_id", Uuid(as_uuid=False), ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False),
         Column("sequence", BigInteger, nullable=False),
         Column("type", Text, nullable=False),
         Column("timestamp", DateTime(timezone=True), nullable=False),
@@ -327,8 +335,9 @@ class DatabaseSessionStore:
     artifacts = Table(
         "session_artifacts",
         metadata,
-        Column("id", Text, primary_key=True),
-        Column("session_id", Text, ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False),
+        database_id_column(),
+        Column("public_id", Text, nullable=False, unique=True),
+        Column("session_id", Uuid(as_uuid=False), ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False),
         Column("agent_run_id", Text, nullable=True),
         Column("kind", Text, nullable=False),
         Column("title", Text, nullable=False),
@@ -364,26 +373,28 @@ class DatabaseSessionStore:
             }))
         session = materialize_events(events)
         with self.engine.begin() as conn:
-            conn.execute(insert(self.sessions).values(**session_to_row(session, version=len(events))))
+            session_row = session_to_row(session, version=len(events))
+            conn.execute(insert(self.sessions).values(**session_row))
             for sequence, event in enumerate(events):
-                conn.execute(insert(self.events).values(**session_event_to_row(session_id, sequence, event)))
+                conn.execute(insert(self.events).values(**session_event_to_row(session_row["id"], sequence, event)))
         return session
 
     def append_event(self, session_id: str, event: dict[str, Any]) -> dict[str, Any]:
         with self.engine.begin() as conn:
-            events = self._events_for_session(conn, session_id)
+            session_pk = self._session_pk(conn, session_id)
+            events = self._events_for_session(conn, session_pk)
             if not events:
                 raise KeyError(session_id)
             sequence = len(events)
-            conn.execute(insert(self.events).values(**session_event_to_row(session_id, sequence, event)))
+            conn.execute(insert(self.events).values(**session_event_to_row(session_pk, sequence, event)))
             session = materialize_events([*events, event])
-            conn.execute(update(self.sessions).where(self.sessions.c.id == session_id).values(**session_to_row(session, version=sequence + 1)))
+            conn.execute(update(self.sessions).where(self.sessions.c.id == session_pk).values(**session_to_row(session, version=sequence + 1, database_id=session_pk)))
         logger.debug("Database session event appended", session_id=session_id, event_type=event.get("type"))
         return session
 
     def get_session(self, session_id: str) -> dict[str, Any]:
         with self.engine.begin() as conn:
-            row = conn.execute(select(self.sessions.c.snapshot).where(self.sessions.c.id == session_id)).mappings().first()
+            row = conn.execute(select(self.sessions.c.snapshot).where(self.sessions.c.public_id == session_id)).mappings().first()
             if not row:
                 raise KeyError(session_id)
         return row["snapshot"]
@@ -413,16 +424,18 @@ class DatabaseSessionStore:
             "bytes": len(body.encode("utf-8")),
         }
         with self.engine.begin() as conn:
-            conn.execute(insert(self.artifacts).values(**session_artifact_to_row(session_id, artifact, {"extension": extension})))
+            session_pk = self._session_pk(conn, session_id)
+            conn.execute(insert(self.artifacts).values(**session_artifact_to_row(session_pk, artifact, {"extension": extension})))
         logger.debug("Database artifact written", session_id=session_id, artifact_id=artifact_id, kind=input.get("kind"), bytes=artifact["bytes"])
         return artifact
 
     def artifact_path(self, session_id: str, artifact_id: str) -> Path:
         with self.engine.begin() as conn:
+            session_pk = self._session_pk(conn, session_id)
             row = conn.execute(
                 select(self.artifacts.c.path)
-                .where(self.artifacts.c.session_id == session_id)
-                .where(self.artifacts.c.id == artifact_id)
+                .where(self.artifacts.c.session_id == session_pk)
+                .where(self.artifacts.c.public_id == artifact_id)
             ).mappings().first()
         if row and row["path"]:
             return Path(row["path"])
@@ -434,10 +447,16 @@ class DatabaseSessionStore:
     def read_artifact(self, session_id: str, artifact_id: str) -> str:
         return self.artifact_path(session_id, artifact_id).read_text(encoding="utf-8")
 
-    def _events_for_session(self, conn: Any, session_id: str) -> list[dict[str, Any]]:
+    def _session_pk(self, conn: Any, session_id: str) -> str:
+        session_pk = conn.scalar(select(self.sessions.c.id).where(self.sessions.c.public_id == session_id))
+        if not session_pk:
+            raise KeyError(session_id)
+        return session_pk
+
+    def _events_for_session(self, conn: Any, session_pk: str) -> list[dict[str, Any]]:
         rows = conn.execute(
             select(self.events.c.payload)
-            .where(self.events.c.session_id == session_id)
+            .where(self.events.c.session_id == session_pk)
             .order_by(self.events.c.sequence)
         ).mappings().all()
         return [row["payload"] for row in rows]
@@ -537,7 +556,8 @@ class DatabaseTaskStore:
     tasks = Table(
         "tasks",
         metadata,
-        Column("id", Text, primary_key=True),
+        database_id_column(),
+        Column("public_id", Text, nullable=False, unique=True),
         Column("title", Text, nullable=False),
         Column("description", Text, nullable=False),
         Column("priority", Text, nullable=False),
@@ -552,8 +572,9 @@ class DatabaseTaskStore:
     events = Table(
         "task_events",
         metadata,
-        Column("id", Text, primary_key=True),
-        Column("task_id", Text, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False),
+        database_id_column(),
+        Column("public_id", Text, nullable=False, unique=True),
+        Column("task_id", Uuid(as_uuid=False), ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False),
         Column("sequence", BigInteger, nullable=False),
         Column("type", Text, nullable=False),
         Column("timestamp", DateTime(timezone=True), nullable=False),
@@ -562,9 +583,11 @@ class DatabaseTaskStore:
     task_sessions = Table(
         "task_sessions",
         metadata,
-        Column("task_id", Text, ForeignKey("tasks.id", ondelete="CASCADE"), primary_key=True),
-        Column("session_id", Text, primary_key=True),
+        database_id_column(),
+        Column("task_id", Uuid(as_uuid=False), ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False),
+        Column("session_public_id", Text, nullable=False),
         Column("created_at", DateTime(timezone=True), nullable=False),
+        UniqueConstraint("task_id", "session_public_id", name="uq_task_sessions_task_session_public"),
     )
 
     def __init__(self, database_url: str, *, create_schema: bool = False):
@@ -587,28 +610,30 @@ class DatabaseTaskStore:
             events.append(relay_task_event("task.status", task_id, {"status": input["status"]}))
         task = materialize_task_events(events)
         with self.engine.begin() as conn:
-            conn.execute(insert(self.tasks).values(**task_to_row(task, version=len(events))))
+            task_row = task_to_row(task, version=len(events))
+            conn.execute(insert(self.tasks).values(**task_row))
             for sequence, event in enumerate(events):
-                conn.execute(insert(self.events).values(**task_event_to_row(task_id, sequence, event)))
+                conn.execute(insert(self.events).values(**task_event_to_row(task_row["id"], sequence, event)))
         return task
 
     def append_event(self, task_id: str, event: dict[str, Any]) -> dict[str, Any]:
         with self.engine.begin() as conn:
-            events = self._events_for_task(conn, task_id)
+            task_pk = self._task_pk(conn, task_id)
+            events = self._events_for_task(conn, task_pk)
             if not events:
                 raise KeyError(task_id)
             sequence = len(events)
-            conn.execute(insert(self.events).values(**task_event_to_row(task_id, sequence, event)))
+            conn.execute(insert(self.events).values(**task_event_to_row(task_pk, sequence, event)))
             task = materialize_task_events([*events, event])
-            conn.execute(update(self.tasks).where(self.tasks.c.id == task_id).values(**task_to_row(task, version=sequence + 1)))
+            conn.execute(update(self.tasks).where(self.tasks.c.id == task_pk).values(**task_to_row(task, version=sequence + 1, database_id=task_pk)))
             if event.get("type") == "task.session_linked":
-                self._ensure_task_session(conn, task_id, event["sessionId"], event["timestamp"])
+                self._ensure_task_session(conn, task_pk, event["sessionId"], event["timestamp"])
         logger.debug("Database task event appended", task_id=task_id, event_type=event.get("type"))
         return task
 
     def get_task(self, task_id: str) -> dict[str, Any]:
         with self.engine.begin() as conn:
-            row = conn.execute(select(self.tasks.c.snapshot).where(self.tasks.c.id == task_id)).mappings().first()
+            row = conn.execute(select(self.tasks.c.snapshot).where(self.tasks.c.public_id == task_id)).mappings().first()
             if not row:
                 raise KeyError(task_id)
         return row["snapshot"]
@@ -652,22 +677,28 @@ class DatabaseTaskStore:
             }
         }))
 
-    def _events_for_task(self, conn: Any, task_id: str) -> list[dict[str, Any]]:
+    def _task_pk(self, conn: Any, task_id: str) -> str:
+        task_pk = conn.scalar(select(self.tasks.c.id).where(self.tasks.c.public_id == task_id))
+        if not task_pk:
+            raise KeyError(task_id)
+        return task_pk
+
+    def _events_for_task(self, conn: Any, task_pk: str) -> list[dict[str, Any]]:
         rows = conn.execute(
             select(self.events.c.payload)
-            .where(self.events.c.task_id == task_id)
+            .where(self.events.c.task_id == task_pk)
             .order_by(self.events.c.sequence)
         ).mappings().all()
         return [row["payload"] for row in rows]
 
-    def _ensure_task_session(self, conn: Any, task_id: str, session_id: str, timestamp: str) -> None:
+    def _ensure_task_session(self, conn: Any, task_pk: str, session_id: str, timestamp: str) -> None:
         existing = conn.execute(
             select(self.task_sessions.c.task_id)
-            .where(self.task_sessions.c.task_id == task_id)
-            .where(self.task_sessions.c.session_id == session_id)
+            .where(self.task_sessions.c.task_id == task_pk)
+            .where(self.task_sessions.c.session_public_id == session_id)
         ).first()
         if not existing:
-            conn.execute(insert(self.task_sessions).values(task_id=task_id, session_id=session_id, created_at=_parse_iso(timestamp)))
+            conn.execute(insert(self.task_sessions).values(id=new_database_id(), task_id=task_pk, session_public_id=session_id, created_at=_parse_iso(timestamp)))
 
 
 class LocalDaemonStore:
@@ -697,6 +728,17 @@ class LocalDaemonStore:
             updated.pop("lastError", None)
         _write_json(self.nodes_dir / f"{safe_name(node_id)}.json", updated, 0o600)
         self.append_daemon_event(daemon_event("daemon.node.seen", {"nodeId": node_id, "patch": {**patch, "lastSeenAt": now}}))
+        return updated
+
+    def assign_node_employee(self, node_id: str, employee_id: str) -> dict[str, Any]:
+        node = self.get_node(node_id)
+        if not node:
+            raise KeyError(node_id)
+        if node.get("employeeId"):
+            raise ValueError("Daemon node is already assigned.")
+        updated = {**node, "employeeId": employee_id, "updatedAt": now_iso()}
+        _write_json(self.nodes_dir / f"{safe_name(node_id)}.json", updated, 0o600)
+        self.append_daemon_event(daemon_event("daemon.node.assigned", {"nodeId": node_id, "employeeId": employee_id}))
         return updated
 
     def get_node(self, node_id: str) -> dict[str, Any] | None:
@@ -819,8 +861,9 @@ class DatabaseDaemonStore:
     nodes = Table(
         "daemon_nodes",
         metadata,
-        Column("id", Text, primary_key=True),
-        Column("employee_id", Text, nullable=False),
+        database_id_column(),
+        Column("public_id", Text, nullable=False, unique=True),
+        Column("employee_id", Text, nullable=True),
         Column("workspace_path", Text, nullable=True),
         Column("status", Text, nullable=False),
         Column("agents", JSON, nullable=False),
@@ -835,8 +878,10 @@ class DatabaseDaemonStore:
     commands = Table(
         "daemon_commands",
         metadata,
-        Column("id", Text, primary_key=True),
-        Column("node_id", Text, ForeignKey("daemon_nodes.id", ondelete="CASCADE"), nullable=False),
+        database_id_column(),
+        Column("public_id", Text, nullable=False, unique=True),
+        Column("node_id", Uuid(as_uuid=False), ForeignKey("daemon_nodes.id", ondelete="CASCADE"), nullable=False),
+        Column("node_public_id", Text, nullable=False),
         Column("type", Text, nullable=False),
         Column("status", Text, nullable=False),
         Column("command", JSON, nullable=False),
@@ -850,10 +895,13 @@ class DatabaseDaemonStore:
     runs = Table(
         "daemon_runs",
         metadata,
-        Column("run_id", Text, primary_key=True),
-        Column("node_id", Text, ForeignKey("daemon_nodes.id", ondelete="CASCADE"), nullable=False),
-        Column("command_id", Text, ForeignKey("daemon_commands.id", ondelete="SET NULL"), nullable=True),
-        Column("session_id", Text, nullable=False),
+        database_id_column(),
+        Column("public_id", Text, nullable=False, unique=True),
+        Column("node_id", Uuid(as_uuid=False), ForeignKey("daemon_nodes.id", ondelete="CASCADE"), nullable=False),
+        Column("node_public_id", Text, nullable=False),
+        Column("command_id", Uuid(as_uuid=False), ForeignKey("daemon_commands.id", ondelete="SET NULL"), nullable=True),
+        Column("command_public_id", Text, nullable=True),
+        Column("session_public_id", Text, nullable=False),
         Column("agent", Text, nullable=False),
         Column("mode", Text, nullable=False),
         Column("task_goal", Text, nullable=False),
@@ -867,10 +915,14 @@ class DatabaseDaemonStore:
     events = Table(
         "daemon_events",
         metadata,
-        Column("id", Text, primary_key=True),
-        Column("node_id", Text, nullable=True),
-        Column("command_id", Text, nullable=True),
-        Column("run_id", Text, nullable=True),
+        database_id_column(),
+        Column("public_id", Text, nullable=False, unique=True),
+        Column("node_id", Uuid(as_uuid=False), nullable=True),
+        Column("node_public_id", Text, nullable=True),
+        Column("command_id", Uuid(as_uuid=False), nullable=True),
+        Column("command_public_id", Text, nullable=True),
+        Column("run_id", Uuid(as_uuid=False), nullable=True),
+        Column("run_public_id", Text, nullable=True),
         Column("type", Text, nullable=False),
         Column("timestamp", DateTime(timezone=True), nullable=False),
         Column("payload", JSON, nullable=False),
@@ -885,9 +937,9 @@ class DatabaseDaemonStore:
         node = {**sandbox, "token": None, "nodeToken": None}
         values = node_to_row(node)
         with self.engine.begin() as conn:
-            existing = conn.scalar(select(self.nodes.c.id).where(self.nodes.c.id == node["id"]))
+            existing = conn.scalar(select(self.nodes.c.id).where(self.nodes.c.public_id == node["id"]))
             if existing:
-                conn.execute(update(self.nodes).where(self.nodes.c.id == node["id"]).values(**values))
+                conn.execute(update(self.nodes).where(self.nodes.c.id == existing).values(**node_to_row(node, database_id=existing)))
             else:
                 conn.execute(insert(self.nodes).values(**values))
             self._append_daemon_event(conn, daemon_event("daemon.node.registered", {"node": node}))
@@ -903,13 +955,27 @@ class DatabaseDaemonStore:
         if patch.get("lastError") is None and "lastError" in patch:
             updated.pop("lastError", None)
         with self.engine.begin() as conn:
-            conn.execute(update(self.nodes).where(self.nodes.c.id == node_id).values(**node_to_row(updated)))
+            node_pk = self._node_pk(conn, node_id)
+            conn.execute(update(self.nodes).where(self.nodes.c.id == node_pk).values(**node_to_row(updated, database_id=node_pk)))
             self._append_daemon_event(conn, daemon_event("daemon.node.seen", {"nodeId": node_id, "patch": {**patch, "lastSeenAt": now}}))
+        return updated
+
+    def assign_node_employee(self, node_id: str, employee_id: str) -> dict[str, Any]:
+        node = self.get_node(node_id)
+        if not node:
+            raise KeyError(node_id)
+        if node.get("employeeId"):
+            raise ValueError("Daemon node is already assigned.")
+        updated = {**node, "employeeId": employee_id, "updatedAt": now_iso()}
+        with self.engine.begin() as conn:
+            node_pk = self._node_pk(conn, node_id)
+            conn.execute(update(self.nodes).where(self.nodes.c.id == node_pk).values(**node_to_row(updated, database_id=node_pk)))
+            self._append_daemon_event(conn, daemon_event("daemon.node.assigned", {"nodeId": node_id, "employeeId": employee_id}))
         return updated
 
     def get_node(self, node_id: str) -> dict[str, Any] | None:
         with self.engine.begin() as conn:
-            row = conn.execute(select(self.nodes).where(self.nodes.c.id == node_id)).mappings().first()
+            row = conn.execute(select(self.nodes).where(self.nodes.c.public_id == node_id)).mappings().first()
         return row_to_node(row) if row else None
 
     def list_nodes(self) -> list[dict[str, Any]]:
@@ -921,11 +987,15 @@ class DatabaseDaemonStore:
         now = now_iso()
         record = {"id": command["id"], "nodeId": node_id, "command": command, "status": "queued", "createdAt": now, "updatedAt": now}
         with self.engine.begin() as conn:
-            conn.execute(insert(self.commands).values(**command_to_row(record)))
+            node_pk = self._node_pk(conn, node_id)
+            command_row = command_to_row(record, node_pk=node_pk)
+            conn.execute(insert(self.commands).values(**command_row))
             if command["type"] == "run.start":
                 self._write_run(conn, {
                     "nodeId": node_id,
+                    "nodeDatabaseId": node_pk,
                     "commandId": command["id"],
+                    "commandDatabaseId": command_row["id"],
                     "sessionId": command["sessionId"],
                     "runId": command["runId"],
                     "agent": command["agent"],
@@ -941,9 +1011,10 @@ class DatabaseDaemonStore:
     def take_queued_commands(self, node_id: str, limit: int = 2**53) -> list[dict[str, Any]]:
         now = now_iso()
         with self.engine.begin() as conn:
+            node_pk = self._node_pk(conn, node_id)
             rows = conn.execute(
                 select(self.commands)
-                .where(self.commands.c.node_id == node_id)
+                .where(self.commands.c.node_id == node_pk)
                 .where(self.commands.c.status == "queued")
                 .order_by(self.commands.c.created_at)
                 .limit(limit)
@@ -955,19 +1026,20 @@ class DatabaseDaemonStore:
                 if record["command"]["type"] == "run.cancel":
                     updated["status"] = "completed"
                     updated["completedAt"] = now
-                conn.execute(update(self.commands).where(self.commands.c.id == record["id"]).values(**command_to_row(updated)))
+                conn.execute(update(self.commands).where(self.commands.c.id == record["databaseId"]).values(**command_to_row(updated, database_id=record["databaseId"], node_pk=node_pk)))
                 self._append_daemon_event(conn, daemon_event("daemon.command.dispatched", {"nodeId": node_id, "commandId": record["id"]}))
                 result.append(updated)
         return result
 
     def queued_command_count(self, node_id: str) -> int:
         with self.engine.begin() as conn:
-            return len(conn.execute(select(self.commands.c.id).where(self.commands.c.node_id == node_id).where(self.commands.c.status == "queued")).all())
+            node_pk = self._node_pk(conn, node_id)
+            return len(conn.execute(select(self.commands.c.id).where(self.commands.c.node_id == node_pk).where(self.commands.c.status == "queued")).all())
 
     def list_active_runs(self, node_id: str | None = None) -> list[dict[str, Any]]:
         statement = select(self.runs).where(self.runs.c.status == "running")
         if node_id is not None:
-            statement = statement.where(self.runs.c.node_id == node_id)
+            statement = statement.where(self.runs.c.node_public_id == node_id)
         with self.engine.begin() as conn:
             rows = conn.execute(statement).mappings().all()
         return [row_to_run(row) for row in rows]
@@ -988,21 +1060,24 @@ class DatabaseDaemonStore:
     def _mark_command_terminal(self, node_id: str, event: dict[str, Any], status: str, exit_code: int | None, error: str | None) -> None:
         now = now_iso()
         with self.engine.begin() as conn:
-            row = conn.execute(select(self.commands).where(self.commands.c.id == event["commandId"])).mappings().first()
+            node_pk = self._node_pk(conn, node_id)
+            row = conn.execute(select(self.commands).where(self.commands.c.public_id == event["commandId"])).mappings().first()
             if row:
                 command = row_to_command(row)
-                conn.execute(update(self.commands).where(self.commands.c.id == command["id"]).values(**command_to_row({
+                conn.execute(update(self.commands).where(self.commands.c.id == command["databaseId"]).values(**command_to_row({
                     **command,
                     "status": status,
                     "updatedAt": now,
                     "completedAt": now,
                     **({"exitCode": exit_code} if exit_code is not None else {}),
                     **({"error": error} if error else {}),
-                })))
-            run_row = conn.execute(select(self.runs).where(self.runs.c.run_id == event["runId"])).mappings().first()
-            run = row_to_run(run_row) if run_row else {
+                }, database_id=command["databaseId"], node_pk=node_pk)))
+            run_row = conn.execute(select(self.runs).where(self.runs.c.public_id == event["runId"])).mappings().first()
+            run = row_to_run(run_row, include_database=True) if run_row else {
                 "nodeId": node_id,
+                "nodeDatabaseId": node_pk,
                 "commandId": event["commandId"],
+                **({"commandDatabaseId": row["id"]} if row else {}),
                 "sessionId": event["sessionId"],
                 "runId": event["runId"],
                 "agent": event["agent"],
@@ -1028,19 +1103,26 @@ class DatabaseDaemonStore:
 
     def _write_run(self, conn: Any, run: dict[str, Any]) -> None:
         values = run_to_row(run)
-        existing = conn.scalar(select(self.runs.c.run_id).where(self.runs.c.run_id == run["runId"]))
+        existing = conn.scalar(select(self.runs.c.id).where(self.runs.c.public_id == run["runId"]))
         if existing:
-            conn.execute(update(self.runs).where(self.runs.c.run_id == run["runId"]).values(**values))
+            conn.execute(update(self.runs).where(self.runs.c.id == existing).values(**run_to_row(run, database_id=existing)))
         else:
             conn.execute(insert(self.runs).values(**values))
 
     def _append_daemon_event(self, conn: Any, event: dict[str, Any]) -> None:
-        conn.execute(insert(self.events).values(**daemon_event_to_row(event)))
+        conn.execute(insert(self.events).values(**daemon_event_to_row(conn, self, event)))
+
+    def _node_pk(self, conn: Any, node_id: str) -> str:
+        node_pk = conn.scalar(select(self.nodes.c.id).where(self.nodes.c.public_id == node_id))
+        if not node_pk:
+            raise KeyError(node_id)
+        return node_pk
 
 
-def session_to_row(session: dict[str, Any], *, version: int) -> dict[str, Any]:
+def session_to_row(session: dict[str, Any], *, version: int, database_id: str | None = None) -> dict[str, Any]:
     return {
-        "id": session["id"],
+        "id": database_id or new_database_id(),
+        "public_id": session["id"],
         "workspace_path": session["workspacePath"],
         "owner_employee_id": session.get("ownerEmployeeId"),
         "task_goal": session["taskGoal"],
@@ -1058,10 +1140,11 @@ def session_to_row(session: dict[str, Any], *, version: int) -> dict[str, Any]:
     }
 
 
-def session_event_to_row(session_id: str, sequence: int, event: dict[str, Any]) -> dict[str, Any]:
+def session_event_to_row(session_pk: str, sequence: int, event: dict[str, Any]) -> dict[str, Any]:
     return {
-        "id": event["id"],
-        "session_id": session_id,
+        "id": new_database_id(),
+        "public_id": event["id"],
+        "session_id": session_pk,
         "sequence": sequence,
         "type": event["type"],
         "timestamp": _parse_iso(event["timestamp"]),
@@ -1069,10 +1152,11 @@ def session_event_to_row(session_id: str, sequence: int, event: dict[str, Any]) 
     }
 
 
-def session_artifact_to_row(session_id: str, artifact: dict[str, Any], metadata: dict[str, Any] | None = None) -> dict[str, Any]:
+def session_artifact_to_row(session_pk: str, artifact: dict[str, Any], metadata: dict[str, Any] | None = None) -> dict[str, Any]:
     return {
-        "id": artifact["id"],
-        "session_id": session_id,
+        "id": new_database_id(),
+        "public_id": artifact["id"],
+        "session_id": session_pk,
         "agent_run_id": artifact.get("agentRunId"),
         "kind": artifact["kind"],
         "title": artifact["title"],
@@ -1084,9 +1168,10 @@ def session_artifact_to_row(session_id: str, artifact: dict[str, Any], metadata:
     }
 
 
-def task_to_row(task: dict[str, Any], *, version: int) -> dict[str, Any]:
+def task_to_row(task: dict[str, Any], *, version: int, database_id: str | None = None) -> dict[str, Any]:
     return {
-        "id": task["id"],
+        "id": database_id or new_database_id(),
+        "public_id": task["id"],
         "title": task["title"],
         "description": task.get("description", ""),
         "priority": task.get("priority", "normal"),
@@ -1100,10 +1185,11 @@ def task_to_row(task: dict[str, Any], *, version: int) -> dict[str, Any]:
     }
 
 
-def task_event_to_row(task_id: str, sequence: int, event: dict[str, Any]) -> dict[str, Any]:
+def task_event_to_row(task_pk: str, sequence: int, event: dict[str, Any]) -> dict[str, Any]:
     return {
-        "id": event["id"],
-        "task_id": task_id,
+        "id": new_database_id(),
+        "public_id": event["id"],
+        "task_id": task_pk,
         "sequence": sequence,
         "type": event["type"],
         "timestamp": _parse_iso(event["timestamp"]),
@@ -1111,10 +1197,11 @@ def task_event_to_row(task_id: str, sequence: int, event: dict[str, Any]) -> dic
     }
 
 
-def node_to_row(node: dict[str, Any]) -> dict[str, Any]:
+def node_to_row(node: dict[str, Any], *, database_id: str | None = None) -> dict[str, Any]:
     return {
-        "id": node["id"],
-        "employee_id": node["employeeId"],
+        "id": database_id or new_database_id(),
+        "public_id": node["id"],
+        "employee_id": node.get("employeeId"),
         "workspace_path": node.get("workspacePath"),
         "status": node["status"],
         "agents": node.get("agents") or {},
@@ -1130,8 +1217,8 @@ def node_to_row(node: dict[str, Any]) -> dict[str, Any]:
 
 def row_to_node(row: Any) -> dict[str, Any]:
     return {
-        "id": row["id"],
-        "employeeId": row["employee_id"],
+        "id": row["public_id"],
+        **({"employeeId": row["employee_id"]} if row.get("employee_id") else {}),
         **({"workspacePath": row["workspace_path"]} if row.get("workspace_path") else {}),
         "status": row["status"],
         "agents": row["agents"] or {},
@@ -1146,10 +1233,12 @@ def row_to_node(row: Any) -> dict[str, Any]:
     }
 
 
-def command_to_row(record: dict[str, Any]) -> dict[str, Any]:
+def command_to_row(record: dict[str, Any], *, database_id: str | None = None, node_pk: str | None = None) -> dict[str, Any]:
     return {
-        "id": record["id"],
-        "node_id": record["nodeId"],
+        "id": database_id or record.get("databaseId") or new_database_id(),
+        "public_id": record["id"],
+        "node_id": node_pk or record.get("nodeDatabaseId"),
+        "node_public_id": record["nodeId"],
         "type": record["command"]["type"],
         "status": record["status"],
         "command": record["command"],
@@ -1164,8 +1253,9 @@ def command_to_row(record: dict[str, Any]) -> dict[str, Any]:
 
 def row_to_command(row: Any) -> dict[str, Any]:
     return {
-        "id": row["id"],
-        "nodeId": row["node_id"],
+        "databaseId": row["id"],
+        "id": row["public_id"],
+        "nodeId": row["node_public_id"],
         "command": row["command"],
         "status": row["status"],
         "createdAt": _format_iso(row["created_at"]),
@@ -1177,12 +1267,15 @@ def row_to_command(row: Any) -> dict[str, Any]:
     }
 
 
-def run_to_row(run: dict[str, Any]) -> dict[str, Any]:
+def run_to_row(run: dict[str, Any], *, database_id: str | None = None) -> dict[str, Any]:
     return {
-        "run_id": run["runId"],
-        "node_id": run["nodeId"],
-        "command_id": run.get("commandId"),
-        "session_id": run["sessionId"],
+        "id": database_id or run.get("databaseId") or new_database_id(),
+        "public_id": run["runId"],
+        "node_id": run["nodeDatabaseId"],
+        "node_public_id": run["nodeId"],
+        "command_id": run.get("commandDatabaseId"),
+        "command_public_id": run.get("commandId"),
+        "session_public_id": run["sessionId"],
         "agent": run["agent"],
         "mode": run["mode"],
         "task_goal": run["taskGoal"],
@@ -1195,12 +1288,15 @@ def run_to_row(run: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def row_to_run(row: Any) -> dict[str, Any]:
+def row_to_run(row: Any, *, include_database: bool = False) -> dict[str, Any]:
     return {
-        "nodeId": row["node_id"],
-        **({"commandId": row["command_id"]} if row.get("command_id") else {}),
-        "sessionId": row["session_id"],
-        "runId": row["run_id"],
+        **({"databaseId": row["id"]} if include_database else {}),
+        "nodeId": row["node_public_id"],
+        **({"nodeDatabaseId": row["node_id"]} if include_database else {}),
+        **({"commandId": row["command_public_id"]} if row.get("command_public_id") else {}),
+        **({"commandDatabaseId": row["command_id"]} if include_database and row.get("command_id") else {}),
+        "sessionId": row["session_public_id"],
+        "runId": row["public_id"],
         "agent": row["agent"],
         "mode": row["mode"],
         "taskGoal": row["task_goal"],
@@ -1213,12 +1309,19 @@ def row_to_run(row: Any) -> dict[str, Any]:
     }
 
 
-def daemon_event_to_row(event: dict[str, Any]) -> dict[str, Any]:
+def daemon_event_to_row(conn: Any, store: DatabaseDaemonStore, event: dict[str, Any]) -> dict[str, Any]:
+    node_id = event.get("nodeId")
+    command_id = event.get("commandId")
+    run_id = event.get("runId")
     return {
-        "id": event["id"],
-        "node_id": event.get("nodeId"),
-        "command_id": event.get("commandId"),
-        "run_id": event.get("runId"),
+        "id": new_database_id(),
+        "public_id": event["id"],
+        "node_id": conn.scalar(select(store.nodes.c.id).where(store.nodes.c.public_id == node_id)) if node_id else None,
+        "node_public_id": node_id,
+        "command_id": conn.scalar(select(store.commands.c.id).where(store.commands.c.public_id == command_id)) if command_id else None,
+        "command_public_id": command_id,
+        "run_id": conn.scalar(select(store.runs.c.id).where(store.runs.c.public_id == run_id)) if run_id else None,
+        "run_public_id": run_id,
         "type": event["type"],
         "timestamp": _parse_iso(event["timestamp"]),
         "payload": event,

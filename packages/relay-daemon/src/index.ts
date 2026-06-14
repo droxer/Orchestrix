@@ -78,7 +78,8 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
   const backendUrl = normalizeBaseUrl(options.backendUrl ?? process.env.RELAY_BACKEND_URL ?? process.env.RELAY_DAEMON_URL ?? "http://127.0.0.1:8790");
   const sandboxId = options.sandboxId ?? process.env.RELAY_SANDBOX_ID;
   if (!sandboxId) throw new Error("RELAY_SANDBOX_ID is required for the relay daemon.");
-  const employeeId = options.employeeId ?? process.env.RELAY_EMPLOYEE_ID ?? process.env.USER ?? "local";
+  const configuredEmployeeId = options.employeeId ?? process.env.RELAY_EMPLOYEE_ID;
+  const employeeId = configuredEmployeeId ?? process.env.USER ?? "local";
   const workspacePath = firstNonBlank(options.workspacePath, process.env.RELAY_WORKSPACE, process.env.WORKSPACE) ?? process.cwd();
   const sandboxMode = resolveSandboxMode(options.sandbox ?? process.env.RELAY_SANDBOX_MODE);
   if (sandboxMode === "boxlite") {
@@ -115,17 +116,31 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
   process.once("SIGTERM", () => shutdown("SIGTERM"));
   logger.info("daemon starting", { sandboxId, employeeId, workspacePath, backendUrl, sandboxMode });
   const activeRuns = new Map<string, AbortController>();
-  const buildRegistration = (): DaemonNodeRegistration => ({
+  const buildRegistration = (includeEmployeeId = Boolean(configuredEmployeeId)): DaemonNodeRegistration => ({
     sandboxId,
-    employeeId,
+    ...(includeEmployeeId ? { employeeId } : {}),
     token,
     workspacePath,
     protocolVersion: DAEMON_NODE_PROTOCOL_VERSION,
     supportedAgents: AGENT_NAMES,
     status: activeRuns.size > 0 ? "busy" : "ready",
   });
-  const register = (): Promise<void> =>
-    postJson(fetchFn, `${backendUrl}/daemon-nodes/register`, buildRegistration());
+  const register = async (): Promise<void> => {
+    const url = `${backendUrl}/daemon-nodes/register`;
+    try {
+      await postJson(fetchFn, url, buildRegistration());
+    } catch (error) {
+      if (
+        error instanceof DaemonHttpError &&
+        error.status === 400 &&
+        error.message.includes("employeeId is required for unprovisioned daemon node registration")
+      ) {
+        await postJson(fetchFn, url, buildRegistration(true));
+        return;
+      }
+      throw error;
+    }
+  };
   await withBackendReconnect(register, logger, { sandboxId, what: "registration" });
   let lastRegisteredAt = Date.now();
   logger.info("daemon registered", { sandboxId, employeeId, workspacePath, backendUrl, logPath: logger.logPath });

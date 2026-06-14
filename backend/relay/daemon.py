@@ -109,11 +109,15 @@ class DaemonNodeRegistry:
         if (existing and (existing.get("nodeTokenHash") or existing.get("tokenHash"))) and not daemon_node_token_matches(existing, input["token"]):
             logger.warning("Unauthorized daemon node registration", sandbox_id=input["sandboxId"])
             raise PermissionError(f"Unauthorized daemon node registration for {input['sandboxId']}: token does not match the token issued at provisioning.")
+        if existing and existing.get("employeeId") and input.get("employeeId") and input["employeeId"] != existing["employeeId"]:
+            logger.warning("Daemon node registration employee mismatch", sandbox_id=input["sandboxId"], expected_employee_id=existing["employeeId"], provided_employee_id=input["employeeId"])
+            raise PermissionError(f"Daemon node registration for {input['sandboxId']} does not match the provisioned employee.")
+        employee_id = (existing or {}).get("employeeId") or input.get("employeeId")
         next_ui_hash = hash_daemon_node_token(ui_token) if ui_token else (existing or {}).get("uiTokenHash") or (existing or {}).get("tokenHash")
         supported = set(input.get("supportedAgents") or [])
         sandbox = {
             "id": input["sandboxId"],
-            "employeeId": input["employeeId"],
+            **({"employeeId": employee_id} if employee_id else {}),
             **({"workspacePath": input["workspacePath"]} if input.get("workspacePath") else {}),
             "status": "running" if input.get("status") == "busy" else "stopped" if input.get("status") == "stopped" else "ready",
             "agents": {agent: "ready" if agent in supported else "unknown" for agent in AGENT_NAMES},
@@ -128,7 +132,7 @@ class DaemonNodeRegistry:
         }
         self.sandboxes[sandbox["id"]] = sandbox
         self.daemon_store.register_node(sandbox)
-        logger.info("Daemon node registered", sandbox_id=sandbox["id"], employee_id=sandbox["employeeId"], status=sandbox["status"], agents={agent: status for agent, status in sandbox["agents"].items()})
+        logger.info("Daemon node registered", sandbox_id=sandbox["id"], employee_id=sandbox.get("employeeId"), status=sandbox["status"], agents={agent: status for agent, status in sandbox["agents"].items()})
         return sandbox
 
     def get(self, sandbox_id: str) -> dict[str, Any] | None:
@@ -174,11 +178,24 @@ class DaemonNodeRegistry:
     def control_panel_nodes(self) -> list[dict[str, Any]]:
         return self.monitor_nodes()
 
-    def provision_pending(self, employee_id: str, workspace_path: str | None = None) -> tuple[dict[str, Any], str | None]:
+    def assign_employee(self, sandbox_id: str, employee_id: str) -> dict[str, Any]:
+        sandbox = self.sandboxes.get(sandbox_id)
+        if not sandbox:
+            raise KeyError(sandbox_id)
+        if sandbox.get("employeeId"):
+            raise ValueError("Daemon node is already assigned.")
+        updated = {**sandbox, "employeeId": employee_id, "updatedAt": now_iso()}
+        self.sandboxes[sandbox_id] = updated
+        self.daemon_store.assign_node_employee(sandbox_id, employee_id)
+        logger.info("Daemon node assigned", sandbox_id=sandbox_id, employee_id=employee_id)
+        return updated
+
+    def provision_pending(self, employee_id: str, workspace_path: str | None = None) -> tuple[dict[str, Any], str | None, str | None]:
         existing = self.find_by_employee(employee_id, workspace_path)
         if existing:
-            return existing, None
+            return existing, None, None
         sandbox_id = new_sandbox_id(employee_id)
+        ui_token = new_daemon_node_token()
         node_token = new_daemon_node_token()
         now = now_iso()
         sandbox = {
@@ -188,8 +205,8 @@ class DaemonNodeRegistry:
             "status": "provisioning",
             "agents": {agent: "unknown" for agent in AGENT_NAMES},
             "token": None,
-            "tokenHash": None,
-            "uiTokenHash": None,
+            "tokenHash": hash_daemon_node_token(ui_token),
+            "uiTokenHash": hash_daemon_node_token(ui_token),
             "nodeTokenHash": hash_daemon_node_token(node_token),
             "nodeToken": None,
             "createdAt": now,
@@ -199,12 +216,12 @@ class DaemonNodeRegistry:
         self.sandboxes[sandbox_id] = sandbox
         self.daemon_store.register_node(sandbox)
         logger.info("Daemon node provisioned", sandbox_id=sandbox_id, employee_id=employee_id, workspace_path=workspace_path)
-        return sandbox, node_token
+        return sandbox, ui_token, node_token
 
     def find_by_employee(self, employee_id: str, workspace_path: str | None = None) -> dict[str, Any] | None:
         matches = [
             sandbox for sandbox in self.sandboxes.values()
-            if sandbox["employeeId"] == employee_id and (not workspace_path or not sandbox.get("workspacePath") or workspace_paths_match(sandbox.get("workspacePath"), workspace_path))
+            if sandbox.get("employeeId") == employee_id and (not workspace_path or not sandbox.get("workspacePath") or workspace_paths_match(sandbox.get("workspacePath"), workspace_path))
         ]
         if not matches:
             return None
@@ -438,13 +455,19 @@ class ServerDaemonNodeBackend:
         return self.registry.list_ready()
 
     def provision_daemon_node(self, input: dict[str, Any]) -> dict[str, Any]:
-        sandbox, node_token = self.registry.provision_pending(input["employeeId"], input.get("workspacePath"))
-        return {**sandbox, **({"nodeToken": node_token} if node_token else {})}
+        sandbox, ui_token, node_token = self.registry.provision_pending(input["employeeId"], input.get("workspacePath"))
+        return {
+            **sandbox,
+            **({"token": ui_token, "sandboxToken": ui_token} if ui_token else {}),
+            **({"nodeToken": node_token} if node_token else {}),
+        }
 
     async def run(self, sandbox_id: str, request: dict[str, Any]) -> dict[str, Any]:
         sandbox = self.registry.get(sandbox_id)
         if not sandbox:
             raise KeyError(f"Sandbox {sandbox_id} has no registered daemon node.")
+        if not sandbox.get("employeeId"):
+            raise ValueError(f"Sandbox {sandbox_id} daemon node is not assigned to an employee.")
         if sandbox["status"] != "ready":
             raise ValueError(f"Sandbox {sandbox_id} daemon node is not ready.")
         if not self.registry.is_live(sandbox_id):

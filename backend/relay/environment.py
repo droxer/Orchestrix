@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-BACKEND_ROOT = Path(__file__).resolve().parent
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
 
 
 def load_env_file(path: str | Path, *, override: bool = False) -> None:

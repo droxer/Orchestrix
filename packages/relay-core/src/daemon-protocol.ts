@@ -4,7 +4,7 @@ export type SandboxStatus = "provisioning" | "ready" | "running" | "stopped" | "
 
 export interface SandboxRecord {
   id: string;
-  employeeId: string;
+  employeeId?: string;
   workspacePath?: string;
   status: SandboxStatus;
   agents: Record<AgentName, "unknown" | "ready" | "failed">;

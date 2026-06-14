@@ -7,8 +7,8 @@ PORT ?= 8787
 BACKEND_PORT ?= 8790
 DATABASE_URL ?=
 RELAY_BACKEND_URL ?= http://127.0.0.1:$(BACKEND_PORT)
-EMPLOYEE_ID ?= $(USER)
-SANDBOX_ID ?= sbx_$(EMPLOYEE_ID)
+EMPLOYEE_ID ?=
+SANDBOX_ID ?= node_$(USER)
 DAEMON_TOKEN ?=
 DAEMON_NODE_TOKEN ?=
 SANDBOX_MODE ?=
@@ -83,7 +83,7 @@ daemon-install:
 
 daemon-run:
 	@echo "Starting the Relay daemon. It registers with the backend, owns the sandbox, and runs agent CLIs."
-	$(if $(filter command line environment,$(origin RELAY_BACKEND_URL)),RELAY_BACKEND_URL="$(RELAY_BACKEND_URL)" )$(if $(filter command line environment,$(origin EMPLOYEE_ID)),RELAY_EMPLOYEE_ID="$(EMPLOYEE_ID)" )$(if $(filter command line environment,$(origin DAEMON_TOKEN)),RELAY_DAEMON_TOKEN="$(DAEMON_TOKEN)" )$(if $(filter command line environment,$(origin DAEMON_NODE_TOKEN)),RELAY_DAEMON_NODE_TOKEN="$(DAEMON_NODE_TOKEN)" )$(if $(filter command line environment,$(origin WORKSPACE)),RELAY_WORKSPACE="$(WORKSPACE)" )node packages/relay-daemon/dist/cli.js $(if $(filter command line environment,$(origin SANDBOX_ID)),--sandbox-id $(SANDBOX_ID),) $(if $(filter command line environment,$(origin SANDBOX_MODE)),--sandbox $(SANDBOX_MODE),)
+	$(if $(filter command line environment,$(origin RELAY_BACKEND_URL)),RELAY_BACKEND_URL="$(RELAY_BACKEND_URL)" )$(if $(filter command line environment,$(origin EMPLOYEE_ID)),RELAY_EMPLOYEE_ID="$(EMPLOYEE_ID)" )$(if $(filter command line environment,$(origin DAEMON_TOKEN)),RELAY_DAEMON_TOKEN="$(DAEMON_TOKEN)" )$(if $(filter command line environment,$(origin DAEMON_NODE_TOKEN)),RELAY_DAEMON_NODE_TOKEN="$(DAEMON_NODE_TOKEN)" )$(if $(filter command line environment,$(origin WORKSPACE)),RELAY_WORKSPACE="$(WORKSPACE)" )node packages/relay-daemon/dist/cli.js --sandbox-id $(SANDBOX_ID) $(if $(filter command line environment,$(origin SANDBOX_MODE)),--sandbox $(SANDBOX_MODE),)
 
 daemon-test:
 	npm run build -w relay-core

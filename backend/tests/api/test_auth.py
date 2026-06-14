@@ -40,7 +40,7 @@ def _create_user(client: TestClient, username: str, *, employee_id: str | None =
 
 def _assert_no_secret_fields(value: object) -> None:
     if isinstance(value, dict):
-        forbidden = {"passwordHash", "token", "nodeToken", "sessionToken"}
+        forbidden = {"passwordHash", "token", "sandboxToken", "nodeToken", "sessionToken"}
         assert forbidden.isdisjoint(value.keys())
         for child in value.values():
             _assert_no_secret_fields(child)
@@ -318,6 +318,14 @@ def test_regular_user_can_access_sessions_and_tasks_but_not_admin_panel(monkeypa
         })
         assert response.status_code == 403
 
+        response = user_client.post("/cp/employees", json={
+            "employeeId": "alice-2",
+            "username": "alice2",
+            "password": "userpass",
+            "nodeId": "sbx_unassigned",
+        })
+        assert response.status_code == 403
+
 
 def test_unauthenticated_user_cannot_access_sessions_or_admin_panel(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
@@ -335,6 +343,14 @@ def test_unauthenticated_user_cannot_access_sessions_or_admin_panel(monkeypatch)
         assert response.status_code == 401
 
         response = client.get("/cp/daemon-nodes")
+        assert response.status_code == 401
+
+        response = client.post("/cp/employees", json={
+            "employeeId": "alice",
+            "username": "alice",
+            "password": "userpass",
+            "nodeId": "sbx_unassigned",
+        })
         assert response.status_code == 401
 
 
@@ -623,3 +639,23 @@ def test_relay_storage_postgres_switches_backend_stores_to_database(monkeypatch)
 
         assert app.state.task_store.get_task(task["id"])["id"] == task["id"]
         assert app.state.session_store.get_session(task["linkedSessionIds"][0])["taskGoal"].startswith("Persist task in DB")
+
+        response = client.post("/daemon-nodes/register", json={
+            "sandboxId": "sbx_unassigned",
+            "token": "node_token",
+            "workspacePath": "/workspace/unassigned",
+            "protocolVersion": 1,
+            "supportedAgents": ["claude"],
+            "status": "ready",
+        })
+        assert response.status_code == 200
+        assert "employeeId" not in app.state.registry.daemon_store.get_node("sbx_unassigned")
+
+        response = client.post("/cp/employees", json={
+            "employeeId": "db-user",
+            "username": "db-user",
+            "password": "secret123",
+            "nodeId": "sbx_unassigned",
+        })
+        assert response.status_code == 201
+        assert app.state.registry.daemon_store.get_node("sbx_unassigned")["employeeId"] == "db-user"

@@ -47,7 +47,7 @@ _INDEXES = [
     ("ix_relay_daemon_commands_node_status", "ix_daemon_commands_node_status"),
     ("ix_relay_daemon_commands_created_at", "ix_daemon_commands_created_at"),
     ("ix_relay_daemon_runs_node_status", "ix_daemon_runs_node_status"),
-    ("ix_relay_daemon_runs_session_id", "ix_daemon_runs_session_id"),
+    ("ix_relay_daemon_runs_session_public_id", "ix_daemon_runs_session_public_id"),
     ("ix_relay_daemon_events_timestamp", "ix_daemon_events_timestamp"),
     ("ix_relay_daemon_events_node_id", "ix_daemon_events_node_id"),
 ]
@@ -55,6 +55,7 @@ _INDEXES = [
 _CONSTRAINTS = [
     ("relay_session_events", "uq_relay_session_events_session_sequence", "uq_session_events_session_sequence"),
     ("relay_task_events", "uq_relay_task_events_task_sequence", "uq_task_events_task_sequence"),
+    ("relay_task_sessions", "uq_relay_task_sessions_task_session_public", "uq_task_sessions_task_session_public"),
 ]
 
 

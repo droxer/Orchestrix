@@ -7,7 +7,7 @@ export const DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS: readonly number[] = [1];
 
 export interface DaemonNodeRegistration {
   sandboxId: string;
-  employeeId: string;
+  employeeId?: string;
   token: string;
   workspacePath?: string;
   protocolVersion: number;

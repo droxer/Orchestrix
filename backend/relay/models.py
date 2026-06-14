@@ -53,7 +53,7 @@ class SandboxRunRequest(RelayModel):
 
 class DaemonNodeRegistration(RelayModel):
     sandbox_id: str
-    employee_id: str
+    employee_id: str | None = None
     token: str
     workspace_path: str | None = None
     protocol_version: int

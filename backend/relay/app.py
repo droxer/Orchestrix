@@ -162,6 +162,7 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
                 role=string_field(body, "role") or "user",
                 email=string_field(body, "email") or None,
                 employee_id=string_field(body, "employeeId") or None,
+                display_name=string_field(body, "displayName") or None,
                 department_id=string_field(body, "departmentId") or None,
                 department_name=string_field(body, "departmentName") or None,
             )
@@ -210,12 +211,91 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
             seen.add(employee_id)
             employees.append({
                 "id": employee_id,
-                "displayName": user.get("username") or employee_id,
+                "displayName": user.get("displayName") or user.get("username") or employee_id,
                 "email": user.get("email"),
                 "createdAt": user.get("createdAt"),
                 "updatedAt": user.get("createdAt"),
             })
         return {"employees": employees}
+
+    @app.post("/cp/employees", status_code=201)
+    async def create_employee(request: Request) -> dict[str, Any]:
+        require_admin_session(request, auth_store)
+        body = await json_body(request)
+        employee_id = string_field(body, "employeeId")
+        username = string_field(body, "username")
+        password = string_field(body, "password")
+        node_id = string_field(body, "nodeId")
+        email = string_field(body, "email") or None
+        display_name = string_field(body, "displayName") or username or employee_id
+        if not employee_id:
+            raise HTTPException(400, "employeeId is required.")
+        if not username:
+            raise HTTPException(400, "username is required.")
+        if not password:
+            raise HTTPException(400, "password is required.")
+        if not node_id:
+            raise HTTPException(400, "nodeId is required.")
+        existing_node = registry.get(node_id)
+        if not existing_node:
+            raise HTTPException(404, "Daemon node not found.")
+        if existing_node.get("employeeId"):
+            raise HTTPException(409, "Daemon node is already assigned.")
+        try:
+            user = auth_store.create_user(
+                username,
+                password,
+                role="user",
+                email=email,
+                employee_id=employee_id,
+                display_name=display_name,
+            )
+        except ValueError as error:
+            message = str(error)
+            status = 409 if "already exists" in message else 400
+            raise HTTPException(status, message) from error
+        if hasattr(auth_store, "ensure_employee"):
+            employee = auth_store.ensure_employee(employee_id, display_name=display_name, email=email)
+        else:
+            employee = {
+                "id": employee_id,
+                "displayName": display_name,
+                "email": email,
+                "createdAt": user.get("createdAt"),
+                "updatedAt": user.get("createdAt"),
+            }
+        try:
+            assigned_node = registry.assign_employee(node_id, employee_id)
+        except KeyError as error:
+            raise HTTPException(404, "Daemon node not found.") from error
+        except ValueError as error:
+            raise HTTPException(409, str(error)) from error
+        public_node = next((item for item in registry.control_panel_nodes() if item["id"] == assigned_node["id"]), public_sandbox_record(assigned_node))
+        return {"employee": employee, "user": user, "node": public_node}
+
+    @app.post("/cp/daemon-nodes/{node_id}/assign")
+    async def assign_control_panel_daemon_node(node_id: str, request: Request) -> dict[str, Any]:
+        require_admin_session(request, auth_store)
+        body = await json_body(request)
+        employee_id = string_field(body, "employeeId")
+        if not employee_id:
+            raise HTTPException(400, "employeeId is required.")
+        existing_node = registry.get(node_id)
+        if not existing_node:
+            raise HTTPException(404, "Daemon node not found.")
+        if existing_node.get("employeeId"):
+            raise HTTPException(409, "Daemon node is already assigned.")
+        employee = employee_record(auth_store, employee_id)
+        if not employee:
+            raise HTTPException(404, "Employee not found.")
+        try:
+            assigned_node = registry.assign_employee(node_id, employee_id)
+        except KeyError as error:
+            raise HTTPException(404, "Daemon node not found.") from error
+        except ValueError as error:
+            raise HTTPException(409, str(error)) from error
+        public_node = next((item for item in registry.control_panel_nodes() if item["id"] == assigned_node["id"]), public_sandbox_record(assigned_node))
+        return {"employee": employee, "node": public_node}
 
     @app.get("/cp/daemon-nodes")
     async def control_panel_nodes(request: Request) -> dict[str, Any]:
@@ -240,6 +320,8 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
             "node": public_node,
             "daemonEnv": daemon_start_env(request, node),
         }
+        if node.get("sandboxToken"):
+            response["sandboxToken"] = node["sandboxToken"]
         if node.get("nodeToken"):
             response["nodeToken"] = node["nodeToken"]
             response["daemonCommand"] = daemon_start_command(request, node)
@@ -575,6 +657,23 @@ def string_field(value: dict[str, Any], key: str) -> str:
     return field.strip() if isinstance(field, str) else ""
 
 
+def employee_record(auth_store: Any, employee_id: str) -> dict[str, Any] | None:
+    if hasattr(auth_store, "list_employees"):
+        for employee in auth_store.list_employees():
+            if employee.get("id") == employee_id:
+                return employee
+    for user in auth_store.list_users():
+        if user.get("employeeId") == employee_id:
+            return {
+                "id": employee_id,
+                "displayName": user.get("displayName") or user.get("username") or employee_id,
+                "email": user.get("email"),
+                "createdAt": user.get("createdAt"),
+                "updatedAt": user.get("createdAt"),
+            }
+    return None
+
+
 def backend_base_url(request: Request) -> str:
     return str(request.base_url).rstrip("/")
 
@@ -583,8 +682,9 @@ def daemon_start_env(request: Request, node: dict[str, Any]) -> dict[str, str]:
     env = {
         "RELAY_BACKEND_URL": backend_base_url(request),
         "RELAY_SANDBOX_ID": node["id"],
-        "RELAY_EMPLOYEE_ID": node["employeeId"],
     }
+    if node.get("employeeId"):
+        env["RELAY_EMPLOYEE_ID"] = node["employeeId"]
     if node.get("nodeToken"):
         env["RELAY_DAEMON_NODE_TOKEN"] = node["nodeToken"]
     if node.get("workspacePath"):
@@ -599,11 +699,11 @@ def daemon_start_command(request: Request, node: dict[str, Any]) -> str:
         backend_base_url(request),
         "--sandbox-id",
         node["id"],
-        "--employee-id",
-        node["employeeId"],
         "--token",
         node.get("nodeToken") or "",
     ]
+    if node.get("employeeId"):
+        parts[5:5] = ["--employee-id", node["employeeId"]]
     return " ".join(shlex.quote(part) for part in parts)
 
 

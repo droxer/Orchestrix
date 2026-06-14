@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import { assignControlPanelDaemonNode, createControlPanelEmployee } from "../src/api.js";
 import { conversationDaemonStatus } from "../src/lib/conversationStatus.js";
 import {
   mergeVisibleDaemonNodes,
@@ -11,7 +12,7 @@ import type {
   DaemonNodeMonitorRecord,
 } from "../src/types.js";
 
-function daemonNode(input: Partial<DaemonNodeMonitorRecord> & { id: string; employeeId: string }): DaemonNodeMonitorRecord {
+function daemonNode(input: Partial<DaemonNodeMonitorRecord> & { id: string; employeeId?: string }): DaemonNodeMonitorRecord {
   return {
     status: "ready",
     agents: { claude: "ready", pi: "ready", codex: "ready", kimi: "unknown" },
@@ -26,7 +27,7 @@ function daemonNode(input: Partial<DaemonNodeMonitorRecord> & { id: string; empl
 }
 
 function controlPanelNode(
-  input: Partial<ControlPanelDaemonNodeRecord> & { id: string; employeeId: string },
+  input: Partial<ControlPanelDaemonNodeRecord> & { id: string; employeeId?: string },
 ): ControlPanelDaemonNodeRecord {
   return {
     ...daemonNode(input),
@@ -127,5 +128,116 @@ describe("Relay web conversation status", () => {
       online: true,
       stale: false,
     })]), false);
+  });
+
+  it("keeps unassigned control-panel nodes out of the chat roster", () => {
+    const assignedNode = controlPanelNode({
+      id: "sbx_alice",
+      employeeId: "alice",
+      online: true,
+      stale: false,
+    });
+    const unassignedNode = controlPanelNode({
+      id: "sbx_unassigned",
+      online: true,
+      stale: false,
+    });
+
+    const visibleNodes = mergeVisibleDaemonNodes([], [assignedNode, unassignedNode]);
+
+    assert.deepEqual(visibleNodes.map((node) => node.id), ["sbx_alice"]);
+    assert.equal(shouldClaimLocalDaemonNode(unassignedNode, []), false);
+  });
+
+  it("posts employee creation with the selected unassigned node", async () => {
+    const originalFetch = globalThis.fetch;
+    let requestPath = "";
+    let requestInit: RequestInit | undefined;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      requestPath = String(input);
+      requestInit = init;
+      return new Response(JSON.stringify({
+        employee: {
+          id: "alice",
+          displayName: "Alice",
+          email: "alice@example.com",
+        },
+        user: {
+          id: "usr_alice",
+          username: "alice",
+          role: "user",
+          employeeId: "alice",
+        },
+        node: controlPanelNode({
+          id: "sbx_unassigned",
+          employeeId: "alice",
+        }),
+      }), {
+        status: 201,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+    try {
+      const result = await createControlPanelEmployee({
+        employeeId: "alice",
+        username: "alice",
+        password: "userpass",
+        nodeId: "sbx_unassigned",
+        email: "alice@example.com",
+        displayName: "Alice",
+      });
+
+      assert.equal(requestPath, "/cp/employees");
+      assert.equal(requestInit?.method, "POST");
+      assert.deepEqual(JSON.parse(String(requestInit?.body)), {
+        employeeId: "alice",
+        username: "alice",
+        password: "userpass",
+        nodeId: "sbx_unassigned",
+        email: "alice@example.com",
+        displayName: "Alice",
+      });
+      assert.equal(result.node.employeeId, "alice");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("posts direct node assignment for an existing employee", async () => {
+    const originalFetch = globalThis.fetch;
+    let requestPath = "";
+    let requestInit: RequestInit | undefined;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      requestPath = String(input);
+      requestInit = init;
+      return new Response(JSON.stringify({
+        employee: {
+          id: "alice",
+          displayName: "Alice",
+        },
+        node: controlPanelNode({
+          id: "node_unassigned",
+          employeeId: "alice",
+        }),
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+    try {
+      const result = await assignControlPanelDaemonNode({
+        employeeId: "alice",
+        nodeId: "node_unassigned",
+      });
+
+      assert.equal(requestPath, "/cp/daemon-nodes/node_unassigned/assign");
+      assert.equal(requestInit?.method, "POST");
+      assert.deepEqual(JSON.parse(String(requestInit?.body)), {
+        employeeId: "alice",
+      });
+      assert.equal(result.node.employeeId, "alice");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });

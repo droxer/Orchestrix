@@ -26,22 +26,24 @@ export function mergeVisibleDaemonNodes(
 ): DaemonNodeMonitorRecord[] {
   const byEmployee = new Map<string, DaemonNodeMonitorRecord>();
   for (const node of authenticatedNodes) {
+    if (!node.employeeId) continue;
     const existing = byEmployee.get(node.employeeId);
     byEmployee.set(node.employeeId, existing ? preferDaemonNode(existing, node) : node);
   }
   for (const controlPanelNode of controlPanelNodes) {
     const node = stripControlPanelToken(controlPanelNode);
+    if (!node.employeeId) continue;
     const existing = byEmployee.get(node.employeeId);
     byEmployee.set(node.employeeId, existing ? preferDaemonNode(existing, node) : node);
   }
-  return [...byEmployee.values()].sort((a, b) => a.employeeId.localeCompare(b.employeeId));
+  return [...byEmployee.values()].sort((a, b) => (a.employeeId ?? "").localeCompare(b.employeeId ?? ""));
 }
 
 export function shouldClaimLocalDaemonNode(
   controlPanelNode: ControlPanelDaemonNodeRecord,
   authenticatedNodes: DaemonNodeMonitorRecord[],
 ): boolean {
-  if (!controlPanelNode.nodeToken || !controlPanelNode.online || controlPanelNode.stale) return false;
+  if (!controlPanelNode.employeeId || !controlPanelNode.nodeToken || !controlPanelNode.online || controlPanelNode.stale) return false;
   return !authenticatedNodes.some((node) =>
     (node.id === controlPanelNode.id || node.employeeId === controlPanelNode.employeeId) &&
     node.online &&

@@ -1,9 +1,13 @@
 import type {
   AgentName,
+  AssignControlPanelDaemonNodeResponse,
+  CreateControlPanelEmployeeInput,
+  CreateControlPanelEmployeeResponse,
   CreateControlPanelDaemonNodeInput,
   CreateControlPanelDaemonNodeResponse,
   CreateSessionInput,
   ControlPanelDaemonNodesResponse,
+  ControlPanelEmployeesResponse,
   CurrentUser,
   DaemonNodesResponse,
   RelaySession,
@@ -60,6 +64,35 @@ export function listDaemonNodes(token?: string, signal?: AbortSignal): Promise<D
 
 export function listControlPanelDaemonNodes(signal?: AbortSignal): Promise<ControlPanelDaemonNodesResponse> {
   return apiJson<ControlPanelDaemonNodesResponse>("/cp/daemon-nodes", { signal });
+}
+
+export function listControlPanelEmployees(signal?: AbortSignal): Promise<ControlPanelEmployeesResponse> {
+  return apiJson<ControlPanelEmployeesResponse>("/cp/employees", { signal });
+}
+
+export function createControlPanelEmployee(
+  input: CreateControlPanelEmployeeInput,
+): Promise<CreateControlPanelEmployeeResponse> {
+  return apiJson<CreateControlPanelEmployeeResponse>("/cp/employees", {
+    method: "POST",
+    body: {
+      employeeId: input.employeeId,
+      username: input.username,
+      password: input.password,
+      nodeId: input.nodeId,
+      ...(input.email ? { email: input.email } : {}),
+      ...(input.displayName ? { displayName: input.displayName } : {}),
+    },
+  });
+}
+
+export function assignControlPanelDaemonNode(
+  input: { nodeId: string; employeeId: string },
+): Promise<AssignControlPanelDaemonNodeResponse> {
+  return apiJson<AssignControlPanelDaemonNodeResponse>(`/cp/daemon-nodes/${encodeURIComponent(input.nodeId)}/assign`, {
+    method: "POST",
+    body: { employeeId: input.employeeId },
+  });
 }
 
 export function createControlPanelDaemonNode(
