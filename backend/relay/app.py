@@ -512,9 +512,15 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     @app.get("/sandboxes")
     async def sandboxes(request: Request) -> dict[str, Any]:
         token = bearer_token(request)
-        allowed = [public_sandbox_record(sandbox) for sandbox in backend.list() if sandbox_ui_token_matches(sandbox, token)]
-        if not token or not allowed:
-            raise HTTPException(401, "Invalid sandbox token." if token else "Sandbox token is required.")
+        if token:
+            allowed = [public_sandbox_record(sandbox) for sandbox in backend.list() if sandbox_ui_token_matches(sandbox, token)]
+            if allowed:
+                return {"sandboxes": allowed}
+        actor = request_actor_or_none(request, auth_store)
+        if actor:
+            allowed = [public_sandbox_record(sandbox) for sandbox in backend.list() if actor_can_access_sandbox(actor, sandbox)]
+        else:
+            allowed = [public_sandbox_record(sandbox) for sandbox in backend.list()]
         return {"sandboxes": allowed}
 
     @app.post("/sandboxes", status_code=201)
@@ -585,9 +591,16 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
 
     @app.get("/daemon-nodes")
     async def list_daemon_nodes(request: Request) -> dict[str, Any]:
-        nodes = registry.monitor_nodes_for_token(bearer_token(request))
-        if nodes is None:
-            raise HTTPException(401, "Invalid sandbox token." if bearer_token(request) else "Sandbox token is required.")
+        token = bearer_token(request)
+        if token:
+            nodes = registry.monitor_nodes_for_token(token)
+            if nodes is not None:
+                return {"nodes": nodes}
+        actor = request_actor_or_none(request, auth_store)
+        if actor:
+            nodes = [node for node in registry.monitor_nodes() if actor_can_access_sandbox(actor, node)]
+        else:
+            nodes = registry.monitor_nodes()
         return {"nodes": nodes}
 
     @app.post("/daemon-nodes/register")
@@ -752,6 +765,13 @@ def request_actor(request: Request, auth_store: Any) -> dict[str, Any]:
     }
 
 
+def request_actor_or_none(request: Request, auth_store: Any) -> dict[str, Any] | None:
+    try:
+        return request_actor(request, auth_store)
+    except HTTPException:
+        return None
+
+
 def owner_employee_id_for_create(actor: dict[str, Any], body: dict[str, Any]) -> str:
     requested = string_field(body, "ownerEmployeeId") or string_field(body, "employeeId")
     if actor["isAdmin"] and requested:
@@ -763,6 +783,12 @@ def actor_can_access_record(actor: dict[str, Any], record: dict[str, Any]) -> bo
     if actor["isAdmin"]:
         return True
     return record.get("ownerEmployeeId") == actor["employeeId"]
+
+
+def actor_can_access_sandbox(actor: dict[str, Any], sandbox: dict[str, Any]) -> bool:
+    if actor["isAdmin"]:
+        return True
+    return sandbox.get("employeeId") == actor["employeeId"]
 
 
 def get_session_for_actor(store: Any, session_id: str, actor: dict[str, Any]) -> dict[str, Any]:

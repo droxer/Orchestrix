@@ -1,4 +1,7 @@
 {
+  "app": {
+    "title": "Relay — 工作力控制平面"
+  },
   "skip_to_conversation": "跳至對話",
   "nav": {
     "conversations": "對話",
@@ -35,7 +38,9 @@
     "open_workspace": "開啟 Agent 工作區",
     "no_agent_yet": "尚無 Agent",
     "remove": "移除 @{{id}}",
-    "remove_confirm": "從此瀏覽器移除 @{{id}}？"
+    "remove_confirm": "從此瀏覽器移除 @{{id}}？",
+    "agent_running_aria": "Agent 運作中",
+    "no_sessions": "—"
   },
   "composer": {
     "placeholder": "傳送給 @{{employee}} — 輸入 @ 切換 Agent…",
@@ -68,9 +73,11 @@
     "sandbox_token": "沙盒憑證",
     "save_token": "儲存憑證",
     "token_hint": "已在此瀏覽器中為選定員工本地儲存。",
+    "token_placeholder": "tok_…",
     "live_sandbox": "活躍沙盒",
     "no_sandbox": "未選取沙盒",
     "workspace_label": "工作區",
+    "workspace_none": "無",
     "node_label": "節點",
     "run_label": "執行",
     "queued": "排隊中",
@@ -171,6 +178,7 @@
     "stale_run_body_one": "{{count}} 筆執行記錄仍開放，但節點未在輪詢。",
     "stale_run_body_other": "{{count}} 筆執行記錄仍開放，但節點未在輪詢。",
     "quiet_body": "最後上線於 {{time}}。",
+    "run_title": "{{agent}} · {{mode}}",
     "time": {
       "now": "剛剛",
       "never": "從未",
@@ -192,7 +200,10 @@
       "pulse_label": "節點概覽",
       "onboard_cta": "新增員工",
       "onboard_title": "新增員工",
-      "onboard_sub": "為新員工配置未使用的沙箱,或將既有員工綁定到節點。",
+      "onboard_sub": "為新員工配置未使用的沙箱，或將既有員工綁定到節點。",
+      "onboard_mode_label": "到職模式",
+      "mode_new": "新員工",
+      "mode_existing": "現有員工",
       "section_identity": "身份",
       "section_credentials": "憑證",
       "section_assignment": "節點分配",
@@ -204,12 +215,12 @@
       "token_only_at_provision": "原始權杖僅在建立時顯示。Relay 之後僅儲存雜湊。",
       "rail_label": "即時關注",
       "rail_title": "即時",
-      "rail_empty": "一切就緒,沒有執行也沒有等待。",
+      "rail_empty": "一切就緒，沒有執行也沒有等待。",
       "rail_foot": "更新於 {{time}}",
       "active_run_default": "未命名任務",
       "dept_none": "未分組",
       "empty_people_title": "尚無員工。",
-      "empty_people_body": "新增第一位員工,將代理沙箱綁定到具體人員。",
+      "empty_people_body": "新增第一位員工，將代理沙箱綁定到具體人員。",
       "no_match": "沒有相符的員工。",
       "no_nodes_for_employee": "尚無沙箱。",
       "no_nodes_for_filter": "此篩選下沒有節點。",
@@ -218,7 +229,16 @@
       "reveal_credentials_for": "檢視 {{id}} 的憑證",
       "filter_all": "全部",
       "filter_failed": "失敗 / 離線",
-      "filter_label": "依狀態篩選"
+      "filter_label": "依狀態篩選",
+      "placeholder_employee_id": "alice",
+      "placeholder_display_name": "愛麗絲",
+      "placeholder_username": "alice",
+      "placeholder_email": "alice@example.com",
+      "assign_title": "指派節點",
+      "assign_sub": "將未指派的守護節點綁定到現有員工。",
+      "add_node": "新增節點",
+      "add_node_for": "為 @{{id}} 指派節點",
+      "add_node_disabled_hint": "尚無可指派的節點。請先啟動一個守護程序。"
     }
   },
   "mcp": {
@@ -229,7 +249,10 @@
     "no_servers_title": "未設定 MCP 伺服器",
     "no_servers_body": "在 ~/.claude/settings.json 的 mcpServers 下新增 MCP 伺服器，將外部工具與服務接入您的 Agent。",
     "learn_more": "瞭解 MCP →",
-    "tools": "工具"
+    "tools": "工具",
+    "status_connected": "已連線",
+    "status_disconnected": "已斷線",
+    "status_error": "錯誤"
   },
   "skills": {
     "title": "技能庫",
@@ -250,6 +273,20 @@
       "everything-claude-code": "Claude Code 全集",
       "built-in": "內建",
       "code-review": "程式碼審查"
+    },
+    "sample": {
+      "using-superpowers": { "desc": "確立如何發現與使用技能，要求在做出任何回應之前呼叫 Skill 工具。" },
+      "brainstorming": { "desc": "在複雜任務進入計畫模式前進行結構化腦力激盪。" },
+      "writing-plans": { "desc": "撰寫包含上下文、方法與驗證步驟的實作計畫。" },
+      "executing-plans": { "desc": "逐步執行已核准的計畫並追蹤任務。" },
+      "systematic-debugging": { "desc": "從重現到根因分析的系統化除錯流程。" },
+      "frontend-design": { "desc": "創造獨特、生產級的前端介面，具備高品質設計，避免通用 AI 審美。" },
+      "ui-ux-pro-max": { "desc": "針對生產級介面的進階 UI/UX 指引，具備強而有力的設計方向。" },
+      "web-design-guidelines": { "desc": "一致、可存取且精緻網頁設計的指導原則。" },
+      "code-simplifier": { "desc": "簡化過度複雜的程式碼——減少巢狀、提取函式、改善命名。" },
+      "find-skills": { "desc": "探索並導覽工作區中可用的技能。" },
+      "next-best-practices": { "desc": "生產級應用 Next.js 最佳實踐：路由、資料取得、效能。" },
+      "vercel-react-best-practices": { "desc": "React + Vercel 部署最佳實踐、邊緣函式與效能模式。" }
     }
   },
   "pref": {
@@ -301,6 +338,56 @@
     "cancelled": "已取消",
     "unknown": "未知"
   },
+  "mode": {
+    "implement": "實作",
+    "review": "審查"
+  },
+  "verdict": {
+    "approved": "已通過",
+    "rejected": "已拒絕"
+  },
+  "artifact": {
+    "kind": {
+      "default": "{{kind}}"
+    }
+  },
+  "agent_stream": {
+    "thinking": "思考中",
+    "tool": "工具",
+    "empty_working": "執行中…",
+    "empty_done": "暫無輸出。",
+    "claude_error": "Claude 錯誤",
+    "claude_finished": "Claude 已完成。",
+    "claude_api_retry": "Claude API 重試 {{attempt}}/{{max}}",
+    "codex_started": "Codex 已啟動。",
+    "codex_finished": "Codex 已完成。",
+    "codex_failed": "Codex 失敗：{{message}}",
+    "codex_error": "Codex 錯誤：{{message}}",
+    "codex_changed_files": "Codex 已變更檔案。"
+  },
+  "message": {
+    "user_label": "你",
+    "user_avatar": "我",
+    "agent_header": "{{employee}} 的 {{agent}}",
+    "started": "{{agent}} — {{mode}} 已啟動",
+    "artifact": "產物 — {{kind}}",
+    "decision": "你 — {{kind}}",
+    "agent_completed": "{{agent}} — {{status}}",
+    "exit_code": "結束碼 {{exitCode}}",
+    "review_verdict": "codex 裁決 — {{verdict}}",
+    "session_status": "狀態 — {{phase}}",
+    "session_completed": "工作階段已完成",
+    "session_failed": "工作階段失敗"
+  },
+  "fleet": {
+    "agent_status_title": "{{agent}}：{{status}}"
+  },
+  "sheet": {
+    "close": "關閉"
+  },
+  "cancel": {
+    "reason": "從 Relay Web UI 取消。"
+  },
   "toast": {
     "open_workspace_to_begin": "開啟員工工作區以開始。",
     "opening_workspace": "正在開啟 {{employee}} 的 Relay 工作區。",
@@ -315,7 +402,7 @@
     "add_task": "請在 @{{agent}} 後新增任務內容。",
     "open_sandbox": "請先開啟此員工的沙盒再傳送。",
     "handed_to": "對話已移交給 {{agent}}。",
-    "decision_recorded": "已記錄: {{kind}}。"
+    "decision_recorded": "已記錄：{{kind}}。"
   },
   "agent": {
     "claude": { "role": "建構者", "blurb": "透過系統化的上下文將需求轉化為實作工作。" },

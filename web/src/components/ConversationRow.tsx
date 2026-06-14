@@ -63,14 +63,14 @@ export function ConversationRow({ contact, selected, onSelect, onRemove }: Conve
             </span>
             <span className="conversation-topline-actions">
               {contact.activeRun ? (
-                <span className="conversation-badge mono" aria-label="Agent running">
+                <span className="conversation-badge mono" aria-label={t("conversation.agent_running_aria")}>
                   {Math.max(contact.sessionCount, 1)}
                 </span>
               ) : (
                 <span className="conversation-stamp mono">
                   {contact.sessionCount > 0
                     ? `${contact.sessionCount.toString().padStart(2, "0")}`
-                    : "—"}
+                    : t("conversation.no_sessions")}
                 </span>
               )}
             </span>

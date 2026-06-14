@@ -1,4 +1,6 @@
 import { StreamAttachment } from "./icons";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { AgentMark } from "./AgentMark";
 import { AgentStream } from "./AgentStream";
 import type { AgentName, RelaySession, Tone } from "../types";
@@ -43,7 +45,7 @@ export function isGroupedContinuation(messages: DerivedMessage[], index: number)
 }
 
 function formatTime(value: string): string {
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat(document.documentElement.lang || undefined, {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
@@ -71,13 +73,14 @@ export function MessageBlock({
   sessionId,
   grouped = false,
 }: MessageBlockProps) {
+  const { t } = useTranslation();
   if (message.kind === "user") {
     return (
       <article className="msg msg-user">
-        <span className="user-avatar" aria-hidden="true">Y</span>
+        <span className="user-avatar" aria-hidden="true">{t("message.user_avatar")}</span>
         <div className="bubble">
           <header>
-            <span>you</span>
+            <span>{t("message.user_label")}</span>
             <time className="mono">{formatTime(message.timestamp)}</time>
           </header>
           <p>{message.text}</p>
@@ -95,7 +98,9 @@ export function MessageBlock({
         <div className="bubble">
           <header>
             <span>
-              {employeeId}'s {message.agent}
+              {employeeId
+                ? t("message.agent_header", { employee: employeeId, agent: message.agent })
+                : message.agent}
             </span>
             <time className="mono">{formatTime(message.timestamp)}</time>
           </header>
@@ -143,7 +148,7 @@ export function MessageBlock({
   );
 }
 
-export function projectMessages(session: RelaySession | undefined): DerivedMessage[] {
+export function projectMessages(session: RelaySession | undefined, t: TFunction): DerivedMessage[] {
   if (!session) return [];
   const out: DerivedMessage[] = [];
   out.push({
@@ -205,7 +210,7 @@ export function projectMessages(session: RelaySession | undefined): DerivedMessa
           id: event.id,
           timestamp: event.timestamp,
           tone: "neutral",
-          label: `${event.agent} - ${event.mode} started`,
+          label: t("message.started", { agent: event.agent, mode: t(`mode.${event.mode}`, { defaultValue: event.mode }) }),
         });
         break;
       }
@@ -241,7 +246,7 @@ export function projectMessages(session: RelaySession | undefined): DerivedMessa
             id: event.id,
             timestamp: event.timestamp,
             tone: "neutral",
-            label: `artifact - ${event.artifact.kind}`,
+            label: t("message.artifact", { kind: t(`artifact.kind.${event.artifact.kind}`, { defaultValue: event.artifact.kind }) }),
             detail: event.artifact.title,
           });
         }
@@ -253,7 +258,7 @@ export function projectMessages(session: RelaySession | undefined): DerivedMessa
           id: event.id,
           timestamp: event.timestamp,
           tone: "info",
-          label: `you - ${event.decision.kind.replace("_", " ")}`,
+          label: t("message.decision", { kind: t(`decision.${event.decision.kind}`, { defaultValue: event.decision.kind }) }),
           detail: event.decision.note,
         });
         break;
@@ -277,8 +282,11 @@ export function projectMessages(session: RelaySession | undefined): DerivedMessa
               : event.status === "failed"
               ? "bad"
               : "neutral",
-          label: `${event.agent} - ${event.status}`,
-          detail: `exit ${event.exitCode}`,
+          label: t("message.agent_completed", {
+            agent: event.agent,
+            status: t(`status.${event.status}`, { defaultValue: event.status }),
+          }),
+          detail: t("message.exit_code", { exitCode: event.exitCode }),
         });
         break;
       }
@@ -288,7 +296,9 @@ export function projectMessages(session: RelaySession | undefined): DerivedMessa
           id: event.id,
           timestamp: event.timestamp,
           tone: event.verdict === "approved" ? "good" : "bad",
-          label: `codex verdict - ${event.verdict}`,
+          label: t("message.review_verdict", {
+            verdict: t(`verdict.${event.verdict}`, { defaultValue: event.verdict }),
+          }),
           detail: event.feedback,
         });
         break;
@@ -299,7 +309,7 @@ export function projectMessages(session: RelaySession | undefined): DerivedMessa
           id: event.id,
           timestamp: event.timestamp,
           tone: "neutral",
-          label: `status - ${event.phase}`,
+          label: t("message.session_status", { phase: t(`status.${event.phase}`, { defaultValue: event.phase }) }),
         });
         break;
       }
@@ -311,7 +321,7 @@ export function projectMessages(session: RelaySession | undefined): DerivedMessa
           timestamp: event.timestamp,
           tone: event.type === "session.completed" ? "good" : "bad",
           label:
-            event.type === "session.completed" ? "session completed" : "session failed",
+            event.type === "session.completed" ? t("message.session_completed") : t("message.session_failed"),
           detail: event.outcome,
         });
         break;

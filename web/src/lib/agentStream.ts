@@ -6,6 +6,7 @@ export type AgentSegment =
   | { kind: "tool"; name: string }
   | { kind: "command"; command: string }
   | { kind: "status"; tone: StatusTone; text: string }
+  | { kind: "narration"; key: string; params?: Record<string, string | number> }
   | { kind: "raw"; text: string };
 
 type StatusTone = Exclude<Tone, "neutral">;
@@ -94,7 +95,7 @@ function streamRecords(raw: string): Array<{ kind: "json"; value: Record<string,
 
     if (end === -1) {
       const text = raw.slice(i).trim();
-      if (text && !isLikelyProtocolFragment(text)) out.push({ kind: "text", text });
+      if (text && !isLikelyProtocolFragment(text)) out.push({ kind: "text", text: stripAnsi(text) });
       break;
     }
 
@@ -124,6 +125,14 @@ class TextBuffer {
     if (trimmed) out.push({ kind, text: trimmed });
     this.value = "";
   }
+}
+
+function narration(
+  key: string,
+  params?: Record<string, string | number>,
+  tone?: StatusTone,
+): AgentSegment {
+  return { kind: "narration", key, params: tone ? { ...params, tone } : params };
 }
 
 function parseClaude(raw: string): AgentSegment[] {
@@ -182,18 +191,20 @@ function parseClaude(raw: string): AgentSegment[] {
       text.flush(out, "text");
       thinking.flush(out, "thinking");
       if (event.is_error) {
-        out.push({ kind: "status", tone: "bad", text: String(event.result ?? "Claude error") });
+        const message = String(event.result ?? "");
+        out.push(message
+          ? { kind: "status", tone: "bad", text: message }
+          : narration("agent_stream.claude_error", undefined, "bad"));
       } else {
-        out.push({ kind: "status", tone: "good", text: "Claude finished." });
+        out.push(narration("agent_stream.claude_finished", undefined, "good"));
       }
       continue;
     }
     if (event.type === "system" && event.subtype === "api_retry") {
-      out.push({
-        kind: "status",
-        tone: "warn",
-        text: `Claude API retry ${String(event.attempt ?? "?")}/${String(event.max_retries ?? "?")}`,
-      });
+      out.push(narration("agent_stream.claude_api_retry", {
+        attempt: Number(event.attempt ?? "?"),
+        max: Number(event.max_retries ?? "?"),
+      }, "warn"));
     }
   }
   text.flush(out, "text");
@@ -210,20 +221,20 @@ function parseCodex(raw: string): AgentSegment[] {
     }
     const event = record.value;
     if (event.type === "turn.started") {
-      out.push({ kind: "status", tone: "info", text: "Codex started." });
+      out.push(narration("agent_stream.codex_started", undefined, "info"));
       continue;
     }
     if (event.type === "turn.completed") {
-      out.push({ kind: "status", tone: "good", text: "Codex finished." });
+      out.push(narration("agent_stream.codex_finished", undefined, "good"));
       continue;
     }
     if (event.type === "turn.failed") {
       const error = asRecord(event.error);
-      out.push({ kind: "status", tone: "bad", text: `Codex failed: ${String(error.message ?? "turn failed")}` });
+      out.push(narration("agent_stream.codex_failed", { message: String(error.message ?? "turn failed") }, "bad"));
       continue;
     }
     if (event.type === "error") {
-      out.push({ kind: "status", tone: "bad", text: `Codex error: ${String(event.message ?? "unknown")}` });
+      out.push(narration("agent_stream.codex_error", { message: String(event.message ?? "unknown") }, "bad"));
       continue;
     }
     if (typeof event.type === "string" && event.type.startsWith("item.")) {
@@ -243,7 +254,7 @@ function parseCodex(raw: string): AgentSegment[] {
         continue;
       }
       if (item.type === "file_change" && event.type === "item.completed") {
-        out.push({ kind: "status", tone: "info", text: "Codex changed files." });
+        out.push(narration("agent_stream.codex_changed_files", undefined, "info"));
       }
       continue;
     }

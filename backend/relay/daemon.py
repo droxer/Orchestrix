@@ -99,6 +99,7 @@ class DaemonNodeRegistry:
         self.completions: dict[str, asyncio.Future[dict[str, Any]]] = {}
         self.outputs: dict[str, list[str]] = {}
         self.output_sequences: dict[str, set[int]] = {}
+        self.plain_node_tokens: dict[str, str] = {}
         self._load_persisted_state()
 
     def register(self, input: dict[str, Any], ui_token: str | None = None) -> dict[str, Any]:
@@ -131,6 +132,8 @@ class DaemonNodeRegistry:
             "lastSeenAt": now,
         }
         self.sandboxes[sandbox["id"]] = sandbox
+        if input.get("token"):
+            self.plain_node_tokens[sandbox["id"]] = input["token"]
         self.daemon_store.register_node(sandbox)
         logger.info("Daemon node registered", sandbox_id=sandbox["id"], employee_id=sandbox.get("employeeId"), status=sandbox["status"], agents={agent: status for agent, status in sandbox["agents"].items()})
         return sandbox
@@ -176,7 +179,12 @@ class DaemonNodeRegistry:
         return [node for node in self.monitor_nodes() if node["id"] in allowed]
 
     def control_panel_nodes(self) -> list[dict[str, Any]]:
-        return self.monitor_nodes()
+        nodes = self.monitor_nodes()
+        for node in nodes:
+            plain = self.plain_node_tokens.get(node["id"])
+            if plain:
+                node["nodeToken"] = plain
+        return nodes
 
     def assign_employee(self, sandbox_id: str, employee_id: str) -> dict[str, Any]:
         sandbox = self.sandboxes.get(sandbox_id)
@@ -214,6 +222,7 @@ class DaemonNodeRegistry:
             "lastError": "Waiting for daemon node registration.",
         }
         self.sandboxes[sandbox_id] = sandbox
+        self.plain_node_tokens[sandbox_id] = node_token
         self.daemon_store.register_node(sandbox)
         logger.info("Daemon node provisioned", sandbox_id=sandbox_id, employee_id=employee_id, workspace_path=workspace_path)
         return sandbox, ui_token, node_token

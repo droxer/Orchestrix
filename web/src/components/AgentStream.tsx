@@ -1,5 +1,6 @@
 import { StreamCheck, StreamCommand, StreamError, StreamInfo, StreamTool, StreamWarn } from "./icons";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 import type { AgentName } from "../types";
 import { parseAgentStream, parseAgentStderr, type AgentSegment } from "../lib/agentStream";
@@ -13,13 +14,14 @@ type AgentStreamProps = {
 };
 
 export function AgentStream({ agent, stdout, stderr, streaming }: AgentStreamProps) {
+  const { t } = useTranslation();
   const segments = [
     ...parseAgentStream(agent, stdout),
     ...parseAgentStderr(stderr),
   ];
 
   if (segments.length === 0) {
-    return <p className="msg-quiet">{streaming ? "Working…" : "No output."}</p>;
+    return <p className="msg-quiet">{streaming ? t("agent_stream.empty_working") : t("agent_stream.empty_done")}</p>;
   }
 
   return (
@@ -32,6 +34,7 @@ export function AgentStream({ agent, stdout, stderr, streaming }: AgentStreamPro
 }
 
 function SegmentView({ segment }: { segment: AgentSegment }) {
+  const { t } = useTranslation();
   if (segment.kind === "text") {
     return <div className="agent-text">{renderProse(segment.text)}</div>;
   }
@@ -39,7 +42,7 @@ function SegmentView({ segment }: { segment: AgentSegment }) {
     return (
       <details className="agent-thinking">
         <summary>
-          <span className="agent-segment-label">Thinking</span>
+          <span className="agent-segment-label">{t("agent_stream.thinking")}</span>
         </summary>
         <div className="agent-thinking-body">{renderProse(segment.text)}</div>
       </details>
@@ -49,7 +52,7 @@ function SegmentView({ segment }: { segment: AgentSegment }) {
     return (
       <div className="agent-tool">
         <StreamTool size={13} aria-hidden="true" />
-        <span className="agent-segment-label">Tool</span>
+        <span className="agent-segment-label">{t("agent_stream.tool")}</span>
         <span className="agent-tool-name">{segment.name}</span>
       </div>
     );
@@ -59,6 +62,14 @@ function SegmentView({ segment }: { segment: AgentSegment }) {
       <div className="agent-command">
         <StreamCommand size={13} aria-hidden="true" />
         <code>{segment.command}</code>
+      </div>
+    );
+  }
+  if (segment.kind === "narration") {
+    return (
+      <div className={`agent-status agent-status-${segment.params?.tone ?? "info"}`}>
+        <StatusIcon tone={(segment.params?.tone as "good" | "bad" | "warn" | "info") ?? "info"} />
+        <span>{t(segment.key, segment.params)}</span>
       </div>
     );
   }

@@ -276,7 +276,7 @@ export function App() {
 
   const selectedToken = selectedSandbox ? (tokens[selectedSandbox.id] ?? tokens[selectedEmployee]) : tokens[selectedEmployee];
   const activeRun = selectedNode?.activeRuns[0];
-  const messages = useMemo<DerivedMessage[]>(() => projectMessages(activeSession), [activeSession]);
+  const messages = useMemo<DerivedMessage[]>(() => projectMessages(activeSession, t), [activeSession, t]);
   const selectedEmployeeLabel = selectedEmployee ? `@${selectedEmployee}` : t("thread.no_employee_selected");
 
   const awaitingDecision = useMemo(() => {
@@ -498,7 +498,10 @@ export function App() {
   useEffect(() => {
     localStorage.setItem(languageStorageKey, language);
     document.documentElement.lang = language;
-    void i18n.changeLanguage(language);
+    document.title = i18n.t("app.title");
+    if (i18n.language !== language) {
+      void i18n.changeLanguage(language);
+    }
   }, [i18n, language]);
 
   function handleTranscriptScroll(): void {
@@ -551,7 +554,7 @@ export function App() {
       const { sandbox, token } = await provisionEmployeeSandbox(selectedEmployee, selectedToken);
       rememberSandboxToken(selectedEmployee, sandbox, token);
       const assignment = { agent: routedAgent, mode: defaultModeForAgent(routedAgent) };
-      const session = await createSession({ taskGoal: goal, assignments: [assignment], workspacePath: sandbox.workspacePath }, token);
+      const session = await createSession({ taskGoal: goal, assignments: [assignment], workspacePath: sandbox.workspacePath, ownerEmployeeId: selectedEmployee }, token);
       setSelectedSessionId(session.id); setComposerText(""); setMentionOpen(false);
       setMobileView("chat"); atBottomRef.current = true;
       await refresh(undefined, token);
@@ -598,7 +601,7 @@ export function App() {
   async function cancelActiveRun() {
     if (!selectedSandbox || !activeRun) return;
     try {
-      const session = await cancelRun(selectedSandbox.id, activeRun.sessionId, selectedToken);
+      const session = await cancelRun(selectedSandbox.id, activeRun.sessionId, selectedToken, t("cancel.reason"));
       setSelectedSessionId(session.id);
       setStatus({ tone: "warn", message: t("toast.cancel_requested", { sessionId: activeRun.sessionId }) });
       await refresh();

@@ -16,6 +16,7 @@ import type {
   CurrentUser,
   EmployeeRecord,
 } from "../types";
+import { AssignNodeDrawer } from "./admin/AssignNodeDrawer";
 import { AttentionRail } from "./admin/AttentionRail";
 import { BootstrapScreen, LoginScreen } from "./admin/AuthScreens";
 import { CredentialsDrawer } from "./admin/CredentialsDrawer";
@@ -50,6 +51,7 @@ export function AdminConsole() {
 
   const [view, setView] = useState<AdminView>("people");
   const [onboardOpen, setOnboardOpen] = useState(false);
+  const [assignTarget, setAssignTarget] = useState<{ employeeId?: string } | null>(null);
   const [credentialsNodeId, setCredentialsNodeId] = useState<string | null>(null);
   const [highlightedEmployeeId, setHighlightedEmployeeId] = useState<string | null>(null);
   const [storedTokens, setStoredTokens] = useState<StoredNodeTokenMap>(() => readStoredNodeTokens());
@@ -174,6 +176,7 @@ export function AdminConsole() {
     setHighlightedEmployeeId(result.employee.id);
     window.setTimeout(() => setHighlightedEmployeeId((prev) => (prev === result.employee.id ? null : prev)), 2400);
     setOnboardOpen(false);
+    setAssignTarget(null);
     setView("people");
   }
 
@@ -252,6 +255,8 @@ export function AdminConsole() {
                 nodes={nodes}
                 onRevealCredentials={handleRevealCredentials}
                 onOnboard={() => setOnboardOpen(true)}
+                onRequestAssign={(employeeId) => setAssignTarget({ employeeId })}
+                unassignedNodeCount={unassignedNodes.length}
                 highlightedEmployeeId={highlightedEmployeeId}
               />
             ) : (
@@ -272,6 +277,14 @@ export function AdminConsole() {
         employees={employees}
         unassignedNodes={unassignedNodes}
         onSuccess={handleOnboardSuccess}
+        onAssignSuccess={handleAssignSuccess}
+      />
+      <AssignNodeDrawer
+        open={assignTarget !== null}
+        onClose={() => setAssignTarget(null)}
+        employees={employees}
+        unassignedNodes={unassignedNodes}
+        defaultEmployeeId={assignTarget?.employeeId}
         onAssignSuccess={handleAssignSuccess}
       />
       <CredentialsDrawer

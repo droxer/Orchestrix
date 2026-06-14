@@ -48,7 +48,7 @@ def test_fastapi_daemon_routes_register_and_poll(monkeypatch) -> None:
         assert response.json() == {"commands": []}
         response = client.get("/cp/daemon-nodes")
         assert response.status_code == 200
-        assert "nodeToken" not in response.json()["nodes"][0]
+        assert response.json()["nodes"][0].get("nodeToken") == "node_token"
 
 
 def test_admin_creates_employee_login_and_assigns_unassigned_node(monkeypatch) -> None:

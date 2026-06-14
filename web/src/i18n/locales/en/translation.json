@@ -1,4 +1,7 @@
 {
+  "app": {
+    "title": "Relay — Workforce control plane"
+  },
   "skip_to_conversation": "Skip to Conversation",
   "nav": {
     "conversations": "Conversations",
@@ -35,7 +38,9 @@
     "open_workspace": "Open their agent workspace",
     "no_agent_yet": "no agent yet",
     "remove": "Remove @{{id}}",
-    "remove_confirm": "Remove @{{id}} from this browser?"
+    "remove_confirm": "Remove @{{id}} from this browser?",
+    "agent_running_aria": "Agent running",
+    "no_sessions": "—"
   },
   "composer": {
     "placeholder": "Write to @{{employee}} — type @ to switch agent…",
@@ -68,9 +73,11 @@
     "sandbox_token": "Sandbox token",
     "save_token": "Save Token",
     "token_hint": "Saved locally in this browser for the selected employee.",
+    "token_placeholder": "tok_…",
     "live_sandbox": "Live sandbox",
     "no_sandbox": "No sandbox selected",
     "workspace_label": "workspace",
+    "workspace_none": "none",
     "node_label": "node",
     "run_label": "run",
     "queued": "queued",
@@ -171,6 +178,7 @@
     "stale_run_body_one": "{{count}} run record still open but node is not polling.",
     "stale_run_body_other": "{{count}} run records still open but node is not polling.",
     "quiet_body": "Last seen {{time}}.",
+    "run_title": "{{agent}} · {{mode}}",
     "time": {
       "now": "now",
       "never": "never",
@@ -193,6 +201,9 @@
       "onboard_cta": "Onboard employee",
       "onboard_title": "Onboard employee",
       "onboard_sub": "Provision an employee against an unassigned sandbox, or re-assign one that already exists.",
+      "onboard_mode_label": "Onboard mode",
+      "mode_new": "New employee",
+      "mode_existing": "Existing employee",
       "section_identity": "Identity",
       "section_credentials": "Credentials",
       "section_assignment": "Assignment",
@@ -218,7 +229,16 @@
       "reveal_credentials_for": "Reveal credentials for {{id}}",
       "filter_all": "All",
       "filter_failed": "Failed / stale",
-      "filter_label": "Filter by status"
+      "filter_label": "Filter by status",
+      "placeholder_employee_id": "alice",
+      "placeholder_display_name": "Alice",
+      "placeholder_username": "alice",
+      "placeholder_email": "alice@example.com",
+      "assign_title": "Assign node",
+      "assign_sub": "Bind an unassigned daemon node to an existing employee.",
+      "add_node": "Add node",
+      "add_node_for": "Assign a node to @{{id}}",
+      "add_node_disabled_hint": "No unassigned nodes available. Onboard a daemon first."
     }
   },
   "mcp": {
@@ -229,7 +249,10 @@
     "no_servers_title": "No MCP servers configured",
     "no_servers_body": "Add MCP servers to ~/.claude/settings.json under mcpServers to connect external tools and services to your agents.",
     "learn_more": "Learn about MCP →",
-    "tools": "tools"
+    "tools": "tools",
+    "status_connected": "connected",
+    "status_disconnected": "disconnected",
+    "status_error": "error"
   },
   "skills": {
     "title": "Skills Library",
@@ -250,6 +273,20 @@
       "everything-claude-code": "Everything Claude Code",
       "built-in": "Built-in",
       "code-review": "Code Review"
+    },
+    "sample": {
+      "using-superpowers": { "desc": "Establishes how to find and use skills, requiring Skill tool invocation before any response." },
+      "brainstorming": { "desc": "Structured brainstorming before entering plan mode for complex tasks." },
+      "writing-plans": { "desc": "Write implementation plans with context, approach, and verification steps." },
+      "executing-plans": { "desc": "Execute approved plans step by step with task tracking." },
+      "systematic-debugging": { "desc": "Systematic debugging workflow from reproduction to root cause analysis." },
+      "frontend-design": { "desc": "Create distinctive, production-grade frontend interfaces with high design quality. Avoids generic AI aesthetics." },
+      "ui-ux-pro-max": { "desc": "Advanced UI/UX guidance for production-grade interfaces with strong aesthetic direction." },
+      "web-design-guidelines": { "desc": "Guidelines for consistent, accessible, and visually refined web design." },
+      "code-simplifier": { "desc": "Simplify overly complex code — reduce nesting, extract functions, improve naming." },
+      "find-skills": { "desc": "Discover and navigate available skills in the workspace." },
+      "next-best-practices": { "desc": "Next.js best practices for production apps: routing, data fetching, performance." },
+      "vercel-react-best-practices": { "desc": "React + Vercel deployment best practices, edge functions, and performance patterns." }
     }
   },
   "pref": {
@@ -300,6 +337,56 @@
     "blocked": "blocked",
     "cancelled": "cancelled",
     "unknown": "unknown"
+  },
+  "mode": {
+    "implement": "implement",
+    "review": "review"
+  },
+  "verdict": {
+    "approved": "approved",
+    "rejected": "rejected"
+  },
+  "artifact": {
+    "kind": {
+      "default": "{{kind}}"
+    }
+  },
+  "agent_stream": {
+    "thinking": "Thinking",
+    "tool": "Tool",
+    "empty_working": "Working…",
+    "empty_done": "No output.",
+    "claude_error": "Claude error",
+    "claude_finished": "Claude finished.",
+    "claude_api_retry": "Claude API retry {{attempt}}/{{max}}",
+    "codex_started": "Codex started.",
+    "codex_finished": "Codex finished.",
+    "codex_failed": "Codex failed: {{message}}",
+    "codex_error": "Codex error: {{message}}",
+    "codex_changed_files": "Codex changed files."
+  },
+  "message": {
+    "user_label": "you",
+    "user_avatar": "Y",
+    "agent_header": "{{employee}}'s {{agent}}",
+    "started": "{{agent}} — {{mode}} started",
+    "artifact": "artifact — {{kind}}",
+    "decision": "you — {{kind}}",
+    "agent_completed": "{{agent}} — {{status}}",
+    "exit_code": "exit {{exitCode}}",
+    "review_verdict": "codex verdict — {{verdict}}",
+    "session_status": "status — {{phase}}",
+    "session_completed": "session completed",
+    "session_failed": "session failed"
+  },
+  "fleet": {
+    "agent_status_title": "{{agent}}: {{status}}"
+  },
+  "sheet": {
+    "close": "Close"
+  },
+  "cancel": {
+    "reason": "Cancelled from Relay Web UI."
   },
   "toast": {
     "open_workspace_to_begin": "Open an employee workspace to begin.",

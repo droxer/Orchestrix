@@ -170,6 +170,7 @@ export function createSession(input: CreateSessionInput, token?: string): Promis
       taskGoal: input.taskGoal,
       assignments: input.assignments,
       workspacePath: input.workspacePath,
+      ...(input.ownerEmployeeId ? { ownerEmployeeId: input.ownerEmployeeId } : {}),
     },
   });
 }
@@ -186,11 +187,11 @@ export function runSandbox(input: RunInput, token?: string): Promise<RelaySessio
   });
 }
 
-export function cancelRun(sandboxId: string, sessionId: string, token?: string): Promise<RelaySession> {
+export function cancelRun(sandboxId: string, sessionId: string, token?: string, reason?: string): Promise<RelaySession> {
   return apiJson<RelaySession>(`/sandboxes/${encodeURIComponent(sandboxId)}/runs/${encodeURIComponent(sessionId)}/cancel`, {
     method: "POST",
     token,
-    body: { reason: "Cancelled from Relay Web UI." },
+    body: { reason: reason ?? "Cancelled from Relay Web UI." },
   });
 }
 

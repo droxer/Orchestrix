@@ -97,7 +97,11 @@ function NodeCard({
             const agentStatus = node.agents[name] ?? "unknown";
             const agentTone = agentStatusTone(agentStatus);
             return (
-              <span key={name} className={`adm-agent-chip tone-${agentTone}`} title={`${name}: ${agentStatus}`}>
+              <span
+                key={name}
+                className={`adm-agent-chip tone-${agentTone}`}
+                title={t("fleet.agent_status_title", { agent: name, status: t(`status.${agentStatus}`, { defaultValue: agentStatus }) })}
+              >
                 {name}
               </span>
             );

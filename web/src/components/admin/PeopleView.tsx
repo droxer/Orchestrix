@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import type { ControlPanelDaemonNodeRecord } from "../../types";
 import {
   buildEmployeeSummaries,
@@ -18,6 +18,8 @@ interface PeopleViewProps {
   nodes: ControlPanelDaemonNodeRecord[];
   onRevealCredentials: (node: ControlPanelDaemonNodeRecord) => void;
   onOnboard: () => void;
+  onRequestAssign: (employeeId: string) => void;
+  unassignedNodeCount: number;
   highlightedEmployeeId: string | null;
 }
 
@@ -48,6 +50,8 @@ export function PeopleView({
   nodes,
   onRevealCredentials,
   onOnboard,
+  onRequestAssign,
+  unassignedNodeCount,
   highlightedEmployeeId,
 }: PeopleViewProps) {
   const { t } = useTranslation();
@@ -154,6 +158,20 @@ export function PeopleView({
                           );
                         })
                       )}
+                      <button
+                        type="button"
+                        className="adm-emp-add-node"
+                        onClick={() => onRequestAssign(member.id)}
+                        disabled={unassignedNodeCount === 0}
+                        title={
+                          unassignedNodeCount === 0
+                            ? t("admin.v2.add_node_disabled_hint")
+                            : t("admin.v2.add_node_for", { id: member.id })
+                        }
+                      >
+                        <Plus size={12} aria-hidden="true" />
+                        <span>{t("admin.v2.add_node")}</span>
+                      </button>
                     </div>
                     <div className="adm-emp-metrics">
                       <span className={`adm-emp-running mono ${member.runningCount > 0 ? "tone-info" : "tone-muted"}`}>

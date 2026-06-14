@@ -22,6 +22,9 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
+  // The default language is English; the client App updates both
+  // document.documentElement.lang and document.title from the user's
+  // saved preference once it hydrates.
   return (
     <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
       <body>{children}</body>

@@ -161,7 +161,7 @@ export function OnboardDrawer({
                 value={employeeId}
                 onChange={(event) => setEmployeeId(event.target.value)}
                 autoComplete="off"
-                placeholder="alice"
+                placeholder={t("admin.v2.placeholder_employee_id")}
                 autoFocus
               />
             </label>
@@ -172,7 +172,7 @@ export function OnboardDrawer({
                 value={displayName}
                 onChange={(event) => setDisplayName(event.target.value)}
                 autoComplete="off"
-                placeholder="Alice"
+                placeholder={t("admin.v2.placeholder_display_name")}
               />
             </label>
             <label className="adm-field">
@@ -183,7 +183,7 @@ export function OnboardDrawer({
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 autoComplete="email"
-                placeholder="alice@example.com"
+                placeholder={t("admin.v2.placeholder_email")}
               />
             </label>
           </fieldset>
@@ -197,7 +197,7 @@ export function OnboardDrawer({
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
                 autoComplete="username"
-                placeholder="alice"
+                placeholder={t("admin.v2.placeholder_username")}
               />
             </label>
             <label className="adm-field">

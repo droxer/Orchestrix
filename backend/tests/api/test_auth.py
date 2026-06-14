@@ -517,7 +517,34 @@ def test_auth_responses_do_not_expose_secret_fields(monkeypatch) -> None:
         _assert_no_secret_fields(response.json())
 
 
-def test_control_panel_node_list_does_not_expose_daemon_tokens(monkeypatch) -> None:
+def test_control_panel_node_list_exposes_node_token_for_admins(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _login(client, "admin", "secret123")
+
+        create = client.post("/cp/daemon-nodes", json={
+            "employeeId": "alice",
+            "workspacePath": "/workspace/alice",
+        })
+        assert create.status_code == 201
+        created_node_token = create.json()["nodeToken"]
+        assert created_node_token.startswith("tok_")
+
+        response = client.get("/cp/daemon-nodes")
+        assert response.status_code == 200
+        nodes = response.json()["nodes"]
+        assert len(nodes) == 1
+        assert nodes[0].get("nodeToken") == created_node_token
+        # Other secrets must still be hidden from the control-panel list.
+        assert "token" not in nodes[0]
+        assert "tokenHash" not in nodes[0]
+        assert "uiTokenHash" not in nodes[0]
+        assert "nodeTokenHash" not in nodes[0]
+
+
+def test_authenticated_user_can_list_own_sandbox_and_daemon_node_without_token(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
         client = TestClient(create_app(root))
@@ -529,11 +556,62 @@ def test_control_panel_node_list_does_not_expose_daemon_tokens(monkeypatch) -> N
             "workspacePath": "/workspace/alice",
         })
         assert response.status_code == 201
-        assert response.json()["nodeToken"].startswith("tok_")
+        response = client.post("/cp/daemon-nodes", json={
+            "employeeId": "bob",
+            "workspacePath": "/workspace/bob",
+        })
+        assert response.status_code == 201
 
-        response = client.get("/cp/daemon-nodes")
+        response = client.get("/sandboxes")
         assert response.status_code == 200
+        assert {sandbox["employeeId"] for sandbox in response.json()["sandboxes"]} == {"alice", "bob"}
         _assert_no_secret_fields(response.json())
+
+        response = client.get("/daemon-nodes")
+        assert response.status_code == 200
+        assert {node["employeeId"] for node in response.json()["nodes"]} == {"alice", "bob"}
+        _assert_no_secret_fields(response.json())
+
+
+def test_unauthenticated_user_can_list_all_sandboxes_and_daemon_nodes(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        admin_client = TestClient(create_app(root))
+        _bootstrap_admin(admin_client)
+        _login(admin_client, "admin", "secret123")
+
+        response = admin_client.post("/cp/daemon-nodes", json={
+            "employeeId": "alice",
+            "workspacePath": "/workspace/alice",
+        })
+        assert response.status_code == 201
+        response = admin_client.post("/cp/daemon-nodes", json={
+            "employeeId": "bob",
+            "workspacePath": "/workspace/bob",
+        })
+        assert response.status_code == 201
+
+        # Use a fresh client with no session cookie.
+        client = TestClient(create_app(root))
+
+        response = client.get("/sandboxes")
+        assert response.status_code == 200
+        assert {sandbox["employeeId"] for sandbox in response.json()["sandboxes"]} == {"alice", "bob"}
+        _assert_no_secret_fields(response.json())
+
+        response = client.get("/daemon-nodes")
+        assert response.status_code == 200
+        assert {node["employeeId"] for node in response.json()["nodes"]} == {"alice", "bob"}
+        _assert_no_secret_fields(response.json())
+
+        # A stale/invalid bearer token should fall back to the public list, not 401.
+        response = client.get("/sandboxes", headers={"Authorization": "Bearer invalid-token"})
+        assert response.status_code == 200
+        assert {sandbox["employeeId"] for sandbox in response.json()["sandboxes"]} == {"alice", "bob"}
+
+        response = client.get("/daemon-nodes", headers={"Authorization": "Bearer invalid-token"})
+        assert response.status_code == 200
+        assert {node["employeeId"] for node in response.json()["nodes"]} == {"alice", "bob"}
 
 
 def test_app_can_use_database_backed_auth_store(monkeypatch) -> None:

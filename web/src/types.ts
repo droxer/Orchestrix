@@ -89,6 +89,7 @@ export interface CreateSessionInput {
   taskGoal: string;
   assignments: RunInput["assignments"];
   workspacePath?: string;
+  ownerEmployeeId?: string;
 }
 
 export interface ApiErrorBody {

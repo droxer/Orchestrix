@@ -27,8 +27,9 @@ function TransportBadge({ transport }: { transport: McpServer["transport"] }) {
 }
 
 function StatusDot({ status }: { status: McpServer["status"] }) {
+  const { t } = useTranslation();
   return (
-    <span className="mcp-status-dot" data-status={status} aria-label={status} />
+    <span className="mcp-status-dot" data-status={status} aria-label={t(`mcp.status_${status}`, { defaultValue: status })} />
   );
 }
 

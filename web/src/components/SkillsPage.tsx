@@ -51,11 +51,12 @@ function namespaceLabel(ns: string, t: TFunction): string {
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function SkillRow({ skill }: { skill: Skill }) {
+  const { t } = useTranslation();
   return (
     <div className="skill-row">
       <div className="skill-row-main">
         <span className="skill-name mono">{skill.name}</span>
-        <p className="skill-desc">{skill.description}</p>
+        <p className="skill-desc">{t(`skills.sample.${skill.name}.desc`, { defaultValue: skill.description })}</p>
       </div>
       {skill.triggerWord && (
         <span className="skill-trigger mono">/{skill.triggerWord}</span>

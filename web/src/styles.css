@@ -4797,6 +4797,38 @@ button:disabled {
   50% { opacity: 1; }
 }
 
+.adm-emp-add-node {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  height: 28px;
+  padding: 0 var(--space-sm) 0 calc(var(--space-sm) - 2px);
+  border: 1px dashed var(--color-hairline);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-muted);
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
+}
+
+.adm-emp-add-node:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 6%, transparent);
+  border-style: solid;
+}
+
+.adm-emp-add-node:disabled {
+  color: var(--color-muted-soft);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .adm-emp-metrics {
   display: flex;
   align-items: baseline;
@@ -4822,42 +4854,82 @@ button:disabled {
 .tone-muted { color: var(--color-muted); }
 .tone-neutral { color: var(--color-ink); }
 
-/* ── Fleet view ───────────────────────────────────────────────────── */
+/* ── Fleet view — editorial section nav ───────────────────────────── */
 .adm-tabs {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-xs);
-  padding: 0;
+  gap: var(--space-lg);
+  padding: 0 0 2px;
+  margin-bottom: var(--space-base);
+  border-bottom: 1px solid var(--color-hairline);
 }
 
 .adm-tab {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: var(--space-xs);
-  height: 36px;
-  padding: 0 var(--space-base);
-  background: var(--color-surface-strong);
+  gap: 10px;
+  height: 40px;
+  padding: 0 2px;
+  background: transparent;
   border: none;
-  border-radius: var(--radius-pill);
   color: var(--color-muted);
-  font-size: 13px;
-  font-weight: 500;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   cursor: pointer;
-  transition: color 160ms ease, background 160ms ease;
+  transition: color 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.adm-tab::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -3px;
+  height: 2px;
+  background: var(--color-ink);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .adm-tab:hover { color: var(--color-ink); }
+.adm-tab:hover::after { transform: scaleX(0.35); background: var(--color-muted); }
 
 .adm-tab.active {
-  color: var(--color-primary);
-  background: var(--color-canvas);
-  box-shadow: inset 0 0 0 1px var(--color-primary);
+  color: var(--color-ink);
+}
+
+.adm-tab.active::after {
+  transform: scaleX(1);
+  background: var(--color-primary);
 }
 
 .adm-tab-count {
-  font-size: 11px;
-  color: inherit;
-  opacity: 0.7;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 2px;
+  background: var(--color-surface-strong);
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1;
+  transition: background 200ms ease, color 200ms ease;
+}
+
+.adm-tab.active .adm-tab-count {
+  background: var(--color-ink);
+  color: var(--color-canvas);
 }
 
 .adm-fleet-grid {
@@ -5110,37 +5182,54 @@ button:disabled {
   color: var(--color-muted);
 }
 
-/* ── Mode tabs (drawer) ───────────────────────────────────────────── */
+/* ── Mode tabs (drawer) — refined segmented control ───────────────── */
 .adm-mode-tabs {
+  position: relative;
   display: inline-flex;
   gap: 0;
-  padding: 2px;
+  padding: 0;
   margin-bottom: var(--space-lg);
-  background: var(--color-surface-strong);
-  border-radius: var(--radius-pill);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--color-hairline);
 }
 
 .adm-mode-tab {
-  height: 32px;
-  padding: 0 var(--space-base);
+  position: relative;
+  height: 38px;
+  padding: 0 var(--space-base) 0 0;
+  margin-right: var(--space-lg);
   border: none;
   background: transparent;
   color: var(--color-muted);
-  font-size: 13px;
-  font-weight: 500;
-  border-radius: var(--radius-pill);
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border-radius: 0;
   cursor: pointer;
-  transition: color 160ms ease, background 160ms ease;
+  transition: color 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.adm-mode-tab::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: var(--space-base);
+  bottom: -1px;
+  height: 2px;
+  background: var(--color-primary);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .adm-mode-tab:hover:not(:disabled) { color: var(--color-ink); }
 .adm-mode-tab:disabled { color: var(--color-muted-soft); cursor: not-allowed; }
 
-.adm-mode-tab.active {
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  box-shadow: inset 0 0 0 1px var(--color-hairline);
-}
+.adm-mode-tab.active { color: var(--color-ink); }
+.adm-mode-tab.active::after { transform: scaleX(1); }
 
 /* ── Empty states ─────────────────────────────────────────────────── */
 .adm-empty-block {

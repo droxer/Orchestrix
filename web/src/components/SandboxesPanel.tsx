@@ -68,7 +68,7 @@ export function SandboxesPanel({
             type="password"
             autoComplete="off"
             spellCheck={false}
-            placeholder="tok_…"
+            placeholder={t("settings.token_placeholder")}
             value={tokenInput}
             onChange={(event) => setTokenInput(event.target.value)}
           />
@@ -88,7 +88,7 @@ export function SandboxesPanel({
         <dl className="settings-dl">
           <div>
             <dt>{t("settings.workspace_label")}</dt>
-            <dd>{selectedSandbox?.workspacePath ?? "none"}</dd>
+            <dd>{selectedSandbox?.workspacePath ?? t("settings.workspace_none")}</dd>
           </div>
           <div>
             <dt>{t("settings.node_label")}</dt>

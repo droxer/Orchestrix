@@ -44,7 +44,7 @@ function buildEntries(nodes: ControlPanelDaemonNodeRecord[], t: TFunction): Rail
     key: `run:${run.commandId}`,
     kind: "run",
     tone: "info",
-    title: `${run.agent} · ${run.mode}`,
+    title: t("admin.run_title", { agent: run.agent, mode: t(`mode.${run.mode}`, { defaultValue: run.mode }) }),
     meta: employeeId ? `@${employeeId}` : t("admin.unassigned"),
     body: run.taskGoal || t("admin.v2.active_run_default"),
   }));
