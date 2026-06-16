@@ -218,12 +218,10 @@
     grid-template-rows: auto minmax(0, 1fr);
   }
 
-  .mcp-body,
   .skills-body {
     padding: var(--space-base);
   }
 
-  .mcp-header,
   .skills-header,
   .skills-search-bar {
     padding-left: var(--space-base);
