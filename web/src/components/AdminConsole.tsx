@@ -3,12 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Plus } from "lucide-react";
-import {
-  getAuthStatus,
-  getMe,
-  listControlPanelDaemonNodes,
-  listControlPanelEmployees,
-} from "../api";
+import { getAuthStatus, getMe } from "../api";
 import type {
   AssignControlPanelDaemonNodeResponse,
   ControlPanelDaemonNodeRecord,
@@ -25,6 +20,7 @@ import { NavRail, type AdminView } from "./admin/NavRail";
 import { OnboardDrawer } from "./admin/OnboardDrawer";
 import { PeopleView } from "./admin/PeopleView";
 import { PulseStrip } from "./admin/PulseStrip";
+import { useAdminFleet } from "../hooks/useAdminFleet";
 import {
   isStale,
   readStoredNodeTokens,
@@ -38,16 +34,13 @@ type AuthScreen = "login" | "bootstrap";
 export function AdminConsole() {
   const { t } = useTranslation();
 
-  const [nodes, setNodes] = useState<ControlPanelDaemonNodeRecord[]>([]);
-  const [employees, setEmployees] = useState<EmployeeRecord[]>([]);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [fetchError, setFetchError] = useState<string | null>(null);
-  const [isFetching, setIsFetching] = useState(false);
-
   const [admin, setAdmin] = useState<CurrentUser | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [needsBootstrap, setNeedsBootstrap] = useState(false);
   const [authScreen, setAuthScreen] = useState<AuthScreen>("login");
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  const { nodes, employees, lastUpdated, pollError, isFetching, mergeFleet } = useAdminFleet(Boolean(admin));
 
   const [view, setView] = useState<AdminView>("people");
   const [onboardOpen, setOnboardOpen] = useState(false);
@@ -75,7 +68,7 @@ export function AdminConsole() {
       if (err instanceof Error && err.name === "AbortError") return;
       const status = err && typeof err === "object" && "status" in err ? (err as { status: number }).status : 0;
       setAdmin(null);
-      if (status === 503) setFetchError(t("admin.admin_token_required"));
+      if (status === 503) setAuthError(t("admin.admin_token_required"));
     } finally {
       setAuthChecked(true);
     }
@@ -88,40 +81,14 @@ export function AdminConsole() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // The fleet poll lives in useAdminFleet; a failure that looks like an expired
+  // session drops us back to the login screen (the query disables once admin
+  // clears).
   useEffect(() => {
-    if (!admin) return;
-    const controller = new AbortController();
-
-    async function poll() {
-      setIsFetching(true);
-      try {
-        const [nodeResult, employeeResult] = await Promise.all([
-          listControlPanelDaemonNodes(controller.signal),
-          listControlPanelEmployees(controller.signal),
-        ]);
-        setNodes(nodeResult.nodes);
-        setEmployees(employeeResult.employees);
-        setLastUpdated(new Date());
-        setFetchError(null);
-      } catch (err) {
-        if (err instanceof Error && err.name === "AbortError") return;
-        const message = err instanceof Error ? err.message : String(err);
-        setFetchError(message);
-        if (message.includes("401") || message.includes("Session expired") || message.includes("Admin token is required")) {
-          setAdmin(null);
-        }
-      } finally {
-        setIsFetching(false);
-      }
+    if (pollError && (pollError.includes("401") || pollError.includes("Session expired") || pollError.includes("Admin token is required"))) {
+      setAdmin(null);
     }
-
-    void poll();
-    const timer = window.setInterval(() => void poll(), 2000);
-    return () => {
-      controller.abort();
-      window.clearInterval(timer);
-    };
-  }, [admin]);
+  }, [pollError]);
 
   const metrics = useMemo(() => {
     const total = nodes.length;
@@ -147,9 +114,10 @@ export function AdminConsole() {
   }
 
   function handleOnboardSuccess(result: CreateControlPanelEmployeeResponse) {
-    setNodes((current) => [result.node, ...current.filter((node) => node.id !== result.node.id)]);
-    setEmployees((current) => [result.employee, ...current.filter((employee) => employee.id !== result.employee.id)]);
-    setLastUpdated(new Date());
+    mergeFleet((prev) => ({
+      nodes: [result.node, ...prev.nodes.filter((node) => node.id !== result.node.id)],
+      employees: [result.employee, ...prev.employees.filter((employee) => employee.id !== result.employee.id)],
+    }));
 
     const nodeToken = result.node.nodeToken;
     if (nodeToken) {
@@ -170,9 +138,10 @@ export function AdminConsole() {
   }
 
   function handleAssignSuccess(result: AssignControlPanelDaemonNodeResponse) {
-    setNodes((current) => [result.node, ...current.filter((node) => node.id !== result.node.id)]);
-    setEmployees((current) => [result.employee, ...current.filter((employee) => employee.id !== result.employee.id)]);
-    setLastUpdated(new Date());
+    mergeFleet((prev) => ({
+      nodes: [result.node, ...prev.nodes.filter((node) => node.id !== result.node.id)],
+      employees: [result.employee, ...prev.employees.filter((employee) => employee.id !== result.employee.id)],
+    }));
     setHighlightedEmployeeId(result.employee.id);
     window.setTimeout(() => setHighlightedEmployeeId((prev) => (prev === result.employee.id ? null : prev)), 2400);
     setOnboardOpen(false);
@@ -204,6 +173,7 @@ export function AdminConsole() {
     );
   }
 
+  const headerError = authError ?? pollError;
   const lastUpdatedStr = lastUpdated
     ? lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
     : null;
@@ -221,9 +191,9 @@ export function AdminConsole() {
             <p className="adm-header-sub">{viewSub}</p>
           </div>
           <div className="adm-header-meta">
-            <span className={`adm-live-dot ${fetchError ? "offline" : isFetching ? "fetching" : ""}`} aria-hidden="true" />
-            {fetchError ? (
-              <span className="adm-header-error">{t("admin.fetch_error", { message: fetchError })}</span>
+            <span className={`adm-live-dot ${headerError ? "offline" : isFetching ? "fetching" : ""}`} aria-hidden="true" />
+            {headerError ? (
+              <span className="adm-header-error">{t("admin.fetch_error", { message: headerError })}</span>
             ) : lastUpdatedStr ? (
               <span className="adm-header-time mono">{t("admin.updated_at", { time: lastUpdatedStr })}</span>
             ) : null}
