@@ -13,7 +13,7 @@ import {
   RelayApiError,
   recordDecision, recordHandoff, runSandbox,
 } from "./api";
-import type { AgentName, AgentTaskMode, ControlPanelDaemonNodeRecord, CurrentUser, SandboxRecord, Tone } from "./types";
+import type { AgentName, AgentTaskMode, ControlPanelDaemonNodeRecord, CurrentUser, SandboxRecord } from "./types";
 import { RelayMark } from "./components/RelayMark";
 import { EmployeeAvatar } from "./components/EmployeeAvatar";
 import { StatusPill } from "./components/StatusPill";
@@ -35,8 +35,9 @@ import { useRelayData } from "./hooks/useRelayData";
 import { useSessionEvents } from "./hooks/useSessionEvents";
 import { useLocalDaemonNodes } from "./hooks/useLocalDaemonNodes";
 import { mergeVisibleDaemonNodes, shouldClaimLocalDaemonNode } from "./lib/daemonNodes";
-import { applyTheme, readLanguage, readTheme, readTokens, selectedEmployeeKey, writeLanguage, writeTheme, writeTokens, type TokenMap } from "./lib/appStorage";
+import { applyTheme, readLanguage, readTheme, readTokens, selectedEmployeeKey, writeLanguage, writeTheme } from "./lib/appStorage";
 import { canUseLocalControlPanel, localControlPanelNodes, newBrowserSandboxToken, preferLocalControlPanelNode, sessionBelongsToEmployee } from "./lib/controlPanel";
+import { useRelayStore } from "./lib/store";
 import "./i18n";
 
 // Mirrors AGENT_REGISTRY in relay-core. Kept as a local literal so the browser
@@ -52,8 +53,14 @@ type AppRoute = "main" | "admin" | "mcp" | "skills";
 
 export function App() {
   const { t, i18n } = useTranslation();
-  const [selectedEmployee, setSelectedEmployee] = useState("");
-  const [tokens, setTokens] = useState<TokenMap>({});
+  const selectedEmployee = useRelayStore((s) => s.selectedEmployee);
+  const setSelectedEmployee = useRelayStore((s) => s.setSelectedEmployee);
+  const selectedSessionId = useRelayStore((s) => s.selectedSessionId);
+  const setSelectedSessionId = useRelayStore((s) => s.setSelectedSessionId);
+  const tokens = useRelayStore((s) => s.tokens);
+  const setTokens = useRelayStore((s) => s.setTokens);
+  const status = useRelayStore((s) => s.status);
+  const setStatus = useRelayStore((s) => s.setStatus);
   const [hydrated, setHydrated] = useState(false);
   const [activeAgent, setActiveAgent] = useState<AgentName>("claude");
   const [composerMode, setComposerMode] = useState<AgentTaskMode>("implement");
@@ -64,7 +71,6 @@ export function App() {
   const [isComposing, setIsComposing] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [employeeQuery, setEmployeeQuery] = useState("");
-  const [selectedSessionId, setSelectedSessionId] = useState<string | undefined>();
   const [prefsOpen, setPrefsOpen] = useState(false);
   const [mobileView, setMobileView] = useState<MobileView>("chat");
   const [route, setRoute] = useState<AppRoute>("main");
@@ -77,7 +83,6 @@ export function App() {
   const [handoffNote, setHandoffNote] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [navTooltip, setNavTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
-  const [status, setStatus] = useState<{ tone: Tone; message: string }>({ tone: "info", message: t("toast.open_workspace_to_begin") });
   const [toastVisible, setToastVisible] = useState(false);
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
@@ -230,7 +235,6 @@ export function App() {
     if (token) {
       const nextTokens = { ...tokens, [employeeId]: token, [sandbox.id]: token };
       setTokens(nextTokens);
-      writeTokens(nextTokens);
     }
     setSandboxes((cur) => [sandbox, ...cur.filter((s) => s.id !== sandbox.id)]);
   }
@@ -257,7 +261,6 @@ export function App() {
 
     if (adoptedSandboxes.length === 0) return;
     setTokens(nextTokens);
-    writeTokens(nextTokens);
     setSandboxes((cur) => [
       ...adoptedSandboxes,
       ...cur.filter((sandbox) => !adoptedSandboxes.some((adopted) => adopted.id === sandbox.id)),
@@ -370,7 +373,7 @@ export function App() {
         delete nextTokens[key];
       }
     }
-    setTokens(nextTokens); writeTokens(nextTokens);
+    setTokens(nextTokens);
     if (selectedEmployee === employeeId) setSelectedEmployee("");
   }
 

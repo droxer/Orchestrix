@@ -27,7 +27,7 @@ type RelayDataResult = {
 // AbortController + Promise.allSettled. The hook keeps its previous external
 // shape so callers (App.tsx) are unchanged.
 export function useRelayData(
-  setStatus: Dispatch<SetStateAction<StatusUpdate>>,
+  setStatus: (status: StatusUpdate) => void,
   token: string | undefined,
   enabled: boolean,
 ): RelayDataResult {
