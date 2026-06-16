@@ -4,6 +4,8 @@ import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
 
 import "../styles.css";
 
+import { Providers } from "./providers";
+
 // Editorial Serif system — Instrument Serif carries display moments with
 // a confident editorial voice; Geist handles every line of UI text at
 // modern grotesque crispness; Geist Mono renders numbers and code with
@@ -41,7 +43,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   // saved preference once it hydrates.
   return (
     <html lang="en" className={`${instrumentSerif.variable} ${geist.variable} ${geistMono.variable}`}>
-      <body>{children}</body>
+      <body>
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }
