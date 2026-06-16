@@ -2,16 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  NavConversations, NavPreferences, NavRefresh,
-} from "./components/icons";
+import { NavConversations, NavPreferences } from "./components/icons";
 import {
   cancelRun, createSession, logout,
   recordDecision, recordHandoff, runSandbox,
 } from "./api";
 import type { AgentName, AgentTaskMode, ControlPanelDaemonNodeRecord, CurrentUser } from "./types";
-import { EmployeeAvatar } from "./components/EmployeeAvatar";
-import { StatusPill } from "./components/StatusPill";
 import { TranscriptEmpty } from "./components/TranscriptEmpty";
 import { MessageBlock, projectMessages, isGroupedContinuation } from "./components/MessageBlock";
 import type { DerivedMessage } from "./components/MessageBlock";
@@ -36,6 +32,7 @@ import { useComposer } from "./hooks/useComposer";
 import { useEmployeeProvisioning } from "./hooks/useEmployeeProvisioning";
 import { SideNav } from "./components/SideNav";
 import { ThreadPanel } from "./components/ThreadPanel";
+import { ChatHeader } from "./components/ChatHeader";
 import type { AppRoute, MobileView } from "./lib/viewTypes";
 import "./i18n";
 
@@ -416,36 +413,17 @@ export function App() {
       />
 
       <section id="chat-panel" className="chat-panel" aria-label={t("nav.conversations")} tabIndex={-1}>
-        <header className="chat-header">
-          <div className="chat-title">
-            <button className="mobile-back-button" type="button" onClick={() => setMobileView("threads")}>
-              <NavConversations size={16} /><span>{t("nav.conversations")}</span>
-            </button>
-            <EmployeeAvatar employeeId={selectedEmployee} running={Boolean(activeRun)} />
-            <div>
-              <p>
-                {selectedEmployee ? (
-                  <span translate="no">@{selectedEmployee}</span>
-                ) : (
-                  <span>{t("thread.no_employee_selected")}</span>
-                )}
-                <span className="header-separator" aria-hidden="true" />
-                <span translate="no">{activeAgent}</span>
-                {activeSession ? <><span className="header-separator" aria-hidden="true" /><span className="session-id">{activeSession.id.slice(0, 8)}</span></> : null}
-              </p>
-              <h2>{activeSession ? activeSession.taskGoal : t("thread.new_conversation")}</h2>
-            </div>
-          </div>
-          <div className="chat-tools">
-            <div className="header-agent-tabs" aria-label={t("thread.talk_to_agent")}>
-              {agents.map((a) => <button key={a} type="button" aria-pressed={a === activeAgent} className={a === activeAgent ? "active" : ""} onClick={() => setActiveAgent(a)}><span translate="no">@{a}</span></button>)}
-            </div>
-            {activeSession ? <StatusPill value={activeSession.status} /> : null}
-            <button className="icon-button" type="button" aria-label={t("nav.refresh")} title={t("nav.refresh")} onClick={() => void refresh()}>
-              <NavRefresh size={16} className={isRefreshing ? "spin" : ""} />
-            </button>
-          </div>
-        </header>
+        <ChatHeader
+          selectedEmployee={selectedEmployee}
+          running={Boolean(activeRun)}
+          activeAgent={activeAgent}
+          setActiveAgent={setActiveAgent}
+          agentNames={agents}
+          activeSession={activeSession}
+          isRefreshing={isRefreshing}
+          onRefresh={() => void refresh()}
+          onBackToThreads={() => setMobileView("threads")}
+        />
 
         <div className={`toast ${status.tone}`} data-visible={toastVisible} role="status" aria-live="polite">
           {toastVisible ? status.message : null}
