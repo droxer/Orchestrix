@@ -9,7 +9,7 @@ import {
   NavSidebarCollapse, NavSidebarExpand, NavSkills,
 } from "./components/icons";
 import {
-  cancelRun, createSession, getMe, logout, provisionSandbox,
+  cancelRun, createSession, logout, provisionSandbox,
   RelayApiError,
   recordDecision, recordHandoff, runSandbox,
 } from "./api";
@@ -38,6 +38,7 @@ import { mergeVisibleDaemonNodes, shouldClaimLocalDaemonNode } from "./lib/daemo
 import { applyTheme, readLanguage, readTheme, readTokens, selectedEmployeeKey, writeLanguage, writeTheme } from "./lib/appStorage";
 import { canUseLocalControlPanel, localControlPanelNodes, newBrowserSandboxToken, preferLocalControlPanelNode, sessionBelongsToEmployee } from "./lib/controlPanel";
 import { useRelayStore } from "./lib/store";
+import { useAuthSession } from "./hooks/useAuthSession";
 import "./i18n";
 
 // Mirrors AGENT_REGISTRY in relay-core. Kept as a local literal so the browser
@@ -84,8 +85,7 @@ export function App() {
   const [isRunning, setIsRunning] = useState(false);
   const [navTooltip, setNavTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
   const [toastVisible, setToastVisible] = useState(false);
-  const [user, setUser] = useState<CurrentUser | null>(null);
-  const [authChecked, setAuthChecked] = useState(false);
+  const { user, authChecked, setUser } = useAuthSession();
   const statusSeenRef = useRef(false);
   const localNodeAdoptionStartedRef = useRef(false);
   const transcriptRef = useRef<HTMLDivElement>(null);
@@ -271,19 +271,6 @@ export function App() {
     });
     await refreshWithToken(nextTokens[selectedEmployee] ?? nextTokens[adoptedSandboxes[0].id]);
   }, [nodes, refreshLocalDaemonNodes, refreshWithToken, selectedEmployee, setSandboxes, t, tokens]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    void getMe(controller.signal)
-      .then((result) => {
-        if (result.authenticated && result.user) {
-          setUser(result.user);
-        }
-      })
-      .catch(() => undefined)
-      .finally(() => setAuthChecked(true));
-    return () => controller.abort();
-  }, []);
 
   useEffect(() => {
     if (!authChecked) return;
