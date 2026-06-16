@@ -393,6 +393,13 @@ Instrument Serif, Geist, and Geist Mono are open Google Fonts, loaded by `next/f
 - **Body Geist** at weight 400/500/600. No italic in dense UI — emphasis uses weight, not slant.
 - **Numerals & code Geist Mono** at weight 500 with `font-variant-numeric: tabular-nums` for column alignment.
 
+### International Type (CJK)
+The web app ships English plus Simplified (`zh-CN`) and Traditional (`zh-TW`) Chinese. Geist, Instrument Serif, and Geist Mono carry no Han glyphs, so the Chinese locales fall through to **Noto Sans SC / Noto Sans TC**, loaded by `next/font` with `preload: false` (CJK has no single subset to preload) and downloaded only on a Chinese locale.
+- **`:lang()` switching, not duplication.** `html:lang(zh-CN)` / `html:lang(zh-TW)` in `tokens.css` reorder the `--font-sans/-display/-mono` stacks so the Latin face stays first (Geist body, Instrument Serif display for ASCII / brand) and Han characters resolve to Noto. `--font-number` aliases `--font-mono` and inherits via custom-property substitution.
+- **Display goes sans for Han.** The editorial Latin serif has no clean CJK counterpart at 28–36px, so Chinese display renders in a weighted Noto sans rather than a system Song/Ming face — Latin in the same heading still renders Instrument Serif.
+- **System fallbacks** cover machines without the webfont: PingFang (macOS), Microsoft YaHei / JhengHei (Windows), Source Han Sans.
+- **`latin-ext`** is loaded alongside `latin` for the three Latin families so accented European/Vietnamese names in employee and sandbox labels render in-brand rather than falling back.
+
 ## Layout
 
 ### Spacing System

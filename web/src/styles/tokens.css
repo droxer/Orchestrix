@@ -228,6 +228,28 @@
   -webkit-font-smoothing: antialiased;
 }
 
+/* International type — CJK coverage. Geist, Instrument Serif, and Geist
+   Mono carry no Han glyphs, so under a Chinese locale we keep the Latin
+   face first (Geist for body, Instrument Serif for display) and resolve
+   Han characters to Noto Sans SC/TC (loaded by next/font in layout.tsx).
+   Display deliberately drops the Latin serif's system-serif tail for Han:
+   an editorial Latin serif has no clean CJK counterpart at 28–36px, so
+   Chinese display renders in a weighted Noto sans rather than a system
+   Song/Ming face. The trailing names cover machines without the webfont —
+   PingFang (macOS), Microsoft YaHei/JhengHei (Windows), Source Han.
+   --font-number aliases --font-mono and inherits these via substitution. */
+html:lang(zh-CN) {
+  --font-sans: var(--font-geist), var(--font-noto-sans-sc), "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", "Source Han Sans SC", sans-serif;
+  --font-display: var(--font-instrument-serif), var(--font-noto-sans-sc), "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Source Han Sans SC", sans-serif;
+  --font-mono: var(--font-geist-mono), var(--font-noto-sans-sc), "Noto Sans SC", "PingFang SC", "Microsoft YaHei", monospace;
+}
+
+html:lang(zh-TW) {
+  --font-sans: var(--font-geist), var(--font-noto-sans-tc), "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "Source Han Sans TC", sans-serif;
+  --font-display: var(--font-instrument-serif), var(--font-noto-sans-tc), "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "Source Han Sans TC", sans-serif;
+  --font-mono: var(--font-geist-mono), var(--font-noto-sans-tc), "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", monospace;
+}
+
 /* Dark theme — one definition, applied either when the user pinned dark
    (html[data-theme="dark"]) or when the OS prefers dark AND the user hasn't
    pinned light (html:not([data-theme="light"]) inside the media query).
