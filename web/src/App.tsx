@@ -39,6 +39,7 @@ import { applyTheme, readLanguage, readTheme, readTokens, selectedEmployeeKey, w
 import { canUseLocalControlPanel, localControlPanelNodes, newBrowserSandboxToken, preferLocalControlPanelNode, sessionBelongsToEmployee } from "./lib/controlPanel";
 import { useRelayStore } from "./lib/store";
 import { useAuthSession } from "./hooks/useAuthSession";
+import { useComposer } from "./hooks/useComposer";
 import "./i18n";
 
 // Mirrors AGENT_REGISTRY in relay-core. Kept as a local literal so the browser
@@ -65,12 +66,10 @@ export function App() {
   const [hydrated, setHydrated] = useState(false);
   const [activeAgent, setActiveAgent] = useState<AgentName>("claude");
   const [composerMode, setComposerMode] = useState<AgentTaskMode>("implement");
-  const [composerText, setComposerText] = useState("");
-  const [mentionOpen, setMentionOpen] = useState(false);
-  const [mentionQuery, setMentionQuery] = useState("");
-  const [mentionIndex, setMentionIndex] = useState(0);
-  const [isComposing, setIsComposing] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const {
+    composerText, setComposerText, mentionOpen, setMentionOpen, mentionIndex, setMentionIndex,
+    setIsComposing, textareaRef, filteredMentionAgents, syncMentionState, insertMention,
+  } = useComposer({ agentNames: agents, onAgentPicked: setActiveAgent });
   const [employeeQuery, setEmployeeQuery] = useState("");
   const [prefsOpen, setPrefsOpen] = useState(false);
   const [mobileView, setMobileView] = useState<MobileView>("chat");
@@ -395,34 +394,6 @@ export function App() {
     } finally { setIsRunning(false); }
   }
 
-  function detectMentionToken(text: string, caret: number): { start: number; query: string } | null {
-    const m = /(?:^|\s)@([a-z0-9-]*)$/i.exec(text.slice(0, caret));
-    if (!m) return null;
-    return { start: m.index === 0 ? 0 : m.index + 1, query: m[1].toLowerCase() };
-  }
-
-  function syncMentionState(text: string, caret: number) {
-    if (isComposing) return;
-    const token = detectMentionToken(text, caret);
-    if (token) { setMentionOpen(true); setMentionQuery(token.query); setMentionIndex(0); }
-    else if (mentionOpen) setMentionOpen(false);
-  }
-
-  function insertMention(agent: AgentName) {
-    const el = textareaRef.current;
-    const caret = el?.selectionStart ?? composerText.length;
-    const token = detectMentionToken(composerText, caret);
-    const start = token?.start ?? caret;
-    const inserted = `@${agent} `;
-    setComposerText(`${composerText.slice(0, start)}${inserted}${composerText.slice(caret)}`);
-    setMentionOpen(false); setMentionQuery(""); setMentionIndex(0); pickAgent(agent);
-    requestAnimationFrame(() => {
-      const node = textareaRef.current;
-      if (!node) return;
-      node.focus(); node.setSelectionRange(start + inserted.length, start + inserted.length);
-    });
-  }
-
   async function cancelActiveRun() {
     if (!selectedSandbox || !activeRun) return;
     try {
@@ -459,8 +430,6 @@ export function App() {
     }
   }
 
-  function pickAgent(agent: AgentName) { setActiveAgent(agent); }
-
   function showNavTooltip(text: string, el: HTMLElement) {
     if (sidenavExpanded) return;
     const rect = el.getBoundingClientRect();
@@ -478,8 +447,6 @@ export function App() {
     setUser(null);
     setRoute("main");
   }
-
-  const filteredMentionAgents = mentionQuery ? agents.filter((a) => a.startsWith(mentionQuery)) : agents;
 
   if (!authChecked) {
     return (
