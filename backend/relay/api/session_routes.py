@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import asyncio
 import json
+import time
+from collections.abc import AsyncIterator
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request, Response
-from fastapi.responses import PlainTextResponse
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import PlainTextResponse, StreamingResponse
 from loguru import logger
 
 from ..controller import SessionController
@@ -126,13 +129,66 @@ async def handoff(session_id: str, request: Request, ctx: AppContextDep) -> dict
     return result
 
 
+# Session lifecycle states after which no further events are appended; the
+# stream flushes the backlog and closes when it sees one of these.
+TERMINAL_SESSION_STATUSES = frozenset({"completed", "failed", "cancelled"})
+_STREAM_POLL_SECONDS = 1.0
+_STREAM_HEARTBEAT_SECONDS = 15.0
+_STREAM_MAX_SECONDS = 60 * 30
+
+
+def _sse_frame(data: dict[str, Any], *, event: str | None = None) -> str:
+    prefix = f"event: {event}\n" if event else ""
+    return f"{prefix}data: {json.dumps(data)}\n\n"
+
+
 @router.get("/sessions/{session_id}/events")
-async def session_events(session_id: str, request: Request, ctx: AppContextDep) -> Response:
+async def session_events(session_id: str, request: Request, ctx: AppContextDep) -> StreamingResponse:
     actor = request_actor(request, ctx.auth_store)
-    session = get_session_for_actor(ctx.session_store, session_id, actor)
-    body = "".join(f"event: {event['type']}\ndata: {json.dumps(event)}\n\n" for event in session["events"])
-    body += f"event: heartbeat\ndata: {json.dumps({'timestamp': datetime.utcnow().isoformat() + 'Z'})}\n\n"
-    return Response(body, media_type="text/event-stream")
+    # Authorize before the stream opens so 403/404 surface as normal responses.
+    get_session_for_actor(ctx.session_store, session_id, actor)
+
+    async def event_stream() -> AsyncIterator[str]:
+        # Server-side tail-poll: re-read the materialized session each tick and
+        # emit only newly-appended events (by index). This moves the poll off N
+        # browser clients and onto one short loop per open stream, and lets the
+        # active conversation update at push latency instead of the list poll's
+        # cadence. The store rewrites the snapshot on every append, and
+        # get_session reads it fresh, so new events are visible here.
+        sent = 0
+        start = time.monotonic()
+        last_heartbeat = start
+        while True:
+            if await request.is_disconnected():
+                return
+            try:
+                session = get_session_for_actor(ctx.session_store, session_id, actor)
+            except HTTPException:
+                return
+            events = session.get("events", [])
+            if len(events) > sent:
+                for event in events[sent:]:
+                    yield _sse_frame(event)
+                sent = len(events)
+                last_heartbeat = time.monotonic()
+            status = session.get("status")
+            if status in TERMINAL_SESSION_STATUSES:
+                yield _sse_frame({"status": status}, event="done")
+                return
+            now = time.monotonic()
+            if now - last_heartbeat >= _STREAM_HEARTBEAT_SECONDS:
+                yield _sse_frame({"timestamp": datetime.utcnow().isoformat() + "Z"}, event="heartbeat")
+                last_heartbeat = now
+            if now - start >= _STREAM_MAX_SECONDS:
+                yield _sse_frame({"status": status, "reason": "timeout"}, event="done")
+                return
+            await asyncio.sleep(_STREAM_POLL_SECONDS)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.get("/sessions/{session_id}/artifacts/{artifact_id}")

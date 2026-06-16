@@ -30,6 +30,7 @@ import { SUPPORTED_LANGUAGES, type Theme, type Language } from "./components/Pre
 import { ConversationRow } from "./components/ConversationRow";
 import type { EmployeeContact } from "./components/ConversationRow";
 import { useRelayData } from "./hooks/useRelayData";
+import { useSessionEvents } from "./hooks/useSessionEvents";
 import { mergeVisibleDaemonNodes, shouldClaimLocalDaemonNode } from "./lib/daemonNodes";
 import "./i18n";
 
@@ -278,6 +279,10 @@ export function App() {
     if (selectedSessionId) { const p = sessions.find((s) => s.id === selectedSessionId); if (p) return p; }
     return threadSessions[0];
   }, [selectedSessionId, sessions, threadSessions]);
+
+  // Live SSE tail of the open conversation; merges new events into the
+  // sessions cache so the active thread updates at push latency.
+  useSessionEvents(activeSession?.id, Boolean(user));
 
   const selectedToken = selectedSandbox ? (tokens[selectedSandbox.id] ?? tokens[selectedEmployee]) : tokens[selectedEmployee];
   const activeRun = selectedNode?.activeRuns[0];
@@ -563,12 +568,11 @@ export function App() {
       setSelectedSessionId(session.id); setComposerText(""); setMentionOpen(false);
       setMobileView("chat"); atBottomRef.current = true;
       await refresh(undefined, token);
-      const timer = window.setInterval(() => void refresh(undefined, token), 1000);
-      try {
-        const done = await runSandbox({ sandboxId: sandbox.id, taskGoal: goal, assignments: [assignment], sessionId: session.id }, token);
-        setSelectedSessionId(done.id);
-        setStatus({ tone: "good", message: t("toast.message_sent", { employee: selectedEmployee, agent: routedAgent }) });
-      } finally { window.clearInterval(timer); }
+      // The active session now tails live over SSE (useSessionEvents), so no
+      // per-run polling loop is needed while the run is in flight.
+      const done = await runSandbox({ sandboxId: sandbox.id, taskGoal: goal, assignments: [assignment], sessionId: session.id }, token);
+      setSelectedSessionId(done.id);
+      setStatus({ tone: "good", message: t("toast.message_sent", { employee: selectedEmployee, agent: routedAgent }) });
       await refresh(undefined, token);
     } catch (err) {
       setStatus({ tone: "bad", message: err instanceof Error ? err.message : String(err) });
