@@ -1,10 +1,10 @@
 import type { AgentState } from "./state.js";
 
-export function appendCodexFeedback(prompt: string, state: AgentState): string {
-  return state.codex_feedback ? `${prompt}\n\nCodex review feedback to fix:\n${state.codex_feedback}` : prompt;
+export function appendReviewFeedback(prompt: string, state: AgentState): string {
+  return state.review_feedback ? `${prompt}\n\nReview feedback to fix:\n${state.review_feedback}` : prompt;
 }
 
-export function codexReviewPrompt(state: AgentState): string {
+export function reviewPrompt(state: AgentState): string {
   return [
     "Review the current workspace changes for the user's task.",
     "",
@@ -22,17 +22,17 @@ export function codexReviewPrompt(state: AgentState): string {
 }
 
 export function codexImplementPrompt(state: AgentState): string {
-  return appendCodexFeedback(state.task_goal, state);
+  return appendReviewFeedback(state.task_goal, state);
 }
 
 export function claudeTaskPrompt(state: AgentState): string {
-  return appendCodexFeedback(state.task_goal, state);
+  return appendReviewFeedback(state.task_goal, state);
 }
 
 export function piTaskPrompt(state: AgentState): string {
-  return appendCodexFeedback(state.task_goal, state);
+  return appendReviewFeedback(state.task_goal, state);
 }
 
 export function kimiTaskPrompt(state: AgentState): string {
-  return appendCodexFeedback(state.task_goal, state);
+  return appendReviewFeedback(state.task_goal, state);
 }

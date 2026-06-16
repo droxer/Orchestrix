@@ -1,0 +1,388 @@
+/* =====================================================================
+   Relay web — operational chat surface (Slack-style three-pane shell)
+
+   Token architecture, three tiers:
+     1. Primitives — the raw palette, type scale, radii, spacing.
+        Hex values live here and nowhere else.
+     2. Semantic   — role-based aliases (tones, borders, elevation)
+        consumed by component CSS below.
+     3. shadcn/ui  — the @theme bridge exposing tokens to Tailwind
+        utilities used by src/components/ui.
+
+   Visual language: white canvas, ink text, Relay Blue as the single
+   action color, neutral hairlines, Instrument Serif for editorial
+   display moments, Geist for interface text, and Geist Mono for
+   numbers and code.
+   ===================================================================== */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Typography families exposed to Tailwind utilities */
+  --font-sans: var(--font-sans);
+  --font-display: var(--font-display);
+  --font-mono: var(--font-mono);
+}
+
+:root {
+  /* ----- 1. Primitives ---------------------------------------- */
+
+  /* Brand — Relay Blue is the only action color */
+  --color-primary: #0052ff;
+  --color-primary-active: #003ecc;
+  --color-primary-disabled: #a8b8cc;
+
+  /* Text */
+  --color-ink: #18232d;        /* headings, primary copy, emphasized body */
+  --color-body: #5b616e;       /* running text */
+  --color-muted: #7c828a;      /* secondary labels */
+  --color-muted-soft: #a8acb3; /* timestamps, disabled */
+  --color-on-primary: #ffffff; /* text on Relay Blue */
+  --color-on-dark: #ffffff;    /* text on ink fills */
+
+  /* Surfaces */
+  --color-canvas: #ffffff;
+  --color-surface-card: #ffffff;   /* feature/product cards on white */
+  --color-surface-soft: #f7f6f1;   /* warm tint — quotes, code, hover */
+  --color-surface-strong: #eef0f3; /* cool tint — fills, search, avatars */
+  --color-surface-dark: #18232d;
+  --color-surface-dark-elevated: #16181c;
+  --color-on-dark-soft: #a8acb3;
+
+  /* Hairlines */
+  --color-hairline: #d0d5db;
+  --color-hairline-soft: #eef0f3;
+  --color-hairline-on-dark: color-mix(in srgb, var(--color-on-dark) 14%, transparent);
+
+  /* Syntax-highlight numerals — JetBrains Mono numeric literal in code blocks */
+  --color-code-number: #b45309;
+
+  /* Status — text, dots, and borders only; never background fills */
+  --color-semantic-up: #05b169;
+  --color-semantic-down: #cf202f;
+  --color-accent-yellow: #f4b000; /* attention dot only, not an action color */
+
+  /* Type scale — operational chat surface scale. The brand's marketing
+     scale climbs to 80px (display-mega). Inside the product we keep the
+     scale tight, but admin metric highlights need a 32–36px display step. */
+  --text-xs: 12px;   /* badges, timestamps, meta rows */
+  --text-sm: 13px;   /* captions, previews, secondary UI */
+  --text-base: 14px; /* default UI chrome */
+  --text-md: 16px;   /* message bodies, inputs (≥16px avoids iOS zoom) */
+  --text-lg: 18px;   /* chat header title, brand mark */
+  --text-xl: 22px;   /* panel headings */
+  --text-2xl: 28px;  /* empty-state display, mobile metric values */
+  --text-3xl: 32px;  /* admin page title */
+  --text-4xl: 36px;  /* admin metric values */
+  --text-2xs: 11px;  /* compact labels, tiny metadata */
+  --text-micro: 10px; /* minimap / token abbreviations */
+
+  /* Radii — pill for actions, md for inputs/popovers, full for avatars.
+     Pill geometry (100px) is the brand's strongest signal — every CTA,
+     search bar, and badge inherits it. xl (24px) carries every card. */
+  --radius-none: 0;
+  --radius-xs: 3px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 24px;
+  --radius-pill: 100px;
+  --radius-full: 9999px;
+
+  /* Spacing — 4px base unit */
+  --space-xxs: 4px;
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-base: 16px;
+  --space-md: 20px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-xxl: 48px;
+  --space-section: 96px; /* editorial section rhythm */
+
+  /* Shell dimensions */
+  --sidenav-w: 64px;
+  --sidenav-w-open: 200px;
+  --thread-w: 296px;
+  --drawer-w: 360px;
+  --header-h: 60px;
+
+  /* Font families. Editorial-serif system: Instrument Serif carries the
+     editorial display moments with a quietly authoritative voice; Geist
+     handles every line of UI text at modern grotesque crispness; Geist
+     Mono renders numbers and code with the same designer's hand. All
+     three are loaded as variable / typographic fonts by next/font in
+     app/layout.tsx. */
+  --font-sans: var(--font-geist), "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-display: var(--font-instrument-serif), "Instrument Serif", "Times New Roman", "Times", Georgia, serif;
+  --font-mono: var(--font-geist-mono), "Geist Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --font-number: var(--font-mono);
+
+  /* Leading scale — exposed so the 432 inline font-size declarations can
+     pick a consistent line-height without re-deriving it each time. */
+  --leading-tight: 1.15;   /* button labels, single-line CTAs */
+  --leading-snug: 1.33;    /* title-md, dense headings */
+  --leading-normal: 1.5;   /* body, captions */
+  --leading-loose: 1.6;    /* long-form prose, agent text */
+
+  /* Tracking scale — one token per intent, not per pixel. Display values
+     are tuned for Instrument Serif: a refined editorial serif holds its
+     own shapes at 28–36px with only mild tightening, unlike a geometric
+     sans that wanted the harder -0.5/-0.8 pull. */
+  --letter-display: -0.3px;       /* Instrument Serif display (28–36px) */
+  --letter-display-strong: -0.5px; /* admin metric values, Geist Mono 36px+ */
+  --letter-tight: -0.2px;
+  --letter-eyebrow: 0.08em;       /* the 11/12px 600-weight kicker tracking */
+  --letter-eyebrow-wide: 0.12em;  /* drawer section labels */
+
+  /* Semantic typography. Each role bundles size + weight + line-height
+     + family so components can apply one variable instead of re-inlining
+     the triple. Display weight is locked to 400 per spec; anywhere
+     needing emphasis steps up to 600, never 700+. */
+  --type-display-lg: 400 36px/1.11 var(--font-display);  /* admin page title */
+  --type-display-sm: 400 28px/1.11 var(--font-display);
+  --type-title-lg:   400 22px/1.13 var(--font-sans);
+  --type-title-md:   600 18px/1.33 var(--font-sans);
+  --type-title-sm:   600 16px/1.25 var(--font-sans);
+  --type-body-md:    400 16px/1.5  var(--font-sans);
+  --type-body-strong: 600 16px/1.5 var(--font-sans);
+  --type-body-sm:    400 14px/1.5  var(--font-sans);
+  --type-caption:    400 13px/1.5  var(--font-sans);
+  --type-caption-strong: 600 12px/1.5 var(--font-sans);
+  --type-button:     600 16px/1.15 var(--font-sans);
+  --type-nav-link:   500 14px/1.4  var(--font-sans);
+  --type-number:     500 18px/1.4  var(--font-number);
+  --type-number-display: 500 36px/1.1 var(--font-number);  /* admin metric values */
+  --type-eyebrow:    600 11px/1.5 var(--font-sans);  /* pair with letter-spacing: var(--letter-eyebrow) */
+
+  /* ----- 2. Semantic aliases ----------------------------------- */
+
+  /* Status borders for outlined pills and danger buttons */
+  --border-success: color-mix(in srgb, var(--color-semantic-up) 28%, transparent);
+  --border-danger: color-mix(in srgb, var(--color-semantic-down) 32%, transparent);
+  --border-info: color-mix(in srgb, var(--color-primary) 24%, transparent);
+
+  /* Elevation — two surface contracts.
+     --shadow-soft: just the drop. For surfaces that ALREADY have a 1px
+     hairline border; the soft drop adds depth without doubling the line.
+     --shadow-lift: welded ring + drop. For BORDERLESS floating surfaces
+     (drawers, dialogs, composer chrome, tooltips) — the inner ring acts
+     as the edge in place of a hairline border.
+     Pick by the surface, not by intuition: bordered card hover → soft;
+     unbordered floating chrome → lift. */
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-lift:
+    0 0 0 1px color-mix(in srgb, var(--color-ink) 6%, transparent),
+    var(--shadow-soft);
+
+  /* Focus ring — single token, used by every interactive surface so the
+     focus treatment never drifts between buttons, inputs, and rows.
+     3px primary-alpha halo with no inner solid keeps WCAG contrast
+     without overpowering the brand color. */
+  --ring-focus: 0 0 0 3px color-mix(in srgb, var(--color-primary) 28%, transparent);
+
+  /* ----- 3. shadcn/ui bridge ----------------------------------- */
+
+  --background: var(--color-canvas);
+  --foreground: var(--color-ink);
+  --card: var(--color-canvas);
+  --card-foreground: var(--color-ink);
+  --popover: var(--color-canvas);
+  --popover-foreground: var(--color-ink);
+  --primary: var(--color-primary);
+  --primary-foreground: var(--color-on-primary);
+  --secondary: var(--color-surface-strong);
+  --secondary-foreground: var(--color-ink);
+  --muted: var(--color-surface-strong);
+  --muted-foreground: var(--color-muted);
+  --accent: var(--color-surface-soft);
+  --accent-foreground: var(--color-ink);
+  --destructive: var(--color-semantic-down);
+  --border: var(--color-hairline);
+  --input: var(--color-hairline);
+  --ring: var(--color-primary);
+
+  color-scheme: light;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Dark theme — one definition, applied either when the user pinned dark
+   (html[data-theme="dark"]) or when the OS prefers dark AND the user hasn't
+   pinned light (html:not([data-theme="light"]) inside the media query).
+   This collapses the previous duplicated :root + attribute overrides into
+   a single source of truth and removes drift between the two paths.
+
+   html[data-theme="light"] needs no rules — primitives in :root already
+   define the light palette, so the attribute selector is just a signal
+   to the media query above. */
+html[data-theme="dark"] {
+  --color-ink: var(--color-on-dark);
+  --color-body: var(--color-on-dark-soft);
+  --color-muted: var(--color-on-dark-soft);
+  --color-muted-soft: color-mix(in srgb, var(--color-on-dark-soft) 62%, var(--color-surface-dark));
+  --color-canvas: var(--color-surface-dark);
+  --color-surface-soft: var(--color-surface-dark-elevated);
+  --color-surface-strong: color-mix(in srgb, var(--color-on-dark) 9%, var(--color-surface-dark));
+  --color-hairline: color-mix(in srgb, var(--color-on-dark) 14%, var(--color-surface-dark));
+  --color-hairline-soft: color-mix(in srgb, var(--color-on-dark) 8%, var(--color-surface-dark));
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) {
+    --color-ink: var(--color-on-dark);
+    --color-body: var(--color-on-dark-soft);
+    --color-muted: var(--color-on-dark-soft);
+    --color-muted-soft: color-mix(in srgb, var(--color-on-dark-soft) 62%, var(--color-surface-dark));
+    --color-canvas: var(--color-surface-dark);
+    --color-surface-soft: var(--color-surface-dark-elevated);
+    --color-surface-strong: color-mix(in srgb, var(--color-on-dark) 9%, var(--color-surface-dark));
+    --color-hairline: color-mix(in srgb, var(--color-on-dark) 14%, var(--color-surface-dark));
+    --color-hairline-soft: color-mix(in srgb, var(--color-on-dark) 8%, var(--color-surface-dark));
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html,
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  overflow-x: hidden;
+  background: var(--color-canvas);
+  color: var(--color-body);
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  line-height: 1.5;
+}
+
+::selection {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.skip-link {
+  position: fixed;
+  left: var(--space-base);
+  top: var(--space-base);
+  z-index: 100;
+  transform: translateY(calc(-100% - var(--space-base)));
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-size: var(--text-base);
+  font-weight: 600;
+  text-decoration: none;
+  transition: transform 140ms ease;
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button,
+a,
+input,
+textarea,
+select {
+  -webkit-tap-highlight-color: color-mix(in srgb, var(--color-primary) 14%, transparent);
+  touch-action: manipulation;
+}
+
+button {
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* Primary CTA disabled — when a button explicitly opts in via the data
+   attribute, use the dedicated faded-blue token instead of generic opacity.
+   This preserves the brand voltage on disabled CTAs (per design-system spec
+   `button-primary-disabled` = `--color-primary-disabled` background). */
+button[data-variant="primary"]:disabled,
+.btn-primary:disabled {
+  background: var(--color-primary-disabled);
+  color: var(--color-on-primary);
+  opacity: 1;
+}
+
+/* Inline keyboard hint — small rotated badge used inside chips and tooltips
+   to expose a shortcut without stealing focus. Composer's mode-chip hint
+   was the original site; promoted here so other shortcut affordances can
+   reuse the same visual language. */
+.kbd-hint {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  line-height: 1;
+  color: var(--color-muted);
+  letter-spacing: 0.02em;
+}
+
+.mono {
+  font-family: var(--font-number);
+  font-feature-settings: "tnum" 1;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+.eyebrow,
+.panel-kicker {
+  margin: 0;
+  color: var(--color-muted);
+  font: var(--type-caption-strong);
+  text-transform: none;
+}
+
+.panel-kicker {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.panel-kicker::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--color-hairline-soft);
+}

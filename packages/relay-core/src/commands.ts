@@ -3,16 +3,16 @@ import { agentWorkspacePath, codexCliConfigOverrides, runAsAgent } from "./guest
 import {
   claudeTaskPrompt,
   codexImplementPrompt,
-  codexReviewPrompt,
   kimiTaskPrompt,
   piTaskPrompt,
+  reviewPrompt,
 } from "./prompts.js";
 import { kimiModel } from "./env.js";
 import { escapeRegExp, shellCommand, shellQuote } from "./shell.js";
 import type { AgentState } from "./state.js";
 
 export function buildCodexReviewCommand(state: AgentState): string {
-  const argv = [...codexBaseArgv(), codexReviewPrompt(state)];
+  const argv = [...codexBaseArgv(), reviewPrompt(state)];
   return runAsAgent(shellCommand(argv), "codex");
 }
 
@@ -42,6 +42,14 @@ function codexBaseArgv(): string[] {
 }
 
 export function buildClaudeImplementCommand(state: AgentState): string {
+  return buildClaudeCommand(claudeTaskPrompt(state));
+}
+
+export function buildClaudeReviewCommand(state: AgentState): string {
+  return buildClaudeCommand(reviewPrompt(state));
+}
+
+function buildClaudeCommand(prompt: string): string {
   const workspace = agentWorkspacePath();
   const argv = [
     "stdbuf",
@@ -60,17 +68,24 @@ export function buildClaudeImplementCommand(state: AgentState): string {
   ];
   const model = anthropicModel();
   if (model) argv.push("--model", model);
-  argv.push(claudeTaskPrompt(state));
+  argv.push(prompt);
   return runAsAgent(shellCommand(argv), "claude");
 }
 
 export function buildPiImplementCommand(state: AgentState): string {
+  return buildPiCommand(piTaskPrompt(state));
+}
+
+export function buildPiReviewCommand(state: AgentState): string {
+  return buildPiCommand(reviewPrompt(state));
+}
+
+function buildPiCommand(prompt: string): string {
   const argv = ["stdbuf", "-oL", "-eL", "pi", "--no-session"];
   const provider = piProvider();
   if (provider) argv.push("--provider", provider);
   const model = piModel();
   if (model) argv.push("--model", model);
-  const prompt = piTaskPrompt(state);
   const streamingCommand = shellCommand([...argv, "-P", prompt]);
   const printCommand = shellCommand([...argv, "-p", prompt]);
   const supportsStreamingPrint =
@@ -84,10 +99,18 @@ export function buildPiImplementCommand(state: AgentState): string {
 // Kimi (Moonshot AI) CLI. The exact flags are provisional — confirm `-p`/model
 // flags against the installed Kimi CLI version before relying on this in prod.
 export function buildKimiImplementCommand(state: AgentState): string {
+  return buildKimiCommand(kimiTaskPrompt(state));
+}
+
+export function buildKimiReviewCommand(state: AgentState): string {
+  return buildKimiCommand(reviewPrompt(state));
+}
+
+function buildKimiCommand(prompt: string): string {
   const argv = ["stdbuf", "-oL", "-eL", "kimi", "-p"];
   const model = kimiModel();
   if (model) argv.push("--model", model);
-  argv.push(kimiTaskPrompt(state));
+  argv.push(prompt);
   return runAsAgent(shellCommand(argv), "kimi");
 }
 

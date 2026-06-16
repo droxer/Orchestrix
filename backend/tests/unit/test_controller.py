@@ -20,11 +20,11 @@ def test_session_controller_records_review_verdict() -> None:
             "status": "completed",
             "exitCode": 0,
             "agentLog": "approved",
-            "codexVerdict": "approved",
-            "codexFeedback": "ok",
+            "reviewVerdict": "approved",
+            "reviewFeedback": "ok",
         })
 
         updated = store.get_session(session["id"])
-        assert state["codex_verdict"] == "approved"
+        assert state["review_verdict"] == "approved"
         assert updated["reviewVerdict"] == "approved"
         assert updated["agentRuns"][0]["artifactIds"]

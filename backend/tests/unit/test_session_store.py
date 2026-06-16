@@ -18,7 +18,7 @@ def test_session_store_persists_events_and_artifacts() -> None:
         store.append_event(session["id"], relay_event("human.decision", session["id"], {
             "decision": {"id": "dec_test", "kind": "approve", "createdAt": "2026-06-05T00:00:00.000Z"}
         }))
-        artifact = store.write_artifact(session["id"], {"kind": "review", "title": "Codex review", "body": "Looks good.", "extension": "md"})
+        artifact = store.write_artifact(session["id"], {"kind": "review", "title": "Agent review", "body": "Looks good.", "extension": "md"})
         updated = store.append_event(session["id"], relay_event("artifact.created", session["id"], {"artifact": artifact}))
 
         assert updated["events"][0]["type"] == "session.created"
@@ -39,7 +39,7 @@ def test_database_session_store_persists_events_and_artifacts() -> None:
         store.append_event(session["id"], relay_event("human.decision", session["id"], {
             "decision": {"id": "dec_test", "kind": "approve", "createdAt": "2026-06-05T00:00:00.000Z"}
         }))
-        artifact = store.write_artifact(session["id"], {"kind": "review", "title": "Codex review", "body": "Looks good.", "extension": "md"})
+        artifact = store.write_artifact(session["id"], {"kind": "review", "title": "Agent review", "body": "Looks good.", "extension": "md"})
         updated = store.append_event(session["id"], relay_event("artifact.created", session["id"], {"artifact": artifact}))
 
         assert updated["events"][0]["type"] == "session.created"

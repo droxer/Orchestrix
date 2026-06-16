@@ -38,7 +38,7 @@ export function LoginScreen({ onLogin, needsBootstrap, onSwitchToBootstrap }: Lo
       await login({ username: username.trim(), password });
       onLogin();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(t("admin.error_generic"));
     } finally {
       setIsLoading(false);
     }
@@ -56,16 +56,18 @@ export function LoginScreen({ onLogin, needsBootstrap, onSwitchToBootstrap }: Lo
         <label className="adm-field">
           <span>{t("admin.username")}</span>
           <input
+            name="username"
             className="adm-input mono"
             value={username}
             onChange={(event) => setUsername(event.target.value)}
             autoComplete="username"
-            autoFocus
+            spellCheck={false}
           />
         </label>
         <label className="adm-field">
           <span>{t("admin.password")}</span>
           <input
+            name="password"
             className="adm-input mono"
             type="password"
             value={password}
@@ -107,7 +109,7 @@ export function BootstrapScreen({ onBootstrapped, onSwitchToLogin }: BootstrapSc
       await bootstrapUser({ token: token.trim(), username: username.trim(), password });
       onBootstrapped();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(t("admin.error_generic"));
     } finally {
       setIsLoading(false);
     }
@@ -123,26 +125,30 @@ export function BootstrapScreen({ onBootstrapped, onSwitchToLogin }: BootstrapSc
         <label className="adm-field">
           <span>{t("admin.bootstrap_token")}</span>
           <input
+            name="bootstrap-token"
             className="adm-input mono"
             type="password"
             value={token}
             onChange={(event) => setToken(event.target.value)}
             autoComplete="off"
-            autoFocus
+            spellCheck={false}
           />
         </label>
         <label className="adm-field">
           <span>{t("admin.username")}</span>
           <input
+            name="username"
             className="adm-input mono"
             value={username}
             onChange={(event) => setUsername(event.target.value)}
             autoComplete="username"
+            spellCheck={false}
           />
         </label>
         <label className="adm-field">
           <span>{t("admin.password")}</span>
           <input
+            name="password"
             className="adm-input mono"
             type="password"
             value={password}

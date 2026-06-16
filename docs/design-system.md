@@ -1,7 +1,7 @@
 ---
 version: alpha
 name: Relay-design
-description: An institutional-grade workforce intelligence platform whose marketing surfaces read like a quietly confident enterprise software brand. The base canvas is pure white; Relay Blue (`#0052ff`) is the single brand voltage, used scarcely on primary CTAs, signature glyphs, and inline accent moments. Type uses Inter for display and body at modest weights; display sits at weight 400, not 700, signaling editorial calm rather than bombastic AI platform energy. Page rhythm rotates between bright white sections, soft neutral elevation bands, and full-bleed dark editorial heroes (`#18232d`) carrying product UI mockup cards. Iconography is geometric and minimal; depth comes from card-on-card layering, never decorative shadows.
+description: An institutional-grade workforce intelligence platform whose marketing surfaces read like a quietly confident enterprise software brand. The base canvas is pure white; Relay Blue (`#0052ff`) is the single brand voltage, used scarcely on primary CTAs, signature glyphs, and inline accent moments. Type pairs Instrument Serif for editorial display moments with Geist for body and UI chrome at modest weights; display sits at weight 400, not 700, signaling editorial calm rather than bombastic AI platform energy. Page rhythm rotates between bright white sections, soft neutral elevation bands, and full-bleed dark editorial heroes (`#18232d`) carrying product UI mockup cards. Iconography is geometric and minimal; depth comes from card-on-card layering, never decorative shadows.
 
 colors:
   primary: "#0052ff"
@@ -29,97 +29,97 @@ colors:
 
 typography:
   display-mega:
-    fontFamily: "'Inter', -apple-system, system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+    fontFamily: "'Instrument Serif', 'Times New Roman', Times, system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
     fontSize: 80px
     fontWeight: 400
     lineHeight: 1.0
     letterSpacing: -2px
   display-xl:
-    fontFamily: "'Inter', sans-serif"
+    fontFamily: "'Instrument Serif', serif"
     fontSize: 64px
     fontWeight: 400
     lineHeight: 1.0
     letterSpacing: -1.6px
   display-lg:
-    fontFamily: "'Inter', sans-serif"
+    fontFamily: "'Instrument Serif', serif"
     fontSize: 52px
     fontWeight: 400
     lineHeight: 1.0
     letterSpacing: -1.3px
   display-md:
-    fontFamily: "'Inter', sans-serif"
+    fontFamily: "'Instrument Serif', serif"
     fontSize: 44px
     fontWeight: 400
     lineHeight: 1.09
     letterSpacing: -1px
   display-sm:
-    fontFamily: "'Inter', sans-serif"
+    fontFamily: "'Instrument Serif', serif"
     fontSize: 36px
     fontWeight: 400
     lineHeight: 1.11
     letterSpacing: -0.5px
   title-lg:
-    fontFamily: "'Inter', sans-serif"
+    fontFamily: "'Instrument Serif', serif"
     fontSize: 32px
     fontWeight: 400
     lineHeight: 1.13
     letterSpacing: -0.4px
   title-md:
-    fontFamily: "'Inter', sans-serif"
+    fontFamily: "'Geist', sans-serif"
     fontSize: 18px
     fontWeight: 600
     lineHeight: 1.33
     letterSpacing: 0
   title-sm:
-    fontFamily: "'Inter', sans-serif"
+    fontFamily: "'Geist', sans-serif"
     fontSize: 16px
     fontWeight: 600
     lineHeight: 1.25
     letterSpacing: 0
   body-md:
-    fontFamily: "'Inter', sans-serif"
+    fontFamily: "'Geist', sans-serif"
     fontSize: 16px
     fontWeight: 400
     lineHeight: 1.5
     letterSpacing: 0
   body-strong:
-    fontFamily: "'Inter', sans-serif"
+    fontFamily: "'Geist', sans-serif"
     fontSize: 16px
     fontWeight: 700
     lineHeight: 1.5
     letterSpacing: 0
   body-sm:
-    fontFamily: "'Inter', sans-serif"
+    fontFamily: "'Geist', sans-serif"
     fontSize: 14px
     fontWeight: 400
     lineHeight: 1.5
     letterSpacing: 0
   caption:
-    fontFamily: "'Inter', sans-serif"
+    fontFamily: "'Geist', sans-serif"
     fontSize: 13px
     fontWeight: 400
     lineHeight: 1.5
     letterSpacing: 0
   caption-strong:
-    fontFamily: "'Inter', sans-serif"
+    fontFamily: "'Geist', sans-serif"
     fontSize: 12px
     fontWeight: 600
     lineHeight: 1.5
     letterSpacing: 0
   number-display:
-    fontFamily: "'JetBrains Mono', 'Inter', monospace"
+    fontFamily: "'Geist Mono', 'Geist', monospace"
     fontSize: 18px
     fontWeight: 500
     lineHeight: 1.4
     letterSpacing: 0
   button:
-    fontFamily: "'Inter', sans-serif"
+    fontFamily: "'Geist', sans-serif"
     fontSize: 16px
     fontWeight: 600
     lineHeight: 1.15
     letterSpacing: 0
   nav-link:
-    fontFamily: "'Inter', sans-serif"
+    fontFamily: "'Geist', sans-serif"
     fontSize: 14px
     fontWeight: 500
     lineHeight: 1.4
@@ -309,13 +309,13 @@ components:
 
 Relay reads like an institutional enterprise software brand: quiet, white-canvas, editorially spaced, and almost monochromatic. The single brand voltage is **Relay Blue** (`{colors.primary}` — #0052ff), used scarcely: every primary CTA pill, the brand wordmark, and inline emphasis links. Beyond that one accent, the system is white canvas + ink + soft neutral elevation bands + a deep near-black editorial canvas (`{colors.surface-dark}` — #18232d) for full-bleed product-mockup heroes.
 
-Type pairs **Inter** for hero headlines with **Inter** for body, captions, and navigation. Display sits at **weight 400** — not the 700+ typical of AI tools. The choice signals editorial calm and institutional trust rather than AI platform urgency.
+Type pairs **Instrument Serif** for hero headlines with **Geist** for body, captions, and navigation. Display sits at **weight 400** — not the 700+ typical of AI tools. The choice signals editorial calm and institutional trust rather than AI platform urgency.
 
 The page rhythm rotates three modes: bright white editorial sections, soft-gray elevation bands, and **full-bleed dark editorial heroes** carrying layered product-UI mockup cards. The dark hero with floating dashboard mockups is the single most distinctive component.
 
 **Key Characteristics:**
 - Single accent color: `{colors.primary}` (#0052ff Relay Blue) carries every primary CTA, wordmark, and inline brand link. Used scarcely.
-- Modest display weights — Inter at weight 400, never 700+.
+- Modest display weights — Instrument Serif at weight 400, never 700+.
 - Editorial pill geometry: every CTA is `{rounded.pill}` (100px), every asset glyph is `{rounded.full}`, every card is `{rounded.xl}` (24px). Sharp corners absent.
 - Full-bleed dark heroes with floating product-UI cards: `{component.hero-band-dark}` plus inline `{component.product-ui-card-dark}` mockups is the brand's strongest signature pattern.
 - Operational semantics: `{colors.semantic-up}` (#05b169) and `{colors.semantic-down}` (#cf202f) — text color only, never background fills.
@@ -357,9 +357,9 @@ The page rhythm rotates three modes: bright white editorial sections, soft-gray 
 ## Typography
 
 ### Font Family
-The system runs **Inter** for display headlines, body, navigation, captions, and buttons, **Lucide icons** for product iconography, and **JetBrains Mono** for tabular numerical data. Fallback stack: `-apple-system, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif`.
+The system pairs **Instrument Serif** for display headlines and brand moments with **Geist** for body, navigation, captions, and buttons. **Lucide icons** handle product iconography, and **Geist Mono** renders tabular numerical data. Fallback stack: `-apple-system, system-ui, "Segoe UI", Helvetica, Arial, sans-serif` for sans; `"Times New Roman", Times, Georgia, serif` for display.
 
-The display/body split is functional: lighter Inter carries hero headlines; regular and semibold Inter carry everything else.
+The display/body split is functional: Instrument Serif at weight 400 carries hero headlines with a quietly authoritative editorial voice; Geist at 400/500/600 keeps dense UI text crisp and readable through a modern grotesque skeleton.
 
 ### Hierarchy
 
@@ -369,7 +369,7 @@ The display/body split is functional: lighter Inter carries hero headlines; regu
 | `{typography.display-xl}` | 64px | 400 | 1.0 | -1.6px | Subsidiary heroes |
 | `{typography.display-lg}` | 52px | 400 | 1.0 | -1.3px | Section heads |
 | `{typography.display-md}` | 44px | 400 | 1.09 | -1px | CTA-band headlines |
-| `{typography.display-sm}` | 36px | 400 | 1.11 | -0.5px | Sub-section heads — Inter |
+| `{typography.display-sm}` | 36px | 400 | 1.11 | -0.3px | Sub-section heads — Instrument Serif |
 | `{typography.title-lg}` | 32px | 400 | 1.13 | -0.4px | Card group titles |
 | `{typography.title-md}` | 18px | 600 | 1.33 | 0 | Component titles, asset row primary |
 | `{typography.title-sm}` | 16px | 600 | 1.25 | 0 | List labels |
@@ -378,20 +378,20 @@ The display/body split is functional: lighter Inter carries hero headlines; regu
 | `{typography.body-sm}` | 14px | 400 | 1.5 | 0 | Footer body |
 | `{typography.caption}` | 13px | 400 | 1.5 | 0 | Photo captions |
 | `{typography.caption-strong}` | 12px | 600 | 1.5 | 0 | Badge pill labels |
-| `{typography.number-display}` | 18px | 500 | 1.4 | 0 | Asset prices, status deltas — JetBrains Mono |
+| `{typography.number-display}` | 18px | 500 | 1.4 | 0 | Asset prices, status deltas — Geist Mono |
 | `{typography.button}` | 16px | 600 | 1.15 | 0 | Standard CTA pill |
 | `{typography.nav-link}` | 14px | 500 | 1.4 | 0 | Top-nav menu items |
 
 ### Principles
 - **Display weight stays at 400.** The single most distinctive typographic choice signals calm institutional software rather than AI-tool urgency.
 - **Negative letter-spacing on display only.** Display uses -1px to -2px tracking; body stays at 0.
-- **JetBrains Mono on every number.** Asset prices, status deltas — anything tabular renders in JetBrains Mono.
+- **Geist Mono on every number.** Asset prices, status deltas — anything tabular renders in Geist Mono.
 
 ### Note on Font Substitutes
-Inter and JetBrains Mono are open, practical defaults.
-- **Display Inter** at weight 400, letter-spacing -1.5%.
-- **Body Inter** at weight 400/600.
-- **JetBrains Mono → JetBrains Mono** or **Geist Mono** at weight 500.
+Instrument Serif, Geist, and Geist Mono are open Google Fonts, loaded by `next/font` in the web app — Instrument Serif as a single-weight 400 typographic font (with italic), Geist and Geist Mono as variable fonts.
+- **Display Instrument Serif** at weight 400, mild negative tracking (-0.3px at 36px, scaling tighter on the marketing display steps). Italic is reserved for editorial emphasis moments.
+- **Body Geist** at weight 400/500/600. No italic in dense UI — emphasis uses weight, not slant.
+- **Numerals & code Geist Mono** at weight 500 with `font-variant-numeric: tabular-nums` for column alignment.
 
 ## Layout
 
@@ -519,9 +519,9 @@ Pill for interactive, card-radius (24px) for containers, full circle for icons. 
 ### Do
 - Reserve `{colors.primary}` (Relay Blue) for primary CTAs, wordmark, brand-glyph illustrations, inline accent links.
 - Set every CTA as `{rounded.pill}` (100px); every workflow glyph as `{rounded.full}`.
-- Keep Inter headlines at weight 400.
+- Keep Instrument Serif headlines at weight 400.
 - Use the dark/light band rotation as page rhythm.
-- Render every numerical value in JetBrains Mono via `{typography.number-display}`.
+- Render every numerical value in Geist Mono via `{typography.number-display}`.
 - Pair every dark hero with a layered product-UI mockup card stack.
 
 ### Don't
@@ -564,13 +564,93 @@ Pill for interactive, card-radius (24px) for containers, full circle for icons. 
 3. Variants live as separate entries inside the `components:` block.
 4. Use `{token.refs}` everywhere — never inline hex.
 5. Hover state never documented. Only Default and Active/Pressed.
-6. Inter 400 for display, Inter 400/600/700 for body. JetBrains Mono on every number.
+6. Instrument Serif 400 for display, Geist 400/500/600 for body. Geist Mono on every number.
 7. Relay Blue stays scarce — one or two blue moments per band.
+
+## Operational Surfaces (in-product)
+
+The marketing system above defines the brand voice. The in-product chat shell
+is operational and dense — it inherits the same primitives but adds a tighter
+scale tuned for an authenticated three-pane Slack-style canvas. The tokens
+below live in `web/src/styles.css` and supersede the marketing typography
+inside `.messenger-shell`.
+
+### Shell dimensions
+
+| Token | Value | Use |
+|---|---|---|
+| `--sidenav-w` | 64px | Collapsed left rail |
+| `--sidenav-w-open` | 200px | Expanded left rail |
+| `--thread-w` | 296px | Conversation list (second pane) |
+| `--drawer-w` | 360px | Settings/preferences drawer (right) |
+| `--header-h` | 60px | Chat panel top bar |
+
+### Operational type scale
+
+| Token | Size | Role |
+|---|---|---|
+| `--text-micro` | 10px | Minimap / abbreviations |
+| `--text-2xs` | 11px | Compact metadata |
+| `--text-xs` | 12px | Badges, timestamps, panel kickers |
+| `--text-sm` | 13px | Captions, secondary UI |
+| `--text-base` | 14px | Default UI chrome (buttons, nav, rows) |
+| `--text-md` | 16px | Message bodies, inputs (≥16px avoids iOS zoom) |
+| `--text-lg` | 18px | Chat header title, brand mark |
+| `--text-xl` | 22px | Panel headings |
+| `--text-2xl` | 28px | Empty-state display, mobile metric values |
+| `--text-3xl` | 32px | Admin page title — **Instrument Serif 400** |
+| `--text-4xl` | 36px | Admin metric values — **Geist Mono 500** |
+
+The split between `--text-base` (14px, chrome) and `--text-md` (16px, prose)
+is intentional. Use `--text-base` for buttons, row labels, nav items, and
+metadata; use `--text-md` for message bodies, composer text, and form input
+contents. Anything ≥ 28px should reach for `var(--font-display)` (Instrument Serif 400)
+to carry the brand voice into the product.
+
+### Operational components
+
+- **`messenger-shell`** — three-pane CSS grid (`sidenav | thread | chat`),
+  optionally with a fourth `drawer` column when settings open. The chat
+  column flexes; the others are fixed. Below 768px the shell collapses to
+  one pane at a time (mobile-topbar takes over).
+- **`sidenav-panel`** — vertical icon rail. Buttons are 44px squares with
+  `--radius-xs`. The whole rail expands to 200px on hover/focus, revealing
+  labels in `--type-nav-link`.
+- **`thread-panel`** — conversation list. Each `conversation-row` is a 68px
+  flat row with a 36px avatar, the contact name (`--text-base` / 600), and
+  a 13px preview line. Separated by hairlines, not card geometry.
+- **`chat-panel`** — message canvas. The header carries an 18px title in
+  ink. Messages render as block-grouped `.msg` units with no surrounding
+  card — depth comes from typography, not boxes.
+- **`composer`** — bottom-pinned input. Outer wrap uses `--shadow-lift`,
+  inner field is a flat textarea. The send button is a circular
+  `--radius-full` Relay Blue plate — the only blue moment in the chat
+  panel. The mode chip (Implement / Review) sits at the composer's
+  bottom-left as a pill in ink, with a tiny accent dot — accent-yellow for
+  implement, primary blue for review — never a coloured background fill.
+- **`ac-*` (Admin Console)** — page-level metric cards. Titles use
+  `var(--font-display)` at `--text-3xl`; metric values use `--font-number`
+  at `--text-4xl`. Cards are `--radius-xl`, hairline-bordered, lift on
+  hover via `--shadow-lift`.
+- **`adm-drawer`** — right-edge sheet for credentials, onboarding, etc.
+  Light variant is white canvas; dark variant fills with
+  `--color-surface-dark` and uses `--color-hairline-on-dark` for internal
+  dividers.
+
+### Focus, motion, dark mode
+
+- **Focus ring** — every interactive surface uses `var(--ring-focus)`,
+  a 3px primary-alpha halo. Do not introduce 1px or 2px ad-hoc variants.
+- **Mode chip color** — distinguishes Implement / Review by leading dot
+  hue only (accent-yellow / primary); the chip body stays ink + hairline.
+  Spec rule "no secondary brand color" applies.
+- **Dark mode** — one definition. Either pin via
+  `html[data-theme="dark"]` or fall back to `prefers-color-scheme: dark`
+  when `html[data-theme="light"]` is absent.
 
 ## Known Gaps
 
-- Inter and JetBrains Mono are documented as the default open-source font choices.
-- In-product operational surfaces are behind login walls — this document covers marketing only.
+- Instrument Serif, Geist, and Geist Mono are documented as the default open-source font choices.
 - Animation timings out of scope.
 - Form validation states beyond focus not visible on captured surfaces.
 - Accent yellow appears only inside workflow glyph illustrations; documented as illustrative-only.

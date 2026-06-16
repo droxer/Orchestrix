@@ -1,0 +1,80 @@
+/* ============================ pills ============================ */
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  padding: 4px var(--space-sm);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-strong);
+  color: var(--color-ink);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.pill::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-muted-soft);
+}
+
+.pill.good {
+  color: var(--color-semantic-up);
+  border-color: var(--border-success);
+  background: var(--color-canvas);
+}
+
+.pill.good::before { background: var(--color-semantic-up); }
+
+.pill.info {
+  color: var(--color-primary);
+  border-color: var(--border-info);
+  background: var(--color-canvas);
+}
+
+.pill.info::before { background: var(--color-primary); }
+
+.pill.warn {
+  color: var(--color-muted);
+  background: var(--color-canvas);
+}
+
+.pill.warn::before { background: var(--color-accent-yellow); }
+
+.pill.bad {
+  color: var(--color-semantic-down);
+  border-color: var(--border-danger);
+  background: var(--color-canvas);
+}
+
+.pill.bad::before { background: var(--color-semantic-down); }
+
+.spin { animation: spin 0.9s linear infinite; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 1ms !important;
+  }
+}
+
+:where(button, a, input, textarea, select):focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
+.chat-panel:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}

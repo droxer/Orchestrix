@@ -223,7 +223,7 @@ export function AdminConsole() {
           <div className="adm-header-meta">
             <span className={`adm-live-dot ${fetchError ? "offline" : isFetching ? "fetching" : ""}`} aria-hidden="true" />
             {fetchError ? (
-              <span className="adm-header-error">{fetchError}</span>
+              <span className="adm-header-error">{t("admin.fetch_error", { message: fetchError })}</span>
             ) : lastUpdatedStr ? (
               <span className="adm-header-time mono">{t("admin.updated_at", { time: lastUpdatedStr })}</span>
             ) : null}

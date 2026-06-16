@@ -157,6 +157,7 @@ class DaemonNodeRegistry:
         logger.debug("Daemon node status updated", sandbox_id=sandbox_id, status=status)
 
     def monitor_nodes(self) -> list[dict[str, Any]]:
+        self.reap_stale_runs()
         nodes = []
         for sandbox in self.sandboxes.values():
             liveness = self._liveness(sandbox)
@@ -258,6 +259,7 @@ class DaemonNodeRegistry:
 
     def take_commands(self, sandbox_id: str, token: str | None) -> list[dict[str, Any]]:
         self._assert_authorized(sandbox_id, token)
+        self.reap_stale_runs()
         self._mark_seen(sandbox_id)
         records = self.daemon_store.take_queued_commands(sandbox_id)
         logger.debug("Commands taken by daemon node", sandbox_id=sandbox_id, command_count=len(records))
@@ -281,6 +283,18 @@ class DaemonNodeRegistry:
         future: asyncio.Future[dict[str, Any]] = asyncio.get_running_loop().create_future()
         self.completions[command_id] = future
         return await asyncio.wait_for(future, timeout=timeout_ms / 1000)
+
+    def start_run_request(self, sandbox_id: str, session_id: str, task_goal: str, assignments: list[dict[str, Any]], state: dict[str, Any]) -> dict[str, Any]:
+        if self.daemon_store.active_run_request_for_session(sandbox_id, session_id):
+            raise ValueError(f"Session {session_id} already has an active daemon run.")
+        request = self.daemon_store.create_run_request({
+            "nodeId": sandbox_id,
+            "sessionId": session_id,
+            "taskGoal": task_goal,
+            "assignments": assignments,
+            "state": state,
+        })
+        return self._enqueue_current_assignment(request)
 
     def cancel_active_run(self, sandbox_id: str, session_id: str, reason: str) -> dict[str, Any] | None:
         active = next((run for run in self.active_commands.values() if run["sandboxId"] == sandbox_id and run["sessionId"] == session_id), None)
@@ -340,8 +354,175 @@ class DaemonNodeRegistry:
         future = self.completions.pop(event["commandId"], None)
         if future and not future.done():
             future.set_result(event)
+            return
+        run_request = self.daemon_store.run_request_for_command(event["commandId"])
+        if run_request:
+            self._advance_run_request(run_request, event)
         else:
             self.clear_run_output(event["runId"])
+
+    def reap_stale_runs(self) -> None:
+        for request in self.daemon_store.list_active_run_requests():
+            sandbox = self.sandboxes.get(request["nodeId"])
+            if not sandbox:
+                self._fail_run_request(request, f"Daemon node {request['nodeId']} disappeared.")
+                continue
+            current_started_at = request.get("currentStartedAt")
+            if current_started_at and self._age_ms(current_started_at) > DAEMON_RUN_TIMEOUT_MS:
+                self.cancel_active_run(request["nodeId"], request["sessionId"], "Daemon run timed out.")
+                self._fail_run_request(request, "Daemon run timed out.")
+                continue
+            if not self._liveness(sandbox)["online"]:
+                self._fail_run_request(request, "Daemon node heartbeat expired while run was active.")
+
+    def _enqueue_current_assignment(self, run_request: dict[str, Any]) -> dict[str, Any]:
+        assignments = run_request["assignments"]
+        index = run_request.get("currentIndex", 0)
+        if index >= len(assignments):
+            self._complete_run_request(run_request, "Assignments completed.")
+            return run_request
+        assignment = assignments[index]
+        mode = assignment.get("mode") or "implement"
+        run_id = new_relay_id("run")
+        sandbox = self.sandboxes[run_request["nodeId"]]
+        controller = self._controller_for_sandbox(sandbox)
+        controller.record_agent_started(run_request["sessionId"], {
+            "runId": run_id,
+            "agent": assignment["agent"],
+            "role": role_for_agent(assignment["agent"], mode),
+            "mode": mode,
+        })
+        command = {
+            "id": new_relay_id("cmd"),
+            "type": "run.start",
+            "sessionId": run_request["sessionId"],
+            "runId": run_id,
+            "taskGoal": run_request["taskGoal"],
+            "agent": assignment["agent"],
+            "mode": mode,
+            **({"workspacePath": sandbox["workspacePath"]} if sandbox.get("workspacePath") else {}),
+            "state": run_request["state"],
+        }
+        self.enqueue(run_request["nodeId"], command)
+        return self.daemon_store.update_run_request(run_request["id"], {
+            "currentCommandId": command["id"],
+            "currentRunId": run_id,
+            "currentAgent": assignment["agent"],
+            "currentMode": mode,
+            "currentStartedAt": now_iso(),
+        })
+
+    def _advance_run_request(self, run_request: dict[str, Any], event: dict[str, Any]) -> None:
+        sandbox = self.sandboxes.get(run_request["nodeId"])
+        if not sandbox:
+            self.clear_run_output(event["runId"])
+            return
+        controller = self._controller_for_sandbox(sandbox)
+        assignments = run_request["assignments"]
+        assignment = assignments[run_request.get("currentIndex", 0)]
+        mode = assignment.get("mode") or "implement"
+        state = run_request["state"]
+        if event["type"] == "run.failed":
+            self.clear_run_output(event["runId"])
+            controller.record_agent_completed(run_request["sessionId"], state, {"runId": event["runId"], "agent": event["agent"], "mode": mode, "status": "failed", "exitCode": event.get("exitCode", 1), "agentLog": event["error"]})
+            controller.fail_session(run_request["sessionId"], event["error"])
+            self.daemon_store.update_run_request(run_request["id"], {"status": "failed", "error": event["error"]})
+            self.update_status(run_request["nodeId"], {"status": "ready", "lastError": event["error"]})
+            return
+        if event["type"] == "run.cancelled":
+            self.clear_run_output(event["runId"])
+            controller.record_agent_completed(run_request["sessionId"], state, {"runId": event["runId"], "agent": event["agent"], "mode": mode, "status": "cancelled", "exitCode": 130, "agentLog": ""})
+            controller.cancel_session(run_request["sessionId"], event["reason"])
+            self.daemon_store.update_run_request(run_request["id"], {"status": "cancelled", "error": event["reason"]})
+            self.update_status(run_request["nodeId"], {"status": "ready", "lastError": event["reason"]})
+            return
+        agent_log = event.get("agentLog") or self.output_for_run(event["runId"])
+        self.clear_run_output(event["runId"])
+        next_state = controller.record_agent_completed(run_request["sessionId"], state, {
+            "runId": event["runId"],
+            "agent": event["agent"],
+            "mode": mode,
+            "status": "completed" if event["exitCode"] == 0 else "failed",
+            "exitCode": event["exitCode"],
+            "agentLog": agent_log,
+            "reviewVerdict": event.get("reviewVerdict", ""),
+            "reviewFeedback": event.get("reviewFeedback", ""),
+        })
+        if is_review_assignment(mode) and event.get("reviewVerdict") != "approved":
+            outcome = f"{assignment['agent']} rejected the work." if event.get("reviewVerdict") == "rejected" else f"{assignment['agent']} review did not approve the work."
+            controller.fail_session(run_request["sessionId"], outcome)
+            self.daemon_store.update_run_request(run_request["id"], {"status": "failed", "state": next_state, "error": outcome})
+            self.update_status(run_request["nodeId"], {"status": "ready", "lastError": outcome})
+            return
+        if event["exitCode"] != 0:
+            outcome = f"{assignment['agent']} {mode} failed with exit code {event['exitCode']}."
+            controller.fail_session(run_request["sessionId"], outcome)
+            self.daemon_store.update_run_request(run_request["id"], {"status": "failed", "state": next_state, "error": outcome})
+            self.update_status(run_request["nodeId"], {"status": "ready", "lastError": outcome})
+            return
+        next_index = run_request.get("currentIndex", 0) + 1
+        updated = self.daemon_store.update_run_request(run_request["id"], {
+            "currentIndex": next_index,
+            "state": next_state,
+            "currentCommandId": None,
+            "currentRunId": None,
+            "currentAgent": None,
+            "currentMode": None,
+            "currentStartedAt": None,
+        })
+        if next_index >= len(assignments):
+            self._complete_run_request(updated, "Assignments completed.")
+        else:
+            self._enqueue_current_assignment(updated)
+
+    def _complete_run_request(self, run_request: dict[str, Any], outcome: str) -> None:
+        sandbox = self.sandboxes.get(run_request["nodeId"])
+        controller = self._controller_for_sandbox(sandbox) if sandbox else SessionController(self.store)
+        controller.complete_session(run_request["sessionId"], outcome)
+        self.daemon_store.update_run_request(run_request["id"], {"status": "completed", "error": None})
+        self.update_status(run_request["nodeId"], {"status": "ready", "lastError": None})
+
+    def _fail_run_request(self, run_request: dict[str, Any], outcome: str) -> None:
+        run_id = run_request.get("currentRunId")
+        command_id = run_request.get("currentCommandId")
+        if command_id:
+            self.active_commands.pop(command_id, None)
+            event = {
+                "type": "run.failed",
+                "commandId": command_id,
+                "sessionId": run_request["sessionId"],
+                "runId": run_id or "",
+                "agent": run_request.get("currentAgent") or "codex",
+                "mode": run_request.get("currentMode") or "implement",
+                "error": outcome,
+                "exitCode": 1,
+            }
+            self.daemon_store.mark_command_failed(run_request["nodeId"], event)
+        sandbox = self.sandboxes.get(run_request["nodeId"])
+        controller = self._controller_for_sandbox(sandbox) if sandbox else SessionController(self.store)
+        if run_id and run_request.get("currentAgent") and run_request.get("currentMode"):
+            controller.record_agent_completed(run_request["sessionId"], run_request.get("state", initial_agent_state(run_request["taskGoal"])), {
+                "runId": run_id,
+                "agent": run_request["currentAgent"],
+                "mode": run_request["currentMode"],
+                "status": "failed",
+                "exitCode": 1,
+                "agentLog": outcome,
+            })
+        controller.fail_session(run_request["sessionId"], outcome)
+        self.daemon_store.update_run_request(run_request["id"], {"status": "failed", "error": outcome})
+        self.update_status(run_request["nodeId"], {"status": "failed", "lastError": outcome})
+
+    def _controller_for_sandbox(self, sandbox: dict[str, Any]) -> SessionController:
+        return SessionController(self.store, workspace_path=sandbox.get("workspacePath") or "/workspace", owner_employee_id=sandbox.get("employeeId"))
+
+    def _age_ms(self, iso_timestamp: str) -> int:
+        try:
+            timestamp = iso_timestamp.replace("Z", "+00:00")
+            seen_ms = __import__("datetime").datetime.fromisoformat(timestamp).timestamp() * 1000
+            return max(0, int(time.time() * 1000 - seen_ms))
+        except Exception:
+            return 0
 
     def output_for_run(self, run_id: str) -> str:
         return "".join(self.outputs.get(run_id, []))
@@ -378,8 +559,9 @@ class DaemonNodeRegistry:
         nodes = self.daemon_store.list_nodes()
         if nodes:
             logger.info("Loaded persisted daemon nodes", count=len(nodes))
+        active_node_ids = {run["nodeId"] for run in self.daemon_store.list_active_runs()}
         for sandbox in nodes:
-            waiting_status = "provisioning" if sandbox.get("status") == "provisioning" else "stopped"
+            waiting_status = "running" if sandbox["id"] in active_node_ids else "provisioning" if sandbox.get("status") == "provisioning" else "stopped"
             self.sandboxes[sandbox["id"]] = {
                 **sandbox,
                 "token": None,
@@ -472,6 +654,7 @@ class ServerDaemonNodeBackend:
         }
 
     async def run(self, sandbox_id: str, request: dict[str, Any]) -> dict[str, Any]:
+        self.registry.reap_stale_runs()
         sandbox = self.registry.get(sandbox_id)
         if not sandbox:
             raise KeyError(f"Sandbox {sandbox_id} has no registered daemon node.")
@@ -490,67 +673,7 @@ class ServerDaemonNodeBackend:
             ["human", *dict.fromkeys(assignment["agent"] for assignment in request["assignments"])],
         )["id"]
         state = initial_agent_state(request["taskGoal"])
-        for assignment in request["assignments"]:
-            mode = assignment.get("mode") or "implement"
-            run_id = new_relay_id("run")
-            controller.record_agent_started(session_id, {"runId": run_id, "agent": assignment["agent"], "role": role_for_agent(assignment["agent"], mode), "mode": mode})
-            command = {
-                "id": new_relay_id("cmd"),
-                "type": "run.start",
-                "sessionId": session_id,
-                "runId": run_id,
-                "taskGoal": request["taskGoal"],
-                "agent": assignment["agent"],
-                "mode": mode,
-                **({"workspacePath": sandbox["workspacePath"]} if sandbox.get("workspacePath") else {}),
-                "state": state,
-            }
-            try:
-                self.registry.enqueue(sandbox_id, command)
-                completed = await self.registry.wait_for_completion(command["id"])
-            except Exception as error:
-                outcome = str(error)
-                self.registry.clear_run_output(run_id)
-                state = controller.record_agent_completed(session_id, state, {"runId": run_id, "agent": assignment["agent"], "mode": mode, "status": "failed", "exitCode": 1, "agentLog": ""})
-                controller.fail_session(session_id, outcome)
-                self.registry.update_status(sandbox_id, {"status": "failed", "lastError": outcome})
-                return self.registry.store.get_session(session_id)
-            if completed["type"] == "run.failed":
-                self.registry.clear_run_output(run_id)
-                state = controller.record_agent_completed(session_id, state, {"runId": run_id, "agent": assignment["agent"], "mode": mode, "status": "failed", "exitCode": completed.get("exitCode", 1), "agentLog": completed["error"]})
-                controller.fail_session(session_id, completed["error"])
-                self.registry.update_status(sandbox_id, {"status": "ready", "lastError": completed["error"]})
-                return self.registry.store.get_session(session_id)
-            if completed["type"] == "run.cancelled":
-                self.registry.clear_run_output(run_id)
-                state = controller.record_agent_completed(session_id, state, {"runId": run_id, "agent": assignment["agent"], "mode": mode, "status": "cancelled", "exitCode": 130, "agentLog": ""})
-                controller.cancel_session(session_id, completed["reason"])
-                self.registry.update_status(sandbox_id, {"status": "ready", "lastError": completed["reason"]})
-                return self.registry.store.get_session(session_id)
-            agent_log = completed.get("agentLog") or self.registry.output_for_run(run_id)
-            self.registry.clear_run_output(run_id)
-            state = controller.record_agent_completed(session_id, state, {
-                "runId": run_id,
-                "agent": assignment["agent"],
-                "mode": mode,
-                "status": "completed" if completed["exitCode"] == 0 else "failed",
-                "exitCode": completed["exitCode"],
-                "agentLog": agent_log,
-                "codexVerdict": completed.get("codexVerdict", ""),
-                "codexFeedback": completed.get("codexFeedback", ""),
-            })
-            if is_review_assignment(assignment["agent"], mode) and completed.get("codexVerdict") != "approved":
-                outcome = "Codex rejected the work." if completed.get("codexVerdict") == "rejected" else "Codex review did not approve the work."
-                controller.fail_session(session_id, outcome)
-                self.registry.update_status(sandbox_id, {"status": "ready", "lastError": outcome})
-                return self.registry.store.get_session(session_id)
-            if completed["exitCode"] != 0:
-                outcome = f"{assignment['agent']} {mode} failed with exit code {completed['exitCode']}."
-                controller.fail_session(session_id, outcome)
-                self.registry.update_status(sandbox_id, {"status": "ready", "lastError": outcome})
-                return self.registry.store.get_session(session_id)
-        controller.complete_session(session_id, "Assignments completed.")
-        self.registry.update_status(sandbox_id, {"status": "ready", "lastError": None})
+        self.registry.start_run_request(sandbox_id, session_id, request["taskGoal"], request["assignments"], state)
         return self.registry.store.get_session(session_id)
 
     def cancel_run(self, sandbox_id: str, session_id: str, reason: str) -> dict[str, Any]:

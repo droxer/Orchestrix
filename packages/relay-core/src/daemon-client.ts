@@ -1,4 +1,4 @@
-import type { AgentName, CodexTaskMode } from "./state.js";
+import type { AgentName, AgentTaskMode } from "./state.js";
 import type { RelaySession } from "./session-store.js";
 import type { ControlPanelDaemonNodeRecord, SandboxRecord, SandboxRunAssignment } from "./daemon-protocol.js";
 
@@ -15,7 +15,7 @@ export interface RecordHandoffInput {
   sessionId: string;
   targetAgent: AgentName;
   note?: string;
-  mode?: CodexTaskMode;
+  mode?: AgentTaskMode;
 }
 
 export interface RelayDaemonClientOptions {
@@ -108,7 +108,7 @@ export class RelayDaemonClient {
   }
 
   async runSandbox(input: RunSandboxInput): Promise<RelaySession> {
-    return this.request<RelaySession>(`/sandboxes/${encodeURIComponent(input.sandboxId)}/runs`, {
+    const submitted = await this.request<RelaySession>(`/sandboxes/${encodeURIComponent(input.sandboxId)}/runs`, {
       method: "POST",
       signal: input.signal,
       body: {
@@ -117,6 +117,7 @@ export class RelayDaemonClient {
         sessionId: input.sessionId,
       },
     });
+    return this.waitForSessionTerminal(submitted.id, input.signal);
   }
 
   async recordDecision(input: RecordDecisionInput): Promise<RelaySession> {
@@ -177,13 +178,40 @@ export class RelayDaemonClient {
     if (!response.ok) {
       const detail = parsed && typeof parsed === "object" && "error" in parsed
         ? String((parsed as { error: unknown }).error)
+        : parsed && typeof parsed === "object" && "detail" in parsed
+          ? String((parsed as { detail: unknown }).detail)
         : response.statusText;
       throw new Error(`Relay daemon request failed: ${detail}`);
     }
     return parsed as T;
   }
+
+  private async waitForSessionTerminal(sessionId: string, signal?: AbortSignal): Promise<RelaySession> {
+    while (true) {
+      if (signal?.aborted) throw new Error("Relay daemon request cancelled.");
+      const session = await this.getSession(sessionId, signal);
+      if (session.status === "completed" || session.status === "failed" || session.status === "cancelled") {
+        return session;
+      }
+      await sleep(1000, signal);
+    }
+  }
 }
 
 export function normalizeBaseUrl(value: string): string {
   return value.replace(/\/+$/, "");
+}
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new Error("Relay daemon request cancelled."));
+      return;
+    }
+    const timeout = setTimeout(resolve, ms);
+    signal?.addEventListener("abort", () => {
+      clearTimeout(timeout);
+      reject(new Error("Relay daemon request cancelled."));
+    }, { once: true });
+  });
 }

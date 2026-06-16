@@ -25,6 +25,7 @@ test("relay-daemon CLI parses admin-created credential flags", () => {
     employeeId: "alice",
     token: "tok_node",
     sandbox: "none",
+    doctor: false,
     help: false,
     version: false,
   });
@@ -39,6 +40,22 @@ test("relay-daemon CLI still allows env-only runtime options", () => {
     employeeId: undefined,
     token: undefined,
     sandbox: undefined,
+    doctor: false,
+    help: false,
+    version: false,
+  });
+});
+
+test("relay-daemon CLI parses doctor mode", () => {
+  const args = parseArgs(["node", "relay-daemon", "--doctor", "--sandbox-id", "sbx_alice"]);
+
+  assert.deepEqual(args, {
+    backendUrl: undefined,
+    sandboxId: "sbx_alice",
+    employeeId: undefined,
+    token: undefined,
+    sandbox: undefined,
+    doctor: true,
     help: false,
     version: false,
   });

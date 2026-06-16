@@ -1,0 +1,29 @@
+/* =====================================================================
+   Accessibility / guideline patches
+   ===================================================================== */
+
+/* Headings: prefer balanced line breaks to prevent widows */
+.conversation-heading h1,
+.mcp-header-title h1,
+.skills-header-title h1,
+.mcp-empty-title,
+.pref-header-text h3,
+.login-card h1,
+.adm-header-title,
+.adm-rail-title,
+.adm-empty-title,
+.adm-auth-title {
+  text-wrap: balance;
+}
+
+/* Focus replacement for inputs that hide outline */
+.skills-search-bar:focus-within,
+.adm-search:focus-within {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.pref-modal:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}

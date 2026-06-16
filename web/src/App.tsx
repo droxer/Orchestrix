@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  ActionAddPerson, ActionApprove, ActionHandoff, ActionMention, ActionSearch,
-  ActionSend, ActionStop, NavAdmin, NavCollapse, NavConversations, NavLogout, NavMcp,
-  NavPreferences, NavRefresh, NavSkills,
+  ActionAddPerson, ActionApprove, ActionHandoff, ActionSearch,
+  ActionSend, ActionStop, ModeImplement, ModeReview, NavAdmin,
+  NavConversations, NavLogout, NavMcp, NavPreferences, NavRefresh,
+  NavSidebarCollapse, NavSidebarExpand, NavSkills,
 } from "./components/icons";
 import { AgentMark } from "./components/AgentMark";
 import {
@@ -13,7 +14,7 @@ import {
   RelayApiError,
   recordDecision, recordHandoff, runSandbox,
 } from "./api";
-import type { AgentName, CodexTaskMode, ControlPanelDaemonNodeRecord, CurrentUser, SandboxRecord, Tone } from "./types";
+import type { AgentName, AgentTaskMode, ControlPanelDaemonNodeRecord, CurrentUser, SandboxRecord, Tone } from "./types";
 import { RelayMark } from "./components/RelayMark";
 import { EmployeeAvatar } from "./components/EmployeeAvatar";
 import { StatusPill } from "./components/StatusPill";
@@ -40,10 +41,6 @@ const tokenStorageKey = "relay-web.tokens";
 const selectedEmployeeKey = "relay-web.selectedEmployee";
 const themeStorageKey = "relay-web.theme";
 const languageStorageKey = "relay-web.language";
-
-function defaultModeForAgent(agent: AgentName): CodexTaskMode {
-  return agent === "codex" ? "review" : "implement";
-}
 
 type TokenMap = Record<string, string>;
 type MobileView = "threads" | "chat";
@@ -130,27 +127,26 @@ function sessionBelongsToEmployee(
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function AgentPicker({ activeAgent, agentPickerOpen, setAgentPickerOpen, pickAgent }: {
-  activeAgent: AgentName; agentPickerOpen: boolean;
-  setAgentPickerOpen: (v: boolean) => void; pickAgent: (a: AgentName) => void;
+function ModeToggle({ mode, setMode }: {
+  mode: AgentTaskMode;
+  setMode: (mode: AgentTaskMode) => void;
 }) {
   const { t } = useTranslation();
+  const next: AgentTaskMode = mode === "implement" ? "review" : "implement";
+  const Icon = mode === "implement" ? ModeImplement : ModeReview;
   return (
-    <div className="agent-picker-wrap">
-      <button type="button" className="agent-picker-trigger" aria-label={t("composer.choose_agent")} aria-controls="agent-picker" aria-expanded={agentPickerOpen} onClick={() => setAgentPickerOpen(!agentPickerOpen)}>
-        <ActionMention size={14} /><span translate="no">{activeAgent}</span>
-      </button>
-      {agentPickerOpen ? (
-        <div id="agent-picker" className="agent-picker" aria-label={t("composer.choose_agent")}>
-          {agents.map((a) => (
-            <button key={a} type="button" aria-pressed={a === activeAgent} className={a === activeAgent ? "active" : ""} onClick={() => pickAgent(a)}>
-              <span className="agent-avatar" data-agent={a} aria-hidden="true"><AgentMark agent={a} size={16} /></span>
-              <span translate="no">{a}</span>
-            </button>
-          ))}
-        </div>
-      ) : null}
-    </div>
+    <button
+      type="button"
+      className="mode-chip"
+      data-mode={mode}
+      aria-label={t("composer.choose_mode")}
+      title={`${t(`mode.${next}`)} (Shift+Tab)`}
+      onClick={() => setMode(next)}
+    >
+      <Icon className="mode-chip-icon" size={13} aria-hidden="true" />
+      <span className="mode-chip-label">{t(`mode.${mode}`)}</span>
+      <span className="mode-chip-hint" aria-hidden="true">⇧⇥</span>
+    </button>
   );
 }
 
@@ -171,10 +167,11 @@ function MentionPopover({ filteredAgents, mentionIndex, insertMention }: {
   );
 }
 
-function DecisionBar({ sendDecision, handoffOpen, setHandoffOpen, handoffAgent, setHandoffAgent, handoffNote, setHandoffNote, sendHandoff }: {
+function DecisionBar({ sendDecision, handoffOpen, setHandoffOpen, handoffAgent, setHandoffAgent, handoffMode, setHandoffMode, handoffNote, setHandoffNote, sendHandoff }: {
   sendDecision: (kind: "approve" | "reject" | "rerun" | "mark_done") => Promise<void>;
   handoffOpen: boolean; setHandoffOpen: (v: boolean) => void;
   handoffAgent: AgentName; setHandoffAgent: (a: AgentName) => void;
+  handoffMode: AgentTaskMode; setHandoffMode: (m: AgentTaskMode) => void;
   handoffNote: string; setHandoffNote: (v: string) => void;
   sendHandoff: () => Promise<void>;
 }) {
@@ -198,6 +195,13 @@ function DecisionBar({ sendDecision, handoffOpen, setHandoffOpen, handoffAgent, 
               {agents.map((a) => <option key={a} value={a}>{a}</option>)}
             </select>
           </div>
+          <div className="handoff-row">
+            <label htmlFor="handoff-mode">{t("handoff.mode")}</label>
+            <select id="handoff-mode" name="handoff-mode" value={handoffMode} onChange={(e) => setHandoffMode(e.target.value as AgentTaskMode)}>
+              <option value="implement">{t("mode.implement")}</option>
+              <option value="review">{t("mode.review")}</option>
+            </select>
+          </div>
           <input aria-label={t("handoff.note_placeholder")} name="handoff-note" autoComplete="off" placeholder={t("handoff.note_placeholder")} value={handoffNote} onChange={(e) => setHandoffNote(e.target.value)} />
           <div className="handoff-actions">
             <button type="button" onClick={() => setHandoffOpen(false)}>{t("handoff.cancel")}</button>
@@ -217,6 +221,7 @@ export function App() {
   const [tokens, setTokens] = useState<TokenMap>({});
   const [hydrated, setHydrated] = useState(false);
   const [activeAgent, setActiveAgent] = useState<AgentName>("claude");
+  const [composerMode, setComposerMode] = useState<AgentTaskMode>("implement");
   const [composerText, setComposerText] = useState("");
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionQuery, setMentionQuery] = useState("");
@@ -231,9 +236,9 @@ export function App() {
   const [sidenavExpanded, setSidenavExpanded] = useState(true);
   const [theme, setTheme] = useState<Theme>(readTheme);
   const [language, setLanguage] = useState<Language>(readLanguage);
-  const [agentPickerOpen, setAgentPickerOpen] = useState(false);
   const [handoffOpen, setHandoffOpen] = useState(false);
   const [handoffAgent, setHandoffAgent] = useState<AgentName>("codex");
+  const [handoffMode, setHandoffMode] = useState<AgentTaskMode>("implement");
   const [handoffNote, setHandoffNote] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [navTooltip, setNavTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
@@ -553,7 +558,7 @@ export function App() {
     try {
       const { sandbox, token } = await provisionEmployeeSandbox(selectedEmployee, selectedToken);
       rememberSandboxToken(selectedEmployee, sandbox, token);
-      const assignment = { agent: routedAgent, mode: defaultModeForAgent(routedAgent) };
+      const assignment = { agent: routedAgent, mode: composerMode };
       const session = await createSession({ taskGoal: goal, assignments: [assignment], workspacePath: sandbox.workspacePath, ownerEmployeeId: selectedEmployee }, token);
       setSelectedSessionId(session.id); setComposerText(""); setMentionOpen(false);
       setMobileView("chat"); atBottomRef.current = true;
@@ -625,8 +630,8 @@ export function App() {
   async function sendHandoff() {
     if (!activeSession) return;
     try {
-      const session = await recordHandoff(activeSession.id, handoffAgent, defaultModeForAgent(handoffAgent), handoffNote.trim() || undefined, selectedToken);
-      setSelectedSessionId(session.id); setHandoffNote(""); setHandoffOpen(false); setActiveAgent(handoffAgent);
+      const session = await recordHandoff(activeSession.id, handoffAgent, handoffMode, handoffNote.trim() || undefined, selectedToken);
+      setSelectedSessionId(session.id); setHandoffNote(""); setHandoffMode("implement"); setHandoffOpen(false); setActiveAgent(handoffAgent);
       setStatus({ tone: "good", message: t("toast.handed_to", { agent: handoffAgent }) });
       await refresh();
     } catch (err) {
@@ -634,7 +639,7 @@ export function App() {
     }
   }
 
-  function pickAgent(agent: AgentName) { setActiveAgent(agent); setAgentPickerOpen(false); }
+  function pickAgent(agent: AgentName) { setActiveAgent(agent); }
 
   function showNavTooltip(text: string, el: HTMLElement) {
     if (sidenavExpanded) return;
@@ -703,7 +708,7 @@ export function App() {
             onFocus={(e) => showNavTooltip(sidenavExpanded ? t("nav.collapse_sidebar") : t("nav.expand_sidebar"), e.currentTarget)}
             onBlur={hideNavTooltip}
           >
-            <NavCollapse size={16} className={sidenavExpanded ? "sidenav-chevron-open" : ""} />
+            {sidenavExpanded ? <NavSidebarCollapse size={16} /> : <NavSidebarExpand size={16} />}
             <span className="sidenav-toggle-label">{sidenavExpanded ? t("nav.collapse") : t("nav.expand")}</span>
           </button>
         </div>
@@ -903,7 +908,7 @@ export function App() {
             {activeSession ? (
               <>
                 {messages.map((msg, i) => <MessageBlock key={msg.id} message={msg} employeeId={selectedEmployee} sessionId={activeSession.id} grouped={isGroupedContinuation(messages, i)} />)}
-                {awaitingDecision ? <DecisionBar sendDecision={sendDecision} handoffOpen={handoffOpen} setHandoffOpen={setHandoffOpen} handoffAgent={handoffAgent} setHandoffAgent={setHandoffAgent} handoffNote={handoffNote} setHandoffNote={setHandoffNote} sendHandoff={sendHandoff} /> : null}
+                {awaitingDecision ? <DecisionBar sendDecision={sendDecision} handoffOpen={handoffOpen} setHandoffOpen={setHandoffOpen} handoffAgent={handoffAgent} setHandoffAgent={setHandoffAgent} handoffMode={handoffMode} setHandoffMode={setHandoffMode} handoffNote={handoffNote} setHandoffNote={setHandoffNote} sendHandoff={sendHandoff} /> : null}
               </>
             ) : (
               <TranscriptEmpty selectedEmployee={selectedEmployee} activeAgent={activeAgent} agentDescriptors={agentDescriptors} />
@@ -941,24 +946,41 @@ export function App() {
                     if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); insertMention(filteredMentionAgents[mentionIndex]); return; }
                     if (e.key === "Escape") { e.preventDefault(); setMentionOpen(false); return; }
                   }
+                  if (e.key === "Tab" && e.shiftKey) {
+                    e.preventDefault();
+                    setComposerMode((m) => (m === "implement" ? "review" : "implement"));
+                    return;
+                  }
                   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendMessage(); }
                 }}
                 rows={2}
               />
               <div className="composer-footer">
                 <div className="composer-footer-left">
-                  <AgentPicker activeAgent={activeAgent} agentPickerOpen={agentPickerOpen} setAgentPickerOpen={setAgentPickerOpen} pickAgent={pickAgent} />
+                  <ModeToggle mode={composerMode} setMode={setComposerMode} />
                 </div>
                 <div className="composer-footer-right">
                   {activeRun ? (
-                    <button type="button" className="cancel-run" onClick={() => void cancelActiveRun()} aria-label={t("composer.cancel_run")} title={t("composer.cancel_run")}>
-                      <ActionStop size={14} />
-                      <span className="cancel-run-label">{t("composer.cancel_run")}</span>
+                    <button
+                      type="button"
+                      className="send-button send-button-cancel"
+                      onClick={() => void cancelActiveRun()}
+                      aria-label={t("composer.cancel_run")}
+                      title={t("composer.cancel_run")}
+                    >
+                      <ActionStop size={16} />
                     </button>
-                  ) : null}
-                  <button type="submit" className="send-button" disabled={isRunning || !composerText.trim()} aria-label={t("composer.send")} title={t("composer.send")}>
-                    <ActionSend size={16} />
-                  </button>
+                  ) : (
+                    <button
+                      type="submit"
+                      className="send-button"
+                      disabled={!composerText.trim()}
+                      aria-label={t("composer.send")}
+                      title={t("composer.send")}
+                    >
+                      <ActionSend size={16} />
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

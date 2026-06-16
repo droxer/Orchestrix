@@ -3,7 +3,7 @@ import { basename, join, resolve } from "node:path";
 
 import { getAgent } from "./agents.js";
 import { REPO_ROOT } from "./env.js";
-import type { AgentName, CodexReviewVerdict } from "./state.js";
+import type { AgentName, ReviewVerdict } from "./state.js";
 
 export type AgentRole = "implementer" | "reviewer" | "planner" | "tester" | "fixer";
 export type SessionStatus = "pending_approval" | "running" | "waiting_for_human" | "completed" | "failed" | "cancelled";
@@ -60,7 +60,7 @@ export interface RelaySession {
   decisions: HumanDecision[];
   events: RelayEvent[];
   finalOutcome?: string;
-  reviewVerdict?: CodexReviewVerdict;
+  reviewVerdict?: ReviewVerdict;
 }
 
 export type RelayEvent =
@@ -133,7 +133,8 @@ export type RelayEvent =
       sessionId: string;
       timestamp: string;
       runId: string;
-      verdict: CodexReviewVerdict;
+      agent: AgentName;
+      verdict: ReviewVerdict;
       feedback: string;
     }
   | {

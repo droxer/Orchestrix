@@ -2,11 +2,10 @@ import { emitOrPrint, status, type AgentOutputSink } from "./format.js";
 import { getAgent } from "./agents.js";
 import { failureCount, type AgentState } from "./state.js";
 
-export type Route = "claude_implement" | "pi_implement" | "codex_review" | "__end__";
+export type Route = "claude_implement" | "pi_implement" | "__end__";
 
 const MAX_CLAUDE_FAILURES = getAgent("claude").maxFailures;
 const MAX_PI_FAILURES = getAgent("pi").maxFailures;
-const MAX_CODEX_FAILURES = getAgent("codex").maxFailures;
 
 export function routeClaudeHandoff(state: AgentState, sink?: AgentOutputSink): Route {
   if (state.last_exit_code === 0) {
@@ -23,7 +22,7 @@ export function routeClaudeHandoff(state: AgentState, sink?: AgentOutputSink): R
 
 export function routePiHandoff(state: AgentState, sink?: AgentOutputSink): Route {
   if (state.last_exit_code === 0) {
-    return "codex_review";
+    return "__end__";
   }
   const failures = failureCount(state, "pi");
   if (failures < MAX_PI_FAILURES) {
@@ -31,27 +30,5 @@ export function routePiHandoff(state: AgentState, sink?: AgentOutputSink): Route
     return "pi_implement";
   }
   emitOrPrint(sink, status("error", `Pi failed ${MAX_PI_FAILURES} times; halting.`));
-  return "__end__";
-}
-
-export function routeCodexHandoff(state: AgentState, sink?: AgentOutputSink): Route {
-  const verdict = state.codex_verdict || "failed";
-  if (verdict === "approved") {
-    emitOrPrint(sink, status("ok", "Codex approved; workflow complete."));
-    return "__end__";
-  }
-  if (verdict === "rejected") {
-    emitOrPrint(sink, status("warn", "Codex rejected the change; handing feedback back to Claude."));
-    return "claude_implement";
-  }
-  const failures = failureCount(state, "codex");
-  if (failures < MAX_CODEX_FAILURES) {
-    const reason = state.last_exit_code === 0
-      ? "Codex review did not produce a valid verdict"
-      : `Codex review failed with exit ${state.last_exit_code}`;
-    emitOrPrint(sink, status("warn", `${reason}; retry ${failures}/${MAX_CODEX_FAILURES}.`));
-    return "codex_review";
-  }
-  emitOrPrint(sink, status("error", `Codex review failed ${MAX_CODEX_FAILURES} times; halting.`));
   return "__end__";
 }

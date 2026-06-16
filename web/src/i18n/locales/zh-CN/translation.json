@@ -50,6 +50,7 @@
     "send": "发送",
     "cancel_run": "取消运行",
     "choose_agent": "选择 Agent",
+    "choose_mode": "选择模式",
     "address_agent": "选择 Agent"
   },
   "decision": {
@@ -61,6 +62,7 @@
   },
   "handoff": {
     "route_to": "路由至",
+    "mode": "模式",
     "note_placeholder": "可选备注…",
     "send": "发送移交",
     "cancel": "取消"
@@ -374,7 +376,7 @@
     "decision": "你 — {{kind}}",
     "agent_completed": "{{agent}} — {{status}}",
     "exit_code": "退出码 {{exitCode}}",
-    "review_verdict": "codex 裁决 — {{verdict}}",
+    "review_verdict": "{{agent}} 裁决 — {{verdict}}",
     "session_status": "状态 — {{phase}}",
     "session_completed": "会话已完成",
     "session_failed": "会话失败"

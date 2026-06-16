@@ -22,7 +22,7 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
     if (err instanceof RelayApiError && err.status === 401 && unauthorizedMessage) {
       return unauthorizedMessage;
     }
-    return err instanceof Error ? err.message : String(err);
+    return t("login.error_generic");
   }
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
@@ -74,15 +74,17 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
             <label className="login-field">
               <span>{t("login.username")}</span>
               <input
+                name="username"
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
                 autoComplete="username"
-                autoFocus
+                spellCheck={false}
               />
             </label>
             <label className="login-field">
               <span>{t("login.password")}</span>
               <input
+                name="password"
                 type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
@@ -99,24 +101,28 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
             <label className="login-field">
               <span>{t("login.bootstrap_token")}</span>
               <input
+                name="bootstrap-token"
                 type="password"
                 value={bootstrapToken}
                 onChange={(event) => setBootstrapToken(event.target.value)}
                 autoComplete="off"
-                autoFocus
+                spellCheck={false}
               />
             </label>
             <label className="login-field">
               <span>{t("login.username")}</span>
               <input
+                name="username"
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
                 autoComplete="username"
+                spellCheck={false}
               />
             </label>
             <label className="login-field">
               <span>{t("login.password")}</span>
               <input
+                name="password"
                 type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}

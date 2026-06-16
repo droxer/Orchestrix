@@ -1,10 +1,13 @@
 import {
   buildClaudeImplementCommand,
+  buildClaudeReviewCommand,
   buildCodexImplementCommand,
   buildCodexReviewCommand,
   buildKimiImplementCommand,
+  buildKimiReviewCommand,
   buildPiImplementCommand,
   buildPiPreflightCommand,
+  buildPiReviewCommand,
 } from "./commands.js";
 import { ansi } from "./format.js";
 import { runAsAgent } from "./guest.js";
@@ -13,7 +16,7 @@ import {
   CodexStreamRenderer,
   PlainTextStreamRenderer,
 } from "./renderers.js";
-import type { AgentName, AgentState, CodexTaskMode } from "./state.js";
+import type { AgentName, AgentState, AgentTaskMode } from "./state.js";
 
 /** Minimal contract every stream renderer satisfies: feed a chunk, get display text. */
 export interface StreamRenderer {
@@ -32,17 +35,16 @@ export interface AgentDefinition {
   /** Consecutive-failure budget before the workflow halts retries for this agent. */
   maxFailures: number;
   /** Mode chosen when a caller addresses the agent without specifying one. */
-  defaultMode: CodexTaskMode;
-  capabilities: { implement: boolean; review: boolean };
+  defaultMode: AgentTaskMode;
   /** Role recorded for an implement-mode assignment. */
   implementRole: AgentImplementRole;
   buildImplementCommand(state: AgentState): string;
-  buildReviewCommand?(state: AgentState): string;
-  createRenderer(mode: CodexTaskMode): StreamRenderer;
+  buildReviewCommand(state: AgentState): string;
+  createRenderer(mode: AgentTaskMode): StreamRenderer;
   /** Label shown for the implement-mode artifact/log header. */
   implementLabel: string;
-  /** Label shown for the review-mode artifact/log header (review-capable agents only). */
-  reviewLabel?: string;
+  /** Label shown for the review-mode artifact/log header. */
+  reviewLabel: string;
   /** Whether the daemon must provision guest auth files before this agent can run. */
   needsGuestAuth: boolean;
   preflight: { label: string; command(): string };
@@ -55,11 +57,12 @@ export const AGENT_REGISTRY: Record<AgentName, AgentDefinition> = {
     initial: "C",
     maxFailures: 3,
     defaultMode: "implement",
-    capabilities: { implement: true, review: false },
     implementRole: "implementer",
     buildImplementCommand: buildClaudeImplementCommand,
+    buildReviewCommand: buildClaudeReviewCommand,
     createRenderer: () => new ClaudeStreamRenderer(),
     implementLabel: "Claude Code",
+    reviewLabel: "Claude Code Review",
     needsGuestAuth: false,
     preflight: { label: "Claude Code", command: () => runAsAgent("claude --version", "claude") },
   },
@@ -69,11 +72,12 @@ export const AGENT_REGISTRY: Record<AgentName, AgentDefinition> = {
     initial: "π",
     maxFailures: 2,
     defaultMode: "implement",
-    capabilities: { implement: true, review: false },
     implementRole: "tester",
     buildImplementCommand: buildPiImplementCommand,
+    buildReviewCommand: buildPiReviewCommand,
     createRenderer: () => new PlainTextStreamRenderer("Pi", ansi.yellow),
     implementLabel: "Pi",
+    reviewLabel: "Pi Review",
     needsGuestAuth: true,
     preflight: { label: "Pi coding agent", command: buildPiPreflightCommand },
   },
@@ -82,8 +86,7 @@ export const AGENT_REGISTRY: Record<AgentName, AgentDefinition> = {
     displayName: "Codex",
     initial: "X",
     maxFailures: 2,
-    defaultMode: "review",
-    capabilities: { implement: true, review: true },
+    defaultMode: "implement",
     implementRole: "implementer",
     buildImplementCommand: buildCodexImplementCommand,
     buildReviewCommand: buildCodexReviewCommand,
@@ -99,11 +102,12 @@ export const AGENT_REGISTRY: Record<AgentName, AgentDefinition> = {
     initial: "K",
     maxFailures: 2,
     defaultMode: "implement",
-    capabilities: { implement: true, review: false },
     implementRole: "implementer",
     buildImplementCommand: buildKimiImplementCommand,
+    buildReviewCommand: buildKimiReviewCommand,
     createRenderer: () => new PlainTextStreamRenderer("Kimi", ansi.magenta),
     implementLabel: "Kimi",
+    reviewLabel: "Kimi Review",
     needsGuestAuth: false,
     preflight: { label: "Kimi", command: () => runAsAgent("kimi --version", "kimi") },
   },

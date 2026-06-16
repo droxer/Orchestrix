@@ -57,7 +57,7 @@ export function AssignNodeDrawer({
       });
       onAssignSuccess(result);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(t("admin.v2.assign_error", { message: err instanceof Error ? err.message : String(err) }));
     } finally {
       setIsBusy(false);
     }
@@ -84,11 +84,11 @@ export function AssignNodeDrawer({
           <label className="adm-field">
             <span>{t("admin.employee")}</span>
             <select
+              name="employee-id"
               className="adm-input mono"
               value={employeeId}
               onChange={(event) => setEmployeeId(event.target.value)}
               disabled={employees.length === 0 || employeeLocked}
-              autoFocus={!employeeLocked}
             >
               <option value="">
                 {employees.length === 0 ? t("admin.no_employees") : t("admin.select_employee")}
@@ -106,11 +106,11 @@ export function AssignNodeDrawer({
           <label className="adm-field">
             <span>{t("admin.assign_node")}</span>
             <select
+              name="node-id"
               className="adm-input mono"
               value={nodeId}
               onChange={(event) => setNodeId(event.target.value)}
               disabled={unassignedNodes.length === 0}
-              autoFocus={employeeLocked && unassignedNodes.length > 0}
             >
               <option value="">
                 {unassignedNodes.length === 0 ? t("admin.no_unassigned_nodes") : t("admin.select_node")}

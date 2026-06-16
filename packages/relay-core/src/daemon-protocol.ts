@@ -1,4 +1,4 @@
-import type { AgentName, CodexTaskMode } from "./state.js";
+import type { AgentName, AgentTaskMode } from "./state.js";
 
 export type SandboxStatus = "provisioning" | "ready" | "running" | "stopped" | "failed";
 
@@ -21,7 +21,7 @@ export interface SandboxRecord {
 
 export interface SandboxRunAssignment {
   agent: AgentName;
-  mode?: CodexTaskMode;
+  mode?: AgentTaskMode;
 }
 
 export interface DaemonNodeActiveRun {
@@ -29,7 +29,7 @@ export interface DaemonNodeActiveRun {
   sessionId: string;
   runId: string;
   agent: AgentName;
-  mode: CodexTaskMode;
+  mode: AgentTaskMode;
   taskGoal: string;
   workspacePath?: string;
   startedAt: string;

@@ -1,8 +1,8 @@
 import type { AgentOutputSink } from "./format.js";
 
 export type AgentName = "claude" | "pi" | "codex" | "kimi";
-export type CodexTaskMode = "implement" | "review";
-export type CodexReviewVerdict = "approved" | "rejected" | "failed";
+export type AgentTaskMode = "implement" | "review";
+export type ReviewVerdict = "approved" | "rejected" | "failed";
 export type { AgentOutputSink };
 
 export const AGENT_USER = "agent";
@@ -14,8 +14,8 @@ export interface AgentState {
   last_exit_code: number;
   /** Per-agent consecutive failure counts; absent entries mean zero. */
   agent_failures: Partial<Record<AgentName, number>>;
-  codex_verdict: CodexReviewVerdict | "";
-  codex_feedback: string;
+  review_verdict: ReviewVerdict | "";
+  review_feedback: string;
 }
 
 export interface AgentRunOptions {
@@ -41,7 +41,7 @@ export interface SessionStepRunner {
   runStep(
     sessionId: string,
     state: AgentState,
-    step: { agent: AgentName; mode: CodexTaskMode; role?: string },
+    step: { agent: AgentName; mode: AgentTaskMode; role?: string },
     options?: Pick<AgentRunOptions, "signal" | "sink" | "execStream">,
   ): Promise<AgentState>;
 }
@@ -71,8 +71,8 @@ export function initialAgentState(taskGoal: string): AgentState {
     agent_logs: [],
     last_exit_code: 0,
     agent_failures: {},
-    codex_verdict: "",
-    codex_feedback: "",
+    review_verdict: "",
+    review_feedback: "",
   };
 }
 

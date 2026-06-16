@@ -81,7 +81,7 @@ export function OnboardDrawer({
       });
       onSuccess(result);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(t("admin.v2.onboard_error", { message: err instanceof Error ? err.message : String(err) }));
     } finally {
       setIsBusy(false);
     }
@@ -102,7 +102,7 @@ export function OnboardDrawer({
       });
       onAssignSuccess(result);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(t("admin.v2.assign_error", { message: err instanceof Error ? err.message : String(err) }));
     } finally {
       setIsBusy(false);
     }
@@ -157,17 +157,19 @@ export function OnboardDrawer({
             <label className="adm-field">
               <span>{t("admin.employee_id")}</span>
               <input
+                name="employee-id"
                 className="adm-input mono"
                 value={employeeId}
                 onChange={(event) => setEmployeeId(event.target.value)}
                 autoComplete="off"
+                spellCheck={false}
                 placeholder={t("admin.v2.placeholder_employee_id")}
-                autoFocus
               />
             </label>
             <label className="adm-field">
               <span>{t("admin.display_name")}</span>
               <input
+                name="display-name"
                 className="adm-input"
                 value={displayName}
                 onChange={(event) => setDisplayName(event.target.value)}
@@ -178,6 +180,7 @@ export function OnboardDrawer({
             <label className="adm-field">
               <span>{t("admin.email")}</span>
               <input
+                name="email"
                 className="adm-input mono"
                 type="email"
                 value={email}
@@ -193,16 +196,19 @@ export function OnboardDrawer({
             <label className="adm-field">
               <span>{t("admin.username")}</span>
               <input
+                name="username"
                 className="adm-input mono"
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
                 autoComplete="username"
+                spellCheck={false}
                 placeholder={t("admin.v2.placeholder_username")}
               />
             </label>
             <label className="adm-field">
               <span>{t("admin.password")}</span>
               <input
+                name="password"
                 className="adm-input mono"
                 type="password"
                 value={password}
@@ -217,6 +223,7 @@ export function OnboardDrawer({
             <label className="adm-field">
               <span>{t("admin.assign_node")}</span>
               <select
+                name="node-id"
                 className="adm-input mono"
                 value={selectedNodeId}
                 onChange={(event) => setSelectedNodeId(event.target.value)}
@@ -255,11 +262,11 @@ export function OnboardDrawer({
             <label className="adm-field">
               <span>{t("admin.employee")}</span>
               <select
+                name="existing-employee-id"
                 className="adm-input mono"
                 value={existingEmployeeId}
                 onChange={(event) => setExistingEmployeeId(event.target.value)}
                 disabled={employees.length === 0}
-                autoFocus
               >
                 <option value="">
                   {employees.length === 0 ? t("admin.no_employees") : t("admin.select_employee")}
@@ -277,6 +284,7 @@ export function OnboardDrawer({
             <label className="adm-field">
               <span>{t("admin.assign_node")}</span>
               <select
+                name="existing-node-id"
                 className="adm-input mono"
                 value={existingNodeId}
                 onChange={(event) => setExistingNodeId(event.target.value)}

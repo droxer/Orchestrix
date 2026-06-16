@@ -1,0 +1,355 @@
+/* ============================ agent stream ============================ */
+
+.agent-stream {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.agent-text {
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  line-height: 1.6;
+}
+
+.agent-prose p {
+  margin: 0 0 var(--space-xs);
+}
+
+.agent-prose p:last-child {
+  margin-bottom: 0;
+}
+
+.agent-prose code,
+.agent-thinking code {
+  padding: var(--space-xxs) var(--space-xs);
+  border-radius: var(--radius-xs);
+  background: var(--color-surface-strong);
+  color: var(--color-ink);
+  font-family: var(--font-number);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.agent-prose strong {
+  font-weight: 600;
+}
+
+.agent-prose em {
+  font-style: italic;
+}
+
+.agent-code {
+  position: relative;
+  margin: var(--space-xs) 0 0;
+  padding: var(--space-sm) var(--space-base);
+  border: 1px solid var(--color-hairline-soft);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-strong);
+  color: var(--color-ink);
+  font-family: var(--font-number);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.agent-code code {
+  font: inherit;
+  background: transparent;
+  padding: 0;
+}
+
+/* Syntax highlight tokens — editorial calm: monochrome ink + weight for
+   keywords, muted italic for strings, warm number token for literals,
+   muted italic for comments. Keeps Relay Blue scarce; the code block is
+   carried by JetBrains Mono's character, not by saturated hue stripes. */
+.hl-keyword { color: var(--color-ink);  font-weight: 600; }
+.hl-string  { color: var(--color-body); font-style: italic; }
+.hl-number  { color: var(--color-code-number); }
+.hl-comment { color: var(--color-muted); font-style: italic; }
+.hl-plain   { /* inherits agent-code color */ }
+
+.agent-code-lang {
+  display: block;
+  margin-bottom: var(--space-xxs);
+  color: var(--color-muted);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: lowercase;
+  }
+
+.agent-thinking {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  color: var(--color-body);
+}
+
+.agent-thinking summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: 32px;
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--color-hairline-soft);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-muted);
+  cursor: pointer;
+  list-style: none;
+}
+
+.agent-thinking summary::-webkit-details-marker {
+  display: none;
+}
+
+.agent-thinking summary::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 140ms ease;
+}
+
+.agent-thinking[open] summary::before {
+  transform: rotate(45deg);
+}
+
+.agent-thinking-body {
+  margin-top: var(--space-xs);
+  padding: var(--space-xs) 0 var(--space-xs) var(--space-sm);
+  border-left: 2px solid var(--color-hairline);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-style: italic;
+  line-height: 1.55;
+  color: var(--color-body);
+}
+
+.agent-thinking-body p {
+  margin: 0 0 var(--space-xxs);
+}
+
+.agent-thinking-body p:last-child {
+  margin-bottom: 0;
+}
+
+.agent-segment-label {
+  color: var(--color-muted);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.agent-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  align-self: flex-start;
+  padding: 4px var(--space-sm);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+.agent-tool > svg {
+  color: var(--color-muted);
+}
+
+.agent-tool-name {
+  font-family: var(--font-number);
+  font-weight: 500;
+}
+
+.agent-command {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--color-hairline-soft);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+  color: var(--color-ink);
+  font-family: var(--font-number);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1.5;
+  overflow-x: auto;
+}
+
+.agent-command > svg {
+  flex-shrink: 0;
+  color: var(--color-muted);
+}
+
+.agent-command code {
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  white-space: pre;
+}
+
+.agent-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  align-self: flex-start;
+  color: var(--color-muted);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  }
+
+.agent-status > svg {
+  flex-shrink: 0;
+}
+
+.agent-status-good    { color: var(--color-semantic-up); }
+.agent-status-good    > svg { color: var(--color-semantic-up); }
+.agent-status-bad { color: var(--color-semantic-down); }
+.agent-status-bad > svg { color: var(--color-semantic-down); }
+.agent-status-warn  { color: var(--color-muted); }
+.agent-status-warn  > svg { color: var(--color-accent-yellow); }
+.agent-status-info  { color: var(--color-body); }
+.agent-status-info  > svg { color: var(--color-primary); }
+
+.agent-raw {
+  margin: 0;
+  padding: var(--space-sm) var(--space-base);
+  border: 1px solid var(--color-hairline-soft);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+  color: var(--color-body);
+  font-family: var(--font-number);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+
+.agent-stream.streaming .agent-text:last-child .agent-prose p:last-child::after,
+.agent-stream.streaming .agent-thinking:last-child .agent-thinking-body p:last-child::after {
+  content: "";
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 3px;
+  vertical-align: -2px;
+  background: var(--color-primary);
+  animation: caret 1s steps(1, end) infinite;
+}
+
+@keyframes caret { 50% { opacity: 0; } }
+
+.attachment-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+  padding: 0;
+}
+
+.attachment-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-xl);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  text-decoration: none;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.attachment-card:hover {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-soft);
+}
+
+.attachment-meta {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.attachment-kind {
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.attachment-meta strong {
+  min-width: 0;
+  color: var(--color-ink);
+  font-size: var(--text-base);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* System lifecycle line. Shares the micro-status visual language with
+   .agent-status: a small colored dot carries the tone, label and detail
+   stay neutral. No horizontal rule — the calm transcript flow is the
+   point, and tone is a hint, not a banner. */
+.msg-system {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  padding: 2px 0;
+  color: var(--color-muted);
+}
+
+.msg-system-label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+  color: var(--color-body);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.msg-system-label::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-muted-soft);
+  align-self: center;
+}
+
+.msg-system-detail {
+  max-width: 360px;
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  font-weight: 400;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.msg-system time {
+  margin-left: auto;
+  color: var(--color-muted);
+  font-family: var(--font-number);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+.msg-system.tone-good .msg-system-label::before { background: var(--color-semantic-up); }
+.msg-system.tone-bad  .msg-system-label::before { background: var(--color-semantic-down); }
+.msg-system.tone-info .msg-system-label::before { background: var(--color-primary); }

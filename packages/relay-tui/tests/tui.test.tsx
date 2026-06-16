@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { describe, it } from "node:test";
 import React from "react";
 import { render } from "ink-testing-library";
@@ -18,8 +18,8 @@ import {
   withDefaultAssignments,
   type RunRequest,
 } from "../src/tui.js";
-import { backendArgs, daemonArgs, resolveLocalRunConfig } from "../src/local-run.js";
-import { LocalSessionStore } from "../../relay-core/src/index.js";
+import { backendArgs, daemonArgs, liveDaemonExists, resolveLocalRunConfig, resolveRepoRootFromDist } from "../src/local-run.js";
+import { LocalSessionStore, type RelayDaemonClient, type RelaySession } from "../../relay-core/src/index.js";
 
 function testSessionStore(): LocalSessionStore {
   return new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-tui-")));
@@ -161,6 +161,13 @@ describe("TUI daemon runner", () => {
     assert.deepEqual(daemonArgs("sbx_alice", "boxlite"), ["--sandbox-id", "sbx_alice", "--sandbox", "boxlite"]);
   });
 
+  it("resolves the repository root from the relay-tui dist directory", async () => {
+    assert.equal(
+      resolveRepoRootFromDist("/Users/feihe/Workspace/Relay/packages/relay-tui/dist"),
+      resolve("/Users/feihe/Workspace/Relay"),
+    );
+  });
+
   it("ignores blank workspace values when resolving local run config", async () => {
     const workspace = mkdtempSync(join(tmpdir(), "relay-local-run-workspace-"));
     const config = resolveLocalRunConfig({
@@ -173,6 +180,58 @@ describe("TUI daemon runner", () => {
     assert.equal(config.workspacePath, workspace);
     assert.equal(config.sandboxId, "sbx_relay_user");
     assert.equal(config.childEnv.RELAY_WORKSPACE, workspace);
+  });
+
+  it("surfaces daemon API detail errors", async () => {
+    const { RelayDaemonClient } = await import("../../relay-core/src/index.js");
+    const client = new RelayDaemonClient({
+      baseUrl: "http://daemon.local",
+      fetchFn: async () => new Response(JSON.stringify({ detail: "Invalid daemon node token." }), {
+        status: 401,
+        statusText: "Unauthorized",
+        headers: { "Content-Type": "application/json" },
+      }),
+    });
+
+    await assert.rejects(
+      () => client.provisionSandbox({ employeeId: "alice" }),
+      /Invalid daemon node token\./,
+    );
+  });
+
+  it("matches live local-run daemons by employee and workspace", async () => {
+    const oldFetch = globalThis.fetch;
+    globalThis.fetch = (async (): Promise<Response> => new Response(JSON.stringify({
+      nodes: [
+        {
+          employeeId: "alice",
+          workspacePath: "/workspace/other",
+          online: true,
+          stale: false,
+        },
+      ],
+    }), { status: 200, headers: { "Content-Type": "application/json" } })) as typeof fetch;
+    try {
+      assert.equal(await liveDaemonExists("http://daemon.local", "alice", "/workspace/current"), false);
+    } finally {
+      globalThis.fetch = oldFetch;
+    }
+
+    globalThis.fetch = (async (): Promise<Response> => new Response(JSON.stringify({
+      nodes: [
+        {
+          employeeId: "alice",
+          workspacePath: "/workspace/current",
+          online: true,
+          stale: false,
+        },
+      ],
+    }), { status: 200, headers: { "Content-Type": "application/json" } })) as typeof fetch;
+    try {
+      assert.equal(await liveDaemonExists("http://daemon.local", "alice", "/workspace/current"), true);
+    } finally {
+      globalThis.fetch = oldFetch;
+    }
   });
 
   it("submits assignments to the host daemon sandbox", async () => {
@@ -232,7 +291,7 @@ describe("TUI daemon runner", () => {
     let log = "";
 
     await runner({
-      assignments: [{ agent: "codex", codexMode: "review" }],
+      assignments: [{ agent: "codex", mode: "review" }],
       task: "review auth",
       sessionId: "ses_existing",
       log: (text) => {
@@ -243,10 +302,10 @@ describe("TUI daemon runner", () => {
       },
     });
 
-    assert.equal(calls.length, 1);
-    assert.equal(calls[0].url, "http://daemon.local/sandboxes/sbx_alice/runs");
-    assert.equal(calls[0].init.method, "POST");
-    assert.deepEqual(JSON.parse(String(calls[0].init.body)), {
+    const runCall = calls.find((call) => call.url === "http://daemon.local/sandboxes/sbx_alice/runs");
+    assert.ok(runCall);
+    assert.equal(runCall.init.method, "POST");
+    assert.deepEqual(JSON.parse(String(runCall.init.body)), {
       taskGoal: "review auth",
       assignments: [{ agent: "codex", mode: "review" }],
       sessionId: "ses_existing",
@@ -322,7 +381,7 @@ describe("TUI daemon runner", () => {
     let log = "";
 
     await runner({
-      assignments: [{ agent: "codex", codexMode: "review" }],
+      assignments: [{ agent: "codex", mode: "review" }],
       task: "review auth",
       log: (text) => {
         log += text;
@@ -408,6 +467,167 @@ describe("TUI daemon runner", () => {
       call.body !== null &&
       (call.body as { reason?: string }).reason === "Cancelled by human."
     ));
+  });
+
+  it("returns the cancelled daemon session when the run wait rejects after abort", async () => {
+    let cancelSeen = false;
+    let releaseRun: (() => void) | undefined;
+    const session: RelaySession = {
+      id: "ses_abort_reject",
+      workspacePath: "/workspace/alice",
+      taskGoal: "cancel auth",
+      status: "running",
+      phase: "running",
+      participants: ["human", "claude"],
+      currentAgent: "claude",
+      pendingDecision: undefined,
+      createdAt: "2026-06-07T00:00:00.000Z",
+      updatedAt: "2026-06-07T00:00:00.000Z",
+      events: [],
+      decisions: [],
+      agentRuns: [{
+        id: "run_abort_reject",
+        agent: "claude",
+        role: "implementer",
+        mode: "implement",
+        status: "running",
+        startedAt: "2026-06-07T00:00:00.000Z",
+        artifactIds: [],
+      }],
+      artifacts: [],
+    };
+    const cancelledSession: RelaySession = {
+      ...session,
+      status: "cancelled",
+      phase: "cancelled",
+      currentAgent: undefined,
+      decisions: [{ id: "dec_cancel", kind: "cancel", createdAt: "2026-06-07T00:00:01.000Z", note: "Cancelled by human." }],
+      agentRuns: [{ ...session.agentRuns[0], status: "cancelled" }],
+    };
+    const client = {
+      createSession: async () => session,
+      getSession: async () => cancelSeen ? cancelledSession : session,
+      cancelSandboxRun: async () => {
+        cancelSeen = true;
+        releaseRun?.();
+        return cancelledSession;
+      },
+      runSandbox: async () => {
+        await new Promise<void>((resolve) => {
+          releaseRun = resolve;
+        });
+        throw new Error("Relay daemon request cancelled.");
+      },
+    } as unknown as RelayDaemonClient;
+    const runner = createDaemonAssignmentRunner(client, "sbx_alice");
+    const controller = new AbortController();
+    let updatedStatus = "";
+    let log = "";
+
+    const running = runner({
+      assignments: [{ agent: "claude" }],
+      task: "cancel auth",
+      log: (text) => {
+        log += text;
+      },
+      signal: controller.signal,
+      onSessionUpdate: (updated) => {
+        updatedStatus = updated.status;
+      },
+    });
+    await waitForInput();
+    controller.abort();
+    await running;
+
+    assert.equal(cancelSeen, true);
+    assert.equal(updatedStatus, "cancelled");
+    assert.doesNotMatch(log, /ERR\s+Relay daemon request cancelled/);
+  });
+
+  it("waits for the daemon cancel response before completing an aborted run", async () => {
+    let cancelSeen = false;
+    let releaseRun: (() => void) | undefined;
+    let releaseCancel: (() => void) | undefined;
+    let completed = false;
+    const session: RelaySession = {
+      id: "ses_abort_race",
+      workspacePath: "/workspace/alice",
+      taskGoal: "cancel auth",
+      status: "running",
+      phase: "running",
+      participants: ["human", "claude"],
+      currentAgent: "claude",
+      pendingDecision: undefined,
+      createdAt: "2026-06-07T00:00:00.000Z",
+      updatedAt: "2026-06-07T00:00:00.000Z",
+      events: [],
+      decisions: [],
+      agentRuns: [{
+        id: "run_abort_race",
+        agent: "claude",
+        role: "implementer",
+        mode: "implement",
+        status: "running",
+        startedAt: "2026-06-07T00:00:00.000Z",
+        artifactIds: [],
+      }],
+      artifacts: [],
+    };
+    const cancelledSession: RelaySession = {
+      ...session,
+      status: "cancelled",
+      phase: "cancelled",
+      currentAgent: undefined,
+      decisions: [{ id: "dec_cancel", kind: "cancel", createdAt: "2026-06-07T00:00:01.000Z", note: "Cancelled by human." }],
+      agentRuns: [{ ...session.agentRuns[0], status: "cancelled" }],
+    };
+    const client = {
+      createSession: async () => session,
+      getSession: async () => cancelSeen ? cancelledSession : session,
+      cancelSandboxRun: async () => {
+        await new Promise<void>((resolve) => {
+          releaseCancel = resolve;
+        });
+        cancelSeen = true;
+        return cancelledSession;
+      },
+      runSandbox: async () => {
+        await new Promise<void>((resolve) => {
+          releaseRun = resolve;
+        });
+        throw new Error("Relay daemon request cancelled.");
+      },
+    } as unknown as RelayDaemonClient;
+    const runner = createDaemonAssignmentRunner(client, "sbx_alice");
+    const controller = new AbortController();
+    let updatedStatus = "";
+
+    const running = runner({
+      assignments: [{ agent: "claude" }],
+      task: "cancel auth",
+      log: () => undefined,
+      signal: controller.signal,
+      onSessionUpdate: (updated) => {
+        updatedStatus = updated.status;
+      },
+    }).finally(() => {
+      completed = true;
+    });
+
+    await waitForInput();
+    controller.abort();
+    await waitForInput();
+    releaseRun?.();
+    await waitForInput();
+
+    assert.equal(completed, false);
+    assert.notEqual(updatedStatus, "cancelled");
+
+    releaseCancel?.();
+    await running;
+
+    assert.equal(completed, true);
+    assert.equal(updatedStatus, "cancelled");
   });
 
   it("replays daemon Pi output as readable transcript text", async () => {
@@ -496,7 +716,7 @@ describe("RelayTui component", () => {
 
     const frame = lastFrame() ?? "";
     assert.match(frame, /Relay/);
-    assert.match(frame, /agent orchestration/);
+    assert.match(frame, /Agent Orchestration/);
     assert.match(frame, /cwd/);
     assert.match(frame, />/);
   });
@@ -986,10 +1206,36 @@ describe("RelayTui component", () => {
     assert.match(lastFrame() ?? "", /· @codex/);
     assert.doesNotMatch(lastFrame() ?? "", /waiting for \/approve|Approve session/);
     assert.equal(requests.length, 2);
-    assert.deepEqual(requests[1].assignments, [{ agent: "codex", codexMode: "review" }]);
+    assert.deepEqual(requests[1].assignments, [{ agent: "codex", mode: "implement" }]);
     assert.match(requests[1].task, /fix auth/);
     assert.match(requests[1].task, /verify the fix/);
     assert.equal(requests[1].sessionId, requests[0].sessionId);
+  });
+
+  it("runs an explicit review handoff for any agent", async () => {
+    const requests: RunRequest[] = [];
+    const { lastFrame, stdin } = render(
+      <RelayTui
+        sessionStore={testSessionStore()}
+        runner={async (request) => {
+          requests.push(request);
+        }}
+      />,
+    );
+
+    stdin.write("@claude fix auth");
+    await waitForInput();
+    stdin.write("\r");
+    await waitForInput();
+    stdin.write("/handoff pi --review verify the fix");
+    await waitForInput();
+    stdin.write("\r");
+    await waitForInput();
+
+    assert.match(lastFrame() ?? "", /· @pi:review/);
+    assert.equal(requests.length, 2);
+    assert.deepEqual(requests[1].assignments, [{ agent: "pi", mode: "review" }]);
+    assert.match(requests[1].task, /verify the fix/);
   });
 
   it("runs an active-session handoff in daemon mode", async () => {
@@ -1032,9 +1278,154 @@ describe("RelayTui component", () => {
     assert.equal(requests.length, 2);
     assert.equal(requests[0].sessionId, undefined);
     assert.equal(requests[1].sessionId, "ses_daemon");
-    assert.deepEqual(requests[1].assignments, [{ agent: "codex", codexMode: "review" }]);
+    assert.deepEqual(requests[1].assignments, [{ agent: "codex", mode: "implement" }]);
     assert.match(requests[1].task, /verify the fix/);
     assert.match(lastFrame() ?? "", /· @codex/);
+  });
+
+  it("waits for remote handoff recording before starting the handoff run", async () => {
+    const events: string[] = [];
+    let releaseHandoff: (() => void) | undefined;
+    const { stdin } = render(
+      <RelayTui
+        localSessionControl={false}
+        sessionStore={testSessionStore()}
+        workspacePath="/workspace/alice"
+        remoteSessionControl={{
+          recordDecision: async () => {
+            throw new Error("unexpected decision");
+          },
+          recordHandoff: async () => {
+            events.push("handoff:start");
+            await new Promise<void>((resolve) => {
+              releaseHandoff = resolve;
+            });
+            events.push("handoff:end");
+            return {
+              id: "ses_daemon",
+              workspacePath: "/workspace/alice",
+              taskGoal: "fix auth",
+              participants: ["human", "codex"],
+              status: "pending_approval",
+              phase: "handoff:codex",
+              pendingDecision: "start",
+              createdAt: "2026-06-07T00:00:00.000Z",
+              updatedAt: "2026-06-07T00:00:01.000Z",
+              agentRuns: [],
+              artifacts: [],
+              decisions: [],
+              events: [],
+            };
+          },
+        }}
+        runner={async (request) => {
+          events.push(request.task.includes("Handoff note:") ? "run:handoff" : "run:initial");
+          request.onSessionUpdate?.({
+            id: request.sessionId ?? "ses_daemon",
+            workspacePath: request.workspacePath ?? "/workspace/alice",
+            taskGoal: request.task,
+            participants: ["human", ...request.assignments.map((assignment) => assignment.agent)],
+            status: "completed",
+            phase: "completed",
+            createdAt: "2026-06-07T00:00:00.000Z",
+            updatedAt: "2026-06-07T00:00:00.000Z",
+            agentRuns: [],
+            artifacts: [],
+            decisions: [],
+            events: [],
+            finalOutcome: "Assignments completed.",
+          });
+        }}
+      />,
+    );
+
+    stdin.write("@claude fix auth");
+    await waitForInput();
+    stdin.write("\r");
+    await waitForInput();
+    stdin.write("/handoff codex verify the fix");
+    await waitForInput();
+    stdin.write("\r");
+    await waitForInput();
+
+    assert.deepEqual(events, ["run:initial", "handoff:start"]);
+    releaseHandoff?.();
+    await waitForInput();
+
+    assert.deepEqual(events, ["run:initial", "handoff:start", "handoff:end", "run:handoff"]);
+  });
+
+  it("waits for remote rerun recording before starting the rerun", async () => {
+    const events: string[] = [];
+    let releaseRerun: (() => void) | undefined;
+    const { stdin } = render(
+      <RelayTui
+        localSessionControl={false}
+        sessionStore={testSessionStore()}
+        workspacePath="/workspace/alice"
+        remoteSessionControl={{
+          recordDecision: async (input) => {
+            assert.equal(input.kind, "rerun");
+            events.push("rerun:start");
+            await new Promise<void>((resolve) => {
+              releaseRerun = resolve;
+            });
+            events.push("rerun:end");
+            return {
+              id: "ses_daemon",
+              workspacePath: "/workspace/alice",
+              taskGoal: "fix auth",
+              participants: ["human", "claude"],
+              status: "pending_approval",
+              phase: "rerun:codex",
+              pendingDecision: "start",
+              createdAt: "2026-06-07T00:00:00.000Z",
+              updatedAt: "2026-06-07T00:00:01.000Z",
+              agentRuns: [],
+              artifacts: [],
+              decisions: [],
+              events: [],
+            };
+          },
+          recordHandoff: async () => {
+            throw new Error("unexpected handoff");
+          },
+        }}
+        runner={async (request) => {
+          events.push(request.sessionId ? "run:rerun" : "run:initial");
+          request.onSessionUpdate?.({
+            id: request.sessionId ?? "ses_daemon",
+            workspacePath: request.workspacePath ?? "/workspace/alice",
+            taskGoal: request.task,
+            participants: ["human", ...request.assignments.map((assignment) => assignment.agent)],
+            status: "completed",
+            phase: "completed",
+            createdAt: "2026-06-07T00:00:00.000Z",
+            updatedAt: "2026-06-07T00:00:00.000Z",
+            agentRuns: [],
+            artifacts: [],
+            decisions: [],
+            events: [],
+            finalOutcome: "Assignments completed.",
+          });
+        }}
+      />,
+    );
+
+    stdin.write("@claude fix auth");
+    await waitForInput();
+    stdin.write("\r");
+    await waitForInput();
+    stdin.write("/rerun codex");
+    await waitForInput();
+    stdin.write("\r");
+    await waitForInput();
+
+    assert.deepEqual(events, ["run:initial", "rerun:start"]);
+    releaseRerun?.();
+    await waitForInput();
+
+    assert.deepEqual(events, ["run:initial", "rerun:start", "rerun:end", "run:rerun"]);
   });
 
   it("runs a no-note handoff immediately and updates the default assignment", async () => {
@@ -1059,7 +1450,7 @@ describe("RelayTui component", () => {
 
     assert.match(lastFrame() ?? "", /· @codex/);
     assert.equal(requests.length, 2);
-    assert.deepEqual(requests[1].assignments, [{ agent: "codex", codexMode: "review" }]);
+    assert.deepEqual(requests[1].assignments, [{ agent: "codex", mode: "implement" }]);
     assert.equal(requests[1].task, "fix auth");
 
     stdin.write("fix billing");
@@ -1068,7 +1459,7 @@ describe("RelayTui component", () => {
     await waitForInput();
 
     assert.equal(requests.length, 3);
-    assert.deepEqual(requests[2].assignments, [{ agent: "codex" }]);
+    assert.deepEqual(requests[2].assignments, [{ agent: "codex", mode: "implement" }]);
     assert.equal(requests[2].task, "fix billing");
   });
 
@@ -1115,14 +1506,18 @@ describe("RelayTui component", () => {
     const oldWorkspace = process.env.RELAY_WORKSPACE;
     const oldEmployeeId = process.env.RELAY_EMPLOYEE_ID;
     const oldToken = process.env.RELAY_DAEMON_NODE_TOKEN;
+    const oldUiToken = process.env.RELAY_DAEMON_UI_TOKEN;
     const workspace = mkdtempSync(join(tmpdir(), "relay-tui-host-workspace-"));
     const bodies: unknown[] = [];
+    const authorizationHeaders: string[] = [];
     let sandboxPolls = 0;
     process.env.RELAY_WORKSPACE = workspace;
     process.env.RELAY_EMPLOYEE_ID = "host";
     process.env.RELAY_DAEMON_NODE_TOKEN = "tok_has_under_score";
+    delete process.env.RELAY_DAEMON_UI_TOKEN;
     globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
       if (init?.body) bodies.push(JSON.parse(String(init.body)));
+      authorizationHeaders.push(String(new Headers(init?.headers).get("authorization") ?? ""));
       if (String(url) === "http://127.0.0.1:8790/sandboxes" && init?.method === "POST") {
         return new Response(JSON.stringify({
           id: "sbx_host",
@@ -1156,15 +1551,16 @@ describe("RelayTui component", () => {
       assert.match(bootFrame, /EMPLOYEE_ID=host/);
       assert.match(bootFrame, /SANDBOX_ID=sbx_host/);
       assert.match(bootFrame, /DAEMON_TOKEN=tok_has_under_score/);
-      assert.doesNotMatch(bootFrame, /WORKSPACE=/);
+      assert.match(bootFrame, /WORKSPACE=/);
       await new Promise((resolve) => setTimeout(resolve, 450));
 
       assert.match(lastFrame() ?? "", /Host daemon ready/);
       assert.ok(bodies.every((body) =>
         typeof body === "object" &&
         body !== null &&
-        !("workspacePath" in body)
+        (body as { workspacePath?: string }).workspacePath === workspace
       ));
+      assert.ok(authorizationHeaders.includes("Bearer tok_has_under_score"));
       unmount();
     } finally {
       globalThis.fetch = oldFetch;
@@ -1183,6 +1579,11 @@ describe("RelayTui component", () => {
       } else {
         process.env.RELAY_DAEMON_NODE_TOKEN = oldToken;
       }
+      if (oldUiToken === undefined) {
+        delete process.env.RELAY_DAEMON_UI_TOKEN;
+      } else {
+        process.env.RELAY_DAEMON_UI_TOKEN = oldUiToken;
+      }
     }
   });
 
@@ -1191,19 +1592,23 @@ describe("RelayTui component", () => {
     const oldWorkspace = process.env.RELAY_WORKSPACE;
     const oldEmployeeId = process.env.RELAY_EMPLOYEE_ID;
     const oldToken = process.env.RELAY_DAEMON_NODE_TOKEN;
+    const oldUiToken = process.env.RELAY_DAEMON_UI_TOKEN;
     const workspace = mkdtempSync(join(tmpdir(), "relay-tui-live-node-"));
     const bodies: unknown[] = [];
+    const authorizationHeaders: string[] = [];
     process.env.RELAY_WORKSPACE = workspace;
     process.env.RELAY_EMPLOYEE_ID = "alice";
     process.env.RELAY_DAEMON_NODE_TOKEN = "tok_stale";
+    delete process.env.RELAY_DAEMON_UI_TOKEN;
     globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
       if (init?.body) bodies.push(JSON.parse(String(init.body)));
+      authorizationHeaders.push(String(new Headers(init?.headers).get("authorization") ?? ""));
       if (String(url) === "http://127.0.0.1:8790/cp/daemon-nodes") {
         return new Response(JSON.stringify({
           nodes: [{
             id: "sbx_alice_live",
             employeeId: "alice",
-            workspacePath: "/workspace/live",
+            workspacePath: workspace,
             status: "ready",
             agents: { claude: "ready", pi: "ready", codex: "ready" },
             createdAt: "2026-06-07T00:00:00.000Z",
@@ -1221,7 +1626,7 @@ describe("RelayTui component", () => {
         return new Response(JSON.stringify({
           id: "sbx_alice_live",
           employeeId: "alice",
-          workspacePath: "/workspace/live",
+          workspacePath: workspace,
           status: "ready",
           agents: { claude: "ready", pi: "ready", codex: "ready" },
           createdAt: "2026-06-07T00:00:00.000Z",
@@ -1235,14 +1640,15 @@ describe("RelayTui component", () => {
       await new Promise((resolve) => setTimeout(resolve, 250));
 
       assert.match(lastFrame() ?? "", /Host daemon ready/);
-      assert.match(lastFrame() ?? "", /\/workspace\/live/);
+      assert.match(lastFrame() ?? "", new RegExp(workspace.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
       assert.ok(bodies.some((body) =>
         typeof body === "object" &&
         body !== null &&
         (body as { employeeId?: string; nodeToken?: string; workspacePath?: string }).employeeId === "alice" &&
         (body as { nodeToken?: string }).nodeToken === "tok_live" &&
-        !("workspacePath" in body)
+        (body as { workspacePath?: string }).workspacePath === workspace
       ));
+      assert.ok(authorizationHeaders.includes("Bearer tok_live"));
       unmount();
     } finally {
       globalThis.fetch = oldFetch;
@@ -1260,6 +1666,11 @@ describe("RelayTui component", () => {
         delete process.env.RELAY_DAEMON_NODE_TOKEN;
       } else {
         process.env.RELAY_DAEMON_NODE_TOKEN = oldToken;
+      }
+      if (oldUiToken === undefined) {
+        delete process.env.RELAY_DAEMON_UI_TOKEN;
+      } else {
+        process.env.RELAY_DAEMON_UI_TOKEN = oldUiToken;
       }
     }
   });

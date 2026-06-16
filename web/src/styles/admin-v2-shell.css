@@ -1,0 +1,289 @@
+/* =====================================================================
+   Admin Console v2  (adm-* namespace)
+   Editorial command-center: white canvas, hairlines, JetBrains Mono
+   numbers, Relay Blue scarce. Two views (People / Fleet) share a
+   shell with left nav rail, top header, pulse strip, and right
+   attention rail. Drawers carry onboarding and credentials reveal.
+   ===================================================================== */
+
+.admin-console.adm-shell {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  background: var(--color-canvas);
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.admin-console.adm-bare {
+  background: var(--color-surface-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-xxl) var(--space-lg);
+  min-height: 100%;
+}
+
+.adm-loading {
+  color: var(--color-muted);
+  font-family: var(--font-number);
+  font-size: var(--text-sm);
+  letter-spacing: 0.04em;
+}
+
+/* ── Nav rail ─────────────────────────────────────────────────────── */
+.adm-nav {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  border-right: 1px solid var(--color-hairline);
+  background: var(--color-canvas);
+  padding: var(--space-lg) 0;
+  gap: var(--space-base);
+}
+
+.adm-nav-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--space-base);
+}
+
+.adm-nav-brand-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+}
+
+.adm-nav-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: var(--space-base);
+}
+
+.adm-nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  height: 48px;
+  border: none;
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+  transition: color 160ms ease;
+}
+
+.adm-nav-item:hover { color: var(--color-ink); }
+
+.adm-nav-item.active {
+  color: var(--color-ink);
+}
+
+.adm-nav-item.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 2px;
+  background: var(--color-primary);
+}
+
+.adm-nav-item-label {
+  /* Label visible on hover via tooltip-style — keep visually hidden,
+     but accessible to screen readers. */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.adm-nav-foot {
+  margin-top: auto;
+  padding: 0 var(--space-xs);
+  text-align: center;
+}
+
+.adm-nav-user {
+  display: inline-block;
+  padding: var(--space-xxs) var(--space-xs);
+  font-size: var(--text-2xs);
+  color: var(--color-muted);
+  border-top: 1px solid var(--color-hairline);
+  width: 100%;
+  padding-top: var(--space-sm);
+}
+
+/* ── Main column ──────────────────────────────────────────────────── */
+.adm-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ── Header ───────────────────────────────────────────────────────── */
+.adm-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-lg);
+  padding: var(--space-xl) var(--space-xxl) var(--space-lg);
+  border-bottom: 1px solid var(--color-hairline);
+  flex-shrink: 0;
+}
+
+.adm-header-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  min-width: 0;
+}
+
+.adm-header-title {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--text-4xl);
+  font-weight: 400;
+  line-height: 1.0;
+  letter-spacing: var(--letter-display-strong);
+  color: var(--color-ink);
+}
+
+.adm-header-sub {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.adm-header-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-base);
+  flex-shrink: 0;
+}
+
+.adm-header-time {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+}
+
+.adm-header-error {
+  font-size: var(--text-sm);
+  color: var(--color-semantic-down);
+}
+
+.adm-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-muted-soft);
+  transition: background 200ms ease;
+}
+
+.adm-live-dot.fetching { background: var(--color-primary); }
+.adm-live-dot.offline { background: var(--color-semantic-down); }
+
+/* ── Buttons ──────────────────────────────────────────────────────── */
+.adm-button-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xxs);
+  height: 44px;
+  padding: 0 var(--space-md);
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 160ms ease, transform 160ms ease;
+}
+
+.adm-button-primary:hover { background: var(--color-primary-active); }
+.adm-button-primary:active { transform: translateY(1px); }
+.adm-button-primary:disabled {
+  background: var(--color-primary-disabled);
+  cursor: not-allowed;
+}
+
+.adm-button-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xxs);
+  height: 44px;
+  padding: 0 var(--space-md);
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-muted);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 160ms ease;
+}
+
+.adm-button-ghost:hover { color: var(--color-ink); }
+.adm-button-ghost:disabled { color: var(--color-muted-soft); cursor: not-allowed; }
+
+.adm-button-full { width: 100%; }
+
+/* ── Pulse strip ──────────────────────────────────────────────────── */
+.adm-pulse {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  padding: var(--space-lg) var(--space-xxl);
+  border-bottom: 1px solid var(--color-hairline);
+  flex-shrink: 0;
+  gap: 0;
+}
+
+.adm-pulse-cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  padding: 0 var(--space-base);
+  border-right: 1px solid var(--color-hairline);
+}
+
+.adm-pulse-cell:first-child { padding-left: 0; }
+.adm-pulse-cell:last-child { border-right: none; padding-right: 0; }
+
+.adm-pulse-value {
+  font-family: var(--font-number);
+  font-size: var(--text-3xl);
+  font-weight: 500;
+  line-height: 1.0;
+  letter-spacing: var(--letter-display);
+  color: var(--color-ink);
+  font-feature-settings: "tnum" 1;
+}
+
+.adm-pulse-value.tone-good { color: var(--color-semantic-up); }
+.adm-pulse-value.tone-info { color: var(--color-primary); }
+.adm-pulse-value.tone-bad { color: var(--color-semantic-down); }
+.adm-pulse-value.tone-neutral { color: var(--color-ink); }
+
+.adm-pulse-label {
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}

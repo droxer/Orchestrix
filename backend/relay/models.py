@@ -6,8 +6,8 @@ from pydantic import BaseModel, ConfigDict
 
 
 AgentName = Literal["claude", "pi", "codex", "kimi"]
-CodexTaskMode = Literal["implement", "review"]
-CodexReviewVerdict = Literal["approved", "rejected", "failed"]
+AgentTaskMode = Literal["implement", "review"]
+ReviewVerdict = Literal["approved", "rejected", "failed"]
 AgentRole = Literal["implementer", "reviewer", "planner", "tester", "fixer"]
 SessionStatus = Literal["pending_approval", "running", "waiting_for_human", "completed", "failed", "cancelled"]
 TaskPriority = Literal["low", "normal", "high"]
@@ -41,7 +41,7 @@ class RelayModel(BaseModel):
 
 class Assignment(RelayModel):
     agent: AgentName
-    mode: CodexTaskMode = "implement"
+    mode: AgentTaskMode = "implement"
     role: AgentRole | None = None
 
 
@@ -68,7 +68,7 @@ class DaemonNodeRunCommand(RelayModel):
     run_id: str
     task_goal: str
     agent: AgentName
-    mode: CodexTaskMode
+    mode: AgentTaskMode
     workspace_path: str | None = None
     state: dict[str, Any] | None = None
 
@@ -80,7 +80,7 @@ class DaemonNodeCancelCommand(RelayModel):
     session_id: str
     run_id: str
     agent: AgentName
-    mode: CodexTaskMode
+    mode: AgentTaskMode
     reason: str
 
 

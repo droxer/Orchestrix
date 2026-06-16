@@ -1,0 +1,346 @@
+/* ============================ chat panel ============================ */
+
+.chat-panel {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: var(--header-h) minmax(0, 1fr) auto;
+  background: var(--color-canvas);
+}
+
+.chat-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 0 var(--space-base);
+  border-bottom: 1px solid var(--color-hairline);
+  background: var(--color-canvas);
+}
+
+.chat-title {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.mobile-back-button {
+  display: none;
+}
+
+.chat-title .employee-avatar {
+  width: 32px;
+  height: 32px;
+  font-size: var(--text-sm);
+}
+
+.chat-title p {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: 0 0 2px;
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.chat-title p > span:first-child {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.chat-title h2 {
+  min-width: 0;
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  line-height: 1.33;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-title .session-id {
+  color: var(--color-muted);
+  font-family: var(--font-number);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+.header-separator {
+  width: 4px;
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--color-muted-soft);
+}
+
+.chat-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.header-agent-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: var(--space-xxs);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-strong);
+}
+
+.header-agent-tabs button {
+  min-height: 30px;
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius-pill);
+  color: var(--color-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  background: transparent;
+  white-space: nowrap;
+}
+
+.header-agent-tabs button:hover {
+  color: var(--color-ink);
+}
+
+.header-agent-tabs button.active {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-soft);
+}
+
+/* Transient status toast, floated over the transcript below the header.
+   Tone is signaled by a leading dot — text stays the same neutral body
+   color so the toast doesn't shout when a run merely starts. */
+.toast {
+  position: absolute;
+  top: calc(var(--header-h) + var(--space-sm));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 25;
+  max-width: min(420px, calc(100% - var(--space-xl)));
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 0 var(--space-base);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-lift);
+  color: var(--color-body);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.toast::before {
+  content: "";
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-muted-soft);
+}
+
+.toast[data-visible="false"] {
+  opacity: 0;
+  transform: translate(-50%, -6px);
+}
+
+.toast.good::before { background: var(--color-semantic-up); }
+.toast.warn::before { background: var(--color-accent-yellow); }
+.toast.bad::before  { background: var(--color-semantic-down); }
+.toast.info::before { background: var(--color-primary); }
+
+.transcript {
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--color-canvas);
+}
+
+.transcript-inner {
+  width: min(100%, 960px);
+  min-height: 100%;
+  margin: 0 auto;
+  padding: var(--space-xl) var(--space-lg) var(--space-xxl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.transcript-empty {
+  margin: var(--space-xxl) auto 0;
+  width: min(100%, 640px);
+  display: grid;
+  gap: var(--space-base);
+  align-items: start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink);
+  text-align: left;
+}
+
+.transcript-empty > svg {
+  color: var(--color-muted-soft);
+}
+
+.transcript-empty .eyebrow {
+  color: var(--color-muted);
+}
+
+.transcript-empty h2 {
+  margin: 0;
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: 400;
+  line-height: 1.11;
+  letter-spacing: var(--letter-display);
+  text-wrap: balance;
+}
+
+.transcript-empty p {
+  margin: 0;
+  max-width: 58ch;
+  color: var(--color-body);
+  font-size: var(--text-md);
+  line-height: 1.5;
+}
+
+.empty-brand-mark {
+  width: 64px;
+  height: auto;
+  opacity: 0.75;
+}
+
+.msg {
+  display: grid;
+  gap: var(--space-xs);
+  animation: message-in 220ms ease-out both;
+}
+
+@keyframes message-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+.msg-agent {
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: start;
+  column-gap: var(--space-sm);
+}
+
+.msg-agent > .agent-avatar {
+  grid-row: 1 / span 2;
+  margin-top: 2px;
+}
+
+/* Slack-style grouping: a continuation from the same agent drops its
+   avatar and header but keeps the gutter so text stays aligned. */
+.msg-agent.grouped > .agent-avatar {
+  visibility: hidden;
+}
+
+.msg-agent.grouped .bubble > header {
+  display: none;
+}
+
+.msg-agent + .msg-agent.grouped {
+  margin-top: calc(var(--space-sm) - var(--space-md));
+}
+
+.bubble {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.msg header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  padding: 0;
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.msg header > span:first-child {
+  color: var(--color-ink);
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.msg time {
+  margin-left: auto;
+  color: var(--color-muted);
+  font-family: var(--font-number);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+.msg-user {
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: start;
+  column-gap: var(--space-sm);
+}
+
+.user-avatar {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin-top: 2px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  flex-shrink: 0;
+  align-self: start;
+}
+
+.msg-user p {
+  margin: 0;
+  max-width: min(72ch, 100%);
+  padding: var(--space-sm) var(--space-base);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-canvas));
+  border: 1px solid color-mix(in srgb, var(--color-primary) 18%, transparent);
+  color: var(--color-ink);
+  font-size: var(--text-md);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.msg-quiet {
+  margin: 0;
+  max-width: 100%;
+  color: var(--color-muted);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+.msg-agent.streaming .msg-quiet::after {
+  content: "";
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 4px;
+  vertical-align: -2px;
+  background: var(--color-primary);
+  animation: caret 1s steps(1, end) infinite;
+}

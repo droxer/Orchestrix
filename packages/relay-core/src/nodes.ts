@@ -1,5 +1,5 @@
 import { getAgent } from "./agents.js";
-import { classifyCodexReview, extractCodexFeedback } from "./codex-review.js";
+import { classifyReview, extractReviewFeedback } from "./review.js";
 import { StderrLineRenderer } from "./renderers.js";
 import {
   agentWorkspacePath,
@@ -9,7 +9,7 @@ import {
   type AgentName,
   type AgentRunOptions,
   type AgentState,
-  type CodexTaskMode,
+  type AgentTaskMode,
 } from "./state.js";
 
 /**
@@ -19,7 +19,7 @@ import {
  */
 export async function runAgentNode(
   agent: AgentName,
-  mode: CodexTaskMode,
+  mode: AgentTaskMode,
   state: AgentState,
   options: AgentRunOptions = {},
 ): Promise<Partial<AgentState>> {
@@ -28,10 +28,8 @@ export async function runAgentNode(
   const renderer = def.createRenderer(mode);
   const stderrRenderer = new StderrLineRenderer();
   const runId = options.runId;
-  const reviewMode = mode === "review" && def.capabilities.review;
-  const command = reviewMode && def.buildReviewCommand
-    ? def.buildReviewCommand(state)
-    : def.buildImplementCommand(state);
+  const reviewMode = mode === "review";
+  const command = reviewMode ? def.buildReviewCommand(state) : def.buildImplementCommand(state);
   const result = await execute("bash", ["-c", command], {
     cwd: agentWorkspacePath(),
     stdoutRenderer: (chunk) => {
@@ -47,14 +45,14 @@ export async function runAgentNode(
   });
 
   if (reviewMode) {
-    const feedback = extractCodexFeedback(result.stdout);
-    const verdict = classifyCodexReview(result.exit_code, feedback);
+    const feedback = extractReviewFeedback(result.stdout);
+    const verdict = classifyReview(result.exit_code, feedback);
     return {
-      agent_logs: [agentResultLog(def.reviewLabel ?? `${def.displayName} Review`, result, 4000)],
+      agent_logs: [agentResultLog(def.reviewLabel, result, 4000)],
       last_exit_code: result.exit_code,
       agent_failures: withFailure(state, agent, verdict === "failed"),
-      codex_verdict: verdict,
-      codex_feedback: feedback,
+      review_verdict: verdict,
+      review_feedback: feedback,
     };
   }
 
@@ -65,7 +63,7 @@ export async function runAgentNode(
   };
 }
 
-// Backwards-compatible thin wrappers around the registry-driven node.
+// Thin wrappers around the registry-driven node.
 export function claudeImplementNode(state: AgentState, options: AgentRunOptions = {}): Promise<Partial<AgentState>> {
   return runAgentNode("claude", "implement", state, options);
 }
@@ -76,10 +74,6 @@ export function piImplementNode(state: AgentState, options: AgentRunOptions = {}
 
 export function codexImplementNode(state: AgentState, options: AgentRunOptions = {}): Promise<Partial<AgentState>> {
   return runAgentNode("codex", "implement", state, options);
-}
-
-export function codexReviewNode(state: AgentState, options: AgentRunOptions = {}): Promise<Partial<AgentState>> {
-  return runAgentNode("codex", "review", state, options);
 }
 
 function requiredExecStream(options: AgentRunOptions) {

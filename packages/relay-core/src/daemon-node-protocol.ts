@@ -1,4 +1,4 @@
-import type { AgentName, AgentState, CodexReviewVerdict, CodexTaskMode } from "./state.js";
+import type { AgentName, AgentState, ReviewVerdict, AgentTaskMode } from "./state.js";
 
 export type DaemonNodeStatus = "ready" | "busy" | "stopped";
 
@@ -22,7 +22,7 @@ export interface DaemonNodeRunCommand {
   runId: string;
   taskGoal: string;
   agent: AgentName;
-  mode: CodexTaskMode;
+  mode: AgentTaskMode;
   workspacePath?: string;
   state?: AgentState;
 }
@@ -34,7 +34,7 @@ export interface DaemonNodeCancelCommand {
   sessionId: string;
   runId: string;
   agent: AgentName;
-  mode: CodexTaskMode;
+  mode: AgentTaskMode;
   reason: string;
 }
 
@@ -57,11 +57,11 @@ export type DaemonNodeEvent =
       sessionId: string;
       runId: string;
       agent: AgentName;
-      mode: CodexTaskMode;
+      mode: AgentTaskMode;
       exitCode: number;
       agentLog: string;
-      codexVerdict?: CodexReviewVerdict | "";
-      codexFeedback?: string;
+      reviewVerdict?: ReviewVerdict | "";
+      reviewFeedback?: string;
     }
   | {
       type: "run.failed";
@@ -69,7 +69,7 @@ export type DaemonNodeEvent =
       sessionId: string;
       runId: string;
       agent: AgentName;
-      mode: CodexTaskMode;
+      mode: AgentTaskMode;
       error: string;
       exitCode?: number;
     }
@@ -79,6 +79,6 @@ export type DaemonNodeEvent =
       sessionId: string;
       runId: string;
       agent: AgentName;
-      mode: CodexTaskMode;
+      mode: AgentTaskMode;
       reason: string;
     };

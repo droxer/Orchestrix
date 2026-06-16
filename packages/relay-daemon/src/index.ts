@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { appendFileSync, chmodSync, mkdirSync, writeFileSync } from "node:fs";
+import { accessSync, appendFileSync, chmodSync, constants, mkdirSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import type {
@@ -8,7 +8,7 @@ import type {
   DaemonNodeRegistration,
   DaemonNodeRunCommand,
   AgentName,
-  CodexTaskMode,
+  AgentTaskMode,
   StreamExecResult,
 } from "relay-core";
 import { startOrchestratorSession, ensureAgentReady as ensureSandboxAgentReady, type ActiveOrchestratorSession } from "./sandbox-session.js";
@@ -49,6 +49,23 @@ export interface DaemonRuntimeOptions {
   token?: string;
   logDir?: string;
   logger?: DaemonLogger;
+  signal?: AbortSignal;
+  shutdownGraceMs?: number;
+  environment?: DaemonExecutionEnvironment;
+  preflight?: boolean;
+}
+
+export type DaemonHealthState = "starting" | "registered" | "polling" | "busy" | "stopping" | "stopped";
+
+export interface DaemonDoctorCheck {
+  name: string;
+  ok: boolean;
+  detail: string;
+}
+
+export interface DaemonDoctorReport {
+  ok: boolean;
+  checks: DaemonDoctorCheck[];
 }
 
 export interface DaemonLogFields {
@@ -57,7 +74,7 @@ export interface DaemonLogFields {
   sessionId?: string;
   runId?: string;
   agent?: AgentName;
-  mode?: CodexTaskMode;
+  mode?: AgentTaskMode;
   stream?: "stdout" | "stderr";
   sequence?: number;
   exitCode?: number;
@@ -107,23 +124,27 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
     logDir: options.logDir,
   });
   const heartbeatIntervalMs = options.heartbeatIntervalMs ?? positiveIntEnv("RELAY_DAEMON_HEARTBEAT_MS") ?? positiveIntEnv("RELAY_DAEMON_NODE_HEARTBEAT_MS") ?? 30_000;
-  const environment = createExecutionEnvironment(sandboxMode, sandboxId, workspacePath, logger);
-  const shutdown = (signal: NodeJS.Signals): void => {
-    logger.info("daemon stopping", { sandboxId, signal });
-    void environment.close().finally(() => process.exit(0));
+  const environment = options.environment ?? createExecutionEnvironment(sandboxMode, sandboxId, workspacePath, logger);
+  let health: DaemonHealthState | undefined;
+  const setHealth = (next: DaemonHealthState, fields: DaemonLogFields = {}): void => {
+    if (health === next) return;
+    health = next;
+    logger.info("daemon health", { sandboxId, health: next, ...fields });
   };
-  process.once("SIGINT", () => shutdown("SIGINT"));
-  process.once("SIGTERM", () => shutdown("SIGTERM"));
   logger.info("daemon starting", { sandboxId, employeeId, workspacePath, backendUrl, sandboxMode });
-  const activeRuns = new Map<string, AbortController>();
-  const buildRegistration = (includeEmployeeId = Boolean(configuredEmployeeId)): DaemonNodeRegistration => ({
+  setHealth("starting", { employeeId, workspacePath, backendUrl, sandboxMode });
+  const activeRuns = new Map<string, { controller: AbortController; promise: Promise<void> }>();
+  const shutdownGraceMs = options.shutdownGraceMs ?? positiveIntEnv("RELAY_DAEMON_SHUTDOWN_GRACE_MS") ?? 10_000;
+  let stopping = false;
+  let shutdownPromise: Promise<void> | undefined;
+  const buildRegistration = (includeEmployeeId = Boolean(configuredEmployeeId), status?: DaemonNodeRegistration["status"]): DaemonNodeRegistration => ({
     sandboxId,
     ...(includeEmployeeId ? { employeeId } : {}),
     token,
     workspacePath,
     protocolVersion: DAEMON_NODE_PROTOCOL_VERSION,
     supportedAgents: AGENT_NAMES,
-    status: activeRuns.size > 0 ? "busy" : "ready",
+    status: status ?? (activeRuns.size > 0 ? "busy" : "ready"),
   });
   const register = async (): Promise<void> => {
     const url = `${backendUrl}/daemon-nodes/register`;
@@ -141,9 +162,34 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
       throw error;
     }
   };
+  if (options.preflight !== false) {
+    await runStartupPreflight({ backendUrl, sandboxId, token, workspacePath, fetchFn, logger });
+  }
+  const shutdown = (signal: NodeJS.Signals | "external", exitProcess: boolean): void => {
+    shutdownPromise ??= (async () => {
+      stopping = true;
+      setHealth("stopping", { signal });
+      logger.info("daemon stopping", { sandboxId, signal });
+      for (const active of activeRuns.values()) active.controller.abort(`Daemon received ${signal}.`);
+      await Promise.race([
+        Promise.allSettled([...activeRuns.values()].map((active) => active.promise)),
+        delay(shutdownGraceMs),
+      ]);
+      await postJson(fetchFn, `${backendUrl}/daemon-nodes/register`, buildRegistration(undefined, "stopped")).catch((error: unknown) => {
+        logger.warn("daemon stopped registration failed", { sandboxId, error: error instanceof Error ? error.message : String(error) });
+      });
+      await environment.close();
+      setHealth("stopped");
+      if (exitProcess) process.exit(0);
+    })();
+  };
+  process.once("SIGINT", () => shutdown("SIGINT", true));
+  process.once("SIGTERM", () => shutdown("SIGTERM", true));
+  options.signal?.addEventListener("abort", () => shutdown("external", false), { once: true });
   await withBackendReconnect(register, logger, { sandboxId, what: "registration" });
   let lastRegisteredAt = Date.now();
   logger.info("daemon registered", { sandboxId, employeeId, workspacePath, backendUrl, logPath: logger.logPath });
+  setHealth("registered");
   console.log(`Relay daemon registered sandbox ${sandboxId} with backend at ${backendUrl} (sandbox: ${sandboxMode})`);
   if (logger.logPath) console.log(`Relay daemon log: ${logger.logPath}`);
   if (tokenResolution.source === "generated" && tokenResolution.path) {
@@ -151,8 +197,10 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
     console.log(`Relay daemon generated token for ${employeeId}: ${tokenResolution.path}`);
   }
 
-  while (true) {
+  setHealth("polling");
+  while (!stopping) {
     const body = await withBackendReconnect(async () => {
+      if (stopping) return { commands: [] };
       // Heartbeat re-registration keeps a restarted backend current on this
       // node's agent roster and busy/ready status without waiting for a poll
       // rejection.
@@ -173,26 +221,65 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
       }
       return await response.json() as { commands?: DaemonNodeCommand[] };
     }, logger, { sandboxId, what: "command poll" });
+    if (stopping) break;
     for (const command of body.commands ?? []) {
       if (command.type === "run.start") {
-        logger.info("command received", commandLogFields(sandboxId, command));
-        const controller = new AbortController();
-        activeRuns.set(command.id, controller);
-        void executeCommand(backendUrl, sandboxId, token, command, fetchFn, logger, workspacePath, environment, controller.signal).catch((error: unknown) => {
-          const message = error instanceof Error ? error.message : String(error);
-          logger.error("command failed before completion", { ...commandLogFields(sandboxId, command), error: message });
-          return postJson(fetchFn, `${backendUrl}/daemon-nodes/${encodeURIComponent(sandboxId)}/events`, {
+        if (activeRuns.has(command.id)) {
+          logger.warn("duplicate command ignored", commandLogFields(sandboxId, command));
+          continue;
+        }
+        if (activeRuns.size > 0) {
+          const detail = "Daemon node already has an active run; this node runs one command at a time.";
+          logger.warn("command rejected while daemon busy", { ...commandLogFields(sandboxId, command), error: detail });
+          await postJsonWithRetry(fetchFn, `${backendUrl}/daemon-nodes/${encodeURIComponent(sandboxId)}/events`, {
             type: "run.failed",
             commandId: command.id,
             sessionId: command.sessionId,
             runId: command.runId,
             agent: command.agent,
             mode: command.mode,
-            error: message,
+            error: detail,
+            exitCode: 1,
           } satisfies DaemonNodeEvent, token);
+          continue;
+        }
+        logger.info("command received", commandLogFields(sandboxId, command));
+        setHealth("busy", commandLogFields(sandboxId, command));
+        const controller = new AbortController();
+        const promise = executeCommand(backendUrl, sandboxId, token, command, fetchFn, logger, workspacePath, environment, controller.signal).catch(async (error: unknown) => {
+          const message = error instanceof Error ? error.message : String(error);
+          logger.error("command failed before completion", { ...commandLogFields(sandboxId, command), error: message });
+          const eventUrl = `${backendUrl}/daemon-nodes/${encodeURIComponent(sandboxId)}/events`;
+          const event = controller.signal.aborted
+            ? {
+                type: "run.cancelled",
+                commandId: command.id,
+                sessionId: command.sessionId,
+                runId: command.runId,
+                agent: command.agent,
+                mode: command.mode,
+                reason: typeof controller.signal.reason === "string" ? controller.signal.reason : "Daemon run cancelled.",
+              } satisfies DaemonNodeEvent
+            : {
+                type: "run.failed",
+                commandId: command.id,
+                sessionId: command.sessionId,
+                runId: command.runId,
+                agent: command.agent,
+                mode: command.mode,
+                error: message,
+              } satisfies DaemonNodeEvent;
+          await postJsonWithRetry(fetchFn, eventUrl, event, token, controller.signal.aborted ? undefined : controller.signal).catch((postError: unknown) => {
+            logger.error("terminal event post failed", {
+              ...commandLogFields(sandboxId, command),
+              error: postError instanceof Error ? postError.message : String(postError),
+            });
+          });
         }).finally(() => {
           activeRuns.delete(command.id);
+          if (!stopping) setHealth("polling");
         });
+        activeRuns.set(command.id, { controller, promise });
       } else if (command.type === "run.cancel") {
         logger.info("cancel command received", {
           sandboxId,
@@ -202,15 +289,120 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
           agent: command.agent,
           mode: command.mode,
         });
-        activeRuns.get(command.commandId)?.abort(command.reason);
+        activeRuns.get(command.commandId)?.controller.abort(command.reason);
       }
     }
     await delay(pollIntervalMs);
   }
+  await shutdownPromise;
+}
+
+export async function runRelayDaemonDoctor(options: DaemonRuntimeOptions = {}): Promise<DaemonDoctorReport> {
+  const backendUrl = normalizeBaseUrl(options.backendUrl ?? process.env.RELAY_BACKEND_URL ?? process.env.RELAY_DAEMON_URL ?? "http://127.0.0.1:8790");
+  const sandboxId = options.sandboxId ?? process.env.RELAY_SANDBOX_ID;
+  const configuredEmployeeId = options.employeeId ?? process.env.RELAY_EMPLOYEE_ID;
+  const employeeId = configuredEmployeeId ?? process.env.USER ?? "local";
+  const workspacePath = firstNonBlank(options.workspacePath, process.env.RELAY_WORKSPACE, process.env.WORKSPACE) ?? process.cwd();
+  const sandboxMode = resolveSandboxMode(options.sandbox ?? process.env.RELAY_SANDBOX_MODE);
+  if (sandboxMode === "boxlite") {
+    process.env.RELAY_AGENT_WORKSPACE = GUEST_WORKSPACE;
+  } else {
+    process.env.RELAY_AGENT_WORKSPACE = workspacePath;
+  }
+  const logger = options.logger ?? createDaemonLogger({ workspacePath, sandboxId: sandboxId ?? "doctor", logDir: options.logDir });
+  const fetchFn = options.fetchFn ?? fetch;
+  const checks: DaemonDoctorCheck[] = [];
+  const add = (name: string, ok: boolean, detail: string): void => {
+    checks.push({ name, ok, detail });
+    logger.info("daemon doctor check", { check: name, ok, detail, sandboxId });
+  };
+  if (!sandboxId) {
+    add("sandbox-id", false, "--sandbox-id or RELAY_SANDBOX_ID is required.");
+    return { ok: false, checks };
+  }
+  let token = "";
+  try {
+    token = ensureDaemonNodeToken({
+      workspacePath,
+      employeeId,
+      token: options.token ?? process.env.RELAY_DAEMON_TOKEN ?? process.env.RELAY_DAEMON_NODE_TOKEN,
+    }).token;
+    add("token", true, "daemon node token resolved.");
+  } catch (error) {
+    add("token", false, error instanceof Error ? error.message : String(error));
+  }
+  await checkBackendReachable(fetchFn, backendUrl).then(
+    () => add("backend", true, `${backendUrl} is reachable.`),
+    (error: unknown) => add("backend", false, error instanceof Error ? error.message : String(error)),
+  );
+  try {
+    checkWorkspace(workspacePath);
+    add("workspace", true, `${workspacePath} exists and is writable.`);
+  } catch (error) {
+    add("workspace", false, error instanceof Error ? error.message : String(error));
+  }
+  if (token) {
+    await postJson(fetchFn, `${backendUrl}/daemon-nodes/register`, {
+      sandboxId,
+      ...(configuredEmployeeId ? { employeeId } : {}),
+      token,
+      workspacePath,
+      protocolVersion: DAEMON_NODE_PROTOCOL_VERSION,
+      supportedAgents: AGENT_NAMES,
+      status: "stopped",
+    } satisfies DaemonNodeRegistration).then(
+      () => add("registration", true, "backend accepted daemon node registration."),
+      (error: unknown) => add("registration", false, error instanceof Error ? error.message : String(error)),
+    );
+  }
+  const environment = options.environment ?? createExecutionEnvironment(sandboxMode, sandboxId, workspacePath, logger);
+  for (const agent of AGENT_NAMES) {
+    await environment.ensureAgentReady(agent).then(
+      () => add(`agent:${agent}`, true, `${getAgent(agent).displayName} preflight passed.`),
+      (error: unknown) => add(`agent:${agent}`, false, error instanceof Error ? error.message : String(error)),
+    );
+  }
+  await environment.close().catch(() => undefined);
+  return { ok: checks.every((check) => check.ok), checks };
 }
 
 function firstNonBlank(...values: Array<string | undefined>): string | undefined {
   return values.find((value) => value?.trim());
+}
+
+async function runStartupPreflight(input: {
+  backendUrl: string;
+  sandboxId: string;
+  token: string;
+  workspacePath: string;
+  fetchFn: typeof fetch;
+  logger: DaemonLogger;
+}): Promise<void> {
+  if (!input.token.trim()) throw new Error("Daemon node token is required.");
+  checkWorkspace(input.workspacePath);
+  try {
+    await checkBackendReachable(input.fetchFn, input.backendUrl);
+    input.logger.info("daemon preflight passed", { sandboxId: input.sandboxId, check: "backend" });
+  } catch (error) {
+    input.logger.warn("daemon backend preflight failed; registration will retry", {
+      sandboxId: input.sandboxId,
+      check: "backend",
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+async function checkBackendReachable(fetchFn: typeof fetch, backendUrl: string): Promise<void> {
+  const response = await fetchFn(`${backendUrl}/`, { signal: requestSignal() });
+  if (!response.ok) {
+    throw new DaemonHttpError(`GET ${backendUrl}/ failed: ${response.status} ${await response.text()}`, response.status);
+  }
+}
+
+function checkWorkspace(workspacePath: string): void {
+  const stat = statSync(workspacePath);
+  if (!stat.isDirectory()) throw new Error(`Workspace path is not a directory: ${workspacePath}`);
+  accessSync(workspacePath, constants.R_OK | constants.W_OK);
 }
 
 async function executeCommand(
@@ -301,10 +493,10 @@ async function executeCommand(
   logger.info("run completed", {
     ...commandLogFields(sandboxId, command),
     exitCode: next.last_exit_code,
-    codexVerdict: next.codex_verdict,
+    reviewVerdict: next.review_verdict,
     agentLogBytes: next.agent_logs.slice(-1)[0]?.length ?? 0,
   });
-  await postJson(fetchFn, eventUrl, {
+  await postJsonWithRetry(fetchFn, eventUrl, {
     type: "run.completed",
     commandId: command.id,
     sessionId: command.sessionId,
@@ -313,9 +505,9 @@ async function executeCommand(
     mode: command.mode,
     exitCode: next.last_exit_code,
     agentLog: next.agent_logs.slice(-1)[0] ?? "",
-    codexVerdict: next.codex_verdict,
-    codexFeedback: next.codex_feedback,
-  } satisfies DaemonNodeEvent, token);
+    reviewVerdict: next.review_verdict,
+    reviewFeedback: next.review_feedback,
+  } satisfies DaemonNodeEvent, token, signal);
 }
 
 async function postRunCancelled(
@@ -325,7 +517,7 @@ async function postRunCancelled(
   token: string,
   reason: unknown,
 ): Promise<void> {
-  await postJson(fetchFn, eventUrl, {
+  await postJsonWithRetry(fetchFn, eventUrl, {
     type: "run.cancelled",
     commandId: command.id,
     sessionId: command.sessionId,
@@ -384,10 +576,20 @@ function createExecutionEnvironment(
   if (mode === "boxlite") return createBoxliteEnvironment(sandboxId, workspacePath, logger);
   return {
     sandboxMode: "none",
-    ensureAgentReady: async (agent) => ensureHostAgentReady(agent),
+    ensureAgentReady: async (agent, signal) => ensureLocalAgentReady(agent, signal),
     execStream: localProcessExecStream,
     close: async () => undefined,
   };
+}
+
+async function ensureLocalAgentReady(agent: AgentName, signal?: AbortSignal): Promise<void> {
+  ensureHostAgentReady(agent);
+  const def = getAgent(agent);
+  const result = await localProcessExecStream("bash", ["-c", def.preflight.command()], { signal });
+  if (result.exit_code !== 0) {
+    const detail = (result.stderr || result.stdout || result.error_message || "").trim();
+    throw new Error(`${def.preflight.label} preflight failed.${detail ? ` ${detail}` : ""}`);
+  }
 }
 
 function createBoxliteEnvironment(
@@ -523,8 +725,18 @@ export async function localProcessExecStream(
   });
 }
 
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function delay(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new Error("Delay aborted."));
+      return;
+    }
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener("abort", () => {
+      clearTimeout(timer);
+      reject(new Error("Delay aborted."));
+    }, { once: true });
+  });
 }
 
 function positiveIntEnv(name: string): number | undefined {
@@ -666,7 +878,8 @@ async function postJson(fetchFn: typeof fetch, url: string, body: unknown, token
   }
 }
 
-const EVENT_POST_RETRY_DELAYS_MS = [200, 400, 800, 1600, 3200] as const;
+const EVENT_POST_RETRY_INITIAL_DELAY_MS = 200;
+const EVENT_POST_RETRY_MAX_DELAY_MS = 10_000;
 
 async function postJsonWithRetry(
   fetchFn: typeof fetch,
@@ -675,19 +888,19 @@ async function postJsonWithRetry(
   token: string,
   signal?: AbortSignal,
 ): Promise<void> {
-  let lastError: unknown;
-  for (let attempt = 0; attempt <= EVENT_POST_RETRY_DELAYS_MS.length; attempt += 1) {
+  let attempt = 0;
+  while (true) {
     if (signal?.aborted) throw new Error("Aborted before event post.");
     try {
       await postJson(fetchFn, url, body, token, signal);
       return;
     } catch (error) {
-      lastError = error;
-      if (attempt === EVENT_POST_RETRY_DELAYS_MS.length) break;
-      await delay(EVENT_POST_RETRY_DELAYS_MS[attempt]);
+      if (error instanceof DaemonHttpError && error.status < 500) throw error;
+      const backoff = Math.min(EVENT_POST_RETRY_INITIAL_DELAY_MS * 2 ** Math.min(attempt, 5), EVENT_POST_RETRY_MAX_DELAY_MS);
+      attempt += 1;
+      await delay(backoff, signal);
     }
   }
-  throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
 async function getJson(fetchFn: typeof fetch, url: string, token?: string): Promise<Response> {

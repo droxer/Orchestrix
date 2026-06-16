@@ -36,13 +36,13 @@ export interface BackendStatus {
 
 const currentFile = fileURLToPath(import.meta.url);
 const distDir = dirname(currentFile);
-const repoRoot = resolve(distDir, "../../../..");
+const repoRoot = resolveRepoRootFromDist(distDir);
 const pythonBackendProject = repoRoot;
 const daemonCli = resolve(distDir, "../../relay-daemon/dist/cli.js");
 const tuiCli = resolve(distDir, "cli.js");
 
 async function main(): Promise<void> {
-  const { backendUrl, backendEndpoint, employeeId, sandboxId, sandboxMode, childEnv } = resolveLocalRunConfig();
+  const { backendUrl, backendEndpoint, workspacePath, employeeId, sandboxId, sandboxMode, childEnv } = resolveLocalRunConfig();
 
   const children: ManagedChild[] = [];
   let ownsBackend = false;
@@ -72,7 +72,7 @@ async function main(): Promise<void> {
     // when a live daemon for this employee is already registered (e.g. from a
     // previous local run or a remote sandbox) so two pollers never compete
     // for the same command queue.
-    if (!(await liveDaemonExists(backendUrl, employeeId))) {
+    if (!(await liveDaemonExists(backendUrl, employeeId, workspacePath))) {
       children.push(startChild("daemon", process.execPath, [daemonCli, ...daemonArgs(sandboxId, sandboxMode)], childEnv));
     }
 
@@ -137,6 +137,10 @@ export function resolveLocalRunConfig(env: NodeJS.ProcessEnv = process.env): Loc
   };
 }
 
+export function resolveRepoRootFromDist(distDirectory: string = distDir): string {
+  return resolve(distDirectory, "../../..");
+}
+
 export function backendArgs(backendEndpoint: URL): string[] {
   const port = backendEndpoint.port || (backendEndpoint.protocol === "https:" ? "443" : "80");
   return ["--port", port];
@@ -179,15 +183,31 @@ async function backendStatus(backendUrl: string): Promise<BackendStatus> {
   }
 }
 
-async function liveDaemonExists(backendUrl: string, employeeId: string): Promise<boolean> {
+export async function liveDaemonExists(backendUrl: string, employeeId: string, workspacePath: string): Promise<boolean> {
   try {
     const response = await fetch(`${backendUrl}/cp/daemon-nodes`, { signal: AbortSignal.timeout(1000) });
     if (!response.ok) return false;
-    const body = await response.json() as { nodes?: Array<{ employeeId?: string; online?: boolean; stale?: boolean }> };
-    return (body.nodes ?? []).some((node) => node.employeeId === employeeId && node.online !== false && node.stale !== true);
+    const body = await response.json() as { nodes?: Array<{ employeeId?: string; online?: boolean; stale?: boolean; workspacePath?: string }> };
+    return (body.nodes ?? []).some((node) =>
+      node.employeeId === employeeId &&
+      node.online !== false &&
+      node.stale !== true &&
+      (!node.workspacePath || workspacePathsMatch(node.workspacePath, workspacePath))
+    );
   } catch {
     return false;
   }
+}
+
+function workspacePathsMatch(a?: string, b?: string): boolean {
+  const left = normalizeWorkspacePath(a);
+  const right = normalizeWorkspacePath(b);
+  return Boolean(left && right && left === right);
+}
+
+function normalizeWorkspacePath(value?: string): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? resolve(trimmed) : undefined;
 }
 
 async function waitFor(check: () => Promise<boolean>, label: string, children: ManagedChild[]): Promise<void> {

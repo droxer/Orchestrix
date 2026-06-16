@@ -136,13 +136,12 @@ export function MessageBlock({
 
   return (
     <div className={`msg msg-system tone-${message.tone}`}>
-      <span className="msg-system-rule" aria-hidden="true" />
       <span className="msg-system-label">
         <span>{message.label}</span>
-        {message.detail ? (
-          <span className="msg-system-detail">{message.detail}</span>
-        ) : null}
       </span>
+      {message.detail ? (
+        <span className="msg-system-detail">{message.detail}</span>
+      ) : null}
       <time className="mono">{formatTime(message.timestamp)}</time>
     </div>
   );
@@ -227,6 +226,7 @@ export function projectMessages(session: RelaySession | undefined, t: TFunction)
         break;
       }
       case "artifact.created": {
+        if (event.artifact.kind === "command_log") break;
         const runId = event.artifact.agentRunId;
         if (runId) {
           const index = ensureRun(runId, session.currentAgent ?? "claude", event.timestamp);
@@ -297,6 +297,7 @@ export function projectMessages(session: RelaySession | undefined, t: TFunction)
           timestamp: event.timestamp,
           tone: event.verdict === "approved" ? "good" : "bad",
           label: t("message.review_verdict", {
+            agent: event.agent,
             verdict: t(`verdict.${event.verdict}`, { defaultValue: event.verdict }),
           }),
           detail: event.feedback,

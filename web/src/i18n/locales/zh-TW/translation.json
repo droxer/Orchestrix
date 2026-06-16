@@ -50,6 +50,7 @@
     "send": "傳送",
     "cancel_run": "取消執行",
     "choose_agent": "選擇 Agent",
+    "choose_mode": "選擇模式",
     "address_agent": "選擇 Agent"
   },
   "decision": {
@@ -61,6 +62,7 @@
   },
   "handoff": {
     "route_to": "路由至",
+    "mode": "模式",
     "note_placeholder": "選填備註…",
     "send": "傳送移交",
     "cancel": "取消"
@@ -374,7 +376,7 @@
     "decision": "你 — {{kind}}",
     "agent_completed": "{{agent}} — {{status}}",
     "exit_code": "結束碼 {{exitCode}}",
-    "review_verdict": "codex 裁決 — {{verdict}}",
+    "review_verdict": "{{agent}} 裁決 — {{verdict}}",
     "session_status": "狀態 — {{phase}}",
     "session_completed": "工作階段已完成",
     "session_failed": "工作階段失敗"

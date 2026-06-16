@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { pathToFileURL } from "node:url";
 import { loadPackageEnv } from "relay-core";
-import { resolveSandboxMode, runRelayDaemon } from "./index.js";
+import { resolveSandboxMode, runRelayDaemon, runRelayDaemonDoctor } from "./index.js";
 
 loadPackageEnv("relay-daemon");
 
@@ -16,6 +16,8 @@ Options:
   --sandbox <mode>      Sandbox mode: "boxlite" boots a BoxLite VM and runs
                         agents inside it; "none" runs agents as local
                         processes (default; also RELAY_SANDBOX_MODE).
+  --doctor              Check backend, token, workspace, auth, and agent CLIs,
+                        then exit without running the daemon loop.
   --help                Show this help message.
   --version             Show version information.
 `);
@@ -31,6 +33,7 @@ export interface DaemonCliArgs {
   employeeId?: string;
   token?: string;
   sandbox?: string;
+  doctor: boolean;
   help: boolean;
   version: boolean;
 }
@@ -41,6 +44,7 @@ export function parseArgs(argv: string[]): DaemonCliArgs {
   let employeeId: string | undefined;
   let token: string | undefined;
   let sandbox: string | undefined;
+  let doctor = false;
   let help = false;
   let version = false;
   for (let i = 2; i < argv.length; i += 1) {
@@ -49,6 +53,8 @@ export function parseArgs(argv: string[]): DaemonCliArgs {
       help = true;
     } else if (arg === "--version") {
       version = true;
+    } else if (arg === "--doctor") {
+      doctor = true;
     } else if (arg === "--backend-url") {
       const value = argv[i + 1];
       if (!value || value.startsWith("-")) {
@@ -88,7 +94,7 @@ export function parseArgs(argv: string[]): DaemonCliArgs {
       throw new Error(`Unknown argument: ${arg}`);
     }
   }
-  return { backendUrl, sandboxId, employeeId, token, sandbox, help, version };
+  return { backendUrl, sandboxId, employeeId, token, sandbox, doctor, help, version };
 }
 
 export async function main(argv: string[] = process.argv): Promise<void> {
@@ -109,6 +115,20 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     console.error("Error: --sandbox-id or RELAY_SANDBOX_ID is required.");
     showHelp();
     process.exitCode = 1;
+    return;
+  }
+  if (args.doctor) {
+    const report = await runRelayDaemonDoctor({
+      backendUrl: args.backendUrl ?? process.env.RELAY_BACKEND_URL,
+      sandboxId,
+      employeeId: args.employeeId ?? process.env.RELAY_EMPLOYEE_ID,
+      token: args.token ?? process.env.RELAY_DAEMON_NODE_TOKEN ?? process.env.RELAY_DAEMON_TOKEN,
+      sandbox: resolveSandboxMode(args.sandbox ?? process.env.RELAY_SANDBOX_MODE),
+    });
+    for (const check of report.checks) {
+      console.log(`${check.ok ? "OK" : "FAIL"} ${check.name}: ${check.detail}`);
+    }
+    if (!report.ok) process.exitCode = 1;
     return;
   }
   await runRelayDaemon({

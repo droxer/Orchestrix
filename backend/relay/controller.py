@@ -14,8 +14,8 @@ def initial_agent_state(task_goal: str) -> dict[str, Any]:
         "agent_logs": [],
         "last_exit_code": 0,
         "agent_failures": {},
-        "codex_verdict": "",
-        "codex_feedback": "",
+        "review_verdict": "",
+        "review_feedback": "",
     }
 
 
@@ -28,8 +28,8 @@ def merge_agent_state(state: dict[str, Any], patch: dict[str, Any]) -> dict[str,
     }
 
 
-def is_review_assignment(agent: str, mode: str) -> bool:
-    return mode == "review" and agent == "codex"
+def is_review_assignment(mode: str) -> bool:
+    return mode == "review"
 
 
 class SessionController:
@@ -195,9 +195,9 @@ class SessionController:
     def record_agent_completed(self, session_id: str, state: dict[str, Any], input: dict[str, Any]) -> dict[str, Any]:
         logger.info("Agent run completed", session_id=session_id, run_id=input["runId"], agent=input["agent"], mode=input["mode"], status=input["status"], exit_code=input["exitCode"])
         state_patch = {"agent_logs": [input.get("agentLog", "")], "last_exit_code": input["exitCode"]}
-        if is_review_assignment(input["agent"], input["mode"]):
-            state_patch["codex_verdict"] = input.get("codexVerdict", "")
-            state_patch["codex_feedback"] = input.get("codexFeedback", "")
+        if is_review_assignment(input["mode"]):
+            state_patch["review_verdict"] = input.get("reviewVerdict", "")
+            state_patch["review_feedback"] = input.get("reviewFeedback", "")
         self.create_artifact(session_id, {
             "kind": "review" if input["mode"] == "review" else "command_log",
             "title": f"{input['agent']} {input['mode']} output",
@@ -222,17 +222,18 @@ class SessionController:
                 "agent": input["agent"],
                 "sessionId": session_id,
             })
-        if is_review_assignment(input["agent"], input["mode"]):
-            verdict = input.get("codexVerdict") or "failed"
+        if is_review_assignment(input["mode"]):
+            verdict = input.get("reviewVerdict") or "failed"
             self._append(session_id, relay_event("review.verdict", session_id, {
                 "runId": input["runId"],
+                "agent": input["agent"],
                 "verdict": verdict,
-                "feedback": input.get("codexFeedback", ""),
+                "feedback": input.get("reviewFeedback", ""),
             }))
             if verdict == "approved":
-                self._update_task_status("done", "Codex approved the work.", {"agent": input["agent"], "sessionId": session_id})
+                self._update_task_status("done", f"{input['agent']} approved the work.", {"agent": input["agent"], "sessionId": session_id})
             elif verdict == "rejected":
-                self._update_task_status("blocked", "Codex rejected the work.", {"agent": input["agent"], "sessionId": session_id})
+                self._update_task_status("blocked", f"{input['agent']} rejected the work.", {"agent": input["agent"], "sessionId": session_id})
         return merge_agent_state(state, state_patch)
 
     def _append(self, session_id: str, event: dict[str, Any]) -> dict[str, Any]:

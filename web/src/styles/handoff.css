@@ -1,0 +1,111 @@
+/* ============================ decision bar / handoff ============================ */
+
+.decision-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+  border: 1px solid var(--color-hairline-soft);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+}
+
+.decision-bar button,
+.handoff-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xxs);
+  min-height: 40px;
+  padding: 0 var(--space-base);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-strong);
+  color: var(--color-ink);
+  font-size: var(--text-base);
+  font-weight: 600;
+  line-height: 1.15;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+
+.decision-bar button:hover,
+.handoff-actions button:hover {
+  border-color: var(--color-primary);
+  background: var(--color-canvas);
+  color: var(--color-primary);
+}
+
+.decision-bar .primary,
+.handoff-actions .primary {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.decision-bar .primary:hover,
+.handoff-actions .primary:hover {
+  border-color: var(--color-primary-active);
+  background: var(--color-primary-active);
+  color: var(--color-on-primary);
+}
+
+.decision-bar .danger-soft {
+  color: var(--color-semantic-down);
+  border-color: var(--border-danger);
+  background: var(--color-canvas);
+}
+
+.decision-bar .danger-soft:hover {
+  color: var(--color-semantic-down);
+  border-color: var(--color-semantic-down);
+  background: var(--color-canvas);
+}
+
+.handoff-panel {
+  width: min(100%, 560px);
+  margin-top: var(--space-sm);
+  display: grid;
+  gap: var(--space-sm);
+  padding: var(--space-base);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-md);
+  background: var(--color-canvas);
+}
+
+.handoff-row {
+  display: grid;
+  grid-template-columns: auto 1fr 1fr;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.handoff-row label {
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.handoff-row select,
+.handoff-panel input {
+  min-width: 0;
+  height: 48px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-md);
+  outline: 0;
+  background: var(--color-canvas);
+  padding: 0 var(--space-base);
+  color: var(--color-ink);
+  font-size: var(--text-md);
+}
+
+.handoff-row select:focus,
+.handoff-panel input:focus {
+  border-color: var(--color-primary);
+  box-shadow: var(--ring-focus);
+}
+
+.handoff-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-xs);
+}

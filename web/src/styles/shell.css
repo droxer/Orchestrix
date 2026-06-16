@@ -1,0 +1,29 @@
+/* ============================ shell ============================ */
+
+.messenger-shell {
+  display: grid;
+  grid-template-columns: var(--sidenav-w) var(--thread-w) minmax(0, 1fr);
+  height: 100vh;
+  height: 100svh;
+  min-height: 100vh;
+  overflow: hidden;
+  background: var(--color-canvas);
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  transition: grid-template-columns 220ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.messenger-shell[data-sidenav="open"] {
+  grid-template-columns: var(--sidenav-w-open) var(--thread-w) minmax(0, 1fr);
+}
+
+.messenger-shell[data-settings="open"] {
+  grid-template-columns: var(--sidenav-w) var(--thread-w) minmax(0, 1fr) var(--drawer-w);
+}
+
+.messenger-shell[data-sidenav="open"][data-settings="open"] {
+  grid-template-columns: var(--sidenav-w-open) var(--thread-w) minmax(0, 1fr) var(--drawer-w);
+}
+
+.mobile-topbar {
+  display: none;
+}

@@ -5,7 +5,7 @@ import { Box, render, Text, useApp, useInput } from "ink";
 
 import {
   type AgentName,
-  type CodexTaskMode,
+  type AgentTaskMode,
   type RelaySession,
   type SessionController,
   type SessionStore,
@@ -18,6 +18,7 @@ import {
   assignmentSucceeded,
   hostWorkspacePath,
   initialAgentState,
+  shellQuote,
   stripAnsi,
   type RelayEvent,
   type SandboxRecord,
@@ -31,7 +32,7 @@ import { ensureAgentReady, type OrchestratorSession } from "relay-daemon";
 
 export interface ParsedAssignment {
   agent: AgentName;
-  codexMode?: CodexTaskMode;
+  mode?: AgentTaskMode;
 }
 
 export interface ParsedTask {
@@ -75,6 +76,7 @@ const THINK_MARK = "○";
 const TOOL_MARK = "⏺";
 const SPINNER_FRAMES = ["·", "✢", "*", "✳", "✶", "✻", "✽"] as const;
 const DAEMON_POLL_INTERVAL_MS = 400;
+const DAEMON_ABORT_TERMINAL_WAIT_MS = 15_000;
 const STATUS_LABELS: Record<string, string> = {
   OK: RELAY_OK,
   WARN: RELAY_WARN,
@@ -187,7 +189,7 @@ export async function runAssignments(request: RunRequest): Promise<void> {
         recordCancelled("Task cancelled before the next agent started.");
         return;
       }
-      const mode = assignment.agent === "codex" ? assignment.codexMode ?? "implement" : "implement";
+      const mode = assignment.mode ?? "implement";
       request.onAgentStart?.(assignment);
       await ensureAgentReady(assignment.agent, request.log, request.signal);
       state = await controller.runStep(sessionId, state, { agent: assignment.agent, mode }, {
@@ -234,7 +236,7 @@ export function createDaemonAssignmentRunner(
     request.log("\nSubmitting task to Relay daemon.\n");
     const assignments = request.assignments.map((assignment) => ({
       agent: assignment.agent,
-      mode: assignment.agent === "codex" ? assignment.codexMode ?? "implement" : "implement",
+      mode: assignment.mode ?? "implement",
     }));
     const sessionId = request.sessionId ?? (await client.createSession({
       taskGoal: request.task,
@@ -245,24 +247,31 @@ export function createDaemonAssignmentRunner(
     if (!request.sessionId) {
       request.onSessionUpdate?.(await client.getSession(sessionId, request.signal));
     }
-    let cancelPosted = false;
-    const requestDaemonCancel = (): void => {
-      if (cancelPosted) return;
-      cancelPosted = true;
-      void client.cancelSandboxRun({
+    let cancelPromise: Promise<RelaySession | undefined> | undefined;
+    const requestDaemonCancel = (): Promise<RelaySession | undefined> => {
+      if (cancelPromise) return cancelPromise;
+      cancelPromise = client.cancelSandboxRun({
         sandboxId,
         sessionId,
         reason: "Cancelled by human.",
+      }).then((session) => {
+        request.onSessionUpdate?.(session);
+        return session;
       }).catch((error: unknown) => {
         const message = error instanceof Error ? error.message : String(error);
         // Make the cancel failure loud — the daemon may still be running the
-        // agent. Reset cancelPosted so a subsequent /cancel retries.
-        cancelPosted = false;
+        // agent. Reset cancelPromise so a subsequent /cancel retries.
+        cancelPromise = undefined;
         request.log(`\nERR daemon cancel failed: ${message}. Press /cancel again to retry.\n`);
+        return undefined;
       });
+      return cancelPromise;
     };
-    request.signal?.addEventListener("abort", requestDaemonCancel, { once: true });
-    if (request.signal?.aborted) requestDaemonCancel();
+    const abortListener = (): void => {
+      void requestDaemonCancel();
+    };
+    request.signal?.addEventListener("abort", abortListener, { once: true });
+    if (request.signal?.aborted) void requestDaemonCancel();
     const run = client.runSandbox({
       sandboxId,
       taskGoal: request.task,
@@ -276,11 +285,12 @@ export function createDaemonAssignmentRunner(
         renderers,
         signal: request.signal,
         onSessionUpdate: request.onSessionUpdate,
+        onAbort: requestDaemonCancel,
       });
       replayDaemonAgentOutput(session.events, deliveredEventIds, request.log, renderers);
       request.onSessionUpdate?.(session);
     } finally {
-      request.signal?.removeEventListener("abort", requestDaemonCancel);
+      request.signal?.removeEventListener("abort", abortListener);
     }
   };
 }
@@ -295,6 +305,7 @@ async function pollDaemonRunOutput(
     renderers: Map<string, { feed(chunk: string): string }>;
     signal?: AbortSignal;
     onSessionUpdate?: (session: RelaySession) => void;
+    onAbort?: () => Promise<RelaySession | undefined>;
   },
 ): Promise<RelaySession> {
   let settled = false;
@@ -333,13 +344,49 @@ async function pollDaemonRunOutput(
   }
 
   await trackedRun;
-  if (failure) throw failure;
+  if (failure) {
+    if (options.signal?.aborted) {
+      await options.onAbort?.();
+      return waitForTerminalDaemonSession(client, sessionId, {
+        deliveredEventIds: options.deliveredEventIds,
+        log: options.log,
+        renderers: options.renderers,
+        onSessionUpdate: options.onSessionUpdate,
+      });
+    }
+    throw failure;
+  }
   if (finalSession) return finalSession;
   try {
     return await client.getSession(sessionId, options.signal);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`Daemon run settled but final session fetch failed: ${message}`);
+  }
+}
+
+async function waitForTerminalDaemonSession(
+  client: RelayDaemonClient,
+  sessionId: string,
+  options: {
+    deliveredEventIds: Set<string>;
+    log: (text: string) => void;
+    renderers: Map<string, { feed(chunk: string): string }>;
+    onSessionUpdate?: (session: RelaySession) => void;
+  },
+): Promise<RelaySession> {
+  const deadline = Date.now() + DAEMON_ABORT_TERMINAL_WAIT_MS;
+  while (true) {
+    const session = await client.getSession(sessionId);
+    replayDaemonAgentOutput(session.events, options.deliveredEventIds, options.log, options.renderers);
+    options.onSessionUpdate?.(session);
+    if (session.status === "completed" || session.status === "failed" || session.status === "cancelled") {
+      return session;
+    }
+    if (Date.now() >= deadline) {
+      throw new Error("Timed out waiting for daemon run to stop after cancellation.");
+    }
+    await delay(DAEMON_POLL_INTERVAL_MS);
   }
 }
 
@@ -958,22 +1005,22 @@ export function RelayTui({
       setMessage("Summary appended.");
       return;
     }
-    const runRemoteDecision = (
+    const runRemoteDecision = async (
       kind: "approve" | "reject" | "cancel" | "rerun" | "mark_done",
       note?: string,
       targetAgent?: AgentName,
-    ): void => {
-      if (!remoteSessionControl || !current) return;
-      void remoteSessionControl
-        .recordDecision({ sessionId: current.id, kind, note, targetAgent })
-        .then((updated) => {
-          setActiveSession(updated);
-        })
-        .catch((error: unknown) => {
-          const detail = error instanceof Error ? error.message : String(error);
-          setMessage(`Failed to record ${kind} on daemon: ${detail}`);
-          appendLog(`\nERR daemon ${kind} failed: ${detail}\n`);
-        });
+    ): Promise<RelaySession | undefined> => {
+      if (!remoteSessionControl || !current) return undefined;
+      try {
+        const updated = await remoteSessionControl.recordDecision({ sessionId: current.id, kind, note, targetAgent });
+        setActiveSession(updated);
+        return updated;
+      } catch (error: unknown) {
+        const detail = error instanceof Error ? error.message : String(error);
+        setMessage(`Failed to record ${kind} on daemon: ${detail}`);
+        appendLog(`\nERR daemon ${kind} failed: ${detail}\n`);
+        return undefined;
+      }
     };
 
     if (name === "/approve") {
@@ -985,7 +1032,7 @@ export function RelayTui({
         setMessage("Approval is not required; prompts run immediately.");
         return;
       }
-      runRemoteDecision("approve", detail || undefined);
+      void runRemoteDecision("approve", detail || undefined);
       setMessage("Approval sent to daemon.");
       return;
     }
@@ -997,7 +1044,7 @@ export function RelayTui({
       if (localSessionControl) {
         void controllerRef.current.recordDecision(current.id, "reject", detail || "Rejected by human.").then(setActiveSession);
       } else {
-        runRemoteDecision("reject", detail || "Rejected by human.");
+        void runRemoteDecision("reject", detail || "Rejected by human.");
       }
       setMessage("Feedback recorded.");
       return;
@@ -1008,7 +1055,7 @@ export function RelayTui({
         if (localSessionControl) {
           void controllerRef.current.recordDecision(current.id, "cancel", "Cancelled by human.").then(setActiveSession);
         } else {
-          runRemoteDecision("cancel", "Cancelled by human.");
+          void runRemoteDecision("cancel", "Cancelled by human.");
         }
       }
       setMessage("Cancellation requested.");
@@ -1020,12 +1067,20 @@ export function RelayTui({
         setMessage(`Usage: /rerun <${AGENT_NAMES.join("|")}>`);
         return;
       }
-      if (localSessionControl) {
-        void controllerRef.current.recordDecision(current.id, "rerun", "Rerun requested.", agent).then(setActiveSession);
-      } else {
-        runRemoteDecision("rerun", "Rerun requested.", agent);
-      }
-      executeParsedTask({ assignments: [{ agent }], task: current.taskGoal }, current.id);
+      void (async () => {
+        if (localSessionControl) {
+          const updated = await controllerRef.current.recordDecision(current.id, "rerun", "Rerun requested.", agent);
+          setActiveSession(updated);
+        } else if (remoteSessionControl) {
+          const updated = await runRemoteDecision("rerun", "Rerun requested.", agent);
+          if (!updated) return;
+        }
+        executeParsedTask({ assignments: [{ agent, mode: "implement" }], task: current.taskGoal }, current.id);
+      })().catch((error: unknown) => {
+        const detail = error instanceof Error ? error.message : String(error);
+        setMessage(`Failed to rerun session: ${detail}`);
+        appendLog(`\nERR rerun failed: ${detail}\n`);
+      });
       return;
     }
     if (name === "/handoff") {
@@ -1035,30 +1090,41 @@ export function RelayTui({
         setMessage(`Usage: /handoff <${AGENT_NAMES.join("|")}> [note]`);
         return;
       }
+      const reviewFlagIndex = noteParts.indexOf("--review");
+      const mode: AgentTaskMode = reviewFlagIndex === -1 ? "implement" : "review";
+      if (reviewFlagIndex !== -1) noteParts.splice(reviewFlagIndex, 1);
       const note = noteParts.join(" ").trim();
-      const assignment = { agent, codexMode: agent === "codex" ? "review" as const : undefined };
-      const defaultAssignment = { agent };
+      const assignment = { agent, mode };
+      const defaultAssignment = { agent, mode };
       const task = note ? `${current.taskGoal}\n\nHandoff note:\n${note}` : current.taskGoal;
-      if (localSessionControl) {
-        void controllerRef.current.recordDecision(current.id, "handoff", note || `Handoff to ${agent}.`, agent).then(setActiveSession);
-      } else if (remoteSessionControl) {
-        void remoteSessionControl
-          .recordHandoff({
-            sessionId: current.id,
-            targetAgent: agent,
-            note: note || `Handoff to ${agent}.`,
-            mode: agent === "codex" ? "review" : "implement",
-          })
-          .then((updated) => setActiveSession(updated))
-          .catch((error: unknown) => {
+      void (async () => {
+        if (localSessionControl) {
+          const updated = await controllerRef.current.recordDecision(current.id, "handoff", note || `Handoff to ${agent}.`, agent);
+          setActiveSession(updated);
+        } else if (remoteSessionControl) {
+          try {
+            const updated = await remoteSessionControl.recordHandoff({
+              sessionId: current.id,
+              targetAgent: agent,
+              note: note || `Handoff to ${agent}.`,
+              mode,
+            });
+            setActiveSession(updated);
+          } catch (error: unknown) {
             const detail = error instanceof Error ? error.message : String(error);
             setMessage(`Failed to record handoff on daemon: ${detail}`);
             appendLog(`\nERR daemon handoff failed: ${detail}\n`);
-          });
-      }
-      setCurrentAgent(formatAssignmentLabel(assignment));
-      setDefaultAssignments([defaultAssignment]);
-      executeParsedTask({ assignments: [assignment], task }, current.id);
+            return;
+          }
+        }
+        setCurrentAgent(formatAssignmentLabel(assignment));
+        setDefaultAssignments([defaultAssignment]);
+        executeParsedTask({ assignments: [assignment], task }, current.id);
+      })().catch((error: unknown) => {
+        const detail = error instanceof Error ? error.message : String(error);
+        setMessage(`Failed to hand off session: ${detail}`);
+        appendLog(`\nERR handoff failed: ${detail}\n`);
+      });
       return;
     }
     setMessage(`Unknown command: ${name}`);
@@ -1073,7 +1139,7 @@ export function RelayTui({
         <Box justifyContent="space-between">
           <Text>
             <Text color={RELAY_ACCENT} bold>{BRAND_MARK} Relay</Text>
-            <Text dimColor>  ·  agent orchestration</Text>
+            <Text dimColor>  ·  Agent Orchestration</Text>
           </Text>
           <Text>
             <Text color={statusTone}>{statusMark}</Text>
@@ -1130,7 +1196,7 @@ export function RelayTui({
           {defaultAssignments.length > 0 ? (
             <Text dimColor>· {defaultAssignmentLabel}</Text>
           ) : (
-            <Text dimColor>no agent yet</Text>
+            <Text dimColor>No Agent Yet</Text>
           )}
           {activeSession ? (
             <>
@@ -1447,14 +1513,14 @@ function PromptHintText({
   ready: boolean;
   showShortcutMenu: boolean;
 }): React.ReactElement {
-  if (isRunning) return <Text dimColor>esc to interrupt</Text>;
-  if (!ready) return <Text dimColor>esc to exit</Text>;
-  if (showShortcutMenu) return <Text dimColor>enter accept · tab/←→ choose · esc hide</Text>;
-  return <Text dimColor>enter send · tab shortcuts · esc exit</Text>;
+  if (isRunning) return <Text dimColor>Esc to Interrupt</Text>;
+  if (!ready) return <Text dimColor>Esc to Exit</Text>;
+  if (showShortcutMenu) return <Text dimColor>Enter Accept · Tab/←→ Choose · Esc Hide</Text>;
+  return <Text dimColor>Enter Send · Tab Shortcuts · Esc Exit</Text>;
 }
 
 function formatAssignmentLabel(assignment: ParsedAssignment): string {
-  return assignment.agent;
+  return assignment.mode === "review" ? `${assignment.agent}:review` : assignment.agent;
 }
 
 function formatAssignmentsLabel(assignments: ParsedAssignment[]): string {
@@ -1502,25 +1568,26 @@ export function RelayTuiHost({ onExit }: { onExit: () => void }): React.ReactEle
     let cancelled = false;
     const waitForReadySandbox = async (): Promise<void> => {
       const discoveryClient = new RelayDaemonClient();
-      const liveNode = await discoverLiveDaemonNode(discoveryClient, employeeId);
+      const liveNode = await discoverLiveDaemonNode(discoveryClient, employeeId, workspacePath);
       // Share the daemon-node token contract: a live daemon node wins, explicit
       // env token is the fallback, otherwise use the local per-employee token
       // file for a node that has not registered yet.
+      const explicitNodeToken = process.env.RELAY_DAEMON_TOKEN ?? process.env.RELAY_DAEMON_NODE_TOKEN;
       const nodeToken = liveNode?.nodeToken ?? ensureDaemonNodeToken({
         workspacePath,
         employeeId,
-        token: process.env.RELAY_DAEMON_TOKEN ?? process.env.RELAY_DAEMON_NODE_TOKEN,
+        token: explicitNodeToken,
       }).token;
       const uiToken = ensureDaemonNodeToken({
         workspacePath,
         employeeId: `${employeeId}.ui`,
-        token: process.env.RELAY_DAEMON_UI_TOKEN,
+        token: process.env.RELAY_DAEMON_UI_TOKEN ?? liveNode?.nodeToken ?? explicitNodeToken,
       }).token;
       const client = new RelayDaemonClient({
         token: uiToken,
         nodeToken,
       });
-      let current = await client.provisionSandbox({ employeeId });
+      let current = await client.provisionSandbox({ employeeId, workspacePath });
       let lastWaitingStatus = "";
       while (!cancelled && current.status !== "ready") {
         if (mountedRef.current) {
@@ -1530,8 +1597,8 @@ export function RelayTuiHost({ onExit }: { onExit: () => void }): React.ReactEle
         if (waitingStatus !== lastWaitingStatus) {
           lastWaitingStatus = waitingStatus;
 	          appendBootLog(
-	            `\nINFO Waiting for daemon node ${current.id} (${current.status}). ${current.lastError ?? "Start the sandbox worker."}\n` +
-	              `Run: \`make daemon EMPLOYEE_ID=${employeeId} SANDBOX_ID=${current.id} DAEMON_TOKEN=${nodeToken}\`\n`,
+            `\nINFO Waiting for daemon node ${current.id} (${current.status}). ${current.lastError ?? "Start the sandbox worker."}\n` +
+              `Run: \`make daemon EMPLOYEE_ID=${employeeId} SANDBOX_ID=${current.id} DAEMON_TOKEN=${nodeToken} WORKSPACE=${shellQuote(workspacePath)}\`\n`,
 	          );
         }
         await delay(DAEMON_POLL_INTERVAL_MS);
@@ -1539,7 +1606,7 @@ export function RelayTuiHost({ onExit }: { onExit: () => void }): React.ReactEle
         // node; re-provision so we attach to whichever node registers for this
         // employee, even when it registers under a different sandbox id.
         current = current.status === "stopped"
-          ? await client.provisionSandbox({ employeeId })
+          ? await client.provisionSandbox({ employeeId, workspacePath })
           : await client.getSandbox(current.id);
       }
       if (cancelled || !mountedRef.current) return;
@@ -1591,6 +1658,7 @@ export function RelayTuiHost({ onExit }: { onExit: () => void }): React.ReactEle
 async function discoverLiveDaemonNode(
   client: RelayDaemonClient,
   employeeId: string,
+  workspacePath: string,
 ): Promise<ControlPanelDaemonNodeRecord | undefined> {
   try {
     const nodes = await client.listControlPanelDaemonNodes();
@@ -1599,7 +1667,8 @@ async function discoverLiveDaemonNode(
         node.employeeId === employeeId &&
         node.online !== false &&
         node.stale !== true &&
-        Boolean(node.nodeToken)
+        Boolean(node.nodeToken) &&
+        (!node.workspacePath || workspacePathsMatch(node.workspacePath, workspacePath))
       )
       .sort((a, b) => daemonNodeRank(a) - daemonNodeRank(b) || (b.lastSeenAt ?? "").localeCompare(a.lastSeenAt ?? ""))[0];
   } catch {
