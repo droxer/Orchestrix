@@ -10,6 +10,7 @@ import type {
   EmployeeRecord,
 } from "../../types";
 import { Drawer } from "./Drawer";
+import { Button } from "@/components/ui/button";
 
 type OnboardMode = "new" | "existing";
 
@@ -247,12 +248,12 @@ export function OnboardDrawer({
           {error ? <div className="adm-form-error">{error}</div> : null}
 
           <div className="adm-form-actions">
-            <button type="button" className="adm-button-ghost" onClick={onClose} disabled={isBusy}>
+            <Button type="button" variant="ghost" onClick={onClose} disabled={isBusy}>
               {t("admin.v2.cancel")}
-            </button>
-            <button type="submit" className="adm-button-primary" disabled={isBusy || !canSubmitNew}>
+            </Button>
+            <Button type="submit" disabled={isBusy || !canSubmitNew}>
               {isBusy ? t("admin.creating") : t("admin.v2.provision")}
-            </button>
+            </Button>
           </div>
         </form>
       ) : (
@@ -308,12 +309,12 @@ export function OnboardDrawer({
           {error ? <div className="adm-form-error">{error}</div> : null}
 
           <div className="adm-form-actions">
-            <button type="button" className="adm-button-ghost" onClick={onClose} disabled={isBusy}>
+            <Button type="button" variant="ghost" onClick={onClose} disabled={isBusy}>
               {t("admin.v2.cancel")}
-            </button>
-            <button type="submit" className="adm-button-primary" disabled={isBusy || !canSubmitExisting}>
+            </Button>
+            <Button type="submit" disabled={isBusy || !canSubmitExisting}>
               {isBusy ? t("admin.assigning") : t("admin.assign")}
-            </button>
+            </Button>
           </div>
         </form>
       )}

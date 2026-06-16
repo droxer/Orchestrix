@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   getAuthStatus,
   getMe,
@@ -227,14 +228,10 @@ export function AdminConsole() {
             ) : lastUpdatedStr ? (
               <span className="adm-header-time mono">{t("admin.updated_at", { time: lastUpdatedStr })}</span>
             ) : null}
-            <button
-              type="button"
-              className="adm-button-primary"
-              onClick={() => setOnboardOpen(true)}
-            >
+            <Button type="button" onClick={() => setOnboardOpen(true)}>
               <Plus size={16} aria-hidden="true" />
               <span>{t("admin.v2.onboard_cta")}</span>
-            </button>
+            </Button>
           </div>
         </header>
 

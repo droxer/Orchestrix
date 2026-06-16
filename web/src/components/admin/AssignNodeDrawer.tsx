@@ -9,6 +9,7 @@ import type {
   EmployeeRecord,
 } from "../../types";
 import { Drawer } from "./Drawer";
+import { Button } from "@/components/ui/button";
 
 interface AssignNodeDrawerProps {
   open: boolean;
@@ -131,12 +132,12 @@ export function AssignNodeDrawer({
         {error ? <div className="adm-form-error">{error}</div> : null}
 
         <div className="adm-form-actions">
-          <button type="button" className="adm-button-ghost" onClick={onClose} disabled={isBusy}>
+          <Button type="button" variant="ghost" onClick={onClose} disabled={isBusy}>
             {t("admin.v2.cancel")}
-          </button>
-          <button type="submit" className="adm-button-primary" disabled={isBusy || !canSubmit}>
+          </Button>
+          <Button type="submit" disabled={isBusy || !canSubmit}>
             {isBusy ? t("admin.assigning") : t("admin.assign")}
-          </button>
+          </Button>
         </div>
       </form>
     </Drawer>

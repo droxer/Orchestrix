@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Plus, Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import type { ControlPanelDaemonNodeRecord } from "../../types";
 import {
   buildEmployeeSummaries,
@@ -85,9 +86,9 @@ export function PeopleView({
       <div className="adm-empty-block">
         <p className="adm-empty-title">{t("admin.v2.empty_people_title")}</p>
         <p className="adm-empty-body">{t("admin.v2.empty_people_body")}</p>
-        <button type="button" className="adm-button-primary" onClick={onOnboard}>
+        <Button type="button" onClick={onOnboard}>
           {t("admin.v2.onboard_cta")}
-        </button>
+        </Button>
       </div>
     );
   }

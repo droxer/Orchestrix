@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { bootstrapUser, login } from "../../api";
+import { Button } from "@/components/ui/button";
 
 interface LoginScreenProps {
   onLogin: () => void;
@@ -76,17 +77,17 @@ export function LoginScreen({ onLogin, needsBootstrap, onSwitchToBootstrap }: Lo
           />
         </label>
         {error ? <div className="adm-form-error">{error}</div> : null}
-        <button
+        <Button
           type="submit"
-          className="adm-button-primary adm-button-full"
+          className="w-full"
           disabled={isLoading || !username.trim() || !password}
         >
           {isLoading ? t("admin.creating") : t("admin.sign_in")}
-        </button>
+        </Button>
         {needsBootstrap ? (
-          <button type="button" className="adm-button-ghost adm-button-full" onClick={onSwitchToBootstrap}>
+          <Button type="button" variant="ghost" className="w-full" onClick={onSwitchToBootstrap}>
             {t("login.go_bootstrap")}
-          </button>
+          </Button>
         ) : null}
       </form>
     </AuthShell>
@@ -157,16 +158,16 @@ export function BootstrapScreen({ onBootstrapped, onSwitchToLogin }: BootstrapSc
           />
         </label>
         {error ? <div className="adm-form-error">{error}</div> : null}
-        <button
+        <Button
           type="submit"
-          className="adm-button-primary adm-button-full"
+          className="w-full"
           disabled={isLoading || !token.trim() || !username.trim() || !password}
         >
           {isLoading ? t("admin.creating") : t("admin.create_admin")}
-        </button>
-        <button type="button" className="adm-button-ghost adm-button-full" onClick={onSwitchToLogin}>
+        </Button>
+        <Button type="button" variant="ghost" className="w-full" onClick={onSwitchToLogin}>
           {t("login.go_login")}
-        </button>
+        </Button>
       </form>
     </AuthShell>
   );
