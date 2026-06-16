@@ -5,7 +5,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const badgeVariants = cva(
-  "inline-flex items-center justify-center rounded-[var(--radius-pill)] border px-3 py-1 text-xs font-semibold w-fit whitespace-nowrap shrink-0 gap-1 overflow-hidden [&>svg]:size-3 pointer-events-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] transition-[color,box-shadow,border-color,background]",
+  "inline-flex items-center justify-center rounded-pill border px-3 py-1 text-xs font-semibold w-fit whitespace-nowrap shrink-0 gap-1 overflow-hidden [&>svg]:size-3 pointer-events-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] transition-[color,box-shadow,border-color,background]",
   {
     variants: {
       variant: {
@@ -13,6 +13,18 @@ const badgeVariants = cva(
         secondary: "border-transparent bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90",
         destructive: "border-destructive/30 bg-background text-destructive [a&]:hover:border-destructive",
         outline: "text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
+        // Status tones — carry a leading dot so they read as live status
+        // indicators (the former .pill good/info/warn/bad vocabulary).
+        neutral:
+          "border-hairline bg-surface-strong text-ink before:content-[''] before:size-1.5 before:rounded-full before:bg-muted-soft",
+        success:
+          "border-success/35 bg-background text-success before:content-[''] before:size-1.5 before:rounded-full before:bg-success",
+        info:
+          "border-primary/25 bg-background text-primary before:content-[''] before:size-1.5 before:rounded-full before:bg-primary",
+        warning:
+          "border-hairline bg-background text-muted-foreground before:content-[''] before:size-1.5 before:rounded-full before:bg-warning",
+        danger:
+          "border-danger/35 bg-background text-destructive before:content-[''] before:size-1.5 before:rounded-full before:bg-danger",
       },
     },
     defaultVariants: {

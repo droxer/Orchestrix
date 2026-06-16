@@ -378,37 +378,11 @@
   letter-spacing: 0.04em;
 }
 
-.login-field input {
-  padding: var(--space-sm);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-md);
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font-size: var(--text-base);
-}
-
-.login-field input:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  box-shadow: var(--ring-focus);
-}
-
-.login-card > form > button[type="submit"] {
-  width: 100%;
+/* Login inputs and the submit CTA now use the shadcn <Input> / <Button>
+   primitives; the .login-field column layout + label below are retained.
+   A small top margin keeps the submit button spaced from the last field. */
+.login-card > form > button[data-slot="button"] {
   margin-top: var(--space-sm);
-  padding: var(--space-sm);
-  border: none;
-  border-radius: var(--radius-pill);
-  background: var(--color-primary);
-  color: var(--color-on-primary);
-  font-size: var(--text-base);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.login-card > form > button[type="submit"]:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .login-error {

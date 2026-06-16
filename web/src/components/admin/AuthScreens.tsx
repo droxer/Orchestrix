@@ -3,6 +3,8 @@
 import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { bootstrapUser, login } from "../../api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 interface LoginScreenProps {
   onLogin: () => void;
@@ -55,9 +57,9 @@ export function LoginScreen({ onLogin, needsBootstrap, onSwitchToBootstrap }: Lo
       <form className="adm-form" onSubmit={(event) => void handleSubmit(event)} noValidate>
         <label className="adm-field">
           <span>{t("admin.username")}</span>
-          <input
+          <Input
             name="username"
-            className="adm-input mono"
+            className="mono"
             value={username}
             onChange={(event) => setUsername(event.target.value)}
             autoComplete="username"
@@ -66,9 +68,9 @@ export function LoginScreen({ onLogin, needsBootstrap, onSwitchToBootstrap }: Lo
         </label>
         <label className="adm-field">
           <span>{t("admin.password")}</span>
-          <input
+          <Input
             name="password"
-            className="adm-input mono"
+            className="mono"
             type="password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
@@ -76,17 +78,17 @@ export function LoginScreen({ onLogin, needsBootstrap, onSwitchToBootstrap }: Lo
           />
         </label>
         {error ? <div className="adm-form-error">{error}</div> : null}
-        <button
+        <Button
           type="submit"
-          className="adm-button-primary adm-button-full"
+          className="w-full"
           disabled={isLoading || !username.trim() || !password}
         >
           {isLoading ? t("admin.creating") : t("admin.sign_in")}
-        </button>
+        </Button>
         {needsBootstrap ? (
-          <button type="button" className="adm-button-ghost adm-button-full" onClick={onSwitchToBootstrap}>
+          <Button type="button" variant="ghost" className="w-full" onClick={onSwitchToBootstrap}>
             {t("login.go_bootstrap")}
-          </button>
+          </Button>
         ) : null}
       </form>
     </AuthShell>
@@ -124,9 +126,9 @@ export function BootstrapScreen({ onBootstrapped, onSwitchToLogin }: BootstrapSc
       <form className="adm-form" onSubmit={(event) => void handleSubmit(event)} noValidate>
         <label className="adm-field">
           <span>{t("admin.bootstrap_token")}</span>
-          <input
+          <Input
             name="bootstrap-token"
-            className="adm-input mono"
+            className="mono"
             type="password"
             value={token}
             onChange={(event) => setToken(event.target.value)}
@@ -136,9 +138,9 @@ export function BootstrapScreen({ onBootstrapped, onSwitchToLogin }: BootstrapSc
         </label>
         <label className="adm-field">
           <span>{t("admin.username")}</span>
-          <input
+          <Input
             name="username"
-            className="adm-input mono"
+            className="mono"
             value={username}
             onChange={(event) => setUsername(event.target.value)}
             autoComplete="username"
@@ -147,9 +149,9 @@ export function BootstrapScreen({ onBootstrapped, onSwitchToLogin }: BootstrapSc
         </label>
         <label className="adm-field">
           <span>{t("admin.password")}</span>
-          <input
+          <Input
             name="password"
-            className="adm-input mono"
+            className="mono"
             type="password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
@@ -157,16 +159,16 @@ export function BootstrapScreen({ onBootstrapped, onSwitchToLogin }: BootstrapSc
           />
         </label>
         {error ? <div className="adm-form-error">{error}</div> : null}
-        <button
+        <Button
           type="submit"
-          className="adm-button-primary adm-button-full"
+          className="w-full"
           disabled={isLoading || !token.trim() || !username.trim() || !password}
         >
           {isLoading ? t("admin.creating") : t("admin.create_admin")}
-        </button>
-        <button type="button" className="adm-button-ghost adm-button-full" onClick={onSwitchToLogin}>
+        </Button>
+        <Button type="button" variant="ghost" className="w-full" onClick={onSwitchToLogin}>
           {t("login.go_login")}
-        </button>
+        </Button>
       </form>
     </AuthShell>
   );

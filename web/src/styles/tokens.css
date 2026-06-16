@@ -35,6 +35,71 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
+  /* Relay palette — brand, surfaces, tones, and hairlines exposed as
+     utilities so the full design language (not just shadcn's semantic
+     aliases) is addressable: bg-surface-soft, text-ink, text-body,
+     border-hairline, text-success. Hex values stay in :root primitives;
+     `inline` means these resolve to the :root var at the use site rather
+     than emitting a competing custom property. */
+  --color-ink: var(--color-ink);
+  --color-body: var(--color-body);
+  --color-muted-soft: var(--color-muted-soft);
+  --color-on-primary: var(--color-on-primary);
+  --color-primary-active: var(--color-primary-active);
+  --color-primary-disabled: var(--color-primary-disabled);
+  --color-surface-soft: var(--color-surface-soft);
+  --color-surface-strong: var(--color-surface-strong);
+  --color-surface-dark: var(--color-surface-dark);
+  --color-hairline: var(--color-hairline);
+  --color-hairline-soft: var(--color-hairline-soft);
+  --color-success: var(--color-semantic-up);
+  --color-danger: var(--color-semantic-down);
+  --color-warning: var(--color-accent-yellow);
+
+  /* Radii — pill (100px) is the brand's signature; expose the whole token
+     scale so rounded-pill / rounded-md / rounded-xl replace the
+     rounded-[var(--radius-*)] arbitrary values the primitives carried. */
+  --radius-xs: var(--radius-xs);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-pill: var(--radius-pill);
+
+  /* Spacing — the 4px-base named scale → p-md, gap-sm, etc. Coexists with
+     Tailwind's numeric spacing (p-4) since the keys are named, not numeric. */
+  --spacing-xxs: var(--space-xxs);
+  --spacing-xs: var(--space-xs);
+  --spacing-sm: var(--space-sm);
+  --spacing-base: var(--space-base);
+  --spacing-md: var(--space-md);
+  --spacing-lg: var(--space-lg);
+  --spacing-xl: var(--space-xl);
+  --spacing-xxl: var(--space-xxl);
+
+  /* Type scale — the operational chat surface sizes (px). Registering these
+     makes the documented scale the source of truth for text-* utilities, so
+     text-md / text-2xs / text-micro exist and text-base means 14px. The
+     shadcn primitives were updated to the matching role token (text-md for
+     16px controls) so this does not resize them. */
+  --text-micro: var(--text-micro);
+  --text-2xs: var(--text-2xs);
+  --text-xs: var(--text-xs);
+  --text-sm: var(--text-sm);
+  --text-base: var(--text-base);
+  --text-md: var(--text-md);
+  --text-lg: var(--text-lg);
+  --text-xl: var(--text-xl);
+  --text-2xl: var(--text-2xl);
+  --text-3xl: var(--text-3xl);
+  --text-4xl: var(--text-4xl);
+
+  /* Leading scale → leading-tight / leading-loose for migrated prose. */
+  --leading-tight: var(--leading-tight);
+  --leading-snug: var(--leading-snug);
+  --leading-normal: var(--leading-normal);
+  --leading-loose: var(--leading-loose);
+
   /* Typography families exposed to Tailwind utilities */
   --font-sans: var(--font-sans);
   --font-display: var(--font-display);
@@ -355,12 +420,12 @@ button:disabled {
   opacity: 0.55;
 }
 
-/* Primary CTA disabled — when a button explicitly opts in via the data
-   attribute, use the dedicated faded-blue token instead of generic opacity.
-   This preserves the brand voltage on disabled CTAs (per design-system spec
+/* Primary CTA disabled — the shadcn <Button> default variant is the primary
+   CTA (it renders data-variant="default"), so its disabled state uses the
+   dedicated faded-blue token instead of generic opacity. This preserves the
+   brand voltage on disabled CTAs (per design-system spec
    `button-primary-disabled` = `--color-primary-disabled` background). */
-button[data-variant="primary"]:disabled,
-.btn-primary:disabled {
+button[data-slot="button"][data-variant="default"]:disabled {
   background: var(--color-primary-disabled);
   color: var(--color-on-primary);
   opacity: 1;

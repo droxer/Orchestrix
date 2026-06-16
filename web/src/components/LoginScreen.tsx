@@ -4,6 +4,8 @@ import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { bootstrapUser, getAuthStatus, login, RelayApiError } from "../api";
 import type { CurrentUser } from "../types";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 interface LoginScreenProps {
   onAuthenticated: (user: CurrentUser) => void;
@@ -73,7 +75,7 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
           <form onSubmit={(event) => void handleLogin(event)}>
             <label className="login-field">
               <span>{t("login.username")}</span>
-              <input
+              <Input
                 name="username"
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
@@ -83,7 +85,7 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
             </label>
             <label className="login-field">
               <span>{t("login.password")}</span>
-              <input
+              <Input
                 name="password"
                 type="password"
                 value={password}
@@ -91,16 +93,16 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
                 autoComplete="current-password"
               />
             </label>
-            <button type="submit" disabled={isLoading || !username.trim() || !password}>
+            <Button type="submit" className="w-full" disabled={isLoading || !username.trim() || !password}>
               {isLoading ? t("login.loading") : t("login.sign_in")}
-            </button>
+            </Button>
           </form>
         ) : (
           <form onSubmit={(event) => void handleBootstrap(event)}>
             <p className="login-hint">{t("login.bootstrap_hint")}</p>
             <label className="login-field">
               <span>{t("login.bootstrap_token")}</span>
-              <input
+              <Input
                 name="bootstrap-token"
                 type="password"
                 value={bootstrapToken}
@@ -111,7 +113,7 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
             </label>
             <label className="login-field">
               <span>{t("login.username")}</span>
-              <input
+              <Input
                 name="username"
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
@@ -121,7 +123,7 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
             </label>
             <label className="login-field">
               <span>{t("login.password")}</span>
-              <input
+              <Input
                 name="password"
                 type="password"
                 value={password}
@@ -129,9 +131,9 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
                 autoComplete="new-password"
               />
             </label>
-            <button type="submit" disabled={isLoading || !bootstrapToken.trim() || !username.trim() || !password}>
+            <Button type="submit" className="w-full" disabled={isLoading || !bootstrapToken.trim() || !username.trim() || !password}>
               {isLoading ? t("login.loading") : t("login.create_admin")}
-            </button>
+            </Button>
           </form>
         )}
 
