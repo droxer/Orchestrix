@@ -1,144 +1,161 @@
-# Relay Web Stack Audit — 2026 Modern Frontend Alignment
+# Relay Web Stack Audit — Solid-Stack Review (Performance & Maintainability)
 
 _Audit date: 2026-06-16 · Scope: `web/` (Next.js control-panel UI) · Branch: `claude/web-stack-audit-wgnsff`_
 
-## 1. Executive summary
+## 1. Framing: what "solid" means here
 
-Relay's web UI is **modern at the framework and styling layers** and **dated at the data,
-state, testing, and observability layers**. The core stack (React 19, Next 16, TypeScript,
-Tailwind v4, Radix + shadcn/ui) matches the 2026 reference almost exactly. The gaps are in the
-"plumbing" that a production AI control plane leans on hardest: server-state caching, a state
-store, streaming transport, test depth, and production telemetry.
+This review evaluates the web stack against **performance** and **maintainability**, not against a
+trend checklist. A solid stack is defined by:
 
-Two architectural constraints shape every recommendation below and must be stated up front,
-because they invalidate some otherwise-default 2026 advice:
+- **Fewer, stable, well-fitted dependencies.** Every library is a long-term maintenance liability
+  (upgrades, CVEs, breaking changes, onboarding cost). The bar to add one is "removes more code
+  and risk than it introduces," not "appears on a 2026 list."
+- **Runtime performance that matches the workload.** Relay's UI is a long-lived operational
+  console that polls a control plane and streams agent output. Its real costs are redundant
+  network traffic, re-render fan-out, and bundle weight — not cold-start SSR.
+- **Longevity and low cognitive load.** Boring, battle-tested tools that the existing team
+  conventions already support beat novel ones that fragment the toolchain.
 
-- **The web app is a static export.** `next.config.ts` sets `output: "export"` and the FastAPI
-  backend serves the bundle at `/web`. This is deliberate (the backend is the only runtime;
-  see ADR-009). **Server Components, Server Actions, and Streaming SSR are therefore off the
-  table** — they require a Node server Relay intentionally does not run. The UI is effectively a
-  SPA hosted inside the Next App Router shell (`app/page.tsx` → `<App />`).
-- **The backend is Python/FastAPI, not Node.** So **tRPC does not apply.** The type-safe-API
-  goal is still reachable, but via **OpenAPI client generation** from FastAPI's schema, not tRPC.
+Under this lens several items from a pure trend audit get **dropped or downgraded** (Vercel AI SDK,
+pnpm, Turborepo, Vitest-as-second-runner, React Hook Form, Sentry-by-default). The performance and
+maintenance core tightens to a short, high-conviction list.
 
-Verdict: **No framework migration is warranted.** The high-value work is adopting TanStack Query
-(to replace hand-rolled polling), a lightweight store (Zustand/Jotai) to dissolve the 1,005-line
-`App.tsx`, real component/E2E testing, and error/perf telemetry.
+Two hard constraints still hold and remove whole categories of "default" advice:
+
+- **Static export** (`output: "export"`, served by FastAPI per ADR-009) → no Server Components,
+  Server Actions, or Streaming SSR. The UI is a SPA in the App Router shell.
+- **Python/FastAPI backend** → tRPC does not apply; type safety comes from OpenAPI codegen.
 
 ## 2. Current stack inventory
 
-| Layer | What Relay uses today | Source |
+| Layer | Today | Source |
 | --- | --- | --- |
-| Framework | **Next.js 16.1.6**, App Router, static export | `web/package.json`, `next.config.ts` |
-| UI runtime | **React 19.2.7** | `web/package.json` |
-| Language | **TypeScript 5.9**, `target: ES2017`, `moduleResolution: Bundler` | `web/tsconfig.json` |
-| Bundler | **webpack** (`next build --webpack`) — opts out of Next 16's default Turbopack | `web/package.json` |
-| Package mgr / monorepo | **npm workspaces** (root `package.json`), no Turborepo/Nx | root `package.json` |
-| Styling | **Tailwind CSS v4** + `@tailwindcss/postcss` + `tw-animate-css`, plus ~20 hand-written CSS modules under `src/styles/` | `styles.css`, `src/styles/*` |
-| Components | **shadcn/ui** (`new-york`, `components.json`) over **Radix UI**, `cva` + `clsx` + `tailwind-merge` | `components.json`, `src/components/ui/*` |
-| Icons | **lucide-react** | `web/package.json` |
-| i18n | **i18next / react-i18next** (en, zh-CN, zh-TW) | `src/i18n/*` |
-| State | **Raw hooks only** — `App.tsx` is 1,005 lines with 56 `useState/useEffect/useCallback/useMemo` calls; no Context, no store, prop-drilled | `src/App.tsx` |
-| Server state | **Hand-rolled `fetch` + `setInterval` polling** (1s / 2s / 3s loops); `Promise.allSettled` fan-out | `src/api.ts`, `src/hooks/useRelayData.ts`, `AdminConsole.tsx` |
-| Streaming | **None at the transport layer** — agent JSONL is parsed (`lib/agentStream.ts`) but delivered by polling, not SSE/WebSocket | `src/lib/agentStream.ts` |
-| Forms | **None** — manual controlled inputs, no schema validation | `src/components/*` |
-| Auth | Custom cookie/session via backend (`/auth/*`) | `src/api.ts` |
-| Testing | **`node:test` only**, 2 unit files (`status.test.ts`, `adminHelpers.test.ts`); no component or E2E tests | `web/tests/*` |
-| Observability | **None** — no error tracking, RUM, or tracing | — |
-| AI SDK | **None** — bespoke JSONL parser instead of a streaming UI SDK | `src/lib/agentStream.ts` |
+| Framework | Next.js 16.1.6, App Router, static export | `web/package.json`, `next.config.ts` |
+| UI runtime | React 19.2.7 | `web/package.json` |
+| Language | TypeScript 5.9, `target: ES2017` | `web/tsconfig.json` |
+| Bundler | webpack (`next build --webpack`) | `web/package.json` |
+| Pkg mgr / monorepo | npm workspaces | root `package.json` |
+| Styling | Tailwind v4 + token tiers, plus ~20 hand-written CSS modules | `styles.css`, `src/styles/*` |
+| Components | shadcn/ui (`new-york`) + Radix, `cva`/`clsx`/`tailwind-merge` | `components.json`, `src/components/ui/*` |
+| i18n | i18next / react-i18next (en, zh-CN, zh-TW) | `src/i18n/*` |
+| State | Raw hooks; `App.tsx` 1,005 lines, 56 hook calls, no store, prop-drilled | `src/App.tsx` |
+| Server state | Hand-rolled `fetch` + `setInterval` (1s/2s/3s) + `Promise.allSettled` | `api.ts`, `useRelayData.ts`, `AdminConsole.tsx` |
+| Streaming | Custom JSONL parser, delivered by polling (no SSE/WS) | `src/lib/agentStream.ts` |
+| Forms / validation | Manual controlled inputs, no schema validation | `src/components/*` |
+| Testing | `node:test`, 2 unit files; no component/E2E | `web/tests/*` |
+| Observability | None | — |
 
-## 3. Layer-by-layer audit
+## 3. Where the stack is already solid (leave it alone)
 
-Legend: ✅ aligned · 🟡 partial / caveated · 🔴 gap · ⚪ N/A for this architecture
+These are correct on both axes; adding the "modern alternative" would be churn, not improvement.
 
-| Reference layer (2026) | Relay today | Verdict | Notes |
-| --- | --- | --- | --- |
-| React 19 | 19.2.7 | ✅ | Current. |
-| Next.js 16 + RSC / Server Actions / Streaming SSR | Next 16, **static export SPA** | 🟡 | Framework current; RSC/Actions ⚪ unusable under `output: export`. Fine — by design. |
-| TypeScript ES2024+ | TS 5.9, **`target: ES2017`** | 🟡 | Compiler current; raise `target`/`lib` to `ES2022`+ (already shipping to evergreen browsers). |
-| Vite / fast bundler | **webpack** via `--webpack` | 🔴 | Next 16 defaults to **Turbopack**; the build explicitly opts out. Drop `--webpack` (or justify it) to regain fast builds/HMR. Vite itself doesn't apply inside Next. |
-| pnpm | **npm** workspaces | 🟡 | Works; pnpm would speed installs and tighten the monorepo. Low urgency. |
-| Turborepo / Nx | npm workspaces only | 🟡 | No task graph/caching. Turborepo is a drop-in win for the 4-package workspace. Low urgency. |
-| Tailwind + tokens | Tailwind v4 + CSS-var token tiers | ✅ | Token architecture in `styles.css` is genuinely good. |
-| shadcn/ui + Radix | shadcn (`new-york`) + Radix | ✅ | Exactly the reference pattern. **But** ~20 bespoke CSS modules sit alongside it — design-system drift risk (see §5). |
-| Zustand / Jotai (global state) | **none** | 🔴 | 56 hooks in one component, prop-drilled. Highest-leverage refactor. |
-| TanStack Query (server state) | **`setInterval` polling** | 🔴 | No caching, dedup, retries, backoff, or optimistic updates. Biggest functional gap. |
-| OpenAPI / tRPC (type-safe API) | hand-written `api.ts` + manual types | 🟡 | tRPC ⚪ (Python backend). Generate a client from FastAPI's OpenAPI schema instead. |
-| React Hook Form + Zod | manual inputs, no validation | 🔴 | Onboarding/credentials/login forms would benefit; Zod also validates API payloads. |
-| Vitest | `node:test` | 🟡 | Works and matches repo convention; Vitest adds jsdom + watch + coverage for the web package. |
-| Testing Library (component) | **none** | 🔴 | No component tests for a UI this size. |
-| Playwright (E2E) | **none** | 🔴 | No smoke/E2E coverage of login → run → approve flows. |
-| Sentry / Datadog RUM | **none** | 🔴 | No production error or performance visibility. |
-| OpenTelemetry | **none** | 🔴 | No frontend traces correlating UI → backend → daemon. |
-| Streaming UI (SSE/WS) + Vercel AI SDK | polling + custom JSONL parser | 🔴 | Relay is an **agent platform** — streaming is core, not optional. Polling adds latency and load. |
-| Auth.js / Clerk | custom backend auth | ✅/⚪ | Self-hosted control plane; custom OIDC-free auth is a reasonable choice. No change needed. |
+- **React 19 + Next 16 (static export).** Current, stable, and the export model is a *performance
+  and maintenance asset* — no Node server to run, scale, or patch. Do **not** chase RSC/Server
+  Actions; they'd reintroduce a runtime Relay deliberately removed.
+- **Tailwind v4 + CSS-variable token tiers + shadcn/Radix.** Mainstream, low-churn, accessible
+  primitives you own in-tree. No reason to touch.
+- **npm workspaces.** Fine for a 4-package repo. Switching to pnpm/Turborepo adds tooling and a
+  migration for marginal install/CI gains — **not** justified unless CI time is a measured pain.
+- **Custom backend auth.** Appropriate for a self-hosted control plane; an auth SaaS would add a
+  dependency and a network hop for no benefit here.
+- **i18next.** Established and stable. Keep.
 
-## 4. Prioritized recommendations
+## 4. The performance & maintenance gaps that matter
 
-### P0 — High value, contained blast radius
+Each item below earns its place by improving **both** axes or removing more code/risk than it adds.
 
-1. **Adopt TanStack Query** for all reads (`/sessions`, `/sandboxes`, `/daemon-nodes`, `/cp/*`).
-   Replace the 1s/2s/3s `setInterval` loops in `useRelayData.ts`, `App.tsx`, and
-   `AdminConsole.tsx` with queries (`refetchInterval` where polling is still wanted) plus
-   mutations with optimistic updates for decisions/handoffs/runs. Removes hand-rolled
-   `AbortController`/`Promise.allSettled` plumbing and gives caching, dedup, retry, and backoff
-   for free. Keep `api.ts` as the typed fetch layer underneath.
-2. **Introduce a store (Zustand or Jotai)** for cross-cutting client state (auth/user, active
-   session id, selected employee, theme/language, status banner). Target: shrink `App.tsx` from
-   1,005 lines and eliminate prop-drilling through `DecisionBar`/`MentionPopover`/drawers.
-3. **Stream agent output over SSE** instead of polling. The backend already event-sources
-   sessions; expose an `EventSource`/`text/event-stream` (or WebSocket) endpoint and feed
-   `parseAgentStream` incrementally. Largest UX win for an agent product and cuts redundant
-   request volume.
+### P0 — Net-negative code _and_ net-positive performance
 
-### P1 — Production readiness
+**1. Replace hand-rolled polling with TanStack Query.**
+- _Performance:_ kills three concurrent `setInterval` loops (1s/2s/3s) and their redundant
+  refetches; adds request dedup, caching, cancellation, and backoff. Fewer requests, less main-
+  thread churn.
+- _Maintenance:_ deletes the bespoke `AbortController` + `Promise.allSettled` + `isRefreshing`
+  plumbing in `useRelayData.ts`/`AdminConsole.tsx` and centralizes invalidation. One stable,
+  boring dependency that *removes* code. Keep `api.ts` as the typed fetch layer underneath.
+- _Net:_ highest-leverage change on the board. This is the keystone.
 
-4. **Add Sentry** (browser SDK) for error + performance monitoring; wire release/source-maps
-   into the export build.
-5. **Stand up real tests:** Vitest + Testing Library for components, Playwright for the core
-   login → assign → run → approve E2E path. Keep existing `node:test` unit files or migrate them
-   under Vitest for one runner.
-6. **Generate a typed API client from FastAPI's OpenAPI schema** (e.g. `openapi-typescript` +
-   a fetch client) so `web/src/types.ts` and `api.ts` stay in lockstep with the backend instead
-   of being maintained by hand.
+**2. Stream agent output over native SSE (`EventSource`), not polling — and skip the AI SDK.**
+- _Performance:_ event-driven updates replace tight polling of session events; lower latency, far
+  less traffic for the product's hottest surface.
+- _Maintenance:_ an `EventSource` wired into the *existing* `parseAgentStream` is **less** code
+  than the polling loop it replaces. The backend already event-sources sessions, so the server
+  side is a natural fit.
+- _Anti-bloat:_ **do not adopt the Vercel AI SDK.** It targets Node/serverless + OpenAI-style
+  protocols and would sit awkwardly on a static export + FastAPI + custom-agent-JSONL stack. The
+  native browser API plus the parser you already maintain is the solid choice.
 
-### P2 — Tooling & polish
+**3. Decompose `App.tsx`; let TanStack Query own server state; add a *small* store only for what
+remains.**
+- _Maintenance:_ a 1,005-line component with 56 hooks is the single biggest maintainability risk
+  in the UI. Most of that "state" is **server state** that item 1 removes outright. Split the rest
+  into focused components/hooks.
+- _Performance:_ for the genuinely-global client state that's left (auth/user, active session id,
+  selected employee, theme/language, status banner), prefer **Zustand with selectors** over React
+  Context. Context broadcasts every change to all consumers (re-render fan-out); Zustand subscribes
+  by slice. The store should stay *small* — if Context suffices after decomposition, skip the
+  dependency entirely. Add the library for a measured reason, not by default.
 
-7. **Re-enable Turbopack** — drop `--webpack` (or document why webpack is pinned).
-8. **Raise the TS target** to `ES2022`+ and align `lib`.
-9. **Add React Hook Form + Zod** to the onboarding, credentials, and login forms; reuse the Zod
-   schemas to validate API responses.
-10. **Evaluate Turborepo + pnpm** for the workspace (install speed, task caching). Optional.
-11. **Consolidate the ~20 bespoke CSS modules** toward Tailwind utilities + the existing token
-    layer to reduce design-system drift (see §5).
+### P1 — Maintainability you'll feel within a release
 
-### Explicitly _not_ recommended
+**4. Generate the API client from FastAPI's OpenAPI schema.**
+- _Maintenance:_ `types.ts` and `api.ts` are hand-maintained against a Python backend — guaranteed
+  drift. Codegen (`openapi-typescript` + a thin fetch wrapper) makes the backend schema the single
+  source of truth and turns contract breaks into compile errors.
+- _Note:_ this is the *correct* substitute for tRPC given the Python backend; it pairs naturally
+  with item 1.
 
-- **No framework change** (Vue/Svelte/Solid/Qwik) — React+Next is correct and current.
-- **No RSC / Server Actions / Streaming SSR** — incompatible with the deliberate static-export +
-  FastAPI architecture (ADR-009). Don't reintroduce a Node server to chase them.
-- **No tRPC** — the backend is Python; use OpenAPI codegen instead.
-- **No auth platform swap** — custom control-plane auth is appropriate here.
+**5. Adopt Zod for runtime validation at the boundary.**
+- _Maintenance:_ validates API responses and form input where TypeScript's compile-time types
+  can't reach; one schema both validates and infers types. Pairs with item 4 (validate generated
+  payloads at the edge).
+- _Scope discipline:_ Zod is the keeper. **React Hook Form is optional** — the forms here (login,
+  onboard, credentials) are small enough that controlled inputs + a Zod parse are sufficient.
+  Don't add RHF unless a genuinely complex form appears.
 
-## 5. Notes & caveats
+**6. Add testing that respects the existing runner — don't fragment the toolchain.**
+- _Maintenance:_ the repo's canonical runner is `node:test` (per `CLAUDE.md`). Keep it for logic
+  and add a DOM env (`happy-dom`/`jsdom`) + **Testing Library** for component tests under the same
+  runner. Add **Playwright** for a *thin* critical-path E2E (login → assign → run → approve).
+- _Anti-bloat:_ **do not introduce Vitest** just to match a list — a second unit runner splits CI,
+  config, and mental model. One unit runner + one E2E tool is the solid shape.
 
-- **Styling duality.** Tailwind v4 + shadcn is modern, but `src/styles/*` carries ~20
-  hand-authored CSS modules (shell, thread, composer, admin-v2-*, etc.). The token tiers in
-  `styles.css` are well-designed, yet the volume of bespoke CSS is the main place the design
-  system can drift from the utility/component model the reference assumes. Treat consolidation as
-  ongoing hygiene, not a rewrite.
-- **`AGENT_REGISTRY` mirroring.** Per `CLAUDE.md`, the web app cannot import the node-only agent
-  registry, so agents are mirrored as literals in `App.tsx`/`MessageBlock.tsx` and `agent.<name>`
-  i18n keys. Any data-layer refactor must preserve that mirror — it's enforced by
-  `Record<AgentName, …>` types but easy to overlook during a move to a store.
-- **Polling cost.** Three independent intervals (1s/2s/3s) run concurrently while the UI is open.
-  TanStack Query (P0-1) plus SSE (P0-3) would cut this to event-driven updates with a single
-  cached source of truth.
+### P2 — Cheap, safe polish
 
-## 6. Suggested sequencing
+**7. Raise TS `target`/`lib` to `ES2022`+.** Less downleveling → marginally smaller, faster
+   bundle. Zero risk on evergreen targets.
 
-1. TanStack Query over existing `api.ts` (P0-1) — unlocks the rest, low risk.
-2. Zustand/Jotai store + `App.tsx` decomposition (P0-2).
-3. SSE streaming endpoint + incremental `parseAgentStream` wiring (P0-3).
-4. Sentry + Vitest/Testing Library/Playwright (P1-4, P1-5) in parallel.
-5. OpenAPI client generation (P1-6), then P2 tooling polish.
+**8. Decide Turbopack deliberately — don't blindly flip.** Next 16 defaults dev to Turbopack;
+   `build --webpack` is an *explicit opt-out*. Faster builds are nice, but production bundler
+   stability outranks build speed for a solid stack. Confirm why `--webpack` is pinned before
+   changing it; if there's no reason, drop the flag.
+
+**9. Govern CSS drift instead of rewriting.** The ~20 bespoke modules in `src/styles/*` are the
+   main maintainability smell, but a Tailwind rewrite is high-churn/high-regression. The token
+   tiers are good — keep modules that encode real design decisions, prevent *new* drift, and
+   migrate opportunistically. Not a project in itself.
+
+### Explicitly not worth it (anti-bloat ledger)
+
+| Candidate | Why it's dropped under perf/maintenance |
+| --- | --- |
+| Vercel AI SDK | Heavy, Node/serverless + OpenAI-shaped; native `EventSource` + existing parser is less code and fits the architecture. |
+| Vitest | Second unit runner fragments a toolchain already standardized on `node:test`. |
+| pnpm / Turborepo | Migration churn + extra tooling for marginal gains on a 4-package workspace. |
+| React Hook Form | Forms are too simple to justify it; Zod covers validation. |
+| Sentry/Datadog by default | SaaS dependency + bundle weight; revisit only if production error visibility becomes a real need (and consider self-hosted/lightweight first). |
+| RSC / Server Actions / SSR | Incompatible with the deliberate static-export architecture. |
+| tRPC | Backend is Python; OpenAPI codegen is the right substitute. |
+| Framework swap (Vue/Svelte/Solid/Qwik) | No performance or maintenance case over current React+Next. |
+
+## 5. Suggested sequencing
+
+1. **TanStack Query** over the existing `api.ts` (P0-1) — keystone; removes polling, lowers traffic.
+2. **SSE streaming** into `parseAgentStream` (P0-2) — biggest runtime win, *less* code.
+3. **Decompose `App.tsx`**; add a small Zustand store only for leftover global client state (P0-3).
+4. **OpenAPI codegen + Zod at the boundary** (P1-4, P1-5) — kills backend/frontend drift.
+5. **Testing Library under `node:test` + a thin Playwright path** (P1-6).
+6. **TS target bump, Turbopack decision, CSS-drift governance** (P2) as low-risk follow-ups.
+
+Each P0 item is chosen because it makes the app **both** faster and smaller-to-maintain; nothing on
+this list is added for coverage's sake.
