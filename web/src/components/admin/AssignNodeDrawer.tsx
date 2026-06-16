@@ -10,6 +10,13 @@ import type {
 } from "../../types";
 import { Drawer } from "./Drawer";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface AssignNodeDrawerProps {
   open: boolean;
@@ -84,45 +91,49 @@ export function AssignNodeDrawer({
           <legend className="adm-form-legend">{t("admin.assign_existing_employee")}</legend>
           <label className="adm-field">
             <span>{t("admin.employee")}</span>
-            <select
-              name="employee-id"
-              className="adm-input mono"
-              value={employeeId}
-              onChange={(event) => setEmployeeId(event.target.value)}
+            <Select
+              value={employeeId || undefined}
+              onValueChange={setEmployeeId}
               disabled={employees.length === 0 || employeeLocked}
             >
-              <option value="">
-                {employees.length === 0 ? t("admin.no_employees") : t("admin.select_employee")}
-              </option>
-              {employees.map((employee) => (
-                <option key={employee.id} value={employee.id}>
-                  @{employee.id}
-                  {employee.displayName && employee.displayName !== employee.id
-                    ? ` / ${employee.displayName}`
-                    : ""}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-full mono">
+                <SelectValue
+                  placeholder={employees.length === 0 ? t("admin.no_employees") : t("admin.select_employee")}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {employees.map((employee) => (
+                  <SelectItem key={employee.id} value={employee.id}>
+                    @{employee.id}
+                    {employee.displayName && employee.displayName !== employee.id
+                      ? ` / ${employee.displayName}`
+                      : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </label>
           <label className="adm-field">
             <span>{t("admin.assign_node")}</span>
-            <select
-              name="node-id"
-              className="adm-input mono"
-              value={nodeId}
-              onChange={(event) => setNodeId(event.target.value)}
+            <Select
+              value={nodeId || undefined}
+              onValueChange={setNodeId}
               disabled={unassignedNodes.length === 0}
             >
-              <option value="">
-                {unassignedNodes.length === 0 ? t("admin.no_unassigned_nodes") : t("admin.select_node")}
-              </option>
-              {unassignedNodes.map((node) => (
-                <option key={node.id} value={node.id}>
-                  {node.id}
-                  {node.workspacePath ? ` / ${node.workspacePath}` : ""}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-full mono">
+                <SelectValue
+                  placeholder={unassignedNodes.length === 0 ? t("admin.no_unassigned_nodes") : t("admin.select_node")}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {unassignedNodes.map((node) => (
+                  <SelectItem key={node.id} value={node.id}>
+                    {node.id}
+                    {node.workspacePath ? ` / ${node.workspacePath}` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </label>
           {unassignedNodes.length === 0 ? (
             <p className="adm-form-hint">{t("admin.unassigned_hint")}</p>

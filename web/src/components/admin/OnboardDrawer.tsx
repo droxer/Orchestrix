@@ -11,6 +11,14 @@ import type {
 } from "../../types";
 import { Drawer } from "./Drawer";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type OnboardMode = "new" | "existing";
 
@@ -157,9 +165,9 @@ export function OnboardDrawer({
             <legend className="adm-form-legend">{t("admin.v2.section_identity")}</legend>
             <label className="adm-field">
               <span>{t("admin.employee_id")}</span>
-              <input
+              <Input
                 name="employee-id"
-                className="adm-input mono"
+                className="mono"
                 value={employeeId}
                 onChange={(event) => setEmployeeId(event.target.value)}
                 autoComplete="off"
@@ -169,9 +177,8 @@ export function OnboardDrawer({
             </label>
             <label className="adm-field">
               <span>{t("admin.display_name")}</span>
-              <input
+              <Input
                 name="display-name"
-                className="adm-input"
                 value={displayName}
                 onChange={(event) => setDisplayName(event.target.value)}
                 autoComplete="off"
@@ -180,9 +187,9 @@ export function OnboardDrawer({
             </label>
             <label className="adm-field">
               <span>{t("admin.email")}</span>
-              <input
+              <Input
                 name="email"
-                className="adm-input mono"
+                className="mono"
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
@@ -196,9 +203,9 @@ export function OnboardDrawer({
             <legend className="adm-form-legend">{t("admin.v2.section_credentials")}</legend>
             <label className="adm-field">
               <span>{t("admin.username")}</span>
-              <input
+              <Input
                 name="username"
-                className="adm-input mono"
+                className="mono"
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
                 autoComplete="username"
@@ -208,9 +215,9 @@ export function OnboardDrawer({
             </label>
             <label className="adm-field">
               <span>{t("admin.password")}</span>
-              <input
+              <Input
                 name="password"
-                className="adm-input mono"
+                className="mono"
                 type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
@@ -223,22 +230,24 @@ export function OnboardDrawer({
             <legend className="adm-form-legend">{t("admin.v2.section_assignment")}</legend>
             <label className="adm-field">
               <span>{t("admin.assign_node")}</span>
-              <select
-                name="node-id"
-                className="adm-input mono"
-                value={selectedNodeId}
-                onChange={(event) => setSelectedNodeId(event.target.value)}
+              <Select
+                value={selectedNodeId || undefined}
+                onValueChange={setSelectedNodeId}
                 disabled={unassignedNodes.length === 0}
               >
-                <option value="">
-                  {unassignedNodes.length === 0 ? t("admin.no_unassigned_nodes") : t("admin.select_node")}
-                </option>
-                {unassignedNodes.map((node) => (
-                  <option key={node.id} value={node.id}>
-                    {node.id}{node.workspacePath ? ` / ${node.workspacePath}` : ""}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full mono">
+                  <SelectValue
+                    placeholder={unassignedNodes.length === 0 ? t("admin.no_unassigned_nodes") : t("admin.select_node")}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {unassignedNodes.map((node) => (
+                    <SelectItem key={node.id} value={node.id}>
+                      {node.id}{node.workspacePath ? ` / ${node.workspacePath}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </label>
             {unassignedNodes.length === 0 ? (
               <p className="adm-form-hint">{t("admin.unassigned_hint")}</p>
@@ -262,44 +271,48 @@ export function OnboardDrawer({
             <legend className="adm-form-legend">{t("admin.assign_existing_employee")}</legend>
             <label className="adm-field">
               <span>{t("admin.employee")}</span>
-              <select
-                name="existing-employee-id"
-                className="adm-input mono"
-                value={existingEmployeeId}
-                onChange={(event) => setExistingEmployeeId(event.target.value)}
+              <Select
+                value={existingEmployeeId || undefined}
+                onValueChange={setExistingEmployeeId}
                 disabled={employees.length === 0}
               >
-                <option value="">
-                  {employees.length === 0 ? t("admin.no_employees") : t("admin.select_employee")}
-                </option>
-                {employees.map((employee) => (
-                  <option key={employee.id} value={employee.id}>
-                    @{employee.id}
-                    {employee.displayName && employee.displayName !== employee.id
-                      ? ` / ${employee.displayName}`
-                      : ""}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full mono">
+                  <SelectValue
+                    placeholder={employees.length === 0 ? t("admin.no_employees") : t("admin.select_employee")}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {employees.map((employee) => (
+                    <SelectItem key={employee.id} value={employee.id}>
+                      @{employee.id}
+                      {employee.displayName && employee.displayName !== employee.id
+                        ? ` / ${employee.displayName}`
+                        : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </label>
             <label className="adm-field">
               <span>{t("admin.assign_node")}</span>
-              <select
-                name="existing-node-id"
-                className="adm-input mono"
-                value={existingNodeId}
-                onChange={(event) => setExistingNodeId(event.target.value)}
+              <Select
+                value={existingNodeId || undefined}
+                onValueChange={setExistingNodeId}
                 disabled={unassignedNodes.length === 0}
               >
-                <option value="">
-                  {unassignedNodes.length === 0 ? t("admin.no_unassigned_nodes") : t("admin.select_node")}
-                </option>
-                {unassignedNodes.map((node) => (
-                  <option key={node.id} value={node.id}>
-                    {node.id}{node.workspacePath ? ` / ${node.workspacePath}` : ""}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full mono">
+                  <SelectValue
+                    placeholder={unassignedNodes.length === 0 ? t("admin.no_unassigned_nodes") : t("admin.select_node")}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {unassignedNodes.map((node) => (
+                    <SelectItem key={node.id} value={node.id}>
+                      {node.id}{node.workspacePath ? ` / ${node.workspacePath}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </label>
             {unassignedNodes.length === 0 ? (
               <p className="adm-form-hint">{t("admin.unassigned_hint")}</p>
