@@ -1,58 +1,8 @@
 /* ============================ pills ============================ */
 
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-xxs);
-  padding: 4px var(--space-sm);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-pill);
-  background: var(--color-surface-strong);
-  color: var(--color-ink);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  line-height: 1.5;
-  white-space: nowrap;
-}
-
-.pill::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-full);
-  background: var(--color-muted-soft);
-}
-
-.pill.good {
-  color: var(--color-semantic-up);
-  border-color: var(--border-success);
-  background: var(--color-canvas);
-}
-
-.pill.good::before { background: var(--color-semantic-up); }
-
-.pill.info {
-  color: var(--color-primary);
-  border-color: var(--border-info);
-  background: var(--color-canvas);
-}
-
-.pill.info::before { background: var(--color-primary); }
-
-.pill.warn {
-  color: var(--color-muted);
-  background: var(--color-canvas);
-}
-
-.pill.warn::before { background: var(--color-accent-yellow); }
-
-.pill.bad {
-  color: var(--color-semantic-down);
-  border-color: var(--border-danger);
-  background: var(--color-canvas);
-}
-
-.pill.bad::before { background: var(--color-semantic-down); }
+/* The .pill status vocabulary (good/info/warn/bad, each with a leading dot)
+   moved into the shadcn Badge tone variants (src/components/ui/badge.tsx),
+   consumed via <StatusPill>. The motion + focus helpers below remain global. */
 
 .spin { animation: spin 0.9s linear infinite; }
 
