@@ -9,11 +9,10 @@ import {
   NavSidebarCollapse, NavSidebarExpand, NavSkills,
 } from "./components/icons";
 import {
-  cancelRun, createSession, logout, provisionSandbox,
-  RelayApiError,
+  cancelRun, createSession, logout,
   recordDecision, recordHandoff, runSandbox,
 } from "./api";
-import type { AgentName, AgentTaskMode, ControlPanelDaemonNodeRecord, CurrentUser, SandboxRecord } from "./types";
+import type { AgentName, AgentTaskMode, ControlPanelDaemonNodeRecord, CurrentUser } from "./types";
 import { RelayMark } from "./components/RelayMark";
 import { EmployeeAvatar } from "./components/EmployeeAvatar";
 import { StatusPill } from "./components/StatusPill";
@@ -34,12 +33,13 @@ import { DecisionBar } from "./components/composer/DecisionBar";
 import { useRelayData } from "./hooks/useRelayData";
 import { useSessionEvents } from "./hooks/useSessionEvents";
 import { useLocalDaemonNodes } from "./hooks/useLocalDaemonNodes";
-import { mergeVisibleDaemonNodes, shouldClaimLocalDaemonNode } from "./lib/daemonNodes";
+import { mergeVisibleDaemonNodes } from "./lib/daemonNodes";
 import { applyTheme, readLanguage, readTheme, readTokens, selectedEmployeeKey, writeLanguage, writeTheme } from "./lib/appStorage";
-import { canUseLocalControlPanel, localControlPanelNodes, newBrowserSandboxToken, preferLocalControlPanelNode, sessionBelongsToEmployee } from "./lib/controlPanel";
+import { canUseLocalControlPanel, localControlPanelNodes, sessionBelongsToEmployee } from "./lib/controlPanel";
 import { useRelayStore } from "./lib/store";
 import { useAuthSession } from "./hooks/useAuthSession";
 import { useComposer } from "./hooks/useComposer";
+import { useEmployeeProvisioning } from "./hooks/useEmployeeProvisioning";
 import "./i18n";
 
 // Mirrors AGENT_REGISTRY in relay-core. Kept as a local literal so the browser
@@ -195,81 +195,12 @@ export function App() {
     await refresh(undefined, tokenOverride);
   }, [refresh]);
 
-  async function provisionEmployeeSandbox(
-    employeeId: string,
-    preferredToken?: string,
-  ): Promise<{ sandbox: SandboxRecord; token?: string }> {
-    const token = preferredToken?.trim() || undefined;
-    const controlPanelNodes = await refreshLocalDaemonNodes();
-    const localNode = preferLocalControlPanelNode(employeeId, controlPanelNodes);
-
-    const claimLocalNode = async () => {
-      if (!localNode?.nodeToken) return undefined;
-      const nextToken = newBrowserSandboxToken();
-      const sandbox = await provisionSandbox(employeeId, nextToken, localNode.nodeToken);
-      return { sandbox, token: nextToken };
-    };
-
-    if (token) {
-      try {
-        const sandbox = await provisionSandbox(employeeId, token);
-        return { sandbox, token: sandbox.token ?? token };
-      } catch (error) {
-        if (error instanceof RelayApiError && error.status === 401) {
-          const claimed = await claimLocalNode();
-          if (claimed) return claimed;
-        }
-        throw error;
-      }
-    }
-
-    const claimed = await claimLocalNode();
-    if (claimed) return claimed;
-
-    const sandbox = await provisionSandbox(employeeId, token);
-    return { sandbox, token: sandbox.token ?? token };
-  }
-
-  function rememberSandboxToken(employeeId: string, sandbox: SandboxRecord, token?: string): void {
-    if (token) {
-      const nextTokens = { ...tokens, [employeeId]: token, [sandbox.id]: token };
-      setTokens(nextTokens);
-    }
-    setSandboxes((cur) => [sandbox, ...cur.filter((s) => s.id !== sandbox.id)]);
-  }
-
-  const adoptLocalDaemonNodes = useCallback(async () => {
-    const controlPanelNodes = await refreshLocalDaemonNodes();
-    const claimable = controlPanelNodes.filter((node) => shouldClaimLocalDaemonNode(node, nodes));
-    if (claimable.length === 0) return;
-
-    const nextTokens = { ...tokens };
-    const adoptedSandboxes: SandboxRecord[] = [];
-    for (const node of claimable) {
-      if (!node.employeeId || !node.nodeToken) continue;
-      const uiToken = newBrowserSandboxToken();
-      try {
-        const sandbox = await provisionSandbox(node.employeeId, uiToken, node.nodeToken);
-        nextTokens[node.employeeId] = uiToken;
-        nextTokens[sandbox.id] = uiToken;
-        adoptedSandboxes.push(sandbox);
-      } catch {
-        // A node may already belong to another browser token; leave it untouched.
-      }
-    }
-
-    if (adoptedSandboxes.length === 0) return;
-    setTokens(nextTokens);
-    setSandboxes((cur) => [
-      ...adoptedSandboxes,
-      ...cur.filter((sandbox) => !adoptedSandboxes.some((adopted) => adopted.id === sandbox.id)),
-    ]);
-    setStatus({
-      tone: "info",
-      message: t("toast.connected_nodes", { count: adoptedSandboxes.length }),
-    });
-    await refreshWithToken(nextTokens[selectedEmployee] ?? nextTokens[adoptedSandboxes[0].id]);
-  }, [nodes, refreshLocalDaemonNodes, refreshWithToken, selectedEmployee, setSandboxes, t, tokens]);
+  const { provisionEmployeeSandbox, rememberSandboxToken, adoptLocalDaemonNodes } = useEmployeeProvisioning({
+    nodes,
+    setSandboxes,
+    refreshLocalDaemonNodes,
+    refreshWithToken,
+  });
 
   useEffect(() => {
     if (!authChecked) return;
