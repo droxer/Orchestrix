@@ -1,11 +1,11 @@
 /* =====================================================================
-   MCP / Skills route shell
+   MCP / Skills route shell grid
 
-   The MCP Integrations page itself is now styled with Tailwind utilities
-   in McpPage.tsx. What remains here is shell-level: the .messenger-shell
-   grid for the mcp/skills routes (parent-driven via data-route), plus the
-   shared .skills-* page/header rules still consumed by the not-yet-migrated
-   SkillsPage. Those skills rules move into skills.css when it migrates.
+   The MCP and Skills pages are styled with Tailwind utilities in
+   McpPage.tsx / SkillsPage.tsx. What remains is shell-level: the
+   .messenger-shell column grid for these routes, driven by the parent's
+   data-route / data-sidenav attributes. The <820px override lives in
+   skills.css alongside the other small-screen route rules.
    ===================================================================== */
 
 .messenger-shell[data-route="mcp"],
@@ -20,58 +20,4 @@
 .messenger-shell[data-route="skills"][data-sidenav="open"],
 .messenger-shell[data-route="skills"][data-sidenav="open"][data-settings="open"] {
   grid-template-columns: var(--sidenav-w-open) minmax(0, 1fr);
-}
-
-/* Shared page shell (skills) */
-.skills-page {
-  min-height: 0;
-  overflow-y: auto;
-  background: var(--color-canvas);
-  display: flex;
-  flex-direction: column;
-}
-
-/* ── Skills header ─────────────────────────────────────────────────────────── */
-
-.skills-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-base);
-  min-height: var(--header-h);
-  padding: 0 var(--space-xl);
-  border-bottom: 1px solid var(--color-hairline);
-  flex-shrink: 0;
-}
-
-.skills-header-title {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-sm);
-}
-
-.skills-header-title h1 {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: var(--text-lg);
-  font-weight: 600;
-  line-height: 1.25;
-}
-
-.skills-header-sub {
-  color: var(--color-muted);
-  font-size: var(--text-xs);
-  font-weight: 500;
-}
-
-.skills-header-meta {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-}
-
-.skills-total {
-  color: var(--color-muted);
-  font-size: var(--text-xs);
-  font-weight: 500;
 }
