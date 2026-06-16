@@ -331,11 +331,20 @@
   "transcript": {
     "new_session": "New Workspace Session",
     "ready_for": "@{{employee}} Is Ready for {{agent}}.",
-    "ready_no_employee": "Open an Employee Workspace to Talk to {{agent}}."
+    "ready_no_employee": "Open an Employee Workspace to Talk to {{agent}}.",
+    "awaiting_first": "awaiting first message"
   },
   "login": {
     "title": "Relay",
     "subtitle": "Sign in to Continue",
+    "brand": "Relay · Console",
+    "headline_a": "Sign in to the",
+    "headline_b": "orchestrator.",
+    "headline_bootstrap_a": "Provision the",
+    "headline_bootstrap_b": "first admin.",
+    "lede": "Operate the control plane that schedules sandboxes, supervises daemons, and routes work across Claude, Pi, Codex, and Kimi.",
+    "lede_bootstrap": "First-run setup. Use the RELAY_ADMIN_TOKEN printed by the backend on its first boot to mint the founding administrator.",
+    "kicker_setup": "First-run setup",
     "username": "Username",
     "password": "Password",
     "sign_in": "Sign In",
@@ -347,7 +356,16 @@
     "create_admin": "Create Admin",
     "no_bootstrap": "Bootstrap Is Not Required. Please Sign In.",
     "go_bootstrap": "Create First Admin",
-    "go_login": "Back to Sign In"
+    "go_login": "Back to Sign In",
+    "pullquote": "A control plane is the room where work decides what to become.",
+    "pullquote_attribution": "The Relay Operator's Field Notes",
+    "system_label": "System",
+    "system_backend": "backend",
+    "system_daemon": "daemon",
+    "system_sandbox": "sandbox",
+    "system_state_ready": "ready",
+    "system_state_boxlite": "boxlite",
+    "system_state_pending": "awaiting credentials"
   },
   "status": {
     "ready": "Ready",

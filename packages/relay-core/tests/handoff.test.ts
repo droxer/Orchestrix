@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
@@ -30,6 +30,7 @@ import {
   failureCount,
   formatClaudeJsonLine,
   formatCodexJsonLine,
+  formatPiJsonLine,
   getAgent,
   agentCredentialEnv,
   guestCodexConfigToml,
@@ -53,7 +54,9 @@ import {
   ensureAgentReady,
   ensureLocalDevboxOci,
   localProcessExecStream,
+  prepareGuestAgentAuth,
   resetAgentReadiness,
+  setSessionBox,
   type ExecutionManager,
 } from "../../relay-daemon/src/index.js";
 
@@ -108,8 +111,11 @@ function writeFakePi(path: string): void {
     "#!/bin/sh",
     "if [ \"$1\" = \"--help\" ]; then printf '%s\\n' \"$PI_HELP_TEXT\"; exit 0; fi",
     "flag=",
+    "prev=",
     "for arg in \"$@\"; do",
+    "  if [ \"$prev\" = \"--mode\" ] && [ \"$arg\" = \"json\" ]; then flag=json; fi",
     "  case \"$arg\" in -P|--print-streaming) flag=streaming ;; -p|--print) flag=print ;; esac",
+    "  prev=\"$arg\"",
     "done",
     "printf '%s\\n' \"$flag\"",
     "test -n \"$flag\"",
@@ -138,6 +144,21 @@ describe("review parsing", () => {
         type: "message",
         role: "assistant",
         content: [{ type: "output_text", text: "Looks good.\nRELAY_REVIEW_VERDICT: APPROVED" }],
+      }) + "\n",
+    );
+
+    assert.equal(feedback, "Looks good.\nRELAY_REVIEW_VERDICT: APPROVED");
+    assert.equal(classifyReview(0, feedback), "approved");
+  });
+
+  it("extracts review verdicts from Pi JSON assistant message events", () => {
+    const feedback = extractReviewFeedback(
+      JSON.stringify({
+        type: "message",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "Looks good.\nRELAY_REVIEW_VERDICT: APPROVED" }],
+        },
       }) + "\n",
     );
 
@@ -306,7 +327,26 @@ describe("agent failure logging", () => {
 });
 
 describe("agent command invocation", () => {
-  it("falls back to Pi -p when pi --help does not advertise streaming print", () => {
+  it("uses Pi JSON mode when pi --help advertises it", () => {
+    const temp = mkdtempSync(join(tmpdir(), "relay-pi-invoke-"));
+    const workspace = mkdtempSync(join(tmpdir(), "relay-pi-workspace-"));
+    writeFakePi(join(temp, "pi"));
+
+    withEnv({
+      PATH: `${temp}:${process.env.PATH ?? ""}`,
+      RELAY_AGENT_HOME: join(temp, "home"),
+      RELAY_AGENT_WORKSPACE: workspace,
+      RELAY_RUN_AS_CURRENT_USER: "1",
+      PI_HELP_TEXT: "Options:\n  --mode <mode> Output mode: text or json\n  --print, -p  Non-interactive mode",
+    }, () => {
+      const result = runShellCommand(buildPiImplementCommand(state()), process.env);
+
+      assert.equal(result.exit_code, 0, result.stderr || result.error_message);
+      assert.equal(result.stdout, "json\n");
+    });
+  });
+
+  it("falls back to Pi -p when pi --help does not advertise JSON or streaming print", () => {
     const temp = mkdtempSync(join(tmpdir(), "relay-pi-invoke-"));
     const workspace = mkdtempSync(join(tmpdir(), "relay-pi-workspace-"));
     writeFakePi(join(temp, "pi"));
@@ -325,7 +365,7 @@ describe("agent command invocation", () => {
     });
   });
 
-  it("uses Pi -P when pi --help advertises streaming print", () => {
+  it("uses Pi -P when pi --help advertises streaming print but not JSON mode", () => {
     const temp = mkdtempSync(join(tmpdir(), "relay-pi-invoke-"));
     const workspace = mkdtempSync(join(tmpdir(), "relay-pi-workspace-"));
     writeFakePi(join(temp, "pi"));
@@ -472,6 +512,39 @@ describe("agent stream rendering", () => {
 
     assert.match(output, /● First chunk continues/);
     assert.match(output, /\n {2}Next line/);
+  });
+
+  it("renders Pi JSON assistant message events without raw JSON", () => {
+    const line = JSON.stringify({
+      type: "message",
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: "Hi from Pi JSON." }],
+      },
+    });
+
+    const output = formatPiJsonLine(line);
+
+    assert.match(output, /Hi from Pi JSON\./);
+    assert.doesNotMatch(output, /"type":"message"/);
+  });
+
+  it("renders Pi JSON empty assistant events as visible status", () => {
+    const output = formatPiJsonLine(JSON.stringify({
+      type: "message_end",
+      message: { role: "assistant", content: [], stopReason: "stop" },
+    }));
+
+    assert.match(output, /Pi returned no assistant text\./);
+  });
+
+  it("renders Pi JSON assistant errors as visible status", () => {
+    const output = formatPiJsonLine(JSON.stringify({
+      type: "turn_end",
+      message: { role: "assistant", content: [], stopReason: "error", errorMessage: "Connection error." },
+    }));
+
+    assert.match(output, /Pi error: Connection error\./);
   });
 
   it("filters noisy seccomp stderr warnings", () => {
@@ -650,6 +723,56 @@ describe("execution manager boundary", () => {
     assert.equal(calls[0], "auth:codex");
     assert.match(calls[1] ?? "", /^shell:su agent .*codex login status/);
     assert.equal(calls.length, 2);
+
+    resetAgentReadiness();
+    calls.length = 0;
+    await ensureAgentReady("kimi", undefined, undefined, manager);
+
+    assert.equal(calls[0], "auth:kimi");
+    assert.match(calls[1] ?? "", /^shell:su agent .*KIMI_CODE_HOME=.*kimi --version/);
+    assert.equal(calls.length, 2);
+  });
+
+  it("provisions Kimi config and credentials into the guest without copying host binaries", async () => {
+    const temp = mkdtempSync(join(tmpdir(), "relay-kimi-code-"));
+    const credentials = join(temp, "credentials");
+    const oauth = join(temp, "oauth");
+    const bin = join(temp, "bin");
+    mkdirSync(credentials, { recursive: true });
+    mkdirSync(oauth, { recursive: true });
+    mkdirSync(bin, { recursive: true });
+    writeFileSync(join(temp, "config.toml"), "default_model = \"kimi-test\"\n");
+    writeFileSync(join(temp, "tui.toml"), "theme = \"dark\"\n");
+    writeFileSync(join(credentials, "kimi-code.json"), "{\"token\":\"secret\"}\n");
+    writeFileSync(join(oauth, "kimi-code"), "");
+    writeFileSync(join(bin, "kimi"), "mac binary");
+
+    const oldEnv = process.env;
+    let script = "";
+    setSessionBox({
+      exec: async (_cmd: string, args: string[]) => {
+        script = args[1] ?? "";
+        const emptyReader = { next: async () => null };
+        return {
+          stdout: async () => emptyReader,
+          stderr: async () => emptyReader,
+          wait: async () => ({ exitCode: 0 }),
+        };
+      },
+    });
+    process.env = { KIMI_CODE_HOME: temp };
+    try {
+      await prepareGuestAgentAuth(["kimi"]);
+    } finally {
+      process.env = oldEnv;
+      setSessionBox(null);
+    }
+
+    assert.match(script, /\/home\/agent\/\.kimi-code\/config\.toml/);
+    assert.match(script, /\/home\/agent\/\.kimi-code\/tui\.toml/);
+    assert.match(script, /\/home\/agent\/\.kimi-code\/credentials\/kimi-code\.json/);
+    assert.match(script, /\/home\/agent\/\.kimi-code\/oauth\/kimi-code/);
+    assert.doesNotMatch(script, /\/home\/agent\/\.kimi-code\/bin\/kimi/);
   });
 });
 
@@ -694,17 +817,18 @@ describe("Pi provider config", () => {
         assert.match(command, /PI_CODING_AGENT_DIR=\/home\/agent\/.pi\/agent/);
         assert.match(command, /--provider openai/);
         assert.match(command, /--model test-model/);
+        assert.match(command, /--mode json/);
         assert.match(command, /--print-streaming/);
         assert.match(command, / -P /);
         assert.match(command, / -p /);
-        assert.match(command, /if pi --help/);
+        assert.match(command, /elif pi --help/);
         assert.match(preflight, /pi --list-models/);
         assert.match(preflight, /openai test-model/);
       },
     );
   });
 
-  it("uses OpenAI-compatible Pi config for MiniMax-compatible OpenAI env", () => {
+  it("uses Anthropic-compatible Pi config for MiniMax-compatible OpenAI env", () => {
     withEnv(
       {
         OPENAI_API_KEY: "test-key",
@@ -717,15 +841,16 @@ describe("Pi provider config", () => {
         const command = buildPiImplementCommand(state());
         const preflight = buildPiPreflightCommand();
 
-        assert.equal(auth.openai.key, "test-key");
-        const provider = models.providers.openai;
-        assert.equal(provider.baseUrl, "https://api.minimaxi.com/v1");
-        assert.equal(provider.api, "openai-completions");
+        assert.equal(auth["minimax-cn"].key, "test-key");
+        const provider = models.providers["minimax-cn"];
+        assert.equal(provider.baseUrl, "https://api.minimaxi.com/anthropic");
+        assert.equal(provider.api, "anthropic-messages");
+        assert.equal(provider.apiKey, "$PI_API_KEY");
         assert.equal(provider.models[0].id, "MiniMax-M2.7");
-        assert.match(command, /--provider openai/);
+        assert.match(command, /--provider minimax-cn/);
         assert.match(command, /--model MiniMax-M2\.7/);
         assert.match(preflight, /pi --list-models/);
-        assert.match(preflight, /openai MiniMax-M2\.7/);
+        assert.match(preflight, /minimax-cn MiniMax-M2\.7/);
       },
     );
   });

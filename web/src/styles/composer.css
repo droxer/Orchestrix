@@ -208,7 +208,7 @@
 .composer-input:focus-within {
   border-color: color-mix(in srgb, var(--color-primary) 60%, var(--color-hairline));
   box-shadow:
-    0 0 0 2px color-mix(in srgb, var(--color-primary) 35%, transparent),
+    var(--ring-focus),
     0 1px 0 color-mix(in srgb, var(--color-ink) 4%, transparent);
 }
 
@@ -263,7 +263,7 @@
       color-mix(in srgb, var(--color-on-primary) 22%, transparent) 0%,
       transparent 55%),
     linear-gradient(180deg,
-      color-mix(in srgb, var(--color-primary) 92%, white 8%) 0%,
+      color-mix(in srgb, var(--color-primary) 92%, var(--color-on-primary) 8%) 0%,
       var(--color-primary) 100%);
   color: var(--color-on-primary);
   box-shadow:
@@ -273,16 +273,16 @@
   isolation: isolate;
   overflow: hidden;
   transition:
-    background 160ms ease,
-    transform 140ms cubic-bezier(0.34, 1.56, 0.64, 1),
-    box-shadow 200ms ease,
-    color 160ms ease;
+    background var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-spring),
+    box-shadow var(--duration-base) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
 }
 
 .send-button > svg {
   position: relative;
   z-index: 1;
-  transition: transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform var(--duration-base) var(--ease-spring);
   will-change: transform;
 }
 
@@ -306,7 +306,7 @@
       color-mix(in srgb, var(--color-on-primary) 28%, transparent) 0%,
       transparent 55%),
     linear-gradient(180deg,
-      color-mix(in srgb, var(--color-primary-active) 92%, white 10%) 0%,
+      color-mix(in srgb, var(--color-primary-active) 90%, var(--color-on-primary) 10%) 0%,
       var(--color-primary-active) 100%);
   transform: translateY(-1.5px);
   box-shadow:

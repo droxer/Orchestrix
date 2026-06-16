@@ -1,4 +1,5 @@
 DEVBOX_IMAGE := relay-devbox:v1
+DEVBOX_BASE_IMAGE ?= node:22.19-bookworm-slim
 OCI_DIR := .oci/relay-devbox-v1
 DOCKERFILE := dockerfile
 IMAGE_ID_FILE := $(OCI_DIR)/.docker-image-id
@@ -17,10 +18,10 @@ WORKSPACE ?=
 .PHONY: devbox-image devbox-check devbox-oci build-packages test test-python backend-install backend-run backend-test backend-migrate pre-commit-install pre-commit-run run tui-install tui-run tui-test tui tui-local backend daemon-install daemon-run daemon-test daemon run-with-daemon serve web-install web-run web-test web run-fresh stop
 
 devbox-image:
-	docker build -t $(DEVBOX_IMAGE) -f $(DOCKERFILE) .
+	docker build --build-arg DEVBOX_BASE_IMAGE="$(DEVBOX_BASE_IMAGE)" -t $(DEVBOX_IMAGE) -f $(DOCKERFILE) .
 
 devbox-check: devbox-image
-	docker run --rm $(DEVBOX_IMAGE) bash -lc 'node --version && command -v pi && pi --version && claude --version && codex --version'
+	docker run --rm $(DEVBOX_IMAGE) bash -lc 'node --version && command -v pi && pi --version && claude --version && codex --version && kimi --version'
 
 devbox-oci: devbox-check
 	mkdir -p $(OCI_DIR)

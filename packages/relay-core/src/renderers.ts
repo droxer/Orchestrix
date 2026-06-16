@@ -82,6 +82,34 @@ export class PlainTextStreamRenderer extends BlockStreamRenderer {
   }
 }
 
+export class PiStreamRenderer {
+  private readonly text = new BlockStreamRenderer(TEXT_MARK, ansi.yellow);
+  private readonly plain = new PlainTextStreamRenderer("Pi", ansi.yellow);
+  private readonly lines = new JsonLineRenderer((line) => this.formatLine(line));
+
+  feed(chunk: string): string {
+    return this.lines.feed(chunk);
+  }
+
+  private formatLine(line: string): string {
+    const event = parseJsonObject(line);
+    if (!event) return this.plain.feed(`${sanitizeUntrustedText(line)}\n`);
+
+    const text = piAssistantText(event).trim();
+    if (text) {
+      this.text.resetBlock();
+      return this.text.feed(`${text}\n`);
+    }
+
+    if (event.type === "error") {
+      return `\n${status("error", `Pi error: ${String(event.message ?? "unknown error")}`)}\n`;
+    }
+    const piStatus = piStatusMessage(event);
+    if (piStatus) return `\n${piStatus}\n`;
+    return "";
+  }
+}
+
 export class StderrLineRenderer {
   private buffer = "";
 
@@ -263,10 +291,39 @@ function textFromContentRecord(record: Record<string, unknown>): string {
     .join("\n");
 }
 
+function piAssistantText(event: Record<string, unknown>): string {
+  const message = asRecord(event.message ?? event);
+  if (event.type !== "message" && event.type !== "assistant_message" && message.role !== "assistant") return "";
+  if (message.role && message.role !== "assistant") return "";
+  return textFromContentRecord(message);
+}
+
+function piStatusMessage(event: Record<string, unknown>): string {
+  if (event.type === "auto_retry_end" && event.success === false) {
+    return status("error", `Pi error: ${String(event.finalError ?? "unknown error")}`);
+  }
+  if (event.type !== "message_end" && event.type !== "turn_end") return "";
+  const message = asRecord(event.message ?? event);
+  if (message.role !== "assistant") return "";
+  const errorMessage = message.errorMessage ?? event.errorMessage;
+  if (errorMessage || message.stopReason === "error") {
+    return status("error", `Pi error: ${String(errorMessage ?? "unknown error")}`);
+  }
+  const content = message.content;
+  if (Array.isArray(content) && content.length === 0 && message.stopReason === "stop") {
+    return status("warn", "Pi returned no assistant text.");
+  }
+  return "";
+}
+
 export function formatClaudeJsonLine(line: string): string {
   return new ClaudeStreamRenderer().feed(`${line}\n`);
 }
 
 export function formatCodexJsonLine(line: string): string {
   return new CodexStreamRenderer().feed(`${line}\n`);
+}
+
+export function formatPiJsonLine(line: string): string {
+  return new PiStreamRenderer().feed(`${line}\n`);
 }

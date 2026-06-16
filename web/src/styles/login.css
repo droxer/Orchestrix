@@ -1,0 +1,471 @@
+/* =====================================================================
+   Login — editorial split surface
+
+   Two-pane composition: a left rail carrying the form and a right pane
+   carrying atmosphere (pull-quote + system status). The split collapses
+   to a single column under 880px; the right pane is hidden rather than
+   stacked, since stacking the editorial moment under a form turns it
+   into decorative noise instead of context.
+
+   All colors, type, radii, and spacing come from tokens.css. No new
+   primitives are introduced.
+   ===================================================================== */
+
+.login-screen {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  min-height: 100vh;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+@media (max-width: 879px) {
+  .login-screen {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- Left rail: the form ---------------------------------- */
+
+.login-pane {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: var(--space-xl) clamp(var(--space-lg), 6vw, var(--space-xxl));
+  min-height: 100vh;
+}
+
+.login-pane-top,
+.login-pane-bottom {
+  flex: 0 0 auto;
+}
+
+.login-pane-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  max-width: 420px;
+  width: 100%;
+  margin: 0 auto;
+  padding: var(--space-xxl) 0;
+}
+
+.login-pane-top,
+.login-pane-bottom {
+  max-width: 420px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* Brand kicker — dot + eyebrow text. Dot doubles as a status indicator:
+   blue for the sign-in flow, amber for bootstrap (first-run setup). */
+.login-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: 0;
+  font: var(--type-eyebrow);
+  letter-spacing: var(--letter-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-muted);
+  opacity: 0;
+  animation: login-rise 540ms var(--ease-out-quint) forwards;
+  animation-delay: 40ms;
+}
+
+.login-kicker::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 18%, transparent);
+}
+
+.login-kicker[data-mode="bootstrap"]::before {
+  background: var(--color-accent-yellow);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent-yellow) 22%, transparent);
+}
+
+/* Headline — Instrument Serif, two lines, second line italic for the
+   editorial accent. Locked to display weight 400 per the brand spec. */
+.login-headline {
+  margin: var(--space-md) 0 var(--space-base);
+  font-family: var(--font-display);
+  font-size: clamp(34px, 4.4vw, 44px);
+  font-weight: 400;
+  line-height: 1.05;
+  letter-spacing: var(--letter-display);
+  color: var(--color-ink);
+  opacity: 0;
+  animation: login-rise 720ms var(--ease-out-quint) forwards;
+  animation-delay: 120ms;
+}
+
+.login-headline-break {
+  display: block;
+  font-style: italic;
+  color: color-mix(in srgb, var(--color-ink) 84%, var(--color-primary));
+}
+
+.login-lede {
+  margin: 0 0 var(--space-xl);
+  max-width: 38ch;
+  font-size: var(--text-md);
+  line-height: var(--leading-loose);
+  color: var(--color-body);
+  opacity: 0;
+  animation: login-rise 720ms var(--ease-out-quint) forwards;
+  animation-delay: 200ms;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-base);
+  opacity: 0;
+  animation: login-rise 720ms var(--ease-out-quint) forwards;
+  animation-delay: 280ms;
+}
+
+.login-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+}
+
+.login-field-label {
+  font: var(--type-eyebrow);
+  letter-spacing: var(--letter-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+/* Full-width primary CTA. Pill radius is inherited from the shadcn Button
+   base — only the editorial 48px height + button type role are local. */
+.login-form > button[data-slot="button"] {
+  margin-top: var(--space-xs);
+  width: 100%;
+  height: 48px;
+  font: var(--type-button);
+}
+
+.login-error {
+  margin: 0;
+  padding: var(--space-sm) var(--space-base);
+  border-left: 2px solid var(--color-semantic-down);
+  background: color-mix(in srgb, var(--color-semantic-down) 8%, var(--color-canvas));
+  color: var(--color-semantic-down);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+/* Mode toggle — a hairline-bordered secondary affordance, not a link.
+   Switching between sign-in and first-run setup is a context switch,
+   not a navigation, and deserves the weight of a real button. */
+.login-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-base);
+  padding-top: var(--space-base);
+  border-top: 1px solid var(--color-hairline-soft);
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  opacity: 0;
+  animation: login-rise 720ms var(--ease-out-quint) forwards;
+  animation-delay: 360ms;
+}
+
+.login-toggle-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  padding: var(--space-xs) var(--space-base);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
+}
+
+.login-toggle-button:hover {
+  background: var(--color-surface-soft);
+  border-color: color-mix(in srgb, var(--color-ink) 18%, transparent);
+}
+
+.login-toggle-button:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-focus);
+}
+
+.login-toggle-button::after {
+  content: "→";
+  margin-left: var(--space-xxs);
+  font-family: var(--font-mono);
+  transition: transform 140ms ease;
+}
+
+.login-toggle-button:hover::after {
+  transform: translateX(2px);
+}
+
+/* ---------- Right pane: the editorial moment --------------------- */
+
+.login-atmosphere {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: var(--space-xxl) clamp(var(--space-lg), 5vw, var(--space-xxl));
+  background: var(--color-surface-soft);
+  color: var(--color-ink);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+@media (max-width: 879px) {
+  .login-atmosphere {
+    display: none;
+  }
+}
+
+/* Atmospheric mark — a single oversized serif character bled to the
+   corner. Adds depth without competing with the pull-quote. */
+.login-atmosphere::before {
+  content: "R";
+  position: absolute;
+  right: -0.12em;
+  bottom: -0.28em;
+  font-family: var(--font-display);
+  font-size: clamp(360px, 48vw, 640px);
+  font-weight: 400;
+  line-height: 1;
+  /* On light: 5% ink reads as a watermark; on dark, a flat 5% white is
+     too hot — drop to 3% so the bled-glyph stays a whisper. */
+  color: color-mix(in srgb, var(--color-ink) 5%, transparent);
+  z-index: -1;
+  pointer-events: none;
+  user-select: none;
+}
+
+html[data-theme="dark"] .login-atmosphere::before,
+.transcript-empty-watermark {
+  /* Shared rule: the bled-glyph trick belongs to both surfaces. */
+}
+
+html[data-theme="dark"] .login-atmosphere::before {
+  color: color-mix(in srgb, var(--color-ink) 3%, transparent);
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) .login-atmosphere::before {
+    color: color-mix(in srgb, var(--color-ink) 3%, transparent);
+  }
+}
+
+.login-atmosphere-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font: var(--type-eyebrow);
+  letter-spacing: var(--letter-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-muted);
+  opacity: 0;
+  animation: login-rise 720ms var(--ease-out-quint) forwards;
+  animation-delay: 160ms;
+}
+
+.login-atmosphere-top::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--color-hairline);
+}
+
+.login-pullquote {
+  margin: 0;
+  max-width: 18ch;
+  font-family: var(--font-display);
+  font-size: clamp(28px, 3.6vw, 42px);
+  font-style: italic;
+  font-weight: 400;
+  line-height: 1.18;
+  letter-spacing: var(--letter-display);
+  color: var(--color-ink);
+  opacity: 0;
+  animation: login-rise 880ms var(--ease-out-quint) forwards;
+  animation-delay: 240ms;
+}
+
+.login-pullquote::before {
+  content: "“";
+  display: block;
+  margin-bottom: var(--space-xs);
+  font-size: 1.6em;
+  line-height: 0.4;
+  color: color-mix(in srgb, var(--color-ink) 30%, transparent);
+}
+
+.login-pullquote-attribution {
+  margin-top: var(--space-base);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-style: normal;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--color-muted);
+}
+
+.login-pullquote-attribution::before {
+  content: "— ";
+  color: color-mix(in srgb, var(--color-muted) 60%, transparent);
+}
+
+/* Status block — mono identifiers stacked, evoking a daemon log. Reads
+   as ambient context, not interactive UI. */
+.login-system {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--space-xs) var(--space-base);
+  align-items: baseline;
+  padding-top: var(--space-base);
+  border-top: 1px solid var(--color-hairline);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-body);
+  opacity: 0;
+  animation: login-rise 720ms var(--ease-out-quint) forwards;
+  animation-delay: 380ms;
+}
+
+.login-system-row {
+  display: contents;
+}
+
+.login-system-key {
+  color: var(--color-muted);
+}
+
+.login-system-sep {
+  color: color-mix(in srgb, var(--color-muted) 50%, transparent);
+}
+
+.login-system-value {
+  color: var(--color-ink);
+  font-feature-settings: "tnum" 1;
+  text-align: right;
+}
+
+.login-system-value[data-state="ready"]::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: var(--space-xxs);
+  border-radius: var(--radius-full);
+  background: var(--color-semantic-up);
+  vertical-align: middle;
+}
+
+.login-system-value[data-state="pending"]::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: var(--space-xxs);
+  border-radius: var(--radius-full);
+  background: var(--color-accent-yellow);
+  vertical-align: middle;
+}
+
+/* ---------- Footer rail ----------------------------------------- */
+
+.login-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-base);
+  margin-top: var(--space-xl);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-muted-soft);
+}
+
+.login-foot-mark {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: var(--text-sm);
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--color-muted);
+}
+
+/* ---------- Pre-auth "checking" splash --------------------------- */
+
+.login-checking {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: var(--color-canvas);
+  color: var(--color-muted);
+}
+
+.login-checking-text {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: var(--letter-display);
+  animation: login-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes login-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-checking-text {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+/* ---------- Motion ---------------------------------------------- */
+
+@keyframes login-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-kicker,
+  .login-headline,
+  .login-lede,
+  .login-form,
+  .login-toggle,
+  .login-atmosphere-top,
+  .login-pullquote,
+  .login-system {
+    animation: none;
+    opacity: 1;
+  }
+}

@@ -86,12 +86,15 @@ function buildPiCommand(prompt: string): string {
   if (provider) argv.push("--provider", provider);
   const model = piModel();
   if (model) argv.push("--model", model);
+  const jsonCommand = shellCommand([...argv, "--mode", "json", prompt]);
   const streamingCommand = shellCommand([...argv, "-P", prompt]);
   const printCommand = shellCommand([...argv, "-p", prompt]);
+  const supportsJsonMode =
+    "pi --help 2>&1 | grep -Eq '(^|[[:space:]])--mode([=,[:space:]]|$)'";
   const supportsStreamingPrint =
     "pi --help 2>&1 | grep -Eq '(^|[[:space:]])(-P|--print-streaming)([=,[:space:]]|$)'";
   return runAsAgent(
-    `if ${supportsStreamingPrint}; then ${streamingCommand}; else ${printCommand}; fi`,
+    `if ${supportsJsonMode}; then ${jsonCommand}; elif ${supportsStreamingPrint}; then ${streamingCommand}; else ${printCommand}; fi`,
     "pi",
   );
 }

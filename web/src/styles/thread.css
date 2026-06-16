@@ -73,7 +73,28 @@
   border-bottom: 1px solid var(--color-hairline-soft);
   background: transparent;
   color: var(--color-ink);
-  transition: background 120ms ease;
+  transition: background var(--duration-fast) var(--ease-standard);
+  animation: thread-row-in 360ms var(--ease-out-quint) both;
+}
+
+/* Staggered reveal — first 8 rows fade-rise on mount. Cheap delight; the
+   chat panel feels populated rather than slapped together. */
+.conversation-row:nth-child(1) { animation-delay: 40ms; }
+.conversation-row:nth-child(2) { animation-delay: 80ms; }
+.conversation-row:nth-child(3) { animation-delay: 120ms; }
+.conversation-row:nth-child(4) { animation-delay: 160ms; }
+.conversation-row:nth-child(5) { animation-delay: 200ms; }
+.conversation-row:nth-child(6) { animation-delay: 240ms; }
+.conversation-row:nth-child(7) { animation-delay: 280ms; }
+.conversation-row:nth-child(8) { animation-delay: 320ms; }
+
+@keyframes thread-row-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .conversation-row { animation: none; }
 }
 
 /* Full-width inner button — carries the grid layout and all interactive content */

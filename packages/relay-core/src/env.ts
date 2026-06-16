@@ -26,7 +26,7 @@ export const OPENAI_ENV_KEYS = [
 ] as const;
 
 export const DEFAULT_HOST_WORKSPACE = "~/projects/air-platform";
-export const PI_NATIVE_BASE_URL_PROVIDERS = new Set(["minimax", "minimax-cn"]);
+export const PI_NATIVE_BASE_URL_PROVIDERS = new Set<string>();
 
 function loadDotEnv(path: string, options: { overrideLoaded?: boolean } = {}): void {
   if (!existsSync(path)) return;
@@ -139,9 +139,35 @@ export function piModel(): string | undefined {
   return process.env.PI_MODEL || openaiModel();
 }
 
+function minimaxPiProviderForBaseUrl(baseUrl: string | undefined): string | undefined {
+  if (!baseUrl) return undefined;
+  let hostname: string;
+  try {
+    hostname = new URL(baseUrl).hostname.toLowerCase();
+  } catch {
+    hostname = baseUrl.toLowerCase();
+  }
+  if (hostname === "api.minimaxi.com" || hostname.endsWith(".minimaxi.com")) return "minimax-cn";
+  if (hostname === "api.minimax.io" || hostname.endsWith(".minimax.io")) return "minimax";
+  return undefined;
+}
+
+function minimaxAnthropicBaseUrl(baseUrl: string): string | undefined {
+  const provider = minimaxPiProviderForBaseUrl(baseUrl);
+  if (!provider) return undefined;
+  try {
+    const url = new URL(baseUrl);
+    return `${url.protocol}//${url.hostname}${url.port ? `:${url.port}` : ""}/anthropic`;
+  } catch {
+    return undefined;
+  }
+}
+
 export function piProvider(): string {
   if (process.env.PI_PROVIDER) return process.env.PI_PROVIDER;
   const baseUrl = piSourceBaseUrl();
+  const minimaxProvider = minimaxPiProviderForBaseUrl(baseUrl);
+  if (minimaxProvider) return minimaxProvider;
   if (baseUrl) return "openai";
   if (anthropicApiKey()) return "anthropic";
   if (openaiApiKey()) return "openai";
@@ -149,9 +175,12 @@ export function piProvider(): string {
 }
 
 export function piBaseUrl(): string | undefined {
+  const provider = piProvider();
+  if (PI_NATIVE_BASE_URL_PROVIDERS.has(provider)) return undefined;
   if (process.env.PI_BASE_URL) return process.env.PI_BASE_URL;
-  if (process.env.PI_PROVIDER && PI_NATIVE_BASE_URL_PROVIDERS.has(process.env.PI_PROVIDER)) return undefined;
-  return openaiBaseUrl();
+  const baseUrl = openaiBaseUrl();
+  if (!baseUrl) return undefined;
+  return minimaxAnthropicBaseUrl(baseUrl) ?? baseUrl;
 }
 
 export function piApi(): string {

@@ -1,5 +1,6 @@
 # Pi requires Node.js >=22.19.0.
-FROM node:22.19-bookworm-slim
+ARG DEVBOX_BASE_IMAGE=node:22.19-bookworm-slim
+FROM ${DEVBOX_BASE_IMAGE}
 
 # Prevent interactive prompts during apt installations
 ENV DEBIAN_FRONTEND=noninteractive
@@ -17,7 +18,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install agent CLIs
-RUN npm install -g @anthropic-ai/claude-code @openai/codex @earendil-works/pi-coding-agent
+RUN npm install -g @anthropic-ai/claude-code @openai/codex @earendil-works/pi-coding-agent @moonshot-ai/kimi-code
 
 # UID/GID are aligned to the host workspace owner at runtime (orchestrator boot).
 RUN useradd -m -s /bin/bash agent

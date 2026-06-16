@@ -24,6 +24,24 @@ def _login_admin(client: TestClient) -> None:
     assert response.status_code == 200
 
 
+def _login(client: TestClient, username: str, password: str) -> None:
+    response = client.post("/auth/login", json={
+        "username": username,
+        "password": password,
+    })
+    assert response.status_code == 200
+
+
+def _create_user(client: TestClient, username: str, *, employee_id: str) -> None:
+    response = client.post("/cp/users", json={
+        "username": username,
+        "password": "userpass",
+        "role": "user",
+        "employeeId": employee_id,
+    })
+    assert response.status_code == 201
+
+
 def test_fastapi_daemon_routes_register_and_poll(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
@@ -297,3 +315,94 @@ def test_control_panel_creates_pending_daemon_node_and_reuses_duplicate(monkeypa
         assert "sandboxToken" not in duplicate_body
         assert "nodeToken" not in duplicate_body
         assert "daemonCommand" not in duplicate_body
+
+
+def test_employee_can_ask_assigned_daemon_node_without_daemon_node_token(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        admin_client = TestClient(app)
+        _bootstrap_admin(admin_client)
+        _login_admin(admin_client)
+        _create_user(admin_client, "alice", employee_id="alice")
+        _create_user(admin_client, "bob", employee_id="bob")
+
+        pending = admin_client.post("/cp/daemon-nodes", json={
+            "employeeId": "alice",
+            "workspacePath": "/workspace/stale",
+        })
+        assert pending.status_code == 201
+        pending_id = pending.json()["node"]["id"]
+
+        register = admin_client.post("/daemon-nodes/register", json={
+            "sandboxId": "sbx_alice",
+            "employeeId": "alice",
+            "token": "node_token",
+            "workspacePath": "/workspace/alice",
+            "protocolVersion": 1,
+            "supportedAgents": ["codex"],
+            "status": "ready",
+        }, headers={"Authorization": "Bearer ui_token"})
+        assert register.status_code == 200
+
+        alice_client = TestClient(app)
+        _login(alice_client, "alice", "userpass")
+        listed = alice_client.get("/sandboxes")
+        assert listed.status_code == 200
+        assert listed.json()["sandboxes"][0]["id"] == "sbx_alice"
+        assert any(sandbox["id"] == pending_id for sandbox in listed.json()["sandboxes"])
+
+        bob_client = TestClient(app)
+        _login(bob_client, "bob", "userpass")
+
+        provision = alice_client.post("/sandboxes", json={"employeeId": "alice"})
+        assert provision.status_code == 201
+        assert provision.json()["id"] == "sbx_alice"
+        assert "nodeToken" not in provision.json()
+
+        bob_provision = bob_client.post("/sandboxes", json={"employeeId": "alice"})
+        assert bob_provision.status_code == 201
+        assert bob_provision.json()["id"] == "sbx_alice"
+
+        run = alice_client.post("/sandboxes/sbx_alice/runs", json={
+            "taskGoal": "answer this",
+            "assignments": [{"agent": "codex", "mode": "implement"}],
+        })
+        assert run.status_code == 202
+        session_id = run.json()["id"]
+        assert run.json()["ownerEmployeeId"] == "alice"
+        assert run.json()["status"] == "running"
+
+        cancel = alice_client.post(f"/sandboxes/sbx_alice/runs/{session_id}/cancel", json={
+            "reason": "test cleanup",
+        })
+        assert cancel.status_code == 202
+        ready_again = admin_client.post("/daemon-nodes/register", json={
+            "sandboxId": "sbx_alice",
+            "employeeId": "alice",
+            "token": "node_token",
+            "workspacePath": "/workspace/alice",
+            "protocolVersion": 1,
+            "supportedAgents": ["codex"],
+            "status": "ready",
+        }, headers={"Authorization": "Bearer ui_token"})
+        assert ready_again.status_code == 200
+
+        bob_session = bob_client.post("/sessions", json={
+            "taskGoal": "bob asks alice node",
+            "assignments": [{"agent": "codex", "mode": "implement"}],
+            "workspacePath": "/workspace/alice",
+        })
+        assert bob_session.status_code == 201
+        bob_run = bob_client.post("/sandboxes/sbx_alice/runs", json={
+            "taskGoal": "bob asks alice node",
+            "assignments": [{"agent": "codex", "mode": "implement"}],
+            "sessionId": bob_session.json()["id"],
+        })
+        assert bob_run.status_code == 202
+        assert bob_run.json()["ownerEmployeeId"] == "bob"
+
+        alice_cancel_bob = alice_client.post(f"/sandboxes/sbx_alice/runs/{bob_session.json()['id']}/cancel", json={
+            "reason": "not alice's session",
+        })
+        assert alice_cancel_bob.status_code == 400

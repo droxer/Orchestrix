@@ -1510,7 +1510,7 @@ describe("RelayTui component", () => {
     const workspace = mkdtempSync(join(tmpdir(), "relay-tui-host-workspace-"));
     const bodies: unknown[] = [];
     const authorizationHeaders: string[] = [];
-    let sandboxPolls = 0;
+    let provisionCalls = 0;
     process.env.RELAY_WORKSPACE = workspace;
     process.env.RELAY_EMPLOYEE_ID = "host";
     process.env.RELAY_DAEMON_NODE_TOKEN = "tok_has_under_score";
@@ -1519,27 +1519,28 @@ describe("RelayTui component", () => {
       if (init?.body) bodies.push(JSON.parse(String(init.body)));
       authorizationHeaders.push(String(new Headers(init?.headers).get("authorization") ?? ""));
       if (String(url) === "http://127.0.0.1:8790/sandboxes" && init?.method === "POST") {
+        provisionCalls += 1;
+        if (provisionCalls === 1) {
+          return new Response(JSON.stringify({
+            id: "sbx_host_stale",
+            employeeId: "host",
+            workspacePath: workspace,
+            status: "provisioning",
+            agents: { claude: "unknown", pi: "unknown", codex: "unknown" },
+            createdAt: "2026-06-07T00:00:00.000Z",
+            updatedAt: "2026-06-07T00:00:00.000Z",
+            lastError: "Waiting for daemon node registration.",
+          }), { status: 201, headers: { "Content-Type": "application/json" } });
+        }
         return new Response(JSON.stringify({
           id: "sbx_host",
           employeeId: "host",
           workspacePath: workspace,
-          status: "provisioning",
-          agents: { claude: "unknown", pi: "unknown", codex: "unknown" },
-          createdAt: "2026-06-07T00:00:00.000Z",
-          updatedAt: "2026-06-07T00:00:00.000Z",
-        }), { status: 201, headers: { "Content-Type": "application/json" } });
-      }
-      if (String(url) === "http://127.0.0.1:8790/sandboxes/sbx_host") {
-        sandboxPolls += 1;
-        return new Response(JSON.stringify({
-          id: "sbx_host",
-          employeeId: "host",
-          workspacePath: workspace,
-          status: sandboxPolls >= 1 ? "ready" : "provisioning",
+          status: "ready",
           agents: { claude: "ready", pi: "ready", codex: "ready" },
           createdAt: "2026-06-07T00:00:00.000Z",
           updatedAt: "2026-06-07T00:00:01.000Z",
-        }), { status: 200, headers: { "Content-Type": "application/json" } });
+        }), { status: 201, headers: { "Content-Type": "application/json" } });
       }
       return new Response(JSON.stringify({ error: "unexpected request" }), { status: 500, headers: { "Content-Type": "application/json" } });
     }) as typeof fetch;
@@ -1549,12 +1550,14 @@ describe("RelayTui component", () => {
       const bootFrame = lastFrame() ?? "";
       assert.match(bootFrame, /Waiting for daemon node|Connecting to Relay daemon/);
       assert.match(bootFrame, /EMPLOYEE_ID=host/);
-      assert.match(bootFrame, /SANDBOX_ID=sbx_host/);
+      assert.match(bootFrame, /SANDBOX_ID=sbx_host_stale/);
       assert.match(bootFrame, /DAEMON_TOKEN=tok_has_under_score/);
       assert.match(bootFrame, /WORKSPACE=/);
       await new Promise((resolve) => setTimeout(resolve, 450));
 
       assert.match(lastFrame() ?? "", /Host daemon ready/);
+      assert.match(lastFrame() ?? "", /Sandbox sbx_host assigned/);
+      assert.equal(provisionCalls, 2);
       assert.ok(bodies.every((body) =>
         typeof body === "object" &&
         body !== null &&

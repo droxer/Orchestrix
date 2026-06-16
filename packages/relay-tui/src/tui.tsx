@@ -1602,12 +1602,9 @@ export function RelayTuiHost({ onExit }: { onExit: () => void }): React.ReactEle
 	          );
         }
         await delay(DAEMON_POLL_INTERVAL_MS);
-        // A "stopped" sandbox is an offline placeholder waiting for a daemon
-        // node; re-provision so we attach to whichever node registers for this
-        // employee, even when it registers under a different sandbox id.
-        current = current.status === "stopped"
-          ? await client.provisionSandbox({ employeeId, workspacePath })
-          : await client.getSandbox(current.id);
+        // Re-run employee selection while waiting so a stale placeholder does
+        // not pin the TUI to an old sandbox id after a live node registers.
+        current = await client.provisionSandbox({ employeeId, workspacePath });
       }
       if (cancelled || !mountedRef.current) return;
       setSandbox(current);

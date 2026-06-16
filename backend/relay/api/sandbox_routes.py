@@ -8,9 +8,22 @@ from loguru import logger
 from ..daemon import provisioned_sandbox_record, public_sandbox_record, sandbox_ui_auth_error, sandbox_ui_token_matches
 from ..models import SandboxRunRequest
 from .deps import AppContextDep
-from .helpers import actor_can_access_sandbox, bearer_token, json_body, request_actor_or_none, string_field
+from .helpers import bearer_token, json_body, request_actor_or_none, string_field
 
 router = APIRouter()
+
+
+def require_sandbox_access(sandbox: dict[str, Any], request: Request, ctx: AppContextDep) -> dict[str, Any] | None:
+    token = bearer_token(request)
+    if token and sandbox_ui_token_matches(sandbox, token):
+        return None
+    actor = request_actor_or_none(request, ctx.auth_store)
+    if actor:
+        return actor
+    auth_error = sandbox_ui_auth_error(sandbox, token)
+    if auth_error:
+        raise HTTPException(401, auth_error)
+    return None
 
 
 @router.get("/sandboxes")
@@ -22,7 +35,7 @@ async def sandboxes(request: Request, ctx: AppContextDep) -> dict[str, Any]:
             return {"sandboxes": allowed}
     actor = request_actor_or_none(request, ctx.auth_store)
     if actor:
-        allowed = [public_sandbox_record(sandbox) for sandbox in ctx.backend.list() if actor_can_access_sandbox(actor, sandbox)]
+        allowed = [public_sandbox_record(sandbox) for sandbox in ctx.backend.list()]
     else:
         allowed = [public_sandbox_record(sandbox) for sandbox in ctx.backend.list()]
     return {"sandboxes": allowed}
@@ -34,12 +47,17 @@ async def provision_sandbox(request: Request, ctx: AppContextDep) -> dict[str, A
     employee_id = string_field(body, "employeeId")
     if not employee_id:
         raise HTTPException(400, "employeeId is required.")
+    actor = request_actor_or_none(request, ctx.auth_store)
     try:
         sandbox = ctx.backend.provision({
             "employeeId": employee_id,
             "workspacePath": string_field(body, "workspacePath") or None,
             "token": bearer_token(request),
             "nodeToken": string_field(body, "nodeToken") or None,
+            **({
+                "actorEmployeeId": actor["employeeId"],
+                "actorIsAdmin": actor["isAdmin"],
+            } if actor else {}),
         })
         logger.info("Sandbox provisioned", sandbox_id=sandbox["id"], employee_id=employee_id)
         return provisioned_sandbox_record(sandbox)
@@ -53,9 +71,7 @@ async def get_sandbox(sandbox_id: str, request: Request, ctx: AppContextDep) -> 
     sandbox = ctx.backend.get(sandbox_id)
     if not sandbox:
         raise HTTPException(404, "Sandbox not found.")
-    auth_error = sandbox_ui_auth_error(sandbox, bearer_token(request))
-    if auth_error:
-        raise HTTPException(401, auth_error)
+    require_sandbox_access(sandbox, request, ctx)
     return public_sandbox_record(sandbox)
 
 
@@ -64,10 +80,7 @@ async def run_sandbox(sandbox_id: str, request: Request, ctx: AppContextDep) -> 
     sandbox = ctx.backend.get(sandbox_id)
     if not sandbox:
         raise HTTPException(404, "Sandbox not found.")
-    auth_error = sandbox_ui_auth_error(sandbox, bearer_token(request))
-    if auth_error:
-        logger.warning("Sandbox run unauthorized", sandbox_id=sandbox_id, error=auth_error)
-        raise HTTPException(401, auth_error)
+    actor = require_sandbox_access(sandbox, request, ctx)
     body = await json_body(request)
     try:
         parsed = SandboxRunRequest.model_validate(body).relay_dump()
@@ -75,6 +88,8 @@ async def run_sandbox(sandbox_id: str, request: Request, ctx: AppContextDep) -> 
         raise HTTPException(400, "taskGoal and at least one assignment are required.")
     if not parsed["assignments"]:
         raise HTTPException(400, "taskGoal and at least one assignment are required.")
+    if actor:
+        parsed["actorEmployeeId"] = actor["employeeId"]
     logger.info("Sandbox run starting", sandbox_id=sandbox_id, session_id=parsed.get("sessionId"))
     return await ctx.backend.run(sandbox_id, parsed)
 
@@ -84,13 +99,15 @@ async def cancel_sandbox_run(sandbox_id: str, session_id: str, request: Request,
     sandbox = ctx.backend.get(sandbox_id)
     if not sandbox:
         raise HTTPException(404, "Sandbox not found.")
-    auth_error = sandbox_ui_auth_error(sandbox, bearer_token(request))
-    if auth_error:
-        logger.warning("Sandbox run cancel unauthorized", sandbox_id=sandbox_id, error=auth_error)
-        raise HTTPException(401, auth_error)
+    actor = require_sandbox_access(sandbox, request, ctx)
     body = await json_body(request)
     try:
-        result = ctx.backend.cancel_run(sandbox_id, session_id, string_field(body, "reason") or "Cancelled by human.")
+        result = ctx.backend.cancel_run(
+            sandbox_id,
+            session_id,
+            string_field(body, "reason") or "Cancelled by human.",
+            actor["employeeId"] if actor else None,
+        )
         logger.info("Sandbox run cancelled", sandbox_id=sandbox_id, session_id=session_id)
         return result
     except Exception as error:

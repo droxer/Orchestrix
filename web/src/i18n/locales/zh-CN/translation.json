@@ -309,11 +309,20 @@
   "transcript": {
     "new_session": "新工作区会话",
     "ready_for": "@{{employee}} 已准备好使用 {{agent}}。",
-    "ready_no_employee": "打开员工工作区以与 {{agent}} 对话。"
+    "ready_no_employee": "打开员工工作区以与 {{agent}} 对话。",
+    "awaiting_first": "等待首条消息"
   },
   "login": {
     "title": "Relay",
     "subtitle": "登录以继续",
+    "brand": "Relay · 控制台",
+    "headline_a": "登入",
+    "headline_b": "编排控制台。",
+    "headline_bootstrap_a": "配置",
+    "headline_bootstrap_b": "首位管理员。",
+    "lede": "操作调度沙箱、监管守护进程，并在 Claude、Pi、Codex 与 Kimi 之间分发任务的控制平面。",
+    "lede_bootstrap": "首次配置。使用后端首次启动时打印的 RELAY_ADMIN_TOKEN 来设立第一位管理员。",
+    "kicker_setup": "首次配置",
     "username": "用户名",
     "password": "密码",
     "sign_in": "登录",
@@ -323,9 +332,18 @@
     "bootstrap_hint": "使用后端提供的 RELAY_ADMIN_TOKEN 创建第一个管理员。",
     "bootstrap_token": "引导令牌",
     "create_admin": "创建管理员",
-    "no_bootstrap": "无需引导，请直接登录。",
+    "no_bootstrap": "无需引导,请直接登录。",
     "go_bootstrap": "创建首个管理员",
-    "go_login": "返回登录"
+    "go_login": "返回登录",
+    "pullquote": "控制平面,就是让任务自己决定走向何处的那间房。",
+    "pullquote_attribution": "《Relay 操作员手记》",
+    "system_label": "系统",
+    "system_backend": "后端",
+    "system_daemon": "守护进程",
+    "system_sandbox": "沙箱",
+    "system_state_ready": "就绪",
+    "system_state_boxlite": "boxlite",
+    "system_state_pending": "等待凭据"
   },
   "status": {
     "ready": "就绪",

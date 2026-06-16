@@ -142,7 +142,7 @@ class DaemonNodeRegistry:
         return self.sandboxes.get(sandbox_id)
 
     def list_ready(self) -> list[dict[str, Any]]:
-        return list(self.sandboxes.values())
+        return sorted(self.sandboxes.values(), key=self._selection_key)
 
     def update_status(self, sandbox_id: str, patch: dict[str, Any]) -> None:
         sandbox = self.sandboxes.get(sandbox_id)
@@ -159,7 +159,7 @@ class DaemonNodeRegistry:
     def monitor_nodes(self) -> list[dict[str, Any]]:
         self.reap_stale_runs()
         nodes = []
-        for sandbox in self.sandboxes.values():
+        for sandbox in self.list_ready():
             liveness = self._liveness(sandbox)
             nodes.append({
                 **public_sandbox_record(sandbox),
@@ -235,7 +235,21 @@ class DaemonNodeRegistry:
         ]
         if not matches:
             return None
-        return sorted(matches, key=lambda sandbox: (0 if self._liveness(sandbox)["online"] and sandbox["status"] == "ready" else 1, sandbox.get("lastSeenAt", "")), reverse=False)[0]
+        return sorted(matches, key=self._selection_key)[0]
+
+    def _selection_key(self, sandbox: dict[str, Any]) -> tuple[int, int, float, str]:
+        liveness = self._liveness(sandbox)
+        timestamp = sandbox.get("lastSeenAt") or sandbox.get("updatedAt") or sandbox.get("createdAt") or ""
+        try:
+            seen_at = __import__("datetime").datetime.fromisoformat(timestamp.replace("Z", "+00:00")).timestamp()
+        except Exception:
+            seen_at = 0.0
+        return (
+            0 if liveness["online"] and sandbox.get("status") == "ready" else 1,
+            0 if liveness["online"] else 1,
+            -seen_at,
+            sandbox["id"],
+        )
 
     def is_live(self, sandbox_id: str) -> bool:
         sandbox = self.sandboxes.get(sandbox_id)
@@ -595,6 +609,8 @@ class ServerDaemonNodeBackend:
     def provision(self, input: dict[str, Any]) -> dict[str, Any]:
         existing = self.registry.find_by_employee(input["employeeId"], input.get("workspacePath"))
         if existing:
+            if input.get("actorEmployeeId"):
+                return existing
             ui_error = sandbox_ui_auth_error(existing, input.get("token"))
             if not ui_error:
                 return existing
@@ -664,10 +680,11 @@ class ServerDaemonNodeBackend:
             raise ValueError(f"Sandbox {sandbox_id} daemon node is not ready.")
         if not self.registry.is_live(sandbox_id):
             raise ValueError(f"Sandbox {sandbox_id} daemon node heartbeat expired.")
+        owner_employee_id = request.get("actorEmployeeId") or sandbox["employeeId"]
         if request.get("sessionId"):
-            assert_session_owned_by_employee(self.registry.store, request["sessionId"], sandbox["employeeId"])
+            assert_session_owned_by_employee(self.registry.store, request["sessionId"], owner_employee_id)
         self.registry.update_status(sandbox_id, {"status": "running", "lastError": None})
-        controller = SessionController(self.registry.store, workspace_path=sandbox.get("workspacePath") or "/workspace", owner_employee_id=sandbox["employeeId"])
+        controller = SessionController(self.registry.store, workspace_path=sandbox.get("workspacePath") or "/workspace", owner_employee_id=owner_employee_id)
         session_id = request.get("sessionId") or controller.create_session(
             request["taskGoal"],
             ["human", *dict.fromkeys(assignment["agent"] for assignment in request["assignments"])],
@@ -676,10 +693,12 @@ class ServerDaemonNodeBackend:
         self.registry.start_run_request(sandbox_id, session_id, request["taskGoal"], request["assignments"], state)
         return self.registry.store.get_session(session_id)
 
-    def cancel_run(self, sandbox_id: str, session_id: str, reason: str) -> dict[str, Any]:
+    def cancel_run(self, sandbox_id: str, session_id: str, reason: str, actor_employee_id: str | None = None) -> dict[str, Any]:
         sandbox = self.registry.get(sandbox_id)
         if not sandbox:
             raise KeyError(f"Sandbox {sandbox_id} has no registered daemon node.")
+        if actor_employee_id:
+            assert_session_owned_by_employee(self.registry.store, session_id, actor_employee_id)
         active = self.registry.cancel_active_run(sandbox_id, session_id, reason)
         if not active:
             raise KeyError(f"Session {session_id} has no active daemon node run.")

@@ -14,6 +14,7 @@ import { runAsAgent } from "./guest.js";
 import {
   ClaudeStreamRenderer,
   CodexStreamRenderer,
+  PiStreamRenderer,
   PlainTextStreamRenderer,
 } from "./renderers.js";
 import type { AgentName, AgentState, AgentTaskMode } from "./state.js";
@@ -75,7 +76,7 @@ export const AGENT_REGISTRY: Record<AgentName, AgentDefinition> = {
     implementRole: "tester",
     buildImplementCommand: buildPiImplementCommand,
     buildReviewCommand: buildPiReviewCommand,
-    createRenderer: () => new PlainTextStreamRenderer("Pi", ansi.yellow),
+    createRenderer: () => new PiStreamRenderer(),
     implementLabel: "Pi",
     reviewLabel: "Pi Review",
     needsGuestAuth: true,
@@ -108,7 +109,7 @@ export const AGENT_REGISTRY: Record<AgentName, AgentDefinition> = {
     createRenderer: () => new PlainTextStreamRenderer("Kimi", ansi.magenta),
     implementLabel: "Kimi",
     reviewLabel: "Kimi Review",
-    needsGuestAuth: false,
+    needsGuestAuth: true,
     preflight: { label: "Kimi", command: () => runAsAgent("kimi --version", "kimi") },
   },
 };

@@ -24,6 +24,7 @@ import { useRelayData } from "./hooks/useRelayData";
 import { useSessionEvents } from "./hooks/useSessionEvents";
 import { useLocalDaemonNodes } from "./hooks/useLocalDaemonNodes";
 import { mergeVisibleDaemonNodes } from "./lib/daemonNodes";
+import { routeComposerMessage } from "./lib/messageRouting";
 import { applyTheme, readLanguage, readTheme, readTokens, selectedEmployeeKey, writeLanguage, writeTheme } from "./lib/appStorage";
 import { canUseLocalControlPanel, localControlPanelNodes, sessionBelongsToEmployee } from "./lib/controlPanel";
 import { useRelayStore } from "./lib/store";
@@ -289,10 +290,9 @@ export function App() {
       setStatus({ tone: "warn", message: t("toast.no_node_selected") });
       return;
     }
-    const mm = new RegExp(`^@(${agents.join("|")})(?:\\s+|$)`, "i").exec(raw);
-    const routedAgent: AgentName = (mm?.[1].toLowerCase() as AgentName | undefined) ?? activeAgent;
-    const goal = mm ? raw.slice(mm[0].length).trim() : raw;
+    const { agent: routedAgent, goal } = routeComposerMessage(raw, activeAgent, agents);
     if (!goal) { setStatus({ tone: "warn", message: t("toast.add_task", { agent: routedAgent }) }); return; }
+    if (routedAgent !== activeAgent) setActiveAgent(routedAgent);
     setIsRunning(true);
     try {
       const { sandbox, token } = await provisionEmployeeSandbox(selectedEmployee, selectedToken);
@@ -362,10 +362,8 @@ export function App() {
 
   if (!authChecked) {
     return (
-      <main className="login-screen">
-        <div className="login-card">
-          <p className="login-subtitle">{t("login.checking")}</p>
-        </div>
+      <main className="login-checking">
+        <p className="login-checking-text">{t("login.checking")}</p>
       </main>
     );
   }

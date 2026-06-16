@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join, posix, relative, resolve, sep } from "node:path";
 
 import {
   DEVBOX_IMAGE,
@@ -25,6 +26,12 @@ import type { AgentName, AgentOutputSink, StreamExecResult } from "relay-core";
 export type BoxLiteModule = typeof import("@boxlite-ai/boxlite");
 type StreamRenderer = (chunk: string) => string;
 type CommandRunner = typeof spawnSync;
+interface KimiCodeFile {
+  relativePath: string;
+  content: Buffer;
+}
+
+const KIMI_CODE_AUTH_ENTRIES = ["config.toml", "tui.toml", "credentials", "oauth"] as const;
 
 export interface DevboxOciOptions {
   dockerfile?: string;
@@ -84,6 +91,66 @@ export async function prepareGuestWorkspace(hostWorkspace: string): Promise<[num
   return [uid, gid];
 }
 
+export function hostKimiCodeHomePath(): string {
+  return resolve(process.env.KIMI_CODE_HOME || join(homedir(), ".kimi-code"));
+}
+
+export function prepareHostKimiCodeHome(targetHome: string): void {
+  for (const file of collectKimiCodeFiles()) {
+    const target = join(targetHome, file.relativePath);
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, file.content, { mode: 0o600 });
+    chmodSync(target, 0o600);
+  }
+}
+
+function kimiCodeGuestSetupScript(targetHome = "/home/agent/.kimi-code"): string[] {
+  const files = collectKimiCodeFiles();
+  const script = [
+    `mkdir -p ${shellQuote(targetHome)}`,
+  ];
+  for (const file of files) {
+    const target = posix.join(targetHome, ...file.relativePath.split(posix.sep));
+    script.push(
+      `mkdir -p ${shellQuote(posix.dirname(target))}`,
+      `printf %s ${shellQuote(file.content.toString("base64"))} | base64 -d > ${shellQuote(target)}`,
+      `chmod 600 ${shellQuote(target)}`,
+    );
+  }
+  script.push(
+    `chown -R agent:agent ${shellQuote(targetHome)}`,
+    `find ${shellQuote(targetHome)} -type d -exec chmod 700 {} +`,
+  );
+  return script;
+}
+
+function collectKimiCodeFiles(sourceHome = hostKimiCodeHomePath()): KimiCodeFile[] {
+  if (!existsSync(sourceHome)) {
+    throw new Error(`Kimi Code home not found at ${sourceHome}. Run kimi login on the host or set KIMI_CODE_HOME.`);
+  }
+  const files: KimiCodeFile[] = [];
+  for (const entry of KIMI_CODE_AUTH_ENTRIES) {
+    const path = join(sourceHome, entry);
+    if (existsSync(path)) collectKimiCodePath(sourceHome, path, files);
+  }
+  if (files.length === 0) {
+    throw new Error(`Kimi Code home at ${sourceHome} does not contain config or credential files.`);
+  }
+  return files;
+}
+
+function collectKimiCodePath(sourceHome: string, path: string, files: KimiCodeFile[]): void {
+  const stat = statSync(path);
+  if (stat.isDirectory()) {
+    for (const child of readdirSync(path).sort()) collectKimiCodePath(sourceHome, join(path, child), files);
+    return;
+  }
+  if (!stat.isFile()) return;
+  const relativePath = relative(sourceHome, path).split(sep).join(posix.sep);
+  if (!relativePath || relativePath.startsWith("../") || relativePath === "..") return;
+  files.push({ relativePath, content: readFileSync(path) });
+}
+
 export async function prepareGuestAgentAuth(agents: Iterable<AgentName> = ["codex", "pi"], signal?: AbortSignal): Promise<void> {
   if (signal?.aborted) throw new Error("Agent auth setup cancelled.");
   const selectedAgents = new Set(agents);
@@ -113,6 +180,9 @@ export async function prepareGuestAgentAuth(agents: Iterable<AgentName> = ["code
       "chown -R agent:agent /home/agent/.pi",
       "chmod 600 /home/agent/.pi/agent/auth.json",
     );
+  }
+  if (selectedAgents.has("kimi")) {
+    script.push(...kimiCodeGuestSetupScript());
   }
   if (script.length === 1) return;
   const command = script.join("; ");

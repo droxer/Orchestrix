@@ -45,6 +45,7 @@
 @import "./styles/pills.css";
 
 /* 5. Authenticated pages */
+@import "./styles/login.css";
 @import "./styles/admin.css";
 @import "./styles/mcp.css";
 @import "./styles/skills.css";

@@ -309,7 +309,8 @@
   "transcript": {
     "new_session": "新工作區工作階段",
     "ready_for": "@{{employee}} 已準備好使用 {{agent}}。",
-    "ready_no_employee": "開啟員工工作區以與 {{agent}} 對話。"
+    "ready_no_employee": "開啟員工工作區以與 {{agent}} 對話。",
+    "awaiting_first": "等待首則訊息"
   },
   "login": {
     "title": "Relay",
@@ -325,7 +326,24 @@
     "create_admin": "建立管理員",
     "no_bootstrap": "無需引導，請直接登入。",
     "go_bootstrap": "建立首位管理員",
-    "go_login": "返回登入"
+    "go_login": "返回登入",
+    "brand": "Relay · 控制台",
+    "headline_a": "登入",
+    "headline_b": "編排控制台。",
+    "headline_bootstrap_a": "配置",
+    "headline_bootstrap_b": "首位管理員。",
+    "lede": "操作排程沙箱、監管守護程式，並在 Claude、Pi、Codex 與 Kimi 之間分派任務的控制平面。",
+    "lede_bootstrap": "首次設定。使用後端首次啟動時印出的 RELAY_ADMIN_TOKEN 來建立第一位管理員。",
+    "kicker_setup": "首次設定",
+    "pullquote": "控制平面，就是讓任務自己決定走向何方的那間房。",
+    "pullquote_attribution": "《Relay 操作員手記》",
+    "system_label": "系統",
+    "system_backend": "後端",
+    "system_daemon": "守護程式",
+    "system_sandbox": "沙箱",
+    "system_state_ready": "就緒",
+    "system_state_boxlite": "boxlite",
+    "system_state_pending": "等待憑證"
   },
   "status": {
     "ready": "就緒",

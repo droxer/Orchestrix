@@ -13,6 +13,7 @@ import type {
 } from "relay-core";
 import { startOrchestratorSession, ensureAgentReady as ensureSandboxAgentReady, type ActiveOrchestratorSession } from "./sandbox-session.js";
 import { defaultExecutionManager } from "./execution.js";
+import { prepareHostKimiCodeHome } from "./box.js";
 import {
   AGENT_NAMES,
   getAgent,
@@ -546,6 +547,9 @@ function ensureHostAgentReady(agent: AgentName): void {
     writeSecretFile(join(piHome, "auth.json"), guestPiAuthJson());
     writeFileSync(join(piHome, "models.json"), guestPiModelsJson());
   }
+  if (agent === "kimi") {
+    prepareHostKimiCodeHome(join(home, ".kimi-code"));
+  }
 }
 
 function writeSecretFile(path: string, content: string): void {
@@ -922,7 +926,9 @@ export {
   ensureSingleOrchestrator,
   execStream,
   importBoxLite,
+  hostKimiCodeHomePath,
   prepareGuestAgentAuth,
+  prepareHostKimiCodeHome,
   prepareGuestWorkspace,
   setSessionBox,
   stopSessionBox,

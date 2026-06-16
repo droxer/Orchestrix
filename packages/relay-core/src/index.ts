@@ -142,10 +142,12 @@ export {
   ClaudeStreamRenderer,
   CodexStreamRenderer,
   JsonLineRenderer,
+  PiStreamRenderer,
   PlainTextStreamRenderer,
   StderrLineRenderer,
   formatClaudeJsonLine,
   formatCodexJsonLine,
+  formatPiJsonLine,
 } from "./renderers.js";
 
 export {

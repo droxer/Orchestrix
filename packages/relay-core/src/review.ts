@@ -49,7 +49,7 @@ function reviewMessageText(value: unknown): string {
     return textFromRecord(asRecord(event.message));
   }
   if (event.type === "message" || event.type === "assistant_message") {
-    return textFromRecord(event);
+    return textFromRecord(asRecord(event.message ?? event));
   }
   return "";
 }

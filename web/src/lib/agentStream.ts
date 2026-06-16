@@ -1,4 +1,4 @@
-import type { AgentName, Tone } from "../types";
+import type { AgentName, Tone } from "../types.js";
 
 export type AgentSegment =
   | { kind: "text"; text: string }
@@ -21,6 +21,7 @@ export function parseAgentStream(agent: AgentName, raw: string): AgentSegment[] 
   if (!raw) return [];
   if (agent === "claude") return parseClaude(raw);
   if (agent === "codex") return parseCodex(raw);
+  if (agent === "pi") return parsePi(raw);
   return parsePlain(raw);
 }
 
@@ -266,9 +267,60 @@ function parseCodex(raw: string): AgentSegment[] {
   return out;
 }
 
+function parsePi(raw: string): AgentSegment[] {
+  const out: AgentSegment[] = [];
+  for (const record of streamRecords(raw)) {
+    if (record.kind === "text") {
+      const text = stripAnsi(record.text).trim();
+      if (text) out.push({ kind: "text", text });
+      continue;
+    }
+    const event = record.value;
+    const text = piAssistantText(event).trim();
+    if (text) {
+      out.push({ kind: "text", text });
+      continue;
+    }
+    if (event.type === "error") {
+      out.push({ kind: "status", tone: "bad", text: String(event.message ?? "unknown error") });
+      continue;
+    }
+    const status = piStatusSegment(event);
+    if (status) {
+      out.push(status);
+    }
+  }
+  return out;
+}
+
 function parsePlain(raw: string): AgentSegment[] {
   const text = stripAnsi(raw).trim();
   return text ? [{ kind: "text", text }] : [];
+}
+
+function piAssistantText(event: Record<string, unknown>): string {
+  const message = asRecord(event.message ?? event);
+  if (event.type !== "message" && event.type !== "assistant_message" && message.role !== "assistant") return "";
+  if (message.role && message.role !== "assistant") return "";
+  return textFromContent(message);
+}
+
+function piStatusSegment(event: Record<string, unknown>): AgentSegment | null {
+  if (event.type === "auto_retry_end" && event.success === false) {
+    return { kind: "status", tone: "bad", text: `Pi error: ${String(event.finalError ?? "unknown error")}` };
+  }
+  if (event.type !== "message_end" && event.type !== "turn_end") return null;
+  const message = asRecord(event.message ?? event);
+  if (message.role !== "assistant") return null;
+  const errorMessage = message.errorMessage ?? event.errorMessage;
+  if (errorMessage || message.stopReason === "error") {
+    return { kind: "status", tone: "bad", text: `Pi error: ${String(errorMessage ?? "unknown error")}` };
+  }
+  const content = message.content;
+  if (Array.isArray(content) && content.length === 0 && message.stopReason === "stop") {
+    return { kind: "status", tone: "warn", text: "Pi returned no assistant text." };
+  }
+  return null;
 }
 
 function textFromContent(record: Record<string, unknown>): string {
