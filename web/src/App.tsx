@@ -31,6 +31,7 @@ import { ConversationRow } from "./components/ConversationRow";
 import type { EmployeeContact } from "./components/ConversationRow";
 import { useRelayData } from "./hooks/useRelayData";
 import { useSessionEvents } from "./hooks/useSessionEvents";
+import { useLocalDaemonNodes } from "./hooks/useLocalDaemonNodes";
 import { mergeVisibleDaemonNodes, shouldClaimLocalDaemonNode } from "./lib/daemonNodes";
 import "./i18n";
 
@@ -245,7 +246,6 @@ export function App() {
   const [navTooltip, setNavTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
   const [status, setStatus] = useState<{ tone: Tone; message: string }>({ tone: "info", message: t("toast.open_workspace_to_begin") });
   const [toastVisible, setToastVisible] = useState(false);
-  const [localNodes, setLocalNodes] = useState<ControlPanelDaemonNodeRecord[]>([]);
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const statusSeenRef = useRef(false);
@@ -255,6 +255,10 @@ export function App() {
 
   const selectedEmployeeToken = tokens[selectedEmployee];
   const { sandboxes, nodes, sessions, isRefreshing, refresh, setSandboxes } = useRelayData(setStatus, selectedEmployeeToken, Boolean(user));
+  const { localNodes, refreshLocalDaemonNodes } = useLocalDaemonNodes(
+    localControlPanelNodes,
+    hydrated && user?.role === "admin" && canUseLocalControlPanel(),
+  );
   const visibleNodes = useMemo(() => mergeVisibleDaemonNodes(nodes, localNodes), [nodes, localNodes]);
   const agentDescriptors = useMemo<Record<AgentName, { role: string; blurb: string }>>(() => ({
     claude: { role: t("agent.claude.role"), blurb: t("agent.claude.blurb") },
@@ -353,12 +357,6 @@ export function App() {
   const refreshWithToken = useCallback(async (tokenOverride?: string) => {
     await refresh(undefined, tokenOverride);
   }, [refresh]);
-
-  const refreshLocalDaemonNodes = useCallback(async () => {
-    const nextNodes = await localControlPanelNodes();
-    setLocalNodes(nextNodes);
-    return nextNodes;
-  }, []);
 
   async function provisionEmployeeSandbox(
     employeeId: string,
@@ -469,12 +467,7 @@ export function App() {
     localNodeAdoptionStartedRef.current = true;
     void adoptLocalDaemonNodes();
   }, [adoptLocalDaemonNodes, hydrated, user]);
-  useEffect(() => {
-    if (!hydrated || !user || user.role !== "admin") return;
-    void refreshLocalDaemonNodes();
-    const timer = window.setInterval(() => void refreshLocalDaemonNodes(), 3000);
-    return () => window.clearInterval(timer);
-  }, [hydrated, refreshLocalDaemonNodes, user]);
+  // Admin local-node polling now lives in useLocalDaemonNodes (refetchInterval).
   useEffect(() => {
     if (!hydrated) return;
     if (selectedEmployee) {
