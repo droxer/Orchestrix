@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  ActionAddPerson, ActionSearch,
   ActionSend, ActionStop,
   NavConversations, NavPreferences, NavRefresh,
 } from "./components/icons";
@@ -23,7 +22,6 @@ import { McpPage } from "./components/McpPage";
 import { SkillsPage } from "./components/SkillsPage";
 import { PreferencesDialog } from "./components/PreferencesDialog";
 import { type Theme, type Language } from "./components/PreferencesPanel";
-import { ConversationRow } from "./components/ConversationRow";
 import type { EmployeeContact } from "./components/ConversationRow";
 import { ModeToggle } from "./components/composer/ModeToggle";
 import { MentionPopover } from "./components/composer/MentionPopover";
@@ -39,6 +37,7 @@ import { useAuthSession } from "./hooks/useAuthSession";
 import { useComposer } from "./hooks/useComposer";
 import { useEmployeeProvisioning } from "./hooks/useEmployeeProvisioning";
 import { SideNav } from "./components/SideNav";
+import { ThreadPanel } from "./components/ThreadPanel";
 import type { AppRoute, MobileView } from "./lib/viewTypes";
 import "./i18n";
 
@@ -412,45 +411,14 @@ export function App() {
 
       {route === "admin" ? <AdminConsole /> : route === "mcp" ? <McpPage /> : route === "skills" ? <SkillsPage /> : (<>
 
-      <aside className="thread-panel" aria-label={t("nav.conversations")}>
-        <div className="conversation-header">
-          <div className="conversation-heading">
-            <h1>{t("thread.messages")}<small className="mono conversation-heading-count">{filteredEmployees.length.toString().padStart(2, "0")}</small></h1>
-          </div>
-        </div>
-        <form className="people-search conversation-search" onSubmit={(e) => {
-          e.preventDefault();
-          const q = employeeQuery.trim().replace(/^@/, "");
-          if (q) { void selectEmployee(q); setEmployeeQuery(""); }
-        }}>
-          <ActionSearch size={16} />
-          <input aria-label={t("thread.search_label")} name="employee-search" autoComplete="off" spellCheck={false} placeholder={t("thread.search_placeholder")} value={employeeQuery} onChange={(e) => setEmployeeQuery(e.target.value)} />
-          {employeeQuery.trim() ? (
-            <button type="submit" className="search-connect-btn" aria-label={t("thread.connect_to", { name: employeeQuery.trim().replace(/^@/, "") })} title={t("thread.connect_hint")}>
-              <ActionAddPerson size={13} />
-            </button>
-          ) : null}
-        </form>
-        <section className="conversation-list" aria-label={t("nav.conversations")}>
-          {filteredEmployees.map((c) => <ConversationRow key={c.id} contact={c} selected={selectedEmployee === c.id} onSelect={(id) => void selectEmployee(id)} onRemove={removeEmployee} />)}
-          {filteredEmployees.length === 0 && !employeeQuery.trim() ? (
-            <p className="conversation-empty">{t("thread.no_nodes")}</p>
-          ) : null}
-          {filteredEmployees.length === 0 && employeeQuery.trim() ? (
-            <button
-              className="conversation-row conversation-connect-hint"
-              type="button"
-              onClick={() => { const q = employeeQuery.trim().replace(/^@/, ""); if (q) { void selectEmployee(q); setEmployeeQuery(""); } }}
-            >
-              <span className="connect-hint-icon" aria-hidden="true"><ActionAddPerson size={14} /></span>
-              <span className="conversation-copy">
-                <span className="conversation-name"><strong translate="no">@{employeeQuery.trim().replace(/^@/, "")}</strong></span>
-                <span className="conversation-preview">{t("thread.connect_hint")}</span>
-              </span>
-            </button>
-          ) : null}
-        </section>
-      </aside>
+      <ThreadPanel
+        employees={filteredEmployees}
+        employeeQuery={employeeQuery}
+        setEmployeeQuery={setEmployeeQuery}
+        selectedEmployee={selectedEmployee}
+        onSelectEmployee={(id) => void selectEmployee(id)}
+        onRemoveEmployee={removeEmployee}
+      />
 
       <section id="chat-panel" className="chat-panel" aria-label={t("nav.conversations")} tabIndex={-1}>
         <header className="chat-header">
