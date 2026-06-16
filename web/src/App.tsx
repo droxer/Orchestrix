@@ -3,14 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  ActionAddPerson, ActionApprove, ActionHandoff, ActionSearch,
-  ActionSend, ActionStop, ModeImplement, ModeReview, NavAdmin,
+  ActionAddPerson, ActionSearch,
+  ActionSend, ActionStop, NavAdmin,
   NavConversations, NavLogout, NavMcp, NavPreferences, NavRefresh,
   NavSidebarCollapse, NavSidebarExpand, NavSkills,
 } from "./components/icons";
-import { AgentMark } from "./components/AgentMark";
 import {
-  cancelRun, createSession, getMe, listControlPanelDaemonNodes, logout, provisionSandbox,
+  cancelRun, createSession, getMe, logout, provisionSandbox,
   RelayApiError,
   recordDecision, recordHandoff, runSandbox,
 } from "./api";
@@ -26,194 +25,28 @@ import { LoginScreen } from "./components/LoginScreen";
 import { McpPage } from "./components/McpPage";
 import { SkillsPage } from "./components/SkillsPage";
 import { PreferencesDialog } from "./components/PreferencesDialog";
-import { SUPPORTED_LANGUAGES, type Theme, type Language } from "./components/PreferencesPanel";
+import { type Theme, type Language } from "./components/PreferencesPanel";
 import { ConversationRow } from "./components/ConversationRow";
 import type { EmployeeContact } from "./components/ConversationRow";
+import { ModeToggle } from "./components/composer/ModeToggle";
+import { MentionPopover } from "./components/composer/MentionPopover";
+import { DecisionBar } from "./components/composer/DecisionBar";
 import { useRelayData } from "./hooks/useRelayData";
 import { useSessionEvents } from "./hooks/useSessionEvents";
 import { useLocalDaemonNodes } from "./hooks/useLocalDaemonNodes";
 import { mergeVisibleDaemonNodes, shouldClaimLocalDaemonNode } from "./lib/daemonNodes";
+import { applyTheme, readLanguage, readTheme, readTokens, selectedEmployeeKey, writeLanguage, writeTheme, writeTokens, type TokenMap } from "./lib/appStorage";
+import { canUseLocalControlPanel, localControlPanelNodes, newBrowserSandboxToken, preferLocalControlPanelNode, sessionBelongsToEmployee } from "./lib/controlPanel";
 import "./i18n";
 
 // Mirrors AGENT_REGISTRY in relay-core. Kept as a local literal so the browser
 // bundle never imports node-only runtime; the Record<AgentName, …>
 // types below fail to compile if this drifts from the AgentName union.
 const agents: AgentName[] = ["claude", "pi", "codex", "kimi"];
-const tokenStorageKey = "relay-web.tokens";
-const selectedEmployeeKey = "relay-web.selectedEmployee";
-const themeStorageKey = "relay-web.theme";
-const languageStorageKey = "relay-web.language";
-
-type TokenMap = Record<string, string>;
 type MobileView = "threads" | "chat";
 type AppRoute = "main" | "admin" | "mcp" | "skills";
 
-function readTokens(): TokenMap {
-  if (typeof window === "undefined") return {};
-  try { return JSON.parse(localStorage.getItem(tokenStorageKey) ?? "null") as TokenMap ?? {}; }
-  catch { return {}; }
-}
 
-function writeTokens(tokens: TokenMap): void {
-  if (typeof window !== "undefined") localStorage.setItem(tokenStorageKey, JSON.stringify(tokens));
-}
-
-function readTheme(): Theme {
-  if (typeof window === "undefined") return "system";
-  return (localStorage.getItem(themeStorageKey) as Theme | null) ?? "system";
-}
-
-function readLanguage(): Language {
-  if (typeof window === "undefined") return "en";
-  const stored = localStorage.getItem(languageStorageKey);
-  return SUPPORTED_LANGUAGES.includes(stored as Language) ? stored as Language : "en";
-}
-
-function applyTheme(theme: Theme): void {
-  if (typeof document === "undefined") return;
-  if (theme === "system") {
-    document.documentElement.removeAttribute("data-theme");
-  } else {
-    document.documentElement.setAttribute("data-theme", theme);
-  }
-}
-
-function canUseLocalControlPanel(): boolean {
-  if (typeof window === "undefined") return false;
-  return window.location.hostname === "localhost" ||
-    window.location.hostname === "127.0.0.1" ||
-    window.location.hostname === "::1";
-}
-
-function newBrowserSandboxToken(): string {
-  const bytes = new Uint8Array(24);
-  crypto.getRandomValues(bytes);
-  let raw = "";
-  for (const byte of bytes) raw += String.fromCharCode(byte);
-  return `tok_${btoa(raw).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "")}`;
-}
-
-function preferLocalControlPanelNode(
-  employeeId: string,
-  nodes: ControlPanelDaemonNodeRecord[],
-): ControlPanelDaemonNodeRecord | undefined {
-  return nodes
-    .filter((node) => node.employeeId === employeeId && node.nodeToken)
-    .sort((a, b) => {
-      const score = (node: ControlPanelDaemonNodeRecord) =>
-        (node.online && !node.stale ? 2 : 0) + (node.status === "ready" ? 1 : 0);
-      const delta = score(b) - score(a);
-      return delta || (b.lastSeenAt ?? "").localeCompare(a.lastSeenAt ?? "");
-    })[0];
-}
-
-async function localControlPanelNodes(): Promise<ControlPanelDaemonNodeRecord[]> {
-  if (!canUseLocalControlPanel()) return [];
-  try {
-    return (await listControlPanelDaemonNodes()).nodes;
-  } catch {
-    return [];
-  }
-}
-
-function sessionBelongsToEmployee(
-  session: { workspacePath: string },
-  employeeId: string,
-  sandbox?: SandboxRecord,
-  node?: { workspacePath?: string },
-): boolean {
-  if (sandbox && session.workspacePath === sandbox.workspacePath) return true;
-  if (node?.workspacePath && session.workspacePath === node.workspacePath) return true;
-  return session.workspacePath === `/workspace/${employeeId}` || session.workspacePath.endsWith(`/${employeeId}`);
-}
-
-// ── Sub-components ────────────────────────────────────────────────────────────
-
-function ModeToggle({ mode, setMode }: {
-  mode: AgentTaskMode;
-  setMode: (mode: AgentTaskMode) => void;
-}) {
-  const { t } = useTranslation();
-  const next: AgentTaskMode = mode === "implement" ? "review" : "implement";
-  const Icon = mode === "implement" ? ModeImplement : ModeReview;
-  return (
-    <button
-      type="button"
-      className="mode-chip"
-      data-mode={mode}
-      aria-label={t("composer.choose_mode")}
-      title={`${t(`mode.${next}`)} (Shift+Tab)`}
-      onClick={() => setMode(next)}
-    >
-      <Icon className="mode-chip-icon" size={13} aria-hidden="true" />
-      <span className="mode-chip-label">{t(`mode.${mode}`)}</span>
-      <span className="mode-chip-hint" aria-hidden="true">⇧⇥</span>
-    </button>
-  );
-}
-
-function MentionPopover({ filteredAgents, mentionIndex, insertMention }: {
-  filteredAgents: AgentName[]; mentionIndex: number; insertMention: (a: AgentName) => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <div id="mention-popover" className="mention-popover agent-picker" role="listbox" aria-label={t("composer.address_agent")}>
-      {filteredAgents.map((a, i) => (
-        <button key={a} id={`mention-option-${i}`} type="button" role="option" aria-selected={i === mentionIndex} className={i === mentionIndex ? "active" : ""} onMouseDown={(e) => { e.preventDefault(); insertMention(a); }}>
-          <span className="agent-avatar" data-agent={a} aria-hidden="true"><AgentMark agent={a} size={16} /></span>
-          <span translate="no">@{a}</span>
-          <span className="mention-role">{t(`agent.${a}.role`)}</span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function DecisionBar({ sendDecision, handoffOpen, setHandoffOpen, handoffAgent, setHandoffAgent, handoffMode, setHandoffMode, handoffNote, setHandoffNote, sendHandoff }: {
-  sendDecision: (kind: "approve" | "reject" | "rerun" | "mark_done") => Promise<void>;
-  handoffOpen: boolean; setHandoffOpen: (v: boolean) => void;
-  handoffAgent: AgentName; setHandoffAgent: (a: AgentName) => void;
-  handoffMode: AgentTaskMode; setHandoffMode: (m: AgentTaskMode) => void;
-  handoffNote: string; setHandoffNote: (v: string) => void;
-  sendHandoff: () => Promise<void>;
-}) {
-  const { t } = useTranslation();
-  return (
-    <>
-      <div className="decision-bar">
-        <button type="button" onClick={() => void sendDecision("approve")}><ActionApprove size={14} /> {t("decision.approve")}</button>
-        <button type="button" onClick={() => void sendDecision("rerun")}>{t("decision.rerun")}</button>
-        <button type="button" onClick={() => void sendDecision("mark_done")}>{t("decision.mark_done")}</button>
-        <button type="button" className="danger-soft" onClick={() => void sendDecision("reject")}>{t("decision.reject")}</button>
-        <button type="button" className="primary" aria-controls="handoff-panel" aria-expanded={handoffOpen} onClick={() => setHandoffOpen(!handoffOpen)}>
-          <ActionHandoff size={14} /> {t("decision.handoff")}
-        </button>
-      </div>
-      {handoffOpen ? (
-        <div id="handoff-panel" className="handoff-panel">
-          <div className="handoff-row">
-            <label htmlFor="handoff-agent">{t("handoff.route_to")}</label>
-            <select id="handoff-agent" name="handoff-agent" value={handoffAgent} onChange={(e) => setHandoffAgent(e.target.value as AgentName)}>
-              {agents.map((a) => <option key={a} value={a}>{a}</option>)}
-            </select>
-          </div>
-          <div className="handoff-row">
-            <label htmlFor="handoff-mode">{t("handoff.mode")}</label>
-            <select id="handoff-mode" name="handoff-mode" value={handoffMode} onChange={(e) => setHandoffMode(e.target.value as AgentTaskMode)}>
-              <option value="implement">{t("mode.implement")}</option>
-              <option value="review">{t("mode.review")}</option>
-            </select>
-          </div>
-          <input aria-label={t("handoff.note_placeholder")} name="handoff-note" autoComplete="off" placeholder={t("handoff.note_placeholder")} value={handoffNote} onChange={(e) => setHandoffNote(e.target.value)} />
-          <div className="handoff-actions">
-            <button type="button" onClick={() => setHandoffOpen(false)}>{t("handoff.cancel")}</button>
-            <button type="button" className="primary" onClick={() => void sendHandoff()}>{t("handoff.send")}</button>
-          </div>
-        </div>
-      ) : null}
-    </>
-  );
-}
 
 // ── App ───────────────────────────────────────────────────────────────────────
 
@@ -495,11 +328,11 @@ export function App() {
 
   useEffect(() => {
     applyTheme(theme);
-    localStorage.setItem(themeStorageKey, theme);
+    writeTheme(theme);
   }, [theme]);
 
   useEffect(() => {
-    localStorage.setItem(languageStorageKey, language);
+    writeLanguage(language);
     document.documentElement.lang = language;
     document.title = i18n.t("app.title");
     if (i18n.language !== language) {
@@ -905,7 +738,7 @@ export function App() {
             {activeSession ? (
               <>
                 {messages.map((msg, i) => <MessageBlock key={msg.id} message={msg} employeeId={selectedEmployee} sessionId={activeSession.id} grouped={isGroupedContinuation(messages, i)} />)}
-                {awaitingDecision ? <DecisionBar sendDecision={sendDecision} handoffOpen={handoffOpen} setHandoffOpen={setHandoffOpen} handoffAgent={handoffAgent} setHandoffAgent={setHandoffAgent} handoffMode={handoffMode} setHandoffMode={setHandoffMode} handoffNote={handoffNote} setHandoffNote={setHandoffNote} sendHandoff={sendHandoff} /> : null}
+                {awaitingDecision ? <DecisionBar agentNames={agents} sendDecision={sendDecision} handoffOpen={handoffOpen} setHandoffOpen={setHandoffOpen} handoffAgent={handoffAgent} setHandoffAgent={setHandoffAgent} handoffMode={handoffMode} setHandoffMode={setHandoffMode} handoffNote={handoffNote} setHandoffNote={setHandoffNote} sendHandoff={sendHandoff} /> : null}
               </>
             ) : (
               <TranscriptEmpty selectedEmployee={selectedEmployee} activeAgent={activeAgent} agentDescriptors={agentDescriptors} />
