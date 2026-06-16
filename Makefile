@@ -73,9 +73,9 @@ tui-test:
 	./node_modules/.bin/tsc -p packages/tsconfig.json
 	node --test dist/packages/relay-tui/tests/tui.test.js
 
-tui: tui-run
+tui: tui-local
 
-run: tui
+run: tui-local
 
 backend: backend-run
 
