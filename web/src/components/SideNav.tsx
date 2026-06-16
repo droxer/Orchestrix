@@ -1,0 +1,167 @@
+import { useState, type Dispatch, type SetStateAction } from "react";
+import { useTranslation } from "react-i18next";
+import {
+  NavAdmin, NavConversations, NavLogout, NavMcp, NavPreferences,
+  NavSidebarCollapse, NavSidebarExpand, NavSkills,
+} from "./icons";
+import { RelayMark } from "./RelayMark";
+import type { AppRoute } from "../lib/viewTypes";
+
+// Left rail: brand, collapse toggle, route nav, settings/logout. Owns its own
+// collapsed-state hover tooltip (only shown while the rail is collapsed).
+export function SideNav({ sidenavExpanded, setSidenavExpanded, route, setRoute, isAdmin, prefsOpen, setPrefsOpen, onLogout }: {
+  sidenavExpanded: boolean;
+  setSidenavExpanded: Dispatch<SetStateAction<boolean>>;
+  route: AppRoute;
+  setRoute: Dispatch<SetStateAction<AppRoute>>;
+  isAdmin: boolean;
+  prefsOpen: boolean;
+  setPrefsOpen: Dispatch<SetStateAction<boolean>>;
+  onLogout: () => void;
+}) {
+  const { t } = useTranslation();
+  const [navTooltip, setNavTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
+
+  function showNavTooltip(text: string, el: HTMLElement) {
+    if (sidenavExpanded) return;
+    const rect = el.getBoundingClientRect();
+    setNavTooltip({ text, x: rect.right + 12, y: rect.top + rect.height / 2 });
+  }
+  function hideNavTooltip() { setNavTooltip(null); }
+
+  return (
+    <aside className="sidenav-panel" aria-label="Relay" data-expanded={sidenavExpanded ? "true" : "false"}>
+      <div className="sidenav-brand-row">
+        <div className="sidenav-brand" aria-hidden="true">
+          <RelayMark width={28} height={19} />
+          <span className="sidenav-brand-word">Relay</span>
+        </div>
+        <button
+          type="button"
+          aria-label={sidenavExpanded ? t("nav.collapse_sidebar") : t("nav.expand_sidebar")}
+          className="sidenav-btn sidenav-toggle"
+          onClick={() => setSidenavExpanded((v) => !v)}
+          title={sidenavExpanded ? t("nav.collapse_sidebar") : t("nav.expand_sidebar")}
+          onMouseEnter={(e) => showNavTooltip(sidenavExpanded ? t("nav.collapse_sidebar") : t("nav.expand_sidebar"), e.currentTarget)}
+          onMouseLeave={hideNavTooltip}
+          onFocus={(e) => showNavTooltip(sidenavExpanded ? t("nav.collapse_sidebar") : t("nav.expand_sidebar"), e.currentTarget)}
+          onBlur={hideNavTooltip}
+        >
+          {sidenavExpanded ? <NavSidebarCollapse size={16} /> : <NavSidebarExpand size={16} />}
+          <span className="sidenav-toggle-label">{sidenavExpanded ? t("nav.collapse") : t("nav.expand")}</span>
+        </button>
+      </div>
+      <nav className="sidenav-nav" aria-label={t("nav.conversations")}>
+        <button
+          className={`sidenav-btn ${route === "main" ? "active" : ""}`}
+          data-nav="conversations"
+          type="button"
+          aria-label={t("nav.conversations")}
+          aria-pressed={route === "main"}
+          title={t("nav.conversations")}
+          onClick={() => setRoute("main")}
+          onMouseEnter={(e) => showNavTooltip(t("nav.conversations"), e.currentTarget)}
+          onMouseLeave={hideNavTooltip}
+          onFocus={(e) => showNavTooltip(t("nav.conversations"), e.currentTarget)}
+          onBlur={hideNavTooltip}
+        >
+          <NavConversations size={18} />
+          <span className="sidenav-label">{t("nav.conversations")}</span>
+        </button>
+        <button
+          className={`sidenav-btn ${route === "mcp" ? "active" : ""}`}
+          data-nav="mcp"
+          type="button"
+          aria-label={t("nav.mcp_label")}
+          aria-pressed={route === "mcp"}
+          title={t("nav.mcp_label")}
+          onClick={() => setRoute((r) => r === "mcp" ? "main" : "mcp")}
+          onMouseEnter={(e) => showNavTooltip(t("nav.mcp"), e.currentTarget)}
+          onMouseLeave={hideNavTooltip}
+          onFocus={(e) => showNavTooltip(t("nav.mcp"), e.currentTarget)}
+          onBlur={hideNavTooltip}
+        >
+          <NavMcp size={18} />
+          <span className="sidenav-label">{t("nav.mcp")}</span>
+        </button>
+        <button
+          className={`sidenav-btn ${route === "skills" ? "active" : ""}`}
+          data-nav="skills"
+          type="button"
+          aria-label={t("nav.skills_label")}
+          aria-pressed={route === "skills"}
+          title={t("nav.skills_label")}
+          onClick={() => setRoute((r) => r === "skills" ? "main" : "skills")}
+          onMouseEnter={(e) => showNavTooltip(t("nav.skills"), e.currentTarget)}
+          onMouseLeave={hideNavTooltip}
+          onFocus={(e) => showNavTooltip(t("nav.skills"), e.currentTarget)}
+          onBlur={hideNavTooltip}
+        >
+          <NavSkills size={18} />
+          <span className="sidenav-label">{t("nav.skills")}</span>
+        </button>
+        {isAdmin ? (
+          <button
+            className={`sidenav-btn ${route === "admin" ? "active" : ""}`}
+            data-nav="admin"
+            type="button"
+            aria-label={t("nav.admin_label")}
+            aria-pressed={route === "admin"}
+            title={t("nav.admin_label")}
+            onClick={() => setRoute((r) => r === "admin" ? "main" : "admin")}
+            onMouseEnter={(e) => showNavTooltip(t("nav.admin"), e.currentTarget)}
+            onMouseLeave={hideNavTooltip}
+            onFocus={(e) => showNavTooltip(t("nav.admin"), e.currentTarget)}
+            onBlur={hideNavTooltip}
+          >
+            <NavAdmin size={18} />
+            <span className="sidenav-label">{t("nav.admin")}</span>
+          </button>
+        ) : null}
+      </nav>
+      <div className="sidenav-bottom">
+        <button
+          className={`sidenav-btn ${prefsOpen ? "active" : ""}`}
+          data-nav="settings"
+          type="button"
+          aria-haspopup="dialog"
+          aria-expanded={prefsOpen}
+          aria-label={t("nav.settings")}
+          title={t("nav.settings")}
+          onClick={() => setPrefsOpen((v) => !v)}
+          onMouseEnter={(e) => showNavTooltip(t("nav.settings"), e.currentTarget)}
+          onMouseLeave={hideNavTooltip}
+          onFocus={(e) => showNavTooltip(t("nav.settings"), e.currentTarget)}
+          onBlur={hideNavTooltip}
+        >
+          <NavPreferences size={18} />
+          <span className="sidenav-label">{t("nav.settings")}</span>
+        </button>
+        <button
+          type="button"
+          aria-label={t("nav.logout")}
+          className="sidenav-btn"
+          data-nav="logout"
+          onClick={onLogout}
+          title={t("nav.logout")}
+          onMouseEnter={(e) => showNavTooltip(t("nav.logout"), e.currentTarget)}
+          onMouseLeave={hideNavTooltip}
+          onFocus={(e) => showNavTooltip(t("nav.logout"), e.currentTarget)}
+          onBlur={hideNavTooltip}
+        >
+          <NavLogout size={18} />
+          <span className="sidenav-label">{t("nav.logout")}</span>
+        </button>
+      </div>
+      {navTooltip ? (
+        <div
+          className="sidenav-tooltip"
+          role="tooltip"
+          style={{ top: navTooltip.y, left: navTooltip.x }}
+        >
+          {navTooltip.text}
+        </div>
+      ) : null}
+    </aside>
+  );
+}

@@ -2,22 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { NavConversations, NavPreferences } from "./components/icons";
 import {
-  ActionAddPerson, ActionApprove, ActionHandoff, ActionSearch,
-  ActionSend, ActionStop, ModeImplement, ModeReview, NavAdmin,
-  NavConversations, NavLogout, NavMcp, NavPreferences, NavRefresh,
-  NavSidebarCollapse, NavSidebarExpand, NavSkills,
-} from "./components/icons";
-import { AgentMark } from "./components/AgentMark";
-import {
-  cancelRun, createSession, getMe, listControlPanelDaemonNodes, logout, provisionSandbox,
-  RelayApiError,
+  cancelRun, createSession, logout,
   recordDecision, recordHandoff, runSandbox,
 } from "./api";
-import type { AgentName, AgentTaskMode, ControlPanelDaemonNodeRecord, CurrentUser, SandboxRecord, Tone } from "./types";
-import { RelayMark } from "./components/RelayMark";
-import { EmployeeAvatar } from "./components/EmployeeAvatar";
-import { StatusPill } from "./components/StatusPill";
+import type { AgentName, AgentTaskMode, ControlPanelDaemonNodeRecord, CurrentUser } from "./types";
 import { TranscriptEmpty } from "./components/TranscriptEmpty";
 import { MessageBlock, projectMessages, isGroupedContinuation } from "./components/MessageBlock";
 import type { DerivedMessage } from "./components/MessageBlock";
@@ -26,210 +16,50 @@ import { LoginScreen } from "./components/LoginScreen";
 import { McpPage } from "./components/McpPage";
 import { SkillsPage } from "./components/SkillsPage";
 import { PreferencesDialog } from "./components/PreferencesDialog";
-import { SUPPORTED_LANGUAGES, type Theme, type Language } from "./components/PreferencesPanel";
-import { ConversationRow } from "./components/ConversationRow";
+import { type Theme, type Language } from "./components/PreferencesPanel";
 import type { EmployeeContact } from "./components/ConversationRow";
+import { DecisionBar } from "./components/composer/DecisionBar";
+import { Composer } from "./components/composer/Composer";
 import { useRelayData } from "./hooks/useRelayData";
-import { mergeVisibleDaemonNodes, shouldClaimLocalDaemonNode } from "./lib/daemonNodes";
+import { useSessionEvents } from "./hooks/useSessionEvents";
+import { useLocalDaemonNodes } from "./hooks/useLocalDaemonNodes";
+import { mergeVisibleDaemonNodes } from "./lib/daemonNodes";
+import { applyTheme, readLanguage, readTheme, readTokens, selectedEmployeeKey, writeLanguage, writeTheme } from "./lib/appStorage";
+import { canUseLocalControlPanel, localControlPanelNodes, sessionBelongsToEmployee } from "./lib/controlPanel";
+import { useRelayStore } from "./lib/store";
+import { useAuthSession } from "./hooks/useAuthSession";
+import { useComposer } from "./hooks/useComposer";
+import { useEmployeeProvisioning } from "./hooks/useEmployeeProvisioning";
+import { SideNav } from "./components/SideNav";
+import { ThreadPanel } from "./components/ThreadPanel";
+import { ChatHeader } from "./components/ChatHeader";
+import type { AppRoute, MobileView } from "./lib/viewTypes";
 import "./i18n";
 
 // Mirrors AGENT_REGISTRY in relay-core. Kept as a local literal so the browser
 // bundle never imports node-only runtime; the Record<AgentName, …>
 // types below fail to compile if this drifts from the AgentName union.
 const agents: AgentName[] = ["claude", "pi", "codex", "kimi"];
-const tokenStorageKey = "relay-web.tokens";
-const selectedEmployeeKey = "relay-web.selectedEmployee";
-const themeStorageKey = "relay-web.theme";
-const languageStorageKey = "relay-web.language";
 
-type TokenMap = Record<string, string>;
-type MobileView = "threads" | "chat";
-type AppRoute = "main" | "admin" | "mcp" | "skills";
 
-function readTokens(): TokenMap {
-  if (typeof window === "undefined") return {};
-  try { return JSON.parse(localStorage.getItem(tokenStorageKey) ?? "null") as TokenMap ?? {}; }
-  catch { return {}; }
-}
-
-function writeTokens(tokens: TokenMap): void {
-  if (typeof window !== "undefined") localStorage.setItem(tokenStorageKey, JSON.stringify(tokens));
-}
-
-function readTheme(): Theme {
-  if (typeof window === "undefined") return "system";
-  return (localStorage.getItem(themeStorageKey) as Theme | null) ?? "system";
-}
-
-function readLanguage(): Language {
-  if (typeof window === "undefined") return "en";
-  const stored = localStorage.getItem(languageStorageKey);
-  return SUPPORTED_LANGUAGES.includes(stored as Language) ? stored as Language : "en";
-}
-
-function applyTheme(theme: Theme): void {
-  if (typeof document === "undefined") return;
-  if (theme === "system") {
-    document.documentElement.removeAttribute("data-theme");
-  } else {
-    document.documentElement.setAttribute("data-theme", theme);
-  }
-}
-
-function canUseLocalControlPanel(): boolean {
-  if (typeof window === "undefined") return false;
-  return window.location.hostname === "localhost" ||
-    window.location.hostname === "127.0.0.1" ||
-    window.location.hostname === "::1";
-}
-
-function newBrowserSandboxToken(): string {
-  const bytes = new Uint8Array(24);
-  crypto.getRandomValues(bytes);
-  let raw = "";
-  for (const byte of bytes) raw += String.fromCharCode(byte);
-  return `tok_${btoa(raw).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "")}`;
-}
-
-function preferLocalControlPanelNode(
-  employeeId: string,
-  nodes: ControlPanelDaemonNodeRecord[],
-): ControlPanelDaemonNodeRecord | undefined {
-  return nodes
-    .filter((node) => node.employeeId === employeeId && node.nodeToken)
-    .sort((a, b) => {
-      const score = (node: ControlPanelDaemonNodeRecord) =>
-        (node.online && !node.stale ? 2 : 0) + (node.status === "ready" ? 1 : 0);
-      const delta = score(b) - score(a);
-      return delta || (b.lastSeenAt ?? "").localeCompare(a.lastSeenAt ?? "");
-    })[0];
-}
-
-async function localControlPanelNodes(): Promise<ControlPanelDaemonNodeRecord[]> {
-  if (!canUseLocalControlPanel()) return [];
-  try {
-    return (await listControlPanelDaemonNodes()).nodes;
-  } catch {
-    return [];
-  }
-}
-
-function sessionBelongsToEmployee(
-  session: { workspacePath: string },
-  employeeId: string,
-  sandbox?: SandboxRecord,
-  node?: { workspacePath?: string },
-): boolean {
-  if (sandbox && session.workspacePath === sandbox.workspacePath) return true;
-  if (node?.workspacePath && session.workspacePath === node.workspacePath) return true;
-  return session.workspacePath === `/workspace/${employeeId}` || session.workspacePath.endsWith(`/${employeeId}`);
-}
-
-// ── Sub-components ────────────────────────────────────────────────────────────
-
-function ModeToggle({ mode, setMode }: {
-  mode: AgentTaskMode;
-  setMode: (mode: AgentTaskMode) => void;
-}) {
-  const { t } = useTranslation();
-  const next: AgentTaskMode = mode === "implement" ? "review" : "implement";
-  const Icon = mode === "implement" ? ModeImplement : ModeReview;
-  return (
-    <button
-      type="button"
-      className="mode-chip"
-      data-mode={mode}
-      aria-label={t("composer.choose_mode")}
-      title={`${t(`mode.${next}`)} (Shift+Tab)`}
-      onClick={() => setMode(next)}
-    >
-      <Icon className="mode-chip-icon" size={13} aria-hidden="true" />
-      <span className="mode-chip-label">{t(`mode.${mode}`)}</span>
-      <span className="mode-chip-hint" aria-hidden="true">⇧⇥</span>
-    </button>
-  );
-}
-
-function MentionPopover({ filteredAgents, mentionIndex, insertMention }: {
-  filteredAgents: AgentName[]; mentionIndex: number; insertMention: (a: AgentName) => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <div id="mention-popover" className="mention-popover agent-picker" role="listbox" aria-label={t("composer.address_agent")}>
-      {filteredAgents.map((a, i) => (
-        <button key={a} id={`mention-option-${i}`} type="button" role="option" aria-selected={i === mentionIndex} className={i === mentionIndex ? "active" : ""} onMouseDown={(e) => { e.preventDefault(); insertMention(a); }}>
-          <span className="agent-avatar" data-agent={a} aria-hidden="true"><AgentMark agent={a} size={16} /></span>
-          <span translate="no">@{a}</span>
-          <span className="mention-role">{t(`agent.${a}.role`)}</span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function DecisionBar({ sendDecision, handoffOpen, setHandoffOpen, handoffAgent, setHandoffAgent, handoffMode, setHandoffMode, handoffNote, setHandoffNote, sendHandoff }: {
-  sendDecision: (kind: "approve" | "reject" | "rerun" | "mark_done") => Promise<void>;
-  handoffOpen: boolean; setHandoffOpen: (v: boolean) => void;
-  handoffAgent: AgentName; setHandoffAgent: (a: AgentName) => void;
-  handoffMode: AgentTaskMode; setHandoffMode: (m: AgentTaskMode) => void;
-  handoffNote: string; setHandoffNote: (v: string) => void;
-  sendHandoff: () => Promise<void>;
-}) {
-  const { t } = useTranslation();
-  return (
-    <>
-      <div className="decision-bar">
-        <button type="button" onClick={() => void sendDecision("approve")}><ActionApprove size={14} /> {t("decision.approve")}</button>
-        <button type="button" onClick={() => void sendDecision("rerun")}>{t("decision.rerun")}</button>
-        <button type="button" onClick={() => void sendDecision("mark_done")}>{t("decision.mark_done")}</button>
-        <button type="button" className="danger-soft" onClick={() => void sendDecision("reject")}>{t("decision.reject")}</button>
-        <button type="button" className="primary" aria-controls="handoff-panel" aria-expanded={handoffOpen} onClick={() => setHandoffOpen(!handoffOpen)}>
-          <ActionHandoff size={14} /> {t("decision.handoff")}
-        </button>
-      </div>
-      {handoffOpen ? (
-        <div id="handoff-panel" className="handoff-panel">
-          <div className="handoff-row">
-            <label htmlFor="handoff-agent">{t("handoff.route_to")}</label>
-            <select id="handoff-agent" name="handoff-agent" value={handoffAgent} onChange={(e) => setHandoffAgent(e.target.value as AgentName)}>
-              {agents.map((a) => <option key={a} value={a}>{a}</option>)}
-            </select>
-          </div>
-          <div className="handoff-row">
-            <label htmlFor="handoff-mode">{t("handoff.mode")}</label>
-            <select id="handoff-mode" name="handoff-mode" value={handoffMode} onChange={(e) => setHandoffMode(e.target.value as AgentTaskMode)}>
-              <option value="implement">{t("mode.implement")}</option>
-              <option value="review">{t("mode.review")}</option>
-            </select>
-          </div>
-          <input aria-label={t("handoff.note_placeholder")} name="handoff-note" autoComplete="off" placeholder={t("handoff.note_placeholder")} value={handoffNote} onChange={(e) => setHandoffNote(e.target.value)} />
-          <div className="handoff-actions">
-            <button type="button" onClick={() => setHandoffOpen(false)}>{t("handoff.cancel")}</button>
-            <button type="button" className="primary" onClick={() => void sendHandoff()}>{t("handoff.send")}</button>
-          </div>
-        </div>
-      ) : null}
-    </>
-  );
-}
 
 // ── App ───────────────────────────────────────────────────────────────────────
 
 export function App() {
   const { t, i18n } = useTranslation();
-  const [selectedEmployee, setSelectedEmployee] = useState("");
-  const [tokens, setTokens] = useState<TokenMap>({});
+  const selectedEmployee = useRelayStore((s) => s.selectedEmployee);
+  const setSelectedEmployee = useRelayStore((s) => s.setSelectedEmployee);
+  const selectedSessionId = useRelayStore((s) => s.selectedSessionId);
+  const setSelectedSessionId = useRelayStore((s) => s.setSelectedSessionId);
+  const tokens = useRelayStore((s) => s.tokens);
+  const setTokens = useRelayStore((s) => s.setTokens);
+  const status = useRelayStore((s) => s.status);
+  const setStatus = useRelayStore((s) => s.setStatus);
   const [hydrated, setHydrated] = useState(false);
   const [activeAgent, setActiveAgent] = useState<AgentName>("claude");
   const [composerMode, setComposerMode] = useState<AgentTaskMode>("implement");
-  const [composerText, setComposerText] = useState("");
-  const [mentionOpen, setMentionOpen] = useState(false);
-  const [mentionQuery, setMentionQuery] = useState("");
-  const [mentionIndex, setMentionIndex] = useState(0);
-  const [isComposing, setIsComposing] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const composer = useComposer({ agentNames: agents, onAgentPicked: setActiveAgent });
   const [employeeQuery, setEmployeeQuery] = useState("");
-  const [selectedSessionId, setSelectedSessionId] = useState<string | undefined>();
   const [prefsOpen, setPrefsOpen] = useState(false);
   const [mobileView, setMobileView] = useState<MobileView>("chat");
   const [route, setRoute] = useState<AppRoute>("main");
@@ -241,12 +71,8 @@ export function App() {
   const [handoffMode, setHandoffMode] = useState<AgentTaskMode>("implement");
   const [handoffNote, setHandoffNote] = useState("");
   const [isRunning, setIsRunning] = useState(false);
-  const [navTooltip, setNavTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
-  const [status, setStatus] = useState<{ tone: Tone; message: string }>({ tone: "info", message: t("toast.open_workspace_to_begin") });
   const [toastVisible, setToastVisible] = useState(false);
-  const [localNodes, setLocalNodes] = useState<ControlPanelDaemonNodeRecord[]>([]);
-  const [user, setUser] = useState<CurrentUser | null>(null);
-  const [authChecked, setAuthChecked] = useState(false);
+  const { user, authChecked, setUser } = useAuthSession();
   const statusSeenRef = useRef(false);
   const localNodeAdoptionStartedRef = useRef(false);
   const transcriptRef = useRef<HTMLDivElement>(null);
@@ -254,6 +80,10 @@ export function App() {
 
   const selectedEmployeeToken = tokens[selectedEmployee];
   const { sandboxes, nodes, sessions, isRefreshing, refresh, setSandboxes } = useRelayData(setStatus, selectedEmployeeToken, Boolean(user));
+  const { localNodes, refreshLocalDaemonNodes } = useLocalDaemonNodes(
+    localControlPanelNodes,
+    hydrated && user?.role === "admin" && canUseLocalControlPanel(),
+  );
   const visibleNodes = useMemo(() => mergeVisibleDaemonNodes(nodes, localNodes), [nodes, localNodes]);
   const agentDescriptors = useMemo<Record<AgentName, { role: string; blurb: string }>>(() => ({
     claude: { role: t("agent.claude.role"), blurb: t("agent.claude.blurb") },
@@ -278,6 +108,10 @@ export function App() {
     if (selectedSessionId) { const p = sessions.find((s) => s.id === selectedSessionId); if (p) return p; }
     return threadSessions[0];
   }, [selectedSessionId, sessions, threadSessions]);
+
+  // Live SSE tail of the open conversation; merges new events into the
+  // sessions cache so the active thread updates at push latency.
+  useSessionEvents(activeSession?.id, Boolean(user));
 
   const selectedToken = selectedSandbox ? (tokens[selectedSandbox.id] ?? tokens[selectedEmployee]) : tokens[selectedEmployee];
   const activeRun = selectedNode?.activeRuns[0];
@@ -349,102 +183,12 @@ export function App() {
     await refresh(undefined, tokenOverride);
   }, [refresh]);
 
-  const refreshLocalDaemonNodes = useCallback(async () => {
-    const nextNodes = await localControlPanelNodes();
-    setLocalNodes(nextNodes);
-    return nextNodes;
-  }, []);
-
-  async function provisionEmployeeSandbox(
-    employeeId: string,
-    preferredToken?: string,
-  ): Promise<{ sandbox: SandboxRecord; token?: string }> {
-    const token = preferredToken?.trim() || undefined;
-    const controlPanelNodes = await refreshLocalDaemonNodes();
-    const localNode = preferLocalControlPanelNode(employeeId, controlPanelNodes);
-
-    const claimLocalNode = async () => {
-      if (!localNode?.nodeToken) return undefined;
-      const nextToken = newBrowserSandboxToken();
-      const sandbox = await provisionSandbox(employeeId, nextToken, localNode.nodeToken);
-      return { sandbox, token: nextToken };
-    };
-
-    if (token) {
-      try {
-        const sandbox = await provisionSandbox(employeeId, token);
-        return { sandbox, token: sandbox.token ?? token };
-      } catch (error) {
-        if (error instanceof RelayApiError && error.status === 401) {
-          const claimed = await claimLocalNode();
-          if (claimed) return claimed;
-        }
-        throw error;
-      }
-    }
-
-    const claimed = await claimLocalNode();
-    if (claimed) return claimed;
-
-    const sandbox = await provisionSandbox(employeeId, token);
-    return { sandbox, token: sandbox.token ?? token };
-  }
-
-  function rememberSandboxToken(employeeId: string, sandbox: SandboxRecord, token?: string): void {
-    if (token) {
-      const nextTokens = { ...tokens, [employeeId]: token, [sandbox.id]: token };
-      setTokens(nextTokens);
-      writeTokens(nextTokens);
-    }
-    setSandboxes((cur) => [sandbox, ...cur.filter((s) => s.id !== sandbox.id)]);
-  }
-
-  const adoptLocalDaemonNodes = useCallback(async () => {
-    const controlPanelNodes = await refreshLocalDaemonNodes();
-    const claimable = controlPanelNodes.filter((node) => shouldClaimLocalDaemonNode(node, nodes));
-    if (claimable.length === 0) return;
-
-    const nextTokens = { ...tokens };
-    const adoptedSandboxes: SandboxRecord[] = [];
-    for (const node of claimable) {
-      if (!node.employeeId || !node.nodeToken) continue;
-      const uiToken = newBrowserSandboxToken();
-      try {
-        const sandbox = await provisionSandbox(node.employeeId, uiToken, node.nodeToken);
-        nextTokens[node.employeeId] = uiToken;
-        nextTokens[sandbox.id] = uiToken;
-        adoptedSandboxes.push(sandbox);
-      } catch {
-        // A node may already belong to another browser token; leave it untouched.
-      }
-    }
-
-    if (adoptedSandboxes.length === 0) return;
-    setTokens(nextTokens);
-    writeTokens(nextTokens);
-    setSandboxes((cur) => [
-      ...adoptedSandboxes,
-      ...cur.filter((sandbox) => !adoptedSandboxes.some((adopted) => adopted.id === sandbox.id)),
-    ]);
-    setStatus({
-      tone: "info",
-      message: t("toast.connected_nodes", { count: adoptedSandboxes.length }),
-    });
-    await refreshWithToken(nextTokens[selectedEmployee] ?? nextTokens[adoptedSandboxes[0].id]);
-  }, [nodes, refreshLocalDaemonNodes, refreshWithToken, selectedEmployee, setSandboxes, t, tokens]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    void getMe(controller.signal)
-      .then((result) => {
-        if (result.authenticated && result.user) {
-          setUser(result.user);
-        }
-      })
-      .catch(() => undefined)
-      .finally(() => setAuthChecked(true));
-    return () => controller.abort();
-  }, []);
+  const { provisionEmployeeSandbox, rememberSandboxToken, adoptLocalDaemonNodes } = useEmployeeProvisioning({
+    nodes,
+    setSandboxes,
+    refreshLocalDaemonNodes,
+    refreshWithToken,
+  });
 
   useEffect(() => {
     if (!authChecked) return;
@@ -464,12 +208,7 @@ export function App() {
     localNodeAdoptionStartedRef.current = true;
     void adoptLocalDaemonNodes();
   }, [adoptLocalDaemonNodes, hydrated, user]);
-  useEffect(() => {
-    if (!hydrated || !user || user.role !== "admin") return;
-    void refreshLocalDaemonNodes();
-    const timer = window.setInterval(() => void refreshLocalDaemonNodes(), 3000);
-    return () => window.clearInterval(timer);
-  }, [hydrated, refreshLocalDaemonNodes, user]);
+  // Admin local-node polling now lives in useLocalDaemonNodes (refetchInterval).
   useEffect(() => {
     if (!hydrated) return;
     if (selectedEmployee) {
@@ -497,11 +236,11 @@ export function App() {
 
   useEffect(() => {
     applyTheme(theme);
-    localStorage.setItem(themeStorageKey, theme);
+    writeTheme(theme);
   }, [theme]);
 
   useEffect(() => {
-    localStorage.setItem(languageStorageKey, language);
+    writeLanguage(language);
     document.documentElement.lang = language;
     document.title = i18n.t("app.title");
     if (i18n.language !== language) {
@@ -539,12 +278,12 @@ export function App() {
         delete nextTokens[key];
       }
     }
-    setTokens(nextTokens); writeTokens(nextTokens);
+    setTokens(nextTokens);
     if (selectedEmployee === employeeId) setSelectedEmployee("");
   }
 
   async function sendMessage() {
-    const raw = composerText.trim();
+    const raw = composer.composerText.trim();
     if (!raw) return;
     if (!selectedEmployee) {
       setStatus({ tone: "warn", message: t("toast.no_node_selected") });
@@ -560,47 +299,18 @@ export function App() {
       rememberSandboxToken(selectedEmployee, sandbox, token);
       const assignment = { agent: routedAgent, mode: composerMode };
       const session = await createSession({ taskGoal: goal, assignments: [assignment], workspacePath: sandbox.workspacePath, ownerEmployeeId: selectedEmployee }, token);
-      setSelectedSessionId(session.id); setComposerText(""); setMentionOpen(false);
+      setSelectedSessionId(session.id); composer.setComposerText(""); composer.setMentionOpen(false);
       setMobileView("chat"); atBottomRef.current = true;
       await refresh(undefined, token);
-      const timer = window.setInterval(() => void refresh(undefined, token), 1000);
-      try {
-        const done = await runSandbox({ sandboxId: sandbox.id, taskGoal: goal, assignments: [assignment], sessionId: session.id }, token);
-        setSelectedSessionId(done.id);
-        setStatus({ tone: "good", message: t("toast.message_sent", { employee: selectedEmployee, agent: routedAgent }) });
-      } finally { window.clearInterval(timer); }
+      // The active session now tails live over SSE (useSessionEvents), so no
+      // per-run polling loop is needed while the run is in flight.
+      const done = await runSandbox({ sandboxId: sandbox.id, taskGoal: goal, assignments: [assignment], sessionId: session.id }, token);
+      setSelectedSessionId(done.id);
+      setStatus({ tone: "good", message: t("toast.message_sent", { employee: selectedEmployee, agent: routedAgent }) });
       await refresh(undefined, token);
     } catch (err) {
       setStatus({ tone: "bad", message: err instanceof Error ? err.message : String(err) });
     } finally { setIsRunning(false); }
-  }
-
-  function detectMentionToken(text: string, caret: number): { start: number; query: string } | null {
-    const m = /(?:^|\s)@([a-z0-9-]*)$/i.exec(text.slice(0, caret));
-    if (!m) return null;
-    return { start: m.index === 0 ? 0 : m.index + 1, query: m[1].toLowerCase() };
-  }
-
-  function syncMentionState(text: string, caret: number) {
-    if (isComposing) return;
-    const token = detectMentionToken(text, caret);
-    if (token) { setMentionOpen(true); setMentionQuery(token.query); setMentionIndex(0); }
-    else if (mentionOpen) setMentionOpen(false);
-  }
-
-  function insertMention(agent: AgentName) {
-    const el = textareaRef.current;
-    const caret = el?.selectionStart ?? composerText.length;
-    const token = detectMentionToken(composerText, caret);
-    const start = token?.start ?? caret;
-    const inserted = `@${agent} `;
-    setComposerText(`${composerText.slice(0, start)}${inserted}${composerText.slice(caret)}`);
-    setMentionOpen(false); setMentionQuery(""); setMentionIndex(0); pickAgent(agent);
-    requestAnimationFrame(() => {
-      const node = textareaRef.current;
-      if (!node) return;
-      node.focus(); node.setSelectionRange(start + inserted.length, start + inserted.length);
-    });
   }
 
   async function cancelActiveRun() {
@@ -639,15 +349,6 @@ export function App() {
     }
   }
 
-  function pickAgent(agent: AgentName) { setActiveAgent(agent); }
-
-  function showNavTooltip(text: string, el: HTMLElement) {
-    if (sidenavExpanded) return;
-    const rect = el.getBoundingClientRect();
-    setNavTooltip({ text, x: rect.right + 12, y: rect.top + rect.height / 2 });
-  }
-
-  function hideNavTooltip() { setNavTooltip(null); }
 
   async function handleLogout() {
     try {
@@ -658,8 +359,6 @@ export function App() {
     setUser(null);
     setRoute("main");
   }
-
-  const filteredMentionAgents = mentionQuery ? agents.filter((a) => a.startsWith(mentionQuery)) : agents;
 
   if (!authChecked) {
     return (
@@ -691,213 +390,40 @@ export function App() {
         </button>
       </div>
 
-      <aside className="sidenav-panel" aria-label="Relay" data-expanded={sidenavExpanded ? "true" : "false"}>
-        <div className="sidenav-brand-row">
-          <div className="sidenav-brand" aria-hidden="true">
-            <RelayMark width={28} height={19} />
-            <span className="sidenav-brand-word">Relay</span>
-          </div>
-          <button
-            type="button"
-            aria-label={sidenavExpanded ? t("nav.collapse_sidebar") : t("nav.expand_sidebar")}
-            className="sidenav-btn sidenav-toggle"
-            onClick={() => setSidenavExpanded((v) => !v)}
-            title={sidenavExpanded ? t("nav.collapse_sidebar") : t("nav.expand_sidebar")}
-            onMouseEnter={(e) => showNavTooltip(sidenavExpanded ? t("nav.collapse_sidebar") : t("nav.expand_sidebar"), e.currentTarget)}
-            onMouseLeave={hideNavTooltip}
-            onFocus={(e) => showNavTooltip(sidenavExpanded ? t("nav.collapse_sidebar") : t("nav.expand_sidebar"), e.currentTarget)}
-            onBlur={hideNavTooltip}
-          >
-            {sidenavExpanded ? <NavSidebarCollapse size={16} /> : <NavSidebarExpand size={16} />}
-            <span className="sidenav-toggle-label">{sidenavExpanded ? t("nav.collapse") : t("nav.expand")}</span>
-          </button>
-        </div>
-        <nav className="sidenav-nav" aria-label={t("nav.conversations")}>
-          <button
-            className={`sidenav-btn ${route === "main" ? "active" : ""}`}
-            data-nav="conversations"
-            type="button"
-            aria-label={t("nav.conversations")}
-            aria-pressed={route === "main"}
-            title={t("nav.conversations")}
-            onClick={() => setRoute("main")}
-            onMouseEnter={(e) => showNavTooltip(t("nav.conversations"), e.currentTarget)}
-            onMouseLeave={hideNavTooltip}
-            onFocus={(e) => showNavTooltip(t("nav.conversations"), e.currentTarget)}
-            onBlur={hideNavTooltip}
-          >
-            <NavConversations size={18} />
-            <span className="sidenav-label">{t("nav.conversations")}</span>
-          </button>
-          <button
-            className={`sidenav-btn ${route === "mcp" ? "active" : ""}`}
-            data-nav="mcp"
-            type="button"
-            aria-label={t("nav.mcp_label")}
-            aria-pressed={route === "mcp"}
-            title={t("nav.mcp_label")}
-            onClick={() => setRoute((r) => r === "mcp" ? "main" : "mcp")}
-            onMouseEnter={(e) => showNavTooltip(t("nav.mcp"), e.currentTarget)}
-            onMouseLeave={hideNavTooltip}
-            onFocus={(e) => showNavTooltip(t("nav.mcp"), e.currentTarget)}
-            onBlur={hideNavTooltip}
-          >
-            <NavMcp size={18} />
-            <span className="sidenav-label">{t("nav.mcp")}</span>
-          </button>
-          <button
-            className={`sidenav-btn ${route === "skills" ? "active" : ""}`}
-            data-nav="skills"
-            type="button"
-            aria-label={t("nav.skills_label")}
-            aria-pressed={route === "skills"}
-            title={t("nav.skills_label")}
-            onClick={() => setRoute((r) => r === "skills" ? "main" : "skills")}
-            onMouseEnter={(e) => showNavTooltip(t("nav.skills"), e.currentTarget)}
-            onMouseLeave={hideNavTooltip}
-            onFocus={(e) => showNavTooltip(t("nav.skills"), e.currentTarget)}
-            onBlur={hideNavTooltip}
-          >
-            <NavSkills size={18} />
-            <span className="sidenav-label">{t("nav.skills")}</span>
-          </button>
-          {user.role === "admin" ? (
-            <button
-              className={`sidenav-btn ${route === "admin" ? "active" : ""}`}
-              data-nav="admin"
-              type="button"
-              aria-label={t("nav.admin_label")}
-              aria-pressed={route === "admin"}
-              title={t("nav.admin_label")}
-              onClick={() => setRoute((r) => r === "admin" ? "main" : "admin")}
-              onMouseEnter={(e) => showNavTooltip(t("nav.admin"), e.currentTarget)}
-              onMouseLeave={hideNavTooltip}
-              onFocus={(e) => showNavTooltip(t("nav.admin"), e.currentTarget)}
-              onBlur={hideNavTooltip}
-            >
-              <NavAdmin size={18} />
-              <span className="sidenav-label">{t("nav.admin")}</span>
-            </button>
-          ) : null}
-        </nav>
-        <div className="sidenav-bottom">
-          <button
-            className={`sidenav-btn ${prefsOpen ? "active" : ""}`}
-            data-nav="settings"
-            type="button"
-            aria-haspopup="dialog"
-            aria-expanded={prefsOpen}
-            aria-label={t("nav.settings")}
-            title={t("nav.settings")}
-            onClick={() => setPrefsOpen((v) => !v)}
-            onMouseEnter={(e) => showNavTooltip(t("nav.settings"), e.currentTarget)}
-            onMouseLeave={hideNavTooltip}
-            onFocus={(e) => showNavTooltip(t("nav.settings"), e.currentTarget)}
-            onBlur={hideNavTooltip}
-          >
-            <NavPreferences size={18} />
-            <span className="sidenav-label">{t("nav.settings")}</span>
-          </button>
-          <button
-            type="button"
-            aria-label={t("nav.logout")}
-            className="sidenav-btn"
-            data-nav="logout"
-            onClick={() => void handleLogout()}
-            title={t("nav.logout")}
-            onMouseEnter={(e) => showNavTooltip(t("nav.logout"), e.currentTarget)}
-            onMouseLeave={hideNavTooltip}
-            onFocus={(e) => showNavTooltip(t("nav.logout"), e.currentTarget)}
-            onBlur={hideNavTooltip}
-          >
-            <NavLogout size={18} />
-            <span className="sidenav-label">{t("nav.logout")}</span>
-          </button>
-        </div>
-        {navTooltip ? (
-          <div
-            className="sidenav-tooltip"
-            role="tooltip"
-            style={{ top: navTooltip.y, left: navTooltip.x }}
-          >
-            {navTooltip.text}
-          </div>
-        ) : null}
-      </aside>
+      <SideNav
+        sidenavExpanded={sidenavExpanded}
+        setSidenavExpanded={setSidenavExpanded}
+        route={route}
+        setRoute={setRoute}
+        isAdmin={user.role === "admin"}
+        prefsOpen={prefsOpen}
+        setPrefsOpen={setPrefsOpen}
+        onLogout={() => void handleLogout()}
+      />
 
       {route === "admin" ? <AdminConsole /> : route === "mcp" ? <McpPage /> : route === "skills" ? <SkillsPage /> : (<>
 
-      <aside className="thread-panel" aria-label={t("nav.conversations")}>
-        <div className="conversation-header">
-          <div className="conversation-heading">
-            <h1>{t("thread.messages")}<small className="mono conversation-heading-count">{filteredEmployees.length.toString().padStart(2, "0")}</small></h1>
-          </div>
-        </div>
-        <form className="people-search conversation-search" onSubmit={(e) => {
-          e.preventDefault();
-          const q = employeeQuery.trim().replace(/^@/, "");
-          if (q) { void selectEmployee(q); setEmployeeQuery(""); }
-        }}>
-          <ActionSearch size={16} />
-          <input aria-label={t("thread.search_label")} name="employee-search" autoComplete="off" spellCheck={false} placeholder={t("thread.search_placeholder")} value={employeeQuery} onChange={(e) => setEmployeeQuery(e.target.value)} />
-          {employeeQuery.trim() ? (
-            <button type="submit" className="search-connect-btn" aria-label={t("thread.connect_to", { name: employeeQuery.trim().replace(/^@/, "") })} title={t("thread.connect_hint")}>
-              <ActionAddPerson size={13} />
-            </button>
-          ) : null}
-        </form>
-        <section className="conversation-list" aria-label={t("nav.conversations")}>
-          {filteredEmployees.map((c) => <ConversationRow key={c.id} contact={c} selected={selectedEmployee === c.id} onSelect={(id) => void selectEmployee(id)} onRemove={removeEmployee} />)}
-          {filteredEmployees.length === 0 && !employeeQuery.trim() ? (
-            <p className="conversation-empty">{t("thread.no_nodes")}</p>
-          ) : null}
-          {filteredEmployees.length === 0 && employeeQuery.trim() ? (
-            <button
-              className="conversation-row conversation-connect-hint"
-              type="button"
-              onClick={() => { const q = employeeQuery.trim().replace(/^@/, ""); if (q) { void selectEmployee(q); setEmployeeQuery(""); } }}
-            >
-              <span className="connect-hint-icon" aria-hidden="true"><ActionAddPerson size={14} /></span>
-              <span className="conversation-copy">
-                <span className="conversation-name"><strong translate="no">@{employeeQuery.trim().replace(/^@/, "")}</strong></span>
-                <span className="conversation-preview">{t("thread.connect_hint")}</span>
-              </span>
-            </button>
-          ) : null}
-        </section>
-      </aside>
+      <ThreadPanel
+        employees={filteredEmployees}
+        employeeQuery={employeeQuery}
+        setEmployeeQuery={setEmployeeQuery}
+        selectedEmployee={selectedEmployee}
+        onSelectEmployee={(id) => void selectEmployee(id)}
+        onRemoveEmployee={removeEmployee}
+      />
 
       <section id="chat-panel" className="chat-panel" aria-label={t("nav.conversations")} tabIndex={-1}>
-        <header className="chat-header">
-          <div className="chat-title">
-            <button className="mobile-back-button" type="button" onClick={() => setMobileView("threads")}>
-              <NavConversations size={16} /><span>{t("nav.conversations")}</span>
-            </button>
-            <EmployeeAvatar employeeId={selectedEmployee} running={Boolean(activeRun)} />
-            <div>
-              <p>
-                {selectedEmployee ? (
-                  <span translate="no">@{selectedEmployee}</span>
-                ) : (
-                  <span>{t("thread.no_employee_selected")}</span>
-                )}
-                <span className="header-separator" aria-hidden="true" />
-                <span translate="no">{activeAgent}</span>
-                {activeSession ? <><span className="header-separator" aria-hidden="true" /><span className="session-id">{activeSession.id.slice(0, 8)}</span></> : null}
-              </p>
-              <h2>{activeSession ? activeSession.taskGoal : t("thread.new_conversation")}</h2>
-            </div>
-          </div>
-          <div className="chat-tools">
-            <div className="header-agent-tabs" aria-label={t("thread.talk_to_agent")}>
-              {agents.map((a) => <button key={a} type="button" aria-pressed={a === activeAgent} className={a === activeAgent ? "active" : ""} onClick={() => setActiveAgent(a)}><span translate="no">@{a}</span></button>)}
-            </div>
-            {activeSession ? <StatusPill value={activeSession.status} /> : null}
-            <button className="icon-button" type="button" aria-label={t("nav.refresh")} title={t("nav.refresh")} onClick={() => void refresh()}>
-              <NavRefresh size={16} className={isRefreshing ? "spin" : ""} />
-            </button>
-          </div>
-        </header>
+        <ChatHeader
+          selectedEmployee={selectedEmployee}
+          running={Boolean(activeRun)}
+          activeAgent={activeAgent}
+          setActiveAgent={setActiveAgent}
+          agentNames={agents}
+          activeSession={activeSession}
+          isRefreshing={isRefreshing}
+          onRefresh={() => void refresh()}
+          onBackToThreads={() => setMobileView("threads")}
+        />
 
         <div className={`toast ${status.tone}`} data-visible={toastVisible} role="status" aria-live="polite">
           {toastVisible ? status.message : null}
@@ -908,7 +434,7 @@ export function App() {
             {activeSession ? (
               <>
                 {messages.map((msg, i) => <MessageBlock key={msg.id} message={msg} employeeId={selectedEmployee} sessionId={activeSession.id} grouped={isGroupedContinuation(messages, i)} />)}
-                {awaitingDecision ? <DecisionBar sendDecision={sendDecision} handoffOpen={handoffOpen} setHandoffOpen={setHandoffOpen} handoffAgent={handoffAgent} setHandoffAgent={setHandoffAgent} handoffMode={handoffMode} setHandoffMode={setHandoffMode} handoffNote={handoffNote} setHandoffNote={setHandoffNote} sendHandoff={sendHandoff} /> : null}
+                {awaitingDecision ? <DecisionBar agentNames={agents} sendDecision={sendDecision} handoffOpen={handoffOpen} setHandoffOpen={setHandoffOpen} handoffAgent={handoffAgent} setHandoffAgent={setHandoffAgent} handoffMode={handoffMode} setHandoffMode={setHandoffMode} handoffNote={handoffNote} setHandoffNote={setHandoffNote} sendHandoff={sendHandoff} /> : null}
               </>
             ) : (
               <TranscriptEmpty selectedEmployee={selectedEmployee} activeAgent={activeAgent} agentDescriptors={agentDescriptors} />
@@ -916,76 +442,16 @@ export function App() {
           </div>
         </div>
 
-        <form className="composer" onSubmit={(e) => { e.preventDefault(); void sendMessage(); }}>
-          <div className="composer-input-wrap">
-            {mentionOpen && filteredMentionAgents.length > 0 ? <MentionPopover filteredAgents={filteredMentionAgents} mentionIndex={mentionIndex} insertMention={insertMention} /> : null}
-            <div className="composer-input">
-              <textarea
-                ref={textareaRef}
-                aria-label={selectedEmployee
-                  ? t("composer.aria_label", { employee: selectedEmployee, agent: activeAgent })
-                  : t("composer.aria_label_no_employee", { agent: activeAgent })}
-                aria-controls={mentionOpen ? "mention-popover" : undefined}
-                aria-expanded={mentionOpen}
-                aria-activedescendant={mentionOpen ? `mention-option-${mentionIndex}` : undefined}
-                name="message"
-                placeholder={selectedEmployee
-                  ? t("composer.placeholder", { employee: selectedEmployee })
-                  : t("composer.placeholder_no_employee")}
-                value={composerText}
-                onChange={(e) => { setComposerText(e.target.value); syncMentionState(e.target.value, e.target.selectionStart ?? e.target.value.length); }}
-                onKeyUp={(e) => { if (e.key.startsWith("Arrow") || e.key === "Home" || e.key === "End") syncMentionState(e.currentTarget.value, e.currentTarget.selectionStart ?? e.currentTarget.value.length); }}
-                onSelect={(e) => syncMentionState(e.currentTarget.value, e.currentTarget.selectionStart ?? e.currentTarget.value.length)}
-                onCompositionStart={() => setIsComposing(true)}
-                onCompositionEnd={(e) => { setIsComposing(false); syncMentionState(e.currentTarget.value, e.currentTarget.selectionStart ?? e.currentTarget.value.length); }}
-                onBlur={() => setMentionOpen(false)}
-                onKeyDown={(e) => {
-                  if (mentionOpen && filteredMentionAgents.length > 0) {
-                    if (e.key === "ArrowDown") { e.preventDefault(); setMentionIndex((i) => (i + 1) % filteredMentionAgents.length); return; }
-                    if (e.key === "ArrowUp") { e.preventDefault(); setMentionIndex((i) => (i - 1 + filteredMentionAgents.length) % filteredMentionAgents.length); return; }
-                    if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); insertMention(filteredMentionAgents[mentionIndex]); return; }
-                    if (e.key === "Escape") { e.preventDefault(); setMentionOpen(false); return; }
-                  }
-                  if (e.key === "Tab" && e.shiftKey) {
-                    e.preventDefault();
-                    setComposerMode((m) => (m === "implement" ? "review" : "implement"));
-                    return;
-                  }
-                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendMessage(); }
-                }}
-                rows={2}
-              />
-              <div className="composer-footer">
-                <div className="composer-footer-left">
-                  <ModeToggle mode={composerMode} setMode={setComposerMode} />
-                </div>
-                <div className="composer-footer-right">
-                  {activeRun ? (
-                    <button
-                      type="button"
-                      className="send-button send-button-cancel"
-                      onClick={() => void cancelActiveRun()}
-                      aria-label={t("composer.cancel_run")}
-                      title={t("composer.cancel_run")}
-                    >
-                      <ActionStop size={16} />
-                    </button>
-                  ) : (
-                    <button
-                      type="submit"
-                      className="send-button"
-                      disabled={!composerText.trim()}
-                      aria-label={t("composer.send")}
-                      title={t("composer.send")}
-                    >
-                      <ActionSend size={16} />
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </form>
+        <Composer
+          composer={composer}
+          composerMode={composerMode}
+          setComposerMode={setComposerMode}
+          activeAgent={activeAgent}
+          selectedEmployee={selectedEmployee}
+          running={Boolean(activeRun)}
+          onSend={() => void sendMessage()}
+          onCancelRun={() => void cancelActiveRun()}
+        />
       </section>
 
       </>)}

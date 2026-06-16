@@ -10,6 +10,8 @@ import {
 
 import "../styles.css";
 
+import { Providers } from "./providers";
+
 // Editorial Serif system — Instrument Serif carries display moments with
 // a confident editorial voice; Geist handles every line of UI text at
 // modern grotesque crispness; Geist Mono renders numbers and code with
@@ -71,7 +73,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       lang="en"
       className={`${instrumentSerif.variable} ${geist.variable} ${geistMono.variable} ${notoSansSC.variable} ${notoSansTC.variable}`}
     >
-      <body>{children}</body>
+      <body>
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }
