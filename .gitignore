@@ -38,3 +38,4 @@ htmlcov/
 *.swo
 .DS_Store
 daemon.log
+.worktrees/

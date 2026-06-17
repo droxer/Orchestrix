@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NavConversations, NavPreferences } from "./components/icons";
 import {
-  cancelRun, createSession, logout,
+  appendAssignment, archiveSession, cancelRun, createSession, logout,
   recordDecision, recordHandoff, runSandbox,
 } from "./api";
 import type { AgentName, AgentTaskMode, ControlPanelDaemonNodeRecord, CurrentUser } from "./types";
@@ -30,6 +30,8 @@ import { canUseLocalControlPanel, localControlPanelNodes, sessionBelongsToEmploy
 import { useRelayStore } from "./lib/store";
 import { useAuthSession } from "./hooks/useAuthSession";
 import { useComposer } from "./hooks/useComposer";
+import { useActiveSession } from "./hooks/useActiveSession";
+import { chooseSendAction } from "./lib/sendAction";
 import { useEmployeeProvisioning } from "./hooks/useEmployeeProvisioning";
 import { SideNav } from "./components/SideNav";
 import { ThreadPanel } from "./components/ThreadPanel";
@@ -104,11 +106,12 @@ export function App() {
   const selectedNode = useMemo(() => visibleNodes.find((n) => n.employeeId === selectedEmployee || n.id === selectedSandbox?.id), [visibleNodes, selectedEmployee, selectedSandbox?.id]);
   const sandboxWorkspace = selectedSandbox?.workspacePath ?? selectedNode?.workspacePath;
   const sandboxSessions = useMemo(() => sessions.filter((s) => !sandboxWorkspace || s.workspacePath === sandboxWorkspace), [sessions, sandboxWorkspace]);
-  const threadSessions = useMemo(() => sandboxSessions.filter((s) => s.agentRuns.some((r) => r.agent === activeAgent)), [sandboxSessions, activeAgent]);
+  const { activeSessionId, setActiveSessionId } = useActiveSession(selectedEmployee, sandboxSessions);
   const activeSession = useMemo(() => {
     if (selectedSessionId) { const p = sessions.find((s) => s.id === selectedSessionId); if (p) return p; }
-    return threadSessions[0];
-  }, [selectedSessionId, sessions, threadSessions]);
+    if (activeSessionId) { const p = sandboxSessions.find((s) => s.id === activeSessionId); if (p) return p; }
+    return sandboxSessions.find((s) => !s.archived);
+  }, [selectedSessionId, sessions, sandboxSessions, activeSessionId]);
 
   // Live SSE tail of the open conversation; merges new events into the
   // sessions cache so the active thread updates at push latency.
@@ -298,13 +301,22 @@ export function App() {
       const { sandbox, token } = await provisionEmployeeSandbox(selectedEmployee, selectedToken);
       rememberSandboxToken(selectedEmployee, sandbox, token);
       const assignment = { agent: routedAgent, mode: composerMode };
-      const session = await createSession({ taskGoal: goal, assignments: [assignment], workspacePath: sandbox.workspacePath, ownerEmployeeId: selectedEmployee }, token);
-      setSelectedSessionId(session.id); composer.setComposerText(""); composer.setMentionOpen(false);
+      const action = chooseSendAction({ activeSessionId, session: activeSession });
+      let sessionId: string;
+      if (action.kind === "append") {
+        await appendAssignment(action.sessionId, assignment, token);
+        sessionId = action.sessionId;
+      } else {
+        const session = await createSession({ taskGoal: goal, assignments: [assignment], workspacePath: sandbox.workspacePath, ownerEmployeeId: selectedEmployee }, token);
+        sessionId = session.id;
+        setActiveSessionId(sessionId);
+      }
+      setSelectedSessionId(sessionId); composer.setComposerText(""); composer.setMentionOpen(false);
       setMobileView("chat"); atBottomRef.current = true;
       await refresh(undefined, token);
       // The active session now tails live over SSE (useSessionEvents), so no
       // per-run polling loop is needed while the run is in flight.
-      const done = await runSandbox({ sandboxId: sandbox.id, taskGoal: goal, assignments: [assignment], sessionId: session.id }, token);
+      const done = await runSandbox({ sandboxId: sandbox.id, taskGoal: goal, assignments: [assignment], sessionId }, token);
       setSelectedSessionId(done.id);
       setStatus({ tone: "good", message: t("toast.message_sent", { employee: selectedEmployee, agent: routedAgent }) });
       await refresh(undefined, token);
@@ -421,6 +433,13 @@ export function App() {
           isRefreshing={isRefreshing}
           onRefresh={() => void refresh()}
           onBackToThreads={() => setMobileView("threads")}
+          onNewThread={async () => {
+            if (!activeSession) return;
+            try { await archiveSession(activeSession.id, selectedToken); } catch { /* surfaced via refresh */ }
+            setActiveSessionId(null);
+            setSelectedSessionId("");
+            await refresh();
+          }}
         />
 
         <div className={`toast ${status.tone}`} data-visible={toastVisible} role="status" aria-live="polite">

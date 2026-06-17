@@ -32,6 +32,18 @@ def is_review_assignment(mode: str) -> bool:
     return mode == "review"
 
 
+class SessionArchivedError(Exception):
+    def __init__(self, session_id: str) -> None:
+        super().__init__(f"Session {session_id} is archived.")
+        self.session_id = session_id
+
+
+class SessionRunInFlightError(Exception):
+    def __init__(self, session_id: str) -> None:
+        super().__init__(f"Session {session_id} has a run in flight.")
+        self.session_id = session_id
+
+
 class SessionController:
     def __init__(
         self,
@@ -147,7 +159,20 @@ class SessionController:
             "pendingDecision": "start",
         }))
 
+    def archive_session(self, session_id: str) -> dict[str, Any]:
+        snapshot = self.store.get_session(session_id)
+        if snapshot.get("archived"):
+            return snapshot
+        self._append(session_id, relay_event("session.archived", session_id, {}))
+        logger.info("Session archived", session_id=session_id)
+        return self.store.get_session(session_id)
+
     def assign_session(self, session_id: str, assignments: list[dict[str, Any]]) -> dict[str, Any]:
+        snapshot = self.store.get_session(session_id)
+        if snapshot.get("archived"):
+            raise SessionArchivedError(session_id)
+        if any(run.get("status") == "running" for run in snapshot.get("agentRuns", [])):
+            raise SessionRunInFlightError(session_id)
         self.create_artifact(session_id, {
             "kind": "plan",
             "title": "Assignment plan",

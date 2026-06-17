@@ -115,6 +115,26 @@ def request_actor_or_none(request: Request, auth_store: Any) -> dict[str, Any] |
         return None
 
 
+def request_actor_or_sandbox(request: Request, auth_store: Any, registry: DaemonNodeRegistry) -> dict[str, Any]:
+    actor = request_actor_or_none(request, auth_store)
+    if actor:
+        return actor
+    sandbox = authorized_sandbox_for_token(registry, bearer_token(request))
+    employee_id = sandbox.get("employeeId") if sandbox else None
+    if isinstance(employee_id, str) and employee_id:
+        return {
+            "user": {
+                "id": f"sandbox:{sandbox['id']}",
+                "username": employee_id,
+                "employeeId": employee_id,
+                "role": "user",
+            },
+            "employeeId": employee_id,
+            "isAdmin": False,
+        }
+    return request_actor(request, auth_store)
+
+
 def owner_employee_id_for_create(actor: dict[str, Any], body: dict[str, Any]) -> str:
     requested = string_field(body, "ownerEmployeeId") or string_field(body, "employeeId")
     if actor["isAdmin"] and requested:

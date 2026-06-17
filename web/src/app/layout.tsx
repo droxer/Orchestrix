@@ -62,6 +62,14 @@ const notoSansTC = Noto_Sans_TC({
 export const metadata: Metadata = {
   title: "Relay — Workforce Control Plane",
   description: "Coordinate Claude, Pi, and Codex Inside Employee Sandboxes.",
+  icons: {
+    icon: [
+      { url: "/web/favicon.svg", type: "image/svg+xml" },
+      { url: "/web/brand/relay-mark.svg", type: "image/svg+xml" },
+    ],
+    shortcut: "/web/favicon.svg",
+    apple: "/web/brand/relay-mark.svg",
+  },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

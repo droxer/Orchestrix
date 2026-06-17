@@ -208,6 +208,25 @@ export function recordDecision(
   });
 }
 
+export function appendAssignment(
+  sessionId: string,
+  assignment: { agent: AgentName; mode: "implement" | "review" },
+  token?: string,
+): Promise<RelaySession> {
+  return apiJson<RelaySession>(`/sessions/${encodeURIComponent(sessionId)}/assignments`, {
+    method: "POST",
+    token,
+    body: { assignments: [assignment] },
+  });
+}
+
+export function archiveSession(sessionId: string, token?: string): Promise<RelaySession> {
+  return apiJson<RelaySession>(`/sessions/${encodeURIComponent(sessionId)}/archive`, {
+    method: "POST",
+    token,
+  });
+}
+
 export function recordHandoff(
   sessionId: string,
   targetAgent: AgentName,

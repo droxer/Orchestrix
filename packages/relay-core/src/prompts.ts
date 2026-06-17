@@ -1,5 +1,9 @@
 import type { AgentState } from "./state.js";
 
+export function prependPriorAgentBridge(prompt: string, state: AgentState): string {
+  return state.prior_agent_bridge ? `${state.prior_agent_bridge}\n\n[User]\n${prompt}` : prompt;
+}
+
 export function appendReviewFeedback(prompt: string, state: AgentState): string {
   return state.review_feedback ? `${prompt}\n\nReview feedback to fix:\n${state.review_feedback}` : prompt;
 }
@@ -22,17 +26,17 @@ export function reviewPrompt(state: AgentState): string {
 }
 
 export function codexImplementPrompt(state: AgentState): string {
-  return appendReviewFeedback(state.task_goal, state);
+  return prependPriorAgentBridge(appendReviewFeedback(state.task_goal, state), state);
 }
 
 export function claudeTaskPrompt(state: AgentState): string {
-  return appendReviewFeedback(state.task_goal, state);
+  return prependPriorAgentBridge(appendReviewFeedback(state.task_goal, state), state);
 }
 
 export function piTaskPrompt(state: AgentState): string {
-  return appendReviewFeedback(state.task_goal, state);
+  return prependPriorAgentBridge(appendReviewFeedback(state.task_goal, state), state);
 }
 
 export function kimiTaskPrompt(state: AgentState): string {
-  return appendReviewFeedback(state.task_goal, state);
+  return prependPriorAgentBridge(appendReviewFeedback(state.task_goal, state), state);
 }

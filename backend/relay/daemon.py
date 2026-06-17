@@ -11,6 +11,7 @@ from typing import Any
 
 from loguru import logger
 
+from .bridge import compute_prior_agent_bridge
 from .controller import SessionController, initial_agent_state, is_review_assignment
 from .environment import load_backend_env
 from .ids import new_relay_id, new_sandbox_id, now_iso
@@ -406,6 +407,11 @@ class DaemonNodeRegistry:
             "role": role_for_agent(assignment["agent"], mode),
             "mode": mode,
         })
+        state = dict(run_request["state"] or {})
+        session_snapshot = self.store.get_session(run_request["sessionId"])
+        bridge = compute_prior_agent_bridge(session_snapshot, assignment["agent"], self.store)
+        if bridge:
+            state["prior_agent_bridge"] = bridge
         command = {
             "id": new_relay_id("cmd"),
             "type": "run.start",
@@ -415,7 +421,7 @@ class DaemonNodeRegistry:
             "agent": assignment["agent"],
             "mode": mode,
             **({"workspacePath": sandbox["workspacePath"]} if sandbox.get("workspacePath") else {}),
-            "state": run_request["state"],
+            "state": state,
         }
         self.enqueue(run_request["nodeId"], command)
         return self.daemon_store.update_run_request(run_request["id"], {

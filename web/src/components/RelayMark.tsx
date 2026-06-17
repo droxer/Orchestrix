@@ -19,27 +19,21 @@ export function RelayMark({ className, width = 40, height = 27 }: RelayMarkProps
       <title>Relay</title>
       <g
         fill="none"
-        stroke="var(--color-ink)"
-        strokeWidth="4"
+        stroke="currentColor"
+        strokeWidth="5"
         strokeLinecap="round"
         strokeLinejoin="round"
       >
-        <path d="M10 14 H22 L32 24 H40" />
-        <path d="M10 50 H22 L32 40 H40" />
-      </g>
-      <g fill="var(--color-ink)">
-        <circle cx="10" cy="14" r="4" />
-        <circle cx="10" cy="50" r="4" />
+        <path d="M18 50 V14 H44 C56 14 64 21 64 31 C64 41 56 47 44 47 H18" />
       </g>
       <g
         stroke="var(--color-primary)"
-        strokeWidth="4"
+        strokeWidth="5"
         strokeLinecap="round"
         strokeLinejoin="round"
         fill="none"
       >
-        <line x1="32" y1="32" x2="76" y2="32" />
-        <polyline points="68,24 80,32 68,40" />
+        <path d="M44 47 L70 56" />
       </g>
     </svg>
   );

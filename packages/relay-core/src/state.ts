@@ -16,6 +16,8 @@ export interface AgentState {
   agent_failures: Partial<Record<AgentName, number>>;
   review_verdict: ReviewVerdict | "";
   review_feedback: string;
+  /** Bridge text from intervening other-agent runs on the shared session, if any. */
+  prior_agent_bridge?: string;
 }
 
 export interface AgentRunOptions {

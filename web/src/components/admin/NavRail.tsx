@@ -3,6 +3,7 @@
 import { useTranslation } from "react-i18next";
 import { Server, Users } from "lucide-react";
 import type { CurrentUser } from "../../types";
+import { RelayMark } from "../RelayMark";
 
 export type AdminView = "people" | "fleet";
 
@@ -22,7 +23,7 @@ export function NavRail({ view, onChange, admin }: NavRailProps) {
   return (
     <nav className="adm-nav" aria-label={t("admin.v2.nav_label")}>
       <div className="adm-nav-brand" aria-hidden="true">
-        <span className="adm-nav-brand-dot" />
+        <RelayMark width={32} height={22} />
       </div>
       <div className="adm-nav-items">
         {items.map((item) => {

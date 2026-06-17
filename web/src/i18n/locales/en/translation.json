@@ -31,7 +31,8 @@
     "no_employee_selected": "No Node Selected",
     "connect_hint": "Connect to This Employee",
     "new_conversation": "New Conversation",
-    "talk_to_agent": "Talk to Agent"
+    "talk_to_agent": "Talk to Agent",
+    "new_thread": "New thread"
   },
   "conversation": {
     "agent_working": "{{agent}} Is Working",

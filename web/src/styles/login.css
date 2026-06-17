@@ -60,8 +60,18 @@
   margin: 0 auto;
 }
 
-/* Brand kicker — dot + eyebrow text. Dot doubles as a status indicator:
-   blue for the sign-in flow, amber for bootstrap (first-run setup). */
+.login-brand-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--color-ink);
+  opacity: 0;
+  animation: login-rise 540ms var(--ease-out-quint) forwards;
+  animation-delay: 40ms;
+}
+
+/* Brand kicker — mark + eyebrow text. The mark carries the product identity;
+   the text switches between sign-in and first-run setup. */
 .login-kicker {
   display: inline-flex;
   align-items: center;
@@ -71,23 +81,6 @@
   letter-spacing: var(--letter-eyebrow);
   text-transform: uppercase;
   color: var(--color-muted);
-  opacity: 0;
-  animation: login-rise 540ms var(--ease-out-quint) forwards;
-  animation-delay: 40ms;
-}
-
-.login-kicker::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-full);
-  background: var(--color-primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 18%, transparent);
-}
-
-.login-kicker[data-mode="bootstrap"]::before {
-  background: var(--color-accent-yellow);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent-yellow) 22%, transparent);
 }
 
 /* Headline — Instrument Serif, two lines, second line italic for the
@@ -401,6 +394,13 @@ html[data-theme="dark"] .login-atmosphere::before {
   color: var(--color-muted-soft);
 }
 
+.login-foot-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--color-ink);
+}
+
 .login-foot-mark {
   font-family: var(--font-display);
   font-style: italic;
@@ -458,6 +458,7 @@ html[data-theme="dark"] .login-atmosphere::before {
 
 @media (prefers-reduced-motion: reduce) {
   .login-kicker,
+  .login-brand-lockup,
   .login-headline,
   .login-lede,
   .login-form,

@@ -1185,9 +1185,10 @@ describe("RelayTui component", () => {
 
   it("runs an active-session handoff immediately", async () => {
     const requests: RunRequest[] = [];
+    const store = testSessionStore();
     const { lastFrame, stdin } = render(
       <RelayTui
-        sessionStore={testSessionStore()}
+        sessionStore={store}
         runner={async (request) => {
           requests.push(request);
         }}
@@ -1210,6 +1211,9 @@ describe("RelayTui component", () => {
     assert.match(requests[1].task, /fix auth/);
     assert.match(requests[1].task, /verify the fix/);
     assert.equal(requests[1].sessionId, requests[0].sessionId);
+    const session = await store.getSession(requests[0].sessionId ?? "");
+    assert.ok(session.decisions.some((decision) => decision.kind === "handoff" && decision.targetAgent === "codex"));
+    assert.ok(session.artifacts.some((artifact) => artifact.kind === "plan" && artifact.title === "Assignment plan"));
   });
 
   it("runs an explicit review handoff for any agent", async () => {
@@ -1281,6 +1285,61 @@ describe("RelayTui component", () => {
     assert.deepEqual(requests[1].assignments, [{ agent: "codex", mode: "implement" }]);
     assert.match(requests[1].task, /verify the fix/);
     assert.match(lastFrame() ?? "", /· @codex/);
+  });
+
+  it("lists and opens sessions in daemon mode", async () => {
+    const remoteSession: RelaySession = {
+      id: "ses_remote",
+      workspacePath: "/workspace/alice",
+      taskGoal: "remote task",
+      participants: ["human", "codex"],
+      status: "completed",
+      phase: "completed",
+      createdAt: "2026-06-07T00:00:00.000Z",
+      updatedAt: "2026-06-07T00:00:01.000Z",
+      agentRuns: [],
+      artifacts: [],
+      decisions: [],
+      events: [],
+      finalOutcome: "Done.",
+    };
+    const { lastFrame, stdin } = render(
+      <RelayTui
+        localSessionControl={false}
+        sessionStore={testSessionStore()}
+        workspacePath="/workspace/alice"
+        remoteSessionControl={{
+          listSessions: async () => [remoteSession],
+          getSession: async (sessionId) => {
+            if (sessionId === remoteSession.id) return remoteSession;
+            throw new Error(`Unknown Relay session ${sessionId}.`);
+          },
+          recordDecision: async () => {
+            throw new Error("unexpected decision");
+          },
+          recordHandoff: async () => {
+            throw new Error("unexpected handoff");
+          },
+        }}
+        runner={async () => undefined}
+      />,
+    );
+
+    stdin.write("/sessions");
+    await waitForInput();
+    stdin.write("\r");
+    await waitForInput();
+
+    assert.match(lastFrame() ?? "", /ses_remote\s+completed\s+remote task/);
+
+    stdin.write("/open ses_remote");
+    await waitForInput();
+    stdin.write("\r");
+    await waitForInput();
+
+    const frame = lastFrame() ?? "";
+    assert.match(frame, /Opened ses_remote/);
+    assert.match(frame, /ses_remote completed\/completed/);
   });
 
   it("waits for remote handoff recording before starting the handoff run", async () => {

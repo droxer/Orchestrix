@@ -89,6 +89,7 @@ def materialize_events(events: list[dict[str, Any]]) -> dict[str, Any]:
         "artifacts": [],
         "decisions": [],
         "events": [],
+        "archived": False,
     }
     if created.get("ownerEmployeeId"):
         session["ownerEmployeeId"] = created["ownerEmployeeId"]
@@ -154,6 +155,8 @@ def materialize_events(events: list[dict[str, Any]]) -> dict[str, Any]:
             session["phase"] = "failed"
             session["finalOutcome"] = event["outcome"]
             session.pop("currentAgent", None)
+        elif event_type == "session.archived":
+            session["archived"] = True
     return session
 
 

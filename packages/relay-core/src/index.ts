@@ -112,6 +112,10 @@ export {
 
 export { shellCommand, shellQuote } from "./shell.js";
 
+export { buildBridgedPrompt } from "./bridged-prompt.js";
+
+export { extractLastAssistantText } from "./last-assistant-text.js";
+
 export {
   appendReviewFeedback,
   claudeTaskPrompt,

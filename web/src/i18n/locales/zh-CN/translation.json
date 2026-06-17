@@ -31,7 +31,8 @@
     "no_employee_selected": "未选择节点",
     "connect_hint": "连接此员工",
     "new_conversation": "新对话",
-    "talk_to_agent": "选择 Agent"
+    "talk_to_agent": "选择 Agent",
+    "new_thread": "新对话"
   },
   "conversation": {
     "agent_working": "{{agent}} 正在工作",

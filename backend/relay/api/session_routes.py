@@ -11,7 +11,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import PlainTextResponse, StreamingResponse
 from loguru import logger
 
-from ..controller import SessionController
+from ..controller import SessionArchivedError, SessionController, SessionRunInFlightError
 from ..models import AGENT_NAMES
 from ..stores import valid_agent
 from .deps import AppContextDep
@@ -21,7 +21,7 @@ from .helpers import (
     get_task_for_actor,
     json_body,
     owner_employee_id_for_create,
-    request_actor,
+    request_actor_or_sandbox,
     role_name,
     string_field,
 )
@@ -31,13 +31,13 @@ router = APIRouter()
 
 @router.get("/sessions")
 async def list_sessions(request: Request, ctx: AppContextDep) -> dict[str, Any]:
-    actor = request_actor(request, ctx.auth_store)
+    actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
     return {"sessions": [session for session in ctx.session_store.list_sessions() if actor["isAdmin"] or session.get("ownerEmployeeId") == actor["employeeId"]]}
 
 
 @router.post("/sessions", status_code=201)
 async def create_session(request: Request, ctx: AppContextDep) -> dict[str, Any]:
-    actor = request_actor(request, ctx.auth_store)
+    actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
     body = await json_body(request)
     task_goal = string_field(body, "taskGoal")
     if not task_goal:
@@ -73,26 +73,43 @@ async def create_session(request: Request, ctx: AppContextDep) -> dict[str, Any]
 
 @router.get("/sessions/{session_id}")
 async def get_session(session_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
-    actor = request_actor(request, ctx.auth_store)
+    actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
     return get_session_for_actor(ctx.session_store, session_id, actor)
 
 
 @router.post("/sessions/{session_id}/assignments")
 async def assign_session(session_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
-    actor = request_actor(request, ctx.auth_store)
+    actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
     get_session_for_actor(ctx.session_store, session_id, actor)
     body = await json_body(request)
     assignments = assignment_list(body.get("assignments"))
     if not assignments:
         raise HTTPException(400, "assignments must include at least one agent.")
     controller = SessionController(ctx.session_store, task_store=ctx.task_store, owner_employee_id=actor["employeeId"])
-    controller.assign_session(session_id, assignments)
+    try:
+        controller.assign_session(session_id, assignments)
+    except SessionArchivedError:
+        raise HTTPException(409, "Session is archived.")
+    except SessionRunInFlightError:
+        raise HTTPException(409, "Session has a run in flight.")
     return ctx.session_store.get_session(session_id)
+
+
+@router.post("/sessions/{session_id}/archive")
+async def archive_session(session_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
+    actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
+    get_session_for_actor(ctx.session_store, session_id, actor)
+    controller = SessionController(
+        ctx.session_store,
+        task_store=ctx.task_store,
+        owner_employee_id=actor["employeeId"],
+    )
+    return controller.archive_session(session_id)
 
 
 @router.post("/sessions/{session_id}/decisions")
 async def decision(session_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
-    actor = request_actor(request, ctx.auth_store)
+    actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
     get_session_for_actor(ctx.session_store, session_id, actor)
     body = await json_body(request)
     kind = body.get("kind")
@@ -111,7 +128,7 @@ async def decision(session_id: str, request: Request, ctx: AppContextDep) -> dic
 
 @router.post("/sessions/{session_id}/handoffs")
 async def handoff(session_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
-    actor = request_actor(request, ctx.auth_store)
+    actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
     get_session_for_actor(ctx.session_store, session_id, actor)
     body = await json_body(request)
     target_agent = valid_agent(body.get("targetAgent"))
@@ -144,7 +161,7 @@ def _sse_frame(data: dict[str, Any], *, event: str | None = None) -> str:
 
 @router.get("/sessions/{session_id}/events")
 async def session_events(session_id: str, request: Request, ctx: AppContextDep) -> StreamingResponse:
-    actor = request_actor(request, ctx.auth_store)
+    actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
     # Authorize before the stream opens so 403/404 surface as normal responses.
     get_session_for_actor(ctx.session_store, session_id, actor)
 
@@ -193,7 +210,7 @@ async def session_events(session_id: str, request: Request, ctx: AppContextDep) 
 
 @router.get("/sessions/{session_id}/artifacts/{artifact_id}")
 async def read_artifact(session_id: str, artifact_id: str, request: Request, ctx: AppContextDep) -> PlainTextResponse:
-    actor = request_actor(request, ctx.auth_store)
+    actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
     get_session_for_actor(ctx.session_store, session_id, actor)
     try:
         return PlainTextResponse(ctx.session_store.read_artifact(session_id, artifact_id))

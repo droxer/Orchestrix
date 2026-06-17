@@ -317,6 +317,69 @@ def test_control_panel_creates_pending_daemon_node_and_reuses_duplicate(monkeypa
         assert "daemonCommand" not in duplicate_body
 
 
+def test_sandbox_ui_token_can_manage_owned_sessions(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        admin_client = TestClient(app)
+        _bootstrap_admin(admin_client)
+        _login_admin(admin_client)
+
+        register = admin_client.post("/daemon-nodes/register", json={
+            "sandboxId": "sbx_alice",
+            "employeeId": "alice",
+            "token": "node_token",
+            "workspacePath": "/workspace/alice",
+            "protocolVersion": 1,
+            "supportedAgents": ["claude", "codex"],
+            "status": "ready",
+        }, headers={"Authorization": "Bearer ui_token"})
+        assert register.status_code == 200
+
+        token_client = TestClient(app)
+        headers = {"Authorization": "Bearer ui_token"}
+        created = token_client.post("/sessions", json={
+            "taskGoal": "ship daemon task",
+            "assignments": [{"agent": "claude"}],
+            "workspacePath": "/workspace/alice",
+        }, headers=headers)
+        assert created.status_code == 201
+        session = created.json()
+        session_id = session["id"]
+        assert session["ownerEmployeeId"] == "alice"
+
+        listed = token_client.get("/sessions", headers=headers)
+        assert listed.status_code == 200
+        assert [item["id"] for item in listed.json()["sessions"]] == [session_id]
+
+        opened = token_client.get(f"/sessions/{session_id}", headers=headers)
+        assert opened.status_code == 200
+        assert opened.json()["id"] == session_id
+
+        approved = token_client.post(f"/sessions/{session_id}/decisions", json={
+            "kind": "approve",
+        }, headers=headers)
+        assert approved.status_code == 200
+        assert approved.json()["status"] == "running"
+
+        handed_off = token_client.post(f"/sessions/{session_id}/handoffs", json={
+            "targetAgent": "codex",
+            "mode": "review",
+            "note": "check it",
+        }, headers=headers)
+        assert handed_off.status_code == 200
+        assert handed_off.json()["pendingDecision"] == "start"
+        assert any(decision["kind"] == "handoff" and decision["targetAgent"] == "codex" for decision in handed_off.json()["decisions"])
+
+        bob_session = admin_client.post("/sessions", json={
+            "taskGoal": "bob task",
+            "ownerEmployeeId": "bob",
+        })
+        assert bob_session.status_code == 201
+        assert token_client.get(f"/sessions/{bob_session.json()['id']}", headers=headers).status_code == 403
+        assert token_client.get("/sessions", headers={"Authorization": "Bearer wrong"}).status_code == 401
+
+
 def test_employee_can_ask_assigned_daemon_node_without_daemon_node_token(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:

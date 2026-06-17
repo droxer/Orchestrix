@@ -103,6 +103,11 @@ export class RelayDaemonClient {
     });
   }
 
+  async listSessions(signal?: AbortSignal): Promise<RelaySession[]> {
+    const body = await this.request<{ sessions?: RelaySession[] }>("/sessions", { signal });
+    return Array.isArray(body.sessions) ? body.sessions : [];
+  }
+
   async getSession(sessionId: string, signal?: AbortSignal): Promise<RelaySession> {
     return this.request<RelaySession>(`/sessions/${encodeURIComponent(sessionId)}`, { signal });
   }

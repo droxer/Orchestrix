@@ -6,6 +6,7 @@ import { bootstrapUser, getAuthStatus, login, RelayApiError } from "../api";
 import type { CurrentUser } from "../types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { RelayMark } from "./RelayMark";
 
 interface LoginScreenProps {
   onAuthenticated: (user: CurrentUser) => void;
@@ -83,9 +84,12 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
     <main className="login-screen">
       <section className="login-pane" aria-labelledby="login-headline">
         <header className="login-pane-top">
-          <p className="login-kicker" data-mode={mode}>
-            {kickerLabel}
-          </p>
+          <div className="login-brand-lockup">
+            <RelayMark width={36} height={24} />
+            <p className="login-kicker" data-mode={mode}>
+              {kickerLabel}
+            </p>
+          </div>
         </header>
 
         <div className="login-pane-body">
@@ -183,7 +187,10 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
             </button>
           </div>
           <div className="login-foot">
-            <span>Relay · {new Date().getFullYear()}</span>
+            <span className="login-foot-brand">
+              <RelayMark width={20} height={14} />
+              <span>Relay · {new Date().getFullYear()}</span>
+            </span>
             <span className="login-foot-mark">control plane</span>
           </div>
         </footer>

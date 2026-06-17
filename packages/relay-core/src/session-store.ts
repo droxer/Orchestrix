@@ -61,6 +61,7 @@ export interface RelaySession {
   events: RelayEvent[];
   finalOutcome?: string;
   reviewVerdict?: ReviewVerdict;
+  archived?: boolean;
 }
 
 export type RelayEvent =
@@ -150,6 +151,12 @@ export type RelayEvent =
       sessionId: string;
       timestamp: string;
       outcome: string;
+    }
+  | {
+      id: string;
+      type: "session.archived";
+      sessionId: string;
+      timestamp: string;
     };
 
 export interface SessionStore {

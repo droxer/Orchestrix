@@ -47,13 +47,7 @@
   align-items: center;
   justify-content: center;
   padding: 0 var(--space-base);
-}
-
-.adm-nav-brand-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: var(--radius-full);
-  background: var(--color-primary);
+  color: var(--color-ink);
 }
 
 .adm-nav-items {

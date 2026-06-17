@@ -70,7 +70,7 @@ const RELAY_INFO = "cyan";
 const RELAY_THINK = "gray";
 const RELAY_TOOL = "magenta";
 const RELAY_CODE = "cyan";
-const BRAND_MARK = "✻";
+const BRAND_MARK = "R";
 const TEXT_MARK = "●";
 const THINK_MARK = "○";
 const TOOL_MARK = "⏺";
@@ -172,21 +172,21 @@ export async function runAssignments(request: RunRequest): Promise<void> {
   const sessionId = request.sessionId ?? (await controller.createSession(request.task)).id;
   let state = initialAgentState(request.task);
   let terminalRecorded = false;
-  const recordCancelled = (outcome: string): void => {
+  const recordCancelled = async (outcome: string): Promise<void> => {
     if (terminalRecorded) return;
-    void controller.cancelSession(sessionId, outcome);
+    await controller.cancelSession(sessionId, outcome);
     terminalRecorded = true;
   };
-  const recordFailed = (outcome: string): void => {
+  const recordFailed = async (outcome: string): Promise<void> => {
     if (terminalRecorded) return;
-    void controller.failSession(sessionId, outcome);
+    await controller.failSession(sessionId, outcome);
     terminalRecorded = true;
   };
   try {
     for (const assignment of request.assignments) {
       if (request.signal?.aborted) {
         request.log("\nCancelled before next agent started.\n");
-        recordCancelled("Task cancelled before the next agent started.");
+        await recordCancelled("Task cancelled before the next agent started.");
         return;
       }
       const mode = assignment.mode ?? "implement";
@@ -198,29 +198,28 @@ export async function runAssignments(request: RunRequest): Promise<void> {
       });
       if (!assignmentSucceeded({ agent: assignment.agent, mode }, state)) {
         const outcome = assignmentFailureOutcome({ agent: assignment.agent, mode }, state);
-        controller.failSession(sessionId, outcome);
-        terminalRecorded = true;
+        await recordFailed(outcome);
         request.log(`\n${outcome}\n`);
         return;
       }
       if (request.signal?.aborted) {
         request.log("\nCancelled current agent.\n");
-        recordCancelled("Task cancelled during agent execution.");
+        await recordCancelled("Task cancelled during agent execution.");
         return;
       }
     }
   } catch (error: unknown) {
     if (request.signal?.aborted) {
       request.log("\nCancelled current agent.\n");
-      recordCancelled("Task cancelled during agent execution.");
+      await recordCancelled("Task cancelled during agent execution.");
       return;
     }
     const outcome = error instanceof Error ? error.message : String(error);
-    recordFailed(outcome);
+    await recordFailed(outcome);
     throw error;
   }
   terminalRecorded = true;
-  controller.completeSession(sessionId, "Assignments completed.");
+  await controller.completeSession(sessionId, "Assignments completed.");
 }
 
 export function createDaemonAssignmentRunner(
@@ -517,6 +516,8 @@ export interface RelayTuiProps {
 }
 
 export interface RemoteSessionControl {
+  listSessions?(): Promise<RelaySession[]>;
+  getSession?(sessionId: string): Promise<RelaySession>;
   recordDecision(input: {
     sessionId: string;
     kind: "approve" | "reject" | "cancel" | "rerun" | "mark_done";
@@ -965,8 +966,18 @@ export function RelayTui({
     }
     if (name === "/sessions") {
       if (!localSessionControl) {
-        appendLog("\nSession listing is served by the host daemon API.\n");
-        setMessage("Use the daemon API for session listings.");
+        if (!remoteSessionControl?.listSessions) {
+          appendLog("\nSession listing is served by the host daemon API.\n");
+          setMessage("Session listing is unavailable in daemon mode.");
+          return;
+        }
+        void remoteSessionControl.listSessions().then((items) => {
+          const sessions = items.slice(0, 6);
+          appendLog(`\n${sessions.map((item) => `${item.id}  ${item.status}  ${item.taskGoal}`).join("\n") || "No sessions yet."}\n`);
+          setMessage("Listed recent sessions.");
+        }).catch((error: unknown) => {
+          setMessage(error instanceof Error ? error.message : String(error));
+        });
         return;
       }
       void sessionStore.listSessions().then((items) => {
@@ -980,7 +991,21 @@ export function RelayTui({
     }
     if (name === "/open") {
       if (!localSessionControl) {
-        setMessage("Use the daemon API to open sessions in daemon mode.");
+        if (!remoteSessionControl?.getSession) {
+          setMessage("Session opening is unavailable in daemon mode.");
+          return;
+        }
+        if (!detail) {
+          setMessage("Usage: /open <session-id>");
+          return;
+        }
+        void remoteSessionControl.getSession(detail).then((opened) => {
+          setActiveSession(opened);
+          setMessage(`Opened ${opened.id}.`);
+        }).catch((error: unknown) => {
+          const fallback = `Unknown Relay session ${detail}.`;
+          setMessage(error instanceof Error ? error.message : fallback);
+        });
         return;
       }
       if (!detail) {
@@ -1099,7 +1124,12 @@ export function RelayTui({
       const task = note ? `${current.taskGoal}\n\nHandoff note:\n${note}` : current.taskGoal;
       void (async () => {
         if (localSessionControl) {
-          const updated = await controllerRef.current.recordDecision(current.id, "handoff", note || `Handoff to ${agent}.`, agent);
+          const updated = await controllerRef.current.handoffSession(
+            current.id,
+            agent,
+            [assignment],
+            note || `Handoff to ${agent}.`,
+          );
           setActiveSession(updated);
         } else if (remoteSessionControl) {
           try {
@@ -1610,6 +1640,8 @@ export function RelayTuiHost({ onExit }: { onExit: () => void }): React.ReactEle
       setSandbox(current);
       setRunner(() => createDaemonAssignmentRunner(client, current.id));
       setRemoteSessionControl({
+        listSessions: () => client.listSessions(),
+        getSession: (sessionId) => client.getSession(sessionId),
         recordDecision: (input) => client.recordDecision(input),
         recordHandoff: (input) => client.recordHandoff(input),
       });

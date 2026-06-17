@@ -7,7 +7,7 @@ import { StatusPill } from "./StatusPill";
 
 // Chat-panel header: who/which agent/session identity, the per-agent tabs,
 // session status pill, and the refresh control.
-export function ChatHeader({ selectedEmployee, running, activeAgent, setActiveAgent, agentNames, activeSession, isRefreshing, onRefresh, onBackToThreads }: {
+export function ChatHeader({ selectedEmployee, running, activeAgent, setActiveAgent, agentNames, activeSession, isRefreshing, onRefresh, onBackToThreads, onNewThread }: {
   selectedEmployee: string;
   running: boolean;
   activeAgent: AgentName;
@@ -17,6 +17,7 @@ export function ChatHeader({ selectedEmployee, running, activeAgent, setActiveAg
   isRefreshing: boolean;
   onRefresh: () => void;
   onBackToThreads: () => void;
+  onNewThread?: () => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -45,6 +46,11 @@ export function ChatHeader({ selectedEmployee, running, activeAgent, setActiveAg
           {agentNames.map((a) => <button key={a} type="button" aria-pressed={a === activeAgent} className={a === activeAgent ? "active" : ""} onClick={() => setActiveAgent(a)}><span translate="no">@{a}</span></button>)}
         </div>
         {activeSession ? <StatusPill value={activeSession.status} /> : null}
+        {activeSession && onNewThread ? (
+          <button className="icon-button" type="button" aria-label={t("thread.new_thread")} title={t("thread.new_thread")} onClick={onNewThread}>
+            {t("thread.new_thread")}
+          </button>
+        ) : null}
         <button className="icon-button" type="button" aria-label={t("nav.refresh")} title={t("nav.refresh")} onClick={onRefresh}>
           <NavRefresh size={16} className={isRefreshing ? "spin" : ""} />
         </button>
