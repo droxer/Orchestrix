@@ -83,7 +83,7 @@ export class RelayDaemonClient {
   }
 
   async listControlPanelDaemonNodes(): Promise<ControlPanelDaemonNodeRecord[]> {
-    const body = await this.request<{ nodes?: ControlPanelDaemonNodeRecord[] }>("/cp/daemon-nodes");
+    const body = await this.request<{ nodes?: ControlPanelDaemonNodeRecord[] }>("/daemon-nodes");
     return Array.isArray(body.nodes) ? body.nodes : [];
   }
 

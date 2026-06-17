@@ -321,6 +321,108 @@ describe("TUI daemon runner", () => {
     assert.doesNotMatch(log, /\{"type":"item.completed"/);
   });
 
+  it("rejects failed daemon sessions after rendering their output", async () => {
+    const failedSession: RelaySession = {
+      id: "ses_failed",
+      workspacePath: "/workspace/alice",
+      taskGoal: "fix auth",
+      status: "failed",
+      phase: "failed",
+      participants: ["human", "codex"],
+      currentAgent: undefined,
+      pendingDecision: undefined,
+      createdAt: "2026-06-07T00:00:00.000Z",
+      updatedAt: "2026-06-07T00:00:02.000Z",
+      events: [
+        {
+          id: "evt_failed_started",
+          type: "agent.started",
+          sessionId: "ses_failed",
+          timestamp: "2026-06-07T00:00:00.000Z",
+          runId: "run_failed",
+          agent: "codex",
+          role: "implementer",
+          mode: "implement",
+        },
+        {
+          id: "evt_failed_output",
+          type: "agent.output",
+          sessionId: "ses_failed",
+          timestamp: "2026-06-07T00:00:01.000Z",
+          runId: "run_failed",
+          agent: "codex",
+          stream: "stderr",
+          text: "Another Relay orchestrator is already running.\n",
+        },
+        {
+          id: "evt_failed_completed",
+          type: "agent.completed",
+          sessionId: "ses_failed",
+          timestamp: "2026-06-07T00:00:02.000Z",
+          runId: "run_failed",
+          agent: "codex",
+          status: "failed",
+          exitCode: 1,
+        },
+        {
+          id: "evt_session_failed",
+          type: "session.failed",
+          sessionId: "ses_failed",
+          timestamp: "2026-06-07T00:00:02.000Z",
+          outcome: "Another Relay orchestrator is already running.",
+        },
+      ],
+      decisions: [],
+      agentRuns: [{
+        id: "run_failed",
+        agent: "codex",
+        role: "implementer",
+        mode: "implement",
+        status: "failed",
+        startedAt: "2026-06-07T00:00:00.000Z",
+        completedAt: "2026-06-07T00:00:02.000Z",
+        exitCode: 1,
+        artifactIds: [],
+      }],
+      artifacts: [],
+      finalOutcome: "Another Relay orchestrator is already running.",
+    };
+    const fetchFn = async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
+      if (String(url) === "http://daemon.local/sandboxes/sbx_alice/runs" && init?.method === "POST") {
+        return new Response(JSON.stringify({ ...failedSession, events: [] }), {
+          status: 202,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      if (String(url) === "http://daemon.local/sessions/ses_failed") {
+        return new Response(JSON.stringify(failedSession), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      throw new Error(`unexpected request ${String(url)}`);
+    };
+    const { RelayDaemonClient } = await import("../../relay-core/src/index.js");
+    const client = new RelayDaemonClient({ baseUrl: "http://daemon.local", fetchFn });
+    const runner = createDaemonAssignmentRunner(client, "sbx_alice");
+    let log = "";
+
+    await assert.rejects(
+      () => runner({
+        assignments: [{ agent: "codex" }],
+        task: "fix auth",
+        sessionId: "ses_failed",
+        log: (text) => {
+          log += text;
+        },
+      }),
+      /Another Relay orchestrator is already running\./,
+    );
+
+    assert.match(log, /ERR\s+codex\s+failed \(exit 1\)/);
+    assert.match(log, /Another Relay orchestrator is already running\./);
+  });
+
   it("creates and polls daemon sessions while a Codex run is still in flight", async () => {
     const calls: string[] = [];
     const outputEvent = {
@@ -1287,6 +1389,34 @@ describe("RelayTui component", () => {
     assert.match(lastFrame() ?? "", /· @codex/);
   });
 
+  it("does not mark failed daemon assignments as finished", async () => {
+    const failureMessage = "Another Relay orchestrator is already running.";
+    const { lastFrame, stdin } = render(
+      <RelayTui
+        localSessionControl={false}
+        sessionStore={testSessionStore()}
+        workspacePath="/workspace/alice"
+        runner={async (request) => {
+          request.log("\nERR   codex  failed (exit 1)\n");
+          request.log(`\nERR   ${failureMessage}\n`);
+          const error = new Error(failureMessage) as Error & { logAlreadyRendered: true };
+          error.logAlreadyRendered = true;
+          throw error;
+        }}
+      />,
+    );
+
+    stdin.write("@codex fix auth");
+    await waitForInput();
+    stdin.write("\r");
+    await waitForInput();
+
+    const frame = lastFrame() ?? "";
+    assert.match(frame, /ERR\s+Another Relay orchestrator is already running\./);
+    assert.equal(frame.match(/ERR\s+Another Relay orchestrator is already running\./g)?.length, 1);
+    assert.doesNotMatch(frame, /OK\s+Task finished\./);
+  });
+
   it("lists and opens sessions in daemon mode", async () => {
     const remoteSession: RelaySession = {
       id: "ses_remote",
@@ -1665,7 +1795,7 @@ describe("RelayTui component", () => {
     globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
       if (init?.body) bodies.push(JSON.parse(String(init.body)));
       authorizationHeaders.push(String(new Headers(init?.headers).get("authorization") ?? ""));
-      if (String(url) === "http://127.0.0.1:8790/cp/daemon-nodes") {
+      if (String(url) === "http://127.0.0.1:8790/daemon-nodes") {
         return new Response(JSON.stringify({
           nodes: [{
             id: "sbx_alice_live",

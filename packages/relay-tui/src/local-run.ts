@@ -185,7 +185,7 @@ async function backendStatus(backendUrl: string): Promise<BackendStatus> {
 
 export async function liveDaemonExists(backendUrl: string, employeeId: string, workspacePath: string): Promise<boolean> {
   try {
-    const response = await fetch(`${backendUrl}/cp/daemon-nodes`, { signal: AbortSignal.timeout(1000) });
+    const response = await fetch(`${backendUrl}/daemon-nodes`, { signal: AbortSignal.timeout(1000) });
     if (!response.ok) return false;
     const body = await response.json() as { nodes?: Array<{ employeeId?: string; online?: boolean; stale?: boolean; workspacePath?: string }> };
     return (body.nodes ?? []).some((node) =>

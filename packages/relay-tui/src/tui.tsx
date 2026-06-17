@@ -83,6 +83,19 @@ const STATUS_LABELS: Record<string, string> = {
   ERR: RELAY_ERR,
   INFO: RELAY_INFO,
 };
+const AGENT_COLORS: Record<string, string> = {
+  claude: "#D97757",
+  pi: "#7BD3F7",
+  codex: "#C792EA",
+  kimi: "#FFD580",
+};
+const ARTIFACT_KIND_COLORS: Record<string, string> = {
+  plan: "cyan",
+  command_log: "magenta",
+  diff: "yellow",
+  review: "green",
+  summary: "blue",
+};
 
 export interface CompletionResult {
   input: string;
@@ -185,7 +198,7 @@ export async function runAssignments(request: RunRequest): Promise<void> {
   try {
     for (const assignment of request.assignments) {
       if (request.signal?.aborted) {
-        request.log("\nCancelled before next agent started.\n");
+        request.log("\nWARN  Cancelled before next agent.\n");
         await recordCancelled("Task cancelled before the next agent started.");
         return;
       }
@@ -232,7 +245,7 @@ export function createDaemonAssignmentRunner(
     if (request.assignments.length === 0) {
       throw new Error(`Assign the task with ${AGENT_MENTION_HINT}.`);
     }
-    request.log("\nSubmitting task to Relay daemon.\n");
+    request.log("\nINFO  Submitting task to Relay daemon.\n");
     const assignments = request.assignments.map((assignment) => ({
       agent: assignment.agent,
       mode: assignment.mode ?? "implement",
@@ -288,10 +301,33 @@ export function createDaemonAssignmentRunner(
       });
       replayDaemonAgentOutput(session.events, deliveredEventIds, request.log, renderers);
       request.onSessionUpdate?.(session);
+      assertDaemonSessionSucceeded(session, request.signal);
     } finally {
       request.signal?.removeEventListener("abort", abortListener);
     }
   };
+}
+
+function assertDaemonSessionSucceeded(session: RelaySession, signal?: AbortSignal): void {
+  if (session.status === "failed") {
+    throw new RenderedRunError(session.finalOutcome ?? "Relay daemon session failed.");
+  }
+  if (session.status === "cancelled" && !signal?.aborted) {
+    throw new Error(session.finalOutcome ?? "Relay daemon session cancelled.");
+  }
+}
+
+class RenderedRunError extends Error {
+  readonly logAlreadyRendered = true;
+}
+
+function logAlreadyRendered(error: unknown): boolean {
+  return Boolean(
+    error &&
+    typeof error === "object" &&
+    "logAlreadyRendered" in error &&
+    (error as { logAlreadyRendered?: unknown }).logAlreadyRendered === true,
+  );
 }
 
 async function pollDaemonRunOutput(
@@ -416,27 +452,29 @@ export function replayDaemonAgentOutput(
     }
     if (event.type === "agent.started") {
       deliveredEventIds.add(event.id);
-      log(`\n[${event.agent}] started\n`);
+      log(`\nINFO  ${event.agent}  started\n`);
       continue;
     }
     if (event.type === "agent.completed") {
       deliveredEventIds.add(event.id);
-      log(`\n[${event.agent}] ${event.status} (exit ${event.exitCode})\n`);
+      const badge = event.status === "completed" ? "OK" : event.status === "cancelled" ? "WARN" : "ERR";
+      log(`\n${badge}  ${event.agent}  ${event.status} (exit ${event.exitCode})\n`);
       continue;
     }
     if (event.type === "artifact.created") {
       deliveredEventIds.add(event.id);
-      log(`\n[artifact] ${event.artifact.kind}: ${event.artifact.title}\n`);
+      log(`\n⏺ ${event.artifact.kind} · ${event.artifact.title}\n`);
       continue;
     }
     if (event.type === "review.verdict") {
       deliveredEventIds.add(event.id);
-      log(`\n[review] ${event.verdict}\n`);
+      const badge = event.verdict === "approved" ? "OK" : event.verdict === "rejected" ? "ERR" : "INFO";
+      log(`\n${badge}  review · ${event.verdict}\n`);
       continue;
     }
     if (event.type === "session.failed") {
       deliveredEventIds.add(event.id);
-      log(`\n[session.failed] ${event.outcome}\n`);
+      log(`\nERR  ${event.outcome}\n`);
       continue;
     }
   }
@@ -757,7 +795,7 @@ export function RelayTui({
   const { exit } = useApp();
   const [input, setInput] = useState("");
   const [logLines, setLogLines] = useState<string[]>([
-    `Ready. Type ${AGENT_MENTION_HINT} followed by a task.`,
+    `INFO  Ready — type ${AGENT_MENTION_HINT} followed by a task.`,
   ]);
   const [currentAgent, setCurrentAgent] = useState("idle");
   const [isRunning, setIsRunning] = useState(false);
@@ -848,14 +886,16 @@ export function RelayTui({
     })
       .then(() => {
         if (!mountedRef.current) return;
-        const finished = controller.signal.aborted ? "Task cancelled." : "Task finished.";
-        appendLog(`\n${finished}\n`);
+        const aborted = controller.signal.aborted;
+        const finished = aborted ? "Task cancelled." : "Task finished.";
+        const badge = aborted ? "WARN" : "OK";
+        appendLog(`\n${badge}  ${finished}\n`);
         setMessage(finished);
       })
       .catch((error: unknown) => {
         if (!mountedRef.current) return;
         const detail = error instanceof Error ? error.message : String(error);
-        appendLog(`\nERR  ${detail}\n`);
+        if (!logAlreadyRendered(error)) appendLog(`\nERR  ${detail}\n`);
         setMessage(detail);
       })
       .finally(() => {
@@ -876,7 +916,7 @@ export function RelayTui({
         const controller = abortRef.current;
         if (controller && !controller.signal.aborted) {
           controller.abort();
-          appendLog("\nCancellation requested; stopping current agent.\n");
+          appendLog("\nWARN  Cancelling current agent.\n");
           setMessage("Cancelling…");
           return;
         }
@@ -1384,14 +1424,16 @@ function renderAgentMarkerLine(line: string, key: string): React.ReactElement | 
 
   const tool = /^⏺\s+(\S+)\s*(.*)$/.exec(line);
   if (tool) {
+    const kindColor = ARTIFACT_KIND_COLORS[tool[1].toLowerCase()] ?? RELAY_TOOL;
+    const rest = tool[2].replace(/^·\s*/, "");
     return (
       <Text key={key}>
-        <Text color={RELAY_TOOL}>{`${TOOL_MARK} `}</Text>
-        <Text color={RELAY_TOOL} bold>{tool[1]}</Text>
-        {tool[2] ? (
+        <Text color={kindColor}>{`${TOOL_MARK} `}</Text>
+        <Text color={kindColor} bold>{tool[1]}</Text>
+        {rest ? (
           <>
-            <Text dimColor>{" · "}</Text>
-            <Text>{tool[2]}</Text>
+            <Text dimColor>{"  ·  "}</Text>
+            <Text color={kindColor}>{rest}</Text>
           </>
         ) : null}
       </Text>
@@ -1406,11 +1448,22 @@ function renderStatusLine(line: string, key: string): React.ReactElement | null 
   const match = /^(OK|WARN|ERR|INFO)\s{1,2}(.*)$/.exec(line);
   if (!match) return null;
   const tone = STATUS_LABELS[match[1]];
+  const rest = match[2];
+  const agentMatch = /^(\S+)\s{2}(.*)$/.exec(rest);
+  const agentColor = agentMatch ? AGENT_COLORS[agentMatch[1].toLowerCase()] : undefined;
   return (
     <Text key={key}>
       <Text color={tone} bold inverse>{` ${match[1]} `}</Text>
       <Text>{"  "}</Text>
-      <Text>{match[2]}</Text>
+      {agentMatch && agentColor ? (
+        <>
+          <Text color={agentColor} bold>{agentMatch[1]}</Text>
+          <Text dimColor>{"  "}</Text>
+          <Text color={tone}>{agentMatch[2]}</Text>
+        </>
+      ) : (
+        <Text color={tone}>{rest}</Text>
+      )}
     </Text>
   );
 }

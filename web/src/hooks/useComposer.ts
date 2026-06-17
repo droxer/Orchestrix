@@ -37,7 +37,13 @@ export function useComposer({ agentNames, onAgentPicked }: {
   function syncMentionState(text: string, caret: number) {
     if (isComposing) return;
     const token = detectMentionToken(text, caret);
-    if (token) { setMentionOpen(true); setMentionQuery(token.query); setMentionIndex(0); }
+    if (token) {
+      setMentionOpen(true);
+      setMentionQuery((prev) => {
+        if (prev !== token.query) setMentionIndex(0);
+        return token.query;
+      });
+    }
     else if (mentionOpen) setMentionOpen(false);
   }
 

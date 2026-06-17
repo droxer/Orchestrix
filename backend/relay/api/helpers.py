@@ -10,7 +10,7 @@ from fastapi import HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from ..auth import require_user_session
-from ..daemon import DaemonNodeRegistry, sandbox_ui_token_matches, workspace_paths_match
+from ..daemon import DaemonNodeRegistry, daemon_node_token_matches, sandbox_ui_token_matches, workspace_paths_match
 from ..models import AGENT_NAMES
 from ..stores import valid_agent
 
@@ -119,7 +119,8 @@ def request_actor_or_sandbox(request: Request, auth_store: Any, registry: Daemon
     actor = request_actor_or_none(request, auth_store)
     if actor:
         return actor
-    sandbox = authorized_sandbox_for_token(registry, bearer_token(request))
+    token = bearer_token(request)
+    sandbox = authorized_sandbox_for_token(registry, token)
     employee_id = sandbox.get("employeeId") if sandbox else None
     if isinstance(employee_id, str) and employee_id:
         return {
@@ -132,6 +133,8 @@ def request_actor_or_sandbox(request: Request, auth_store: Any, registry: Daemon
             "employeeId": employee_id,
             "isAdmin": False,
         }
+    if token:
+        raise HTTPException(401, "Invalid sandbox token.")
     return request_actor(request, auth_store)
 
 
@@ -200,7 +203,10 @@ def role_name(value: Any) -> str | None:
 def authorized_sandbox_for_token(registry: DaemonNodeRegistry, token: str | None) -> dict[str, Any] | None:
     if not token:
         return None
-    return next((sandbox for sandbox in registry.list_ready() if sandbox_ui_token_matches(sandbox, token)), None)
+    return next((
+        sandbox for sandbox in registry.list_ready()
+        if sandbox_ui_token_matches(sandbox, token) or daemon_node_token_matches(sandbox, token)
+    ), None)
 
 
 def session_belongs_to_sandbox(session: dict[str, Any], sandbox: dict[str, Any]) -> bool:

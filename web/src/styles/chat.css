@@ -75,20 +75,6 @@
   white-space: nowrap;
 }
 
-.chat-title .session-id {
-  color: var(--color-muted);
-  font-family: var(--font-number);
-  font-size: var(--text-xs);
-  font-weight: 500;
-}
-
-.header-separator {
-  width: 4px;
-  height: 4px;
-  border-radius: var(--radius-full);
-  background: var(--color-muted-soft);
-}
-
 .chat-tools {
   display: flex;
   align-items: center;
@@ -190,208 +176,27 @@
   gap: var(--space-md);
 }
 
-/* ============================ transcript empty state ============================
-   Editorial counterpart to the login pane. Asymmetric two-column inside the
-   transcript max-width: oversized italic-serif headline left, hairline
-   capability card right, dotted-leader system log below. A bled agent-initial
-   watermark carries the atmosphere — the same trick as the login `R` glyph,
-   reused so the first-open chat surface speaks the brand voice. */
+/* Quiet empty state — one headline, one sublabel, centered. */
 .transcript-empty {
-  position: relative;
-  isolation: isolate;
-  margin: clamp(var(--space-xl), 8vh, var(--space-xxl)) auto 0;
-  width: 100%;
+  margin: auto;
   display: grid;
-  gap: var(--space-xl);
-  align-content: start;
-  padding: 0;
-  border: 0;
-  background: transparent;
+  gap: var(--space-xs);
+  justify-items: center;
+  text-align: center;
   color: var(--color-ink);
-  text-align: left;
-  overflow: hidden;
-}
-
-.transcript-empty-watermark {
-  position: absolute;
-  right: -0.06em;
-  bottom: -0.32em;
-  z-index: -1;
-  font-family: var(--font-display);
-  font-size: clamp(280px, 38vw, 480px);
-  font-weight: 400;
-  line-height: 1;
-  color: color-mix(in srgb, var(--color-ink) 4%, transparent);
-  pointer-events: none;
-  user-select: none;
-  opacity: 0;
-  animation: transcript-empty-rise var(--duration-editorial) var(--ease-out-quint) forwards;
-  animation-delay: 80ms;
-}
-
-.transcript-empty-eyebrow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  font: var(--type-eyebrow);
-  letter-spacing: var(--letter-eyebrow);
-  text-transform: uppercase;
-  color: var(--color-muted);
-  opacity: 0;
-  animation: transcript-empty-rise var(--duration-editorial) var(--ease-out-quint) forwards;
-  animation-delay: 120ms;
-}
-
-.transcript-empty-eyebrow::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-full);
-  background: var(--color-primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 18%, transparent);
-}
-
-.transcript-empty-eyebrow::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: var(--color-hairline-soft);
-}
-
-.transcript-empty-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
-  gap: var(--space-xl);
-  align-items: start;
-}
-
-@media (max-width: 720px) {
-  .transcript-empty-grid {
-    grid-template-columns: 1fr;
-    gap: var(--space-lg);
-  }
 }
 
 .transcript-empty-headline {
   margin: 0;
-  font-family: var(--font-display);
-  font-size: clamp(32px, 4.4vw, 48px);
-  font-weight: 400;
-  line-height: 1.05;
-  letter-spacing: var(--letter-display);
+  font: var(--type-title-lg);
   color: var(--color-ink);
   text-wrap: balance;
-  opacity: 0;
-  animation: transcript-empty-rise var(--duration-editorial) var(--ease-out-quint) forwards;
-  animation-delay: 200ms;
 }
 
-.transcript-empty-card {
-  display: grid;
-  gap: var(--space-xxs);
-  padding: var(--space-base) var(--space-md);
-  border-left: 1px solid var(--color-hairline);
-  background: transparent;
-  opacity: 0;
-  animation: transcript-empty-rise var(--duration-editorial) var(--ease-out-quint) forwards;
-  animation-delay: 280ms;
-}
-
-.transcript-empty-role {
+.transcript-empty-sublabel {
   margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--text-xl);
-  font-style: italic;
-  font-weight: 400;
-  letter-spacing: var(--letter-display);
-  color: color-mix(in srgb, var(--color-ink) 84%, var(--color-primary));
-}
-
-.transcript-empty-role-meta {
-  margin: 0;
-  font: var(--type-eyebrow);
-  letter-spacing: var(--letter-eyebrow);
-  text-transform: uppercase;
   color: var(--color-muted);
-}
-
-.transcript-empty-blurb {
-  margin: var(--space-xs) 0 0;
-  max-width: 38ch;
-  color: var(--color-body);
   font-size: var(--text-sm);
-  line-height: var(--leading-loose);
-}
-
-.transcript-empty-system {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: var(--space-xs) var(--space-base);
-  align-items: baseline;
-  margin: 0;
-  padding-top: var(--space-base);
-  border-top: 1px solid var(--color-hairline-soft);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--color-body);
-  opacity: 0;
-  animation: transcript-empty-rise var(--duration-editorial) var(--ease-out-quint) forwards;
-  animation-delay: 360ms;
-}
-
-.transcript-empty-system-row {
-  display: contents;
-}
-
-.transcript-empty-system dt {
-  color: var(--color-muted);
-}
-
-.transcript-empty-system-sep {
-  color: color-mix(in srgb, var(--color-muted) 50%, transparent);
-  margin: 0;
-}
-
-.transcript-empty-system dd {
-  margin: 0;
-  color: var(--color-ink);
-  font-feature-settings: "tnum" 1;
-  text-align: right;
-}
-
-.transcript-empty-system dd[data-state="ready"]::before,
-.transcript-empty-system dd[data-state="pending"]::before {
-  content: "";
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin-right: var(--space-xxs);
-  border-radius: var(--radius-full);
-  vertical-align: middle;
-}
-
-.transcript-empty-system dd[data-state="ready"]::before {
-  background: var(--color-semantic-up);
-}
-
-.transcript-empty-system dd[data-state="pending"]::before {
-  background: var(--color-accent-yellow);
-}
-
-@keyframes transcript-empty-rise {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .transcript-empty-watermark,
-  .transcript-empty-eyebrow,
-  .transcript-empty-headline,
-  .transcript-empty-card,
-  .transcript-empty-system {
-    animation: none;
-    opacity: 1;
-  }
 }
 
 .msg {

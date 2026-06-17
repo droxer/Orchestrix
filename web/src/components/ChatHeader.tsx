@@ -34,14 +34,6 @@ export function ChatHeader({ selectedEmployee, running, activeAgent, setActiveAg
             ) : (
               <span>{t("thread.no_employee_selected")}</span>
             )}
-            <span className="header-separator" aria-hidden="true" />
-            <span translate="no">{activeAgent}</span>
-            {activeSession ? (
-              <>
-                <span className="header-separator" aria-hidden="true" />
-                <span className="session-id" title={activeSession.id}>{activeSession.id.slice(0, 8)}</span>
-              </>
-            ) : null}
             {activeSession ? (
               <span className="chat-title-status">
                 <StatusPill value={activeSession.status} />

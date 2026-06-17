@@ -377,7 +377,19 @@ def test_sandbox_ui_token_can_manage_owned_sessions(monkeypatch) -> None:
         })
         assert bob_session.status_code == 201
         assert token_client.get(f"/sessions/{bob_session.json()['id']}", headers=headers).status_code == 403
-        assert token_client.get("/sessions", headers={"Authorization": "Bearer wrong"}).status_code == 401
+        node_token_headers = {"Authorization": "Bearer node_token"}
+        node_token_session = token_client.post("/sessions", json={
+            "taskGoal": "node token task",
+            "assignments": [{"agent": "codex"}],
+            "workspacePath": "/workspace/alice",
+        }, headers=node_token_headers)
+        assert node_token_session.status_code == 201
+        assert node_token_session.json()["ownerEmployeeId"] == "alice"
+        assert token_client.get(f"/sessions/{node_token_session.json()['id']}", headers=node_token_headers).status_code == 200
+
+        bad_token = token_client.get("/sessions", headers={"Authorization": "Bearer wrong"})
+        assert bad_token.status_code == 401
+        assert bad_token.json()["detail"] == "Invalid sandbox token."
 
 
 def test_employee_can_ask_assigned_daemon_node_without_daemon_node_token(monkeypatch) -> None:
