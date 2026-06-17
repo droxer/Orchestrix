@@ -91,24 +91,29 @@
   font-size: var(--text-sm);
 }
 
+/* Per-agent brand tints — bg is a 12% wash, fg is the saturated brand hue.
+   Hex values track the vendors' official marks (Anthropic terracotta,
+   OpenAI teal, Inflection violet, Moonshot indigo). */
+/* Brand tints — saturated fg uses the vendor's official mark color,
+   bg is a ~12% wash for the round chip. */
 .agent-avatar[data-agent="claude"] {
-  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface-strong));
-  color: var(--color-primary);
+  background: color-mix(in srgb, #d97757 12%, var(--color-surface-strong));
+  color: #d97757;
 }
 
 .agent-avatar[data-agent="pi"] {
-  background: color-mix(in srgb, var(--color-semantic-up) 10%, var(--color-surface-strong));
-  color: var(--color-semantic-up);
+  background: color-mix(in srgb, #000 8%, var(--color-surface-strong));
+  color: #111;
 }
 
 .agent-avatar[data-agent="codex"] {
-  background: color-mix(in srgb, var(--color-accent-yellow) 15%, var(--color-surface-strong));
-  color: color-mix(in srgb, var(--color-accent-yellow) 80%, var(--color-ink));
+  background: color-mix(in srgb, #000 8%, var(--color-surface-strong));
+  color: #111;
 }
 
 .agent-avatar[data-agent="kimi"] {
-  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface-strong));
-  color: color-mix(in srgb, var(--color-primary) 55%, var(--color-ink));
+  background: color-mix(in srgb, #1252f1 10%, var(--color-surface-strong));
+  color: #1252f1;
 }
 
 .agent-avatar > svg {

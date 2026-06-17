@@ -42,6 +42,121 @@
   font-style: italic;
 }
 
+.agent-prose h1,
+.agent-prose h2,
+.agent-prose h3,
+.agent-prose h4,
+.agent-prose h5,
+.agent-prose h6 {
+  margin: var(--space-base) 0 var(--space-xs);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.005em;
+}
+
+.agent-prose h1:first-child,
+.agent-prose h2:first-child,
+.agent-prose h3:first-child,
+.agent-prose h4:first-child,
+.agent-prose h5:first-child,
+.agent-prose h6:first-child {
+  margin-top: 0;
+}
+
+.agent-prose h1 { font-size: calc(var(--text-md) * 1.35); }
+.agent-prose h2 { font-size: calc(var(--text-md) * 1.2); }
+.agent-prose h3 { font-size: calc(var(--text-md) * 1.1); }
+.agent-prose h4,
+.agent-prose h5,
+.agent-prose h6 { font-size: var(--text-md); }
+
+.agent-prose ul,
+.agent-prose ol {
+  margin: 0 0 var(--space-xs);
+  padding-left: 1.4em;
+}
+
+.agent-prose ul { list-style: disc; }
+.agent-prose ol { list-style: decimal; }
+
+.agent-prose li {
+  margin-bottom: var(--space-xxs);
+  line-height: 1.55;
+}
+
+.agent-prose li:last-child {
+  margin-bottom: 0;
+}
+
+.agent-prose li > p {
+  margin: 0 0 var(--space-xxs);
+}
+
+.agent-prose li > p:last-child {
+  margin-bottom: 0;
+}
+
+.agent-prose li > ul,
+.agent-prose li > ol {
+  margin-top: var(--space-xxs);
+}
+
+.agent-prose blockquote {
+  margin: 0 0 var(--space-xs);
+  padding: var(--space-xxs) var(--space-sm);
+  border-left: 3px solid var(--color-hairline);
+  color: var(--color-body);
+  font-style: italic;
+}
+
+.agent-prose blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+.agent-prose hr {
+  margin: var(--space-sm) 0;
+  border: 0;
+  border-top: 1px solid var(--color-hairline-soft);
+}
+
+.agent-prose a {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.agent-prose a:hover {
+  text-decoration-thickness: 2px;
+}
+
+.agent-prose table {
+  width: 100%;
+  margin: 0 0 var(--space-xs);
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.agent-prose th,
+.agent-prose td {
+  padding: var(--space-xxs) var(--space-xs);
+  border-bottom: 1px solid var(--color-hairline-soft);
+  text-align: left;
+  vertical-align: top;
+}
+
+.agent-prose thead th {
+  color: var(--color-muted);
+  font-weight: 600;
+  border-bottom-color: var(--color-hairline);
+}
+
+.agent-prose del {
+  color: var(--color-muted);
+  text-decoration: line-through;
+}
+
 .agent-code {
   position: relative;
   margin: var(--space-xs) 0 0;

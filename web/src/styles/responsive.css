@@ -32,6 +32,16 @@
   .header-agent-tabs button {
     padding-inline: var(--space-xs);
   }
+
+  .chat-title-status {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .header-agent-tabs {
+    display: none;
+  }
 }
 
 @media (max-width: 820px) {

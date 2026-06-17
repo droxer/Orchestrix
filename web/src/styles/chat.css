@@ -19,11 +19,6 @@
   background: var(--color-canvas);
 }
 
-/* Header task title carries the editorial register: Instrument Serif at
-   22px, weight 400, tight tracking. This is the chat shell's single
-   display-typography moment — the rest of the chrome stays Geist so the
-   serif reads as deliberate, not decorative. */
-
 .chat-title {
   min-width: 0;
   display: flex;
@@ -36,12 +31,18 @@
 }
 
 .chat-title .employee-avatar {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   font-size: var(--text-sm);
 }
 
-.chat-title p {
+.chat-title-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-title-meta {
   display: flex;
   align-items: center;
   gap: var(--space-xs);
@@ -49,22 +50,26 @@
   color: var(--color-muted);
   font-size: var(--text-sm);
   font-weight: 500;
+  min-width: 0;
 }
 
-.chat-title p > span:first-child {
+.chat-title-meta > span:first-child {
   color: var(--color-ink);
   font-weight: 600;
+}
+
+.chat-title-status {
+  display: inline-flex;
+  align-items: center;
+  margin-left: var(--space-xxs);
 }
 
 .chat-title h2 {
   min-width: 0;
   margin: 0;
   color: var(--color-ink);
-  font-family: var(--font-display);
-  font-size: var(--text-xl);
-  font-weight: 400;
-  line-height: 1.13;
-  letter-spacing: var(--letter-display);
+  font: var(--type-title-md);
+  letter-spacing: -0.005em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

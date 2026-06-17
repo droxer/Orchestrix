@@ -64,6 +64,7 @@ export const NavLogout = withStandardStroke(LogOut, "NavLogout");
 export const NavRefresh = withStandardStroke(RefreshCw, "NavRefresh");
 export const NavSidebarCollapse = withStandardStroke(PanelLeftClose, "NavSidebarCollapse");
 export const NavSidebarExpand = withStandardStroke(PanelLeftOpen, "NavSidebarExpand");
+export const NavNewThread = withStandardStroke(Plus, "NavNewThread");
 
 export const ActionSend = withStandardStroke(ArrowUp, "ActionSend");
 export const ActionApprove = withStandardStroke(Check, "ActionApprove");

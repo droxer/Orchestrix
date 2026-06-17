@@ -80,6 +80,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html
       lang="en"
       className={`${instrumentSerif.variable} ${geist.variable} ${geistMono.variable} ${notoSansSC.variable} ${notoSansTC.variable}`}
+      suppressHydrationWarning
     >
       <body>
         <Providers>{children}</Providers>

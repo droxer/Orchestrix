@@ -1,6 +1,8 @@
 import { StreamCheck, StreamCommand, StreamError, StreamInfo, StreamTool, StreamWarn } from "./icons";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import ReactMarkdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 import type { AgentName } from "../types";
 import { parseAgentStream, parseAgentStderr, type AgentSegment } from "../lib/agentStream";
@@ -91,89 +93,45 @@ function StatusIcon({ tone }: { tone: "good" | "bad" | "warn" | "info" }) {
   return <StreamInfo size={13} aria-hidden="true" />;
 }
 
-function renderProse(text: string): ReactNode {
-  const parts = splitFences(text);
-  return parts.map((part, i) => {
-    if (part.kind === "code") {
+const MARKDOWN_COMPONENTS: Components = {
+  pre: ({ children }) => <>{children}</>,
+  code: ({ className, children, ...rest }) => {
+    const text = String(children ?? "").replace(/\n$/, "");
+    const inline = !/(^|\s)language-/.test(className ?? "") && !text.includes("\n");
+    if (inline) {
       return (
-        <pre className="agent-code" key={i}>
-          {part.lang ? <span className="agent-code-lang">{part.lang}</span> : null}
-          <code>
-            {tokenize(part.text).map((token, j) => (
-              <span key={j} className={`hl-${token.kind}`}>
-                {token.text}
-              </span>
-            ))}
-          </code>
-        </pre>
+        <code className={className} {...rest}>
+          {text}
+        </code>
       );
     }
+    const lang = /language-([\w+-]+)/.exec(className ?? "")?.[1] ?? null;
     return (
-      <div className="agent-prose" key={i}>
-        {part.text.split(/\n{2,}/).map((para, j) => (
-          <p key={j}>{renderInline(para)}</p>
-        ))}
-      </div>
+      <pre className="agent-code">
+        {lang ? <span className="agent-code-lang">{lang}</span> : null}
+        <code>
+          {tokenize(text).map((token, j) => (
+            <span key={j} className={`hl-${token.kind}`}>
+              {token.text}
+            </span>
+          ))}
+        </code>
+      </pre>
     );
-  });
-}
+  },
+  a: ({ href, children, ...rest }) => (
+    <a href={href} target="_blank" rel="noreferrer noopener" {...rest}>
+      {children}
+    </a>
+  ),
+};
 
-type ProseChunk = { kind: "text"; text: string } | { kind: "code"; lang: string | null; text: string };
-
-function splitFences(text: string): ProseChunk[] {
-  const out: ProseChunk[] = [];
-  const pattern = /```([a-zA-Z0-9_+-]*)\n([\s\S]*?)```/g;
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-  while ((match = pattern.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      out.push({ kind: "text", text: text.slice(lastIndex, match.index) });
-    }
-    out.push({ kind: "code", lang: match[1] || null, text: match[2].replace(/\n+$/, "") });
-    lastIndex = pattern.lastIndex;
-  }
-  if (lastIndex < text.length) {
-    out.push({ kind: "text", text: text.slice(lastIndex) });
-  }
-  return out;
-}
-
-function renderInline(text: string): ReactNode {
-  const nodes: ReactNode[] = [];
-  const pattern = /(`[^`\n]+`|\*\*[^*]+\*\*|\*[^*\n]+\*)/g;
-  let lastIndex = 0;
-  let key = 0;
-  let match: RegExpExecArray | null;
-  while ((match = pattern.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      nodes.push(renderLineBreaks(text.slice(lastIndex, match.index), key++));
-    }
-    const token = match[0];
-    if (token.startsWith("`")) {
-      nodes.push(<code key={key++}>{token.slice(1, -1)}</code>);
-    } else if (token.startsWith("**")) {
-      nodes.push(<strong key={key++}>{token.slice(2, -2)}</strong>);
-    } else {
-      nodes.push(<em key={key++}>{token.slice(1, -1)}</em>);
-    }
-    lastIndex = pattern.lastIndex;
-  }
-  if (lastIndex < text.length) {
-    nodes.push(renderLineBreaks(text.slice(lastIndex), key++));
-  }
-  return nodes;
-}
-
-function renderLineBreaks(text: string, key: number): ReactNode {
-  const lines = text.split("\n");
+function renderProse(text: string): ReactNode {
   return (
-    <span key={key}>
-      {lines.map((line, i) => (
-        <span key={i}>
-          {line}
-          {i < lines.length - 1 ? <br /> : null}
-        </span>
-      ))}
-    </span>
+    <div className="agent-prose">
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
+        {text}
+      </ReactMarkdown>
+    </div>
   );
 }

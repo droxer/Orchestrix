@@ -1,7 +1,7 @@
 import { type Dispatch, type SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 import type { AgentName, RelaySession } from "../types";
-import { NavConversations, NavRefresh } from "./icons";
+import { NavConversations, NavNewThread, NavRefresh } from "./icons";
 import { EmployeeAvatar } from "./EmployeeAvatar";
 import { StatusPill } from "./StatusPill";
 
@@ -27,8 +27,8 @@ export function ChatHeader({ selectedEmployee, running, activeAgent, setActiveAg
           <NavConversations size={16} /><span>{t("nav.conversations")}</span>
         </button>
         <EmployeeAvatar employeeId={selectedEmployee} running={running} />
-        <div>
-          <p>
+        <div className="chat-title-text">
+          <p className="chat-title-meta">
             {selectedEmployee ? (
               <span translate="no">@{selectedEmployee}</span>
             ) : (
@@ -36,7 +36,17 @@ export function ChatHeader({ selectedEmployee, running, activeAgent, setActiveAg
             )}
             <span className="header-separator" aria-hidden="true" />
             <span translate="no">{activeAgent}</span>
-            {activeSession ? <><span className="header-separator" aria-hidden="true" /><span className="session-id">{activeSession.id.slice(0, 8)}</span></> : null}
+            {activeSession ? (
+              <>
+                <span className="header-separator" aria-hidden="true" />
+                <span className="session-id" title={activeSession.id}>{activeSession.id.slice(0, 8)}</span>
+              </>
+            ) : null}
+            {activeSession ? (
+              <span className="chat-title-status">
+                <StatusPill value={activeSession.status} />
+              </span>
+            ) : null}
           </p>
           <h2>{activeSession ? activeSession.taskGoal : t("thread.new_conversation")}</h2>
         </div>
@@ -45,10 +55,9 @@ export function ChatHeader({ selectedEmployee, running, activeAgent, setActiveAg
         <div className="header-agent-tabs" aria-label={t("thread.talk_to_agent")}>
           {agentNames.map((a) => <button key={a} type="button" aria-pressed={a === activeAgent} className={a === activeAgent ? "active" : ""} onClick={() => setActiveAgent(a)}><span translate="no">@{a}</span></button>)}
         </div>
-        {activeSession ? <StatusPill value={activeSession.status} /> : null}
         {activeSession && onNewThread ? (
           <button className="icon-button" type="button" aria-label={t("thread.new_thread")} title={t("thread.new_thread")} onClick={onNewThread}>
-            {t("thread.new_thread")}
+            <NavNewThread size={16} />
           </button>
         ) : null}
         <button className="icon-button" type="button" aria-label={t("nav.refresh")} title={t("nav.refresh")} onClick={onRefresh}>
