@@ -2,18 +2,15 @@
 
 import { useTranslation } from "react-i18next";
 import { LayoutDashboard, Server, Users } from "lucide-react";
-import type { CurrentUser } from "../../types";
-import { RelayMark } from "../RelayMark";
 
 export type AdminView = "dashboard" | "people" | "fleet";
 
 interface NavRailProps {
   view: AdminView;
   onChange: (next: AdminView) => void;
-  admin: CurrentUser;
 }
 
-export function NavRail({ view, onChange, admin }: NavRailProps) {
+export function NavRail({ view, onChange }: NavRailProps) {
   const { t } = useTranslation();
   const items: Array<{ id: AdminView; label: string; icon: typeof Users }> = [
     { id: "dashboard", label: t("admin.v2.nav_dashboard"), icon: LayoutDashboard },
@@ -23,9 +20,6 @@ export function NavRail({ view, onChange, admin }: NavRailProps) {
 
   return (
     <nav className="adm-nav" aria-label={t("admin.v2.nav_label")}>
-      <div className="adm-nav-brand" aria-hidden="true">
-        <RelayMark width={32} height={22} />
-      </div>
       <div className="adm-nav-items">
         {items.map((item) => {
           const Icon = item.icon;
@@ -44,9 +38,6 @@ export function NavRail({ view, onChange, admin }: NavRailProps) {
             </button>
           );
         })}
-      </div>
-      <div className="adm-nav-foot">
-        <span className="adm-nav-user mono" translate="no">@{admin.username}</span>
       </div>
     </nav>
   );

@@ -210,7 +210,7 @@ export function AdminConsole() {
 
   return (
     <section className="admin-console adm-shell">
-      <NavRail view={view} onChange={setView} admin={admin} />
+      <NavRail view={view} onChange={setView} />
 
       <div className="adm-main">
         <header className="adm-header">
