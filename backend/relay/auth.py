@@ -97,7 +97,32 @@ class UserAuthStore:
         self.auth_dir = self.root_dir / "auth"
         self.users_path = self.auth_dir / "users.json"
         self.sessions_path = self.auth_dir / "sessions.json"
+        self.deleted_employees_path = self.auth_dir / "deleted_employees.json"
         self.session_ttl_seconds = session_ttl_seconds
+
+    def deleted_employee_ids(self) -> set[str]:
+        if not self.deleted_employees_path.exists():
+            return set()
+        raw = _read_json(self.deleted_employees_path)
+        return {entry["id"] for entry in raw if entry.get("id")}
+
+    def soft_delete_employee(self, employee_id: str) -> dict[str, Any]:
+        employee_id = (employee_id or "").strip()
+        if not employee_id:
+            raise ValueError("employeeId is required.")
+        users = self._read_users()
+        if not any(user.get("employeeId") == employee_id for user in users):
+            raise KeyError(employee_id)
+        entries: list[dict[str, Any]] = []
+        if self.deleted_employees_path.exists():
+            entries = _read_json(self.deleted_employees_path)
+        if any(entry.get("id") == employee_id for entry in entries):
+            raise ValueError("Employee is already deleted.")
+        record = {"id": employee_id, "deletedAt": now_iso()}
+        entries.append(record)
+        _write_json(self.deleted_employees_path, entries)
+        logger.info("Employee soft-deleted", employee_id=employee_id)
+        return record
 
     def has_users(self) -> bool:
         return len(self._read_users()) > 0
@@ -138,6 +163,9 @@ class UserAuthStore:
         }
         users.append(user)
         self._write_users(users)
+        if user.get("employeeId") and self.deleted_employees_path.exists():
+            entries = [entry for entry in _read_json(self.deleted_employees_path) if entry.get("id") != user["employeeId"]]
+            _write_json(self.deleted_employees_path, entries)
         logger.info("User created", user_id=user["id"], username=username, role=role)
         return self._public_user(user)
 
@@ -260,6 +288,7 @@ class DatabaseUserAuthStore:
         Column("department_public_id", Text, nullable=True),
         Column("created_at", DateTime(timezone=True), nullable=False),
         Column("updated_at", DateTime(timezone=True), nullable=False),
+        Column("deleted_at", DateTime(timezone=True), nullable=True),
     )
     users = Table(
         "auth_users",
@@ -379,8 +408,31 @@ class DatabaseUserAuthStore:
         with self.engine.begin() as conn:
             department_rows = conn.execute(select(self.departments)).mappings().all()
             departments = {row["public_id"]: row_to_department(row) for row in department_rows}
-            rows = conn.execute(select(self.employees).order_by(self.employees.c.public_id)).mappings().all()
+            rows = conn.execute(
+                select(self.employees)
+                .where(self.employees.c.deleted_at.is_(None))
+                .order_by(self.employees.c.public_id)
+            ).mappings().all()
         return [employee_with_department(row_to_employee(row), departments) for row in rows]
+
+    def soft_delete_employee(self, employee_id: str) -> dict[str, Any]:
+        employee_id = (employee_id or "").strip()
+        if not employee_id:
+            raise ValueError("employeeId is required.")
+        now = datetime.now(timezone.utc)
+        with self.engine.begin() as conn:
+            row = conn.execute(select(self.employees).where(self.employees.c.public_id == employee_id)).mappings().first()
+            if not row:
+                raise KeyError(employee_id)
+            if row.get("deleted_at"):
+                raise ValueError("Employee is already deleted.")
+            conn.execute(
+                update(self.employees)
+                .where(self.employees.c.id == row["id"])
+                .values(deleted_at=now, updated_at=now)
+            )
+        logger.info("Employee soft-deleted", employee_id=employee_id)
+        return {"id": employee_id, "deletedAt": _format_iso(now)}
 
     def authenticate(self, username: str, password: str) -> dict[str, Any] | None:
         username = username.strip().lower()
@@ -509,6 +561,8 @@ class DatabaseUserAuthStore:
         if row:
             employee_pk = row["id"]
             patch: dict[str, Any] = {"updated_at": now}
+            if row.get("deleted_at"):
+                patch["deleted_at"] = None
             if display_name:
                 patch["display_name"] = display_name
             if email:

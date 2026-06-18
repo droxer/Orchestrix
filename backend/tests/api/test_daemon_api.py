@@ -313,8 +313,19 @@ def test_control_panel_creates_pending_daemon_node_and_reuses_duplicate(monkeypa
         duplicate_body = duplicate.json()
         assert duplicate_body["node"]["id"] == node["id"]
         assert "sandboxToken" not in duplicate_body
-        assert "nodeToken" not in duplicate_body
-        assert "daemonCommand" not in duplicate_body
+        assert duplicate_body["nodeToken"] == body["nodeToken"]
+        assert "daemonCommand" in duplicate_body
+
+        unassign = client.post(f"/cp/daemon-nodes/{node['id']}/unassign")
+        assert unassign.status_code == 200
+        assert "employeeId" not in unassign.json()["node"]
+
+        delete = client.delete(f"/cp/daemon-nodes/{node['id']}")
+        assert delete.status_code == 204
+
+        listing = client.get("/cp/daemon-nodes")
+        assert listing.status_code == 200
+        assert all(item["id"] != node["id"] for item in listing.json()["nodes"])
 
 
 def test_sandbox_ui_token_can_manage_owned_sessions(monkeypatch) -> None:
@@ -481,3 +492,47 @@ def test_employee_can_ask_assigned_daemon_node_without_daemon_node_token(monkeyp
             "reason": "not alice's session",
         })
         assert alice_cancel_bob.status_code == 400
+
+
+def test_admin_can_soft_delete_employee_and_unassign_nodes(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _login_admin(client)
+
+        register_user = client.post("/cp/users", json={
+            "username": "alice",
+            "password": "AlicePass123!",
+            "employeeId": "alice",
+            "displayName": "Alice",
+        })
+        assert register_user.status_code == 201
+        provision = client.post("/cp/daemon-nodes", json={
+            "employeeId": "alice",
+            "workspacePath": "/workspace/alice",
+        })
+        assert provision.status_code == 201
+        node_id = provision.json()["node"]["id"]
+
+        listing = client.get("/cp/employees")
+        assert listing.status_code == 200
+        assert any(item["id"] == "alice" for item in listing.json()["employees"])
+
+        delete = client.delete("/cp/employees/alice")
+        assert delete.status_code == 200
+        body = delete.json()
+        assert body["employee"]["id"] == "alice"
+        assert node_id in body["unassignedNodes"]
+
+        post_delete_employees = client.get("/cp/employees")
+        assert post_delete_employees.status_code == 200
+        assert all(item["id"] != "alice" for item in post_delete_employees.json()["employees"])
+
+        nodes = client.get("/cp/daemon-nodes")
+        assert nodes.status_code == 200
+        match = next(item for item in nodes.json()["nodes"] if item["id"] == node_id)
+        assert "employeeId" not in match
+
+        duplicate = client.delete("/cp/employees/alice")
+        assert duplicate.status_code == 409

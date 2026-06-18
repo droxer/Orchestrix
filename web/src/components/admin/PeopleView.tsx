@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ControlPanelDaemonNodeRecord } from "../../types";
 import {
@@ -20,6 +20,7 @@ interface PeopleViewProps {
   onRevealCredentials: (node: ControlPanelDaemonNodeRecord) => void;
   onOnboard: () => void;
   onRequestAssign: (employeeId: string) => void;
+  onDeleteEmployee?: (employee: import("../../types").EmployeeRecord) => Promise<void>;
   unassignedNodeCount: number;
   highlightedEmployeeId: string | null;
 }
@@ -52,11 +53,32 @@ export function PeopleView({
   onRevealCredentials,
   onOnboard,
   onRequestAssign,
+  onDeleteEmployee,
   unassignedNodeCount,
   highlightedEmployeeId,
 }: PeopleViewProps) {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const employeesById = useMemo(() => new Map(employees.map((employee) => [employee.id, employee])), [employees]);
+
+  async function handleDeleteEmployee(employeeId: string) {
+    if (!onDeleteEmployee) return;
+    const employee = employeesById.get(employeeId);
+    if (!employee) return;
+    if (!window.confirm(t("admin.v2.delete_employee_confirm", { name: employee.displayName ?? employee.id, id: employee.id }))) return;
+    setPendingDelete(employeeId);
+    setDeleteError(null);
+    try {
+      await onDeleteEmployee(employee);
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setPendingDelete(null);
+    }
+  }
 
   const summaries = useMemo(() => buildEmployeeSummaries(employees, nodes), [employees, nodes]);
 
@@ -106,6 +128,10 @@ export function PeopleView({
           aria-label={t("admin.v2.search_people_placeholder")}
         />
       </div>
+
+      {deleteError ? (
+        <p className="adm-people-error">{t("admin.v2.action_failed", { message: deleteError })}</p>
+      ) : null}
 
       {groups.length === 0 ? (
         <p className="adm-empty-body">{t("admin.v2.no_match")}</p>
@@ -181,6 +207,18 @@ export function PeopleView({
                       <span className="adm-emp-ratio mono tone-muted">
                         {member.readyCount}/{member.nodeCount}
                       </span>
+                      {onDeleteEmployee ? (
+                        <button
+                          type="button"
+                          className="adm-emp-delete"
+                          onClick={() => void handleDeleteEmployee(member.id)}
+                          disabled={pendingDelete !== null}
+                          aria-label={t("admin.v2.delete_employee_action")}
+                          title={t("admin.v2.delete_employee_action")}
+                        >
+                          <Trash2 size={13} aria-hidden="true" />
+                        </button>
+                      ) : null}
                     </div>
                   </li>
                 );

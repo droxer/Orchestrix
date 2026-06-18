@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, MetaData, Table, Text, Uuid, create_engine, insert, select, update
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, MetaData, Table, Text, Uuid, create_engine, delete, insert, select, update
 
 from .store_common import (
     DEFAULT_RELAY_DATA_DIR,
@@ -33,7 +33,7 @@ class LocalDaemonStore:
             path.mkdir(parents=True, exist_ok=True)
 
     def register_node(self, sandbox: dict[str, Any]) -> dict[str, Any]:
-        node = {**sandbox, "token": None, "nodeToken": None}
+        node = {**sandbox, "token": None}
         _write_json(self.nodes_dir / f"{safe_name(node['id'])}.json", node, 0o600)
         self.append_daemon_event(daemon_event("daemon.node.registered", {"node": node}))
         return node
@@ -61,6 +61,36 @@ class LocalDaemonStore:
         _write_json(self.nodes_dir / f"{safe_name(node_id)}.json", updated, 0o600)
         self.append_daemon_event(daemon_event("daemon.node.assigned", {"nodeId": node_id, "employeeId": employee_id}))
         return updated
+
+    def unassign_node_employee(self, node_id: str) -> dict[str, Any]:
+        node = self.get_node(node_id)
+        if not node:
+            raise KeyError(node_id)
+        previous = node.get("employeeId")
+        updated = {k: v for k, v in node.items() if k != "employeeId"}
+        updated["updatedAt"] = now_iso()
+        _write_json(self.nodes_dir / f"{safe_name(node_id)}.json", updated, 0o600)
+        self.append_daemon_event(daemon_event("daemon.node.unassigned", {"nodeId": node_id, "previousEmployeeId": previous}))
+        return updated
+
+    def delete_node(self, node_id: str) -> None:
+        node_path = self.nodes_dir / f"{safe_name(node_id)}.json"
+        if not node_path.exists():
+            raise KeyError(node_id)
+        for record in self._list_commands():
+            if record.get("nodeId") == node_id:
+                command_path = self.commands_dir / f"{safe_name(record['id'])}.json"
+                command_path.unlink(missing_ok=True)
+        for path in self.runs_dir.glob("*.json"):
+            run = _read_json(path)
+            if run.get("nodeId") == node_id:
+                path.unlink(missing_ok=True)
+        for path in self.run_requests_dir.glob("*.json"):
+            request = _read_json(path)
+            if request.get("nodeId") == node_id:
+                path.unlink(missing_ok=True)
+        node_path.unlink()
+        self.append_daemon_event(daemon_event("daemon.node.deleted", {"nodeId": node_id}))
 
     def get_node(self, node_id: str) -> dict[str, Any] | None:
         path = self.nodes_dir / f"{safe_name(node_id)}.json"
@@ -241,6 +271,7 @@ class DatabaseDaemonStore:
         Column("agents", JSON, nullable=False),
         Column("ui_token_hash", Text, nullable=True),
         Column("node_token_hash", Text, nullable=True),
+        Column("node_token", Text, nullable=True),
         Column("token_hash", Text, nullable=True),
         Column("last_error", Text, nullable=True),
         Column("created_at", DateTime(timezone=True), nullable=False),
@@ -329,7 +360,7 @@ class DatabaseDaemonStore:
             self.metadata.create_all(self.engine)
 
     def register_node(self, sandbox: dict[str, Any]) -> dict[str, Any]:
-        node = {**sandbox, "token": None, "nodeToken": None}
+        node = {**sandbox, "token": None}
         values = node_to_row(node)
         with self.engine.begin() as conn:
             existing = conn.scalar(select(self.nodes.c.id).where(self.nodes.c.public_id == node["id"]))
@@ -367,6 +398,32 @@ class DatabaseDaemonStore:
             conn.execute(update(self.nodes).where(self.nodes.c.id == node_pk).values(**node_to_row(updated, database_id=node_pk)))
             self._append_daemon_event(conn, daemon_event("daemon.node.assigned", {"nodeId": node_id, "employeeId": employee_id}))
         return updated
+
+    def unassign_node_employee(self, node_id: str) -> dict[str, Any]:
+        node = self.get_node(node_id)
+        if not node:
+            raise KeyError(node_id)
+        previous = node.get("employeeId")
+        updated = {k: v for k, v in node.items() if k != "employeeId"}
+        updated["updatedAt"] = now_iso()
+        with self.engine.begin() as conn:
+            node_pk = self._node_pk(conn, node_id)
+            row = node_to_row(updated, database_id=node_pk)
+            row["employee_id"] = None
+            conn.execute(update(self.nodes).where(self.nodes.c.id == node_pk).values(**row))
+            self._append_daemon_event(conn, daemon_event("daemon.node.unassigned", {"nodeId": node_id, "previousEmployeeId": previous}))
+        return updated
+
+    def delete_node(self, node_id: str) -> None:
+        with self.engine.begin() as conn:
+            node_pk = conn.scalar(select(self.nodes.c.id).where(self.nodes.c.public_id == node_id))
+            if not node_pk:
+                raise KeyError(node_id)
+            conn.execute(delete(self.run_requests).where(self.run_requests.c.node_id == node_pk))
+            conn.execute(delete(self.runs).where(self.runs.c.node_id == node_pk))
+            conn.execute(delete(self.commands).where(self.commands.c.node_id == node_pk))
+            conn.execute(delete(self.nodes).where(self.nodes.c.id == node_pk))
+            self._append_daemon_event(conn, daemon_event("daemon.node.deleted", {"nodeId": node_id}))
 
     def get_node(self, node_id: str) -> dict[str, Any] | None:
         with self.engine.begin() as conn:
@@ -590,6 +647,7 @@ def node_to_row(node: dict[str, Any], *, database_id: str | None = None) -> dict
         "agents": node.get("agents") or {},
         "ui_token_hash": node.get("uiTokenHash"),
         "node_token_hash": node.get("nodeTokenHash"),
+        "node_token": node.get("nodeToken"),
         "token_hash": node.get("tokenHash"),
         "last_error": node.get("lastError"),
         "created_at": _parse_iso(node["createdAt"]),
@@ -609,6 +667,7 @@ def row_to_node(row: Any) -> dict[str, Any]:
         **({"tokenHash": row["token_hash"]} if row.get("token_hash") else {}),
         **({"uiTokenHash": row["ui_token_hash"]} if row.get("ui_token_hash") else {}),
         **({"nodeTokenHash": row["node_token_hash"]} if row.get("node_token_hash") else {}),
+        **({"nodeToken": row["node_token"]} if row.get("node_token") else {}),
         **({"lastError": row["last_error"]} if row.get("last_error") else {}),
         "createdAt": _format_iso(row["created_at"]),
         "updatedAt": _format_iso(row["updated_at"]),

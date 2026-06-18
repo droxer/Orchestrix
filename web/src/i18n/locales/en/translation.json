@@ -239,7 +239,15 @@
       "assign_sub": "Bind an Unassigned Daemon Node to an Existing Employee.",
       "add_node": "Add Node",
       "add_node_for": "Assign a Node to @{{id}}",
-      "add_node_disabled_hint": "No Unassigned Nodes Available. Onboard a Daemon First."
+      "add_node_disabled_hint": "No Unassigned Nodes Available. Onboard a Daemon First.",
+      "unassign_action": "Unassign Employee",
+      "unassign_confirm": "Unassign @{{employee}} From {{id}}?",
+      "delete_action": "Delete Node",
+      "delete_confirm": "Delete Node {{id}}? This Removes Its Commands and Run History.",
+      "danger_zone": "Danger Zone",
+      "action_failed": "Action Failed: {{message}}",
+      "delete_employee_action": "Delete Employee",
+      "delete_employee_confirm": "Soft-Delete {{name}} (@{{id}})? Their Daemon Nodes Will Be Unassigned."
     }
   },
   "mcp": {

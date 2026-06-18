@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getAuthStatus, getMe } from "../api";
+import { deleteControlPanelDaemonNode, deleteControlPanelEmployee, getAuthStatus, getMe, unassignControlPanelDaemonNode } from "../api";
 import type {
   AssignControlPanelDaemonNodeResponse,
   ControlPanelDaemonNodeRecord,
@@ -112,6 +112,34 @@ export function AdminConsole() {
 
   function handleRevealCredentials(node: ControlPanelDaemonNodeRecord) {
     setCredentialsNodeId(node.id);
+  }
+
+  async function handleUnassignNode(node: ControlPanelDaemonNodeRecord) {
+    const result = await unassignControlPanelDaemonNode(node.id);
+    mergeFleet((prev) => ({
+      ...prev,
+      nodes: prev.nodes.map((current) => (current.id === result.node.id ? result.node : current)),
+    }));
+  }
+
+  async function handleDeleteNode(node: ControlPanelDaemonNodeRecord) {
+    await deleteControlPanelDaemonNode(node.id);
+    mergeFleet((prev) => ({
+      ...prev,
+      nodes: prev.nodes.filter((current) => current.id !== node.id),
+    }));
+    setCredentialsNodeId(null);
+  }
+
+  async function handleDeleteEmployee(employee: EmployeeRecord) {
+    const result = await deleteControlPanelEmployee(employee.id);
+    const unassignedSet = new Set(result.unassignedNodes);
+    mergeFleet((prev) => ({
+      employees: prev.employees.filter((current) => current.id !== employee.id),
+      nodes: prev.nodes.map((current) =>
+        unassignedSet.has(current.id) ? (({ employeeId: _ignored, ...rest }) => rest)(current) : current,
+      ),
+    }));
   }
 
   function handleOnboardSuccess(result: CreateControlPanelEmployeeResponse) {
@@ -223,6 +251,7 @@ export function AdminConsole() {
                 onRevealCredentials={handleRevealCredentials}
                 onOnboard={() => setOnboardOpen(true)}
                 onRequestAssign={(employeeId) => setAssignTarget({ employeeId })}
+                onDeleteEmployee={handleDeleteEmployee}
                 unassignedNodeCount={unassignedNodes.length}
                 highlightedEmployeeId={highlightedEmployeeId}
               />
@@ -231,6 +260,7 @@ export function AdminConsole() {
                 nodes={nodes}
                 employees={employees}
                 onRevealCredentials={handleRevealCredentials}
+                onDeleteNode={handleDeleteNode}
               />
             )}
           </div>
@@ -259,6 +289,8 @@ export function AdminConsole() {
         onClose={() => setCredentialsNodeId(null)}
         node={credentialsNode}
         storedToken={credentialsNodeId ? storedTokens[credentialsNodeId] : undefined}
+        onUnassign={handleUnassignNode}
+        onDelete={handleDeleteNode}
       />
     </section>
   );

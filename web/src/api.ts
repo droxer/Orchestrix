@@ -9,6 +9,7 @@ import type {
   ControlPanelDaemonNodesResponse,
   ControlPanelEmployeesResponse,
   CurrentUser,
+  UnassignControlPanelDaemonNodeResponse,
   DaemonNodesResponse,
   RelaySession,
   RunInput,
@@ -105,6 +106,28 @@ export function createControlPanelDaemonNode(
       ...(input.workspacePath ? { workspacePath: input.workspacePath } : {}),
     },
   });
+}
+
+export function unassignControlPanelDaemonNode(
+  nodeId: string,
+): Promise<UnassignControlPanelDaemonNodeResponse> {
+  return apiJson<UnassignControlPanelDaemonNodeResponse>(
+    `/cp/daemon-nodes/${encodeURIComponent(nodeId)}/unassign`,
+    { method: "POST" },
+  );
+}
+
+export function deleteControlPanelDaemonNode(nodeId: string): Promise<void> {
+  return apiJson<void>(`/cp/daemon-nodes/${encodeURIComponent(nodeId)}`, { method: "DELETE" });
+}
+
+export function deleteControlPanelEmployee(
+  employeeId: string,
+): Promise<{ employee: { id: string; deletedAt: string }; unassignedNodes: string[] }> {
+  return apiJson<{ employee: { id: string; deletedAt: string }; unassignedNodes: string[] }>(
+    `/cp/employees/${encodeURIComponent(employeeId)}`,
+    { method: "DELETE" },
+  );
 }
 
 export function getAuthStatus(signal?: AbortSignal): Promise<{ requiresBootstrap: boolean }> {

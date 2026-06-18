@@ -241,7 +241,15 @@
       "assign_sub": "将未分配的守护节点绑定到现有员工。",
       "add_node": "添加节点",
       "add_node_for": "为 @{{id}} 分配节点",
-      "add_node_disabled_hint": "暂无可分配的节点。请先注册一个守护进程。"
+      "add_node_disabled_hint": "暂无可分配的节点。请先注册一个守护进程。",
+      "unassign_action": "解除员工绑定",
+      "unassign_confirm": "确定要将 {{id}} 与 @{{employee}} 解除绑定吗？",
+      "delete_action": "删除节点",
+      "delete_confirm": "确定要删除节点 {{id}} 吗？此操作将一并清除其命令与运行记录。",
+      "danger_zone": "危险操作",
+      "action_failed": "操作失败：{{message}}",
+      "delete_employee_action": "删除员工",
+      "delete_employee_confirm": "确定要软删除 {{name}}（@{{id}}）吗？其守护节点将被取消分配。"
     }
   },
   "mcp": {

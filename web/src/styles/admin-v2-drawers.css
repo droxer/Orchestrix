@@ -332,6 +332,59 @@
   line-height: 1.6;
 }
 
+.adm-cred-actions {
+  margin-top: var(--space-lg);
+  padding-top: var(--space-base);
+  border-top: 1px solid var(--color-hairline-on-dark);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.adm-cred-actions-title {
+  margin: 0;
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-on-dark-soft);
+}
+
+.adm-cred-action-button {
+  appearance: none;
+  border: 1px solid var(--color-hairline-on-dark);
+  background: transparent;
+  color: var(--color-on-dark);
+  padding: var(--space-sm) var(--space-base);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.adm-cred-action-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.adm-cred-action-button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.adm-cred-action-button.danger {
+  color: #ff8a8a;
+  border-color: rgba(255, 138, 138, 0.4);
+}
+
+.adm-cred-action-button.danger:hover:not(:disabled) {
+  background: rgba(255, 138, 138, 0.08);
+}
+
+.adm-cred-action-error {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: #ff8a8a;
+}
+
 /* ── Auth screens ─────────────────────────────────────────────────── */
 .adm-auth-shell {
   width: 100%;

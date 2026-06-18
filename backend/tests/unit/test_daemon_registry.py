@@ -183,7 +183,7 @@ def test_daemon_run_timeout_marks_session_failed(monkeypatch) -> None:
     asyncio.run(run_flow())
 
 
-def test_database_daemon_store_does_not_persist_plaintext_node_tokens() -> None:
+def test_database_daemon_store_persists_plaintext_node_token() -> None:
     with TemporaryDirectory() as root:
         store = DatabaseDaemonStore(f"sqlite:///{root}/daemon.db", create_schema=True)
         store.register_node({
@@ -203,7 +203,7 @@ def test_database_daemon_store_does_not_persist_plaintext_node_tokens() -> None:
         [node] = store.list_nodes()
         assert node["id"] == "sbx_alice"
         assert node["nodeTokenHash"] == "sha256:hash"
-        assert "nodeToken" not in node
+        assert node["nodeToken"] == "tok_secret"
         assert node["token"] is None
 
 

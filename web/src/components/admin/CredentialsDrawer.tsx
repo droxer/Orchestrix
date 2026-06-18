@@ -12,6 +12,8 @@ interface CredentialsDrawerProps {
   onClose: () => void;
   node: ControlPanelDaemonNodeRecord | null;
   storedToken?: StoredNodeToken;
+  onUnassign?: (node: ControlPanelDaemonNodeRecord) => Promise<void>;
+  onDelete?: (node: ControlPanelDaemonNodeRecord) => Promise<void>;
 }
 
 interface RowProps {
@@ -44,9 +46,36 @@ function DarkCopyRow({ label, value, copyLabel, copied, onCopy }: RowProps) {
   );
 }
 
-export function CredentialsDrawer({ open, onClose, node, storedToken }: CredentialsDrawerProps) {
+export function CredentialsDrawer({ open, onClose, node, storedToken, onUnassign, onDelete }: CredentialsDrawerProps) {
   const { t } = useTranslation();
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [actionPending, setActionPending] = useState<"unassign" | "delete" | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  async function runAction(kind: "unassign" | "delete", handler: () => Promise<void>) {
+    setActionPending(kind);
+    setActionError(null);
+    try {
+      await handler();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setActionPending(null);
+    }
+  }
+
+  function handleUnassign() {
+    if (!node || !onUnassign) return;
+    const employee = node.employeeId ?? "";
+    if (!window.confirm(t("admin.v2.unassign_confirm", { employee, id: node.id }))) return;
+    void runAction("unassign", () => onUnassign(node));
+  }
+
+  function handleDelete() {
+    if (!node || !onDelete) return;
+    if (!window.confirm(t("admin.v2.delete_confirm", { id: node.id }))) return;
+    void runAction("delete", () => onDelete(node));
+  }
 
   async function handleCopy(field: string, value: string) {
     await copyText(value);
@@ -137,6 +166,34 @@ export function CredentialsDrawer({ open, onClose, node, storedToken }: Credenti
       ) : (
         <p className="adm-cred-empty">{t("admin.v2.token_only_at_provision")}</p>
       )}
+      {(onUnassign || onDelete) ? (
+        <div className="adm-cred-actions">
+          <p className="adm-cred-actions-title">{t("admin.v2.danger_zone")}</p>
+          {onUnassign && node.employeeId ? (
+            <button
+              type="button"
+              className="adm-cred-action-button"
+              onClick={handleUnassign}
+              disabled={actionPending !== null}
+            >
+              {t("admin.v2.unassign_action")}
+            </button>
+          ) : null}
+          {onDelete ? (
+            <button
+              type="button"
+              className="adm-cred-action-button danger"
+              onClick={handleDelete}
+              disabled={actionPending !== null}
+            >
+              {t("admin.v2.delete_action")}
+            </button>
+          ) : null}
+          {actionError ? (
+            <p className="adm-cred-action-error">{t("admin.v2.action_failed", { message: actionError })}</p>
+          ) : null}
+        </div>
+      ) : null}
     </Drawer>
   );
 }

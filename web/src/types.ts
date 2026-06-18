@@ -62,6 +62,10 @@ export interface AssignControlPanelDaemonNodeResponse {
   node: ControlPanelDaemonNodeRecord;
 }
 
+export interface UnassignControlPanelDaemonNodeResponse {
+  node: ControlPanelDaemonNodeRecord;
+}
+
 export interface CreateControlPanelDaemonNodeInput {
   employeeId: string;
   workspacePath?: string;

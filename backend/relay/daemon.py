@@ -127,7 +127,7 @@ class DaemonNodeRegistry:
             "tokenHash": next_ui_hash,
             "uiTokenHash": next_ui_hash,
             "nodeTokenHash": hash_daemon_node_token(input.get("token")) or (existing or {}).get("nodeTokenHash") or (existing or {}).get("tokenHash"),
-            "nodeToken": None,
+            "nodeToken": input.get("token") or (existing or {}).get("nodeToken") or self.plain_node_tokens.get(input["sandboxId"]),
             "createdAt": (existing or {}).get("createdAt", now),
             "updatedAt": now,
             "lastSeenAt": now,
@@ -200,6 +200,48 @@ class DaemonNodeRegistry:
         logger.info("Daemon node assigned", sandbox_id=sandbox_id, employee_id=employee_id)
         return updated
 
+    def unassign_employee_everywhere(self, employee_id: str) -> list[str]:
+        affected: list[str] = []
+        for sandbox_id, sandbox in list(self.sandboxes.items()):
+            if sandbox.get("employeeId") == employee_id:
+                self.unassign_employee(sandbox_id)
+                affected.append(sandbox_id)
+        return affected
+
+    def unassign_employee(self, sandbox_id: str) -> dict[str, Any]:
+        sandbox = self.sandboxes.get(sandbox_id)
+        if not sandbox:
+            raise KeyError(sandbox_id)
+        if not sandbox.get("employeeId"):
+            raise ValueError("Daemon node is not assigned.")
+        previous = sandbox["employeeId"]
+        updated = {k: v for k, v in sandbox.items() if k != "employeeId"}
+        updated["updatedAt"] = now_iso()
+        self.sandboxes[sandbox_id] = updated
+        self.daemon_store.unassign_node_employee(sandbox_id)
+        logger.info("Daemon node unassigned", sandbox_id=sandbox_id, previous_employee_id=previous)
+        return updated
+
+    def delete(self, sandbox_id: str) -> None:
+        sandbox = self.sandboxes.get(sandbox_id)
+        if not sandbox:
+            raise KeyError(sandbox_id)
+        active_runs = self.daemon_store.list_active_runs(sandbox_id)
+        if active_runs:
+            raise ValueError("Daemon node has active runs; cancel them before deleting.")
+        self.daemon_store.delete_node(sandbox_id)
+        self.sandboxes.pop(sandbox_id, None)
+        self.plain_node_tokens.pop(sandbox_id, None)
+        for command_id, command in list(self.active_commands.items()):
+            if command.get("sandboxId") == sandbox_id or command.get("nodeId") == sandbox_id:
+                self.active_commands.pop(command_id, None)
+                future = self.completions.pop(command_id, None)
+                if future and not future.done():
+                    future.set_exception(RuntimeError("Daemon node deleted."))
+                self.outputs.pop(command_id, None)
+                self.output_sequences.pop(command_id, None)
+        logger.info("Daemon node deleted", sandbox_id=sandbox_id)
+
     def provision_pending(self, employee_id: str, workspace_path: str | None = None) -> tuple[dict[str, Any], str | None, str | None]:
         existing = self.find_by_employee(employee_id, workspace_path)
         if existing:
@@ -218,7 +260,7 @@ class DaemonNodeRegistry:
             "tokenHash": hash_daemon_node_token(ui_token),
             "uiTokenHash": hash_daemon_node_token(ui_token),
             "nodeTokenHash": hash_daemon_node_token(node_token),
-            "nodeToken": None,
+            "nodeToken": node_token,
             "createdAt": now,
             "updatedAt": now,
             "lastError": "Waiting for daemon node registration.",
@@ -590,6 +632,8 @@ class DaemonNodeRegistry:
                 "updatedAt": now_iso(),
                 "lastError": sandbox.get("lastError") or "Waiting for daemon node registration.",
             }
+            if sandbox.get("nodeToken"):
+                self.plain_node_tokens[sandbox["id"]] = sandbox["nodeToken"]
         for run in self.daemon_store.list_active_runs():
             self.active_commands[run["commandId"]] = {**run, "sandboxId": run["nodeId"]}
 

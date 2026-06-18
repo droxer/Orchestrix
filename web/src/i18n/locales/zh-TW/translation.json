@@ -241,7 +241,15 @@
       "assign_sub": "將未指派的守護節點綁定到現有員工。",
       "add_node": "新增節點",
       "add_node_for": "為 @{{id}} 指派節點",
-      "add_node_disabled_hint": "尚無可指派的節點。請先啟動一個守護程序。"
+      "add_node_disabled_hint": "尚無可指派的節點。請先啟動一個守護程序。",
+      "unassign_action": "解除員工綁定",
+      "unassign_confirm": "確定要將 {{id}} 與 @{{employee}} 解除綁定嗎？",
+      "delete_action": "刪除節點",
+      "delete_confirm": "確定要刪除節點 {{id}} 嗎？此動作會一併清除其指令與執行記錄。",
+      "danger_zone": "危險操作",
+      "action_failed": "操作失敗：{{message}}",
+      "delete_employee_action": "刪除員工",
+      "delete_employee_confirm": "確定要軟刪除 {{name}}（@{{id}}）嗎？其守護節點將被解除指派。"
     }
   },
   "mcp": {
