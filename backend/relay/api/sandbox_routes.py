@@ -90,8 +90,12 @@ async def run_sandbox(sandbox_id: str, request: Request, ctx: AppContextDep) -> 
         raise HTTPException(400, "taskGoal and at least one assignment are required.")
     if actor:
         parsed["actorEmployeeId"] = actor["employeeId"]
+        parsed["actorIsAdmin"] = actor["isAdmin"]
     logger.info("Sandbox run starting", sandbox_id=sandbox_id, session_id=parsed.get("sessionId"))
-    return await ctx.backend.run(sandbox_id, parsed)
+    try:
+        return await ctx.backend.run(sandbox_id, parsed)
+    except PermissionError as error:
+        raise HTTPException(403, str(error))
 
 
 @router.post("/sandboxes/{sandbox_id}/runs/{session_id}/cancel", status_code=202)

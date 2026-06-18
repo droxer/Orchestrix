@@ -257,6 +257,268 @@
   border-top: 1px solid var(--color-hairline);
 }
 
+/* ── Assign-node drawer (operator context + node list) ────────────── */
+.adm-assign-form { gap: var(--space-xl); }
+
+.adm-assign-section-eyebrow,
+.adm-assign-operator-eyebrow {
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--letter-eyebrow-wide);
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.adm-assign-operator {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.adm-assign-operator-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-base);
+  padding: var(--space-base) var(--space-lg);
+  border: 1px solid var(--color-hairline);
+  border-left: 2px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  background: var(--color-canvas);
+}
+
+.adm-assign-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.adm-assign-operator-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.adm-assign-operator-handle {
+  font-size: var(--text-lg);
+  font-weight: 500;
+  color: var(--color-ink);
+  line-height: 1.1;
+  word-break: break-all;
+}
+
+.adm-assign-operator-name {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+}
+
+.adm-assign-nodes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.adm-assign-nodes-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-base);
+  padding-bottom: var(--space-xxs);
+  border-bottom: 1px dotted var(--color-hairline);
+}
+
+.adm-assign-nodes-count {
+  font-size: var(--text-2xs);
+  color: var(--color-muted);
+  letter-spacing: 0.04em;
+}
+
+.adm-assign-node-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.adm-assign-node-choice {
+  display: block;
+  position: relative;
+}
+
+.adm-assign-node-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.adm-assign-node {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: var(--space-base);
+  width: 100%;
+  padding: var(--space-sm) var(--space-base);
+  background: var(--color-canvas);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.adm-assign-node:hover {
+  border-color: var(--color-hairline-strong, var(--color-ink));
+  background: var(--color-surface, rgba(0, 0, 0, 0.015));
+}
+
+.adm-assign-node-input:focus-visible + .adm-assign-node {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(207, 32, 47, 0.12);
+}
+
+.adm-assign-node.selected {
+  border-color: var(--color-primary);
+  background: rgba(207, 32, 47, 0.04);
+  box-shadow: inset 2px 0 0 var(--color-primary);
+}
+
+.adm-assign-node-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-muted-soft, var(--color-muted));
+  flex-shrink: 0;
+  position: relative;
+}
+
+.adm-assign-node-dot.tone-good {
+  background: var(--color-semantic-up, #2e9e54);
+  box-shadow: 0 0 0 3px rgba(46, 158, 84, 0.16);
+}
+
+.adm-assign-node-dot.tone-info {
+  background: var(--color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 16%, transparent);
+}
+
+.adm-assign-node-dot.tone-warn {
+  background: var(--color-accent-yellow, #d9920a);
+  box-shadow: 0 0 0 3px rgba(217, 146, 10, 0.14);
+}
+
+.adm-assign-node-dot.tone-bad {
+  background: var(--color-semantic-down, #cf202f);
+  box-shadow: 0 0 0 3px rgba(207, 32, 47, 0.14);
+}
+
+.adm-assign-node-dot.tone-neutral {
+  background: var(--color-muted, #8c8c8c);
+}
+
+.adm-assign-node-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.adm-assign-node-id {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-ink);
+  word-break: break-all;
+  line-height: 1.2;
+}
+
+.adm-assign-node-path {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  word-break: break-all;
+  line-height: 1.3;
+}
+
+.adm-assign-node-path.muted {
+  font-style: italic;
+  opacity: 0.7;
+}
+
+.adm-assign-node-status {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.adm-assign-node-status.tone-good { color: var(--color-semantic-up, #2e9e54); }
+.adm-assign-node-status.tone-info { color: var(--color-primary); }
+.adm-assign-node-status.tone-bad { color: var(--color-semantic-down, #cf202f); }
+.adm-assign-node-status.tone-warn { color: var(--color-accent-yellow, #d9920a); }
+
+.adm-assign-node-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-full);
+  color: var(--color-on-primary);
+  background: transparent;
+  flex-shrink: 0;
+  transition: background 160ms ease;
+}
+
+.adm-assign-node.selected .adm-assign-node-check {
+  background: var(--color-primary);
+}
+
+.adm-assign-empty {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-base);
+  padding: var(--space-lg);
+  border: 1px dashed var(--color-hairline);
+  border-radius: var(--radius-md);
+  color: var(--color-muted);
+}
+
+.adm-assign-empty > svg { margin-top: 2px; flex-shrink: 0; opacity: 0.7; }
+
+.adm-assign-empty-title {
+  margin: 0 0 var(--space-xxs);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.adm-assign-empty-body {
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 1.55;
+  color: var(--color-muted);
+}
+
 /* ── Credentials drawer rows ──────────────────────────────────────── */
 .adm-cred-row {
   padding: var(--space-base) 0;

@@ -249,6 +249,7 @@ export async function collectExecution(
   }
 
   try {
+    await closeExecutionStdin(execution);
     await Promise.all([readStream("stdout", stdoutParts), readStream("stderr", stderrParts)]);
     const result = await execution.wait();
     return {
@@ -259,6 +260,16 @@ export async function collectExecution(
     };
   } finally {
     signal?.removeEventListener("abort", abortExecution);
+  }
+}
+
+async function closeExecutionStdin(execution: any): Promise<void> {
+  if (typeof execution.stdin !== "function") return;
+  try {
+    const stdin = await execution.stdin();
+    await stdin?.close?.();
+  } catch {
+    // Some BoxLite runtimes may not expose stdin for every execution.
   }
 }
 

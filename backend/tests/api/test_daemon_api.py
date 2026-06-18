@@ -494,6 +494,67 @@ def test_employee_can_ask_assigned_daemon_node_without_daemon_node_token(monkeyp
         assert alice_cancel_bob.status_code == 400
 
 
+def test_admin_can_start_existing_employee_session_on_employee_daemon_node(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        admin_client = TestClient(app)
+        _bootstrap_admin(admin_client)
+        _login_admin(admin_client)
+        _create_user(admin_client, "alice", employee_id="alice")
+        _create_user(admin_client, "bob", employee_id="bob")
+
+        register = admin_client.post("/daemon-nodes/register", json={
+            "sandboxId": "sbx_alice",
+            "employeeId": "alice",
+            "token": "node_token",
+            "workspacePath": "/workspace/alice",
+            "protocolVersion": 1,
+            "supportedAgents": ["codex"],
+            "status": "ready",
+        }, headers={"Authorization": "Bearer ui_token"})
+        assert register.status_code == 200
+        register_bob = admin_client.post("/daemon-nodes/register", json={
+            "sandboxId": "sbx_bob",
+            "employeeId": "bob",
+            "token": "bob_node_token",
+            "workspacePath": "/workspace/bob",
+            "protocolVersion": 1,
+            "supportedAgents": ["codex"],
+            "status": "ready",
+        }, headers={"Authorization": "Bearer bob_ui_token"})
+        assert register_bob.status_code == 200
+
+        created = admin_client.post("/sessions", json={
+            "taskGoal": "alice asks through admin",
+            "ownerEmployeeId": "alice",
+            "assignments": [{"agent": "codex", "mode": "implement"}],
+            "workspacePath": "/workspace/alice",
+        })
+        assert created.status_code == 201
+        session_id = created.json()["id"]
+        assert created.json()["ownerEmployeeId"] == "alice"
+
+        bob_client = TestClient(app)
+        _login(bob_client, "bob", "userpass")
+        denied = bob_client.post("/sandboxes/sbx_alice/runs", json={
+            "taskGoal": "alice asks through admin",
+            "assignments": [{"agent": "codex", "mode": "implement"}],
+            "sessionId": session_id,
+        })
+        assert denied.status_code == 403
+
+        run = admin_client.post("/sandboxes/sbx_bob/runs", json={
+            "taskGoal": "alice asks through admin",
+            "assignments": [{"agent": "codex", "mode": "implement"}],
+            "sessionId": session_id,
+        })
+        assert run.status_code == 202
+        assert run.json()["id"] == session_id
+        assert run.json()["ownerEmployeeId"] == "alice"
+        assert run.json()["status"] == "running"
+
+
 def test_admin_can_soft_delete_employee_and_unassign_nodes(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:

@@ -1,11 +1,11 @@
 "use client";
 
 import { useTranslation } from "react-i18next";
-import { Server, Users } from "lucide-react";
+import { LayoutDashboard, Server, Users } from "lucide-react";
 import type { CurrentUser } from "../../types";
 import { RelayMark } from "../RelayMark";
 
-export type AdminView = "people" | "fleet";
+export type AdminView = "dashboard" | "people" | "fleet";
 
 interface NavRailProps {
   view: AdminView;
@@ -16,6 +16,7 @@ interface NavRailProps {
 export function NavRail({ view, onChange, admin }: NavRailProps) {
   const { t } = useTranslation();
   const items: Array<{ id: AdminView; label: string; icon: typeof Users }> = [
+    { id: "dashboard", label: t("admin.v2.nav_dashboard"), icon: LayoutDashboard },
     { id: "people", label: t("admin.v2.nav_people"), icon: Users },
     { id: "fleet", label: t("admin.v2.nav_fleet"), icon: Server },
   ];

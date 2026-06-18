@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { DashboardView } from "./admin/dashboard/DashboardView";
+import { useFleetMetrics } from "../hooks/useFleetMetrics";
 import { useTranslation } from "react-i18next";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,9 +25,7 @@ import { PeopleView } from "./admin/PeopleView";
 import { PulseStrip } from "./admin/PulseStrip";
 import { useAdminFleet } from "../hooks/useAdminFleet";
 import {
-  isStale,
   readStoredNodeTokens,
-  visualStatus,
   writeStoredNodeToken,
   type StoredNodeTokenMap,
 } from "./admin/helpers";
@@ -43,7 +43,7 @@ export function AdminConsole() {
 
   const { nodes, employees, lastUpdated, pollError, isFetching, mergeFleet } = useAdminFleet(Boolean(admin));
 
-  const [view, setView] = useState<AdminView>("people");
+  const [view, setView] = useState<AdminView>("dashboard");
   const [onboardOpen, setOnboardOpen] = useState(false);
   const [assignTarget, setAssignTarget] = useState<{ employeeId?: string } | null>(null);
   const [credentialsNodeId, setCredentialsNodeId] = useState<string | null>(null);
@@ -91,18 +91,7 @@ export function AdminConsole() {
     }
   }, [pollError]);
 
-  const metrics = useMemo(() => {
-    const total = nodes.length;
-    const ready = nodes.filter((node) => visualStatus(node) === "ready").length;
-    const running = nodes.filter((node) => !isStale(node) && node.status === "running").length;
-    const failed = nodes.filter((node) => {
-      const status = visualStatus(node);
-      return status === "failed" || status === "stale";
-    }).length;
-    const queued = nodes.reduce((acc, node) => acc + node.queuedCommandCount, 0);
-    const employeeTotal = employees.length || new Set(nodes.map((node) => node.employeeId).filter(Boolean)).size;
-    return { total, ready, running, failed, queued, employeeTotal };
-  }, [nodes, employees]);
+  const metrics = useFleetMetrics(nodes, employees);
 
   const unassignedNodes = useMemo(() => nodes.filter((node) => !node.employeeId), [nodes]);
   const credentialsNode = useMemo(
@@ -206,8 +195,18 @@ export function AdminConsole() {
   const lastUpdatedStr = lastUpdated
     ? lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
     : null;
-  const viewTitle = view === "people" ? t("admin.v2.title_people") : t("admin.v2.title_fleet");
-  const viewSub = view === "people" ? t("admin.v2.sub_people") : t("admin.v2.sub_fleet");
+  const viewTitle =
+    view === "dashboard"
+      ? t("admin.v2.title_dashboard")
+      : view === "people"
+        ? t("admin.v2.title_people")
+        : t("admin.v2.title_fleet");
+  const viewSub =
+    view === "dashboard"
+      ? t("admin.v2.sub_dashboard")
+      : view === "people"
+        ? t("admin.v2.sub_people")
+        : t("admin.v2.sub_fleet");
 
   return (
     <section className="admin-console adm-shell">
@@ -244,7 +243,9 @@ export function AdminConsole() {
 
         <div className="adm-content">
           <div className="adm-content-main">
-            {view === "people" ? (
+            {view === "dashboard" ? (
+              <DashboardView nodes={nodes} employees={employees} metrics={metrics} />
+            ) : view === "people" ? (
               <PeopleView
                 employees={employees}
                 nodes={nodes}
@@ -264,7 +265,7 @@ export function AdminConsole() {
               />
             )}
           </div>
-          <AttentionRail nodes={nodes} />
+          {view === "fleet" ? <AttentionRail nodes={nodes} /> : null}
         </div>
       </div>
 

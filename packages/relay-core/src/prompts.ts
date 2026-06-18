@@ -25,18 +25,22 @@ export function reviewPrompt(state: AgentState): string {
   ].join("\n");
 }
 
-export function codexImplementPrompt(state: AgentState): string {
+export function implementationPrompt(state: AgentState): string {
   return prependPriorAgentBridge(appendReviewFeedback(state.task_goal, state), state);
 }
 
 export function claudeTaskPrompt(state: AgentState): string {
-  return prependPriorAgentBridge(appendReviewFeedback(state.task_goal, state), state);
+  return implementationPrompt(state);
 }
 
 export function piTaskPrompt(state: AgentState): string {
-  return prependPriorAgentBridge(appendReviewFeedback(state.task_goal, state), state);
+  return implementationPrompt(state);
+}
+
+export function codexImplementPrompt(state: AgentState): string {
+  return implementationPrompt(state);
 }
 
 export function kimiTaskPrompt(state: AgentState): string {
-  return prependPriorAgentBridge(appendReviewFeedback(state.task_goal, state), state);
+  return implementationPrompt(state);
 }

@@ -730,9 +730,15 @@ class ServerDaemonNodeBackend:
             raise ValueError(f"Sandbox {sandbox_id} daemon node is not ready.")
         if not self.registry.is_live(sandbox_id):
             raise ValueError(f"Sandbox {sandbox_id} daemon node heartbeat expired.")
-        owner_employee_id = request.get("actorEmployeeId") or sandbox["employeeId"]
+        actor_employee_id = request.get("actorEmployeeId")
+        owner_employee_id = actor_employee_id or sandbox["employeeId"]
         if request.get("sessionId"):
-            assert_session_owned_by_employee(self.registry.store, request["sessionId"], owner_employee_id)
+            session_owner = session_owner_employee_id(self.registry.store, request["sessionId"])
+            if actor_employee_id and not request.get("actorIsAdmin"):
+                assert_session_owned_by_employee(self.registry.store, request["sessionId"], actor_employee_id)
+            if not actor_employee_id:
+                assert_session_owned_by_employee(self.registry.store, request["sessionId"], sandbox["employeeId"])
+            owner_employee_id = session_owner
         self.registry.update_status(sandbox_id, {"status": "running", "lastError": None})
         controller = SessionController(self.registry.store, workspace_path=sandbox.get("workspacePath") or "/workspace", owner_employee_id=owner_employee_id)
         session_id = request.get("sessionId") or controller.create_session(
@@ -768,3 +774,11 @@ def assert_session_owned_by_employee(store: LocalSessionStore, session_id: str, 
         raise PermissionError(f"Session {session_id} has no owner; {employee_id} is not authorized to run it.")
     if session["ownerEmployeeId"] != employee_id:
         raise PermissionError(f"Session {session_id} is owned by {session['ownerEmployeeId']}; {employee_id} is not authorized to run it.")
+
+
+def session_owner_employee_id(store: LocalSessionStore, session_id: str) -> str:
+    session = store.get_session(session_id)
+    owner = session.get("ownerEmployeeId")
+    if not owner:
+        raise PermissionError(f"Session {session_id} has no owner; cannot start daemon run.")
+    return owner

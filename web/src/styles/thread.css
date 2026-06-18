@@ -17,6 +17,21 @@
   padding: 0 var(--space-base);
 }
 
+.conversation-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.conversation-heading-eyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+  line-height: 1;
+}
+
 .conversation-heading h1 {
   margin: 0;
   display: inline-flex;
@@ -100,11 +115,11 @@
 /* Full-width inner button — carries the grid layout and all interactive content */
 .conversation-row-inner {
   display: grid;
-  grid-template-columns: 36px minmax(0, 1fr);
-  align-items: start;
+  grid-template-columns: 40px minmax(0, 1fr);
+  align-items: center;
   gap: var(--space-sm);
   width: 100%;
-  min-height: 68px;
+  min-height: 76px;
   padding: var(--space-sm) var(--space-base);
   border: 0;
   border-radius: var(--radius-none);
@@ -120,11 +135,17 @@
 
 .conversation-row.active {
   background: color-mix(in srgb, var(--color-primary) 9%, var(--color-canvas));
-  border-left: 2px solid var(--color-primary);
 }
 
-.conversation-row.active .conversation-row-inner {
-  padding-left: calc(var(--space-base) - 2px);
+.conversation-row.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--color-primary);
 }
 
 .conversation-empty {
@@ -176,10 +197,17 @@
   color: var(--color-ink);
   font-size: var(--text-base);
   font-weight: 600;
-  line-height: 1.25;
+  letter-spacing: -0.005em;
+  line-height: 1.2;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.conversation-name strong.mono {
+  font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace);
+  font-weight: 500;
+  font-size: var(--text-sm);
 }
 
 .conversation-topline-actions {
@@ -268,7 +296,7 @@
    align with the employee name above. */
 .conversation-preview {
   min-width: 0;
-  padding-left: calc(6px + var(--space-xs));
+  padding-left: 0;
   color: var(--color-body);
   font-size: var(--text-sm);
   line-height: 1.5;
@@ -277,9 +305,53 @@
   white-space: nowrap;
 }
 
+/* Single activity line — replaces preview + working dual-state. */
+.conversation-activity {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--color-body);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conversation-activity.muted {
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+.conversation-activity.working em {
+  font-style: italic;
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+.conversation-activity-pulse {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-primary) 40%, transparent);
+  animation: conv-pulse 1.4s ease-out infinite;
+}
+
+@keyframes conv-pulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-primary) 45%, transparent); }
+  100% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--color-primary) 0%, transparent); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .conversation-activity-pulse { animation: none; }
+}
+
 .conversation-meta {
   min-width: 0;
-  padding-left: calc(6px + var(--space-xs));
+  padding-left: 0;
   display: flex;
   align-items: center;
   gap: var(--space-xs);
@@ -290,6 +362,28 @@
 
 .conversation-meta-status {
   text-transform: lowercase;
+  letter-spacing: 0.02em;
+}
+
+.conversation-meta-status.tone-good { color: var(--color-semantic-up); }
+.conversation-meta-status.tone-info { color: var(--color-primary); }
+.conversation-meta-status.tone-bad  { color: var(--color-semantic-down); }
+.conversation-meta-status.tone-warn { color: var(--color-accent-yellow); }
+
+.conversation-meta-count {
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-strong);
+  color: var(--color-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.conversation-row.active .conversation-meta-count {
+  background: color-mix(in srgb, var(--color-primary) 14%, var(--color-canvas));
+  color: var(--color-primary);
 }
 
 .conversation-meta-sep {

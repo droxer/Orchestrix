@@ -1,0 +1,430 @@
+/* =====================================================================
+   Admin Dashboard  (adm-dash-* namespace)
+   Editorial control-room overview: oversized JetBrains Mono numerals,
+   hairline grids, a single Relay-blue accent. Reuses the admin-v2
+   tokens so the page reads as the same product as People and Fleet.
+   ===================================================================== */
+
+.adm-dash {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  padding: var(--space-lg) var(--space-xxl) var(--space-xxl);
+  min-width: 0;
+}
+
+/* ── KPI row ──────────────────────────────────────────────────────────
+   Hero tile (Conversations) spans 2 of 5 columns; three compact tiles
+   fill the rest. Keeps a single hero numeral as the page's first read. */
+.adm-dash-kpis {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  border: 1px solid var(--color-hairline);
+  background: var(--color-canvas);
+}
+
+.adm-dash-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-lg) var(--space-base);
+  border-right: 1px solid var(--color-hairline);
+  min-width: 0;
+}
+
+.adm-dash-tile:last-child { border-right: none; }
+
+.adm-dash-tile--hero {
+  padding: var(--space-lg) var(--space-lg);
+  background:
+    radial-gradient(
+      circle at 0% 100%,
+      color-mix(in srgb, var(--color-primary) 6%, transparent),
+      transparent 60%
+    );
+  gap: var(--space-base);
+}
+
+.adm-dash-tile-eyebrow {
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--letter-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.adm-dash-tile-value {
+  font-family: var(--font-number);
+  font-size: clamp(2.25rem, 4.5vw, 3.5rem);
+  font-weight: 500;
+  line-height: 1.0;
+  letter-spacing: var(--letter-display-strong);
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.adm-dash-tile--hero .adm-dash-tile-value {
+  font-size: clamp(3.5rem, 7vw, 5.5rem);
+  letter-spacing: -0.02em;
+}
+
+.adm-dash-tile-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  color: var(--color-muted);
+}
+
+.adm-dash-tile-hint {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+}
+
+.adm-dash-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-xs);
+  font-family: var(--font-number);
+  letter-spacing: 0.02em;
+}
+
+.adm-dash-delta.tone-up { color: var(--color-semantic-up); }
+.adm-dash-delta.tone-down { color: var(--color-semantic-down); }
+.adm-dash-delta.tone-flat { color: var(--color-muted); }
+
+.adm-dash-spark {
+  color: var(--color-primary);
+  display: block;
+}
+
+/* ── Layout ──────────────────────────────────────────────────────────
+   Vertical narrative: KPIs → headline chart (full-width) → 3-card belt
+   (fleet / people / tokens) → activity stream (full-width). The belt
+   demotes the token "coming soon" so it doesn't compete with active
+   signals. */
+.adm-dash-belt {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-lg);
+}
+
+.adm-dash-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-base);
+  padding: var(--space-lg);
+  border: 1px solid var(--color-hairline);
+  background: var(--color-canvas);
+  min-width: 0;
+  height: 100%;
+}
+
+.adm-dash-card-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+}
+
+.adm-dash-card-eyebrow {
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--letter-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.adm-dash-card-title {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--text-lg, 1.125rem);
+  font-weight: 500;
+  letter-spacing: var(--letter-display);
+  color: var(--color-ink);
+}
+
+.adm-dash-card-hint {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+}
+
+.adm-dash-card-foot {
+  margin-top: auto;
+  border-top: 1px solid var(--color-hairline-soft);
+  padding-top: var(--space-sm);
+}
+
+/* ── Charts ───────────────────────────────────────────────────────── */
+.adm-dash-chart {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.adm-dash-chart--empty { opacity: 0.85; }
+
+.adm-dash-empty {
+  position: relative;
+  min-height: 200px;
+}
+
+.adm-dash-empty--compact { min-height: 140px; }
+
+.adm-dash-empty-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  text-align: center;
+  pointer-events: none;
+}
+
+.adm-dash-empty-tag {
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--letter-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-primary);
+  padding: 2px 8px;
+  border: 1px solid var(--color-hairline);
+  border-radius: 999px;
+  background: var(--color-canvas);
+}
+
+.adm-dash-empty-copy {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  max-width: 28ch;
+  background: var(--color-canvas);
+  padding: 0 var(--space-xs);
+}
+
+/* ── Fleet health: stacked bar + stat grid ────────────────────────── */
+.adm-dash-bar {
+  display: flex;
+  width: 100%;
+  height: 10px;
+  border: 1px solid var(--color-hairline);
+  background: var(--color-hairline-soft);
+  overflow: hidden;
+}
+
+.adm-dash-bar-seg {
+  display: block;
+  height: 100%;
+  border-right: 1px solid var(--color-canvas);
+}
+
+.adm-dash-bar-seg:last-child { border-right: none; }
+.adm-dash-bar-seg.tone-good { background: var(--color-semantic-up); }
+.adm-dash-bar-seg.tone-info { background: var(--color-primary); }
+.adm-dash-bar-seg.tone-bad  { background: var(--color-semantic-down); }
+.adm-dash-bar-seg.tone-muted { background: var(--color-muted-soft); }
+
+.adm-dash-bar-empty {
+  flex: 1;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 6px,
+    var(--color-hairline) 6px,
+    var(--color-hairline) 7px
+  );
+}
+
+.adm-dash-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-base);
+  margin: 0;
+}
+
+.adm-dash-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.adm-dash-stat-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-eyebrow);
+  color: var(--color-muted);
+  margin: 0;
+}
+
+.adm-dash-stat-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: currentColor;
+}
+
+.adm-dash-stat.tone-good { color: var(--color-semantic-up); }
+.adm-dash-stat.tone-info { color: var(--color-primary); }
+.adm-dash-stat.tone-bad  { color: var(--color-semantic-down); }
+.adm-dash-stat.tone-muted { color: var(--color-muted); }
+
+.adm-dash-stat-value {
+  margin: 0;
+  font-family: var(--font-number);
+  font-size: var(--text-3xl);
+  font-weight: 500;
+  line-height: 1.0;
+  letter-spacing: var(--letter-display);
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Top employees ────────────────────────────────────────────────── */
+.adm-dash-top-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.adm-dash-top-row {
+  display: grid;
+  grid-template-columns: 24px 28px minmax(0, 1fr) minmax(40px, 1fr) auto;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.adm-dash-top-rank {
+  font-size: var(--text-2xs);
+  color: var(--color-muted);
+  letter-spacing: 0.06em;
+}
+
+.adm-dash-top-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.adm-dash-top-name {
+  font-size: var(--text-sm);
+  color: var(--color-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.adm-dash-top-sub {
+  font-size: var(--text-2xs);
+  color: var(--color-muted);
+  letter-spacing: 0.04em;
+}
+
+.adm-dash-top-bar {
+  position: relative;
+  height: 4px;
+  background: var(--color-hairline-soft);
+}
+
+.adm-dash-top-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--color-primary);
+  min-width: 4px;
+}
+
+.adm-dash-top-count {
+  font-size: var(--text-sm);
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Activity feed ────────────────────────────────────────────────── */
+.adm-dash-feed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: var(--space-lg);
+}
+
+.adm-dash-feed-row {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: var(--space-sm);
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--color-hairline-soft);
+  align-items: start;
+}
+
+.adm-dash-feed-row:last-child { border-bottom: none; }
+
+.adm-dash-feed-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+}
+
+.adm-dash-feed-icon.tone-good { color: var(--color-semantic-up); }
+.adm-dash-feed-icon.tone-bad  { color: var(--color-semantic-down); }
+.adm-dash-feed-icon.tone-info { color: var(--color-primary); }
+.adm-dash-feed-icon.tone-muted { color: var(--color-muted); }
+
+.adm-dash-feed-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.adm-dash-feed-message {
+  font-size: var(--text-sm);
+  color: var(--color-ink);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+.adm-dash-feed-meta {
+  font-size: var(--text-2xs);
+  color: var(--color-muted);
+  letter-spacing: 0.04em;
+}
+
+/* ── Responsive ───────────────────────────────────────────────────── */
+@media (max-width: 1200px) {
+  .adm-dash-belt { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .adm-dash-belt > :last-child { grid-column: 1 / -1; }
+}
+
+@media (max-width: 900px) {
+  .adm-dash-belt { grid-template-columns: minmax(0, 1fr); }
+  .adm-dash-belt > :last-child { grid-column: auto; }
+  .adm-dash-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .adm-dash-tile { grid-column: span 1; }
+  .adm-dash-tile--hero { grid-column: 1 / -1; border-right: none; border-bottom: 1px solid var(--color-hairline); }
+  .adm-dash-tile:nth-child(2) { border-right: 1px solid var(--color-hairline); }
+  .adm-dash-tile:nth-child(3) { border-right: none; }
+  .adm-dash-tile:nth-child(2),
+  .adm-dash-tile:nth-child(3) { border-bottom: 1px solid var(--color-hairline); }
+  .adm-dash-feed { grid-template-columns: minmax(0, 1fr); }
+}

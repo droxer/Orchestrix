@@ -20,7 +20,27 @@ function statusTone(value: string): Tone {
   if (value === "running") return "info";
   if (value === "failed" || value === "blocked" || value === "cancelled") return "bad";
   if (value === "stale") return "warn";
-  return "neutral"; // provisioning, stopped — grey, not alarming
+  return "neutral";
+}
+
+function relativeTime(iso?: string): string {
+  if (!iso) return "";
+  const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return "";
+  const diff = Math.max(0, Date.now() - then);
+  const sec = Math.round(diff / 1000);
+  if (sec < 60) return `${sec}s`;
+  const min = Math.round(sec / 60);
+  if (min < 60) return `${min}m`;
+  const hr = Math.round(min / 60);
+  if (hr < 24) return `${hr}h`;
+  const day = Math.round(hr / 24);
+  if (day < 7) return `${day}d`;
+  const wk = Math.round(day / 7);
+  if (wk < 5) return `${wk}w`;
+  const mo = Math.round(day / 30);
+  if (mo < 12) return `${mo}mo`;
+  return `${Math.round(day / 365)}y`;
 }
 
 type ConversationRowProps = {
@@ -33,8 +53,12 @@ type ConversationRowProps = {
 export function ConversationRow({ contact, selected, onSelect, onRemove }: ConversationRowProps) {
   const { t } = useTranslation();
   const status = conversationDaemonStatus(contact);
+  const tone = statusTone(status);
   const lastAgent =
     contact.lastSession?.agentRuns[contact.lastSession.agentRuns.length - 1]?.agent;
+  const stamp = relativeTime(contact.lastSession?.updatedAt);
+  const sessionCountLabel = contact.sessionCount.toString().padStart(2, "0");
+
   function handleRemove() {
     if (!onRemove) return;
     if (window.confirm(t("conversation.remove_confirm", { id: contact.id }))) {
@@ -42,8 +66,22 @@ export function ConversationRow({ contact, selected, onSelect, onRemove }: Conve
     }
   }
 
+  const activityLine = contact.activeRun ? (
+    <span className="conversation-activity working">
+      <span className="conversation-activity-pulse" aria-hidden="true" />
+      <em>{t("conversation.agent_working", { agent: contact.activeRun.agent })}</em>
+    </span>
+  ) : contact.lastSession?.taskGoal ? (
+    <span className="conversation-activity">
+      {contact.lastSession.taskGoal}
+    </span>
+  ) : (
+    <span className="conversation-activity muted">
+      {t("conversation.open_workspace")}
+    </span>
+  );
+
   return (
-    // Wrapper div — keeps the remove button as a sibling of the row button (no nested buttons)
     <div className={`conversation-row ${selected ? "active" : ""} ${contact.activeRun ? "has-activity" : ""}`}>
       <button
         className="conversation-row-inner"
@@ -51,41 +89,34 @@ export function ConversationRow({ contact, selected, onSelect, onRemove }: Conve
         aria-pressed={selected}
         onClick={() => onSelect(contact.id)}
       >
-        <EmployeeAvatar employeeId={contact.id} running={Boolean(contact.activeRun)} />
+        <EmployeeAvatar
+          employeeId={contact.id}
+          running={Boolean(contact.activeRun)}
+          tone={tone}
+          size={40}
+        />
         <span className="conversation-copy">
           <span className="conversation-topline">
             <span className="conversation-name">
-              <span
-                className={`status-dot status-dot-${statusTone(status)}`}
-                aria-hidden="true"
-              />
-              <strong translate="no">{contact.id}</strong>
+              <strong className="mono" translate="no">@{contact.id}</strong>
             </span>
-            <span className="conversation-topline-actions">
-              {contact.activeRun ? (
-                <span className="conversation-badge mono" aria-label={t("conversation.agent_running_aria")}>
-                  {Math.max(contact.sessionCount, 1)}
-                </span>
-              ) : (
-                <span className="conversation-stamp mono">
-                  {contact.sessionCount > 0
-                    ? `${contact.sessionCount.toString().padStart(2, "0")}`
-                    : t("conversation.no_sessions")}
-                </span>
-              )}
-            </span>
+            {stamp ? (
+              <span className="conversation-stamp mono" title={status}>
+                {stamp}
+              </span>
+            ) : null}
           </span>
-          <span className="conversation-preview">
-            {contact.activeRun
-              ? t("conversation.agent_working", { agent: contact.activeRun.agent })
-              : (contact.lastSession?.taskGoal ?? t("conversation.open_workspace"))}
-          </span>
+          {activityLine}
           <span className="conversation-meta">
-            <span className="conversation-meta-status">
+            <span className={`conversation-meta-status tone-${tone}`}>
               {t(`status.${status}`, { defaultValue: status })}
             </span>
             <span className="conversation-meta-sep" aria-hidden="true" />
-            <span>{lastAgent ?? t("conversation.no_agent_yet")}</span>
+            <span className="mono">{lastAgent ?? t("conversation.no_agent_yet")}</span>
+            <span className="conversation-meta-sep" aria-hidden="true" />
+            <span className="conversation-meta-count mono" aria-label={t("conversation.agent_running_aria")}>
+              {sessionCountLabel}
+            </span>
           </span>
         </span>
       </button>

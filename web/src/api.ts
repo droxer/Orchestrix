@@ -171,6 +171,32 @@ export function listSessions(signal?: AbortSignal): Promise<SessionsResponse> {
   return apiJson<SessionsResponse>("/sessions", { signal });
 }
 
+export interface DashboardSessionsResponse {
+  total: number;
+  last24h: number;
+  last7d: number;
+  statusCounts: Record<string, number>;
+  dailyCounts: Array<{ date: string; count: number; completed: number; failed: number }>;
+  topEmployees: Array<{ employeeId: string; sessionCount: number }>;
+}
+
+export interface DashboardActivityItem {
+  kind: string;
+  timestamp: string;
+  sessionId?: string;
+  taskId?: string;
+  employeeId?: string | null;
+  message: string;
+}
+
+export function getDashboardSessions(signal?: AbortSignal): Promise<DashboardSessionsResponse> {
+  return apiJson<DashboardSessionsResponse>("/cp/dashboard/sessions", { signal });
+}
+
+export function getDashboardActivity(signal?: AbortSignal): Promise<{ items: DashboardActivityItem[] }> {
+  return apiJson<{ items: DashboardActivityItem[] }>("/cp/dashboard/activity?limit=20", { signal });
+}
+
 export function provisionSandbox(employeeId: string, token?: string, nodeToken?: string): Promise<SandboxRecord> {
   // No workspacePath: the daemon matches by employee, so we attach to the
   // employee's registered daemon node (whatever workspace it runs in) instead

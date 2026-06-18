@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections import Counter
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response
@@ -260,3 +262,135 @@ async def create_control_panel_daemon_node(request: Request, ctx: AppContextDep)
         response["nodeToken"] = node["nodeToken"]
         response["daemonCommand"] = daemon_start_command(request, node)
     return response
+
+
+# ── Dashboard ────────────────────────────────────────────────────────────
+# Aggregated, read-only stats for the admin Dashboard view. Built on the
+# existing session/task event stores — no schema changes. Token-usage stats
+# (TODO: GET /cp/dashboard/tokens) will land once agent runs record token
+# counts on their session events.
+
+_DAY_WINDOW = 14
+
+
+def _parse_timestamp(value: Any) -> datetime | None:
+    if not isinstance(value, str) or not value:
+        return None
+    raw = value.replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+@router.get("/cp/dashboard/sessions")
+async def dashboard_sessions(request: Request, ctx: AppContextDep) -> dict[str, Any]:
+    require_admin_session(request, ctx.auth_store)
+    sessions = ctx.session_store.list_sessions()
+    now = datetime.now(timezone.utc)
+    window_start = (now - timedelta(days=_DAY_WINDOW - 1)).date()
+
+    buckets: dict[str, dict[str, int]] = {
+        (window_start + timedelta(days=offset)).isoformat(): {"count": 0, "completed": 0, "failed": 0}
+        for offset in range(_DAY_WINDOW)
+    }
+
+    total = len(sessions)
+    last_24h = 0
+    last_7d = 0
+    status_counts: Counter[str] = Counter()
+    per_employee: Counter[str] = Counter()
+
+    one_day = now - timedelta(hours=24)
+    seven_day = now - timedelta(days=7)
+
+    for session in sessions:
+        created = _parse_timestamp(session.get("createdAt"))
+        status = str(session.get("status") or "unknown")
+        status_counts[status] += 1
+        owner = session.get("ownerEmployeeId")
+        if owner:
+            per_employee[str(owner)] += 1
+        if created is None:
+            continue
+        if created >= one_day:
+            last_24h += 1
+        if created >= seven_day:
+            last_7d += 1
+        day_key = created.date().isoformat()
+        if day_key in buckets:
+            bucket = buckets[day_key]
+            bucket["count"] += 1
+            if status == "completed":
+                bucket["completed"] += 1
+            elif status == "failed":
+                bucket["failed"] += 1
+
+    daily_counts = [{"date": day, **stats} for day, stats in buckets.items()]
+    top_employees = [
+        {"employeeId": employee_id, "sessionCount": count}
+        for employee_id, count in per_employee.most_common(5)
+    ]
+
+    return {
+        "total": total,
+        "last24h": last_24h,
+        "last7d": last_7d,
+        "statusCounts": dict(status_counts),
+        "dailyCounts": daily_counts,
+        "topEmployees": top_employees,
+    }
+
+
+@router.get("/cp/dashboard/activity")
+async def dashboard_activity(
+    request: Request,
+    ctx: AppContextDep,
+    limit: int = 20,
+) -> dict[str, Any]:
+    require_admin_session(request, ctx.auth_store)
+    limit = max(1, min(limit, 100))
+
+    sessions = ctx.session_store.list_sessions()
+    tasks = ctx.task_store.list_tasks() if hasattr(ctx.task_store, "list_tasks") else []
+
+    items: list[dict[str, Any]] = []
+
+    for session in sessions:
+        owner = session.get("ownerEmployeeId")
+        status = session.get("status")
+        created_at = session.get("createdAt")
+        if created_at:
+            items.append({
+                "kind": "session.created",
+                "timestamp": created_at,
+                "sessionId": session.get("id"),
+                "employeeId": owner,
+                "message": session.get("taskGoal") or "Session created",
+            })
+        if status in {"completed", "failed"} and session.get("updatedAt"):
+            items.append({
+                "kind": f"session.{status}",
+                "timestamp": session.get("updatedAt"),
+                "sessionId": session.get("id"),
+                "employeeId": owner,
+                "message": session.get("taskGoal") or f"Session {status}",
+            })
+
+    for task in tasks:
+        created_at = task.get("createdAt")
+        if not created_at:
+            continue
+        items.append({
+            "kind": "task.created",
+            "timestamp": created_at,
+            "taskId": task.get("id"),
+            "employeeId": task.get("ownerEmployeeId"),
+            "message": task.get("goal") or task.get("taskGoal") or "Task created",
+        })
+
+    items.sort(key=lambda item: item.get("timestamp") or "", reverse=True)
+    return {"items": items[:limit]}

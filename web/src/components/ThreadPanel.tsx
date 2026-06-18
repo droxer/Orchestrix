@@ -23,7 +23,13 @@ export function ThreadPanel({ employees, employeeQuery, setEmployeeQuery, select
     <aside className="thread-panel" aria-label={t("nav.conversations")}>
       <div className="conversation-header">
         <div className="conversation-heading">
-          <h1>{t("thread.messages")}<small className="mono conversation-heading-count">{employees.length.toString().padStart(2, "0")}</small></h1>
+          <span className="conversation-heading-eyebrow">{t("nav.conversations")}</span>
+          <h1>
+            {t("thread.messages")}
+            <small className="mono conversation-heading-count">
+              {employees.length.toString().padStart(2, "0")}
+            </small>
+          </h1>
         </div>
       </div>
       <form className="people-search conversation-search" onSubmit={(e) => { e.preventDefault(); connect(); }}>

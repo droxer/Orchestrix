@@ -607,6 +607,37 @@ describe("execution cancellation", () => {
     assert.equal(killed, true);
     assert.equal(result.error_message, "Execution cancelled.");
   });
+
+  it("closes BoxLite stdin before collecting output", async () => {
+    const events: string[] = [];
+    const execution = {
+      stdin: async () => ({
+        close: async () => {
+          events.push("stdin closed");
+        },
+      }),
+      stdout: async () => ({
+        next: async () => {
+          events.push("stdout read");
+          return null;
+        },
+      }),
+      stderr: async () => ({
+        next: async () => {
+          events.push("stderr read");
+          return null;
+        },
+      }),
+      wait: async () => ({ exitCode: 0 }),
+    };
+
+    const result = await collectExecution(execution);
+
+    assert.equal(result.exit_code, 0);
+    assert.equal(events[0], "stdin closed");
+    assert.ok(events.includes("stdout read"));
+    assert.ok(events.includes("stderr read"));
+  });
 });
 
 describe("devbox OCI preparation", () => {
