@@ -64,7 +64,7 @@ tui-install:
 	npm install -w relay-tui
 
 tui-run:
-	$(if $(filter command line environment,$(origin RELAY_BACKEND_URL)),RELAY_BACKEND_URL="$(RELAY_BACKEND_URL)" )$(if $(filter command line environment,$(origin EMPLOYEE_ID)),RELAY_EMPLOYEE_ID="$(EMPLOYEE_ID)" )$(if $(filter command line environment,$(origin DAEMON_TOKEN)),RELAY_DAEMON_TOKEN="$(DAEMON_TOKEN)" )$(if $(filter command line environment,$(origin DAEMON_NODE_TOKEN)),RELAY_DAEMON_NODE_TOKEN="$(DAEMON_NODE_TOKEN)" )$(if $(filter command line environment,$(origin WORKSPACE)),RELAY_WORKSPACE="$(WORKSPACE)" WORKSPACE="$(WORKSPACE)" )node packages/relay-tui/dist/cli.js
+	$(if $(filter command line environment,$(origin RELAY_BACKEND_URL)),RELAY_BACKEND_URL="$(RELAY_BACKEND_URL)" )$(if $(filter command line environment,$(origin EMPLOYEE_ID)),RELAY_EMPLOYEE_ID="$(EMPLOYEE_ID)" )$(if $(filter command line environment,$(origin DAEMON_TOKEN)),RELAY_DAEMON_TOKEN="$(DAEMON_TOKEN)" )$(if $(filter command line environment,$(origin DAEMON_NODE_TOKEN)),RELAY_DAEMON_NODE_TOKEN="$(DAEMON_NODE_TOKEN)" )$(if $(filter command line environment,$(origin SANDBOX_ID)),RELAY_SANDBOX_ID="$(SANDBOX_ID)" SANDBOX_ID="$(SANDBOX_ID)" )$(if $(filter command line environment,$(origin WORKSPACE)),RELAY_WORKSPACE="$(WORKSPACE)" WORKSPACE="$(WORKSPACE)" )node packages/relay-tui/dist/cli.js
 
 tui-test:
 	npm run build -w relay-core
@@ -73,7 +73,7 @@ tui-test:
 	./node_modules/.bin/tsc -p packages/tsconfig.json
 	node --test dist/packages/relay-tui/tests/tui.test.js
 
-tui: tui-local
+tui: tui-run
 
 run: tui-local
 

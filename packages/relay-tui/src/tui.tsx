@@ -310,7 +310,7 @@ export function createDaemonAssignmentRunner(
 
 function assertDaemonSessionSucceeded(session: RelaySession, signal?: AbortSignal): void {
   if (session.status === "failed") {
-    throw new RenderedRunError(session.finalOutcome ?? "Relay daemon session failed.");
+    throw new RenderedRunError(formatDaemonFailureForTui(session.finalOutcome ?? "Relay daemon session failed."));
   }
   if (session.status === "cancelled" && !signal?.aborted) {
     throw new Error(session.finalOutcome ?? "Relay daemon session cancelled.");
@@ -446,6 +446,7 @@ export function replayDaemonAgentOutput(
     if (deliveredEventIds.has(event.id)) continue;
     if (event.type === "agent.output") {
       deliveredEventIds.add(event.id);
+      if (event.stream === "stderr" && isBoxLiteSingleRuntimeError(event.text)) continue;
       const rendered = rendererForDaemonOutput(event, renderers).feed(daemonRendererInput(event.text));
       if (rendered) log(rendered);
       continue;
@@ -474,10 +475,21 @@ export function replayDaemonAgentOutput(
     }
     if (event.type === "session.failed") {
       deliveredEventIds.add(event.id);
-      log(`\nERR  ${event.outcome}\n`);
+      log(`\nERR  ${formatDaemonFailureForTui(event.outcome)}\n`);
       continue;
     }
   }
+}
+
+function isBoxLiteSingleRuntimeError(text: string): boolean {
+  const normalized = text.replace(/\s+/g, " ");
+  return normalized.includes("Another Relay orchestrator is already running:")
+    && normalized.includes("only one BoxLite runtime can use ~/.boxlite");
+}
+
+function formatDaemonFailureForTui(text: string): string {
+  if (!isBoxLiteSingleRuntimeError(text)) return text;
+  return "Another Relay orchestrator is already running. Stop the existing Relay daemon first (try `make stop`) before retrying.";
 }
 
 function daemonRendererInput(text: string): string {
@@ -1648,10 +1660,11 @@ export function RelayTuiHost({ onExit }: { onExit: () => void }): React.ReactEle
 
   useEffect(() => {
     const employeeId = process.env.RELAY_EMPLOYEE_ID || process.env.USER || "local";
+    const explicitSandboxId = envValue("RELAY_SANDBOX_ID") ?? envValue("SANDBOX_ID");
     let cancelled = false;
     const waitForReadySandbox = async (): Promise<void> => {
       const discoveryClient = new RelayDaemonClient();
-      const liveNode = await discoverLiveDaemonNode(discoveryClient, employeeId, workspacePath);
+      const liveNode = await discoverLiveDaemonNode(discoveryClient, employeeId, workspacePath, explicitSandboxId);
       // Share the daemon-node token contract: a live daemon node wins, explicit
       // env token is the fallback, otherwise use the local per-employee token
       // file for a node that has not registered yet.
@@ -1670,7 +1683,8 @@ export function RelayTuiHost({ onExit }: { onExit: () => void }): React.ReactEle
         token: uiToken,
         nodeToken,
       });
-      let current = await client.provisionSandbox({ employeeId, workspacePath });
+      const provisionInput = { employeeId, workspacePath, ...(explicitSandboxId ? { sandboxId: explicitSandboxId } : {}) };
+      let current = await client.provisionSandbox(provisionInput);
       let lastWaitingStatus = "";
       while (!cancelled && current.status !== "ready") {
         if (mountedRef.current) {
@@ -1687,7 +1701,7 @@ export function RelayTuiHost({ onExit }: { onExit: () => void }): React.ReactEle
         await delay(DAEMON_POLL_INTERVAL_MS);
         // Re-run employee selection while waiting so a stale placeholder does
         // not pin the TUI to an old sandbox id after a live node registers.
-        current = await client.provisionSandbox({ employeeId, workspacePath });
+        current = await client.provisionSandbox(provisionInput);
       }
       if (cancelled || !mountedRef.current) return;
       setSandbox(current);
@@ -1741,21 +1755,27 @@ async function discoverLiveDaemonNode(
   client: RelayDaemonClient,
   employeeId: string,
   workspacePath: string,
+  sandboxId?: string,
 ): Promise<ControlPanelDaemonNodeRecord | undefined> {
   try {
     const nodes = await client.listControlPanelDaemonNodes();
     return nodes
       .filter((node) =>
-        node.employeeId === employeeId &&
+        (sandboxId ? node.id === sandboxId : node.employeeId === employeeId) &&
         node.online !== false &&
         node.stale !== true &&
         Boolean(node.nodeToken) &&
-        (!node.workspacePath || workspacePathsMatch(node.workspacePath, workspacePath))
+        (sandboxId || !node.workspacePath || workspacePathsMatch(node.workspacePath, workspacePath))
       )
       .sort((a, b) => daemonNodeRank(a) - daemonNodeRank(b) || (b.lastSeenAt ?? "").localeCompare(a.lastSeenAt ?? ""))[0];
   } catch {
     return undefined;
   }
+}
+
+function envValue(name: string): string | undefined {
+  const value = process.env[name]?.trim();
+  return value ? value : undefined;
 }
 
 function daemonNodeRank(node: ControlPanelDaemonNodeRecord): number {

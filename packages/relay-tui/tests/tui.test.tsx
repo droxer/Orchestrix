@@ -423,6 +423,116 @@ describe("TUI daemon runner", () => {
     assert.match(log, /Another Relay orchestrator is already running\./);
   });
 
+  it("condenses BoxLite single-runtime daemon failures for the TUI", async () => {
+    const failureMessage = [
+      "Another Relay orchestrator is already running:",
+      "  55975 node packages/relay-daemon/dist/cli.js --sandbox-id sbx_bob",
+      "Stop it first (only one BoxLite runtime can use ~/.boxlite).",
+    ].join("\n");
+    const failedSession: RelaySession = {
+      id: "ses_boxlite_busy",
+      workspacePath: "/workspace/alice",
+      taskGoal: "fix auth",
+      status: "failed",
+      phase: "failed",
+      participants: ["human", "claude"],
+      currentAgent: undefined,
+      pendingDecision: undefined,
+      createdAt: "2026-06-07T00:00:00.000Z",
+      updatedAt: "2026-06-07T00:00:02.000Z",
+      events: [
+        {
+          id: "evt_boxlite_started",
+          type: "agent.started",
+          sessionId: "ses_boxlite_busy",
+          timestamp: "2026-06-07T00:00:00.000Z",
+          runId: "run_boxlite_busy",
+          agent: "claude",
+          role: "implementer",
+          mode: "implement",
+        },
+        {
+          id: "evt_boxlite_output",
+          type: "agent.output",
+          sessionId: "ses_boxlite_busy",
+          timestamp: "2026-06-07T00:00:01.000Z",
+          runId: "run_boxlite_busy",
+          agent: "claude",
+          stream: "stderr",
+          text: `${failureMessage}\n`,
+        },
+        {
+          id: "evt_boxlite_completed",
+          type: "agent.completed",
+          sessionId: "ses_boxlite_busy",
+          timestamp: "2026-06-07T00:00:02.000Z",
+          runId: "run_boxlite_busy",
+          agent: "claude",
+          status: "failed",
+          exitCode: 1,
+        },
+        {
+          id: "evt_boxlite_session_failed",
+          type: "session.failed",
+          sessionId: "ses_boxlite_busy",
+          timestamp: "2026-06-07T00:00:02.000Z",
+          outcome: failureMessage,
+        },
+      ],
+      decisions: [],
+      agentRuns: [{
+        id: "run_boxlite_busy",
+        agent: "claude",
+        role: "implementer",
+        mode: "implement",
+        status: "failed",
+        startedAt: "2026-06-07T00:00:00.000Z",
+        completedAt: "2026-06-07T00:00:02.000Z",
+        exitCode: 1,
+        artifactIds: [],
+      }],
+      artifacts: [],
+      finalOutcome: failureMessage,
+    };
+    const fetchFn = async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
+      if (String(url) === "http://daemon.local/sandboxes/sbx_alice/runs" && init?.method === "POST") {
+        return new Response(JSON.stringify({ ...failedSession, events: [] }), {
+          status: 202,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      if (String(url) === "http://daemon.local/sessions/ses_boxlite_busy") {
+        return new Response(JSON.stringify(failedSession), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      throw new Error(`unexpected request ${String(url)}`);
+    };
+    const { RelayDaemonClient } = await import("../../relay-core/src/index.js");
+    const client = new RelayDaemonClient({ baseUrl: "http://daemon.local", fetchFn });
+    const runner = createDaemonAssignmentRunner(client, "sbx_alice");
+    let log = "";
+
+    await assert.rejects(
+      () => runner({
+        assignments: [{ agent: "claude" }],
+        task: "fix auth",
+        sessionId: "ses_boxlite_busy",
+        log: (text) => {
+          log += text;
+        },
+      }),
+      /Stop the existing Relay daemon first/,
+    );
+
+    assert.match(log, /ERR\s+claude\s+failed \(exit 1\)/);
+    assert.match(log, /ERR\s+Another Relay orchestrator is already running\. Stop the existing Relay daemon first/);
+    assert.equal(log.match(/Another Relay orchestrator is already running/g)?.length, 1);
+    assert.doesNotMatch(log, /55975 node packages\/relay-daemon/);
+    assert.doesNotMatch(log, /only one BoxLite runtime/);
+  });
+
   it("creates and polls daemon sessions while a Codex run is still in flight", async () => {
     const calls: string[] = [];
     const outputEvent = {
@@ -1863,6 +1973,92 @@ describe("RelayTui component", () => {
         delete process.env.RELAY_DAEMON_UI_TOKEN;
       } else {
         process.env.RELAY_DAEMON_UI_TOKEN = oldUiToken;
+      }
+    }
+  });
+
+  it("provisions the explicitly requested sandbox id in daemon host mode", async () => {
+    const oldFetch = globalThis.fetch;
+    const oldWorkspace = process.env.RELAY_WORKSPACE;
+    const oldEmployeeId = process.env.RELAY_EMPLOYEE_ID;
+    const oldToken = process.env.RELAY_DAEMON_NODE_TOKEN;
+    const oldUiToken = process.env.RELAY_DAEMON_UI_TOKEN;
+    const oldRelaySandboxId = process.env.RELAY_SANDBOX_ID;
+    const oldSandboxId = process.env.SANDBOX_ID;
+    const workspace = mkdtempSync(join(tmpdir(), "relay-tui-explicit-sandbox-"));
+    const bodies: unknown[] = [];
+    const authorizationHeaders: string[] = [];
+    process.env.RELAY_WORKSPACE = workspace;
+    process.env.RELAY_EMPLOYEE_ID = "admin";
+    process.env.RELAY_DAEMON_NODE_TOKEN = "tok_bob";
+    process.env.RELAY_SANDBOX_ID = "sbx_bob";
+    delete process.env.RELAY_DAEMON_UI_TOKEN;
+    delete process.env.SANDBOX_ID;
+    globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
+      if (init?.body) bodies.push(JSON.parse(String(init.body)));
+      authorizationHeaders.push(String(new Headers(init?.headers).get("authorization") ?? ""));
+      if (String(url) === "http://127.0.0.1:8790/daemon-nodes") {
+        return new Response(JSON.stringify({ nodes: [] }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      if (String(url) === "http://127.0.0.1:8790/sandboxes" && init?.method === "POST") {
+        return new Response(JSON.stringify({
+          id: "sbx_bob",
+          employeeId: "bob",
+          workspacePath: workspace,
+          status: "ready",
+          agents: { claude: "ready", pi: "ready", codex: "ready" },
+          createdAt: "2026-06-07T00:00:00.000Z",
+          updatedAt: "2026-06-07T00:00:01.000Z",
+        }), { status: 201, headers: { "Content-Type": "application/json" } });
+      }
+      return new Response(JSON.stringify({ error: "unexpected request" }), { status: 500, headers: { "Content-Type": "application/json" } });
+    }) as typeof fetch;
+    try {
+      const { lastFrame, unmount } = render(<RelayTuiHost onExit={() => undefined} />);
+      await new Promise((resolve) => setTimeout(resolve, 250));
+
+      assert.match(lastFrame() ?? "", /Host daemon ready/);
+      assert.match(lastFrame() ?? "", /Sandbox sbx_bob assigned/);
+      assert.ok(bodies.some((body) =>
+        typeof body === "object" &&
+        body !== null &&
+        (body as { employeeId?: string; nodeToken?: string; sandboxId?: string }).employeeId === "admin" &&
+        (body as { nodeToken?: string }).nodeToken === "tok_bob" &&
+        (body as { sandboxId?: string }).sandboxId === "sbx_bob"
+      ));
+      assert.ok(authorizationHeaders.includes("Bearer tok_bob"));
+      unmount();
+    } finally {
+      globalThis.fetch = oldFetch;
+      if (oldWorkspace === undefined) {
+        delete process.env.RELAY_WORKSPACE;
+      } else {
+        process.env.RELAY_WORKSPACE = oldWorkspace;
+      }
+      if (oldEmployeeId === undefined) {
+        delete process.env.RELAY_EMPLOYEE_ID;
+      } else {
+        process.env.RELAY_EMPLOYEE_ID = oldEmployeeId;
+      }
+      if (oldToken === undefined) {
+        delete process.env.RELAY_DAEMON_NODE_TOKEN;
+      } else {
+        process.env.RELAY_DAEMON_NODE_TOKEN = oldToken;
+      }
+      if (oldUiToken === undefined) {
+        delete process.env.RELAY_DAEMON_UI_TOKEN;
+      } else {
+        process.env.RELAY_DAEMON_UI_TOKEN = oldUiToken;
+      }
+      if (oldRelaySandboxId === undefined) {
+        delete process.env.RELAY_SANDBOX_ID;
+      } else {
+        process.env.RELAY_SANDBOX_ID = oldRelaySandboxId;
+      }
+      if (oldSandboxId === undefined) {
+        delete process.env.SANDBOX_ID;
+      } else {
+        process.env.SANDBOX_ID = oldSandboxId;
       }
     }
   });

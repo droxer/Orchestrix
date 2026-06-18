@@ -657,7 +657,8 @@ class ServerDaemonNodeBackend:
         self.registry = registry
 
     def provision(self, input: dict[str, Any]) -> dict[str, Any]:
-        existing = self.registry.find_by_employee(input["employeeId"], input.get("workspacePath"))
+        requested_sandbox_id = input.get("sandboxId")
+        existing = self.registry.get(requested_sandbox_id) if requested_sandbox_id else self.registry.find_by_employee(input["employeeId"], input.get("workspacePath"))
         if existing:
             if input.get("actorEmployeeId"):
                 return existing
@@ -666,9 +667,10 @@ class ServerDaemonNodeBackend:
                 return existing
             node_error = sandbox_node_auth_error(existing, input.get("nodeToken"))
             if not node_error and input.get("token"):
+                employee_id = existing.get("employeeId") or input["employeeId"]
                 return self.registry.register({
                     "sandboxId": existing["id"],
-                    "employeeId": existing["employeeId"],
+                    "employeeId": employee_id,
                     "token": input.get("nodeToken", ""),
                     "workspacePath": existing.get("workspacePath"),
                     "protocolVersion": DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS[0],
@@ -680,7 +682,7 @@ class ServerDaemonNodeBackend:
             raise PermissionError("Sandbox token is required.")
         if not input.get("nodeToken"):
             raise PermissionError("Daemon node token is required.")
-        sandbox_id = new_sandbox_id(input["employeeId"])
+        sandbox_id = requested_sandbox_id or new_sandbox_id(input["employeeId"])
         now = now_iso()
         sandbox = {
             "id": sandbox_id,

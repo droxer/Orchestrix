@@ -51,6 +51,7 @@ async def provision_sandbox(request: Request, ctx: AppContextDep) -> dict[str, A
     try:
         sandbox = ctx.backend.provision({
             "employeeId": employee_id,
+            "sandboxId": string_field(body, "sandboxId") or None,
             "workspacePath": string_field(body, "workspacePath") or None,
             "token": bearer_token(request),
             "nodeToken": string_field(body, "nodeToken") or None,

@@ -5,8 +5,38 @@ from tempfile import TemporaryDirectory
 
 import pytest
 
-from relay.daemon import DaemonNodeRegistry, ServerDaemonNodeBackend
+from relay.daemon import DaemonNodeRegistry, ServerDaemonNodeBackend, sandbox_ui_token_matches
 from relay.stores import DatabaseDaemonStore, LocalDaemonStore, LocalSessionStore
+
+
+def test_explicit_sandbox_provision_targets_requested_node() -> None:
+    with TemporaryDirectory() as root:
+        session_store = LocalSessionStore(root)
+        daemon_store = LocalDaemonStore(root)
+        registry = DaemonNodeRegistry(session_store, daemon_store)
+        backend = ServerDaemonNodeBackend(registry)
+        registry.register({
+            "sandboxId": "sbx_bob",
+            "employeeId": "bob",
+            "token": "node_token",
+            "workspacePath": "/workspace/bob",
+            "protocolVersion": 1,
+            "supportedAgents": ["claude"],
+            "status": "ready",
+        }, "old_ui_token")
+
+        sandbox = backend.provision({
+            "employeeId": "admin",
+            "sandboxId": "sbx_bob",
+            "workspacePath": "/workspace/admin",
+            "token": "new_ui_token",
+            "nodeToken": "node_token",
+        })
+
+        assert sandbox["id"] == "sbx_bob"
+        assert sandbox["employeeId"] == "bob"
+        assert sandbox["status"] == "ready"
+        assert sandbox_ui_token_matches(registry.get("sbx_bob") or {}, "new_ui_token")
 
 
 def test_daemon_registration_poll_and_completion_updates_session() -> None:

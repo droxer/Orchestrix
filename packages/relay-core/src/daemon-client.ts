@@ -28,6 +28,7 @@ export interface RelayDaemonClientOptions {
 export interface ProvisionSandboxInput {
   employeeId: string;
   workspacePath?: string;
+  sandboxId?: string;
 }
 
 export interface RunSandboxInput {

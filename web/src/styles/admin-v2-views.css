@@ -7,9 +7,18 @@
   overflow: hidden;
 }
 
+.adm-content--solo {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .adm-content-main {
   overflow-y: auto;
   padding: var(--space-xl) var(--space-xxl);
+  min-width: 0;
+}
+
+.adm-content-main:has(> .adm-dash) {
+  padding: 0;
 }
 
 .adm-view {

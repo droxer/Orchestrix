@@ -241,7 +241,7 @@ export function AdminConsole() {
           queued={metrics.queued}
         />
 
-        <div className="adm-content">
+        <div className={`adm-content${view === "fleet" ? "" : " adm-content--solo"}`}>
           <div className="adm-content-main">
             {view === "dashboard" ? (
               <DashboardView nodes={nodes} employees={employees} metrics={metrics} />
