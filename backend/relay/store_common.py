@@ -72,6 +72,19 @@ def relay_task_event(event_type: str, task_id: str, payload: dict[str, Any]) -> 
     return {"id": new_relay_id("evt"), "type": event_type, "taskId": task_id, "timestamp": now_iso(), **payload}
 
 
+def merge_token_usage(values: list[dict[str, Any] | None]) -> dict[str, int] | None:
+    totals = {"input": 0, "output": 0, "cache": 0}
+    for value in values:
+        if not isinstance(value, dict):
+            continue
+        totals["input"] += int(value.get("input") or 0)
+        totals["output"] += int(value.get("output") or 0)
+        totals["cache"] += int(value.get("cache") or 0)
+    if totals["input"] == 0 and totals["output"] == 0 and totals["cache"] == 0:
+        return None
+    return {**totals, "total": totals["input"] + totals["output"] + totals["cache"]}
+
+
 def materialize_events(events: list[dict[str, Any]]) -> dict[str, Any]:
     created = next((event for event in events if event.get("type") == "session.created"), None)
     if not created:
@@ -125,6 +138,13 @@ def materialize_events(events: list[dict[str, Any]]) -> dict[str, Any]:
                     run["status"] = event["status"]
                     run["completedAt"] = event["timestamp"]
                     run["exitCode"] = event["exitCode"]
+                    if event.get("tokenUsage"):
+                        run["tokenUsage"] = event["tokenUsage"]
+            token_usage = merge_token_usage([run.get("tokenUsage") for run in session["agentRuns"]])
+            if token_usage:
+                session["tokenUsage"] = token_usage
+            else:
+                session.pop("tokenUsage", None)
             session.pop("currentAgent", None)
             session["phase"] = "agent_completed" if event["status"] == "completed" else "cancelled" if event["status"] == "cancelled" else "agent_failed"
         elif event_type == "artifact.created":

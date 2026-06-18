@@ -86,6 +86,7 @@ export class PiStreamRenderer {
   private readonly text = new BlockStreamRenderer(TEXT_MARK, ansi.yellow);
   private readonly plain = new PlainTextStreamRenderer("Pi", ansi.yellow);
   private readonly lines = new JsonLineRenderer((line) => this.formatLine(line));
+  private sawAssistantTextInTurn = false;
 
   feed(chunk: string): string {
     return this.lines.feed(chunk);
@@ -95,16 +96,32 @@ export class PiStreamRenderer {
     const event = parseJsonObject(line);
     if (!event) return this.plain.feed(`${sanitizeUntrustedText(line)}\n`);
 
-    const text = piAssistantText(event).trim();
-    if (text) {
+    if (event.type === "turn_start") {
+      this.sawAssistantTextInTurn = false;
+      return "";
+    }
+    if (event.type === "message_start" && asRecord(event.message).role === "assistant") {
       this.text.resetBlock();
-      return this.text.feed(`${text}\n`);
+      return "";
+    }
+
+    const delta = piAssistantTextDelta(event);
+    if (delta.trim()) {
+      this.sawAssistantTextInTurn = true;
+      return this.text.feed(sanitizeUntrustedText(delta));
+    }
+
+    const text = piAssistantText(event);
+    if (text.trim()) {
+      this.sawAssistantTextInTurn = true;
+      this.text.resetBlock();
+      return this.text.feed(`${text.trim()}\n`);
     }
 
     if (event.type === "error") {
       return `\n${status("error", `Pi error: ${String(event.message ?? "unknown error")}`)}\n`;
     }
-    const piStatus = piStatusMessage(event);
+    const piStatus = piStatusMessage(event, this.sawAssistantTextInTurn);
     if (piStatus) return `\n${piStatus}\n`;
     return "";
   }
@@ -298,7 +315,16 @@ function piAssistantText(event: Record<string, unknown>): string {
   return textFromContentRecord(message);
 }
 
-function piStatusMessage(event: Record<string, unknown>): string {
+function piAssistantTextDelta(event: Record<string, unknown>): string {
+  if (event.type !== "message_update") return "";
+  const message = asRecord(event.message);
+  if (message.role !== "assistant") return "";
+  const assistantEvent = asRecord(event.assistantMessageEvent);
+  if (assistantEvent.type !== "text_delta") return "";
+  return typeof assistantEvent.delta === "string" ? assistantEvent.delta : "";
+}
+
+function piStatusMessage(event: Record<string, unknown>, sawAssistantTextInTurn = false): string {
   if (event.type === "auto_retry_end" && event.success === false) {
     return status("error", `Pi error: ${String(event.finalError ?? "unknown error")}`);
   }
@@ -309,6 +335,7 @@ function piStatusMessage(event: Record<string, unknown>): string {
   if (errorMessage || message.stopReason === "error") {
     return status("error", `Pi error: ${String(errorMessage ?? "unknown error")}`);
   }
+  if (sawAssistantTextInTurn) return "";
   const content = message.content;
   if (Array.isArray(content) && content.length === 0 && message.stopReason === "stop") {
     return status("warn", "Pi returned no assistant text.");

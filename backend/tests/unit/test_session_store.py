@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from tempfile import TemporaryDirectory
 
+from sqlalchemy import text
+
 from relay.stores import DatabaseSessionStore, LocalSessionStore, relay_event
 
 
@@ -41,8 +43,26 @@ def test_database_session_store_persists_events_and_artifacts() -> None:
         }))
         artifact = store.write_artifact(session["id"], {"kind": "review", "title": "Agent review", "body": "Looks good.", "extension": "md"})
         updated = store.append_event(session["id"], relay_event("artifact.created", session["id"], {"artifact": artifact}))
+        store.append_event(session["id"], relay_event("agent.started", session["id"], {
+            "runId": "run_1",
+            "agent": "codex",
+            "role": "fixer",
+            "mode": "implement",
+        }))
+        store.append_event(session["id"], relay_event("agent.completed", session["id"], {
+            "runId": "run_1",
+            "agent": "codex",
+            "status": "completed",
+            "exitCode": 0,
+            "tokenUsage": {"input": 4, "output": 5, "cache": 1, "total": 10, "source": "codex"},
+        }))
 
         assert updated["events"][0]["type"] == "session.created"
         assert store.get_session(session["id"])["decisions"][0]["kind"] == "approve"
         assert store.list_sessions()[0]["id"] == session["id"]
         assert store.read_artifact(session["id"], artifact["id"]) == "Looks good."
+        assert store.list_token_usage()[0]["total"] == 10
+        with store.engine.begin() as conn:
+            row = conn.execute(text("select session_public_id, total_tokens from session_token_usage")).mappings().one()
+        assert row["session_public_id"] == session["id"]
+        assert row["total_tokens"] == 10

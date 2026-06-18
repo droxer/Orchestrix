@@ -5,10 +5,11 @@ import test, { type TestContext } from "node:test";
 
 import {
   runRelayDaemon,
+  runRelayDaemonDoctor,
   type DaemonExecutionEnvironment,
   type DaemonLogger,
 } from "../src/index.js";
-import type { DaemonNodeCommand, DaemonNodeEvent, StreamExecResult } from "relay-core";
+import type { DaemonNodeCommand, DaemonNodeEvent, DaemonNodeRegistration, StreamExecResult } from "relay-core";
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -101,6 +102,74 @@ test("relay daemon ignores duplicate run.start commands already active", async (
 
   assert.equal(execCount, 1);
   assert.equal(events.filter((event) => event.type === "run.completed").length, 1);
+});
+
+test("relay daemon advertises only agents with passing capability preflight", async () => {
+  const stop = new AbortController();
+  const registrations: DaemonNodeRegistration[] = [];
+  const daemon = runRelayDaemon({
+    backendUrl: "http://relay.test",
+    sandboxId: "sbx_test",
+    employeeId: "alice",
+    workspacePath: process.cwd(),
+    token: "node_token",
+    pollIntervalMs: 5,
+    shutdownGraceMs: 50,
+    logger: testLogger(),
+    signal: stop.signal,
+    environment: fakeEnvironment({
+      ensure: async (agent) => {
+        if (agent === "kimi") throw new Error("Kimi is not logged in.");
+      },
+    }),
+    fetchFn: async (url, init) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/daemon-nodes/register") {
+        registrations.push(await jsonBody<DaemonNodeRegistration>(init));
+        return jsonResponse({ ok: true });
+      }
+      if (path.endsWith("/commands")) {
+        stop.abort();
+        return jsonResponse({ commands: [] });
+      }
+      throw new Error(`unexpected URL ${url}`);
+    },
+  });
+
+  await daemon;
+
+  assert.equal(registrations[0].supportedAgents.includes("codex"), true);
+  assert.equal(registrations[0].supportedAgents.includes("kimi"), false);
+  assert.equal(registrations[0].agentHealth?.kimi?.status, "failed");
+  assert.match(registrations[0].agentHealth?.kimi?.detail ?? "", /not logged in/);
+});
+
+test("relay daemon doctor reports per-agent preflight failures", async () => {
+  const report = await runRelayDaemonDoctor({
+    backendUrl: "http://relay.test",
+    sandboxId: "sbx_test",
+    employeeId: "alice",
+    workspacePath: process.cwd(),
+    token: "node_token",
+    logger: testLogger(),
+    environment: fakeEnvironment({
+      ensure: async (agent) => {
+        if (agent === "codex") throw new Error("Codex auth missing.");
+      },
+    }),
+    fetchFn: async (url) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/daemon-nodes/register") return jsonResponse({ ok: true });
+      throw new Error(`unexpected URL ${url}`);
+    },
+  });
+
+  assert.equal(report.ok, false);
+  const codex = report.checks.find((check) => check.name === "agent:codex");
+  assert.equal(codex?.ok, false);
+  assert.match(codex?.detail ?? "", /auth missing/);
 });
 
 test("relay daemon retries terminal event posts across backend failures", async () => {

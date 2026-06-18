@@ -1,21 +1,25 @@
-export interface TokenUsageSnapshot {
-  available: boolean;
-  totalInput: number;
-  totalOutput: number;
-  totalCache: number;
-  daily: Array<{ date: string; input: number; output: number; cache: number }>;
-}
+import { useQuery } from "@tanstack/react-query";
+import { getDashboardTokens, type TokenUsageSnapshot } from "../api";
 
-// Token-usage tracking is not yet wired into the backend. This hook returns a
-// stable zero snapshot so the dashboard surfaces the empty state until the
-// `/cp/dashboard/tokens` endpoint lands. Swap the body for a useQuery call at
-// that point — consumers don't change.
+export type { TokenUsageSnapshot };
+
+const KEY = ["admin", "dashboard", "tokens"] as const;
+const POLL_INTERVAL_MS = 10_000;
+
 export function useTokenUsage(): TokenUsageSnapshot {
-  return {
+  const query = useQuery<TokenUsageSnapshot>({
+    queryKey: KEY,
+    queryFn: ({ signal }) => getDashboardTokens(signal),
+    refetchInterval: POLL_INTERVAL_MS,
+  });
+  return query.data ?? {
     available: false,
     totalInput: 0,
     totalOutput: 0,
     totalCache: 0,
+    total: 0,
     daily: [],
+    byEmployee: [],
+    recentSessions: [],
   };
 }

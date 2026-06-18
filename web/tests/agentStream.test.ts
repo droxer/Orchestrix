@@ -21,6 +21,29 @@ describe("agent stream parsing", () => {
     ]);
   });
 
+  it("renders Pi JSON streaming text deltas without empty terminal warnings", () => {
+    const raw = [
+      JSON.stringify({ type: "turn_start" }),
+      JSON.stringify({ type: "message_start", message: { role: "assistant", content: [] } }),
+      JSON.stringify({
+        type: "message_update",
+        message: { role: "assistant", content: [] },
+        assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "Hi " },
+      }),
+      JSON.stringify({
+        type: "message_update",
+        message: { role: "assistant", content: [] },
+        assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "from Pi JSON." },
+      }),
+      JSON.stringify({ type: "message_end", message: { role: "assistant", content: [], stopReason: "stop" } }),
+      JSON.stringify({ type: "turn_end", message: { role: "assistant", content: [], stopReason: "stop" }, toolResults: [] }),
+    ].join("\n");
+
+    assert.deepEqual(parseAgentStream("pi", raw), [
+      { kind: "text", text: "Hi from Pi JSON." },
+    ]);
+  });
+
   it("renders Pi JSON empty assistant events as warning status", () => {
     const raw = JSON.stringify({
       type: "message_end",

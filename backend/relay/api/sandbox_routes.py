@@ -97,6 +97,8 @@ async def run_sandbox(sandbox_id: str, request: Request, ctx: AppContextDep) -> 
         return await ctx.backend.run(sandbox_id, parsed)
     except PermissionError as error:
         raise HTTPException(403, str(error))
+    except ValueError as error:
+        raise HTTPException(409, str(error))
 
 
 @router.post("/sandboxes/{sandbox_id}/runs/{session_id}/cancel", status_code=202)

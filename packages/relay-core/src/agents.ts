@@ -110,7 +110,7 @@ export const AGENT_REGISTRY: Record<AgentName, AgentDefinition> = {
     implementLabel: "Kimi",
     reviewLabel: "Kimi Review",
     needsGuestAuth: true,
-    preflight: { label: "Kimi", command: () => runAsAgent("kimi --version", "kimi") },
+    preflight: { label: "Kimi", command: () => runAsAgent("kimi --version && kimi doctor", "kimi") },
   },
 };
 

@@ -110,10 +110,10 @@ export function buildKimiReviewCommand(state: AgentState): string {
 }
 
 function buildKimiCommand(prompt: string): string {
-  const argv = ["stdbuf", "-oL", "-eL", "kimi", "-p"];
+  const argv = ["kimi"];
   const model = kimiModel();
   if (model) argv.push("--model", model);
-  argv.push(prompt);
+  argv.push("--prompt", prompt);
   return runAsAgent(shellCommand(argv), "kimi");
 }
 

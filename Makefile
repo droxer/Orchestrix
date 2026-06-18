@@ -108,7 +108,7 @@ web-run:
 web-test:
 	npm run build -w relay-core
 	./node_modules/.bin/tsc -p packages/tsconfig.json
-	node --test dist/web/tests/status.test.js
+	node --test dist/web/tests/status.test.js dist/web/tests/messageBlock.test.js
 
 web: web-run
 

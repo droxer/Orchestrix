@@ -41,6 +41,8 @@
     "remove": "Remove @{{id}}",
     "remove_confirm": "Remove @{{id}} from This Browser?",
     "agent_running_aria": "Agent Running",
+    "tokens_short": "tok",
+    "token_usage_title": "Input {{input}} · Output {{output}} · Cache {{cache}}",
     "no_sessions": "—"
   },
   "composer": {
@@ -198,7 +200,7 @@
       "title_dashboard": "Dashboard",
       "title_people": "People",
       "title_fleet": "Fleet",
-      "sub_dashboard": "Fleet, People, Conversations, and Token Spend at a Glance.",
+      "sub_dashboard": "Fleet, People, Conversations, and Token Usage at a Glance.",
       "sub_people": "Employees and the Sandboxes They Own.",
       "sub_fleet": "Every Daemon Node Across the Workforce.",
       "dash_kpis_label": "Headline Numbers",
@@ -209,7 +211,7 @@
       "dash_kpi_sessions": "Conversations",
       "dash_kpi_sessions_delta": "{{count}} in 24h · {{diff}} vs prior",
       "dash_loading": "Loading…",
-      "dash_kpi_tokens": "Token Spend",
+      "dash_kpi_tokens": "Token Usage",
       "dash_kpi_tokens_hint": "Last 7 days",
       "dash_coming_soon_tag": "Coming Soon",
       "dash_sessions_eyebrow": "Conversations · 14d",
@@ -218,7 +220,11 @@
       "dash_tokens_eyebrow": "Tokens",
       "dash_tokens_title": "Token Usage",
       "dash_tokens_empty": "Token accounting lands when agent runs report usage on their session events.",
-      "dash_tokens_summary": "Input {{input}} · Output {{output}}",
+      "dash_tokens_summary": "Input {{input}} · Output {{output}} · Cache {{cache}}",
+      "dash_tokens_legend": "Token usage breakdown",
+      "dash_tokens_input": "Input",
+      "dash_tokens_output": "Output",
+      "dash_tokens_cache": "Cache",
       "dash_health_eyebrow": "Fleet Health",
       "dash_health_title": "Daemon Status Mix",
       "dash_health_ready": "Ready",
@@ -436,8 +442,25 @@
   },
   "artifact": {
     "kind": {
-      "default": "{{kind}}"
-    }
+      "default": "{{kind}}",
+      "plan": "Plan",
+      "diff": "Diff",
+      "review": "Review",
+      "test_output": "Test Output",
+      "summary": "Summary",
+      "agent_output": "Agent Output"
+    },
+    "open_raw": "Open Raw",
+    "show_preview": "Preview",
+    "hide_preview": "Hide",
+    "loading_preview": "Loading preview…",
+    "preview_error": "Could not load preview: {{message}}",
+    "preview_empty": "No artifact content.",
+    "preview_truncated": "Preview truncated. Open raw to inspect the full artifact.",
+    "size_unknown": "Size Unknown",
+    "size_bytes": "{{count}} B",
+    "size_kb": "{{count}} KB",
+    "size_mb": "{{count}} MB"
   },
   "agent_stream": {
     "thinking": "Thinking",

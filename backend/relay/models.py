@@ -58,6 +58,7 @@ class DaemonNodeRegistration(RelayModel):
     workspace_path: str | None = None
     protocol_version: int
     supported_agents: list[AgentName] = []
+    agent_health: dict[str, dict[str, Any]] | None = None
     status: Literal["ready", "busy", "stopped"] = "ready"
 
 

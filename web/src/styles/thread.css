@@ -372,6 +372,7 @@
 
 .conversation-meta-count {
   margin-left: auto;
+  flex: 0 0 auto;
   padding: 0 6px;
   border-radius: var(--radius-pill);
   background: var(--color-surface-strong);
@@ -384,6 +385,15 @@
 .conversation-row.active .conversation-meta-count {
   background: color-mix(in srgb, var(--color-primary) 14%, var(--color-canvas));
   color: var(--color-primary);
+}
+
+.conversation-meta-tokens {
+  flex: 0 0 auto;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-canvas));
+  color: var(--color-primary);
+  font-weight: 600;
 }
 
 .conversation-meta-sep {

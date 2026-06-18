@@ -84,6 +84,33 @@ def workspace_paths_match(left: str | None, right: str | None) -> bool:
     return bool(left and right and Path(left).resolve() == Path(right).resolve())
 
 
+def _string_metadata(value: Any, limit: int = 500) -> str | None:
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    return text[:limit] if text else None
+
+
+def agent_registration_state(input: dict[str, Any]) -> tuple[dict[str, str], dict[str, dict[str, str]]]:
+    supported = set(input.get("supportedAgents") or [])
+    raw_health = input.get("agentHealth") if isinstance(input.get("agentHealth"), dict) else {}
+    agents: dict[str, str] = {}
+    details: dict[str, dict[str, str]] = {}
+    for agent in AGENT_NAMES:
+        raw = raw_health.get(agent) if isinstance(raw_health, dict) else None
+        status = raw.get("status") if isinstance(raw, dict) else None
+        agents[agent] = "failed" if status == "failed" else "ready" if status == "ready" or agent in supported else "unknown"
+        if isinstance(raw, dict):
+            detail: dict[str, str] = {}
+            for key in ("detail", "version", "adapter"):
+                value = _string_metadata(raw.get(key))
+                if value:
+                    detail[key] = value
+            if detail:
+                details[agent] = detail
+    return agents, details
+
+
 class DaemonNodeRegistry:
     def __init__(
         self,
@@ -116,13 +143,14 @@ class DaemonNodeRegistry:
             raise PermissionError(f"Daemon node registration for {input['sandboxId']} does not match the provisioned employee.")
         employee_id = (existing or {}).get("employeeId") or input.get("employeeId")
         next_ui_hash = hash_daemon_node_token(ui_token) if ui_token else (existing or {}).get("uiTokenHash") or (existing or {}).get("tokenHash")
-        supported = set(input.get("supportedAgents") or [])
+        agents, agent_details = agent_registration_state(input)
         sandbox = {
             "id": input["sandboxId"],
             **({"employeeId": employee_id} if employee_id else {}),
             **({"workspacePath": input["workspacePath"]} if input.get("workspacePath") else {}),
             "status": "running" if input.get("status") == "busy" else "stopped" if input.get("status") == "stopped" else "ready",
-            "agents": {agent: "ready" if agent in supported else "unknown" for agent in AGENT_NAMES},
+            "agents": agents,
+            **({"agentDetails": agent_details} if agent_details else {}),
             "token": None,
             "tokenHash": next_ui_hash,
             "uiTokenHash": next_ui_hash,
@@ -509,6 +537,7 @@ class DaemonNodeRegistry:
             "agentLog": agent_log,
             "reviewVerdict": event.get("reviewVerdict", ""),
             "reviewFeedback": event.get("reviewFeedback", ""),
+            "tokenUsage": event.get("tokenUsage"),
         })
         if is_review_assignment(mode) and event.get("reviewVerdict") != "approved":
             outcome = f"{assignment['agent']} rejected the work." if event.get("reviewVerdict") == "rejected" else f"{assignment['agent']} review did not approve the work."
@@ -732,6 +761,10 @@ class ServerDaemonNodeBackend:
             raise ValueError(f"Sandbox {sandbox_id} daemon node is not ready.")
         if not self.registry.is_live(sandbox_id):
             raise ValueError(f"Sandbox {sandbox_id} daemon node heartbeat expired.")
+        unavailable = [assignment["agent"] for assignment in request["assignments"] if sandbox.get("agents", {}).get(assignment["agent"]) != "ready"]
+        if unavailable:
+            detail = ", ".join(dict.fromkeys(unavailable))
+            raise ValueError(f"Sandbox {sandbox_id} daemon node does not have ready agent(s): {detail}.")
         actor_employee_id = request.get("actorEmployeeId")
         owner_employee_id = actor_employee_id or sandbox["employeeId"]
         if request.get("sessionId"):

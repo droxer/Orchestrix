@@ -5,11 +5,12 @@ from pathlib import Path
 from typing import Any
 
 from loguru import logger
-from sqlalchemy import BigInteger, JSON, Column, DateTime, ForeignKey, MetaData, Table, Text, Uuid, create_engine, insert, select, update
+from sqlalchemy import BigInteger, JSON, Column, DateTime, ForeignKey, MetaData, Table, Text, Uuid, create_engine, delete, insert, select, update
 
 from .store_common import (
     DEFAULT_RELAY_DATA_DIR,
     _append_jsonl,
+    _format_iso,
     _parse_iso,
     _read_json,
     _read_jsonl,
@@ -157,6 +158,19 @@ class DatabaseSessionStore:
         Column("metadata", JSON, nullable=False),
         Column("created_at", DateTime(timezone=True), nullable=False),
     )
+    token_usage = Table(
+        "session_token_usage",
+        metadata,
+        database_id_column(),
+        Column("session_id", Uuid(as_uuid=False), ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False, unique=True),
+        Column("session_public_id", Text, nullable=False, unique=True),
+        Column("owner_employee_id", Text, nullable=True),
+        Column("input_tokens", BigInteger, nullable=False),
+        Column("output_tokens", BigInteger, nullable=False),
+        Column("cache_tokens", BigInteger, nullable=False),
+        Column("total_tokens", BigInteger, nullable=False),
+        Column("updated_at", DateTime(timezone=True), nullable=False),
+    )
 
     def __init__(self, database_url: str, root_dir: str | Path = DEFAULT_RELAY_DATA_DIR, *, create_schema: bool = False):
         self.engine = create_engine(database_url, future=True)
@@ -199,6 +213,7 @@ class DatabaseSessionStore:
             conn.execute(insert(self.events).values(**session_event_to_row(session_pk, sequence, event)))
             session = materialize_events([*events, event])
             conn.execute(update(self.sessions).where(self.sessions.c.id == session_pk).values(**session_to_row(session, version=sequence + 1, database_id=session_pk)))
+            self._sync_token_usage(conn, session_pk, session)
         logger.debug("Database session event appended", session_id=session_id, event_type=event.get("type"))
         return session
 
@@ -213,6 +228,22 @@ class DatabaseSessionStore:
         with self.engine.begin() as conn:
             rows = conn.execute(select(self.sessions.c.snapshot).order_by(self.sessions.c.updated_at.desc())).mappings().all()
         return [row["snapshot"] for row in rows]
+
+    def list_token_usage(self) -> list[dict[str, Any]]:
+        with self.engine.begin() as conn:
+            rows = conn.execute(select(self.token_usage).order_by(self.token_usage.c.updated_at.desc())).mappings().all()
+        return [
+            {
+                "sessionId": row["session_public_id"],
+                "ownerEmployeeId": row["owner_employee_id"],
+                "input": int(row["input_tokens"] or 0),
+                "output": int(row["output_tokens"] or 0),
+                "cache": int(row["cache_tokens"] or 0),
+                "total": int(row["total_tokens"] or 0),
+                "updatedAt": _format_iso(row["updated_at"]),
+            }
+            for row in rows
+        ]
 
     def write_artifact(self, session_id: str, input: dict[str, Any]) -> dict[str, Any]:
         if not self.get_session(session_id):
@@ -271,6 +302,17 @@ class DatabaseSessionStore:
         ).mappings().all()
         return [row["payload"] for row in rows]
 
+    def _sync_token_usage(self, conn: Any, session_pk: str, session: dict[str, Any]) -> None:
+        row = session_token_usage_to_row(session_pk, session)
+        existing_id = conn.scalar(select(self.token_usage.c.id).where(self.token_usage.c.session_id == session_pk))
+        if row:
+            if existing_id:
+                conn.execute(update(self.token_usage).where(self.token_usage.c.id == existing_id).values({**row, "id": existing_id}))
+            else:
+                conn.execute(insert(self.token_usage).values(**row))
+        elif existing_id:
+            conn.execute(delete(self.token_usage).where(self.token_usage.c.id == existing_id))
+
 
 
 def session_to_row(session: dict[str, Any], *, version: int, database_id: str | None = None) -> dict[str, Any]:
@@ -319,4 +361,21 @@ def session_artifact_to_row(session_pk: str, artifact: dict[str, Any], metadata:
         "byte_size": artifact.get("bytes", 0),
         "metadata": metadata or {},
         "created_at": _parse_iso(artifact["createdAt"]),
+    }
+
+
+def session_token_usage_to_row(session_pk: str, session: dict[str, Any]) -> dict[str, Any] | None:
+    usage = session.get("tokenUsage")
+    if not isinstance(usage, dict) or not int(usage.get("total") or 0):
+        return None
+    return {
+        "id": new_database_id(),
+        "session_id": session_pk,
+        "session_public_id": session["id"],
+        "owner_employee_id": session.get("ownerEmployeeId"),
+        "input_tokens": int(usage.get("input") or 0),
+        "output_tokens": int(usage.get("output") or 0),
+        "cache_tokens": int(usage.get("cache") or 0),
+        "total_tokens": int(usage.get("total") or 0),
+        "updated_at": _parse_iso(session["updatedAt"]),
     }

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import mimetypes
 import os
 import shlex
@@ -32,6 +33,34 @@ def bearer_token(request: Request) -> str | None:
 def string_field(value: dict[str, Any], key: str) -> str:
     field = value.get(key)
     return field.strip() if isinstance(field, str) else ""
+
+
+def token_usage_field(value: dict[str, Any], key: str = "tokenUsage") -> dict[str, Any] | None:
+    raw = value.get(key)
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise ValueError("tokenUsage must be an object.")
+    usage = {
+        "input": token_count_field(raw, "input"),
+        "output": token_count_field(raw, "output"),
+        "cache": token_count_field(raw, "cache"),
+    }
+    usage["total"] = usage["input"] + usage["output"] + usage["cache"]
+    if usage["total"] == 0:
+        raise ValueError("tokenUsage must include at least one reported count.")
+    if "total" in raw and token_count_field(raw, "total") != usage["total"]:
+        raise ValueError("tokenUsage total must equal input + output + cache.")
+    if isinstance(raw.get("source"), str) and raw["source"].strip():
+        usage["source"] = raw["source"].strip()
+    return usage
+
+
+def token_count_field(value: dict[str, Any], key: str) -> int:
+    raw = value.get(key, 0)
+    if isinstance(raw, bool) or not isinstance(raw, (int, float)) or not math.isfinite(raw) or raw < 0:
+        raise ValueError(f"tokenUsage.{key} must be a non-negative finite number.")
+    return int(raw)
 
 
 def employee_record(auth_store: Any, employee_id: str) -> dict[str, Any] | None:
@@ -241,6 +270,7 @@ def daemon_node_event(value: dict[str, Any]) -> dict[str, Any]:
         verdict = value.get("reviewVerdict", "")
         if verdict not in ("approved", "rejected", "failed", ""):
             raise ValueError(f"invalid reviewVerdict {verdict}.")
+        token_usage = token_usage_field(value)
         return {
             "type": event_type,
             "commandId": command_id,
@@ -252,6 +282,7 @@ def daemon_node_event(value: dict[str, Any]) -> dict[str, Any]:
             "agentLog": string_field(value, "agentLog"),
             "reviewVerdict": verdict,
             "reviewFeedback": string_field(value, "reviewFeedback"),
+            **({"tokenUsage": token_usage} if token_usage else {}),
         }
     if event_type == "run.failed":
         return {

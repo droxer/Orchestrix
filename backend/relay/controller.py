@@ -219,7 +219,7 @@ class SessionController:
 
     def record_agent_completed(self, session_id: str, state: dict[str, Any], input: dict[str, Any]) -> dict[str, Any]:
         logger.info("Agent run completed", session_id=session_id, run_id=input["runId"], agent=input["agent"], mode=input["mode"], status=input["status"], exit_code=input["exitCode"])
-        state_patch = {"agent_logs": [input.get("agentLog", "")], "last_exit_code": input["exitCode"]}
+        state_patch = {"agent_logs": [input.get("agentLog", "")], "last_exit_code": input["exitCode"], "token_usage": input.get("tokenUsage")}
         if is_review_assignment(input["mode"]):
             state_patch["review_verdict"] = input.get("reviewVerdict", "")
             state_patch["review_feedback"] = input.get("reviewFeedback", "")
@@ -229,12 +229,15 @@ class SessionController:
             "body": input.get("agentLog", ""),
             "agentRunId": input["runId"],
         })
-        self._append(session_id, relay_event("agent.completed", session_id, {
+        completed_payload = {
             "runId": input["runId"],
             "agent": input["agent"],
             "status": input["status"],
             "exitCode": input["exitCode"],
-        }))
+        }
+        if input.get("tokenUsage"):
+            completed_payload["tokenUsage"] = input["tokenUsage"]
+        self._append(session_id, relay_event("agent.completed", session_id, completed_payload))
         if input["status"] == "failed":
             self._update_task_status("blocked", f"{input['agent']} {input['mode']} failed with exit code {input['exitCode']}.", {
                 "agent": input["agent"],

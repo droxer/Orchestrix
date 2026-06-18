@@ -32,6 +32,7 @@ import { useAuthSession } from "./hooks/useAuthSession";
 import { useComposer } from "./hooks/useComposer";
 import { useActiveSession } from "./hooks/useActiveSession";
 import { chooseSendAction } from "./lib/sendAction";
+import { sessionTokenUsage } from "./lib/tokenUsage";
 import { useEmployeeProvisioning } from "./hooks/useEmployeeProvisioning";
 import { SideNav } from "./components/SideNav";
 import { ThreadPanel } from "./components/ThreadPanel";
@@ -167,7 +168,7 @@ export function App() {
     }
     for (const c of byId.values()) {
       const rel = sessions.filter((s) => sessionBelongsToEmployee(s, c.id, c.sandbox, c.node));
-      c.sessionCount = rel.length; c.lastSession = rel[0];
+      c.sessionCount = rel.length; c.lastSession = rel[0]; c.tokenUsage = sessionTokenUsage(rel);
     }
     return [...byId.values()].sort((a, b) => {
       if (a.id === selectedEmployee) return -1;

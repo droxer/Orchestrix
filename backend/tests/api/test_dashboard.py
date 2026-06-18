@@ -5,6 +5,7 @@ from tempfile import TemporaryDirectory
 from fastapi.testclient import TestClient
 
 from relay.app import create_app
+from relay.stores import relay_event
 
 
 def _bootstrap(client: TestClient) -> None:
@@ -60,3 +61,36 @@ def test_dashboard_activity_returns_recent_items(monkeypatch) -> None:
         assert len(body["items"]) >= 1
         first = body["items"][0]
         assert {"kind", "timestamp", "message"} <= set(first)
+
+
+def test_dashboard_tokens_returns_reported_usage(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap(client)
+        session_id = _create_session(client)
+        app.state.session_store.append_event(session_id, relay_event("agent.started", session_id, {
+            "runId": "run_1",
+            "agent": "codex",
+            "role": "fixer",
+            "mode": "implement",
+        }))
+        app.state.session_store.append_event(session_id, relay_event("agent.completed", session_id, {
+            "runId": "run_1",
+            "agent": "codex",
+            "status": "completed",
+            "exitCode": 0,
+            "tokenUsage": {"input": 10, "output": 5, "cache": 2, "total": 17, "source": "codex"},
+        }))
+
+        response = client.get("/cp/dashboard/tokens")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["available"] is True
+        assert body["totalInput"] == 10
+        assert body["totalOutput"] == 5
+        assert body["totalCache"] == 2
+        assert body["total"] == 17
+        assert len(body["daily"]) == 14
+        assert body["recentSessions"][0]["sessionId"] == session_id

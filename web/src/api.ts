@@ -171,6 +171,22 @@ export function listSessions(signal?: AbortSignal): Promise<SessionsResponse> {
   return apiJson<SessionsResponse>("/sessions", { signal });
 }
 
+export async function readArtifactText(
+  sessionId: string,
+  artifactId: string,
+  signal?: AbortSignal,
+): Promise<string> {
+  const response = await fetch(
+    `/sessions/${encodeURIComponent(sessionId)}/artifacts/${encodeURIComponent(artifactId)}`,
+    { credentials: "include", signal },
+  );
+  const text = await response.text();
+  if (!response.ok) {
+    throw new RelayApiError(text.trim() || response.statusText, response.status);
+  }
+  return text;
+}
+
 export interface DashboardSessionsResponse {
   total: number;
   last24h: number;
@@ -189,12 +205,27 @@ export interface DashboardActivityItem {
   message: string;
 }
 
+export interface TokenUsageSnapshot {
+  available: boolean;
+  totalInput: number;
+  totalOutput: number;
+  totalCache: number;
+  total: number;
+  daily: Array<{ date: string; input: number; output: number; cache: number; total: number }>;
+  byEmployee: Array<{ employeeId: string; input: number; output: number; cache: number; total: number; sessionCount: number }>;
+  recentSessions: Array<{ sessionId: string; employeeId?: string | null; taskGoal?: string; updatedAt?: string; input: number; output: number; cache: number; total: number }>;
+}
+
 export function getDashboardSessions(signal?: AbortSignal): Promise<DashboardSessionsResponse> {
   return apiJson<DashboardSessionsResponse>("/cp/dashboard/sessions", { signal });
 }
 
 export function getDashboardActivity(signal?: AbortSignal): Promise<{ items: DashboardActivityItem[] }> {
   return apiJson<{ items: DashboardActivityItem[] }>("/cp/dashboard/activity?limit=20", { signal });
+}
+
+export function getDashboardTokens(signal?: AbortSignal): Promise<TokenUsageSnapshot> {
+  return apiJson<TokenUsageSnapshot>("/cp/dashboard/tokens", { signal });
 }
 
 export function provisionSandbox(employeeId: string, token?: string, nodeToken?: string): Promise<SandboxRecord> {

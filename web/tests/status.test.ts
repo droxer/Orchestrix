@@ -97,12 +97,14 @@ describe("Relay web conversation status", () => {
       online: true,
       stale: false,
       lastSeenAt: "2026-06-12T00:00:03.000Z",
+      agentDetails: { kimi: { detail: "Kimi is not logged in.", adapter: "cli" } },
     });
 
     const [visibleNode] = mergeVisibleDaemonNodes([staleAuthenticatedNode], [liveControlPanelNode]);
 
     assert.equal(visibleNode.id, "sbx_alice_live");
     assert.equal(visibleNode.online, true);
+    assert.equal(visibleNode.agentDetails?.kimi?.detail, "Kimi is not logged in.");
     assert.equal(conversationDaemonStatus({ node: visibleNode }), "ready");
     assert.equal("nodeToken" in visibleNode, false);
   });

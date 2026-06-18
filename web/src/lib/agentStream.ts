@@ -269,6 +269,8 @@ function parseCodex(raw: string): AgentSegment[] {
 
 function parsePi(raw: string): AgentSegment[] {
   const out: AgentSegment[] = [];
+  const textBuffer = new TextBuffer();
+  let sawAssistantTextInTurn = false;
   for (const record of streamRecords(raw)) {
     if (record.kind === "text") {
       const text = stripAnsi(record.text).trim();
@@ -276,20 +278,36 @@ function parsePi(raw: string): AgentSegment[] {
       continue;
     }
     const event = record.value;
+    if (event.type === "turn_start") {
+      textBuffer.flush(out, "text");
+      sawAssistantTextInTurn = false;
+      continue;
+    }
+    const delta = piAssistantTextDelta(event);
+    if (delta.trim()) {
+      sawAssistantTextInTurn = true;
+      textBuffer.push(delta);
+      continue;
+    }
     const text = piAssistantText(event).trim();
     if (text) {
+      textBuffer.flush(out, "text");
+      sawAssistantTextInTurn = true;
       out.push({ kind: "text", text });
       continue;
     }
     if (event.type === "error") {
+      textBuffer.flush(out, "text");
       out.push({ kind: "status", tone: "bad", text: String(event.message ?? "unknown error") });
       continue;
     }
-    const status = piStatusSegment(event);
+    const status = piStatusSegment(event, sawAssistantTextInTurn);
     if (status) {
+      textBuffer.flush(out, "text");
       out.push(status);
     }
   }
+  textBuffer.flush(out, "text");
   return out;
 }
 
@@ -305,7 +323,16 @@ function piAssistantText(event: Record<string, unknown>): string {
   return textFromContent(message);
 }
 
-function piStatusSegment(event: Record<string, unknown>): AgentSegment | null {
+function piAssistantTextDelta(event: Record<string, unknown>): string {
+  if (event.type !== "message_update") return "";
+  const message = asRecord(event.message);
+  if (message.role !== "assistant") return "";
+  const assistantEvent = asRecord(event.assistantMessageEvent);
+  if (assistantEvent.type !== "text_delta") return "";
+  return typeof assistantEvent.delta === "string" ? assistantEvent.delta : "";
+}
+
+function piStatusSegment(event: Record<string, unknown>, sawAssistantTextInTurn = false): AgentSegment | null {
   if (event.type === "auto_retry_end" && event.success === false) {
     return { kind: "status", tone: "bad", text: `Pi error: ${String(event.finalError ?? "unknown error")}` };
   }
@@ -316,6 +343,7 @@ function piStatusSegment(event: Record<string, unknown>): AgentSegment | null {
   if (errorMessage || message.stopReason === "error") {
     return { kind: "status", tone: "bad", text: `Pi error: ${String(errorMessage ?? "unknown error")}` };
   }
+  if (sawAssistantTextInTurn) return null;
   const content = message.content;
   if (Array.isArray(content) && content.length === 0 && message.stopReason === "stop") {
     return { kind: "status", tone: "warn", text: "Pi returned no assistant text." };

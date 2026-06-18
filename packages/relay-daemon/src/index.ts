@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 import type {
   DaemonNodeCommand,
   DaemonNodeEvent,
+  DaemonAgentHealth,
   DaemonNodeRegistration,
   DaemonNodeRunCommand,
   AgentName,
@@ -13,7 +14,7 @@ import type {
 } from "relay-core";
 import { startOrchestratorSession, ensureAgentReady as ensureSandboxAgentReady, type ActiveOrchestratorSession } from "./sandbox-session.js";
 import { defaultExecutionManager } from "./execution.js";
-import { prepareHostKimiCodeHome } from "./box.js";
+import { hasHostKimiCodeAuth, prepareHostKimiCodeHome } from "./box.js";
 import {
   AGENT_NAMES,
   getAgent,
@@ -27,6 +28,7 @@ import {
   ensureDaemonNodeToken,
   GUEST_WORKSPACE,
   agentHomePath,
+  kimiApiKey,
   openaiApiKey,
   DAEMON_NODE_PROTOCOL_VERSION,
 } from "relay-core";
@@ -138,13 +140,16 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
   const shutdownGraceMs = options.shutdownGraceMs ?? positiveIntEnv("RELAY_DAEMON_SHUTDOWN_GRACE_MS") ?? 10_000;
   let stopping = false;
   let shutdownPromise: Promise<void> | undefined;
+  const agentHealth = await discoverDaemonAgentHealth(environment, logger, sandboxId, options.signal);
+  const supportedAgents = readyAgents(agentHealth);
   const buildRegistration = (includeEmployeeId = Boolean(configuredEmployeeId), status?: DaemonNodeRegistration["status"]): DaemonNodeRegistration => ({
     sandboxId,
     ...(includeEmployeeId ? { employeeId } : {}),
     token,
     workspacePath,
     protocolVersion: DAEMON_NODE_PROTOCOL_VERSION,
-    supportedAgents: AGENT_NAMES,
+    supportedAgents,
+    agentHealth,
     status: status ?? (activeRuns.size > 0 ? "busy" : "ready"),
   });
   const register = async (): Promise<void> => {
@@ -342,6 +347,8 @@ export async function runRelayDaemonDoctor(options: DaemonRuntimeOptions = {}): 
   } catch (error) {
     add("workspace", false, error instanceof Error ? error.message : String(error));
   }
+  const environment = options.environment ?? createExecutionEnvironment(sandboxMode, sandboxId, workspacePath, logger);
+  const agentHealth = await discoverDaemonAgentHealth(environment, logger, sandboxId, options.signal);
   if (token) {
     await postJson(fetchFn, `${backendUrl}/daemon-nodes/register`, {
       sandboxId,
@@ -349,19 +356,17 @@ export async function runRelayDaemonDoctor(options: DaemonRuntimeOptions = {}): 
       token,
       workspacePath,
       protocolVersion: DAEMON_NODE_PROTOCOL_VERSION,
-      supportedAgents: AGENT_NAMES,
+      supportedAgents: readyAgents(agentHealth),
+      agentHealth,
       status: "stopped",
     } satisfies DaemonNodeRegistration).then(
       () => add("registration", true, "backend accepted daemon node registration."),
       (error: unknown) => add("registration", false, error instanceof Error ? error.message : String(error)),
     );
   }
-  const environment = options.environment ?? createExecutionEnvironment(sandboxMode, sandboxId, workspacePath, logger);
   for (const agent of AGENT_NAMES) {
-    await environment.ensureAgentReady(agent).then(
-      () => add(`agent:${agent}`, true, `${getAgent(agent).displayName} preflight passed.`),
-      (error: unknown) => add(`agent:${agent}`, false, error instanceof Error ? error.message : String(error)),
-    );
+    const health = agentHealth[agent];
+    add(`agent:${agent}`, health?.status === "ready", health?.detail ?? `${getAgent(agent).displayName} preflight did not report a result.`);
   }
   await environment.close().catch(() => undefined);
   return { ok: checks.every((check) => check.ok), checks };
@@ -391,6 +396,40 @@ async function runStartupPreflight(input: {
       error: error instanceof Error ? error.message : String(error),
     });
   }
+}
+
+async function discoverDaemonAgentHealth(
+  environment: DaemonExecutionEnvironment,
+  logger: DaemonLogger,
+  sandboxId: string,
+  signal?: AbortSignal,
+): Promise<Partial<Record<AgentName, DaemonAgentHealth>>> {
+  const health: Partial<Record<AgentName, DaemonAgentHealth>> = {};
+  for (const agent of AGENT_NAMES) {
+    const def = getAgent(agent);
+    try {
+      await environment.ensureAgentReady(agent, signal);
+      health[agent] = {
+        status: "ready",
+        detail: `${def.displayName} preflight passed.`,
+        adapter: "cli",
+      };
+      logger.info("agent capability ready", { sandboxId, agent });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      health[agent] = {
+        status: "failed",
+        detail,
+        adapter: "cli",
+      };
+      logger.warn("agent capability failed", { sandboxId, agent, error: detail });
+    }
+  }
+  return health;
+}
+
+function readyAgents(health: Partial<Record<AgentName, DaemonAgentHealth>>): AgentName[] {
+  return AGENT_NAMES.filter((agent) => health[agent]?.status === "ready");
 }
 
 async function checkBackendReachable(fetchFn: typeof fetch, backendUrl: string): Promise<void> {
@@ -508,6 +547,7 @@ async function executeCommand(
     agentLog: next.agent_logs.slice(-1)[0] ?? "",
     reviewVerdict: next.review_verdict,
     reviewFeedback: next.review_feedback,
+    tokenUsage: next.token_usage,
   } satisfies DaemonNodeEvent, token, signal);
 }
 
@@ -548,7 +588,11 @@ function ensureHostAgentReady(agent: AgentName): void {
     writeFileSync(join(piHome, "models.json"), guestPiModelsJson());
   }
   if (agent === "kimi") {
-    prepareHostKimiCodeHome(join(home, ".kimi-code"));
+    if (hasHostKimiCodeAuth()) {
+      prepareHostKimiCodeHome(join(home, ".kimi-code"));
+    } else if (!kimiApiKey()) {
+      throw new Error("Kimi requires a host Kimi Code login, KIMI_API_KEY, or MOONSHOT_API_KEY.");
+    }
   }
 }
 
@@ -925,6 +969,7 @@ export {
   ensureLocalDevboxOci,
   ensureSingleOrchestrator,
   execStream,
+  hasHostKimiCodeAuth,
   importBoxLite,
   hostKimiCodeHomePath,
   prepareGuestAgentAuth,

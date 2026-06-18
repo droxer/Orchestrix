@@ -1,8 +1,9 @@
 import { ActionRemove } from "./icons";
 import { useTranslation } from "react-i18next";
 import { EmployeeAvatar } from "./EmployeeAvatar";
-import type { DaemonNodeMonitorRecord, SandboxRecord, RelaySession, Tone } from "../types";
+import type { DaemonNodeMonitorRecord, SandboxRecord, RelaySession, Tone, TokenUsage } from "../types";
 import { conversationDaemonStatus } from "../lib/conversationStatus";
+import { formatCompactTokens } from "../lib/tokenUsage";
 
 type EmployeeContact = {
   id: string;
@@ -11,6 +12,7 @@ type EmployeeContact = {
   activeRun?: DaemonNodeMonitorRecord["activeRuns"][number];
   sessionCount: number;
   lastSession?: RelaySession;
+  tokenUsage?: TokenUsage;
 };
 
 export type { EmployeeContact };
@@ -58,6 +60,14 @@ export function ConversationRow({ contact, selected, onSelect, onRemove }: Conve
     contact.lastSession?.agentRuns[contact.lastSession.agentRuns.length - 1]?.agent;
   const stamp = relativeTime(contact.lastSession?.updatedAt);
   const sessionCountLabel = contact.sessionCount.toString().padStart(2, "0");
+  const tokenUsage = contact.tokenUsage;
+  const tokenUsageTitleText = tokenUsage
+    ? t("conversation.token_usage_title", {
+        input: tokenUsage.input.toLocaleString(),
+        output: tokenUsage.output.toLocaleString(),
+        cache: tokenUsage.cache.toLocaleString(),
+      })
+    : "";
 
   function handleRemove() {
     if (!onRemove) return;
@@ -114,6 +124,18 @@ export function ConversationRow({ contact, selected, onSelect, onRemove }: Conve
             <span className="conversation-meta-sep" aria-hidden="true" />
             <span className="mono">{lastAgent ?? t("conversation.no_agent_yet")}</span>
             <span className="conversation-meta-sep" aria-hidden="true" />
+            {tokenUsage ? (
+              <>
+                <span
+                  className="conversation-meta-tokens mono"
+                  title={tokenUsageTitleText}
+                  aria-label={tokenUsageTitleText}
+                >
+                  {formatCompactTokens(tokenUsage.total)} {t("conversation.tokens_short")}
+                </span>
+                <span className="conversation-meta-sep" aria-hidden="true" />
+              </>
+            ) : null}
             <span className="conversation-meta-count mono" aria-label={t("conversation.agent_running_aria")}>
               {sessionCountLabel}
             </span>

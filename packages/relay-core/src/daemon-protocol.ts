@@ -1,4 +1,5 @@
 import type { AgentName, AgentTaskMode } from "./state.js";
+import type { DaemonAgentAdapter } from "./daemon-node-protocol.js";
 
 export type SandboxStatus = "provisioning" | "ready" | "running" | "stopped" | "failed";
 
@@ -8,6 +9,11 @@ export interface SandboxRecord {
   workspacePath?: string;
   status: SandboxStatus;
   agents: Record<AgentName, "unknown" | "ready" | "failed">;
+  agentDetails?: Partial<Record<AgentName, {
+    detail?: string;
+    version?: string;
+    adapter?: DaemonAgentAdapter;
+  }>>;
   token?: string;
   tokenHash?: string;
   uiTokenHash?: string;

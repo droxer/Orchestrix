@@ -394,3 +394,82 @@ async def dashboard_activity(
 
     items.sort(key=lambda item: item.get("timestamp") or "", reverse=True)
     return {"items": items[:limit]}
+
+
+@router.get("/cp/dashboard/tokens")
+async def dashboard_tokens(request: Request, ctx: AppContextDep) -> dict[str, Any]:
+    require_admin_session(request, ctx.auth_store)
+    usage_rows = ctx.session_store.list_token_usage() if hasattr(ctx.session_store, "list_token_usage") else [
+        {
+            "sessionId": session.get("id"),
+            "ownerEmployeeId": session.get("ownerEmployeeId"),
+            "taskGoal": session.get("taskGoal"),
+            "updatedAt": session.get("updatedAt"),
+            **usage,
+        }
+        for session in ctx.session_store.list_sessions()
+        for usage in [_token_usage(session.get("tokenUsage"))]
+        if usage
+    ]
+    now = datetime.now(timezone.utc)
+    window_start = (now - timedelta(days=_DAY_WINDOW - 1)).date()
+    buckets: dict[str, dict[str, int]] = {
+        (window_start + timedelta(days=offset)).isoformat(): {"input": 0, "output": 0, "cache": 0, "total": 0}
+        for offset in range(_DAY_WINDOW)
+    }
+    totals = {"input": 0, "output": 0, "cache": 0, "total": 0}
+    by_employee: dict[str, dict[str, Any]] = {}
+    recent_sessions: list[dict[str, Any]] = []
+
+    for row in usage_rows:
+        usage = _token_usage(row)
+        if not usage:
+            continue
+        for key in totals:
+            totals[key] += usage[key]
+        timestamp = _parse_timestamp(row.get("updatedAt"))
+        if timestamp:
+            day_key = timestamp.date().isoformat()
+            if day_key in buckets:
+                for key in buckets[day_key]:
+                    buckets[day_key][key] += usage[key]
+        employee_id = str(row.get("ownerEmployeeId") or "unassigned")
+        employee = by_employee.setdefault(
+            employee_id,
+            {"employeeId": employee_id, "input": 0, "output": 0, "cache": 0, "total": 0, "sessionCount": 0},
+        )
+        for key in ("input", "output", "cache", "total"):
+            employee[key] += usage[key]
+        employee["sessionCount"] += 1
+        recent_sessions.append({
+            "sessionId": row.get("sessionId"),
+            "employeeId": row.get("ownerEmployeeId"),
+            "taskGoal": row.get("taskGoal"),
+            "updatedAt": row.get("updatedAt"),
+            **usage,
+        })
+
+    recent_sessions.sort(key=lambda item: item.get("updatedAt") or "", reverse=True)
+    ranked_employees = sorted(by_employee.values(), key=lambda item: item["total"], reverse=True)
+    return {
+        "available": totals["total"] > 0,
+        "totalInput": totals["input"],
+        "totalOutput": totals["output"],
+        "totalCache": totals["cache"],
+        "total": totals["total"],
+        "daily": [{"date": day, **stats} for day, stats in buckets.items()],
+        "byEmployee": ranked_employees,
+        "recentSessions": recent_sessions[:10],
+    }
+
+
+def _token_usage(value: Any) -> dict[str, int] | None:
+    if not isinstance(value, dict):
+        return None
+    usage = {
+        "input": int(value.get("input") or 0),
+        "output": int(value.get("output") or 0),
+        "cache": int(value.get("cache") or 0),
+    }
+    usage["total"] = usage["input"] + usage["output"] + usage["cache"]
+    return usage if usage["total"] > 0 else None

@@ -1,4 +1,5 @@
 import type { AgentOutputSink } from "./format.js";
+import type { TokenUsage } from "./token-usage.js";
 
 export type AgentName = "claude" | "pi" | "codex" | "kimi";
 export type AgentTaskMode = "implement" | "review";
@@ -16,6 +17,7 @@ export interface AgentState {
   agent_failures: Partial<Record<AgentName, number>>;
   review_verdict: ReviewVerdict | "";
   review_feedback: string;
+  token_usage?: TokenUsage;
   /** Bridge text from intervening other-agent runs on the shared session, if any. */
   prior_agent_bridge?: string;
 }

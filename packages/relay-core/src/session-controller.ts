@@ -260,6 +260,7 @@ export class SessionController implements AgentEventSink {
       agentLog: string;
       reviewVerdict?: ReviewVerdict | "";
       reviewFeedback?: string;
+      tokenUsage?: AgentState["token_usage"];
     },
   ): Promise<AgentState> {
     this.activeSessionId = sessionId;
@@ -283,6 +284,7 @@ export class SessionController implements AgentEventSink {
       agent: input.agent,
       status: input.status,
       exitCode: input.exitCode,
+      tokenUsage: input.tokenUsage,
     }));
     if (input.status === "failed") {
       await this.updateTaskStatus("blocked", `${input.agent} ${input.mode} failed with exit code ${input.exitCode}.`, {
@@ -355,6 +357,7 @@ export class SessionController implements AgentEventSink {
         agent: step.agent,
         status,
         exitCode: status === "cancelled" ? 130 : 1,
+        tokenUsage: undefined,
       }));
       const message = error instanceof Error ? error.message : String(error);
       await this.updateTaskStatus("blocked", message, {
@@ -379,6 +382,7 @@ export class SessionController implements AgentEventSink {
       agent: step.agent,
       status,
       exitCode: next.last_exit_code,
+      tokenUsage: next.token_usage,
     }));
     if (status === "failed") {
       await this.updateTaskStatus("blocked", `${step.agent} ${step.mode} failed with exit code ${next.last_exit_code}.`, {

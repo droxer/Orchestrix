@@ -5,9 +5,10 @@ import type {
   DaemonNodeMonitorRecord,
   RelaySession,
   SandboxRecord,
+  TokenUsage,
 } from "relay-core";
 
-export type { AgentName, AgentTaskMode, ControlPanelDaemonNodeRecord, DaemonNodeMonitorRecord, RelaySession, SandboxRecord };
+export type { AgentName, AgentTaskMode, ControlPanelDaemonNodeRecord, DaemonNodeMonitorRecord, RelaySession, SandboxRecord, TokenUsage };
 
 /** Single tone vocabulary for every status surface (toasts, pills, dots, stream status, system rows). */
 export type Tone = "good" | "bad" | "warn" | "info" | "neutral";

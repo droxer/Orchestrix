@@ -4,6 +4,7 @@ import { basename, join, resolve } from "node:path";
 import { getAgent } from "./agents.js";
 import { REPO_ROOT } from "./env.js";
 import type { AgentName, ReviewVerdict } from "./state.js";
+import { mergeTokenUsage, type TokenUsage } from "./token-usage.js";
 
 export type AgentRole = "implementer" | "reviewer" | "planner" | "tester" | "fixer";
 export type SessionStatus = "pending_approval" | "running" | "waiting_for_human" | "completed" | "failed" | "cancelled";
@@ -19,6 +20,7 @@ export interface AgentRun {
   startedAt: string;
   completedAt?: string;
   exitCode?: number;
+  tokenUsage?: TokenUsage;
   artifactIds: string[];
 }
 
@@ -62,6 +64,7 @@ export interface RelaySession {
   finalOutcome?: string;
   reviewVerdict?: ReviewVerdict;
   archived?: boolean;
+  tokenUsage?: TokenUsage;
 }
 
 export type RelayEvent =
@@ -127,6 +130,7 @@ export type RelayEvent =
       agent: AgentName;
       status: AgentRun["status"];
       exitCode: number;
+      tokenUsage?: TokenUsage;
     }
   | {
       id: string;
@@ -360,6 +364,7 @@ export function materializeEvents(events: RelayEvent[]): RelaySession {
     artifacts: [],
     decisions: [],
     events: [],
+    archived: false,
   };
 
   for (const event of events) {
@@ -390,7 +395,9 @@ export function materializeEvents(events: RelayEvent[]): RelaySession {
         run.status = event.status;
         run.completedAt = event.timestamp;
         run.exitCode = event.exitCode;
+        if (event.tokenUsage) run.tokenUsage = event.tokenUsage;
       }
+      session.tokenUsage = mergeTokenUsage(session.agentRuns.map((item) => item.tokenUsage));
       session.currentAgent = undefined;
       session.phase = event.status === "completed"
         ? "agent_completed"
@@ -423,6 +430,8 @@ export function materializeEvents(events: RelayEvent[]): RelaySession {
       session.phase = "failed";
       session.finalOutcome = event.outcome;
       session.currentAgent = undefined;
+    } else if (event.type === "session.archived") {
+      session.archived = true;
     }
   }
   return session;

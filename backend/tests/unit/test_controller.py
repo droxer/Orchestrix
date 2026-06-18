@@ -22,9 +22,13 @@ def test_session_controller_records_review_verdict() -> None:
             "agentLog": "approved",
             "reviewVerdict": "approved",
             "reviewFeedback": "ok",
+            "tokenUsage": {"input": 9, "output": 4, "cache": 2, "total": 15, "source": "codex"},
         })
 
         updated = store.get_session(session["id"])
         assert state["review_verdict"] == "approved"
+        assert state["token_usage"]["total"] == 15
         assert updated["reviewVerdict"] == "approved"
+        assert updated["agentRuns"][0]["tokenUsage"]["input"] == 9
+        assert updated["tokenUsage"]["total"] == 15
         assert updated["agentRuns"][0]["artifactIds"]

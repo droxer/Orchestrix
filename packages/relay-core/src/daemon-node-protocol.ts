@@ -1,6 +1,16 @@
 import type { AgentName, AgentState, ReviewVerdict, AgentTaskMode } from "./state.js";
+import type { TokenUsage } from "./token-usage.js";
 
 export type DaemonNodeStatus = "ready" | "busy" | "stopped";
+export type DaemonAgentAdapter = "cli" | "service";
+export type DaemonAgentHealthStatus = "ready" | "failed";
+
+export interface DaemonAgentHealth {
+  status: DaemonAgentHealthStatus;
+  detail?: string;
+  version?: string;
+  adapter?: DaemonAgentAdapter;
+}
 
 export const DAEMON_NODE_PROTOCOL_VERSION = 1 as const;
 export const DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS: readonly number[] = [1];
@@ -12,6 +22,7 @@ export interface DaemonNodeRegistration {
   workspacePath?: string;
   protocolVersion: number;
   supportedAgents: AgentName[];
+  agentHealth?: Partial<Record<AgentName, DaemonAgentHealth>>;
   status?: DaemonNodeStatus;
 }
 
@@ -62,6 +73,7 @@ export type DaemonNodeEvent =
       agentLog: string;
       reviewVerdict?: ReviewVerdict | "";
       reviewFeedback?: string;
+      tokenUsage?: TokenUsage;
     }
   | {
       type: "run.failed";

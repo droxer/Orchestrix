@@ -11,6 +11,7 @@ import {
   type AgentState,
   type AgentTaskMode,
 } from "./state.js";
+import { extractTokenUsageFromJsonl } from "./token-usage.js";
 
 /**
  * Run one agent assignment. Command construction, rendering, failure accounting,
@@ -43,6 +44,7 @@ export async function runAgentNode(
     sink: options.sink,
     signal: options.signal,
   });
+  const tokenUsage = extractTokenUsageFromJsonl(result.stdout, agent);
 
   if (reviewMode) {
     const feedback = extractReviewFeedback(result.stdout);
@@ -53,6 +55,7 @@ export async function runAgentNode(
       agent_failures: withFailure(state, agent, verdict === "failed"),
       review_verdict: verdict,
       review_feedback: feedback,
+      token_usage: tokenUsage,
     };
   }
 
@@ -60,6 +63,7 @@ export async function runAgentNode(
     agent_logs: [agentResultLog(def.implementLabel, result)],
     last_exit_code: result.exit_code,
     agent_failures: withFailure(state, agent, result.exit_code !== 0),
+    token_usage: tokenUsage,
   };
 }
 

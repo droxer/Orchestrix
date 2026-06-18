@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Check, Copy, KeyRound, Trash2 } from "lucide-react";
 import type { TFunction } from "i18next";
-import type { ControlPanelDaemonNodeRecord, EmployeeRecord } from "../../types";
+import type { AgentName, ControlPanelDaemonNodeRecord, EmployeeRecord } from "../../types";
 import {
   agentStatusTone,
   copyText,
@@ -24,6 +24,7 @@ interface FleetViewProps {
 }
 
 const FILTERS: FleetFilter[] = ["all", "ready", "running", "provisioning", "failed", "unassigned"];
+const CONNECT_AGENT_NAMES: AgentName[] = ["claude", "codex", "kimi"];
 
 function matchesFilter(node: ControlPanelDaemonNodeRecord, filter: FleetFilter): boolean {
   if (filter === "all") return true;
@@ -41,6 +42,24 @@ function filterLabel(filter: FleetFilter, t: TFunction): string {
   if (filter === "unassigned") return t("admin.unassigned");
   if (filter === "failed") return t("admin.v2.filter_failed");
   return t(`status.${filter}`, { defaultValue: filter });
+}
+
+function visibleAgentNames(node: ControlPanelDaemonNodeRecord): AgentName[] {
+  const names = [...CONNECT_AGENT_NAMES];
+  if (node.agents.pi && node.agents.pi !== "unknown") names.push("pi");
+  return names;
+}
+
+function agentTitle(node: ControlPanelDaemonNodeRecord, agent: AgentName, t: TFunction): string {
+  const agentStatus = node.agents[agent] ?? "unknown";
+  const statusLabel = t(`status.${agentStatus}`, { defaultValue: agentStatus });
+  const detail = node.agentDetails?.[agent];
+  const parts = [
+    t("fleet.agent_status_title", { agent, status: statusLabel }),
+    detail?.version,
+    detail?.detail,
+  ].filter(Boolean);
+  return parts.join(" · ");
 }
 
 function NodeCard({
@@ -119,14 +138,14 @@ function NodeCard({
           )}
         </p>
         <div className="adm-agents">
-          {(Object.keys(node.agents) as Array<keyof typeof node.agents>).map((name) => {
+          {visibleAgentNames(node).map((name) => {
             const agentStatus = node.agents[name] ?? "unknown";
             const agentTone = agentStatusTone(agentStatus);
             return (
               <span
                 key={name}
                 className={`adm-agent-chip tone-${agentTone}`}
-                title={t("fleet.agent_status_title", { agent: name, status: t(`status.${agentStatus}`, { defaultValue: agentStatus }) })}
+                title={agentTitle(node, name, t)}
               >
                 {name}
               </span>

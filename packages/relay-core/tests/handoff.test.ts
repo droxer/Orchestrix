@@ -27,6 +27,7 @@ import {
   reviewPrompt,
   CodexStreamRenderer,
   extractReviewFeedback,
+  extractTokenUsageFromJsonl,
   failureCount,
   formatClaudeJsonLine,
   formatCodexJsonLine,
@@ -40,10 +41,13 @@ import {
   hostWorkspacePath,
   isAgentName,
   JsonLineRenderer,
+  materializeEvents,
   piTaskPrompt,
+  PiStreamRenderer,
   PlainTextStreamRenderer,
   routeClaudeHandoff,
   routePiHandoff,
+  relayEvent,
   runAgentNode,
   StderrLineRenderer,
   withFailure,
@@ -529,6 +533,30 @@ describe("agent stream rendering", () => {
     assert.doesNotMatch(output, /"type":"message"/);
   });
 
+  it("renders Pi JSON streaming text deltas without empty terminal warnings", () => {
+    const renderer = new PiStreamRenderer();
+    const output = [
+      { type: "turn_start" },
+      { type: "message_start", message: { role: "assistant", content: [] } },
+      {
+        type: "message_update",
+        message: { role: "assistant", content: [] },
+        assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "Hi " },
+      },
+      {
+        type: "message_update",
+        message: { role: "assistant", content: [] },
+        assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "from Pi JSON." },
+      },
+      { type: "message_end", message: { role: "assistant", content: [], stopReason: "stop" } },
+      { type: "turn_end", message: { role: "assistant", content: [], stopReason: "stop" }, toolResults: [] },
+    ].map((event) => renderer.feed(`${JSON.stringify(event)}\n`)).join("");
+
+    assert.match(output, /Hi from Pi JSON\./);
+    assert.doesNotMatch(output, /Pi returned no assistant text\./);
+    assert.doesNotMatch(output, /"type":"message_update"/);
+  });
+
   it("renders Pi JSON empty assistant events as visible status", () => {
     const output = formatPiJsonLine(JSON.stringify({
       type: "message_end",
@@ -760,8 +788,46 @@ describe("execution manager boundary", () => {
     await ensureAgentReady("kimi", undefined, undefined, manager);
 
     assert.equal(calls[0], "auth:kimi");
-    assert.match(calls[1] ?? "", /^shell:su agent .*KIMI_CODE_HOME=.*kimi --version/);
+    assert.match(calls[1] ?? "", /^shell:su agent .*KIMI_CODE_HOME=.*kimi --version && kimi doctor/);
     assert.equal(calls.length, 2);
+  });
+
+  it("allows Kimi env-key auth without a host Kimi Code home", async () => {
+    const oldEnv = process.env;
+    let execCalled = false;
+    setSessionBox({
+      exec: async () => {
+        execCalled = true;
+        throw new Error("guest auth setup should not copy files when Kimi env auth is available");
+      },
+    });
+    process.env = {
+      KIMI_CODE_HOME: join(tmpdir(), "relay-missing-kimi-code-home"),
+      KIMI_API_KEY: "kimi-key",
+    };
+    try {
+      await prepareGuestAgentAuth(["kimi"]);
+    } finally {
+      process.env = oldEnv;
+      setSessionBox(null);
+    }
+
+    assert.equal(execCalled, false);
+  });
+
+  it("requires Kimi login files or env-key auth", async () => {
+    const oldEnv = process.env;
+    process.env = {
+      KIMI_CODE_HOME: join(tmpdir(), "relay-missing-kimi-code-home"),
+    };
+    try {
+      await assert.rejects(
+        () => prepareGuestAgentAuth(["kimi"]),
+        /Kimi requires a host Kimi Code login, KIMI_API_KEY, or MOONSHOT_API_KEY/,
+      );
+    } finally {
+      process.env = oldEnv;
+    }
   });
 
   it("provisions Kimi config and credentials into the guest without copying host binaries", async () => {
@@ -1072,6 +1138,75 @@ describe("credential scoping", () => {
   });
 });
 
+describe("token usage accounting", () => {
+  it("extracts Claude usage from assistant stream JSON", () => {
+    const usage = extractTokenUsageFromJsonl([
+      JSON.stringify({
+        type: "assistant",
+        message: {
+          usage: {
+            input_tokens: 10,
+            output_tokens: 4,
+            cache_creation_input_tokens: 3,
+            cache_read_input_tokens: 2,
+          },
+        },
+      }),
+    ].join("\n"), "claude");
+
+    assert.deepEqual(usage, { input: 10, output: 4, cache: 5, total: 19, source: "claude" });
+  });
+
+  it("extracts Codex/OpenAI-style usage from the final JSON event", () => {
+    const usage = extractTokenUsageFromJsonl([
+      JSON.stringify({ type: "turn.started" }),
+      JSON.stringify({
+        type: "turn.completed",
+        usage: {
+          prompt_tokens: 12,
+          completion_tokens: 8,
+          prompt_tokens_details: { cached_tokens: 6 },
+        },
+      }),
+    ].join("\n"), "codex");
+
+    assert.deepEqual(usage, { input: 12, output: 8, cache: 6, total: 26, source: "codex" });
+  });
+
+  it("does not estimate usage when JSONL has no reported counts", () => {
+    assert.equal(extractTokenUsageFromJsonl(JSON.stringify({ type: "turn.completed" })), undefined);
+  });
+
+  it("materializes token usage onto runs and sessions", () => {
+    const sessionId = "ses_tokens";
+    const events = [
+      relayEvent("session.created", sessionId, {
+        workspacePath: "/workspace",
+        taskGoal: "count tokens",
+        participants: ["human", "codex"],
+      }),
+      relayEvent("agent.started", sessionId, {
+        runId: "run_1",
+        agent: "codex",
+        role: "fixer",
+        mode: "implement",
+      }),
+      relayEvent("agent.completed", sessionId, {
+        runId: "run_1",
+        agent: "codex",
+        status: "completed",
+        exitCode: 0,
+        tokenUsage: { input: 5, output: 7, cache: 3, total: 15, source: "codex" },
+      }),
+    ];
+
+    const session = materializeEvents(events);
+
+    assert.deepEqual(session.agentRuns[0].tokenUsage, { input: 5, output: 7, cache: 3, total: 15, source: "codex" });
+    assert.deepEqual(session.tokenUsage, { input: 5, output: 7, cache: 3, total: 15 });
+  });
+});
+
 describe("agent registry", () => {
   it("validates agent names through the registry", () => {
     assert.equal(isAgentName("claude"), true);
@@ -1093,10 +1228,24 @@ describe("agent registry", () => {
   });
 
   it("embeds the task goal in the Kimi implement command without leaking raw JSONL", () => {
-    const command = buildKimiImplementCommand(state({ task_goal: "Wire up Kimi" }));
-    assert.match(command, /kimi/);
-    assert.match(command, /Wire up Kimi/);
-    assert.doesNotMatch(command, /stream-json/);
+    withEnv(
+      {
+        RELAY_AGENT_HOME: "/tmp/relay-agent-home",
+        RELAY_AGENT_WORKSPACE: "/tmp/relay-host-workspace",
+        RELAY_RUN_AS_CURRENT_USER: "1",
+        KIMI_MODEL: "kimi-test",
+      },
+      () => {
+        const command = buildKimiImplementCommand(state({ task_goal: "Wire up Kimi" }));
+        assert.match(command, /kimi --model kimi-test --prompt/);
+        assert.match(command, /Wire up Kimi/);
+        assert.ok(command.indexOf("--model kimi-test") < command.indexOf("--prompt"));
+        assert.doesNotMatch(command, /--yolo/);
+        assert.doesNotMatch(command, /--auto/);
+        assert.doesNotMatch(command, /stdbuf/);
+        assert.doesNotMatch(command, /stream-json/);
+      },
+    );
   });
 
   it("tracks failures per agent and resets on success", () => {

@@ -7,6 +7,7 @@ import {
   DEVBOX_IMAGE,
   DOCKERFILE,
   OCI_LAYOUT_DIR,
+  kimiApiKey,
   requireOpenaiApiKey,
   requirePiConfig,
 } from "relay-core";
@@ -104,8 +105,11 @@ export function prepareHostKimiCodeHome(targetHome: string): void {
   }
 }
 
-function kimiCodeGuestSetupScript(targetHome = "/home/agent/.kimi-code"): string[] {
-  const files = collectKimiCodeFiles();
+export function hasHostKimiCodeAuth(sourceHome = hostKimiCodeHomePath()): boolean {
+  return collectKimiCodeFiles(sourceHome, false).length > 0;
+}
+
+function kimiCodeGuestSetupScript(targetHome = "/home/agent/.kimi-code", files = collectKimiCodeFiles()): string[] {
   const script = [
     `mkdir -p ${shellQuote(targetHome)}`,
   ];
@@ -124,8 +128,9 @@ function kimiCodeGuestSetupScript(targetHome = "/home/agent/.kimi-code"): string
   return script;
 }
 
-function collectKimiCodeFiles(sourceHome = hostKimiCodeHomePath()): KimiCodeFile[] {
+function collectKimiCodeFiles(sourceHome = hostKimiCodeHomePath(), required = true): KimiCodeFile[] {
   if (!existsSync(sourceHome)) {
+    if (!required) return [];
     throw new Error(`Kimi Code home not found at ${sourceHome}. Run kimi login on the host or set KIMI_CODE_HOME.`);
   }
   const files: KimiCodeFile[] = [];
@@ -134,6 +139,7 @@ function collectKimiCodeFiles(sourceHome = hostKimiCodeHomePath()): KimiCodeFile
     if (existsSync(path)) collectKimiCodePath(sourceHome, path, files);
   }
   if (files.length === 0) {
+    if (!required) return [];
     throw new Error(`Kimi Code home at ${sourceHome} does not contain config or credential files.`);
   }
   return files;
@@ -182,7 +188,12 @@ export async function prepareGuestAgentAuth(agents: Iterable<AgentName> = ["code
     );
   }
   if (selectedAgents.has("kimi")) {
-    script.push(...kimiCodeGuestSetupScript());
+    const files = collectKimiCodeFiles(hostKimiCodeHomePath(), false);
+    if (files.length > 0) {
+      script.push(...kimiCodeGuestSetupScript("/home/agent/.kimi-code", files));
+    } else if (!kimiApiKey()) {
+      throw new Error("Kimi requires a host Kimi Code login, KIMI_API_KEY, or MOONSHOT_API_KEY.");
+    }
   }
   if (script.length === 1) return;
   const command = script.join("; ");

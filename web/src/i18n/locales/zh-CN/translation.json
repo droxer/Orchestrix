@@ -41,6 +41,8 @@
     "remove": "移除 @{{id}}",
     "remove_confirm": "从此浏览器移除 @{{id}}？",
     "agent_running_aria": "Agent 运行中",
+    "tokens_short": "tok",
+    "token_usage_title": "输入 {{input}} · 输出 {{output}} · 缓存 {{cache}}",
     "no_sessions": "—"
   },
   "composer": {
@@ -220,7 +222,11 @@
       "dash_tokens_eyebrow": "Tokens",
       "dash_tokens_title": "Token 用量",
       "dash_tokens_empty": "等待 Agent 在会话事件中上报用量后即可统计。",
-      "dash_tokens_summary": "输入 {{input}} · 输出 {{output}}",
+      "dash_tokens_summary": "输入 {{input}} · 输出 {{output}} · 缓存 {{cache}}",
+      "dash_tokens_legend": "Token 用量明细",
+      "dash_tokens_input": "输入",
+      "dash_tokens_output": "输出",
+      "dash_tokens_cache": "缓存",
       "dash_health_eyebrow": "节点健康",
       "dash_health_title": "守护节点状态",
       "dash_health_ready": "就绪",
@@ -414,8 +420,25 @@
   },
   "artifact": {
     "kind": {
-      "default": "{{kind}}"
-    }
+      "default": "{{kind}}",
+      "plan": "计划",
+      "diff": "差异",
+      "review": "审阅",
+      "test_output": "测试输出",
+      "summary": "摘要",
+      "agent_output": "Agent 输出"
+    },
+    "open_raw": "打开原文",
+    "show_preview": "预览",
+    "hide_preview": "收起",
+    "loading_preview": "正在加载预览…",
+    "preview_error": "无法加载预览：{{message}}",
+    "preview_empty": "暂无产物内容。",
+    "preview_truncated": "预览已截断。打开原文可查看完整产物。",
+    "size_unknown": "大小未知",
+    "size_bytes": "{{count}} B",
+    "size_kb": "{{count}} KB",
+    "size_mb": "{{count}} MB"
   },
   "agent_stream": {
     "thinking": "思考中",

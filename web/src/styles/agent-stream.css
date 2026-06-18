@@ -370,43 +370,70 @@
 
 .attachment-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-xs);
   margin-top: var(--space-xs);
   padding: 0;
 }
 
-.attachment-card {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-sm);
+.artifact-card {
+  min-width: 0;
+  display: grid;
+  gap: 0;
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-md);
   background: var(--color-canvas);
   color: var(--color-ink);
-  text-decoration: none;
+  overflow: hidden;
   transition: border-color 140ms ease, box-shadow 140ms ease;
 }
 
-.attachment-card:hover {
-  border-color: var(--color-primary);
+.artifact-card:hover,
+.artifact-card.expanded {
+  border-color: color-mix(in srgb, var(--color-primary) 42%, var(--color-hairline));
   box-shadow: var(--shadow-soft);
 }
 
-.attachment-meta {
+.artifact-card-main {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+}
+
+.artifact-card-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--color-hairline-soft);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-soft);
+  color: var(--color-primary);
+}
+
+.artifact-card-copy {
   min-width: 0;
   display: grid;
   gap: 2px;
 }
 
-.attachment-kind {
+.artifact-card-kicker {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   color: var(--color-muted);
   font-size: var(--text-xs);
   font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.attachment-meta strong {
+.artifact-card-copy strong {
   min-width: 0;
   color: var(--color-ink);
   font-size: var(--text-base);
@@ -414,6 +441,80 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.artifact-card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+}
+
+.artifact-card-link,
+.artifact-card-toggle {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 var(--space-xs);
+  border-radius: var(--radius-sm);
+  color: var(--color-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.artifact-card-link:hover,
+.artifact-card-toggle:hover {
+  background: var(--color-surface-soft);
+  color: var(--color-ink);
+}
+
+.artifact-preview {
+  min-width: 0;
+  border-top: 1px solid var(--color-hairline-soft);
+  background: var(--color-surface-soft);
+}
+
+.artifact-preview p,
+.artifact-preview pre {
+  margin: 0;
+}
+
+.artifact-preview p {
+  padding: var(--space-sm) var(--space-base);
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.artifact-preview-error {
+  color: var(--color-semantic-down);
+}
+
+.artifact-preview pre {
+  max-height: 320px;
+  padding: var(--space-sm) var(--space-base);
+  color: var(--color-body);
+  font-family: var(--font-number);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 560px) {
+  .artifact-card-main {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .artifact-card-actions {
+    grid-column: 2;
+    justify-self: start;
+    flex-wrap: wrap;
+  }
 }
 
 /* System lifecycle line. Shares the micro-status visual language with

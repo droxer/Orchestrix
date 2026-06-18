@@ -4,6 +4,7 @@ import type { AgentName, RelaySession } from "../types";
 import { NavConversations, NavNewThread, NavRefresh } from "./icons";
 import { EmployeeAvatar } from "./EmployeeAvatar";
 import { StatusPill } from "./StatusPill";
+import { formatCompactTokens } from "../lib/tokenUsage";
 
 // Chat-panel header: who/which agent/session identity, the per-agent tabs,
 // session status pill, and the refresh control.
@@ -20,6 +21,14 @@ export function ChatHeader({ selectedEmployee, running, activeAgent, setActiveAg
   onNewThread?: () => void;
 }) {
   const { t } = useTranslation();
+  const tokenUsage = activeSession?.tokenUsage;
+  const tokenUsageTitle = tokenUsage
+    ? t("conversation.token_usage_title", {
+        input: tokenUsage.input.toLocaleString(),
+        output: tokenUsage.output.toLocaleString(),
+        cache: tokenUsage.cache.toLocaleString(),
+      })
+    : "";
   return (
     <header className="chat-header">
       <div className="chat-title">
@@ -37,6 +46,15 @@ export function ChatHeader({ selectedEmployee, running, activeAgent, setActiveAg
             {activeSession ? (
               <span className="chat-title-status">
                 <StatusPill value={activeSession.status} />
+              </span>
+            ) : null}
+            {tokenUsage ? (
+              <span
+                className="chat-title-tokens mono"
+                title={tokenUsageTitle}
+                aria-label={tokenUsageTitle}
+              >
+                {formatCompactTokens(tokenUsage.total)} {t("conversation.tokens_short")}
               </span>
             ) : null}
           </p>

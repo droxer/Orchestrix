@@ -165,6 +165,39 @@
 
 .adm-dash-chart--empty { opacity: 0.85; }
 
+.adm-dash-token-chart {
+  min-height: 140px;
+}
+
+.adm-token-seg--input { fill: var(--color-primary); }
+.adm-token-seg--output { fill: var(--color-semantic-up); }
+.adm-token-seg--cache { fill: var(--color-muted-soft); }
+
+.adm-token-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-base);
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+}
+
+.adm-token-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.adm-token-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  display: inline-block;
+}
+
+.adm-token-dot--input { background: var(--color-primary); }
+.adm-token-dot--output { background: var(--color-semantic-up); }
+.adm-token-dot--cache { background: var(--color-muted-soft); }
+
 .adm-dash-empty {
   position: relative;
   min-height: 200px;

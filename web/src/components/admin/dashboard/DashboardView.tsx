@@ -75,7 +75,7 @@ export function DashboardView({ nodes, employees, metrics }: DashboardViewProps)
         />
         <KpiTile
           eyebrow={t("admin.v2.dash_kpi_tokens")}
-          value={tokens.available ? formatCompact(tokens.totalInput + tokens.totalOutput) : dash}
+          value={tokens.available ? formatCompact(tokens.total) : dash}
           hint={tokens.available ? t("admin.v2.dash_kpi_tokens_hint") : t("admin.v2.dash_coming_soon_tag")}
         />
       </section>

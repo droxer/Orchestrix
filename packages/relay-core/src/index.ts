@@ -61,6 +61,13 @@ export {
 } from "./state.js";
 
 export {
+  extractTokenUsageFromJsonl,
+  mergeTokenUsage,
+  normalizeTokenUsage,
+  type TokenUsage,
+} from "./token-usage.js";
+
+export {
   AGENT_NAMES,
   AGENT_REGISTRY,
   agentNameList,
@@ -74,6 +81,9 @@ export {
 export {
   DAEMON_NODE_PROTOCOL_VERSION,
   DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS,
+  type DaemonAgentAdapter,
+  type DaemonAgentHealth,
+  type DaemonAgentHealthStatus,
   type DaemonNodeCommand,
   type DaemonNodeEvent,
   type DaemonNodeRegistration,

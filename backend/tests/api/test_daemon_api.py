@@ -69,6 +69,52 @@ def test_fastapi_daemon_routes_register_and_poll(monkeypatch) -> None:
         assert response.json()["nodes"][0].get("nodeToken") == "node_token"
 
 
+def test_daemon_registration_stores_agent_health_and_rejects_unready_runs(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _login_admin(client)
+
+        response = client.post("/daemon-nodes/register", json={
+            "sandboxId": "sbx_alice",
+            "employeeId": "alice",
+            "token": "node_token",
+            "workspacePath": "/workspace/alice",
+            "protocolVersion": 1,
+            "supportedAgents": ["codex"],
+            "agentHealth": {
+                "codex": {"status": "ready", "detail": "Codex preflight passed.", "adapter": "cli"},
+                "kimi": {"status": "failed", "detail": "Kimi is not logged in.", "adapter": "cli"},
+            },
+            "status": "ready",
+        }, headers={"Authorization": "Bearer ui_token"})
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["agents"]["codex"] == "ready"
+        assert body["agents"]["kimi"] == "failed"
+        assert body["agentDetails"]["kimi"]["detail"] == "Kimi is not logged in."
+
+        public = client.get("/daemon-nodes", headers={"Authorization": "Bearer ui_token"})
+        assert public.status_code == 200
+        public_node = public.json()["nodes"][0]
+        assert public_node["agentDetails"]["kimi"]["adapter"] == "cli"
+        assert "nodeToken" not in public_node
+
+        admin = client.get("/cp/daemon-nodes")
+        assert admin.status_code == 200
+        assert admin.json()["nodes"][0]["nodeToken"] == "node_token"
+
+        run = client.post("/sandboxes/sbx_alice/runs", json={
+            "taskGoal": "try kimi",
+            "assignments": [{"agent": "kimi", "mode": "implement"}],
+        }, headers={"Authorization": "Bearer ui_token"})
+        assert run.status_code == 409
+        assert "does not have ready agent" in run.json()["detail"]
+
+
 def test_admin_creates_employee_login_and_assigns_unassigned_node(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
