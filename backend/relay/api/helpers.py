@@ -174,6 +174,15 @@ def request_chat_service_actor(request: Request) -> dict[str, Any] | None:
     }
 
 
+def require_chat_service_request(request: Request) -> None:
+    expected = os.environ.get("RELAY_CHAT_TOKEN", "").strip()
+    if not expected:
+        raise HTTPException(503, "RELAY_CHAT_TOKEN is not configured.")
+    token = bearer_token(request)
+    if not token or len(token) != len(expected) or not secrets.compare_digest(token, expected):
+        raise HTTPException(401, "Invalid chat service token.")
+
+
 def request_actor_or_sandbox(request: Request, auth_store: Any, registry: DaemonNodeRegistry) -> dict[str, Any]:
     actor = request_actor_or_none(request, auth_store)
     if actor:

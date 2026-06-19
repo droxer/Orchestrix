@@ -52,7 +52,8 @@ responsibility.
 
 ## Required Configuration
 
-Configure the Relay backend with a chat service token:
+Configure the Relay backend with a chat service token. Provider adapters use it
+for identity resolution and employee-scoped run/status/cancel requests.
 
 ```bash
 RELAY_CHAT_TOKEN=replace-with-a-random-secret
@@ -75,6 +76,79 @@ X-Relay-Employee-Id: <employeeId>
 The backend treats this as a non-admin employee actor. The actor can access only
 records and sandboxes allowed for that employee unless a route explicitly allows
 public access.
+
+## Web Setup
+
+Admins configure chat clients in Relay Web:
+
+1. Open **Admin Console -> Integrations**.
+2. Create a Discord, Telegram, or Lark integration.
+3. Add the provider tenant or guild ID when the provider has one.
+4. Store the provider secret. Relay records only whether a secret is configured
+   in admin API responses; raw secret values are not returned.
+5. Add identity links from provider user IDs to Relay `employeeId` values.
+6. Add allowed conversations. Chat-triggered agent runs are rejected outside
+   those channels, groups, chats, or threads.
+7. Run **Check Setup**, then **Activate**.
+
+The admin setup creates a backend-owned configuration contract:
+
+```text
+chat_integrations
+- provider
+- tenant_id
+- status
+- public config
+- health
+
+chat_identity_links
+- integration_id
+- external_user_id
+- employee_id
+- default_sandbox_id
+
+chat_allowed_conversations
+- integration_id
+- conversation_id
+- thread_id
+- label
+```
+
+Local development stores this under `.relay/chat/`. Secrets are isolated in a
+separate local file with restrictive permissions. Production deployments should
+back the same API contract with database storage and a managed secret store.
+
+## Runtime Identity Resolution
+
+Provider adapters should use backend-owned mappings rather than static files:
+
+```ts
+import { RelayChatIdentityResolver } from "relay-chat";
+
+const identities = new RelayChatIdentityResolver({
+  baseUrl: process.env.RELAY_BACKEND_URL,
+  token: process.env.RELAY_CHAT_TOKEN,
+});
+```
+
+The resolver calls:
+
+```http
+POST /chat/identity/resolve
+Authorization: Bearer $RELAY_CHAT_TOKEN
+Content-Type: application/json
+
+{
+  "provider": "discord",
+  "tenantId": "guild-id",
+  "externalUserId": "provider-user-id",
+  "conversationId": "channel-or-chat-id",
+  "threadId": "optional-thread-id"
+}
+```
+
+The backend returns an employee identity only when the integration is active,
+the provider conversation is allowlisted, and the provider user is linked.
 
 ## Shared Runtime Shape
 

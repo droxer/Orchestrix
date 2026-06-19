@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import {
   RelayChatClient,
   RelayChatGateway,
+  RelayChatIdentityResolver,
   StaticChatIdentityResolver,
   commandToAgentRequest,
   discordConversation,
@@ -119,6 +120,53 @@ describe("RelayChatClient", () => {
     const event = parseSseRelayEvent('data: {"id":"evt_1","type":"agent.output","sessionId":"sess_1","timestamp":"now","runId":"run_1","agent":"codex","stream":"stdout","text":"hello"}\n\n');
     assert.equal(event?.type, "agent.output");
     assert.equal(parseSseRelayEvent('event: done\ndata: {"status":"completed"}\n\n'), undefined);
+  });
+});
+
+describe("RelayChatIdentityResolver", () => {
+  it("resolves identities through backend-managed chat configuration", async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const fetchFn = async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
+      calls.push({ url: String(url), init: init ?? {} });
+      return jsonResponse({
+        identity: {
+          employeeId: "alice",
+          displayName: "Alice",
+          defaultSandboxId: "sbx_alice",
+        },
+      });
+    };
+    const resolver = new RelayChatIdentityResolver({ baseUrl: "http://relay.local/", token: "svc", fetchFn });
+
+    const identity = await resolver.resolve(discordConversation({
+      userId: "du",
+      guildId: "g1",
+      channelId: "c1",
+      threadId: "t1",
+    }));
+
+    assert.equal(identity?.employeeId, "alice");
+    assert.equal(calls[0].url, "http://relay.local/chat/identity/resolve");
+    assert.equal((calls[0].init.headers as Record<string, string>).Authorization, "Bearer svc");
+    assert.deepEqual(JSON.parse(String(calls[0].init.body)), {
+      provider: "discord",
+      tenantId: "g1",
+      externalUserId: "du",
+      conversationId: "c1",
+      threadId: "t1",
+    });
+  });
+
+  it("returns undefined for unlinked or disallowed chat users", async () => {
+    const resolver = new RelayChatIdentityResolver({
+      baseUrl: "http://relay.local",
+      token: "svc",
+      fetchFn: async () => new Response(JSON.stringify({ detail: "No link" }), { status: 404 }),
+    });
+
+    const identity = await resolver.resolve(telegramConversation({ userId: 42, chatId: -100 }));
+
+    assert.equal(identity, undefined);
   });
 });
 

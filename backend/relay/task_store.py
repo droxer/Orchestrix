@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
+import time
+from threading import RLock
 from pathlib import Path
 from typing import Any
 
 from loguru import logger
 from sqlalchemy import BigInteger, JSON, Column, DateTime, ForeignKey, MetaData, Table, Text, UniqueConstraint, Uuid, create_engine, insert, select, update
+from sqlalchemy.exc import IntegrityError
 
 from .store_common import (
     DEFAULT_RELAY_DATA_DIR,
@@ -27,39 +30,47 @@ class LocalTaskStore:
     def __init__(self, root_dir: str | Path = DEFAULT_RELAY_DATA_DIR):
         self.root_dir = Path(root_dir)
         self.tasks_dir = self.root_dir / "tasks"
+        self._lock = RLock()
         self.tasks_dir.mkdir(parents=True, exist_ok=True)
 
     def create_task(self, input: dict[str, Any]) -> dict[str, Any]:
-        task_id = new_relay_id("task")
-        self._task_dir(task_id).mkdir(parents=True, exist_ok=True)
-        logger.debug("Creating task", task_id=task_id, title=input.get("title"))
-        events = [relay_task_event("task.created", task_id, {
-            "title": input["title"],
-            "description": input.get("description", ""),
-            "priority": input.get("priority", "normal"),
-            **({"ownerEmployeeId": input["ownerEmployeeId"]} if input.get("ownerEmployeeId") else {}),
-        })]
-        if input.get("assignedAgent"):
-            events.append(relay_task_event("task.assigned", task_id, {"agent": input["assignedAgent"]}))
-        if input.get("status") and input["status"] != "backlog":
-            events.append(relay_task_event("task.status", task_id, {"status": input["status"]}))
-        task = materialize_task_events(events)
-        self._events_path(task_id).write_text("".join(json.dumps(item, separators=(",", ":")) + "\n" for item in events), encoding="utf-8")
-        _write_json(self._snapshot_path(task_id), task)
-        return task
+        with self._lock:
+            task_id = new_relay_id("task")
+            self._task_dir(task_id).mkdir(parents=True, exist_ok=True)
+            logger.debug("Creating task", task_id=task_id, title=input.get("title"))
+            events = [relay_task_event("task.created", task_id, {
+                "title": input["title"],
+                "description": input.get("description", ""),
+                "priority": input.get("priority", "normal"),
+                **({"ownerEmployeeId": input["ownerEmployeeId"]} if input.get("ownerEmployeeId") else {}),
+            })]
+            if input.get("assignedAgent"):
+                events.append(relay_task_event("task.assigned", task_id, {"agent": input["assignedAgent"]}))
+            if input.get("status") and input["status"] != "backlog":
+                events.append(relay_task_event("task.status", task_id, {"status": input["status"]}))
+            task = materialize_task_events(events)
+            self._events_path(task_id).write_text("".join(json.dumps(item, separators=(",", ":")) + "\n" for item in events), encoding="utf-8")
+            _write_json(self._snapshot_path(task_id), task)
+            return task
 
     def append_event(self, task_id: str, event: dict[str, Any]) -> dict[str, Any]:
-        self._task_dir(task_id).mkdir(parents=True, exist_ok=True)
-        _append_jsonl(self._events_path(task_id), event)
-        logger.debug("Task event appended", task_id=task_id, event_type=event.get("type"))
-        task = materialize_task_events(_read_jsonl(self._events_path(task_id)))
-        _write_json(self._snapshot_path(task_id), task)
-        return task
+        with self._lock:
+            self._task_dir(task_id).mkdir(parents=True, exist_ok=True)
+            _append_jsonl(self._events_path(task_id), event)
+            logger.debug("Task event appended", task_id=task_id, event_type=event.get("type"))
+            if self._snapshot_path(task_id).exists():
+                events = [*_read_json(self._snapshot_path(task_id)).get("events", []), event]
+            else:
+                events = _read_jsonl(self._events_path(task_id))
+            task = materialize_task_events(events)
+            _write_json(self._snapshot_path(task_id), task)
+            return task
 
     def get_task(self, task_id: str) -> dict[str, Any]:
-        if self._snapshot_path(task_id).exists():
-            return _read_json(self._snapshot_path(task_id))
-        return materialize_task_events(_read_jsonl(self._events_path(task_id)))
+        with self._lock:
+            if self._snapshot_path(task_id).exists():
+                return _read_json(self._snapshot_path(task_id))
+            return materialize_task_events(_read_jsonl(self._events_path(task_id)))
 
     def list_tasks(self) -> list[dict[str, Any]]:
         if not self.tasks_dir.exists():
@@ -178,14 +189,28 @@ class DatabaseTaskStore:
         return task
 
     def append_event(self, task_id: str, event: dict[str, Any]) -> dict[str, Any]:
+        for attempt in range(3):
+            try:
+                return self._append_event_once(task_id, event)
+            except IntegrityError:
+                if attempt == 2:
+                    raise
+                time.sleep(0.01 * (attempt + 1))
+        raise RuntimeError("unreachable")
+
+    def _append_event_once(self, task_id: str, event: dict[str, Any]) -> dict[str, Any]:
         with self.engine.begin() as conn:
-            task_pk = self._task_pk(conn, task_id)
-            events = self._events_for_task(conn, task_pk)
-            if not events:
+            row = conn.execute(
+                select(self.tasks.c.id, self.tasks.c.snapshot, self.tasks.c.version)
+                .where(self.tasks.c.public_id == task_id)
+                .with_for_update()
+            ).mappings().first()
+            if not row:
                 raise KeyError(task_id)
-            sequence = len(events)
+            task_pk = row["id"]
+            sequence = int(row["version"] or 0)
             conn.execute(insert(self.events).values(**task_event_to_row(task_pk, sequence, event)))
-            task = materialize_task_events([*events, event])
+            task = materialize_task_events([*(row["snapshot"] or {}).get("events", []), event])
             conn.execute(update(self.tasks).where(self.tasks.c.id == task_pk).values(**task_to_row(task, version=sequence + 1, database_id=task_pk)))
             if event.get("type") == "task.session_linked":
                 self._ensure_task_session(conn, task_pk, event["sessionId"], event["timestamp"])
@@ -238,8 +263,11 @@ class DatabaseTaskStore:
             }
         }))
 
-    def _task_pk(self, conn: Any, task_id: str) -> str:
-        task_pk = conn.scalar(select(self.tasks.c.id).where(self.tasks.c.public_id == task_id))
+    def _task_pk(self, conn: Any, task_id: str, *, lock: bool = False) -> str:
+        statement = select(self.tasks.c.id).where(self.tasks.c.public_id == task_id)
+        if lock:
+            statement = statement.with_for_update()
+        task_pk = conn.scalar(statement)
         if not task_pk:
             raise KeyError(task_id)
         return task_pk

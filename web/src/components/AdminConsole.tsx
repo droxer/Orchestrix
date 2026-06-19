@@ -17,6 +17,7 @@ import type {
 import { AssignNodeDrawer } from "./admin/AssignNodeDrawer";
 import { AttentionRail } from "./admin/AttentionRail";
 import { BootstrapScreen, LoginScreen } from "./admin/AuthScreens";
+import { ChatIntegrationsView } from "./admin/ChatIntegrationsView";
 import { CredentialsDrawer } from "./admin/CredentialsDrawer";
 import { FleetView } from "./admin/FleetView";
 import { ManageAgentsDrawer } from "./admin/ManageAgentsDrawer";
@@ -217,13 +218,17 @@ export function AdminConsole() {
       ? t("admin.v2.title_dashboard")
       : view === "people"
         ? t("admin.v2.title_people")
-        : t("admin.v2.title_fleet");
+        : view === "fleet"
+          ? t("admin.v2.title_fleet")
+          : t("admin.v2.title_integrations");
   const viewSub =
     view === "dashboard"
       ? t("admin.v2.sub_dashboard")
       : view === "people"
         ? t("admin.v2.sub_people")
-        : t("admin.v2.sub_fleet");
+        : view === "fleet"
+          ? t("admin.v2.sub_fleet")
+          : t("admin.v2.sub_integrations");
 
   return (
     <section className="admin-console adm-shell">
@@ -242,10 +247,12 @@ export function AdminConsole() {
             ) : lastUpdatedStr ? (
               <span className="adm-header-time mono">{t("admin.updated_at", { time: lastUpdatedStr })}</span>
             ) : null}
-            <Button type="button" onClick={() => setOnboardOpen(true)}>
-              <Plus size={16} aria-hidden="true" />
-              <span>{t("admin.v2.onboard_cta")}</span>
-            </Button>
+            {view === "integrations" ? null : (
+              <Button type="button" onClick={() => setOnboardOpen(true)}>
+                <Plus size={16} aria-hidden="true" />
+                <span>{t("admin.v2.onboard_cta")}</span>
+              </Button>
+            )}
           </div>
         </header>
 
@@ -273,7 +280,7 @@ export function AdminConsole() {
                 unassignedNodeCount={unassignedNodes.length}
                 highlightedEmployeeId={highlightedEmployeeId}
               />
-            ) : (
+            ) : view === "fleet" ? (
               <FleetView
                 nodes={nodes}
                 employees={employees}
@@ -281,6 +288,8 @@ export function AdminConsole() {
                 onManageAgents={handleManageAgents}
                 onDeleteNode={handleDeleteNode}
               />
+            ) : (
+              <ChatIntegrationsView />
             )}
           </div>
           {view === "fleet" ? <AttentionRail nodes={nodes} /> : null}

@@ -29,6 +29,17 @@ async function waitForInput(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 50));
 }
 
+async function waitForFrame(lastFrame: () => string | undefined, pattern: RegExp, timeoutMs = 1500): Promise<string> {
+  const deadline = Date.now() + timeoutMs;
+  let frame = lastFrame() ?? "";
+  while (!pattern.test(frame) && Date.now() < deadline) {
+    await waitForInput();
+    frame = lastFrame() ?? "";
+  }
+  assert.match(frame, pattern);
+  return frame;
+}
+
 describe("TUI task parsing", () => {
   it("parses a single Claude assignment", async () => {
     const parsed = parseAssignedTask("@claude fix auth middleware");
@@ -1845,17 +1856,14 @@ describe("RelayTui component", () => {
     }) as typeof fetch;
     try {
       const { lastFrame, unmount } = render(<RelayTuiHost onExit={() => undefined} />);
-      await waitForInput();
-      const bootFrame = lastFrame() ?? "";
+      const bootFrame = await waitForFrame(lastFrame, /EMPLOYEE_ID=host/);
       assert.match(bootFrame, /Waiting for daemon node|Connecting to Relay daemon/);
-      assert.match(bootFrame, /EMPLOYEE_ID=host/);
       assert.match(bootFrame, /SANDBOX_ID=sbx_host_stale/);
       assert.match(bootFrame, /DAEMON_TOKEN=tok_has_under_score/);
       assert.match(bootFrame, /WORKSPACE=/);
-      await new Promise((resolve) => setTimeout(resolve, 450));
 
-      assert.match(lastFrame() ?? "", /Host daemon ready/);
-      assert.match(lastFrame() ?? "", /Sandbox sbx_host assigned/);
+      const readyFrame = await waitForFrame(lastFrame, /Host daemon ready/);
+      assert.match(readyFrame, /Sandbox sbx_host assigned/);
       assert.equal(provisionCalls, 2);
       assert.ok(bodies.every((body) =>
         typeof body === "object" &&
@@ -1939,7 +1947,7 @@ describe("RelayTui component", () => {
     }) as typeof fetch;
     try {
       const { lastFrame, unmount } = render(<RelayTuiHost onExit={() => undefined} />);
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      await waitForFrame(lastFrame, /Host daemon ready/);
 
       assert.match(lastFrame() ?? "", /Host daemon ready/);
       assert.match(lastFrame() ?? "", new RegExp(workspace.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
@@ -2015,7 +2023,7 @@ describe("RelayTui component", () => {
     }) as typeof fetch;
     try {
       const { lastFrame, unmount } = render(<RelayTuiHost onExit={() => undefined} />);
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      await waitForFrame(lastFrame, /Host daemon ready/);
 
       assert.match(lastFrame() ?? "", /Host daemon ready/);
       assert.match(lastFrame() ?? "", /Sandbox sbx_bob assigned/);

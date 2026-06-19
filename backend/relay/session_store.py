@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
+import time
+from threading import RLock
 from pathlib import Path
 from typing import Any
 
 from loguru import logger
 from sqlalchemy import BigInteger, JSON, Column, DateTime, ForeignKey, MetaData, Table, Text, Uuid, create_engine, delete, insert, select, update
+from sqlalchemy.exc import IntegrityError
 
 from .store_common import (
     DEFAULT_RELAY_DATA_DIR,
@@ -28,42 +31,50 @@ class LocalSessionStore:
     def __init__(self, root_dir: str | Path = DEFAULT_RELAY_DATA_DIR):
         self.root_dir = Path(root_dir)
         self.sessions_dir = self.root_dir / "sessions"
+        self._lock = RLock()
         self.sessions_dir.mkdir(parents=True, exist_ok=True)
 
     def create_session(self, input: dict[str, Any]) -> dict[str, Any]:
-        session_id = new_relay_id("ses")
-        (self._session_dir(session_id) / "artifacts").mkdir(parents=True, exist_ok=True)
-        logger.debug("Creating session", session_id=session_id, workspace_path=input.get("workspacePath"))
-        event = relay_event("session.created", session_id, {
-            "workspacePath": input["workspacePath"],
-            **({"ownerEmployeeId": input["ownerEmployeeId"]} if input.get("ownerEmployeeId") else {}),
-            "taskGoal": input["taskGoal"],
-            "participants": input.get("participants", ["human"]),
-        })
-        events = [event]
-        if input.get("status") or input.get("pendingDecision"):
-            events.append(relay_event("session.status", session_id, {
-                "status": input.get("status", "running"),
-                "phase": f"waiting:{input['pendingDecision']}" if input.get("pendingDecision") else "created",
-                **({"pendingDecision": input["pendingDecision"]} if input.get("pendingDecision") else {}),
-            }))
-        session = materialize_events(events)
-        self._events_path(session_id).write_text("".join(json.dumps(item, separators=(",", ":")) + "\n" for item in events), encoding="utf-8")
-        _write_json(self._snapshot_path(session_id), session)
-        return session
+        with self._lock:
+            session_id = new_relay_id("ses")
+            (self._session_dir(session_id) / "artifacts").mkdir(parents=True, exist_ok=True)
+            logger.debug("Creating session", session_id=session_id, workspace_path=input.get("workspacePath"))
+            event = relay_event("session.created", session_id, {
+                "workspacePath": input["workspacePath"],
+                **({"ownerEmployeeId": input["ownerEmployeeId"]} if input.get("ownerEmployeeId") else {}),
+                "taskGoal": input["taskGoal"],
+                "participants": input.get("participants", ["human"]),
+            })
+            events = [event]
+            if input.get("status") or input.get("pendingDecision"):
+                events.append(relay_event("session.status", session_id, {
+                    "status": input.get("status", "running"),
+                    "phase": f"waiting:{input['pendingDecision']}" if input.get("pendingDecision") else "created",
+                    **({"pendingDecision": input["pendingDecision"]} if input.get("pendingDecision") else {}),
+                }))
+            session = materialize_events(events)
+            self._events_path(session_id).write_text("".join(json.dumps(item, separators=(",", ":")) + "\n" for item in events), encoding="utf-8")
+            _write_json(self._snapshot_path(session_id), session)
+            return session
 
     def append_event(self, session_id: str, event: dict[str, Any]) -> dict[str, Any]:
-        self._session_dir(session_id).mkdir(parents=True, exist_ok=True)
-        _append_jsonl(self._events_path(session_id), event)
-        logger.debug("Session event appended", session_id=session_id, event_type=event.get("type"))
-        session = materialize_events(_read_jsonl(self._events_path(session_id)))
-        _write_json(self._snapshot_path(session_id), session)
-        return session
+        with self._lock:
+            self._session_dir(session_id).mkdir(parents=True, exist_ok=True)
+            _append_jsonl(self._events_path(session_id), event)
+            logger.debug("Session event appended", session_id=session_id, event_type=event.get("type"))
+            if self._snapshot_path(session_id).exists():
+                events = [*_read_json(self._snapshot_path(session_id)).get("events", []), event]
+            else:
+                events = _read_jsonl(self._events_path(session_id))
+            session = materialize_events(events)
+            _write_json(self._snapshot_path(session_id), session)
+            return session
 
     def get_session(self, session_id: str) -> dict[str, Any]:
-        if self._snapshot_path(session_id).exists():
-            return _read_json(self._snapshot_path(session_id))
-        return materialize_events(_read_jsonl(self._events_path(session_id)))
+        with self._lock:
+            if self._snapshot_path(session_id).exists():
+                return _read_json(self._snapshot_path(session_id))
+            return materialize_events(_read_jsonl(self._events_path(session_id)))
 
     def list_sessions(self) -> list[dict[str, Any]]:
         if not self.sessions_dir.exists():
@@ -72,23 +83,24 @@ class LocalSessionStore:
         return sorted(sessions, key=lambda item: item["updatedAt"], reverse=True)
 
     def write_artifact(self, session_id: str, input: dict[str, Any]) -> dict[str, Any]:
-        artifact_id = new_relay_id("art")
-        extension = input.get("extension") or "txt"
-        artifact_dir = self._session_dir(session_id) / "artifacts"
-        artifact_dir.mkdir(parents=True, exist_ok=True)
-        path = artifact_dir / f"{artifact_id}.{extension}"
-        body = input["body"]
-        path.write_text(body, encoding="utf-8")
-        logger.debug("Artifact written", session_id=session_id, artifact_id=artifact_id, kind=input.get("kind"), bytes=len(body.encode("utf-8")))
-        return {
-            "id": artifact_id,
-            "kind": input["kind"],
-            "title": input["title"],
-            "path": str(path),
-            "createdAt": now_iso(),
-            **({"agentRunId": input["agentRunId"]} if input.get("agentRunId") else {}),
-            "bytes": len(body.encode("utf-8")),
-        }
+        with self._lock:
+            artifact_id = new_relay_id("art")
+            extension = input.get("extension") or "txt"
+            artifact_dir = self._session_dir(session_id) / "artifacts"
+            artifact_dir.mkdir(parents=True, exist_ok=True)
+            path = artifact_dir / f"{artifact_id}.{extension}"
+            body = input["body"]
+            path.write_text(body, encoding="utf-8")
+            logger.debug("Artifact written", session_id=session_id, artifact_id=artifact_id, kind=input.get("kind"), bytes=len(body.encode("utf-8")))
+            return {
+                "id": artifact_id,
+                "kind": input["kind"],
+                "title": input["title"],
+                "path": str(path),
+                "createdAt": now_iso(),
+                **({"agentRunId": input["agentRunId"]} if input.get("agentRunId") else {}),
+                "bytes": len(body.encode("utf-8")),
+            }
 
     def artifact_path(self, session_id: str, artifact_id: str) -> Path:
         for artifact in self.get_session(session_id).get("artifacts", []):
@@ -204,14 +216,28 @@ class DatabaseSessionStore:
         return session
 
     def append_event(self, session_id: str, event: dict[str, Any]) -> dict[str, Any]:
+        for attempt in range(3):
+            try:
+                return self._append_event_once(session_id, event)
+            except IntegrityError:
+                if attempt == 2:
+                    raise
+                time.sleep(0.01 * (attempt + 1))
+        raise RuntimeError("unreachable")
+
+    def _append_event_once(self, session_id: str, event: dict[str, Any]) -> dict[str, Any]:
         with self.engine.begin() as conn:
-            session_pk = self._session_pk(conn, session_id)
-            events = self._events_for_session(conn, session_pk)
-            if not events:
+            row = conn.execute(
+                select(self.sessions.c.id, self.sessions.c.snapshot, self.sessions.c.version)
+                .where(self.sessions.c.public_id == session_id)
+                .with_for_update()
+            ).mappings().first()
+            if not row:
                 raise KeyError(session_id)
-            sequence = len(events)
+            session_pk = row["id"]
+            sequence = int(row["version"] or 0)
             conn.execute(insert(self.events).values(**session_event_to_row(session_pk, sequence, event)))
-            session = materialize_events([*events, event])
+            session = materialize_events([*(row["snapshot"] or {}).get("events", []), event])
             conn.execute(update(self.sessions).where(self.sessions.c.id == session_pk).values(**session_to_row(session, version=sequence + 1, database_id=session_pk)))
             self._sync_token_usage(conn, session_pk, session)
         logger.debug("Database session event appended", session_id=session_id, event_type=event.get("type"))
@@ -288,8 +314,11 @@ class DatabaseSessionStore:
     def read_artifact(self, session_id: str, artifact_id: str) -> str:
         return self.artifact_path(session_id, artifact_id).read_text(encoding="utf-8")
 
-    def _session_pk(self, conn: Any, session_id: str) -> str:
-        session_pk = conn.scalar(select(self.sessions.c.id).where(self.sessions.c.public_id == session_id))
+    def _session_pk(self, conn: Any, session_id: str, *, lock: bool = False) -> str:
+        statement = select(self.sessions.c.id).where(self.sessions.c.public_id == session_id)
+        if lock:
+            statement = statement.with_for_update()
+        session_pk = conn.scalar(statement)
         if not session_pk:
             raise KeyError(session_id)
         return session_pk

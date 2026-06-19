@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from tempfile import TemporaryDirectory
 
 import pytest
@@ -214,7 +215,7 @@ def test_daemon_run_timeout_marks_session_failed(monkeypatch) -> None:
     asyncio.run(run_flow())
 
 
-def test_database_daemon_store_persists_plaintext_node_token() -> None:
+def test_database_daemon_store_redacts_plaintext_node_token() -> None:
     with TemporaryDirectory() as root:
         store = DatabaseDaemonStore(f"sqlite:///{root}/daemon.db", create_schema=True)
         store.register_node({
@@ -234,8 +235,41 @@ def test_database_daemon_store_persists_plaintext_node_token() -> None:
         [node] = store.list_nodes()
         assert node["id"] == "sbx_alice"
         assert node["nodeTokenHash"] == "sha256:hash"
-        assert node["nodeToken"] == "tok_secret"
+        assert "nodeToken" not in node
         assert node["token"] is None
+
+
+def test_database_daemon_store_claims_queued_commands_once() -> None:
+    with TemporaryDirectory() as root:
+        store = DatabaseDaemonStore(f"sqlite:///{root}/daemon.db", create_schema=True)
+        store.register_node({
+            "id": "sbx_alice",
+            "employeeId": "alice",
+            "workspacePath": "/workspace/alice",
+            "status": "ready",
+            "agents": {"codex": "ready"},
+            "token": None,
+            "nodeToken": "tok_secret",
+            "nodeTokenHash": "sha256:hash",
+            "createdAt": "2026-06-13T00:00:00.000Z",
+            "updatedAt": "2026-06-13T00:00:00.000Z",
+        })
+        store.enqueue_command("sbx_alice", {
+            "id": "cmd_once",
+            "type": "run.start",
+            "sessionId": "ses_1",
+            "runId": "run_1",
+            "agent": "codex",
+            "mode": "implement",
+            "taskGoal": "fix auth",
+        })
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(lambda _: store.take_queued_commands("sbx_alice"), range(2)))
+
+        claimed = [command for commands in results for command in commands]
+        assert [command["id"] for command in claimed] == ["cmd_once"]
+        assert store.queued_command_count("sbx_alice") == 0
 
 
 def test_daemon_run_rejects_ownerless_sessions() -> None:
@@ -268,6 +302,39 @@ def test_daemon_run_rejects_ownerless_sessions() -> None:
                 })
 
     asyncio.run(run_flow())
+
+
+def test_daemon_run_dispatch_rejects_concurrent_second_claim() -> None:
+    with TemporaryDirectory() as root:
+        session_store = LocalSessionStore(root)
+        daemon_store = LocalDaemonStore(root)
+        registry = DaemonNodeRegistry(session_store, daemon_store)
+        backend = ServerDaemonNodeBackend(registry)
+        registry.register({
+            "sandboxId": "sbx_alice",
+            "employeeId": "alice",
+            "token": "node_token",
+            "workspacePath": "/workspace/alice",
+            "protocolVersion": 1,
+            "supportedAgents": ["codex"],
+            "status": "ready",
+        }, "ui_token")
+
+        def run_once() -> str:
+            try:
+                asyncio.run(backend.run("sbx_alice", {
+                    "taskGoal": "fix auth",
+                    "assignments": [{"agent": "codex", "mode": "implement"}],
+                }))
+                return "started"
+            except ValueError as error:
+                return str(error)
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(lambda _: run_once(), range(2)))
+
+        assert results.count("started") == 1
+        assert any("not ready" in result for result in results)
 
 
 def test_set_disabled_agents_blocks_dispatch_and_survives_restart() -> None:

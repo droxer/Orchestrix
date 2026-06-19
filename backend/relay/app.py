@@ -7,8 +7,9 @@ from typing import Any
 from fastapi import FastAPI
 from loguru import logger
 
-from .api import admin_routes, auth_routes, daemon_node_routes, sandbox_routes, session_routes, task_routes, web_routes
+from .api import admin_routes, auth_routes, chat_routes, daemon_node_routes, sandbox_routes, session_routes, task_routes, web_routes
 from .auth import auth_store_from_env
+from .chat_integrations import LocalChatIntegrationStore
 from .daemon import DaemonNodeRegistry, ServerDaemonNodeBackend
 from .environment import load_backend_env
 from .storage_config import database_url_from_env, use_postgres_storage
@@ -35,6 +36,7 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     session_store = session_store_from_env(root_dir)
     task_store = task_store_from_env(root_dir)
     daemon_store = daemon_store_from_env(root_dir)
+    chat_store = LocalChatIntegrationStore(root_dir)
     registry = DaemonNodeRegistry(session_store, daemon_store)
     backend = ServerDaemonNodeBackend(registry)
     auth_store = auth_store_from_env(root_dir)
@@ -43,6 +45,7 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     app.state.session_store = session_store
     app.state.task_store = task_store
     app.state.daemon_store = daemon_store
+    app.state.chat_store = chat_store
     app.state.registry = registry
     app.state.backend = backend
     app.state.auth_store = auth_store
@@ -72,6 +75,7 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     app.include_router(web_routes.router)
     app.include_router(auth_routes.router)
     app.include_router(admin_routes.router)
+    app.include_router(chat_routes.router)
     app.include_router(task_routes.router)
     app.include_router(session_routes.router)
     app.include_router(sandbox_routes.router)

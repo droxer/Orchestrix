@@ -1,6 +1,9 @@
 import type {
   AgentName,
   AssignControlPanelDaemonNodeResponse,
+  ChatIntegration,
+  ChatIntegrationsResponse,
+  ChatProvider,
   CreateControlPanelEmployeeInput,
   CreateControlPanelEmployeeResponse,
   CreateControlPanelDaemonNodeInput,
@@ -236,6 +239,74 @@ export function getDashboardActivity(signal?: AbortSignal): Promise<{ items: Das
 
 export function getDashboardTokens(signal?: AbortSignal): Promise<TokenUsageSnapshot> {
   return apiJson<TokenUsageSnapshot>("/cp/dashboard/tokens", { signal });
+}
+
+export function listChatIntegrations(signal?: AbortSignal): Promise<ChatIntegrationsResponse> {
+  return apiJson<ChatIntegrationsResponse>("/cp/chat-integrations", { signal });
+}
+
+export function createChatIntegration(input: {
+  provider: ChatProvider;
+  displayName: string;
+  tenantId?: string;
+  secrets?: Record<string, string>;
+  config?: Record<string, string | number | boolean>;
+}): Promise<{ integration: ChatIntegration }> {
+  return apiJson<{ integration: ChatIntegration }>("/cp/chat-integrations", {
+    method: "POST",
+    body: input,
+  });
+}
+
+export function checkChatIntegration(integrationId: string): Promise<{ integration: ChatIntegration }> {
+  return apiJson<{ integration: ChatIntegration }>(
+    `/cp/chat-integrations/${encodeURIComponent(integrationId)}/check`,
+    { method: "POST" },
+  );
+}
+
+export function activateChatIntegration(integrationId: string): Promise<{ integration: ChatIntegration }> {
+  return apiJson<{ integration: ChatIntegration }>(
+    `/cp/chat-integrations/${encodeURIComponent(integrationId)}/activate`,
+    { method: "POST" },
+  );
+}
+
+export function addChatIdentityLink(
+  integrationId: string,
+  input: { externalUserId: string; employeeId: string; displayName?: string; defaultSandboxId?: string },
+): Promise<{ integration: ChatIntegration }> {
+  return apiJson<{ integration: ChatIntegration }>(
+    `/cp/chat-integrations/${encodeURIComponent(integrationId)}/identity-links`,
+    { method: "POST", body: input },
+  );
+}
+
+export function deleteChatIdentityLink(integrationId: string, linkId: string): Promise<{ integration: ChatIntegration }> {
+  return apiJson<{ integration: ChatIntegration }>(
+    `/cp/chat-integrations/${encodeURIComponent(integrationId)}/identity-links/${encodeURIComponent(linkId)}`,
+    { method: "DELETE" },
+  );
+}
+
+export function addChatAllowedConversation(
+  integrationId: string,
+  input: { conversationId: string; threadId?: string; label?: string },
+): Promise<{ integration: ChatIntegration }> {
+  return apiJson<{ integration: ChatIntegration }>(
+    `/cp/chat-integrations/${encodeURIComponent(integrationId)}/allowed-conversations`,
+    { method: "POST", body: input },
+  );
+}
+
+export function deleteChatAllowedConversation(
+  integrationId: string,
+  conversationRecordId: string,
+): Promise<{ integration: ChatIntegration }> {
+  return apiJson<{ integration: ChatIntegration }>(
+    `/cp/chat-integrations/${encodeURIComponent(integrationId)}/allowed-conversations/${encodeURIComponent(conversationRecordId)}`,
+    { method: "DELETE" },
+  );
 }
 
 export function provisionSandbox(employeeId: string, token?: string, nodeToken?: string): Promise<SandboxRecord> {

@@ -286,6 +286,135 @@ async def create_control_panel_daemon_node(request: Request, ctx: AppContextDep)
     return response
 
 
+# ── Chat integrations ───────────────────────────────────────────────────
+
+def _actor_name(user: dict[str, Any]) -> str:
+    return str(user.get("username") or user.get("id") or "admin")
+
+
+def _chat_error(error: Exception) -> HTTPException:
+    if isinstance(error, KeyError):
+        return HTTPException(404, "Chat integration record not found.")
+    if isinstance(error, ValueError):
+        return HTTPException(400, str(error))
+    return HTTPException(500, "Chat integration operation failed.")
+
+
+@router.get("/cp/chat-integrations")
+async def list_chat_integrations(request: Request, ctx: AppContextDep) -> dict[str, Any]:
+    require_admin_session(request, ctx.auth_store)
+    return {"integrations": ctx.chat_store.list_integrations()}
+
+
+@router.post("/cp/chat-integrations", status_code=201)
+async def create_chat_integration(request: Request, ctx: AppContextDep) -> dict[str, Any]:
+    user = require_admin_session(request, ctx.auth_store)
+    body = await json_body(request)
+    try:
+        integration = ctx.chat_store.create_integration(body, actor=_actor_name(user))
+    except (KeyError, ValueError) as error:
+        raise _chat_error(error) from error
+    return {"integration": integration}
+
+
+@router.get("/cp/chat-integrations/{integration_id}")
+async def get_chat_integration(integration_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
+    require_admin_session(request, ctx.auth_store)
+    try:
+        integration = ctx.chat_store.get_integration(integration_id)
+    except (KeyError, ValueError) as error:
+        raise _chat_error(error) from error
+    return {"integration": integration}
+
+
+@router.patch("/cp/chat-integrations/{integration_id}")
+async def update_chat_integration(integration_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
+    user = require_admin_session(request, ctx.auth_store)
+    body = await json_body(request)
+    try:
+        integration = ctx.chat_store.update_integration(integration_id, body, actor=_actor_name(user))
+    except (KeyError, ValueError) as error:
+        raise _chat_error(error) from error
+    return {"integration": integration}
+
+
+@router.post("/cp/chat-integrations/{integration_id}/activate")
+async def activate_chat_integration(integration_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
+    user = require_admin_session(request, ctx.auth_store)
+    try:
+        integration = ctx.chat_store.activate_integration(integration_id, actor=_actor_name(user))
+    except (KeyError, ValueError) as error:
+        raise _chat_error(error) from error
+    return {"integration": integration}
+
+
+@router.post("/cp/chat-integrations/{integration_id}/check")
+async def check_chat_integration(integration_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
+    user = require_admin_session(request, ctx.auth_store)
+    try:
+        integration = ctx.chat_store.check_integration(integration_id, actor=_actor_name(user))
+    except (KeyError, ValueError) as error:
+        raise _chat_error(error) from error
+    return {"integration": integration}
+
+
+@router.post("/cp/chat-integrations/{integration_id}/identity-links", status_code=201)
+async def add_chat_identity_link(integration_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
+    user = require_admin_session(request, ctx.auth_store)
+    body = await json_body(request)
+    try:
+        integration = ctx.chat_store.add_identity_link(integration_id, body, actor=_actor_name(user))
+    except (KeyError, ValueError) as error:
+        raise _chat_error(error) from error
+    return {"integration": integration}
+
+
+@router.delete("/cp/chat-integrations/{integration_id}/identity-links/{link_id}")
+async def delete_chat_identity_link(integration_id: str, link_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
+    user = require_admin_session(request, ctx.auth_store)
+    try:
+        integration = ctx.chat_store.delete_identity_link(integration_id, link_id, actor=_actor_name(user))
+    except (KeyError, ValueError) as error:
+        raise _chat_error(error) from error
+    return {"integration": integration}
+
+
+@router.post("/cp/chat-integrations/{integration_id}/allowed-conversations", status_code=201)
+async def add_chat_allowed_conversation(integration_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
+    user = require_admin_session(request, ctx.auth_store)
+    body = await json_body(request)
+    try:
+        integration = ctx.chat_store.add_allowed_conversation(integration_id, body, actor=_actor_name(user))
+    except (KeyError, ValueError) as error:
+        raise _chat_error(error) from error
+    return {"integration": integration}
+
+
+@router.delete("/cp/chat-integrations/{integration_id}/allowed-conversations/{conversation_record_id}")
+async def delete_chat_allowed_conversation(
+    integration_id: str,
+    conversation_record_id: str,
+    request: Request,
+    ctx: AppContextDep,
+) -> dict[str, Any]:
+    user = require_admin_session(request, ctx.auth_store)
+    try:
+        integration = ctx.chat_store.delete_allowed_conversation(integration_id, conversation_record_id, actor=_actor_name(user))
+    except (KeyError, ValueError) as error:
+        raise _chat_error(error) from error
+    return {"integration": integration}
+
+
+@router.get("/cp/chat-integrations/{integration_id}/audit")
+async def list_chat_integration_audit(integration_id: str, request: Request, ctx: AppContextDep, limit: int = 50) -> dict[str, Any]:
+    require_admin_session(request, ctx.auth_store)
+    try:
+        ctx.chat_store.get_integration(integration_id)
+    except (KeyError, ValueError) as error:
+        raise _chat_error(error) from error
+    return {"events": ctx.chat_store.audit_events(integration_id, limit=limit)}
+
+
 # ── Dashboard ────────────────────────────────────────────────────────────
 # Aggregated, read-only stats for the admin Dashboard view. Built on the
 # existing session/task event stores — no schema changes. Token-usage stats

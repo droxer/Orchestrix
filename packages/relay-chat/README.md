@@ -17,5 +17,9 @@ The package keeps platform details at the edge:
 The shared core works with `employeeId`, `sandboxId`, `sessionId`, agent,
 mode, and task goal. Authorization remains a backend responsibility.
 
+Use `RelayChatIdentityResolver` with the Admin Console's chat integration setup
+when running provider adapters in production. It resolves provider users through
+the backend's active identity links and allowed-conversation gates.
+
 For setup, provider-specific adapter guidance, identity mapping, security, and
 rollout steps, see [Chat Integrations](../../docs/chat-integrations.md).

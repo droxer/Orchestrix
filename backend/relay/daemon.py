@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import os
 import secrets
+from threading import RLock
 import time
 from pathlib import Path
 from typing import Any
@@ -128,6 +129,7 @@ class DaemonNodeRegistry:
         self.outputs: dict[str, list[str]] = {}
         self.output_sequences: dict[str, set[int]] = {}
         self.plain_node_tokens: dict[str, str] = {}
+        self.dispatch_lock = RLock()
         self._load_persisted_state()
 
     def register(self, input: dict[str, Any], ui_token: str | None = None) -> dict[str, Any]:
@@ -769,51 +771,52 @@ class ServerDaemonNodeBackend:
         }
 
     async def run(self, sandbox_id: str, request: dict[str, Any]) -> dict[str, Any]:
-        self.registry.reap_stale_runs()
-        sandbox = self.registry.get(sandbox_id)
-        if not sandbox:
-            raise KeyError(f"Sandbox {sandbox_id} has no registered daemon node.")
-        if not sandbox.get("employeeId"):
-            raise ValueError(f"Sandbox {sandbox_id} daemon node is not assigned to an employee.")
-        if sandbox["status"] != "ready":
-            raise ValueError(f"Sandbox {sandbox_id} daemon node is not ready.")
-        if not self.registry.is_live(sandbox_id):
-            raise ValueError(f"Sandbox {sandbox_id} daemon node heartbeat expired.")
-        disabled = set(sandbox.get("disabledAgents") or [])
-        requested_agents = [assignment["agent"] for assignment in request["assignments"]]
-        disabled_hit = [agent for agent in requested_agents if agent in disabled]
-        not_ready = [
-            agent
-            for agent in requested_agents
-            if agent not in disabled and sandbox.get("agents", {}).get(agent) != "ready"
-        ]
-        if disabled_hit:
-            detail = ", ".join(dict.fromkeys(disabled_hit))
-            raise ValueError(
-                f"Sandbox {sandbox_id} daemon node has disabled agent(s): {detail}. "
-                "Re-enable them from the admin console to dispatch work."
-            )
-        if not_ready:
-            detail = ", ".join(dict.fromkeys(not_ready))
-            raise ValueError(f"Sandbox {sandbox_id} daemon node does not have ready agent(s): {detail}.")
-        actor_employee_id = request.get("actorEmployeeId")
-        owner_employee_id = actor_employee_id or sandbox["employeeId"]
-        if request.get("sessionId"):
-            session_owner = session_owner_employee_id(self.registry.store, request["sessionId"])
-            if actor_employee_id and not request.get("actorIsAdmin"):
-                assert_session_owned_by_employee(self.registry.store, request["sessionId"], actor_employee_id)
-            if not actor_employee_id:
-                assert_session_owned_by_employee(self.registry.store, request["sessionId"], sandbox["employeeId"])
-            owner_employee_id = session_owner
-        self.registry.update_status(sandbox_id, {"status": "running", "lastError": None})
-        controller = SessionController(self.registry.store, workspace_path=sandbox.get("workspacePath") or "/workspace", owner_employee_id=owner_employee_id)
-        session_id = request.get("sessionId") or controller.create_session(
-            request["taskGoal"],
-            ["human", *dict.fromkeys(assignment["agent"] for assignment in request["assignments"])],
-        )["id"]
-        state = initial_agent_state(request["taskGoal"])
-        self.registry.start_run_request(sandbox_id, session_id, request["taskGoal"], request["assignments"], state)
-        return self.registry.store.get_session(session_id)
+        with self.registry.dispatch_lock:
+            self.registry.reap_stale_runs()
+            sandbox = self.registry.get(sandbox_id)
+            if not sandbox:
+                raise KeyError(f"Sandbox {sandbox_id} has no registered daemon node.")
+            if not sandbox.get("employeeId"):
+                raise ValueError(f"Sandbox {sandbox_id} daemon node is not assigned to an employee.")
+            if sandbox["status"] != "ready":
+                raise ValueError(f"Sandbox {sandbox_id} daemon node is not ready.")
+            if not self.registry.is_live(sandbox_id):
+                raise ValueError(f"Sandbox {sandbox_id} daemon node heartbeat expired.")
+            disabled = set(sandbox.get("disabledAgents") or [])
+            requested_agents = [assignment["agent"] for assignment in request["assignments"]]
+            disabled_hit = [agent for agent in requested_agents if agent in disabled]
+            not_ready = [
+                agent
+                for agent in requested_agents
+                if agent not in disabled and sandbox.get("agents", {}).get(agent) != "ready"
+            ]
+            if disabled_hit:
+                detail = ", ".join(dict.fromkeys(disabled_hit))
+                raise ValueError(
+                    f"Sandbox {sandbox_id} daemon node has disabled agent(s): {detail}. "
+                    "Re-enable them from the admin console to dispatch work."
+                )
+            if not_ready:
+                detail = ", ".join(dict.fromkeys(not_ready))
+                raise ValueError(f"Sandbox {sandbox_id} daemon node does not have ready agent(s): {detail}.")
+            actor_employee_id = request.get("actorEmployeeId")
+            owner_employee_id = actor_employee_id or sandbox["employeeId"]
+            if request.get("sessionId"):
+                session_owner = session_owner_employee_id(self.registry.store, request["sessionId"])
+                if actor_employee_id and not request.get("actorIsAdmin"):
+                    assert_session_owned_by_employee(self.registry.store, request["sessionId"], actor_employee_id)
+                if not actor_employee_id:
+                    assert_session_owned_by_employee(self.registry.store, request["sessionId"], sandbox["employeeId"])
+                owner_employee_id = session_owner
+            self.registry.update_status(sandbox_id, {"status": "running", "lastError": None})
+            controller = SessionController(self.registry.store, workspace_path=sandbox.get("workspacePath") or "/workspace", owner_employee_id=owner_employee_id)
+            session_id = request.get("sessionId") or controller.create_session(
+                request["taskGoal"],
+                ["human", *dict.fromkeys(assignment["agent"] for assignment in request["assignments"])],
+            )["id"]
+            state = initial_agent_state(request["taskGoal"])
+            self.registry.start_run_request(sandbox_id, session_id, request["taskGoal"], request["assignments"], state)
+            return self.registry.store.get_session(session_id)
 
     def cancel_run(self, sandbox_id: str, session_id: str, reason: str, actor_employee_id: str | None = None) -> dict[str, Any]:
         sandbox = self.registry.get(sandbox_id)

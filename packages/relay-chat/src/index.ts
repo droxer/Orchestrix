@@ -9,7 +9,9 @@ export {
 } from "./gateway.js";
 
 export {
+  RelayChatIdentityResolver,
   StaticChatIdentityResolver,
+  type RelayChatIdentityResolverOptions,
   type StaticChatIdentityRecord,
 } from "./identity.js";
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from threading import RLock
 from typing import Any
 
 from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, MetaData, Table, Text, Uuid, create_engine, delete, insert, select, update
@@ -24,6 +25,7 @@ from .store_common import (
 class LocalDaemonStore:
     def __init__(self, root_dir: str | Path = DEFAULT_RELAY_DATA_DIR):
         root = Path(root_dir)
+        self._lock = RLock()
         self.nodes_dir = root / "daemon" / "nodes"
         self.commands_dir = root / "daemon" / "commands"
         self.runs_dir = root / "daemon" / "runs"
@@ -33,23 +35,25 @@ class LocalDaemonStore:
             path.mkdir(parents=True, exist_ok=True)
 
     def register_node(self, sandbox: dict[str, Any]) -> dict[str, Any]:
-        node = {**sandbox, "token": None}
-        _write_json(self.nodes_dir / f"{safe_name(node['id'])}.json", node, 0o600)
-        self.append_daemon_event(daemon_event("daemon.node.registered", {"node": node}))
-        return node
+        with self._lock:
+            node = {**sandbox, "token": None}
+            _write_json(self.nodes_dir / f"{safe_name(node['id'])}.json", node, 0o600)
+            self.append_daemon_event(daemon_event("daemon.node.registered", {"node": node}))
+            return node
 
     def mark_node_seen(self, node_id: str, patch: dict[str, Any] | None = None) -> dict[str, Any] | None:
-        node = self.get_node(node_id)
-        if not node:
-            return None
-        now = now_iso()
-        patch = patch or {}
-        updated = {**node, **{k: v for k, v in patch.items() if v is not None}, "updatedAt": now, "lastSeenAt": now}
-        if patch.get("lastError") is None and "lastError" in patch:
-            updated.pop("lastError", None)
-        _write_json(self.nodes_dir / f"{safe_name(node_id)}.json", updated, 0o600)
-        self.append_daemon_event(daemon_event("daemon.node.seen", {"nodeId": node_id, "patch": {**patch, "lastSeenAt": now}}))
-        return updated
+        with self._lock:
+            node = self.get_node(node_id)
+            if not node:
+                return None
+            now = now_iso()
+            patch = patch or {}
+            updated = {**node, **{k: v for k, v in patch.items() if v is not None}, "updatedAt": now, "lastSeenAt": now}
+            if patch.get("lastError") is None and "lastError" in patch:
+                updated.pop("lastError", None)
+            _write_json(self.nodes_dir / f"{safe_name(node_id)}.json", updated, 0o600)
+            self.append_daemon_event(daemon_event("daemon.node.seen", {"nodeId": node_id, "patch": {**patch, "lastSeenAt": now}}))
+            return updated
 
     def assign_node_employee(self, node_id: str, employee_id: str) -> dict[str, Any]:
         node = self.get_node(node_id)
@@ -116,39 +120,41 @@ class LocalDaemonStore:
         return [_read_json(path) for path in self.nodes_dir.glob("*.json")]
 
     def enqueue_command(self, node_id: str, command: dict[str, Any]) -> dict[str, Any]:
-        now = now_iso()
-        record = {"id": command["id"], "nodeId": node_id, "command": command, "status": "queued", "createdAt": now, "updatedAt": now}
-        _write_json(self.commands_dir / f"{safe_name(record['id'])}.json", record)
-        if command["type"] == "run.start":
-            self._write_run({
-                "nodeId": node_id,
-                "commandId": command["id"],
-                "sessionId": command["sessionId"],
-                "runId": command["runId"],
-                "agent": command["agent"],
-                "mode": command["mode"],
-                "taskGoal": command["taskGoal"],
-                **({"workspacePath": command["workspacePath"]} if command.get("workspacePath") else {}),
-                "status": "running",
-                "startedAt": now,
-            })
-        self.append_daemon_event(daemon_event("daemon.command.queued", {"nodeId": node_id, "commandId": command["id"]}))
-        return record
+        with self._lock:
+            now = now_iso()
+            record = {"id": command["id"], "nodeId": node_id, "command": command, "status": "queued", "createdAt": now, "updatedAt": now}
+            _write_json(self.commands_dir / f"{safe_name(record['id'])}.json", record)
+            if command["type"] == "run.start":
+                self._write_run({
+                    "nodeId": node_id,
+                    "commandId": command["id"],
+                    "sessionId": command["sessionId"],
+                    "runId": command["runId"],
+                    "agent": command["agent"],
+                    "mode": command["mode"],
+                    "taskGoal": command["taskGoal"],
+                    **({"workspacePath": command["workspacePath"]} if command.get("workspacePath") else {}),
+                    "status": "running",
+                    "startedAt": now,
+                })
+            self.append_daemon_event(daemon_event("daemon.command.queued", {"nodeId": node_id, "commandId": command["id"]}))
+            return record
 
     def take_queued_commands(self, node_id: str, limit: int = 2**53) -> list[dict[str, Any]]:
-        now = now_iso()
-        records = [record for record in self._list_commands() if record["nodeId"] == node_id and record["status"] == "queued"]
-        records = sorted(records, key=lambda item: item["createdAt"])[:limit]
-        result = []
-        for record in records:
-            updated = {**record, "status": "dispatched", "updatedAt": now, "dispatchedAt": now}
-            if record["command"]["type"] == "run.cancel":
-                updated["status"] = "completed"
-                updated["completedAt"] = now
-            _write_json(self.commands_dir / f"{safe_name(record['id'])}.json", updated)
-            self.append_daemon_event(daemon_event("daemon.command.dispatched", {"nodeId": node_id, "commandId": record["id"]}))
-            result.append(updated)
-        return result
+        with self._lock:
+            now = now_iso()
+            records = [record for record in self._list_commands() if record["nodeId"] == node_id and record["status"] == "queued"]
+            records = sorted(records, key=lambda item: item["createdAt"])[:limit]
+            result = []
+            for record in records:
+                updated = {**record, "status": "dispatched", "updatedAt": now, "dispatchedAt": now}
+                if record["command"]["type"] == "run.cancel":
+                    updated["status"] = "completed"
+                    updated["completedAt"] = now
+                _write_json(self.commands_dir / f"{safe_name(record['id'])}.json", updated)
+                self.append_daemon_event(daemon_event("daemon.command.dispatched", {"nodeId": node_id, "commandId": record["id"]}))
+                result.append(updated)
+            return result
 
     def queued_command_count(self, node_id: str) -> int:
         return len([record for record in self._list_commands() if record["nodeId"] == node_id and record["status"] == "queued"])
@@ -193,20 +199,21 @@ class LocalDaemonStore:
         return next((request for request in self.list_active_run_requests() if request.get("currentCommandId") == command_id), None)
 
     def update_run_request(self, request_id: str, patch: dict[str, Any]) -> dict[str, Any]:
-        current = self.get_run_request(request_id)
-        if not current:
-            raise KeyError(request_id)
-        now = now_iso()
-        updated = {**current, **patch, "updatedAt": now}
-        if patch.get("status") in ("completed", "failed", "cancelled"):
-            updated["completedAt"] = now
-        _write_json(self.run_requests_dir / f"{safe_name(request_id)}.json", updated)
-        self.append_daemon_event(daemon_event("daemon.run_request.updated", {
-            "nodeId": updated["nodeId"],
-            "runRequestId": updated["id"],
-            "status": updated["status"],
-        }))
-        return updated
+        with self._lock:
+            current = self.get_run_request(request_id)
+            if not current:
+                raise KeyError(request_id)
+            now = now_iso()
+            updated = {**current, **patch, "updatedAt": now}
+            if patch.get("status") in ("completed", "failed", "cancelled"):
+                updated["completedAt"] = now
+            _write_json(self.run_requests_dir / f"{safe_name(request_id)}.json", updated)
+            self.append_daemon_event(daemon_event("daemon.run_request.updated", {
+                "nodeId": updated["nodeId"],
+                "runRequestId": updated["id"],
+                "status": updated["status"],
+            }))
+            return updated
 
     def mark_command_completed(self, node_id: str, event: dict[str, Any]) -> None:
         self._mark_command_terminal(node_id, event, "completed", event.get("exitCode"), None)
@@ -506,6 +513,7 @@ class DatabaseDaemonStore:
                 .where(self.commands.c.status == "queued")
                 .order_by(self.commands.c.created_at)
                 .limit(limit)
+                .with_for_update(skip_locked=True)
             ).mappings().all()
             result = []
             for row in rows:
@@ -514,7 +522,14 @@ class DatabaseDaemonStore:
                 if record["command"]["type"] == "run.cancel":
                     updated["status"] = "completed"
                     updated["completedAt"] = now
-                conn.execute(update(self.commands).where(self.commands.c.id == record["databaseId"]).values(**command_to_row(updated, database_id=record["databaseId"], node_pk=node_pk)))
+                claimed = conn.execute(
+                    update(self.commands)
+                    .where(self.commands.c.id == record["databaseId"])
+                    .where(self.commands.c.status == "queued")
+                    .values(**command_to_row(updated, database_id=record["databaseId"], node_pk=node_pk))
+                )
+                if claimed.rowcount != 1:
+                    continue
                 self._append_daemon_event(conn, daemon_event("daemon.command.dispatched", {"nodeId": node_id, "commandId": record["id"]}))
                 result.append(updated)
         return result
@@ -685,7 +700,9 @@ def node_to_row(node: dict[str, Any], *, database_id: str | None = None) -> dict
         "disabled_agents": list(node.get("disabledAgents") or []),
         "ui_token_hash": node.get("uiTokenHash"),
         "node_token_hash": node.get("nodeTokenHash"),
-        "node_token": node.get("nodeToken"),
+        # Legacy column kept for migrations/backward compatibility. Plaintext
+        # node tokens are intentionally process-local and must not be persisted.
+        "node_token": None,
         "token_hash": node.get("tokenHash"),
         "last_error": node.get("lastError"),
         "created_at": _parse_iso(node["createdAt"]),
@@ -707,7 +724,6 @@ def row_to_node(row: Any) -> dict[str, Any]:
         **({"tokenHash": row["token_hash"]} if row.get("token_hash") else {}),
         **({"uiTokenHash": row["ui_token_hash"]} if row.get("ui_token_hash") else {}),
         **({"nodeTokenHash": row["node_token_hash"]} if row.get("node_token_hash") else {}),
-        **({"nodeToken": row["node_token"]} if row.get("node_token") else {}),
         **({"lastError": row["last_error"]} if row.get("last_error") else {}),
         "createdAt": _format_iso(row["created_at"]),
         "updatedAt": _format_iso(row["updated_at"]),
