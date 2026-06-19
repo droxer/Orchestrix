@@ -137,7 +137,7 @@ Key modules:
 - `packages/relay-daemon/src/index.ts`: daemon runtime — registers with the
   backend, polls for commands, owns the sandbox, and runs agent CLIs.
 - `packages/relay-tui/src/tui.tsx`: Ink-based TUI. Owns input parsing for `@claude`, `@pi`,
-  `@codex`, `/approve`, `/reject`, `/cancel`, `/rerun`, `/handoff`,
+  `@codex`, `@kimi`, `/approve`, `/reject`, `/cancel`, `/rerun`, `/handoff`,
   `/sessions`, `/open`, `/summary`, and `/quit`.
 - `packages/relay-daemon/src/sandbox-session.ts`: sandbox session lifecycle and
   agent readiness preflight (`ensureAgentReady`).
@@ -225,7 +225,14 @@ Test focus:
 
 - `packages/relay-core/tests/handoff.test.ts`: routing, prompt construction, stream rendering, and
   Codex review verdict parsing.
+- `packages/relay-chat/tests/chat.test.ts`: chat gateway, provider adapters,
+  command parsing, and relay-client integration.
+- `packages/relay-daemon/tests/daemon.test.ts`: daemon registration, command
+  polling, and agent execution.
 - `backend/tests/`: Python controller, event store behavior, daemon registry,
   and HTTP API tests.
 - `packages/relay-tui/tests/tui.test.tsx`: Ink rendering through `ink-testing-library`.
 - `web/tests/status.test.ts`: web daemon-node status derivation.
+- `web/tests/agentStream.test.ts`, `web/tests/messageBlock.test.ts`,
+  `web/tests/tokenUsage.test.ts`, `web/tests/manageAgents.test.ts`: web
+  component and utility unit tests.

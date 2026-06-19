@@ -54,11 +54,15 @@ Set agent credentials in `packages/.env`, `packages/relay-core/.env`,
 ```bash
 ANTHROPIC_API_KEY=...
 OPENAI_API_KEY=...
-OPENAI_BASE_URL=...     # optional compatible endpoint
-OPENAI_MODEL=...        # optional
-PI_API_KEY=...          # optional override
-PI_BASE_URL=...         # optional override
-PI_MODEL=...            # optional override
+OPENAI_BASE_URL=...       # optional compatible endpoint
+OPENAI_MODEL=...          # optional
+PI_API_KEY=...            # optional override
+PI_BASE_URL=...           # optional override
+PI_MODEL=...              # optional override
+KIMI_API_KEY=...          # optional; Kimi agent via Moonshot API
+KIMI_BASE_URL=...         # optional override
+KIMI_MODEL=...            # optional override
+MOONSHOT_API_KEY=...      # alternative Moonshot credential
 ```
 
 Shell environment values always win. Package-local env files override
@@ -260,6 +264,7 @@ Assign agents from the TUI:
 @claude fix auth middleware
 @claude @pi @codex add tests for upload routing
 @codex inspect the current diff
+@kimi analyze the codebase structure
 ```
 
 Useful slash commands:
@@ -405,6 +410,14 @@ packages/relay-core/src/commands.ts             agent command builders
 packages/relay-core/src/prompts.ts              agent prompt builders
 packages/relay-core/src/renderers.ts            stream-json and JSONL renderers
 packages/relay-core/src/routing.ts              default workflow routing helpers
+packages/relay-core/src/token-usage.ts          TokenUsage type and normalizeTokenUsage
+packages/relay-chat/src/gateway.ts              RelayChatGateway — routes chat events to backend
+packages/relay-chat/src/relay-client.ts         HTTP client for chat → backend calls
+packages/relay-chat/src/identity.ts             StaticChatIdentityResolver
+packages/relay-chat/src/commands.ts             shared /relay command parser
+packages/relay-chat/src/providers/discord.ts    Discord adapter
+packages/relay-chat/src/providers/telegram.ts   Telegram adapter
+packages/relay-chat/src/providers/lark.ts       Lark adapter
 packages/relay-daemon/src/cli.ts                daemon binary entrypoint
 packages/relay-daemon/src/index.ts              daemon runtime
 packages/relay-daemon/src/box.ts                BoxLite VM setup
@@ -434,10 +447,17 @@ Test coverage is organized as:
   task updates, daemon registry behavior, and HTTP API routes.
 - `packages/relay-core/tests/handoff.test.ts`: routing, prompt contracts, Codex verdict
   parsing, command generation, stream renderers, and BoxLite helpers.
+- `packages/relay-chat/tests/chat.test.ts`: chat gateway, provider adapters,
+  command parsing, and relay-client integration.
+- `packages/relay-daemon/tests/daemon.test.ts`: daemon registration, command
+  polling, and agent execution.
 - `packages/relay-tui/tests/tui.test.tsx`: TUI parsing, shortcuts, rendering,
   cancellation, session state updates, and slash commands.
 - `web/tests/status.test.ts`: web status derivation for daemon nodes and
   conversations.
+- `web/tests/agentStream.test.ts`, `web/tests/messageBlock.test.ts`,
+  `web/tests/tokenUsage.test.ts`, `web/tests/manageAgents.test.ts`: web
+  component and utility unit tests.
 
 Use focused tests for behavior changes, then run the relevant layer before the
 full `npm test`.
