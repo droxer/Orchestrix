@@ -144,6 +144,7 @@ class DaemonNodeRegistry:
         employee_id = (existing or {}).get("employeeId") or input.get("employeeId")
         next_ui_hash = hash_daemon_node_token(ui_token) if ui_token else (existing or {}).get("uiTokenHash") or (existing or {}).get("tokenHash")
         agents, agent_details = agent_registration_state(input)
+        prior_disabled = list((existing or {}).get("disabledAgents") or [])
         sandbox = {
             "id": input["sandboxId"],
             **({"employeeId": employee_id} if employee_id else {}),
@@ -151,6 +152,7 @@ class DaemonNodeRegistry:
             "status": "running" if input.get("status") == "busy" else "stopped" if input.get("status") == "stopped" else "ready",
             "agents": agents,
             **({"agentDetails": agent_details} if agent_details else {}),
+            **({"disabledAgents": prior_disabled} if prior_disabled else {}),
             "token": None,
             "tokenHash": next_ui_hash,
             "uiTokenHash": next_ui_hash,
@@ -248,6 +250,22 @@ class DaemonNodeRegistry:
         self.sandboxes[sandbox_id] = updated
         self.daemon_store.unassign_node_employee(sandbox_id)
         logger.info("Daemon node unassigned", sandbox_id=sandbox_id, previous_employee_id=previous)
+        return updated
+
+    def set_disabled_agents(self, sandbox_id: str, disabled_agents: list[str]) -> dict[str, Any]:
+        sandbox = self.sandboxes.get(sandbox_id)
+        if not sandbox:
+            raise KeyError(sandbox_id)
+        invalid = [name for name in disabled_agents if name not in AGENT_NAMES]
+        if invalid:
+            raise ValueError(f"Unknown agent name(s): {', '.join(invalid)}.")
+        normalized = sorted({name for name in disabled_agents})
+        updated = {**sandbox, "disabledAgents": normalized, "updatedAt": now_iso()}
+        if not normalized:
+            updated.pop("disabledAgents", None)
+        self.sandboxes[sandbox_id] = updated
+        self.daemon_store.update_node_disabled_agents(sandbox_id, normalized)
+        logger.info("Daemon node disabled agents updated", sandbox_id=sandbox_id, disabled_agents=normalized)
         return updated
 
     def delete(self, sandbox_id: str) -> None:
@@ -761,9 +779,22 @@ class ServerDaemonNodeBackend:
             raise ValueError(f"Sandbox {sandbox_id} daemon node is not ready.")
         if not self.registry.is_live(sandbox_id):
             raise ValueError(f"Sandbox {sandbox_id} daemon node heartbeat expired.")
-        unavailable = [assignment["agent"] for assignment in request["assignments"] if sandbox.get("agents", {}).get(assignment["agent"]) != "ready"]
-        if unavailable:
-            detail = ", ".join(dict.fromkeys(unavailable))
+        disabled = set(sandbox.get("disabledAgents") or [])
+        requested_agents = [assignment["agent"] for assignment in request["assignments"]]
+        disabled_hit = [agent for agent in requested_agents if agent in disabled]
+        not_ready = [
+            agent
+            for agent in requested_agents
+            if agent not in disabled and sandbox.get("agents", {}).get(agent) != "ready"
+        ]
+        if disabled_hit:
+            detail = ", ".join(dict.fromkeys(disabled_hit))
+            raise ValueError(
+                f"Sandbox {sandbox_id} daemon node has disabled agent(s): {detail}. "
+                "Re-enable them from the admin console to dispatch work."
+            )
+        if not_ready:
+            detail = ", ".join(dict.fromkeys(not_ready))
             raise ValueError(f"Sandbox {sandbox_id} daemon node does not have ready agent(s): {detail}.")
         actor_employee_id = request.get("actorEmployeeId")
         owner_employee_id = actor_employee_id or sandbox["employeeId"]

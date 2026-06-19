@@ -643,3 +643,66 @@ def test_admin_can_soft_delete_employee_and_unassign_nodes(monkeypatch) -> None:
 
         duplicate = client.delete("/cp/employees/alice")
         assert duplicate.status_code == 409
+
+
+def test_admin_updates_disabled_agents_for_daemon_node(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _login_admin(client)
+
+        provision = client.post("/cp/daemon-nodes", json={
+            "employeeId": "alice",
+            "workspacePath": "/workspace/alice",
+        })
+        assert provision.status_code == 201
+        body = provision.json()
+        node_id = body["node"]["id"]
+
+        register = client.post("/daemon-nodes/register", json={
+            "sandboxId": node_id,
+            "token": body["nodeToken"],
+            "workspacePath": "/workspace/alice",
+            "protocolVersion": 1,
+            "supportedAgents": ["claude", "codex", "pi"],
+            "status": "ready",
+        })
+        assert register.status_code == 200
+
+        disable = client.patch(
+            f"/cp/daemon-nodes/{node_id}/disabled-agents",
+            json={"disabledAgents": ["codex", "pi"]},
+        )
+        assert disable.status_code == 200
+        assert disable.json()["node"]["disabledAgents"] == ["codex", "pi"]
+
+        listing = client.get("/cp/daemon-nodes")
+        assert listing.status_code == 200
+        match = next(item for item in listing.json()["nodes"] if item["id"] == node_id)
+        assert match["disabledAgents"] == ["codex", "pi"]
+
+        invalid_name = client.patch(
+            f"/cp/daemon-nodes/{node_id}/disabled-agents",
+            json={"disabledAgents": ["bogus"]},
+        )
+        assert invalid_name.status_code == 400
+
+        invalid_shape = client.patch(
+            f"/cp/daemon-nodes/{node_id}/disabled-agents",
+            json={"disabledAgents": "codex"},
+        )
+        assert invalid_shape.status_code == 400
+
+        missing = client.patch(
+            "/cp/daemon-nodes/node_missing/disabled-agents",
+            json={"disabledAgents": []},
+        )
+        assert missing.status_code == 404
+
+        clear = client.patch(
+            f"/cp/daemon-nodes/{node_id}/disabled-agents",
+            json={"disabledAgents": []},
+        )
+        assert clear.status_code == 200
+        assert "disabledAgents" not in clear.json()["node"]

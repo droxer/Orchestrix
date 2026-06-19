@@ -14,6 +14,7 @@ export interface SandboxRecord {
     version?: string;
     adapter?: DaemonAgentAdapter;
   }>>;
+  disabledAgents?: AgentName[];
   token?: string;
   tokenHash?: string;
   uiTokenHash?: string;

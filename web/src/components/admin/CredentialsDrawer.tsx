@@ -92,7 +92,7 @@ export function CredentialsDrawer({ open, onClose, node, storedToken, onUnassign
         open={open}
         onClose={onClose}
         title={t("admin.v2.credentials_title")}
-        variant="dark"
+        variant="light"
         closeLabel={t("admin.v2.close_drawer")}
         ariaLabel={t("admin.v2.credentials_title")}
         layer={1}
@@ -118,7 +118,7 @@ export function CredentialsDrawer({ open, onClose, node, storedToken, onUnassign
           {employeeLabel} · {node.id}
         </span>
       }
-      variant="dark"
+      variant="light"
       closeLabel={t("admin.v2.close_drawer")}
       ariaLabel={t("admin.v2.credentials_title")}
       layer={1}

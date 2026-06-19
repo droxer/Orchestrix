@@ -62,6 +62,22 @@ class LocalDaemonStore:
         self.append_daemon_event(daemon_event("daemon.node.assigned", {"nodeId": node_id, "employeeId": employee_id}))
         return updated
 
+    def update_node_disabled_agents(self, node_id: str, disabled_agents: list[str]) -> dict[str, Any]:
+        node = self.get_node(node_id)
+        if not node:
+            raise KeyError(node_id)
+        updated = {**node, "updatedAt": now_iso()}
+        if disabled_agents:
+            updated["disabledAgents"] = list(disabled_agents)
+        else:
+            updated.pop("disabledAgents", None)
+        _write_json(self.nodes_dir / f"{safe_name(node_id)}.json", updated, 0o600)
+        self.append_daemon_event(daemon_event("daemon.node.disabled_agents_updated", {
+            "nodeId": node_id,
+            "disabledAgents": list(disabled_agents),
+        }))
+        return updated
+
     def unassign_node_employee(self, node_id: str) -> dict[str, Any]:
         node = self.get_node(node_id)
         if not node:
@@ -270,6 +286,7 @@ class DatabaseDaemonStore:
         Column("status", Text, nullable=False),
         Column("agents", JSON, nullable=False),
         Column("agent_details", JSON, nullable=False, default=dict),
+        Column("disabled_agents", JSON, nullable=False, default=list),
         Column("ui_token_hash", Text, nullable=True),
         Column("node_token_hash", Text, nullable=True),
         Column("node_token", Text, nullable=True),
@@ -398,6 +415,24 @@ class DatabaseDaemonStore:
             node_pk = self._node_pk(conn, node_id)
             conn.execute(update(self.nodes).where(self.nodes.c.id == node_pk).values(**node_to_row(updated, database_id=node_pk)))
             self._append_daemon_event(conn, daemon_event("daemon.node.assigned", {"nodeId": node_id, "employeeId": employee_id}))
+        return updated
+
+    def update_node_disabled_agents(self, node_id: str, disabled_agents: list[str]) -> dict[str, Any]:
+        node = self.get_node(node_id)
+        if not node:
+            raise KeyError(node_id)
+        updated = {**node, "updatedAt": now_iso()}
+        if disabled_agents:
+            updated["disabledAgents"] = list(disabled_agents)
+        else:
+            updated.pop("disabledAgents", None)
+        with self.engine.begin() as conn:
+            node_pk = self._node_pk(conn, node_id)
+            conn.execute(update(self.nodes).where(self.nodes.c.id == node_pk).values(**node_to_row(updated, database_id=node_pk)))
+            self._append_daemon_event(conn, daemon_event("daemon.node.disabled_agents_updated", {
+                "nodeId": node_id,
+                "disabledAgents": list(disabled_agents),
+            }))
         return updated
 
     def unassign_node_employee(self, node_id: str) -> dict[str, Any]:
@@ -647,6 +682,7 @@ def node_to_row(node: dict[str, Any], *, database_id: str | None = None) -> dict
         "status": node["status"],
         "agents": node.get("agents") or {},
         "agent_details": node.get("agentDetails") or {},
+        "disabled_agents": list(node.get("disabledAgents") or []),
         "ui_token_hash": node.get("uiTokenHash"),
         "node_token_hash": node.get("nodeTokenHash"),
         "node_token": node.get("nodeToken"),
@@ -666,6 +702,7 @@ def row_to_node(row: Any) -> dict[str, Any]:
         "status": row["status"],
         "agents": row["agents"] or {},
         **({"agentDetails": row["agent_details"]} if row.get("agent_details") else {}),
+        **({"disabledAgents": list(row["disabled_agents"])} if row.get("disabled_agents") else {}),
         "token": None,
         **({"tokenHash": row["token_hash"]} if row.get("token_hash") else {}),
         **({"uiTokenHash": row["ui_token_hash"]} if row.get("ui_token_hash") else {}),

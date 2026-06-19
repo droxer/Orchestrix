@@ -267,3 +267,47 @@ def test_daemon_run_rejects_ownerless_sessions() -> None:
                 })
 
     asyncio.run(run_flow())
+
+
+def test_set_disabled_agents_blocks_dispatch_and_survives_restart() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store = LocalSessionStore(root)
+            daemon_store = LocalDaemonStore(root)
+            registry = DaemonNodeRegistry(session_store, daemon_store)
+            backend = ServerDaemonNodeBackend(registry)
+            registry.register({
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["claude", "codex"],
+                "status": "ready",
+            }, "ui_token")
+
+            registry.set_disabled_agents("sbx_alice", ["codex"])
+            assert registry.get("sbx_alice")["disabledAgents"] == ["codex"]
+
+            with pytest.raises(ValueError, match="disabled agent\\(s\\): codex"):
+                await backend.run("sbx_alice", {
+                    "taskGoal": "review auth",
+                    "assignments": [{"agent": "codex", "mode": "review"}],
+                })
+
+            session = await backend.run("sbx_alice", {
+                "taskGoal": "implement auth",
+                "assignments": [{"agent": "claude", "mode": "implement"}],
+            })
+            assert session["status"] == "running"
+
+            registry2 = DaemonNodeRegistry(LocalSessionStore(root), LocalDaemonStore(root))
+            assert registry2.get("sbx_alice")["disabledAgents"] == ["codex"]
+
+            registry.set_disabled_agents("sbx_alice", [])
+            assert "disabledAgents" not in registry.get("sbx_alice")
+
+            with pytest.raises(ValueError, match="Unknown agent"):
+                registry.set_disabled_agents("sbx_alice", ["bogus"])
+
+    asyncio.run(run_flow())

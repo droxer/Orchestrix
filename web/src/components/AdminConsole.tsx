@@ -19,6 +19,7 @@ import { AttentionRail } from "./admin/AttentionRail";
 import { BootstrapScreen, LoginScreen } from "./admin/AuthScreens";
 import { CredentialsDrawer } from "./admin/CredentialsDrawer";
 import { FleetView } from "./admin/FleetView";
+import { ManageAgentsDrawer } from "./admin/ManageAgentsDrawer";
 import { NavRail, type AdminView } from "./admin/NavRail";
 import { OnboardDrawer } from "./admin/OnboardDrawer";
 import { PeopleView } from "./admin/PeopleView";
@@ -47,6 +48,7 @@ export function AdminConsole() {
   const [onboardOpen, setOnboardOpen] = useState(false);
   const [assignTarget, setAssignTarget] = useState<{ employeeId?: string } | null>(null);
   const [credentialsNodeId, setCredentialsNodeId] = useState<string | null>(null);
+  const [manageAgentsNodeId, setManageAgentsNodeId] = useState<string | null>(null);
   const [highlightedEmployeeId, setHighlightedEmployeeId] = useState<string | null>(null);
   const [storedTokens, setStoredTokens] = useState<StoredNodeTokenMap>(() => readStoredNodeTokens());
 
@@ -98,9 +100,24 @@ export function AdminConsole() {
     () => (credentialsNodeId ? nodes.find((node) => node.id === credentialsNodeId) ?? null : null),
     [credentialsNodeId, nodes],
   );
+  const manageAgentsNode = useMemo(
+    () => (manageAgentsNodeId ? nodes.find((node) => node.id === manageAgentsNodeId) ?? null : null),
+    [manageAgentsNodeId, nodes],
+  );
 
   function handleRevealCredentials(node: ControlPanelDaemonNodeRecord) {
     setCredentialsNodeId(node.id);
+  }
+
+  function handleManageAgents(node: ControlPanelDaemonNodeRecord) {
+    setManageAgentsNodeId(node.id);
+  }
+
+  function handleNodeUpdated(updated: ControlPanelDaemonNodeRecord) {
+    mergeFleet((prev) => ({
+      ...prev,
+      nodes: prev.nodes.map((current) => (current.id === updated.id ? updated : current)),
+    }));
   }
 
   async function handleUnassignNode(node: ControlPanelDaemonNodeRecord) {
@@ -261,6 +278,7 @@ export function AdminConsole() {
                 nodes={nodes}
                 employees={employees}
                 onRevealCredentials={handleRevealCredentials}
+                onManageAgents={handleManageAgents}
                 onDeleteNode={handleDeleteNode}
               />
             )}
@@ -292,6 +310,12 @@ export function AdminConsole() {
         storedToken={credentialsNodeId ? storedTokens[credentialsNodeId] : undefined}
         onUnassign={handleUnassignNode}
         onDelete={handleDeleteNode}
+      />
+      <ManageAgentsDrawer
+        open={manageAgentsNodeId !== null}
+        onClose={() => setManageAgentsNodeId(null)}
+        node={manageAgentsNode}
+        onUpdated={handleNodeUpdated}
       />
     </section>
   );

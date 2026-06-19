@@ -5,7 +5,7 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import type { AgentName } from "../types";
-import { parseAgentStream, parseAgentStderr, type AgentSegment } from "../lib/agentStream";
+import { emptyAgentStreamSegments, parseAgentStream, parseAgentStderr, type AgentSegment } from "../lib/agentStream";
 import { tokenize } from "../lib/highlight";
 
 type AgentStreamProps = {
@@ -23,6 +23,16 @@ export function AgentStream({ agent, stdout, stderr, streaming }: AgentStreamPro
   ];
 
   if (segments.length === 0) {
+    const emptySegments = emptyAgentStreamSegments(agent, streaming, t);
+    if (emptySegments.length > 0) {
+      return (
+        <div className="agent-stream">
+          {emptySegments.map((segment, i) => (
+            <SegmentView key={i} segment={segment} />
+          ))}
+        </div>
+      );
+    }
     return <p className="msg-quiet">{streaming ? t("agent_stream.empty_working") : t("agent_stream.empty_done")}</p>;
   }
 

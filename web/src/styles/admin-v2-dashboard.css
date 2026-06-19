@@ -11,11 +11,14 @@
   gap: var(--space-lg);
   padding: var(--space-lg) var(--space-xxl) var(--space-xxl);
   min-width: 0;
+  max-width: 1440px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 /* ── KPI row ──────────────────────────────────────────────────────────
-   Hero tile (Conversations) spans 2 of 5 columns; three compact tiles
-   fill the rest. Keeps a single hero numeral as the page's first read. */
+   Hero tile (Conversations) takes the 2fr track; three 1fr tiles fill the
+   rest. Keeps a single hero numeral as the page's first read. */
 .adm-dash-kpis {
   display: grid;
   grid-template-columns: 2fr 1fr 1fr 1fr;
@@ -27,7 +30,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
-  padding: var(--space-lg) var(--space-base);
+  padding: var(--space-base) var(--space-base);
   border-right: 1px solid var(--color-hairline);
   min-width: 0;
 }
@@ -35,19 +38,18 @@
 .adm-dash-tile:last-child { border-right: none; }
 
 .adm-dash-tile--hero {
-  padding: var(--space-lg) var(--space-lg);
+  padding: var(--space-base) var(--space-lg);
   background:
     radial-gradient(
       circle at 0% 100%,
       color-mix(in srgb, var(--color-primary) 6%, transparent),
       transparent 60%
     );
-  gap: var(--space-base);
+  gap: var(--space-sm);
 }
 
 .adm-dash-tile-eyebrow {
-  font-size: var(--text-2xs);
-  font-weight: 600;
+  font: var(--type-eyebrow);
   letter-spacing: var(--letter-eyebrow);
   text-transform: uppercase;
   color: var(--color-muted);
@@ -55,7 +57,7 @@
 
 .adm-dash-tile-value {
   font-family: var(--font-number);
-  font-size: clamp(2.25rem, 4.5vw, 3.5rem);
+  font-size: clamp(1.875rem, 3vw, 2.5rem);
   font-weight: 500;
   line-height: 1.0;
   letter-spacing: var(--letter-display-strong);
@@ -64,7 +66,7 @@
 }
 
 .adm-dash-tile--hero .adm-dash-tile-value {
-  font-size: clamp(3.5rem, 7vw, 5.5rem);
+  font-size: clamp(2.75rem, 4.5vw, 3.75rem);
   letter-spacing: -0.02em;
 }
 
@@ -121,6 +123,10 @@
   height: 100%;
 }
 
+.adm-dash-belt > .adm-dash-card {
+  min-height: 280px;
+}
+
 .adm-dash-card-head {
   display: flex;
   flex-direction: column;
@@ -128,8 +134,7 @@
 }
 
 .adm-dash-card-eyebrow {
-  font-size: var(--text-2xs);
-  font-weight: 600;
+  font: var(--type-eyebrow);
   letter-spacing: var(--letter-eyebrow);
   text-transform: uppercase;
   color: var(--color-muted);
@@ -161,12 +166,18 @@
   width: 100%;
   height: auto;
   display: block;
+  max-height: 260px;
 }
 
 .adm-dash-chart--empty { opacity: 0.85; }
 
 .adm-dash-token-chart {
-  min-height: 140px;
+  min-height: 120px;
+  max-height: 160px;
+}
+
+.adm-dash-belt .adm-dash-chart {
+  max-height: 140px;
 }
 
 .adm-token-seg--input { fill: var(--color-primary); }
@@ -201,9 +212,13 @@
 .adm-dash-empty {
   position: relative;
   min-height: 200px;
+  max-height: 260px;
 }
 
-.adm-dash-empty--compact { min-height: 140px; }
+.adm-dash-empty--compact {
+  min-height: 120px;
+  max-height: 160px;
+}
 
 .adm-dash-empty-overlay {
   position: absolute;
@@ -225,7 +240,7 @@
   color: var(--color-primary);
   padding: 2px 8px;
   border: 1px solid var(--color-hairline);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--color-canvas);
 }
 
@@ -409,7 +424,7 @@
   justify-content: center;
   width: 24px;
   height: 24px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   border: 1px solid currentColor;
 }
 

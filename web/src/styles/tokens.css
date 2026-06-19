@@ -487,3 +487,16 @@ button[data-slot="button"][data-variant="default"]:disabled {
   height: 1px;
   background: var(--color-hairline-soft);
 }
+
+/* Status tone driver — the single source for dot + pill color. A component
+   sets a `tone-*` modifier on the element; dots fill with var(--tone) and
+   outlined pills take it as currentColor. This keeps the tone→color table
+   in one place instead of re-declared per component (the former
+   .status-dot-*, .adm-node-chip-dot.tone-*, .adm-status-pill.tone-* trio).
+   Tone classes only set the variable so they never fight an element's own
+   text color — consumers opt in by reading var(--tone). */
+.tone-good    { --tone: var(--color-semantic-up); }
+.tone-info    { --tone: var(--color-primary); }
+.tone-bad     { --tone: var(--color-semantic-down); }
+.tone-warn    { --tone: var(--color-accent-yellow); }
+.tone-neutral { --tone: var(--color-muted-soft); }

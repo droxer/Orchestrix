@@ -248,11 +248,6 @@
   user-select: none;
 }
 
-html[data-theme="dark"] .login-atmosphere::before,
-.transcript-empty-watermark {
-  /* Shared rule: the bled-glyph trick belongs to both surfaces. */
-}
-
 html[data-theme="dark"] .login-atmosphere::before {
   color: color-mix(in srgb, var(--color-ink) 3%, transparent);
 }

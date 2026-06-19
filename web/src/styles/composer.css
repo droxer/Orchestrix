@@ -65,8 +65,6 @@
 
 /* Mode chip — single-state status indicator styled after Codex/Claude Code
    CLI mode pickers. Click cycles to the next mode. */
-/* Mode chip — single-state status indicator after Codex/Claude Code CLI
-   mode pickers. Click cycles to the next mode. */
 .mode-chip {
   --mode-color: var(--color-muted);
   display: inline-flex;
@@ -106,8 +104,8 @@
 .mode-chip:active { transform: scale(0.97); }
 
 .mode-chip:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--color-primary) 55%, transparent);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: var(--ring-focus);
 }
 
 .mode-chip-icon {

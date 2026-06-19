@@ -32,7 +32,10 @@
     "connect_hint": "Connect to This Employee",
     "new_conversation": "New Conversation",
     "talk_to_agent": "Talk to Agent",
-    "new_thread": "New thread"
+    "new_thread": "New thread",
+    "agent_disabled_title": "{{agent}} is disabled on this node by an admin.",
+    "agent_failed_title": "{{agent}} is not ready on this node.",
+    "agent_disabled_option": "{{agent}} (disabled)"
   },
   "conversation": {
     "agent_working": "{{agent}} Is Working",
@@ -290,7 +293,18 @@
       "danger_zone": "Danger Zone",
       "action_failed": "Action Failed: {{message}}",
       "delete_employee_action": "Delete Employee",
-      "delete_employee_confirm": "Soft-Delete {{name}} (@{{id}})? Their Daemon Nodes Will Be Unassigned."
+      "delete_employee_confirm": "Soft-Delete {{name}} (@{{id}})? Their Daemon Nodes Will Be Unassigned.",
+      "manage_agents": "Manage Agents",
+      "manage_agents_for": "Manage Agents for {{id}}",
+      "manage_agents_title": "Manage Agents",
+      "manage_agents_help": "Disable Agents to Stop Dispatching Work to Them on This Node. Health Continues to Be Reported by the Daemon.",
+      "manage_agents_disable_confirm": "Disable {{agents}} on this node? Queued work targeting these agents will fail until you re-enable them.",
+      "agent_enabled": "Enabled",
+      "agent_disabled": "Disabled",
+      "enable_agent": "Enable {{agent}} on This Node",
+      "disable_agent": "Disable {{agent}} on This Node",
+      "save": "Save",
+      "saving": "Saving…"
     }
   },
   "mcp": {
@@ -467,6 +481,7 @@
     "tool": "Tool",
     "empty_working": "Working…",
     "empty_done": "No Output.",
+    "pi_empty_done": "Pi returned no assistant text.",
     "claude_error": "Claude Error",
     "claude_finished": "Claude Finished.",
     "claude_api_retry": "Claude API Retry {{attempt}}/{{max}}",
@@ -513,7 +528,8 @@
     "add_task": "Add a Task After @{{agent}}.",
     "open_sandbox": "Open This Employee's Sandbox Before Sending.",
     "handed_to": "Conversation Handed to {{agent}}.",
-    "decision_recorded": "{{kind}} Recorded."
+    "decision_recorded": "{{kind}} Recorded.",
+    "dismiss": "Dismiss"
   },
   "agent": {
     "claude": {

@@ -10,6 +10,14 @@ import type {
 
 export type { AgentName, AgentTaskMode, ControlPanelDaemonNodeRecord, DaemonNodeMonitorRecord, RelaySession, SandboxRecord, TokenUsage };
 
+/**
+ * Canonical agent ordering for web surfaces. Mirrors AGENT_REGISTRY in
+ * relay-core/src/agents.ts (which isn't importable here because web bundles
+ * can't pull node-only modules — see CLAUDE.md). Update both when adding an
+ * agent.
+ */
+export const AGENT_NAMES: AgentName[] = ["claude", "pi", "codex", "kimi"];
+
 /** Single tone vocabulary for every status surface (toasts, pills, dots, stream status, system rows). */
 export type Tone = "good" | "bad" | "warn" | "info" | "neutral";
 

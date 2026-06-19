@@ -215,6 +215,28 @@ async def unassign_control_panel_daemon_node(node_id: str, request: Request, ctx
     return {"node": public_node}
 
 
+@router.patch("/cp/daemon-nodes/{node_id}/disabled-agents")
+async def update_control_panel_daemon_node_disabled_agents(node_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
+    require_admin_session(request, ctx.auth_store)
+    body = await json_body(request)
+    raw = body.get("disabledAgents")
+    if not isinstance(raw, list) or not all(isinstance(name, str) for name in raw):
+        raise HTTPException(400, "disabledAgents must be an array of agent names.")
+    if not ctx.registry.get(node_id):
+        raise HTTPException(404, "Daemon node not found.")
+    try:
+        updated = ctx.registry.set_disabled_agents(node_id, raw)
+    except KeyError as error:
+        raise HTTPException(404, "Daemon node not found.") from error
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from error
+    public_node = next(
+        (item for item in ctx.registry.control_panel_nodes() if item["id"] == updated["id"]),
+        public_sandbox_record(updated),
+    )
+    return {"node": public_node}
+
+
 @router.delete("/cp/daemon-nodes/{node_id}", status_code=204)
 async def delete_control_panel_daemon_node(node_id: str, request: Request, ctx: AppContextDep) -> Response:
     require_admin_session(request, ctx.auth_store)

@@ -39,3 +39,6 @@ htmlcov/
 .DS_Store
 daemon.log
 .worktrees/
+
+# Visual brainstorming companion
+.superpowers/

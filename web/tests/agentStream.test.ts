@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import type { TFunction } from "i18next";
 
-import { parseAgentStream } from "../src/lib/agentStream.js";
+import { emptyAgentStreamSegments, parseAgentStream } from "../src/lib/agentStream.js";
 
 describe("agent stream parsing", () => {
   it("renders Pi stdout as message text", () => {
@@ -55,6 +56,18 @@ describe("agent stream parsing", () => {
     ]);
   });
 
+  it("renders one Pi empty assistant warning per turn", () => {
+    const raw = [
+      JSON.stringify({ type: "turn_start" }),
+      JSON.stringify({ type: "message_end", message: { role: "assistant", content: [], stopReason: "stop" } }),
+      JSON.stringify({ type: "turn_end", message: { role: "assistant", content: [], stopReason: "stop" }, toolResults: [] }),
+    ].join("\n");
+
+    assert.deepEqual(parseAgentStream("pi", raw), [
+      { kind: "status", tone: "warn", text: "Pi returned no assistant text." },
+    ]);
+  });
+
   it("renders Pi JSON assistant errors as bad status", () => {
     const raw = JSON.stringify({
       type: "turn_end",
@@ -64,5 +77,15 @@ describe("agent stream parsing", () => {
     assert.deepEqual(parseAgentStream("pi", raw), [
       { kind: "status", tone: "bad", text: "Pi error: Connection error." },
     ]);
+  });
+
+  it("uses a Pi-specific warning for completed empty chat output", () => {
+    const t = (key: string) => key === "agent_stream.pi_empty_done" ? "Pi returned no assistant text." : key;
+
+    assert.deepEqual(emptyAgentStreamSegments("pi", false, t as TFunction), [
+      { kind: "status", tone: "warn", text: "Pi returned no assistant text." },
+    ]);
+    assert.deepEqual(emptyAgentStreamSegments("pi", true, t as TFunction), []);
+    assert.deepEqual(emptyAgentStreamSegments("claude", false, t as TFunction), []);
   });
 });

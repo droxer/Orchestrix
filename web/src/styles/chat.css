@@ -125,6 +125,21 @@
   box-shadow: var(--shadow-soft);
 }
 
+.header-agent-tabs button.agent-tab-disabled,
+.header-agent-tabs button.agent-tab-disabled:hover {
+  color: var(--color-muted);
+  opacity: 0.55;
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  cursor: not-allowed;
+  background: transparent;
+  box-shadow: none;
+}
+
+.header-agent-tabs button.agent-tab-failed {
+  color: var(--color-semantic-down);
+}
+
 /* Transient status toast, floated over the transcript below the header.
    Tone is signaled by a leading dot — text stays the same neutral body
    color so the toast doesn't shout when a run merely starts. */
@@ -172,6 +187,61 @@
 .toast.warn::before { background: var(--color-accent-yellow); }
 .toast.bad::before  { background: var(--color-semantic-down); }
 .toast.info::before { background: var(--color-primary); }
+
+/* Message text — single-line + ellipsis for transient tones. The error
+   override below lets it wrap. */
+.toast-message {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Error toast — persists until dismissed (App.tsx), so it must be readable
+   in full and clickable. Drop the nowrap clamp, let it wrap, and become
+   interactive for the dismiss button. */
+.toast.bad {
+  max-width: min(480px, calc(100% - var(--space-xl)));
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-xs) var(--space-xs) var(--space-base);
+  white-space: normal;
+  overflow: visible;
+  pointer-events: auto;
+}
+
+.toast.bad::before {
+  margin-top: 7px;
+}
+
+.toast.bad .toast-message {
+  overflow: visible;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: var(--leading-normal);
+  padding: 3px 0;
+}
+
+.toast-dismiss {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  color: var(--color-muted);
+  transition: color 120ms ease, background 120ms ease;
+}
+
+.toast-dismiss:hover {
+  color: var(--color-ink);
+  background: var(--color-surface-strong);
+}
+
+.toast-dismiss:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-focus);
+}
 
 .transcript {
   min-height: 0;

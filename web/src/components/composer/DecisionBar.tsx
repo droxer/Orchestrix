@@ -2,8 +2,9 @@ import { useTranslation } from "react-i18next";
 import type { AgentName, AgentTaskMode } from "../../types";
 import { ActionApprove, ActionHandoff } from "../icons";
 
-export function DecisionBar({ agentNames, sendDecision, handoffOpen, setHandoffOpen, handoffAgent, setHandoffAgent, handoffMode, setHandoffMode, handoffNote, setHandoffNote, sendHandoff }: {
+export function DecisionBar({ agentNames, disabledAgents, sendDecision, handoffOpen, setHandoffOpen, handoffAgent, setHandoffAgent, handoffMode, setHandoffMode, handoffNote, setHandoffNote, sendHandoff }: {
   agentNames: AgentName[];
+  disabledAgents?: AgentName[];
   sendDecision: (kind: "approve" | "reject" | "rerun" | "mark_done") => Promise<void>;
   handoffOpen: boolean; setHandoffOpen: (v: boolean) => void;
   handoffAgent: AgentName; setHandoffAgent: (a: AgentName) => void;
@@ -12,6 +13,7 @@ export function DecisionBar({ agentNames, sendDecision, handoffOpen, setHandoffO
   sendHandoff: () => Promise<void>;
 }) {
   const { t } = useTranslation();
+  const disabledSet = new Set(disabledAgents ?? []);
   return (
     <>
       <div className="decision-bar">
@@ -28,7 +30,14 @@ export function DecisionBar({ agentNames, sendDecision, handoffOpen, setHandoffO
           <div className="handoff-row">
             <label htmlFor="handoff-agent">{t("handoff.route_to")}</label>
             <select id="handoff-agent" name="handoff-agent" value={handoffAgent} onChange={(e) => setHandoffAgent(e.target.value as AgentName)}>
-              {agentNames.map((a) => <option key={a} value={a}>{a}</option>)}
+              {agentNames.map((a) => {
+                const isDisabled = disabledSet.has(a);
+                return (
+                  <option key={a} value={a} disabled={isDisabled}>
+                    {isDisabled ? t("thread.agent_disabled_option", { agent: a }) : a}
+                  </option>
+                );
+              })}
             </select>
           </div>
           <div className="handoff-row">

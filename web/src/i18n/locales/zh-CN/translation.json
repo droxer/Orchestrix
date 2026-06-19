@@ -32,7 +32,10 @@
     "connect_hint": "连接此员工",
     "new_conversation": "新对话",
     "talk_to_agent": "选择 Agent",
-    "new_thread": "新对话"
+    "new_thread": "新对话",
+    "agent_disabled_title": "{{agent}} 在该节点已被管理员禁用。",
+    "agent_failed_title": "{{agent}} 在该节点尚未就绪。",
+    "agent_disabled_option": "{{agent}}（已禁用）"
   },
   "conversation": {
     "agent_working": "{{agent}} 正在工作",
@@ -292,7 +295,18 @@
       "danger_zone": "危险操作",
       "action_failed": "操作失败：{{message}}",
       "delete_employee_action": "删除员工",
-      "delete_employee_confirm": "确定要软删除 {{name}}（@{{id}}）吗？其守护节点将被取消分配。"
+      "delete_employee_confirm": "确定要软删除 {{name}}（@{{id}}）吗？其守护节点将被取消分配。",
+      "manage_agents": "管理智能体",
+      "manage_agents_for": "管理 {{id}} 的智能体",
+      "manage_agents_title": "管理智能体",
+      "manage_agents_help": "禁用某个智能体后，将不再向此节点派发对应的任务。守护进程仍会上报其健康状态。",
+      "manage_agents_disable_confirm": "确认在该节点上禁用 {{agents}}？在重新启用之前，针对这些智能体的待处理任务将会失败。",
+      "agent_enabled": "已启用",
+      "agent_disabled": "已禁用",
+      "enable_agent": "在此节点启用 {{agent}}",
+      "disable_agent": "在此节点禁用 {{agent}}",
+      "save": "保存",
+      "saving": "保存中…"
     }
   },
   "mcp": {
@@ -445,6 +459,7 @@
     "tool": "工具",
     "empty_working": "运行中…",
     "empty_done": "暂无输出。",
+    "pi_empty_done": "Pi 未返回助手文本。",
     "claude_error": "Claude 错误",
     "claude_finished": "Claude 已完成。",
     "claude_api_retry": "Claude API 重试 {{attempt}}/{{max}}",
@@ -491,7 +506,8 @@
     "add_task": "请在 @{{agent}} 后添加任务内容。",
     "open_sandbox": "请先打开此员工的沙盒再发送。",
     "handed_to": "对话已移交给 {{agent}}。",
-    "decision_recorded": "已记录：{{kind}}。"
+    "decision_recorded": "已记录：{{kind}}。",
+    "dismiss": "关闭"
   },
   "agent": {
     "claude": { "role": "构建者", "blurb": "通过系统化的上下文将需求转化为实现工作。" },

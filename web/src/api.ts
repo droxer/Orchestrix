@@ -121,6 +121,16 @@ export function deleteControlPanelDaemonNode(nodeId: string): Promise<void> {
   return apiJson<void>(`/cp/daemon-nodes/${encodeURIComponent(nodeId)}`, { method: "DELETE" });
 }
 
+export function updateControlPanelDaemonNodeDisabledAgents(
+  nodeId: string,
+  disabledAgents: AgentName[],
+): Promise<UnassignControlPanelDaemonNodeResponse> {
+  return apiJson<UnassignControlPanelDaemonNodeResponse>(
+    `/cp/daemon-nodes/${encodeURIComponent(nodeId)}/disabled-agents`,
+    { method: "PATCH", body: { disabledAgents } },
+  );
+}
+
 export function deleteControlPanelEmployee(
   employeeId: string,
 ): Promise<{ employee: { id: string; deletedAt: string }; unassignedNodes: string[] }> {

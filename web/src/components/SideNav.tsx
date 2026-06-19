@@ -33,7 +33,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, setRoute, 
     <aside className="sidenav-panel" aria-label="Relay" data-expanded={sidenavExpanded ? "true" : "false"}>
       <div className="sidenav-brand-row">
         <div className="sidenav-brand" aria-hidden="true">
-          <RelayMark width={28} height={19} />
+          <RelayMark width={28} height={28} />
           <span className="sidenav-brand-word">Relay</span>
         </div>
         <button

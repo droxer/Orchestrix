@@ -566,6 +566,17 @@ describe("agent stream rendering", () => {
     assert.match(output, /Pi returned no assistant text\./);
   });
 
+  it("renders one Pi empty assistant warning per turn", () => {
+    const renderer = new PiStreamRenderer();
+    const output = [
+      { type: "turn_start" },
+      { type: "message_end", message: { role: "assistant", content: [], stopReason: "stop" } },
+      { type: "turn_end", message: { role: "assistant", content: [], stopReason: "stop" }, toolResults: [] },
+    ].map((event) => renderer.feed(`${JSON.stringify(event)}\n`)).join("");
+
+    assert.equal((output.match(/Pi returned no assistant text\./g) ?? []).length, 1);
+  });
+
   it("renders Pi JSON assistant errors as visible status", () => {
     const output = formatPiJsonLine(JSON.stringify({
       type: "turn_end",

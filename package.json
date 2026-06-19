@@ -13,7 +13,7 @@
   "scripts": {
     "build": "npm run build -w relay-core && npm run build -w relay-daemon && npm run build -w relay-tui && npm run build -w web && tsc -p packages/tsconfig.json",
     "test": "npm run test:ts && npm run test:py",
-    "test:ts": "npm run build && node --test dist/packages/relay-core/tests/handoff.test.js dist/packages/relay-daemon/tests/cli.test.js dist/packages/relay-daemon/tests/daemon.test.js dist/packages/relay-tui/tests/tui.test.js dist/web/tests/status.test.js dist/web/tests/adminHelpers.test.js dist/web/tests/agentStream.test.js dist/web/tests/messageRouting.test.js dist/web/tests/messageBlock.test.js dist/web/tests/tokenUsage.test.js",
+    "test:ts": "npm run build && node --test dist/packages/relay-core/tests/handoff.test.js dist/packages/relay-daemon/tests/cli.test.js dist/packages/relay-daemon/tests/daemon.test.js dist/packages/relay-tui/tests/tui.test.js dist/web/tests/status.test.js dist/web/tests/adminHelpers.test.js dist/web/tests/agentStream.test.js dist/web/tests/messageRouting.test.js dist/web/tests/messageBlock.test.js dist/web/tests/tokenUsage.test.js dist/web/tests/manageAgents.test.js",
     "test:py": "UV_CACHE_DIR=.uv-cache uv run --project backend --extra dev pytest",
     "test:integration": "npm run build && UV_CACHE_DIR=.uv-cache uv run --project backend --extra dev pytest -m integration",
     "run": "npm run build && node packages/relay-tui/dist/local-run.js",

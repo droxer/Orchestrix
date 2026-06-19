@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { NavConversations, NavPreferences } from "./components/icons";
+import { ActionRemove, NavConversations, NavPreferences } from "./components/icons";
 import {
   appendAssignment, archiveSession, cancelRun, createSession, logout,
   recordDecision, recordHandoff, runSandbox,
 } from "./api";
+import { AGENT_NAMES } from "./types";
 import type { AgentName, AgentTaskMode, ControlPanelDaemonNodeRecord, CurrentUser } from "./types";
 import { TranscriptEmpty } from "./components/TranscriptEmpty";
 import { MessageBlock, projectMessages, isGroupedContinuation } from "./components/MessageBlock";
@@ -40,10 +41,7 @@ import { ChatHeader } from "./components/ChatHeader";
 import type { AppRoute, MobileView } from "./lib/viewTypes";
 import "./i18n";
 
-// Mirrors AGENT_REGISTRY in relay-core. Kept as a local literal so the browser
-// bundle never imports node-only runtime; the Record<AgentName, …>
-// types below fail to compile if this drifts from the AgentName union.
-const agents: AgentName[] = ["claude", "pi", "codex", "kimi"];
+const agents: AgentName[] = AGENT_NAMES;
 
 
 
@@ -62,7 +60,6 @@ export function App() {
   const [hydrated, setHydrated] = useState(false);
   const [activeAgent, setActiveAgent] = useState<AgentName>("claude");
   const [composerMode, setComposerMode] = useState<AgentTaskMode>("implement");
-  const composer = useComposer({ agentNames: agents, onAgentPicked: setActiveAgent });
   const [employeeQuery, setEmployeeQuery] = useState("");
   const [prefsOpen, setPrefsOpen] = useState(false);
   const [mobileView, setMobileView] = useState<MobileView>("chat");
@@ -99,12 +96,16 @@ export function App() {
   useEffect(() => {
     if (!statusSeenRef.current) { statusSeenRef.current = true; return; }
     setToastVisible(true);
-    const t = window.setTimeout(() => setToastVisible(false), 4000);
-    return () => window.clearTimeout(t);
+    // Errors persist until dismissed — they're often long and actionable, so
+    // auto-hiding them after 4s loses the message before it can be read.
+    if (status.tone === "bad") return;
+    const timer = window.setTimeout(() => setToastVisible(false), 4000);
+    return () => window.clearTimeout(timer);
   }, [status]);
 
   const selectedSandbox = useMemo(() => sandboxes.find((s) => s.employeeId === selectedEmployee), [sandboxes, selectedEmployee]);
   const selectedNode = useMemo(() => visibleNodes.find((n) => n.employeeId === selectedEmployee || n.id === selectedSandbox?.id), [visibleNodes, selectedEmployee, selectedSandbox?.id]);
+  const composer = useComposer({ agentNames: agents, disabledAgents: selectedNode?.disabledAgents, onAgentPicked: setActiveAgent });
   const sandboxWorkspace = selectedSandbox?.workspacePath ?? selectedNode?.workspacePath;
   const sandboxSessions = useMemo(() => sessions.filter((s) => !sandboxWorkspace || s.workspacePath === sandboxWorkspace), [sessions, sandboxWorkspace]);
   const { activeSessionId, setActiveSessionId } = useActiveSession(selectedEmployee, sandboxSessions);
@@ -229,6 +230,18 @@ export function App() {
     }
   }, [employeeContacts, hydrated, selectedEmployee]);
   useEffect(() => { setSelectedSessionId(undefined); }, [activeAgent, selectedEmployee]);
+  useEffect(() => {
+    const disabled = selectedNode?.disabledAgents ?? [];
+    if (disabled.length === 0) return;
+    if (disabled.includes(activeAgent)) {
+      const fallback = agents.find((a) => !disabled.includes(a));
+      if (fallback && fallback !== activeAgent) setActiveAgent(fallback);
+    }
+    if (disabled.includes(handoffAgent)) {
+      const fallback = agents.find((a) => !disabled.includes(a));
+      if (fallback && fallback !== handoffAgent) setHandoffAgent(fallback);
+    }
+  }, [selectedNode?.disabledAgents, activeAgent, handoffAgent]);
   useEffect(() => {
     if (route === "admin" && user && user.role !== "admin") {
       setRoute("main");
@@ -430,6 +443,8 @@ export function App() {
           activeAgent={activeAgent}
           setActiveAgent={setActiveAgent}
           agentNames={agents}
+          disabledAgents={selectedNode?.disabledAgents}
+          agentHealth={selectedNode?.agents}
           activeSession={activeSession}
           isRefreshing={isRefreshing}
           onRefresh={() => void refresh()}
@@ -443,8 +458,27 @@ export function App() {
           }}
         />
 
-        <div className={`toast ${status.tone}`} data-visible={toastVisible} role="status" aria-live="polite">
-          {toastVisible ? status.message : null}
+        <div
+          className={`toast ${status.tone}`}
+          data-visible={toastVisible}
+          role={status.tone === "bad" ? "alert" : "status"}
+          aria-live={status.tone === "bad" ? "assertive" : "polite"}
+        >
+          {toastVisible ? (
+            <>
+              <span className="toast-message">{status.message}</span>
+              {status.tone === "bad" ? (
+                <button
+                  type="button"
+                  className="toast-dismiss"
+                  aria-label={t("toast.dismiss")}
+                  onClick={() => setToastVisible(false)}
+                >
+                  <ActionRemove size={14} />
+                </button>
+              ) : null}
+            </>
+          ) : null}
         </div>
 
         <div className="transcript" ref={transcriptRef} onScroll={handleTranscriptScroll}>
@@ -452,7 +486,7 @@ export function App() {
             {activeSession ? (
               <>
                 {messages.map((msg, i) => <MessageBlock key={msg.id} message={msg} employeeId={selectedEmployee} sessionId={activeSession.id} grouped={isGroupedContinuation(messages, i)} />)}
-                {awaitingDecision ? <DecisionBar agentNames={agents} sendDecision={sendDecision} handoffOpen={handoffOpen} setHandoffOpen={setHandoffOpen} handoffAgent={handoffAgent} setHandoffAgent={setHandoffAgent} handoffMode={handoffMode} setHandoffMode={setHandoffMode} handoffNote={handoffNote} setHandoffNote={setHandoffNote} sendHandoff={sendHandoff} /> : null}
+                {awaitingDecision ? <DecisionBar agentNames={agents} disabledAgents={selectedNode?.disabledAgents} sendDecision={sendDecision} handoffOpen={handoffOpen} setHandoffOpen={setHandoffOpen} handoffAgent={handoffAgent} setHandoffAgent={setHandoffAgent} handoffMode={handoffMode} setHandoffMode={setHandoffMode} handoffNote={handoffNote} setHandoffNote={setHandoffNote} sendHandoff={sendHandoff} /> : null}
               </>
             ) : (
               <TranscriptEmpty selectedEmployee={selectedEmployee} activeAgent={activeAgent} agentDescriptors={agentDescriptors} />

@@ -1,21 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 64" role="img" aria-label="Relay" shape-rendering="geometricPrecision">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Relay" shape-rendering="geometricPrecision">
   <title>Relay</title>
-  <style>
-    :root {
-      color-scheme: light dark;
-      --relay-ink: #18232d;
-      --relay-accent: #0052ff;
-    }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --relay-ink: #ffffff;
-      }
-    }
-  </style>
-  <g fill="none" stroke="var(--relay-ink, #18232d)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M18 50 V14 H44 C56 14 64 21 64 31 C64 41 56 47 44 47 H18"/>
-  </g>
-  <g stroke="var(--relay-accent, #0052ff)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none">
-    <path d="M44 47 L70 56"/>
+  <rect x="4" y="4" width="56" height="56" rx="15" fill="#0052ff"/>
+  <g fill="none" stroke="#ffffff" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M22 20 L36 32 L22 44"/>
+    <path d="M36 20 L50 32 L36 44" opacity="0.55"/>
   </g>
 </svg>

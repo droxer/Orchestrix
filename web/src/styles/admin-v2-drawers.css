@@ -79,7 +79,7 @@
 .adm-drawer-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(24, 35, 45, 0.22);
+  background: color-mix(in srgb, var(--color-surface-dark) 22%, transparent);
   backdrop-filter: blur(2px);
   display: flex;
   justify-content: flex-end;
@@ -243,7 +243,7 @@
   margin: 0;
   padding: var(--space-sm) var(--space-base);
   border-radius: var(--radius-sm);
-  background: rgba(207, 32, 47, 0.06);
+  background: color-mix(in srgb, var(--color-semantic-down) 6%, transparent);
   color: var(--color-semantic-down);
   font-size: var(--text-sm);
   line-height: 1.5;
@@ -387,19 +387,19 @@
 }
 
 .adm-assign-node:hover {
-  border-color: var(--color-hairline-strong, var(--color-ink));
-  background: var(--color-surface, rgba(0, 0, 0, 0.015));
+  border-color: var(--color-ink);
+  background: var(--color-surface-soft);
 }
 
 .adm-assign-node-input:focus-visible + .adm-assign-node {
   outline: none;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(207, 32, 47, 0.12);
+  box-shadow: var(--ring-focus);
 }
 
 .adm-assign-node.selected {
   border-color: var(--color-primary);
-  background: rgba(207, 32, 47, 0.04);
+  background: color-mix(in srgb, var(--color-primary) 5%, var(--color-canvas));
   box-shadow: inset 2px 0 0 var(--color-primary);
 }
 
@@ -407,33 +407,15 @@
   width: 8px;
   height: 8px;
   border-radius: var(--radius-full);
-  background: var(--color-muted-soft, var(--color-muted));
+  background: var(--tone, var(--color-muted-soft));
   flex-shrink: 0;
   position: relative;
 }
 
-.adm-assign-node-dot.tone-good {
-  background: var(--color-semantic-up, #2e9e54);
-  box-shadow: 0 0 0 3px rgba(46, 158, 84, 0.16);
-}
-
-.adm-assign-node-dot.tone-info {
-  background: var(--color-primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 16%, transparent);
-}
-
-.adm-assign-node-dot.tone-warn {
-  background: var(--color-accent-yellow, #d9920a);
-  box-shadow: 0 0 0 3px rgba(217, 146, 10, 0.14);
-}
-
-.adm-assign-node-dot.tone-bad {
-  background: var(--color-semantic-down, #cf202f);
-  box-shadow: 0 0 0 3px rgba(207, 32, 47, 0.14);
-}
-
-.adm-assign-node-dot.tone-neutral {
-  background: var(--color-muted, #8c8c8c);
+/* Toned dots carry a soft halo; neutral stays a flat dot. The tone→color
+   table lives in tokens.css (.tone-* sets --tone). */
+.adm-assign-node-dot:not(.tone-neutral) {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tone, transparent) 16%, transparent);
 }
 
 .adm-assign-node-body {
@@ -464,17 +446,12 @@
 }
 
 .adm-assign-node-status {
-  font-size: 10px;
+  font-size: var(--text-micro);
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: var(--letter-eyebrow-wide);
   text-transform: uppercase;
-  color: var(--color-muted);
+  color: var(--tone, var(--color-muted));
 }
-
-.adm-assign-node-status.tone-good { color: var(--color-semantic-up, #2e9e54); }
-.adm-assign-node-status.tone-info { color: var(--color-primary); }
-.adm-assign-node-status.tone-bad { color: var(--color-semantic-down, #cf202f); }
-.adm-assign-node-status.tone-warn { color: var(--color-accent-yellow, #d9920a); }
 
 .adm-assign-node-check {
   display: inline-flex;
@@ -522,7 +499,7 @@
 /* ── Credentials drawer rows ──────────────────────────────────────── */
 .adm-cred-row {
   padding: var(--space-base) 0;
-  border-bottom: 1px solid var(--color-hairline-on-dark);
+  border-bottom: 1px solid var(--color-hairline-soft);
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
@@ -535,7 +512,7 @@
   font-weight: 600;
   letter-spacing: var(--letter-eyebrow);
   text-transform: uppercase;
-  color: var(--color-on-dark-soft);
+  color: var(--color-muted);
 }
 
 .adm-cred-value-line {
@@ -543,13 +520,14 @@
   align-items: center;
   gap: var(--space-xs);
   padding: var(--space-sm) var(--space-base);
-  background: var(--color-surface-dark-elevated);
+  background: var(--color-surface-strong);
+  border: 1px solid var(--color-hairline);
   border-radius: var(--radius-sm);
 }
 
 .adm-cred-value {
   flex: 1;
-  color: var(--color-on-dark);
+  color: var(--color-ink);
   font-size: var(--text-sm);
   word-break: break-all;
   background: transparent;
@@ -579,7 +557,7 @@
 .adm-cred-note {
   margin: var(--space-base) 0 0;
   font-size: var(--text-xs);
-  color: var(--color-on-dark-soft);
+  color: var(--color-muted);
   line-height: 1.6;
 }
 
@@ -587,8 +565,8 @@
   margin: 0;
   padding: var(--space-base);
   font-size: var(--text-sm);
-  color: var(--color-on-dark-soft);
-  border: 1px dashed var(--color-hairline-on-dark);
+  color: var(--color-muted);
+  border: 1px dashed var(--color-hairline);
   border-radius: var(--radius-md);
   text-align: center;
   line-height: 1.6;
@@ -597,7 +575,7 @@
 .adm-cred-actions {
   margin-top: var(--space-lg);
   padding-top: var(--space-base);
-  border-top: 1px solid var(--color-hairline-on-dark);
+  border-top: 1px solid var(--color-hairline-soft);
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
@@ -608,23 +586,35 @@
   font-size: var(--text-xs);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--color-on-dark-soft);
+  color: var(--color-muted);
+}
+
+.adm-cred-actions--row {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
 }
 
 .adm-cred-action-button {
   appearance: none;
-  border: 1px solid var(--color-hairline-on-dark);
-  background: transparent;
-  color: var(--color-on-dark);
+  border: 1px solid var(--color-hairline);
+  background: var(--color-canvas);
+  color: var(--color-ink);
   padding: var(--space-sm) var(--space-base);
   border-radius: var(--radius-md);
   font-size: var(--text-sm);
   text-align: left;
   cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.adm-cred-actions--row .adm-cred-action-button {
+  text-align: center;
 }
 
 .adm-cred-action-button:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--color-surface-strong);
+  border-color: var(--color-muted-soft);
 }
 
 .adm-cred-action-button:disabled {
@@ -632,19 +622,32 @@
   cursor: progress;
 }
 
+.adm-cred-action-button.primary {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.adm-cred-action-button.primary:hover:not(:disabled) {
+  background: var(--color-primary-active);
+  border-color: var(--color-primary-active);
+  color: var(--color-on-primary);
+}
+
 .adm-cred-action-button.danger {
-  color: #ff8a8a;
-  border-color: rgba(255, 138, 138, 0.4);
+  color: var(--color-semantic-down);
+  border-color: color-mix(in srgb, var(--color-semantic-down) 35%, var(--color-hairline));
 }
 
 .adm-cred-action-button.danger:hover:not(:disabled) {
-  background: rgba(255, 138, 138, 0.08);
+  background: color-mix(in srgb, var(--color-semantic-down) 8%, var(--color-canvas));
+  border-color: var(--color-semantic-down);
 }
 
 .adm-cred-action-error {
   margin: 0;
   font-size: var(--text-xs);
-  color: #ff8a8a;
+  color: var(--color-semantic-down);
 }
 
 /* ── Auth screens ─────────────────────────────────────────────────── */

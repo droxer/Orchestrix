@@ -32,7 +32,10 @@
     "connect_hint": "連線此員工",
     "new_conversation": "新對話",
     "talk_to_agent": "選擇 Agent",
-    "new_thread": "新對話"
+    "new_thread": "新對話",
+    "agent_disabled_title": "{{agent}} 在此節點已被管理員停用。",
+    "agent_failed_title": "{{agent}} 在此節點尚未就緒。",
+    "agent_disabled_option": "{{agent}}（已停用）"
   },
   "conversation": {
     "agent_working": "{{agent}} 正在運作",
@@ -292,7 +295,18 @@
       "danger_zone": "危險操作",
       "action_failed": "操作失敗：{{message}}",
       "delete_employee_action": "刪除員工",
-      "delete_employee_confirm": "確定要軟刪除 {{name}}（@{{id}}）嗎？其守護節點將被解除指派。"
+      "delete_employee_confirm": "確定要軟刪除 {{name}}（@{{id}}）嗎？其守護節點將被解除指派。",
+      "manage_agents": "管理代理",
+      "manage_agents_for": "管理 {{id}} 的代理",
+      "manage_agents_title": "管理代理",
+      "manage_agents_help": "停用某個代理後，將不再向此節點派發對應的任務。守護程序仍會回報其健康狀態。",
+      "manage_agents_disable_confirm": "確認在此節點停用 {{agents}}？在重新啟用前，針對這些代理的待處理任務將會失敗。",
+      "agent_enabled": "已啟用",
+      "agent_disabled": "已停用",
+      "enable_agent": "在此節點啟用 {{agent}}",
+      "disable_agent": "在此節點停用 {{agent}}",
+      "save": "儲存",
+      "saving": "儲存中…"
     }
   },
   "mcp": {
@@ -445,6 +459,7 @@
     "tool": "工具",
     "empty_working": "執行中…",
     "empty_done": "暫無輸出。",
+    "pi_empty_done": "Pi 未回傳助手文字。",
     "claude_error": "Claude 錯誤",
     "claude_finished": "Claude 已完成。",
     "claude_api_retry": "Claude API 重試 {{attempt}}/{{max}}",
@@ -491,7 +506,8 @@
     "add_task": "請在 @{{agent}} 後新增任務內容。",
     "open_sandbox": "請先開啟此員工的沙盒再傳送。",
     "handed_to": "對話已移交給 {{agent}}。",
-    "decision_recorded": "已記錄：{{kind}}。"
+    "decision_recorded": "已記錄：{{kind}}。",
+    "dismiss": "關閉"
   },
   "agent": {
     "claude": { "role": "建構者", "blurb": "透過系統化的上下文將需求轉化為實作工作。" },

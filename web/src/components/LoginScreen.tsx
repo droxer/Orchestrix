@@ -85,7 +85,7 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
       <section className="login-pane" aria-labelledby="login-headline">
         <header className="login-pane-top">
           <div className="login-brand-lockup">
-            <RelayMark width={36} height={24} />
+            <RelayMark width={36} height={36} />
             <p className="login-kicker" data-mode={mode}>
               {kickerLabel}
             </p>
@@ -188,7 +188,7 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
           </div>
           <div className="login-foot">
             <span className="login-foot-brand">
-              <RelayMark width={20} height={14} />
+              <RelayMark width={20} height={20} />
               <span>Relay · {new Date().getFullYear()}</span>
             </span>
             <span className="login-foot-mark">control plane</span>

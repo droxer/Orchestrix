@@ -24,9 +24,8 @@
 }
 
 .conversation-heading-eyebrow {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
+  font: var(--type-eyebrow);
+  letter-spacing: var(--letter-eyebrow);
   text-transform: uppercase;
   color: var(--color-primary);
   line-height: 1;
