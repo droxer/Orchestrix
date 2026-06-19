@@ -614,6 +614,52 @@ def test_unauthenticated_user_can_list_all_sandboxes_and_daemon_nodes(monkeypatc
         assert {node["employeeId"] for node in response.json()["nodes"]} == {"alice", "bob"}
 
 
+def test_chat_service_token_can_act_as_employee(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_CHAT_TOKEN", "chat_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+
+        response = client.post("/sessions", json={
+            "taskGoal": "invoke from chat",
+        }, headers={
+            "Authorization": "Bearer chat_token",
+            "X-Relay-Employee-Id": "alice",
+        })
+        assert response.status_code == 201
+        assert response.json()["ownerEmployeeId"] == "alice"
+
+        allowed = client.get(f"/sessions/{response.json()['id']}", headers={
+            "Authorization": "Bearer chat_token",
+            "X-Relay-Employee-Id": "alice",
+        })
+        assert allowed.status_code == 200
+
+        denied = client.get(f"/sessions/{response.json()['id']}", headers={
+            "Authorization": "Bearer chat_token",
+            "X-Relay-Employee-Id": "bob",
+        })
+        assert denied.status_code == 403
+
+
+def test_chat_service_employee_header_requires_configured_token(monkeypatch) -> None:
+    monkeypatch.delenv("RELAY_CHAT_TOKEN", raising=False)
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+
+        response = client.get("/sessions", headers={
+            "Authorization": "Bearer wrong",
+            "X-Relay-Employee-Id": "alice",
+        })
+        assert response.status_code == 503
+
+        monkeypatch.setenv("RELAY_CHAT_TOKEN", "chat_token")
+        response = client.get("/sessions", headers={
+            "Authorization": "Bearer wrong",
+            "X-Relay-Employee-Id": "alice",
+        })
+        assert response.status_code == 401
+
+
 def test_app_can_use_database_backed_auth_store(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     monkeypatch.setenv("RELAY_AUTH_STORE", "database")

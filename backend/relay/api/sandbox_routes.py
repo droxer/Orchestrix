@@ -8,7 +8,7 @@ from loguru import logger
 from ..daemon import provisioned_sandbox_record, public_sandbox_record, sandbox_ui_auth_error, sandbox_ui_token_matches
 from ..models import SandboxRunRequest
 from .deps import AppContextDep
-from .helpers import bearer_token, json_body, request_actor_or_none, string_field
+from .helpers import actor_can_access_sandbox, bearer_token, json_body, request_actor_or_none, string_field
 
 router = APIRouter()
 
@@ -19,6 +19,8 @@ def require_sandbox_access(sandbox: dict[str, Any], request: Request, ctx: AppCo
         return None
     actor = request_actor_or_none(request, ctx.auth_store)
     if actor:
+        if not actor_can_access_sandbox(actor, sandbox):
+            raise HTTPException(403, "Sandbox access denied.")
         return actor
     auth_error = sandbox_ui_auth_error(sandbox, token)
     if auth_error:
@@ -48,6 +50,8 @@ async def provision_sandbox(request: Request, ctx: AppContextDep) -> dict[str, A
     if not employee_id:
         raise HTTPException(400, "employeeId is required.")
     actor = request_actor_or_none(request, ctx.auth_store)
+    if actor and not actor["isAdmin"] and employee_id != actor["employeeId"]:
+        raise HTTPException(403, "Sandbox access denied.")
     try:
         sandbox = ctx.backend.provision({
             "employeeId": employee_id,

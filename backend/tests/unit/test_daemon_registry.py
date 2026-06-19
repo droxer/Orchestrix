@@ -201,6 +201,7 @@ def test_daemon_run_timeout_marks_session_failed(monkeypatch) -> None:
             [request] = daemon_store.list_active_run_requests("sbx_alice")
             daemon_store.update_run_request(request["id"], {"currentStartedAt": "2020-01-01T00:00:00.000Z"})
 
+            monkeypatch.setattr("relay.daemon.DAEMON_RUN_TIMEOUT_MS", 1)
             registry.reap_stale_runs()
 
             failed = session_store.get_session(session["id"])
@@ -209,7 +210,7 @@ def test_daemon_run_timeout_marks_session_failed(monkeypatch) -> None:
             assert daemon_store.list_active_run_requests("sbx_alice") == []
             assert command["id"] not in registry.active_commands
 
-    monkeypatch.setattr("relay.daemon.DAEMON_RUN_TIMEOUT_MS", 1)
+    monkeypatch.setattr("relay.daemon.DAEMON_RUN_TIMEOUT_MS", 60_000)
     asyncio.run(run_flow())
 
 

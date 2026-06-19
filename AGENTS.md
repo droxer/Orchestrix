@@ -69,13 +69,17 @@ ask the user whether to run `codegraph init -i`.
 ## Project Shape
 
 - Workspace packages: root Python backend `backend/`,
-  `packages/relay-core/`, `packages/relay-daemon/`, `packages/relay-tui/`,
-  and top-level web frontend `web/`.
+  `packages/relay-core/`, `packages/relay-chat/`, `packages/relay-daemon/`,
+  `packages/relay-tui/`, and top-level web frontend `web/`.
 - Backend CLI entrypoint: `backend/relay/cli.py`.
 - Daemon CLI entrypoint: `packages/relay-daemon/src/cli.ts`.
 - TUI CLI entrypoint: `packages/relay-tui/src/cli.ts`.
 - Shared protocol and agent runtime modules: `packages/relay-core/src/`.
+- Chat gateway and provider adapters: `packages/relay-chat/src/`.
 - Python backend implementation modules: `backend/relay/`.
+- Python backend HTTP routes: `backend/relay/api/` (split by domain —
+  `admin_routes.py`, `auth_routes.py`, `daemon_node_routes.py`,
+  `sandbox_routes.py`, `session_routes.py`, `task_routes.py`).
 - TUI implementation: `packages/relay-tui/src/tui.tsx`.
 - Tests: Python backend tests under `backend/tests/`, TypeScript package tests
   under `packages/*/tests/`, and web tests under `web/tests/`.
@@ -89,7 +93,7 @@ Node.js 22.19 or newer is required.
 ## Commands
 
 - Install dependencies: `npm install`.
-- Build packages: `make build-packages` builds `relay-core`, `relay-daemon`, and `relay-tui` only. Full build: `npm run build`.
+- Build packages: `make build-packages` builds `relay-core`, `relay-daemon`, and `relay-tui` only. Full build: `npm run build` (includes `relay-chat` and `web`).
 - Test: `npm test` or `make test`.
 - Run one built test file: `node --test dist/packages/relay-core/tests/handoff.test.js`
   after a build.
@@ -97,6 +101,7 @@ Node.js 22.19 or newer is required.
 - Run the TUI against another workspace: `make run WORKSPACE=/path/to/workspace`.
 - Run the read-only API server: `make serve`; default port is `8787`, override
   with `PORT=9000`.
+- Run database migrations: `make backend-migrate` (Alembic; optionally pass `DATABASE_URL=<url>`).
 - Stop Relay and BoxLite processes: `make stop`.
 - Install pre-commit hooks: `make pre-commit-install`.
 - Run pre-commit hooks on all files: `make pre-commit-run`.
@@ -118,7 +123,15 @@ and Codex CLIs inside it.
 Key modules:
 
 - `packages/relay-core/src/index.ts`: shared protocol, agent state, prompts,
-  command builders, stream renderers, guest helpers, and agent execution units.
+  command builders, stream renderers, token-usage normalization, guest helpers,
+  and agent execution units.
+- `packages/relay-core/src/token-usage.ts`: `TokenUsage` type and
+  `normalizeTokenUsage` — normalizes input/output/cache token counts from any
+  agent CLI output format.
+- `packages/relay-chat/src/gateway.ts`: `RelayChatGateway` — routes chat
+  provider events to the backend and streams session updates back.
+- `packages/relay-chat/src/providers/`: Discord, Telegram, and Lark
+  conversation adapters.
 - `backend/relay/cli.py`: Python backend binary entrypoint (`relay`).
 - `packages/relay-daemon/src/cli.ts`: daemon binary entrypoint.
 - `packages/relay-daemon/src/index.ts`: daemon runtime — registers with the
@@ -128,9 +141,13 @@ Key modules:
   `/sessions`, `/open`, `/summary`, and `/quit`.
 - `packages/relay-daemon/src/sandbox-session.ts`: sandbox session lifecycle and
   agent readiness preflight (`ensureAgentReady`).
-- `backend/relay/controller.py`, `backend/relay/stores.py`, and
-  `backend/relay/daemon.py`: Python control-plane session, task, and daemon
-  registry implementation.
+- `backend/relay/controller.py`, `backend/relay/stores.py`,
+  `backend/relay/session_store.py`, `backend/relay/task_store.py`,
+  `backend/relay/daemon_store.py`, and `backend/relay/daemon.py`: Python
+  control-plane session, task, and daemon registry implementation.
+- `backend/relay/api/admin_routes.py`: admin control-panel routes — users,
+  departments, node assignment, agent management, and dashboard data
+  (KPI tiles, fleet health, activity feed, token usage).
 - `packages/relay-core/src/session-store.ts`,
   `packages/relay-core/src/session-controller.ts`, and
   `packages/relay-core/src/daemon-client.ts`: TypeScript protocol/client and

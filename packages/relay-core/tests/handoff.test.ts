@@ -600,10 +600,11 @@ describe("execution cancellation", () => {
   it("kills shell child processes when local process execution is cancelled", async () => {
     const workspace = mkdtempSync(join(tmpdir(), "relay-process-cancel-"));
     const marker = join(workspace, "survived.txt");
+    const release = join(workspace, "release.txt");
     const controller = new AbortController();
     const pending = localProcessExecStream("bash", [
       "-c",
-      `(sleep 1; printf survived > ${JSON.stringify(marker)}) & wait`,
+      `(while [ ! -f ${JSON.stringify(release)} ]; do sleep 0.05; done; printf survived > ${JSON.stringify(marker)}) & wait`,
     ], {
       cwd: workspace,
       signal: controller.signal,
@@ -612,7 +613,8 @@ describe("execution cancellation", () => {
     await new Promise((resolve) => setTimeout(resolve, 100));
     controller.abort("stop test process");
     const result = await pending;
-    await new Promise((resolve) => setTimeout(resolve, 1200));
+    writeFileSync(release, "go");
+    await new Promise((resolve) => setTimeout(resolve, 300));
 
     assert.notEqual(result.exit_code, 0);
     assert.equal(existsSync(marker), false);

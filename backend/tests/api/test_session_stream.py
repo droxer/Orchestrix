@@ -67,3 +67,28 @@ def test_session_events_unauthorized_is_forbidden_before_streaming(monkeypatch) 
         # A nonexistent session is a 404 (authorization runs before the stream
         # opens), proving errors still surface as normal responses.
         assert client.get("/sessions/sess_missing/events").status_code == 404
+
+
+def test_session_events_accept_chat_service_actor(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_CHAT_TOKEN", "chat_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        headers = {
+            "Authorization": "Bearer chat_token",
+            "X-Relay-Employee-Id": "alice",
+        }
+
+        created = client.post("/sessions", json={"taskGoal": "from chat"}, headers=headers)
+        assert created.status_code == 201
+        session_id = created.json()["id"]
+
+        done = client.post(f"/sessions/{session_id}/decisions", json={"kind": "mark_done"}, headers=headers)
+        assert done.status_code == 200
+        assert done.json()["status"] == "completed"
+
+        response = client.get(f"/sessions/{session_id}/events", headers=headers)
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("text/event-stream")
+
+        missing_employee = client.get(f"/sessions/{session_id}/events", headers={"Authorization": "Bearer chat_token"})
+        assert missing_employee.status_code == 401

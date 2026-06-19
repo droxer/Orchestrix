@@ -493,8 +493,7 @@ def test_employee_can_ask_assigned_daemon_node_without_daemon_node_token(monkeyp
         assert "nodeToken" not in provision.json()
 
         bob_provision = bob_client.post("/sandboxes", json={"employeeId": "alice"})
-        assert bob_provision.status_code == 201
-        assert bob_provision.json()["id"] == "sbx_alice"
+        assert bob_provision.status_code == 403
 
         run = alice_client.post("/sandboxes/sbx_alice/runs", json={
             "taskGoal": "answer this",
@@ -531,8 +530,7 @@ def test_employee_can_ask_assigned_daemon_node_without_daemon_node_token(monkeyp
             "assignments": [{"agent": "codex", "mode": "implement"}],
             "sessionId": bob_session.json()["id"],
         })
-        assert bob_run.status_code == 202
-        assert bob_run.json()["ownerEmployeeId"] == "bob"
+        assert bob_run.status_code == 403
 
         alice_cancel_bob = alice_client.post(f"/sandboxes/sbx_alice/runs/{bob_session.json()['id']}/cancel", json={
             "reason": "not alice's session",

@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 import mimetypes
 import os
+import secrets
 import shlex
 from pathlib import Path
 from typing import Any
@@ -14,6 +15,8 @@ from ..auth import require_user_session
 from ..daemon import DaemonNodeRegistry, daemon_node_token_matches, sandbox_ui_token_matches, workspace_paths_match
 from ..models import AGENT_NAMES
 from ..stores import valid_agent
+
+CHAT_SERVICE_EMPLOYEE_HEADER = "x-relay-employee-id"
 
 
 async def json_body(request: Request) -> dict[str, Any]:
@@ -128,6 +131,9 @@ def get_task_or_404(store: Any, task_id: str) -> dict[str, Any]:
 
 
 def request_actor(request: Request, auth_store: Any) -> dict[str, Any]:
+    chat_actor = request_chat_service_actor(request)
+    if chat_actor:
+        return chat_actor
     user = require_user_session(request, auth_store)
     employee_id = user.get("employeeId") or user.get("username") or user["id"]
     return {
@@ -138,10 +144,34 @@ def request_actor(request: Request, auth_store: Any) -> dict[str, Any]:
 
 
 def request_actor_or_none(request: Request, auth_store: Any) -> dict[str, Any] | None:
+    if request.headers.get(CHAT_SERVICE_EMPLOYEE_HEADER):
+        return request_chat_service_actor(request)
     try:
         return request_actor(request, auth_store)
     except HTTPException:
         return None
+
+
+def request_chat_service_actor(request: Request) -> dict[str, Any] | None:
+    employee_id = (request.headers.get(CHAT_SERVICE_EMPLOYEE_HEADER) or "").strip()
+    if not employee_id:
+        return None
+    expected = os.environ.get("RELAY_CHAT_TOKEN", "").strip()
+    if not expected:
+        raise HTTPException(503, "RELAY_CHAT_TOKEN is not configured.")
+    token = bearer_token(request)
+    if not token or len(token) != len(expected) or not secrets.compare_digest(token, expected):
+        raise HTTPException(401, "Invalid chat service token.")
+    return {
+        "user": {
+            "id": f"chat:{employee_id}",
+            "username": employee_id,
+            "employeeId": employee_id,
+            "role": "user",
+        },
+        "employeeId": employee_id,
+        "isAdmin": False,
+    }
 
 
 def request_actor_or_sandbox(request: Request, auth_store: Any, registry: DaemonNodeRegistry) -> dict[str, Any]:

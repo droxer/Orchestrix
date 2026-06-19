@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 64" role="img" aria-label="Relay" shape-rendering="geometricPrecision">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 250 64" role="img" aria-label="Relay" shape-rendering="geometricPrecision">
   <title>Relay</title>
   <style>
     :root {
@@ -9,18 +9,15 @@
     @media (prefers-color-scheme: dark) {
       :root {
         --relay-ink: #ffffff;
+        --relay-accent: #3d7bff;
       }
     }
   </style>
-  <g>
-    <g fill="none" stroke="var(--relay-ink, #18232d)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M18 50 V14 H44 C56 14 64 21 64 31 C64 41 56 47 44 47 H18"/>
-    </g>
-    <g stroke="var(--relay-accent, #0052ff)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none">
-      <path d="M44 47 L70 56"/>
-    </g>
+  <g fill="none" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M8 14 L28 32 L8 50" stroke="var(--relay-accent, #0052ff)"/>
+    <path d="M28 14 L48 32 L28 50" stroke="var(--relay-ink, #18232d)" opacity="0.5"/>
   </g>
-  <text x="110" y="44"
+  <text x="74" y="44"
         font-family="'Inter', -apple-system, system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
         font-size="42"
         font-weight="400"
