@@ -14,6 +14,9 @@ export interface DrawerProps {
   children: ReactNode;
   closeLabel: string;
   ariaLabel?: string;
+  /** Extra class on the scroll body — e.g. to opt into a flex-column layout
+   *  so a form footer can anchor to the bottom of the panel. */
+  bodyClassName?: string;
   /** Stacking order — higher = on top. Used when multiple drawers open at once. */
   layer?: number;
 }
@@ -28,10 +31,20 @@ export function Drawer({
   children,
   closeLabel,
   ariaLabel,
+  bodyClassName,
   layer = 0,
 }: DrawerProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
+
+  // Hold onClose in a ref so the focus-trap effect can depend on [open] alone.
+  // Callers commonly pass a fresh inline arrow each render; depending on it here
+  // would re-run the effect on every keystroke and steal focus back to the
+  // first focusable element (the ✕ button).
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -41,9 +54,19 @@ export function Drawer({
     (initial ?? panelRef.current)?.focus();
 
     function handleKey(event: KeyboardEvent) {
+      // A Radix Select/Popover/Dropdown renders its content in a portal on
+      // document.body — outside this panel. While one is open it owns the
+      // keyboard (Escape closes the dropdown, arrows/Tab navigate it), so we
+      // must defer entirely. Otherwise Escape would close the whole drawer and
+      // the focus trap below would yank focus out of the open listbox.
+      const overlayOpen = document.querySelector(
+        '[data-slot="select-content"], [data-radix-popper-content-wrapper]',
+      );
+      if (overlayOpen) return;
+
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (event.key !== "Tab" || !panelRef.current) return;
@@ -78,7 +101,7 @@ export function Drawer({
       body.style.overflow = previousOverflow;
       previouslyFocused.current?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open || typeof document === "undefined") return null;
 
@@ -115,7 +138,7 @@ export function Drawer({
             <X size={18} aria-hidden="true" />
           </button>
         </header>
-        <div className="adm-drawer-body">{children}</div>
+        <div className={`adm-drawer-body${bodyClassName ? ` ${bodyClassName}` : ""}`}>{children}</div>
       </aside>
     </div>,
     document.body,

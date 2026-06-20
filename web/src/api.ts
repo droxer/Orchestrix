@@ -83,7 +83,7 @@ export function createControlPanelEmployee(
       employeeId: input.employeeId,
       username: input.username,
       password: input.password,
-      nodeId: input.nodeId,
+      ...(input.nodeId ? { nodeId: input.nodeId } : {}),
       ...(input.email ? { email: input.email } : {}),
       ...(input.displayName ? { displayName: input.displayName } : {}),
     },

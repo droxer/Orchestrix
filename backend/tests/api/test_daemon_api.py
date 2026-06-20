@@ -211,13 +211,18 @@ def test_create_employee_rejects_invalid_node_assignment(monkeypatch) -> None:
         _bootstrap_admin(client)
         _login_admin(client)
 
-        missing_field = client.post("/cp/employees", json={
-            "employeeId": "alice",
-            "username": "alice",
+        # Node assignment is optional: onboarding without a nodeId succeeds and
+        # automatically creates a pending daemon node for the employee.
+        without_node = client.post("/cp/employees", json={
+            "employeeId": "nodeless",
+            "username": "nodeless",
             "password": "userpass",
         })
-        assert missing_field.status_code == 400
-        assert missing_field.json()["detail"] == "nodeId is required."
+        assert without_node.status_code == 201
+        without_node_body = without_node.json()
+        assert without_node_body["node"]["employeeId"] == "nodeless"
+        assert without_node_body["node"]["status"] == "provisioning"
+        assert without_node_body["node"]["nodeToken"].startswith("tok_")
 
         missing_node = client.post("/cp/employees", json={
             "employeeId": "alice",
@@ -290,6 +295,27 @@ def test_control_panel_requires_admin_session(monkeypatch) -> None:
         _login_admin(client)
         response = client.get("/cp/daemon-nodes")
         assert response.status_code == 200
+
+
+def test_control_panel_accepts_admin_bearer_token_for_supervisor(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        response = client.get("/cp/employees", headers={"Authorization": "Bearer admin_token"})
+        assert response.status_code == 200
+
+        created = client.post("/cp/users", json={
+            "username": "alice",
+            "password": "userpass",
+            "role": "user",
+            "employeeId": "alice",
+        }, headers={"Authorization": "Bearer admin_token"})
+        assert created.status_code == 201
+        body = created.json()
+        assert body["user"]["employeeId"] == "alice"
+        assert body["node"]["employeeId"] == "alice"
+        assert body["node"]["status"] == "provisioning"
 
 
 def test_control_panel_creates_pending_daemon_node_and_reuses_duplicate(monkeypatch) -> None:

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bot, CheckCircle2, Link2, LockKeyhole, MessageSquare, ShieldCheck, Trash2, Users } from "lucide-react";
+import { Bot, Link2, LockKeyhole, MessageSquare, ShieldCheck, Trash2, Users } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,6 +31,14 @@ function providerLabel(provider: ChatProvider): string {
   return provider[0].toUpperCase() + provider.slice(1);
 }
 
+function ProviderAvatar({ provider, size }: { provider: ChatProvider; size?: "lg" }) {
+  return (
+    <span className={`adm-chat-avatar${size ? " adm-chat-avatar--lg" : ""}`} data-provider={provider} aria-hidden="true">
+      {providerLabel(provider).charAt(0)}
+    </span>
+  );
+}
+
 function statusTone(status: ChatIntegration["status"]): string {
   if (status === "active") return "good";
   if (status === "degraded") return "warn";
@@ -38,11 +46,11 @@ function statusTone(status: ChatIntegration["status"]): string {
   return "neutral";
 }
 
-function readiness(integration: ChatIntegration): Array<{ key: string; label: string; ready: boolean; icon: typeof LockKeyhole }> {
+function readiness(integration: ChatIntegration): Array<{ key: string; labelKey: string; ready: boolean; icon: typeof LockKeyhole }> {
   return [
-    { key: "secrets", label: "Secrets", ready: integration.secretConfigured, icon: LockKeyhole },
-    { key: "links", label: "Identity Links", ready: integration.identityLinkCount > 0, icon: Users },
-    { key: "allowlist", label: "Allowlist", ready: integration.allowedConversationCount > 0, icon: ShieldCheck },
+    { key: "secrets", labelKey: "admin.v2.chat_readiness_secrets", ready: integration.secretConfigured, icon: LockKeyhole },
+    { key: "links", labelKey: "admin.v2.chat_readiness_identity", ready: integration.identityLinkCount > 0, icon: Users },
+    { key: "allowlist", labelKey: "admin.v2.chat_readiness_allowlist", ready: integration.allowedConversationCount > 0, icon: ShieldCheck },
   ];
 }
 
@@ -167,7 +175,7 @@ export function ChatIntegrationsView() {
             </label>
             <label>
               <span>{t("admin.v2.chat_tenant")}</span>
-              <input value={tenantId} onChange={(event) => setTenantId(event.target.value)} placeholder={provider === "telegram" ? "optional" : "guild / tenant"} />
+              <input value={tenantId} onChange={(event) => setTenantId(event.target.value)} placeholder={provider === "telegram" ? t("admin.v2.optional") : t("admin.v2.chat_tenant")} />
             </label>
             <label>
               <span>{t("admin.v2.chat_secret")}</span>
@@ -201,11 +209,12 @@ export function ChatIntegrationsView() {
                     className={`adm-chat-integration ${active ? "active" : ""}`}
                     onClick={() => setSelectedId(integration.id)}
                   >
+                    <ProviderAvatar provider={integration.provider} />
                     <span className="adm-chat-integration-main">
                       <strong>{integration.displayName}</strong>
                       <span className="mono">{providerLabel(integration.provider)} {integration.tenantId ? `· ${integration.tenantId}` : ""}</span>
                     </span>
-                    <span className={`adm-status-pill tone-${statusTone(integration.status)}`}>{integration.status}</span>
+                    <span className={`adm-status-pill tone-${statusTone(integration.status)}`}>{t(`admin.v2.chat_status_${integration.status}`, { defaultValue: integration.status })}</span>
                   </button>
                 );
               })}
@@ -216,12 +225,13 @@ export function ChatIntegrationsView() {
         <section className="adm-chat-panel adm-chat-panel--detail">
           {selected ? (
             <>
-              <header className="adm-chat-panel-head">
-                <CheckCircle2 size={18} aria-hidden="true" />
+              <header className="adm-chat-panel-head adm-chat-panel-head--detail">
+                <ProviderAvatar provider={selected.provider} size="lg" />
                 <div>
                   <h3>{selected.displayName}</h3>
                   <p>{selected.health.message}</p>
                 </div>
+                <span className={`adm-status-pill tone-${statusTone(selected.status)}`}>{t(`admin.v2.chat_status_${selected.status}`, { defaultValue: selected.status })}</span>
               </header>
 
               <div className="adm-chat-readiness">
@@ -230,7 +240,7 @@ export function ChatIntegrationsView() {
                   return (
                     <span key={item.key} className={`adm-chat-ready ${item.ready ? "ready" : ""}`}>
                       <Icon size={14} aria-hidden="true" />
-                      <span>{item.label}</span>
+                      <span>{t(item.labelKey)}</span>
                     </span>
                   );
                 })}
@@ -251,7 +261,7 @@ export function ChatIntegrationsView() {
                   <div className="adm-chat-form compact">
                     <input value={identityForm.externalUserId} onChange={(event) => setIdentityForm((prev) => ({ ...prev, externalUserId: event.target.value }))} placeholder={t("admin.v2.chat_external_user")} />
                     <input value={identityForm.employeeId} onChange={(event) => setIdentityForm((prev) => ({ ...prev, employeeId: event.target.value }))} placeholder={t("admin.v2.placeholder_employee_id")} />
-                    <input value={identityForm.defaultSandboxId} onChange={(event) => setIdentityForm((prev) => ({ ...prev, defaultSandboxId: event.target.value }))} placeholder="sbx_alice" />
+                    <input value={identityForm.defaultSandboxId} onChange={(event) => setIdentityForm((prev) => ({ ...prev, defaultSandboxId: event.target.value }))} placeholder={t("admin.v2.chat_sandbox_placeholder")} />
                     <Button type="button" variant="secondary" onClick={() => void handleAddIdentity()} disabled={busy !== null}>
                       {t("admin.v2.chat_add_link")}
                     </Button>

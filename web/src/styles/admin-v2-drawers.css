@@ -184,6 +184,22 @@
   padding: var(--space-xl);
 }
 
+/* Opt-in column layout: the form grows to fill the panel so its footer can be
+   anchored to the bottom edge even when the form is short. */
+.adm-drawer-body--column {
+  display: flex;
+  flex-direction: column;
+}
+
+.adm-drawer-body--column .adm-mode-tabs {
+  align-self: flex-start;
+}
+
+.adm-drawer-body--column .adm-form {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 /* ── Forms (drawer + auth) ────────────────────────────────────────── */
 .adm-form {
   display: flex;
@@ -197,7 +213,7 @@
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-sm);
+  gap: var(--space-base);
   padding-bottom: var(--space-lg);
   border-bottom: 1px solid var(--color-hairline-soft);
 }
@@ -213,7 +229,9 @@
   letter-spacing: var(--letter-eyebrow);
   text-transform: uppercase;
   color: var(--color-muted);
-  margin-bottom: var(--space-xxs);
+  /* Spacing to the first field is owned by the section's flex gap. */
+  margin-bottom: 0;
+  padding: 0;
 }
 
 .adm-field {
@@ -223,9 +241,26 @@
 }
 
 .adm-field > span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-xxs);
   font-size: var(--text-xs);
   color: var(--color-body);
   font-weight: 500;
+}
+
+.adm-field-req {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.adm-field-opt {
+  font-style: normal;
+  font-size: var(--text-micro);
+  font-weight: 600;
+  letter-spacing: var(--letter-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-muted-soft);
 }
 
 /* Admin form fields (.adm-input / select.adm-input) were replaced by the
@@ -249,12 +284,31 @@
   line-height: 1.5;
 }
 
+/* Pinned footer: the action bar stays flush to the drawer's bottom edge while
+   the fields scroll behind it, so the primary action is always reachable.
+   `margin-top: auto` anchors it to the bottom when the form is short (the form
+   is a flex child that fills the column body); `position: sticky` keeps it
+   visible while a tall form scrolls. Negative side/bottom margins cancel the
+   .adm-drawer-body padding so the bar full-bleeds to the panel edges. */
 .adm-form-actions {
+  position: sticky;
+  bottom: calc(-1 * var(--space-xl));
+  z-index: 1;
   display: flex;
   justify-content: flex-end;
   gap: var(--space-xs);
-  padding-top: var(--space-base);
+  margin-top: auto;
+  margin-right: calc(-1 * var(--space-xl));
+  margin-bottom: calc(-1 * var(--space-xl));
+  margin-left: calc(-1 * var(--space-xl));
+  padding: var(--space-base) var(--space-xl);
+  background: var(--color-canvas);
   border-top: 1px solid var(--color-hairline);
+}
+
+.adm-drawer.dark .adm-form-actions {
+  background: var(--color-surface-dark);
+  border-top-color: var(--color-hairline-on-dark);
 }
 
 /* ── Assign-node drawer (operator context + node list) ────────────── */
@@ -282,7 +336,7 @@
   padding: var(--space-base) var(--space-lg);
   border: 1px solid var(--color-hairline);
   border-left: 2px solid var(--color-primary);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   background: var(--color-canvas);
 }
 
@@ -374,7 +428,7 @@
   padding: var(--space-sm) var(--space-base);
   background: var(--color-canvas);
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-xs);
   cursor: pointer;
   text-align: left;
   font: inherit;
@@ -476,7 +530,7 @@
   gap: var(--space-base);
   padding: var(--space-lg);
   border: 1px dashed var(--color-hairline);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   color: var(--color-muted);
 }
 
@@ -567,7 +621,7 @@
   font-size: var(--text-sm);
   color: var(--color-muted);
   border: 1px dashed var(--color-hairline);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   text-align: center;
   line-height: 1.6;
 }
@@ -601,7 +655,7 @@
   background: var(--color-canvas);
   color: var(--color-ink);
   padding: var(--space-sm) var(--space-base);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-xs);
   font-size: var(--text-sm);
   text-align: left;
   cursor: pointer;
@@ -663,7 +717,7 @@
   max-width: 440px;
   background: var(--color-canvas);
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-sm);
   padding: var(--space-xxl);
   display: flex;
   flex-direction: column;

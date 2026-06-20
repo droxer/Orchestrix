@@ -111,6 +111,7 @@ export function AssignNodeDrawer({
       width={520}
       closeLabel={t("admin.v2.close_drawer")}
       ariaLabel={t("admin.v2.assign_title")}
+      bodyClassName="adm-drawer-body--column"
     >
       <form
         className="adm-form adm-assign-form"

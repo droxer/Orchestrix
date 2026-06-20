@@ -742,10 +742,25 @@ def require_user_session(request: Request, auth_store: UserAuthStore) -> dict[st
 
 
 def require_admin_session(request: Request, auth_store: UserAuthStore) -> dict[str, Any]:
+    bearer = _bearer_token(request)
+    expected = os.environ.get("RELAY_ADMIN_TOKEN", "").strip()
+    if bearer and expected and len(bearer) == len(expected) and secrets.compare_digest(bearer, expected):
+        return {
+            "id": "admin-token",
+            "username": "admin-token",
+            "role": "admin",
+            "isAdmin": True,
+        }
     user = require_user_session(request, auth_store)
     if user.get("role") != "admin":
         raise HTTPException(403, "Admin access required.")
     return user
+
+
+def _bearer_token(request: Request) -> str | None:
+    header = request.headers.get("authorization", "")
+    parts = header.split(" ", 1)
+    return parts[1] if len(parts) == 2 and parts[0].lower() == "bearer" else None
 
 
 def user_session_cookie_attrs(*, max_age_seconds: int, secure: bool | None = None) -> dict[str, Any]:

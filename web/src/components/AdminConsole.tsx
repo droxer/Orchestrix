@@ -150,16 +150,16 @@ export function AdminConsole() {
   }
 
   function handleOnboardSuccess(result: CreateControlPanelEmployeeResponse) {
+    const { node } = result;
     mergeFleet((prev) => ({
-      nodes: [result.node, ...prev.nodes.filter((node) => node.id !== result.node.id)],
+      nodes: node ? [node, ...prev.nodes.filter((current) => current.id !== node.id)] : prev.nodes,
       employees: [result.employee, ...prev.employees.filter((employee) => employee.id !== result.employee.id)],
     }));
 
-    const nodeToken = result.node.nodeToken;
-    if (nodeToken) {
-      writeStoredNodeToken(result.node.id, {
+    if (node?.nodeToken) {
+      writeStoredNodeToken(node.id, {
         employeeId: result.employee.id,
-        nodeToken,
+        nodeToken: node.nodeToken,
         savedAt: new Date().toISOString(),
       });
       setStoredTokens(readStoredNodeTokens());
@@ -170,7 +170,9 @@ export function AdminConsole() {
 
     setOnboardOpen(false);
     setView("people");
-    setCredentialsNodeId(result.node.id);
+    // Only surface the credentials drawer when a sandbox was bound — it is
+    // keyed by node id and has nothing to show for an unassigned employee.
+    if (node) setCredentialsNodeId(node.id);
   }
 
   function handleAssignSuccess(result: AssignControlPanelDaemonNodeResponse) {

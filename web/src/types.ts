@@ -55,7 +55,7 @@ export interface CreateControlPanelEmployeeInput {
   employeeId: string;
   username: string;
   password: string;
-  nodeId: string;
+  nodeId?: string;
   email?: string;
   displayName?: string;
 }

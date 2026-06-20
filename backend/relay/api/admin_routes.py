@@ -14,6 +14,25 @@ from .helpers import daemon_start_command, daemon_start_env, employee_record, js
 router = APIRouter()
 
 
+def _public_control_panel_node(ctx: AppContextDep, node: dict[str, Any]) -> dict[str, Any]:
+    return next(
+        (item for item in ctx.registry.control_panel_nodes() if item["id"] == node["id"]),
+        public_sandbox_record(node),
+    )
+
+
+def _ensure_employee_daemon_node(
+    ctx: AppContextDep,
+    employee_id: str,
+    workspace_path: str | None = None,
+) -> dict[str, Any]:
+    node = ctx.backend.provision_daemon_node({
+        "employeeId": employee_id,
+        "workspacePath": workspace_path,
+    })
+    return _public_control_panel_node(ctx, node)
+
+
 @router.get("/cp/users")
 async def list_users(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
@@ -37,7 +56,8 @@ async def create_user(request: Request, ctx: AppContextDep) -> dict[str, Any]:
         )
     except ValueError as error:
         raise HTTPException(400, str(error)) from error
-    return {"user": user}
+    node = _ensure_employee_daemon_node(ctx, user["employeeId"]) if user.get("employeeId") else None
+    return {"user": user, **({"node": node} if node else {})}
 
 
 @router.get("/cp/departments")
@@ -114,7 +134,7 @@ async def create_employee(request: Request, ctx: AppContextDep) -> dict[str, Any
     employee_id = string_field(body, "employeeId")
     username = string_field(body, "username")
     password = string_field(body, "password")
-    node_id = string_field(body, "nodeId")
+    node_id = string_field(body, "nodeId") or None
     email = string_field(body, "email") or None
     display_name = string_field(body, "displayName") or username or employee_id
     if not employee_id:
@@ -123,13 +143,15 @@ async def create_employee(request: Request, ctx: AppContextDep) -> dict[str, Any
         raise HTTPException(400, "username is required.")
     if not password:
         raise HTTPException(400, "password is required.")
-    if not node_id:
-        raise HTTPException(400, "nodeId is required.")
-    existing_node = ctx.registry.get(node_id)
-    if not existing_node:
-        raise HTTPException(404, "Daemon node not found.")
-    if existing_node.get("employeeId"):
-        raise HTTPException(409, "Daemon node is already assigned.")
+    # Node assignment is optional at onboarding — an employee may be created
+    # first and bound to a sandbox later via the assign-node flow. Only validate
+    # the node when one was supplied.
+    if node_id:
+        existing_node = ctx.registry.get(node_id)
+        if not existing_node:
+            raise HTTPException(404, "Daemon node not found.")
+        if existing_node.get("employeeId"):
+            raise HTTPException(409, "Daemon node is already assigned.")
     try:
         user = ctx.auth_store.create_user(
             username,
@@ -153,16 +175,17 @@ async def create_employee(request: Request, ctx: AppContextDep) -> dict[str, Any
             "createdAt": user.get("createdAt"),
             "updatedAt": user.get("createdAt"),
         }
-    try:
-        assigned_node = ctx.registry.assign_employee(node_id, employee_id)
-    except KeyError as error:
-        raise HTTPException(404, "Daemon node not found.") from error
-    except ValueError as error:
-        raise HTTPException(409, str(error)) from error
-    public_node = next(
-        (item for item in ctx.registry.control_panel_nodes() if item["id"] == assigned_node["id"]),
-        public_sandbox_record(assigned_node),
-    )
+    public_node: dict[str, Any] | None = None
+    if node_id:
+        try:
+            assigned_node = ctx.registry.assign_employee(node_id, employee_id)
+        except KeyError as error:
+            raise HTTPException(404, "Daemon node not found.") from error
+        except ValueError as error:
+            raise HTTPException(409, str(error)) from error
+        public_node = _public_control_panel_node(ctx, assigned_node)
+    else:
+        public_node = _ensure_employee_daemon_node(ctx, employee_id)
     return {"employee": employee, "user": user, "node": public_node}
 
 
@@ -187,10 +210,7 @@ async def assign_control_panel_daemon_node(node_id: str, request: Request, ctx: 
         raise HTTPException(404, "Daemon node not found.") from error
     except ValueError as error:
         raise HTTPException(409, str(error)) from error
-    public_node = next(
-        (item for item in ctx.registry.control_panel_nodes() if item["id"] == assigned_node["id"]),
-        public_sandbox_record(assigned_node),
-    )
+    public_node = _public_control_panel_node(ctx, assigned_node)
     return {"employee": employee, "node": public_node}
 
 
@@ -208,10 +228,7 @@ async def unassign_control_panel_daemon_node(node_id: str, request: Request, ctx
         raise HTTPException(404, "Daemon node not found.") from error
     except ValueError as error:
         raise HTTPException(409, str(error)) from error
-    public_node = next(
-        (item for item in ctx.registry.control_panel_nodes() if item["id"] == updated["id"]),
-        public_sandbox_record(updated),
-    )
+    public_node = _public_control_panel_node(ctx, updated)
     return {"node": public_node}
 
 
@@ -230,10 +247,7 @@ async def update_control_panel_daemon_node_disabled_agents(node_id: str, request
         raise HTTPException(404, "Daemon node not found.") from error
     except ValueError as error:
         raise HTTPException(400, str(error)) from error
-    public_node = next(
-        (item for item in ctx.registry.control_panel_nodes() if item["id"] == updated["id"]),
-        public_sandbox_record(updated),
-    )
+    public_node = _public_control_panel_node(ctx, updated)
     return {"node": public_node}
 
 
@@ -270,10 +284,7 @@ async def create_control_panel_daemon_node(request: Request, ctx: AppContextDep)
         "employeeId": employee_id,
         "workspacePath": string_field(body, "workspacePath") or None,
     })
-    public_node = next(
-        (item for item in ctx.registry.control_panel_nodes() if item["id"] == node["id"]),
-        public_sandbox_record(node),
-    )
+    public_node = _public_control_panel_node(ctx, node)
     response = {
         "node": public_node,
         "daemonEnv": daemon_start_env(request, node),

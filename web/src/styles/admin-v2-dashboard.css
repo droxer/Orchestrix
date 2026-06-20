@@ -314,7 +314,7 @@
 .adm-dash-stat-dot {
   width: 8px;
   height: 8px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   background: currentColor;
 }
 

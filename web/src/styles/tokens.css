@@ -434,6 +434,20 @@ button:disabled {
   opacity: 0.55;
 }
 
+/* Primary CTA enabled — the unlayered `button { background: none }` reset above
+   outranks Tailwind's layered `bg-primary`/`text-primary-foreground` utilities
+   (an unlayered rule beats any @layer regardless of specificity), so the
+   default-variant <Button> would otherwise render with no fill once enabled.
+   Restore the brand fill here to match the disabled rule below. */
+button[data-slot="button"][data-variant="default"] {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+button[data-slot="button"][data-variant="default"]:hover:not(:disabled) {
+  background: var(--color-primary-active);
+}
+
 /* Primary CTA disabled — the shadcn <Button> default variant is the primary
    CTA (it renders data-variant="default"), so its disabled state uses the
    dedicated faded-blue token instead of generic opacity. This preserves the

@@ -1,0 +1,49 @@
+import type { ControlPanelDaemonNodeRecord } from "relay-core";
+import type { EmployeeRecord, ProvisionedDaemonNode, SupervisorBackend } from "./types.js";
+
+export interface SupervisorBackendClientOptions {
+  backendUrl: string;
+  adminToken?: string;
+  fetchFn?: typeof fetch;
+}
+
+export class SupervisorBackendClient implements SupervisorBackend {
+  private readonly backendUrl: string;
+  private readonly adminToken?: string;
+  private readonly fetchFn: typeof fetch;
+
+  constructor(options: SupervisorBackendClientOptions) {
+    this.backendUrl = options.backendUrl.replace(/\/+$/, "");
+    this.adminToken = options.adminToken;
+    this.fetchFn = options.fetchFn ?? fetch;
+  }
+
+  async listEmployees(): Promise<EmployeeRecord[]> {
+    return (await this.request<{ employees: EmployeeRecord[] }>("/cp/employees")).employees;
+  }
+
+  async listDaemonNodes(): Promise<ControlPanelDaemonNodeRecord[]> {
+    return (await this.request<{ nodes: ControlPanelDaemonNodeRecord[] }>("/cp/daemon-nodes")).nodes;
+  }
+
+  async provisionDaemonNode(input: { employeeId: string; workspacePath?: string }): Promise<ProvisionedDaemonNode> {
+    return await this.request<ProvisionedDaemonNode>("/cp/daemon-nodes", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+
+  private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
+    const headers = new Headers(init.headers);
+    headers.set("content-type", "application/json");
+    if (this.adminToken) headers.set("authorization", `Bearer ${this.adminToken}`);
+    const response = await this.fetchFn(`${this.backendUrl}${path}`, {
+      ...init,
+      headers,
+    });
+    if (!response.ok) {
+      throw new Error(`${init.method ?? "GET"} ${path} failed: ${response.status} ${await response.text()}`);
+    }
+    return await response.json() as T;
+  }
+}

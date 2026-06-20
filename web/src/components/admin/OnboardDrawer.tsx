@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { assignControlPanelDaemonNode, createControlPanelEmployee } from "../../api";
 import type {
@@ -75,7 +75,6 @@ export function OnboardDrawer({
     if (!nextEmployeeId) return setError(t("admin.employee_required"));
     if (!username.trim()) return setError(t("admin.username_required"));
     if (!password) return setError(t("admin.password_required"));
-    if (!selectedNodeId) return setError(t("admin.node_required"));
 
     setIsBusy(true);
     setError(null);
@@ -84,7 +83,7 @@ export function OnboardDrawer({
         employeeId: nextEmployeeId,
         username: username.trim(),
         password,
-        nodeId: selectedNodeId,
+        nodeId: selectedNodeId || undefined,
         email: email.trim() || undefined,
         displayName: displayName.trim() || undefined,
       });
@@ -117,12 +116,38 @@ export function OnboardDrawer({
     }
   }
 
+  const tabRefs = useRef<Record<OnboardMode, HTMLButtonElement | null>>({ new: null, existing: null });
+
   function switchMode(next: OnboardMode) {
     setMode(next);
     setError(null);
   }
 
-  const canSubmitNew = Boolean(employeeId.trim() && username.trim() && password && selectedNodeId);
+  // WAI-ARIA tabs keyboard support: Left/Right cycle, Home/End jump to ends.
+  // The "existing" tab is skipped when disabled (no employees yet).
+  function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    const order: OnboardMode[] = ["new", "existing"];
+    const enabled = order.filter((m) => m === "new" || employees.length > 0);
+    if (enabled.length < 2) return;
+
+    let next: OnboardMode | null = null;
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+      next = enabled[(enabled.indexOf(mode) + 1) % enabled.length];
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+      next = enabled[(enabled.indexOf(mode) - 1 + enabled.length) % enabled.length];
+    } else if (event.key === "Home") {
+      next = enabled[0];
+    } else if (event.key === "End") {
+      next = enabled[enabled.length - 1];
+    }
+    if (!next) return;
+
+    event.preventDefault();
+    switchMode(next);
+    tabRefs.current[next]?.focus();
+  }
+
+  const canSubmitNew = Boolean(employeeId.trim() && username.trim() && password);
   const canSubmitExisting = Boolean(existingEmployeeId && existingNodeId);
 
   return (
@@ -136,23 +161,34 @@ export function OnboardDrawer({
       variant="light"
       closeLabel={t("admin.v2.close_drawer")}
       ariaLabel={t("admin.v2.onboard_title")}
+      bodyClassName="adm-drawer-body--column"
     >
       <div className="adm-mode-tabs" role="tablist" aria-label={t("admin.v2.onboard_mode_label")}>
         <button
           type="button"
           role="tab"
+          id="onboard-tab-new"
+          aria-controls="onboard-panel-new"
           aria-selected={mode === "new"}
+          tabIndex={mode === "new" ? 0 : -1}
+          ref={(node) => { tabRefs.current.new = node; }}
           className={`adm-mode-tab ${mode === "new" ? "active" : ""}`}
           onClick={() => switchMode("new")}
+          onKeyDown={handleTabKeyDown}
         >
           {t("admin.v2.mode_new")}
         </button>
         <button
           type="button"
           role="tab"
+          id="onboard-tab-existing"
+          aria-controls="onboard-panel-existing"
           aria-selected={mode === "existing"}
+          tabIndex={mode === "existing" ? 0 : -1}
+          ref={(node) => { tabRefs.current.existing = node; }}
           className={`adm-mode-tab ${mode === "existing" ? "active" : ""}`}
           onClick={() => switchMode("existing")}
+          onKeyDown={handleTabKeyDown}
           disabled={employees.length === 0}
         >
           {t("admin.v2.mode_existing")}
@@ -160,11 +196,21 @@ export function OnboardDrawer({
       </div>
 
       {mode === "new" ? (
-        <form className="adm-form" onSubmit={(event) => void handleSubmitNew(event)} noValidate>
+        <form
+          className="adm-form"
+          onSubmit={(event) => void handleSubmitNew(event)}
+          noValidate
+          role="tabpanel"
+          id="onboard-panel-new"
+          aria-labelledby="onboard-tab-new"
+        >
           <fieldset className="adm-form-section">
             <legend className="adm-form-legend">{t("admin.v2.section_identity")}</legend>
             <label className="adm-field">
-              <span>{t("admin.employee_id")}</span>
+              <span>
+                {t("admin.employee_id")}
+                <span className="adm-field-req" aria-hidden="true">*</span>
+              </span>
               <Input
                 name="employee-id"
                 className="mono"
@@ -176,7 +222,10 @@ export function OnboardDrawer({
               />
             </label>
             <label className="adm-field">
-              <span>{t("admin.display_name")}</span>
+              <span>
+                {t("admin.display_name")}
+                <span className="adm-field-opt">{t("admin.v2.optional")}</span>
+              </span>
               <Input
                 name="display-name"
                 value={displayName}
@@ -186,7 +235,10 @@ export function OnboardDrawer({
               />
             </label>
             <label className="adm-field">
-              <span>{t("admin.email")}</span>
+              <span>
+                {t("admin.email")}
+                <span className="adm-field-opt">{t("admin.v2.optional")}</span>
+              </span>
               <Input
                 name="email"
                 className="mono"
@@ -202,7 +254,10 @@ export function OnboardDrawer({
           <fieldset className="adm-form-section">
             <legend className="adm-form-legend">{t("admin.v2.section_credentials")}</legend>
             <label className="adm-field">
-              <span>{t("admin.username")}</span>
+              <span>
+                {t("admin.username")}
+                <span className="adm-field-req" aria-hidden="true">*</span>
+              </span>
               <Input
                 name="username"
                 className="mono"
@@ -214,7 +269,10 @@ export function OnboardDrawer({
               />
             </label>
             <label className="adm-field">
-              <span>{t("admin.password")}</span>
+              <span>
+                {t("admin.password")}
+                <span className="adm-field-req" aria-hidden="true">*</span>
+              </span>
               <Input
                 name="password"
                 className="mono"
@@ -229,7 +287,10 @@ export function OnboardDrawer({
           <fieldset className="adm-form-section">
             <legend className="adm-form-legend">{t("admin.v2.section_assignment")}</legend>
             <label className="adm-field">
-              <span>{t("admin.assign_node")}</span>
+              <span>
+                {t("admin.assign_node")}
+                <span className="adm-field-opt">{t("admin.v2.optional")}</span>
+              </span>
               <Select
                 value={selectedNodeId || undefined}
                 onValueChange={setSelectedNodeId}
@@ -266,11 +327,21 @@ export function OnboardDrawer({
           </div>
         </form>
       ) : (
-        <form className="adm-form" onSubmit={(event) => void handleSubmitExisting(event)} noValidate>
+        <form
+          className="adm-form"
+          onSubmit={(event) => void handleSubmitExisting(event)}
+          noValidate
+          role="tabpanel"
+          id="onboard-panel-existing"
+          aria-labelledby="onboard-tab-existing"
+        >
           <fieldset className="adm-form-section">
             <legend className="adm-form-legend">{t("admin.assign_existing_employee")}</legend>
             <label className="adm-field">
-              <span>{t("admin.employee")}</span>
+              <span>
+                {t("admin.employee")}
+                <span className="adm-field-req" aria-hidden="true">*</span>
+              </span>
               <Select
                 value={existingEmployeeId || undefined}
                 onValueChange={setExistingEmployeeId}
@@ -294,7 +365,10 @@ export function OnboardDrawer({
               </Select>
             </label>
             <label className="adm-field">
-              <span>{t("admin.assign_node")}</span>
+              <span>
+                {t("admin.assign_node")}
+                <span className="adm-field-req" aria-hidden="true">*</span>
+              </span>
               <Select
                 value={existingNodeId || undefined}
                 onValueChange={setExistingNodeId}
