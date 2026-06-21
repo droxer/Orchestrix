@@ -196,7 +196,7 @@
   font-size: var(--text-xs);
   font-weight: 600;
   text-transform: lowercase;
-  }
+}
 
 .agent-thinking {
   display: block;
@@ -214,7 +214,7 @@
   min-height: 32px;
   padding: 0 var(--space-sm);
   border: 1px solid var(--color-hairline-soft);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-sm);
   background: var(--color-canvas);
   color: var(--color-muted);
   cursor: pointer;
@@ -232,7 +232,7 @@
   border-right: 1.5px solid currentColor;
   border-bottom: 1.5px solid currentColor;
   transform: rotate(-45deg);
-  transition: transform 140ms ease;
+  transition: transform var(--duration-fast) ease;
 }
 
 .agent-thinking[open] summary::before {
@@ -272,7 +272,7 @@
   align-self: flex-start;
   padding: 4px var(--space-sm);
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-sm);
   background: var(--color-canvas);
   color: var(--color-ink);
   font-size: var(--text-xs);
@@ -325,7 +325,7 @@
   font-family: var(--font-sans);
   font-size: var(--text-xs);
   font-weight: 500;
-  }
+}
 
 .agent-status > svg {
   flex-shrink: 0;
@@ -385,7 +385,7 @@
   background: var(--color-canvas);
   color: var(--color-ink);
   overflow: hidden;
-  transition: border-color 140ms ease, box-shadow 140ms ease;
+  transition: border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
 }
 
 .artifact-card:hover,
@@ -469,6 +469,70 @@
 .artifact-card-toggle:hover {
   background: var(--color-surface-soft);
   color: var(--color-ink);
+}
+
+.artifact-plan-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xxs) var(--space-xs);
+  padding: var(--space-xs) 0;
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+}
+
+.artifact-plan-note-label {
+  font-weight: 600;
+  color: var(--color-body);
+}
+
+.artifact-plan-note-loading {
+  opacity: 0.6;
+}
+
+.artifact-plan-note .artifact-plan-summary {
+  padding: 0;
+}
+
+.artifact-plan-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xxs) var(--space-xs);
+  margin: 0;
+  padding: var(--space-xs) var(--space-base) var(--space-sm);
+  list-style: none;
+}
+
+.artifact-plan-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+}
+
+.artifact-plan-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px var(--space-xs);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-soft);
+}
+
+.artifact-plan-arrow {
+  color: var(--color-muted);
+}
+
+.artifact-plan-agent {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.artifact-plan-mode {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--color-muted);
 }
 
 .artifact-preview {
@@ -568,4 +632,4 @@
 
 .msg-system.tone-good .msg-system-label::before { background: var(--color-semantic-up); }
 .msg-system.tone-bad  .msg-system-label::before { background: var(--color-semantic-down); }
-.msg-system.tone-info .msg-system-label::before { background: var(--color-primary); }
+.msg-system.tone-info .msg-system-label::before { background: var(--color-info); }

@@ -1,0 +1,77 @@
+/* =====================================================================
+   Confirm / Prompt Dialog  (dialog-* namespace)
+
+   In-brand replacement for native window.confirm / window.prompt. Reuses
+   the same overlay + lift language as the preferences modal but at a
+   compact size for a single question + two actions. All colors, type,
+   radii, spacing, and motion come from tokens.css.
+   ===================================================================== */
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-overlay);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  padding: var(--space-base);
+  animation: pref-backdrop-in var(--duration-fast) ease both;
+}
+
+.dialog-modal {
+  position: relative;
+  width: min(420px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+  background: var(--color-canvas);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lift);
+  animation: pref-modal-in 180ms var(--ease-emphasized) both;
+  outline: none;
+}
+
+.dialog-title {
+  margin: 0;
+  font: var(--type-title-md);
+  color: var(--color-ink);
+}
+
+.dialog-message {
+  margin: 0;
+  font: var(--type-body-sm);
+  color: var(--color-body);
+}
+
+.dialog-form {
+  margin: 0;
+}
+
+.dialog-input {
+  width: 100%;
+  height: 40px;
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-md);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-md);
+  transition: border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
+}
+
+.dialog-input:focus-visible {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: var(--ring-focus);
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+}

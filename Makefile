@@ -14,8 +14,14 @@ DAEMON_TOKEN ?=
 DAEMON_NODE_TOKEN ?=
 SANDBOX_MODE ?=
 WORKSPACE ?=
+SUPERVISOR_PROVIDER ?= local
+SUPERVISOR_COMMAND ?=
+SUPERVISOR_WORKSPACE_ROOT ?= .relay/employee-workspaces
+SUPERVISOR_INTERVAL_MS ?=
+SUPERVISOR_ONCE ?=
+ADMIN_TOKEN ?=
 
-.PHONY: devbox-image devbox-check devbox-oci build-packages test test-python backend-install backend-run backend-test backend-migrate pre-commit-install pre-commit-run run tui-install tui-run tui-test tui tui-local backend daemon-install daemon-run daemon-test daemon run-with-daemon serve web-install web-run web-test web run-fresh stop
+.PHONY: devbox-image devbox-check devbox-oci build-packages test test-python backend-install backend backend-test backend-migrate pre-commit-install pre-commit-run run tui-install tui-test tui tui-local daemon-install daemon-test daemon supervisor-install supervisor-test supervisor run-with-daemon serve web-install web-test web run-fresh stop
 
 devbox-image:
 	docker build --build-arg DEVBOX_BASE_IMAGE="$(DEVBOX_BASE_IMAGE)" -t $(DEVBOX_IMAGE) -f $(DOCKERFILE) .
@@ -32,6 +38,7 @@ devbox-oci: devbox-check
 build-packages:
 	npm run build -w relay-core
 	npm run build -w relay-daemon
+	npm run build -w relay-supervisor
 	npm run build -w relay-tui
 
 test:
@@ -48,7 +55,7 @@ pre-commit-install: backend-install
 pre-commit-run:
 	UV_CACHE_DIR=.uv-cache uv run --project backend --extra dev pre-commit run --all-files
 
-backend-run:
+backend:
 	$(if $(filter command line environment,$(origin BACKEND_PORT)),BACKEND_PORT="$(BACKEND_PORT)" )UV_CACHE_DIR=.uv-cache uv run --project backend relay
 
 backend-test:
@@ -63,7 +70,7 @@ tui-local:
 tui-install:
 	npm install -w relay-tui
 
-tui-run:
+tui:
 	$(if $(filter command line environment,$(origin RELAY_BACKEND_URL)),RELAY_BACKEND_URL="$(RELAY_BACKEND_URL)" )$(if $(filter command line environment,$(origin EMPLOYEE_ID)),RELAY_EMPLOYEE_ID="$(EMPLOYEE_ID)" )$(if $(filter command line environment,$(origin DAEMON_TOKEN)),RELAY_DAEMON_TOKEN="$(DAEMON_TOKEN)" )$(if $(filter command line environment,$(origin DAEMON_NODE_TOKEN)),RELAY_DAEMON_NODE_TOKEN="$(DAEMON_NODE_TOKEN)" )$(if $(filter command line environment,$(origin SANDBOX_ID)),RELAY_SANDBOX_ID="$(SANDBOX_ID)" SANDBOX_ID="$(SANDBOX_ID)" )$(if $(filter command line environment,$(origin WORKSPACE)),RELAY_WORKSPACE="$(WORKSPACE)" WORKSPACE="$(WORKSPACE)" )node packages/relay-tui/dist/cli.js
 
 tui-test:
@@ -73,16 +80,12 @@ tui-test:
 	./node_modules/.bin/tsc -p packages/tsconfig.json
 	node --test dist/packages/relay-tui/tests/tui.test.js
 
-tui: tui-run
-
 run: tui-local
-
-backend: backend-run
 
 daemon-install:
 	npm install -w relay-daemon
 
-daemon-run:
+daemon:
 	@echo "Starting the Relay daemon. It registers with the backend, owns the sandbox, and runs agent CLIs."
 	$(if $(filter command line environment,$(origin RELAY_BACKEND_URL)),RELAY_BACKEND_URL="$(RELAY_BACKEND_URL)" )$(if $(filter command line environment,$(origin EMPLOYEE_ID)),RELAY_EMPLOYEE_ID="$(EMPLOYEE_ID)" )$(if $(filter command line environment,$(origin DAEMON_TOKEN)),RELAY_DAEMON_TOKEN="$(DAEMON_TOKEN)" )$(if $(filter command line environment,$(origin DAEMON_NODE_TOKEN)),RELAY_DAEMON_NODE_TOKEN="$(DAEMON_NODE_TOKEN)" )$(if $(filter command line environment,$(origin WORKSPACE)),RELAY_WORKSPACE="$(WORKSPACE)" )node packages/relay-daemon/dist/cli.js --sandbox-id $(SANDBOX_ID) $(if $(filter command line environment,$(origin SANDBOX_MODE)),--sandbox $(SANDBOX_MODE),)
 
@@ -92,7 +95,18 @@ daemon-test:
 	./node_modules/.bin/tsc -p packages/tsconfig.json
 	node --test dist/packages/relay-core/tests/handoff.test.js
 
-daemon: daemon-run
+supervisor-install:
+	npm install -w relay-supervisor
+
+supervisor:
+	@echo "Starting the Relay supervisor. It provisions employee daemon nodes and launches them through the selected provider."
+	$(if $(filter command line environment,$(origin RELAY_BACKEND_URL)),RELAY_BACKEND_URL="$(RELAY_BACKEND_URL)" )$(if $(filter command line environment,$(origin ADMIN_TOKEN)),RELAY_ADMIN_TOKEN="$(ADMIN_TOKEN)" )$(if $(filter command line environment,$(origin SUPERVISOR_PROVIDER)),RELAY_SUPERVISOR_PROVIDER="$(SUPERVISOR_PROVIDER)" )$(if $(filter command line environment,$(origin SUPERVISOR_COMMAND)),RELAY_SUPERVISOR_COMMAND="$(SUPERVISOR_COMMAND)" )$(if $(filter command line environment,$(origin SUPERVISOR_WORKSPACE_ROOT)),RELAY_SUPERVISOR_WORKSPACE_ROOT="$(SUPERVISOR_WORKSPACE_ROOT)" )node packages/relay-supervisor/dist/cli.js $(if $(filter command line environment,$(origin SANDBOX_MODE)),--sandbox $(SANDBOX_MODE),) $(if $(filter command line environment,$(origin SUPERVISOR_INTERVAL_MS)),--interval-ms $(SUPERVISOR_INTERVAL_MS),) $(if $(SUPERVISOR_ONCE),--once,)
+
+supervisor-test:
+	npm run build -w relay-core
+	npm run build -w relay-supervisor
+	./node_modules/.bin/tsc -p packages/tsconfig.json
+	node --test dist/packages/relay-supervisor/tests/supervisor.test.js
 
 run-with-daemon: run
 
@@ -102,7 +116,7 @@ serve:
 web-install:
 	npm install -w web
 
-web-run:
+web:
 	$(if $(filter command line environment,$(origin RELAY_BACKEND_URL)),RELAY_BACKEND_URL="$(RELAY_BACKEND_URL)" )npm run dev -w web
 
 web-test:
@@ -110,14 +124,13 @@ web-test:
 	./node_modules/.bin/tsc -p packages/tsconfig.json
 	node --test dist/web/tests/status.test.js dist/web/tests/messageBlock.test.js
 
-web: web-run
-
 run-fresh: devbox-oci
 	$(if $(filter command line environment,$(origin WORKSPACE)),RELAY_WORKSPACE="$(WORKSPACE)" )node packages/relay-tui/dist/local-run.js
 
 stop:
 	-pkill -f "backend --port" 2>/dev/null
 	-pkill -f "node packages/relay-daemon/dist/cli.js" 2>/dev/null
+	-pkill -f "node packages/relay-supervisor/dist/cli.js" 2>/dev/null
 	-pkill -f "node packages/relay-tui/dist/cli.js$$" 2>/dev/null
 	-pkill -f "npm run run" 2>/dev/null
 	-pkill -f "boxlite-shim" 2>/dev/null

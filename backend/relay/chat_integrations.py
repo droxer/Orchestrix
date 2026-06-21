@@ -39,6 +39,10 @@ class LocalChatIntegrationStore:
         self.integrations_path = root / "integrations.json"
         self.secrets_path = root / "secrets.json"
         self.audit_path = root / "audit.jsonl"
+        # Persistent conversation -> session bindings so a chat thread resumes
+        # the right Relay session across bot restarts, and so one user can run
+        # several conversations in parallel from different threads.
+        self.conversations_path = root / "conversations.json"
 
     def list_integrations(self) -> list[dict[str, Any]]:
         with self._lock:
@@ -242,6 +246,51 @@ class LocalChatIntegrationStore:
                 }
             return None
 
+    def get_conversation_session(self, payload: dict[str, Any]) -> dict[str, Any] | None:
+        """Return the session binding for a conversation thread, if any."""
+        with self._lock:
+            key = _conversation_key(payload)
+            for record in self._read_conversations():
+                if record.get("key") == key:
+                    return record
+            return None
+
+    def set_conversation_session(self, payload: dict[str, Any], session_id: str, owner_employee_id: str) -> dict[str, Any]:
+        """Bind a conversation thread to a Relay session (upsert by thread key)."""
+        with self._lock:
+            key = _conversation_key(payload)
+            now = now_iso()
+            records = self._read_conversations()
+            for index, record in enumerate(records):
+                if record.get("key") == key:
+                    updated = {**record, "sessionId": session_id, "ownerEmployeeId": owner_employee_id, "updatedAt": now}
+                    records[index] = updated
+                    self._write_conversations(records)
+                    return updated
+            record = {
+                "key": key,
+                "provider": _provider(payload.get("provider")),
+                "tenantId": _string(payload.get("tenantId")),
+                "conversationId": _required_string(payload.get("conversationId"), "conversationId"),
+                "threadId": _string(payload.get("threadId")),
+                "sessionId": session_id,
+                "ownerEmployeeId": owner_employee_id,
+                "createdAt": now,
+                "updatedAt": now,
+            }
+            records.append(record)
+            self._write_conversations(records)
+            return record
+
+    def _read_conversations(self) -> list[dict[str, Any]]:
+        if not self.conversations_path.exists():
+            return []
+        value = _read_json(self.conversations_path)
+        return value if isinstance(value, list) else []
+
+    def _write_conversations(self, records: list[dict[str, Any]]) -> None:
+        _write_json(self.conversations_path, records)
+
     def _read_integrations(self) -> list[dict[str, Any]]:
         if not self.integrations_path.exists():
             return []
@@ -362,6 +411,14 @@ def _public_config(value: Any) -> dict[str, Any]:
         for key, item in value.items()
         if key not in SECRET_FIELDS and item is not None and not isinstance(item, (dict, list))
     }
+
+
+def _conversation_key(payload: dict[str, Any]) -> str:
+    provider = _provider(payload.get("provider"))
+    tenant_id = _string(payload.get("tenantId")) or ""
+    conversation_id = _required_string(payload.get("conversationId"), "conversationId")
+    thread_id = _string(payload.get("threadId")) or ""
+    return "::".join([provider, tenant_id, conversation_id, thread_id])
 
 
 def _conversation_allowed(integration: dict[str, Any], conversation_id: str, thread_id: str | None) -> bool:

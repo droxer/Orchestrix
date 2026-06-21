@@ -50,7 +50,7 @@ function runCommand(id = "cmd_1"): DaemonNodeCommand {
     runId: "run_1",
     taskGoal: "do work",
     agent: "codex",
-    mode: "implement",
+    mode: "action",
     workspacePath: process.cwd(),
   };
 }

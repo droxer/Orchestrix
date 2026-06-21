@@ -177,6 +177,8 @@ def materialize_events(events: list[dict[str, Any]]) -> dict[str, Any]:
             session.pop("currentAgent", None)
         elif event_type == "session.archived":
             session["archived"] = True
+        elif event_type == "session.renamed":
+            session["title"] = event["title"]
     return session
 
 
@@ -226,7 +228,7 @@ def safe_name(value: str) -> str:
     return safe or "relay"
 
 
-def role_for_agent(agent: str, mode: str = "implement") -> str:
+def role_for_agent(agent: str, mode: str = "action") -> str:
     if mode == "review":
         return "reviewer"
     return {"claude": "implementer", "pi": "tester", "codex": "fixer", "kimi": "implementer"}.get(agent, "implementer")

@@ -8,10 +8,10 @@
   min-height: 40px;
   padding: 0 var(--space-xs) 0 var(--space-base);
   border: 1px solid var(--color-hairline-soft);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-sm);
   background: var(--color-surface-strong);
   color: var(--color-ink);
-  transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+  transition: border-color var(--duration-fast) ease, background var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
 }
 
 .people-search svg {
@@ -57,7 +57,7 @@
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-md);
   background: var(--color-surface-strong);
   color: var(--color-ink);
   font-family: var(--font-sans);
@@ -69,12 +69,7 @@
   width: var(--avatar-size, 36px);
   height: var(--avatar-size, 36px);
   font-size: var(--text-sm);
-  background:
-    linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--color-surface-strong) 92%, var(--color-ink) 8%) 0%,
-      var(--color-surface-strong) 100%
-    );
+  background: var(--color-surface-strong);
   box-shadow: inset 0 0 0 1px var(--color-hairline-soft);
 }
 
@@ -95,7 +90,7 @@
 }
 
 .employee-avatar.tone-good::after    { background: var(--color-semantic-up); }
-.employee-avatar.tone-info::after    { background: var(--color-primary); }
+.employee-avatar.tone-info::after    { background: var(--color-info); }
 .employee-avatar.tone-bad::after     { background: var(--color-semantic-down); }
 .employee-avatar.tone-warn::after    { background: var(--color-accent-yellow); }
 .employee-avatar.tone-neutral::after { background: var(--color-muted-soft); }
@@ -136,29 +131,16 @@
   font-size: var(--text-sm);
 }
 
-/* Per-agent brand tints — bg is a 12% wash, fg is the saturated brand hue.
-   Hex values track the vendors' official marks (Anthropic terracotta,
-   OpenAI teal, Inflection violet, Moonshot indigo). */
-/* Brand tints — saturated fg uses the vendor's official mark color,
-   bg is a ~12% wash for the round chip. */
-.agent-avatar[data-agent="claude"] {
-  background: color-mix(in srgb, #d97757 12%, var(--color-surface-strong));
-  color: #d97757;
-}
-
-.agent-avatar[data-agent="pi"] {
-  background: color-mix(in srgb, #000 8%, var(--color-surface-strong));
-  color: #111;
-}
-
-.agent-avatar[data-agent="codex"] {
-  background: color-mix(in srgb, #000 8%, var(--color-surface-strong));
-  color: #111;
-}
-
+/* Monochrome agent avatars. The precision system reserves color for
+   status, so agents are no longer tinted with vendor brand hues — the
+   AgentMark glyph carries identity. All four render ink-on-neutral on a
+   shared surface chip; differentiation is by glyph shape, not color. */
+.agent-avatar[data-agent="claude"],
+.agent-avatar[data-agent="pi"],
+.agent-avatar[data-agent="codex"],
 .agent-avatar[data-agent="kimi"] {
-  background: color-mix(in srgb, #1252f1 10%, var(--color-surface-strong));
-  color: #1252f1;
+  background: var(--color-surface-strong);
+  color: var(--color-ink);
 }
 
 .agent-avatar > svg {

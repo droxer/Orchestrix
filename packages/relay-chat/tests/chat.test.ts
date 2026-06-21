@@ -39,6 +39,28 @@ describe("relay-chat command parsing", () => {
     assert.equal(request?.agent, "codex");
     assert.equal(request?.taskGoal, "implement the chat gateway");
   });
+
+  it("parses new, list, and switch conversation commands", () => {
+    assert.deepEqual(parseChatCommand('/relay new --agent codex "second task"'), {
+      kind: "new",
+      agent: "codex",
+      mode: "action",
+      sandboxId: undefined,
+      taskGoal: "second task",
+    });
+    assert.deepEqual(parseChatCommand("/relay list"), { kind: "list" });
+    assert.deepEqual(parseChatCommand("/relay switch ses_42"), { kind: "switch", sessionId: "ses_42" });
+    assert.equal(parseChatCommand("/relay switch"), undefined);
+  });
+
+  it("marks a new command as forcing a fresh conversation", () => {
+    const ref = discordConversation({ userId: "u1", channelId: "c1" });
+    const command = parseChatCommand("/relay new start fresh");
+    assert.ok(command);
+    const request = commandToAgentRequest(ref, command);
+    assert.equal(request?.forceNew, true);
+    assert.equal(request?.taskGoal, "start fresh");
+  });
 });
 
 describe("provider conversation mapping", () => {
@@ -85,14 +107,14 @@ describe("RelayChatClient", () => {
       sandboxId: "sbx_alice",
       employeeId: "alice",
       taskGoal: "build it",
-      assignments: [{ agent: "codex", mode: "implement" }],
+      assignments: [{ agent: "codex", mode: "action" }],
     });
     assert.equal(calls[0].url, "http://relay.local/sandboxes/sbx_alice/runs");
     assert.equal((calls[0].init.headers as Record<string, string>).Authorization, "Bearer svc");
     assert.equal((calls[0].init.headers as Record<string, string>)["X-Relay-Employee-Id"], "alice");
     assert.deepEqual(JSON.parse(String(calls[0].init.body)), {
       taskGoal: "build it",
-      assignments: [{ agent: "codex", mode: "implement" }],
+      assignments: [{ agent: "codex", mode: "action" }],
     });
   });
 
@@ -201,7 +223,7 @@ describe("RelayChatGateway", () => {
     const run = await gateway.run({
       ...telegramConversation({ userId: 42, chatId: 42 }),
       agent: "codex",
-      mode: "implement",
+      mode: "action",
       taskGoal: "ship chat support",
     }, {
       event: (update) => {
@@ -239,6 +261,138 @@ describe("RelayChatGateway", () => {
     });
 
     assert.equal(session.status, "completed");
+  });
+
+  it("continues the thread's bound session and re-binds after the run", async () => {
+    const calls: { resolved: number; boundTo: string[]; ranWith: (string | undefined)[] } = {
+      resolved: 0,
+      boundTo: [],
+      ranWith: [],
+    };
+    const backend: RelayChatBackend = {
+      async startSandboxRun(input) {
+        calls.ranWith.push(input.sessionId);
+        return makeSession("running");
+      },
+      async cancelSandboxRun() {
+        return makeSession("cancelled");
+      },
+      async getSession() {
+        return makeSession("completed");
+      },
+      async streamSessionEvents() {},
+      async resolveConversationSession() {
+        calls.resolved += 1;
+        return makeSession("running"); // bound to sess_1
+      },
+      async bindConversationSession(_ref, sessionId) {
+        calls.boundTo.push(sessionId);
+      },
+    };
+    const identities = new StaticChatIdentityResolver([
+      { provider: "discord", externalUserId: "u1", employeeId: "alice", defaultSandboxId: "sbx_alice" },
+    ]);
+    const gateway = new RelayChatGateway({ backend, identities });
+
+    await gateway.run({
+      ...discordConversation({ userId: "u1", channelId: "c1" }),
+      agent: "codex",
+      mode: "action",
+      taskGoal: "follow up",
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    // Resolved the existing binding, ran against it, and re-bound the result.
+    assert.equal(calls.resolved, 1);
+    assert.deepEqual(calls.ranWith, ["sess_1"]);
+    assert.deepEqual(calls.boundTo, ["sess_1"]);
+  });
+
+  it("keeps a started chat run alive when conversation binding fails", async () => {
+    const seen: RelayEvent[] = [];
+    let started = 0;
+    let failed = 0;
+    const backend: RelayChatBackend = {
+      async startSandboxRun() {
+        return makeSession("running");
+      },
+      async cancelSandboxRun() {
+        return makeSession("cancelled");
+      },
+      async getSession() {
+        return makeSession("completed");
+      },
+      async streamSessionEvents(_sessionId, onEvent) {
+        await onEvent(makeOutputEvent());
+      },
+      async bindConversationSession() {
+        throw new Error("mapping write failed");
+      },
+    };
+    const identities = new StaticChatIdentityResolver([
+      { provider: "discord", externalUserId: "u1", employeeId: "alice", defaultSandboxId: "sbx_alice" },
+    ]);
+    const gateway = new RelayChatGateway({ backend, identities });
+
+    const run = await gateway.run({
+      ...discordConversation({ userId: "u1", channelId: "c1" }),
+      agent: "codex",
+      mode: "action",
+      taskGoal: "continue anyway",
+    }, {
+      started: () => {
+        started += 1;
+      },
+      failed: () => {
+        failed += 1;
+      },
+      event: (update) => {
+        seen.push(update.event);
+      },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    assert.equal(run.session.id, "sess_1");
+    assert.equal(started, 1);
+    assert.equal(failed, 0);
+    assert.equal(seen[0].type, "agent.output");
+  });
+
+  it("skips the existing binding when forceNew is set", async () => {
+    let resolved = 0;
+    const ranWith: (string | undefined)[] = [];
+    const backend: RelayChatBackend = {
+      async startSandboxRun(input) {
+        ranWith.push(input.sessionId);
+        return makeSession("running");
+      },
+      async cancelSandboxRun() {
+        return makeSession("cancelled");
+      },
+      async getSession() {
+        return makeSession("completed");
+      },
+      async streamSessionEvents() {},
+      async resolveConversationSession() {
+        resolved += 1;
+        return makeSession("running");
+      },
+      async bindConversationSession() {},
+    };
+    const identities = new StaticChatIdentityResolver([
+      { provider: "discord", externalUserId: "u1", employeeId: "alice", defaultSandboxId: "sbx_alice" },
+    ]);
+    const gateway = new RelayChatGateway({ backend, identities });
+
+    await gateway.run({
+      ...discordConversation({ userId: "u1", channelId: "c1" }),
+      agent: "codex",
+      mode: "action",
+      taskGoal: "fresh start",
+      forceNew: true,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(resolved, 0);
+    assert.deepEqual(ranWith, [undefined]);
   });
 });
 

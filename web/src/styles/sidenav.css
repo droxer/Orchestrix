@@ -45,7 +45,7 @@
   height: 44px;
   flex-shrink: 0;
   color: var(--color-ink);
-  transition: width 220ms ease, padding 220ms ease;
+  transition: width var(--duration-base) ease, padding var(--duration-base) ease;
 }
 
 .sidenav-panel[data-expanded="true"] .sidenav-brand {
@@ -150,7 +150,7 @@
   top: 50%;
   width: 2px;
   height: 20px;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-sm);
   background: var(--color-primary);
   transform: translateY(-50%);
 }
@@ -198,7 +198,7 @@
   box-shadow: var(--shadow-lift);
   pointer-events: none;
   z-index: 100;
-  animation: tooltip-in 140ms ease both;
+  animation: tooltip-in var(--duration-fast) ease both;
 }
 
 @keyframes tooltip-in {
@@ -218,7 +218,7 @@
 .sidenav-panel[data-expanded="true"] .sidenav-btn:nth-child(3) .sidenav-label { transition-delay: 80ms; }
 .sidenav-panel[data-expanded="true"] .sidenav-btn:nth-child(4) .sidenav-label { transition-delay: 105ms; }
 .sidenav-panel[data-expanded="true"] .sidenav-bottom .sidenav-btn:nth-child(1) .sidenav-label { transition-delay: 120ms; }
-.sidenav-panel[data-expanded="true"] .sidenav-bottom .sidenav-btn:nth-child(2) .sidenav-label { transition-delay: 140ms; }
+.sidenav-panel[data-expanded="true"] .sidenav-bottom .sidenav-btn:nth-child(2) .sidenav-label { transition-delay: var(--duration-fast); }
 
 /* Expanded button layout: icon + label side by side */
 .sidenav-panel[data-expanded="true"] .sidenav-btn {

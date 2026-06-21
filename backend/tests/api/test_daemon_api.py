@@ -109,7 +109,7 @@ def test_daemon_registration_stores_agent_health_and_rejects_unready_runs(monkey
 
         run = client.post("/sandboxes/sbx_alice/runs", json={
             "taskGoal": "try kimi",
-            "assignments": [{"agent": "kimi", "mode": "implement"}],
+            "assignments": [{"agent": "kimi", "mode": "action"}],
         }, headers={"Authorization": "Bearer ui_token"})
         assert run.status_code == 409
         assert "does not have ready agent" in run.json()["detail"]
@@ -451,7 +451,8 @@ def test_sandbox_ui_token_can_manage_owned_sessions(monkeypatch) -> None:
             "note": "check it",
         }, headers=headers)
         assert handed_off.status_code == 200
-        assert handed_off.json()["pendingDecision"] == "start"
+        assert handed_off.json()["status"] == "running"
+        assert "pendingDecision" not in handed_off.json()
         assert any(decision["kind"] == "handoff" and decision["targetAgent"] == "codex" for decision in handed_off.json()["decisions"])
 
         bob_session = admin_client.post("/sessions", json={
@@ -523,7 +524,7 @@ def test_employee_can_ask_assigned_daemon_node_without_daemon_node_token(monkeyp
 
         run = alice_client.post("/sandboxes/sbx_alice/runs", json={
             "taskGoal": "answer this",
-            "assignments": [{"agent": "codex", "mode": "implement"}],
+            "assignments": [{"agent": "codex", "mode": "action"}],
         })
         assert run.status_code == 202
         session_id = run.json()["id"]
@@ -547,13 +548,13 @@ def test_employee_can_ask_assigned_daemon_node_without_daemon_node_token(monkeyp
 
         bob_session = bob_client.post("/sessions", json={
             "taskGoal": "bob asks alice node",
-            "assignments": [{"agent": "codex", "mode": "implement"}],
+            "assignments": [{"agent": "codex", "mode": "action"}],
             "workspacePath": "/workspace/alice",
         })
         assert bob_session.status_code == 201
         bob_run = bob_client.post("/sandboxes/sbx_alice/runs", json={
             "taskGoal": "bob asks alice node",
-            "assignments": [{"agent": "codex", "mode": "implement"}],
+            "assignments": [{"agent": "codex", "mode": "action"}],
             "sessionId": bob_session.json()["id"],
         })
         assert bob_run.status_code == 403
@@ -562,6 +563,78 @@ def test_employee_can_ask_assigned_daemon_node_without_daemon_node_token(monkeyp
             "reason": "not alice's session",
         })
         assert alice_cancel_bob.status_code == 400
+
+
+def test_sandbox_run_accepts_decision_metadata(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        admin_client = TestClient(app)
+        _bootstrap_admin(admin_client)
+        _login_admin(admin_client)
+        _create_user(admin_client, "alice", employee_id="alice")
+
+        register = admin_client.post("/daemon-nodes/register", json={
+            "sandboxId": "sbx_alice",
+            "employeeId": "alice",
+            "token": "node_token",
+            "workspacePath": "/workspace/alice",
+            "protocolVersion": 1,
+            "supportedAgents": ["codex"],
+            "status": "ready",
+        }, headers={"Authorization": "Bearer ui_token"})
+        assert register.status_code == 200
+
+        alice_client = TestClient(app)
+        _login(alice_client, "alice", "userpass")
+        created = alice_client.post("/sessions", json={
+            "taskGoal": "fix auth",
+            "workspacePath": "/workspace/alice",
+        })
+        assert created.status_code == 201
+
+        run = alice_client.post("/sandboxes/sbx_alice/runs", json={
+            "taskGoal": "fix auth",
+            "assignments": [{"agent": "codex", "mode": "action"}],
+            "sessionId": created.json()["id"],
+            "decision": {"kind": "rerun", "targetAgent": "codex"},
+        })
+
+        assert run.status_code == 202
+        assert run.json()["decisions"][0]["kind"] == "rerun"
+        assert run.json()["decisions"][0]["targetAgent"] == "codex"
+
+
+def test_sandbox_run_accepts_fresh_new_conversation_payload(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        admin_client = TestClient(app)
+        _bootstrap_admin(admin_client)
+        _login_admin(admin_client)
+        _create_user(admin_client, "alice", employee_id="alice")
+
+        register = admin_client.post("/daemon-nodes/register", json={
+            "sandboxId": "sbx_alice",
+            "employeeId": "alice",
+            "token": "node_token",
+            "workspacePath": "/workspace/alice",
+            "protocolVersion": 1,
+            "supportedAgents": ["claude"],
+            "status": "ready",
+        }, headers={"Authorization": "Bearer ui_token"})
+        assert register.status_code == 200
+
+        alice_client = TestClient(app)
+        _login(alice_client, "alice", "userpass")
+        run = alice_client.post("/sandboxes/sbx_alice/runs", json={
+            "taskGoal": "start a fresh thread",
+            "assignments": [{"agent": "claude", "mode": "action"}],
+        })
+
+        assert run.status_code == 202
+        assert run.json()["taskGoal"] == "start a fresh thread"
+        assert run.json()["ownerEmployeeId"] == "alice"
 
 
 def test_admin_can_start_existing_employee_session_on_employee_daemon_node(monkeypatch) -> None:
@@ -598,7 +671,7 @@ def test_admin_can_start_existing_employee_session_on_employee_daemon_node(monke
         created = admin_client.post("/sessions", json={
             "taskGoal": "alice asks through admin",
             "ownerEmployeeId": "alice",
-            "assignments": [{"agent": "codex", "mode": "implement"}],
+            "assignments": [{"agent": "codex", "mode": "action"}],
             "workspacePath": "/workspace/alice",
         })
         assert created.status_code == 201
@@ -609,14 +682,14 @@ def test_admin_can_start_existing_employee_session_on_employee_daemon_node(monke
         _login(bob_client, "bob", "userpass")
         denied = bob_client.post("/sandboxes/sbx_alice/runs", json={
             "taskGoal": "alice asks through admin",
-            "assignments": [{"agent": "codex", "mode": "implement"}],
+            "assignments": [{"agent": "codex", "mode": "action"}],
             "sessionId": session_id,
         })
         assert denied.status_code == 403
 
         run = admin_client.post("/sandboxes/sbx_bob/runs", json={
             "taskGoal": "alice asks through admin",
-            "assignments": [{"agent": "codex", "mode": "implement"}],
+            "assignments": [{"agent": "codex", "mode": "action"}],
             "sessionId": session_id,
         })
         assert run.status_code == 202

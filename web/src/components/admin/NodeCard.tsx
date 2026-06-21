@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Check, Copy, KeyRound, Server, Settings2, Trash2 } from "lucide-react";
 import type { TFunction } from "i18next";
 import type { AgentName, ControlPanelDaemonNodeRecord, EmployeeRecord } from "../../types";
+import { useDialogs } from "@/components/ui/DialogProvider";
 import {
   agentStatusTone,
   copyText,
@@ -55,6 +56,7 @@ interface NodeCardProps {
 }
 
 export function NodeCard({ node, employee, onReveal, onManageAgents, onDelete, t }: NodeCardProps) {
+  const { confirm } = useDialogs();
   const [copied, setCopied] = useState(false);
   const [deletePending, setDeletePending] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -70,7 +72,12 @@ export function NodeCard({ node, employee, onReveal, onManageAgents, onDelete, t
 
   async function handleDelete() {
     if (!onDelete) return;
-    if (!window.confirm(t("admin.v2.delete_confirm", { id: node.id }))) return;
+    const ok = await confirm({
+      title: t("admin.v2.delete_confirm", { id: node.id }),
+      confirmLabel: t("admin.v2.delete_action"),
+      tone: "danger",
+    });
+    if (!ok) return;
     setDeletePending(true);
     setDeleteError(null);
     try {
@@ -106,7 +113,10 @@ export function NodeCard({ node, employee, onReveal, onManageAgents, onDelete, t
           )}
         </div>
         <div className="adm-node-card-meta-col">
-          <span className={`adm-status-pill tone-${tone}`}>{t(`status.${status}`, { defaultValue: status })}</span>
+          <span className={`adm-status-pill tone-${tone}`}>
+            <i className="adm-status-dot" aria-hidden="true" />
+            {t(`status.${status}`, { defaultValue: status })}
+          </span>
           <button
             type="button"
             className="adm-node-id mono"

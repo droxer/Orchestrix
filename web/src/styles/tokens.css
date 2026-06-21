@@ -9,10 +9,14 @@
      3. shadcn/ui  — the @theme bridge exposing tokens to Tailwind
         utilities used by src/components/ui.
 
-   Visual language: white canvas, ink text, Relay Blue as the single
-   action color, neutral hairlines, Instrument Serif for editorial
-   display moments, Geist for interface text, and Geist Mono for
-   numbers and code.
+   Visual language: precision/technical (Linear / Vercel / Resend
+   lineage). White canvas, near-black ink as the single ACTION color
+   (it inverts to white-on-black in dark mode), cool neutral hairlines.
+   Color is reserved exclusively for status (success / danger / warning
+   / info) and never used for actions. Geist carries interface and
+   display text; Geist Mono is a deliberate identity signal — eyebrows,
+   metadata, agent labels, tool lines, numbers, and code. No editorial
+   serif; no pill geometry.
    ===================================================================== */
 
 @theme inline {
@@ -55,16 +59,17 @@
   --color-success: var(--color-semantic-up);
   --color-danger: var(--color-semantic-down);
   --color-warning: var(--color-accent-yellow);
+  --color-info: var(--color-info);
 
-  /* Radii — pill (100px) is the brand's signature; expose the whole token
-     scale so rounded-pill / rounded-md / rounded-xl replace the
-     rounded-[var(--radius-*)] arbitrary values the primitives carried. */
+  /* Radii — tight precision geometry; expose the whole token scale so
+     rounded-sm / rounded-md / rounded-xl replace the
+     rounded-[var(--radius-*)] arbitrary values the primitives carried.
+     The pill is retired — all former consumers now use rounded-sm. */
   --radius-xs: var(--radius-xs);
   --radius-sm: var(--radius-sm);
   --radius-md: var(--radius-md);
   --radius-lg: var(--radius-lg);
   --radius-xl: var(--radius-xl);
-  --radius-pill: var(--radius-pill);
 
   /* Spacing — the 4px-base named scale → p-md, gap-sm, etc. Coexists with
      Tailwind's numeric spacing (p-4) since the keys are named, not numeric. */
@@ -109,40 +114,43 @@
 :root {
   /* ----- 1. Primitives ---------------------------------------- */
 
-  /* Brand — Relay Blue is the only action color */
-  --color-primary: #0052ff;
-  --color-primary-active: #003ecc;
-  --color-primary-disabled: #a8b8cc;
+  /* Action — near-black ink is the only action color (monochrome).
+     Color is reserved for status; actions never carry a hue. */
+  --color-primary: #0a0a0a;
+  --color-primary-active: #27272a;
+  --color-primary-disabled: #d4d4d8;
 
-  /* Text */
-  --color-ink: #18232d;        /* headings, primary copy, emphasized body */
-  --color-body: #5b616e;       /* running text */
-  --color-muted: #7c828a;      /* secondary labels */
-  --color-muted-soft: #a8acb3; /* timestamps, disabled */
-  --color-on-primary: #ffffff; /* text on Relay Blue */
+  /* Text — cool neutral ramp (zinc) */
+  --color-ink: #0a0a0a;        /* headings, primary copy, emphasized body */
+  --color-body: #52525b;       /* running text */
+  --color-muted: #71717a;      /* secondary labels */
+  --color-muted-soft: #a1a1aa; /* timestamps, disabled */
+  --color-on-primary: #ffffff; /* text on the ink action fill */
   --color-on-dark: #ffffff;    /* text on ink fills */
 
-  /* Surfaces */
+  /* Surfaces — cool, neutral */
   --color-canvas: #ffffff;
   --color-surface-card: #ffffff;   /* feature/product cards on white */
-  --color-surface-soft: #f7f6f1;   /* warm tint — quotes, code, hover */
-  --color-surface-strong: #eef0f3; /* cool tint — fills, search, avatars */
-  --color-surface-dark: #18232d;
-  --color-surface-dark-elevated: #16181c;
-  --color-on-dark-soft: #a8acb3;
+  --color-surface-soft: #fafafa;   /* subtle tint — quotes, code, hover */
+  --color-surface-strong: #f4f4f5; /* fills, search, avatars */
+  --color-surface-dark: #0b0b0d;
+  --color-surface-dark-elevated: #111114;
+  --color-on-dark-soft: #a1a1aa;
 
   /* Hairlines */
-  --color-hairline: #d0d5db;
-  --color-hairline-soft: #eef0f3;
+  --color-hairline: #e4e4e7;
+  --color-hairline-soft: #f0f0f0;
   --color-hairline-on-dark: color-mix(in srgb, var(--color-on-dark) 14%, transparent);
 
   /* Syntax-highlight numerals — JetBrains Mono numeric literal in code blocks */
   --color-code-number: #b45309;
 
-  /* Status — text, dots, and borders only; never background fills */
-  --color-semantic-up: #05b169;
-  --color-semantic-down: #cf202f;
-  --color-accent-yellow: #f4b000; /* attention dot only, not an action color */
+  /* Status — the ONLY hues in the system. Text, dots, and borders
+     only; never background fills, never actions. */
+  --color-semantic-up: #10b981;
+  --color-semantic-down: #e5484d;
+  --color-accent-yellow: #f5a623; /* attention dot only, not an action color */
+  --color-info: #3b82f6;          /* neutral "info" status — the sole surviving blue, status-only */
 
   /* Type scale — operational chat surface scale. The brand's marketing
      scale climbs to 80px (display-mega). Inside the product we keep the
@@ -159,16 +167,17 @@
   --text-2xs: 11px;  /* compact labels, tiny metadata */
   --text-micro: 10px; /* minimap / token abbreviations */
 
-  /* Radii — pill for actions, md for inputs/popovers, full for avatars.
-     Pill geometry (100px) is the brand's strongest signal — every CTA,
-     search bar, and badge inherits it. xl (24px) carries every card. */
+  /* Radii — tight precision geometry. sm (6px) for buttons/badges, md
+     (8px) for inputs/popovers, xl (12px) for cards. The pill is retired:
+     all former --radius-pill consumers now use --radius-sm and render as
+     tight 6px corners instead of 100px capsules. --radius-full stays for
+     any genuine circles (status dots). */
   --radius-none: 0;
   --radius-xs: 3px;
   --radius-sm: 6px;
   --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 24px;
-  --radius-pill: 100px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
   --radius-full: 9999px;
 
   /* Spacing — 4px base unit */
@@ -189,14 +198,14 @@
   --drawer-w: 360px;
   --header-h: 60px;
 
-  /* Font families. Editorial-serif system: Instrument Serif carries the
-     editorial display moments with a quietly authoritative voice; Geist
-     handles every line of UI text at modern grotesque crispness; Geist
-     Mono renders numbers and code with the same designer's hand. All
-     three are loaded as variable / typographic fonts by next/font in
-     app/layout.tsx. */
+  /* Font families. Precision system: Geist handles every line of UI and
+     display text at modern grotesque crispness; Geist Mono is the
+     identity signal for eyebrows, metadata, agent labels, numbers, and
+     code. The editorial serif is retired — --font-display now aliases the
+     Geist sans stack so display moments render as tight, weighted sans.
+     Both families load as variable fonts via next/font in app/layout.tsx. */
   --font-sans: var(--font-geist), "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-  --font-display: var(--font-instrument-serif), "Instrument Serif", "Times New Roman", "Times", Georgia, serif;
+  --font-display: var(--font-sans);
   --font-mono: var(--font-geist-mono), "Geist Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
   --font-number: var(--font-mono);
 
@@ -208,10 +217,9 @@
   --leading-loose: 1.6;    /* long-form prose, agent text */
 
   /* Tracking scale — one token per intent, not per pixel. Display values
-     are tuned for Instrument Serif: a refined editorial serif holds its
-     own shapes at 28–36px with only mild tightening, unlike a geometric
-     sans that wanted the harder -0.5/-0.8 pull. */
-  --letter-display: -0.3px;       /* Instrument Serif display (28–36px) */
+     are tuned for weighted Geist: a grotesque sans at 24–34px wants a
+     firmer optical pull than the retired serif did. */
+  --letter-display: -0.6px;       /* Geist sans display (24–34px) */
   --letter-display-strong: -0.5px; /* admin metric values, Geist Mono 36px+ */
   --letter-tight: -0.2px;
   --letter-eyebrow: 0.08em;       /* the 11/12px 600-weight kicker tracking */
@@ -219,11 +227,12 @@
 
   /* Semantic typography. Each role bundles size + weight + line-height
      + family so components can apply one variable instead of re-inlining
-     the triple. Display weight is locked to 400 per spec; anywhere
-     needing emphasis steps up to 600, never 700+. */
-  --type-display-lg: 400 36px/1.11 var(--font-display);  /* admin page title */
-  --type-display-sm: 400 28px/1.11 var(--font-display);
-  --type-title-lg:   400 22px/1.13 var(--font-sans);
+     the triple. Display is weighted Geist (600) with tight tracking;
+     emphasis elsewhere steps to 600, never 700+. Eyebrows and metadata
+     go mono as the identity signal. */
+  --type-display-lg: 600 34px/1.08 var(--font-display);  /* admin page title */
+  --type-display-sm: 600 24px/1.1  var(--font-display);
+  --type-title-lg:   600 22px/1.13 var(--font-sans);
   --type-title-md:   600 18px/1.33 var(--font-sans);
   --type-title-sm:   600 16px/1.25 var(--font-sans);
   --type-body-md:    400 16px/1.5  var(--font-sans);
@@ -235,9 +244,14 @@
   --type-nav-link:   500 14px/1.4  var(--font-sans);
   --type-number:     500 18px/1.4  var(--font-number);
   --type-number-display: 500 36px/1.1 var(--font-number);  /* admin metric values */
-  --type-eyebrow:    600 11px/1.5 var(--font-sans);  /* pair with letter-spacing: var(--letter-eyebrow) */
+  --type-meta-mono:  500 12px/1.4 var(--font-mono);  /* agent labels, tool lines, timestamps */
+  --type-eyebrow:    500 11px/1.5 var(--font-mono);  /* mono signal; pair with letter-spacing: var(--letter-eyebrow) */
 
   /* ----- 2. Semantic aliases ----------------------------------- */
+
+  /* Overlay scrim — behind modal drawers/dialogs. One token so every
+     floating surface dims the canvas identically. */
+  --color-overlay: color-mix(in srgb, #000 55%, transparent);
 
   /* Status borders for outlined pills and danger buttons */
   --border-success: color-mix(in srgb, var(--color-semantic-up) 28%, transparent);
@@ -272,6 +286,11 @@
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-out-quint: cubic-bezier(0.2, 0.7, 0.2, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* `--ease-emphasized` is the firmer decelerate used by the admin tab
+     underline, drawer mode-tabs, and the preferences modal rise — a
+     distinct curve from out-quint, promoted to the shelf so its ~5 sites
+     stop re-declaring the same cubic-bezier inline. */
+  --ease-emphasized: cubic-bezier(0.22, 1, 0.36, 1);
   --duration-fast: 140ms;
   --duration-base: 220ms;
   --duration-slow: 540ms;
@@ -307,63 +326,77 @@
   -webkit-font-smoothing: antialiased;
 }
 
-/* International type — CJK coverage. Geist, Instrument Serif, and Geist
-   Mono carry no Han glyphs, so under a Chinese locale we keep the Latin
-   face first (Geist for body, Instrument Serif for display) and resolve
-   Han characters to Noto Sans SC/TC (loaded by next/font in layout.tsx).
-   Display deliberately drops the Latin serif's system-serif tail for Han:
-   an editorial Latin serif has no clean CJK counterpart at 28–36px, so
-   Chinese display renders in a weighted Noto sans rather than a system
-   Song/Ming face. The trailing names cover machines without the webfont —
-   PingFang (macOS), Microsoft YaHei/JhengHei (Windows), Source Han.
-   --font-number aliases --font-mono and inherits these via substitution. */
+/* International type — CJK coverage. Geist and Geist Mono carry no Han
+   glyphs, so under a Chinese locale we keep the Latin face first (Geist
+   for body and display) and resolve Han characters to Noto Sans SC/TC
+   (loaded by next/font in layout.tsx). --font-display aliases --font-sans
+   in :root, so overriding --font-sans here also retargets display — no
+   separate display stack is needed. The trailing names cover machines
+   without the webfont — PingFang (macOS), Microsoft YaHei/JhengHei
+   (Windows), Source Han. --font-number aliases --font-mono and inherits
+   these via substitution. */
 html:lang(zh-CN) {
   --font-sans: var(--font-geist), var(--font-noto-sans-sc), "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", "Source Han Sans SC", sans-serif;
-  --font-display: var(--font-instrument-serif), var(--font-noto-sans-sc), "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Source Han Sans SC", sans-serif;
   --font-mono: var(--font-geist-mono), var(--font-noto-sans-sc), "Noto Sans SC", "PingFang SC", "Microsoft YaHei", monospace;
 }
 
 html:lang(zh-TW) {
   --font-sans: var(--font-geist), var(--font-noto-sans-tc), "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "Source Han Sans TC", sans-serif;
-  --font-display: var(--font-instrument-serif), var(--font-noto-sans-tc), "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "Source Han Sans TC", sans-serif;
   --font-mono: var(--font-geist-mono), var(--font-noto-sans-tc), "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", monospace;
 }
 
-/* Dark theme — one definition, applied either when the user pinned dark
-   (html[data-theme="dark"]) or when the OS prefers dark AND the user hasn't
-   pinned light (html:not([data-theme="light"]) inside the media query).
-   This collapses the previous duplicated :root + attribute overrides into
-   a single source of truth and removes drift between the two paths.
+/* Dark theme — ONE definition, ONE selector. `applyTheme` (appStorage.ts)
+   always resolves the user's choice — including "system" via matchMedia —
+   to a concrete data-theme="light"|"dark" before paint (the inline script
+   in app/layout.tsx sets it pre-hydration to avoid a flash). So dark never
+   needs a parallel `@media (prefers-color-scheme: dark)` block: that path
+   was a verbatim copy of this one and the standing drift risk. There is now
+   a single source of truth.
 
-   html[data-theme="light"] needs no rules — primitives in :root already
-   define the light palette, so the attribute selector is just a signal
-   to the media query above. */
+   html[data-theme="light"] needs no rules — the :root primitives already
+   define the light palette.
+
+   This block re-tunes the primitives that don't survive an inversion:
+   surfaces, text hierarchy, hairlines, AND the colors/elevation that are
+   authored for a light canvas (brand blue, code amber, drop shadows). */
 html[data-theme="dark"] {
+  /* Text — keep four distinct steps; body must stay lighter (more
+     prominent) than muted, mirroring the light ramp where body is darker
+     than muted. Collapsing body+muted onto on-dark-soft flattened it. */
   --color-ink: var(--color-on-dark);
-  --color-body: var(--color-on-dark-soft);
+  --color-body: color-mix(in srgb, var(--color-on-dark) 78%, var(--color-surface-dark));
   --color-muted: var(--color-on-dark-soft);
   --color-muted-soft: color-mix(in srgb, var(--color-on-dark-soft) 62%, var(--color-surface-dark));
+
+  /* Surfaces + hairlines */
   --color-canvas: var(--color-surface-dark);
+  --color-surface-card: color-mix(in srgb, var(--color-on-dark) 9%, var(--color-surface-dark));
   --color-surface-soft: var(--color-surface-dark-elevated);
   --color-surface-strong: color-mix(in srgb, var(--color-on-dark) 9%, var(--color-surface-dark));
   --color-hairline: color-mix(in srgb, var(--color-on-dark) 14%, var(--color-surface-dark));
   --color-hairline-soft: color-mix(in srgb, var(--color-on-dark) 8%, var(--color-surface-dark));
-  color-scheme: dark;
-}
 
-@media (prefers-color-scheme: dark) {
-  html:not([data-theme="light"]) {
-    --color-ink: var(--color-on-dark);
-    --color-body: var(--color-on-dark-soft);
-    --color-muted: var(--color-on-dark-soft);
-    --color-muted-soft: color-mix(in srgb, var(--color-on-dark-soft) 62%, var(--color-surface-dark));
-    --color-canvas: var(--color-surface-dark);
-    --color-surface-soft: var(--color-surface-dark-elevated);
-    --color-surface-strong: color-mix(in srgb, var(--color-on-dark) 9%, var(--color-surface-dark));
-    --color-hairline: color-mix(in srgb, var(--color-on-dark) 14%, var(--color-surface-dark));
-    --color-hairline-soft: color-mix(in srgb, var(--color-on-dark) 8%, var(--color-surface-dark));
-    color-scheme: dark;
-  }
+  /* Action — monochrome invert. In dark mode the action fill flips to
+     near-white with ink text (the Vercel signature). Primary also drives
+     links and the focus ring, so they read as white-on-dark; status hues
+     stay separate via --color-info etc. */
+  --color-primary: #f4f4f5;
+  --color-primary-active: #e4e4e7;
+  --color-primary-disabled: color-mix(in srgb, var(--color-on-dark) 24%, var(--color-surface-dark));
+  --color-on-primary: #0a0a0a; /* ink text on the white action fill */
+
+  /* Status — text/dots authored for white; lift for legibility on dark. */
+  --color-semantic-up: #2ed391;
+  --color-semantic-down: #ff6b75;
+  --color-info: #60a5fa;
+  --color-code-number: #f0a868;
+
+  /* Elevation — the rgba(0,0,0,.04) drop is invisible on dark; deepen it.
+     --shadow-lift inherits this drop and its ink-based ring flips to a
+     white hairline automatically. */
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.5);
+
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -393,7 +426,7 @@ body {
   z-index: 100;
   transform: translateY(calc(-100% - var(--space-base)));
   padding: var(--space-xs) var(--space-sm);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-sm);
   background: var(--color-primary);
   color: var(--color-on-primary);
   font-size: var(--text-base);
@@ -510,7 +543,7 @@ button[data-slot="button"][data-variant="default"]:disabled {
    Tone classes only set the variable so they never fight an element's own
    text color — consumers opt in by reading var(--tone). */
 .tone-good    { --tone: var(--color-semantic-up); }
-.tone-info    { --tone: var(--color-primary); }
+.tone-info    { --tone: var(--color-info); }
 .tone-bad     { --tone: var(--color-semantic-down); }
 .tone-warn    { --tone: var(--color-accent-yellow); }
 .tone-neutral { --tone: var(--color-muted-soft); }

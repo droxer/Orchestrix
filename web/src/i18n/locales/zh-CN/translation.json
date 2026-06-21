@@ -2,6 +2,10 @@
   "app": {
     "title": "Relay — 工作力控制平面"
   },
+  "dialog": {
+    "confirm": "确认",
+    "cancel": "取消"
+  },
   "skip_to_conversation": "跳至对话",
   "nav": {
     "conversations": "对话",
@@ -35,7 +39,9 @@
     "new_thread": "新对话",
     "agent_disabled_title": "{{agent}} 在该节点已被管理员禁用。",
     "agent_failed_title": "{{agent}} 在该节点尚未就绪。",
-    "agent_disabled_option": "{{agent}}（已禁用）"
+    "agent_disabled_option": "{{agent}}（已禁用）",
+    "no_conversations": "暂无会话，开始新会话吧。",
+    "no_matches": "没有匹配的会话。"
   },
   "conversation": {
     "agent_working": "{{agent}} 正在工作",
@@ -46,7 +52,12 @@
     "agent_running_aria": "Agent 运行中",
     "tokens_short": "tok",
     "token_usage_title": "输入 {{input}} · 输出 {{output}} · 缓存 {{cache}}",
-    "no_sessions": "—"
+    "no_sessions": "—",
+    "new": "新建会话",
+    "rename": "重命名",
+    "rename_prompt": "重命名会话",
+    "close": "关闭",
+    "close_confirm": "关闭会话“{{name}}”？"
   },
   "composer": {
     "placeholder": "发送给 @{{employee}} — 输入 @ 切换 Agent…",
@@ -387,18 +398,42 @@
       "code-review": "代码审查"
     },
     "sample": {
-      "using-superpowers": { "desc": "确立如何发现和使用技能，要求在做出任何响应之前调用 Skill 工具。" },
-      "brainstorming": { "desc": "在复杂任务进入计划模式之前进行结构化头脑风暴。" },
-      "writing-plans": { "desc": "编写包含上下文、方法和验证步骤的实现计划。" },
-      "executing-plans": { "desc": "逐步执行已批准的计划并跟踪任务。" },
-      "systematic-debugging": { "desc": "从复现到根因分析的系统化调试流程。" },
-      "frontend-design": { "desc": "创建独特、生产级的前端界面，具有高品质设计，避免通用 AI 审美。" },
-      "ui-ux-pro-max": { "desc": "针对生产级界面的高级 UI/UX 指导，具备强有力的审美方向。" },
-      "web-design-guidelines": { "desc": "一致、可访问且精致网页设计的指导原则。" },
-      "code-simplifier": { "desc": "简化过度复杂的代码——减少嵌套、提取函数、改进命名。" },
-      "find-skills": { "desc": "发现并导航工作区中可用的技能。" },
-      "next-best-practices": { "desc": "生产级应用 Next.js 最佳实践：路由、数据获取、性能。" },
-      "vercel-react-best-practices": { "desc": "React + Vercel 部署最佳实践、边缘函数和性能模式。" }
+      "using-superpowers": {
+        "desc": "确立如何发现和使用技能，要求在做出任何响应之前调用 Skill 工具。"
+      },
+      "brainstorming": {
+        "desc": "在复杂任务进入计划模式之前进行结构化头脑风暴。"
+      },
+      "writing-plans": {
+        "desc": "编写包含上下文、方法和验证步骤的实现计划。"
+      },
+      "executing-plans": {
+        "desc": "逐步执行已批准的计划并跟踪任务。"
+      },
+      "systematic-debugging": {
+        "desc": "从复现到根因分析的系统化调试流程。"
+      },
+      "frontend-design": {
+        "desc": "创建独特、生产级的前端界面，具有高品质设计，避免通用 AI 审美。"
+      },
+      "ui-ux-pro-max": {
+        "desc": "针对生产级界面的高级 UI/UX 指导，具备强有力的审美方向。"
+      },
+      "web-design-guidelines": {
+        "desc": "一致、可访问且精致网页设计的指导原则。"
+      },
+      "code-simplifier": {
+        "desc": "简化过度复杂的代码——减少嵌套、提取函数、改进命名。"
+      },
+      "find-skills": {
+        "desc": "发现并导航工作区中可用的技能。"
+      },
+      "next-best-practices": {
+        "desc": "生产级应用 Next.js 最佳实践：路由、数据获取、性能。"
+      },
+      "vercel-react-best-practices": {
+        "desc": "React + Vercel 部署最佳实践、边缘函数和性能模式。"
+      }
     }
   },
   "pref": {
@@ -469,7 +504,7 @@
     "unknown": "未知"
   },
   "mode": {
-    "implement": "实现",
+    "action": "执行",
     "review": "审查"
   },
   "verdict": {
@@ -554,9 +589,21 @@
     "dismiss": "关闭"
   },
   "agent": {
-    "claude": { "role": "构建者", "blurb": "通过系统化的上下文将需求转化为实现工作。" },
-    "pi":     { "role": "规划者", "blurb": "探索权衡方案，规划下一个可靠步骤。" },
-    "codex":  { "role": "审阅者", "blurb": "阅读差异、检查行为并指出风险。" },
-    "kimi":   { "role": "构建者", "blurb": "由 Kimi 智能体提供长上下文的实现协助。" }
+    "claude": {
+      "role": "构建者",
+      "blurb": "通过系统化的上下文将需求转化为实现工作。"
+    },
+    "pi": {
+      "role": "规划者",
+      "blurb": "探索权衡方案，规划下一个可靠步骤。"
+    },
+    "codex": {
+      "role": "审阅者",
+      "blurb": "阅读差异、检查行为并指出风险。"
+    },
+    "kimi": {
+      "role": "构建者",
+      "blurb": "由 Kimi 智能体提供长上下文的实现协助。"
+    }
   }
 }

@@ -80,6 +80,14 @@ export function TokenUsageChart({ snapshot, compact }: TokenUsageChartProps) {
   }
 
   const points = compact ? snapshot.daily.slice(-7) : snapshot.daily;
+  const visibleTotals = points.reduce(
+    (totals, point) => ({
+      input: totals.input + point.input,
+      output: totals.output + point.output,
+      cache: totals.cache + point.cache,
+    }),
+    { input: 0, output: 0, cache: 0 },
+  );
   const maxTotal = Math.max(1, ...points.map((point) => point.total));
   const innerW = WIDTH - PADDING.left - PADDING.right;
   const innerH = HEIGHT - PADDING.top - PADDING.bottom;
@@ -94,9 +102,9 @@ export function TokenUsageChart({ snapshot, compact }: TokenUsageChartProps) {
       </header>
       <p className="adm-dash-card-hint">
         {t("admin.v2.dash_tokens_summary", {
-          input: snapshot.totalInput.toLocaleString(),
-          output: snapshot.totalOutput.toLocaleString(),
-          cache: snapshot.totalCache.toLocaleString(),
+          input: visibleTotals.input.toLocaleString(),
+          output: visibleTotals.output.toLocaleString(),
+          cache: visibleTotals.cache.toLocaleString(),
         })}
       </p>
       <svg

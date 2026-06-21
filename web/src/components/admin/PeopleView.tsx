@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useDialogs } from "@/components/ui/DialogProvider";
 import type { ControlPanelDaemonNodeRecord } from "../../types";
 import {
   buildEmployeeSummaries,
@@ -58,6 +59,7 @@ export function PeopleView({
   highlightedEmployeeId,
 }: PeopleViewProps) {
   const { t } = useTranslation();
+  const { confirm } = useDialogs();
   const [query, setQuery] = useState("");
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -68,7 +70,12 @@ export function PeopleView({
     if (!onDeleteEmployee) return;
     const employee = employeesById.get(employeeId);
     if (!employee) return;
-    if (!window.confirm(t("admin.v2.delete_employee_confirm", { name: employee.displayName ?? employee.id, id: employee.id }))) return;
+    const ok = await confirm({
+      title: t("admin.v2.delete_employee_confirm", { name: employee.displayName ?? employee.id, id: employee.id }),
+      confirmLabel: t("admin.v2.delete_employee_action"),
+      tone: "danger",
+    });
+    if (!ok) return;
     setPendingDelete(employeeId);
     setDeleteError(null);
     try {

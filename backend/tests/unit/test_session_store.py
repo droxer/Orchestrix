@@ -15,8 +15,6 @@ def test_session_store_persists_events_and_artifacts() -> None:
             "workspacePath": "/workspace",
             "taskGoal": "fix auth",
             "participants": ["human", "claude"],
-            "status": "pending_approval",
-            "pendingDecision": "start",
         })
         store.append_event(session["id"], relay_event("human.decision", session["id"], {
             "decision": {"id": "dec_test", "kind": "approve", "createdAt": "2026-06-05T00:00:00.000Z"}
@@ -58,8 +56,6 @@ def test_database_session_store_persists_events_and_artifacts() -> None:
             "workspacePath": "/workspace",
             "taskGoal": "fix auth",
             "participants": ["human", "claude"],
-            "status": "pending_approval",
-            "pendingDecision": "start",
         })
         store.append_event(session["id"], relay_event("human.decision", session["id"], {
             "decision": {"id": "dec_test", "kind": "approve", "createdAt": "2026-06-05T00:00:00.000Z"}
@@ -70,7 +66,7 @@ def test_database_session_store_persists_events_and_artifacts() -> None:
             "runId": "run_1",
             "agent": "codex",
             "role": "fixer",
-            "mode": "implement",
+            "mode": "action",
         }))
         store.append_event(session["id"], relay_event("agent.completed", session["id"], {
             "runId": "run_1",
@@ -84,7 +80,9 @@ def test_database_session_store_persists_events_and_artifacts() -> None:
         assert store.get_session(session["id"])["decisions"][0]["kind"] == "approve"
         assert store.list_sessions()[0]["id"] == session["id"]
         assert store.read_artifact(session["id"], artifact["id"]) == "Looks good."
-        assert store.list_token_usage()[0]["total"] == 10
+        usage = store.list_token_usage()[0]
+        assert usage["taskGoal"] == "fix auth"
+        assert usage["total"] == 10
         with store.engine.begin() as conn:
             row = conn.execute(text("select session_public_id, total_tokens from session_token_usage")).mappings().one()
         assert row["session_public_id"] == session["id"]

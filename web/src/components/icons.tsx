@@ -25,6 +25,7 @@ import {
   Search,
   Settings,
   Sparkles,
+  SquarePen,
   Terminal,
   TriangleAlert,
   UserCog,
@@ -65,6 +66,8 @@ export const NavRefresh = withStandardStroke(RefreshCw, "NavRefresh");
 export const NavSidebarCollapse = withStandardStroke(PanelLeftClose, "NavSidebarCollapse");
 export const NavSidebarExpand = withStandardStroke(PanelLeftOpen, "NavSidebarExpand");
 export const NavNewThread = withStandardStroke(Plus, "NavNewThread");
+// Compose a new conversation (pencil-in-square), the messaging-app convention.
+export const ActionCompose = withStandardStroke(SquarePen, "ActionCompose");
 
 export const ActionSend = withStandardStroke(ArrowUp, "ActionSend");
 export const ActionApprove = withStandardStroke(Check, "ActionApprove");
@@ -75,7 +78,7 @@ export const ActionRemove = withStandardStroke(X, "ActionRemove");
 export const ActionSearch = withStandardStroke(Search, "ActionSearch");
 export const ActionKey = withStandardStroke(KeyRound, "ActionKey");
 
-export const ModeImplement = withStandardStroke(Code2, "ModeImplement");
+export const ModeAction = withStandardStroke(Code2, "ModeAction");
 export const ModeReview = withStandardStroke(ScanEye, "ModeReview");
 
 // Stream markers form a deliberate geometric family: circle / triangle /

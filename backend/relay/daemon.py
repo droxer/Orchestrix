@@ -13,11 +13,12 @@ from typing import Any
 from loguru import logger
 
 from .bridge import compute_prior_agent_bridge
+from .conversation import compute_conversation_history
 from .controller import SessionController, initial_agent_state, is_review_assignment
 from .environment import load_backend_env
 from .ids import new_relay_id, new_sandbox_id, now_iso
 from .models import AGENT_NAMES, DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS
-from .stores import LocalDaemonStore, LocalSessionStore, role_for_agent
+from .stores import LocalDaemonStore, LocalSessionStore, role_for_agent, valid_agent
 
 load_backend_env()
 
@@ -487,21 +488,26 @@ class DaemonNodeRegistry:
             self._complete_run_request(run_request, "Assignments completed.")
             return run_request
         assignment = assignments[index]
-        mode = assignment.get("mode") or "implement"
+        mode = assignment.get("mode") or "action"
         run_id = new_relay_id("run")
         sandbox = self.sandboxes[run_request["nodeId"]]
         controller = self._controller_for_sandbox(sandbox)
+        state = dict(run_request["state"] or {})
+        state.pop("prior_agent_bridge", None)
+        state.pop("prior_conversation", None)
+        session_snapshot = self.store.get_session(run_request["sessionId"])
+        bridge = compute_prior_agent_bridge(session_snapshot, assignment["agent"], self.store)
+        if bridge:
+            state["prior_agent_bridge"] = bridge
+        conversation = compute_conversation_history(session_snapshot, self.store)
+        if conversation:
+            state["prior_conversation"] = conversation
         controller.record_agent_started(run_request["sessionId"], {
             "runId": run_id,
             "agent": assignment["agent"],
             "role": role_for_agent(assignment["agent"], mode),
             "mode": mode,
         })
-        state = dict(run_request["state"] or {})
-        session_snapshot = self.store.get_session(run_request["sessionId"])
-        bridge = compute_prior_agent_bridge(session_snapshot, assignment["agent"], self.store)
-        if bridge:
-            state["prior_agent_bridge"] = bridge
         command = {
             "id": new_relay_id("cmd"),
             "type": "run.start",
@@ -530,7 +536,7 @@ class DaemonNodeRegistry:
         controller = self._controller_for_sandbox(sandbox)
         assignments = run_request["assignments"]
         assignment = assignments[run_request.get("currentIndex", 0)]
-        mode = assignment.get("mode") or "implement"
+        mode = assignment.get("mode") or "action"
         state = run_request["state"]
         if event["type"] == "run.failed":
             self.clear_run_output(event["runId"])
@@ -604,7 +610,7 @@ class DaemonNodeRegistry:
                 "sessionId": run_request["sessionId"],
                 "runId": run_id or "",
                 "agent": run_request.get("currentAgent") or "codex",
-                "mode": run_request.get("currentMode") or "implement",
+                "mode": run_request.get("currentMode") or "action",
                 "error": outcome,
                 "exitCode": 1,
             }
@@ -808,12 +814,34 @@ class ServerDaemonNodeBackend:
                 if not actor_employee_id:
                     assert_session_owned_by_employee(self.registry.store, request["sessionId"], sandbox["employeeId"])
                 owner_employee_id = session_owner
+                if self.registry.daemon_store.active_run_request_for_session(sandbox_id, request["sessionId"]):
+                    raise ValueError(f"Session {request['sessionId']} already has an active daemon run.")
             self.registry.update_status(sandbox_id, {"status": "running", "lastError": None})
             controller = SessionController(self.registry.store, workspace_path=sandbox.get("workspacePath") or "/workspace", owner_employee_id=owner_employee_id)
             session_id = request.get("sessionId") or controller.create_session(
                 request["taskGoal"],
                 ["human", *dict.fromkeys(assignment["agent"] for assignment in request["assignments"])],
             )["id"]
+            # A follow-up turn on an existing session: persist the new user
+            # message so it renders in the transcript and feeds the next run's
+            # conversation history. A fresh session already captures the first
+            # turn as its taskGoal via session.created.
+            if request.get("sessionId"):
+                controller.record_user_message(
+                    session_id,
+                    request["taskGoal"],
+                    actor_employee_id=actor_employee_id,
+                    message_id=request.get("userMessageId"),
+                )
+            decision = request.get("decision") if isinstance(request.get("decision"), dict) else None
+            if decision:
+                kind = decision.get("kind")
+                note = decision.get("note") if isinstance(decision.get("note"), str) else None
+                target_agent = valid_agent(decision.get("targetAgent"))
+                if kind == "rerun":
+                    controller.record_decision(session_id, "rerun", note, target_agent)
+                elif kind == "handoff" and target_agent:
+                    controller.handoff_session(session_id, target_agent, request["assignments"], note)
             state = initial_agent_state(request["taskGoal"])
             self.registry.start_run_request(sandbox_id, session_id, request["taskGoal"], request["assignments"], state)
             return self.registry.store.get_session(session_id)

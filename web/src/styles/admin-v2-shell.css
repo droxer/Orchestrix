@@ -179,7 +179,7 @@
   transition: background 200ms ease;
 }
 
-.adm-live-dot.fetching { background: var(--color-primary); }
+.adm-live-dot.fetching { background: var(--color-info); }
 .adm-live-dot.offline { background: var(--color-semantic-down); }
 
 /* Buttons in admin surfaces now route through the shadcn <Button> primitive
@@ -218,7 +218,7 @@
 }
 
 .adm-pulse-value.tone-good { color: var(--color-semantic-up); }
-.adm-pulse-value.tone-info { color: var(--color-primary); }
+.adm-pulse-value.tone-info { color: var(--color-info); }
 .adm-pulse-value.tone-bad { color: var(--color-semantic-down); }
 .adm-pulse-value.tone-neutral { color: var(--color-ink); }
 

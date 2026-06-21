@@ -52,7 +52,7 @@ describe("projectMessages artifact projection", () => {
         runId: "run_a",
         agent: "claude",
         role: "implementer",
-        mode: "implement",
+        mode: "action",
       },
       {
         id: "ev_plan",
@@ -141,6 +141,33 @@ describe("projectMessages artifact projection", () => {
     assert.ok(system);
     assert.equal(system.id, "ev_summary");
     assert.equal(system.detail, "Session summary");
+  });
+
+  it("renders a follow-up user.message as a user turn after the goal", () => {
+    const messages = projectMessages(session([
+      {
+        id: "ev_created",
+        type: "session.created",
+        sessionId: "ses_1",
+        timestamp,
+        workspacePath: "/workspace",
+        taskGoal: "Build artifact display",
+        participants: ["human", "claude"],
+      },
+      {
+        id: "ev_followup",
+        type: "user.message",
+        sessionId: "ses_1",
+        timestamp,
+        text: "Now add a dark mode toggle",
+      },
+    ]), t);
+
+    const userMessages = messages.filter((message) => message.kind === "user");
+    assert.equal(userMessages.length, 2);
+    assert.equal(userMessages[0].text, "Build artifact display");
+    assert.equal(userMessages[1].id, "ev_followup");
+    assert.equal(userMessages[1].text, "Now add a dark mode toggle");
   });
 
   it("does not fabricate an agent message for an unknown artifact run", () => {

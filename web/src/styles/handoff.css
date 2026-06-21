@@ -19,13 +19,13 @@
   min-height: 40px;
   padding: 0 var(--space-base);
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-sm);
   background: var(--color-surface-strong);
   color: var(--color-ink);
   font-size: var(--text-base);
   font-weight: 600;
   line-height: 1.15;
-  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+  transition: background var(--duration-fast) ease, color var(--duration-fast) ease, border-color var(--duration-fast) ease;
 }
 
 .decision-bar button:hover,

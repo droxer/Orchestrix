@@ -2,7 +2,7 @@ import type { AgentOutputSink } from "./format.js";
 import type { TokenUsage } from "./token-usage.js";
 
 export type AgentName = "claude" | "pi" | "codex" | "kimi";
-export type AgentTaskMode = "implement" | "review";
+export type AgentTaskMode = "action" | "review";
 export type ReviewVerdict = "approved" | "rejected" | "failed";
 export type { AgentOutputSink };
 
@@ -20,6 +20,8 @@ export interface AgentState {
   token_usage?: TokenUsage;
   /** Bridge text from intervening other-agent runs on the shared session, if any. */
   prior_agent_bridge?: string;
+  /** Rendered transcript of earlier conversation turns on this session, if any. */
+  prior_conversation?: string;
 }
 
 export interface AgentRunOptions {

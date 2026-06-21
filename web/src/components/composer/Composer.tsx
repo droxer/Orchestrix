@@ -32,6 +32,8 @@ export function Composer({ composer, composerMode, setComposerMode, activeAgent,
         <div className="composer-input">
           <textarea
             ref={textareaRef}
+            role="combobox"
+            aria-autocomplete="list"
             aria-label={selectedEmployee
               ? t("composer.aria_label", { employee: selectedEmployee, agent: activeAgent })
               : t("composer.aria_label_no_employee", { agent: activeAgent })}
@@ -58,10 +60,10 @@ export function Composer({ composer, composerMode, setComposerMode, activeAgent,
               }
               if (e.key === "Tab" && e.shiftKey) {
                 e.preventDefault();
-                setComposerMode((m) => (m === "implement" ? "review" : "implement"));
+                setComposerMode((m) => (m === "action" ? "review" : "action"));
                 return;
               }
-              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend(); }
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); onSend(); }
             }}
             rows={2}
           />
@@ -86,7 +88,7 @@ export function Composer({ composer, composerMode, setComposerMode, activeAgent,
                   className="send-button"
                   disabled={!composerText.trim()}
                   aria-label={t("composer.send")}
-                  title={t("composer.send")}
+                  title={`${t("composer.send")} (⌘↵)`}
                 >
                   <ActionSend size={16} />
                 </button>

@@ -66,7 +66,7 @@
   gap: var(--space-sm);
   color: var(--color-ink);
   opacity: 0;
-  animation: login-rise 540ms var(--ease-out-quint) forwards;
+  animation: login-rise var(--duration-slow) var(--ease-out-quint) forwards;
   animation-delay: 40ms;
 }
 
@@ -83,25 +83,24 @@
   color: var(--color-muted);
 }
 
-/* Headline — Instrument Serif, two lines, second line italic for the
-   editorial accent. Locked to display weight 400 per the brand spec. */
+/* Headline — weighted Geist display, two lines. The second line drops to
+   a muted tone for hierarchy instead of the retired serif italic. */
 .login-headline {
   margin: var(--space-md) 0 var(--space-base);
   font-family: var(--font-display);
   font-size: clamp(34px, 4.4vw, 44px);
-  font-weight: 400;
+  font-weight: 600;
   line-height: 1.05;
   letter-spacing: var(--letter-display);
   color: var(--color-ink);
   opacity: 0;
-  animation: login-rise 720ms var(--ease-out-quint) forwards;
+  animation: login-rise var(--duration-editorial) var(--ease-out-quint) forwards;
   animation-delay: 120ms;
 }
 
 .login-headline-break {
   display: block;
-  font-style: italic;
-  color: color-mix(in srgb, var(--color-ink) 84%, var(--color-primary));
+  color: var(--color-muted);
 }
 
 .login-lede {
@@ -111,7 +110,7 @@
   line-height: var(--leading-loose);
   color: var(--color-body);
   opacity: 0;
-  animation: login-rise 720ms var(--ease-out-quint) forwards;
+  animation: login-rise var(--duration-editorial) var(--ease-out-quint) forwards;
   animation-delay: 200ms;
 }
 
@@ -120,7 +119,7 @@
   flex-direction: column;
   gap: var(--space-base);
   opacity: 0;
-  animation: login-rise 720ms var(--ease-out-quint) forwards;
+  animation: login-rise var(--duration-editorial) var(--ease-out-quint) forwards;
   animation-delay: 280ms;
 }
 
@@ -169,7 +168,7 @@
   font-size: var(--text-sm);
   color: var(--color-muted);
   opacity: 0;
-  animation: login-rise 720ms var(--ease-out-quint) forwards;
+  animation: login-rise var(--duration-editorial) var(--ease-out-quint) forwards;
   animation-delay: 360ms;
 }
 
@@ -179,13 +178,13 @@
   gap: var(--space-xxs);
   padding: var(--space-xs) var(--space-base);
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-sm);
   background: var(--color-canvas);
   color: var(--color-ink);
   font-size: var(--text-sm);
   font-weight: 500;
   cursor: pointer;
-  transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
+  transition: background var(--duration-fast) ease, border-color var(--duration-fast) ease, transform var(--duration-fast) ease;
 }
 
 .login-toggle-button:hover {
@@ -202,7 +201,7 @@
   content: "→";
   margin-left: var(--space-xxs);
   font-family: var(--font-mono);
-  transition: transform 140ms ease;
+  transition: transform var(--duration-fast) ease;
 }
 
 .login-toggle-button:hover::after {
@@ -267,7 +266,7 @@ html[data-theme="dark"] .login-atmosphere::before {
   text-transform: uppercase;
   color: var(--color-muted);
   opacity: 0;
-  animation: login-rise 720ms var(--ease-out-quint) forwards;
+  animation: login-rise var(--duration-editorial) var(--ease-out-quint) forwards;
   animation-delay: 160ms;
 }
 
@@ -330,7 +329,7 @@ html[data-theme="dark"] .login-atmosphere::before {
   font-size: var(--text-xs);
   color: var(--color-body);
   opacity: 0;
-  animation: login-rise 720ms var(--ease-out-quint) forwards;
+  animation: login-rise var(--duration-editorial) var(--ease-out-quint) forwards;
   animation-delay: 380ms;
 }
 
@@ -386,7 +385,7 @@ html[data-theme="dark"] .login-atmosphere::before {
   font-size: var(--text-2xs);
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--color-muted-soft);
+  color: var(--color-muted);
 }
 
 .login-foot-brand {

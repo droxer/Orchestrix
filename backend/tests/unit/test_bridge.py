@@ -115,3 +115,41 @@ def test_compute_prior_agent_bridge_chronological_multiple_runs() -> None:
     pi_idx = out.find("[Previous from @pi]")
     cx_idx = out.find("[Previous from @codex]")
     assert pi_idx >= 0 and cx_idx > pi_idx
+
+
+def test_compute_prior_agent_bridge_only_uses_runs_after_latest_user_message() -> None:
+    session = {
+        "id": "sess_1",
+        "createdAt": "2026-06-20T00:00:00.000Z",
+        "taskGoal": "first turn",
+        "events": [
+            {
+                "type": "user.message",
+                "timestamp": "2026-06-20T00:02:00.000Z",
+                "text": "follow up",
+            }
+        ],
+        "agentRuns": [
+            {
+                "agent": "claude",
+                "status": "completed",
+                "completedAt": "2026-06-20T00:01:00.000Z",
+                "artifactIds": ["old"],
+            },
+            {
+                "agent": "pi",
+                "status": "completed",
+                "completedAt": "2026-06-20T00:03:00.000Z",
+                "artifactIds": ["recent"],
+            },
+        ],
+        "artifacts": [
+            {"id": "old", "kind": "command_log"},
+            {"id": "recent", "kind": "command_log"},
+        ],
+    }
+    store = _FakeStore({"old": "● old answer", "recent": "● current-turn note"})
+
+    out = compute_prior_agent_bridge(session, "codex", store)
+
+    assert out == "[Previous from @pi]\ncurrent-turn note"

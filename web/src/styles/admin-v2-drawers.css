@@ -25,7 +25,7 @@
   text-transform: uppercase;
   border-radius: var(--radius-none);
   cursor: pointer;
-  transition: color 200ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: color 200ms var(--ease-emphasized);
 }
 
 .adm-mode-tab::after {
@@ -38,7 +38,7 @@
   background: var(--color-primary);
   transform: scaleX(0);
   transform-origin: left center;
-  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 240ms var(--ease-emphasized);
 }
 
 .adm-mode-tab:hover:not(:disabled) { color: var(--color-ink); }
@@ -87,7 +87,7 @@
 }
 
 .adm-drawer-backdrop.dark {
-  background: rgba(0, 0, 0, 0.55);
+  background: var(--color-overlay);
 }
 
 @keyframes adm-fade-in {
@@ -260,7 +260,7 @@
   font-weight: 600;
   letter-spacing: var(--letter-eyebrow);
   text-transform: uppercase;
-  color: var(--color-muted-soft);
+  color: var(--color-muted);
 }
 
 /* Admin form fields (.adm-input / select.adm-input) were replaced by the
@@ -595,7 +595,7 @@
   height: 28px;
   padding: 0 var(--space-sm);
   border: none;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-sm);
   background: var(--color-primary);
   color: var(--color-on-primary);
   font-size: var(--text-xs);

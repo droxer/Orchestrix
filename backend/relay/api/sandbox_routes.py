@@ -6,9 +6,8 @@ from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
 
 from ..daemon import provisioned_sandbox_record, public_sandbox_record, sandbox_ui_auth_error, sandbox_ui_token_matches
-from ..models import SandboxRunRequest
 from .deps import AppContextDep
-from .helpers import actor_can_access_sandbox, bearer_token, json_body, request_actor_or_none, string_field
+from .helpers import actor_can_access_sandbox, assignment_list, bearer_token, json_body, request_actor_or_none, string_field
 
 router = APIRouter()
 
@@ -87,12 +86,28 @@ async def run_sandbox(sandbox_id: str, request: Request, ctx: AppContextDep) -> 
         raise HTTPException(404, "Sandbox not found.")
     actor = require_sandbox_access(sandbox, request, ctx)
     body = await json_body(request)
-    try:
-        parsed = SandboxRunRequest.model_validate(body).relay_dump()
-    except Exception:
+    task_goal = string_field(body, "taskGoal") or string_field(body, "task_goal")
+    assignments = assignment_list(body.get("assignments"))
+    if not task_goal or not assignments:
         raise HTTPException(400, "taskGoal and at least one assignment are required.")
-    if not parsed["assignments"]:
-        raise HTTPException(400, "taskGoal and at least one assignment are required.")
+    parsed: dict[str, Any] = {
+        "taskGoal": task_goal,
+        "assignments": assignments,
+    }
+    session_id = string_field(body, "sessionId") or string_field(body, "session_id")
+    if session_id:
+        parsed["sessionId"] = session_id
+    user_message_id = string_field(body, "userMessageId") or string_field(body, "user_message_id")
+    if user_message_id:
+        parsed["userMessageId"] = user_message_id
+    decision = body.get("decision")
+    if isinstance(decision, dict):
+        parsed_decision = {
+            "kind": string_field(decision, "kind"),
+            "note": string_field(decision, "note") or None,
+            "targetAgent": string_field(decision, "targetAgent") or string_field(decision, "target_agent") or None,
+        }
+        parsed["decision"] = {key: value for key, value in parsed_decision.items() if value}
     if actor:
         parsed["actorEmployeeId"] = actor["employeeId"]
         parsed["actorIsAdmin"] = actor["isAdmin"]

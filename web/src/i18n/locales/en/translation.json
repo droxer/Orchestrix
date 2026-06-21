@@ -2,6 +2,10 @@
   "app": {
     "title": "Relay — Workforce Control Plane"
   },
+  "dialog": {
+    "confirm": "Confirm",
+    "cancel": "Cancel"
+  },
   "skip_to_conversation": "Skip to Conversation",
   "nav": {
     "conversations": "Conversations",
@@ -35,7 +39,9 @@
     "new_thread": "New thread",
     "agent_disabled_title": "{{agent}} is disabled on this node by an admin.",
     "agent_failed_title": "{{agent}} is not ready on this node.",
-    "agent_disabled_option": "{{agent}} (disabled)"
+    "agent_disabled_option": "{{agent}} (disabled)",
+    "no_conversations": "No conversations yet. Start a new one.",
+    "no_matches": "No conversations match your search."
   },
   "conversation": {
     "agent_working": "{{agent}} Is Working",
@@ -46,7 +52,12 @@
     "agent_running_aria": "Agent Running",
     "tokens_short": "tok",
     "token_usage_title": "Input {{input}} · Output {{output}} · Cache {{cache}}",
-    "no_sessions": "—"
+    "no_sessions": "—",
+    "new": "New conversation",
+    "rename": "Rename",
+    "rename_prompt": "Rename conversation",
+    "close": "Close",
+    "close_confirm": "Close conversation “{{name}}”?"
   },
   "composer": {
     "placeholder": "Write to @{{employee}} — Type @ to Switch Agent…",
@@ -491,7 +502,7 @@
     "unknown": "Unknown"
   },
   "mode": {
-    "implement": "Implement",
+    "action": "Action",
     "review": "Review"
   },
   "verdict": {

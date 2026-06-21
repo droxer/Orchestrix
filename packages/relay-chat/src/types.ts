@@ -36,6 +36,8 @@ export interface ChatAgentRequest extends ChatConversationRef {
   mode: AgentTaskMode;
   sandboxId?: string;
   sessionId?: string;
+  /** Start a fresh conversation, ignoring any existing thread->session binding. */
+  forceNew?: boolean;
 }
 
 export interface ChatCancelRequest extends ChatConversationRef {
@@ -50,6 +52,9 @@ export interface ChatStatusRequest extends ChatConversationRef {
 
 export type ChatCommand =
   | { kind: "run"; taskGoal: string; agent: AgentName; mode: AgentTaskMode; sandboxId?: string; sessionId?: string }
+  | { kind: "new"; taskGoal: string; agent: AgentName; mode: AgentTaskMode; sandboxId?: string }
+  | { kind: "list" }
+  | { kind: "switch"; sessionId: string }
   | { kind: "status"; sessionId: string }
   | { kind: "cancel"; sessionId: string; sandboxId?: string; reason?: string };
 
@@ -98,4 +103,10 @@ export interface RelayChatBackend {
     onEvent: (event: RelayEvent) => Promise<void> | void,
     context?: RelayChatRequestContext,
   ): Promise<void>;
+  /** The live session a chat thread is currently bound to, if any. */
+  resolveConversationSession?(ref: ChatConversationRef, signal?: AbortSignal): Promise<RelaySession | undefined>;
+  /** Bind (or rebind) a chat thread to one of the owner's sessions. */
+  bindConversationSession?(ref: ChatConversationRef, sessionId: string, signal?: AbortSignal): Promise<void>;
+  /** The owner's open conversations, for list/switch commands. */
+  listConversationSessions?(ref: ChatConversationRef, signal?: AbortSignal): Promise<RelaySession[]>;
 }

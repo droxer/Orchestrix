@@ -70,7 +70,7 @@
   flex: 0 0 auto;
   padding: 1px 7px;
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--color-primary) 8%, var(--color-canvas));
   color: var(--color-primary);
   font-size: var(--text-xs);
@@ -100,14 +100,17 @@
   align-items: center;
   gap: 2px;
   padding: var(--space-xxs);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-sm);
   background: var(--color-surface-strong);
 }
 
 .header-agent-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   min-height: 30px;
   padding: 0 var(--space-sm);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-sm);
   color: var(--color-body);
   font-size: var(--text-sm);
   font-weight: 600;
@@ -115,8 +118,19 @@
   white-space: nowrap;
 }
 
+.header-agent-tab-mark {
+  flex: 0 0 auto;
+  opacity: 0.75;
+  transition: opacity var(--duration-fast) ease;
+}
+
 .header-agent-tabs button:hover {
   color: var(--color-ink);
+}
+
+.header-agent-tabs button:hover .header-agent-tab-mark,
+.header-agent-tabs button.active .header-agent-tab-mark {
+  opacity: 1;
 }
 
 .header-agent-tabs button.active {
@@ -156,7 +170,7 @@
   gap: var(--space-xs);
   padding: 0 var(--space-base);
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-sm);
   background: var(--color-canvas);
   box-shadow: var(--shadow-lift);
   color: var(--color-body);
@@ -186,7 +200,7 @@
 .toast.good::before { background: var(--color-semantic-up); }
 .toast.warn::before { background: var(--color-accent-yellow); }
 .toast.bad::before  { background: var(--color-semantic-down); }
-.toast.info::before { background: var(--color-primary); }
+.toast.info::before { background: var(--color-info); }
 
 /* Message text — single-line + ellipsis for transient tones. The error
    override below lets it wrap. */
@@ -285,7 +299,7 @@
 .msg {
   display: grid;
   gap: var(--space-xs);
-  animation: message-in 220ms ease-out both;
+  animation: message-in var(--duration-base) ease-out both;
 }
 
 @keyframes message-in {

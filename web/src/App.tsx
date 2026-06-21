@@ -4,11 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActionRemove, NavConversations, NavPreferences } from "./components/icons";
 import {
-  appendAssignment, archiveSession, cancelRun, createSession, logout,
-  recordDecision, recordHandoff, runSandbox,
+  archiveSession, cancelRun, logout, recordDecision, renameSession, runSandbox,
 } from "./api";
 import { AGENT_NAMES } from "./types";
-import type { AgentName, AgentTaskMode, ControlPanelDaemonNodeRecord, CurrentUser } from "./types";
+import type { AgentName, AgentTaskMode, ControlPanelDaemonNodeRecord, CurrentUser, RelaySession } from "./types";
 import { TranscriptEmpty } from "./components/TranscriptEmpty";
 import { MessageBlock, projectMessages, isGroupedContinuation } from "./components/MessageBlock";
 import type { DerivedMessage } from "./components/MessageBlock";
@@ -18,7 +17,7 @@ import { McpPage } from "./components/McpPage";
 import { SkillsPage } from "./components/SkillsPage";
 import { PreferencesDialog } from "./components/PreferencesDialog";
 import { type Theme, type Language } from "./components/PreferencesPanel";
-import type { EmployeeContact } from "./components/ConversationRow";
+import type { ConversationItem } from "./components/ConversationRow";
 import { DecisionBar } from "./components/composer/DecisionBar";
 import { Composer } from "./components/composer/Composer";
 import { useRelayData } from "./hooks/useRelayData";
@@ -27,14 +26,16 @@ import { useLocalDaemonNodes } from "./hooks/useLocalDaemonNodes";
 import { mergeVisibleDaemonNodes } from "./lib/daemonNodes";
 import { routeComposerMessage } from "./lib/messageRouting";
 import { applyTheme, readLanguage, readTheme, readTokens, selectedEmployeeKey, writeLanguage, writeTheme } from "./lib/appStorage";
-import { canUseLocalControlPanel, localControlPanelNodes, sessionBelongsToEmployee } from "./lib/controlPanel";
+import { canUseLocalControlPanel, localControlPanelNodes } from "./lib/controlPanel";
 import { useRelayStore } from "./lib/store";
 import { useAuthSession } from "./hooks/useAuthSession";
 import { useComposer } from "./hooks/useComposer";
 import { useActiveSession } from "./hooks/useActiveSession";
 import { chooseSendAction } from "./lib/sendAction";
-import { sessionTokenUsage } from "./lib/tokenUsage";
+import { myConversationSessions, matchesConversationQuery } from "./lib/conversations";
 import { useEmployeeProvisioning } from "./hooks/useEmployeeProvisioning";
+import { isAwaitingFeedbackDecision, rerunAssignmentForSession } from "./lib/workflow";
+import { useDialogs } from "./components/ui/DialogProvider";
 import { SideNav } from "./components/SideNav";
 import { ThreadPanel } from "./components/ThreadPanel";
 import { ChatHeader } from "./components/ChatHeader";
@@ -49,6 +50,7 @@ const agents: AgentName[] = AGENT_NAMES;
 
 export function App() {
   const { t, i18n } = useTranslation();
+  const { prompt } = useDialogs();
   const selectedEmployee = useRelayStore((s) => s.selectedEmployee);
   const setSelectedEmployee = useRelayStore((s) => s.setSelectedEmployee);
   const selectedSessionId = useRelayStore((s) => s.selectedSessionId);
@@ -59,7 +61,7 @@ export function App() {
   const setStatus = useRelayStore((s) => s.setStatus);
   const [hydrated, setHydrated] = useState(false);
   const [activeAgent, setActiveAgent] = useState<AgentName>("claude");
-  const [composerMode, setComposerMode] = useState<AgentTaskMode>("implement");
+  const [composerMode, setComposerMode] = useState<AgentTaskMode>("action");
   const [employeeQuery, setEmployeeQuery] = useState("");
   const [prefsOpen, setPrefsOpen] = useState(false);
   const [mobileView, setMobileView] = useState<MobileView>("chat");
@@ -69,10 +71,19 @@ export function App() {
   const [language, setLanguage] = useState<Language>(readLanguage);
   const [handoffOpen, setHandoffOpen] = useState(false);
   const [handoffAgent, setHandoffAgent] = useState<AgentName>("codex");
-  const [handoffMode, setHandoffMode] = useState<AgentTaskMode>("implement");
+  const [handoffMode, setHandoffMode] = useState<AgentTaskMode>("action");
   const [handoffNote, setHandoffNote] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
+  // True while the composer is staging a brand-new conversation: suppresses the
+  // fall-back to the most-recent session so the transcript shows the empty state
+  // and the next send creates a fresh owner-scoped session.
+  const [composingNew, setComposingNew] = useState(false);
+  // Optimistic echo of the just-sent turn: shown immediately so the user sees
+  // their message without waiting for the provision + run round-trip. It is
+  // hidden once the persisted turn arrives (matched by id for a continued
+  // session, or by text for the goal of a freshly created one).
+  const [pendingUserMessage, setPendingUserMessage] = useState<{ id: string; text: string } | null>(null);
   const { user, authChecked, setUser } = useAuthSession();
   const statusSeenRef = useRef(false);
   const localNodeAdoptionStartedRef = useRef(false);
@@ -106,14 +117,20 @@ export function App() {
   const selectedSandbox = useMemo(() => sandboxes.find((s) => s.employeeId === selectedEmployee), [sandboxes, selectedEmployee]);
   const selectedNode = useMemo(() => visibleNodes.find((n) => n.employeeId === selectedEmployee || n.id === selectedSandbox?.id), [visibleNodes, selectedEmployee, selectedSandbox?.id]);
   const composer = useComposer({ agentNames: agents, disabledAgents: selectedNode?.disabledAgents, onAgentPicked: setActiveAgent });
-  const sandboxWorkspace = selectedSandbox?.workspacePath ?? selectedNode?.workspacePath;
-  const sandboxSessions = useMemo(() => sessions.filter((s) => !sandboxWorkspace || s.workspacePath === sandboxWorkspace), [sessions, sandboxWorkspace]);
-  const { activeSessionId, setActiveSessionId } = useActiveSession(selectedEmployee, sandboxSessions);
+  // The logged-in user is themselves an employee; their conversations are the
+  // sessions they own. The backend already owner-scopes /sessions, so this is
+  // just the non-archived sessions sorted most-recent first.
+  const myConversations = useMemo(
+    () => myConversationSessions(sessions, selectedEmployee),
+    [sessions, selectedEmployee],
+  );
+  const { activeSessionId, setActiveSessionId } = useActiveSession(selectedEmployee, myConversations);
   const activeSession = useMemo(() => {
+    if (composingNew) return undefined;
     if (selectedSessionId) { const p = sessions.find((s) => s.id === selectedSessionId); if (p) return p; }
-    if (activeSessionId) { const p = sandboxSessions.find((s) => s.id === activeSessionId); if (p) return p; }
-    return sandboxSessions.find((s) => !s.archived);
-  }, [selectedSessionId, sessions, sandboxSessions, activeSessionId]);
+    if (activeSessionId) { const p = myConversations.find((s) => s.id === activeSessionId); if (p) return p; }
+    return myConversations[0];
+  }, [composingNew, selectedSessionId, sessions, myConversations, activeSessionId]);
 
   // Live SSE tail of the open conversation; merges new events into the
   // sessions cache so the active thread updates at push latency.
@@ -122,68 +139,39 @@ export function App() {
   const selectedToken = selectedSandbox ? (tokens[selectedSandbox.id] ?? tokens[selectedEmployee]) : tokens[selectedEmployee];
   const activeRun = selectedNode?.activeRuns[0];
   const messages = useMemo<DerivedMessage[]>(() => projectMessages(activeSession, t), [activeSession, t]);
-  const selectedEmployeeLabel = selectedEmployee ? `@${selectedEmployee}` : t("thread.no_employee_selected");
+  const displayMessages = useMemo<DerivedMessage[]>(() => {
+    if (!pendingUserMessage) return messages;
+    const present = messages.some(
+      (m) => m.kind === "user" && (m.id === pendingUserMessage.id || m.text === pendingUserMessage.text),
+    );
+    if (present) return messages;
+    return [
+      ...messages,
+      { kind: "user", id: pendingUserMessage.id, timestamp: new Date().toISOString(), text: pendingUserMessage.text },
+    ];
+  }, [messages, pendingUserMessage]);
+  useEffect(() => {
+    if (!pendingUserMessage) return;
+    const present = messages.some(
+      (m) => m.kind === "user" && (m.id === pendingUserMessage.id || m.text === pendingUserMessage.text),
+    );
+    if (present) setPendingUserMessage(null);
+  }, [messages, pendingUserMessage]);
 
-  const awaitingDecision = useMemo(() => {
-    if (!activeSession) return false;
-    for (let i = activeSession.events.length - 1; i >= 0; i -= 1) {
-      const ev = activeSession.events[i];
-      if (ev.type === "human.decision") return false;
-      if (ev.type === "agent.completed") return true;
-      if (ev.type === "session.completed" || ev.type === "session.failed") return false;
-    }
-    return false;
-  }, [activeSession]);
+  const activeConversationLabel = activeSession
+    ? (activeSession.title?.trim() || activeSession.taskGoal)
+    : t("thread.new_conversation");
 
-  const employeeContacts = useMemo<EmployeeContact[]>(() => {
-    const byId = new Map<string, EmployeeContact>();
-    // 1. Seed from persisted tokens — employees appear immediately on load, before any API response
-    for (const key of Object.keys(tokens)) {
-      if (key.startsWith("sbx_")) continue;
-      byId.set(key, { id: key, sandbox: undefined, node: undefined, activeRun: undefined, sessionCount: 0 });
-    }
-    // 2. Enrich with live daemon nodes (adds status + active run data)
-    for (const node of visibleNodes) {
-      const eid = node.employeeId ?? sandboxes.find((s) => s.id === node.id)?.employeeId;
-      if (!eid) continue;
-      byId.set(eid, {
-        id: eid,
-        sandbox: sandboxes.find((s) => s.id === node.id || s.employeeId === eid),
-        node,
-        activeRun: node.activeRuns[0],
-        sessionCount: 0,
-      });
-    }
-    // 3. Enrich with provisioned sandboxes not yet backed by a node
-    for (const sandbox of sandboxes) {
-      if (!sandbox.employeeId) continue;
-      const existing = byId.get(sandbox.employeeId);
-      if (existing && existing.node) continue;
-      byId.set(sandbox.employeeId, {
-        id: sandbox.employeeId,
-        sandbox,
-        node: existing?.node,
-        activeRun: existing?.activeRun,
-        sessionCount: 0,
-      });
-    }
-    for (const c of byId.values()) {
-      const rel = sessions.filter((s) => sessionBelongsToEmployee(s, c.id, c.sandbox, c.node));
-      c.sessionCount = rel.length; c.lastSession = rel[0]; c.tokenUsage = sessionTokenUsage(rel);
-    }
-    return [...byId.values()].sort((a, b) => {
-      if (a.id === selectedEmployee) return -1;
-      if (b.id === selectedEmployee) return 1;
-      if (a.activeRun && !b.activeRun) return -1;
-      if (b.activeRun && !a.activeRun) return 1;
-      return a.id.localeCompare(b.id);
-    });
-  }, [visibleNodes, sandboxes, selectedEmployee, sessions, tokens]);
-  const filteredEmployees = useMemo(() => {
-    const q = employeeQuery.trim().toLowerCase();
-    if (!q) return employeeContacts;
-    return employeeContacts.filter((c) => c.id.toLowerCase().includes(q) || (c.lastSession?.taskGoal.toLowerCase() ?? "").includes(q));
-  }, [employeeContacts, employeeQuery]);
+  const awaitingDecision = useMemo(() => isAwaitingFeedbackDecision(activeSession), [activeSession]);
+
+  const conversations = useMemo<ConversationItem[]>(() => {
+    const runningBy = new Map((selectedNode?.activeRuns ?? []).map((run) => [run.sessionId, run.agent]));
+    return myConversations.map((session) => ({ session, runningAgent: runningBy.get(session.id) }));
+  }, [myConversations, selectedNode?.activeRuns]);
+  const filteredConversations = useMemo(
+    () => conversations.filter((c) => matchesConversationQuery(c.session, employeeQuery)),
+    [conversations, employeeQuery],
+  );
 
   const refreshWithToken = useCallback(async (tokenOverride?: string) => {
     await refresh(undefined, tokenOverride);
@@ -198,17 +186,14 @@ export function App() {
 
   useEffect(() => {
     if (!authChecked) return;
-    const stored = localStorage.getItem(selectedEmployeeKey);
-    const storedTokens = readTokens();
-    setTokens(storedTokens);
-    if (stored) {
-      setSelectedEmployee(stored);
-    } else {
-      const firstEmployeeToken = Object.keys(storedTokens).find((key) => !key.startsWith("sbx_"));
-      if (firstEmployeeToken) setSelectedEmployee(firstEmployeeToken);
-    }
+    setTokens(readTokens());
+    // The logged-in user is their own employee; their conversations are the
+    // sessions they own. Pin the selection to self so the chat view always
+    // shows the current employee's own work (never another employee's).
+    const myEmployeeId = user?.employeeId ?? user?.username ?? "";
+    if (myEmployeeId) setSelectedEmployee(myEmployeeId);
     setHydrated(true);
-  }, [authChecked]);
+  }, [authChecked, user]);
   useEffect(() => {
     if (!hydrated || !user || localNodeAdoptionStartedRef.current) return;
     localNodeAdoptionStartedRef.current = true;
@@ -223,13 +208,6 @@ export function App() {
       localStorage.removeItem(selectedEmployeeKey);
     }
   }, [selectedEmployee, hydrated]);
-  useEffect(() => {
-    if (!hydrated || employeeContacts.length === 0) return;
-    if (!employeeContacts.some((contact) => contact.id === selectedEmployee)) {
-      setSelectedEmployee(employeeContacts[0].id);
-    }
-  }, [employeeContacts, hydrated, selectedEmployee]);
-  useEffect(() => { setSelectedSessionId(undefined); }, [activeAgent, selectedEmployee]);
   useEffect(() => {
     const disabled = selectedNode?.disabledAgents ?? [];
     if (disabled.length === 0) return;
@@ -250,11 +228,17 @@ export function App() {
   useEffect(() => {
     const el = transcriptRef.current;
     if (el && atBottomRef.current) el.scrollTop = el.scrollHeight;
-  }, [messages.length, activeSession?.id]);
+  }, [displayMessages.length, activeSession?.id]);
 
   useEffect(() => {
     applyTheme(theme);
     writeTheme(theme);
+    // "system" no longer rides a CSS media query, so re-resolve on OS change.
+    if (theme !== "system" || typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const onChange = () => applyTheme("system");
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
   }, [theme]);
 
   useEffect(() => {
@@ -271,33 +255,53 @@ export function App() {
     if (el) atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
   }
 
-  async function selectEmployee(employeeId: string) {
-    const next = employeeId.trim().replace(/^@/, "");
-    if (!next) return;
-    setSelectedEmployee(next); setMobileView("chat");
-    const token = tokens[next];
+  function openConversation(sessionId: string) {
+    setComposingNew(false);
+    setPendingUserMessage(null);
+    setSelectedSessionId(sessionId);
+    setActiveSessionId(sessionId);
+    setMobileView("chat");
+  }
+
+  function startNewConversation() {
+    setComposingNew(true);
+    setPendingUserMessage(null);
+    setSelectedSessionId(undefined);
+    setActiveSessionId(null);
+    composer.setComposerText("");
+    composer.setMentionOpen(false);
+    setMobileView("chat");
+    atBottomRef.current = true;
+  }
+
+  async function renameConversation(session: RelaySession) {
+    const current = session.title?.trim() || session.taskGoal;
+    const result = await prompt({
+      title: t("conversation.rename_prompt"),
+      defaultValue: current,
+      confirmLabel: t("conversation.rename"),
+    });
+    const next = result?.trim();
+    if (!next || next === current) return;
     try {
-      setStatus({ tone: "info", message: t("toast.opening_workspace", { employee: next }) });
-      const { sandbox, token: savedToken } = await provisionEmployeeSandbox(next, token);
-      rememberSandboxToken(next, sandbox, savedToken);
-      setStatus({ tone: "good", message: t("toast.workspace_ready", { employee: next }) });
-      await refreshWithToken(savedToken);
+      await renameSession(session.id, next, selectedToken);
+      await refresh();
     } catch (err) {
       setStatus({ tone: "bad", message: err instanceof Error ? err.message : String(err) });
     }
   }
 
-  function removeEmployee(employeeId: string) {
-    const nextTokens = { ...tokens };
-    delete nextTokens[employeeId];
-    // Also remove any sandbox token keys that belong to this employee
-    for (const key of Object.keys(nextTokens)) {
-      if (nextTokens[key] === tokens[employeeId] && key.startsWith("sbx_")) {
-        delete nextTokens[key];
+  async function closeConversation(sessionId: string) {
+    try {
+      await archiveSession(sessionId, selectedToken);
+      if (activeSession?.id === sessionId) {
+        setSelectedSessionId(undefined);
+        setActiveSessionId(null);
       }
+      await refresh();
+    } catch (err) {
+      setStatus({ tone: "bad", message: err instanceof Error ? err.message : String(err) });
     }
-    setTokens(nextTokens);
-    if (selectedEmployee === employeeId) setSelectedEmployee("");
   }
 
   async function sendMessage() {
@@ -310,31 +314,34 @@ export function App() {
     const { agent: routedAgent, goal } = routeComposerMessage(raw, activeAgent, agents);
     if (!goal) { setStatus({ tone: "warn", message: t("toast.add_task", { agent: routedAgent }) }); return; }
     if (routedAgent !== activeAgent) setActiveAgent(routedAgent);
+    // When staging a new conversation, always create; otherwise continue the
+    // open one. composingNew forces a fresh owner-scoped session here.
+    const action = composingNew ? { kind: "create" as const } : chooseSendAction({ activeSessionId: activeSession?.id ?? null, session: activeSession });
+    const sessionId = action.kind === "append" ? action.sessionId : undefined;
+    // Echo the turn immediately. For a continued session we mint the message id
+    // here and hand it to the backend so the persisted event reconciles by id.
+    const userMessageId = `evt_${crypto.randomUUID()}`;
+    setPendingUserMessage({ id: userMessageId, text: goal });
     setIsRunning(true);
+    composer.setComposerText(""); composer.setMentionOpen(false);
+    setComposingNew(false);
+    setMobileView("chat"); atBottomRef.current = true;
     try {
       const { sandbox, token } = await provisionEmployeeSandbox(selectedEmployee, selectedToken);
       rememberSandboxToken(selectedEmployee, sandbox, token);
       const assignment = { agent: routedAgent, mode: composerMode };
-      const action = chooseSendAction({ activeSessionId, session: activeSession });
-      let sessionId: string;
-      if (action.kind === "append") {
-        await appendAssignment(action.sessionId, assignment, token);
-        sessionId = action.sessionId;
-      } else {
-        const session = await createSession({ taskGoal: goal, assignments: [assignment], workspacePath: sandbox.workspacePath, ownerEmployeeId: selectedEmployee }, token);
-        sessionId = session.id;
-        setActiveSessionId(sessionId);
-      }
-      setSelectedSessionId(sessionId); composer.setComposerText(""); composer.setMentionOpen(false);
-      setMobileView("chat"); atBottomRef.current = true;
-      await refresh(undefined, token);
       // The active session now tails live over SSE (useSessionEvents), so no
       // per-run polling loop is needed while the run is in flight.
-      const done = await runSandbox({ sandboxId: sandbox.id, taskGoal: goal, assignments: [assignment], sessionId }, token);
+      const done = await runSandbox(
+        { sandboxId: sandbox.id, taskGoal: goal, assignments: [assignment], sessionId, ...(sessionId ? { userMessageId } : {}) },
+        token,
+      );
+      setActiveSessionId(done.id);
       setSelectedSessionId(done.id);
       setStatus({ tone: "good", message: t("toast.message_sent", { employee: selectedEmployee, agent: routedAgent }) });
       await refresh(undefined, token);
     } catch (err) {
+      setPendingUserMessage(null);
       setStatus({ tone: "bad", message: err instanceof Error ? err.message : String(err) });
     } finally { setIsRunning(false); }
   }
@@ -353,6 +360,36 @@ export function App() {
 
   async function sendDecision(kind: "approve" | "reject" | "rerun" | "mark_done") {
     if (!activeSession) return;
+    if (kind === "rerun") {
+      if (!selectedEmployee) {
+        setStatus({ tone: "warn", message: t("toast.no_node_selected") });
+        return;
+      }
+      setIsRunning(true);
+      try {
+        const { sandbox, token } = await provisionEmployeeSandbox(selectedEmployee, selectedToken);
+        rememberSandboxToken(selectedEmployee, sandbox, token);
+        const assignment = rerunAssignmentForSession(activeSession, activeAgent, composerMode);
+        setActiveAgent(assignment.agent);
+        setSelectedSessionId(activeSession.id);
+        setMobileView("chat"); atBottomRef.current = true;
+        const done = await runSandbox({
+          sandboxId: sandbox.id,
+          taskGoal: activeSession.taskGoal,
+          assignments: [assignment],
+          sessionId: activeSession.id,
+          decision: { kind: "rerun", targetAgent: assignment.agent },
+        }, token);
+        setSelectedSessionId(done.id);
+        setStatus({ tone: "good", message: t("toast.decision_recorded", { kind: t("decision.rerun") }) });
+        await refresh(undefined, token);
+      } catch (err) {
+        setStatus({ tone: "bad", message: err instanceof Error ? err.message : String(err) });
+      } finally {
+        setIsRunning(false);
+      }
+      return;
+    }
     try {
       const session = await recordDecision(activeSession.id, kind, undefined, selectedToken);
       setSelectedSessionId(session.id);
@@ -365,14 +402,30 @@ export function App() {
 
   async function sendHandoff() {
     if (!activeSession) return;
+    if (!selectedEmployee) {
+      setStatus({ tone: "warn", message: t("toast.no_node_selected") });
+      return;
+    }
+    setIsRunning(true);
     try {
-      const session = await recordHandoff(activeSession.id, handoffAgent, handoffMode, handoffNote.trim() || undefined, selectedToken);
-      setSelectedSessionId(session.id); setHandoffNote(""); setHandoffMode("implement"); setHandoffOpen(false); setActiveAgent(handoffAgent);
+      const { sandbox, token } = await provisionEmployeeSandbox(selectedEmployee, selectedToken);
+      rememberSandboxToken(selectedEmployee, sandbox, token);
+      const note = handoffNote.trim();
+      const assignment = { agent: handoffAgent, mode: handoffMode };
+      const taskGoal = note ? `${activeSession.taskGoal}\n\nHandoff note:\n${note}` : activeSession.taskGoal;
+      const done = await runSandbox({
+        sandboxId: sandbox.id,
+        taskGoal,
+        assignments: [assignment],
+        sessionId: activeSession.id,
+        decision: { kind: "handoff", targetAgent: handoffAgent, ...(note ? { note } : {}) },
+      }, token);
+      setSelectedSessionId(done.id); setHandoffNote(""); setHandoffMode("action"); setHandoffOpen(false); setActiveAgent(handoffAgent);
       setStatus({ tone: "good", message: t("toast.handed_to", { agent: handoffAgent }) });
-      await refresh();
+      await refresh(undefined, token);
     } catch (err) {
       setStatus({ tone: "bad", message: err instanceof Error ? err.message : String(err) });
-    }
+    } finally { setIsRunning(false); }
   }
 
 
@@ -407,7 +460,7 @@ export function App() {
           <NavConversations size={16} /><span>{t("nav.chats")}</span>
         </button>
         <button type="button" className={mobileView === "chat" ? "active" : ""} aria-pressed={mobileView === "chat"} onClick={() => setMobileView("chat")}>
-          <span translate={selectedEmployee ? "no" : undefined}>{selectedEmployeeLabel}</span>
+          <span>{activeConversationLabel}</span>
         </button>
         <button type="button" className={`mobile-settings ${prefsOpen ? "active" : ""}`} aria-label={t("nav.settings")} aria-haspopup="dialog" aria-expanded={prefsOpen} onClick={() => setPrefsOpen((v) => !v)}>
           <NavPreferences size={16} />
@@ -428,12 +481,14 @@ export function App() {
       {route === "admin" ? <AdminConsole /> : route === "mcp" ? <McpPage /> : route === "skills" ? <SkillsPage /> : (<>
 
       <ThreadPanel
-        employees={filteredEmployees}
-        employeeQuery={employeeQuery}
-        setEmployeeQuery={setEmployeeQuery}
-        selectedEmployee={selectedEmployee}
-        onSelectEmployee={(id) => void selectEmployee(id)}
-        onRemoveEmployee={removeEmployee}
+        conversations={filteredConversations}
+        query={employeeQuery}
+        setQuery={setEmployeeQuery}
+        selectedSessionId={activeSession?.id}
+        onSelectConversation={openConversation}
+        onNewConversation={startNewConversation}
+        onRenameConversation={(session) => void renameConversation(session)}
+        onCloseConversation={(id) => void closeConversation(id)}
       />
 
       <section id="chat-panel" className="chat-panel" aria-label={t("nav.conversations")} tabIndex={-1}>
@@ -449,13 +504,6 @@ export function App() {
           isRefreshing={isRefreshing}
           onRefresh={() => void refresh()}
           onBackToThreads={() => setMobileView("threads")}
-          onNewThread={async () => {
-            if (!activeSession) return;
-            try { await archiveSession(activeSession.id, selectedToken); } catch { /* surfaced via refresh */ }
-            setActiveSessionId(null);
-            setSelectedSessionId("");
-            await refresh();
-          }}
         />
 
         <div
@@ -483,9 +531,9 @@ export function App() {
 
         <div className="transcript" ref={transcriptRef} onScroll={handleTranscriptScroll}>
           <div className="transcript-inner">
-            {activeSession ? (
+            {activeSession || pendingUserMessage ? (
               <>
-                {messages.map((msg, i) => <MessageBlock key={msg.id} message={msg} employeeId={selectedEmployee} sessionId={activeSession.id} grouped={isGroupedContinuation(messages, i)} />)}
+                {displayMessages.map((msg, i) => <MessageBlock key={msg.id} message={msg} employeeId={selectedEmployee} sessionId={activeSession?.id ?? ""} grouped={isGroupedContinuation(displayMessages, i)} />)}
                 {awaitingDecision ? <DecisionBar agentNames={agents} disabledAgents={selectedNode?.disabledAgents} sendDecision={sendDecision} handoffOpen={handoffOpen} setHandoffOpen={setHandoffOpen} handoffAgent={handoffAgent} setHandoffAgent={setHandoffAgent} handoffMode={handoffMode} setHandoffMode={setHandoffMode} handoffNote={handoffNote} setHandoffNote={setHandoffNote} sendHandoff={sendHandoff} /> : null}
               </>
             ) : (

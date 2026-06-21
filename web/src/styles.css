@@ -12,10 +12,11 @@
      3. shadcn/ui  — the @theme bridge exposing tokens to Tailwind
         utilities used by src/components/ui.
 
-   Visual language: white canvas, ink text, Relay Blue as the single
-   action color, neutral hairlines, Instrument Serif for editorial
-   display moments, Geist for interface text, and Geist Mono for
-   numbers and code.
+   Visual language: precision/technical. White canvas, near-black ink as
+   the single action color (inverts to white-on-black in dark), cool
+   neutral hairlines, color reserved for status only, Geist for interface
+   and display text, and Geist Mono as the identity signal for eyebrows,
+   metadata, numbers, and code.
 
    File layout: this orchestrator imports per-surface modules below.
    Tailwind + tw-animate must stay at the very top — every other module
@@ -50,6 +51,7 @@
 @import "./styles/mcp.css";
 @import "./styles/skills.css";
 @import "./styles/preferences.css";
+@import "./styles/dialog.css";
 @import "./styles/admin-v2-shell.css";
 @import "./styles/admin-v2-views.css";
 @import "./styles/admin-v2-drawers.css";

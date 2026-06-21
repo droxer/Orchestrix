@@ -36,6 +36,7 @@ export class RelaySupervisor {
   }
 
   async reconcileOnce(): Promise<ReconcileResult> {
+    this.pruneExitedDaemons();
     const employees = await this.backend.listEmployees();
     const nodes = await this.backend.listDaemonNodes();
     const nodesByEmployee = new Map<string, ControlPanelDaemonNodeRecord>();
@@ -89,6 +90,21 @@ export class RelaySupervisor {
     const daemons = [...this.managed.values()];
     this.managed.clear();
     await Promise.allSettled(daemons.map((daemon) => daemon.stop()));
+  }
+
+  private pruneExitedDaemons(): void {
+    for (const [nodeId, daemon] of this.managed) {
+      if (!daemon.child) continue;
+      if (daemon.child.exitCode === null && !daemon.child.signalCode) continue;
+      this.managed.delete(nodeId);
+      this.logger?.warn("removed exited daemon from supervisor state", {
+        nodeId,
+        key: daemon.key,
+        provider: daemon.provider,
+        exitCode: daemon.child.exitCode,
+        signalCode: daemon.child.signalCode,
+      });
+    }
   }
 }
 

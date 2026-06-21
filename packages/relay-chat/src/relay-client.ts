@@ -1,5 +1,15 @@
 import type { AgentName, AgentTaskMode, RelayEvent, RelaySession } from "relay-core";
-import type { RelayChatBackend, RelayChatRequestContext } from "./types.js";
+import type { ChatConversationRef, RelayChatBackend, RelayChatRequestContext } from "./types.js";
+
+function conversationBody(ref: ChatConversationRef): Record<string, unknown> {
+  return {
+    provider: ref.provider,
+    externalUserId: ref.externalUserId,
+    conversationId: ref.conversationId,
+    threadId: ref.threadId,
+    tenantId: ref.tenantId,
+  };
+}
 
 export interface RelayChatClientOptions {
   baseUrl?: string;
@@ -93,6 +103,32 @@ export class RelayChatClient implements RelayChatBackend {
     buffer += decoder.decode();
     const event = parseSseRelayEvent(buffer);
     if (event) await onEvent(event);
+  }
+
+  async resolveConversationSession(ref: ChatConversationRef, signal?: AbortSignal): Promise<RelaySession | undefined> {
+    const body = await this.request<{ session?: RelaySession | null }>("/chat/conversation/session", {
+      method: "POST",
+      signal,
+      body: conversationBody(ref),
+    });
+    return body.session ?? undefined;
+  }
+
+  async bindConversationSession(ref: ChatConversationRef, sessionId: string, signal?: AbortSignal): Promise<void> {
+    await this.request<{ mapping?: unknown }>("/chat/conversation/mapping", {
+      method: "POST",
+      signal,
+      body: { ...conversationBody(ref), sessionId },
+    });
+  }
+
+  async listConversationSessions(ref: ChatConversationRef, signal?: AbortSignal): Promise<RelaySession[]> {
+    const body = await this.request<{ sessions?: RelaySession[] }>("/chat/conversation/sessions", {
+      method: "POST",
+      signal,
+      body: conversationBody(ref),
+    });
+    return Array.isArray(body.sessions) ? body.sessions : [];
   }
 
   private async request<T>(

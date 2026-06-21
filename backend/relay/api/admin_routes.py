@@ -575,6 +575,7 @@ async def dashboard_tokens(request: Request, ctx: AppContextDep) -> dict[str, An
     ]
     now = datetime.now(timezone.utc)
     window_start = (now - timedelta(days=_DAY_WINDOW - 1)).date()
+    summary_start = (now - timedelta(days=6)).date()
     buckets: dict[str, dict[str, int]] = {
         (window_start + timedelta(days=offset)).isoformat(): {"input": 0, "output": 0, "cache": 0, "total": 0}
         for offset in range(_DAY_WINDOW)
@@ -587,22 +588,25 @@ async def dashboard_tokens(request: Request, ctx: AppContextDep) -> dict[str, An
         usage = _token_usage(row)
         if not usage:
             continue
-        for key in totals:
-            totals[key] += usage[key]
         timestamp = _parse_timestamp(row.get("updatedAt"))
+        in_summary_window = False
         if timestamp:
             day_key = timestamp.date().isoformat()
             if day_key in buckets:
                 for key in buckets[day_key]:
                     buckets[day_key][key] += usage[key]
-        employee_id = str(row.get("ownerEmployeeId") or "unassigned")
-        employee = by_employee.setdefault(
-            employee_id,
-            {"employeeId": employee_id, "input": 0, "output": 0, "cache": 0, "total": 0, "sessionCount": 0},
-        )
-        for key in ("input", "output", "cache", "total"):
-            employee[key] += usage[key]
-        employee["sessionCount"] += 1
+            in_summary_window = timestamp.date() >= summary_start
+        if in_summary_window:
+            for key in totals:
+                totals[key] += usage[key]
+            employee_id = str(row.get("ownerEmployeeId") or "unassigned")
+            employee = by_employee.setdefault(
+                employee_id,
+                {"employeeId": employee_id, "input": 0, "output": 0, "cache": 0, "total": 0, "sessionCount": 0},
+            )
+            for key in ("input", "output", "cache", "total"):
+                employee[key] += usage[key]
+            employee["sessionCount"] += 1
         recent_sessions.append({
             "sessionId": row.get("sessionId"),
             "employeeId": row.get("ownerEmployeeId"),

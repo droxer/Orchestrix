@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronDownIcon, ChevronUpIcon, StreamAttachment } from "./icons";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { AgentMark } from "./AgentMark";
 import { AgentStream } from "./AgentStream";
 import type { AgentName } from "../types";
+import { AGENT_NAMES } from "../types";
+import { agentLabel, parsePlanSteps, type PlanStep } from "../lib/plan";
 import type { RelayArtifact } from "relay-core";
 import { readArtifactText } from "../api";
 import type { DerivedMessage } from "../lib/projectMessages";
@@ -57,12 +59,31 @@ type ArtifactLoadState =
   | { status: "ready"; text: string }
   | { status: "error"; message: string };
 
+function PlanSummary({ steps }: { steps: PlanStep[] }) {
+  const { t } = useTranslation();
+  return (
+    <ol className="artifact-plan-summary">
+      {steps.map((step, index) => (
+        <li key={`${step.agent}-${step.mode}-${index}`} className="artifact-plan-item">
+          {index > 0 ? <span className="artifact-plan-arrow" aria-hidden="true">→</span> : null}
+          <span className="artifact-plan-step">
+            <AgentMark agent={step.agent} size={14} />
+            <span className="artifact-plan-agent">{agentLabel(step.agent)}</span>
+            <span className="artifact-plan-mode">{t(`mode.${step.mode}`)}</span>
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 function ArtifactCard({ artifact, sessionId }: { artifact: RelayArtifact; sessionId: string }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [loadState, setLoadState] = useState<ArtifactLoadState>({ status: "idle" });
   const previewId = `artifact-preview-${artifact.id}`;
   const kindLabel = t(`artifact.kind.${artifact.kind}`, { defaultValue: artifact.kind });
+  const isPlan = artifact.kind === "plan";
 
   function loadPreview(): void {
     if (loadState.status !== "idle") return;
@@ -75,6 +96,17 @@ function ArtifactCard({ artifact, sessionId }: { artifact: RelayArtifact; sessio
       });
   }
 
+  // Plan artifacts carry a short JSON assignment list; eagerly load it so the
+  // human-readable step summary can render inline without an extra click.
+  useEffect(() => {
+    if (isPlan) loadPreview();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlan]);
+
+  const planSteps = isPlan && loadState.status === "ready"
+    ? parsePlanSteps(loadState.text, AGENT_NAMES)
+    : null;
+
   function togglePreview(): void {
     const nextExpanded = !expanded;
     setExpanded(nextExpanded);
@@ -86,6 +118,23 @@ function ArtifactCard({ artifact, sessionId }: { artifact: RelayArtifact; sessio
       ? `${loadState.text.slice(0, ARTIFACT_PREVIEW_LIMIT)}\n\n${t("artifact.preview_truncated")}`
       : loadState.text
     : "";
+
+  // Plan bodies load eagerly; until they resolve render a compact placeholder so
+  // the common single-step case never flashes the full card chrome.
+  if (isPlan && loadState.status !== "ready" && loadState.status !== "error") {
+    return <div className="artifact-plan-note artifact-plan-note-loading">{artifact.title}</div>;
+  }
+
+  // A single-step assignment (e.g. the default Claude → action) carries little
+  // information, so collapse it to a compact inline note instead of a full card.
+  if (planSteps && planSteps.length === 1) {
+    return (
+      <div className="artifact-plan-note">
+        <span className="artifact-plan-note-label">{artifact.title}</span>
+        <PlanSummary steps={planSteps} />
+      </div>
+    );
+  }
 
   return (
     <article className={`artifact-card ${expanded ? "expanded" : ""}`}>
@@ -124,6 +173,7 @@ function ArtifactCard({ artifact, sessionId }: { artifact: RelayArtifact; sessio
           </button>
         </span>
       </div>
+      {planSteps ? <PlanSummary steps={planSteps} /> : null}
       {expanded ? (
         <div id={previewId} className="artifact-preview">
           {loadState.status === "loading" ? (

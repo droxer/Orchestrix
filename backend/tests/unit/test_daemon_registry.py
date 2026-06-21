@@ -96,6 +96,177 @@ def test_daemon_registration_poll_and_completion_updates_session() -> None:
     asyncio.run(run_flow())
 
 
+def test_daemon_follow_up_run_gets_prior_conversation_state() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store = LocalSessionStore(root)
+            daemon_store = LocalDaemonStore(root)
+            registry = DaemonNodeRegistry(session_store, daemon_store)
+            backend = ServerDaemonNodeBackend(registry)
+            registry.register({
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["claude", "codex"],
+                "status": "ready",
+            }, "ui_token")
+
+            session = await backend.run("sbx_alice", {
+                "taskGoal": "first question",
+                "assignments": [{"agent": "claude", "mode": "action"}],
+            })
+            [first_command] = registry.take_commands("sbx_alice", "node_token")
+            assert "prior_conversation" not in first_command["state"]
+            registry.handle_event("sbx_alice", {
+                "type": "run.completed",
+                "commandId": first_command["id"],
+                "sessionId": first_command["sessionId"],
+                "runId": first_command["runId"],
+                "agent": "claude",
+                "mode": "action",
+                "exitCode": 0,
+                "agentLog": "● first answer",
+            }, "node_token")
+
+            await backend.run("sbx_alice", {
+                "taskGoal": "follow up",
+                "sessionId": session["id"],
+                "assignments": [{"agent": "codex", "mode": "action"}],
+            })
+            [follow_up_command] = registry.take_commands("sbx_alice", "node_token")
+
+            state = follow_up_command["state"]
+            assert state["prior_conversation"] == (
+                "[Conversation so far]\n\n"
+                "[User]\nfirst question\n\n"
+                "[Assistant @claude]\nfirst answer"
+            )
+            assert "prior_agent_bridge" not in state
+
+    asyncio.run(run_flow())
+
+
+def test_daemon_multi_agent_same_turn_uses_bridge_without_conversation_duplication() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store = LocalSessionStore(root)
+            daemon_store = LocalDaemonStore(root)
+            registry = DaemonNodeRegistry(session_store, daemon_store)
+            backend = ServerDaemonNodeBackend(registry)
+            registry.register({
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["claude", "codex"],
+                "status": "ready",
+            }, "ui_token")
+
+            await backend.run("sbx_alice", {
+                "taskGoal": "ship it",
+                "assignments": [
+                    {"agent": "claude", "mode": "action"},
+                    {"agent": "codex", "mode": "action"},
+                ],
+            })
+            [first_command] = registry.take_commands("sbx_alice", "node_token")
+            registry.handle_event("sbx_alice", {
+                "type": "run.completed",
+                "commandId": first_command["id"],
+                "sessionId": first_command["sessionId"],
+                "runId": first_command["runId"],
+                "agent": "claude",
+                "mode": "action",
+                "exitCode": 0,
+                "agentLog": "● implementation note",
+            }, "node_token")
+            [second_command] = registry.take_commands("sbx_alice", "node_token")
+
+            state = second_command["state"]
+            assert "prior_conversation" not in state
+            assert state["prior_agent_bridge"] == "[Previous from @claude]\nimplementation note"
+
+    asyncio.run(run_flow())
+
+
+def test_daemon_run_records_decision_metadata_after_validation() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store = LocalSessionStore(root)
+            daemon_store = LocalDaemonStore(root)
+            registry = DaemonNodeRegistry(session_store, daemon_store)
+            backend = ServerDaemonNodeBackend(registry)
+            registry.register({
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }, "ui_token")
+            session = session_store.create_session({
+                "workspacePath": "/workspace/alice",
+                "ownerEmployeeId": "alice",
+                "taskGoal": "fix auth",
+                "participants": ["human", "codex"],
+            })
+
+            updated = await backend.run("sbx_alice", {
+                "taskGoal": "fix auth",
+                "sessionId": session["id"],
+                "assignments": [{"agent": "codex", "mode": "action"}],
+                "decision": {"kind": "rerun", "targetAgent": "codex"},
+            })
+
+            assert updated["id"] == session["id"]
+            assert updated["decisions"][0]["kind"] == "rerun"
+            assert updated["decisions"][0]["targetAgent"] == "codex"
+            [command] = registry.take_commands("sbx_alice", "node_token")
+            assert command["sessionId"] == session["id"]
+
+    asyncio.run(run_flow())
+
+
+def test_daemon_run_does_not_record_decision_when_validation_fails() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store = LocalSessionStore(root)
+            daemon_store = LocalDaemonStore(root)
+            registry = DaemonNodeRegistry(session_store, daemon_store)
+            backend = ServerDaemonNodeBackend(registry)
+            registry.register({
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }, "ui_token")
+            session = session_store.create_session({
+                "workspacePath": "/workspace/alice",
+                "ownerEmployeeId": "alice",
+                "taskGoal": "fix auth",
+                "participants": ["human", "kimi"],
+            })
+
+            with pytest.raises(ValueError, match="does not have ready agent"):
+                await backend.run("sbx_alice", {
+                    "taskGoal": "fix auth",
+                    "sessionId": session["id"],
+                    "assignments": [{"agent": "kimi", "mode": "action"}],
+                    "decision": {"kind": "handoff", "targetAgent": "kimi"},
+                })
+
+            assert session_store.get_session(session["id"])["decisions"] == []
+
+    asyncio.run(run_flow())
+
+
 def test_daemon_terminal_event_after_registry_restart_finalizes_session() -> None:
     async def run_flow() -> None:
         with TemporaryDirectory() as root:
@@ -115,7 +286,7 @@ def test_daemon_terminal_event_after_registry_restart_finalizes_session() -> Non
 
             session = await backend.run("sbx_alice", {
                 "taskGoal": "implement auth",
-                "assignments": [{"agent": "codex", "mode": "implement"}],
+                "assignments": [{"agent": "codex", "mode": "action"}],
             })
             [command] = registry.take_commands("sbx_alice", "node_token")
 
@@ -126,7 +297,7 @@ def test_daemon_terminal_event_after_registry_restart_finalizes_session() -> Non
                 "sessionId": command["sessionId"],
                 "runId": command["runId"],
                 "agent": "codex",
-                "mode": "implement",
+                "mode": "action",
                 "exitCode": 0,
                 "agentLog": "done",
             }, "node_token")
@@ -155,7 +326,7 @@ def test_daemon_cancel_event_clears_active_run_request() -> None:
 
             session = await backend.run("sbx_alice", {
                 "taskGoal": "stop this",
-                "assignments": [{"agent": "claude", "mode": "implement"}],
+                "assignments": [{"agent": "claude", "mode": "action"}],
             })
             [command] = registry.take_commands("sbx_alice", "node_token")
             registry.cancel_active_run("sbx_alice", session["id"], "no longer needed")
@@ -167,7 +338,7 @@ def test_daemon_cancel_event_clears_active_run_request() -> None:
                 "sessionId": command["sessionId"],
                 "runId": command["runId"],
                 "agent": "claude",
-                "mode": "implement",
+                "mode": "action",
                 "reason": "no longer needed",
             }, "node_token")
 
@@ -196,7 +367,7 @@ def test_daemon_run_timeout_marks_session_failed(monkeypatch) -> None:
 
             session = await backend.run("sbx_alice", {
                 "taskGoal": "hang",
-                "assignments": [{"agent": "codex", "mode": "implement"}],
+                "assignments": [{"agent": "codex", "mode": "action"}],
             })
             [command] = registry.take_commands("sbx_alice", "node_token")
             [request] = daemon_store.list_active_run_requests("sbx_alice")
@@ -260,7 +431,7 @@ def test_database_daemon_store_claims_queued_commands_once() -> None:
             "sessionId": "ses_1",
             "runId": "run_1",
             "agent": "codex",
-            "mode": "implement",
+            "mode": "action",
             "taskGoal": "fix auth",
         })
 
@@ -298,7 +469,7 @@ def test_daemon_run_rejects_ownerless_sessions() -> None:
                 await backend.run("sbx_alice", {
                     "sessionId": session["id"],
                     "taskGoal": "legacy ownerless session",
-                    "assignments": [{"agent": "claude", "mode": "implement"}],
+                    "assignments": [{"agent": "claude", "mode": "action"}],
                 })
 
     asyncio.run(run_flow())
@@ -324,7 +495,7 @@ def test_daemon_run_dispatch_rejects_concurrent_second_claim() -> None:
             try:
                 asyncio.run(backend.run("sbx_alice", {
                     "taskGoal": "fix auth",
-                    "assignments": [{"agent": "codex", "mode": "implement"}],
+                    "assignments": [{"agent": "codex", "mode": "action"}],
                 }))
                 return "started"
             except ValueError as error:
@@ -365,7 +536,7 @@ def test_set_disabled_agents_blocks_dispatch_and_survives_restart() -> None:
 
             session = await backend.run("sbx_alice", {
                 "taskGoal": "implement auth",
-                "assignments": [{"agent": "claude", "mode": "implement"}],
+                "assignments": [{"agent": "claude", "mode": "action"}],
             })
             assert session["status"] == "running"
 

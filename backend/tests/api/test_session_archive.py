@@ -21,7 +21,7 @@ def _bootstrap(client: TestClient) -> None:
 def _create_session(client: TestClient) -> str:
     response = client.post("/sessions", json={
         "taskGoal": "demo task",
-        "assignments": [{"agent": "claude", "mode": "implement"}],
+        "assignments": [{"agent": "claude", "mode": "action"}],
         "workspacePath": "/workspace",
     })
     assert response.status_code == 201
@@ -59,7 +59,7 @@ def test_assign_session_rejects_archived(monkeypatch) -> None:
         client.post(f"/sessions/{session_id}/archive")
 
         response = client.post(f"/sessions/{session_id}/assignments", json={
-            "assignments": [{"agent": "codex", "mode": "implement"}],
+            "assignments": [{"agent": "codex", "mode": "action"}],
         })
         assert response.status_code == 409
         assert "archived" in response.json()["detail"].lower()

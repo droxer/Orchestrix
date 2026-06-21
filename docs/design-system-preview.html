@@ -1,1140 +1,436 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Relay Design System Preview</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&family=Syne:wght@400..800&display=swap" rel="stylesheet" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400..600&family=Geist+Mono:wght@400..500&display=swap"
+      rel="stylesheet"
+    />
     <style>
       :root {
-        --primary: #0052ff;
-        --primary-active: #003ecc;
-        --primary-disabled: #a8b8cc;
-        --ink: #18232d;
-        --body: #5b616e;
-        --muted: #7c828a;
-        --muted-soft: #a8acb3;
-        --hairline: #dee1e6;
-        --hairline-soft: #eef0f3;
+        --primary: #0a0a0a;
+        --primary-active: #27272a;
+        --primary-disabled: #d4d4d8;
+        --ink: #0a0a0a;
+        --body: #52525b;
+        --muted: #71717a;
+        --muted-soft: #a1a1aa;
+        --hairline: #e4e4e7;
+        --hairline-soft: #f0f0f0;
         --canvas: #ffffff;
-        --surface-soft: #f7f6f1;
-        --surface-strong: #eef0f3;
-        --surface-dark: #18232d;
-        --surface-dark-elevated: #16181c;
+        --surface-soft: #fafafa;
+        --surface-strong: #f4f4f5;
+        --surface-dark: #0b0b0d;
+        --surface-dark-elevated: #111114;
         --on-primary: #ffffff;
         --on-dark: #ffffff;
-        --on-dark-soft: #a8acb3;
-        --semantic-up: #05b169;
-        --semantic-down: #cf202f;
-        --accent-yellow: #f4b000;
-        --radius-md: 12px;
-        --radius-lg: 16px;
-        --radius-xl: 24px;
-        --radius-pill: 100px;
+        --on-dark-soft: #a1a1aa;
+        --success: #10b981;
+        --danger: #e5484d;
+        --warning: #f5a623;
+        --info: #3b82f6;
+        --radius-sm: 6px;
+        --radius-md: 8px;
+        --radius-lg: 10px;
+        --radius-xl: 12px;
         --radius-full: 9999px;
-        --shadow-soft: 0 4px 12px rgba(0, 0, 0, 0.04);
-        --max: 1200px;
+        --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.04);
+        --shadow-lift: 0 0 0 1px rgba(10, 10, 10, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+        --max: 1080px;
+        --sans: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+        --mono: "Geist Mono", "SFMono-Regular", Consolas, Menlo, monospace;
         color-scheme: light;
       }
 
-      * {
-        box-sizing: border-box;
-      }
+      * { box-sizing: border-box; }
 
       body {
         margin: 0;
         background: var(--canvas);
         color: var(--ink);
-        font-family: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        font-size: 16px;
+        font-family: var(--sans);
+        font-size: 14px;
         line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
       }
 
-      h1,
-      h2,
-      .display {
-        font-family: "Syne", "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      h1, h2, h3 { margin: 0; letter-spacing: -0.6px; }
+      button, input { font: inherit; }
+      a { color: inherit; }
+      code, .mono { font-family: var(--mono); }
+
+      .eyebrow {
+        font-family: var(--mono);
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--muted);
       }
 
-      button,
-      input {
-        font: inherit;
-      }
-
-      a {
-        color: inherit;
-        text-decoration: none;
-      }
-
-      .page {
-        min-height: 100vh;
-        overflow-x: hidden;
-      }
-
-      .container {
-        width: min(var(--max), calc(100% - 48px));
-        margin: 0 auto;
-      }
+      .container { width: min(var(--max), calc(100% - 48px)); margin: 0 auto; }
 
       .top-nav {
         position: sticky;
         top: 0;
         z-index: 10;
-        height: 64px;
-        border-bottom: 1px solid var(--hairline-soft);
-        background: rgba(255, 255, 255, 0.94);
-        backdrop-filter: blur(14px);
+        height: 60px;
+        border-bottom: 1px solid var(--hairline);
+        background: color-mix(in srgb, var(--canvas) 92%, transparent);
+        backdrop-filter: blur(12px);
       }
-
       .top-nav__inner {
-        display: grid;
-        grid-template-columns: auto 1fr auto;
+        display: flex;
         align-items: center;
         gap: 24px;
-        height: 64px;
+        height: 60px;
       }
-
-      .logo {
-        width: 126px;
-        height: auto;
-        display: block;
-      }
-
-      .nav-links {
-        display: flex;
-        justify-content: center;
-        gap: 22px;
-        color: var(--ink);
-        font-size: 14px;
-        font-weight: 500;
-      }
-
-      .nav-actions {
-        display: flex;
-        align-items: center;
-        justify-content: flex-end;
-        gap: 8px;
-      }
-
-      .icon-button {
-        display: inline-grid;
-        place-items: center;
-        width: 44px;
-        height: 44px;
-        border: 0;
-        border-radius: var(--radius-full);
-        background: transparent;
-        color: var(--ink);
-        cursor: pointer;
-      }
-
-      .icon-button:hover {
-        background: var(--surface-strong);
-      }
+      .brand { font-weight: 600; font-size: 16px; letter-spacing: -0.3px; }
+      .nav-links { display: flex; gap: 20px; margin-left: 8px; font-size: 14px; font-weight: 500; color: var(--body); }
+      .nav-links a { text-decoration: none; }
+      .nav-links a:hover { color: var(--ink); }
+      .nav-actions { display: flex; gap: 8px; margin-left: auto; align-items: center; }
 
       .button {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        min-height: 44px;
+        height: 36px;
         border: 0;
-        border-radius: var(--radius-pill);
-        padding: 12px 20px;
-        font-size: 16px;
+        border-radius: var(--radius-sm);
+        padding: 8px 16px;
+        font-size: 14px;
         font-weight: 600;
-        line-height: 1.15;
         white-space: nowrap;
         cursor: pointer;
       }
-
-      .button--primary {
-        background: var(--primary);
-        color: var(--on-primary);
-      }
-
-      .button--primary:hover,
-      .button--primary:active {
-        background: var(--primary-active);
-      }
-
-      .button--primary:disabled {
-        background: var(--primary-disabled);
-        cursor: not-allowed;
-      }
-
-      .button--secondary {
-        background: var(--surface-strong);
-        color: var(--ink);
-      }
-
-      .button--dark {
-        background: var(--surface-dark-elevated);
-        color: var(--on-dark);
-      }
-
-      .button--outline-dark {
-        border: 1px solid rgba(255, 255, 255, 0.58);
-        background: transparent;
-        color: var(--on-dark);
-      }
-
-      .button--hero {
-        min-height: 56px;
-        padding: 16px 32px;
-      }
-
-      .hero {
-        position: relative;
-        background: var(--surface-dark);
-        color: var(--on-dark);
-        padding: 96px 0 76px;
-      }
-
-      .hero__grid {
-        display: grid;
-        grid-template-columns: minmax(0, 0.95fr) minmax(420px, 1.05fr);
-        gap: 72px;
-        align-items: center;
-      }
-
-      .eyebrow {
-        display: inline-flex;
-        align-items: center;
-        min-height: 28px;
-        border-radius: var(--radius-pill);
-        padding: 4px 12px;
-        background: rgba(238, 240, 243, 0.11);
-        color: var(--on-dark-soft);
-        font-size: 12px;
-        font-weight: 600;
-        line-height: 1.5;
-      }
-
-      .hero h1,
-      .section-heading h2,
-      .cta h2 {
-        margin: 0;
-        font-weight: 400;
-        letter-spacing: 0;
-      }
-
-      .hero h1 {
-        margin-top: 22px;
-        max-width: 760px;
-        font-size: clamp(40px, 7vw, 80px);
-        line-height: 1;
-      }
-
-      .hero p {
-        max-width: 560px;
-        margin: 26px 0 0;
-        color: var(--on-dark-soft);
-      }
-
-      .hero__actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 12px;
-        margin-top: 36px;
-      }
-
-      .mockup-stack {
-        position: relative;
-        min-height: 520px;
-      }
-
-      .product-card {
-        border-radius: var(--radius-xl);
-        padding: 32px;
-        background: var(--surface-dark-elevated);
-        color: var(--on-dark);
-      }
-
-      .product-card--main {
-        position: relative;
-        min-height: 420px;
-        border: 1px solid rgba(255, 255, 255, 0.06);
-      }
-
-      .product-card--floating {
-        position: absolute;
-        right: -4px;
-        bottom: 10px;
-        width: min(360px, 62%);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        box-shadow: 0 18px 42px rgba(0, 0, 0, 0.22);
-        transform: rotate(-2deg);
-      }
-
-      .card-head {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 16px;
-        margin-bottom: 24px;
-      }
-
-      .card-title {
-        margin: 0;
-        font-size: 18px;
-        font-weight: 600;
-        line-height: 1.33;
-      }
-
-      .card-meta {
-        color: var(--on-dark-soft);
-        font-size: 13px;
-      }
-
-      .metric-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 12px;
-        margin-bottom: 26px;
-      }
-
-      .metric {
-        min-height: 104px;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: var(--radius-lg);
-        padding: 16px;
-        background: rgba(255, 255, 255, 0.025);
-      }
-
-      .metric span {
-        color: var(--on-dark-soft);
-        font-size: 13px;
-      }
-
-      .metric strong {
-        display: block;
-        margin-top: 12px;
-        font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
-        font-size: 18px;
-        font-weight: 500;
-        line-height: 1.4;
-      }
-
-      .workflow-list {
-        border-top: 1px solid rgba(255, 255, 255, 0.08);
-      }
-
-      .workflow-row {
-        display: grid;
-        grid-template-columns: 32px 1fr auto auto;
-        align-items: center;
-        gap: 14px;
-        min-height: 68px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      }
-
-      .glyph {
-        display: inline-grid;
-        place-items: center;
-        width: 32px;
-        height: 32px;
-        border-radius: var(--radius-full);
-        background: var(--surface-strong);
-        color: var(--ink);
-      }
-
-      .glyph--yellow {
-        background: var(--accent-yellow);
-      }
-
-      .row-label {
-        display: grid;
-        gap: 2px;
-      }
-
-      .row-label strong {
-        font-size: 16px;
-        font-weight: 600;
-        line-height: 1.25;
-      }
-
-      .row-label span {
-        color: var(--on-dark-soft);
-        font-size: 13px;
-      }
-
-      .number {
-        font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
-        font-size: 18px;
-        font-weight: 500;
-      }
-
-      .up {
-        color: var(--semantic-up);
-      }
-
-      .down {
-        color: var(--semantic-down);
-      }
-
-      .section {
-        padding: 96px 0;
-      }
-
-      .section--soft {
-        background: var(--surface-soft);
-      }
-
-      .section-heading {
-        display: grid;
-        grid-template-columns: minmax(0, 0.8fr) minmax(280px, 0.55fr);
-        gap: 48px;
-        align-items: end;
-        margin-bottom: 48px;
-      }
-
-      .section-heading h2 {
-        font-size: clamp(36px, 4.6vw, 52px);
-        line-height: 1;
-      }
-
-      .section-heading p {
-        margin: 0;
-        color: var(--body);
-      }
-
-      .swatch-grid {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 16px;
-      }
-
-      .swatch {
-        min-height: 160px;
-        border: 1px solid var(--hairline);
-        border-radius: var(--radius-xl);
-        overflow: hidden;
-        background: var(--canvas);
-      }
-
-      .swatch__color {
-        height: 86px;
-      }
-
-      .swatch__body {
-        padding: 16px;
-      }
-
-      .swatch__body strong {
-        display: block;
-        font-size: 16px;
-        font-weight: 600;
-      }
-
-      .swatch__body code {
-        color: var(--muted);
-        font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
-        font-size: 13px;
-      }
-
-      .type-specimen {
-        display: grid;
-        gap: 16px;
-      }
-
-      .type-row {
-        display: grid;
-        grid-template-columns: minmax(150px, 0.32fr) 1fr auto;
-        align-items: baseline;
-        gap: 24px;
-        border-bottom: 1px solid var(--hairline);
-        padding: 20px 0;
-      }
-
-      .type-name {
-        color: var(--muted);
-        font-size: 14px;
-      }
-
-      .type-sample {
-        margin: 0;
-        font-weight: 400;
-        line-height: 1.08;
-      }
-
-      .type-detail {
-        color: var(--muted);
-        font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
-        font-size: 13px;
-      }
-
-      .component-grid {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 24px;
-      }
-
-      .component-panel {
-        border: 1px solid var(--hairline);
-        border-radius: var(--radius-xl);
-        padding: 32px;
-        background: var(--canvas);
-      }
-
-      .component-panel h3 {
-        margin: 0 0 18px;
-        font-size: 18px;
-        font-weight: 600;
-        line-height: 1.33;
-      }
-
-      .button-stack,
-      .form-stack,
-      .badge-stack {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 12px;
-      }
-
-      .input {
-        width: 100%;
-        height: 48px;
-        border: 1px solid var(--hairline);
-        border-radius: var(--radius-md);
-        padding: 14px 16px;
-        color: var(--ink);
-        background: var(--canvas);
-      }
-
-      .input:focus {
-        border-color: var(--primary);
-        box-shadow: 0 0 0 1px var(--primary);
-        outline: 0;
-      }
-
-      .search-pill {
-        width: 100%;
-        height: 44px;
-        border: 0;
-        border-radius: var(--radius-pill);
-        padding: 12px 20px;
-        background: var(--surface-strong);
-      }
-
-      .badge {
-        display: inline-flex;
-        align-items: center;
-        min-height: 26px;
-        border-radius: var(--radius-pill);
-        padding: 4px 12px;
-        background: var(--surface-strong);
-        color: var(--ink);
-        font-size: 12px;
-        font-weight: 600;
-      }
-
-      .pricing-grid {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 24px;
-      }
-
-      .pricing-card {
-        border: 1px solid var(--hairline);
-        border-radius: var(--radius-xl);
-        padding: 32px;
-        background: var(--canvas);
-      }
-
-      .pricing-card--featured {
-        border-color: var(--surface-dark);
-        background: var(--surface-dark);
-        color: var(--on-dark);
-      }
-
-      .pricing-card h3 {
-        margin: 0;
-        font-size: 18px;
-        font-weight: 600;
-      }
-
-      .price {
-        margin: 18px 0 4px;
-        font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
-        font-size: 28px;
-        font-weight: 500;
-      }
-
-      .pricing-card p,
-      .pricing-card li {
-        color: var(--body);
-      }
-
-      .pricing-card--featured p,
-      .pricing-card--featured li {
-        color: var(--on-dark-soft);
-      }
-
-      .pricing-card ul {
-        display: grid;
-        gap: 10px;
-        margin: 24px 0;
-        padding: 0;
-        list-style: none;
-      }
-
-      .review-grid {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 24px;
-      }
-
-      .review-card {
-        border: 1px solid var(--hairline);
-        border-radius: var(--radius-xl);
-        padding: 32px;
-        background: var(--canvas);
-      }
-
-      .review-card h3 {
-        margin: 0 0 14px;
-        font-size: 18px;
-        font-weight: 600;
-      }
-
-      .review-card p {
-        margin: 0;
-        color: var(--body);
-      }
-
-      .cta {
-        background: var(--surface-dark);
-        color: var(--on-dark);
-        padding: 96px 0;
-        text-align: center;
-      }
-
-      .cta h2 {
-        max-width: 780px;
-        margin: 0 auto;
-        font-size: clamp(36px, 4vw, 44px);
-        line-height: 1.09;
-      }
-
-      .cta p {
-        max-width: 620px;
-        margin: 22px auto 0;
-        color: var(--on-dark-soft);
-      }
-
-      .cta .hero__actions {
-        justify-content: center;
-      }
-
-      .footer {
-        padding: 64px 0 30px;
-        color: var(--body);
-      }
-
-      .footer__grid {
-        display: grid;
-        grid-template-columns: 1.2fr repeat(4, 1fr);
-        gap: 32px;
-      }
-
-      .footer h3,
-      .footer h4 {
-        margin: 0 0 14px;
-        color: var(--ink);
-        font-size: 14px;
-        font-weight: 600;
-      }
-
-      .footer a,
-      .footer p {
-        display: block;
-        margin: 0 0 10px;
-        color: var(--body);
-        font-size: 14px;
-      }
-
-      .legal {
-        border-top: 1px solid var(--hairline-soft);
-        margin-top: 42px;
-        padding-top: 22px;
-        color: var(--muted);
-        font-size: 13px;
-      }
-
-      @media (max-width: 1024px) {
-        .hero__grid,
-        .section-heading,
-        .footer__grid {
-          grid-template-columns: 1fr;
-        }
-
-        .mockup-stack {
-          min-height: 480px;
-        }
-
-        .swatch-grid,
-        .component-grid,
-        .pricing-grid,
-        .review-grid {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
-        .nav-links {
-          display: none;
-        }
-      }
-
-      @media (max-width: 700px) {
-        .container {
-          width: min(100% - 32px, var(--max));
-        }
-
-        .top-nav__inner {
-          grid-template-columns: auto 1fr;
-        }
-
-        .nav-actions .button--secondary,
-        .nav-actions .icon-button:not(.menu-toggle) {
-          display: none;
-        }
-
-        .hero,
-        .section,
-        .cta {
-          padding: 64px 0;
-        }
-
-        .hero__grid {
-          gap: 42px;
-        }
-
-        .mockup-stack {
-          min-height: auto;
-        }
-
-        .product-card--floating {
-          position: static;
-          width: 100%;
-          margin-top: 16px;
-          transform: none;
-        }
-
-        .metric-grid,
-        .swatch-grid,
-        .component-grid,
-        .pricing-grid,
-        .review-grid {
-          grid-template-columns: 1fr;
-        }
-
-        .workflow-row {
-          grid-template-columns: 32px 1fr;
-          padding: 16px 0;
-        }
-
-        .workflow-row .number {
-          grid-column: 2;
-        }
-
-        .type-row {
-          grid-template-columns: 1fr;
-          gap: 8px;
-        }
+      .button--primary { background: var(--primary); color: var(--on-primary); }
+      .button--primary:hover { background: var(--primary-active); }
+      .button--primary:disabled { background: var(--primary-disabled); color: var(--on-primary); cursor: not-allowed; }
+      .button--secondary { background: var(--surface-strong); color: var(--ink); }
+      .button--ghost { background: transparent; color: var(--ink); }
+      .button--ghost:hover { background: var(--surface-strong); }
+      .link { color: var(--ink); font-weight: 550; text-decoration: underline; }
+
+      .hero { padding: 72px 0 56px; }
+      .hero h1 { font-size: clamp(34px, 5vw, 52px); font-weight: 600; line-height: 1.06; letter-spacing: -1px; max-width: 18ch; }
+      .hero p { max-width: 60ch; margin: 18px 0 0; color: var(--body); font-size: 16px; }
+      .hero__actions { display: flex; gap: 12px; margin-top: 28px; }
+
+      .section { padding: 56px 0; border-top: 1px solid var(--hairline); }
+      .section-heading { margin-bottom: 28px; }
+      .section-heading h2 { font-size: 24px; font-weight: 600; line-height: 1.1; }
+      .section-heading p { margin: 8px 0 0; color: var(--body); max-width: 60ch; }
+
+      .swatch-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+      .swatch { border: 1px solid var(--hairline); border-radius: var(--radius-xl); overflow: hidden; background: var(--canvas); }
+      .swatch__color { height: 72px; }
+      .swatch__body { padding: 12px 14px; }
+      .swatch__body strong { display: block; font-size: 14px; font-weight: 600; }
+      .swatch__body code { color: var(--muted); font-size: 12px; }
+      .swatch__body span { color: var(--muted-soft); font-size: 12px; }
+
+      .type-row { display: grid; grid-template-columns: minmax(140px, 0.3fr) 1fr auto; align-items: baseline; gap: 24px; border-bottom: 1px solid var(--hairline); padding: 18px 0; }
+      .type-name { color: var(--muted); font-family: var(--mono); font-size: 12px; }
+      .type-sample { margin: 0; }
+      .type-detail { color: var(--muted); font-family: var(--mono); font-size: 12px; }
+
+      .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+      .panel { border: 1px solid var(--hairline); border-radius: var(--radius-xl); padding: 20px; background: var(--canvas); }
+      .panel h3 { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
+      .stack { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+
+      .input { width: 100%; height: 40px; border: 1px solid var(--hairline); border-radius: var(--radius-md); padding: 9px 12px; color: var(--ink); background: var(--canvas); font-size: 14px; }
+      .input:focus { outline: 0; border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent); }
+      .search { width: 100%; height: 38px; border: 0; border-radius: var(--radius-md); padding: 8px 12px; background: var(--surface-strong); color: var(--ink); font-size: 14px; }
+
+      .badge { display: inline-flex; align-items: center; gap: 6px; height: 24px; border: 1px solid var(--hairline); border-radius: var(--radius-sm); padding: 0 9px; color: var(--body); font-size: 12px; font-weight: 600; background: transparent; }
+      .badge-mono { font-family: var(--mono); font-weight: 500; letter-spacing: 0.02em; color: var(--muted); }
+      .dot { width: 8px; height: 8px; border-radius: var(--radius-full); display: inline-block; }
+      .dot--up { background: var(--success); }
+      .dot--down { background: var(--danger); }
+      .dot--warn { background: var(--warning); }
+      .dot--info { background: var(--info); }
+
+      /* Operational chat surface */
+      .apps { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+      .app { border: 1px solid var(--app-ln); border-radius: var(--radius-xl); overflow: hidden; background: var(--app-bg); }
+      .app--light { --app-bg: #fff; --app-ln: #e4e4e7; --app-head: #fafafa; --app-ink: #0a0a0a; --app-body: #52525b; --app-soft: #fafafa; --app-tool: #f4f4f5; --app-btn: #0a0a0a; --app-on: #fff; }
+      .app--dark { --app-bg: #0b0b0d; --app-ln: #1e1e22; --app-head: #111114; --app-ink: #f4f4f5; --app-body: #a1a1aa; --app-soft: #111114; --app-tool: #15151a; --app-btn: #f4f4f5; --app-on: #0a0a0a; }
+      .app-head { display: flex; align-items: center; gap: 8px; padding: 11px 14px; background: var(--app-head); border-bottom: 1px solid var(--app-ln); }
+      .app-title { font-size: 13px; font-weight: 600; color: var(--app-ink); }
+      .app-body { padding: 16px 14px; display: flex; flex-direction: column; gap: 14px; }
+      .turn-eye { font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--app-body); margin-bottom: 5px; }
+      .turn-text { font-size: 13px; line-height: 1.5; color: var(--app-ink); }
+      .tool-line { font-family: var(--mono); font-size: 12px; padding: 7px 10px; border-radius: var(--radius-md); background: var(--app-tool); color: var(--app-body); }
+      .rcard { border: 1px solid var(--app-ln); border-radius: var(--radius-lg); background: var(--app-soft); padding: 11px 12px; }
+      .rcard-h { font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--app-ink); margin-bottom: 3px; }
+      .rcard-p { font-size: 12px; color: var(--app-body); }
+      .app-actions { display: flex; align-items: center; gap: 10px; }
+      .app-btn { height: 30px; padding: 0 14px; border: 0; border-radius: var(--radius-sm); background: var(--app-btn); color: var(--app-on); font-size: 12px; font-weight: 600; }
+      .app-link { font-size: 12px; font-weight: 550; color: var(--app-ink); text-decoration: underline; }
+      .app-badge { margin-left: auto; font-family: var(--mono); font-size: 11px; border: 1px solid var(--app-ln); border-radius: var(--radius-sm); padding: 2px 8px; color: var(--app-body); }
+      .app-avatar { width: 26px; height: 26px; border-radius: var(--radius-md); background: var(--app-tool); color: var(--app-ink); display: grid; place-items: center; font-size: 11px; font-weight: 600; }
+
+      .pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+      .pricing-card { border: 1px solid var(--hairline); border-radius: var(--radius-xl); padding: 24px; background: var(--canvas); }
+      .pricing-card--featured { background: var(--surface-dark); color: var(--on-dark); border-color: var(--surface-dark); }
+      .pricing-card h3 { font-size: 16px; font-weight: 600; }
+      .price { font-family: var(--mono); font-size: 28px; font-weight: 500; margin: 16px 0 4px; letter-spacing: -0.5px; }
+      .pricing-card ul { list-style: none; padding: 0; margin: 18px 0; display: grid; gap: 9px; font-size: 13px; color: var(--body); }
+      .pricing-card--featured ul { color: var(--on-dark-soft); }
+
+      .footer { padding: 48px 0 28px; border-top: 1px solid var(--hairline); color: var(--body); }
+      .footer__grid { display: grid; grid-template-columns: 1.4fr repeat(3, 1fr); gap: 28px; }
+      .footer h4 { font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 12px; }
+      .footer a, .footer p { display: block; margin: 0 0 9px; color: var(--body); font-size: 13px; text-decoration: none; }
+      .legal { border-top: 1px solid var(--hairline-soft); margin-top: 36px; padding-top: 18px; color: var(--muted); font-size: 12px; }
+
+      @media (max-width: 880px) {
+        .swatch-grid, .grid-3, .pricing-grid, .apps, .footer__grid { grid-template-columns: 1fr; }
+        .nav-links { display: none; }
+        .type-row { grid-template-columns: 1fr; gap: 6px; }
       }
     </style>
   </head>
   <body>
-    <div class="page">
-      <header class="top-nav">
-        <div class="container top-nav__inner">
-          <a href="#top" aria-label="Relay home">
-            <img class="logo" src="../assets/brand/relay-logo.svg" alt="Relay" />
-          </a>
-          <nav class="nav-links" aria-label="Primary navigation">
+    <header class="top-nav">
+      <div class="container top-nav__inner">
+        <span class="brand">Relay</span>
+        <nav class="nav-links">
+          <a href="#tokens">Tokens</a>
+          <a href="#type">Type</a>
+          <a href="#components">Components</a>
+          <a href="#surface">Surface</a>
+        </nav>
+        <div class="nav-actions">
+          <button class="button button--ghost" type="button">Sign in</button>
+          <button class="button button--primary" type="button">Sign up</button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="container">
+          <span class="eyebrow">Precision control plane</span>
+          <h1 style="margin-top: 12px">Orchestrate agents with monochrome precision.</h1>
+          <p>
+            A preview of the Relay design language: white canvas, near-black ink as the only action
+            color, Geist Mono as the identity signal, tight geometry, and color reserved strictly for
+            status. In the Linear / Vercel / Resend lineage.
+          </p>
+          <div class="hero__actions">
+            <a class="button button--primary" href="#tokens">Review tokens</a>
+            <a class="button button--secondary" href="#components">Inspect components</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="tokens">
+        <div class="container">
+          <div class="section-heading">
+            <h2>Monochrome action, color for status.</h2>
+            <p>Ink carries every action and inverts to white-on-black in dark mode. The only hues on screen are status — success, danger, warning, info.</p>
+          </div>
+          <div class="swatch-grid">
+            <article class="swatch"><div class="swatch__color" style="background: var(--primary)"></div><div class="swatch__body"><strong>Ink / Action</strong><code>#0a0a0a</code></div></article>
+            <article class="swatch"><div class="swatch__color" style="background: var(--surface-strong)"></div><div class="swatch__body"><strong>Surface Strong</strong><code>#f4f4f5</code></div></article>
+            <article class="swatch"><div class="swatch__color" style="background: var(--surface-dark)"></div><div class="swatch__body"><strong>Surface Dark</strong><code>#0b0b0d</code></div></article>
+            <article class="swatch"><div class="swatch__color" style="background: var(--hairline)"></div><div class="swatch__body"><strong>Hairline</strong><code>#e4e4e7</code></div></article>
+            <article class="swatch"><div class="swatch__color" style="background: var(--success)"></div><div class="swatch__body"><strong>Success</strong><code>#10b981</code><span>status only</span></div></article>
+            <article class="swatch"><div class="swatch__color" style="background: var(--danger)"></div><div class="swatch__body"><strong>Danger</strong><code>#e5484d</code><span>status only</span></div></article>
+            <article class="swatch"><div class="swatch__color" style="background: var(--warning)"></div><div class="swatch__body"><strong>Warning</strong><code>#f5a623</code><span>dot only</span></div></article>
+            <article class="swatch"><div class="swatch__color" style="background: var(--info)"></div><div class="swatch__body"><strong>Info</strong><code>#3b82f6</code><span>sole status blue</span></div></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="type">
+        <div class="container">
+          <div class="section-heading">
+            <h2>Weighted-sans display, mono signal.</h2>
+            <p>Display is Geist 600 with tight tracking — no serif. Eyebrows, metadata, and numbers render in Geist Mono.</p>
+          </div>
+          <div class="type-row">
+            <span class="type-name">display-lg</span>
+            <p class="type-sample" style="font-size: 34px; font-weight: 600; letter-spacing: -0.6px">Fleet overview</p>
+            <span class="type-detail">34 / 600</span>
+          </div>
+          <div class="type-row">
+            <span class="type-name">title-md</span>
+            <p class="type-sample" style="font-size: 18px; font-weight: 600">Component titles and panel headings</p>
+            <span class="type-detail">18 / 600</span>
+          </div>
+          <div class="type-row">
+            <span class="type-name">eyebrow</span>
+            <p class="type-sample eyebrow" style="font-size: 11px">claude · action</p>
+            <span class="type-detail">mono 11 / 500</span>
+          </div>
+          <div class="type-row">
+            <span class="type-name">number-display</span>
+            <p class="type-sample mono" style="font-size: 36px; font-weight: 500; letter-spacing: -0.5px">128.4k</p>
+            <span class="type-detail">mono 36 / 500</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="components">
+        <div class="container">
+          <div class="section-heading">
+            <h2>Component checks.</h2>
+            <p>Tight 6–8px geometry, hairline depth, status-only color, underlined links.</p>
+          </div>
+          <div class="grid-3">
+            <article class="panel">
+              <h3>Buttons</h3>
+              <div class="stack">
+                <button class="button button--primary" type="button">Approve</button>
+                <button class="button button--secondary" type="button">Secondary</button>
+                <button class="button button--primary" type="button" disabled>Disabled</button>
+              </div>
+              <div class="stack" style="margin-top: 12px"><a class="link" href="#components">View diff</a></div>
+            </article>
+            <article class="panel">
+              <h3>Forms</h3>
+              <div class="stack" style="flex-direction: column; align-items: stretch">
+                <input class="input" value="relay daemon node" aria-label="Text input" />
+                <input class="search" value="Search sessions" aria-label="Search" />
+              </div>
+            </article>
+            <article class="panel">
+              <h3>Badges &amp; status</h3>
+              <div class="stack">
+                <span class="badge">GOVERNED</span>
+                <span class="badge badge-mono">3 agents</span>
+              </div>
+              <div class="stack" style="margin-top: 12px">
+                <span class="badge"><span class="dot dot--up"></span>ready</span>
+                <span class="badge"><span class="dot dot--down"></span>failed</span>
+                <span class="badge"><span class="dot dot--info"></span>info</span>
+                <span class="badge"><span class="dot dot--warn"></span>attention</span>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="surface">
+        <div class="container">
+          <div class="section-heading">
+            <h2>Operational surface — light &amp; dark.</h2>
+            <p>The action inverts to white-on-black in dark mode. Mono eyebrows identify the agent; color appears only on the verdict and status dot.</p>
+          </div>
+          <div class="apps">
+            <article class="app app--light">
+              <div class="app-head">
+                <span class="dot dot--up"></span>
+                <span class="app-title">#refactor-token-store</span>
+                <span class="app-badge">3 agents</span>
+              </div>
+              <div class="app-body">
+                <div>
+                  <div class="turn-eye">claude · action</div>
+                  <div class="turn-text">I'll split the token store into session and task modules to keep each under 400 lines.</div>
+                </div>
+                <div class="tool-line">⏺ edit session-store.ts · +84 −31</div>
+                <div class="rcard">
+                  <div class="rcard-h">codex · review</div>
+                  <div class="rcard-p">Verdict <b style="color: var(--success)">approved</b>. Clean separation, no behavior change.</div>
+                </div>
+                <div class="app-actions">
+                  <button class="app-btn" type="button">Approve</button>
+                  <span class="app-link">View diff</span>
+                  <span class="app-badge">running</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="app app--dark">
+              <div class="app-head">
+                <span class="dot" style="background: #2ed391"></span>
+                <span class="app-title">#refactor-token-store</span>
+                <span class="app-badge">3 agents</span>
+              </div>
+              <div class="app-body">
+                <div>
+                  <div class="turn-eye">claude · action</div>
+                  <div class="turn-text">I'll split the token store into session and task modules to keep each under 400 lines.</div>
+                </div>
+                <div class="tool-line">⏺ edit session-store.ts · +84 −31</div>
+                <div class="rcard">
+                  <div class="rcard-h">codex · review</div>
+                  <div class="rcard-p">Verdict <b style="color: #2ed391">approved</b>. Clean separation, no behavior change.</div>
+                </div>
+                <div class="app-actions">
+                  <button class="app-btn" type="button">Approve</button>
+                  <span class="app-link">View diff</span>
+                  <span class="app-badge">running</span>
+                </div>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="container">
+          <div class="section-heading">
+            <h2>Pricing inversion.</h2>
+            <p>The featured tier highlights via dark inversion, not a colored ribbon. The action stays ink.</p>
+          </div>
+          <div class="pricing-grid">
+            <article class="pricing-card">
+              <h3>Developer</h3>
+              <div class="price">$0</div>
+              <ul><li>Single workspace</li><li>Local session history</li><li>Manual handoffs</li></ul>
+              <button class="button button--secondary" type="button">Start</button>
+            </article>
+            <article class="pricing-card pricing-card--featured">
+              <h3>Team</h3>
+              <div class="price">$29</div>
+              <ul><li>Governed approvals</li><li>Read-only API surface</li><li>Agent readiness checks</li></ul>
+              <button class="button button--primary" type="button" style="background: var(--on-dark); color: var(--surface-dark)">Start</button>
+            </article>
+            <article class="pricing-card">
+              <h3>Enterprise</h3>
+              <div class="price">Custom</div>
+              <ul><li>Policy integrations</li><li>Audit retention</li><li>Dedicated support</li></ul>
+              <button class="button button--secondary" type="button">Contact</button>
+            </article>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="container">
+        <div class="footer__grid">
+          <div>
+            <h4>Relay</h4>
+            <p>Local-first orchestration for human-directed agent workflows.</p>
+          </div>
+          <div>
+            <h4>Product</h4>
             <a href="#tokens">Tokens</a>
             <a href="#components">Components</a>
-            <a href="#pricing">Pricing</a>
-            <a href="#review">Review</a>
-          </nav>
-          <div class="nav-actions">
-            <button class="icon-button" type="button" aria-label="Search">
-              <svg width="19" height="19" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="m21 21-4.3-4.3m1.3-5.2a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-              </svg>
-            </button>
-            <button class="icon-button" type="button" aria-label="Language">
-              <svg width="19" height="19" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0 0c2-2.4 3-5.4 3-9s-1-6.6-3-9m0 18c-2-2.4-3-5.4-3-9s1-6.6 3-9M3.6 9h16.8M3.6 15h16.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-              </svg>
-            </button>
-            <a class="button button--secondary" href="#components">Sign in</a>
-            <a class="button button--primary" href="#review">Sign up</a>
-            <button class="icon-button menu-toggle" type="button" aria-label="Menu">
-              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-              </svg>
-            </button>
+          </div>
+          <div>
+            <h4>Surface</h4>
+            <a href="#surface">Operational</a>
+            <a href="#type">Type</a>
+          </div>
+          <div>
+            <h4>Docs</h4>
+            <a href="design-system.md">Design system</a>
           </div>
         </div>
-      </header>
-
-      <main id="top">
-        <section class="hero" aria-labelledby="hero-title">
-          <div class="container hero__grid">
-            <div>
-              <span class="eyebrow">INSTITUTIONAL CONTROL PLANE</span>
-              <h1 id="hero-title">Orchestrate agents with quiet operational control.</h1>
-              <p>
-                A preview of the Relay design language: white-canvas editorial spacing, scarce Relay Blue,
-                full-bleed dark heroes, and layered product surfaces for serious team workflows.
-              </p>
-              <div class="hero__actions">
-                <a class="button button--primary button--hero" href="#tokens">Review tokens</a>
-                <a class="button button--outline-dark button--hero" href="#components">Inspect components</a>
-              </div>
-            </div>
-
-            <div class="mockup-stack" aria-label="Layered product UI mockup">
-              <article class="product-card product-card--main">
-                <div class="card-head">
-                  <div>
-                    <h2 class="card-title">Workflow readiness</h2>
-                    <span class="card-meta">Live control-plane overview</span>
-                  </div>
-                  <span class="badge" style="background: rgba(255,255,255,0.1); color: var(--on-dark)">REGULATED</span>
-                </div>
-
-                <div class="metric-grid">
-                  <div class="metric">
-                    <span>Sessions</span>
-                    <strong>128</strong>
-                  </div>
-                  <div class="metric">
-                    <span>Ready agents</span>
-                    <strong>3 / 3</strong>
-                  </div>
-                  <div class="metric">
-                    <span>Review queue</span>
-                    <strong>12</strong>
-                  </div>
-                </div>
-
-                <div class="workflow-list">
-                  <div class="workflow-row">
-                    <span class="glyph">
-                      <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                      </svg>
-                    </span>
-                    <span class="row-label"><strong>Claude to Pi to Codex</strong><span>Release plan handoff</span></span>
-                    <span class="number">04:18</span>
-                    <span class="number up">+8%</span>
-                  </div>
-                  <div class="workflow-row">
-                    <span class="glyph glyph--yellow">
-                      <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M12 3v18M3 12h18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-                      </svg>
-                    </span>
-                    <span class="row-label"><strong>Manual review</strong><span>Governed approval step</span></span>
-                    <span class="number">17</span>
-                    <span class="number down">-3%</span>
-                  </div>
-                  <div class="workflow-row">
-                    <span class="glyph">
-                      <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M4 7h16M7 12h10M10 17h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-                      </svg>
-                    </span>
-                    <span class="row-label"><strong>Daemon node</strong><span>BoxLite guest health</span></span>
-                    <span class="number">99.9</span>
-                    <span class="number up">+0.2</span>
-                  </div>
-                </div>
-              </article>
-
-              <article class="product-card product-card--floating">
-                <div class="card-head">
-                  <div>
-                    <h2 class="card-title">Agent preflight</h2>
-                    <span class="card-meta">Silent on success</span>
-                  </div>
-                </div>
-                <div class="workflow-list">
-                  <div class="workflow-row">
-                    <span class="glyph">
-                      <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                      </svg>
-                    </span>
-                    <span class="row-label"><strong>Claude</strong><span>stream-json renderer</span></span>
-                  </div>
-                  <div class="workflow-row">
-                    <span class="glyph">
-                      <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                      </svg>
-                    </span>
-                    <span class="row-label"><strong>Codex</strong><span>JSON events rendered</span></span>
-                  </div>
-                </div>
-              </article>
-            </div>
-          </div>
-        </section>
-
-        <section class="section" id="tokens" aria-labelledby="tokens-title">
-          <div class="container">
-            <div class="section-heading">
-              <h2 id="tokens-title">Tokens with one brand voltage.</h2>
-              <p>
-                Relay Blue is reserved for primary action and signature accents. Most of the system
-                stays white, ink, and neutral with operational numbers in mono.
-              </p>
-            </div>
-
-            <div class="swatch-grid">
-              <article class="swatch">
-                <div class="swatch__color" style="background: var(--primary)"></div>
-                <div class="swatch__body"><strong>Relay Blue</strong><code>#0052ff</code></div>
-              </article>
-              <article class="swatch">
-                <div class="swatch__color" style="background: var(--ink)"></div>
-                <div class="swatch__body"><strong>Ink / Dark</strong><code>#18232d</code></div>
-              </article>
-              <article class="swatch">
-                <div class="swatch__color" style="background: var(--surface-soft)"></div>
-                <div class="swatch__body"><strong>Surface Soft</strong><code>#f7f6f1</code></div>
-              </article>
-              <article class="swatch">
-                <div class="swatch__color" style="background: var(--surface-strong)"></div>
-                <div class="swatch__body"><strong>Surface Strong</strong><code>#eef0f3</code></div>
-              </article>
-              <article class="swatch">
-                <div class="swatch__color" style="background: var(--semantic-up)"></div>
-                <div class="swatch__body"><strong>Semantic Up</strong><code>#05b169</code></div>
-              </article>
-              <article class="swatch">
-                <div class="swatch__color" style="background: var(--semantic-down)"></div>
-                <div class="swatch__body"><strong>Semantic Down</strong><code>#cf202f</code></div>
-              </article>
-              <article class="swatch">
-                <div class="swatch__color" style="background: var(--accent-yellow)"></div>
-                <div class="swatch__body"><strong>Accent Yellow</strong><code>#f4b000</code></div>
-              </article>
-              <article class="swatch">
-                <div class="swatch__color" style="background: var(--surface-dark-elevated)"></div>
-                <div class="swatch__body"><strong>Dark Elevated</strong><code>#16181c</code></div>
-              </article>
-            </div>
-          </div>
-        </section>
-
-        <section class="section section--soft" aria-labelledby="type-title">
-          <div class="container">
-            <div class="section-heading">
-              <h2 id="type-title">Calm display, precise numbers.</h2>
-              <p>
-                Display remains weight 400. Numerical and operational cells use a mono stack to make
-                timelines, deltas, and counts scan cleanly.
-              </p>
-            </div>
-
-            <div class="type-specimen">
-              <div class="type-row">
-                <span class="type-name">display-mega</span>
-                <p class="type-sample display" style="font-size: clamp(40px, 7vw, 80px)">Quiet confidence</p>
-                <span class="type-detail">80 / 400</span>
-              </div>
-              <div class="type-row">
-                <span class="type-name">display-lg</span>
-                <p class="type-sample display" style="font-size: clamp(36px, 4.6vw, 52px)">Institutional rhythm</p>
-                <span class="type-detail">52 / 400</span>
-              </div>
-              <div class="type-row">
-                <span class="type-name">title-md</span>
-                <p class="type-sample" style="font-size: 18px; font-weight: 600">Component titles and row labels</p>
-                <span class="type-detail">18 / 600</span>
-              </div>
-              <div class="type-row">
-                <span class="type-name">number-display</span>
-                <p class="type-sample number">128.42 +05.8%</p>
-                <span class="type-detail">18 / 500</span>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section class="section" id="components" aria-labelledby="components-title">
-          <div class="container">
-            <div class="section-heading">
-              <h2 id="components-title">Component checks.</h2>
-              <p>
-                The preview exercises the documented pill geometry, input focus treatment, badges,
-                semantic text-only deltas, and dark-surface controls.
-              </p>
-            </div>
-
-            <div class="component-grid">
-              <article class="component-panel">
-                <h3>Buttons</h3>
-                <div class="button-stack">
-                  <button class="button button--primary" type="button">Primary</button>
-                  <button class="button button--secondary" type="button">Secondary</button>
-                  <button class="button button--primary" type="button" disabled>Disabled</button>
-                </div>
-              </article>
-              <article class="component-panel">
-                <h3>Forms</h3>
-                <div class="form-stack">
-                  <input class="input" value="relay daemon node" aria-label="Text input preview" />
-                  <input class="search-pill" value="Search sessions" aria-label="Search input preview" />
-                </div>
-              </article>
-              <article class="component-panel">
-                <h3>Badges</h3>
-                <div class="badge-stack">
-                  <span class="badge">INSTITUTIONAL</span>
-                  <span class="badge">GOVERNED</span>
-                  <span class="badge">LOCAL-FIRST</span>
-                </div>
-              </article>
-            </div>
-          </div>
-        </section>
-
-        <section class="section section--soft" id="pricing" aria-labelledby="pricing-title">
-          <div class="container">
-            <div class="section-heading">
-              <h2 id="pricing-title">Pricing cards and inversion.</h2>
-              <p>
-                The highlighted tier uses dark inversion, not a colored ribbon. Feature text stays
-                restrained and the CTA remains the only blue action.
-              </p>
-            </div>
-
-            <div class="pricing-grid">
-              <article class="pricing-card">
-                <h3>Developer</h3>
-                <div class="price">$0</div>
-                <p>Local workflow prototyping.</p>
-                <ul>
-                  <li>Single workspace</li>
-                  <li>Local session history</li>
-                  <li>Manual handoffs</li>
-                </ul>
-                <a class="button button--secondary" href="#review">Start</a>
-              </article>
-              <article class="pricing-card pricing-card--featured">
-                <h3>Team</h3>
-                <div class="price">$29</div>
-                <p>Shared orchestration and reviews.</p>
-                <ul>
-                  <li>Governed approvals</li>
-                  <li>Read-only API surface</li>
-                  <li>Agent readiness checks</li>
-                </ul>
-                <a class="button button--primary" href="#review">Start</a>
-              </article>
-              <article class="pricing-card">
-                <h3>Enterprise</h3>
-                <div class="price">Custom</div>
-                <p>Controlled agent workflows at scale.</p>
-                <ul>
-                  <li>Policy integrations</li>
-                  <li>Audit retention</li>
-                  <li>Dedicated support</li>
-                </ul>
-                <a class="button button--secondary" href="#review">Contact</a>
-              </article>
-            </div>
-          </div>
-        </section>
-
-        <section class="section" id="review" aria-labelledby="review-title">
-          <div class="container">
-            <div class="section-heading">
-              <h2 id="review-title">Design document review notes.</h2>
-              <p>
-                The system direction is coherent: single accent, calm type, large section rhythm,
-                and one memorable dark product-mockup pattern.
-              </p>
-            </div>
-
-            <div class="review-grid">
-              <article class="review-card">
-                <h3>Strong foundation</h3>
-                <p>
-                  The color, shape, and section-rhythm rules are specific enough to produce consistent
-                  marketing pages without over-specifying every layout.
-                </p>
-              </article>
-              <article class="review-card">
-                <h3>Copy alignment</h3>
-                <p>
-                  CTA language now stays in Relay's orchestration/control-plane domain rather than
-                  borrowing finance-oriented phrasing from an earlier reference.
-                </p>
-              </article>
-              <article class="review-card">
-                <h3>Token clarity</h3>
-                <p>
-                  `surface-dark-elevated` is documented as a deeper product-card surface, matching
-                  the visual relationship between `#16181c` and `#18232d`.
-                </p>
-              </article>
-            </div>
-          </div>
-        </section>
-
-        <section class="cta" aria-labelledby="cta-title">
-          <div class="container">
-            <h2 id="cta-title">A restrained visual system for serious agent operations.</h2>
-            <p>
-              Keep Relay Blue rare, keep display type quiet, and make the dark product surface the
-              signature moment users remember.
-            </p>
-            <div class="hero__actions">
-              <a class="button button--primary button--hero" href="#top">Back to top</a>
-              <a class="button button--dark button--hero" href="design-system.md">Open source doc</a>
-            </div>
-          </div>
-        </section>
-      </main>
-
-      <footer class="footer">
-        <div class="container">
-          <div class="footer__grid">
-            <div>
-              <h3>Relay</h3>
-              <p>Local-first orchestration for human-directed agent workflows.</p>
-            </div>
-            <div>
-              <h4>Product</h4>
-              <a href="#tokens">Tokens</a>
-              <a href="#components">Components</a>
-            </div>
-            <div>
-              <h4>Platform</h4>
-              <a href="#pricing">Pricing</a>
-              <a href="#review">Review</a>
-            </div>
-            <div>
-              <h4>Docs</h4>
-              <a href="design-system.md">Design system</a>
-              <a href="product.md">Product</a>
-            </div>
-            <div>
-              <h4>Company</h4>
-              <a href="#top">Overview</a>
-              <a href="#review">Governance</a>
-            </div>
-          </div>
-          <div class="legal">Preview generated from docs/design-system.md. Static HTML, no runtime dependencies.</div>
-        </div>
-      </footer>
-    </div>
+        <div class="legal">Preview generated from docs/design-system.md. Static HTML, no runtime dependencies.</div>
+      </div>
+    </footer>
   </body>
 </html>

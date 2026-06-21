@@ -1,14 +1,14 @@
 import { useTranslation } from "react-i18next";
 import type { AgentTaskMode } from "../../types";
-import { ModeImplement, ModeReview } from "../icons";
+import { ModeAction, ModeReview } from "../icons";
 
 export function ModeToggle({ mode, setMode }: {
   mode: AgentTaskMode;
   setMode: (mode: AgentTaskMode) => void;
 }) {
   const { t } = useTranslation();
-  const next: AgentTaskMode = mode === "implement" ? "review" : "implement";
-  const Icon = mode === "implement" ? ModeImplement : ModeReview;
+  const next: AgentTaskMode = mode === "action" ? "review" : "action";
+  const Icon = mode === "action" ? ModeAction : ModeReview;
   return (
     <button
       type="button"

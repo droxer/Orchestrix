@@ -24,10 +24,8 @@ function TransportBadge({ transport }: { transport: McpServer["transport"] }) {
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center rounded-pill border px-xs py-[2px] font-mono text-xs font-semibold",
-        tinted
-          ? "border-primary/25 bg-[color-mix(in_srgb,var(--color-primary)_6%,var(--color-canvas))] text-primary"
-          : "border-hairline bg-surface-strong text-muted-foreground",
+        "inline-flex shrink-0 items-center rounded-sm border border-hairline px-xs py-[2px] font-mono text-xs font-semibold",
+        tinted ? "text-ink" : "text-muted-foreground",
       )}
     >
       {transport}

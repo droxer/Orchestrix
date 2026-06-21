@@ -11,6 +11,7 @@ import {
 } from "../../lib/manageAgents";
 import { AGENT_NAMES } from "../../types";
 import type { AgentName, ControlPanelDaemonNodeRecord } from "../../types";
+import { useDialogs } from "@/components/ui/DialogProvider";
 import { Drawer } from "./Drawer";
 import { agentStatusTone } from "./helpers";
 
@@ -23,6 +24,7 @@ interface ManageAgentsDrawerProps {
 
 export function ManageAgentsDrawer({ open, onClose, node, onUpdated }: ManageAgentsDrawerProps) {
   const { t } = useTranslation();
+  const { confirm } = useDialogs();
   const [initialDisabled, setInitialDisabled] = useState<Set<AgentName>>(() => new Set());
   const [disabled, setDisabled] = useState<Set<AgentName>>(() => new Set());
   const [saving, setSaving] = useState(false);
@@ -64,10 +66,13 @@ export function ManageAgentsDrawer({ open, onClose, node, onUpdated }: ManageAge
       node.agents,
     );
     if (newlyDisabledReady.length > 0) {
-      const message = t("admin.v2.manage_agents_disable_confirm", {
-        agents: newlyDisabledReady.join(", "),
+      const ok = await confirm({
+        title: t("admin.v2.manage_agents_disable_confirm", {
+          agents: newlyDisabledReady.join(", "),
+        }),
+        tone: "danger",
       });
-      if (!window.confirm(message)) return;
+      if (!ok) return;
     }
     setSaving(true);
     setError(null);

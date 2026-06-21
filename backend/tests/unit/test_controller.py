@@ -32,3 +32,54 @@ def test_session_controller_records_review_verdict() -> None:
         assert updated["agentRuns"][0]["tokenUsage"]["input"] == 9
         assert updated["tokenUsage"]["total"] == 15
         assert updated["agentRuns"][0]["artifactIds"]
+
+
+def test_record_cancel_decision_appends_one_cancel_decision() -> None:
+    with TemporaryDirectory() as root:
+        store = LocalSessionStore(root)
+        controller = SessionController(store, workspace_path="/workspace")
+        session = controller.create_session("cancel this")
+
+        updated = controller.record_decision(session["id"], "cancel", "No longer needed.")
+
+        assert updated["status"] == "cancelled"
+        assert [decision["kind"] for decision in updated["decisions"]] == ["cancel"]
+
+
+def test_record_user_message_appends_event_with_given_id() -> None:
+    from relay.controller import SessionController, initial_agent_state  # noqa: F401
+    with TemporaryDirectory() as root:
+        store = LocalSessionStore(root)
+        controller = SessionController(store, workspace_path="/workspace")
+        session = controller.create_session("first turn")
+        controller.record_user_message(session["id"], "second turn", message_id="evt_fixed")
+        updated = store.get_session(session["id"])
+        user_events = [e for e in updated["events"] if e["type"] == "user.message"]
+        assert len(user_events) == 1
+        assert user_events[0]["id"] == "evt_fixed"
+        assert user_events[0]["text"] == "second turn"
+
+
+def test_compute_conversation_history_excludes_current_turn() -> None:
+    from relay.conversation import compute_conversation_history
+    with TemporaryDirectory() as root:
+        store = LocalSessionStore(root)
+        controller = SessionController(store, workspace_path="/workspace")
+        session = controller.create_session("first turn")
+        # No prior turns yet beyond the current goal -> nothing to show.
+        assert compute_conversation_history(store.get_session(session["id"]), store) is None
+        controller.record_agent_started(session["id"], {"runId": "run_1", "agent": "claude", "mode": "action"})
+        controller.record_agent_output(session["id"], "run_1", "claude", "stdout", "● answer one")
+        controller.record_agent_completed(
+            session["id"],
+            initial_agent_state("first turn"),
+            {"runId": "run_1", "agent": "claude", "mode": "action", "status": "completed", "exitCode": 0, "agentLog": "● answer one"},
+        )
+        controller.record_user_message(session["id"], "second turn")
+        history = compute_conversation_history(store.get_session(session["id"]), store)
+        assert history is not None
+        assert "[Conversation so far]" in history
+        assert "first turn" in history
+        assert "answer one" in history
+        # The current (latest) turn must not be duplicated into the history.
+        assert "second turn" not in history

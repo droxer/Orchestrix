@@ -10,20 +10,20 @@ import {
   type AgentState,
   type AgentName,
   agentNameList,
-  buildClaudeImplementCommand,
+  buildClaudeActionCommand,
   buildClaudeReviewCommand,
-  buildCodexImplementCommand,
+  buildCodexActionCommand,
   buildCodexReviewCommand,
-  buildKimiImplementCommand,
+  buildKimiActionCommand,
   buildKimiReviewCommand,
-  buildPiImplementCommand,
+  buildPiActionCommand,
   buildPiPreflightCommand,
   buildPiReviewCommand,
-  claudeImplementNode,
+  claudeActionNode,
   claudeTaskPrompt,
   classifyReview,
   ClaudeStreamRenderer,
-  codexImplementPrompt,
+  codexActionPrompt,
   reviewPrompt,
   CodexStreamRenderer,
   extractReviewFeedback,
@@ -271,8 +271,8 @@ describe("prompts", () => {
   });
 
   it("Codex implementation prompt does not require a review verdict", () => {
-    const prompt = codexImplementPrompt(state({ task_goal: "Fix auth" }));
-    const command = buildCodexImplementCommand(state({ task_goal: "Fix auth" }));
+    const prompt = codexActionPrompt(state({ task_goal: "Fix auth" }));
+    const command = buildCodexActionCommand(state({ task_goal: "Fix auth" }));
 
     assert.match(prompt, /Fix auth/);
     assert.doesNotMatch(prompt, /Read docs\/plan\.md/);
@@ -302,7 +302,7 @@ describe("prompts", () => {
       RELAY_AGENT_WORKSPACE: "/tmp/relay-host-workspace",
       RELAY_RUN_AS_CURRENT_USER: "1",
     }, () => {
-      const command = buildClaudeImplementCommand(state());
+      const command = buildClaudeActionCommand(state());
 
       assert.match(command, /export HOME=\/tmp\/relay-agent-home/);
       assert.match(command, /CODEX_HOME=\/tmp\/relay-agent-home\/\.codex/);
@@ -316,7 +316,7 @@ describe("prompts", () => {
 
 describe("agent failure logging", () => {
   it("includes executor spawn errors in Claude agent logs", async () => {
-    const patch = await claudeImplementNode(state(), {
+    const patch = await claudeActionNode(state(), {
       execStream: async () => ({
         exit_code: -1,
         stdout: "",
@@ -343,7 +343,7 @@ describe("agent command invocation", () => {
       RELAY_RUN_AS_CURRENT_USER: "1",
       PI_HELP_TEXT: "Options:\n  --mode <mode> Output mode: text or json\n  --print, -p  Non-interactive mode",
     }, () => {
-      const result = runShellCommand(buildPiImplementCommand(state()), process.env);
+      const result = runShellCommand(buildPiActionCommand(state()), process.env);
 
       assert.equal(result.exit_code, 0, result.stderr || result.error_message);
       assert.equal(result.stdout, "json\n");
@@ -362,7 +362,7 @@ describe("agent command invocation", () => {
       RELAY_RUN_AS_CURRENT_USER: "1",
       PI_HELP_TEXT: "Options:\n  --print, -p  Non-interactive mode",
     }, () => {
-      const result = runShellCommand(buildPiImplementCommand(state()), process.env);
+      const result = runShellCommand(buildPiActionCommand(state()), process.env);
 
       assert.equal(result.exit_code, 0, result.stderr || result.error_message);
       assert.equal(result.stdout, "print\n");
@@ -381,7 +381,7 @@ describe("agent command invocation", () => {
       RELAY_RUN_AS_CURRENT_USER: "1",
       PI_HELP_TEXT: "Options:\n  --print-streaming, -P  Stream print output",
     }, () => {
-      const result = runShellCommand(buildPiImplementCommand(state()), process.env);
+      const result = runShellCommand(buildPiActionCommand(state()), process.env);
 
       assert.equal(result.exit_code, 0, result.stderr || result.error_message);
       assert.equal(result.stdout, "streaming\n");
@@ -410,7 +410,7 @@ describe("agent command invocation", () => {
       CODEX_ARGS_OUT: argsPath,
       CODEX_HOME_OUT: homePath,
     }, () => {
-      const result = runShellCommand(buildCodexImplementCommand(state({ task_goal: "Implement invocation fix" })), process.env);
+      const result = runShellCommand(buildCodexActionCommand(state({ task_goal: "Implement invocation fix" })), process.env);
       const args = readFileSync(argsPath, "utf8").split(/\n/).filter(Boolean);
 
       assert.equal(result.exit_code, 0, result.stderr || result.error_message);
@@ -911,7 +911,7 @@ describe("Pi provider config", () => {
       () => {
         const auth = JSON.parse(guestPiAuthJson());
         const models = JSON.parse(guestPiModelsJson());
-        const command = buildPiImplementCommand(state());
+        const command = buildPiActionCommand(state());
         const preflight = buildPiPreflightCommand();
 
         assert.ok("openai" in auth);
@@ -948,7 +948,7 @@ describe("Pi provider config", () => {
       () => {
         const auth = JSON.parse(guestPiAuthJson());
         const models = JSON.parse(guestPiModelsJson());
-        const command = buildPiImplementCommand(state());
+        const command = buildPiActionCommand(state());
         const preflight = buildPiPreflightCommand();
 
         assert.equal(auth["minimax-cn"].key, "test-key");
@@ -975,7 +975,7 @@ describe("Pi provider config", () => {
       () => {
         const auth = JSON.parse(guestPiAuthJson());
         const models = JSON.parse(guestPiModelsJson());
-        const command = buildPiImplementCommand(state());
+        const command = buildPiActionCommand(state());
 
         assert.equal(auth["minimax-cn"].key, "test-key");
         assert.deepEqual(models, { providers: {} });
@@ -1017,7 +1017,7 @@ describe("Pi provider config", () => {
       () => {
         const auth = JSON.parse(guestPiAuthJson());
         const provider = JSON.parse(guestPiModelsJson()).providers.anthropic;
-        const command = buildPiImplementCommand(state());
+        const command = buildPiActionCommand(state());
 
         assert.equal(auth.anthropic.key, "pi-key");
         assert.equal(provider.api, "anthropic-messages");
@@ -1056,8 +1056,8 @@ describe("Pi provider config", () => {
         const codexEnv = agentCredentialEnv("codex");
         const claudeEnv = agentCredentialEnv("claude");
         const codexConfig = guestCodexConfigToml();
-        const codexCommand = buildCodexImplementCommand(state());
-        const claudeCommand = buildClaudeImplementCommand(state());
+        const codexCommand = buildCodexActionCommand(state());
+        const claudeCommand = buildClaudeActionCommand(state());
 
         assert.ok(codexEnv.some(([key, value]) => key === "OPENAI_API_KEY" && value === "llm-key"));
         assert.ok(codexEnv.some(([key, value]) => key === "CODEX_API_KEY" && value === "llm-key"));
@@ -1113,19 +1113,19 @@ describe("credential scoping", () => {
 
   it("injects only the running agent's provider credentials", () => {
     withEnv(allProviderEnv, () => {
-      const claudeCommand = buildClaudeImplementCommand(state());
+      const claudeCommand = buildClaudeActionCommand(state());
       assert.ok(claudeCommand.includes("anthropic-secret"));
       for (const other of ["openai-secret", "pi-secret", "kimi-secret", "moonshot-secret"]) {
         assert.ok(!claudeCommand.includes(other), `Claude run exposed ${other}`);
       }
 
-      const codexCommand = buildCodexImplementCommand(state());
+      const codexCommand = buildCodexActionCommand(state());
       assert.ok(codexCommand.includes("openai-secret"));
       for (const other of ["anthropic-secret", "pi-secret", "kimi-secret", "moonshot-secret"]) {
         assert.ok(!codexCommand.includes(other), `Codex run exposed ${other}`);
       }
 
-      const kimiCommand = buildKimiImplementCommand(state());
+      const kimiCommand = buildKimiActionCommand(state());
       assert.ok(kimiCommand.includes("kimi-secret"));
       assert.ok(kimiCommand.includes("moonshot-secret"));
       for (const other of ["anthropic-secret", "openai-secret", "pi-secret"]) {
@@ -1183,7 +1183,16 @@ describe("token usage accounting", () => {
       }),
     ].join("\n"), "codex");
 
-    assert.deepEqual(usage, { input: 12, output: 8, cache: 6, total: 26, source: "codex" });
+    assert.deepEqual(usage, { input: 6, output: 8, cache: 6, total: 20, source: "codex" });
+  });
+
+  it("sums usage across multiple reported model calls", () => {
+    const usage = extractTokenUsageFromJsonl([
+      JSON.stringify({ type: "turn.completed", usage: { prompt_tokens: 10, completion_tokens: 4 } }),
+      JSON.stringify({ type: "turn.completed", usage: { prompt_tokens: 8, completion_tokens: 3 } }),
+    ].join("\n"), "codex");
+
+    assert.deepEqual(usage, { input: 18, output: 7, cache: 0, total: 25, source: "codex" });
   });
 
   it("does not estimate usage when JSONL has no reported counts", () => {
@@ -1202,7 +1211,7 @@ describe("token usage accounting", () => {
         runId: "run_1",
         agent: "codex",
         role: "fixer",
-        mode: "implement",
+        mode: "action",
       }),
       relayEvent("agent.completed", sessionId, {
         runId: "run_1",
@@ -1217,6 +1226,29 @@ describe("token usage accounting", () => {
 
     assert.deepEqual(session.agentRuns[0].tokenUsage, { input: 5, output: 7, cache: 3, total: 15, source: "codex" });
     assert.deepEqual(session.tokenUsage, { input: 5, output: 7, cache: 3, total: 15 });
+  });
+
+  it("applies session.renamed to the materialized title", () => {
+    const sessionId = "ses_titled";
+    const base = materializeEvents([
+      relayEvent("session.created", sessionId, {
+        workspacePath: "/workspace",
+        taskGoal: "fix the auth redirect bug",
+        participants: ["human"],
+      }),
+    ]);
+    // Unset by default — callers fall back to taskGoal for the label.
+    assert.equal(base.title, undefined);
+
+    const renamed = materializeEvents([
+      relayEvent("session.created", sessionId, {
+        workspacePath: "/workspace",
+        taskGoal: "fix the auth redirect bug",
+        participants: ["human"],
+      }),
+      relayEvent("session.renamed", sessionId, { title: "Auth bug" }),
+    ]);
+    assert.equal(renamed.title, "Auth bug");
   });
 });
 
@@ -1236,7 +1268,7 @@ describe("agent registry", () => {
   it("exposes review commands for every agent", () => {
     for (const agent of AGENT_NAMES) {
       assert.equal(typeof getAgent(agent).buildReviewCommand, "function");
-      assert.equal(getAgent(agent).defaultMode, "implement");
+      assert.equal(getAgent(agent).defaultMode, "action");
     }
   });
 
@@ -1249,7 +1281,7 @@ describe("agent registry", () => {
         KIMI_MODEL: "kimi-test",
       },
       () => {
-        const command = buildKimiImplementCommand(state({ task_goal: "Wire up Kimi" }));
+        const command = buildKimiActionCommand(state({ task_goal: "Wire up Kimi" }));
         assert.match(command, /kimi --model kimi-test --prompt/);
         assert.match(command, /Wire up Kimi/);
         assert.ok(command.indexOf("--model kimi-test") < command.indexOf("--prompt"));

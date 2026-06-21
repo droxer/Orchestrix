@@ -43,7 +43,7 @@ export function DecisionBar({ agentNames, disabledAgents, sendDecision, handoffO
           <div className="handoff-row">
             <label htmlFor="handoff-mode">{t("handoff.mode")}</label>
             <select id="handoff-mode" name="handoff-mode" value={handoffMode} onChange={(e) => setHandoffMode(e.target.value as AgentTaskMode)}>
-              <option value="implement">{t("mode.implement")}</option>
+              <option value="action">{t("mode.action")}</option>
               <option value="review">{t("mode.review")}</option>
             </select>
           </div>

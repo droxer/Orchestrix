@@ -103,7 +103,7 @@ describe("buildAttentionItems", () => {
     const stale = node({
       id: "a",
       stale: true,
-      activeRuns: [{ commandId: "c1", sessionId: "s1", runId: "r1", agent: "claude", mode: "implement", taskGoal: "do x", startedAt: new Date().toISOString() }],
+      activeRuns: [{ commandId: "c1", sessionId: "s1", runId: "r1", agent: "claude", mode: "action", taskGoal: "do x", startedAt: new Date().toISOString() }],
     });
     const items = buildAttentionItems([stale], t);
     assert.ok(items.some((item) => item.kind === "stale-run"));

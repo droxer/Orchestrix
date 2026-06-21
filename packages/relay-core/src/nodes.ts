@@ -30,7 +30,7 @@ export async function runAgentNode(
   const stderrRenderer = new StderrLineRenderer();
   const runId = options.runId;
   const reviewMode = mode === "review";
-  const command = reviewMode ? def.buildReviewCommand(state) : def.buildImplementCommand(state);
+  const command = reviewMode ? def.buildReviewCommand(state) : def.buildActionCommand(state);
   const result = await execute("bash", ["-c", command], {
     cwd: agentWorkspacePath(),
     stdoutRenderer: (chunk) => {
@@ -60,7 +60,7 @@ export async function runAgentNode(
   }
 
   return {
-    agent_logs: [agentResultLog(def.implementLabel, result)],
+    agent_logs: [agentResultLog(def.actionLabel, result)],
     last_exit_code: result.exit_code,
     agent_failures: withFailure(state, agent, result.exit_code !== 0),
     token_usage: tokenUsage,
@@ -68,16 +68,16 @@ export async function runAgentNode(
 }
 
 // Thin wrappers around the registry-driven node.
-export function claudeImplementNode(state: AgentState, options: AgentRunOptions = {}): Promise<Partial<AgentState>> {
-  return runAgentNode("claude", "implement", state, options);
+export function claudeActionNode(state: AgentState, options: AgentRunOptions = {}): Promise<Partial<AgentState>> {
+  return runAgentNode("claude", "action", state, options);
 }
 
-export function piImplementNode(state: AgentState, options: AgentRunOptions = {}): Promise<Partial<AgentState>> {
-  return runAgentNode("pi", "implement", state, options);
+export function piActionNode(state: AgentState, options: AgentRunOptions = {}): Promise<Partial<AgentState>> {
+  return runAgentNode("pi", "action", state, options);
 }
 
-export function codexImplementNode(state: AgentState, options: AgentRunOptions = {}): Promise<Partial<AgentState>> {
-  return runAgentNode("codex", "implement", state, options);
+export function codexActionNode(state: AgentState, options: AgentRunOptions = {}): Promise<Partial<AgentState>> {
+  return runAgentNode("codex", "action", state, options);
 }
 
 function requiredExecStream(options: AgentRunOptions) {

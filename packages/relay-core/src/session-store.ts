@@ -7,7 +7,7 @@ import type { AgentName, ReviewVerdict } from "./state.js";
 import { mergeTokenUsage, type TokenUsage } from "./token-usage.js";
 
 export type AgentRole = "implementer" | "reviewer" | "planner" | "tester" | "fixer";
-export type SessionStatus = "pending_approval" | "running" | "waiting_for_human" | "completed" | "failed" | "cancelled";
+export type SessionStatus = "running" | "waiting_for_human" | "completed" | "failed" | "cancelled";
 export type RelayArtifactKind = "plan" | "diff" | "review" | "test_output" | "command_log" | "summary" | "agent_output";
 export type HumanDecisionKind = "approve" | "reject" | "cancel" | "rerun" | "handoff" | "mark_done";
 
@@ -15,7 +15,7 @@ export interface AgentRun {
   id: string;
   agent: AgentName;
   role: AgentRole;
-  mode: "implement" | "review";
+  mode: "action" | "review";
   status: "running" | "completed" | "failed" | "cancelled";
   startedAt: string;
   completedAt?: string;
@@ -49,6 +49,8 @@ export interface RelaySession {
   workspacePath: string;
   /** Employee who owns this session; their agent runs the work on their behalf. */
   ownerEmployeeId?: string;
+  /** Optional human-set label for the conversation; falls back to taskGoal when unset. */
+  title?: string;
   taskGoal: string;
   participants: string[];
   status: SessionStatus;
@@ -56,7 +58,7 @@ export interface RelaySession {
   createdAt: string;
   updatedAt: string;
   currentAgent?: AgentName;
-  pendingDecision?: "start" | "finalize" | "feedback";
+  pendingDecision?: "feedback";
   agentRuns: AgentRun[];
   artifacts: RelayArtifact[];
   decisions: HumanDecision[];
@@ -80,6 +82,14 @@ export type RelayEvent =
     }
   | {
       id: string;
+      type: "user.message";
+      sessionId: string;
+      timestamp: string;
+      text: string;
+      actorEmployeeId?: string;
+    }
+  | {
+      id: string;
       type: "session.status";
       sessionId: string;
       timestamp: string;
@@ -95,7 +105,7 @@ export type RelayEvent =
       runId: string;
       agent: AgentName;
       role: AgentRole;
-      mode: "implement" | "review";
+      mode: "action" | "review";
     }
   | {
       id: string;
@@ -161,6 +171,13 @@ export type RelayEvent =
       type: "session.archived";
       sessionId: string;
       timestamp: string;
+    }
+  | {
+      id: string;
+      type: "session.renamed";
+      sessionId: string;
+      timestamp: string;
+      title: string;
     };
 
 export interface SessionStore {
@@ -201,9 +218,9 @@ export function newRelayId(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}_${random}`;
 }
 
-export function roleForAgent(agent: AgentName, mode: "implement" | "review" = "implement"): AgentRole {
+export function roleForAgent(agent: AgentName, mode: "action" | "review" = "action"): AgentRole {
   if (mode === "review") return "reviewer";
-  return getAgent(agent).implementRole;
+  return getAgent(agent).actionRole;
 }
 
 export class LocalSessionStore implements SessionStore {
@@ -432,6 +449,8 @@ export function materializeEvents(events: RelayEvent[]): RelaySession {
       session.currentAgent = undefined;
     } else if (event.type === "session.archived") {
       session.archived = true;
+    } else if (event.type === "session.renamed") {
+      session.title = event.title;
     }
   }
   return session;

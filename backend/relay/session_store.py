@@ -131,6 +131,7 @@ class DatabaseSessionStore:
         Column("public_id", Text, nullable=False, unique=True),
         Column("workspace_path", Text, nullable=False),
         Column("owner_employee_id", Text, nullable=True),
+        Column("title", Text, nullable=True),
         Column("task_goal", Text, nullable=False),
         Column("participants", JSON, nullable=False),
         Column("status", Text, nullable=False),
@@ -257,11 +258,16 @@ class DatabaseSessionStore:
 
     def list_token_usage(self) -> list[dict[str, Any]]:
         with self.engine.begin() as conn:
-            rows = conn.execute(select(self.token_usage).order_by(self.token_usage.c.updated_at.desc())).mappings().all()
+            rows = conn.execute(
+                select(self.token_usage, self.sessions.c.task_goal)
+                .select_from(self.token_usage.join(self.sessions, self.token_usage.c.session_id == self.sessions.c.id))
+                .order_by(self.token_usage.c.updated_at.desc())
+            ).mappings().all()
         return [
             {
                 "sessionId": row["session_public_id"],
                 "ownerEmployeeId": row["owner_employee_id"],
+                "taskGoal": row["task_goal"],
                 "input": int(row["input_tokens"] or 0),
                 "output": int(row["output_tokens"] or 0),
                 "cache": int(row["cache_tokens"] or 0),
@@ -350,6 +356,7 @@ def session_to_row(session: dict[str, Any], *, version: int, database_id: str | 
         "public_id": session["id"],
         "workspace_path": session["workspacePath"],
         "owner_employee_id": session.get("ownerEmployeeId"),
+        "title": session.get("title"),
         "task_goal": session["taskGoal"],
         "participants": session.get("participants") or [],
         "status": session["status"],

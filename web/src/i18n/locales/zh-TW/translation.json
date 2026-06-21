@@ -2,6 +2,10 @@
   "app": {
     "title": "Relay — 工作力控制平面"
   },
+  "dialog": {
+    "confirm": "確認",
+    "cancel": "取消"
+  },
   "skip_to_conversation": "跳至對話",
   "nav": {
     "conversations": "對話",
@@ -35,7 +39,9 @@
     "new_thread": "新對話",
     "agent_disabled_title": "{{agent}} 在此節點已被管理員停用。",
     "agent_failed_title": "{{agent}} 在此節點尚未就緒。",
-    "agent_disabled_option": "{{agent}}（已停用）"
+    "agent_disabled_option": "{{agent}}（已停用）",
+    "no_conversations": "尚無對話，開始新對話吧。",
+    "no_matches": "沒有符合的對話。"
   },
   "conversation": {
     "agent_working": "{{agent}} 正在運作",
@@ -46,7 +52,12 @@
     "agent_running_aria": "Agent 運作中",
     "tokens_short": "tok",
     "token_usage_title": "輸入 {{input}} · 輸出 {{output}} · 快取 {{cache}}",
-    "no_sessions": "—"
+    "no_sessions": "—",
+    "new": "新增對話",
+    "rename": "重新命名",
+    "rename_prompt": "重新命名對話",
+    "close": "關閉",
+    "close_confirm": "關閉對話「{{name}}」？"
   },
   "composer": {
     "placeholder": "傳送給 @{{employee}} — 輸入 @ 切換 Agent…",
@@ -387,18 +398,42 @@
       "code-review": "程式碼審查"
     },
     "sample": {
-      "using-superpowers": { "desc": "確立如何發現與使用技能，要求在做出任何回應之前呼叫 Skill 工具。" },
-      "brainstorming": { "desc": "在複雜任務進入計畫模式前進行結構化腦力激盪。" },
-      "writing-plans": { "desc": "撰寫包含上下文、方法與驗證步驟的實作計畫。" },
-      "executing-plans": { "desc": "逐步執行已核准的計畫並追蹤任務。" },
-      "systematic-debugging": { "desc": "從重現到根因分析的系統化除錯流程。" },
-      "frontend-design": { "desc": "創造獨特、生產級的前端介面，具備高品質設計，避免通用 AI 審美。" },
-      "ui-ux-pro-max": { "desc": "針對生產級介面的進階 UI/UX 指引，具備強而有力的設計方向。" },
-      "web-design-guidelines": { "desc": "一致、可存取且精緻網頁設計的指導原則。" },
-      "code-simplifier": { "desc": "簡化過度複雜的程式碼——減少巢狀、提取函式、改善命名。" },
-      "find-skills": { "desc": "探索並導覽工作區中可用的技能。" },
-      "next-best-practices": { "desc": "生產級應用 Next.js 最佳實踐：路由、資料取得、效能。" },
-      "vercel-react-best-practices": { "desc": "React + Vercel 部署最佳實踐、邊緣函式與效能模式。" }
+      "using-superpowers": {
+        "desc": "確立如何發現與使用技能，要求在做出任何回應之前呼叫 Skill 工具。"
+      },
+      "brainstorming": {
+        "desc": "在複雜任務進入計畫模式前進行結構化腦力激盪。"
+      },
+      "writing-plans": {
+        "desc": "撰寫包含上下文、方法與驗證步驟的實作計畫。"
+      },
+      "executing-plans": {
+        "desc": "逐步執行已核准的計畫並追蹤任務。"
+      },
+      "systematic-debugging": {
+        "desc": "從重現到根因分析的系統化除錯流程。"
+      },
+      "frontend-design": {
+        "desc": "創造獨特、生產級的前端介面，具備高品質設計，避免通用 AI 審美。"
+      },
+      "ui-ux-pro-max": {
+        "desc": "針對生產級介面的進階 UI/UX 指引，具備強而有力的設計方向。"
+      },
+      "web-design-guidelines": {
+        "desc": "一致、可存取且精緻網頁設計的指導原則。"
+      },
+      "code-simplifier": {
+        "desc": "簡化過度複雜的程式碼——減少巢狀、提取函式、改善命名。"
+      },
+      "find-skills": {
+        "desc": "探索並導覽工作區中可用的技能。"
+      },
+      "next-best-practices": {
+        "desc": "生產級應用 Next.js 最佳實踐：路由、資料取得、效能。"
+      },
+      "vercel-react-best-practices": {
+        "desc": "React + Vercel 部署最佳實踐、邊緣函式與效能模式。"
+      }
     }
   },
   "pref": {
@@ -469,7 +504,7 @@
     "unknown": "未知"
   },
   "mode": {
-    "implement": "實作",
+    "action": "執行",
     "review": "審查"
   },
   "verdict": {
@@ -554,9 +589,21 @@
     "dismiss": "關閉"
   },
   "agent": {
-    "claude": { "role": "建構者", "blurb": "透過系統化的上下文將需求轉化為實作工作。" },
-    "pi":     { "role": "規劃者", "blurb": "探索取捨方案，規劃下一個可靠步驟。" },
-    "codex":  { "role": "審閱者", "blurb": "閱讀差異、檢查行為並指出風險。" },
-    "kimi":   { "role": "建構者", "blurb": "由 Kimi 代理提供長上下文的實作協助。" }
+    "claude": {
+      "role": "建構者",
+      "blurb": "透過系統化的上下文將需求轉化為實作工作。"
+    },
+    "pi": {
+      "role": "規劃者",
+      "blurb": "探索取捨方案，規劃下一個可靠步驟。"
+    },
+    "codex": {
+      "role": "審閱者",
+      "blurb": "閱讀差異、檢查行為並指出風險。"
+    },
+    "kimi": {
+      "role": "建構者",
+      "blurb": "由 Kimi 代理提供長上下文的實作協助。"
+    }
   }
 }

@@ -96,6 +96,14 @@ export interface RunInput {
     mode: AgentTaskMode;
   }>;
   sessionId?: string;
+  /** Client-generated id for the follow-up user message, so the optimistic echo
+   * reconciles with the persisted event by id. Ignored for new sessions. */
+  userMessageId?: string;
+  decision?: {
+    kind: "rerun" | "handoff";
+    note?: string;
+    targetAgent?: AgentName;
+  };
 }
 
 export interface CreateSessionInput {

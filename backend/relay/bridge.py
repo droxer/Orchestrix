@@ -53,6 +53,47 @@ def _bridge_artifact_for_run(session: dict[str, Any], run: dict[str, Any]) -> di
     return None
 
 
+def latest_user_turn_timestamp(session: dict[str, Any]) -> str | None:
+    """Return the timestamp for the latest user turn in ``session``.
+
+    ``session.created`` carries the first user turn as ``taskGoal``; later
+    follow-ups are persisted as ``user.message`` events.
+    """
+    timestamps: list[str] = []
+    if session.get("createdAt"):
+        timestamps.append(session["createdAt"])
+    for event in session.get("events", []):
+        if event.get("type") == "user.message" and event.get("timestamp"):
+            timestamps.append(event["timestamp"])
+    return max(timestamps) if timestamps else None
+
+
+def latest_user_turn_marker(session: dict[str, Any]) -> tuple[str, int] | None:
+    """Return ``(timestamp, event_index)`` for the latest user turn."""
+    markers: list[tuple[str, int]] = []
+    if session.get("createdAt"):
+        markers.append((session["createdAt"], -1))
+    for index, event in enumerate(session.get("events", [])):
+        if event.get("type") == "session.created" and event.get("timestamp"):
+            markers.append((event["timestamp"], index))
+        elif event.get("type") == "user.message" and event.get("timestamp"):
+            markers.append((event["timestamp"], index))
+    return max(markers) if markers else None
+
+
+def _run_timestamp(run: dict[str, Any]) -> str:
+    return run.get("completedAt") or run.get("startedAt") or ""
+
+
+def run_marker(session: dict[str, Any], run: dict[str, Any]) -> tuple[str, int]:
+    timestamp = _run_timestamp(run)
+    run_id = run.get("id")
+    for index, event in enumerate(session.get("events", [])):
+        if event.get("type") == "agent.completed" and event.get("runId") == run_id:
+            return (event.get("timestamp") or timestamp, index)
+    return (timestamp, -1)
+
+
 def compute_prior_agent_bridge(
     session: dict[str, Any],
     agent: str,
@@ -73,7 +114,12 @@ def compute_prior_agent_bridge(
             last_own_index = i
             break
 
-    intervening = [r for r in runs[last_own_index + 1:] if r.get("agent") != agent]
+    latest_user = latest_user_turn_marker(session)
+    intervening = [
+        r
+        for r in runs[last_own_index + 1:]
+        if r.get("agent") != agent and (not latest_user or run_marker(session, r) > latest_user)
+    ]
     if not intervening:
         return None
 

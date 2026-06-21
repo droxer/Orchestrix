@@ -60,7 +60,7 @@ const VISIBLE_LOG_LINES = 18;
 const AGENT_SHORTCUTS = AGENT_NAMES.map((agent) => `@${agent}`);
 // "@claude, @pi, @codex, or @kimi" — derived from the registry for user-facing hints.
 const AGENT_MENTION_HINT = AGENT_NAMES.map((agent) => `@${agent}`).join(", ");
-const COMMAND_SHORTCUTS = ["/approve", "/reject", "/cancel", "/rerun", "/handoff", "/sessions", "/open", "/summary", "/quit"] as const;
+const COMMAND_SHORTCUTS = ["/approve", "/reject", "/cancel", "/rerun", "/handoff", "/sessions", "/open", "/new", "/rename", "/summary", "/quit"] as const;
 const RELAY_ACCENT = "#D97757";
 const RELAY_DIM = "gray";
 const RELAY_OK = "green";
@@ -202,7 +202,7 @@ export async function runAssignments(request: RunRequest): Promise<void> {
         await recordCancelled("Task cancelled before the next agent started.");
         return;
       }
-      const mode = assignment.mode ?? "implement";
+      const mode = assignment.mode ?? "action";
       request.onAgentStart?.(assignment);
       await ensureAgentReady(assignment.agent, request.log, request.signal);
       state = await controller.runStep(sessionId, state, { agent: assignment.agent, mode }, {
@@ -248,7 +248,7 @@ export function createDaemonAssignmentRunner(
     request.log("\nINFO  Submitting task to Relay daemon.\n");
     const assignments = request.assignments.map((assignment) => ({
       agent: assignment.agent,
-      mode: assignment.mode ?? "implement",
+      mode: assignment.mode ?? "action",
     }));
     const sessionId = request.sessionId ?? (await client.createSession({
       taskGoal: request.task,
@@ -275,20 +275,21 @@ export function createDaemonAssignmentRunner(
         // agent. Reset cancelPromise so a subsequent /cancel retries.
         cancelPromise = undefined;
         request.log(`\nERR daemon cancel failed: ${message}. Press /cancel again to retry.\n`);
-        return undefined;
+        throw error;
       });
       return cancelPromise;
     };
     const abortListener = (): void => {
-      void requestDaemonCancel();
+      void requestDaemonCancel().catch(() => undefined);
     };
     request.signal?.addEventListener("abort", abortListener, { once: true });
-    if (request.signal?.aborted) void requestDaemonCancel();
+    if (request.signal?.aborted) void requestDaemonCancel().catch(() => undefined);
     const run = client.runSandbox({
       sandboxId,
       taskGoal: request.task,
       sessionId,
       assignments,
+      signal: request.signal,
     });
     try {
       const session = await pollDaemonRunOutput(client, sessionId, run, {
@@ -547,7 +548,7 @@ function rendererForDaemonOutput(
   if (existing) return existing;
   const renderer = event.stream === "stderr"
     ? new StderrLineRenderer()
-    : getAgent(event.agent).createRenderer("implement");
+    : getAgent(event.agent).createRenderer("action");
   renderers.set(key, renderer);
   return renderer;
 }
@@ -568,6 +569,7 @@ export interface RelayTuiProps {
 export interface RemoteSessionControl {
   listSessions?(): Promise<RelaySession[]>;
   getSession?(sessionId: string): Promise<RelaySession>;
+  renameSession?(sessionId: string, title: string): Promise<RelaySession>;
   recordDecision(input: {
     sessionId: string;
     kind: "approve" | "reject" | "cancel" | "rerun" | "mark_done";
@@ -578,7 +580,7 @@ export interface RemoteSessionControl {
     sessionId: string;
     targetAgent: AgentName;
     note?: string;
-    mode?: "implement" | "review";
+    mode?: "action" | "review";
   }): Promise<RelaySession>;
 }
 
@@ -1025,7 +1027,7 @@ export function RelayTui({
         }
         void remoteSessionControl.listSessions().then((items) => {
           const sessions = items.slice(0, 6);
-          appendLog(`\n${sessions.map((item) => `${item.id}  ${item.status}  ${item.taskGoal}`).join("\n") || "No sessions yet."}\n`);
+          appendLog(`\n${sessions.map((item) => `${item.id}  ${item.status}  ${item.title ?? item.taskGoal}`).join("\n") || "No sessions yet."}\n`);
           setMessage("Listed recent sessions.");
         }).catch((error: unknown) => {
           setMessage(error instanceof Error ? error.message : String(error));
@@ -1034,7 +1036,7 @@ export function RelayTui({
       }
       void sessionStore.listSessions().then((items) => {
         const sessions = items.slice(0, 6);
-        appendLog(`\n${sessions.map((item) => `${item.id}  ${item.status}  ${item.taskGoal}`).join("\n") || "No sessions yet."}\n`);
+        appendLog(`\n${sessions.map((item) => `${item.id}  ${item.status}  ${item.title ?? item.taskGoal}`).join("\n") || "No sessions yet."}\n`);
         setMessage("Listed recent sessions.");
       }).catch((error: unknown) => {
         setMessage(error instanceof Error ? error.message : String(error));
@@ -1078,8 +1080,49 @@ export function RelayTui({
         setMessage("No active session.");
         return;
       }
-      appendLog(`\nSession ${current.id}\n${current.status} ${current.phase}\n${current.agentRuns.length} runs, ${current.artifacts.length} artifacts\n${current.finalOutcome ?? current.taskGoal}\n`);
+      appendLog(`\nSession ${current.id}\n${current.status} ${current.phase}\n${current.agentRuns.length} runs, ${current.artifacts.length} artifacts\n${current.finalOutcome ?? current.title ?? current.taskGoal}\n`);
       setMessage("Summary appended.");
+      return;
+    }
+    if (name === "/new") {
+      // Each typed task already opens a fresh session; clearing the active
+      // session resets the transcript so the next task starts a new conversation.
+      setActiveSession(null);
+      setDefaultAssignments([]);
+      setCurrentAgent("idle");
+      setLogLines([`INFO  Ready — type ${AGENT_MENTION_HINT} followed by a task.`]);
+      setMessage("Started a new conversation.");
+      return;
+    }
+    if (name === "/rename") {
+      if (!current) {
+        setMessage("No active session.");
+        return;
+      }
+      const title = detail?.trim();
+      if (!title) {
+        setMessage("Usage: /rename <title>");
+        return;
+      }
+      if (localSessionControl) {
+        void controllerRef.current.renameSession(current.id, title).then((updated) => {
+          setActiveSession(updated);
+          setMessage(`Renamed to ${updated.title ?? title}.`);
+        }).catch((error: unknown) => {
+          setMessage(error instanceof Error ? error.message : String(error));
+        });
+        return;
+      }
+      if (!remoteSessionControl?.renameSession) {
+        setMessage("Renaming is unavailable.");
+        return;
+      }
+      void remoteSessionControl.renameSession(current.id, title).then((updated) => {
+        setActiveSession(updated);
+        setMessage(`Renamed to ${title}.`);
+      }).catch((error: unknown) => {
+        setMessage(error instanceof Error ? error.message : String(error));
+      });
       return;
     }
     const runRemoteDecision = async (
@@ -1152,7 +1195,7 @@ export function RelayTui({
           const updated = await runRemoteDecision("rerun", "Rerun requested.", agent);
           if (!updated) return;
         }
-        executeParsedTask({ assignments: [{ agent, mode: "implement" }], task: current.taskGoal }, current.id);
+        executeParsedTask({ assignments: [{ agent, mode: "action" }], task: current.taskGoal }, current.id);
       })().catch((error: unknown) => {
         const detail = error instanceof Error ? error.message : String(error);
         setMessage(`Failed to rerun session: ${detail}`);
@@ -1168,7 +1211,7 @@ export function RelayTui({
         return;
       }
       const reviewFlagIndex = noteParts.indexOf("--review");
-      const mode: AgentTaskMode = reviewFlagIndex === -1 ? "implement" : "review";
+      const mode: AgentTaskMode = reviewFlagIndex === -1 ? "action" : "review";
       if (reviewFlagIndex !== -1) noteParts.splice(reviewFlagIndex, 1);
       const note = noteParts.join(" ").trim();
       const assignment = { agent, mode };
@@ -1709,6 +1752,7 @@ export function RelayTuiHost({ onExit }: { onExit: () => void }): React.ReactEle
       setRemoteSessionControl({
         listSessions: () => client.listSessions(),
         getSession: (sessionId) => client.getSession(sessionId),
+        renameSession: (sessionId, title) => client.renameSession(sessionId, title),
         recordDecision: (input) => client.recordDecision(input),
         recordHandoff: (input) => client.recordHandoff(input),
       });

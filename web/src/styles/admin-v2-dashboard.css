@@ -39,12 +39,7 @@
 
 .adm-dash-tile--hero {
   padding: var(--space-base) var(--space-lg);
-  background:
-    radial-gradient(
-      circle at 0% 100%,
-      color-mix(in srgb, var(--color-primary) 6%, transparent),
-      transparent 60%
-    );
+  background: var(--color-surface-soft);
   gap: var(--space-sm);
 }
 
@@ -271,7 +266,7 @@
 
 .adm-dash-bar-seg:last-child { border-right: none; }
 .adm-dash-bar-seg.tone-good { background: var(--color-semantic-up); }
-.adm-dash-bar-seg.tone-info { background: var(--color-primary); }
+.adm-dash-bar-seg.tone-info { background: var(--color-info); }
 .adm-dash-bar-seg.tone-bad  { background: var(--color-semantic-down); }
 .adm-dash-bar-seg.tone-muted { background: var(--color-muted-soft); }
 
@@ -319,7 +314,7 @@
 }
 
 .adm-dash-stat.tone-good { color: var(--color-semantic-up); }
-.adm-dash-stat.tone-info { color: var(--color-primary); }
+.adm-dash-stat.tone-info { color: var(--color-info); }
 .adm-dash-stat.tone-bad  { color: var(--color-semantic-down); }
 .adm-dash-stat.tone-muted { color: var(--color-muted); }
 
@@ -430,7 +425,7 @@
 
 .adm-dash-feed-icon.tone-good { color: var(--color-semantic-up); }
 .adm-dash-feed-icon.tone-bad  { color: var(--color-semantic-down); }
-.adm-dash-feed-icon.tone-info { color: var(--color-primary); }
+.adm-dash-feed-icon.tone-info { color: var(--color-info); }
 .adm-dash-feed-icon.tone-muted { color: var(--color-muted); }
 
 .adm-dash-feed-body {

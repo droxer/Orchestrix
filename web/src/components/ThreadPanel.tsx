@@ -1,23 +1,32 @@
 import { type Dispatch, type SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
-import { ActionAddPerson, ActionSearch } from "./icons";
-import { ConversationRow, type EmployeeContact } from "./ConversationRow";
+import { ActionCompose, ActionSearch } from "./icons";
+import { ConversationRow, type ConversationItem } from "./ConversationRow";
+import type { RelaySession } from "../types";
 
-// Conversation/people list: search-to-connect plus the list of employee
-// contacts. Selecting or connecting routes through the host callbacks.
-export function ThreadPanel({ employees, employeeQuery, setEmployeeQuery, selectedEmployee, onSelectEmployee, onRemoveEmployee }: {
-  employees: EmployeeContact[];
-  employeeQuery: string;
-  setEmployeeQuery: Dispatch<SetStateAction<string>>;
-  selectedEmployee: string;
-  onSelectEmployee: (id: string) => void;
-  onRemoveEmployee: (id: string) => void;
+// The logged-in employee's own conversations. Each row is a session; the list
+// is owner-scoped by the backend, so it only ever shows the current employee's
+// work. "+ New conversation" starts a fresh thread without archiving the rest.
+export function ThreadPanel({
+  conversations,
+  query,
+  setQuery,
+  selectedSessionId,
+  onSelectConversation,
+  onNewConversation,
+  onRenameConversation,
+  onCloseConversation,
+}: {
+  conversations: ConversationItem[];
+  query: string;
+  setQuery: Dispatch<SetStateAction<string>>;
+  selectedSessionId: string | undefined;
+  onSelectConversation: (sessionId: string) => void;
+  onNewConversation: () => void;
+  onRenameConversation: (session: RelaySession) => void;
+  onCloseConversation: (sessionId: string) => void;
 }) {
   const { t } = useTranslation();
-  const connect = () => {
-    const q = employeeQuery.trim().replace(/^@/, "");
-    if (q) { onSelectEmployee(q); setEmployeeQuery(""); }
-  };
 
   return (
     <aside className="thread-panel" aria-label={t("nav.conversations")}>
@@ -27,37 +36,47 @@ export function ThreadPanel({ employees, employeeQuery, setEmployeeQuery, select
           <h1>
             {t("thread.messages")}
             <small className="mono conversation-heading-count">
-              {employees.length.toString().padStart(2, "0")}
+              {conversations.length.toString().padStart(2, "0")}
             </small>
           </h1>
         </div>
+        <button
+          type="button"
+          className="conversation-new-btn"
+          aria-label={t("conversation.new")}
+          title={t("conversation.new")}
+          onClick={onNewConversation}
+        >
+          <ActionCompose size={16} />
+        </button>
       </div>
-      <form className="people-search conversation-search" onSubmit={(e) => { e.preventDefault(); connect(); }}>
+      <form className="people-search conversation-search" onSubmit={(e) => e.preventDefault()}>
         <ActionSearch size={16} />
-        <input aria-label={t("thread.search_label")} name="employee-search" autoComplete="off" spellCheck={false} placeholder={t("thread.search_placeholder")} value={employeeQuery} onChange={(e) => setEmployeeQuery(e.target.value)} />
-        {employeeQuery.trim() ? (
-          <button type="submit" className="search-connect-btn" aria-label={t("thread.connect_to", { name: employeeQuery.trim().replace(/^@/, "") })} title={t("thread.connect_hint")}>
-            <ActionAddPerson size={13} />
-          </button>
-        ) : null}
+        <input
+          aria-label={t("thread.search_label")}
+          name="conversation-search"
+          autoComplete="off"
+          spellCheck={false}
+          placeholder={t("thread.search_placeholder")}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
       </form>
       <section className="conversation-list" aria-label={t("nav.conversations")}>
-        {employees.map((c) => <ConversationRow key={c.id} contact={c} selected={selectedEmployee === c.id} onSelect={(id) => onSelectEmployee(id)} onRemove={onRemoveEmployee} />)}
-        {employees.length === 0 && !employeeQuery.trim() ? (
-          <p className="conversation-empty">{t("thread.no_nodes")}</p>
-        ) : null}
-        {employees.length === 0 && employeeQuery.trim() ? (
-          <button
-            className="conversation-row conversation-connect-hint"
-            type="button"
-            onClick={connect}
-          >
-            <span className="connect-hint-icon" aria-hidden="true"><ActionAddPerson size={14} /></span>
-            <span className="conversation-copy">
-              <span className="conversation-name"><strong translate="no">@{employeeQuery.trim().replace(/^@/, "")}</strong></span>
-              <span className="conversation-preview">{t("thread.connect_hint")}</span>
-            </span>
-          </button>
+        {conversations.map((item) => (
+          <ConversationRow
+            key={item.session.id}
+            item={item}
+            selected={selectedSessionId === item.session.id}
+            onSelect={onSelectConversation}
+            onRename={onRenameConversation}
+            onClose={onCloseConversation}
+          />
+        ))}
+        {conversations.length === 0 ? (
+          <p className="conversation-empty">
+            {query.trim() ? t("thread.no_matches") : t("thread.no_conversations")}
+          </p>
         ) : null}
       </section>
     </aside>

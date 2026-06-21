@@ -63,7 +63,6 @@ async def create_session(request: Request, ctx: AppContextDep) -> dict[str, Any]
     session = controller.create_session(
         task_goal,
         list(dict.fromkeys(["human", *(assignment["agent"] for assignment in assignments)])),
-        True,
     )
     if assignments:
         controller.assign_session(session["id"], assignments)
@@ -107,6 +106,24 @@ async def archive_session(session_id: str, request: Request, ctx: AppContextDep)
     return controller.archive_session(session_id)
 
 
+@router.post("/sessions/{session_id}/title")
+async def rename_session(session_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
+    actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
+    get_session_for_actor(ctx.session_store, session_id, actor)
+    body = await json_body(request)
+    title = string_field(body, "title").strip()
+    if not title:
+        raise HTTPException(400, "title is required.")
+    if len(title) > 200:
+        raise HTTPException(400, "title must be 200 characters or fewer.")
+    controller = SessionController(
+        ctx.session_store,
+        task_store=ctx.task_store,
+        owner_employee_id=actor["employeeId"],
+    )
+    return controller.rename_session(session_id, title)
+
+
 @router.post("/sessions/{session_id}/decisions")
 async def decision(session_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
@@ -134,7 +151,7 @@ async def handoff(session_id: str, request: Request, ctx: AppContextDep) -> dict
     target_agent = valid_agent(body.get("targetAgent"))
     if not target_agent:
         raise HTTPException(400, f"targetAgent must be one of: {', '.join(AGENT_NAMES)}.")
-    mode = "review" if body.get("mode") == "review" else "implement"
+    mode = "review" if body.get("mode") == "review" else "action"
     controller = SessionController(ctx.session_store, task_store=ctx.task_store, owner_employee_id=actor["employeeId"])
     result = controller.handoff_session(
         session_id,

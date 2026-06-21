@@ -25,22 +25,29 @@ export function reviewPrompt(state: AgentState): string {
   ].join("\n");
 }
 
-export function implementationPrompt(state: AgentState): string {
-  return prependPriorAgentBridge(appendReviewFeedback(state.task_goal, state), state);
+export function actionPrompt(state: AgentState): string {
+  const task = appendReviewFeedback(state.task_goal, state);
+  // Order: earlier conversation history first, then any within-run bridge from
+  // sibling agents, then the current user turn. Both preludes are optional.
+  const preludes: string[] = [];
+  if (state.prior_conversation) preludes.push(state.prior_conversation);
+  if (state.prior_agent_bridge) preludes.push(state.prior_agent_bridge);
+  if (preludes.length === 0) return task;
+  return `${preludes.join("\n\n")}\n\n[User]\n${task}`;
 }
 
 export function claudeTaskPrompt(state: AgentState): string {
-  return implementationPrompt(state);
+  return actionPrompt(state);
 }
 
 export function piTaskPrompt(state: AgentState): string {
-  return implementationPrompt(state);
+  return actionPrompt(state);
 }
 
-export function codexImplementPrompt(state: AgentState): string {
-  return implementationPrompt(state);
+export function codexActionPrompt(state: AgentState): string {
+  return actionPrompt(state);
 }
 
 export function kimiTaskPrompt(state: AgentState): string {
-  return implementationPrompt(state);
+  return actionPrompt(state);
 }

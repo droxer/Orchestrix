@@ -9,7 +9,7 @@
   overflow: hidden;
   background: var(--color-canvas);
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-  transition: grid-template-columns 220ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: grid-template-columns var(--duration-base) cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .messenger-shell[data-sidenav="open"] {

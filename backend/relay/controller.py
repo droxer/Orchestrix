@@ -67,12 +67,28 @@ class SessionController:
             **({"ownerEmployeeId": self.owner_employee_id} if self.owner_employee_id else {}),
             "taskGoal": task_goal,
             "participants": participants or ["human"],
-            "status": "pending_approval" if pending_start else "running",
-            **({"pendingDecision": "start"} if pending_start else {}),
+            "status": "running",
         })
         self.active_session_id = session["id"]
         self._link_task_session(session["id"])
         logger.info("Session created", session_id=session["id"], workspace_path=self.workspace_path, owner=self.owner_employee_id)
+        return session
+
+    def record_user_message(
+        self,
+        session_id: str,
+        text: str,
+        actor_employee_id: str | None = None,
+        message_id: str | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"text": text}
+        if actor_employee_id:
+            payload["actorEmployeeId"] = actor_employee_id
+        event = relay_event("user.message", session_id, payload)
+        if message_id:
+            event["id"] = message_id
+        session = self._append(session_id, event)
+        logger.info("User message recorded", session_id=session_id, message_id=event["id"])
         return session
 
     def complete_session(self, session_id: str, outcome: str) -> dict[str, Any]:
@@ -105,6 +121,8 @@ class SessionController:
         return session
 
     def record_decision(self, session_id: str, kind: str, note: str | None = None, target_agent: str | None = None) -> dict[str, Any]:
+        if kind == "cancel":
+            return self.cancel_session(session_id, note or "Cancelled by human.")
         decision = {
             "id": new_relay_id("dec"),
             "kind": kind,
@@ -123,15 +141,12 @@ class SessionController:
                 "phase": "feedback",
                 "pendingDecision": "feedback",
             }))
-        if kind == "cancel":
-            return self.cancel_session(session_id, note or "Cancelled by human.")
         if kind == "mark_done":
             return self.complete_session(session_id, note or "Marked done from Relay API.")
         if kind == "rerun":
             return self._append(session_id, relay_event("session.status", session_id, {
-                "status": "pending_approval",
+                "status": "running",
                 "phase": f"rerun:{target_agent}" if target_agent else "rerun",
-                "pendingDecision": "start",
             }))
         if kind == "handoff" and target_agent:
             return self._append(session_id, relay_event("session.status", session_id, {
@@ -154,9 +169,8 @@ class SessionController:
         self.assign_session(session_id, assignments)
         logger.info("Session handoff", session_id=session_id, target_agent=target_agent)
         return self._append(session_id, relay_event("session.status", session_id, {
-            "status": "pending_approval",
+            "status": "running",
             "phase": f"handoff:{target_agent}",
-            "pendingDecision": "start",
         }))
 
     def archive_session(self, session_id: str) -> dict[str, Any]:
@@ -166,6 +180,14 @@ class SessionController:
         self._append(session_id, relay_event("session.archived", session_id, {}))
         logger.info("Session archived", session_id=session_id)
         return self.store.get_session(session_id)
+
+    def rename_session(self, session_id: str, title: str) -> dict[str, Any]:
+        snapshot = self.store.get_session(session_id)
+        if snapshot.get("title") == title:
+            return snapshot
+        session = self._append(session_id, relay_event("session.renamed", session_id, {"title": title}))
+        logger.info("Session renamed", session_id=session_id, title=title)
+        return session
 
     def assign_session(self, session_id: str, assignments: list[dict[str, Any]]) -> dict[str, Any]:
         snapshot = self.store.get_session(session_id)
@@ -181,9 +203,8 @@ class SessionController:
         })
         logger.info("Session assignments updated", session_id=session_id, assignments=[{"agent": a["agent"], "mode": a["mode"]} for a in assignments])
         return self._append(session_id, relay_event("session.status", session_id, {
-            "status": "pending_approval",
-            "phase": "waiting:start",
-            "pendingDecision": "start",
+            "status": "running",
+            "phase": "assigned",
         }))
 
     def create_artifact(self, session_id: str, input: dict[str, Any]) -> dict[str, Any]:

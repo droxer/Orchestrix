@@ -2,14 +2,20 @@ import { isAgentName, type AgentName, type AgentTaskMode } from "relay-core";
 import type { ChatAgentRequest, ChatCommand, ChatConversationRef } from "./types.js";
 
 const DEFAULT_AGENT: AgentName = "codex";
-const DEFAULT_MODE: AgentTaskMode = "implement";
+const DEFAULT_MODE: AgentTaskMode = "action";
 
 export function parseChatCommand(text: string): ChatCommand | undefined {
   const tokens = splitCommand(text.trim());
   if (tokens.length === 0) return undefined;
   if (tokens[0] === "/relay") tokens.shift();
   const action = stripCommandSuffix(tokens.shift() ?? "");
-  if (action === "run") return parseRunCommand(tokens);
+  if (action === "run") return parseRunCommand(tokens, "run");
+  if (action === "new") return parseRunCommand(tokens, "new");
+  if (action === "list") return { kind: "list" };
+  if (action === "switch") {
+    const sessionId = tokens[0];
+    return sessionId ? { kind: "switch", sessionId } : undefined;
+  }
   if (action === "status") {
     const sessionId = tokens[0];
     return sessionId ? { kind: "status", sessionId } : undefined;
@@ -29,23 +35,38 @@ export function parseChatCommand(text: string): ChatCommand | undefined {
 }
 
 export function commandToAgentRequest(ref: ChatConversationRef, command: ChatCommand): ChatAgentRequest | undefined {
-  if (command.kind !== "run") return undefined;
-  return {
-    ...ref,
-    taskGoal: command.taskGoal,
-    agent: command.agent,
-    mode: command.mode,
-    sandboxId: command.sandboxId,
-    sessionId: command.sessionId,
-  };
+  if (command.kind === "run") {
+    return {
+      ...ref,
+      taskGoal: command.taskGoal,
+      agent: command.agent,
+      mode: command.mode,
+      sandboxId: command.sandboxId,
+      sessionId: command.sessionId,
+    };
+  }
+  if (command.kind === "new") {
+    return {
+      ...ref,
+      taskGoal: command.taskGoal,
+      agent: command.agent,
+      mode: command.mode,
+      sandboxId: command.sandboxId,
+      forceNew: true,
+    };
+  }
+  return undefined;
 }
 
-function parseRunCommand(tokens: string[]): ChatCommand | undefined {
+function parseRunCommand(tokens: string[], kind: "run" | "new"): ChatCommand | undefined {
   const parsed = parseKnownOptions(tokens, new Set(["agent", "mode", "sandbox", "session"]));
   const agent = agentOption(parsed.options) ?? DEFAULT_AGENT;
   const mode = modeOption(parsed.options) ?? DEFAULT_MODE;
   const taskGoal = parsed.rest.join(" ").trim();
   if (!taskGoal) return undefined;
+  if (kind === "new") {
+    return { kind: "new", taskGoal, agent, mode, sandboxId: stringOption(parsed.options, "sandbox") };
+  }
   return {
     kind: "run",
     taskGoal,
@@ -121,7 +142,8 @@ function agentOption(options: Map<string, string>): AgentName | undefined {
 
 function modeOption(options: Map<string, string>): AgentTaskMode | undefined {
   const value = stringOption(options, "mode");
-  if (value === "implement" || value === "review") return value;
+  if (value === "action" || value === "review") return value;
+  if (value === "implement") return "action";
   return undefined;
 }
 

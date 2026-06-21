@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import type { ChildProcess } from "node:child_process";
 import type { ControlPanelDaemonNodeRecord } from "relay-core";
 import { RelaySupervisor } from "../src/reconcile.js";
 import type {
@@ -82,6 +83,25 @@ class FakeLauncher implements DaemonLauncher {
   }
 }
 
+class ExitedChildLauncher implements DaemonLauncher {
+  readonly name = "exited-child";
+  readonly starts: DaemonLaunchRequest[] = [];
+
+  async start(request: DaemonLaunchRequest): Promise<ManagedDaemon> {
+    this.starts.push(request);
+    const child = {
+      exitCode: this.starts.length === 1 ? 1 : null,
+      signalCode: null,
+    } as ChildProcess;
+    return {
+      key: `${request.employee.id}:${request.node.id}`,
+      provider: this.name,
+      child,
+      async stop() {},
+    };
+  }
+}
+
 test("supervisor provisions and starts missing employee daemon nodes", async () => {
   const backend = new FakeBackend([{ id: "alice" }], []);
   const launcher = new FakeLauncher();
@@ -120,4 +140,21 @@ test("supervisor skips online nodes and does not assume a BoxLite provider", asy
   assert.equal(result.skipped, 1);
   assert.equal(launcher.starts[0].employee.id, "bob");
   assert.equal(launcher.starts[0].workspacePath, "/remote/bob");
+});
+
+test("supervisor restarts a managed daemon after its child exits", async () => {
+  const backend = new FakeBackend(
+    [{ id: "alice" }],
+    [node({ id: "sbx_alice", employeeId: "alice", status: "stopped", online: false, stale: true, nodeToken: "tok_alice" })],
+  );
+  const launcher = new ExitedChildLauncher();
+  const supervisor = new RelaySupervisor({
+    backend,
+    launcher,
+    workspacePathForEmployee: (employee) => `/workspaces/${employee.id}`,
+  });
+
+  assert.equal((await supervisor.reconcileOnce()).started, 1);
+  assert.equal((await supervisor.reconcileOnce()).started, 1);
+  assert.equal(launcher.starts.length, 2);
 });

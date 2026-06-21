@@ -46,9 +46,9 @@
   font-weight: 500;
   color: color-mix(in srgb, var(--color-ink) 60%, transparent);
   background: transparent;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background 140ms ease, color 140ms ease;
+  transition: background var(--duration-fast) ease, color var(--duration-fast) ease;
 }
 
 .settings-tab:hover {
@@ -93,7 +93,7 @@
   text-align: left;
   font-size: var(--text-base);
   font-weight: 600;
-  transition: background 140ms ease;
+  transition: background var(--duration-fast) ease;
 }
 
 .settings-user:hover,
@@ -117,7 +117,7 @@
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-md);
   background: var(--color-canvas);
-  transition: border-color 140ms ease, box-shadow 140ms ease;
+  transition: border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
 }
 
 .settings-inline:focus-within {
@@ -140,7 +140,7 @@
   align-self: center;
   height: 36px;
   padding: 0 var(--space-sm);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-sm);
   color: var(--color-on-primary);
   background: var(--color-primary);
   font-size: var(--text-base);
@@ -209,7 +209,7 @@
   min-height: 32px;
   padding: 0 var(--space-sm);
   border: 1px solid var(--border-danger);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-sm);
   color: var(--color-semantic-down);
   background: var(--color-canvas);
   font-size: var(--text-sm);

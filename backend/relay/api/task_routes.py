@@ -127,8 +127,8 @@ async def pickup_task(task_id: str, request: Request, ctx: AppContextDep) -> dic
         workspace_path=workspace_path,
         owner_employee_id=current.get("ownerEmployeeId") or actor["employeeId"],
     )
-    session = controller.create_session(task_goal_text(task), ["human", agent], True)
-    mode = "review" if body.get("mode") == "review" else "implement"
+    session = controller.create_session(task_goal_text(task), ["human", agent])
+    mode = "review" if body.get("mode") == "review" else "action"
     controller.assign_session(session["id"], [{"agent": agent, "mode": mode}])
     task = ctx.task_store.record_activity(
         task["id"],

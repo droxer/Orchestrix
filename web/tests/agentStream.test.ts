@@ -45,6 +45,51 @@ describe("agent stream parsing", () => {
     ]);
   });
 
+  it("renders Pi JSON final text events when no text delta was emitted", () => {
+    const raw = [
+      JSON.stringify({
+        type: "message_update",
+        message: { role: "assistant", content: [] },
+        assistantMessageEvent: { type: "text_end", contentIndex: 0, content: "Final Pi text." },
+      }),
+      JSON.stringify({
+        type: "message_end",
+        message: { role: "assistant", content: [{ type: "text", text: "Final Pi text." }], stopReason: "stop" },
+      }),
+    ].join("\n");
+
+    assert.deepEqual(parseAgentStream("pi", raw), [
+      { kind: "text", text: "Final Pi text." },
+    ]);
+  });
+
+  it("renders Pi JSON thinking and tool progress as visible stream segments", () => {
+    const raw = [
+      JSON.stringify({
+        type: "message_update",
+        message: { role: "assistant", content: [] },
+        assistantMessageEvent: { type: "thinking_delta", contentIndex: 0, delta: "Checking files." },
+      }),
+      JSON.stringify({
+        type: "message_update",
+        message: { role: "assistant", content: [] },
+        assistantMessageEvent: { type: "toolcall_end", contentIndex: 1, toolCall: { type: "toolCall", name: "read", arguments: {} } },
+      }),
+      JSON.stringify({
+        type: "tool_execution_start",
+        toolCallId: "call_1",
+        toolName: "bash",
+        args: { command: "npm test" },
+      }),
+    ].join("\n");
+
+    assert.deepEqual(parseAgentStream("pi", raw), [
+      { kind: "thinking", text: "Checking files." },
+      { kind: "tool", name: "read" },
+      { kind: "tool", name: "bash" },
+    ]);
+  });
+
   it("renders Pi JSON empty assistant events as warning status", () => {
     const raw = JSON.stringify({
       type: "message_end",

@@ -89,6 +89,15 @@ export function projectMessages(session: RelaySession | undefined, t: TFunction)
     switch (event.type) {
       case "session.created":
         break;
+      case "user.message": {
+        out.push({
+          kind: "user",
+          id: event.id,
+          timestamp: event.timestamp,
+          text: event.text,
+        });
+        break;
+      }
       case "agent.started": {
         ensureRun(event.runId, event.agent, event.timestamp);
         break;

@@ -2,7 +2,7 @@ import { anthropicModel, openaiModel, piModel, piProvider } from "./env.js";
 import { agentWorkspacePath, codexCliConfigOverrides, runAsAgent } from "./guest.js";
 import {
   claudeTaskPrompt,
-  codexImplementPrompt,
+  codexActionPrompt,
   kimiTaskPrompt,
   piTaskPrompt,
   reviewPrompt,
@@ -16,8 +16,8 @@ export function buildCodexReviewCommand(state: AgentState): string {
   return runAsAgent(shellCommand(argv), "codex");
 }
 
-export function buildCodexImplementCommand(state: AgentState): string {
-  const argv = [...codexBaseArgv(), codexImplementPrompt(state)];
+export function buildCodexActionCommand(state: AgentState): string {
+  const argv = [...codexBaseArgv(), codexActionPrompt(state)];
   return runAsAgent(shellCommand(argv), "codex");
 }
 
@@ -41,7 +41,7 @@ function codexBaseArgv(): string[] {
   return argv;
 }
 
-export function buildClaudeImplementCommand(state: AgentState): string {
+export function buildClaudeActionCommand(state: AgentState): string {
   return buildClaudeCommand(claudeTaskPrompt(state));
 }
 
@@ -72,7 +72,7 @@ function buildClaudeCommand(prompt: string): string {
   return runAsAgent(shellCommand(argv), "claude");
 }
 
-export function buildPiImplementCommand(state: AgentState): string {
+export function buildPiActionCommand(state: AgentState): string {
   return buildPiCommand(piTaskPrompt(state));
 }
 
@@ -101,7 +101,7 @@ function buildPiCommand(prompt: string): string {
 
 // Kimi (Moonshot AI) CLI. The exact flags are provisional — confirm `-p`/model
 // flags against the installed Kimi CLI version before relying on this in prod.
-export function buildKimiImplementCommand(state: AgentState): string {
+export function buildKimiActionCommand(state: AgentState): string {
   return buildKimiCommand(kimiTaskPrompt(state));
 }
 

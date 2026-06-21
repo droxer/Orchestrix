@@ -1,14 +1,15 @@
-import { type Dispatch, type SetStateAction } from "react";
+import { useRef, type Dispatch, type SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 import type { AgentName, RelaySession } from "../types";
-import { NavConversations, NavNewThread, NavRefresh } from "./icons";
+import { NavConversations, NavRefresh } from "./icons";
+import { AgentMark } from "./AgentMark";
 import { EmployeeAvatar } from "./EmployeeAvatar";
 import { StatusPill } from "./StatusPill";
 import { formatCompactTokens } from "../lib/tokenUsage";
 
 // Chat-panel header: who/which agent/session identity, the per-agent tabs,
 // session status pill, and the refresh control.
-export function ChatHeader({ selectedEmployee, running, activeAgent, setActiveAgent, agentNames, disabledAgents, agentHealth, activeSession, isRefreshing, onRefresh, onBackToThreads, onNewThread }: {
+export function ChatHeader({ selectedEmployee, running, activeAgent, setActiveAgent, agentNames, disabledAgents, agentHealth, activeSession, isRefreshing, onRefresh, onBackToThreads }: {
   selectedEmployee: string;
   running: boolean;
   activeAgent: AgentName;
@@ -20,10 +21,22 @@ export function ChatHeader({ selectedEmployee, running, activeAgent, setActiveAg
   isRefreshing: boolean;
   onRefresh: () => void;
   onBackToThreads: () => void;
-  onNewThread?: () => void;
 }) {
   const disabledSet = new Set(disabledAgents ?? []);
   const { t } = useTranslation();
+  const tabsRef = useRef<HTMLDivElement>(null);
+  // Single-select radiogroup: only enabled agents participate in arrow-key
+  // navigation, and exactly one radio is in the tab order (roving tabindex).
+  const enabledAgents = agentNames.filter((a) => !disabledSet.has(a));
+  const rovingAgent = !disabledSet.has(activeAgent) ? activeAgent : enabledAgents[0];
+  const moveActive = (dir: 1 | -1) => {
+    if (enabledAgents.length === 0) return;
+    const current = enabledAgents.indexOf(rovingAgent);
+    const base = current === -1 ? 0 : current;
+    const next = enabledAgents[(base + dir + enabledAgents.length) % enabledAgents.length];
+    setActiveAgent(next);
+    tabsRef.current?.querySelector<HTMLButtonElement>(`[data-agent="${next}"]`)?.focus();
+  };
   const tokenUsage = activeSession?.tokenUsage;
   const tokenUsageTitle = tokenUsage
     ? t("conversation.token_usage_title", {
@@ -41,11 +54,6 @@ export function ChatHeader({ selectedEmployee, running, activeAgent, setActiveAg
         <EmployeeAvatar employeeId={selectedEmployee} running={running} />
         <div className="chat-title-text">
           <p className="chat-title-meta">
-            {selectedEmployee ? (
-              <span translate="no">@{selectedEmployee}</span>
-            ) : (
-              <span>{t("thread.no_employee_selected")}</span>
-            )}
             {activeSession ? (
               <span className="chat-title-status">
                 <StatusPill value={activeSession.status} />
@@ -61,11 +69,11 @@ export function ChatHeader({ selectedEmployee, running, activeAgent, setActiveAg
               </span>
             ) : null}
           </p>
-          <h2>{activeSession ? activeSession.taskGoal : t("thread.new_conversation")}</h2>
+          <h2 title={activeSession ? (activeSession.title?.trim() || activeSession.taskGoal) : undefined}>{activeSession ? (activeSession.title?.trim() || activeSession.taskGoal) : t("thread.new_conversation")}</h2>
         </div>
       </div>
       <div className="chat-tools">
-        <div className="header-agent-tabs" aria-label={t("thread.talk_to_agent")}>
+        <div className="header-agent-tabs" role="radiogroup" aria-label={t("thread.talk_to_agent")} ref={tabsRef}>
           {agentNames.map((a) => {
             const isDisabled = disabledSet.has(a);
             const isFailed = agentHealth?.[a] === "failed";
@@ -84,23 +92,25 @@ export function ChatHeader({ selectedEmployee, running, activeAgent, setActiveAg
               <button
                 key={a}
                 type="button"
-                aria-pressed={isActive}
+                role="radio"
+                data-agent={a}
+                aria-checked={isActive}
                 aria-disabled={isDisabled || undefined}
-                disabled={isDisabled}
+                tabIndex={a === rovingAgent ? 0 : -1}
                 className={classes}
                 title={title}
                 onClick={() => { if (!isDisabled) setActiveAgent(a); }}
+                onKeyDown={(e) => {
+                  if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); moveActive(1); }
+                  else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); moveActive(-1); }
+                }}
               >
+                <AgentMark agent={a} size={14} className="header-agent-tab-mark" />
                 <span translate="no">@{a}</span>
               </button>
             );
           })}
         </div>
-        {activeSession && onNewThread ? (
-          <button className="icon-button" type="button" aria-label={t("thread.new_thread")} title={t("thread.new_thread")} onClick={onNewThread}>
-            <NavNewThread size={16} />
-          </button>
-        ) : null}
         <button className="icon-button" type="button" aria-label={t("nav.refresh")} title={t("nav.refresh")} onClick={onRefresh}>
           <NavRefresh size={16} className={isRefreshing ? "spin" : ""} />
         </button>

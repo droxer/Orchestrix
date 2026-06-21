@@ -2,6 +2,7 @@ import type { RelaySession } from "relay-core";
 import type {
   ChatAgentRequest,
   ChatCancelRequest,
+  ChatConversationRef,
   ChatIdentity,
   ChatIdentityResolver,
   ChatRun,
@@ -32,14 +33,28 @@ export class RelayChatGateway {
     const identity = await this.requireIdentity(request);
     const sandboxId = await this.requireSandbox(identity, request);
     try {
+      // Continue the session this thread is already bound to unless the caller
+      // pinned one explicitly or asked for a fresh conversation (/relay new).
+      let sessionId = request.sessionId;
+      if (!sessionId && !request.forceNew) {
+        sessionId = (await this.backend.resolveConversationSession?.(request, signal))?.id;
+      }
       const session = await this.backend.startSandboxRun({
         sandboxId,
         taskGoal: request.taskGoal,
         assignments: [{ agent: request.agent, mode: request.mode }],
-        sessionId: request.sessionId,
+        sessionId,
         employeeId: identity.employeeId,
         signal,
       });
+      // Persist the thread -> session binding so follow-ups, status, and cancel
+      // resume the same conversation after a bot restart.
+      try {
+        await this.backend.bindConversationSession?.(request, session.id, signal);
+      } catch {
+        // The run is already active; keep the live stream usable even if the
+        // durable chat mapping cannot be refreshed.
+      }
       const run = { session, conversation: request };
       await sink.started?.(run);
       void this.followSession(session.id, identity.employeeId, sink, signal);
@@ -48,6 +63,18 @@ export class RelayChatGateway {
       await sink.failed?.(error);
       throw error;
     }
+  }
+
+  /** The owner's open conversations for a `/relay list` command. */
+  async listConversations(ref: ChatConversationRef, signal?: AbortSignal): Promise<RelaySession[]> {
+    await this.requireIdentity(ref);
+    return (await this.backend.listConversationSessions?.(ref, signal)) ?? [];
+  }
+
+  /** Rebind a chat thread to an existing session for `/relay switch`. */
+  async switchConversation(ref: ChatConversationRef, sessionId: string, signal?: AbortSignal): Promise<void> {
+    await this.requireIdentity(ref);
+    await this.backend.bindConversationSession?.(ref, sessionId, signal);
   }
 
   async cancel(request: ChatCancelRequest, signal?: AbortSignal): Promise<RelaySession> {
@@ -79,7 +106,7 @@ export class RelayChatGateway {
     }
   }
 
-  private async requireIdentity(ref: ChatAgentRequest | ChatCancelRequest | ChatStatusRequest): Promise<ChatIdentity> {
+  private async requireIdentity(ref: ChatConversationRef): Promise<ChatIdentity> {
     const identity = await this.identities.resolve(ref);
     if (!identity) {
       throw new Error(`No Relay employee is linked to ${ref.provider} user ${ref.externalUserId}.`);

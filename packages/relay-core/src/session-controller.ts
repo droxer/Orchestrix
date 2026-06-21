@@ -1,4 +1,5 @@
 import { runAgentNode } from "./nodes.js";
+import { extractLastAssistantText } from "./last-assistant-text.js";
 import { routeClaudeHandoff, routePiHandoff, type Route } from "./routing.js";
 import {
   GUEST_WORKSPACE,
@@ -74,14 +75,13 @@ export class SessionController implements AgentEventSink {
     private readonly options: Omit<SessionControllerOptions, "store"> = {},
   ) {}
 
-  async createSession(taskGoal: string, participants: string[] = ["human"], pendingStart = false): Promise<RelaySession> {
+  async createSession(taskGoal: string, participants: string[] = ["human"]): Promise<RelaySession> {
     const session = await this.store.createSession({
       workspacePath: this.options.workspacePath ?? GUEST_WORKSPACE,
       ownerEmployeeId: this.options.ownerEmployeeId,
       taskGoal,
       participants,
-      status: pendingStart ? "pending_approval" : "running",
-      pendingDecision: pendingStart ? "start" : undefined,
+      status: "running",
     });
     this.activeSessionId = session.id;
     this.linkTaskSession(session.id);
@@ -121,7 +121,20 @@ export class SessionController implements AgentEventSink {
     return session;
   }
 
+  async renameSession(sessionId: string, title: string): Promise<RelaySession> {
+    const trimmed = title.trim();
+    if (!trimmed) throw new Error("title is required.");
+    if (trimmed.length > 200) throw new Error("title must be 200 characters or fewer.");
+
+    const current = await this.store.getSession(sessionId);
+    if (current.title === trimmed) return current;
+    return this.append(sessionId, relayEvent("session.renamed", sessionId, { title: trimmed }));
+  }
+
   async recordDecision(sessionId: string, kind: HumanDecisionKind, note?: string, targetAgent?: AgentName): Promise<RelaySession> {
+    if (kind === "cancel") {
+      return this.cancelSession(sessionId, note);
+    }
     const decision = {
       id: newRelayId("dec"),
       kind,
@@ -144,17 +157,13 @@ export class SessionController implements AgentEventSink {
         pendingDecision: "feedback",
       }));
     }
-    if (kind === "cancel") {
-      return this.cancelSession(sessionId, note);
-    }
     if (kind === "mark_done") {
       return this.completeSession(sessionId, note || "Marked done from Relay API.");
     }
     if (kind === "rerun") {
       return this.append(sessionId, relayEvent("session.status", sessionId, {
-        status: "pending_approval",
+        status: "running",
         phase: targetAgent ? `rerun:${targetAgent}` : "rerun",
-        pendingDecision: "start",
       }));
     }
     if (kind === "handoff" && targetAgent) {
@@ -166,7 +175,7 @@ export class SessionController implements AgentEventSink {
     return this.getSession(sessionId);
   }
 
-  async handoffSession(sessionId: string, targetAgent: AgentName, assignments: WorkflowStep[] = [{ agent: targetAgent, mode: "implement" }], note?: string): Promise<RelaySession> {
+  async handoffSession(sessionId: string, targetAgent: AgentName, assignments: WorkflowStep[] = [{ agent: targetAgent, mode: "action" }], note?: string): Promise<RelaySession> {
     const decision = {
       id: newRelayId("dec"),
       kind: "handoff" as const,
@@ -178,9 +187,8 @@ export class SessionController implements AgentEventSink {
     await this.append(sessionId, relayEvent("human.decision", sessionId, { decision }));
     await this.assignSession(sessionId, assignments);
     return this.append(sessionId, relayEvent("session.status", sessionId, {
-      status: "pending_approval",
+      status: "running",
       phase: `handoff:${targetAgent}`,
-      pendingDecision: "start",
     }));
   }
 
@@ -193,17 +201,8 @@ export class SessionController implements AgentEventSink {
       extension: "json",
     });
     return this.append(sessionId, relayEvent("session.status", sessionId, {
-      status: "pending_approval",
-      phase: "waiting:start",
-      pendingDecision: "start",
-    }));
-  }
-
-  async setPendingStart(sessionId: string): Promise<RelaySession> {
-    return this.append(sessionId, relayEvent("session.status", sessionId, {
-      status: "pending_approval",
-      phase: "waiting:start",
-      pendingDecision: "start",
+      status: "running",
+      phase: "assigned",
     }));
   }
 
@@ -324,6 +323,7 @@ export class SessionController implements AgentEventSink {
   ): Promise<AgentState> {
     this.activeSessionId = sessionId;
     await this.linkTaskSession(sessionId);
+    const runState = await this.stateForRun(sessionId, state, step.agent);
     const runId = newRelayId("run");
     const role = step.role ?? roleForAgent(step.agent, step.mode);
     await this.append(sessionId, relayEvent("agent.started", sessionId, {
@@ -348,7 +348,7 @@ export class SessionController implements AgentEventSink {
 
     let patch: Partial<AgentState>;
     try {
-      patch = await runAgentNode(step.agent, step.mode, state, runOptions);
+      patch = await runAgentNode(step.agent, step.mode, runState, runOptions);
     } catch (error) {
       const status = runOptions.signal?.aborted ? "cancelled" : "failed";
       await this.waitForPendingOutputWrites();
@@ -367,7 +367,7 @@ export class SessionController implements AgentEventSink {
       throw error;
     }
 
-    const next = mergeAgentState(state, patch);
+    const next = mergeAgentState(runState, patch);
     const status = runOptions.signal?.aborted ? "cancelled" : next.last_exit_code === 0 ? "completed" : "failed";
     await this.waitForPendingOutputWrites();
     const artifact = await this.store.writeArtifact(sessionId, {
@@ -439,10 +439,10 @@ export class SessionController implements AgentEventSink {
     let next: Route = "claude_implement";
     while (next !== "__end__") {
       if (next === "claude_implement") {
-        state = await this.runStep(sessionId, state, { agent: "claude", mode: "implement", role: "implementer" }, options);
+        state = await this.runStep(sessionId, state, { agent: "claude", mode: "action", role: "implementer" }, options);
         next = routeClaudeHandoff(state, options.sink);
       } else if (next === "pi_implement") {
-        state = await this.runStep(sessionId, state, { agent: "pi", mode: "implement", role: "tester" }, options);
+        state = await this.runStep(sessionId, state, { agent: "pi", mode: "action", role: "tester" }, options);
         next = routePiHandoff(state, options.sink);
       }
     }
@@ -492,8 +492,129 @@ export class SessionController implements AgentEventSink {
     if (this.pendingOutputWrites.size === 0) return;
     await Promise.all([...this.pendingOutputWrites]);
   }
+
+  private async stateForRun(sessionId: string, state: AgentState, agent: AgentName): Promise<AgentState> {
+    const next: AgentState = { ...state };
+    delete next.prior_agent_bridge;
+    delete next.prior_conversation;
+
+    const session = await this.store.getSession(sessionId);
+    const bridge = await computePriorAgentBridge(session, agent, this.store);
+    if (bridge) next.prior_agent_bridge = bridge;
+    const conversation = await computeConversationHistory(session, this.store);
+    if (conversation) next.prior_conversation = conversation;
+    return next;
+  }
 }
 
 function abortReason(signal: AbortSignal): string | undefined {
   return typeof signal.reason === "string" && signal.reason ? signal.reason : undefined;
+}
+
+type TurnMarker = [timestamp: string, eventIndex: number];
+
+function latestUserTurnMarker(session: RelaySession): TurnMarker | undefined {
+  const markers: TurnMarker[] = [[session.createdAt, -1]];
+  session.events.forEach((event, index) => {
+    if (event.type === "session.created") markers.push([event.timestamp, index]);
+    if (event.type === "user.message") markers.push([event.timestamp, index]);
+  });
+  return markers.sort(compareMarkers).at(-1);
+}
+
+function compareMarkers(a: TurnMarker, b: TurnMarker): number {
+  const timestamp = a[0].localeCompare(b[0]);
+  return timestamp !== 0 ? timestamp : a[1] - b[1];
+}
+
+function markerAfter(a: TurnMarker, b: TurnMarker): boolean {
+  return compareMarkers(a, b) > 0;
+}
+
+function markerBefore(a: TurnMarker, b: TurnMarker): boolean {
+  return compareMarkers(a, b) < 0;
+}
+
+function runTimestamp(run: RelaySession["agentRuns"][number]): string {
+  return run.completedAt ?? run.startedAt ?? "";
+}
+
+function runMarker(session: RelaySession, run: RelaySession["agentRuns"][number]): TurnMarker {
+  const timestamp = runTimestamp(run);
+  const index = session.events.findIndex((event) => event.type === "agent.completed" && event.runId === run.id);
+  return [timestamp, index];
+}
+
+function bridgeArtifactForRun(session: RelaySession, run: RelaySession["agentRuns"][number]): RelayArtifact | undefined {
+  const artifacts = new Map(session.artifacts.map((artifact) => [artifact.id, artifact]));
+  for (let i = run.artifactIds.length - 1; i >= 0; i--) {
+    const artifact = artifacts.get(run.artifactIds[i]);
+    if (artifact && (artifact.kind === "command_log" || artifact.kind === "review" || artifact.kind === "agent_output")) {
+      return artifact;
+    }
+  }
+  return undefined;
+}
+
+async function runAssistantText(session: RelaySession, run: RelaySession["agentRuns"][number], store: SessionStore): Promise<string | undefined> {
+  const artifact = bridgeArtifactForRun(session, run);
+  if (!artifact) return undefined;
+  try {
+    return extractLastAssistantText(await store.readArtifact(session.id, artifact.id)) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+async function computePriorAgentBridge(session: RelaySession, agent: AgentName, store: SessionStore): Promise<string | undefined> {
+  const runs = session.agentRuns ?? [];
+  let lastOwnIndex = -1;
+  for (let i = runs.length - 1; i >= 0; i--) {
+    if (runs[i].agent === agent) {
+      lastOwnIndex = i;
+      break;
+    }
+  }
+
+  const latestUser = latestUserTurnMarker(session);
+  const intervening = runs
+    .slice(lastOwnIndex + 1)
+    .filter((run) => run.agent !== agent && (!latestUser || markerAfter(runMarker(session, run), latestUser)));
+  if (intervening.length === 0) return undefined;
+
+  const blocks: string[] = [];
+  for (const run of intervening) {
+    blocks.push(`[Previous from @${run.agent}]\n${(await runAssistantText(session, run, store)) ?? "<no output>"}`);
+  }
+  return blocks.join("\n\n");
+}
+
+async function computeConversationHistory(session: RelaySession, store: SessionStore): Promise<string | undefined> {
+  const latestUser = latestUserTurnMarker(session);
+  const items: Array<{ marker: TurnMarker; block: string }> = [];
+
+  const createdIndex = session.events.findIndex((event) => event.type === "session.created");
+  const createdMarker: TurnMarker = [session.createdAt, createdIndex];
+  if (!latestUser || markerBefore(createdMarker, latestUser)) {
+    items.push({ marker: createdMarker, block: `[User]\n${session.taskGoal}` });
+  }
+  for (let i = 0; i < session.events.length; i++) {
+    const event = session.events[i];
+    if (event.type === "user.message" && (!latestUser || markerBefore([event.timestamp, i], latestUser))) {
+      items.push({ marker: [event.timestamp, i], block: `[User]\n${event.text}` });
+    }
+  }
+  for (const run of session.agentRuns) {
+    if (run.status !== "completed") continue;
+    const marker = runMarker(session, run);
+    if (latestUser && !markerBefore(marker, latestUser)) continue;
+    items.push({
+      marker,
+      block: `[Assistant @${run.agent}]\n${(await runAssistantText(session, run, store)) ?? "<no output>"}`,
+    });
+  }
+
+  items.sort((a, b) => compareMarkers(a.marker, b.marker));
+  if (items.length === 0) return undefined;
+  return `[Conversation so far]\n\n${items.map((item) => item.block).join("\n\n")}`;
 }

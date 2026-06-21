@@ -1,5 +1,5 @@
 import { StreamCheck, StreamCommand, StreamError, StreamInfo, StreamTool, StreamWarn } from "./icons";
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -17,10 +17,13 @@ type AgentStreamProps = {
 
 export function AgentStream({ agent, stdout, stderr, streaming }: AgentStreamProps) {
   const { t } = useTranslation();
-  const segments = [
-    ...parseAgentStream(agent, stdout),
-    ...parseAgentStderr(stderr),
-  ];
+  // The parser scans the whole accumulated stdout char-by-char; without
+  // memoization every streamed delta would re-parse the full string from
+  // scratch (O(n²) over a run). Key the parse on its raw inputs only.
+  const segments = useMemo(
+    () => [...parseAgentStream(agent, stdout), ...parseAgentStderr(stderr)],
+    [agent, stdout, stderr],
+  );
 
   if (segments.length === 0) {
     const emptySegments = emptyAgentStreamSegments(agent, streaming, t);

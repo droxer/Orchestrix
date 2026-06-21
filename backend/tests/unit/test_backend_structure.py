@@ -58,7 +58,7 @@ def test_daemon_node_event_parser_keeps_error_messages() -> None:
         "sessionId": "ses_1",
         "runId": "run_1",
         "agent": "codex",
-        "mode": "implement",
+        "mode": "action",
         "exitCode": 0,
         "tokenUsage": {"input": 10, "output": 5, "cache": 3, "total": 18, "source": "codex"},
     })

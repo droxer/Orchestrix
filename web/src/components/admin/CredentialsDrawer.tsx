@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Check, Copy } from "lucide-react";
 import type { ControlPanelDaemonNodeRecord } from "../../types";
+import { useDialogs } from "@/components/ui/DialogProvider";
 import { Drawer } from "./Drawer";
 import { copyText, type StoredNodeToken } from "./helpers";
 
@@ -48,6 +49,7 @@ function DarkCopyRow({ label, value, copyLabel, copied, onCopy }: RowProps) {
 
 export function CredentialsDrawer({ open, onClose, node, storedToken, onUnassign, onDelete }: CredentialsDrawerProps) {
   const { t } = useTranslation();
+  const { confirm } = useDialogs();
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [actionPending, setActionPending] = useState<"unassign" | "delete" | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -64,16 +66,25 @@ export function CredentialsDrawer({ open, onClose, node, storedToken, onUnassign
     }
   }
 
-  function handleUnassign() {
+  async function handleUnassign() {
     if (!node || !onUnassign) return;
     const employee = node.employeeId ?? "";
-    if (!window.confirm(t("admin.v2.unassign_confirm", { employee, id: node.id }))) return;
+    const ok = await confirm({
+      title: t("admin.v2.unassign_confirm", { employee, id: node.id }),
+      tone: "danger",
+    });
+    if (!ok) return;
     void runAction("unassign", () => onUnassign(node));
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!node || !onDelete) return;
-    if (!window.confirm(t("admin.v2.delete_confirm", { id: node.id }))) return;
+    const ok = await confirm({
+      title: t("admin.v2.delete_confirm", { id: node.id }),
+      confirmLabel: t("admin.v2.delete_action"),
+      tone: "danger",
+    });
+    if (!ok) return;
     void runAction("delete", () => onDelete(node));
   }
 

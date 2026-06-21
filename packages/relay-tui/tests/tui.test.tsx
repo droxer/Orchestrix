@@ -121,7 +121,7 @@ describe("TUI task parsing", () => {
 
   it("finds shortcut dropdown suggestions for the current token", async () => {
     assert.deepEqual(shortcutSuggestions("@c")?.candidates, ["@claude", "@codex"]);
-    assert.deepEqual(shortcutSuggestions("@claude /r")?.candidates, ["/reject", "/rerun"]);
+    assert.deepEqual(shortcutSuggestions("@claude /r")?.candidates, ["/reject", "/rerun", "/rename"]);
     assert.equal(shortcutSuggestions("@unknown"), null);
   });
 
@@ -207,6 +207,23 @@ describe("TUI daemon runner", () => {
     await assert.rejects(
       () => client.provisionSandbox({ employeeId: "alice" }),
       /Invalid daemon node token\./,
+    );
+  });
+
+  it("surfaces non-JSON daemon API errors", async () => {
+    const { RelayDaemonClient } = await import("../../relay-core/src/index.js");
+    const client = new RelayDaemonClient({
+      baseUrl: "http://daemon.local",
+      fetchFn: async () => new Response("upstream gateway failed", {
+        status: 502,
+        statusText: "Bad Gateway",
+        headers: { "Content-Type": "text/plain" },
+      }),
+    });
+
+    await assert.rejects(
+      () => client.provisionSandbox({ employeeId: "alice" }),
+      /Relay daemon request failed: upstream gateway failed/,
     );
   });
 
@@ -353,7 +370,7 @@ describe("TUI daemon runner", () => {
           runId: "run_failed",
           agent: "codex",
           role: "implementer",
-          mode: "implement",
+          mode: "action",
         },
         {
           id: "evt_failed_output",
@@ -388,7 +405,7 @@ describe("TUI daemon runner", () => {
         id: "run_failed",
         agent: "codex",
         role: "implementer",
-        mode: "implement",
+        mode: "action",
         status: "failed",
         startedAt: "2026-06-07T00:00:00.000Z",
         completedAt: "2026-06-07T00:00:02.000Z",
@@ -460,7 +477,7 @@ describe("TUI daemon runner", () => {
           runId: "run_boxlite_busy",
           agent: "claude",
           role: "implementer",
-          mode: "implement",
+          mode: "action",
         },
         {
           id: "evt_boxlite_output",
@@ -495,7 +512,7 @@ describe("TUI daemon runner", () => {
         id: "run_boxlite_busy",
         agent: "claude",
         role: "implementer",
-        mode: "implement",
+        mode: "action",
         status: "failed",
         startedAt: "2026-06-07T00:00:00.000Z",
         completedAt: "2026-06-07T00:00:02.000Z",
@@ -633,7 +650,7 @@ describe("TUI daemon runner", () => {
       updatedAt: "2026-06-07T00:00:00.000Z",
       events: [],
       decisions: [],
-      agentRuns: [{ id: "run_cancel", agent: "claude", role: "implementer", mode: "implement", status: "running" }],
+      agentRuns: [{ id: "run_cancel", agent: "claude", role: "implementer", mode: "action", status: "running" }],
       artifacts: [],
     };
     const cancelledSession = {
@@ -712,7 +729,7 @@ describe("TUI daemon runner", () => {
         id: "run_abort_reject",
         agent: "claude",
         role: "implementer",
-        mode: "implement",
+        mode: "action",
         status: "running",
         startedAt: "2026-06-07T00:00:00.000Z",
         artifactIds: [],
@@ -789,7 +806,7 @@ describe("TUI daemon runner", () => {
         id: "run_abort_race",
         agent: "claude",
         role: "implementer",
-        mode: "implement",
+        mode: "action",
         status: "running",
         startedAt: "2026-06-07T00:00:00.000Z",
         artifactIds: [],
@@ -851,6 +868,66 @@ describe("TUI daemon runner", () => {
 
     assert.equal(completed, true);
     assert.equal(updatedStatus, "cancelled");
+  });
+
+  it("rejects aborted daemon runs when cancel delivery fails", async () => {
+    let runSignal: AbortSignal | undefined;
+    const session: RelaySession = {
+      id: "ses_cancel_failed",
+      workspacePath: "/workspace/alice",
+      taskGoal: "cancel auth",
+      status: "running",
+      phase: "running",
+      participants: ["human", "claude"],
+      currentAgent: "claude",
+      pendingDecision: undefined,
+      createdAt: "2026-06-07T00:00:00.000Z",
+      updatedAt: "2026-06-07T00:00:00.000Z",
+      events: [],
+      decisions: [],
+      agentRuns: [{
+        id: "run_cancel_failed",
+        agent: "claude",
+        role: "implementer",
+        mode: "action",
+        status: "running",
+        startedAt: "2026-06-07T00:00:00.000Z",
+        artifactIds: [],
+      }],
+      artifacts: [],
+    };
+    const client = {
+      createSession: async () => session,
+      getSession: async () => session,
+      cancelSandboxRun: async () => {
+        throw new Error("cancel endpoint unavailable");
+      },
+      runSandbox: async (input: { signal?: AbortSignal }) => {
+        runSignal = input.signal;
+        await new Promise<void>((_resolve, reject) => {
+          input.signal?.addEventListener("abort", () => reject(new Error("Relay daemon request cancelled.")), { once: true });
+        });
+        return session;
+      },
+    } as unknown as RelayDaemonClient;
+    const runner = createDaemonAssignmentRunner(client, "sbx_alice");
+    const controller = new AbortController();
+    let log = "";
+
+    const running = runner({
+      assignments: [{ agent: "claude" }],
+      task: "cancel auth",
+      log: (text) => {
+        log += text;
+      },
+      signal: controller.signal,
+    });
+    await waitForInput();
+    assert.equal(runSignal, controller.signal);
+    controller.abort();
+
+    await assert.rejects(running, /cancel endpoint unavailable/);
+    assert.match(log, /ERR daemon cancel failed: cancel endpoint unavailable/);
   });
 
   it("replays daemon Pi output as readable transcript text", async () => {
@@ -1033,6 +1110,80 @@ describe("RelayTui component", () => {
     assert.match(lastFrame() ?? "", /\/handoff/);
   });
 
+  it("offers the /new and /rename conversation shortcuts", async () => {
+    const { lastFrame, stdin } = render(
+      <RelayTui
+        sessionStore={testSessionStore()}
+        runner={async () => undefined}
+      />,
+    );
+
+    stdin.write("/ne");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.match(lastFrame() ?? "", /\/new/);
+
+    stdin.write("");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    stdin.write("");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    stdin.write("");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    stdin.write("/ren");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.match(lastFrame() ?? "", /\/rename/);
+  });
+
+  it("renames local sessions and lists the custom title", async () => {
+    const store = testSessionStore();
+    const { lastFrame, stdin } = render(
+      <RelayTui
+        sessionStore={store}
+        runner={async () => undefined}
+      />,
+    );
+
+    stdin.write("@claude fix auth");
+    await waitForInput();
+    stdin.write("\r");
+    await waitForInput();
+    stdin.write("/rename Auth repair");
+    await waitForInput();
+    stdin.write("\r");
+    await waitForFrame(lastFrame, /Renamed to Auth repair/);
+
+    const [session] = await store.listSessions();
+    assert.equal(session.title, "Auth repair");
+
+    stdin.write("/sessions");
+    await waitForInput();
+    stdin.write("\r");
+    await waitForFrame(lastFrame, /Auth repair/);
+  });
+
+  it("clears transcript state when starting a new conversation", async () => {
+    const { lastFrame, stdin } = render(
+      <RelayTui
+        sessionStore={testSessionStore()}
+        runner={async (request) => {
+          request.log("\nold transcript line\n");
+        }}
+      />,
+    );
+
+    stdin.write("@claude fix auth");
+    await waitForInput();
+    stdin.write("\r");
+    await waitForFrame(lastFrame, /old transcript line/);
+
+    stdin.write("/new");
+    await waitForInput();
+    stdin.write("\r");
+    const frame = await waitForFrame(lastFrame, /Started a new conversation/);
+    assert.doesNotMatch(frame, /old transcript line/);
+    assert.match(frame, /No Agent Yet/);
+  });
+
   it("selects agent and command shortcuts with left and right arrows", async () => {
     const { lastFrame, stdin } = render(
       <RelayTui
@@ -1071,7 +1222,9 @@ describe("RelayTui component", () => {
     stdin.write("\r");
     await waitForInput();
 
-    assert.match(lastFrame() ?? "", /\/rerun/);
+    // Left-arrow from the first candidate wraps to the last; with /rename now
+    // registered, "/r" yields [/reject, /rerun, /rename] so the wrap lands on it.
+    assert.match(lastFrame() ?? "", /\/rename/);
   });
 
   it("supports delete as an input erase key", async () => {
@@ -1430,7 +1583,7 @@ describe("RelayTui component", () => {
     assert.match(lastFrame() ?? "", /· @codex/);
     assert.doesNotMatch(lastFrame() ?? "", /waiting for \/approve|Approve session/);
     assert.equal(requests.length, 2);
-    assert.deepEqual(requests[1].assignments, [{ agent: "codex", mode: "implement" }]);
+    assert.deepEqual(requests[1].assignments, [{ agent: "codex", mode: "action" }]);
     assert.match(requests[1].task, /fix auth/);
     assert.match(requests[1].task, /verify the fix/);
     assert.equal(requests[1].sessionId, requests[0].sessionId);
@@ -1505,7 +1658,7 @@ describe("RelayTui component", () => {
     assert.equal(requests.length, 2);
     assert.equal(requests[0].sessionId, undefined);
     assert.equal(requests[1].sessionId, "ses_daemon");
-    assert.deepEqual(requests[1].assignments, [{ agent: "codex", mode: "implement" }]);
+    assert.deepEqual(requests[1].assignments, [{ agent: "codex", mode: "action" }]);
     assert.match(requests[1].task, /verify the fix/);
     assert.match(lastFrame() ?? "", /· @codex/);
   });
@@ -1616,9 +1769,8 @@ describe("RelayTui component", () => {
               workspacePath: "/workspace/alice",
               taskGoal: "fix auth",
               participants: ["human", "codex"],
-              status: "pending_approval",
+              status: "running",
               phase: "handoff:codex",
-              pendingDecision: "start",
               createdAt: "2026-06-07T00:00:00.000Z",
               updatedAt: "2026-06-07T00:00:01.000Z",
               agentRuns: [],
@@ -1686,9 +1838,8 @@ describe("RelayTui component", () => {
               workspacePath: "/workspace/alice",
               taskGoal: "fix auth",
               participants: ["human", "claude"],
-              status: "pending_approval",
+              status: "running",
               phase: "rerun:codex",
-              pendingDecision: "start",
               createdAt: "2026-06-07T00:00:00.000Z",
               updatedAt: "2026-06-07T00:00:01.000Z",
               agentRuns: [],
@@ -1760,7 +1911,7 @@ describe("RelayTui component", () => {
 
     assert.match(lastFrame() ?? "", /· @codex/);
     assert.equal(requests.length, 2);
-    assert.deepEqual(requests[1].assignments, [{ agent: "codex", mode: "implement" }]);
+    assert.deepEqual(requests[1].assignments, [{ agent: "codex", mode: "action" }]);
     assert.equal(requests[1].task, "fix auth");
 
     stdin.write("fix billing");
@@ -1769,7 +1920,7 @@ describe("RelayTui component", () => {
     await waitForInput();
 
     assert.equal(requests.length, 3);
-    assert.deepEqual(requests[2].assignments, [{ agent: "codex", mode: "implement" }]);
+    assert.deepEqual(requests[2].assignments, [{ agent: "codex", mode: "action" }]);
     assert.equal(requests[2].task, "fix billing");
   });
 

@@ -101,8 +101,9 @@ function streamRecords(raw: string): Array<{ kind: "json"; value: Record<string,
     }
 
     if (end === -1) {
-      const text = raw.slice(i).trim();
-      if (text && !isLikelyProtocolFragment(text)) out.push({ kind: "text", text: stripAnsi(text) });
+      // Unterminated object: this is almost always a JSON frame still being
+      // streamed in. Drop it rather than flashing the partial as raw text;
+      // the next render reparses once the closing brace arrives.
       break;
     }
 
@@ -276,7 +277,9 @@ function parseCodex(raw: string): AgentSegment[] {
 function parsePi(raw: string): AgentSegment[] {
   const out: AgentSegment[] = [];
   const textBuffer = new TextBuffer();
+  const thinkingBuffer = new TextBuffer();
   let sawAssistantTextInTurn = false;
+  let sawAssistantThinkingInTurn = false;
   let warnedEmptyAssistantInTurn = false;
   for (const record of streamRecords(raw)) {
     if (record.kind === "text") {
@@ -287,36 +290,74 @@ function parsePi(raw: string): AgentSegment[] {
     const event = record.value;
     if (event.type === "turn_start") {
       textBuffer.flush(out, "text");
+      thinkingBuffer.flush(out, "thinking");
       sawAssistantTextInTurn = false;
+      sawAssistantThinkingInTurn = false;
       warnedEmptyAssistantInTurn = false;
       continue;
     }
-    const delta = piAssistantTextDelta(event);
+    const delta = piAssistantDelta(event, "text_delta");
     if (delta.trim()) {
       sawAssistantTextInTurn = true;
+      thinkingBuffer.flush(out, "thinking");
       textBuffer.push(delta);
+      continue;
+    }
+    const thinkingDelta = piAssistantDelta(event, "thinking_delta");
+    if (thinkingDelta.trim()) {
+      textBuffer.flush(out, "text");
+      sawAssistantThinkingInTurn = true;
+      thinkingBuffer.push(thinkingDelta);
+      continue;
+    }
+    const endedText = piAssistantEndedContent(event, "text_end").trim();
+    if (endedText) {
+      thinkingBuffer.flush(out, "thinking");
+      textBuffer.flush(out, "text");
+      if (!sawAssistantTextInTurn) out.push({ kind: "text", text: endedText });
+      sawAssistantTextInTurn = true;
+      continue;
+    }
+    const endedThinking = piAssistantEndedContent(event, "thinking_end").trim();
+    if (endedThinking) {
+      textBuffer.flush(out, "text");
+      thinkingBuffer.flush(out, "thinking");
+      if (!sawAssistantThinkingInTurn) out.push({ kind: "thinking", text: endedThinking });
+      sawAssistantThinkingInTurn = true;
       continue;
     }
     const text = piAssistantText(event).trim();
     if (text) {
       textBuffer.flush(out, "text");
+      thinkingBuffer.flush(out, "thinking");
+      if (sawAssistantTextInTurn && (event.type === "message_end" || event.type === "turn_end")) continue;
       sawAssistantTextInTurn = true;
       out.push({ kind: "text", text });
       continue;
     }
+    const toolName = piToolName(event);
+    if (toolName) {
+      textBuffer.flush(out, "text");
+      thinkingBuffer.flush(out, "thinking");
+      out.push({ kind: "tool", name: toolName });
+      continue;
+    }
     if (event.type === "error") {
       textBuffer.flush(out, "text");
+      thinkingBuffer.flush(out, "thinking");
       out.push({ kind: "status", tone: "bad", text: String(event.message ?? "unknown error") });
       continue;
     }
     const status = piStatusSegment(event, sawAssistantTextInTurn, warnedEmptyAssistantInTurn);
     if (status) {
       textBuffer.flush(out, "text");
+      thinkingBuffer.flush(out, "thinking");
       if (isPiEmptyAssistantEvent(event)) warnedEmptyAssistantInTurn = true;
       out.push(status);
     }
   }
   textBuffer.flush(out, "text");
+  thinkingBuffer.flush(out, "thinking");
   return out;
 }
 
@@ -332,13 +373,36 @@ function piAssistantText(event: Record<string, unknown>): string {
   return textFromContent(message);
 }
 
-function piAssistantTextDelta(event: Record<string, unknown>): string {
+function piAssistantDelta(event: Record<string, unknown>, type: "text_delta" | "thinking_delta"): string {
   if (event.type !== "message_update") return "";
   const message = asRecord(event.message);
   if (message.role !== "assistant") return "";
   const assistantEvent = asRecord(event.assistantMessageEvent);
-  if (assistantEvent.type !== "text_delta") return "";
+  if (assistantEvent.type !== type) return "";
   return typeof assistantEvent.delta === "string" ? assistantEvent.delta : "";
+}
+
+function piAssistantEndedContent(event: Record<string, unknown>, type: "text_end" | "thinking_end"): string {
+  if (event.type !== "message_update") return "";
+  const message = asRecord(event.message);
+  if (message.role !== "assistant") return "";
+  const assistantEvent = asRecord(event.assistantMessageEvent);
+  if (assistantEvent.type === type && typeof assistantEvent.content === "string") return assistantEvent.content;
+  if (assistantEvent.type === "done" && type === "text_end") {
+    return textFromContent(asRecord(assistantEvent.message));
+  }
+  return "";
+}
+
+function piToolName(event: Record<string, unknown>): string {
+  if (event.type === "tool_execution_start" && typeof event.toolName === "string") return event.toolName;
+  if (event.type !== "message_update") return "";
+  const message = asRecord(event.message);
+  if (message.role !== "assistant") return "";
+  const assistantEvent = asRecord(event.assistantMessageEvent);
+  if (assistantEvent.type !== "toolcall_end") return "";
+  const toolCall = asRecord(assistantEvent.toolCall);
+  return typeof toolCall.name === "string" ? toolCall.name : "";
 }
 
 function piStatusSegment(

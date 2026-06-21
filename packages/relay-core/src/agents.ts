@@ -1,11 +1,11 @@
 import {
-  buildClaudeImplementCommand,
+  buildClaudeActionCommand,
   buildClaudeReviewCommand,
-  buildCodexImplementCommand,
+  buildCodexActionCommand,
   buildCodexReviewCommand,
-  buildKimiImplementCommand,
+  buildKimiActionCommand,
   buildKimiReviewCommand,
-  buildPiImplementCommand,
+  buildPiActionCommand,
   buildPiPreflightCommand,
   buildPiReviewCommand,
 } from "./commands.js";
@@ -24,8 +24,8 @@ export interface StreamRenderer {
   feed(chunk: string): string;
 }
 
-/** The session-level role an agent fills when implementing (review mode always maps to "reviewer"). */
-export type AgentImplementRole = "implementer" | "tester" | "planner" | "fixer";
+/** The session-level role an agent fills in action mode (review mode always maps to "reviewer"). */
+export type AgentActionRole = "implementer" | "tester" | "planner" | "fixer";
 
 export interface AgentDefinition {
   name: AgentName;
@@ -37,13 +37,13 @@ export interface AgentDefinition {
   maxFailures: number;
   /** Mode chosen when a caller addresses the agent without specifying one. */
   defaultMode: AgentTaskMode;
-  /** Role recorded for an implement-mode assignment. */
-  implementRole: AgentImplementRole;
-  buildImplementCommand(state: AgentState): string;
+  /** Role recorded for an action-mode assignment. */
+  actionRole: AgentActionRole;
+  buildActionCommand(state: AgentState): string;
   buildReviewCommand(state: AgentState): string;
   createRenderer(mode: AgentTaskMode): StreamRenderer;
-  /** Label shown for the implement-mode artifact/log header. */
-  implementLabel: string;
+  /** Label shown for the action-mode artifact/log header. */
+  actionLabel: string;
   /** Label shown for the review-mode artifact/log header. */
   reviewLabel: string;
   /** Whether the daemon must provision guest auth files before this agent can run. */
@@ -57,12 +57,12 @@ export const AGENT_REGISTRY: Record<AgentName, AgentDefinition> = {
     displayName: "Claude Code",
     initial: "C",
     maxFailures: 3,
-    defaultMode: "implement",
-    implementRole: "implementer",
-    buildImplementCommand: buildClaudeImplementCommand,
+    defaultMode: "action",
+    actionRole: "implementer",
+    buildActionCommand: buildClaudeActionCommand,
     buildReviewCommand: buildClaudeReviewCommand,
     createRenderer: () => new ClaudeStreamRenderer(),
-    implementLabel: "Claude Code",
+    actionLabel: "Claude Code",
     reviewLabel: "Claude Code Review",
     needsGuestAuth: false,
     preflight: { label: "Claude Code", command: () => runAsAgent("claude --version", "claude") },
@@ -72,12 +72,12 @@ export const AGENT_REGISTRY: Record<AgentName, AgentDefinition> = {
     displayName: "Pi",
     initial: "π",
     maxFailures: 2,
-    defaultMode: "implement",
-    implementRole: "tester",
-    buildImplementCommand: buildPiImplementCommand,
+    defaultMode: "action",
+    actionRole: "tester",
+    buildActionCommand: buildPiActionCommand,
     buildReviewCommand: buildPiReviewCommand,
     createRenderer: () => new PiStreamRenderer(),
-    implementLabel: "Pi",
+    actionLabel: "Pi",
     reviewLabel: "Pi Review",
     needsGuestAuth: true,
     preflight: { label: "Pi coding agent", command: buildPiPreflightCommand },
@@ -87,12 +87,12 @@ export const AGENT_REGISTRY: Record<AgentName, AgentDefinition> = {
     displayName: "Codex",
     initial: "X",
     maxFailures: 2,
-    defaultMode: "implement",
-    implementRole: "implementer",
-    buildImplementCommand: buildCodexImplementCommand,
+    defaultMode: "action",
+    actionRole: "implementer",
+    buildActionCommand: buildCodexActionCommand,
     buildReviewCommand: buildCodexReviewCommand,
     createRenderer: () => new CodexStreamRenderer(),
-    implementLabel: "Codex Implement",
+    actionLabel: "Codex Action",
     reviewLabel: "Codex Review",
     needsGuestAuth: true,
     preflight: { label: "Codex auth", command: () => runAsAgent("codex login status", "codex") },
@@ -102,12 +102,12 @@ export const AGENT_REGISTRY: Record<AgentName, AgentDefinition> = {
     displayName: "Kimi",
     initial: "K",
     maxFailures: 2,
-    defaultMode: "implement",
-    implementRole: "implementer",
-    buildImplementCommand: buildKimiImplementCommand,
+    defaultMode: "action",
+    actionRole: "implementer",
+    buildActionCommand: buildKimiActionCommand,
     buildReviewCommand: buildKimiReviewCommand,
     createRenderer: () => new PlainTextStreamRenderer("Kimi", ansi.magenta),
-    implementLabel: "Kimi",
+    actionLabel: "Kimi",
     reviewLabel: "Kimi Review",
     needsGuestAuth: true,
     preflight: { label: "Kimi", command: () => runAsAgent("kimi --version && kimi doctor", "kimi") },

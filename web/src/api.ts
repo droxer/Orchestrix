@@ -344,6 +344,8 @@ export function runSandbox(input: RunInput, token?: string): Promise<RelaySessio
       taskGoal: input.taskGoal,
       assignments: input.assignments,
       sessionId: input.sessionId,
+      ...(input.userMessageId ? { userMessageId: input.userMessageId } : {}),
+      ...(input.decision ? { decision: input.decision } : {}),
     },
   });
 }
@@ -361,17 +363,18 @@ export function recordDecision(
   kind: "approve" | "reject" | "rerun" | "mark_done",
   note?: string,
   token?: string,
+  targetAgent?: AgentName,
 ): Promise<RelaySession> {
   return apiJson<RelaySession>(`/sessions/${encodeURIComponent(sessionId)}/decisions`, {
     method: "POST",
     token,
-    body: { kind, note },
+    body: { kind, note, ...(targetAgent ? { targetAgent } : {}) },
   });
 }
 
 export function appendAssignment(
   sessionId: string,
-  assignment: { agent: AgentName; mode: "implement" | "review" },
+  assignment: { agent: AgentName; mode: "action" | "review" },
   token?: string,
 ): Promise<RelaySession> {
   return apiJson<RelaySession>(`/sessions/${encodeURIComponent(sessionId)}/assignments`, {
@@ -388,10 +391,18 @@ export function archiveSession(sessionId: string, token?: string): Promise<Relay
   });
 }
 
+export function renameSession(sessionId: string, title: string, token?: string): Promise<RelaySession> {
+  return apiJson<RelaySession>(`/sessions/${encodeURIComponent(sessionId)}/title`, {
+    method: "POST",
+    token,
+    body: { title },
+  });
+}
+
 export function recordHandoff(
   sessionId: string,
   targetAgent: AgentName,
-  mode: "implement" | "review",
+  mode: "action" | "review",
   note?: string,
   token?: string,
 ): Promise<RelaySession> {

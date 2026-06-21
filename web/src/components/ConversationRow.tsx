@@ -1,27 +1,27 @@
 import { ActionRemove } from "./icons";
 import { useTranslation } from "react-i18next";
+import { useDialogs } from "./ui/DialogProvider";
 import { EmployeeAvatar } from "./EmployeeAvatar";
-import type { DaemonNodeMonitorRecord, SandboxRecord, RelaySession, Tone, TokenUsage } from "../types";
-import { conversationDaemonStatus } from "../lib/conversationStatus";
+import type { AgentName, RelaySession, Tone } from "../types";
 import { formatCompactTokens } from "../lib/tokenUsage";
+import { conversationLabel } from "../lib/conversations";
 
-type EmployeeContact = {
-  id: string;
-  sandbox?: SandboxRecord;
-  node?: DaemonNodeMonitorRecord;
-  activeRun?: DaemonNodeMonitorRecord["activeRuns"][number];
-  sessionCount: number;
-  lastSession?: RelaySession;
-  tokenUsage?: TokenUsage;
+// A conversation is one owner-scoped session. The row binds to the session
+// itself (not an employee), so the logged-in employee can hold several in
+// parallel and switch between them.
+type ConversationItem = {
+  session: RelaySession;
+  /** Agent of an in-flight run for this conversation, if any. */
+  runningAgent?: AgentName;
 };
 
-export type { EmployeeContact };
+export type { ConversationItem };
 
 function statusTone(value: string): Tone {
-  if (value === "ready" || value === "completed" || value === "done") return "good";
+  if (value === "completed" || value === "done") return "good";
   if (value === "running") return "info";
   if (value === "failed" || value === "blocked" || value === "cancelled") return "bad";
-  if (value === "stale") return "warn";
+  if (value === "waiting_for_human") return "warn";
   return "neutral";
 }
 
@@ -46,21 +46,23 @@ function relativeTime(iso?: string): string {
 }
 
 type ConversationRowProps = {
-  contact: EmployeeContact;
+  item: ConversationItem;
   selected: boolean;
-  onSelect: (id: string) => void;
-  onRemove?: (id: string) => void;
+  onSelect: (sessionId: string) => void;
+  onRename?: (session: RelaySession) => void;
+  onClose?: (sessionId: string) => void;
 };
 
-export function ConversationRow({ contact, selected, onSelect, onRemove }: ConversationRowProps) {
+export function ConversationRow({ item, selected, onSelect, onRename, onClose }: ConversationRowProps) {
   const { t } = useTranslation();
-  const status = conversationDaemonStatus(contact);
+  const { confirm } = useDialogs();
+  const { session, runningAgent } = item;
+  const label = conversationLabel(session);
+  const status = session.status;
   const tone = statusTone(status);
-  const lastAgent =
-    contact.lastSession?.agentRuns[contact.lastSession.agentRuns.length - 1]?.agent;
-  const stamp = relativeTime(contact.lastSession?.updatedAt);
-  const sessionCountLabel = contact.sessionCount.toString().padStart(2, "0");
-  const tokenUsage = contact.tokenUsage;
+  const lastAgent = runningAgent ?? session.agentRuns[session.agentRuns.length - 1]?.agent;
+  const stamp = relativeTime(session.updatedAt);
+  const tokenUsage = session.tokenUsage;
   const tokenUsageTitleText = tokenUsage
     ? t("conversation.token_usage_title", {
         input: tokenUsage.input.toLocaleString(),
@@ -69,46 +71,43 @@ export function ConversationRow({ contact, selected, onSelect, onRemove }: Conve
       })
     : "";
 
-  function handleRemove() {
-    if (!onRemove) return;
-    if (window.confirm(t("conversation.remove_confirm", { id: contact.id }))) {
-      onRemove(contact.id);
-    }
+  async function handleClose() {
+    if (!onClose) return;
+    const ok = await confirm({
+      title: t("conversation.close_confirm", { name: label }),
+      confirmLabel: t("conversation.close"),
+      tone: "danger",
+    });
+    if (ok) onClose(session.id);
   }
 
-  const activityLine = contact.activeRun ? (
+  const activityLine = runningAgent ? (
     <span className="conversation-activity working">
       <span className="conversation-activity-pulse" aria-hidden="true" />
-      <em>{t("conversation.agent_working", { agent: contact.activeRun.agent })}</em>
-    </span>
-  ) : contact.lastSession?.taskGoal ? (
-    <span className="conversation-activity">
-      {contact.lastSession.taskGoal}
+      <em>{t("conversation.agent_working", { agent: runningAgent })}</em>
     </span>
   ) : (
-    <span className="conversation-activity muted">
-      {t("conversation.open_workspace")}
-    </span>
+    <span className="conversation-activity">{session.taskGoal}</span>
   );
 
   return (
-    <div className={`conversation-row ${selected ? "active" : ""} ${contact.activeRun ? "has-activity" : ""}`}>
+    <div className={`conversation-row ${selected ? "active" : ""} ${runningAgent ? "has-activity" : ""}`}>
       <button
         className="conversation-row-inner"
         type="button"
         aria-pressed={selected}
-        onClick={() => onSelect(contact.id)}
+        onClick={() => onSelect(session.id)}
       >
         <EmployeeAvatar
-          employeeId={contact.id}
-          running={Boolean(contact.activeRun)}
+          employeeId={label}
+          running={Boolean(runningAgent)}
           tone={tone}
           size={40}
         />
         <span className="conversation-copy">
           <span className="conversation-topline">
             <span className="conversation-name">
-              <strong className="mono" translate="no">@{contact.id}</strong>
+              <strong>{label}</strong>
             </span>
             {stamp ? (
               <span className="conversation-stamp mono" title={status}>
@@ -118,14 +117,10 @@ export function ConversationRow({ contact, selected, onSelect, onRemove }: Conve
           </span>
           {activityLine}
           <span className="conversation-meta">
-            <span className={`conversation-meta-status tone-${tone}`}>
-              {t(`status.${status}`, { defaultValue: status })}
-            </span>
-            <span className="conversation-meta-sep" aria-hidden="true" />
             <span className="mono">{lastAgent ?? t("conversation.no_agent_yet")}</span>
-            <span className="conversation-meta-sep" aria-hidden="true" />
             {tokenUsage ? (
               <>
+                <span className="conversation-meta-sep" aria-hidden="true" />
                 <span
                   className="conversation-meta-tokens mono"
                   title={tokenUsageTitleText}
@@ -133,26 +128,35 @@ export function ConversationRow({ contact, selected, onSelect, onRemove }: Conve
                 >
                   {formatCompactTokens(tokenUsage.total)} {t("conversation.tokens_short")}
                 </span>
-                <span className="conversation-meta-sep" aria-hidden="true" />
               </>
             ) : null}
-            <span className="conversation-meta-count mono" aria-label={t("conversation.agent_running_aria")}>
-              {sessionCountLabel}
-            </span>
           </span>
         </span>
       </button>
-      {onRemove ? (
-        <button
-          className="conversation-remove-btn"
-          type="button"
-          aria-label={t("conversation.remove", { id: contact.id })}
-          title={t("conversation.remove", { id: contact.id })}
-          onClick={handleRemove}
-        >
-          <ActionRemove size={11} />
-        </button>
-      ) : null}
+      <span className="conversation-row-actions">
+        {onRename ? (
+          <button
+            className="conversation-rename-btn"
+            type="button"
+            aria-label={t("conversation.rename")}
+            title={t("conversation.rename")}
+            onClick={() => onRename(session)}
+          >
+            <span aria-hidden="true">✎</span>
+          </button>
+        ) : null}
+        {onClose ? (
+          <button
+            className="conversation-remove-btn"
+            type="button"
+            aria-label={t("conversation.close")}
+            title={t("conversation.close")}
+            onClick={handleClose}
+          >
+            <ActionRemove size={11} />
+          </button>
+        ) : null}
+      </span>
     </div>
   );
 }

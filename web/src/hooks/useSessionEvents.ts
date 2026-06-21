@@ -22,7 +22,13 @@ export function useSessionEvents(sessionId: string | undefined, enabled: boolean
       withCredentials: true,
     });
 
+    // Track ids we've already merged so dedup is O(1) per frame rather than a
+    // linear scan of the session's growing event list on every streamed delta.
+    const seen = new Set<string>();
+
     const mergeEvent = (event: RelayEvent) => {
+      if (seen.has(event.id)) return;
+      seen.add(event.id);
       queryClient.setQueryData<RelaySession[]>(SESSIONS_KEY, (sessions) => {
         if (!sessions) return sessions;
         let changed = false;
@@ -48,8 +54,24 @@ export function useSessionEvents(sessionId: string | undefined, enabled: boolean
     // The server closes the stream at a terminal status; stop reconnecting.
     source.addEventListener("done", () => source.close());
 
-    // EventSource auto-reconnects on transient errors, which is what we want
-    // for a long-lived run; nothing to do here beyond letting it retry.
+    // EventSource auto-reconnects on transient errors, but it cannot read the
+    // HTTP status, so a permanent failure (auth lost, session gone) would loop
+    // forever hammering the backend. Cap consecutive failures and fall back to
+    // the list poll, which remains the source of truth.
+    let failures = 0;
+    const MAX_FAILURES = 5;
+    source.onerror = () => {
+      // A reconnect attempt (CONNECTING) is normal; only count hard failures.
+      if (source.readyState !== EventSource.CLOSED) {
+        failures += 1;
+        if (failures >= MAX_FAILURES) source.close();
+        return;
+      }
+      source.close();
+    };
+    source.onopen = () => {
+      failures = 0;
+    };
 
     return () => source.close();
   }, [sessionId, enabled, queryClient]);

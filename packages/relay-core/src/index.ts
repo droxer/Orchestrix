@@ -74,7 +74,7 @@ export {
   getAgent,
   isAgentName,
   type AgentDefinition,
-  type AgentImplementRole,
+  type AgentActionRole,
   type StreamRenderer,
 } from "./agents.js";
 
@@ -129,20 +129,20 @@ export { extractLastAssistantText } from "./last-assistant-text.js";
 export {
   appendReviewFeedback,
   claudeTaskPrompt,
-  codexImplementPrompt,
+  codexActionPrompt,
   reviewPrompt,
   kimiTaskPrompt,
   piTaskPrompt,
 } from "./prompts.js";
 
 export {
-  buildClaudeImplementCommand,
+  buildClaudeActionCommand,
   buildClaudeReviewCommand,
-  buildCodexImplementCommand,
+  buildCodexActionCommand,
   buildCodexReviewCommand,
-  buildKimiImplementCommand,
+  buildKimiActionCommand,
   buildKimiReviewCommand,
-  buildPiImplementCommand,
+  buildPiActionCommand,
   buildPiPreflightCommand,
   buildPiReviewCommand,
 } from "./commands.js";
@@ -165,9 +165,9 @@ export {
 } from "./renderers.js";
 
 export {
-  claudeImplementNode,
-  codexImplementNode,
-  piImplementNode,
+  claudeActionNode,
+  codexActionNode,
+  piActionNode,
   runAgentNode,
 } from "./nodes.js";
 

@@ -251,7 +251,7 @@ def assignment_list(value: Any) -> list[dict[str, Any]]:
             continue
         result.append({
             "agent": agent,
-            "mode": "review" if item.get("mode") == "review" else "implement",
+            "mode": "review" if item.get("mode") == "review" else "action",
             **({"role": item["role"]} if role_name(item.get("role")) else {}),
         })
     return result
@@ -302,7 +302,7 @@ def daemon_node_event(value: dict[str, Any]) -> dict[str, Any]:
             "text": value["text"],
             "sequence": int(value["sequence"]),
         }
-    mode = "review" if value.get("mode") == "review" else "implement"
+    mode = "review" if value.get("mode") == "review" else "action"
     if event_type == "run.completed":
         if not isinstance(value.get("exitCode"), (int, float)):
             raise ValueError("daemon node run.completed exitCode must be a finite number.")

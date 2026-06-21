@@ -36,11 +36,17 @@ export function writeLanguage(language: Language): void {
   if (typeof window !== "undefined") localStorage.setItem(languageStorageKey, language);
 }
 
+/** Resolve the OS color-scheme preference; defaults to light off-DOM. */
+export function systemTheme(): "light" | "dark" {
+  if (typeof window === "undefined" || !window.matchMedia) return "light";
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+/** Reflect the user's choice onto data-theme, resolving "system" to a
+ *  concrete value so the CSS needs only a single html[data-theme="dark"]
+ *  block (no parallel prefers-color-scheme media query). */
 export function applyTheme(theme: Theme): void {
   if (typeof document === "undefined") return;
-  if (theme === "system") {
-    document.documentElement.removeAttribute("data-theme");
-  } else {
-    document.documentElement.setAttribute("data-theme", theme);
-  }
+  const resolved = theme === "system" ? systemTheme() : theme;
+  document.documentElement.setAttribute("data-theme", resolved);
 }

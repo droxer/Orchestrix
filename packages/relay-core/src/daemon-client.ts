@@ -113,6 +113,14 @@ export class RelayDaemonClient {
     return this.request<RelaySession>(`/sessions/${encodeURIComponent(sessionId)}`, { signal });
   }
 
+  async renameSession(sessionId: string, title: string, signal?: AbortSignal): Promise<RelaySession> {
+    return this.request<RelaySession>(`/sessions/${encodeURIComponent(sessionId)}/title`, {
+      method: "POST",
+      signal,
+      body: { title },
+    });
+  }
+
   async runSandbox(input: RunSandboxInput): Promise<RelaySession> {
     const submitted = await this.request<RelaySession>(`/sandboxes/${encodeURIComponent(input.sandboxId)}/runs`, {
       method: "POST",
@@ -180,15 +188,11 @@ export class RelayDaemonClient {
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
     });
     const text = await response.text();
-    const parsed = text.trim() ? JSON.parse(text) : undefined;
     if (!response.ok) {
-      const detail = parsed && typeof parsed === "object" && "error" in parsed
-        ? String((parsed as { error: unknown }).error)
-        : parsed && typeof parsed === "object" && "detail" in parsed
-          ? String((parsed as { detail: unknown }).detail)
-        : response.statusText;
+      const detail = responseErrorText(text, response.statusText);
       throw new Error(`Relay daemon request failed: ${detail}`);
     }
+    const parsed = text.trim() ? JSON.parse(text) : undefined;
     return parsed as T;
   }
 
@@ -220,4 +224,14 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
       reject(new Error("Relay daemon request cancelled."));
     }, { once: true });
   });
+}
+
+function responseErrorText(text: string, statusText: string): string {
+  if (!text.trim()) return statusText;
+  try {
+    const parsed = JSON.parse(text) as { detail?: unknown; error?: unknown };
+    return String(parsed.detail ?? parsed.error ?? statusText);
+  } catch {
+    return text;
+  }
 }

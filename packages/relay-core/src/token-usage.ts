@@ -8,26 +8,27 @@ export interface TokenUsage {
 
 const INPUT_KEYS = ["input", "inputTokens", "input_tokens", "promptTokens", "prompt_tokens"];
 const OUTPUT_KEYS = ["output", "outputTokens", "output_tokens", "completionTokens", "completion_tokens"];
-const CACHE_KEYS = [
+const ADDITIVE_CACHE_KEYS = [
   "cache",
   "cacheTokens",
   "cache_tokens",
-  "cachedTokens",
-  "cached_tokens",
   "cacheCreationInputTokens",
   "cache_creation_input_tokens",
   "cacheReadInputTokens",
   "cache_read_input_tokens",
 ];
+const INCLUDED_CACHE_KEYS = ["cachedTokens", "cached_tokens"];
 
 export function normalizeTokenUsage(value: unknown, source?: string): TokenUsage | undefined {
   const record = asRecord(value);
   if (!record) return undefined;
-  const input = sumNumericFields(record, INPUT_KEYS);
+  const rawInput = sumNumericFields(record, INPUT_KEYS);
   const output = sumNumericFields(record, OUTPUT_KEYS);
-  const cache =
-    sumNumericFields(record, CACHE_KEYS) +
+  const includedCache =
+    sumNumericFields(record, INCLUDED_CACHE_KEYS) +
     sumNestedNumericFields(record, "prompt_tokens_details", ["cached_tokens", "cachedTokens"]);
+  const cache = sumNumericFields(record, ADDITIVE_CACHE_KEYS) + includedCache;
+  const input = Math.max(0, rawInput - includedCache);
   if (input === 0 && output === 0 && cache === 0) return undefined;
   return {
     input,
@@ -51,7 +52,7 @@ export function mergeTokenUsage(values: Array<TokenUsage | undefined>): TokenUsa
 }
 
 export function extractTokenUsageFromJsonl(text: string, source?: string): TokenUsage | undefined {
-  let latest: TokenUsage | undefined;
+  const values: TokenUsage[] = [];
   for (const line of text.split(/\r?\n/)) {
     const trimmed = line.trim();
     if (!trimmed) continue;
@@ -61,9 +62,11 @@ export function extractTokenUsageFromJsonl(text: string, source?: string): Token
     } catch {
       continue;
     }
-    latest = usageFromEvent(event, source) ?? latest;
+    const usage = usageFromEvent(event, source);
+    if (usage) values.push(usage);
   }
-  return latest;
+  const merged = mergeTokenUsage(values);
+  return merged ? { ...merged, ...(source ? { source } : {}) } : undefined;
 }
 
 function usageFromEvent(event: unknown, source?: string): TokenUsage | undefined {

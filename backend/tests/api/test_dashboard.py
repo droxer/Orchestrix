@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from tempfile import TemporaryDirectory
 
 from fastapi.testclient import TestClient
@@ -22,7 +23,7 @@ def _bootstrap(client: TestClient) -> None:
 def _create_session(client: TestClient) -> str:
     response = client.post("/sessions", json={
         "taskGoal": "demo",
-        "assignments": [{"agent": "claude", "mode": "implement"}],
+        "assignments": [{"agent": "claude", "mode": "action"}],
         "workspacePath": "/workspace",
     })
     assert response.status_code == 201
@@ -74,7 +75,7 @@ def test_dashboard_tokens_returns_reported_usage(monkeypatch) -> None:
             "runId": "run_1",
             "agent": "codex",
             "role": "fixer",
-            "mode": "implement",
+            "mode": "action",
         }))
         app.state.session_store.append_event(session_id, relay_event("agent.completed", session_id, {
             "runId": "run_1",
@@ -94,3 +95,56 @@ def test_dashboard_tokens_returns_reported_usage(monkeypatch) -> None:
         assert body["total"] == 17
         assert len(body["daily"]) == 14
         assert body["recentSessions"][0]["sessionId"] == session_id
+        assert body["recentSessions"][0]["taskGoal"] == "demo"
+
+
+def test_dashboard_tokens_totals_only_cover_last_seven_days(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap(client)
+        current_session_id = _create_session(client)
+        old_session_id = _create_session(client)
+
+        app.state.session_store.append_event(current_session_id, relay_event("agent.started", current_session_id, {
+            "runId": "run_current",
+            "agent": "codex",
+            "role": "fixer",
+            "mode": "action",
+        }))
+        app.state.session_store.append_event(current_session_id, relay_event("agent.completed", current_session_id, {
+            "runId": "run_current",
+            "agent": "codex",
+            "status": "completed",
+            "exitCode": 0,
+            "tokenUsage": {"input": 10, "output": 5, "cache": 2, "total": 17, "source": "codex"},
+        }))
+
+        old_started = relay_event("agent.started", old_session_id, {
+            "runId": "run_old",
+            "agent": "codex",
+            "role": "fixer",
+            "mode": "action",
+        })
+        old_completed = relay_event("agent.completed", old_session_id, {
+            "runId": "run_old",
+            "agent": "codex",
+            "status": "completed",
+            "exitCode": 0,
+            "tokenUsage": {"input": 100, "output": 50, "cache": 25, "total": 175, "source": "codex"},
+        })
+        old_timestamp = (datetime.now(timezone.utc) - timedelta(days=20)).isoformat()
+        old_started["timestamp"] = old_timestamp
+        old_completed["timestamp"] = old_timestamp
+        app.state.session_store.append_event(old_session_id, old_started)
+        app.state.session_store.append_event(old_session_id, old_completed)
+
+        response = client.get("/cp/dashboard/tokens")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["totalInput"] == 10
+        assert body["totalOutput"] == 5
+        assert body["totalCache"] == 2
+        assert body["total"] == 17
+        assert {item["sessionId"] for item in body["recentSessions"]} == {current_session_id, old_session_id}
