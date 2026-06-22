@@ -114,11 +114,11 @@
 /* Full-width inner button — carries the grid layout and all interactive content */
 .conversation-row-inner {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
   gap: var(--space-sm);
   width: 100%;
-  min-height: 76px;
+  min-height: 52px;
   padding: var(--space-sm) var(--space-base);
   border: 0;
   border-radius: var(--radius-none);

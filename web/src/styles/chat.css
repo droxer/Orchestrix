@@ -310,22 +310,11 @@
 }
 
 .msg-agent {
-  grid-template-columns: 32px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
-  column-gap: var(--space-sm);
 }
 
-.msg-agent > .agent-avatar {
-  grid-row: 1 / span 2;
-  margin-top: 2px;
-}
-
-/* Slack-style grouping: a continuation from the same agent drops its
-   avatar and header but keeps the gutter so text stays aligned. */
-.msg-agent.grouped > .agent-avatar {
-  visibility: hidden;
-}
-
+/* A continuation from the same agent drops its header. */
 .msg-agent.grouped .bubble > header {
   display: none;
 }
@@ -355,6 +344,16 @@
   font-weight: 600;
 }
 
+.msg header .agent-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.msg header .agent-title-mark {
+  flex-shrink: 0;
+}
+
 .msg time {
   margin-left: auto;
   color: var(--color-muted);
@@ -363,42 +362,43 @@
   font-weight: 500;
 }
 
+/* User voice — right-aligned against the left-aligned agent replies so the
+   transcript reads as a dialogue. It earns the single solid fill in the
+   stream (ink on white): the operator is speaking, not reporting a status,
+   and the fill makes agent turns read as responses to it. No avatar or
+   "You" label — the alignment and fill already carry attribution. */
 .msg-user {
-  grid-template-columns: 32px minmax(0, 1fr);
-  align-items: start;
-  column-gap: var(--space-sm);
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: end;
 }
 
-.user-avatar {
+.msg-user .bubble {
   display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  margin-top: 2px;
-  border-radius: var(--radius-full);
-  background: var(--color-primary);
-  color: var(--color-on-primary);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  flex-shrink: 0;
-  align-self: start;
+  justify-items: end;
+  gap: var(--space-xxs);
+  max-width: min(64ch, 84%);
 }
 
-/* User voice — the one fill in the transcript. Spec reserves status colors
-   for text/dots/borders, but the user message is not a status; it's the
-   operator speaking, and it earns a tinted bubble so agent replies read as
-   responses to it rather than coequal text. Keeping it deliberately. */
 .msg-user p {
   margin: 0;
-  max-width: min(72ch, 100%);
   padding: var(--space-sm) var(--space-base);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--color-primary) 7%, var(--color-canvas));
-  border: 1px solid color-mix(in srgb, var(--color-primary) 16%, transparent);
-  color: var(--color-ink);
+  /* Rounded with one squared corner toward the speaker — a quiet tail. */
+  border-radius: var(--radius-lg) var(--radius-lg) var(--radius-xs) var(--radius-lg);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
   font-size: var(--text-md);
-  line-height: 1.5;
+  line-height: 1.55;
   white-space: pre-wrap;
+  word-break: break-word;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--color-primary) 20%, transparent);
+}
+
+.msg-user-time {
+  padding-right: var(--space-xxs);
+  color: var(--color-muted);
+  font-family: var(--font-number);
+  font-size: var(--text-xs);
+  font-weight: 500;
 }
 
 .msg-quiet {

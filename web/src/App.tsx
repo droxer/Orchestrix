@@ -493,8 +493,6 @@ export function App() {
 
       <section id="chat-panel" className="chat-panel" aria-label={t("nav.conversations")} tabIndex={-1}>
         <ChatHeader
-          selectedEmployee={selectedEmployee}
-          running={Boolean(activeRun)}
           activeAgent={activeAgent}
           setActiveAgent={setActiveAgent}
           agentNames={agents}
@@ -533,7 +531,7 @@ export function App() {
           <div className="transcript-inner">
             {activeSession || pendingUserMessage ? (
               <>
-                {displayMessages.map((msg, i) => <MessageBlock key={msg.id} message={msg} employeeId={selectedEmployee} sessionId={activeSession?.id ?? ""} grouped={isGroupedContinuation(displayMessages, i)} />)}
+                {displayMessages.map((msg, i) => <MessageBlock key={msg.id} message={msg} sessionId={activeSession?.id ?? ""} grouped={isGroupedContinuation(displayMessages, i)} />)}
                 {awaitingDecision ? <DecisionBar agentNames={agents} disabledAgents={selectedNode?.disabledAgents} sendDecision={sendDecision} handoffOpen={handoffOpen} setHandoffOpen={setHandoffOpen} handoffAgent={handoffAgent} setHandoffAgent={setHandoffAgent} handoffMode={handoffMode} setHandoffMode={setHandoffMode} handoffNote={handoffNote} setHandoffNote={setHandoffNote} sendHandoff={sendHandoff} /> : null}
               </>
             ) : (

@@ -1,0 +1,251 @@
+/* Conversation artifacts: a compact, kind-aware chip in the transcript that
+   opens a full kind-aware viewer in a drawer. The chip stays glanceable — a
+   colored kind tag plus a one-line semantic stat (verdict, +/−, pass/fail) —
+   so large bodies (diffs, logs) never disrupt the conversation flow. */
+
+/* Per-kind accent. Mirrors the TUI artifact palette so the two surfaces read
+   the same. Falls back to the primary ink for unrecognized kinds. */
+.artifact-chip,
+.artifact-kind-tag {
+  --artifact-accent: var(--color-primary);
+}
+[data-kind="plan"],
+.artifact-kind-tag.is-plan {
+  --artifact-accent: #0891b2; /* cyan */
+}
+[data-kind="diff"],
+.artifact-kind-tag.is-diff {
+  --artifact-accent: #b45309; /* amber */
+}
+[data-kind="review"],
+.artifact-kind-tag.is-review {
+  --artifact-accent: var(--color-semantic-up);
+}
+[data-kind="test_output"],
+.artifact-kind-tag.is-test_output {
+  --artifact-accent: #7c3aed; /* violet */
+}
+[data-kind="command_log"],
+.artifact-kind-tag.is-command_log {
+  --artifact-accent: #c026d3; /* magenta */
+}
+[data-kind="summary"],
+.artifact-kind-tag.is-summary {
+  --artifact-accent: #2563eb; /* blue */
+}
+
+.artifact-chip {
+  min-width: 0;
+  border: 1px solid var(--color-hairline);
+  border-left: 3px solid var(--artifact-accent);
+  border-radius: var(--radius-md);
+  background: var(--color-canvas);
+  overflow: hidden;
+  transition: border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
+}
+
+.artifact-chip:hover {
+  border-color: color-mix(in srgb, var(--artifact-accent) 45%, var(--color-hairline));
+  box-shadow: var(--shadow-soft);
+}
+
+.artifact-chip-main {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.artifact-chip-main:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-focus);
+}
+
+.artifact-chip-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--artifact-accent) 12%, transparent);
+  color: var(--artifact-accent);
+}
+
+.artifact-chip-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.artifact-chip-kicker {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.artifact-chip-copy strong {
+  min-width: 0;
+  color: var(--color-ink);
+  font-size: var(--text-base);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.artifact-kind-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--artifact-accent) 14%, transparent);
+  color: var(--artifact-accent);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.artifact-stat {
+  font-variant-numeric: tabular-nums;
+}
+.artifact-stat.tone-up {
+  color: var(--color-semantic-up);
+}
+.artifact-stat.tone-down {
+  color: var(--color-semantic-down);
+}
+
+.artifact-chip-cta {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--space-xs);
+  color: var(--color-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0.6;
+  transition: opacity var(--duration-fast) ease;
+}
+.artifact-chip:hover .artifact-chip-cta,
+.artifact-chip-main:focus-visible .artifact-chip-cta {
+  opacity: 1;
+}
+
+@media (max-width: 560px) {
+  .artifact-chip-cta {
+    display: none;
+  }
+}
+
+/* ── Viewer drawer ─────────────────────────────────────────────────────── */
+
+.artifact-viewer-sub {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.artifact-viewer-raw {
+  color: var(--color-on-dark);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  opacity: 0.8;
+}
+.artifact-viewer-raw:hover {
+  opacity: 1;
+}
+
+.artifact-viewer-drawer-body {
+  padding: 0;
+}
+
+.artifact-viewer-status {
+  padding: var(--space-lg);
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+}
+.artifact-viewer-error {
+  color: var(--color-semantic-down);
+}
+
+.artifact-viewer-body {
+  min-width: 0;
+}
+
+/* Diff: per-line add/delete coloring with a sign gutter. */
+.artifact-diff {
+  font-family: var(--font-number);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  overflow-x: auto;
+}
+.artifact-diff-line {
+  display: grid;
+  grid-template-columns: 1.6em minmax(0, 1fr);
+  white-space: pre;
+}
+.artifact-diff-sign {
+  text-align: center;
+  user-select: none;
+  opacity: 0.5;
+}
+.artifact-diff-text {
+  padding-right: var(--space-base);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.artifact-diff-line.is-add {
+  background: color-mix(in srgb, var(--color-semantic-up) 16%, transparent);
+  color: color-mix(in srgb, var(--color-semantic-up) 70%, var(--color-on-dark));
+}
+.artifact-diff-line.is-del {
+  background: color-mix(in srgb, var(--color-semantic-down) 16%, transparent);
+  color: color-mix(in srgb, var(--color-semantic-down) 70%, var(--color-on-dark));
+}
+.artifact-diff-line.is-hunk {
+  color: #5eb3f5;
+  opacity: 0.9;
+}
+.artifact-diff-line.is-meta {
+  color: var(--color-on-dark);
+  opacity: 0.55;
+}
+.artifact-diff-line.is-context {
+  color: var(--color-on-dark);
+  opacity: 0.85;
+}
+
+/* Terminal block for command logs and test output. */
+.artifact-terminal,
+.artifact-plain {
+  margin: 0;
+  padding: var(--space-base);
+  color: var(--color-on-dark);
+  font-family: var(--font-number);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.artifact-terminal code {
+  font: inherit;
+  color: inherit;
+}

@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { DialogProvider } from "@/components/ui/DialogProvider";
+import { ArtifactViewerProvider } from "@/components/ArtifactViewerProvider";
 import "../i18n";
 
 // Single QueryClient for the SPA. Created in state so it survives re-renders
@@ -26,7 +27,9 @@ export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(makeQueryClient);
   return (
     <QueryClientProvider client={queryClient}>
-      <DialogProvider>{children}</DialogProvider>
+      <DialogProvider>
+        <ArtifactViewerProvider>{children}</ArtifactViewerProvider>
+      </DialogProvider>
     </QueryClientProvider>
   );
 }

@@ -516,9 +516,12 @@
       "diff": "Diff",
       "review": "Review",
       "test_output": "Test Output",
+      "command_log": "Command Log",
       "summary": "Summary",
       "agent_output": "Agent Output"
     },
+    "view": "View",
+    "view_named": "View {{title}}",
     "open_raw": "Open Raw",
     "show_preview": "Preview",
     "hide_preview": "Hide",
@@ -526,6 +529,16 @@
     "preview_error": "Could not load preview: {{message}}",
     "preview_empty": "No artifact content.",
     "preview_truncated": "Preview truncated. Open raw to inspect the full artifact.",
+    "stat": {
+      "diff": "+{{additions}} −{{deletions}} · {{files}} files",
+      "test": "{{passed}} passed · {{failed}} failed",
+      "test_unknown": "Test output",
+      "review_approved": "Approved",
+      "review_rejected": "Changes requested",
+      "review_pending": "Review",
+      "command": "Exit {{code}}",
+      "command_unknown": "Command log"
+    },
     "size_unknown": "Size Unknown",
     "size_bytes": "{{count}} B",
     "size_kb": "{{count}} KB",
@@ -549,7 +562,7 @@
   "message": {
     "user_label": "You",
     "user_avatar": "Y",
-    "agent_header": "{{employee}}'s {{agent}}",
+    "agent_header": "{{employee}}",
     "started": "{{agent}} — {{mode}} Started",
     "artifact": "Artifact — {{kind}}",
     "decision": "You — {{kind}}",

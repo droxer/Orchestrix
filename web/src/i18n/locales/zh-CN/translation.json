@@ -518,9 +518,12 @@
       "diff": "差异",
       "review": "审阅",
       "test_output": "测试输出",
+      "command_log": "命令日志",
       "summary": "摘要",
       "agent_output": "Agent 输出"
     },
+    "view": "查看",
+    "view_named": "查看 {{title}}",
     "open_raw": "打开原文",
     "show_preview": "预览",
     "hide_preview": "收起",
@@ -528,6 +531,16 @@
     "preview_error": "无法加载预览：{{message}}",
     "preview_empty": "暂无产物内容。",
     "preview_truncated": "预览已截断。打开原文可查看完整产物。",
+    "stat": {
+      "diff": "+{{additions}} −{{deletions}} · {{files}} 个文件",
+      "test": "{{passed}} 通过 · {{failed}} 失败",
+      "test_unknown": "测试输出",
+      "review_approved": "已通过",
+      "review_rejected": "需修改",
+      "review_pending": "审阅",
+      "command": "退出码 {{code}}",
+      "command_unknown": "命令日志"
+    },
     "size_unknown": "大小未知",
     "size_bytes": "{{count}} B",
     "size_kb": "{{count}} KB",
@@ -551,7 +564,7 @@
   "message": {
     "user_label": "你",
     "user_avatar": "我",
-    "agent_header": "{{employee}} 的 {{agent}}",
+    "agent_header": "{{employee}}",
     "started": "{{agent}} — {{mode}} 已启动",
     "artifact": "产物 — {{kind}}",
     "decision": "你 — {{kind}}",

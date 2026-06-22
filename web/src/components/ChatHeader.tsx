@@ -3,15 +3,11 @@ import { useTranslation } from "react-i18next";
 import type { AgentName, RelaySession } from "../types";
 import { NavConversations, NavRefresh } from "./icons";
 import { AgentMark } from "./AgentMark";
-import { EmployeeAvatar } from "./EmployeeAvatar";
-import { StatusPill } from "./StatusPill";
 import { formatCompactTokens } from "../lib/tokenUsage";
 
 // Chat-panel header: who/which agent/session identity, the per-agent tabs,
 // session status pill, and the refresh control.
-export function ChatHeader({ selectedEmployee, running, activeAgent, setActiveAgent, agentNames, disabledAgents, agentHealth, activeSession, isRefreshing, onRefresh, onBackToThreads }: {
-  selectedEmployee: string;
-  running: boolean;
+export function ChatHeader({ activeAgent, setActiveAgent, agentNames, disabledAgents, agentHealth, activeSession, isRefreshing, onRefresh, onBackToThreads }: {
   activeAgent: AgentName;
   setActiveAgent: Dispatch<SetStateAction<AgentName>>;
   agentNames: AgentName[];
@@ -51,14 +47,8 @@ export function ChatHeader({ selectedEmployee, running, activeAgent, setActiveAg
         <button className="mobile-back-button" type="button" onClick={onBackToThreads}>
           <NavConversations size={16} /><span>{t("nav.conversations")}</span>
         </button>
-        <EmployeeAvatar employeeId={selectedEmployee} running={running} />
         <div className="chat-title-text">
           <p className="chat-title-meta">
-            {activeSession ? (
-              <span className="chat-title-status">
-                <StatusPill value={activeSession.status} />
-              </span>
-            ) : null}
             {tokenUsage ? (
               <span
                 className="chat-title-tokens mono"
@@ -106,7 +96,7 @@ export function ChatHeader({ selectedEmployee, running, activeAgent, setActiveAg
                 }}
               >
                 <AgentMark agent={a} size={14} className="header-agent-tab-mark" />
-                <span translate="no">@{a}</span>
+                <span translate="no">{a}</span>
               </button>
             );
           })}

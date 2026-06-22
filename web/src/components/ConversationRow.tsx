@@ -1,9 +1,7 @@
 import { ActionRemove } from "./icons";
 import { useTranslation } from "react-i18next";
 import { useDialogs } from "./ui/DialogProvider";
-import { EmployeeAvatar } from "./EmployeeAvatar";
-import type { AgentName, RelaySession, Tone } from "../types";
-import { formatCompactTokens } from "../lib/tokenUsage";
+import type { AgentName, RelaySession } from "../types";
 import { conversationLabel } from "../lib/conversations";
 
 // A conversation is one owner-scoped session. The row binds to the session
@@ -16,14 +14,6 @@ type ConversationItem = {
 };
 
 export type { ConversationItem };
-
-function statusTone(value: string): Tone {
-  if (value === "completed" || value === "done") return "good";
-  if (value === "running") return "info";
-  if (value === "failed" || value === "blocked" || value === "cancelled") return "bad";
-  if (value === "waiting_for_human") return "warn";
-  return "neutral";
-}
 
 function relativeTime(iso?: string): string {
   if (!iso) return "";
@@ -58,18 +48,7 @@ export function ConversationRow({ item, selected, onSelect, onRename, onClose }:
   const { confirm } = useDialogs();
   const { session, runningAgent } = item;
   const label = conversationLabel(session);
-  const status = session.status;
-  const tone = statusTone(status);
-  const lastAgent = runningAgent ?? session.agentRuns[session.agentRuns.length - 1]?.agent;
   const stamp = relativeTime(session.updatedAt);
-  const tokenUsage = session.tokenUsage;
-  const tokenUsageTitleText = tokenUsage
-    ? t("conversation.token_usage_title", {
-        input: tokenUsage.input.toLocaleString(),
-        output: tokenUsage.output.toLocaleString(),
-        cache: tokenUsage.cache.toLocaleString(),
-      })
-    : "";
 
   async function handleClose() {
     if (!onClose) return;
@@ -81,15 +60,6 @@ export function ConversationRow({ item, selected, onSelect, onRename, onClose }:
     if (ok) onClose(session.id);
   }
 
-  const activityLine = runningAgent ? (
-    <span className="conversation-activity working">
-      <span className="conversation-activity-pulse" aria-hidden="true" />
-      <em>{t("conversation.agent_working", { agent: runningAgent })}</em>
-    </span>
-  ) : (
-    <span className="conversation-activity">{session.taskGoal}</span>
-  );
-
   return (
     <div className={`conversation-row ${selected ? "active" : ""} ${runningAgent ? "has-activity" : ""}`}>
       <button
@@ -98,37 +68,15 @@ export function ConversationRow({ item, selected, onSelect, onRename, onClose }:
         aria-pressed={selected}
         onClick={() => onSelect(session.id)}
       >
-        <EmployeeAvatar
-          employeeId={label}
-          running={Boolean(runningAgent)}
-          tone={tone}
-          size={40}
-        />
         <span className="conversation-copy">
           <span className="conversation-topline">
             <span className="conversation-name">
               <strong>{label}</strong>
             </span>
             {stamp ? (
-              <span className="conversation-stamp mono" title={status}>
+              <span className="conversation-stamp mono">
                 {stamp}
               </span>
-            ) : null}
-          </span>
-          {activityLine}
-          <span className="conversation-meta">
-            <span className="mono">{lastAgent ?? t("conversation.no_agent_yet")}</span>
-            {tokenUsage ? (
-              <>
-                <span className="conversation-meta-sep" aria-hidden="true" />
-                <span
-                  className="conversation-meta-tokens mono"
-                  title={tokenUsageTitleText}
-                  aria-label={tokenUsageTitleText}
-                >
-                  {formatCompactTokens(tokenUsage.total)} {t("conversation.tokens_short")}
-                </span>
-              </>
             ) : null}
           </span>
         </span>
