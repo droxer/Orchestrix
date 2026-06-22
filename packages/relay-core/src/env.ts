@@ -127,8 +127,10 @@ export function kimiModel(): string | undefined {
   return process.env.KIMI_MODEL || process.env.MOONSHOT_MODEL;
 }
 
-export function piApiKey(): string | undefined {
-  return process.env.PI_API_KEY || openaiApiKey() || anthropicApiKey();
+export function piApiKey(provider = piProvider()): string | undefined {
+  if (process.env.PI_API_KEY) return process.env.PI_API_KEY;
+  if (provider === "anthropic") return anthropicApiKey() || openaiApiKey();
+  return openaiApiKey() || anthropicApiKey();
 }
 
 export function piSourceBaseUrl(): string | undefined {

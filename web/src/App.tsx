@@ -19,7 +19,7 @@ import { PreferencesDialog } from "./components/PreferencesDialog";
 import { type Theme, type Language } from "./components/PreferencesPanel";
 import type { ConversationItem } from "./components/ConversationRow";
 import { DecisionBar } from "./components/composer/DecisionBar";
-import { Composer } from "./components/composer/Composer";
+import { Composer, type ComposerHandle } from "./components/composer/Composer";
 import { useRelayData } from "./hooks/useRelayData";
 import { useSessionEvents } from "./hooks/useSessionEvents";
 import { useLocalDaemonNodes } from "./hooks/useLocalDaemonNodes";
@@ -29,7 +29,6 @@ import { applyTheme, readLanguage, readTheme, readTokens, selectedEmployeeKey, w
 import { canUseLocalControlPanel, localControlPanelNodes } from "./lib/controlPanel";
 import { useRelayStore } from "./lib/store";
 import { useAuthSession } from "./hooks/useAuthSession";
-import { useComposer } from "./hooks/useComposer";
 import { useActiveSession } from "./hooks/useActiveSession";
 import { chooseSendAction } from "./lib/sendAction";
 import { myConversationSessions, matchesConversationQuery } from "./lib/conversations";
@@ -44,7 +43,13 @@ import "./i18n";
 
 const agents: AgentName[] = AGENT_NAMES;
 
-
+function useStableEvent<TArgs extends unknown[], TResult>(handler: (...args: TArgs) => TResult): (...args: TArgs) => TResult {
+  const handlerRef = useRef(handler);
+  useEffect(() => {
+    handlerRef.current = handler;
+  });
+  return useCallback((...args: TArgs) => handlerRef.current(...args), []);
+}
 
 // ── App ───────────────────────────────────────────────────────────────────────
 
@@ -87,6 +92,7 @@ export function App() {
   const { user, authChecked, setUser } = useAuthSession();
   const statusSeenRef = useRef(false);
   const localNodeAdoptionStartedRef = useRef(false);
+  const composerRef = useRef<ComposerHandle>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
 
@@ -116,7 +122,6 @@ export function App() {
 
   const selectedSandbox = useMemo(() => sandboxes.find((s) => s.employeeId === selectedEmployee), [sandboxes, selectedEmployee]);
   const selectedNode = useMemo(() => visibleNodes.find((n) => n.employeeId === selectedEmployee || n.id === selectedSandbox?.id), [visibleNodes, selectedEmployee, selectedSandbox?.id]);
-  const composer = useComposer({ agentNames: agents, disabledAgents: selectedNode?.disabledAgents, onAgentPicked: setActiveAgent });
   // The logged-in user is themselves an employee; their conversations are the
   // sessions they own. The backend already owner-scopes /sessions, so this is
   // just the non-archived sessions sorted most-recent first.
@@ -268,8 +273,7 @@ export function App() {
     setPendingUserMessage(null);
     setSelectedSessionId(undefined);
     setActiveSessionId(null);
-    composer.setComposerText("");
-    composer.setMentionOpen(false);
+    composerRef.current?.clear();
     setMobileView("chat");
     atBottomRef.current = true;
   }
@@ -305,7 +309,7 @@ export function App() {
   }
 
   async function sendMessage() {
-    const raw = composer.composerText.trim();
+    const raw = composerRef.current?.getText().trim() ?? "";
     if (!raw) return;
     if (!selectedEmployee) {
       setStatus({ tone: "warn", message: t("toast.no_node_selected") });
@@ -323,7 +327,7 @@ export function App() {
     const userMessageId = `evt_${crypto.randomUUID()}`;
     setPendingUserMessage({ id: userMessageId, text: goal });
     setIsRunning(true);
-    composer.setComposerText(""); composer.setMentionOpen(false);
+    composerRef.current?.clear();
     setComposingNew(false);
     setMobileView("chat"); atBottomRef.current = true;
     try {
@@ -357,6 +361,9 @@ export function App() {
       setStatus({ tone: "bad", message: err instanceof Error ? err.message : String(err) });
     }
   }
+
+  const handleComposerSend = useStableEvent(() => { void sendMessage(); });
+  const handleCancelRun = useStableEvent(() => { void cancelActiveRun(); });
 
   async function sendDecision(kind: "approve" | "reject" | "rerun" | "mark_done") {
     if (!activeSession) return;
@@ -541,14 +548,17 @@ export function App() {
         </div>
 
         <Composer
-          composer={composer}
+          ref={composerRef}
+          agentNames={agents}
+          disabledAgents={selectedNode?.disabledAgents}
           composerMode={composerMode}
           setComposerMode={setComposerMode}
           activeAgent={activeAgent}
           selectedEmployee={selectedEmployee}
           running={Boolean(activeRun)}
-          onSend={() => void sendMessage()}
-          onCancelRun={() => void cancelActiveRun()}
+          onAgentPicked={setActiveAgent}
+          onSend={handleComposerSend}
+          onCancelRun={handleCancelRun}
         />
       </section>
 

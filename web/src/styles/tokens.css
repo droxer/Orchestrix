@@ -282,7 +282,7 @@
      login rise, the message-in slide, and the mode-chip spring stay in the
      same family. `--ease-out-quint` is the editorial rise (login pane,
      transcript empty); `--ease-spring` is the playful overshoot used on
-     send-button + mode-chip; `--ease-standard` is everything else. */
+     the mode-chip; `--ease-standard` is everything else. */
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-out-quint: cubic-bezier(0.2, 0.7, 0.2, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);

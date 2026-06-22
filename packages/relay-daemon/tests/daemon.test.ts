@@ -4,6 +4,8 @@ import type { AddressInfo } from "node:net";
 import test, { type TestContext } from "node:test";
 
 import {
+  discoverAgentInventory,
+  parseInventoryOutput,
   runRelayDaemon,
   runRelayDaemonDoctor,
   type DaemonExecutionEnvironment,
@@ -72,8 +74,10 @@ test("relay daemon ignores duplicate run.start commands already active", async (
     logger: testLogger(),
     signal: stop.signal,
     environment: fakeEnvironment({
-      exec: async (_cmd, _args, options) => {
-        execCount += 1;
+      exec: async (_cmd, args, options) => {
+        // The startup agent-inventory sweep also runs through execStream; only
+        // count actual agent runs so the duplicate-suppression assertion holds.
+        if (!args?.[1]?.includes("printf 'SKILL")) execCount += 1;
         options?.sink?.("done\n");
         return { exit_code: 0, stdout: "done\n", stderr: "" };
       },
@@ -403,3 +407,52 @@ function listenOrSkip(server: ReturnType<typeof createServer>, t: TestContext): 
     server.listen(0, "127.0.0.1");
   });
 }
+
+function inventoryLine(kind: "SKILL" | "MCP", agent: string, id: string, content: string): string {
+  return [kind, agent, id, Buffer.from(content, "utf8").toString("base64")].join("\t");
+}
+
+test("parseInventoryOutput reads skill frontmatter and MCP servers per agent", () => {
+  const skillMd = "---\nname: brainstorming\ndescription: Structured brainstorming.\n---\nbody";
+  const mcpJson = JSON.stringify({
+    mcpServers: {
+      codegraph: { command: "codegraph", args: ["serve"] },
+      remote: { url: "https://example.com/sse", type: "sse" },
+    },
+  });
+  const stdout = [
+    inventoryLine("SKILL", "claude", "superpowers/brainstorming/SKILL.md", skillMd),
+    inventoryLine("SKILL", "claude", "frontend-design/SKILL.md", "---\nname: frontend-design\n---\n"),
+    inventoryLine("MCP", "claude", ".claude.json", mcpJson),
+    inventoryLine("SKILL", "bogus-agent", "x/SKILL.md", skillMd),
+    "",
+  ].join("\n");
+
+  const inventory = parseInventoryOutput(stdout);
+  const claude = inventory.claude;
+  assert.ok(claude, "claude inventory present");
+  assert.deepEqual(
+    claude.skills.map((s) => ({ name: s.name, namespace: s.namespace, description: s.description })),
+    [
+      { name: "brainstorming", namespace: "superpowers", description: "Structured brainstorming." },
+      { name: "frontend-design", namespace: undefined, description: undefined },
+    ],
+  );
+  assert.deepEqual(
+    claude.mcpServers.map((m) => ({ name: m.name, transport: m.transport })),
+    [
+      { name: "codegraph", transport: "stdio" },
+      { name: "remote", transport: "sse" },
+    ],
+  );
+  assert.equal(inventory["bogus-agent" as "claude"], undefined);
+});
+
+test("discoverAgentInventory returns empty on non-zero exit and never throws", async () => {
+  const failing = async (): Promise<StreamExecResult> => ({ exit_code: 1, stdout: "ignored", stderr: "" });
+  assert.deepEqual(await discoverAgentInventory(failing), {});
+  const throwing = async (): Promise<StreamExecResult> => {
+    throw new Error("exec exploded");
+  };
+  assert.deepEqual(await discoverAgentInventory(throwing), {});
+});

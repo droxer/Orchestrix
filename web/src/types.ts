@@ -2,13 +2,29 @@ import type {
   AgentName,
   AgentTaskMode,
   ControlPanelDaemonNodeRecord,
+  DaemonAgentInventory,
+  DaemonAgentMcpServer,
+  DaemonAgentSkill,
+  DaemonMcpTransport,
   DaemonNodeMonitorRecord,
   RelaySession,
   SandboxRecord,
   TokenUsage,
 } from "relay-core";
 
-export type { AgentName, AgentTaskMode, ControlPanelDaemonNodeRecord, DaemonNodeMonitorRecord, RelaySession, SandboxRecord, TokenUsage };
+export type {
+  AgentName,
+  AgentTaskMode,
+  ControlPanelDaemonNodeRecord,
+  DaemonAgentInventory,
+  DaemonAgentMcpServer,
+  DaemonAgentSkill,
+  DaemonMcpTransport,
+  DaemonNodeMonitorRecord,
+  RelaySession,
+  SandboxRecord,
+  TokenUsage,
+};
 
 /**
  * Canonical agent ordering for web surfaces. Mirrors AGENT_REGISTRY in

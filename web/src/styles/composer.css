@@ -248,147 +248,64 @@
   flex-wrap: wrap;
 }
 
+/* Send control — the one filled action in the composer. Kept flat and calm to
+   match the mode-chip / input house style: a square ink fill, a hairline-quiet
+   hover, scale(0.97) on press, and the shared focus ring. No ripple, hover
+   lift, icon rotation, or idle nudge — those read louder than the rest of the
+   surface. Square footprint matches the 28px footer control height. */
 .send-button {
-  position: relative;
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
-  border: 0;
+  width: 28px;
+  height: 28px;
+  border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: var(--color-primary);
   color: var(--color-on-primary);
   cursor: pointer;
-  isolation: isolate;
-  overflow: hidden;
   transition:
-    background var(--duration-fast) var(--ease-standard),
-    transform var(--duration-fast) var(--ease-spring),
-    box-shadow var(--duration-base) var(--ease-standard),
-    color var(--duration-fast) var(--ease-standard);
-}
-
-.send-button > svg {
-  position: relative;
-  z-index: 1;
-  transition: transform var(--duration-base) var(--ease-spring);
-  will-change: transform;
-}
-
-.send-button::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: radial-gradient(60% 60% at 50% 50%,
-    color-mix(in srgb, var(--color-on-primary) 35%, transparent) 0%,
-    transparent 70%);
-  opacity: 0;
-  transform: scale(0.6);
-  transition: opacity 280ms ease, transform 280ms ease;
-  pointer-events: none;
+    background 200ms ease,
+    border-color 200ms ease,
+    transform 120ms ease;
 }
 
 .send-button:hover:not(:disabled) {
   background: var(--color-primary-active);
-  transform: translateY(-1.5px);
-}
-
-.send-button:hover:not(:disabled) > svg {
-  transform: translate(1px, -1px) rotate(-4deg);
 }
 
 .send-button:active:not(:disabled) {
-  transform: translateY(0) scale(0.94);
-  transition-duration: 60ms;
-  box-shadow:
-    inset 0 2px 4px color-mix(in srgb, black 30%, transparent),
-    inset 0 1px 0 color-mix(in srgb, black 15%, transparent),
-    0 1px 1px color-mix(in srgb, var(--color-primary) 30%, transparent);
-}
-
-.send-button:active:not(:disabled)::after {
-  opacity: 1;
-  transform: scale(1.2);
-  transition-duration: 0ms;
+  transform: scale(0.97);
 }
 
 .send-button:focus-visible {
   outline: none;
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--color-on-primary) 25%, transparent),
-    0 0 0 2px var(--color-canvas),
-    0 0 0 4px var(--color-primary);
-}
-
-/* One-shot "armed" nudge when the button transitions from disabled (empty
-   composer) to enabled — a single acknowledgement rather than a perpetual
-   loop, keeping with the calm of the rest of the surface. */
-.send-button:not(:disabled):not(:active) > svg {
-  animation: send-button-armed 360ms var(--ease-spring) 1;
-}
-
-@keyframes send-button-armed {
-  0% { transform: translate(0, 0); }
-  55% { transform: translate(0.5px, -1.5px); }
-  100% { transform: translate(0, 0); }
+  box-shadow: var(--ring-focus);
 }
 
 .send-button:disabled {
-  background: color-mix(in srgb, var(--color-ink) 8%, var(--color-surface-strong));
+  background: var(--color-surface-strong);
+  border-color: var(--color-hairline);
   color: color-mix(in srgb, var(--color-ink) 32%, transparent);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--color-ink) 4%, transparent),
-    inset 0 0 0 1px color-mix(in srgb, var(--color-ink) 6%, transparent);
   cursor: not-allowed;
-  transform: none;
 }
 
-.send-button:disabled > svg {
-  animation: none;
-  transform: none;
-  opacity: 0.85;
-}
-
-/* Cancel variant — replaces send in-place while an agent run is active.
-   A flat red fill (vs the send button's primary blue) and no idle nudge make
-   it an unambiguous stop affordance; both share the radius-sm footprint. */
+/* Cancel variant — replaces send in-place while an agent run is active. A flat
+   red fill makes it an unambiguous stop affordance; everything else matches. */
 .send-button.send-button-cancel {
-  border-radius: var(--radius-sm);
   background: var(--color-semantic-down);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--color-on-primary) 20%, transparent),
-    0 1px 2px color-mix(in srgb, var(--color-semantic-down) 35%, transparent);
+  color: var(--color-on-primary);
 }
 
 .send-button.send-button-cancel:hover:not(:disabled) {
   background: color-mix(in srgb, var(--color-semantic-down) 88%, black 12%);
-  transform: translateY(-1px);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--color-on-primary) 25%, transparent),
-    0 2px 3px color-mix(in srgb, var(--color-semantic-down) 40%, transparent);
-}
-
-.send-button.send-button-cancel:hover:not(:disabled) > svg {
-  transform: none;
-}
-
-.send-button.send-button-cancel:not(:disabled):not(:active) > svg {
-  animation: none;
 }
 
 .send-button.send-button-cancel:focus-visible {
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--color-on-primary) 20%, transparent),
-    0 0 0 2px var(--color-canvas),
-    0 0 0 4px var(--color-semantic-down);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-semantic-down) 28%, transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .send-button,
-  .send-button > svg,
-  .send-button::after {
+  .send-button {
     transition: none;
-    animation: none !important;
   }
 }

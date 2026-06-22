@@ -66,6 +66,8 @@ export async function ensureAgentReady(
   if (def.needsGuestAuth) {
     await executionManager.prepareAgentAuth([agent], signal);
   }
+  // Skills are shared across every agent under ~/.claude/skills.
+  await executionManager.prepareAgentSkills(signal);
   const result = await executionManager.runShell(def.preflight.command(), signal);
   if (result.exit_code !== 0) {
     const detail = (result.stderr || result.stdout).trim();

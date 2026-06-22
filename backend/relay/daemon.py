@@ -113,6 +113,73 @@ def agent_registration_state(input: dict[str, Any]) -> tuple[dict[str, str], dic
     return agents, details
 
 
+_MCP_TRANSPORTS = ("stdio", "sse", "http")
+
+
+def agent_inventory_state(input: dict[str, Any]) -> dict[str, dict[str, list[dict[str, str]]]]:
+    """Sanitize the daemon-reported per-agent skill/MCP inventory.
+
+    Untrusted daemon payload: keep only known agents and well-typed fields, and
+    drop agents that report nothing so the record stays compact.
+    """
+    raw = input.get("agentInventory")
+    if not isinstance(raw, dict):
+        return {}
+    inventory: dict[str, dict[str, list[dict[str, str]]]] = {}
+    for agent in AGENT_NAMES:
+        entry = raw.get(agent)
+        if not isinstance(entry, dict):
+            continue
+        skills = _clean_skills(entry.get("skills"))
+        mcp_servers = _clean_mcp_servers(entry.get("mcpServers"))
+        if skills or mcp_servers:
+            inventory[agent] = {"skills": skills, "mcpServers": mcp_servers}
+    return inventory
+
+
+def _clean_skills(value: Any) -> list[dict[str, str]]:
+    if not isinstance(value, list):
+        return []
+    skills: list[dict[str, str]] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        name = _string_metadata(item.get("name"), limit=200)
+        if not name:
+            continue
+        skill = {"name": name}
+        namespace = _string_metadata(item.get("namespace"), limit=200)
+        if namespace:
+            skill["namespace"] = namespace
+        description = _string_metadata(item.get("description"), limit=500)
+        if description:
+            skill["description"] = description
+        skills.append(skill)
+    return skills
+
+
+def _clean_mcp_servers(value: Any) -> list[dict[str, str]]:
+    if not isinstance(value, list):
+        return []
+    servers: list[dict[str, str]] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        name = _string_metadata(item.get("name"), limit=200)
+        if not name:
+            continue
+        transport = item.get("transport")
+        server = {
+            "name": name,
+            "transport": transport if transport in _MCP_TRANSPORTS else "stdio",
+        }
+        command = _string_metadata(item.get("command"), limit=500)
+        if command:
+            server["command"] = command
+        servers.append(server)
+    return servers
+
+
 class DaemonNodeRegistry:
     def __init__(
         self,
@@ -147,6 +214,7 @@ class DaemonNodeRegistry:
         employee_id = (existing or {}).get("employeeId") or input.get("employeeId")
         next_ui_hash = hash_daemon_node_token(ui_token) if ui_token else (existing or {}).get("uiTokenHash") or (existing or {}).get("tokenHash")
         agents, agent_details = agent_registration_state(input)
+        agent_inventory = agent_inventory_state(input)
         prior_disabled = list((existing or {}).get("disabledAgents") or [])
         sandbox = {
             "id": input["sandboxId"],
@@ -155,6 +223,7 @@ class DaemonNodeRegistry:
             "status": "running" if input.get("status") == "busy" else "stopped" if input.get("status") == "stopped" else "ready",
             "agents": agents,
             **({"agentDetails": agent_details} if agent_details else {}),
+            **({"agentInventory": agent_inventory} if agent_inventory else {}),
             **({"disabledAgents": prior_disabled} if prior_disabled else {}),
             "token": None,
             "tokenHash": next_ui_hash,

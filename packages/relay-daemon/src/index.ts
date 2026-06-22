@@ -13,8 +13,9 @@ import type {
   StreamExecResult,
 } from "relay-core";
 import { startOrchestratorSession, ensureAgentReady as ensureSandboxAgentReady, type ActiveOrchestratorSession } from "./sandbox-session.js";
+import { discoverAgentInventory } from "./agent-inventory.js";
 import { defaultExecutionManager } from "./execution.js";
-import { hasHostKimiCodeAuth, prepareHostKimiCodeHome } from "./box.js";
+import { hasHostKimiCodeAuth, prepareHostAgentSkills, prepareHostKimiCodeHome } from "./box.js";
 import {
   AGENT_NAMES,
   getAgent,
@@ -142,6 +143,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
   let shutdownPromise: Promise<void> | undefined;
   const agentHealth = await discoverDaemonAgentHealth(environment, logger, sandboxId, options.signal);
   const supportedAgents = readyAgents(agentHealth);
+  const agentInventory = await discoverAgentInventory(environment.execStream, options.signal);
   const buildRegistration = (includeEmployeeId = Boolean(configuredEmployeeId), status?: DaemonNodeRegistration["status"]): DaemonNodeRegistration => ({
     sandboxId,
     ...(includeEmployeeId ? { employeeId } : {}),
@@ -150,6 +152,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
     protocolVersion: DAEMON_NODE_PROTOCOL_VERSION,
     supportedAgents,
     agentHealth,
+    ...(Object.keys(agentInventory).length > 0 ? { agentInventory } : {}),
     status: status ?? (activeRuns.size > 0 ? "busy" : "ready"),
   });
   const register = async (): Promise<void> => {
@@ -573,6 +576,8 @@ function ensureHostAgentReady(agent: AgentName): void {
   // Auth material is written directly from this process; never pass it
   // through a shell where it would be visible in the process table.
   const home = agentHomePath();
+  // Skills are shared across every agent under ~/.claude/skills.
+  prepareHostAgentSkills(join(home, ".claude", "skills"));
   if (agent === "codex") {
     const apiKey = openaiApiKey();
     if (!apiKey) throw new Error("OPENAI_API_KEY or CODEX_API_KEY is required for Codex daemon runs.");
@@ -972,7 +977,10 @@ export {
   hasHostKimiCodeAuth,
   importBoxLite,
   hostKimiCodeHomePath,
+  hostAgentSkillsDir,
   prepareGuestAgentAuth,
+  prepareGuestAgentSkills,
+  prepareHostAgentSkills,
   prepareHostKimiCodeHome,
   prepareGuestWorkspace,
   setSessionBox,
@@ -999,3 +1007,5 @@ export {
   type OrchestratorSession,
   type OrchestratorSessionOptions,
 } from "./sandbox-session.js";
+
+export { discoverAgentInventory, parseInventoryOutput } from "./agent-inventory.js";

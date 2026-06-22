@@ -1,71 +1,31 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-export interface Skill {
-  name: string;
-  description: string;
-  namespace?: string;   // e.g. "superpowers", "document-skills", "everything-claude-code"
-  triggerWord?: string; // e.g. "frontend-design"
-}
-
-// ── Static sample — replace with API call once /skills endpoint exists ─────────
-const SAMPLE_SKILLS: Skill[] = [
-  { name: "using-superpowers", description: "Establishes how to find and use skills, requiring Skill tool invocation before any response.", namespace: "superpowers", triggerWord: "using-superpowers" },
-  { name: "brainstorming", description: "Structured brainstorming before entering plan mode for complex tasks.", namespace: "superpowers", triggerWord: "brainstorm" },
-  { name: "writing-plans", description: "Write implementation plans with context, approach, and verification steps.", namespace: "superpowers", triggerWord: "plan" },
-  { name: "executing-plans", description: "Execute approved plans step by step with task tracking.", namespace: "superpowers", triggerWord: "execute" },
-  { name: "systematic-debugging", description: "Systematic debugging workflow from reproduction to root cause analysis.", namespace: "superpowers", triggerWord: "debug" },
-  { name: "frontend-design", description: "Create distinctive, production-grade frontend interfaces with high design quality. Avoids generic AI aesthetics.", namespace: "frontend-design", triggerWord: "frontend-design" },
-  { name: "ui-ux-pro-max", description: "Advanced UI/UX guidance for production-grade interfaces with strong aesthetic direction.", namespace: "ui-ux-pro-max", triggerWord: "ui-ux" },
-  { name: "web-design-guidelines", description: "Guidelines for consistent, accessible, and visually refined web design.", namespace: "built-in", triggerWord: "web-design" },
-  { name: "code-simplifier", description: "Simplify overly complex code — reduce nesting, extract functions, improve naming.", namespace: "built-in", triggerWord: "simplify" },
-  { name: "find-skills", description: "Discover and navigate available skills in the workspace.", namespace: "built-in", triggerWord: "find-skills" },
-  { name: "next-best-practices", description: "Next.js best practices for production apps: routing, data fetching, performance.", namespace: "built-in", triggerWord: "next" },
-  { name: "vercel-react-best-practices", description: "React + Vercel deployment best practices, edge functions, and performance patterns.", namespace: "built-in", triggerWord: "vercel" },
-];
-
-// ── Helpers ────────────────────────────────────────────────────────────────────
-
-function getNamespaces(skills: Skill[]): string[] {
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const s of skills) {
-    const ns = s.namespace ?? "built-in";
-    if (!seen.has(ns)) { seen.add(ns); result.push(ns); }
-  }
-  return result;
-}
-
-function namespaceLabel(ns: string, t: TFunction): string {
-  return t(`skills.ns.${ns}`, {
-    defaultValue: ns.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-  });
-}
+import { useAgentInventoryNodes } from "../hooks/useAgentInventory";
+import { aggregateSkillsByAgent, totalItemCount } from "../lib/agentInventory";
+import type { AgentName, DaemonAgentSkill } from "../types";
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function SkillRow({ skill }: { skill: Skill }) {
-  const { t } = useTranslation();
+function SkillRow({ skill }: { skill: DaemonAgentSkill }) {
   return (
     <div className="flex items-baseline gap-base rounded-sm py-xs pr-0 pl-lg transition-[background] duration-[120ms] hover:-mx-xs hover:bg-surface-soft hover:pr-xs hover:pl-[calc(var(--space-lg)+var(--space-xs))]">
       <div className="flex min-w-0 flex-1 flex-col gap-xxs">
         <span className="mono truncate text-sm font-semibold text-ink">{skill.name}</span>
-        <p className="truncate text-sm leading-[1.4] text-body">{t(`skills.sample.${skill.name}.desc`, { defaultValue: skill.description })}</p>
+        {skill.description && (
+          <p className="truncate text-sm leading-[1.4] text-body">{skill.description}</p>
+        )}
       </div>
-      {skill.triggerWord && (
-        <span className="mono shrink-0 whitespace-nowrap text-xs font-medium text-muted-soft">/{skill.triggerWord}</span>
+      {skill.namespace && (
+        <span className="mono shrink-0 whitespace-nowrap text-xs font-medium text-muted-soft">{skill.namespace}</span>
       )}
     </div>
   );
 }
 
-function NamespaceGroup({ namespace, skills }: { namespace: string; skills: Skill[] }) {
+function AgentGroup({ agent, skills }: { agent: AgentName; skills: DaemonAgentSkill[] }) {
   const [collapsed, setCollapsed] = useState(false);
   const { t } = useTranslation();
 
@@ -84,14 +44,18 @@ function NamespaceGroup({ namespace, skills }: { namespace: string; skills: Skil
         >
           ›
         </span>
-        <span className="flex-1 text-base font-semibold text-ink">{namespaceLabel(namespace, t)}</span>
+        <span className="flex-1 text-base font-semibold text-ink" translate="no">
+          {agent}
+        </span>
         <span className="mono text-xs font-medium text-muted-foreground">{skills.length}</span>
       </button>
       {!collapsed && (
         <div className="pb-sm">
-          {skills.map((skill) => (
-            <SkillRow key={skill.name} skill={skill} />
-          ))}
+          {skills.length === 0 ? (
+            <p className="py-xs pl-lg text-sm text-muted-soft">{t("skills.agent_empty")}</p>
+          ) : (
+            skills.map((skill) => <SkillRow key={`${skill.namespace ?? ""}/${skill.name}`} skill={skill} />)
+          )}
         </div>
       )}
     </div>
@@ -116,9 +80,7 @@ function EmptyState({ query }: { query: string }) {
             </svg>
           </div>
           <p className="text-lg font-semibold text-ink">{t("skills.no_skills_title")}</p>
-          <p className="text-sm leading-loose text-body">
-            {t("skills.no_skills_body")}
-          </p>
+          <p className="text-sm leading-loose text-body">{t("skills.no_skills_body")}</p>
         </>
       )}
     </div>
@@ -130,23 +92,28 @@ function EmptyState({ query }: { query: string }) {
 export function SkillsPage() {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
+  const { nodes } = useAgentInventoryNodes();
 
-  const skills = SAMPLE_SKILLS;
+  const groups = useMemo(() => aggregateSkillsByAgent(nodes), [nodes]);
+  const total = totalItemCount(groups);
 
   const filtered = useMemo(() => {
-    if (!query.trim()) return skills;
     const q = query.trim().toLowerCase();
-    return skills.filter(
-      (s) =>
-        s.name.toLowerCase().includes(q) ||
-        s.description.toLowerCase().includes(q) ||
-        s.namespace?.toLowerCase().includes(q) ||
-        s.triggerWord?.toLowerCase().includes(q),
-    );
-  }, [query, skills]);
+    if (!q) return groups;
+    return groups.map((group) => ({
+      ...group,
+      items: group.items.filter(
+        (s) =>
+          s.name.toLowerCase().includes(q) ||
+          s.description?.toLowerCase().includes(q) ||
+          s.namespace?.toLowerCase().includes(q) ||
+          group.agent.toLowerCase().includes(q),
+      ),
+    }));
+  }, [query, groups]);
 
-  const namespaces = getNamespaces(filtered);
-  const byNamespace = (ns: string) => filtered.filter((s) => (s.namespace ?? "built-in") === ns);
+  const visibleGroups = query.trim() ? filtered.filter((group) => group.items.length > 0) : filtered;
+  const hasResults = totalItemCount(visibleGroups) > 0;
 
   return (
     <section className="flex min-h-0 flex-col overflow-y-auto bg-background">
@@ -156,7 +123,7 @@ export function SkillsPage() {
           <span className="mono text-xs font-medium text-muted-foreground">{t("skills.sub")}</span>
         </div>
         <div className="flex items-center gap-sm">
-          <span className="mono text-xs font-medium text-muted-foreground">{t("skills.total", { count: skills.length })}</span>
+          <span className="mono text-xs font-medium text-muted-foreground">{t("skills.total", { count: total })}</span>
         </div>
       </header>
 
@@ -188,11 +155,11 @@ export function SkillsPage() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-xl py-base max-[820px]:px-base">
-        {filtered.length === 0 ? (
+        {total === 0 || !hasResults ? (
           <EmptyState query={query} />
         ) : (
-          namespaces.map((ns) => (
-            <NamespaceGroup key={ns} namespace={ns} skills={byNamespace(ns)} />
+          visibleGroups.map((group) => (
+            <AgentGroup key={group.agent} agent={group.agent} skills={group.items} />
           ))
         )}
       </div>

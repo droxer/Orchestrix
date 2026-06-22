@@ -361,7 +361,10 @@
       "enable_agent": "在此節點啟用 {{agent}}",
       "disable_agent": "在此節點停用 {{agent}}",
       "save": "儲存",
-      "saving": "儲存中…"
+      "saving": "儲存中…",
+      "agent_skills": "技能（{{count}}）",
+      "agent_mcp": "MCP（{{count}}）",
+      "agent_no_inventory": "未安裝技能或 MCP"
     }
   },
   "mcp": {
@@ -375,7 +378,9 @@
     "tools": "工具",
     "status_connected": "已連線",
     "status_disconnected": "已斷線",
-    "status_error": "錯誤"
+    "status_error": "錯誤",
+    "agent_empty": "此 Agent 未設定 MCP 伺服器。",
+    "total": "共 {{count}} 個伺服器"
   },
   "skills": {
     "title": "技能庫",
@@ -434,7 +439,8 @@
       "vercel-react-best-practices": {
         "desc": "React + Vercel 部署最佳實踐、邊緣函式與效能模式。"
       }
-    }
+    },
+    "agent_empty": "此 Agent 未安裝技能。"
   },
   "pref": {
     "title": "偏好設定",
@@ -551,7 +557,6 @@
     "tool": "工具",
     "empty_working": "執行中…",
     "empty_done": "暫無輸出。",
-    "pi_empty_done": "Pi 未回傳助手文字。",
     "claude_error": "Claude 錯誤",
     "claude_finished": "Claude 已完成。",
     "claude_api_retry": "Claude API 重試 {{attempt}}/{{max}}",

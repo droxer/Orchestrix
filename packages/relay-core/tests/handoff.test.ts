@@ -553,20 +553,48 @@ describe("agent stream rendering", () => {
     ].map((event) => renderer.feed(`${JSON.stringify(event)}\n`)).join("");
 
     assert.match(output, /Hi from Pi JSON\./);
-    assert.doesNotMatch(output, /Pi returned no assistant text\./);
+    assert.doesNotMatch(output, /no assistant text/i);
     assert.doesNotMatch(output, /"type":"message_update"/);
   });
 
-  it("renders Pi JSON empty assistant events as visible status", () => {
+  it("does not replay Pi final message content after streaming deltas", () => {
+    const renderer = new PiStreamRenderer();
+    const output = [
+      { type: "turn_start" },
+      { type: "message_start", message: { role: "assistant", content: [] } },
+      {
+        type: "message_update",
+        message: { role: "assistant", content: [] },
+        assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "Hi " },
+      },
+      {
+        type: "message_update",
+        message: { role: "assistant", content: [] },
+        assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "from Pi JSON." },
+      },
+      {
+        type: "message_end",
+        message: { role: "assistant", content: [{ type: "text", text: "Hi from Pi JSON." }], stopReason: "stop" },
+      },
+      {
+        type: "turn_end",
+        message: { role: "assistant", content: [{ type: "text", text: "Hi from Pi JSON." }], stopReason: "stop" },
+      },
+    ].map((event) => renderer.feed(`${JSON.stringify(event)}\n`)).join("");
+
+    assert.equal((output.match(/Hi from Pi JSON\./g) ?? []).length, 1);
+  });
+
+  it("ignores Pi JSON empty assistant lifecycle events", () => {
     const output = formatPiJsonLine(JSON.stringify({
       type: "message_end",
       message: { role: "assistant", content: [], stopReason: "stop" },
     }));
 
-    assert.match(output, /Pi returned no assistant text\./);
+    assert.equal(output, "");
   });
 
-  it("renders one Pi empty assistant warning per turn", () => {
+  it("ignores repeated Pi empty assistant lifecycle events", () => {
     const renderer = new PiStreamRenderer();
     const output = [
       { type: "turn_start" },
@@ -574,7 +602,7 @@ describe("agent stream rendering", () => {
       { type: "turn_end", message: { role: "assistant", content: [], stopReason: "stop" }, toolResults: [] },
     ].map((event) => renderer.feed(`${JSON.stringify(event)}\n`)).join("");
 
-    assert.equal((output.match(/Pi returned no assistant text\./g) ?? []).length, 1);
+    assert.equal(output, "");
   });
 
   it("renders Pi JSON assistant errors as visible status", () => {
@@ -591,6 +619,17 @@ describe("agent stream rendering", () => {
     const output = renderer.feed(
       "2026-06-03T14:06:38.981712Z  WARN libcontainer::process::init::process: seccomp not available, unable to set seccomp privileges!\n",
     );
+
+    assert.equal(output, "");
+  });
+
+  it("filters Codex stdin notice from stderr", () => {
+    const renderer = new StderrLineRenderer();
+    const output = [
+      "Reading additional input from stdin.\n",
+      "Reading additional input from stdin...\n",
+      "Reading additional input from stdin…\n",
+    ].map((line) => renderer.feed(line)).join("");
 
     assert.equal(output, "");
   });
@@ -782,6 +821,9 @@ describe("execution manager boundary", () => {
       prepareAgentAuth: async (agents) => {
         calls.push(`auth:${[...agents].join(",")}`);
       },
+      prepareAgentSkills: async () => {
+        calls.push("skills");
+      },
       execStream: async () => ({ exit_code: 0, stdout: "", stderr: "" }),
       runShell: async (command) => {
         calls.push(`shell:${command}`);
@@ -792,16 +834,28 @@ describe("execution manager boundary", () => {
     await ensureAgentReady("codex", undefined, undefined, manager);
     await ensureAgentReady("codex", undefined, undefined, manager);
 
+    // Every agent gets shared skills installed after auth, before preflight.
     assert.equal(calls[0], "auth:codex");
-    assert.match(calls[1] ?? "", /^shell:su agent .*codex login status/);
-    assert.equal(calls.length, 2);
+    assert.equal(calls[1], "skills");
+    assert.match(calls[2] ?? "", /^shell:su agent .*codex login status/);
+    assert.equal(calls.length, 3);
 
     resetAgentReadiness();
     calls.length = 0;
     await ensureAgentReady("kimi", undefined, undefined, manager);
 
     assert.equal(calls[0], "auth:kimi");
-    assert.match(calls[1] ?? "", /^shell:su agent .*KIMI_CODE_HOME=.*kimi --version && kimi doctor/);
+    assert.equal(calls[1], "skills");
+    assert.match(calls[2] ?? "", /^shell:su agent .*KIMI_CODE_HOME=.*kimi --version && kimi doctor/);
+    assert.equal(calls.length, 3);
+
+    resetAgentReadiness();
+    calls.length = 0;
+    await ensureAgentReady("claude", undefined, undefined, manager);
+
+    // Claude needs no guest auth but still gets the shared skills before preflight.
+    assert.equal(calls[0], "skills");
+    assert.match(calls[1] ?? "", /^shell:su agent .*claude/);
     assert.equal(calls.length, 2);
   });
 
@@ -1025,6 +1079,22 @@ describe("Pi provider config", () => {
         assert.equal("authHeader" in provider, false);
         assert.match(command, /--provider anthropic/);
         assert.match(command, /--model claude-compatible/);
+      },
+    );
+  });
+
+  it("uses Anthropic fallback credentials when Pi selects the Anthropic provider", () => {
+    withEnv(
+      {
+        ANTHROPIC_API_KEY: "anthropic-key",
+        OPENAI_API_KEY: "openai-key",
+      },
+      () => {
+        const auth = JSON.parse(guestPiAuthJson());
+        const piEnv = agentCredentialEnv("pi");
+
+        assert.equal(auth.anthropic.key, "anthropic-key");
+        assert.ok(piEnv.some(([key, value]) => key === "PI_API_KEY" && value === "anthropic-key"));
       },
     );
   });

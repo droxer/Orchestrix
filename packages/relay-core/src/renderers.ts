@@ -87,7 +87,6 @@ export class PiStreamRenderer {
   private readonly plain = new PlainTextStreamRenderer("Pi", ansi.yellow);
   private readonly lines = new JsonLineRenderer((line) => this.formatLine(line));
   private sawAssistantTextInTurn = false;
-  private warnedEmptyAssistantInTurn = false;
 
   feed(chunk: string): string {
     return this.lines.feed(chunk);
@@ -99,7 +98,6 @@ export class PiStreamRenderer {
 
     if (event.type === "turn_start") {
       this.sawAssistantTextInTurn = false;
-      this.warnedEmptyAssistantInTurn = false;
       return "";
     }
     if (event.type === "message_start" && asRecord(event.message).role === "assistant") {
@@ -115,6 +113,7 @@ export class PiStreamRenderer {
 
     const text = piAssistantText(event);
     if (text.trim()) {
+      if (this.sawAssistantTextInTurn && isPiAssistantTerminalEvent(event)) return "";
       this.sawAssistantTextInTurn = true;
       this.text.resetBlock();
       return this.text.feed(`${text.trim()}\n`);
@@ -123,9 +122,8 @@ export class PiStreamRenderer {
     if (event.type === "error") {
       return `\n${status("error", `Pi error: ${String(event.message ?? "unknown error")}`)}\n`;
     }
-    const piStatus = piStatusMessage(event, this.sawAssistantTextInTurn, this.warnedEmptyAssistantInTurn);
+    const piStatus = piStatusMessage(event);
     if (piStatus) {
-      if (isPiEmptyAssistantEvent(event)) this.warnedEmptyAssistantInTurn = true;
       return `\n${piStatus}\n`;
     }
     return "";
@@ -151,8 +149,13 @@ export class StderrLineRenderer {
   private formatLine(line: string): string {
     if (!line) return "";
     if (line.includes("seccomp not available")) return "";
+    if (isCodexStdinNotice(line)) return "";
     return `${status("warn", line)}\n`;
   }
+}
+
+function isCodexStdinNotice(line: string): boolean {
+  return /^Reading additional input from stdin(?:\.{1,3}|…)?$/.test(line);
 }
 
 export class JsonLineRenderer {
@@ -329,11 +332,7 @@ function piAssistantTextDelta(event: Record<string, unknown>): string {
   return typeof assistantEvent.delta === "string" ? assistantEvent.delta : "";
 }
 
-function piStatusMessage(
-  event: Record<string, unknown>,
-  sawAssistantTextInTurn = false,
-  warnedEmptyAssistantInTurn = false,
-): string {
+function piStatusMessage(event: Record<string, unknown>): string {
   if (event.type === "auto_retry_end" && event.success === false) {
     return status("error", `Pi error: ${String(event.finalError ?? "unknown error")}`);
   }
@@ -344,19 +343,13 @@ function piStatusMessage(
   if (errorMessage || message.stopReason === "error") {
     return status("error", `Pi error: ${String(errorMessage ?? "unknown error")}`);
   }
-  if (sawAssistantTextInTurn || warnedEmptyAssistantInTurn) return "";
-  if (isPiEmptyAssistantEvent(event)) {
-    return status("warn", "Pi returned no assistant text.");
-  }
   return "";
 }
 
-function isPiEmptyAssistantEvent(event: Record<string, unknown>): boolean {
+function isPiAssistantTerminalEvent(event: Record<string, unknown>): boolean {
   if (event.type !== "message_end" && event.type !== "turn_end") return false;
   const message = asRecord(event.message ?? event);
-  if (message.role !== "assistant") return false;
-  const content = message.content;
-  return Array.isArray(content) && content.length === 0 && message.stopReason === "stop";
+  return message.role === "assistant";
 }
 
 export function formatClaudeJsonLine(line: string): string {

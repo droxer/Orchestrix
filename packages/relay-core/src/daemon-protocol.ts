@@ -1,5 +1,5 @@
 import type { AgentName, AgentTaskMode } from "./state.js";
-import type { DaemonAgentAdapter } from "./daemon-node-protocol.js";
+import type { DaemonAgentAdapter, DaemonAgentInventory } from "./daemon-node-protocol.js";
 
 export type SandboxStatus = "provisioning" | "ready" | "running" | "stopped" | "failed";
 
@@ -15,6 +15,7 @@ export interface SandboxRecord {
     adapter?: DaemonAgentAdapter;
   }>>;
   disabledAgents?: AgentName[];
+  agentInventory?: Partial<Record<AgentName, DaemonAgentInventory>>;
   token?: string;
   tokenHash?: string;
   uiTokenHash?: string;

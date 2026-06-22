@@ -1,29 +1,49 @@
-import { type Dispatch, type SetStateAction } from "react";
+import { forwardRef, memo, useImperativeHandle, type Dispatch, type SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 import type { AgentName, AgentTaskMode } from "../../types";
 import { ActionSend, ActionStop } from "../icons";
 import { ModeToggle } from "./ModeToggle";
 import { MentionPopover } from "./MentionPopover";
-import type { useComposer } from "../../hooks/useComposer";
+import { useComposer } from "../../hooks/useComposer";
+
+export type ComposerHandle = {
+  clear: () => void;
+  closeMentions: () => void;
+  focus: () => void;
+  getText: () => string;
+};
 
 // Message composer: textarea with @mention autocomplete, mode toggle, and the
-// send/cancel control. Composer state lives in the host's useComposer bundle
-// (passed via `composer`); submit/cancel are delegated to the host.
-export function Composer({ composer, composerMode, setComposerMode, activeAgent, selectedEmployee, running, onSend, onCancelRun }: {
-  composer: ReturnType<typeof useComposer>;
+// send/cancel control. Draft state stays inside this component so every
+// keystroke does not re-render the full application shell and transcript.
+const ComposerView = forwardRef<ComposerHandle, {
+  agentNames: AgentName[];
+  disabledAgents?: AgentName[];
   composerMode: AgentTaskMode;
   setComposerMode: Dispatch<SetStateAction<AgentTaskMode>>;
   activeAgent: AgentName;
   selectedEmployee: string;
   running: boolean;
+  onAgentPicked: (agent: AgentName) => void;
   onSend: () => void;
   onCancelRun: () => void;
-}) {
+}>(function Composer({ agentNames, disabledAgents, composerMode, setComposerMode, activeAgent, selectedEmployee, running, onAgentPicked, onSend, onCancelRun }, ref) {
   const { t } = useTranslation();
+  const composer = useComposer({ agentNames, disabledAgents, onAgentPicked });
   const {
     composerText, setComposerText, mentionOpen, setMentionOpen, mentionIndex, setMentionIndex,
     setIsComposing, textareaRef, filteredMentionAgents, syncMentionState, insertMention,
   } = composer;
+
+  useImperativeHandle(ref, () => ({
+    clear: () => {
+      setComposerText("");
+      setMentionOpen(false);
+    },
+    closeMentions: () => setMentionOpen(false),
+    focus: () => textareaRef.current?.focus(),
+    getText: () => composerText,
+  }), [composerText, setComposerText, setMentionOpen, textareaRef]);
 
   return (
     <form className="composer" onSubmit={(e) => { e.preventDefault(); onSend(); }}>
@@ -99,4 +119,6 @@ export function Composer({ composer, composerMode, setComposerMode, activeAgent,
       </div>
     </form>
   );
-}
+});
+
+export const Composer = memo(ComposerView);

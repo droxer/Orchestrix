@@ -1,25 +1,15 @@
 "use client";
 
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-export interface McpServer {
-  name: string;
-  transport: "stdio" | "sse" | "http";
-  status: "connected" | "disconnected" | "error";
-  toolCount?: number;
-  description?: string;
-  command?: string;
-}
-
-// ── Static sample — replace with API call once /mcp-servers endpoint exists ───
-const SAMPLE_SERVERS: McpServer[] = [];
+import { useAgentInventoryNodes } from "../hooks/useAgentInventory";
+import { aggregateMcpByAgent, totalItemCount } from "../lib/agentInventory";
+import type { AgentName, DaemonAgentMcpServer, DaemonMcpTransport } from "../types";
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function TransportBadge({ transport }: { transport: McpServer["transport"] }) {
+function TransportBadge({ transport }: { transport: DaemonMcpTransport }) {
   const tinted = transport === "sse" || transport === "http";
   return (
     <span
@@ -33,56 +23,39 @@ function TransportBadge({ transport }: { transport: McpServer["transport"] }) {
   );
 }
 
-function StatusDot({ status }: { status: McpServer["status"] }) {
-  const { t } = useTranslation();
+function ServerCard({ server }: { server: DaemonAgentMcpServer }) {
   return (
-    <span
-      className={cn(
-        "size-2 shrink-0 rounded-full",
-        status === "connected" ? "bg-success" : status === "error" ? "bg-danger" : "bg-muted-soft",
+    <div className="flex flex-col gap-sm rounded-md border border-l-[3px] border-hairline border-l-hairline bg-background p-base transition-[box-shadow,border-color] duration-150 hover:shadow-[var(--shadow-soft)]">
+      <div className="flex items-center justify-between gap-sm">
+        <h3 className="mono m-0 min-w-0 truncate text-base font-semibold text-ink">{server.name}</h3>
+        <TransportBadge transport={server.transport} />
+      </div>
+      {server.command && (
+        <span className="mono mt-auto truncate text-xs text-muted-soft">{server.command}</span>
       )}
-      data-status={status}
-      aria-label={t(`mcp.status_${status}`, { defaultValue: status })}
-    />
+    </div>
   );
 }
 
-function ServerCard({ server }: { server: McpServer }) {
+function AgentSection({ agent, servers }: { agent: AgentName; servers: DaemonAgentMcpServer[] }) {
   const { t } = useTranslation();
-  const leftBorder =
-    server.status === "connected"
-      ? "border-l-success"
-      : server.status === "error"
-        ? "border-l-danger"
-        : "border-l-hairline";
   return (
-    <div
-      className={cn(
-        "flex flex-col gap-sm rounded-md border border-l-[3px] border-hairline bg-background p-base transition-[box-shadow,border-color] duration-150 hover:shadow-[var(--shadow-soft)]",
-        leftBorder,
-      )}
-    >
-      <div className="flex items-center justify-between gap-sm">
-        <div className="flex min-w-0 items-center gap-xs">
-          <StatusDot status={server.status} />
-          <h3 className="mono m-0 truncate text-base font-semibold text-ink">{server.name}</h3>
+    <div className="mb-lg last:mb-0">
+      <div className="mb-md flex items-baseline gap-sm">
+        <span className="text-base font-semibold text-ink" translate="no">
+          {agent}
+        </span>
+        <span className="mono text-xs font-medium text-muted-foreground">{servers.length}</span>
+      </div>
+      {servers.length === 0 ? (
+        <p className="text-sm text-muted-soft">{t("mcp.agent_empty")}</p>
+      ) : (
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-base">
+          {servers.map((server) => (
+            <ServerCard key={server.name} server={server} />
+          ))}
         </div>
-        <TransportBadge transport={server.transport} />
-      </div>
-      {server.description && (
-        <p className="m-0 flex-1 text-sm leading-normal text-body">{server.description}</p>
       )}
-      <div className="mt-auto flex items-center justify-between gap-sm">
-        {server.command && (
-          <span className="mono max-w-[160px] truncate text-xs text-muted-soft">{server.command}</span>
-        )}
-        {server.toolCount !== undefined && (
-          <span className="flex shrink-0 items-baseline gap-1">
-            <span className="mono text-md font-semibold leading-none text-ink">{server.toolCount}</span>
-            <span className="text-xs font-medium text-muted-foreground">{t("mcp.tools")}</span>
-          </span>
-        )}
-      </div>
     </div>
   );
 }
@@ -102,9 +75,7 @@ function EmptyState() {
         </svg>
       </div>
       <h3 className="m-0 text-lg font-semibold text-balance text-ink">{t("mcp.no_servers_title")}</h3>
-      <p className="m-0 text-sm leading-loose text-body">
-        {t("mcp.no_servers_body")}
-      </p>
+      <p className="m-0 text-sm leading-loose text-body">{t("mcp.no_servers_body")}</p>
       <a
         className="mt-xs inline-block text-sm font-medium text-primary no-underline transition-opacity duration-[120ms] hover:opacity-75"
         href="https://modelcontextprotocol.io"
@@ -121,10 +92,10 @@ function EmptyState() {
 
 export function McpPage() {
   const { t } = useTranslation();
-  const servers = SAMPLE_SERVERS;
+  const { nodes } = useAgentInventoryNodes();
 
-  const connected = servers.filter((s) => s.status === "connected").length;
-  const total = servers.length;
+  const groups = useMemo(() => aggregateMcpByAgent(nodes), [nodes]);
+  const total = totalItemCount(groups);
 
   return (
     <section className="mcp-page flex min-h-0 flex-col overflow-y-auto bg-background">
@@ -134,15 +105,7 @@ export function McpPage() {
           <span className="mono text-xs font-medium text-muted-foreground">{t("mcp.sub")}</span>
         </div>
         {total > 0 && (
-          <div className="flex items-center gap-sm">
-            <span className="flex items-center gap-xs text-sm text-muted-foreground">
-              <span
-                className={cn("size-[7px] shrink-0 rounded-full", connected > 0 ? "bg-success" : "bg-muted-soft")}
-                aria-hidden="true"
-              />
-              <span className="mono">{t("mcp.connected_stat", { connected, total })}</span>
-            </span>
-          </div>
+          <span className="mono text-xs font-medium text-muted-foreground">{t("mcp.total", { count: total })}</span>
         )}
       </header>
 
@@ -150,14 +113,9 @@ export function McpPage() {
         {total === 0 ? (
           <EmptyState />
         ) : (
-          <>
-            <div className="mono mb-md text-xs font-semibold text-muted-foreground">{t("mcp.configured_servers")}</div>
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-base">
-              {servers.map((server) => (
-                <ServerCard key={server.name} server={server} />
-              ))}
-            </div>
-          </>
+          groups.map((group) => (
+            <AgentSection key={group.agent} agent={group.agent} servers={group.items} />
+          ))
         )}
       </div>
     </section>

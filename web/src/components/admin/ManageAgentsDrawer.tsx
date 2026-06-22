@@ -127,26 +127,63 @@ export function ManageAgentsDrawer({ open, onClose, node, onUpdated }: ManageAge
           const agentStatus = node.agents[agent] ?? "unknown";
           const tone = agentStatusTone(agentStatus);
           const isEnabled = !disabled.has(agent);
+          const inventory = node.agentInventory?.[agent];
+          const skills = inventory?.skills ?? [];
+          const mcpServers = inventory?.mcpServers ?? [];
           return (
-            <li key={agent} className="adm-agent-toggle-row">
-              <div className="adm-agent-toggle-meta">
-                <span className="adm-agent-toggle-name" translate="no">{agent}</span>
-                <span className={`adm-agent-chip tone-${tone}`}>{t(`status.${agentStatus}`, { defaultValue: agentStatus })}</span>
+            <li key={agent} className="adm-agent-toggle-item">
+              <div className="adm-agent-toggle-row">
+                <div className="adm-agent-toggle-meta">
+                  <span className="adm-agent-toggle-name" translate="no">{agent}</span>
+                  <span className={`adm-agent-chip tone-${tone}`}>{t(`status.${agentStatus}`, { defaultValue: agentStatus })}</span>
+                </div>
+                <label className="adm-agent-toggle-switch">
+                  <input
+                    type="checkbox"
+                    checked={isEnabled}
+                    onChange={() => toggle(agent)}
+                    disabled={saving}
+                    aria-label={
+                      isEnabled
+                        ? t("admin.v2.disable_agent", { agent })
+                        : t("admin.v2.enable_agent", { agent })
+                    }
+                  />
+                  <span>{isEnabled ? t("admin.v2.agent_enabled") : t("admin.v2.agent_disabled")}</span>
+                </label>
               </div>
-              <label className="adm-agent-toggle-switch">
-                <input
-                  type="checkbox"
-                  checked={isEnabled}
-                  onChange={() => toggle(agent)}
-                  disabled={saving}
-                  aria-label={
-                    isEnabled
-                      ? t("admin.v2.disable_agent", { agent })
-                      : t("admin.v2.enable_agent", { agent })
-                  }
-                />
-                <span>{isEnabled ? t("admin.v2.agent_enabled") : t("admin.v2.agent_disabled")}</span>
-              </label>
+              <div className="adm-agent-inventory">
+                {skills.length === 0 && mcpServers.length === 0 ? (
+                  <span className="adm-agent-inventory-empty">{t("admin.v2.agent_no_inventory")}</span>
+                ) : (
+                  <>
+                    {skills.length > 0 && (
+                      <div className="adm-agent-inventory-group">
+                        <span className="adm-agent-inventory-label">{t("admin.v2.agent_skills", { count: skills.length })}</span>
+                        <span className="adm-agent-inventory-pills">
+                          {skills.map((skill) => (
+                            <span key={`${skill.namespace ?? ""}/${skill.name}`} className="adm-agent-inventory-pill" title={skill.description ?? skill.name}>
+                              {skill.name}
+                            </span>
+                          ))}
+                        </span>
+                      </div>
+                    )}
+                    {mcpServers.length > 0 && (
+                      <div className="adm-agent-inventory-group">
+                        <span className="adm-agent-inventory-label">{t("admin.v2.agent_mcp", { count: mcpServers.length })}</span>
+                        <span className="adm-agent-inventory-pills">
+                          {mcpServers.map((server) => (
+                            <span key={server.name} className="adm-agent-inventory-pill" title={server.command ?? server.name}>
+                              {server.name}
+                            </span>
+                          ))}
+                        </span>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </li>
           );
         })}

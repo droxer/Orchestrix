@@ -157,6 +157,85 @@ function collectKimiCodePath(sourceHome: string, path: string, files: KimiCodeFi
   files.push({ relativePath, content: readFileSync(path) });
 }
 
+// ── Agent skills (Claude Code SKILL.md directories) ─────────────────────────
+// Skills are not secret, so they go in with world-readable perms. The source
+// directory on the host is configured via RELAY_AGENT_SKILLS_DIR; every file
+// under it is mirrored into the agent's ~/.claude/skills inside the node.
+
+const GUEST_AGENT_SKILLS_DIR = "/home/agent/.claude/skills";
+
+interface SkillFile {
+  relativePath: string;
+  content: Buffer;
+}
+
+export function hostAgentSkillsDir(): string | undefined {
+  const raw = process.env.RELAY_AGENT_SKILLS_DIR?.trim();
+  return raw ? resolve(raw) : undefined;
+}
+
+function collectSkillFiles(sourceDir: string): SkillFile[] {
+  const files: SkillFile[] = [];
+  collectSkillPath(sourceDir, sourceDir, files);
+  return files;
+}
+
+function collectSkillPath(sourceDir: string, path: string, files: SkillFile[]): void {
+  const stat = statSync(path);
+  if (stat.isDirectory()) {
+    for (const child of readdirSync(path).sort()) collectSkillPath(sourceDir, join(path, child), files);
+    return;
+  }
+  if (!stat.isFile()) return;
+  const relativePath = relative(sourceDir, path).split(sep).join(posix.sep);
+  if (!relativePath || relativePath.startsWith("../") || relativePath === "..") return;
+  files.push({ relativePath, content: readFileSync(path) });
+}
+
+function resolveSkillSource(): string | undefined {
+  const sourceDir = hostAgentSkillsDir();
+  if (!sourceDir) return undefined;
+  if (!existsSync(sourceDir)) {
+    throw new Error(`RELAY_AGENT_SKILLS_DIR points at ${sourceDir}, which does not exist.`);
+  }
+  return sourceDir;
+}
+
+/** Mirror the configured host skills into a node home (`none` sandbox mode). */
+export function prepareHostAgentSkills(targetDir: string): void {
+  const sourceDir = resolveSkillSource();
+  if (!sourceDir) return;
+  for (const file of collectSkillFiles(sourceDir)) {
+    const target = join(targetDir, file.relativePath);
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, file.content, { mode: 0o644 });
+  }
+}
+
+/** Inject the configured host skills into the guest VM (`boxlite` mode). */
+export async function prepareGuestAgentSkills(signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) throw new Error("Skill provisioning cancelled.");
+  const sourceDir = resolveSkillSource();
+  if (!sourceDir) return;
+  const files = collectSkillFiles(sourceDir);
+  if (files.length === 0) return;
+  const script = ["set -eu", `mkdir -p ${shellQuote(GUEST_AGENT_SKILLS_DIR)}`];
+  for (const file of files) {
+    const target = posix.join(GUEST_AGENT_SKILLS_DIR, ...file.relativePath.split(posix.sep));
+    script.push(
+      `mkdir -p ${shellQuote(posix.dirname(target))}`,
+      `printf %s ${shellQuote(file.content.toString("base64"))} | base64 -d > ${shellQuote(target)}`,
+    );
+  }
+  script.push(`chown -R agent:agent ${shellQuote(GUEST_AGENT_SKILLS_DIR)}`);
+  const command = script.join("; ");
+  const result = await collectExecution(await activeBox().exec("bash", ["-c", command]), false, undefined, undefined, undefined, signal);
+  if (result.exit_code !== 0) {
+    const detail = (result.stderr || result.stdout).trim();
+    throw new Error(`Failed to install agent skills in the guest. ${detail}`);
+  }
+}
+
 export async function prepareGuestAgentAuth(agents: Iterable<AgentName> = ["codex", "pi"], signal?: AbortSignal): Promise<void> {
   if (signal?.aborted) throw new Error("Agent auth setup cancelled.");
   const selectedAgents = new Set(agents);

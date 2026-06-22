@@ -12,6 +12,28 @@ export interface DaemonAgentHealth {
   adapter?: DaemonAgentAdapter;
 }
 
+export type DaemonMcpTransport = "stdio" | "sse" | "http";
+
+/** A SKILL.md directory installed in an agent's home inside the node. */
+export interface DaemonAgentSkill {
+  name: string;
+  namespace?: string;
+  description?: string;
+}
+
+/** An MCP server configured for an agent CLI inside the node. */
+export interface DaemonAgentMcpServer {
+  name: string;
+  transport: DaemonMcpTransport;
+  command?: string;
+}
+
+/** What an agent CLI actually has installed inside the node. */
+export interface DaemonAgentInventory {
+  skills: DaemonAgentSkill[];
+  mcpServers: DaemonAgentMcpServer[];
+}
+
 export const DAEMON_NODE_PROTOCOL_VERSION = 1 as const;
 export const DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS: readonly number[] = [1];
 
@@ -23,6 +45,7 @@ export interface DaemonNodeRegistration {
   protocolVersion: number;
   supportedAgents: AgentName[];
   agentHealth?: Partial<Record<AgentName, DaemonAgentHealth>>;
+  agentInventory?: Partial<Record<AgentName, DaemonAgentInventory>>;
   status?: DaemonNodeStatus;
 }
 

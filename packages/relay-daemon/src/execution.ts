@@ -5,6 +5,7 @@ import {
   collectExecution,
   ensureLocalDevboxOci,
   prepareGuestAgentAuth,
+  prepareGuestAgentSkills,
   prepareGuestWorkspace,
   setSessionBox,
   stopSessionBox,
@@ -43,6 +44,7 @@ export interface ExecutionManager {
   removeSandbox(runtime: BoxLiteRuntime, boxName: string): Promise<void>;
   prepareWorkspace(hostWorkspace: string): Promise<[number, number]>;
   prepareAgentAuth(agents: Iterable<AgentName>, signal?: AbortSignal): Promise<void>;
+  prepareAgentSkills(signal?: AbortSignal): Promise<void>;
   execStream(
     cmd: string,
     args?: string[],
@@ -94,6 +96,10 @@ export class BoxLiteExecutionManager implements ExecutionManager {
 
   async prepareAgentAuth(agents: Iterable<AgentName>, signal?: AbortSignal): Promise<void> {
     await prepareGuestAgentAuth(agents, signal);
+  }
+
+  async prepareAgentSkills(signal?: AbortSignal): Promise<void> {
+    await prepareGuestAgentSkills(signal);
   }
 
   async execStream(

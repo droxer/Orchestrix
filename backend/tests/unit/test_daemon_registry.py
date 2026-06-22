@@ -550,3 +550,59 @@ def test_set_disabled_agents_blocks_dispatch_and_survives_restart() -> None:
                 registry.set_disabled_agents("sbx_alice", ["bogus"])
 
     asyncio.run(run_flow())
+
+
+def test_register_sanitizes_and_exposes_agent_inventory() -> None:
+    with TemporaryDirectory() as root:
+        session_store = LocalSessionStore(root)
+        daemon_store = LocalDaemonStore(root)
+        registry = DaemonNodeRegistry(session_store, daemon_store)
+        registry.register({
+            "sandboxId": "sbx_inv",
+            "employeeId": "alice",
+            "token": "node_token",
+            "workspacePath": "/workspace/alice",
+            "protocolVersion": 1,
+            "supportedAgents": ["claude"],
+            "status": "ready",
+            "agentInventory": {
+                "claude": {
+                    "skills": [
+                        {"name": "brainstorming", "namespace": "superpowers", "description": "Ideas."},
+                        {"name": "", "description": "dropped: no name"},
+                        "not-a-dict",
+                    ],
+                    "mcpServers": [
+                        {"name": "codegraph", "transport": "stdio", "command": "codegraph"},
+                        {"name": "remote", "transport": "bogus"},
+                    ],
+                },
+                "bogus-agent": {"skills": [{"name": "x"}]},
+                "codex": {"skills": [], "mcpServers": []},
+            },
+        }, "ui_token")
+
+        node = next(n for n in registry.control_panel_nodes() if n["id"] == "sbx_inv")
+        inventory = node["agentInventory"]
+        assert set(inventory.keys()) == {"claude"}  # empty + unknown agents dropped
+        assert inventory["claude"]["skills"] == [
+            {"name": "brainstorming", "namespace": "superpowers", "description": "Ideas."},
+        ]
+        assert inventory["claude"]["mcpServers"] == [
+            {"name": "codegraph", "transport": "stdio", "command": "codegraph"},
+            {"name": "remote", "transport": "stdio"},  # unknown transport coerced
+        ]
+
+
+def test_register_without_inventory_omits_field() -> None:
+    with TemporaryDirectory() as root:
+        registry = DaemonNodeRegistry(LocalSessionStore(root), LocalDaemonStore(root))
+        registry.register({
+            "sandboxId": "sbx_none",
+            "token": "node_token",
+            "protocolVersion": 1,
+            "supportedAgents": ["claude"],
+            "status": "ready",
+        }, "ui_token")
+        node = next(n for n in registry.control_panel_nodes() if n["id"] == "sbx_none")
+        assert "agentInventory" not in node
