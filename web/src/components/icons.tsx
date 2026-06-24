@@ -8,12 +8,16 @@ import {
   CircleAlert,
   CircleCheck,
   CircleStop,
+  ClipboardList,
+  CalendarDays,
   Code2,
   Forward,
+  Play,
   Info,
   KeyRound,
   Library,
   LogOut,
+  MessageSquareMore,
   MessagesSquare,
   PanelLeftClose,
   PanelLeftOpen,
@@ -58,6 +62,8 @@ function withStandardStroke(Icon: LucideIcon, displayName: string) {
 // here — no caller in the app has to know which lucide picture we chose.
 export const NavConversations = withStandardStroke(MessagesSquare, "NavConversations");
 export const NavAdmin = withStandardStroke(UserCog, "NavAdmin");
+export const NavBacklog = withStandardStroke(ClipboardList, "NavBacklog");
+export const NavChannels = withStandardStroke(MessageSquareMore, "NavChannels");
 export const NavMcp = withStandardStroke(Plug, "NavMcp");
 export const NavSkills = withStandardStroke(Library, "NavSkills");
 export const NavPreferences = withStandardStroke(Settings, "NavPreferences");
@@ -72,10 +78,12 @@ export const ActionCompose = withStandardStroke(SquarePen, "ActionCompose");
 export const ActionSend = withStandardStroke(ArrowUp, "ActionSend");
 export const ActionApprove = withStandardStroke(Check, "ActionApprove");
 export const ActionHandoff = withStandardStroke(Forward, "ActionHandoff");
+export const ActionStart = withStandardStroke(Play, "ActionStart");
 export const ActionStop = withStandardStroke(CircleStop, "ActionStop");
 export const ActionAddPerson = withStandardStroke(UserPlus, "ActionAddPerson");
 export const ActionRemove = withStandardStroke(X, "ActionRemove");
 export const ActionSearch = withStandardStroke(Search, "ActionSearch");
+export const ActionCalendar = withStandardStroke(CalendarDays, "ActionCalendar");
 export const ActionKey = withStandardStroke(KeyRound, "ActionKey");
 
 export const ModeAction = withStandardStroke(Code2, "ModeAction");

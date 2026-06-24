@@ -96,6 +96,19 @@
   align-items: stretch;
 }
 
+.sidenav-separator {
+  width: 28px;
+  height: 1px;
+  margin: var(--space-xs) 0;
+  background: var(--color-hairline-soft);
+  flex-shrink: 0;
+}
+
+.sidenav-panel[data-expanded="true"] .sidenav-separator {
+  width: auto;
+  margin: var(--space-xs) var(--space-sm);
+}
+
 .sidenav-bottom {
   display: flex;
   flex-direction: column;
@@ -108,6 +121,64 @@
 
 .sidenav-panel[data-expanded="true"] .sidenav-bottom {
   align-items: stretch;
+}
+
+.sidenav-settings-menu {
+  position: fixed;
+  min-width: 180px;
+  padding: var(--space-xs);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-lift);
+  transform: translateY(-100%);
+  z-index: 120;
+  animation: settings-menu-in var(--duration-fast) var(--ease-standard) both;
+}
+
+.sidenav-settings-menu button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  min-height: 38px;
+  padding: 0 var(--space-sm);
+  border: 1px solid transparent;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--color-ink);
+  font: var(--type-nav-link);
+  text-align: left;
+  cursor: pointer;
+}
+
+.sidenav-settings-menu button:hover {
+  background: var(--color-surface-strong);
+  border-color: var(--color-hairline-soft);
+}
+
+.sidenav-settings-menu button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.sidenav-settings-menu button.danger {
+  color: var(--color-semantic-down);
+}
+
+.sidenav-settings-menu svg {
+  flex-shrink: 0;
+}
+
+@keyframes settings-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-100% + 4px));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-100%);
+  }
 }
 
 .sidenav-btn {
@@ -217,6 +288,9 @@
 .sidenav-panel[data-expanded="true"] .sidenav-btn:nth-child(2) .sidenav-label { transition-delay: 55ms; }
 .sidenav-panel[data-expanded="true"] .sidenav-btn:nth-child(3) .sidenav-label { transition-delay: 80ms; }
 .sidenav-panel[data-expanded="true"] .sidenav-btn:nth-child(4) .sidenav-label { transition-delay: 105ms; }
+.sidenav-panel[data-expanded="true"] .sidenav-btn:nth-child(5) .sidenav-label { transition-delay: 120ms; }
+.sidenav-panel[data-expanded="true"] .sidenav-btn:nth-child(6) .sidenav-label { transition-delay: var(--duration-fast); }
+.sidenav-panel[data-expanded="true"] .sidenav-btn:nth-child(7) .sidenav-label { transition-delay: var(--duration-fast); }
 .sidenav-panel[data-expanded="true"] .sidenav-bottom .sidenav-btn:nth-child(1) .sidenav-label { transition-delay: 120ms; }
 .sidenav-panel[data-expanded="true"] .sidenav-bottom .sidenav-btn:nth-child(2) .sidenav-label { transition-delay: var(--duration-fast); }
 

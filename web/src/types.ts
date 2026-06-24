@@ -7,8 +7,11 @@ import type {
   DaemonAgentSkill,
   DaemonMcpTransport,
   DaemonNodeMonitorRecord,
+  RelayTask,
   RelaySession,
   SandboxRecord,
+  TaskPriority,
+  TaskStatus,
   TokenUsage,
 } from "relay-core";
 
@@ -21,8 +24,11 @@ export type {
   DaemonAgentSkill,
   DaemonMcpTransport,
   DaemonNodeMonitorRecord,
+  RelayTask,
   RelaySession,
   SandboxRecord,
+  TaskPriority,
+  TaskStatus,
   TokenUsage,
 };
 
@@ -39,6 +45,10 @@ export type Tone = "good" | "bad" | "warn" | "info" | "neutral";
 
 export interface SessionsResponse {
   sessions: RelaySession[];
+}
+
+export interface TasksResponse {
+  tasks: RelayTask[];
 }
 
 export interface SandboxesResponse {
@@ -127,6 +137,25 @@ export interface CreateSessionInput {
   assignments: RunInput["assignments"];
   workspacePath?: string;
   ownerEmployeeId?: string;
+}
+
+export interface TaskMutationInput {
+  title?: string;
+  description?: string;
+  priority?: TaskPriority;
+  status?: TaskStatus;
+  dueDate?: string;
+  assigneeEmployeeId?: string;
+  assignedAgent?: AgentName;
+}
+
+export interface CreateTaskInput extends TaskMutationInput {
+  title: string;
+}
+
+export interface StartTaskResponse {
+  task: RelayTask;
+  session: RelaySession | null;
 }
 
 export interface ApiErrorBody {

@@ -23,6 +23,10 @@ export interface RelayTask {
   status: TaskStatus;
   /** Employee who owns this task; their agent carries it out on their behalf. */
   ownerEmployeeId?: string;
+  /** Human assignee responsible for the backlog item. */
+  assigneeEmployeeId?: string;
+  /** Date-only due date in YYYY-MM-DD format. */
+  dueDate?: string;
   assignedAgent?: AgentName;
   linkedSessionIds: string[];
   activity: RelayTaskActivity[];
@@ -41,6 +45,8 @@ export type RelayTaskEvent =
       description: string;
       priority: TaskPriority;
       ownerEmployeeId?: string;
+      assigneeEmployeeId?: string;
+      dueDate?: string;
     }
   | {
       id: string;
@@ -50,6 +56,8 @@ export type RelayTaskEvent =
       title?: string;
       description?: string;
       priority?: TaskPriority;
+      assigneeEmployeeId?: string;
+      dueDate?: string;
     }
   | {
       id: string;
@@ -89,12 +97,15 @@ export interface TaskStore {
     status?: TaskStatus;
     assignedAgent?: AgentName;
     ownerEmployeeId?: string;
+    assigneeEmployeeId?: string;
+    dueDate?: string;
   }): Promise<RelayTask>;
   appendEvent(taskId: string, event: RelayTaskEvent): Promise<RelayTask>;
   getTask(taskId: string): Promise<RelayTask>;
   listTasks(): Promise<RelayTask[]>;
-  updateTask(taskId: string, input: { title?: string; description?: string; priority?: TaskPriority; status?: TaskStatus }): Promise<RelayTask>;
+  updateTask(taskId: string, input: { title?: string; description?: string; priority?: TaskPriority; status?: TaskStatus; assigneeEmployeeId?: string; dueDate?: string }): Promise<RelayTask>;
   assignTask(taskId: string, agent: AgentName): Promise<RelayTask>;
+  claimNextTaskForAgent(agent: AgentName, assigneeEmployeeId?: string): Promise<RelayTask | undefined>;
   linkSession(taskId: string, sessionId: string): Promise<RelayTask>;
   recordActivity(taskId: string, message: string, input?: { agent?: AgentName; sessionId?: string }): Promise<RelayTask>;
 }
@@ -114,6 +125,8 @@ export class LocalTaskStore implements TaskStore {
     status?: TaskStatus;
     assignedAgent?: AgentName;
     ownerEmployeeId?: string;
+    assigneeEmployeeId?: string;
+    dueDate?: string;
   }): Promise<RelayTask> {
     const taskId = newRelayId("task");
     const dir = this.taskDir(taskId);
@@ -124,6 +137,8 @@ export class LocalTaskStore implements TaskStore {
         description: input.description ?? "",
         priority: input.priority ?? "normal",
         ...(input.ownerEmployeeId ? { ownerEmployeeId: input.ownerEmployeeId } : {}),
+        ...(input.assigneeEmployeeId ? { assigneeEmployeeId: input.assigneeEmployeeId } : {}),
+        ...(input.dueDate ? { dueDate: input.dueDate } : {}),
       }),
     ];
     if (input.assignedAgent) {
@@ -162,11 +177,13 @@ export class LocalTaskStore implements TaskStore {
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 
-  async updateTask(taskId: string, input: { title?: string; description?: string; priority?: TaskPriority; status?: TaskStatus }): Promise<RelayTask> {
+  async updateTask(taskId: string, input: { title?: string; description?: string; priority?: TaskPriority; status?: TaskStatus; assigneeEmployeeId?: string; dueDate?: string }): Promise<RelayTask> {
     let task = await this.appendEvent(taskId, relayTaskEvent("task.updated", taskId, {
       title: input.title,
       description: input.description,
       priority: input.priority,
+      assigneeEmployeeId: input.assigneeEmployeeId,
+      dueDate: input.dueDate,
     }));
     if (input.status) {
       task = await this.appendEvent(taskId, relayTaskEvent("task.status", taskId, { status: input.status }));
@@ -178,6 +195,18 @@ export class LocalTaskStore implements TaskStore {
     let task = await this.appendEvent(taskId, relayTaskEvent("task.assigned", taskId, { agent }));
     task = await this.appendEvent(taskId, relayTaskEvent("task.status", taskId, { status: "assigned" }));
     return this.recordActivity(taskId, `Assigned to ${agent}.`, { agent });
+  }
+
+  async claimNextTaskForAgent(agent: AgentName, assigneeEmployeeId?: string): Promise<RelayTask | undefined> {
+    const candidates = (await this.listTasks()).filter((task) =>
+      task.status === "assigned"
+      && task.assignedAgent === agent
+      && (!assigneeEmployeeId || task.assigneeEmployeeId === assigneeEmployeeId || task.ownerEmployeeId === assigneeEmployeeId)
+    );
+    const task = candidates.sort(taskClaimSortKey)[0];
+    if (!task) return undefined;
+    await this.appendEvent(task.id, relayTaskEvent("task.status", task.id, { status: "running" }));
+    return this.recordActivity(task.id, `Claimed by ${agent}.`, { agent });
   }
 
   async linkSession(taskId: string, sessionId: string): Promise<RelayTask> {
@@ -258,6 +287,8 @@ export function materializeTaskEvents(events: RelayTaskEvent[]): RelayTask {
     description: created.description,
     priority: created.priority,
     ...(created.ownerEmployeeId ? { ownerEmployeeId: created.ownerEmployeeId } : {}),
+    ...(created.assigneeEmployeeId ? { assigneeEmployeeId: created.assigneeEmployeeId } : {}),
+    ...(created.dueDate ? { dueDate: created.dueDate } : {}),
     status: "backlog",
     linkedSessionIds: [],
     activity: [],
@@ -273,6 +304,14 @@ export function materializeTaskEvents(events: RelayTaskEvent[]): RelayTask {
       if (event.title !== undefined) task.title = event.title;
       if (event.description !== undefined) task.description = event.description;
       if (event.priority !== undefined) task.priority = event.priority;
+      if (event.assigneeEmployeeId !== undefined) {
+        if (event.assigneeEmployeeId) task.assigneeEmployeeId = event.assigneeEmployeeId;
+        else delete task.assigneeEmployeeId;
+      }
+      if (event.dueDate !== undefined) {
+        if (event.dueDate) task.dueDate = event.dueDate;
+        else delete task.dueDate;
+      }
     } else if (event.type === "task.assigned") {
       task.assignedAgent = event.agent;
     } else if (event.type === "task.status") {
@@ -284,6 +323,13 @@ export function materializeTaskEvents(events: RelayTaskEvent[]): RelayTask {
     }
   }
   return task;
+}
+
+function taskClaimSortKey(left: RelayTask, right: RelayTask): number {
+  const priorityRank = (task: RelayTask) => ({ high: 0, normal: 1, low: 2 })[task.priority] ?? 1;
+  return priorityRank(left) - priorityRank(right)
+    || (left.dueDate ?? "9999-12-31").localeCompare(right.dueDate ?? "9999-12-31")
+    || left.createdAt.localeCompare(right.createdAt);
 }
 
 export function taskPriority(value: unknown): TaskPriority | undefined {

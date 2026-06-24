@@ -8,15 +8,23 @@
    skills.css alongside the other small-screen route rules.
    ===================================================================== */
 
+.messenger-shell[data-route="channels"],
+.messenger-shell[data-route="channels"][data-settings="open"],
 .messenger-shell[data-route="mcp"],
 .messenger-shell[data-route="mcp"][data-settings="open"],
+.messenger-shell[data-route="backlog"],
+.messenger-shell[data-route="backlog"][data-settings="open"],
 .messenger-shell[data-route="skills"],
 .messenger-shell[data-route="skills"][data-settings="open"] {
   grid-template-columns: var(--sidenav-w) minmax(0, 1fr);
 }
 
+.messenger-shell[data-route="channels"][data-sidenav="open"],
+.messenger-shell[data-route="channels"][data-sidenav="open"][data-settings="open"],
 .messenger-shell[data-route="mcp"][data-sidenav="open"],
 .messenger-shell[data-route="mcp"][data-sidenav="open"][data-settings="open"],
+.messenger-shell[data-route="backlog"][data-sidenav="open"],
+.messenger-shell[data-route="backlog"][data-sidenav="open"][data-settings="open"],
 .messenger-shell[data-route="skills"][data-sidenav="open"],
 .messenger-shell[data-route="skills"][data-sidenav="open"][data-settings="open"] {
   grid-template-columns: var(--sidenav-w-open) minmax(0, 1fr);

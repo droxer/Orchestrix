@@ -1,9 +1,9 @@
 "use client";
 
 import { useTranslation } from "react-i18next";
-import { LayoutDashboard, MessageSquareMore, Server, Users } from "lucide-react";
+import { LayoutDashboard, Server, Users } from "lucide-react";
 
-export type AdminView = "dashboard" | "people" | "fleet" | "integrations";
+export type AdminView = "dashboard" | "people" | "fleet";
 
 interface NavRailProps {
   view: AdminView;
@@ -16,7 +16,6 @@ export function NavRail({ view, onChange }: NavRailProps) {
     { id: "dashboard", label: t("admin.v2.nav_dashboard"), icon: LayoutDashboard },
     { id: "people", label: t("admin.v2.nav_people"), icon: Users },
     { id: "fleet", label: t("admin.v2.nav_fleet"), icon: Server },
-    { id: "integrations", label: t("admin.v2.nav_integrations"), icon: MessageSquareMore },
   ];
 
   return (

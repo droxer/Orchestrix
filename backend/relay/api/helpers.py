@@ -213,10 +213,19 @@ def owner_employee_id_for_create(actor: dict[str, Any], body: dict[str, Any]) ->
     return actor["employeeId"]
 
 
+def assignee_employee_id_for_task(actor: dict[str, Any], body: dict[str, Any], fallback: str | None = None) -> str:
+    requested = string_field(body, "assigneeEmployeeId") or string_field(body, "assignee_employee_id")
+    if actor["isAdmin"] and requested:
+        return requested
+    if requested and requested == actor["employeeId"]:
+        return requested
+    return fallback or actor["employeeId"]
+
+
 def actor_can_access_record(actor: dict[str, Any], record: dict[str, Any]) -> bool:
     if actor["isAdmin"]:
         return True
-    return record.get("ownerEmployeeId") == actor["employeeId"]
+    return record.get("ownerEmployeeId") == actor["employeeId"] or record.get("assigneeEmployeeId") == actor["employeeId"]
 
 
 def actor_can_access_sandbox(actor: dict[str, Any], sandbox: dict[str, Any]) -> bool:

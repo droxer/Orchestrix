@@ -1,7 +1,7 @@
 import { useState, type Dispatch, type SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  NavAdmin, NavConversations, NavLogout, NavMcp, NavPreferences,
+  NavAdmin, NavBacklog, NavChannels, NavConversations, NavLogout, NavMcp, NavPreferences,
   NavSidebarCollapse, NavSidebarExpand, NavSkills,
 } from "./icons";
 import { RelayMark } from "./RelayMark";
@@ -21,6 +21,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, setRoute, 
 }) {
   const { t } = useTranslation();
   const [navTooltip, setNavTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
+  const [settingsMenu, setSettingsMenu] = useState<{ x: number; y: number } | null>(null);
 
   function showNavTooltip(text: string, el: HTMLElement) {
     if (sidenavExpanded) return;
@@ -28,6 +29,22 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, setRoute, 
     setNavTooltip({ text, x: rect.right + 12, y: rect.top + rect.height / 2 });
   }
   function hideNavTooltip() { setNavTooltip(null); }
+  function toggleSettingsMenu(el: HTMLElement) {
+    hideNavTooltip();
+    setSettingsMenu((current) => {
+      if (current) return null;
+      const rect = el.getBoundingClientRect();
+      return { x: rect.right + 10, y: rect.top - 8 };
+    });
+  }
+  function openPreferences() {
+    setSettingsMenu(null);
+    setPrefsOpen(true);
+  }
+  function handleLogout() {
+    setSettingsMenu(null);
+    onLogout();
+  }
 
   return (
     <aside className="sidenav-panel" aria-label="Relay" data-expanded={sidenavExpanded ? "true" : "false"}>
@@ -69,6 +86,23 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, setRoute, 
           <span className="sidenav-label">{t("nav.conversations")}</span>
         </button>
         <button
+          className={`sidenav-btn ${route === "backlog" ? "active" : ""}`}
+          data-nav="backlog"
+          type="button"
+          aria-label={t("nav.backlog_label")}
+          aria-pressed={route === "backlog"}
+          title={t("nav.backlog_label")}
+          onClick={() => setRoute((r) => r === "backlog" ? "main" : "backlog")}
+          onMouseEnter={(e) => showNavTooltip(t("nav.backlog"), e.currentTarget)}
+          onMouseLeave={hideNavTooltip}
+          onFocus={(e) => showNavTooltip(t("nav.backlog"), e.currentTarget)}
+          onBlur={hideNavTooltip}
+        >
+          <NavBacklog size={18} />
+          <span className="sidenav-label">{t("nav.backlog")}</span>
+        </button>
+        <div className="sidenav-separator" aria-hidden="true" />
+        <button
           className={`sidenav-btn ${route === "mcp" ? "active" : ""}`}
           data-nav="mcp"
           type="button"
@@ -102,6 +136,24 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, setRoute, 
         </button>
         {isAdmin ? (
           <button
+            className={`sidenav-btn ${route === "channels" ? "active" : ""}`}
+            data-nav="channels"
+            type="button"
+            aria-label={t("nav.channels_label")}
+            aria-pressed={route === "channels"}
+            title={t("nav.channels_label")}
+            onClick={() => setRoute((r) => r === "channels" ? "main" : "channels")}
+            onMouseEnter={(e) => showNavTooltip(t("nav.channels"), e.currentTarget)}
+            onMouseLeave={hideNavTooltip}
+            onFocus={(e) => showNavTooltip(t("nav.channels"), e.currentTarget)}
+            onBlur={hideNavTooltip}
+          >
+            <NavChannels size={18} />
+            <span className="sidenav-label">{t("nav.channels")}</span>
+          </button>
+        ) : null}
+        {isAdmin ? (
+          <button
             className={`sidenav-btn ${route === "admin" ? "active" : ""}`}
             data-nav="admin"
             type="button"
@@ -121,14 +173,14 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, setRoute, 
       </nav>
       <div className="sidenav-bottom">
         <button
-          className={`sidenav-btn ${prefsOpen ? "active" : ""}`}
+          className={`sidenav-btn ${prefsOpen || settingsMenu ? "active" : ""}`}
           data-nav="settings"
           type="button"
-          aria-haspopup="dialog"
-          aria-expanded={prefsOpen}
+          aria-haspopup="menu"
+          aria-expanded={settingsMenu ? true : undefined}
           aria-label={t("nav.settings")}
           title={t("nav.settings")}
-          onClick={() => setPrefsOpen((v) => !v)}
+          onClick={(event) => toggleSettingsMenu(event.currentTarget)}
           onMouseEnter={(e) => showNavTooltip(t("nav.settings"), e.currentTarget)}
           onMouseLeave={hideNavTooltip}
           onFocus={(e) => showNavTooltip(t("nav.settings"), e.currentTarget)}
@@ -137,22 +189,24 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, setRoute, 
           <NavPreferences size={18} />
           <span className="sidenav-label">{t("nav.settings")}</span>
         </button>
-        <button
-          type="button"
-          aria-label={t("nav.logout")}
-          className="sidenav-btn"
-          data-nav="logout"
-          onClick={onLogout}
-          title={t("nav.logout")}
-          onMouseEnter={(e) => showNavTooltip(t("nav.logout"), e.currentTarget)}
-          onMouseLeave={hideNavTooltip}
-          onFocus={(e) => showNavTooltip(t("nav.logout"), e.currentTarget)}
-          onBlur={hideNavTooltip}
-        >
-          <NavLogout size={18} />
-          <span className="sidenav-label">{t("nav.logout")}</span>
-        </button>
       </div>
+      {settingsMenu ? (
+        <div
+          className="sidenav-settings-menu"
+          role="menu"
+          aria-label={t("nav.settings")}
+          style={{ top: settingsMenu.y, left: settingsMenu.x }}
+        >
+          <button type="button" role="menuitem" onClick={openPreferences}>
+            <NavPreferences size={16} />
+            <span>{t("nav.preferences")}</span>
+          </button>
+          <button type="button" role="menuitem" className="danger" onClick={handleLogout}>
+            <NavLogout size={16} />
+            <span>{t("nav.logout")}</span>
+          </button>
+        </div>
+      ) : null}
       {navTooltip ? (
         <div
           className="sidenav-tooltip"

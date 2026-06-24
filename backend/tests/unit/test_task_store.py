@@ -10,11 +10,19 @@ from relay.stores import DatabaseTaskStore, LocalTaskStore
 def test_task_store_persists_assignment_status_activity_and_link() -> None:
     with TemporaryDirectory() as root:
         store = LocalTaskStore(root)
-        task = store.create_task({"title": "Add Kanban board", "description": "Show backlog.", "priority": "high"})
+        task = store.create_task({
+            "title": "Add Kanban board",
+            "description": "Show backlog.",
+            "priority": "high",
+            "assigneeEmployeeId": "alice",
+            "dueDate": "2026-06-30",
+        })
         task = store.assign_task(task["id"], "codex")
         task = store.link_session(task["id"], "ses_test")
         task = store.update_task(task["id"], {"status": "running"})
 
+        assert task["assigneeEmployeeId"] == "alice"
+        assert task["dueDate"] == "2026-06-30"
         assert task["assignedAgent"] == "codex"
         assert task["linkedSessionIds"] == ["ses_test"]
         assert task["status"] == "running"
@@ -46,13 +54,55 @@ def test_local_task_store_serializes_concurrent_appends() -> None:
 def test_database_task_store_persists_assignment_status_activity_and_link() -> None:
     with TemporaryDirectory() as root:
         store = DatabaseTaskStore(f"sqlite:///{root}/relay.db", create_schema=True)
-        task = store.create_task({"title": "Add Kanban board", "description": "Show backlog.", "priority": "high"})
+        task = store.create_task({
+            "title": "Add Kanban board",
+            "description": "Show backlog.",
+            "priority": "high",
+            "assigneeEmployeeId": "alice",
+            "dueDate": "2026-06-30",
+        })
         task = store.assign_task(task["id"], "codex")
         task = store.link_session(task["id"], "ses_test")
         task = store.update_task(task["id"], {"status": "running"})
 
+        assert task["assigneeEmployeeId"] == "alice"
+        assert task["dueDate"] == "2026-06-30"
         assert task["assignedAgent"] == "codex"
         assert task["linkedSessionIds"] == ["ses_test"]
         assert task["status"] == "running"
         assert store.list_tasks()[0]["id"] == task["id"]
         assert any("Assigned to codex" in item["message"] for item in task["activity"])
+
+
+def test_task_claim_orders_by_priority_due_date_and_assignee() -> None:
+    with TemporaryDirectory() as root:
+        store = LocalTaskStore(root)
+        later = store.create_task({"title": "Later", "priority": "high", "assigneeEmployeeId": "alice", "dueDate": "2026-07-10"})
+        earlier = store.create_task({"title": "Earlier", "priority": "high", "assigneeEmployeeId": "alice", "dueDate": "2026-06-25"})
+        wrong_assignee = store.create_task({"title": "Bob", "priority": "high", "assigneeEmployeeId": "bob", "dueDate": "2026-06-01"})
+        for task in (later, earlier, wrong_assignee):
+            store.assign_task(task["id"], "codex")
+
+        claimed = store.claim_next_task_for_agent("codex", "alice")
+
+        assert claimed is not None
+        assert claimed["id"] == earlier["id"]
+        assert claimed["status"] == "running"
+        assert store.get_task(wrong_assignee["id"])["status"] == "assigned"
+
+
+def test_database_task_claim_orders_by_priority_due_date_and_assignee() -> None:
+    with TemporaryDirectory() as root:
+        store = DatabaseTaskStore(f"sqlite:///{root}/relay.db", create_schema=True)
+        later = store.create_task({"title": "Later", "priority": "high", "assigneeEmployeeId": "alice", "dueDate": "2026-07-10"})
+        earlier = store.create_task({"title": "Earlier", "priority": "high", "assigneeEmployeeId": "alice", "dueDate": "2026-06-25"})
+        wrong_assignee = store.create_task({"title": "Bob", "priority": "high", "assigneeEmployeeId": "bob", "dueDate": "2026-06-01"})
+        for task in (later, earlier, wrong_assignee):
+            store.assign_task(task["id"], "codex")
+
+        claimed = store.claim_next_task_for_agent("codex", "alice")
+
+        assert claimed is not None
+        assert claimed["id"] == earlier["id"]
+        assert claimed["status"] == "running"
+        assert store.get_task(wrong_assignee["id"])["status"] == "assigned"

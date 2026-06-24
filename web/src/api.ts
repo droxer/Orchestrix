@@ -9,17 +9,22 @@ import type {
   CreateControlPanelDaemonNodeInput,
   CreateControlPanelDaemonNodeResponse,
   CreateSessionInput,
+  CreateTaskInput,
   ControlPanelDaemonNodesResponse,
   ControlPanelEmployeesResponse,
   CurrentUser,
   UnassignControlPanelDaemonNodeResponse,
   DaemonNodesResponse,
   RelaySession,
+  RelayTask,
   RunInput,
   SandboxesResponse,
   SandboxRecord,
   SessionsResponse,
+  StartTaskResponse,
   UserRole,
+  TaskMutationInput,
+  TasksResponse,
 } from "./types.js";
 
 export class RelayApiError extends Error {
@@ -182,6 +187,38 @@ export function createUser(input: { username: string; password: string; role?: U
 
 export function listSessions(signal?: AbortSignal): Promise<SessionsResponse> {
   return apiJson<SessionsResponse>("/sessions", { signal });
+}
+
+export function listTasks(signal?: AbortSignal): Promise<TasksResponse> {
+  return apiJson<TasksResponse>("/tasks", { signal });
+}
+
+export function createTask(input: CreateTaskInput): Promise<RelayTask> {
+  return apiJson<RelayTask>("/tasks", {
+    method: "POST",
+    body: input,
+  });
+}
+
+export function updateTask(taskId: string, input: TaskMutationInput): Promise<RelayTask> {
+  return apiJson<RelayTask>(`/tasks/${encodeURIComponent(taskId)}`, {
+    method: "PATCH",
+    body: input,
+  });
+}
+
+export function assignTask(taskId: string, agent: AgentName): Promise<RelayTask> {
+  return apiJson<RelayTask>(`/tasks/${encodeURIComponent(taskId)}/assign`, {
+    method: "POST",
+    body: { agent },
+  });
+}
+
+export function startTask(taskId: string, input: { agent?: AgentName; mode?: "action" | "review" } = {}): Promise<StartTaskResponse> {
+  return apiJson<StartTaskResponse>(`/tasks/${encodeURIComponent(taskId)}/start`, {
+    method: "POST",
+    body: input,
+  });
 }
 
 export async function readArtifactText(

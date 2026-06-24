@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+from datetime import date
 
 from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
@@ -11,6 +12,7 @@ from ..stores import task_priority, task_status, valid_agent
 from .deps import AppContextDep
 from .helpers import (
     actor_can_access_record,
+    assignee_employee_id_for_task,
     assignment_list,
     get_task_for_actor,
     json_body,
@@ -27,6 +29,74 @@ def task_goal_text(task: dict[str, Any]) -> str:
     return f"{task['title']}\n\n{task['description']}" if task.get("description") else task["title"]
 
 
+def date_field(body: dict[str, Any], key: str) -> str | None:
+    if key not in body:
+        return None
+    raw = body.get(key)
+    if raw in (None, ""):
+        return ""
+    if not isinstance(raw, str):
+        raise HTTPException(400, f"{key} must be a YYYY-MM-DD date.")
+    value = raw.strip()
+    try:
+        date.fromisoformat(value)
+    except ValueError:
+        raise HTTPException(400, f"{key} must be a YYYY-MM-DD date.")
+    return value
+
+
+def ready_node_for_task(ctx: AppContextDep, task: dict[str, Any], agent: str) -> dict[str, Any] | None:
+    employee_id = task.get("assigneeEmployeeId") or task.get("ownerEmployeeId")
+    for node in ctx.registry.list_ready():
+        if employee_id and node.get("employeeId") != employee_id:
+            continue
+        if node.get("status") != "ready" or not ctx.registry.is_live(node["id"]):
+            continue
+        if agent in set(node.get("disabledAgents") or []):
+            continue
+        if node.get("agents", {}).get(agent) == "ready":
+            return node
+    return None
+
+
+async def start_task_on_ready_node(
+    ctx: AppContextDep,
+    task: dict[str, Any],
+    actor: dict[str, Any],
+    *,
+    mode: str = "action",
+    record_pending: bool = True,
+) -> dict[str, Any] | None:
+    agent = valid_agent(task.get("assignedAgent"))
+    if not agent:
+        return None
+    if task.get("status") in ("running", "review", "waiting_for_human", "done"):
+        return None
+    node = ready_node_for_task(ctx, task, agent)
+    if not node:
+        if record_pending:
+            return {"task": ctx.task_store.record_activity(task["id"], f"No ready node is available for {agent}.", {"agent": agent}), "session": None}
+        return None
+    try:
+        run_request = {
+            "taskGoal": task_goal_text(task),
+            "assignments": [{"agent": agent, "mode": "review" if mode == "review" else "action"}],
+            "taskId": task["id"],
+            "actorIsAdmin": actor["isAdmin"],
+        }
+        if not actor["isAdmin"]:
+            run_request["actorEmployeeId"] = actor["employeeId"]
+        session = await ctx.backend.run(node["id"], run_request)
+    except ValueError as error:
+        if record_pending:
+            updated = ctx.task_store.record_activity(task["id"], str(error), {"agent": agent})
+            return {"task": updated, "session": None}
+        raise
+    updated_task = ctx.task_store.record_activity(task["id"], f"{agent} started the task.", {"agent": agent, "sessionId": session["id"]})
+    logger.info("Task started", task_id=task["id"], session_id=session["id"], agent=agent, node_id=node["id"])
+    return {"task": updated_task, "session": session}
+
+
 @router.get("/tasks")
 async def list_tasks(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     actor = request_actor(request, ctx.auth_store)
@@ -41,17 +111,23 @@ async def create_task(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     if not title:
         raise HTTPException(400, "title is required.")
     owner = owner_employee_id_for_create(actor, body)
+    assignee = assignee_employee_id_for_task(actor, body, owner)
     task = ctx.task_store.create_task({
         "title": title,
         "description": string_field(body, "description"),
         "priority": task_priority(body.get("priority")) or "normal",
         "ownerEmployeeId": owner,
+        "assigneeEmployeeId": assignee,
+        "dueDate": date_field(body, "dueDate"),
     })
     logger.info("Task created", task_id=task["id"], title=title, owner=owner)
     agent = valid_agent(body.get("assignedAgent"))
     if agent:
         task = ctx.task_store.assign_task(task["id"], agent)
         logger.info("Task assigned", task_id=task["id"], agent=agent)
+        started = await start_task_on_ready_node(ctx, task, actor)
+        if started:
+            task = started["task"]
     if body.get("createSession") is True or isinstance(body.get("assignments"), list):
         workspace_path = string_field(body, "workspacePath") or "/workspace"
         controller = SessionController(
@@ -88,15 +164,33 @@ async def get_task(task_id: str, request: Request, ctx: AppContextDep) -> dict[s
 @router.patch("/tasks/{task_id}")
 async def update_task(task_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     actor = request_actor(request, ctx.auth_store)
-    get_task_for_actor(ctx.task_store, task_id, actor)
+    current = get_task_for_actor(ctx.task_store, task_id, actor)
     body = await json_body(request)
     title = string_field(body, "title") or None
     description = body.get("description") if isinstance(body.get("description"), str) else None
     priority = task_priority(body.get("priority"))
     status = task_status(body.get("status"))
-    if not title and description is None and not priority and not status:
-        raise HTTPException(400, "PATCH requires title, description, priority, or status.")
-    return ctx.task_store.update_task(task_id, {"title": title, "description": description, "priority": priority, "status": status})
+    due_date = date_field(body, "dueDate")
+    assignee = assignee_employee_id_for_task(actor, body, current.get("assigneeEmployeeId")) if "assigneeEmployeeId" in body or "assignee_employee_id" in body else None
+    agent = valid_agent(body.get("assignedAgent")) if "assignedAgent" in body else None
+    if "assignedAgent" in body and body.get("assignedAgent") and not agent:
+        raise HTTPException(400, f"assignedAgent must be one of: {', '.join(AGENT_NAMES)}.")
+    if not title and description is None and not priority and not status and due_date is None and assignee is None and not agent:
+        raise HTTPException(400, "PATCH requires title, description, priority, dueDate, assigneeEmployeeId, assignedAgent, or status.")
+    task = ctx.task_store.update_task(task_id, {
+        "title": title,
+        "description": description,
+        "priority": priority,
+        "status": status,
+        "dueDate": due_date,
+        "assigneeEmployeeId": assignee,
+    })
+    if agent:
+        task = ctx.task_store.assign_task(task_id, agent)
+        started = await start_task_on_ready_node(ctx, task, actor)
+        if started:
+            task = started["task"]
+    return task
 
 
 @router.post("/tasks/{task_id}/assign")
@@ -107,7 +201,40 @@ async def assign_task(task_id: str, request: Request, ctx: AppContextDep) -> dic
     agent = valid_agent(body.get("agent"))
     if not agent:
         raise HTTPException(400, f"agent must be one of: {', '.join(AGENT_NAMES)}.")
-    return ctx.task_store.assign_task(task_id, agent)
+    task = ctx.task_store.assign_task(task_id, agent)
+    started = await start_task_on_ready_node(ctx, task, actor)
+    return started["task"] if started else task
+
+
+@router.post("/tasks/{task_id}/start", status_code=202)
+async def start_task(task_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
+    actor = request_actor(request, ctx.auth_store)
+    task = get_task_for_actor(ctx.task_store, task_id, actor)
+    body = await json_body(request)
+    agent = valid_agent(body.get("agent")) or valid_agent(task.get("assignedAgent"))
+    if not agent:
+        raise HTTPException(400, f"agent must be one of: {', '.join(AGENT_NAMES)}.")
+    if task.get("assignedAgent") != agent:
+        task = ctx.task_store.assign_task(task_id, agent)
+    result = await start_task_on_ready_node(ctx, task, actor, mode="review" if body.get("mode") == "review" else "action")
+    if not result or not result.get("session"):
+        return {"task": result["task"] if result else task, "session": None}
+    return result
+
+
+@router.post("/tasks/claim-next")
+async def claim_next_task(request: Request, ctx: AppContextDep) -> dict[str, Any]:
+    actor = request_actor(request, ctx.auth_store)
+    body = await json_body(request)
+    agent = valid_agent(body.get("agent"))
+    if not agent:
+        raise HTTPException(400, f"agent must be one of: {', '.join(AGENT_NAMES)}.")
+    requested_assignee = string_field(body, "assigneeEmployeeId") or string_field(body, "assignee_employee_id")
+    assignee = requested_assignee if actor["isAdmin"] and requested_assignee else actor["employeeId"]
+    task = ctx.task_store.claim_next_task_for_agent(agent, assignee)
+    if task and not actor_can_access_record(actor, task):
+        raise HTTPException(403, "Task access denied.")
+    return {"task": task}
 
 
 @router.post("/tasks/{task_id}/pickup")

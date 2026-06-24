@@ -2,7 +2,7 @@
    Skills Library route — small-screen shell grid
 
    The Skills page itself is styled with Tailwind utilities in
-   SkillsPage.tsx; only the <820px shell-collapse for the mcp/skills routes
+   SkillsPage.tsx; only the <820px shell-collapse for the mcp/backlog/skills routes
    remains here (the per-element padding now rides on max-[820px]: utility
    variants in the components).
    ===================================================================== */
@@ -10,6 +10,10 @@
 @media (max-width: 820px) {
   .messenger-shell[data-route="mcp"],
   .messenger-shell[data-route="mcp"][data-settings="open"],
+  .messenger-shell[data-route="channels"],
+  .messenger-shell[data-route="channels"][data-settings="open"],
+  .messenger-shell[data-route="backlog"],
+  .messenger-shell[data-route="backlog"][data-settings="open"],
   .messenger-shell[data-route="skills"],
   .messenger-shell[data-route="skills"][data-settings="open"] {
     grid-template-columns: 1fr;

@@ -18,7 +18,7 @@ from .controller import SessionController, initial_agent_state, is_review_assign
 from .environment import load_backend_env
 from .ids import new_relay_id, new_sandbox_id, now_iso
 from .models import AGENT_NAMES, DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS
-from .stores import LocalDaemonStore, LocalSessionStore, role_for_agent, valid_agent
+from .stores import LocalDaemonStore, LocalSessionStore, LocalTaskStore, role_for_agent, valid_agent
 
 load_backend_env()
 
@@ -186,10 +186,12 @@ class DaemonNodeRegistry:
         store: LocalSessionStore | None = None,
         daemon_store: LocalDaemonStore | None = None,
         *,
+        task_store: LocalTaskStore | None = None,
         liveness_timeout_ms: int = DAEMON_NODE_LIVENESS_TIMEOUT_MS,
     ):
         self.store = store or LocalSessionStore()
         self.daemon_store = daemon_store or LocalDaemonStore(self.store.root_dir)
+        self.task_store = task_store
         self.liveness_timeout_ms = liveness_timeout_ms
         self.sandboxes: dict[str, dict[str, Any]] = {}
         self.active_commands: dict[str, dict[str, Any]] = {}
@@ -459,7 +461,7 @@ class DaemonNodeRegistry:
         self.completions[command_id] = future
         return await asyncio.wait_for(future, timeout=timeout_ms / 1000)
 
-    def start_run_request(self, sandbox_id: str, session_id: str, task_goal: str, assignments: list[dict[str, Any]], state: dict[str, Any]) -> dict[str, Any]:
+    def start_run_request(self, sandbox_id: str, session_id: str, task_goal: str, assignments: list[dict[str, Any]], state: dict[str, Any], task_id: str | None = None) -> dict[str, Any]:
         if self.daemon_store.active_run_request_for_session(sandbox_id, session_id):
             raise ValueError(f"Session {session_id} already has an active daemon run.")
         request = self.daemon_store.create_run_request({
@@ -468,6 +470,7 @@ class DaemonNodeRegistry:
             "taskGoal": task_goal,
             "assignments": assignments,
             "state": state,
+            **({"taskId": task_id} if task_id else {}),
         })
         return self._enqueue_current_assignment(request)
 
@@ -560,7 +563,7 @@ class DaemonNodeRegistry:
         mode = assignment.get("mode") or "action"
         run_id = new_relay_id("run")
         sandbox = self.sandboxes[run_request["nodeId"]]
-        controller = self._controller_for_sandbox(sandbox)
+        controller = self._controller_for_sandbox(sandbox, run_request.get("taskId"))
         state = dict(run_request["state"] or {})
         state.pop("prior_agent_bridge", None)
         state.pop("prior_conversation", None)
@@ -602,7 +605,7 @@ class DaemonNodeRegistry:
         if not sandbox:
             self.clear_run_output(event["runId"])
             return
-        controller = self._controller_for_sandbox(sandbox)
+        controller = self._controller_for_sandbox(sandbox, run_request.get("taskId"))
         assignments = run_request["assignments"]
         assignment = assignments[run_request.get("currentIndex", 0)]
         mode = assignment.get("mode") or "action"
@@ -663,7 +666,7 @@ class DaemonNodeRegistry:
 
     def _complete_run_request(self, run_request: dict[str, Any], outcome: str) -> None:
         sandbox = self.sandboxes.get(run_request["nodeId"])
-        controller = self._controller_for_sandbox(sandbox) if sandbox else SessionController(self.store)
+        controller = self._controller_for_sandbox(sandbox, run_request.get("taskId")) if sandbox else SessionController(self.store, task_store=self.task_store, task_id=run_request.get("taskId"))
         controller.complete_session(run_request["sessionId"], outcome)
         self.daemon_store.update_run_request(run_request["id"], {"status": "completed", "error": None})
         self.update_status(run_request["nodeId"], {"status": "ready", "lastError": None})
@@ -685,7 +688,7 @@ class DaemonNodeRegistry:
             }
             self.daemon_store.mark_command_failed(run_request["nodeId"], event)
         sandbox = self.sandboxes.get(run_request["nodeId"])
-        controller = self._controller_for_sandbox(sandbox) if sandbox else SessionController(self.store)
+        controller = self._controller_for_sandbox(sandbox, run_request.get("taskId")) if sandbox else SessionController(self.store, task_store=self.task_store, task_id=run_request.get("taskId"))
         if run_id and run_request.get("currentAgent") and run_request.get("currentMode"):
             controller.record_agent_completed(run_request["sessionId"], run_request.get("state", initial_agent_state(run_request["taskGoal"])), {
                 "runId": run_id,
@@ -699,8 +702,14 @@ class DaemonNodeRegistry:
         self.daemon_store.update_run_request(run_request["id"], {"status": "failed", "error": outcome})
         self.update_status(run_request["nodeId"], {"status": "failed", "lastError": outcome})
 
-    def _controller_for_sandbox(self, sandbox: dict[str, Any]) -> SessionController:
-        return SessionController(self.store, workspace_path=sandbox.get("workspacePath") or "/workspace", owner_employee_id=sandbox.get("employeeId"))
+    def _controller_for_sandbox(self, sandbox: dict[str, Any], task_id: str | None = None) -> SessionController:
+        return SessionController(
+            self.store,
+            task_store=self.task_store,
+            task_id=task_id,
+            workspace_path=sandbox.get("workspacePath") or "/workspace",
+            owner_employee_id=sandbox.get("employeeId"),
+        )
 
     def _age_ms(self, iso_timestamp: str) -> int:
         try:
@@ -886,7 +895,14 @@ class ServerDaemonNodeBackend:
                 if self.registry.daemon_store.active_run_request_for_session(sandbox_id, request["sessionId"]):
                     raise ValueError(f"Session {request['sessionId']} already has an active daemon run.")
             self.registry.update_status(sandbox_id, {"status": "running", "lastError": None})
-            controller = SessionController(self.registry.store, workspace_path=sandbox.get("workspacePath") or "/workspace", owner_employee_id=owner_employee_id)
+            task_id = request.get("taskId") if isinstance(request.get("taskId"), str) and request.get("taskId") else None
+            controller = SessionController(
+                self.registry.store,
+                task_store=self.registry.task_store,
+                task_id=task_id,
+                workspace_path=sandbox.get("workspacePath") or "/workspace",
+                owner_employee_id=owner_employee_id,
+            )
             session_id = request.get("sessionId") or controller.create_session(
                 request["taskGoal"],
                 ["human", *dict.fromkeys(assignment["agent"] for assignment in request["assignments"])],
@@ -912,7 +928,7 @@ class ServerDaemonNodeBackend:
                 elif kind == "handoff" and target_agent:
                     controller.handoff_session(session_id, target_agent, request["assignments"], note)
             state = initial_agent_state(request["taskGoal"])
-            self.registry.start_run_request(sandbox_id, session_id, request["taskGoal"], request["assignments"], state)
+            self.registry.start_run_request(sandbox_id, session_id, request["taskGoal"], request["assignments"], state, task_id)
             return self.registry.store.get_session(session_id)
 
     def cancel_run(self, sandbox_id: str, session_id: str, reason: str, actor_employee_id: str | None = None) -> dict[str, Any]:

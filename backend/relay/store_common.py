@@ -200,14 +200,21 @@ def materialize_task_events(events: list[dict[str, Any]]) -> dict[str, Any]:
     }
     if created.get("ownerEmployeeId"):
         task["ownerEmployeeId"] = created["ownerEmployeeId"]
+    if created.get("assigneeEmployeeId"):
+        task["assigneeEmployeeId"] = created["assigneeEmployeeId"]
+    if created.get("dueDate"):
+        task["dueDate"] = created["dueDate"]
     for event in events:
         task["events"].append(event)
         task["updatedAt"] = event["timestamp"]
         event_type = event.get("type")
         if event_type == "task.updated":
-            for key in ("title", "description", "priority"):
+            for key in ("title", "description", "priority", "assigneeEmployeeId", "dueDate"):
                 if key in event and event[key] is not None:
-                    task[key] = event[key]
+                    if key in ("assigneeEmployeeId", "dueDate") and event[key] == "":
+                        task.pop(key, None)
+                    else:
+                        task[key] = event[key]
         elif event_type == "task.assigned":
             task["assignedAgent"] = event["agent"]
         elif event_type == "task.status":

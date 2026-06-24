@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from loguru import logger
-from sqlalchemy import BigInteger, JSON, Column, DateTime, ForeignKey, MetaData, Table, Text, UniqueConstraint, Uuid, create_engine, insert, select, update
+from sqlalchemy import BigInteger, JSON, Column, Date, DateTime, ForeignKey, MetaData, Table, Text, UniqueConstraint, Uuid, create_engine, insert, select, update
 from sqlalchemy.exc import IntegrityError
 
 from .store_common import (
@@ -43,6 +43,8 @@ class LocalTaskStore:
                 "description": input.get("description", ""),
                 "priority": input.get("priority", "normal"),
                 **({"ownerEmployeeId": input["ownerEmployeeId"]} if input.get("ownerEmployeeId") else {}),
+                **({"assigneeEmployeeId": input["assigneeEmployeeId"]} if input.get("assigneeEmployeeId") else {}),
+                **({"dueDate": input["dueDate"]} if input.get("dueDate") else {}),
             })]
             if input.get("assignedAgent"):
                 events.append(relay_task_event("task.assigned", task_id, {"agent": input["assignedAgent"]}))
@@ -83,10 +85,27 @@ class LocalTaskStore:
             "title": input.get("title"),
             "description": input.get("description"),
             "priority": input.get("priority"),
+            "assigneeEmployeeId": input.get("assigneeEmployeeId"),
+            "dueDate": input.get("dueDate"),
         }))
         if input.get("status"):
             task = self.append_event(task_id, relay_task_event("task.status", task_id, {"status": input["status"]}))
         return task
+
+    def claim_next_task_for_agent(self, agent: AgentName, assignee_employee_id: str | None = None) -> dict[str, Any] | None:
+        with self._lock:
+            candidates = [
+                task for task in self.list_tasks()
+                if task.get("status") == "assigned"
+                and task.get("assignedAgent") == agent
+                and (not assignee_employee_id or task.get("assigneeEmployeeId") == assignee_employee_id or task.get("ownerEmployeeId") == assignee_employee_id)
+            ]
+            if not candidates:
+                return None
+            task = sorted(candidates, key=task_claim_sort_key)[0]
+            self.append_event(task["id"], relay_task_event("task.status", task["id"], {"status": "running"}))
+            logger.debug("Task claimed", task_id=task["id"], agent=agent, assignee=assignee_employee_id)
+            return self.record_activity(task["id"], f"Claimed by {agent}.", {"agent": agent})
 
     def assign_task(self, task_id: str, agent: AgentName) -> dict[str, Any]:
         self.append_event(task_id, relay_task_event("task.assigned", task_id, {"agent": agent}))
@@ -136,6 +155,8 @@ class DatabaseTaskStore:
         Column("status", Text, nullable=False),
         Column("assigned_agent", Text, nullable=True),
         Column("owner_employee_id", Text, nullable=True),
+        Column("assignee_employee_id", Text, nullable=True),
+        Column("due_date", Date, nullable=True),
         Column("snapshot", JSON, nullable=False),
         Column("version", BigInteger, nullable=False),
         Column("created_at", DateTime(timezone=True), nullable=False),
@@ -175,6 +196,8 @@ class DatabaseTaskStore:
             "description": input.get("description", ""),
             "priority": input.get("priority", "normal"),
             **({"ownerEmployeeId": input["ownerEmployeeId"]} if input.get("ownerEmployeeId") else {}),
+            **({"assigneeEmployeeId": input["assigneeEmployeeId"]} if input.get("assigneeEmployeeId") else {}),
+            **({"dueDate": input["dueDate"]} if input.get("dueDate") else {}),
         })]
         if input.get("assignedAgent"):
             events.append(relay_task_event("task.assigned", task_id, {"agent": input["assignedAgent"]}))
@@ -234,10 +257,57 @@ class DatabaseTaskStore:
             "title": input.get("title"),
             "description": input.get("description"),
             "priority": input.get("priority"),
+            "assigneeEmployeeId": input.get("assigneeEmployeeId"),
+            "dueDate": input.get("dueDate"),
         }))
         if input.get("status"):
             task = self.append_event(task_id, relay_task_event("task.status", task_id, {"status": input["status"]}))
         return task
+
+    def claim_next_task_for_agent(self, agent: AgentName, assignee_employee_id: str | None = None) -> dict[str, Any] | None:
+        with self.engine.begin() as conn:
+            rows = conn.execute(
+                select(self.tasks.c.public_id, self.tasks.c.snapshot)
+                .where(self.tasks.c.status == "assigned")
+                .where(self.tasks.c.assigned_agent == agent)
+            ).mappings().all()
+            candidates = [
+                row["snapshot"] for row in rows
+                if not assignee_employee_id
+                or row["snapshot"].get("assigneeEmployeeId") == assignee_employee_id
+                or row["snapshot"].get("ownerEmployeeId") == assignee_employee_id
+            ]
+            if not candidates:
+                return None
+            task = sorted(candidates, key=task_claim_sort_key)[0]
+            row = conn.execute(
+                select(self.tasks.c.id, self.tasks.c.snapshot, self.tasks.c.version)
+                .where(self.tasks.c.public_id == task["id"])
+                .with_for_update()
+            ).mappings().first()
+            if not row or row["snapshot"].get("status") != "assigned" or row["snapshot"].get("assignedAgent") != agent:
+                return None
+            events = [
+                relay_task_event("task.status", task["id"], {"status": "running"}),
+                relay_task_event("task.activity", task["id"], {
+                    "activity": {
+                        "id": new_relay_id("act"),
+                        "createdAt": now_iso(),
+                        "message": f"Claimed by {agent}.",
+                        "agent": agent,
+                    }
+                }),
+            ]
+            task_pk = row["id"]
+            snapshot_events = list((row["snapshot"] or {}).get("events", []))
+            sequence = int(row["version"] or 0)
+            for offset, event in enumerate(events):
+                conn.execute(insert(self.events).values(**task_event_to_row(task_pk, sequence + offset, event)))
+                snapshot_events.append(event)
+            claimed = materialize_task_events(snapshot_events)
+            conn.execute(update(self.tasks).where(self.tasks.c.id == task_pk).values(**task_to_row(claimed, version=sequence + len(events), database_id=task_pk)))
+        logger.debug("Database task claimed", task_id=claimed["id"], agent=agent, assignee=assignee_employee_id)
+        return claimed
 
     def assign_task(self, task_id: str, agent: AgentName) -> dict[str, Any]:
         self.append_event(task_id, relay_task_event("task.assigned", task_id, {"agent": agent}))
@@ -301,6 +371,8 @@ def task_to_row(task: dict[str, Any], *, version: int, database_id: str | None =
         "status": task["status"],
         "assigned_agent": task.get("assignedAgent"),
         "owner_employee_id": task.get("ownerEmployeeId"),
+        "assignee_employee_id": task.get("assigneeEmployeeId"),
+        "due_date": _parse_date(task.get("dueDate")),
         "snapshot": task,
         "version": version,
         "created_at": _parse_iso(task["createdAt"]),
@@ -318,3 +390,15 @@ def task_event_to_row(task_pk: str, sequence: int, event: dict[str, Any]) -> dic
         "timestamp": _parse_iso(event["timestamp"]),
         "payload": event,
     }
+
+
+def _parse_date(value: str | None) -> Any:
+    if not value:
+        return None
+    return __import__("datetime").date.fromisoformat(value)
+
+
+def task_claim_sort_key(task: dict[str, Any]) -> tuple[int, str, str]:
+    priority_rank = {"high": 0, "normal": 1, "low": 2}.get(task.get("priority"), 1)
+    due_date = task.get("dueDate") or "9999-12-31"
+    return (priority_rank, due_date, task.get("createdAt") or "")

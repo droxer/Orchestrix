@@ -37,7 +37,7 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     task_store = task_store_from_env(root_dir)
     daemon_store = daemon_store_from_env(root_dir)
     chat_store = LocalChatIntegrationStore(root_dir)
-    registry = DaemonNodeRegistry(session_store, daemon_store)
+    registry = DaemonNodeRegistry(session_store, daemon_store, task_store=task_store)
     backend = ServerDaemonNodeBackend(registry)
     auth_store = auth_store_from_env(root_dir)
 

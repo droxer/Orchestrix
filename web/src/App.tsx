@@ -12,6 +12,8 @@ import { TranscriptEmpty } from "./components/TranscriptEmpty";
 import { MessageBlock, projectMessages, isGroupedContinuation } from "./components/MessageBlock";
 import type { DerivedMessage } from "./components/MessageBlock";
 import { AdminConsole } from "./components/AdminConsole";
+import { BacklogPage } from "./components/BacklogPage";
+import { ChannelsPage } from "./components/ChannelsPage";
 import { LoginScreen } from "./components/LoginScreen";
 import { McpPage } from "./components/McpPage";
 import { SkillsPage } from "./components/SkillsPage";
@@ -97,7 +99,7 @@ export function App() {
   const atBottomRef = useRef(true);
 
   const selectedEmployeeToken = tokens[selectedEmployee];
-  const { sandboxes, nodes, sessions, isRefreshing, refresh, setSandboxes } = useRelayData(setStatus, selectedEmployeeToken, Boolean(user));
+  const { sandboxes, nodes, sessions, tasks, isRefreshing, refresh, setSandboxes } = useRelayData(setStatus, selectedEmployeeToken, Boolean(user));
   const { localNodes, refreshLocalDaemonNodes } = useLocalDaemonNodes(
     localControlPanelNodes,
     hydrated && user?.role === "admin" && canUseLocalControlPanel(),
@@ -226,7 +228,7 @@ export function App() {
     }
   }, [selectedNode?.disabledAgents, activeAgent, handoffAgent]);
   useEffect(() => {
-    if (route === "admin" && user && user.role !== "admin") {
+    if ((route === "admin" || route === "channels") && user && user.role !== "admin") {
       setRoute("main");
     }
   }, [route, user]);
@@ -485,7 +487,21 @@ export function App() {
         onLogout={() => void handleLogout()}
       />
 
-      {route === "admin" ? <AdminConsole /> : route === "mcp" ? <McpPage /> : route === "skills" ? <SkillsPage /> : (<>
+      {route === "admin" ? <AdminConsole /> : route === "channels" ? <ChannelsPage /> : route === "backlog" ? (
+        <BacklogPage
+          tasks={tasks}
+          sessions={sessions}
+          nodes={visibleNodes}
+          currentUser={user}
+          isRefreshing={isRefreshing}
+          onRefresh={() => refresh()}
+          onOpenConversation={(sessionId) => {
+            setRoute("main");
+            openConversation(sessionId);
+          }}
+          setStatus={setStatus}
+        />
+      ) : route === "mcp" ? <McpPage /> : route === "skills" ? <SkillsPage /> : (<>
 
       <ThreadPanel
         conversations={filteredConversations}

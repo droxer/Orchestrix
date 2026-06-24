@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
-import { listDaemonNodes, listSandboxes, listSessions } from "../api";
-import type { DaemonNodeMonitorRecord, RelaySession, SandboxRecord, Tone } from "../types";
+import { listDaemonNodes, listSandboxes, listSessions, listTasks } from "../api";
+import type { DaemonNodeMonitorRecord, RelaySession, RelayTask, SandboxRecord, Tone } from "../types";
 
 type StatusUpdate = { tone: Tone; message: string };
 
@@ -10,12 +10,14 @@ const RELAY_KEY = ["relay"] as const;
 const SANDBOXES_KEY = ["relay", "sandboxes"] as const;
 const NODES_KEY = ["relay", "daemon-nodes"] as const;
 const SESSIONS_KEY = ["relay", "sessions"] as const;
+const TASKS_KEY = ["relay", "tasks"] as const;
 const POLL_INTERVAL_MS = 3000;
 
 type RelayDataResult = {
   sandboxes: SandboxRecord[];
   nodes: DaemonNodeMonitorRecord[];
   sessions: RelaySession[];
+  tasks: RelayTask[];
   isRefreshing: boolean;
   refresh: (signal?: AbortSignal, tokenOverride?: string) => Promise<void>;
   setSandboxes: Dispatch<SetStateAction<SandboxRecord[]>>;
@@ -71,13 +73,21 @@ export function useRelayData(
         queryFn: async ({ signal }: { signal: AbortSignal }): Promise<RelaySession[]> =>
           (await listSessions(signal)).sessions,
       },
+      {
+        queryKey: TASKS_KEY,
+        enabled,
+        refetchInterval: POLL_INTERVAL_MS,
+        queryFn: async ({ signal }: { signal: AbortSignal }): Promise<RelayTask[]> =>
+          (await listTasks(signal)).tasks,
+      },
     ],
   });
 
-  const [sandboxesQuery, nodesQuery, sessionsQuery] = results;
+  const [sandboxesQuery, nodesQuery, sessionsQuery, tasksQuery] = results;
   const sandboxes = sandboxesQuery.data ?? [];
   const nodes = nodesQuery.data ?? [];
   const sessions = sessionsQuery.data ?? [];
+  const tasks = tasksQuery.data ?? [];
   const isRefreshing = results.some((result) => result.isFetching);
 
   // When disabled (e.g. logged out) drop cached rows so the UI clears at once,
@@ -87,12 +97,13 @@ export function useRelayData(
       queryClient.setQueryData(SANDBOXES_KEY, []);
       queryClient.setQueryData(NODES_KEY, []);
       queryClient.setQueryData(SESSIONS_KEY, []);
+      queryClient.setQueryData(TASKS_KEY, []);
     }
   }, [enabled, queryClient]);
 
   // Surface the first failing query as a status warning, mirroring the prior
   // Promise.allSettled error reporting.
-  const firstError = sandboxesQuery.error ?? nodesQuery.error ?? sessionsQuery.error;
+  const firstError = sandboxesQuery.error ?? nodesQuery.error ?? sessionsQuery.error ?? tasksQuery.error;
   useEffect(() => {
     if (firstError) {
       setStatus({
@@ -134,5 +145,5 @@ export function useRelayData(
     [queryClient],
   );
 
-  return { sandboxes, nodes, sessions, isRefreshing, refresh, setSandboxes };
+  return { sandboxes, nodes, sessions, tasks, isRefreshing, refresh, setSandboxes };
 }
