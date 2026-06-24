@@ -38,6 +38,8 @@ from .store_common import (
     role_for_agent,
     safe_name,
     task_priority,
+    task_routine_cadence,
+    task_routine_type,
     task_status,
     valid_agent,
 )
@@ -85,6 +87,8 @@ __all__ = [
     "session_to_row",
     "task_event_to_row",
     "task_priority",
+    "task_routine_cadence",
+    "task_routine_type",
     "task_status",
     "task_to_row",
     "valid_agent",

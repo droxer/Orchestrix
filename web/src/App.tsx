@@ -16,6 +16,7 @@ import { BacklogPage } from "./components/BacklogPage";
 import { ChannelsPage } from "./components/ChannelsPage";
 import { LoginScreen } from "./components/LoginScreen";
 import { McpPage } from "./components/McpPage";
+import { RoutinePage } from "./components/RoutinePage";
 import { SkillsPage } from "./components/SkillsPage";
 import { PreferencesDialog } from "./components/PreferencesDialog";
 import { type Theme, type Language } from "./components/PreferencesPanel";
@@ -489,6 +490,20 @@ export function App() {
 
       {route === "admin" ? <AdminConsole /> : route === "channels" ? <ChannelsPage /> : route === "backlog" ? (
         <BacklogPage
+          tasks={tasks}
+          sessions={sessions}
+          nodes={visibleNodes}
+          currentUser={user}
+          isRefreshing={isRefreshing}
+          onRefresh={() => refresh()}
+          onOpenConversation={(sessionId) => {
+            setRoute("main");
+            openConversation(sessionId);
+          }}
+          setStatus={setStatus}
+        />
+      ) : route === "routine" ? (
+        <RoutinePage
           tasks={tasks}
           sessions={sessions}
           nodes={visibleNodes}

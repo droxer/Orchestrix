@@ -6,6 +6,8 @@ import type { AgentName } from "./state.js";
 
 export type TaskPriority = "low" | "normal" | "high";
 export type TaskStatus = "backlog" | "assigned" | "running" | "waiting_for_human" | "review" | "done" | "blocked";
+export type TaskRoutineType = "task" | "job";
+export type TaskRoutineCadence = "daily" | "weekly" | "monthly" | "custom";
 
 export interface RelayTaskActivity {
   id: string;
@@ -27,6 +29,12 @@ export interface RelayTask {
   assigneeEmployeeId?: string;
   /** Date-only due date in YYYY-MM-DD format. */
   dueDate?: string;
+  isRoutine: boolean;
+  routineType?: TaskRoutineType;
+  routineCadence?: TaskRoutineCadence;
+  /** Date-only next routine run date in YYYY-MM-DD format. */
+  routineNextRunDate?: string;
+  routineEnabled: boolean;
   assignedAgent?: AgentName;
   linkedSessionIds: string[];
   activity: RelayTaskActivity[];
@@ -47,6 +55,11 @@ export type RelayTaskEvent =
       ownerEmployeeId?: string;
       assigneeEmployeeId?: string;
       dueDate?: string;
+      isRoutine?: boolean;
+      routineType?: TaskRoutineType;
+      routineCadence?: TaskRoutineCadence;
+      routineNextRunDate?: string;
+      routineEnabled?: boolean;
     }
   | {
       id: string;
@@ -58,6 +71,11 @@ export type RelayTaskEvent =
       priority?: TaskPriority;
       assigneeEmployeeId?: string;
       dueDate?: string;
+      isRoutine?: boolean;
+      routineType?: TaskRoutineType;
+      routineCadence?: TaskRoutineCadence;
+      routineNextRunDate?: string;
+      routineEnabled?: boolean;
     }
   | {
       id: string;
@@ -99,11 +117,16 @@ export interface TaskStore {
     ownerEmployeeId?: string;
     assigneeEmployeeId?: string;
     dueDate?: string;
+    isRoutine?: boolean;
+    routineType?: TaskRoutineType;
+    routineCadence?: TaskRoutineCadence;
+    routineNextRunDate?: string;
+    routineEnabled?: boolean;
   }): Promise<RelayTask>;
   appendEvent(taskId: string, event: RelayTaskEvent): Promise<RelayTask>;
   getTask(taskId: string): Promise<RelayTask>;
   listTasks(): Promise<RelayTask[]>;
-  updateTask(taskId: string, input: { title?: string; description?: string; priority?: TaskPriority; status?: TaskStatus; assigneeEmployeeId?: string; dueDate?: string }): Promise<RelayTask>;
+  updateTask(taskId: string, input: { title?: string; description?: string; priority?: TaskPriority; status?: TaskStatus; assigneeEmployeeId?: string; dueDate?: string; isRoutine?: boolean; routineType?: TaskRoutineType; routineCadence?: TaskRoutineCadence; routineNextRunDate?: string; routineEnabled?: boolean }): Promise<RelayTask>;
   assignTask(taskId: string, agent: AgentName): Promise<RelayTask>;
   claimNextTaskForAgent(agent: AgentName, assigneeEmployeeId?: string): Promise<RelayTask | undefined>;
   linkSession(taskId: string, sessionId: string): Promise<RelayTask>;
@@ -127,6 +150,11 @@ export class LocalTaskStore implements TaskStore {
     ownerEmployeeId?: string;
     assigneeEmployeeId?: string;
     dueDate?: string;
+    isRoutine?: boolean;
+    routineType?: TaskRoutineType;
+    routineCadence?: TaskRoutineCadence;
+    routineNextRunDate?: string;
+    routineEnabled?: boolean;
   }): Promise<RelayTask> {
     const taskId = newRelayId("task");
     const dir = this.taskDir(taskId);
@@ -139,6 +167,11 @@ export class LocalTaskStore implements TaskStore {
         ...(input.ownerEmployeeId ? { ownerEmployeeId: input.ownerEmployeeId } : {}),
         ...(input.assigneeEmployeeId ? { assigneeEmployeeId: input.assigneeEmployeeId } : {}),
         ...(input.dueDate ? { dueDate: input.dueDate } : {}),
+        ...(input.isRoutine !== undefined ? { isRoutine: input.isRoutine } : {}),
+        ...(input.routineType ? { routineType: input.routineType } : {}),
+        ...(input.routineCadence ? { routineCadence: input.routineCadence } : {}),
+        ...(input.routineNextRunDate ? { routineNextRunDate: input.routineNextRunDate } : {}),
+        ...(input.routineEnabled !== undefined ? { routineEnabled: input.routineEnabled } : {}),
       }),
     ];
     if (input.assignedAgent) {
@@ -177,13 +210,18 @@ export class LocalTaskStore implements TaskStore {
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 
-  async updateTask(taskId: string, input: { title?: string; description?: string; priority?: TaskPriority; status?: TaskStatus; assigneeEmployeeId?: string; dueDate?: string }): Promise<RelayTask> {
+  async updateTask(taskId: string, input: { title?: string; description?: string; priority?: TaskPriority; status?: TaskStatus; assigneeEmployeeId?: string; dueDate?: string; isRoutine?: boolean; routineType?: TaskRoutineType; routineCadence?: TaskRoutineCadence; routineNextRunDate?: string; routineEnabled?: boolean }): Promise<RelayTask> {
     let task = await this.appendEvent(taskId, relayTaskEvent("task.updated", taskId, {
       title: input.title,
       description: input.description,
       priority: input.priority,
       assigneeEmployeeId: input.assigneeEmployeeId,
       dueDate: input.dueDate,
+      isRoutine: input.isRoutine,
+      routineType: input.routineType,
+      routineCadence: input.routineCadence,
+      routineNextRunDate: input.routineNextRunDate,
+      routineEnabled: input.routineEnabled,
     }));
     if (input.status) {
       task = await this.appendEvent(taskId, relayTaskEvent("task.status", taskId, { status: input.status }));
@@ -290,12 +328,15 @@ export function materializeTaskEvents(events: RelayTaskEvent[]): RelayTask {
     ...(created.assigneeEmployeeId ? { assigneeEmployeeId: created.assigneeEmployeeId } : {}),
     ...(created.dueDate ? { dueDate: created.dueDate } : {}),
     status: "backlog",
+    isRoutine: Boolean(created.isRoutine),
+    routineEnabled: Boolean(created.routineEnabled),
     linkedSessionIds: [],
     activity: [],
     createdAt: created.timestamp,
     updatedAt: created.timestamp,
     events: [],
   };
+  applyRoutineFields(task, created);
 
   for (const event of events) {
     task.events.push(event);
@@ -312,6 +353,7 @@ export function materializeTaskEvents(events: RelayTaskEvent[]): RelayTask {
         if (event.dueDate) task.dueDate = event.dueDate;
         else delete task.dueDate;
       }
+      applyRoutineFields(task, event);
     } else if (event.type === "task.assigned") {
       task.assignedAgent = event.agent;
     } else if (event.type === "task.status") {
@@ -323,6 +365,27 @@ export function materializeTaskEvents(events: RelayTaskEvent[]): RelayTask {
     }
   }
   return task;
+}
+
+function applyRoutineFields(task: RelayTask, event: Partial<Extract<RelayTaskEvent, { type: "task.created" | "task.updated" }>>): void {
+  if (event.isRoutine !== undefined) {
+    task.isRoutine = event.isRoutine;
+    if (!event.isRoutine) {
+      task.routineEnabled = false;
+      delete task.routineType;
+      delete task.routineCadence;
+      delete task.routineNextRunDate;
+      return;
+    }
+  }
+  if (!task.isRoutine) return;
+  if (event.routineEnabled !== undefined) task.routineEnabled = event.routineEnabled;
+  if (event.routineType !== undefined) task.routineType = event.routineType;
+  if (event.routineCadence !== undefined) task.routineCadence = event.routineCadence;
+  if (event.routineNextRunDate !== undefined) {
+    if (event.routineNextRunDate) task.routineNextRunDate = event.routineNextRunDate;
+    else delete task.routineNextRunDate;
+  }
 }
 
 function taskClaimSortKey(left: RelayTask, right: RelayTask): number {
@@ -340,4 +403,12 @@ export function taskStatus(value: unknown): TaskStatus | undefined {
   return value === "backlog" || value === "assigned" || value === "running" || value === "waiting_for_human" || value === "review" || value === "done" || value === "blocked"
     ? value
     : undefined;
+}
+
+export function taskRoutineType(value: unknown): TaskRoutineType | undefined {
+  return value === "task" || value === "job" ? value : undefined;
+}
+
+export function taskRoutineCadence(value: unknown): TaskRoutineCadence | undefined {
+  return value === "daily" || value === "weekly" || value === "monthly" || value === "custom" ? value : undefined;
 }

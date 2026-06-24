@@ -14,6 +14,8 @@
   .messenger-shell[data-route="channels"][data-settings="open"],
   .messenger-shell[data-route="backlog"],
   .messenger-shell[data-route="backlog"][data-settings="open"],
+  .messenger-shell[data-route="routine"],
+  .messenger-shell[data-route="routine"][data-settings="open"],
   .messenger-shell[data-route="skills"],
   .messenger-shell[data-route="skills"][data-settings="open"] {
     grid-template-columns: 1fr;

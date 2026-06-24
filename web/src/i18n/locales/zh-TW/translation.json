@@ -12,6 +12,8 @@
     "chats": "訊息",
     "backlog": "待辦",
     "backlog_label": "待辦管理",
+    "routine": "例行",
+    "routine_label": "例行任務與作業",
     "sandboxes": "沙盒",
     "admin": "管理",
     "admin_label": "管理主控台",
@@ -153,6 +155,47 @@
       "high": "高",
       "normal": "一般",
       "low": "低"
+    }
+  },
+  "routine": {
+    "title": "例行",
+    "sub": "{{count}} 個例行任務和作業",
+    "filters": "例行篩選",
+    "new": "新增例行",
+    "edit": "編輯例行",
+    "search": "搜尋例行",
+    "type": "類型",
+    "cadence": "週期",
+    "next_run": "下次執行",
+    "state": "狀態",
+    "enabled": "已啟用",
+    "disabled": "已停用",
+    "due": "到期",
+    "unscheduled": "未排程",
+    "all_types": "全部類型",
+    "all_cadences": "全部週期",
+    "all_states": "全部狀態",
+    "no_next_run": "無下次執行",
+    "toast_created": "例行已建立。",
+    "toast_updated": "例行已更新。",
+    "metrics": "例行指標",
+    "metric_total": "總計",
+    "metric_enabled": "已啟用",
+    "metric_due": "到期",
+    "metric_running": "執行中",
+    "no_routines_title": "尚無例行",
+    "no_routines_body": "建立例行任務和作業，用於重複的手動調度。",
+    "no_match_title": "沒有符合的例行",
+    "no_match_body": "請調整搜尋或篩選條件。",
+    "types": {
+      "task": "任務",
+      "job": "作業"
+    },
+    "cadences": {
+      "daily": "每日",
+      "weekly": "每週",
+      "monthly": "每月",
+      "custom": "自訂"
     }
   },
   "settings": {

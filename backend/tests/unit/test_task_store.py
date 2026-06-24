@@ -16,13 +16,24 @@ def test_task_store_persists_assignment_status_activity_and_link() -> None:
             "priority": "high",
             "assigneeEmployeeId": "alice",
             "dueDate": "2026-06-30",
+            "isRoutine": True,
+            "routineType": "job",
+            "routineCadence": "weekly",
+            "routineNextRunDate": "2026-06-25",
+            "routineEnabled": True,
         })
         task = store.assign_task(task["id"], "codex")
+        task = store.update_task(task["id"], {"routineNextRunDate": "2026-07-02", "routineEnabled": False})
         task = store.link_session(task["id"], "ses_test")
         task = store.update_task(task["id"], {"status": "running"})
 
         assert task["assigneeEmployeeId"] == "alice"
         assert task["dueDate"] == "2026-06-30"
+        assert task["isRoutine"] is True
+        assert task["routineType"] == "job"
+        assert task["routineCadence"] == "weekly"
+        assert task["routineNextRunDate"] == "2026-07-02"
+        assert task["routineEnabled"] is False
         assert task["assignedAgent"] == "codex"
         assert task["linkedSessionIds"] == ["ses_test"]
         assert task["status"] == "running"
@@ -33,6 +44,8 @@ def test_local_task_store_serializes_concurrent_appends() -> None:
     with TemporaryDirectory() as root:
         store = LocalTaskStore(root)
         task = store.create_task({"title": "Collect activity", "description": "", "priority": "normal"})
+        assert task["isRoutine"] is False
+        assert task["routineEnabled"] is False
 
         def append(index: int) -> None:
             store.append_event(task["id"], relay_task_event("task.activity", task["id"], {
@@ -60,13 +73,24 @@ def test_database_task_store_persists_assignment_status_activity_and_link() -> N
             "priority": "high",
             "assigneeEmployeeId": "alice",
             "dueDate": "2026-06-30",
+            "isRoutine": True,
+            "routineType": "job",
+            "routineCadence": "monthly",
+            "routineNextRunDate": "2026-06-25",
+            "routineEnabled": True,
         })
         task = store.assign_task(task["id"], "codex")
+        task = store.update_task(task["id"], {"routineNextRunDate": "2026-07-25", "routineEnabled": False})
         task = store.link_session(task["id"], "ses_test")
         task = store.update_task(task["id"], {"status": "running"})
 
         assert task["assigneeEmployeeId"] == "alice"
         assert task["dueDate"] == "2026-06-30"
+        assert task["isRoutine"] is True
+        assert task["routineType"] == "job"
+        assert task["routineCadence"] == "monthly"
+        assert task["routineNextRunDate"] == "2026-07-25"
+        assert task["routineEnabled"] is False
         assert task["assignedAgent"] == "codex"
         assert task["linkedSessionIds"] == ["ses_test"]
         assert task["status"] == "running"

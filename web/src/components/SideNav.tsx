@@ -2,7 +2,7 @@ import { useState, type Dispatch, type SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 import {
   NavAdmin, NavBacklog, NavChannels, NavConversations, NavLogout, NavMcp, NavPreferences,
-  NavSidebarCollapse, NavSidebarExpand, NavSkills,
+  NavRoutine, NavSidebarCollapse, NavSidebarExpand, NavSkills,
 } from "./icons";
 import { RelayMark } from "./RelayMark";
 import type { AppRoute } from "../lib/viewTypes";
@@ -100,6 +100,22 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, setRoute, 
         >
           <NavBacklog size={18} />
           <span className="sidenav-label">{t("nav.backlog")}</span>
+        </button>
+        <button
+          className={`sidenav-btn ${route === "routine" ? "active" : ""}`}
+          data-nav="routine"
+          type="button"
+          aria-label={t("nav.routine_label")}
+          aria-pressed={route === "routine"}
+          title={t("nav.routine_label")}
+          onClick={() => setRoute((r) => r === "routine" ? "main" : "routine")}
+          onMouseEnter={(e) => showNavTooltip(t("nav.routine"), e.currentTarget)}
+          onMouseLeave={hideNavTooltip}
+          onFocus={(e) => showNavTooltip(t("nav.routine"), e.currentTarget)}
+          onBlur={hideNavTooltip}
+        >
+          <NavRoutine size={18} />
+          <span className="sidenav-label">{t("nav.routine")}</span>
         </button>
         <div className="sidenav-separator" aria-hidden="true" />
         <button

@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from loguru import logger
-from sqlalchemy import BigInteger, JSON, Column, Date, DateTime, ForeignKey, MetaData, Table, Text, UniqueConstraint, Uuid, create_engine, insert, select, update
+from sqlalchemy import BigInteger, Boolean, JSON, Column, Date, DateTime, ForeignKey, MetaData, Table, Text, UniqueConstraint, Uuid, create_engine, insert, select, update
 from sqlalchemy.exc import IntegrityError
 
 from .store_common import (
@@ -45,6 +45,11 @@ class LocalTaskStore:
                 **({"ownerEmployeeId": input["ownerEmployeeId"]} if input.get("ownerEmployeeId") else {}),
                 **({"assigneeEmployeeId": input["assigneeEmployeeId"]} if input.get("assigneeEmployeeId") else {}),
                 **({"dueDate": input["dueDate"]} if input.get("dueDate") else {}),
+                **({"isRoutine": input["isRoutine"]} if "isRoutine" in input else {}),
+                **({"routineType": input["routineType"]} if input.get("routineType") else {}),
+                **({"routineCadence": input["routineCadence"]} if input.get("routineCadence") else {}),
+                **({"routineNextRunDate": input["routineNextRunDate"]} if input.get("routineNextRunDate") else {}),
+                **({"routineEnabled": input["routineEnabled"]} if "routineEnabled" in input else {}),
             })]
             if input.get("assignedAgent"):
                 events.append(relay_task_event("task.assigned", task_id, {"agent": input["assignedAgent"]}))
@@ -87,6 +92,11 @@ class LocalTaskStore:
             "priority": input.get("priority"),
             "assigneeEmployeeId": input.get("assigneeEmployeeId"),
             "dueDate": input.get("dueDate"),
+            "isRoutine": input.get("isRoutine"),
+            "routineType": input.get("routineType"),
+            "routineCadence": input.get("routineCadence"),
+            "routineNextRunDate": input.get("routineNextRunDate"),
+            "routineEnabled": input.get("routineEnabled"),
         }))
         if input.get("status"):
             task = self.append_event(task_id, relay_task_event("task.status", task_id, {"status": input["status"]}))
@@ -157,6 +167,11 @@ class DatabaseTaskStore:
         Column("owner_employee_id", Text, nullable=True),
         Column("assignee_employee_id", Text, nullable=True),
         Column("due_date", Date, nullable=True),
+        Column("is_routine", Boolean, nullable=False, default=False),
+        Column("routine_type", Text, nullable=True),
+        Column("routine_cadence", Text, nullable=True),
+        Column("routine_next_run_date", Date, nullable=True),
+        Column("routine_enabled", Boolean, nullable=False, default=False),
         Column("snapshot", JSON, nullable=False),
         Column("version", BigInteger, nullable=False),
         Column("created_at", DateTime(timezone=True), nullable=False),
@@ -198,6 +213,11 @@ class DatabaseTaskStore:
             **({"ownerEmployeeId": input["ownerEmployeeId"]} if input.get("ownerEmployeeId") else {}),
             **({"assigneeEmployeeId": input["assigneeEmployeeId"]} if input.get("assigneeEmployeeId") else {}),
             **({"dueDate": input["dueDate"]} if input.get("dueDate") else {}),
+            **({"isRoutine": input["isRoutine"]} if "isRoutine" in input else {}),
+            **({"routineType": input["routineType"]} if input.get("routineType") else {}),
+            **({"routineCadence": input["routineCadence"]} if input.get("routineCadence") else {}),
+            **({"routineNextRunDate": input["routineNextRunDate"]} if input.get("routineNextRunDate") else {}),
+            **({"routineEnabled": input["routineEnabled"]} if "routineEnabled" in input else {}),
         })]
         if input.get("assignedAgent"):
             events.append(relay_task_event("task.assigned", task_id, {"agent": input["assignedAgent"]}))
@@ -259,6 +279,11 @@ class DatabaseTaskStore:
             "priority": input.get("priority"),
             "assigneeEmployeeId": input.get("assigneeEmployeeId"),
             "dueDate": input.get("dueDate"),
+            "isRoutine": input.get("isRoutine"),
+            "routineType": input.get("routineType"),
+            "routineCadence": input.get("routineCadence"),
+            "routineNextRunDate": input.get("routineNextRunDate"),
+            "routineEnabled": input.get("routineEnabled"),
         }))
         if input.get("status"):
             task = self.append_event(task_id, relay_task_event("task.status", task_id, {"status": input["status"]}))
@@ -373,6 +398,11 @@ def task_to_row(task: dict[str, Any], *, version: int, database_id: str | None =
         "owner_employee_id": task.get("ownerEmployeeId"),
         "assignee_employee_id": task.get("assigneeEmployeeId"),
         "due_date": _parse_date(task.get("dueDate")),
+        "is_routine": bool(task.get("isRoutine")),
+        "routine_type": task.get("routineType"),
+        "routine_cadence": task.get("routineCadence"),
+        "routine_next_run_date": _parse_date(task.get("routineNextRunDate")),
+        "routine_enabled": bool(task.get("routineEnabled")),
         "snapshot": task,
         "version": version,
         "created_at": _parse_iso(task["createdAt"]),

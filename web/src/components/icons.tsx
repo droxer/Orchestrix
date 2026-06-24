@@ -25,6 +25,7 @@ import {
   Plug,
   Plus,
   RefreshCw,
+  Repeat2,
   ScanEye,
   Search,
   Settings,
@@ -65,6 +66,7 @@ export const NavAdmin = withStandardStroke(UserCog, "NavAdmin");
 export const NavBacklog = withStandardStroke(ClipboardList, "NavBacklog");
 export const NavChannels = withStandardStroke(MessageSquareMore, "NavChannels");
 export const NavMcp = withStandardStroke(Plug, "NavMcp");
+export const NavRoutine = withStandardStroke(Repeat2, "NavRoutine");
 export const NavSkills = withStandardStroke(Library, "NavSkills");
 export const NavPreferences = withStandardStroke(Settings, "NavPreferences");
 export const NavLogout = withStandardStroke(LogOut, "NavLogout");

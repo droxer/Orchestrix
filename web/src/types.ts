@@ -11,6 +11,8 @@ import type {
   RelaySession,
   SandboxRecord,
   TaskPriority,
+  TaskRoutineCadence,
+  TaskRoutineType,
   TaskStatus,
   TokenUsage,
 } from "relay-core";
@@ -28,6 +30,8 @@ export type {
   RelaySession,
   SandboxRecord,
   TaskPriority,
+  TaskRoutineCadence,
+  TaskRoutineType,
   TaskStatus,
   TokenUsage,
 };
@@ -145,6 +149,11 @@ export interface TaskMutationInput {
   priority?: TaskPriority;
   status?: TaskStatus;
   dueDate?: string;
+  isRoutine?: boolean;
+  routineType?: TaskRoutineType;
+  routineCadence?: TaskRoutineCadence;
+  routineNextRunDate?: string;
+  routineEnabled?: boolean;
   assigneeEmployeeId?: string;
   assignedAgent?: AgentName;
 }

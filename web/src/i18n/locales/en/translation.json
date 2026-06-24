@@ -12,6 +12,8 @@
     "chats": "Chats",
     "backlog": "Backlog",
     "backlog_label": "Backlog Management",
+    "routine": "Routine",
+    "routine_label": "Routine Tasks and Jobs",
     "sandboxes": "Sandboxes",
     "admin": "Admin",
     "admin_label": "Admin Console",
@@ -151,6 +153,47 @@
       "high": "High",
       "normal": "Normal",
       "low": "Low"
+    }
+  },
+  "routine": {
+    "title": "Routine",
+    "sub": "{{count}} routine tasks and jobs",
+    "filters": "Routine filters",
+    "new": "New Routine",
+    "edit": "Edit Routine",
+    "search": "Search routines",
+    "type": "Type",
+    "cadence": "Cadence",
+    "next_run": "Next Run",
+    "state": "State",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "due": "Due",
+    "unscheduled": "Unscheduled",
+    "all_types": "All types",
+    "all_cadences": "All cadences",
+    "all_states": "All states",
+    "no_next_run": "No next run",
+    "toast_created": "Routine created.",
+    "toast_updated": "Routine updated.",
+    "metrics": "Routine metrics",
+    "metric_total": "Total",
+    "metric_enabled": "Enabled",
+    "metric_due": "Due",
+    "metric_running": "Running",
+    "no_routines_title": "No routines yet",
+    "no_routines_body": "Create routine tasks and jobs for repeated manual dispatch.",
+    "no_match_title": "No matching routines",
+    "no_match_body": "Try adjusting your search or filters.",
+    "types": {
+      "task": "Task",
+      "job": "Job"
+    },
+    "cadences": {
+      "daily": "Daily",
+      "weekly": "Weekly",
+      "monthly": "Monthly",
+      "custom": "Custom"
     }
   },
   "settings": {

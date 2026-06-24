@@ -291,6 +291,7 @@
 .sidenav-panel[data-expanded="true"] .sidenav-btn:nth-child(5) .sidenav-label { transition-delay: 120ms; }
 .sidenav-panel[data-expanded="true"] .sidenav-btn:nth-child(6) .sidenav-label { transition-delay: var(--duration-fast); }
 .sidenav-panel[data-expanded="true"] .sidenav-btn:nth-child(7) .sidenav-label { transition-delay: var(--duration-fast); }
+.sidenav-panel[data-expanded="true"] .sidenav-btn:nth-child(8) .sidenav-label { transition-delay: var(--duration-fast); }
 .sidenav-panel[data-expanded="true"] .sidenav-bottom .sidenav-btn:nth-child(1) .sidenav-label { transition-delay: 120ms; }
 .sidenav-panel[data-expanded="true"] .sidenav-bottom .sidenav-btn:nth-child(2) .sidenav-label { transition-delay: var(--duration-fast); }
 

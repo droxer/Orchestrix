@@ -8,7 +8,7 @@ from loguru import logger
 
 from ..controller import SessionController
 from ..models import AGENT_NAMES
-from ..stores import task_priority, task_status, valid_agent
+from ..stores import task_priority, task_routine_cadence, task_routine_type, task_status, valid_agent
 from .deps import AppContextDep
 from .helpers import (
     actor_can_access_record,
@@ -43,6 +43,38 @@ def date_field(body: dict[str, Any], key: str) -> str | None:
     except ValueError:
         raise HTTPException(400, f"{key} must be a YYYY-MM-DD date.")
     return value
+
+
+def bool_field(body: dict[str, Any], key: str) -> bool | None:
+    if key not in body:
+        return None
+    raw = body.get(key)
+    if isinstance(raw, bool):
+        return raw
+    raise HTTPException(400, f"{key} must be a boolean.")
+
+
+def routine_fields(body: dict[str, Any], *, current: dict[str, Any] | None = None) -> dict[str, Any]:
+    has_routine_input = any(key in body for key in ("isRoutine", "routineType", "routineCadence", "routineNextRunDate", "routineEnabled"))
+    if not has_routine_input:
+        return {}
+    is_routine = bool_field(body, "isRoutine")
+    enabled = bool_field(body, "routineEnabled")
+    routine_type = task_routine_type(body.get("routineType")) if "routineType" in body else None
+    cadence = task_routine_cadence(body.get("routineCadence")) if "routineCadence" in body else None
+    if "routineType" in body and body.get("routineType") and not routine_type:
+        raise HTTPException(400, "routineType must be one of: task, job.")
+    if "routineCadence" in body and body.get("routineCadence") and not cadence:
+        raise HTTPException(400, "routineCadence must be one of: daily, weekly, monthly, custom.")
+    next_run = date_field(body, "routineNextRunDate") if "routineNextRunDate" in body else None
+    next_is_routine = bool(is_routine if is_routine is not None else current.get("isRoutine") if current else True)
+    return {
+        "isRoutine": is_routine if is_routine is not None else next_is_routine,
+        "routineType": routine_type or (current or {}).get("routineType") or "task",
+        "routineCadence": cadence or (current or {}).get("routineCadence") or "weekly",
+        "routineNextRunDate": next_run,
+        "routineEnabled": enabled if enabled is not None else (bool((current or {}).get("routineEnabled")) if current else next_is_routine),
+    }
 
 
 def ready_node_for_task(ctx: AppContextDep, task: dict[str, Any], agent: str) -> dict[str, Any] | None:
@@ -119,6 +151,7 @@ async def create_task(request: Request, ctx: AppContextDep) -> dict[str, Any]:
         "ownerEmployeeId": owner,
         "assigneeEmployeeId": assignee,
         "dueDate": date_field(body, "dueDate"),
+        **routine_fields(body),
     })
     logger.info("Task created", task_id=task["id"], title=title, owner=owner)
     agent = valid_agent(body.get("assignedAgent"))
@@ -171,11 +204,12 @@ async def update_task(task_id: str, request: Request, ctx: AppContextDep) -> dic
     priority = task_priority(body.get("priority"))
     status = task_status(body.get("status"))
     due_date = date_field(body, "dueDate")
+    routine = routine_fields(body, current=current)
     assignee = assignee_employee_id_for_task(actor, body, current.get("assigneeEmployeeId")) if "assigneeEmployeeId" in body or "assignee_employee_id" in body else None
     agent = valid_agent(body.get("assignedAgent")) if "assignedAgent" in body else None
     if "assignedAgent" in body and body.get("assignedAgent") and not agent:
         raise HTTPException(400, f"assignedAgent must be one of: {', '.join(AGENT_NAMES)}.")
-    if not title and description is None and not priority and not status and due_date is None and assignee is None and not agent:
+    if not title and description is None and not priority and not status and due_date is None and assignee is None and not agent and not routine:
         raise HTTPException(400, "PATCH requires title, description, priority, dueDate, assigneeEmployeeId, assignedAgent, or status.")
     task = ctx.task_store.update_task(task_id, {
         "title": title,
@@ -184,6 +218,7 @@ async def update_task(task_id: str, request: Request, ctx: AppContextDep) -> dic
         "status": status,
         "dueDate": due_date,
         "assigneeEmployeeId": assignee,
+        **routine,
     })
     if agent:
         task = ctx.task_store.assign_task(task_id, agent)

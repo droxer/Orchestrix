@@ -40,19 +40,33 @@ def test_task_create_update_and_claim_next(monkeypatch) -> None:
             "ownerEmployeeId": "alice",
             "assigneeEmployeeId": "alice",
             "dueDate": "2026-06-30",
+            "isRoutine": True,
+            "routineType": "job",
+            "routineCadence": "weekly",
+            "routineNextRunDate": "2026-06-25",
+            "routineEnabled": True,
         })
         assert created.status_code == 201
         task = created.json()
         assert task["assigneeEmployeeId"] == "alice"
         assert task["dueDate"] == "2026-06-30"
+        assert task["isRoutine"] is True
+        assert task["routineType"] == "job"
+        assert task["routineCadence"] == "weekly"
+        assert task["routineNextRunDate"] == "2026-06-25"
+        assert task["routineEnabled"] is True
 
         updated = client.patch(f"/tasks/{task['id']}", json={
             "priority": "low",
             "assignedAgent": "codex",
+            "routineNextRunDate": "2026-07-02",
+            "routineEnabled": False,
         })
         assert updated.status_code == 200
         assert updated.json()["assignedAgent"] == "codex"
         assert updated.json()["status"] == "assigned"
+        assert updated.json()["routineNextRunDate"] == "2026-07-02"
+        assert updated.json()["routineEnabled"] is False
 
         claimed = client.post("/tasks/claim-next", json={"agent": "codex", "assigneeEmployeeId": "alice"})
         assert claimed.status_code == 200
@@ -106,3 +120,26 @@ def test_task_rejects_invalid_due_date(monkeypatch) -> None:
 
         assert response.status_code == 400
         assert "YYYY-MM-DD" in response.json()["detail"]
+
+
+def test_task_rejects_invalid_routine_fields(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+
+        invalid_type = client.post("/tasks", json={"title": "Bad routine", "isRoutine": True, "routineType": "cron"})
+        assert invalid_type.status_code == 400
+        assert "routineType" in invalid_type.json()["detail"]
+
+        invalid_cadence = client.post("/tasks", json={"title": "Bad cadence", "isRoutine": True, "routineCadence": "hourly"})
+        assert invalid_cadence.status_code == 400
+        assert "routineCadence" in invalid_cadence.json()["detail"]
+
+        invalid_date = client.post("/tasks", json={"title": "Bad next run", "isRoutine": True, "routineNextRunDate": "06/30/2026"})
+        assert invalid_date.status_code == 400
+        assert "YYYY-MM-DD" in invalid_date.json()["detail"]
+
+        invalid_enabled = client.post("/tasks", json={"title": "Bad enabled", "isRoutine": True, "routineEnabled": "yes"})
+        assert invalid_enabled.status_code == 400
+        assert "routineEnabled" in invalid_enabled.json()["detail"]

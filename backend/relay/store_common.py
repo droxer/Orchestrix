@@ -8,7 +8,7 @@ from typing import Any
 from sqlalchemy import Column, Uuid
 
 from .ids import new_database_id, new_relay_id, now_iso
-from .models import AGENT_NAMES, AgentName, TaskPriority, TaskStatus
+from .models import AGENT_NAMES, AgentName, TaskPriority, TaskRoutineCadence, TaskRoutineType, TaskStatus
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_RELAY_DATA_DIR = REPO_ROOT / ".relay"
@@ -192,6 +192,8 @@ def materialize_task_events(events: list[dict[str, Any]]) -> dict[str, Any]:
         "description": created.get("description", ""),
         "priority": created.get("priority", "normal"),
         "status": "backlog",
+        "isRoutine": bool(created.get("isRoutine")),
+        "routineEnabled": bool(created.get("routineEnabled")),
         "linkedSessionIds": [],
         "activity": [],
         "createdAt": created["timestamp"],
@@ -204,6 +206,7 @@ def materialize_task_events(events: list[dict[str, Any]]) -> dict[str, Any]:
         task["assigneeEmployeeId"] = created["assigneeEmployeeId"]
     if created.get("dueDate"):
         task["dueDate"] = created["dueDate"]
+    _apply_task_routine_fields(task, created)
     for event in events:
         task["events"].append(event)
         task["updatedAt"] = event["timestamp"]
@@ -215,6 +218,7 @@ def materialize_task_events(events: list[dict[str, Any]]) -> dict[str, Any]:
                         task.pop(key, None)
                     else:
                         task[key] = event[key]
+            _apply_task_routine_fields(task, event)
         elif event_type == "task.assigned":
             task["assignedAgent"] = event["agent"]
         elif event_type == "task.status":
@@ -225,6 +229,31 @@ def materialize_task_events(events: list[dict[str, Any]]) -> dict[str, Any]:
         elif event_type == "task.activity":
             task["activity"].append(event["activity"])
     return task
+
+
+def _apply_task_routine_fields(task: dict[str, Any], event: dict[str, Any]) -> None:
+    if "isRoutine" in event and event["isRoutine"] is not None:
+        task["isRoutine"] = bool(event["isRoutine"])
+        if not task["isRoutine"]:
+            task["routineEnabled"] = False
+            task.pop("routineType", None)
+            task.pop("routineCadence", None)
+            task.pop("routineNextRunDate", None)
+            return
+    if not task.get("isRoutine"):
+        return
+    if "routineEnabled" in event and event["routineEnabled"] is not None:
+        task["routineEnabled"] = bool(event["routineEnabled"])
+    if "routineType" in event and event["routineType"] is not None:
+        task["routineType"] = event["routineType"]
+    if "routineCadence" in event and event["routineCadence"] is not None:
+        task["routineCadence"] = event["routineCadence"]
+    if "routineNextRunDate" in event and event["routineNextRunDate"] is not None:
+        if event["routineNextRunDate"]:
+            task["routineNextRunDate"] = event["routineNextRunDate"]
+        else:
+            task.pop("routineNextRunDate", None)
+
 
 def daemon_event(event_type: str, payload: dict[str, Any]) -> dict[str, Any]:
     return {"id": new_relay_id("devt"), "type": event_type, "timestamp": now_iso(), **payload}
@@ -251,3 +280,11 @@ def task_priority(value: Any) -> TaskPriority | None:
 
 def task_status(value: Any) -> TaskStatus | None:
     return value if value in ("backlog", "assigned", "running", "waiting_for_human", "review", "done", "blocked") else None
+
+
+def task_routine_type(value: Any) -> TaskRoutineType | None:
+    return value if value in ("task", "job") else None
+
+
+def task_routine_cadence(value: Any) -> TaskRoutineCadence | None:
+    return value if value in ("daily", "weekly", "monthly", "custom") else None
