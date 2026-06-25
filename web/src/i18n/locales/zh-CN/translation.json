@@ -46,8 +46,8 @@
     "agent_disabled_title": "{{agent}} 在该节点已被管理员禁用。",
     "agent_failed_title": "{{agent}} 在该节点尚未就绪。",
     "agent_disabled_option": "{{agent}}（已禁用）",
-    "no_conversations": "暂无会话，开始新会话吧。",
-    "no_matches": "没有匹配的会话。"
+    "no_conversations": "暂无对话，开始新对话吧。",
+    "no_matches": "没有匹配的对话。"
   },
   "conversation": {
     "agent_working": "{{agent}} 正在工作",
@@ -59,11 +59,11 @@
     "tokens_short": "tok",
     "token_usage_title": "输入 {{input}} · 输出 {{output}} · 缓存 {{cache}}",
     "no_sessions": "—",
-    "new": "新建会话",
+    "new": "新建对话",
     "rename": "重命名",
-    "rename_prompt": "重命名会话",
+    "rename_prompt": "重命名对话",
     "close": "关闭",
-    "close_confirm": "关闭会话“{{name}}”？"
+    "close_confirm": "关闭对话“{{name}}”？"
   },
   "composer": {
     "placeholder": "发送给 @{{employee}} — 输入 @ 切换 Agent…",
@@ -121,7 +121,7 @@
     "not_ready": "未就绪",
     "assign_agent": "分配 Agent",
     "start": "开始",
-    "open_thread": "打开会话",
+    "open_thread": "打开对话",
     "block": "阻塞",
     "reopen": "重开",
     "done": "完成",
@@ -137,6 +137,11 @@
     "show_filters": "筛选",
     "hide_filters": "收起筛选",
     "clear_filters": "清除",
+    "view": "视图",
+    "view_board": "看板视图",
+    "view_list": "列表视图",
+    "col_task": "任务",
+    "col_labels": "标签",
     "linked": "已关联",
     "no_tasks_title": "暂无任务",
     "no_tasks_body": "创建任务以通过 Agent 队列分配工作。",
@@ -333,7 +338,7 @@
       "title_people": "员工",
       "title_fleet": "节点",
       "title_integrations": "频道",
-      "sub_dashboard": "一览节点、员工、会话与 Token 用量。",
+      "sub_dashboard": "一览节点、员工、对话与 Token 用量。",
       "sub_people": "员工与所属沙箱。",
       "sub_fleet": "所有守护节点。",
       "sub_integrations": "面向 Relay 智能体的企业聊天入口。",
@@ -342,14 +347,14 @@
       "dash_kpi_employees_hint": "在册 {{count}} 人。",
       "dash_kpi_nodes": "守护节点",
       "dash_kpi_nodes_hint": "{{ready}} 就绪 · {{failed}} 失败",
-      "dash_kpi_sessions": "会话",
+      "dash_kpi_sessions": "对话",
       "dash_kpi_sessions_delta": "近 24 小时 {{count}} · 较前 {{diff}}",
       "dash_loading": "加载中…",
       "dash_kpi_tokens": "Token 用量",
       "dash_kpi_tokens_hint": "最近 7 天",
       "dash_coming_soon_tag": "即将上线",
-      "dash_sessions_eyebrow": "会话 · 14 天",
-      "dash_sessions_title": "会话趋势",
+      "dash_sessions_eyebrow": "对话 · 14 天",
+      "dash_sessions_title": "对话趋势",
       "dash_sessions_hint": "峰值：单日 {{count}}。",
       "dash_tokens_eyebrow": "Tokens",
       "dash_tokens_title": "Token 用量",
@@ -369,7 +374,7 @@
       "dash_health_total": "注册节点共 {{count}} 个。",
       "dash_top_eyebrow": "员工",
       "dash_top_title": "最活跃员工",
-      "dash_top_empty": "尚无会话归属到具体员工。",
+      "dash_top_empty": "尚无对话归属到具体员工。",
       "dash_top_nodes_one": "{{count}} 个节点",
       "dash_top_nodes_other": "{{count}} 个节点",
       "dash_feed_eyebrow": "最近",
@@ -569,13 +574,16 @@
       "dark": "深色",
       "dark_sub": "始终深色",
       "system": "系统",
-      "system_sub": "跟随系统设置"
+      "system_sub": "跟随系统设置",
+      "contrast": "高对比度",
+      "contrast_sub": "强边框与文字"
     }
   },
   "transcript": {
     "new_session": "新工作区会话",
     "ready_for": "@{{employee}} 已准备好使用 {{agent}}。",
     "ready_no_employee": "打开员工工作区以与 {{agent}} 对话。",
+    "hint_mention": "输入 @ 切换智能体",
     "awaiting_first": "等待首条消息"
   },
   "login": {

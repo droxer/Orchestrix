@@ -1,4 +1,6 @@
 import { useTranslation } from "react-i18next";
+import { AgentMark } from "./AgentMark";
+import { RelayEmptyState } from "./RelayEmptyState";
 import type { AgentName } from "../types";
 
 type AgentDescriptor = { role: string; blurb: string };
@@ -20,12 +22,21 @@ export function TranscriptEmpty({
     ? t("transcript.ready_for", { employee: selectedEmployee, agent: activeAgent })
     : t("transcript.ready_no_employee", { agent: activeAgent });
 
+  const body = descriptor.blurb || descriptor.role;
+
   return (
-    <section className="transcript-empty" aria-labelledby="transcript-empty-headline">
-      <h2 id="transcript-empty-headline" className="transcript-empty-headline">
-        {headline}
-      </h2>
-      <p className="transcript-empty-sublabel">{descriptor.role}</p>
-    </section>
+    <RelayEmptyState
+      className="transcript-empty"
+      titleId="transcript-empty-headline"
+      title={headline}
+      body={body}
+      hint={selectedEmployee ? t("transcript.hint_mention") : undefined}
+      atmosphere
+      illustration={(
+        <span className="relay-empty-avatar agent-avatar" data-agent={activeAgent}>
+          <AgentMark agent={activeAgent} size={28} />
+        </span>
+      )}
+    />
   );
 }

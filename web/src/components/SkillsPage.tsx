@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
+import { RelayEmptyState } from "./RelayEmptyState";
 import { useAgentInventoryNodes } from "../hooks/useAgentInventory";
 import { aggregateSkillsByAgent, totalItemCount } from "../lib/agentInventory";
 import type { AgentName, DaemonAgentSkill } from "../types";
@@ -62,28 +63,33 @@ function AgentGroup({ agent, skills }: { agent: AgentName; skills: DaemonAgentSk
   );
 }
 
+function SkillsEmptyIllustration() {
+  return (
+    <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+      <path d="M24 8l3.5 7 7.5 1-5.5 5.5 1.3 7.5L24 26l-6.8 3 1.3-7.5L13 16l7.5-1L24 8z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M12 32l2 8M36 32l-2 8M18 40h12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function EmptyState({ query }: { query: string }) {
   const { t } = useTranslation();
+  if (query) {
+    return (
+      <RelayEmptyState
+        fill
+        title={t("skills.no_match_title", { query })}
+        body={t("skills.no_match_body")}
+      />
+    );
+  }
   return (
-    <div className="mx-auto flex max-w-[440px] flex-col items-center gap-md px-xl py-xxl text-center">
-      {query ? (
-        <>
-          <p className="text-lg font-semibold text-ink">{t("skills.no_match_title", { query })}</p>
-          <p className="text-sm leading-loose text-body">{t("skills.no_match_body")}</p>
-        </>
-      ) : (
-        <>
-          <div className="text-muted-soft" aria-hidden="true">
-            <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-              <path d="M24 8l3.5 7 7.5 1-5.5 5.5 1.3 7.5L24 26l-6.8 3 1.3-7.5L13 16l7.5-1L24 8z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-              <path d="M12 32l2 8M36 32l-2 8M18 40h12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-          </div>
-          <p className="text-lg font-semibold text-ink">{t("skills.no_skills_title")}</p>
-          <p className="text-sm leading-loose text-body">{t("skills.no_skills_body")}</p>
-        </>
-      )}
-    </div>
+    <RelayEmptyState
+      fill
+      title={t("skills.no_skills_title")}
+      body={t("skills.no_skills_body")}
+      illustration={<SkillsEmptyIllustration />}
+    />
   );
 }
 

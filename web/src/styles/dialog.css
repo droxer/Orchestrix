@@ -28,7 +28,7 @@
   flex-direction: column;
   gap: var(--space-sm);
   padding: var(--space-lg);
-  background: var(--color-canvas);
+  background: var(--color-surface-raised);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lift);
   animation: pref-modal-in 180ms var(--ease-emphasized) both;

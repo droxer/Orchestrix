@@ -6,9 +6,9 @@
     "confirm": "Confirm",
     "cancel": "Cancel"
   },
-  "skip_to_conversation": "Skip to conversation",
+  "skip_to_conversation": "Skip to thread",
   "nav": {
-    "conversations": "Conversations",
+    "conversations": "Threads",
     "chats": "Chats",
     "backlog": "Backlog",
     "backlog_label": "Backlog management",
@@ -40,14 +40,14 @@
     "no_nodes": "No nodes registered. Type a name above to connect.",
     "no_employee_selected": "No node selected",
     "connect_hint": "Connect to this employee",
-    "new_conversation": "New conversation",
+    "new_conversation": "New thread",
     "talk_to_agent": "Talk to agent",
     "new_thread": "New thread",
     "agent_disabled_title": "{{agent}} is disabled on this node by an admin.",
     "agent_failed_title": "{{agent}} is not ready on this node.",
     "agent_disabled_option": "{{agent}} (disabled)",
-    "no_conversations": "No conversations yet. Start a new one.",
-    "no_matches": "No conversations match your search."
+    "no_conversations": "No threads yet. Start a new one.",
+    "no_matches": "No threads match your search."
   },
   "conversation": {
     "agent_working": "{{agent}} is working",
@@ -59,11 +59,11 @@
     "tokens_short": "tok",
     "token_usage_title": "Input {{input}} · Output {{output}} · Cache {{cache}}",
     "no_sessions": "—",
-    "new": "New conversation",
+    "new": "New thread",
     "rename": "Rename",
-    "rename_prompt": "Rename conversation",
+    "rename_prompt": "Rename thread",
     "close": "Close",
-    "close_confirm": "Close conversation “{{name}}”?"
+    "close_confirm": "Close thread “{{name}}”?"
   },
   "composer": {
     "placeholder": "Write to @{{employee}} — type @ to switch agent…",
@@ -135,6 +135,11 @@
     "show_filters": "Filters",
     "hide_filters": "Hide filters",
     "clear_filters": "Clear",
+    "view": "View",
+    "view_board": "Board view",
+    "view_list": "List view",
+    "col_task": "Task",
+    "col_labels": "Labels",
     "linked": "linked",
     "no_tasks_title": "No tasks yet",
     "no_tasks_body": "Create a task to route work through your agent fleet.",
@@ -331,7 +336,7 @@
       "title_people": "People",
       "title_fleet": "Fleet",
       "title_integrations": "Channels",
-      "sub_dashboard": "Fleet, people, conversations, and token usage at a glance.",
+      "sub_dashboard": "Fleet, people, threads, and token usage at a glance.",
       "sub_people": "Employees and the sandboxes they own.",
       "sub_fleet": "Every daemon node across the workforce.",
       "sub_integrations": "Enterprise chat entry points for Relay agents.",
@@ -340,14 +345,14 @@
       "dash_kpi_employees_hint": "{{count}} on the roster.",
       "dash_kpi_nodes": "Daemon nodes",
       "dash_kpi_nodes_hint": "{{ready}} ready · {{failed}} failed",
-      "dash_kpi_sessions": "Conversations",
+      "dash_kpi_sessions": "Threads",
       "dash_kpi_sessions_delta": "{{count}} in 24h · {{diff}} vs prior",
       "dash_loading": "Loading…",
       "dash_kpi_tokens": "Token usage",
       "dash_kpi_tokens_hint": "Last 7 days",
       "dash_coming_soon_tag": "Coming soon",
-      "dash_sessions_eyebrow": "Conversations · 14d",
-      "dash_sessions_title": "Conversations over time",
+      "dash_sessions_eyebrow": "Threads · 14d",
+      "dash_sessions_title": "Threads over time",
       "dash_sessions_hint": "Peak: {{count}} on a single day.",
       "dash_tokens_eyebrow": "Tokens",
       "dash_tokens_title": "Token usage",
@@ -367,7 +372,7 @@
       "dash_health_total": "{{count}} nodes in the registry.",
       "dash_top_eyebrow": "People",
       "dash_top_title": "Most active employees",
-      "dash_top_empty": "No conversations attributed to employees yet.",
+      "dash_top_empty": "No threads attributed to employees yet.",
       "dash_top_nodes_one": "{{count}} node",
       "dash_top_nodes_other": "{{count}} nodes",
       "dash_feed_eyebrow": "Recent",
@@ -567,13 +572,16 @@
       "dark": "Dark",
       "dark_sub": "Always dark",
       "system": "System",
-      "system_sub": "Follows OS setting"
+      "system_sub": "Follows OS setting",
+      "contrast": "High contrast",
+      "contrast_sub": "Strong borders & text"
     }
   },
   "transcript": {
     "new_session": "New workspace session",
     "ready_for": "@{{employee}} is ready for {{agent}}.",
     "ready_no_employee": "Open an employee workspace to talk to {{agent}}.",
+    "hint_mention": "Type @ to switch agents",
     "awaiting_first": "awaiting first message"
   },
   "login": {
@@ -715,7 +723,7 @@
     "connected_nodes_other": "Connected {{count}} local daemon nodes.",
     "add_task": "Add a task after @{{agent}}.",
     "open_sandbox": "Open this employee's sandbox before sending.",
-    "handed_to": "Conversation handed to {{agent}}.",
+    "handed_to": "Thread handed to {{agent}}.",
     "decision_recorded": "{{kind}} recorded.",
     "dismiss": "Dismiss"
   },

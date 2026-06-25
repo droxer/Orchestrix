@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
+import { RelayEmptyState } from "./RelayEmptyState";
 import { useAgentInventoryNodes } from "../hooks/useAgentInventory";
 import { aggregateMcpByAgent, totalItemCount } from "../lib/agentInventory";
 import type { AgentName, DaemonAgentMcpServer, DaemonMcpTransport } from "../types";
@@ -60,31 +61,38 @@ function AgentSection({ agent, servers }: { agent: AgentName; servers: DaemonAge
   );
 }
 
+function McpEmptyIllustration() {
+  return (
+    <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+      <rect x="8" y="20" width="8" height="8" rx="2" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="32" y="20" width="8" height="8" rx="2" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M16 24h16" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 2" />
+      <rect x="18" y="14" width="12" height="8" rx="2" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="18" y="26" width="12" height="8" rx="2" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M24 14V10M24 38v-4" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
 function EmptyState() {
   const { t } = useTranslation();
   return (
-    <div className="mx-auto flex max-w-[480px] flex-col items-center gap-md px-xl py-xxl text-center">
-      <div className="mb-xs text-muted-soft" aria-hidden="true">
-        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-          <rect x="8" y="20" width="8" height="8" rx="2" stroke="currentColor" strokeWidth="1.5" />
-          <rect x="32" y="20" width="8" height="8" rx="2" stroke="currentColor" strokeWidth="1.5" />
-          <path d="M16 24h16" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 2" />
-          <rect x="18" y="14" width="12" height="8" rx="2" stroke="currentColor" strokeWidth="1.5" />
-          <rect x="18" y="26" width="12" height="8" rx="2" stroke="currentColor" strokeWidth="1.5" />
-          <path d="M24 14V10M24 38v-4" stroke="currentColor" strokeWidth="1.5" />
-        </svg>
-      </div>
-      <h3 className="m-0 text-lg font-semibold text-balance text-ink">{t("mcp.no_servers_title")}</h3>
-      <p className="m-0 text-sm leading-loose text-body">{t("mcp.no_servers_body")}</p>
-      <a
-        className="mt-xs inline-block text-sm font-medium text-primary no-underline transition-opacity duration-[120ms] hover:opacity-75"
-        href="https://modelcontextprotocol.io"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        {t("mcp.learn_more")}
-      </a>
-    </div>
+    <RelayEmptyState
+      fill
+      title={t("mcp.no_servers_title")}
+      body={t("mcp.no_servers_body")}
+      illustration={<McpEmptyIllustration />}
+      actions={(
+        <a
+          className="relay-empty-link"
+          href="https://modelcontextprotocol.io"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {t("mcp.learn_more")}
+        </a>
+      )}
+    />
   );
 }
 

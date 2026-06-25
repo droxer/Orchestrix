@@ -23,3 +23,39 @@
   outline: 2px solid var(--color-primary);
   outline-offset: -2px;
 }
+
+/* Reduced motion — system-wide safety net. Individual surfaces
+   (empty-state, login) already neutralize their entrances, but several
+   keyframe animations (modal/drawer rise, sidenav + tooltip reveals, the
+   agent-stream caret blink) are not guarded locally. This global reset
+   collapses every animation and transition to an imperceptible duration so
+   nothing pulses or slides for motion-sensitive users, without dropping the
+   end state. Loads from a11y.css (last in source order) so it wins. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* OS “increase contrast” — boost hairlines and body copy when the user
+   has not already pinned the dedicated High contrast theme. */
+@media (prefers-contrast: more) {
+  html[data-theme="light"] {
+    --color-body: var(--color-ink);
+    --color-hairline: color-mix(in srgb, var(--color-ink) 42%, var(--color-canvas));
+    --color-hairline-soft: color-mix(in srgb, var(--color-ink) 28%, var(--color-canvas));
+    --ring-focus: 0 0 0 3px var(--color-ink);
+  }
+
+  html[data-theme="dark"] {
+    --color-body: color-mix(in srgb, var(--color-on-dark) 92%, var(--color-surface-dark));
+    --color-hairline: color-mix(in srgb, var(--color-on-dark) 38%, var(--color-surface-dark));
+    --color-hairline-soft: color-mix(in srgb, var(--color-on-dark) 26%, var(--color-surface-dark));
+    --ring-focus: 0 0 0 3px var(--color-on-dark);
+  }
+}

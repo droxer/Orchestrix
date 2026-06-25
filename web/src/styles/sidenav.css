@@ -41,8 +41,8 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-sm);
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   flex-shrink: 0;
   color: var(--color-ink);
   transition: width var(--duration-base) ease, padding var(--duration-base) ease;
@@ -186,8 +186,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   border-radius: var(--radius-sm);
   color: var(--color-muted);
   background: transparent;
@@ -205,33 +205,17 @@
   border-color: var(--color-hairline-soft);
 }
 
-/* Active = ink text + a 2px primary indicator bar on the leading edge.
-   No filled background — keeps the rail editorial-quiet and reserves the
-   solid Relay Blue fill for true CTAs (send button, primary buttons). */
+/* Active = ink text on a quiet monochrome surface fill (Vercel-style), no
+   left bar. The surface fill is neutral, not the ink action fill, so it stays
+   distinct from true CTAs (send button, primary buttons). */
 .sidenav-btn.active {
   color: var(--color-ink);
-  background: transparent;
+  background: var(--color-surface-strong);
   border-color: transparent;
 }
 
-.sidenav-btn.active::before {
-  content: "";
-  position: absolute;
-  left: -1px;
-  top: 50%;
-  width: 2px;
-  height: 20px;
-  border-radius: var(--radius-sm);
-  background: var(--color-primary);
-  transform: translateY(-50%);
-}
-
-.sidenav-panel[data-expanded="true"] .sidenav-btn.active::before {
-  left: 0;
-}
-
 .sidenav-btn.active:hover {
-  background: var(--color-surface-soft);
+  background: var(--color-surface-strong);
   border-color: transparent;
 }
 
@@ -264,8 +248,7 @@
   background: var(--color-canvas);
   border: 1px solid var(--color-hairline);
   color: var(--color-ink);
-  font-size: var(--text-xs);
-  font-weight: 600;
+  font: var(--type-caption-strong);
   box-shadow: var(--shadow-lift);
   pointer-events: none;
   z-index: 100;
@@ -295,16 +278,22 @@
 .sidenav-panel[data-expanded="true"] .sidenav-bottom .sidenav-btn:nth-child(1) .sidenav-label { transition-delay: 120ms; }
 .sidenav-panel[data-expanded="true"] .sidenav-bottom .sidenav-btn:nth-child(2) .sidenav-label { transition-delay: var(--duration-fast); }
 
-/* Expanded button layout: icon + label side by side */
+/* Expanded button layout: icon + label side by side. Vercel-style compact
+   rows — 38px tall (not the 48px collapsed square), tight label rhythm. */
 .sidenav-panel[data-expanded="true"] .sidenav-btn {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
   width: 100%;
+  height: 38px;
   padding: 0 var(--space-sm);
   justify-content: flex-start;
   text-align: left;
   white-space: nowrap;
+}
+
+.sidenav-panel[data-expanded="true"] .sidenav-nav {
+  gap: var(--space-xxs);
 }
 
 .sidenav-btn .sidenav-label,

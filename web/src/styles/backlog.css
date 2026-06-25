@@ -234,9 +234,9 @@
 .backlog-task {
   position: relative;
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   background: var(--color-canvas);
-  padding: var(--space-sm);
+  padding: var(--space-base);
   box-shadow: var(--shadow-soft);
   transition: border-color 150ms, box-shadow 150ms, transform 150ms;
 }
@@ -267,6 +267,113 @@
   margin-bottom: var(--space-xs);
 }
 
+/* ── Agent-state chip — glyph carries identity, pip carries readiness ───
+   The textual label ("claude · ready") lives in the title/aria-label so the
+   board stays scannable. Color is reserved for the readiness pip only; the
+   glyph chip is monochrome ink-on-neutral, matching .agent-avatar. */
+.agent-state {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-strong);
+  color: var(--color-ink);
+  box-shadow: inset 0 0 0 1px var(--color-hairline-soft);
+}
+
+.agent-state > svg {
+  display: block;
+}
+
+.agent-state::after {
+  content: "";
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--color-canvas);
+  border-radius: var(--radius-full);
+  background: var(--color-muted-soft);
+}
+
+.agent-state.tone-good::after { background: var(--color-semantic-up); }
+.agent-state.tone-bad::after { background: var(--color-semantic-down); }
+
+/* Unassigned slot — dashed placeholder, no readiness pip. */
+.agent-state--empty {
+  background: transparent;
+  box-shadow: none;
+  border: 1px dashed color-mix(in srgb, var(--color-hairline) 85%, var(--color-muted-soft));
+}
+
+.agent-state--empty::after {
+  content: none;
+}
+
+.agent-state--empty::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-muted-soft);
+  opacity: 0.5;
+}
+
+/* ── Priority badge — rank, not status ──────────────────────────────────
+   Three ascending bars filled to the level (low 1 / normal 2 / high 3) so
+   priority reads as a rank at a glance, distinct from the leading-dot status
+   badges. The accent escalates muted → ink → danger to match the card rail. */
+.priority-badge {
+  --prio-accent: var(--color-muted-soft);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  padding: 2px var(--space-xs) 2px 6px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--color-canvas);
+  color: var(--color-body);
+  font: var(--type-meta-mono);
+  letter-spacing: 0.02em;
+}
+
+.priority-badge[data-priority="normal"] {
+  --prio-accent: var(--color-ink);
+}
+
+.priority-badge[data-priority="high"] {
+  --prio-accent: var(--color-semantic-down);
+  border-color: color-mix(in srgb, var(--color-semantic-down) 30%, var(--color-hairline));
+  color: var(--color-danger-text);
+}
+
+.priority-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 1.5px;
+  height: 11px;
+}
+
+.priority-bars > i {
+  width: 3px;
+  border-radius: 0.5px;
+  background: var(--color-hairline);
+}
+
+.priority-bars > i:nth-child(1) { height: 4px; }
+.priority-bars > i:nth-child(2) { height: 7px; }
+.priority-bars > i:nth-child(3) { height: 11px; }
+
+.priority-badge[data-priority="low"] .priority-bars > i:nth-child(-n+1),
+.priority-badge[data-priority="normal"] .priority-bars > i:nth-child(-n+2),
+.priority-badge[data-priority="high"] .priority-bars > i:nth-child(-n+3) {
+  background: var(--prio-accent);
+}
+
 .backlog-task-title {
   display: block;
   width: 100%;
@@ -275,8 +382,8 @@
   border: 0;
   background: transparent;
   color: var(--color-ink);
-  font: var(--type-caption-strong);
-  letter-spacing: 0;
+  font: var(--type-label-strong);
+  letter-spacing: -0.005em;
   text-align: left;
   cursor: pointer;
 }
@@ -328,14 +435,14 @@
   padding-top: var(--space-sm);
   border-top: 1px solid var(--color-hairline-soft);
   opacity: 0;
-  transform: translateY(4px);
-  transition: opacity 150ms, transform 150ms;
+  pointer-events: none;
+  transition: opacity 150ms ease;
 }
 
 .backlog-task:hover .backlog-task-actions,
 .backlog-task:focus-within .backlog-task-actions {
   opacity: 1;
-  transform: translateY(0);
+  pointer-events: auto;
 }
 
 .backlog-task-actions select,
@@ -373,6 +480,16 @@
 
 .backlog-task-actions .backlog-action-primary:hover:not(:disabled) {
   background: var(--color-primary-active);
+}
+
+/* Icon-only action — square button, glyph centered, label in the tooltip. */
+.backlog-task-actions .backlog-action-icon,
+.backlog-row-actions .backlog-action-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  padding: 0;
 }
 
 .backlog-empty {
@@ -420,7 +537,7 @@
   border-left: 1px solid var(--color-hairline);
   background:
     linear-gradient(135deg, color-mix(in srgb, var(--color-surface-soft) 40%, transparent), transparent 40%),
-    var(--color-canvas);
+    var(--color-surface-raised);
   box-shadow: -24px 0 60px color-mix(in srgb, var(--color-ink) 12%, transparent);
   animation: backlog-drawer-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -565,32 +682,11 @@
   cursor: not-allowed;
 }
 
-/* ── Empty board ───────────────────────────────────────────────────── */
+/* ── Empty board — uses RelayEmptyState (empty-state.css) ─────────── */
 
 .backlog-board-empty {
   flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-xxl);
-}
-
-.backlog-board-empty-inner {
-  max-width: 420px;
-  text-align: center;
-}
-
-.backlog-board-empty-inner h3 {
-  margin: var(--space-md) 0 var(--space-xs);
-  color: var(--color-ink);
-  font: var(--type-title-md);
-}
-
-.backlog-board-empty-inner p {
-  margin: 0;
-  color: var(--color-body);
-  font: var(--type-body-sm);
-  line-height: var(--leading-loose);
+  width: 100%;
 }
 
 @media (max-width: 1100px) {
@@ -637,6 +733,306 @@
   .backlog-drawer,
   .backlog-task,
   .backlog-task-actions {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* ── View toggle (board / list) ────────────────────────────────────── */
+
+.backlog-view-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  padding: 2px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-soft);
+}
+
+.backlog-view-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 28px;
+  border: 0;
+  border-radius: calc(var(--radius-sm) - 2px);
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+  transition: background 120ms, color 120ms, box-shadow 120ms;
+}
+
+.backlog-view-btn:not([data-active="true"]):hover {
+  background: color-mix(in srgb, var(--color-ink) 6%, transparent);
+  color: var(--color-ink);
+}
+
+.backlog-view-btn[data-active="true"] {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-soft);
+}
+
+/* ── List view — Vercel-style rows ──────────────────────────────────── */
+
+.backlog-rows {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-xs) var(--space-xl) var(--space-xl);
+}
+
+.backlog-rows-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-base);
+  padding: var(--space-xs) var(--space-sm);
+  border-bottom: 1px solid var(--color-hairline);
+  background: color-mix(in srgb, var(--color-canvas) 92%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+.backlog-rows-head-cell {
+  font: var(--type-eyebrow);
+  letter-spacing: var(--letter-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.backlog-rows-head-lead { flex: 1 1 auto; min-width: 0; padding-left: calc(8px + var(--space-sm)); }
+.backlog-rows-head-status { flex: none; width: 96px; }
+.backlog-rows-head-tags { flex: none; width: 200px; }
+.backlog-rows-head-assignee { flex: none; width: 132px; }
+.backlog-rows-head-due { flex: none; width: 116px; }
+
+.backlog-row {
+  --row-accent: var(--color-muted-soft);
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-base);
+  min-height: 52px;
+  padding: var(--space-xs) var(--space-sm);
+  border-bottom: 1px solid var(--color-hairline-soft);
+  transition: background 120ms;
+}
+
+.backlog-row-tags {
+  flex: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: var(--space-xxs);
+  width: 200px;
+  overflow: hidden;
+}
+
+.backlog-row:hover {
+  background: color-mix(in srgb, var(--color-surface-soft) 60%, transparent);
+}
+
+.backlog-row[data-status="backlog"] { --row-accent: var(--color-muted-soft); }
+.backlog-row[data-status="assigned"] { --row-accent: var(--color-info); }
+.backlog-row[data-status="running"] { --row-accent: var(--color-ink); }
+.backlog-row[data-status="waiting_for_human"] { --row-accent: var(--color-accent-yellow); }
+.backlog-row[data-status="review"] { --row-accent: color-mix(in srgb, var(--color-info) 70%, var(--color-ink)); }
+.backlog-row[data-status="blocked"] { --row-accent: var(--color-semantic-down); }
+.backlog-row[data-status="done"] { --row-accent: var(--color-semantic-up); }
+
+.backlog-row-lead {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.backlog-row-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--row-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--row-accent) 18%, transparent);
+}
+
+.backlog-row[data-status="running"] .backlog-row-dot {
+  animation: backlog-row-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes backlog-row-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--row-accent) 18%, transparent); }
+  50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--row-accent) 8%, transparent); }
+}
+
+.backlog-row-title {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink);
+  font: var(--type-label-strong);
+  letter-spacing: -0.005em;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.backlog-row-title:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.backlog-row-status {
+  flex: none;
+  width: 96px;
+  color: var(--color-muted);
+  font: var(--type-meta-mono);
+  letter-spacing: 0.02em;
+}
+
+.backlog-row-assignee {
+  flex: none;
+  width: 132px;
+  color: var(--color-muted);
+  font: var(--type-meta-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.backlog-row-due {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  width: 116px;
+  color: var(--color-muted);
+  font: var(--type-meta-mono);
+}
+
+.backlog-row-due.warn { color: var(--color-warning-text); }
+.backlog-row-due.bad { color: var(--color-danger-text); }
+
+/* Hover-reveal actions dock as a clean panel over the trailing meta. The
+   leading edge fades the panel surface in over ~28px so it never hard-clips
+   a tag badge mid-glyph; a soft divider sits just inside the fade so it still
+   reads as a deliberate toolbar rather than buttons floating over the data. */
+.backlog-row-actions {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  padding-inline: calc(var(--space-base) + 28px) var(--space-sm);
+  background: linear-gradient(
+    to right,
+    transparent,
+    color-mix(in srgb, var(--color-surface-soft) 60%, var(--color-canvas)) 28px
+  );
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.backlog-row-actions::before {
+  content: "";
+  position: absolute;
+  inset-block: var(--space-xs);
+  inset-inline-start: 28px;
+  width: 1px;
+  background: var(--color-hairline-soft);
+}
+
+.backlog-row:hover .backlog-row-actions,
+.backlog-row:focus-within .backlog-row-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.backlog-row-actions select,
+.backlog-row-actions button {
+  min-height: 28px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--color-canvas);
+  padding: 0 var(--space-xs);
+  color: var(--color-ink);
+  font: var(--type-meta-mono);
+  cursor: pointer;
+  transition: background 120ms, border-color 120ms;
+}
+
+.backlog-row-actions select {
+  max-width: 96px;
+}
+
+.backlog-row-actions button:hover:not(:disabled) {
+  background: var(--color-surface-soft);
+  border-color: color-mix(in srgb, var(--color-ink) 14%, var(--color-hairline));
+}
+
+.backlog-row-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.backlog-row-actions .backlog-action-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.backlog-row-actions .backlog-action-primary:hover:not(:disabled) {
+  background: var(--color-primary-active);
+}
+
+@media (max-width: 1100px) {
+  .backlog-row-status,
+  .backlog-rows-head-status { display: none; }
+}
+
+@media (max-width: 900px) {
+  .backlog-row-assignee,
+  .backlog-rows-head-assignee { display: none; }
+}
+
+@media (max-width: 820px) {
+  .backlog-rows { padding-inline: var(--space-base); }
+
+  .backlog-rows-head { display: none; }
+
+  .backlog-row-actions {
+    position: static;
+    padding-inline: 0;
+    background: none;
+    box-shadow: none;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .backlog-row-actions::before {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backlog-row-actions,
+  .backlog-row-dot {
     animation: none;
     transition: none;
   }

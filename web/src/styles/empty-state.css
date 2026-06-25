@@ -1,0 +1,168 @@
+/* =====================================================================
+   Relay empty states + shared enter motion
+
+   One visual language for transcript, board, skills, and MCP zero-data
+   surfaces. Login reuses the same relay-rise keyframes (see login.css).
+   Atmosphere tokens live in tokens.css (--atmosphere-*).
+   ===================================================================== */
+
+@keyframes relay-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Staggered reveal — pair with delay utilities below. */
+.relay-enter {
+  opacity: 0;
+  animation: relay-rise var(--duration-slow) var(--ease-out-quint) forwards;
+}
+
+.relay-enter-delay-1 { animation-delay: 60ms; }
+.relay-enter-delay-2 { animation-delay: 140ms; }
+.relay-enter-delay-3 { animation-delay: 220ms; }
+.relay-enter-delay-4 { animation-delay: 300ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .relay-enter {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Subtle grain + corner wash — reads --atmosphere-* from tokens.css */
+.relay-atmosphere {
+  position: relative;
+  isolation: isolate;
+  background: var(--atmosphere-background);
+}
+
+.relay-atmosphere::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: var(--atmosphere-grain-opacity);
+  background-image: var(--atmosphere-grain-image);
+  background-size: var(--atmosphere-grain-size);
+  mix-blend-mode: var(--atmosphere-grain-blend);
+}
+
+/* ── Empty state layout ───────────────────────────────────────────── */
+
+.relay-empty {
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  max-width: 440px;
+  padding: var(--space-xxl) var(--space-xl);
+  text-align: center;
+  color: var(--color-ink);
+}
+
+.relay-empty--atmosphere {
+  border-radius: var(--radius-xl);
+  padding: var(--space-xxl) var(--space-lg);
+}
+
+.relay-empty--fill {
+  flex: 1;
+  justify-content: center;
+  min-height: min(360px, 50vh);
+}
+
+.relay-empty-illustration {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--space-xs);
+  color: var(--color-muted-soft);
+}
+
+.relay-empty-avatar {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-strong);
+  box-shadow: inset 0 0 0 1px var(--color-hairline-soft);
+  color: var(--color-ink);
+}
+
+/* Monochrome halo — depth without agent brand hues. */
+.relay-empty-avatar::after {
+  content: "";
+  position: absolute;
+  inset: -10px;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: calc(var(--radius-md) + 6px);
+  background: radial-gradient(
+    circle at 50% 45%,
+    color-mix(in srgb, var(--color-ink) 7%, transparent),
+    transparent 68%
+  );
+}
+
+html[data-theme="contrast"] .relay-empty-avatar::after {
+  display: none;
+}
+
+.relay-empty-avatar > svg {
+  display: block;
+}
+
+.relay-empty-title {
+  margin: 0;
+  font: var(--type-title-md);
+  color: var(--color-ink);
+  text-wrap: balance;
+}
+
+.relay-empty-body {
+  margin: 0;
+  max-width: 38ch;
+  color: var(--color-body);
+  font: var(--type-body-sm);
+  line-height: var(--leading-loose);
+}
+
+.relay-empty-hint {
+  margin: var(--space-xxs) 0 0;
+  font: var(--type-meta-mono);
+  letter-spacing: var(--letter-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.relay-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-xs);
+  margin-top: var(--space-sm);
+}
+
+.relay-empty-link {
+  display: inline-block;
+  margin-top: var(--space-xs);
+  font: var(--type-label-md);
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: opacity var(--duration-fast) ease;
+}
+
+.relay-empty-link:hover {
+  opacity: 0.75;
+}

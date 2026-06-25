@@ -43,6 +43,7 @@ export function DashboardView({ nodes, employees, metrics }: DashboardViewProps)
       <section className="adm-dash-kpis" aria-label={t("admin.v2.dash_kpis_label")}>
         <KpiTile
           hero
+          enterIndex={0}
           eyebrow={t("admin.v2.dash_kpi_sessions")}
           value={sessionsReady ? sessions.total : dash}
           delta={
@@ -59,6 +60,7 @@ export function DashboardView({ nodes, employees, metrics }: DashboardViewProps)
           spark={sessionsReady && recentSpark.some((v) => v > 0) ? recentSpark : undefined}
         />
         <KpiTile
+          enterIndex={1}
           eyebrow={t("admin.v2.dash_kpi_nodes")}
           value={fleetReady ? metrics.total : dash}
           hint={
@@ -69,11 +71,13 @@ export function DashboardView({ nodes, employees, metrics }: DashboardViewProps)
           spark={fleetReady && fleetSpark.length > 1 ? fleetSpark : undefined}
         />
         <KpiTile
+          enterIndex={2}
           eyebrow={t("admin.v2.dash_kpi_employees")}
           value={fleetReady ? metrics.employeeTotal : dash}
           hint={fleetReady ? t("admin.v2.dash_kpi_employees_hint", { count: employees.length }) : undefined}
         />
         <KpiTile
+          enterIndex={3}
           eyebrow={t("admin.v2.dash_kpi_tokens")}
           value={tokens.available ? formatCompact(tokens.total) : dash}
           hint={tokens.available ? t("admin.v2.dash_kpi_tokens_hint") : t("admin.v2.dash_coming_soon_tag")}

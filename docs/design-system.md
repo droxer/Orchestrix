@@ -1,7 +1,7 @@
 ---
 version: alpha
 name: Relay-design
-description: A precision/technical design system for an agent-orchestration control plane, in the Linear / Vercel / Resend lineage. The canvas is white (near-black in dark mode); near-black ink is the single ACTION color and inverts to white-on-black in dark mode. Color is reserved exclusively for status — success, danger, warning, and a single info blue — and is never used for actions or decoration. Type is Geist for all interface and display text (display is weighted Geist at 600 with tight tracking, not an editorial serif), with Geist Mono as a deliberate identity signal carrying eyebrows, metadata, agent labels, tool lines, numbers, and code. Geometry is tight: 6px on buttons and badges, 8px on inputs, 10–12px on cards; the pill is retired. Depth comes from hairline borders, not shadows. The result reads as serious engineering tooling — calm, dense, monochrome, terminal-native.
+description: A precision/technical design system for an agent-orchestration control plane, in the Linear / Vercel / Resend lineage. The canvas is white (near-black in dark mode); near-black ink is the single ACTION color and inverts to white-on-black in dark mode. Color is reserved exclusively for status — success, danger, warning, and a single info blue — and is never used for actions or decoration. Type is Geist for all interface and display text (display is weighted Geist at 600 with tight tracking, not an editorial serif), with Geist Mono as a deliberate identity signal carrying eyebrows, metadata, agent labels, tool lines, numbers, and code. Geometry is tight: 4px on buttons and badges, 6px on inputs, 8–10px on cards; the pill is retired. Depth comes from hairline borders, not shadows. The result reads as serious engineering tooling — calm, dense, monochrome, terminal-native.
 
 colors:
   primary: "#0a0a0a"
@@ -89,6 +89,36 @@ typography:
     fontWeight: 600
     lineHeight: 1.5
     letterSpacing: 0
+  label-strong:
+    fontFamily: "'Geist', sans-serif"
+    fontSize: 14px
+    fontWeight: 600
+    lineHeight: 1.4
+    letterSpacing: 0
+  caption-strong-sm:
+    fontFamily: "'Geist', sans-serif"
+    fontSize: 13px
+    fontWeight: 600
+    lineHeight: 1.4
+    letterSpacing: 0
+  label-md:
+    fontFamily: "'Geist', sans-serif"
+    fontSize: 13px
+    fontWeight: 500
+    lineHeight: 1.4
+    letterSpacing: 0
+  label:
+    fontFamily: "'Geist', sans-serif"
+    fontSize: 12px
+    fontWeight: 500
+    lineHeight: 1.4
+    letterSpacing: 0
+  micro-strong:
+    fontFamily: "'Geist', sans-serif"
+    fontSize: 11px
+    fontWeight: 600
+    lineHeight: 1.4
+    letterSpacing: 0
   meta-mono:
     fontFamily: "'Geist Mono', 'SFMono-Regular', Consolas, Menlo, monospace"
     fontSize: 12px
@@ -128,12 +158,12 @@ typography:
 
 rounded:
   none: 0px
-  xs: 3px
-  sm: 6px
-  md: 8px
-  lg: 10px
-  xl: 12px
-  pill: 6px
+  xs: 2px
+  sm: 4px
+  md: 6px
+  lg: 8px
+  xl: 10px
+  pill: 4px
   full: 9999px
 
 spacing:
@@ -281,7 +311,7 @@ elevated to an identity signal — it carries eyebrows, metadata, agent labels, 
 lines, numbers, and code, giving the product its terminal-native voice. There is no
 editorial serif: display moments use weighted Geist (600) with tight tracking.
 
-Geometry is tight — 6px on buttons and badges, 8px on inputs, 10–12px on cards.
+Geometry is tight — 4px on buttons and badges, 6px on inputs, 8–10px on cards.
 The 100px pill is retired. Depth comes from 1px hairline borders, not decorative
 shadows.
 
@@ -289,7 +319,7 @@ shadows.
 - Monochrome action: `{colors.primary}` (#0a0a0a) carries every primary action and inverts to white-on-black (`#f4f4f5`) in dark mode. No brand hue.
 - Color = status only: `{colors.semantic-up}`, `{colors.semantic-down}`, `{colors.accent-yellow}`, and `{colors.info}` are the only hues on screen — text, dots, and borders, never fills, never actions.
 - Mono as signal: eyebrows, metadata, agent labels (`claude · action`), tool lines, timestamps, and numbers render in Geist Mono.
-- Tight geometry: `{rounded.sm}` (6px) interactive, `{rounded.xl}` (12px) cards. Pills and large radii absent.
+- Tight geometry: `{rounded.sm}` (4px) interactive, `{rounded.xl}` (10px) cards. Pills and large radii absent.
 - Hairline depth: 1px `{colors.hairline}` borders over shadows; elevation is restrained.
 - Weighted-sans display: Geist 600 with `-0.6px` tracking replaces the retired serif.
 
@@ -352,6 +382,11 @@ tool lines, timestamps, numbers, and code.
 | `{typography.body-sm}` | 14px | 400 | 1.5 | 0 | Default UI chrome |
 | `{typography.caption}` | 13px | 400 | 1.5 | 0 | Captions, previews |
 | `{typography.caption-strong}` | 12px | 600 | 1.5 | 0 | Badge labels |
+| `{typography.label-strong}` | 14px | 600 | 1.4 | 0 | Bold chrome — row names, CTA labels, tab titles |
+| `{typography.caption-strong-sm}` | 13px | 600 | 1.4 | 0 | Small bold labels, copy buttons |
+| `{typography.label-md}` | 13px | 500 | 1.4 | 0 | Medium chrome — meta rows, timestamps (sans) |
+| `{typography.label}` | 12px | 500 | 1.4 | 0 | Small medium chrome — counts, sub-meta |
+| `{typography.micro-strong}` | 11px | 600 | 1.4 | 0 | Tiny bold — tabs, pills, agent chips |
 | `{typography.meta-mono}` | 12px | 500 | 1.4 | 0 | Agent labels, tool lines, timestamps — Geist Mono |
 | `{typography.eyebrow}` | 11px | 500 | 1.5 | 0.04em | Section kickers — Geist Mono |
 | `{typography.number}` | 18px | 500 | 1.4 | 0 | Inline metrics, deltas — Geist Mono |
@@ -409,15 +444,15 @@ ring stands in for the edge.
 | Token | Value | Use |
 |---|---|---|
 | `{rounded.none}` | 0px | Reserved |
-| `{rounded.xs}` | 3px | Inline tags |
-| `{rounded.sm}` | 6px | Buttons, badges, send button |
-| `{rounded.md}` | 8px | Inputs, popovers, avatars (rounded-square) |
-| `{rounded.lg}` | 10px | Mid-size cards |
-| `{rounded.xl}` | 12px | Cards, drawers, pricing tiers |
-| `{rounded.pill}` | 6px | **Retired** — aliases `{rounded.sm}` so legacy consumers render tight |
+| `{rounded.xs}` | 2px | Inline tags |
+| `{rounded.sm}` | 4px | Buttons, badges, send button |
+| `{rounded.md}` | 6px | Inputs, popovers, avatars (rounded-square) |
+| `{rounded.lg}` | 8px | Mid-size cards |
+| `{rounded.xl}` | 10px | Cards, drawers, pricing tiers |
+| `{rounded.pill}` | 4px | **Retired** — aliases `{rounded.sm}` so legacy consumers render tight |
 | `{rounded.full}` | 9999px | Status dots and pips only |
 
-Tight corners on interactive elements, 12px on containers, full circle reserved for
+Tight corners on interactive elements, 10px on containers, full circle reserved for
 status dots. The pill is gone.
 
 ## Components
@@ -426,7 +461,7 @@ status dots. The pill is gone.
 **`top-nav-light`** — Default top nav on white. Background `{colors.canvas}`, text `{colors.ink}`, height 60px. Wordmark left, menu center, search + actions right.
 
 ### Buttons
-**`button-primary`** — The ink action. Background `{colors.primary}`, text `{colors.on-primary}`, type `{typography.button}`, padding 8px × 16px, height 36px, rounded `{rounded.sm}` (6px). Inverts to white-on-black in dark mode.
+**`button-primary`** — The ink action. Background `{colors.primary}`, text `{colors.on-primary}`, type `{typography.button}`, padding 8px × 16px, height 36px, rounded `{rounded.sm}` (4px). Inverts to white-on-black in dark mode.
 
 **`button-primary-active`** — Press/hover. Background `{colors.primary-active}`.
 
@@ -453,7 +488,7 @@ status dots. The pill is gone.
 **`avatar`** — Employee and agent avatars. Rounded-square (`{rounded.md}`), 36px, `{colors.surface-strong}` fill, ink glyph. Agents are differentiated by their vendor glyph shape (via `AgentMark`), **not** by color — the monochrome rule applies. A corner status pip (`{rounded.full}`) carries tone.
 
 ### Forms
-**`text-input`** — Background `{colors.canvas}`, rounded `{rounded.md}` (8px), padding 9px × 12px, height 40px, 1px hairline. Focus adds `--ring-focus` (3px ink-alpha halo).
+**`text-input`** — Background `{colors.canvas}`, rounded `{rounded.md}` (6px), padding 9px × 12px, height 40px, 1px hairline. Focus adds `--ring-focus` (3px ink-alpha halo).
 
 **`search-input`** — Background `{colors.surface-strong}`, rounded `{rounded.md}`, height 38px. No pill.
 
@@ -499,8 +534,8 @@ tokens below live in `web/src/styles/` and supersede marketing typography inside
 
 | Token | Value | Use |
 |---|---|---|
-| `--sidenav-w` | 64px | Collapsed left rail |
-| `--sidenav-w-open` | 200px | Expanded left rail |
+| `--sidenav-w` | 96px | Collapsed left rail |
+| `--sidenav-w-open` | 260px | Expanded left rail (default) |
 | `--thread-w` | 296px | Conversation list (second pane) |
 | `--drawer-w` | 360px | Settings/preferences drawer (right) |
 | `--header-h` | 60px | Chat panel top bar |
@@ -529,9 +564,10 @@ reach for `var(--font-display)` — now weighted Geist, not a serif.
 ### Operational components
 
 - **`messenger-shell`** — three-pane CSS grid (`sidenav | thread | chat`), with an optional fourth `drawer` column. Below 768px it collapses to one pane at a time.
-- **`sidenav-panel`** — vertical icon rail. 44px square buttons at `--radius-xs`; expands to 200px on hover/focus revealing `--type-nav-link` labels.
+- **`sidenav-panel`** — vertical rail, labeled by default. 48px square buttons (collapsed) / 38px labeled rows at `--radius-sm`; expands to 260px revealing `--type-nav-link` labels. Active route = a quiet monochrome surface fill (no left bar).
 - **`thread-panel`** — conversation list. Flat 68px rows with a rounded-square avatar, name (`--text-base` / 600), and a 13px preview line. Separated by hairlines, not cards.
 - **`chat-panel`** — message canvas. 18px ink header title; messages render as block-grouped `.msg` units with mono eyebrows. Depth from typography, not boxes.
+- **`msg-user`** — the operator's voice. Right-aligned against the left-aligned agent turns so the transcript reads as a dialogue. It earns the single solid fill in the stream — flat `{colors.primary}` ink on white with `{colors.on-primary}` text — at a tight, symmetric `{rounded.md}` (no messenger tail), **no shadow**. Attribution comes from alignment and fill, not an avatar or "You" label. The ink fill is the one intentional box in the otherwise typography-led canvas; agent turns stay card-less.
 - **`composer`** — bottom-pinned input. Outer wrap uses `--shadow-lift`; inner field is a flat textarea. The send button is a 36px rounded-square (`--radius-sm`) ink plate — flat, no gloss. The mode chip (Implement / Review) sits bottom-left with a leading status dot — `accent-yellow` for implement, `info` blue for review — never a colored fill.
 - **`ac-*` (Admin Console)** — metric cards. Titles use `var(--font-display)` at `--text-3xl`; values use `--font-number` at `--text-4xl`. Cards are `--radius-xl`, hairline-bordered, lift on hover.
 - **`adm-drawer`** — right-edge sheet. Light variant is white canvas; dark variant fills with `--color-surface-dark` and uses `--color-hairline-on-dark` for dividers.

@@ -30,6 +30,7 @@
 @import "./styles/tokens.css";
 
 /* 2. Shell + chrome */
+@import "./styles/empty-state.css";
 @import "./styles/shell.css";
 @import "./styles/sidenav.css";
 @import "./styles/inputs.css";

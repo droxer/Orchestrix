@@ -11,12 +11,12 @@
 
    Visual language: precision/technical (Linear / Vercel / Resend
    lineage). White canvas, near-black ink as the single ACTION color
-   (it inverts to white-on-black in dark mode), cool neutral hairlines.
-   Color is reserved exclusively for status (success / danger / warning
-   / info) and never used for actions. Geist carries interface and
-   display text; Geist Mono is a deliberate identity signal — eyebrows,
-   metadata, agent labels, tool lines, numbers, and code. No editorial
-   serif; no pill geometry.
+   (it inverts to white-on-black in dark mode), cool neutral hairlines
+   in light and warm charcoal in dark. Color is reserved exclusively
+   for status (success / danger / warning / info) and never used for
+   actions. Geist carries interface and display text; Geist Mono is a
+   deliberate identity signal — eyebrows, metadata, agent labels, tool
+   lines, numbers, and code. No editorial serif; no pill geometry.
    ===================================================================== */
 
 @theme inline {
@@ -53,6 +53,7 @@
   --color-primary-disabled: var(--color-primary-disabled);
   --color-surface-soft: var(--color-surface-soft);
   --color-surface-strong: var(--color-surface-strong);
+  --color-surface-raised: var(--color-surface-raised);
   --color-surface-dark: var(--color-surface-dark);
   --color-hairline: var(--color-hairline);
   --color-hairline-soft: var(--color-hairline-soft);
@@ -133,8 +134,9 @@
   --color-surface-card: #ffffff;   /* feature/product cards on white */
   --color-surface-soft: #fafafa;   /* subtle tint — quotes, code, hover */
   --color-surface-strong: #f4f4f5; /* fills, search, avatars */
-  --color-surface-dark: #0b0b0d;
-  --color-surface-dark-elevated: #111114;
+  --color-surface-raised: #ffffff; /* modals, drawers, floating chrome */
+  --color-surface-dark: #0d0c0a;
+  --color-surface-dark-elevated: #1a1815;
   --color-on-dark-soft: #a1a1aa;
 
   /* Hairlines */
@@ -142,8 +144,21 @@
   --color-hairline-soft: #f0f0f0;
   --color-hairline-on-dark: color-mix(in srgb, var(--color-on-dark) 14%, transparent);
 
-  /* Syntax-highlight numerals — JetBrains Mono numeric literal in code blocks */
+  /* Syntax-highlight numerals — Geist Mono numeric literal in code blocks */
   --color-code-number: #b45309;
+
+  /* Artifact kind accents — the one DECORATIVE color group in the system, a
+     deliberate exception to "hue is status-only". These mirror the TUI
+     artifact palette so the transcript chip's left-border kind tag reads
+     identically across the two surfaces. Tokenized (not inlined) so dark and
+     contrast can retune them; consumed only by artifact.css. --color-diff-hunk
+     is the hunk header inside the always-dark diff viewer, so it does not flip. */
+  --color-kind-plan: #0891b2;     /* cyan */
+  --color-kind-diff: #b45309;     /* amber */
+  --color-kind-test: #7c3aed;     /* violet */
+  --color-kind-log: #c026d3;      /* magenta */
+  --color-kind-summary: #2563eb;  /* blue */
+  --color-diff-hunk: #5eb3f5;
 
   /* Status — the ONLY hues in the system. Text, dots, and borders
      only; never background fills, never actions. */
@@ -175,17 +190,17 @@
   --text-2xs: 11px;  /* compact labels, tiny metadata */
   --text-micro: 10px; /* minimap / token abbreviations */
 
-  /* Radii — tight precision geometry. sm (6px) for buttons/badges, md
-     (8px) for inputs/popovers, xl (12px) for cards. The pill is retired:
-     all former --radius-pill consumers now use --radius-sm and render as
-     tight 6px corners instead of 100px capsules. --radius-full stays for
-     any genuine circles (status dots). */
+  /* Radii — tight precision geometry, tightened a step sharper. sm (4px)
+     for buttons/badges, md (6px) for inputs/popovers, xl (10px) for cards.
+     The pill is retired: all former --radius-pill consumers now use
+     --radius-sm and render as tight 4px corners instead of 100px capsules.
+     --radius-full stays for any genuine circles (status dots, pips). */
   --radius-none: 0;
-  --radius-xs: 3px;
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 10px;
-  --radius-xl: 12px;
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
   --radius-full: 9999px;
 
   /* Spacing — 4px base unit */
@@ -200,8 +215,8 @@
   --space-section: 96px; /* editorial section rhythm */
 
   /* Shell dimensions */
-  --sidenav-w: 64px;
-  --sidenav-w-open: 200px;
+  --sidenav-w: 96px;
+  --sidenav-w-open: 260px;
   --thread-w: 296px;
   --drawer-w: 360px;
   --header-h: 60px;
@@ -250,6 +265,15 @@
   --type-caption-strong: 600 12px/1.5 var(--font-sans);
   --type-button:     600 16px/1.15 var(--font-sans);
   --type-nav-link:   500 14px/1.4  var(--font-sans);
+  /* Chrome labels — the dense small-text roles that fill operational UI
+     (table heads, field labels, pills, metric captions). Tight 1.4 leading;
+     these are single-line by nature. Fills the gap below caption/caption-strong
+     so small bold/medium chrome has a semantic home instead of raw size+weight. */
+  --type-label-strong:      600 14px/1.4 var(--font-sans);  /* 14px bold chrome */
+  --type-caption-strong-sm: 600 13px/1.4 var(--font-sans);  /* 13px bold */
+  --type-label-md:          500 13px/1.4 var(--font-sans);  /* 13px medium */
+  --type-label:             500 12px/1.4 var(--font-sans);  /* 12px medium */
+  --type-micro-strong:      600 11px/1.4 var(--font-sans);  /* 11px bold */
   --type-number:     500 18px/1.4  var(--font-number);
   --type-number-display: 500 36px/1.1 var(--font-number);  /* admin metric values */
   --type-meta-mono:  500 12px/1.4 var(--font-mono);  /* agent labels, tool lines, timestamps */
@@ -260,6 +284,20 @@
   /* Overlay scrim — behind modal drawers/dialogs. One token so every
      floating surface dims the canvas identically. */
   --color-overlay: color-mix(in srgb, #000 55%, transparent);
+
+  /* Atmosphere — grain + corner wash for soft panels (login rail, KPI
+     hero, transcript empty). Components add .relay-atmosphere or read
+     --atmosphere-background directly. Disabled in high-contrast mode. */
+  --atmosphere-wash: radial-gradient(
+    ellipse 90% 70% at 100% 0%,
+    color-mix(in srgb, var(--color-ink) 4%, transparent),
+    transparent 65%
+  );
+  --atmosphere-grain-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+  --atmosphere-grain-opacity: 0.35;
+  --atmosphere-grain-size: 180px 180px;
+  --atmosphere-grain-blend: multiply;
+  --atmosphere-background: var(--atmosphere-wash), var(--color-surface-soft);
 
   /* Status borders for outlined pills and danger buttons */
   --border-success: color-mix(in srgb, var(--color-semantic-up) 28%, transparent);
@@ -353,21 +391,16 @@ html:lang(zh-TW) {
   --font-mono: var(--font-geist-mono), var(--font-noto-sans-tc), "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", monospace;
 }
 
-/* Dark theme — ONE definition, ONE selector. `applyTheme` (appStorage.ts)
-   always resolves the user's choice — including "system" via matchMedia —
-   to a concrete data-theme="light"|"dark" before paint (the inline script
-   in app/layout.tsx sets it pre-hydration to avoid a flash). So dark never
-   needs a parallel `@media (prefers-color-scheme: dark)` block: that path
-   was a verbatim copy of this one and the standing drift risk. There is now
-   a single source of truth.
-
-   html[data-theme="light"] needs no rules — the :root primitives already
-   define the light palette.
-
-   This block re-tunes the primitives that don't survive an inversion:
-   surfaces, text hierarchy, hairlines, AND the colors/elevation that are
-   authored for a light canvas (brand blue, code amber, drop shadows). */
+/* Dark + high-contrast themes — ONE selector each. `applyTheme`
+   (appStorage.ts) resolves "system" via matchMedia to light|dark, or
+   sets data-theme="contrast" directly. Pre-hydration script in
+   app/layout.tsx mirrors the same logic to avoid a flash. */
 html[data-theme="dark"] {
+  /* Warm charcoal base — a trace of amber lifts the void off cold zinc
+     without breaking the monochrome precision identity. Light stays cool. */
+  --color-surface-dark: #0d0c0a;
+  --color-surface-dark-elevated: #1a1815;
+
   /* Text — keep four distinct steps; body must stay lighter (more
      prominent) than muted, mirroring the light ramp where body is darker
      than muted. Collapsing body+muted onto on-dark-soft flattened it. */
@@ -376,11 +409,13 @@ html[data-theme="dark"] {
   --color-muted: var(--color-on-dark-soft);
   --color-muted-soft: color-mix(in srgb, var(--color-on-dark-soft) 62%, var(--color-surface-dark));
 
-  /* Surfaces + hairlines */
+  /* Surfaces + hairlines — widen the dark ramp so canvas, fills, cards,
+     and floating chrome read as distinct layers (not one flat void). */
   --color-canvas: var(--color-surface-dark);
-  --color-surface-card: color-mix(in srgb, var(--color-on-dark) 9%, var(--color-surface-dark));
-  --color-surface-soft: var(--color-surface-dark-elevated);
-  --color-surface-strong: color-mix(in srgb, var(--color-on-dark) 9%, var(--color-surface-dark));
+  --color-surface-card: color-mix(in srgb, var(--color-on-dark) 12%, var(--color-surface-dark));
+  --color-surface-soft: color-mix(in srgb, var(--color-on-dark) 6%, var(--color-surface-dark));
+  --color-surface-strong: color-mix(in srgb, var(--color-on-dark) 10%, var(--color-surface-dark));
+  --color-surface-raised: color-mix(in srgb, var(--color-on-dark) 14%, var(--color-surface-dark));
   --color-hairline: color-mix(in srgb, var(--color-on-dark) 14%, var(--color-surface-dark));
   --color-hairline-soft: color-mix(in srgb, var(--color-on-dark) 8%, var(--color-surface-dark));
 
@@ -398,10 +433,19 @@ html[data-theme="dark"] {
   --color-semantic-down: #ff6b75;
   --color-info: #60a5fa;
   --color-code-number: #f0a868;
+  --color-accent-yellow: #f7b84d; /* attention dot — brightened for dark canvas */
+
+  /* Artifact kind accents — brightened so the chip left-border keeps its hue
+     separation on the warm dark canvas. */
+  --color-kind-plan: #22b8d4;
+  --color-kind-diff: #e0913a;
+  --color-kind-test: #a78bfa;
+  --color-kind-log: #e879f9;
+  --color-kind-summary: #60a5fa;
 
   /* On the dark canvas the bright status hues clear contrast as text, so the
      text-safe ramps track them rather than the light-mode deepened values. */
-  --color-warning-text: var(--color-accent-yellow);
+  --color-warning-text: #fbbf24; /* amber-400 — ~7:1 on warm dark canvas at 12px */
   --color-danger-text: var(--color-semantic-down);
 
   /* Elevation — the rgba(0,0,0,.04) drop is invisible on dark; deepen it.
@@ -409,7 +453,72 @@ html[data-theme="dark"] {
      white hairline automatically. */
   --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.5);
 
+  /* Scrim — deepen on an already-dark canvas so drawers/dialogs still read
+     as modal without washing out to grey. */
+  --color-overlay: color-mix(in srgb, #000 72%, transparent);
+
+  --atmosphere-grain-opacity: 0.2;
+  --atmosphere-grain-blend: soft-light;
+  --atmosphere-wash: radial-gradient(
+    ellipse 90% 70% at 100% 0%,
+    color-mix(in srgb, #e8dcc8 7%, transparent),
+    transparent 65%
+  );
+  --atmosphere-background: var(--atmosphere-wash), var(--color-surface-soft);
+
   color-scheme: dark;
+}
+
+/* High contrast — accessibility theme. Near-black on white, solid
+   hairlines, no grain, status hues at maximum legibility. Independent of
+   the OS light/dark preference. */
+html[data-theme="contrast"] {
+  --color-ink: #000000;
+  --color-body: #000000;
+  --color-muted: #2e2e2e;
+  --color-muted-soft: #454545;
+
+  --color-canvas: #ffffff;
+  --color-surface-card: #ffffff;
+  --color-surface-soft: #f5f5f5;
+  --color-surface-strong: #ebebeb;
+  --color-surface-raised: #ffffff;
+
+  --color-hairline: #000000;
+  --color-hairline-soft: #5c5c5c;
+
+  --color-primary: #000000;
+  --color-primary-active: #2e2e2e;
+  --color-primary-disabled: #8a8a8a;
+  --color-on-primary: #ffffff;
+
+  --color-semantic-up: #006b3d;
+  --color-semantic-down: #b00020;
+  --color-info: #0033cc;
+  --color-accent-yellow: #8a5a00;
+  --color-warning-text: #5c3b00;
+  --color-danger-text: #b00020;
+  --color-code-number: #7a3e00;
+
+  /* Artifact kind accents collapse to ink — the high-contrast theme drops
+     decorative hue, so the chip left-border reads as a neutral ink bar.
+     --color-diff-hunk is exempt: it lives on the always-dark diff surface. */
+  --color-kind-plan: var(--color-ink);
+  --color-kind-diff: var(--color-ink);
+  --color-kind-test: var(--color-ink);
+  --color-kind-log: var(--color-ink);
+  --color-kind-summary: var(--color-ink);
+
+  --color-overlay: color-mix(in srgb, #000 80%, transparent);
+  --shadow-soft: none;
+  --shadow-lift: 0 0 0 2px #000000;
+  --ring-focus: 0 0 0 3px #000000;
+
+  --atmosphere-wash: none;
+  --atmosphere-grain-opacity: 0;
+  --atmosphere-background: var(--color-surface-soft);
+
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; }
@@ -496,9 +605,7 @@ button[data-slot="button"][data-variant="default"]:hover:not(:disabled) {
 
 /* Primary CTA disabled — the shadcn <Button> default variant is the primary
    CTA (it renders data-variant="default"), so its disabled state uses the
-   dedicated faded-blue token instead of generic opacity. This preserves the
-   brand voltage on disabled CTAs (per design-system spec
-   `button-primary-disabled` = `--color-primary-disabled` background). */
+   dedicated faded-ink token instead of generic opacity. */
 button[data-slot="button"][data-variant="default"]:disabled {
   background: var(--color-primary-disabled);
   color: var(--color-on-primary);

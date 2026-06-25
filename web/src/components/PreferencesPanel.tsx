@@ -2,10 +2,15 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import {
+  SUPPORTED_LANGUAGES,
+  SUPPORTED_THEMES,
+  type Language,
+  type Theme,
+} from "../lib/appStorage";
 
-export type Theme = "light" | "dark" | "system";
-export const SUPPORTED_LANGUAGES = ["en", "zh-CN", "zh-TW"] as const;
-export type Language = (typeof SUPPORTED_LANGUAGES)[number];
+export type { Language, Theme };
+export { SUPPORTED_LANGUAGES, SUPPORTED_THEMES };
 
 const LANGUAGES: { code: Language; label: string; native: string }[] = [
   { code: "en",    label: "English",            native: "English"   },
@@ -17,6 +22,7 @@ const THEME_OPTIONS: { value: Theme }[] = [
   { value: "light" },
   { value: "dark" },
   { value: "system" },
+  { value: "contrast" },
 ];
 
 /* Settings categories. Adding a new settings area = one entry here plus a
@@ -82,7 +88,7 @@ function AppearanceSection({
                 <span className="pref-theme-check" aria-hidden="true">
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                     <circle cx="7" cy="7" r="7" fill="var(--color-primary)" />
-                    <path d="M4 7l2 2 4-4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M4 7l2 2 4-4" stroke="var(--color-on-primary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </span>
               )}

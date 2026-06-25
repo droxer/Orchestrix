@@ -6,6 +6,7 @@ interface KpiTileProps {
   eyebrow: string;
   value: ReactNode;
   hero?: boolean;
+  enterIndex?: number;
   delta?: {
     label: string;
     direction: "up" | "down" | "flat";
@@ -14,10 +15,13 @@ interface KpiTileProps {
   spark?: number[];
 }
 
-export function KpiTile({ eyebrow, value, hero, delta, hint, spark }: KpiTileProps) {
+export function KpiTile({ eyebrow, value, hero, enterIndex = 0, delta, hint, spark }: KpiTileProps) {
   const hasFoot = Boolean(delta || hint || (spark && spark.length > 1));
+  const enterDelay = Math.min(enterIndex + 1, 4);
   return (
-    <div className={`adm-dash-tile${hero ? " adm-dash-tile--hero" : ""}`}>
+    <div
+      className={`adm-dash-tile relay-enter relay-enter-delay-${enterDelay}${hero ? " adm-dash-tile--hero relay-atmosphere" : ""}`}
+    >
       <div className="adm-dash-tile-eyebrow">{eyebrow}</div>
       <div className="adm-dash-tile-value mono">{value}</div>
       {hasFoot ? (

@@ -1,7 +1,7 @@
 /* =====================================================================
    Admin Dashboard  (adm-dash-* namespace)
-   Editorial control-room overview: oversized JetBrains Mono numerals,
-   hairline grids, a single Relay-blue accent. Reuses the admin-v2
+   Editorial control-room overview: oversized Geist Mono numerals,
+   hairline grids, monochrome ink actions. Reuses the admin-v2
    tokens so the page reads as the same product as People and Fleet.
    ===================================================================== */
 
@@ -26,6 +26,13 @@
   background: var(--color-canvas);
 }
 
+@media (min-width: 1200px) {
+  .adm-dash-kpis {
+    margin-inline: calc(-1 * var(--space-xxl));
+    width: calc(100% + 2 * var(--space-xxl));
+  }
+}
+
 .adm-dash-tile {
   display: flex;
   flex-direction: column;
@@ -39,7 +46,6 @@
 
 .adm-dash-tile--hero {
   padding: var(--space-base) var(--space-lg);
-  background: var(--color-surface-soft);
   gap: var(--space-sm);
 }
 
@@ -228,8 +234,7 @@
 }
 
 .adm-dash-empty-tag {
-  font-size: var(--text-2xs);
-  font-weight: 600;
+  font: var(--type-micro-strong);
   letter-spacing: var(--letter-eyebrow);
   text-transform: uppercase;
   color: var(--color-primary);

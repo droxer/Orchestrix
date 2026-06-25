@@ -136,12 +136,14 @@
   color: var(--color-muted);
 }
 
-/* Full-width primary CTA. Pill radius is inherited from the shadcn Button
-   base — only the editorial 48px height + button type role are local. */
+/* Full-width primary CTA. Tight --radius-sm is inherited from the shadcn
+   Button base — only the height + button type role are local. Kept one
+   systematic notch (44px) above the 36px chrome default as the single
+   editorial auth focal point. */
 .login-form > button[data-slot="button"] {
   margin-top: var(--space-xs);
   width: 100%;
-  height: 48px;
+  height: 44px;
   font: var(--type-button);
 }
 
@@ -181,8 +183,7 @@
   border-radius: var(--radius-sm);
   background: var(--color-canvas);
   color: var(--color-ink);
-  font-size: var(--text-sm);
-  font-weight: 500;
+  font: var(--type-label-md);
   cursor: pointer;
   transition: background var(--duration-fast) ease, border-color var(--duration-fast) ease, transform var(--duration-fast) ease;
 }
@@ -216,7 +217,7 @@
   flex-direction: column;
   justify-content: space-between;
   padding: var(--space-xxl) clamp(var(--space-lg), 5vw, var(--space-xxl));
-  background: var(--color-surface-soft);
+  background: var(--atmosphere-background);
   color: var(--color-ink);
   overflow: hidden;
   isolation: isolate;
@@ -228,7 +229,19 @@
   }
 }
 
-/* Atmospheric mark — a single oversized serif character bled to the
+.login-atmosphere::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  opacity: var(--atmosphere-grain-opacity);
+  background-image: var(--atmosphere-grain-image);
+  background-size: var(--atmosphere-grain-size);
+  mix-blend-mode: var(--atmosphere-grain-blend);
+}
+
+/* Atmospheric mark — a single oversized character bled to the
    corner. Adds depth without competing with the pull-quote. */
 .login-atmosphere::before {
   content: "R";
@@ -249,12 +262,6 @@
 
 html[data-theme="dark"] .login-atmosphere::before {
   color: color-mix(in srgb, var(--color-ink) 3%, transparent);
-}
-
-@media (prefers-color-scheme: dark) {
-  html:not([data-theme="light"]) .login-atmosphere::before {
-    color: color-mix(in srgb, var(--color-ink) 3%, transparent);
-  }
 }
 
 .login-atmosphere-top {
@@ -303,10 +310,8 @@ html[data-theme="dark"] .login-atmosphere::before {
 
 .login-pullquote-attribution {
   margin-top: var(--space-base);
-  font-family: var(--font-sans);
-  font-size: var(--text-sm);
+  font: var(--type-label-md);
   font-style: normal;
-  font-weight: 500;
   letter-spacing: 0.01em;
   color: var(--color-muted);
 }

@@ -8,16 +8,19 @@ import {
   CircleAlert,
   CircleCheck,
   CircleStop,
-  ClipboardList,
+  CalendarClock,
   CalendarDays,
   Code2,
+  Columns3,
+  Rows3,
   Forward,
+  Hash,
   Play,
   Info,
   KeyRound,
   Library,
+  ListTodo,
   LogOut,
-  MessageSquareMore,
   MessagesSquare,
   PanelLeftClose,
   PanelLeftOpen,
@@ -25,7 +28,6 @@ import {
   Plug,
   Plus,
   RefreshCw,
-  Repeat2,
   ScanEye,
   Search,
   Settings,
@@ -63,10 +65,10 @@ function withStandardStroke(Icon: LucideIcon, displayName: string) {
 // here — no caller in the app has to know which lucide picture we chose.
 export const NavConversations = withStandardStroke(MessagesSquare, "NavConversations");
 export const NavAdmin = withStandardStroke(UserCog, "NavAdmin");
-export const NavBacklog = withStandardStroke(ClipboardList, "NavBacklog");
-export const NavChannels = withStandardStroke(MessageSquareMore, "NavChannels");
+export const NavBacklog = withStandardStroke(ListTodo, "NavBacklog");
+export const NavChannels = withStandardStroke(Hash, "NavChannels");
 export const NavMcp = withStandardStroke(Plug, "NavMcp");
-export const NavRoutine = withStandardStroke(Repeat2, "NavRoutine");
+export const NavRoutine = withStandardStroke(CalendarClock, "NavRoutine");
 export const NavSkills = withStandardStroke(Library, "NavSkills");
 export const NavPreferences = withStandardStroke(Settings, "NavPreferences");
 export const NavLogout = withStandardStroke(LogOut, "NavLogout");
@@ -86,6 +88,8 @@ export const ActionAddPerson = withStandardStroke(UserPlus, "ActionAddPerson");
 export const ActionRemove = withStandardStroke(X, "ActionRemove");
 export const ActionSearch = withStandardStroke(Search, "ActionSearch");
 export const ActionCalendar = withStandardStroke(CalendarDays, "ActionCalendar");
+export const ViewBoard = withStandardStroke(Columns3, "ViewBoard");
+export const ViewList = withStandardStroke(Rows3, "ViewList");
 export const ActionKey = withStandardStroke(KeyRound, "ActionKey");
 
 export const ModeAction = withStandardStroke(Code2, "ModeAction");

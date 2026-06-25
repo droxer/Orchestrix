@@ -1,9 +1,9 @@
 /* =====================================================================
    Admin Console v2  (adm-* namespace)
-   Editorial command-center: white canvas, hairlines, JetBrains Mono
-   numbers, Relay Blue scarce. Two views (People / Fleet) share a
-   shell with left nav rail, top header, pulse strip, and right
-   attention rail. Drawers carry onboarding and credentials reveal.
+   Editorial command-center: white canvas, hairlines, Geist Mono
+   numerals, near-black ink as the sole action color. Two views
+   (People / Fleet) share a shell with left nav rail, top header,
+   pulse strip, and right attention rail.
    ===================================================================== */
 
 .admin-console.adm-shell {
@@ -17,12 +17,31 @@
 }
 
 .admin-console.adm-bare {
-  background: var(--color-surface-soft);
+  background: var(--atmosphere-background);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: var(--space-xxl) var(--space-lg);
   min-height: 100%;
+  position: relative;
+  isolation: isolate;
+}
+
+.admin-console.adm-bare::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: var(--atmosphere-grain-opacity);
+  background-image: var(--atmosphere-grain-image);
+  background-size: var(--atmosphere-grain-size);
+  mix-blend-mode: var(--atmosphere-grain-blend);
+}
+
+.admin-console.adm-bare > * {
+  position: relative;
+  z-index: 1;
 }
 
 .adm-loading {
@@ -223,8 +242,7 @@
 .adm-pulse-value.tone-neutral { color: var(--color-ink); }
 
 .adm-pulse-label {
-  font-size: var(--text-2xs);
-  font-weight: 600;
+  font: var(--type-micro-strong);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--color-muted);

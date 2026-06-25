@@ -1,4 +1,10 @@
-import { SUPPORTED_LANGUAGES, type Theme, type Language } from "../components/PreferencesPanel";
+export type Theme = "light" | "dark" | "system" | "contrast";
+
+export const SUPPORTED_THEMES = ["light", "dark", "system", "contrast"] as const;
+
+export const SUPPORTED_LANGUAGES = ["en", "zh-CN", "zh-TW"] as const;
+
+export type Language = (typeof SUPPORTED_LANGUAGES)[number];
 
 export type TokenMap = Record<string, string>;
 
@@ -19,7 +25,8 @@ export function writeTokens(tokens: TokenMap): void {
 
 export function readTheme(): Theme {
   if (typeof window === "undefined") return "system";
-  return (localStorage.getItem(themeStorageKey) as Theme | null) ?? "system";
+  const stored = localStorage.getItem(themeStorageKey);
+  return SUPPORTED_THEMES.includes(stored as Theme) ? stored as Theme : "system";
 }
 
 export function readLanguage(): Language {
@@ -43,10 +50,14 @@ export function systemTheme(): "light" | "dark" {
 }
 
 /** Reflect the user's choice onto data-theme, resolving "system" to a
- *  concrete value so the CSS needs only a single html[data-theme="dark"]
- *  block (no parallel prefers-color-scheme media query). */
+ *  concrete value so the CSS needs only html[data-theme] blocks (no
+ *  parallel prefers-color-scheme media query). */
 export function applyTheme(theme: Theme): void {
   if (typeof document === "undefined") return;
+  if (theme === "contrast") {
+    document.documentElement.setAttribute("data-theme", "contrast");
+    return;
+  }
   const resolved = theme === "system" ? systemTheme() : theme;
   document.documentElement.setAttribute("data-theme", resolved);
 }

@@ -4,6 +4,8 @@ import { useMemo, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { assignTask, createTask, startTask, updateTask } from "../api";
 import { Badge } from "@/components/ui/badge";
+import { AgentStateBadge } from "./AgentStateBadge";
+import { PriorityBadge } from "./PriorityBadge";
 import { cn } from "@/lib/utils";
 import { AGENT_NAMES, type AgentName, type CurrentUser, type DaemonNodeMonitorRecord, type RelaySession, type RelayTask, type TaskPriority, type TaskRoutineCadence, type TaskRoutineType, type Tone } from "../types";
 import { ActionAddPerson, ActionCalendar, ActionCompose, ActionRemove, ActionSearch, ActionStart, NavRefresh } from "./icons";
@@ -59,12 +61,6 @@ const emptyForm = (currentUser: CurrentUser): RoutineFormState => ({
   routineNextRunDate: "",
   routineEnabled: true,
 });
-
-const PRIORITY_BADGE: Record<TaskPriority, "danger" | "info" | "neutral"> = {
-  high: "danger",
-  normal: "info",
-  low: "neutral",
-};
 
 function activeFilterCount(filters: RoutineFilters): number {
   let count = 0;
@@ -185,14 +181,8 @@ function RoutineCard({
     <article className="routine-card backlog-task" data-priority={task.priority}>
       <div className="backlog-task-badges">
         <Badge variant={task.routineEnabled ? "success" : "neutral"}>{task.routineEnabled ? t("routine.enabled") : t("routine.disabled")}</Badge>
-        <Badge variant={PRIORITY_BADGE[task.priority]}>{t(`backlog.priorities.${task.priority}`)}</Badge>
-        {task.assignedAgent ? (
-          <Badge variant={ready ? "success" : "danger"} translate="no">
-            {task.assignedAgent} · {ready ? t("backlog.ready") : t("backlog.not_ready")}
-          </Badge>
-        ) : (
-          <Badge variant="neutral">{t("backlog.no_agent")}</Badge>
-        )}
+        <PriorityBadge priority={task.priority} />
+        <AgentStateBadge agent={task.assignedAgent} ready={ready} />
       </div>
       <button type="button" className="backlog-task-title" onClick={onEdit}>{task.title}</button>
       {task.description ? <p className="backlog-description">{task.description}</p> : null}
@@ -226,9 +216,8 @@ function RoutineCard({
           <option value="">{t("backlog.no_agent")}</option>
           {AGENT_NAMES.map((agent) => <option key={agent} value={agent}>{agent}</option>)}
         </select>
-        <button type="button" className="backlog-action-primary" onClick={onStart} disabled={!task.assignedAgent || !task.routineEnabled || task.status === "running" || task.status === "done"}>
+        <button type="button" className="backlog-action-primary backlog-action-icon" onClick={onStart} disabled={!task.assignedAgent || !task.routineEnabled || task.status === "running" || task.status === "done"} aria-label={t("backlog.start")} title={t("backlog.start")}>
           <ActionStart size={14} />
-          {t("backlog.start")}
         </button>
         {session ? <button type="button" onClick={onOpenThread}>{t("backlog.open_thread")}</button> : null}
         <button type="button" onClick={onToggleBlock}>{task.status === "blocked" ? t("backlog.reopen") : t("backlog.block")}</button>
