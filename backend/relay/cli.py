@@ -6,9 +6,9 @@ import os
 import uvicorn
 from loguru import logger
 
-from .environment import load_backend_env
-from .logging_config import setup_logging
 from .app import create_app
+from .core.environment import load_backend_env
+from .core.logging_config import setup_logging
 
 load_backend_env()
 

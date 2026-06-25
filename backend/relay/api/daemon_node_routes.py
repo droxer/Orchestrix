@@ -5,7 +5,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
 
-from ..models import DaemonNodeRegistration
+from ..core.models import DaemonNodeRegistration
 from .deps import AppContextDep
 from .helpers import actor_can_access_sandbox, bearer_token, daemon_node_event, json_body, request_actor_or_none
 

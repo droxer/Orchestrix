@@ -4,9 +4,9 @@ import argparse
 import os
 import sys
 
-from .auth import auth_store_from_env
-from .environment import load_backend_env
-from .stores import DEFAULT_RELAY_DATA_DIR
+from .core.environment import load_backend_env
+from .persistence.stores import DEFAULT_RELAY_DATA_DIR
+from .security.auth import auth_store_from_env
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -11,9 +11,9 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import PlainTextResponse, StreamingResponse
 from loguru import logger
 
-from ..controller import SessionArchivedError, SessionController, SessionRunInFlightError
-from ..models import AGENT_NAMES
-from ..stores import valid_agent
+from ..core.models import AGENT_NAMES
+from ..persistence.stores import valid_agent
+from ..services.controller import SessionArchivedError, SessionController, SessionRunInFlightError
 from .deps import AppContextDep
 from .helpers import (
     assignment_list,

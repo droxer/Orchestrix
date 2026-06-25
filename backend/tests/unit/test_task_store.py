@@ -115,6 +115,51 @@ def test_task_claim_orders_by_priority_due_date_and_assignee() -> None:
         assert store.get_task(wrong_assignee["id"])["status"] == "assigned"
 
 
+def test_task_store_claims_exact_task_for_dispatch() -> None:
+    with TemporaryDirectory() as root:
+        store = LocalTaskStore(root)
+        routine = store.create_task({"title": "Routine", "isRoutine": True, "routineEnabled": True, "assignedAgent": "codex", "status": "assigned"})
+        task = store.create_task({"title": "Dispatch me", "assignedAgent": "codex", "status": "assigned"})
+
+        assert store.claim_task_for_dispatch(routine["id"], "codex") is None
+        claimed = store.claim_task_for_dispatch(task["id"], "codex")
+        second_claim = store.claim_task_for_dispatch(task["id"], "codex")
+
+        assert claimed is not None
+        assert claimed["status"] == "running"
+        assert second_claim is None
+
+
+def test_task_store_promotes_due_routine_once() -> None:
+    with TemporaryDirectory() as root:
+        store = LocalTaskStore(root)
+        routine = store.create_task({
+            "title": "Routine",
+            "description": "Run it.",
+            "priority": "high",
+            "isRoutine": True,
+            "routineEnabled": True,
+            "routineCadence": "weekly",
+            "routineNextRunDate": "2026-06-25",
+            "assignedAgent": "codex",
+            "ownerEmployeeId": "alice",
+            "assigneeEmployeeId": "alice",
+        })
+
+        first = store.promote_due_routine(routine["id"], "2026-06-25", "2026-07-02")
+        second = store.promote_due_routine(routine["id"], "2026-06-25", "2026-07-09")
+
+        assert first is not None
+        assert first["status"] == "assigned"
+        assert first["isRoutine"] is False
+        assert first["assignedAgent"] == "codex"
+        assert first["dueDate"] == "2026-06-25"
+        assert second is None
+        updated = store.get_task(routine["id"])
+        assert updated["routineNextRunDate"] == "2026-07-02"
+        assert len([task for task in store.list_tasks() if task["id"] != routine["id"]]) == 1
+
+
 def test_database_task_claim_orders_by_priority_due_date_and_assignee() -> None:
     with TemporaryDirectory() as root:
         store = DatabaseTaskStore(f"sqlite:///{root}/relay.db", create_schema=True)
@@ -130,3 +175,48 @@ def test_database_task_claim_orders_by_priority_due_date_and_assignee() -> None:
         assert claimed["id"] == earlier["id"]
         assert claimed["status"] == "running"
         assert store.get_task(wrong_assignee["id"])["status"] == "assigned"
+
+
+def test_database_task_store_claims_exact_task_for_dispatch() -> None:
+    with TemporaryDirectory() as root:
+        store = DatabaseTaskStore(f"sqlite:///{root}/relay.db", create_schema=True)
+        routine = store.create_task({"title": "Routine", "isRoutine": True, "routineEnabled": True, "assignedAgent": "codex", "status": "assigned"})
+        task = store.create_task({"title": "Dispatch me", "assignedAgent": "codex", "status": "assigned"})
+
+        assert store.claim_task_for_dispatch(routine["id"], "codex") is None
+        claimed = store.claim_task_for_dispatch(task["id"], "codex")
+        second_claim = store.claim_task_for_dispatch(task["id"], "codex")
+
+        assert claimed is not None
+        assert claimed["status"] == "running"
+        assert second_claim is None
+
+
+def test_database_task_store_promotes_due_routine_once() -> None:
+    with TemporaryDirectory() as root:
+        store = DatabaseTaskStore(f"sqlite:///{root}/relay.db", create_schema=True)
+        routine = store.create_task({
+            "title": "Routine",
+            "description": "Run it.",
+            "priority": "high",
+            "isRoutine": True,
+            "routineEnabled": True,
+            "routineCadence": "weekly",
+            "routineNextRunDate": "2026-06-25",
+            "assignedAgent": "codex",
+            "ownerEmployeeId": "alice",
+            "assigneeEmployeeId": "alice",
+        })
+
+        first = store.promote_due_routine(routine["id"], "2026-06-25", "2026-07-02")
+        second = store.promote_due_routine(routine["id"], "2026-06-25", "2026-07-09")
+
+        assert first is not None
+        assert first["status"] == "assigned"
+        assert first["isRoutine"] is False
+        assert first["assignedAgent"] == "codex"
+        assert first["dueDate"] == "2026-06-25"
+        assert second is None
+        updated = store.get_task(routine["id"])
+        assert updated["routineNextRunDate"] == "2026-07-02"
+        assert len([task for task in store.list_tasks() if task["id"] != routine["id"]]) == 1

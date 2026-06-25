@@ -5,7 +5,7 @@ from typing import Annotated, Any
 
 from fastapi import Depends, Request
 
-from ..daemon import DaemonNodeRegistry, ServerDaemonNodeBackend
+from ..services.daemon import DaemonNodeRegistry, ServerDaemonNodeBackend
 
 
 @dataclass(frozen=True)

@@ -6,9 +6,9 @@ from datetime import date
 from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
 
-from ..controller import SessionController
-from ..models import AGENT_NAMES
-from ..stores import task_priority, task_routine_cadence, task_routine_type, task_status, valid_agent
+from ..core.models import AGENT_NAMES
+from ..persistence.stores import task_priority, task_routine_cadence, task_routine_type, task_status, valid_agent
+from ..services.controller import SessionController
 from .deps import AppContextDep
 from .helpers import (
     actor_can_access_record,
@@ -102,6 +102,8 @@ async def start_task_on_ready_node(
     agent = valid_agent(task.get("assignedAgent"))
     if not agent:
         return None
+    if task.get("isRoutine"):
+        return None
     if task.get("status") in ("running", "review", "waiting_for_human", "done"):
         return None
     node = ready_node_for_task(ctx, task, agent)
@@ -158,9 +160,6 @@ async def create_task(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     if agent:
         task = ctx.task_store.assign_task(task["id"], agent)
         logger.info("Task assigned", task_id=task["id"], agent=agent)
-        started = await start_task_on_ready_node(ctx, task, actor)
-        if started:
-            task = started["task"]
     if body.get("createSession") is True or isinstance(body.get("assignments"), list):
         workspace_path = string_field(body, "workspacePath") or "/workspace"
         controller = SessionController(
@@ -222,9 +221,6 @@ async def update_task(task_id: str, request: Request, ctx: AppContextDep) -> dic
     })
     if agent:
         task = ctx.task_store.assign_task(task_id, agent)
-        started = await start_task_on_ready_node(ctx, task, actor)
-        if started:
-            task = started["task"]
     return task
 
 
@@ -237,8 +233,7 @@ async def assign_task(task_id: str, request: Request, ctx: AppContextDep) -> dic
     if not agent:
         raise HTTPException(400, f"agent must be one of: {', '.join(AGENT_NAMES)}.")
     task = ctx.task_store.assign_task(task_id, agent)
-    started = await start_task_on_ready_node(ctx, task, actor)
-    return started["task"] if started else task
+    return task
 
 
 @router.post("/tasks/{task_id}/start", status_code=202)

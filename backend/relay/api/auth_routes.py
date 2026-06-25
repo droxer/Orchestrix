@@ -4,7 +4,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response
 
-from ..auth import (
+from ..security.auth import (
     USER_COOKIE_NAME,
     require_admin_session,
     require_user_session,

@@ -11,10 +11,10 @@ from typing import Any
 from fastapi import HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse
 
-from ..auth import require_user_session
-from ..daemon import DaemonNodeRegistry, daemon_node_token_matches, sandbox_ui_token_matches, workspace_paths_match
-from ..models import AGENT_NAMES
-from ..stores import valid_agent
+from ..core.models import AGENT_NAMES
+from ..persistence.stores import valid_agent
+from ..security.auth import require_user_session
+from ..services.daemon import DaemonNodeRegistry, daemon_node_token_matches, sandbox_ui_token_matches, workspace_paths_match
 
 CHAT_SERVICE_EMPLOYEE_HEADER = "x-relay-employee-id"
 

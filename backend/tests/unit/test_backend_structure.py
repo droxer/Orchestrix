@@ -6,8 +6,13 @@ import pytest
 
 from relay.api.helpers import daemon_node_event
 from relay.app import create_app
+from relay.core.models import DaemonNodeRegistration
 from relay.daemon_store import LocalDaemonStore
+from relay.persistence.daemon_store import LocalDaemonStore as CanonicalLocalDaemonStore
+from relay.persistence.session_store import LocalSessionStore as CanonicalLocalSessionStore
+from relay.persistence.task_store import LocalTaskStore as CanonicalLocalTaskStore
 from relay.session_store import LocalSessionStore
+from relay.services.daemon import DaemonNodeRegistry
 from relay.stores import LocalDaemonStore as ExportedLocalDaemonStore
 from relay.stores import LocalSessionStore as ExportedLocalSessionStore
 from relay.stores import LocalTaskStore as ExportedLocalTaskStore
@@ -21,6 +26,7 @@ def test_app_factory_wires_backend_state_and_routes() -> None:
     assert isinstance(app.state.session_store, LocalSessionStore)
     assert isinstance(app.state.task_store, LocalTaskStore)
     assert isinstance(app.state.daemon_store, LocalDaemonStore)
+    assert app.state.task_scheduler is not None
 
     paths = {route.path for route in app.routes}
     assert "/auth/login" in paths
@@ -30,10 +36,23 @@ def test_app_factory_wires_backend_state_and_routes() -> None:
     assert "/daemon-nodes/{sandbox_id}/events" in paths
 
 
+def test_app_factory_can_disable_task_scheduler(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_TASK_SCHEDULER_ENABLED", "0")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+
+    assert app.state.task_scheduler is None
+
+
 def test_stores_module_keeps_import_compatibility() -> None:
     assert ExportedLocalSessionStore is LocalSessionStore
     assert ExportedLocalTaskStore is LocalTaskStore
     assert ExportedLocalDaemonStore is LocalDaemonStore
+    assert CanonicalLocalSessionStore is LocalSessionStore
+    assert CanonicalLocalTaskStore is LocalTaskStore
+    assert CanonicalLocalDaemonStore is LocalDaemonStore
+    assert DaemonNodeRegistration.__name__ == "DaemonNodeRegistration"
+    assert DaemonNodeRegistry.__name__ == "DaemonNodeRegistry"
 
 
 def test_daemon_node_event_parser_keeps_error_messages() -> None:

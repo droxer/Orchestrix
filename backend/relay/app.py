@@ -1,19 +1,17 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, AsyncIterator
 
 from fastapi import FastAPI
 from loguru import logger
 
 from .api import admin_routes, auth_routes, chat_routes, daemon_node_routes, sandbox_routes, session_routes, task_routes, web_routes
-from .auth import auth_store_from_env
-from .chat_integrations import LocalChatIntegrationStore
-from .daemon import DaemonNodeRegistry, ServerDaemonNodeBackend
-from .environment import load_backend_env
-from .storage_config import database_url_from_env, use_postgres_storage
-from .stores import (
+from .core.environment import load_backend_env
+from .core.storage_config import database_url_from_env, use_postgres_storage
+from .persistence.stores import (
     DEFAULT_RELAY_DATA_DIR,
     DatabaseDaemonStore,
     DatabaseSessionStore,
@@ -22,6 +20,10 @@ from .stores import (
     LocalSessionStore,
     LocalTaskStore,
 )
+from .security.auth import auth_store_from_env
+from .services.chat_integrations import LocalChatIntegrationStore
+from .services.daemon import DaemonNodeRegistry, ServerDaemonNodeBackend
+from .services.task_scheduler import TaskScheduler
 
 load_backend_env()
 
@@ -41,7 +43,19 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     backend = ServerDaemonNodeBackend(registry)
     auth_store = auth_store_from_env(root_dir)
 
-    app = FastAPI(title="Relay backend", version="0.1.0")
+    scheduler = task_scheduler_from_env(task_store=task_store, registry=registry, backend=backend)
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        if scheduler:
+            scheduler.start()
+        try:
+            yield
+        finally:
+            if scheduler:
+                await scheduler.stop()
+
+    app = FastAPI(title="Relay backend", version="0.1.0", lifespan=lifespan)
     app.state.session_store = session_store
     app.state.task_store = task_store
     app.state.daemon_store = daemon_store
@@ -49,6 +63,7 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     app.state.registry = registry
     app.state.backend = backend
     app.state.auth_store = auth_store
+    app.state.task_scheduler = scheduler
     app.state.control_panel_version = CONTROL_PANEL_VERSION
 
     @app.get("/")
@@ -102,3 +117,16 @@ def task_store_from_env(root_dir: Path) -> Any:
     if not use_postgres_storage():
         return LocalTaskStore(root_dir)
     return DatabaseTaskStore(database_url_from_env())
+
+
+def task_scheduler_from_env(*, task_store: Any, registry: DaemonNodeRegistry, backend: ServerDaemonNodeBackend) -> TaskScheduler | None:
+    enabled = os.environ.get("RELAY_TASK_SCHEDULER_ENABLED", "1").strip().lower()
+    if enabled in ("0", "false", "no", "off"):
+        return None
+    return TaskScheduler(
+        task_store=task_store,
+        registry=registry,
+        backend=backend,
+        interval_seconds=float(os.environ.get("RELAY_TASK_SCHEDULER_INTERVAL_SECONDS", "10")),
+        max_dispatches_per_tick=max(1, int(os.environ.get("RELAY_TASK_SCHEDULER_MAX_DISPATCHES", "5"))),
+    )
