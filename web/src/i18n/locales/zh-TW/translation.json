@@ -163,6 +163,7 @@
     "filters": "例行篩選",
     "new": "新增例行",
     "edit": "編輯例行",
+    "new_routine_id": "草稿",
     "search": "搜尋例行",
     "type": "類型",
     "cadence": "週期",
