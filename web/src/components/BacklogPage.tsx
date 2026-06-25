@@ -4,11 +4,13 @@ import { useMemo, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { assignTask, createTask, startTask, updateTask } from "../api";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { AGENT_NAMES, type AgentName, type CurrentUser, type DaemonNodeMonitorRecord, type RelaySession, type RelayTask, type TaskPriority, type TaskStatus, type Tone } from "../types";
 import { ActionAddPerson, ActionCalendar, ActionCompose, ActionRemove, ActionSearch, ActionStart, NavRefresh } from "./icons";
 import { agentReadyForTask, dueTone, filterTasks, TASK_PRIORITIES, TASK_STATUSES, tasksByStatus, type BacklogFilters } from "../lib/backlog";
+import { PageHeader } from "./PageHeader";
+import { BoardEmpty } from "./BoardEmpty";
+import { useModalDrawer } from "../hooks/useModalDrawer";
 
 type StatusUpdate = { tone: Tone; message: string };
 
@@ -198,30 +200,6 @@ function BacklogFiltersBar({
   );
 }
 
-function BacklogEmptyBoard({ filtered, onCreate }: { filtered: boolean; onCreate: () => void }) {
-  const { t } = useTranslation();
-  return (
-    <div className="backlog-board-empty">
-      <div className="backlog-board-empty-inner">
-        <svg width="56" height="56" viewBox="0 0 56 56" fill="none" aria-hidden="true">
-          <rect x="8" y="14" width="14" height="18" rx="2" stroke="currentColor" strokeWidth="1.5" className="text-muted-soft" />
-          <rect x="22" y="10" width="14" height="22" rx="2" stroke="currentColor" strokeWidth="1.5" className="text-muted-soft" />
-          <rect x="36" y="18" width="14" height="14" rx="2" stroke="currentColor" strokeWidth="1.5" className="text-muted-soft" />
-          <path d="M14 36h28" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 2" className="text-hairline" />
-        </svg>
-        <h3>{filtered ? t("backlog.no_match_title") : t("backlog.no_tasks_title")}</h3>
-        <p>{filtered ? t("backlog.no_match_body") : t("backlog.no_tasks_body")}</p>
-        {!filtered ? (
-          <Button className="mt-md" size="sm" onClick={onCreate}>
-            <ActionCompose size={16} />
-            {t("backlog.new_task")}
-          </Button>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
 function BacklogTaskCard({
   task,
   session,
@@ -325,11 +303,20 @@ function BacklogTaskDrawer({
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   const { t } = useTranslation();
+  const panelRef = useModalDrawer<HTMLFormElement>(onClose);
 
   return (
-    <div className="backlog-drawer-shell" role="dialog" aria-modal="true" aria-label={form.id ? t("backlog.edit_task") : t("backlog.new_task")}>
+    <div className="backlog-drawer-shell">
       <button type="button" className="backlog-drawer-scrim" aria-label={t("dialog.cancel")} onClick={onClose} />
-      <form className="backlog-drawer" onSubmit={onSubmit}>
+      <form
+        ref={panelRef}
+        className="backlog-drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-label={form.id ? t("backlog.edit_task") : t("backlog.new_task")}
+        tabIndex={-1}
+        onSubmit={onSubmit}
+      >
         <header>
           <div>
             <h2>{form.id ? t("backlog.edit_task") : t("backlog.new_task")}</h2>
@@ -501,38 +488,43 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
 
   return (
     <section className="backlog-page" aria-label={t("backlog.title")}>
-      <header className="flex min-h-[var(--header-h)] shrink-0 items-center justify-between gap-base border-b border-hairline px-xl max-[820px]:px-base">
-        <div className="flex min-w-0 items-baseline gap-sm">
-          <h1 className="m-0 text-lg font-semibold leading-[1.25] text-balance text-ink">{t("backlog.title")}</h1>
-          <span className="mono truncate text-xs font-medium text-muted-foreground">
-            {t("backlog.sub", { count: tasks.length })}
-          </span>
-        </div>
-        <div className="flex shrink-0 items-center gap-xs">
-          <button
-            type="button"
-            className="backlog-icon-btn"
-            aria-label={t("nav.refresh")}
-            onClick={() => void onRefresh()}
-            disabled={isRefreshing}
-          >
-            <NavRefresh size={16} />
-          </button>
-          <button type="button" className="backlog-primary" onClick={() => setForm(emptyForm(currentUser))}>
-            <ActionCompose size={16} />
-            <span>{t("backlog.new_task")}</span>
-          </button>
-        </div>
-      </header>
+      <PageHeader
+        title={t("backlog.title")}
+        count={t("backlog.sub", { count: tasks.length })}
+        actions={
+          <>
+            <button
+              type="button"
+              className="backlog-icon-btn"
+              aria-label={t("nav.refresh")}
+              onClick={() => void onRefresh()}
+              disabled={isRefreshing}
+            >
+              <NavRefresh size={16} />
+            </button>
+            <button type="button" className="backlog-primary" onClick={() => setForm(emptyForm(currentUser))}>
+              <ActionCompose size={16} />
+              <span>{t("backlog.new_task")}</span>
+            </button>
+          </>
+        }
+      />
 
       <BacklogStats tasks={tasks} />
       <BacklogFiltersBar filters={filters} onChange={setFilters} />
 
       {showEmptyBoard ? (
-        <BacklogEmptyBoard
-          filtered={tasks.length > 0 && !hasFilterResults}
-          onCreate={() => setForm(emptyForm(currentUser))}
-        />
+        (() => {
+          const filtered = tasks.length > 0 && !hasFilterResults;
+          return (
+            <BoardEmpty
+              title={filtered ? t("backlog.no_match_title") : t("backlog.no_tasks_title")}
+              body={filtered ? t("backlog.no_match_body") : t("backlog.no_tasks_body")}
+              createLabel={filtered ? undefined : t("backlog.new_task")}
+              onCreate={filtered ? undefined : () => setForm(emptyForm(currentUser))}
+            />
+          );
+        })()
       ) : (
         <div className="backlog-board">
           {TASK_STATUSES.map((status) => (

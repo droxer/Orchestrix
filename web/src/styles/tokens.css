@@ -152,6 +152,14 @@
   --color-accent-yellow: #f5a623; /* attention dot only, not an action color */
   --color-info: #3b82f6;          /* neutral "info" status — the sole surviving blue, status-only */
 
+  /* Status-as-TEXT — the dot/border values above are tuned for fills on a
+     white canvas and fail WCAG contrast as small foreground text (amber is
+     ~1.9:1). These darker ramps are the text-safe counterparts: use them
+     wherever a status reads as a word or a numeral, not a dot. They invert
+     to the bright values in dark mode (where the canvas flips). */
+  --color-warning-text: #92400e;  /* amber-800 — ~6.6:1 on white */
+  --color-danger-text: #c2161c;   /* deepened red — ~4.7:1 on white */
+
   /* Type scale — operational chat surface scale. The brand's marketing
      scale climbs to 80px (display-mega). Inside the product we keep the
      scale tight, but admin metric highlights need a 32–36px display step. */
@@ -390,6 +398,11 @@ html[data-theme="dark"] {
   --color-semantic-down: #ff6b75;
   --color-info: #60a5fa;
   --color-code-number: #f0a868;
+
+  /* On the dark canvas the bright status hues clear contrast as text, so the
+     text-safe ramps track them rather than the light-mode deepened values. */
+  --color-warning-text: var(--color-accent-yellow);
+  --color-danger-text: var(--color-semantic-down);
 
   /* Elevation — the rgba(0,0,0,.04) drop is invisible on dark; deepen it.
      --shadow-lift inherits this drop and its ink-based ring flips to a

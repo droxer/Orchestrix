@@ -4,12 +4,14 @@ import { useMemo, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { assignTask, createTask, startTask, updateTask } from "../api";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { AGENT_NAMES, type AgentName, type CurrentUser, type DaemonNodeMonitorRecord, type RelaySession, type RelayTask, type TaskPriority, type TaskRoutineCadence, type TaskRoutineType, type Tone } from "../types";
 import { ActionAddPerson, ActionCalendar, ActionCompose, ActionRemove, ActionSearch, ActionStart, NavRefresh } from "./icons";
 import { agentReadyForTask, TASK_PRIORITIES } from "../lib/backlog";
 import { filterRoutineTasks, routineDueTone, TASK_ROUTINE_CADENCES, TASK_ROUTINE_TYPES, type RoutineFilters } from "../lib/routine";
+import { PageHeader } from "./PageHeader";
+import { BoardEmpty } from "./BoardEmpty";
+import { useModalDrawer } from "../hooks/useModalDrawer";
 
 type StatusUpdate = { tone: Tone; message: string };
 
@@ -183,8 +185,6 @@ function RoutineCard({
     <article className="routine-card backlog-task" data-priority={task.priority}>
       <div className="backlog-task-badges">
         <Badge variant={task.routineEnabled ? "success" : "neutral"}>{task.routineEnabled ? t("routine.enabled") : t("routine.disabled")}</Badge>
-        <Badge variant="info">{t(`routine.types.${task.routineType ?? "task"}`)}</Badge>
-        <Badge variant="neutral">{t(`routine.cadences.${task.routineCadence ?? "weekly"}`)}</Badge>
         <Badge variant={PRIORITY_BADGE[task.priority]}>{t(`backlog.priorities.${task.priority}`)}</Badge>
         {task.assignedAgent ? (
           <Badge variant={ready ? "success" : "danger"} translate="no">
@@ -197,6 +197,8 @@ function RoutineCard({
       <button type="button" className="backlog-task-title" onClick={onEdit}>{task.title}</button>
       {task.description ? <p className="backlog-description">{task.description}</p> : null}
       <div className="backlog-meta">
+        <span>{t(`routine.types.${task.routineType ?? "task"}`)} · {t(`routine.cadences.${task.routineCadence ?? "weekly"}`)}</span>
+        <span className="backlog-meta-sep" aria-hidden="true">·</span>
         <span>@{task.assigneeEmployeeId ?? task.ownerEmployeeId ?? t("backlog.unassigned")}</span>
         <span className="backlog-meta-sep" aria-hidden="true">·</span>
         <span className={cn("backlog-due", tone !== "neutral" && tone)}>
@@ -252,15 +254,24 @@ function RoutineDrawer({
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   const { t } = useTranslation();
+  const panelRef = useModalDrawer<HTMLFormElement>(onClose);
 
   return (
-    <div className="backlog-drawer-shell" role="dialog" aria-modal="true" aria-label={form.id ? t("routine.edit") : t("routine.new")}>
+    <div className="backlog-drawer-shell">
       <button type="button" className="backlog-drawer-scrim" aria-label={t("dialog.cancel")} onClick={onClose} />
-      <form className="backlog-drawer" onSubmit={onSubmit}>
+      <form
+        ref={panelRef}
+        className="backlog-drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-label={form.id ? t("routine.edit") : t("routine.new")}
+        tabIndex={-1}
+        onSubmit={onSubmit}
+      >
         <header>
           <div>
             <h2>{form.id ? t("routine.edit") : t("routine.new")}</h2>
-            <p>{form.id ?? t("backlog.new_task_id")}</p>
+            <p>{form.id ?? t("routine.new_routine_id")}</p>
           </div>
           <button type="button" className="backlog-icon-btn" aria-label={t("dialog.cancel")} onClick={onClose}>
             <ActionRemove size={16} />
@@ -304,11 +315,11 @@ function RoutineDrawer({
               {AGENT_NAMES.map((agent) => <option key={agent} value={agent}>{agent}</option>)}
             </select>
           </label>
-          <label className="routine-toggle">
-            <span>{t("routine.enabled")}</span>
-            <input type="checkbox" checked={form.routineEnabled} onChange={(event) => onChange({ ...form, routineEnabled: event.target.checked })} />
-          </label>
         </div>
+        <label className="routine-toggle">
+          <span>{t("routine.enabled")}</span>
+          <input type="checkbox" checked={form.routineEnabled} onChange={(event) => onChange({ ...form, routineEnabled: event.target.checked })} />
+        </label>
         <label>
           <span>{t("backlog.assignee")}</span>
           <div className="backlog-assignee-input">
@@ -409,38 +420,32 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
 
   return (
     <section className="routine-page backlog-page" aria-label={t("routine.title")}>
-      <header className="flex min-h-[var(--header-h)] shrink-0 items-center justify-between gap-base border-b border-hairline px-xl max-[820px]:px-base">
-        <div className="flex min-w-0 items-baseline gap-sm">
-          <h1 className="m-0 text-lg font-semibold leading-[1.25] text-balance text-ink">{t("routine.title")}</h1>
-          <span className="mono truncate text-xs font-medium text-muted-foreground">{t("routine.sub", { count: routineTasks.length })}</span>
-        </div>
-        <div className="flex shrink-0 items-center gap-xs">
-          <button type="button" className="backlog-icon-btn" aria-label={t("nav.refresh")} onClick={() => void onRefresh()} disabled={isRefreshing}>
-            <NavRefresh size={16} />
-          </button>
-          <Button className="backlog-primary" onClick={() => setForm(emptyForm(currentUser))}>
-            <ActionCompose size={16} />
-            <span>{t("routine.new")}</span>
-          </Button>
-        </div>
-      </header>
+      <PageHeader
+        title={t("routine.title")}
+        count={t("routine.sub", { count: routineTasks.length })}
+        actions={
+          <>
+            <button type="button" className="backlog-icon-btn" aria-label={t("nav.refresh")} onClick={() => void onRefresh()} disabled={isRefreshing}>
+              <NavRefresh size={16} />
+            </button>
+            <button type="button" className="backlog-primary" onClick={() => setForm(emptyForm(currentUser))}>
+              <ActionCompose size={16} />
+              <span>{t("routine.new")}</span>
+            </button>
+          </>
+        }
+      />
 
       <RoutineStats tasks={routineTasks} />
       <RoutineFiltersBar filters={filters} onChange={setFilters} />
 
       {filteredTasks.length === 0 ? (
-        <div className="backlog-board-empty">
-          <div className="backlog-board-empty-inner">
-            <h3>{routineTasks.length === 0 ? t("routine.no_routines_title") : t("routine.no_match_title")}</h3>
-            <p>{routineTasks.length === 0 ? t("routine.no_routines_body") : t("routine.no_match_body")}</p>
-            {routineTasks.length === 0 ? (
-              <Button className="mt-md" size="sm" onClick={() => setForm(emptyForm(currentUser))}>
-                <ActionCompose size={16} />
-                {t("routine.new")}
-              </Button>
-            ) : null}
-          </div>
-        </div>
+        <BoardEmpty
+          title={routineTasks.length === 0 ? t("routine.no_routines_title") : t("routine.no_match_title")}
+          body={routineTasks.length === 0 ? t("routine.no_routines_body") : t("routine.no_match_body")}
+          createLabel={routineTasks.length === 0 ? t("routine.new") : undefined}
+          onCreate={routineTasks.length === 0 ? () => setForm(emptyForm(currentUser)) : undefined}
+        />
       ) : (
         <div className="routine-list">
           {filteredTasks.map((task) => {

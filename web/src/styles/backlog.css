@@ -66,8 +66,8 @@
 }
 
 .backlog-stat-value.tone-active { color: var(--color-info); }
-.backlog-stat-value.tone-blocked { color: var(--color-semantic-down); }
-.backlog-stat-value.tone-overdue { color: var(--color-accent-yellow); }
+.backlog-stat-value.tone-blocked { color: var(--color-danger-text); }
+.backlog-stat-value.tone-overdue { color: var(--color-danger-text); }
 
 /* ── Filter bar ────────────────────────────────────────────────────── */
 
@@ -86,7 +86,7 @@
 }
 
 .backlog-filter-primary:focus-within {
-  outline: 2px solid var(--color-primary);
+  outline: 2px solid color-mix(in srgb, var(--color-primary) 28%, transparent);
   outline-offset: -2px;
 }
 
@@ -316,8 +316,8 @@
   gap: var(--space-xxs);
 }
 
-.backlog-due.warn { color: var(--color-accent-yellow); }
-.backlog-due.bad { color: var(--color-semantic-down); }
+.backlog-due.warn { color: var(--color-warning-text); }
+.backlog-due.bad { color: var(--color-danger-text); }
 
 .backlog-task-actions {
   display: flex;
@@ -646,11 +646,11 @@
 
 .routine-page {
   --backlog-lane-w: 300px;
+  /* A single soft top wash — the former 28px vertical hairline grid never
+     aligned to the minmax(320px) card track, so it read as noise. */
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--color-surface-soft) 62%, transparent), transparent 220px),
-    linear-gradient(90deg, color-mix(in srgb, var(--color-hairline-soft) 46%, transparent) 1px, transparent 1px),
     var(--color-canvas);
-  background-size: auto, 28px 100%, auto;
 }
 
 .routine-list {
@@ -668,10 +668,17 @@
   min-width: 0;
 }
 
+/* The enabled switch is its own row beneath the field grid — a horizontal
+   label+control pair, not a faux grid cell aligned with min-height hacks. */
 .routine-toggle {
-  align-self: end;
-  min-height: 66px;
-  justify-content: center;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink);
 }
 
 .routine-toggle input {

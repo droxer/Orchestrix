@@ -55,5 +55,10 @@ function routineDate(task: RelayTask): string {
 }
 
 function isoToday(date = new Date()): string {
-  return date.toISOString().slice(0, 10);
+  // Local-date key, not UTC — routine next-run dates are calendar days, so
+  // toISOString() (UTC) flips "today" a day early/late for users far from UTC.
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }

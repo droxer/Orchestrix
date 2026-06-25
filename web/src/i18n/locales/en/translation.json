@@ -161,6 +161,7 @@
     "filters": "Routine filters",
     "new": "New Routine",
     "edit": "Edit Routine",
+    "new_routine_id": "Draft",
     "search": "Search routines",
     "type": "Type",
     "cadence": "Cadence",
