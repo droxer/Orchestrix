@@ -6,6 +6,10 @@
 
 Every Employee. Amplified.
 
+<p align="center">
+  <img src="docs/images/relay.png" alt="Relay — AI Workforce Intelligence Platform UI" width="900">
+</p>
+
 Relay is an AI Workforce Intelligence Platform. The long-term product direction
 is to give every employee an AI partner that connects organizational knowledge,
 business workflows, tools, and agent execution.
@@ -18,14 +22,17 @@ agent execution.
 ## Current MVP
 
 - Durable tasks, sessions, events, snapshots, and artifacts under `.relay/`.
+- Task backlog and recurring routines in the web UI, with backend scheduler
+  promotion and dispatch to ready daemon nodes.
 - Human approval and handoff flows through the TUI.
 - Daemon-based execution for Claude, Pi, Codex, and Kimi agent CLIs.
 - Readable rendering for Claude stream JSON and Codex JSONL output.
 - Token usage tracking across sessions and agents.
-- Local HTTP APIs for tasks, sessions, daemon nodes, sandboxes, the control
-  panel, and the exported web UI.
-- Admin console with dashboard (KPI tiles, fleet health, token usage charts,
-  activity feed), node management, and user/department CRUD.
+- Local HTTP APIs for tasks, sessions, daemon nodes, sandboxes, chat
+  integrations, the control panel, and the exported web UI.
+- Web UI with chat, backlog, routines, MCP, skills, channels, and an admin
+  console (dashboard KPI tiles, fleet health, token usage charts, activity
+  feed), node management, and user/department CRUD.
 - Provider-neutral chat gateway (`relay-chat`) with Discord, Telegram, and
   Lark adapters.
 
@@ -81,10 +88,12 @@ data layout, and test organization, see
 
 Relay is split into a control plane and an execution plane.
 
-- `backend/`: Python/FastAPI backend, event stores, session controller, daemon
-  registry, HTTP routes split by domain (`api/admin_routes.py`,
-  `api/daemon_node_routes.py`, `api/session_routes.py`, etc.), and Alembic
-  migrations.
+- `backend/`: Python/FastAPI backend split into `core/` (models, env, ids),
+  `persistence/` (event-sourced session/task/daemon stores),
+  `security/` (auth), `services/` (controller, daemon registry, task
+  scheduler, chat integrations), and `api/` HTTP routes. Top-level modules
+  such as `controller.py` and `daemon.py` are compatibility re-exports.
+  Alembic migrations live under `backend/migrations/`.
 - `packages/relay-core/`: shared TypeScript protocol, command builders,
   prompts, renderers, token-usage normalization, and compatibility client
   exports.
@@ -93,15 +102,16 @@ Relay is split into a control plane and an execution plane.
 - `packages/relay-daemon/`: TypeScript daemon runtime, BoxLite integration, and
   agent process execution.
 - `packages/relay-tui/`: Ink-based terminal UI.
-- `web/`: Next.js web UI served at `/web`, including the admin console and
-  dashboard.
+- `web/`: Next.js web UI served at `/web` — chat, backlog, routines, MCP,
+  skills, channels, and the admin console/dashboard.
 
 The current local MVP keeps persistence file-backed under `.relay/`, but the
 event model is intended to map cleanly to durable database-backed storage.
 
 ## Test Layout
 
-- `backend/tests/`: Python backend unit and API tests.
+- `backend/tests/`: Python backend unit and API tests (including task scheduler
+  and routine promotion).
 - `packages/*/tests/`: TypeScript package tests next to the owning package.
 - `web/tests/`: web UI tests next to the Next.js app.
 
@@ -114,6 +124,8 @@ npm test
 ## Roadmap
 
 The broader implementation roadmap remains in
-[docs/implementation-plan.md](docs/implementation-plan.md). The next major
-work areas are contract test coverage, storage parity, daemon/backend
-integration tests, and enterprise control-plane hardening.
+[docs/implementation-plan.md](docs/implementation-plan.md). Recent MVP additions
+include task backlogs, recurring routines with backend scheduler dispatch, and
+web UI design-system refresh. Next major work areas are contract test coverage,
+storage parity, daemon/backend integration tests, and enterprise control-plane
+hardening.

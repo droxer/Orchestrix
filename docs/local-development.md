@@ -17,7 +17,9 @@ service commands, data layout, and test organization.
 
 Relay uses project-local env files at each runtime boundary:
 
-- `backend/.env`: Python backend settings and migration database URL.
+- `backend/.env`: Python backend settings, migration database URL, and optional
+  task scheduler tuning (`RELAY_TASK_SCHEDULER_ENABLED`,
+  `RELAY_TASK_SCHEDULER_INTERVAL_SECONDS`, `RELAY_TASK_SCHEDULER_MAX_DISPATCHES`).
 - `web/.env.local`: Next.js development proxy settings.
 - `packages/relay-core/.env`: shared TypeScript runtime and agent credential
   defaults.
@@ -132,7 +134,9 @@ By default the hooks run:
 Alembic migration files live under `backend/migrations/`. The initial migration
 creates the PostgreSQL storage tables for sessions, tasks, artifacts, daemon
 nodes, daemon commands, daemon runs, daemon events, auth users, and auth
-sessions, and employees.
+sessions, and employees. Later migrations add backlog task fields, routine
+cadence metadata, session titles, token usage, and related control-plane
+columns.
 
 Run migrations with the database URL in `backend/.env`:
 
@@ -208,7 +212,10 @@ make backend
 ```
 
 The backend loads `backend/.env` and listens on `BACKEND_PORT`, defaulting to
-`8790`. Override with:
+`8790`. It also starts the background task scheduler by default, which promotes
+due routines and dispatches assigned tasks to ready daemon nodes. Disable or
+tune it with `RELAY_TASK_SCHEDULER_ENABLED`, `RELAY_TASK_SCHEDULER_INTERVAL_SECONDS`,
+and `RELAY_TASK_SCHEDULER_MAX_DISPATCHES`. Override the port with:
 
 ```bash
 make backend BACKEND_PORT=9000
@@ -244,7 +251,9 @@ make web
 ```
 
 The web dev server reads `web/.env.local`; set `RELAY_BACKEND_URL` there to
-change the backend proxy target. You can also override it for one run:
+change the backend proxy target. The exported UI at `/web` includes chat,
+backlog, routines, MCP, skills, channels, and the admin console. You can also
+override the backend URL for one run:
 
 ```bash
 make web RELAY_BACKEND_URL=http://127.0.0.1:9000
@@ -306,18 +315,31 @@ PATCH /tasks/:id
 POST /tasks/:id/assign
 POST /tasks/:id/pickup
 GET /tasks/:id/events
+POST /tasks/:id/start
+POST /tasks/claim-next
 GET /sessions
 POST /sessions
 GET /sessions/:id
 GET /sessions/:id/events
 GET /sessions/:id/artifacts/:artifactId
+POST /sessions/:id/assignments
+POST /sessions/:id/decisions
+POST /sessions/:id/handoffs
 GET /sandboxes
 POST /sandboxes
 POST /daemon-nodes/register
 GET /daemon-nodes/:id/commands
 POST /daemon-nodes/:id/events
+POST /chat/identity/resolve
+POST /chat/conversation/session
+POST /chat/conversation/sessions
+POST /chat/conversation/mapping
 GET /cp
 GET /cp/version
+GET /cp/dashboard/sessions
+GET /cp/dashboard/activity
+GET /cp/dashboard/tokens
+GET /cp/chat-integrations
 GET /auth/status
 POST /auth/bootstrap
 POST /auth/login
@@ -332,7 +354,9 @@ GET /web
 ```
 
 The backend serves the exported web UI from `web/out` at `/web`. In development,
-`make web` starts Next.js and proxies API routes to the backend.
+`make web` starts Next.js and proxies API routes to the backend. Use the backlog
+and routine pages to manage assigned work and recurring schedules; the backend
+scheduler dispatches due routines and assigned tasks when daemon nodes are ready.
 
 ### Admin authentication
 
@@ -387,8 +411,16 @@ Relay writes generated state under `.relay/`:
       snapshot.json
       artifacts/
         <artifact-id>.<ext>
+  daemon/
+    nodes/
+    commands/
+    runs/
+    run-requests/
+    events/
   daemon-nodes/
     <employee-id>.token
+    logs/
+      *.jsonl
 ```
 
 The event log is the source of truth. Snapshots are materialized views rebuilt
@@ -399,38 +431,52 @@ from events.
 ```text
 backend/relay/cli.py                          relay binary entrypoint
 backend/relay/app.py                          FastAPI backend application
-backend/relay/controller.py                   session mutation controller
-backend/relay/stores.py                       durable session/task/daemon stores
-backend/relay/daemon.py                       daemon registry and scheduler
-backend/migrations/                     Alembic backend storage migrations
-packages/relay-core/src/index.ts               shared protocol and agent runtime exports
-packages/relay-core/src/daemon-client.ts        TypeScript backend HTTP client
-packages/relay-core/src/daemon-protocol.ts      TypeScript backend protocol types
-packages/relay-core/src/commands.ts             agent command builders
-packages/relay-core/src/prompts.ts              agent prompt builders
-packages/relay-core/src/renderers.ts            stream-json and JSONL renderers
-packages/relay-core/src/routing.ts              default workflow routing helpers
-packages/relay-core/src/token-usage.ts          TokenUsage type and normalizeTokenUsage
-packages/relay-chat/src/gateway.ts              RelayChatGateway — routes chat events to backend
-packages/relay-chat/src/relay-client.ts         HTTP client for chat → backend calls
-packages/relay-chat/src/identity.ts             StaticChatIdentityResolver
-packages/relay-chat/src/commands.ts             shared /relay command parser
-packages/relay-chat/src/providers/discord.ts    Discord adapter
-packages/relay-chat/src/providers/telegram.ts   Telegram adapter
-packages/relay-chat/src/providers/lark.ts       Lark adapter
-packages/relay-daemon/src/cli.ts                daemon binary entrypoint
-packages/relay-daemon/src/index.ts              daemon runtime
-packages/relay-daemon/src/box.ts                BoxLite VM setup
-packages/relay-daemon/src/execution.ts          BoxLite execution manager
-packages/relay-daemon/src/sandbox-session.ts    sandbox session lifecycle and agent preflight
-packages/relay-tui/src/cli.ts                   TUI binary entrypoint
-packages/relay-tui/src/tui.tsx                  Ink TUI and human commands
-web/                                            Next.js web frontend
+backend/relay/core/                           models, env, ids, logging, storage config
+backend/relay/persistence/                    event-sourced session/task/daemon stores
+backend/relay/security/auth.py                auth store and JWT helpers
+backend/relay/services/controller.py          session mutation controller
+backend/relay/services/daemon.py              daemon registry and run dispatch
+backend/relay/services/task_scheduler.py      routine promotion and assigned-task dispatch
+backend/relay/services/chat_integrations.py   chat integration store and helpers
+backend/relay/api/                            HTTP routes (tasks, sessions, daemon nodes,
+                                              sandboxes, auth, admin, chat, web)
+backend/relay/controller.py                   compatibility re-export of services/controller
+backend/relay/daemon.py                       compatibility re-export of services/daemon
+backend/relay/stores.py                       compatibility re-export of persistence/stores
+backend/migrations/                           Alembic backend storage migrations
+packages/relay-core/src/index.ts              shared protocol and agent runtime exports
+packages/relay-core/src/daemon-client.ts      TypeScript backend HTTP client
+packages/relay-core/src/daemon-protocol.ts    TypeScript backend protocol types
+packages/relay-core/src/commands.ts           agent command builders
+packages/relay-core/src/prompts.ts            agent prompt builders
+packages/relay-core/src/renderers.ts          stream-json and JSONL renderers
+packages/relay-core/src/routing.ts            default workflow routing helpers
+packages/relay-core/src/token-usage.ts        TokenUsage type and normalizeTokenUsage
+packages/relay-chat/src/gateway.ts            RelayChatGateway — routes chat events to backend
+packages/relay-chat/src/relay-client.ts       HTTP client for chat → backend calls
+packages/relay-chat/src/identity.ts           StaticChatIdentityResolver
+packages/relay-chat/src/commands.ts           shared /relay command parser
+packages/relay-chat/src/providers/discord.ts  Discord adapter
+packages/relay-chat/src/providers/telegram.ts Telegram adapter
+packages/relay-chat/src/providers/lark.ts     Lark adapter
+packages/relay-daemon/src/cli.ts              daemon binary entrypoint
+packages/relay-daemon/src/index.ts            daemon runtime
+packages/relay-daemon/src/box.ts              BoxLite VM setup
+packages/relay-daemon/src/execution.ts        BoxLite execution manager
+packages/relay-daemon/src/sandbox-session.ts  sandbox session lifecycle and agent preflight
+packages/relay-tui/src/cli.ts                 TUI binary entrypoint
+packages/relay-tui/src/tui.tsx                Ink TUI and human commands
+web/src/components/BacklogPage.tsx            web task backlog view
+web/src/components/RoutinePage.tsx            web recurring routine view
+web/                                          Next.js web frontend
 ```
 
-Keep backend runtime code in `backend/`, TypeScript protocol/client exports in
+Keep backend runtime code in `backend/relay/` (`core/`, `persistence/`,
+`security/`, `services/`, and `api/`), TypeScript protocol/client exports in
 `packages/relay-core/src/`, daemon execution code in `packages/relay-daemon/`,
-TUI code in `packages/relay-tui/`, and frontend code in `web/`.
+TUI code in `packages/relay-tui/`, and frontend code in `web/`. Top-level
+backend modules such as `controller.py`, `daemon.py`, and `stores.py` are
+compatibility re-exports; prefer the nested package paths for new work.
 
 ## Testing
 
@@ -444,7 +490,8 @@ npm test
 Test coverage is organized as:
 
 - `backend/tests/`: Python event stores, artifacts, controller behavior, linked
-  task updates, daemon registry behavior, and HTTP API routes.
+  task updates, daemon registry behavior, task scheduler/routine promotion, and
+  HTTP API routes.
 - `packages/relay-core/tests/handoff.test.ts`: routing, prompt contracts, Codex verdict
   parsing, command generation, stream renderers, and BoxLite helpers.
 - `packages/relay-chat/tests/chat.test.ts`: chat gateway, provider adapters,
@@ -455,6 +502,7 @@ Test coverage is organized as:
   cancellation, session state updates, and slash commands.
 - `web/tests/status.test.ts`: web status derivation for daemon nodes and
   conversations.
+- `web/tests/backlog.test.ts`: backlog filtering, sorting, and display helpers.
 - `web/tests/agentStream.test.ts`, `web/tests/messageBlock.test.ts`,
   `web/tests/tokenUsage.test.ts`, `web/tests/manageAgents.test.ts`: web
   component and utility unit tests.
@@ -465,6 +513,8 @@ full `npm test`.
 ## Implementation Notes
 
 - The backend is the control plane and must not execute agent CLIs in-process.
+  The background `TaskScheduler` only promotes due routines and dispatches
+  already-assigned tasks through daemon commands.
 - Durable state is append-only; add events instead of mutating history.
 - Snapshots are derived from event logs.
 - Keep API state real: no seeded demo tasks, fake agent runs, or dummy

@@ -708,6 +708,11 @@ The local MVP persists two durable records:
 
 Both models are event-sourced. The event log is authoritative; `snapshot.json` is a materialized convenience view rebuilt after each append.
 
+Routine tasks reuse the task model with `isRoutine`, `routineCadence`, and
+`routineNextRunDate` fields. The backend `TaskScheduler`
+(`backend/relay/services/task_scheduler.py`) promotes due routines and dispatches
+assigned tasks to ready daemon nodes.
+
 ```text
 .relay/
   tasks/
@@ -720,17 +725,40 @@ Both models are event-sourced. The event log is authoritative; `snapshot.json` i
       snapshot.json
       artifacts/
         <artifact-id>.<ext>
+  daemon/
+    nodes/
+    commands/
+    runs/
+    run-requests/
+    events/
+  daemon-nodes/
+    <employee-id>.token
+    logs/
+      *.jsonl
 ```
 
-`LocalTaskStore` in `backend/relay/stores.py` owns task persistence and materialization. It emits events such as `task.created`, `task.updated`, `task.assigned`, `task.status`, `task.session_linked`, and `task.activity`.
+`LocalTaskStore` in `backend/relay/persistence/task_store.py` owns task
+persistence and materialization (`backend/relay/stores.py` and
+`backend/relay/task_store.py` re-export). It emits events such as
+`task.created`, `task.updated`, `task.assigned`, `task.status`,
+`task.session_linked`, and `task.activity`.
 
-`LocalSessionStore` in `backend/relay/stores.py` owns session persistence, artifact files, and session materialization. It emits events such as `session.created`, `session.status`, `agent.started`, `agent.output`, `artifact.created`, `human.decision`, `agent.completed`, `review.verdict`, `session.completed`, and `session.failed`.
+`LocalSessionStore` in `backend/relay/persistence/session_store.py` owns session
+persistence, artifact files, and session materialization
+(`backend/relay/session_store.py` re-exports). It emits events such as
+`session.created`, `session.status`, `agent.started`, `agent.output`,
+`artifact.created`, `human.decision`, `agent.completed`, `review.verdict`,
+`session.completed`, and `session.failed`.
 
 When adding a new event type, update the materializer and tests together.
 
 ### 10.3 Execution Controller
 
-`SessionController` in `backend/relay/controller.py` is the backend boundary between durable state and daemon execution. `packages/relay-core/src/session-controller.ts` remains as a TypeScript TUI/test compatibility helper.
+`SessionController` in `backend/relay/services/controller.py` is the backend
+boundary between durable state and daemon execution
+(`backend/relay/controller.py` re-exports).
+`packages/relay-core/src/session-controller.ts` remains as a TypeScript TUI/test
+compatibility helper.
 
 Responsibilities:
 
@@ -811,7 +839,16 @@ The TUI in `packages/relay-tui/src/tui.tsx` accepts leading agent mentions such 
 
 Slash commands include `/approve`, `/reject`, `/cancel`, `/rerun`, `/handoff`, `/sessions`, `/open`, `/summary`, and `/quit`.
 
-The Python API in `backend/relay/app.py` exposes task/session/daemon endpoints. Current API routes can create tasks, create pending sessions, attach assignment-plan artifacts, record decisions, and expose historical events/artifacts. They do not start BoxLite or execute agents.
+The Python API in `backend/relay/app.py` exposes task/session/daemon/chat
+endpoints and starts the background task scheduler by default. Current API
+routes can create tasks (including backlog and routine metadata), create pending
+sessions, attach assignment-plan artifacts, record decisions, and expose
+historical events/artifacts. Scheduled dispatch and daemon execution still flow
+through `ServerDaemonNodeBackend.run`; the backend does not execute agent CLIs
+in-process.
+
+The web UI at `/web` adds chat, backlog, routines, MCP, skills, channels, and
+the admin console on top of the same backend APIs.
 
 Future execution endpoints must call the same `SessionController` and orchestrator readiness flow used by the CLI/TUI.
 
@@ -836,14 +873,18 @@ npm test
 
 Test coverage is organized as:
 
-- `backend/tests/`: Python event stores, artifacts, controller behavior, linked task updates, daemon registry behavior, HTTP API routes.
+- `backend/tests/`: Python event stores, artifacts, controller behavior, linked
+  task updates, daemon registry behavior, task scheduler/routine promotion, and
+  HTTP API routes.
 - `packages/relay-core/tests/handoff.test.ts`: routing, prompt contracts, Codex verdict parsing, command generation, stream renderers, BoxLite execution helpers.
 - `packages/relay-tui/tests/tui.test.tsx`: TUI parsing, shortcuts, rendering, cancellation, session state updates, slash commands.
 - `web/tests/status.test.ts`: web daemon-node status derivation.
+- `web/tests/backlog.test.ts`: backlog filtering, sorting, and display helpers.
 
 ### 10.8 Local Change Guidelines
 
-- Keep backend/control-plane runtime code in `backend/`. Keep shared protocol,
+- Keep backend/control-plane runtime code in `backend/relay/` (`core/`,
+  `persistence/`, `security/`, `services/`, and `api/`). Keep shared protocol,
   daemon execution, TUI, and web client code in TypeScript.
 - Use BoxLite's Node SDK for VM lifecycle and command execution.
 - Keep durable state append-only; add events instead of mutating history.
@@ -851,7 +892,8 @@ Test coverage is organized as:
 - Keep tasks and sessions loosely coupled through `task.session_linked`.
 - Keep API state real: no seeded demo tasks, fake agent runs, or dummy artifacts.
 - Keep agent execution isolated to `nodes.ts`, command construction to
-  `commands.ts`, backend workflow state in `backend/relay/controller.py`, and
+  `commands.ts`, backend workflow state in `backend/relay/services/controller.py`,
+  scheduled task dispatch in `backend/relay/services/task_scheduler.py`, and
   daemon sandbox lifecycle in `packages/relay-daemon/src/sandbox-session.ts` /
   `packages/relay-daemon/src/box.ts`.
 

@@ -76,10 +76,16 @@ ask the user whether to run `codegraph init -i`.
 - TUI CLI entrypoint: `packages/relay-tui/src/cli.ts`.
 - Shared protocol and agent runtime modules: `packages/relay-core/src/`.
 - Chat gateway and provider adapters: `packages/relay-chat/src/`.
-- Python backend implementation modules: `backend/relay/`.
+- Python backend implementation modules: `backend/relay/` — organized as
+  `core/` (models, environment, ids, storage config), `persistence/` (event
+  stores), `security/` (auth), and `services/` (controller, daemon registry,
+  task scheduler, chat integrations). Top-level modules such as
+  `controller.py`, `daemon.py`, and `stores.py` re-export the nested packages
+  for compatibility.
 - Python backend HTTP routes: `backend/relay/api/` (split by domain —
-  `admin_routes.py`, `auth_routes.py`, `daemon_node_routes.py`,
-  `sandbox_routes.py`, `session_routes.py`, `task_routes.py`).
+  `admin_routes.py`, `auth_routes.py`, `chat_routes.py`,
+  `daemon_node_routes.py`, `sandbox_routes.py`, `session_routes.py`,
+  `task_routes.py`, `web_routes.py`).
 - TUI implementation: `packages/relay-tui/src/tui.tsx`.
 - Tests: Python backend tests under `backend/tests/`, TypeScript package tests
   under `packages/*/tests/`, and web tests under `web/tests/`.
@@ -102,6 +108,9 @@ Node.js 22.19 or newer is required.
 - Run the read-only API server: `make serve`; default port is `8787`, override
   with `PORT=9000`.
 - Run database migrations: `make backend-migrate` (Alembic; optionally pass `DATABASE_URL=<url>`).
+- Backend task scheduler env: `RELAY_TASK_SCHEDULER_ENABLED` (default on),
+  `RELAY_TASK_SCHEDULER_INTERVAL_SECONDS` (default `10`),
+  `RELAY_TASK_SCHEDULER_MAX_DISPATCHES` (default `5`).
 - Stop Relay and BoxLite processes: `make stop`.
 - Install pre-commit hooks: `make pre-commit-install`.
 - Run pre-commit hooks on all files: `make pre-commit-run`.
@@ -118,7 +127,7 @@ Relay is a local-first orchestration system split into a backend (control
 plane) and daemons (execution plane). The backend owns sessions, tasks, and
 the daemon registry and never executes agents; each daemon registers with the
 backend, owns its sandbox (BoxLite VM or none), and runs the Claude Code, Pi,
-and Codex CLIs inside it.
+Codex, and Kimi CLIs inside it.
 
 Key modules:
 
@@ -141,10 +150,20 @@ Key modules:
   `/sessions`, `/open`, `/summary`, and `/quit`.
 - `packages/relay-daemon/src/sandbox-session.ts`: sandbox session lifecycle and
   agent readiness preflight (`ensureAgentReady`).
-- `backend/relay/controller.py`, `backend/relay/stores.py`,
-  `backend/relay/session_store.py`, `backend/relay/task_store.py`,
-  `backend/relay/daemon_store.py`, and `backend/relay/daemon.py`: Python
-  control-plane session, task, and daemon registry implementation.
+- `backend/relay/services/controller.py`: session mutation controller
+  (`backend/relay/controller.py` re-exports).
+- `backend/relay/persistence/`: event-sourced session, task, and daemon stores
+  (`backend/relay/stores.py`, `session_store.py`, `task_store.py`, and
+  `daemon_store.py` re-export).
+- `backend/relay/services/daemon.py`: daemon registry and backend run dispatch
+  (`backend/relay/daemon.py` re-exports).
+- `backend/relay/services/task_scheduler.py`: background scheduler that
+  promotes due routines and dispatches assigned tasks to ready daemon nodes.
+  Controlled by `RELAY_TASK_SCHEDULER_ENABLED` (default on),
+  `RELAY_TASK_SCHEDULER_INTERVAL_SECONDS`, and
+  `RELAY_TASK_SCHEDULER_MAX_DISPATCHES`.
+- `backend/relay/security/auth.py`: auth store and JWT helpers
+  (`backend/relay/auth.py` re-exports).
 - `backend/relay/api/admin_routes.py`: admin control-panel routes — users,
   departments, node assignment, agent management, and dashboard data
   (KPI tiles, fleet health, activity feed, token usage).
@@ -183,6 +202,10 @@ Key modules:
 
 ## Invariants
 
+- **The backend never executes agents.** All agent execution flows through
+  daemon commands (`ServerDaemonNodeBackend.run` → registry queue → daemon
+  poll). The background `TaskScheduler` only promotes due routines and
+  dispatches already-assigned tasks; it does not bypass the daemon path.
 - Event logs are authoritative. All session/task state changes go through
   `SessionStore.appendEvent` or `TaskStore.appendEvent`; snapshots are derived.
 - Preserve immutable session/task updates through helpers such as
@@ -230,7 +253,7 @@ Test focus:
 - `packages/relay-daemon/tests/daemon.test.ts`: daemon registration, command
   polling, and agent execution.
 - `backend/tests/`: Python controller, event store behavior, daemon registry,
-  and HTTP API tests.
+  task scheduler/routine promotion, and HTTP API tests.
 - `packages/relay-tui/tests/tui.test.tsx`: Ink rendering through `ink-testing-library`.
 - `web/tests/status.test.ts`: web daemon-node status derivation.
 - `web/tests/agentStream.test.ts`, `web/tests/messageBlock.test.ts`,
