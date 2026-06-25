@@ -374,6 +374,45 @@
   background: var(--prio-accent);
 }
 
+/* ── Task status — dot + label, accent map shared with lanes/rows ───────
+   Used where status would otherwise be plain meta text (routine cards); the
+   board uses lanes and the list its own column, so they don't need it. */
+.task-status {
+  --status-accent: var(--color-muted-soft);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--color-body);
+  font: var(--type-meta-mono);
+}
+
+.task-status::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--status-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--status-accent) 16%, transparent);
+}
+
+.task-status[data-status="backlog"] { --status-accent: var(--color-muted-soft); }
+.task-status[data-status="assigned"] { --status-accent: var(--color-info); }
+.task-status[data-status="running"] { --status-accent: var(--color-ink); }
+.task-status[data-status="waiting_for_human"] { --status-accent: var(--color-accent-yellow); }
+.task-status[data-status="review"] { --status-accent: color-mix(in srgb, var(--color-info) 70%, var(--color-ink)); }
+.task-status[data-status="blocked"] { --status-accent: var(--color-semantic-down); }
+.task-status[data-status="done"] { --status-accent: var(--color-semantic-up); }
+
+.task-status[data-status="running"]::before {
+  animation: task-status-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes task-status-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--status-accent) 16%, transparent); }
+  50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--status-accent) 7%, transparent); }
+}
+
 .backlog-task-title {
   display: block;
   width: 100%;
@@ -445,6 +484,21 @@
   pointer-events: auto;
 }
 
+/* Toolbar clusters — dispatch (assign + start) · navigation · state change —
+   separated by a hairline so it reads as distinct groups of actions rather
+   than one undifferentiated strip. */
+.backlog-action-group {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+}
+
+.backlog-action-group + .backlog-action-group {
+  margin-left: var(--space-xxs);
+  padding-left: calc(var(--space-xs) + var(--space-xxs));
+  border-left: 1px solid var(--color-hairline);
+}
+
 .backlog-task-actions select,
 .backlog-task-actions button {
   min-height: 28px;
@@ -490,6 +544,37 @@
   justify-content: center;
   width: 28px;
   padding: 0;
+}
+
+/* The play glyph is lucide's stroked outline by default; in a solid primary
+   button it should read as a confident filled triangle. The 0.5px nudge
+   optically centres the triangle (its visual mass sits left of geometric
+   centre), and it eases forward on hover to give the run action a "go" cue. */
+.backlog-action-primary.backlog-action-icon svg {
+  fill: currentColor;
+  transform: translateX(0.5px);
+  transition: transform 140ms ease;
+}
+
+.backlog-action-primary.backlog-action-icon:hover:not(:disabled) svg {
+  transform: translateX(1.5px);
+}
+
+/* Secondary actions carry meaning on hover — completing (success) and
+   blocking (caution) read differently from neutral navigation. Reopen reuses
+   the neutral hover since reopening is constructive. */
+.backlog-task-actions .backlog-action-done:hover:not(:disabled),
+.backlog-row-actions .backlog-action-done:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--color-semantic-up) 45%, var(--color-hairline));
+  background: color-mix(in srgb, var(--color-semantic-up) 10%, var(--color-canvas));
+  color: var(--color-semantic-up);
+}
+
+.backlog-task-actions .backlog-action-block:hover:not(:disabled),
+.backlog-row-actions .backlog-action-block:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--color-semantic-down) 42%, var(--color-hairline));
+  background: color-mix(in srgb, var(--color-semantic-down) 9%, var(--color-canvas));
+  color: var(--color-danger-text);
 }
 
 .backlog-empty {
@@ -735,6 +820,15 @@
   .backlog-task-actions {
     animation: none;
     transition: none;
+  }
+
+  /* Keep the optical-centre offset, drop the hover nudge + its transition. */
+  .backlog-action-primary.backlog-action-icon svg {
+    transition: none;
+  }
+
+  .backlog-action-primary.backlog-action-icon:hover:not(:disabled) svg {
+    transform: translateX(0.5px);
   }
 }
 

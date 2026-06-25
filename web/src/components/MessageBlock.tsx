@@ -155,7 +155,7 @@ export function MessageBlock({
         <div className="bubble">
           <header>
             <span className="agent-title" translate="no">
-              <AgentMark agent={message.agent} size={16} className="agent-title-mark" />
+              <AgentMark agent={message.agent} size={14} className="agent-title-mark" />
               {message.agent}
             </span>
             <time className="mono">{formatTime(message.timestamp)}</time>

@@ -6,6 +6,7 @@ import { assignTask, createTask, startTask, updateTask } from "../api";
 import { Badge } from "@/components/ui/badge";
 import { AgentStateBadge } from "./AgentStateBadge";
 import { PriorityBadge } from "./PriorityBadge";
+import { TaskStatusBadge } from "./TaskStatusBadge";
 import { cn } from "@/lib/utils";
 import { AGENT_NAMES, type AgentName, type CurrentUser, type DaemonNodeMonitorRecord, type RelaySession, type RelayTask, type TaskPriority, type TaskRoutineCadence, type TaskRoutineType, type Tone } from "../types";
 import { ActionAddPerson, ActionCalendar, ActionCompose, ActionRemove, ActionSearch, ActionStart, NavRefresh } from "./icons";
@@ -178,7 +179,7 @@ function RoutineCard({
   const tone = routineDueTone(task);
 
   return (
-    <article className="routine-card backlog-task" data-priority={task.priority}>
+    <article className="routine-card backlog-task" data-priority={task.priority} data-status={task.status}>
       <div className="backlog-task-badges">
         <Badge variant={task.routineEnabled ? "success" : "neutral"}>{task.routineEnabled ? t("routine.enabled") : t("routine.disabled")}</Badge>
         <PriorityBadge priority={task.priority} />
@@ -196,7 +197,7 @@ function RoutineCard({
           {task.routineNextRunDate || t("routine.no_next_run")}
         </span>
         <span className="backlog-meta-sep" aria-hidden="true">·</span>
-        <span>{t(`backlog.statuses.${task.status}`)}</span>
+        <TaskStatusBadge status={task.status} />
         {session ? (
           <>
             <span className="backlog-meta-sep" aria-hidden="true">·</span>
@@ -204,24 +205,32 @@ function RoutineCard({
           </>
         ) : null}
       </div>
-      <div className="backlog-task-actions">
-        <select
-          value={task.assignedAgent ?? ""}
-          aria-label={t("backlog.assign_agent")}
-          onChange={(event) => {
-            const agent = event.target.value as AgentName;
-            if (agent) onAssign(agent);
-          }}
-        >
-          <option value="">{t("backlog.no_agent")}</option>
-          {AGENT_NAMES.map((agent) => <option key={agent} value={agent}>{agent}</option>)}
-        </select>
-        <button type="button" className="backlog-action-primary backlog-action-icon" onClick={onStart} disabled={!task.assignedAgent || !task.routineEnabled || task.status === "running" || task.status === "done"} aria-label={t("backlog.start")} title={t("backlog.start")}>
-          <ActionStart size={14} />
-        </button>
-        {session ? <button type="button" onClick={onOpenThread}>{t("backlog.open_thread")}</button> : null}
-        <button type="button" onClick={onToggleBlock}>{task.status === "blocked" ? t("backlog.reopen") : t("backlog.block")}</button>
-        <button type="button" onClick={onDone}>{t("backlog.done")}</button>
+      <div className="backlog-task-actions" role="group" aria-label={t("backlog.actions")}>
+        <div className="backlog-action-group" aria-label={t("backlog.actions_dispatch")}>
+          <select
+            value={task.assignedAgent ?? ""}
+            aria-label={t("backlog.assign_agent")}
+            onChange={(event) => {
+              const agent = event.target.value as AgentName;
+              if (agent) onAssign(agent);
+            }}
+          >
+            <option value="">{t("backlog.no_agent")}</option>
+            {AGENT_NAMES.map((agent) => <option key={agent} value={agent}>{agent}</option>)}
+          </select>
+          <button type="button" className="backlog-action-primary backlog-action-icon" onClick={onStart} disabled={!task.assignedAgent || !task.routineEnabled || task.status === "running" || task.status === "done"} aria-label={t("backlog.start")} title={t("backlog.start")}>
+            <ActionStart size={14} />
+          </button>
+        </div>
+        {session ? (
+          <div className="backlog-action-group">
+            <button type="button" onClick={onOpenThread}>{t("backlog.open_thread")}</button>
+          </div>
+        ) : null}
+        <div className="backlog-action-group" aria-label={t("backlog.actions_state")}>
+          <button type="button" className={task.status === "blocked" ? undefined : "backlog-action-block"} onClick={onToggleBlock}>{task.status === "blocked" ? t("backlog.reopen") : t("backlog.block")}</button>
+          <button type="button" className="backlog-action-done" onClick={onDone}>{t("backlog.done")}</button>
+        </div>
       </div>
     </article>
   );

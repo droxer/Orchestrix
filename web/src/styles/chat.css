@@ -356,18 +356,22 @@ html[data-theme="contrast"] .chat-header::after {
   gap: var(--space-xs);
 }
 
+/* Agent-turn eyebrow — Geist Mono is the identity signal (design-system.md
+   agent-turn / chat-panel: "mono eyebrows", {typography.meta-mono} 12px). The
+   header was drifting to 13/14px sans; meta-mono realigns it to the documented
+   agent-label role and keeps it in family with the mono timestamp beside it. */
 .msg header {
   display: flex;
   align-items: baseline;
   gap: var(--space-sm);
   padding: 0;
   color: var(--color-muted);
-  font: var(--type-label-md);
+  font: var(--type-meta-mono);
 }
 
 .msg header > span:first-child {
   color: var(--color-ink);
-  font: var(--type-label-strong);
+  font: var(--type-meta-mono);
 }
 
 .msg header .agent-title {

@@ -66,7 +66,7 @@
     "close_confirm": "关闭对话“{{name}}”？"
   },
   "composer": {
-    "placeholder": "发送给 @{{employee}} — 输入 @ 切换 Agent…",
+    "placeholder": "描述想让 Relay 做什么 — 输入 @ 切换 Agent…",
     "aria_label": "写信给 {{employee}} 的 {{agent}}",
     "placeholder_no_employee": "请先打开员工工作区再发送…",
     "aria_label_no_employee": "打开员工工作区后再写给 {{agent}}",
@@ -120,6 +120,9 @@
     "ready": "就绪",
     "not_ready": "未就绪",
     "assign_agent": "分配 Agent",
+    "actions": "操作",
+    "actions_dispatch": "派发",
+    "actions_state": "更改状态",
     "start": "开始",
     "open_thread": "打开对话",
     "block": "阻塞",
@@ -581,9 +584,9 @@
   },
   "transcript": {
     "new_session": "新工作区会话",
-    "ready_for": "@{{employee}} 已准备好使用 {{agent}}。",
+    "ready_for": "想让 Relay 做什么？",
     "ready_no_employee": "打开员工工作区以与 {{agent}} 对话。",
-    "hint_mention": "输入 @ 切换智能体",
+    "hint_mention": "输入 @ 切换 Agent",
     "awaiting_first": "等待首条消息"
   },
   "login": {

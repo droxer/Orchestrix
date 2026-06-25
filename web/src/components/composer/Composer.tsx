@@ -62,7 +62,7 @@ const ComposerView = forwardRef<ComposerHandle, {
             aria-activedescendant={mentionOpen ? `mention-option-${mentionIndex}` : undefined}
             name="message"
             placeholder={selectedEmployee
-              ? t("composer.placeholder", { employee: selectedEmployee })
+              ? t("composer.placeholder")
               : t("composer.placeholder_no_employee")}
             value={composerText}
             onChange={(e) => { setComposerText(e.target.value); syncMentionState(e.target.value, e.target.selectionStart ?? e.target.value.length); }}

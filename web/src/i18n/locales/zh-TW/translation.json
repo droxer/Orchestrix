@@ -66,7 +66,7 @@
     "close_confirm": "關閉對話「{{name}}」？"
   },
   "composer": {
-    "placeholder": "傳送給 @{{employee}} — 輸入 @ 切換 Agent…",
+    "placeholder": "描述想讓 Relay 做什麼 — 輸入 @ 切換 Agent…",
     "aria_label": "寫信給 {{employee}} 的 {{agent}}",
     "placeholder_no_employee": "請先開啟員工工作區再傳送…",
     "aria_label_no_employee": "開啟員工工作區後再寫給 {{agent}}",
@@ -120,6 +120,9 @@
     "ready": "就緒",
     "not_ready": "未就緒",
     "assign_agent": "分配 Agent",
+    "actions": "操作",
+    "actions_dispatch": "派發",
+    "actions_state": "變更狀態",
     "start": "開始",
     "open_thread": "開啟對話",
     "block": "阻塞",
@@ -581,9 +584,9 @@
   },
   "transcript": {
     "new_session": "新工作區工作階段",
-    "ready_for": "@{{employee}} 已準備好使用 {{agent}}。",
+    "ready_for": "想讓 Relay 做什麼？",
     "ready_no_employee": "開啟員工工作區以與 {{agent}} 對話。",
-    "hint_mention": "輸入 @ 切換智慧體",
+    "hint_mention": "輸入 @ 切換 Agent",
     "awaiting_first": "等待首則訊息"
   },
   "login": {

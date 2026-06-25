@@ -66,7 +66,7 @@
     "close_confirm": "Close thread “{{name}}”?"
   },
   "composer": {
-    "placeholder": "Write to @{{employee}} — type @ to switch agent…",
+    "placeholder": "Describe what Relay should work on — type @ to switch agent…",
     "aria_label": "Write to {{employee}}'s {{agent}}",
     "placeholder_no_employee": "Open an employee workspace before sending…",
     "aria_label_no_employee": "Open an employee workspace before writing to {{agent}}",
@@ -118,6 +118,9 @@
     "ready": "ready",
     "not_ready": "not ready",
     "assign_agent": "Assign agent",
+    "actions": "Actions",
+    "actions_dispatch": "Dispatch",
+    "actions_state": "Change state",
     "start": "Start",
     "open_thread": "Open thread",
     "block": "Block",
@@ -579,7 +582,7 @@
   },
   "transcript": {
     "new_session": "New workspace session",
-    "ready_for": "@{{employee}} is ready for {{agent}}.",
+    "ready_for": "What should Relay work on?",
     "ready_no_employee": "Open an employee workspace to talk to {{agent}}.",
     "hint_mention": "Type @ to switch agents",
     "awaiting_first": "awaiting first message"

@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { AgentMark } from "./AgentMark";
 import { RelayEmptyState } from "./RelayEmptyState";
+import { agentLabel } from "../lib/plan";
 import type { AgentName } from "../types";
 
 type AgentDescriptor = { role: string; blurb: string };
@@ -19,8 +20,8 @@ export function TranscriptEmpty({
   const { t } = useTranslation();
   const descriptor = agentDescriptors[activeAgent];
   const headline = selectedEmployee
-    ? t("transcript.ready_for", { employee: selectedEmployee, agent: activeAgent })
-    : t("transcript.ready_no_employee", { agent: activeAgent });
+    ? t("transcript.ready_for")
+    : t("transcript.ready_no_employee", { agent: agentLabel(activeAgent) });
 
   const body = descriptor.blurb || descriptor.role;
 
