@@ -432,7 +432,7 @@
       "manage_agents_for": "管理 {{id}} 的智能体",
       "manage_agents_title": "管理智能体",
       "chat_eyebrow": "频道",
-      "chat_title": "Discord、Telegram 与 Lark 设置",
+      "chat_title": "频道配置",
       "chat_sub": "连接服务凭据，限制可调用智能体的位置，并将聊天用户映射到 Relay 员工。",
       "chat_metrics_label": "频道指标",
       "chat_metric_integrations": "频道",

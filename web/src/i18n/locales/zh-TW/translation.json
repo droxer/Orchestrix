@@ -432,7 +432,7 @@
       "manage_agents_for": "管理 {{id}} 的代理",
       "manage_agents_title": "管理代理",
       "chat_eyebrow": "頻道",
-      "chat_title": "Discord、Telegram 與 Lark 設定",
+      "chat_title": "頻道設定",
       "chat_sub": "連接服務憑證，限制可呼叫代理的位置，並將聊天使用者映射到 Relay 員工。",
       "chat_metrics_label": "頻道指標",
       "chat_metric_integrations": "頻道",

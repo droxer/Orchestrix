@@ -432,7 +432,7 @@
       "manage_agents_help": "Disable agents to stop dispatching work to them on this node. Health continues to be reported by the daemon.",
       "manage_agents_disable_confirm": "Disable {{agents}} on this node? Queued work targeting these agents will fail until you re-enable them.",
       "chat_eyebrow": "Channels",
-      "chat_title": "Discord, Telegram, and Lark setup",
+      "chat_title": "Channel Configuration",
       "chat_sub": "Connect provider credentials, restrict where agents can be invoked, and map chat users to Relay employees.",
       "chat_metrics_label": "Channel metrics",
       "chat_metric_integrations": "Channels",
