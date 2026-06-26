@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
+import { PageHeader } from "./PageHeader";
 import { RelayEmptyState } from "./RelayEmptyState";
 import { useAgentInventoryNodes } from "../hooks/useAgentInventory";
 import { aggregateMcpByAgent, totalItemCount } from "../lib/agentInventory";
@@ -39,7 +40,6 @@ function ServerCard({ server }: { server: DaemonAgentMcpServer }) {
 }
 
 function AgentSection({ agent, servers }: { agent: AgentName; servers: DaemonAgentMcpServer[] }) {
-  const { t } = useTranslation();
   return (
     <div className="mb-lg last:mb-0">
       <div className="mb-md flex items-baseline gap-sm">
@@ -48,15 +48,11 @@ function AgentSection({ agent, servers }: { agent: AgentName; servers: DaemonAge
         </span>
         <span className="mono text-xs font-medium text-muted-foreground">{servers.length}</span>
       </div>
-      {servers.length === 0 ? (
-        <p className="text-sm text-muted-soft">{t("mcp.agent_empty")}</p>
-      ) : (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-base">
-          {servers.map((server) => (
-            <ServerCard key={server.name} server={server} />
-          ))}
-        </div>
-      )}
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-base">
+        {servers.map((server) => (
+          <ServerCard key={server.name} server={server} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -104,24 +100,20 @@ export function McpPage() {
 
   const groups = useMemo(() => aggregateMcpByAgent(nodes), [nodes]);
   const total = totalItemCount(groups);
+  const populated = groups.filter((group) => group.items.length > 0);
 
   return (
     <section className="mcp-page flex min-h-0 flex-col overflow-y-auto bg-background">
-      <header className="flex min-h-[var(--header-h)] shrink-0 items-center justify-between gap-base border-b border-hairline px-xl max-[820px]:px-base">
-        <div className="flex items-baseline gap-sm">
-          <h1 className="m-0 text-lg font-semibold leading-[1.25] text-balance text-ink">{t("mcp.title")}</h1>
-          <span className="mono text-xs font-medium text-muted-foreground">{t("mcp.sub")}</span>
-        </div>
-        {total > 0 && (
-          <span className="mono text-xs font-medium text-muted-foreground">{t("mcp.total", { count: total })}</span>
-        )}
-      </header>
+      <PageHeader
+        title={t("mcp.title")}
+        count={total > 0 ? t("mcp.total", { count: total }) : t("mcp.sub")}
+      />
 
       <div className="flex-1 p-xl max-[820px]:p-base">
         {total === 0 ? (
           <EmptyState />
         ) : (
-          groups.map((group) => (
+          populated.map((group) => (
             <AgentSection key={group.agent} agent={group.agent} servers={group.items} />
           ))
         )}

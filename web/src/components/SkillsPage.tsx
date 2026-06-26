@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
+import { PageHeader } from "./PageHeader";
 import { RelayEmptyState } from "./RelayEmptyState";
 import { useAgentInventoryNodes } from "../hooks/useAgentInventory";
 import { aggregateSkillsByAgent, totalItemCount } from "../lib/agentInventory";
@@ -28,7 +29,6 @@ function SkillRow({ skill }: { skill: DaemonAgentSkill }) {
 
 function AgentGroup({ agent, skills }: { agent: AgentName; skills: DaemonAgentSkill[] }) {
   const [collapsed, setCollapsed] = useState(false);
-  const { t } = useTranslation();
 
   return (
     <div className="border-b border-hairline-soft last:border-b-0">
@@ -52,11 +52,9 @@ function AgentGroup({ agent, skills }: { agent: AgentName; skills: DaemonAgentSk
       </button>
       {!collapsed && (
         <div className="pb-sm">
-          {skills.length === 0 ? (
-            <p className="py-xs pl-lg text-sm text-muted-soft">{t("skills.agent_empty")}</p>
-          ) : (
-            skills.map((skill) => <SkillRow key={`${skill.namespace ?? ""}/${skill.name}`} skill={skill} />)
-          )}
+          {skills.map((skill) => (
+            <SkillRow key={`${skill.namespace ?? ""}/${skill.name}`} skill={skill} />
+          ))}
         </div>
       )}
     </div>
@@ -118,20 +116,15 @@ export function SkillsPage() {
     }));
   }, [query, groups]);
 
-  const visibleGroups = query.trim() ? filtered.filter((group) => group.items.length > 0) : filtered;
+  const visibleGroups = filtered.filter((group) => group.items.length > 0);
   const hasResults = totalItemCount(visibleGroups) > 0;
 
   return (
     <section className="flex min-h-0 flex-col overflow-y-auto bg-background">
-      <header className="flex min-h-[var(--header-h)] shrink-0 items-center justify-between gap-base border-b border-hairline px-xl max-[820px]:px-base">
-        <div className="flex items-baseline gap-sm">
-          <h1 className="text-lg font-semibold leading-[1.25] text-balance text-ink">{t("skills.title")}</h1>
-          <span className="mono text-xs font-medium text-muted-foreground">{t("skills.sub")}</span>
-        </div>
-        <div className="flex items-center gap-sm">
-          <span className="mono text-xs font-medium text-muted-foreground">{t("skills.total", { count: total })}</span>
-        </div>
-      </header>
+      <PageHeader
+        title={t("skills.title")}
+        count={total > 0 ? t("skills.total", { count: total }) : t("skills.sub")}
+      />
 
       <div className="flex shrink-0 items-center gap-xs border-b border-hairline bg-background px-xl py-sm max-[820px]:px-base focus-within:[outline:2px_solid_var(--color-primary)] focus-within:[outline-offset:-2px]">
         <svg className="shrink-0 text-muted-soft" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
