@@ -1298,6 +1298,58 @@ describe("token usage accounting", () => {
     assert.deepEqual(session.tokenUsage, { input: 5, output: 7, cache: 3, total: 15 });
   });
 
+  it("clears pending feedback when materializing terminal session events", () => {
+    const sessionId = "ses_terminal_feedback";
+    const events = [
+      relayEvent("session.created", sessionId, {
+        workspacePath: "/workspace",
+        taskGoal: "finish session",
+        participants: ["human", "codex"],
+      }),
+      relayEvent("session.status", sessionId, {
+        status: "waiting_for_human",
+        phase: "feedback",
+        pendingDecision: "feedback",
+      }),
+      relayEvent("session.completed", sessionId, {
+        outcome: "done",
+      }),
+    ];
+
+    const session = materializeEvents(events);
+
+    assert.equal(session.status, "completed");
+    assert.equal(session.pendingDecision, undefined);
+  });
+
+  it("clears pending feedback when materializing cancel decisions", () => {
+    const sessionId = "ses_cancel_feedback";
+    const events = [
+      relayEvent("session.created", sessionId, {
+        workspacePath: "/workspace",
+        taskGoal: "cancel session",
+        participants: ["human", "codex"],
+      }),
+      relayEvent("session.status", sessionId, {
+        status: "waiting_for_human",
+        phase: "feedback",
+        pendingDecision: "feedback",
+      }),
+      relayEvent("human.decision", sessionId, {
+        decision: {
+          id: "dec_cancel",
+          kind: "cancel",
+          createdAt: new Date().toISOString(),
+        },
+      }),
+    ];
+
+    const session = materializeEvents(events);
+
+    assert.equal(session.status, "cancelled");
+    assert.equal(session.pendingDecision, undefined);
+  });
+
   it("applies session.renamed to the materialized title", () => {
     const sessionId = "ses_titled";
     const base = materializeEvents([

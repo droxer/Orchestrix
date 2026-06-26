@@ -33,8 +33,8 @@ import { canUseLocalControlPanel, localControlPanelNodes } from "./lib/controlPa
 import { useRelayStore } from "./lib/store";
 import { useAuthSession } from "./hooks/useAuthSession";
 import { useActiveSession } from "./hooks/useActiveSession";
-import { chooseSendAction } from "./lib/sendAction";
-import { myConversationSessions, matchesConversationQuery } from "./lib/conversations";
+import { chooseSendAction, suppressActiveSessionDuringPendingSend } from "./lib/sendAction";
+import { myConversationSessions, matchesConversationQuery, pickActiveConversationSession } from "./lib/conversations";
 import { useEmployeeProvisioning } from "./hooks/useEmployeeProvisioning";
 import { isAwaitingFeedbackDecision, rerunAssignmentForSession } from "./lib/workflow";
 import { useDialogs } from "./components/ui/DialogProvider";
@@ -133,12 +133,15 @@ export function App() {
     [sessions, selectedEmployee],
   );
   const { activeSessionId, setActiveSessionId } = useActiveSession(selectedEmployee, myConversations);
-  const activeSession = useMemo(() => {
-    if (composingNew) return undefined;
-    if (selectedSessionId) { const p = sessions.find((s) => s.id === selectedSessionId); if (p) return p; }
-    if (activeSessionId) { const p = myConversations.find((s) => s.id === activeSessionId); if (p) return p; }
-    return myConversations[0];
-  }, [composingNew, selectedSessionId, sessions, myConversations, activeSessionId]);
+  const activeSession = useMemo(
+    () => pickActiveConversationSession({
+      conversations: myConversations,
+      selectedSessionId,
+      activeSessionId,
+      composingNew,
+    }),
+    [activeSessionId, composingNew, myConversations, selectedSessionId],
+  );
 
   // Live SSE tail of the open conversation; merges new events into the
   // sessions cache so the active thread updates at push latency.
@@ -325,13 +328,16 @@ export function App() {
     // open one. composingNew forces a fresh owner-scoped session here.
     const action = composingNew ? { kind: "create" as const } : chooseSendAction({ activeSessionId: activeSession?.id ?? null, session: activeSession });
     const sessionId = action.kind === "append" ? action.sessionId : undefined;
+    const creatingSession = suppressActiveSessionDuringPendingSend(action);
     // Echo the turn immediately. For a continued session we mint the message id
     // here and hand it to the backend so the persisted event reconciles by id.
     const userMessageId = `evt_${crypto.randomUUID()}`;
     setPendingUserMessage({ id: userMessageId, text: goal });
     setIsRunning(true);
     composerRef.current?.clear();
-    setComposingNew(false);
+    // While creating a fresh conversation, keep suppressing the previous active
+    // thread so the optimistic user turn does not appear in the wrong transcript.
+    if (!creatingSession) setComposingNew(false);
     setMobileView("chat"); atBottomRef.current = true;
     try {
       const { sandbox, token } = await provisionEmployeeSandbox(selectedEmployee, selectedToken);
@@ -345,6 +351,7 @@ export function App() {
       );
       setActiveSessionId(done.id);
       setSelectedSessionId(done.id);
+      setComposingNew(false);
       setStatus({ tone: "good", message: t("toast.message_sent", { employee: selectedEmployee, agent: routedAgent }) });
       await refresh(undefined, token);
     } catch (err) {
@@ -462,7 +469,7 @@ export function App() {
   }
 
   return (
-    <main className="messenger-shell" data-settings="closed" data-mobile-view={mobileView} data-route={route} data-sidenav={sidenavExpanded ? "open" : "closed"}>
+    <main className="messenger-shell" data-mobile-view={mobileView} data-route={route} data-sidenav={sidenavExpanded ? "open" : "closed"}>
       <a className="skip-link" href="#chat-panel">{t("skip_to_conversation")}</a>
 
       <div className="mobile-topbar" aria-label={t("nav.conversations")}>

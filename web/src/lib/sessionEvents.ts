@@ -1,0 +1,141 @@
+import type { RelaySession, TokenUsage } from "../types.js";
+
+type RelayEvent = RelaySession["events"][number];
+
+function mergeRunTokenUsage(values: Array<TokenUsage | undefined>): TokenUsage | undefined {
+  const totals = { input: 0, output: 0, cache: 0 };
+  for (const value of values) {
+    if (!value) continue;
+    totals.input += value.input;
+    totals.output += value.output;
+    totals.cache += value.cache;
+  }
+  if (totals.input === 0 && totals.output === 0 && totals.cache === 0) return undefined;
+  return { ...totals, total: totals.input + totals.output + totals.cache };
+}
+
+export function applySessionEvent(session: RelaySession, event: RelayEvent): RelaySession {
+  if (session.events.some((existing) => existing.id === event.id)) return session;
+  const next: RelaySession = {
+    ...session,
+    updatedAt: event.timestamp,
+    events: [...session.events, event],
+  };
+
+  switch (event.type) {
+    case "session.status":
+      {
+        const updated: RelaySession = {
+          ...next,
+          status: event.status,
+          phase: event.phase,
+        };
+        if (event.pendingDecision) {
+          updated.pendingDecision = event.pendingDecision;
+        } else {
+          delete updated.pendingDecision;
+        }
+        if (event.status !== "completed" && event.status !== "failed") {
+          delete updated.finalOutcome;
+        }
+        return updated;
+      }
+    case "agent.started": {
+      if (next.agentRuns.some((run) => run.id === event.runId)) {
+        return { ...next, status: "running", phase: `${event.agent}:${event.mode}`, currentAgent: event.agent };
+      }
+      return {
+        ...next,
+        status: "running",
+        phase: `${event.agent}:${event.mode}`,
+        currentAgent: event.agent,
+        agentRuns: [
+          ...next.agentRuns,
+          {
+            id: event.runId,
+            agent: event.agent,
+            role: event.role,
+            mode: event.mode,
+            status: "running",
+            startedAt: event.timestamp,
+            artifactIds: [],
+          },
+        ],
+      };
+    }
+    case "agent.completed": {
+      const agentRuns = next.agentRuns.map((run) => run.id === event.runId
+        ? {
+            ...run,
+            status: event.status,
+            completedAt: event.timestamp,
+            exitCode: event.exitCode,
+            ...(event.tokenUsage ? { tokenUsage: event.tokenUsage } : {}),
+          }
+        : run);
+      {
+        const updated: RelaySession = {
+          ...next,
+          agentRuns,
+          phase: event.status === "completed"
+            ? "agent_completed"
+            : event.status === "cancelled" ? "cancelled" : "agent_failed",
+        };
+        const tokenUsage = mergeRunTokenUsage(agentRuns.map((run) => run.tokenUsage));
+        if (tokenUsage) {
+          updated.tokenUsage = tokenUsage;
+        } else {
+          delete updated.tokenUsage;
+        }
+        delete updated.currentAgent;
+        return updated;
+      }
+    }
+    case "artifact.created": {
+      const artifacts = next.artifacts.some((artifact) => artifact.id === event.artifact.id)
+        ? next.artifacts
+        : [...next.artifacts, event.artifact];
+      const agentRuns = event.artifact.agentRunId
+        ? next.agentRuns.map((run) => run.id === event.artifact.agentRunId && !run.artifactIds.includes(event.artifact.id)
+            ? { ...run, artifactIds: [...run.artifactIds, event.artifact.id] }
+            : run)
+        : next.agentRuns;
+      return { ...next, artifacts, agentRuns };
+    }
+    case "human.decision":
+      {
+        const updated: RelaySession = {
+          ...next,
+          decisions: next.decisions.some((decision) => decision.id === event.decision.id)
+            ? next.decisions
+            : [...next.decisions, event.decision],
+          ...(event.decision.kind === "handoff" && event.decision.targetAgent ? { currentAgent: event.decision.targetAgent } : {}),
+          ...(event.decision.kind === "cancel" ? { status: "cancelled" as const, phase: "cancelled" } : {}),
+        };
+        if (event.decision.kind === "cancel") delete updated.pendingDecision;
+        return updated;
+      }
+    case "review.verdict":
+      return { ...next, reviewVerdict: event.verdict, phase: `review:${event.verdict}` };
+    case "session.completed":
+      {
+        const updated: RelaySession = { ...next, status: "completed", phase: "completed", finalOutcome: event.outcome };
+        delete updated.currentAgent;
+        delete updated.pendingDecision;
+        return updated;
+      }
+    case "session.failed":
+      {
+        const updated: RelaySession = { ...next, status: "failed", phase: "failed", finalOutcome: event.outcome };
+        delete updated.currentAgent;
+        delete updated.pendingDecision;
+        return updated;
+      }
+    case "session.archived":
+      return { ...next, archived: true };
+    case "session.renamed":
+      return { ...next, title: event.title };
+    default:
+      return next;
+  }
+}

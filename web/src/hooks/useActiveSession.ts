@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-type SessionLike = { id: string; archived?: boolean; createdAt?: string };
+type SessionLike = { id: string; archived?: boolean; createdAt?: string; updatedAt?: string };
 
 const STORAGE_PREFIX = "relay.activeSession.";
 
@@ -15,7 +15,7 @@ export function pickInitialActiveSessionId(
   const eligible = sessions
     .filter((s) => !s.archived)
     .slice()
-    .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
+    .sort((a, b) => (b.updatedAt ?? b.createdAt ?? "").localeCompare(a.updatedAt ?? a.createdAt ?? ""));
   return eligible[0]?.id ?? null;
 }
 

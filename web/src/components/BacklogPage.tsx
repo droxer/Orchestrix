@@ -139,6 +139,10 @@ function BacklogFiltersBar({
         <ActionSearch size={15} aria-hidden="true" />
         <input
           className="backlog-filter-search"
+          name="backlog-query"
+          type="search"
+          autoComplete="off"
+          spellCheck={false}
           value={filters.query}
           placeholder={t("backlog.search")}
           aria-label={t("backlog.search")}
@@ -167,6 +171,7 @@ function BacklogFiltersBar({
       {expanded ? (
         <div className="backlog-filter-secondary">
           <select
+            name="backlog-status-filter"
             value={filters.status}
             aria-label={t("backlog.status")}
             onChange={(event) => onChange({ ...filters, status: event.target.value as BacklogFilters["status"] })}
@@ -177,6 +182,7 @@ function BacklogFiltersBar({
             ))}
           </select>
           <select
+            name="backlog-priority-filter"
             value={filters.priority}
             aria-label={t("backlog.priority")}
             onChange={(event) => onChange({ ...filters, priority: event.target.value as BacklogFilters["priority"] })}
@@ -187,6 +193,7 @@ function BacklogFiltersBar({
             ))}
           </select>
           <select
+            name="backlog-agent-filter"
             value={filters.agent}
             aria-label={t("backlog.agent")}
             onChange={(event) => onChange({ ...filters, agent: event.target.value as BacklogFilters["agent"] })}
@@ -197,12 +204,15 @@ function BacklogFiltersBar({
             ))}
           </select>
           <input
+            name="backlog-assignee-filter"
+            autoComplete="off"
             value={filters.assignee}
             placeholder={t("backlog.assignee_filter")}
             aria-label={t("backlog.assignee_filter")}
             onChange={(event) => onChange({ ...filters, assignee: event.target.value })}
           />
           <select
+            name="backlog-due-filter"
             value={filters.due}
             aria-label={t("backlog.due")}
             onChange={(event) => onChange({ ...filters, due: event.target.value as BacklogFilters["due"] })}
@@ -267,6 +277,7 @@ function BacklogTaskCard({
       <div className="backlog-task-actions" role="group" aria-label={t("backlog.actions")}>
         <div className="backlog-action-group" aria-label={t("backlog.actions_dispatch")}>
           <select
+            name={`task-${task.id}-agent-card`}
             value={task.assignedAgent ?? ""}
             aria-label={t("backlog.assign_agent")}
             onChange={(event) => {
@@ -383,6 +394,7 @@ function BacklogTaskRow({
       <div className="backlog-row-actions" role="group" aria-label={t("backlog.actions")}>
         <div className="backlog-action-group" aria-label={t("backlog.actions_dispatch")}>
           <select
+            name={`task-${task.id}-agent-row`}
             value={task.assignedAgent ?? ""}
             aria-label={t("backlog.assign_agent")}
             onChange={(event) => {
@@ -468,6 +480,7 @@ function BacklogTaskDrawer({
         <label>
           <span>{t("backlog.title_field")}</span>
           <input
+            name="task-title"
             required
             value={form.title}
             onChange={(event) => onChange({ ...form, title: event.target.value })}
@@ -476,6 +489,7 @@ function BacklogTaskDrawer({
         <label>
           <span>{t("backlog.description")}</span>
           <textarea
+            name="task-description"
             value={form.description}
             rows={5}
             onChange={(event) => onChange({ ...form, description: event.target.value })}
@@ -485,6 +499,7 @@ function BacklogTaskDrawer({
           <label>
             <span>{t("backlog.priority")}</span>
             <select
+              name="task-priority"
               value={form.priority}
               onChange={(event) => onChange({ ...form, priority: event.target.value as TaskPriority })}
             >
@@ -496,6 +511,7 @@ function BacklogTaskDrawer({
           <label>
             <span>{t("backlog.status")}</span>
             <select
+              name="task-status"
               value={form.status}
               onChange={(event) => onChange({ ...form, status: event.target.value as TaskStatus })}
             >
@@ -507,6 +523,7 @@ function BacklogTaskDrawer({
           <label>
             <span>{t("backlog.due")}</span>
             <input
+              name="task-due-date"
               type="date"
               value={form.dueDate}
               onChange={(event) => onChange({ ...form, dueDate: event.target.value })}
@@ -515,6 +532,7 @@ function BacklogTaskDrawer({
           <label>
             <span>{t("backlog.agent")}</span>
             <select
+              name="task-agent"
               value={form.assignedAgent}
               onChange={(event) => onChange({ ...form, assignedAgent: event.target.value as "" | AgentName })}
             >
@@ -530,6 +548,7 @@ function BacklogTaskDrawer({
           <div className="backlog-assignee-input">
             <ActionAddPerson size={15} />
             <input
+              name="task-assignee"
               list="backlog-employees"
               value={form.assigneeEmployeeId}
               onChange={(event) => onChange({ ...form, assigneeEmployeeId: event.target.value })}

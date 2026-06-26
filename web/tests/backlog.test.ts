@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { agentReadyForTask, dueTone, filterTasks, tasksByStatus, type BacklogFilters } from "../src/lib/backlog.js";
+import { agentReadyForTask, dueTone, filterTasks, localDateKey, tasksByStatus, type BacklogFilters } from "../src/lib/backlog.js";
 import type { DaemonNodeMonitorRecord, RelayTask } from "../src/types.js";
 
 const baseFilters: BacklogFilters = {
@@ -97,5 +97,11 @@ describe("dueTone", () => {
     assert.equal(dueTone(task({ id: "a", title: "A", dueDate: "2026-06-23" }), "2026-06-24"), "bad");
     assert.equal(dueTone(task({ id: "b", title: "B", dueDate: "2026-06-24" }), "2026-06-24"), "warn");
     assert.equal(dueTone(task({ id: "c", title: "C", dueDate: "2026-06-23", status: "done" }), "2026-06-24"), "neutral");
+  });
+});
+
+describe("localDateKey", () => {
+  it("uses the user's local calendar day instead of UTC", () => {
+    assert.equal(localDateKey(new Date(2026, 5, 24, 0, 30)), "2026-06-24");
   });
 });

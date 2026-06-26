@@ -620,6 +620,8 @@
   gap: var(--space-base);
   padding: var(--space-lg);
   border-left: 1px solid var(--color-hairline);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background:
     linear-gradient(135deg, color-mix(in srgb, var(--color-surface-soft) 40%, transparent), transparent 40%),
     var(--color-surface-raised);

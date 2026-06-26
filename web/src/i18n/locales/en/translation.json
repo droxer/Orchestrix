@@ -205,26 +205,6 @@
       "custom": "Custom"
     }
   },
-  "settings": {
-    "employee_workspace": "Employee workspace",
-    "close": "Close",
-    "registered_nodes": "Registered daemon nodes",
-    "no_nodes": "No daemon nodes registered.",
-    "sandbox_token": "Sandbox token",
-    "save_token": "Save token",
-    "token_hint": "Saved locally in this browser for the selected employee.",
-    "token_placeholder": "Tok_…",
-    "live_sandbox": "Live sandbox",
-    "no_sandbox": "No sandbox selected",
-    "workspace_label": "Workspace",
-    "workspace_none": "None",
-    "node_label": "Node",
-    "run_label": "Run",
-    "queued": "Queued",
-    "not_registered": "Not registered",
-    "cancel": "Cancel",
-    "idle": "Idle"
-  },
   "admin": {
     "title": "Admin console",
     "sub": "Daemon operations",

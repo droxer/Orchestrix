@@ -57,6 +57,10 @@ function runCommand(id = "cmd_1"): DaemonNodeCommand {
   };
 }
 
+function isInventoryProbe(args: string[] | undefined): boolean {
+  return Boolean(args?.[1]?.includes("printf 'SKILL"));
+}
+
 test("relay daemon ignores duplicate run.start commands already active", async () => {
   const stop = new AbortController();
   const events: DaemonNodeEvent[] = [];
@@ -77,7 +81,7 @@ test("relay daemon ignores duplicate run.start commands already active", async (
       exec: async (_cmd, args, options) => {
         // The startup agent-inventory sweep also runs through execStream; only
         // count actual agent runs so the duplicate-suppression assertion holds.
-        if (!args?.[1]?.includes("printf 'SKILL")) execCount += 1;
+        if (!isInventoryProbe(args)) execCount += 1;
         options?.sink?.("done\n");
         return { exit_code: 0, stdout: "done\n", stderr: "" };
       },
@@ -214,6 +218,259 @@ test("relay daemon retries terminal event posts across backend failures", async 
   assert.equal(terminalAttempts, 2);
 });
 
+test("relay daemon exits startup preflight after external stop", async () => {
+  const stop = new AbortController();
+  let closeCount = 0;
+  let preflightAborted = false;
+  const daemon = runRelayDaemon({
+    backendUrl: "http://relay.test",
+    sandboxId: "sbx_test",
+    employeeId: "alice",
+    workspacePath: process.cwd(),
+    token: "node_token",
+    pollIntervalMs: 5,
+    shutdownGraceMs: 50,
+    logger: testLogger(),
+    signal: stop.signal,
+    environment: {
+      ...fakeEnvironment(),
+      close: async () => {
+        closeCount += 1;
+      },
+    },
+    fetchFn: async (url, init) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/") {
+        const signal = init?.signal as AbortSignal | undefined;
+        setTimeout(() => stop.abort(), 0);
+        return await new Promise<Response>((_resolve, reject) => {
+          signal?.addEventListener("abort", () => {
+            preflightAborted = true;
+            reject(new Error("preflight aborted"));
+          }, { once: true });
+        });
+      }
+      if (path === "/daemon-nodes/register") return jsonResponse({ ok: true });
+      throw new Error(`unexpected URL ${url}`);
+    },
+  });
+
+  await Promise.race([
+    daemon,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("daemon did not stop")), 500)),
+  ]);
+
+  assert.equal(preflightAborted, true);
+  assert.equal(closeCount, 1);
+});
+
+test("relay daemon skips startup probes when external stop is already requested", async () => {
+  const stop = new AbortController();
+  stop.abort();
+  let closeCount = 0;
+  let ensureCount = 0;
+  let inventoryCount = 0;
+  await runRelayDaemon({
+    backendUrl: "http://relay.test",
+    sandboxId: "sbx_test",
+    employeeId: "alice",
+    workspacePath: process.cwd(),
+    token: "node_token",
+    pollIntervalMs: 5,
+    shutdownGraceMs: 50,
+    logger: testLogger(),
+    signal: stop.signal,
+    environment: {
+      ...fakeEnvironment({
+        ensure: async () => {
+          ensureCount += 1;
+        },
+        exec: async () => {
+          inventoryCount += 1;
+          return { exit_code: 0, stdout: "", stderr: "" };
+        },
+      }),
+      close: async () => {
+        closeCount += 1;
+      },
+    },
+    fetchFn: async (url) => {
+      throw new Error(`unexpected URL ${url}`);
+    },
+  });
+
+  assert.equal(ensureCount, 0);
+  assert.equal(inventoryCount, 0);
+  assert.equal(closeCount, 1);
+});
+
+test("relay daemon exits backend reconnect after external stop during registration", async () => {
+  const stop = new AbortController();
+  let registerAttempts = 0;
+  let closeCount = 0;
+  const daemon = runRelayDaemon({
+    backendUrl: "http://relay.test",
+    sandboxId: "sbx_test",
+    employeeId: "alice",
+    workspacePath: process.cwd(),
+    token: "node_token",
+    pollIntervalMs: 5,
+    shutdownGraceMs: 50,
+    logger: testLogger(),
+    signal: stop.signal,
+    preflight: false,
+    environment: {
+      ...fakeEnvironment(),
+      close: async () => {
+        closeCount += 1;
+      },
+    },
+    fetchFn: async (url) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/daemon-nodes/register") {
+        registerAttempts += 1;
+        stop.abort();
+        return new Response("backend unavailable", { status: 503 });
+      }
+      throw new Error(`unexpected URL ${url}`);
+    },
+  });
+
+  await Promise.race([
+    daemon,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("daemon did not stop")), 500)),
+  ]);
+
+  assert.ok(registerAttempts >= 1);
+  assert.equal(closeCount, 1);
+});
+
+test("relay daemon removes shutdown listeners after external stop", async () => {
+  const stop = new AbortController();
+  const beforeSigint = process.listenerCount("SIGINT");
+  const beforeSigterm = process.listenerCount("SIGTERM");
+  const daemon = runRelayDaemon({
+    backendUrl: "http://relay.test",
+    sandboxId: "sbx_test",
+    employeeId: "alice",
+    workspacePath: process.cwd(),
+    token: "node_token",
+    pollIntervalMs: 5,
+    shutdownGraceMs: 50,
+    logger: testLogger(),
+    signal: stop.signal,
+    environment: fakeEnvironment(),
+    fetchFn: async (url) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/daemon-nodes/register") return jsonResponse({ ok: true });
+      if (path.endsWith("/commands")) {
+        stop.abort();
+        return jsonResponse({ commands: [] });
+      }
+      throw new Error(`unexpected URL ${url}`);
+    },
+  });
+
+  await daemon;
+
+  assert.equal(process.listenerCount("SIGINT"), beforeSigint);
+  assert.equal(process.listenerCount("SIGTERM"), beforeSigterm);
+});
+
+test("relay daemon exits polling sleep after external stop", async () => {
+  const stop = new AbortController();
+  let closeCount = 0;
+  let commandPolls = 0;
+  const daemon = runRelayDaemon({
+    backendUrl: "http://relay.test",
+    sandboxId: "sbx_test",
+    employeeId: "alice",
+    workspacePath: process.cwd(),
+    token: "node_token",
+    pollIntervalMs: 10_000,
+    shutdownGraceMs: 50,
+    logger: testLogger(),
+    signal: stop.signal,
+    environment: {
+      ...fakeEnvironment(),
+      close: async () => {
+        closeCount += 1;
+      },
+    },
+    fetchFn: async (url) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/daemon-nodes/register") return jsonResponse({ ok: true });
+      if (path.endsWith("/commands")) {
+        commandPolls += 1;
+        stop.abort();
+        return jsonResponse({ commands: [] });
+      }
+      throw new Error(`unexpected URL ${url}`);
+    },
+  });
+
+  await Promise.race([
+    daemon,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("daemon did not stop")), 500)),
+  ]);
+
+  assert.equal(commandPolls, 1);
+  assert.equal(closeCount, 1);
+});
+
+test("relay daemon bounds stopped registration during shutdown", async () => {
+  const stop = new AbortController();
+  let closeCount = 0;
+  let stoppedRegisterAborted = false;
+  const daemon = runRelayDaemon({
+    backendUrl: "http://relay.test",
+    sandboxId: "sbx_test",
+    employeeId: "alice",
+    workspacePath: process.cwd(),
+    token: "node_token",
+    pollIntervalMs: 5,
+    shutdownGraceMs: 50,
+    logger: testLogger(),
+    signal: stop.signal,
+    environment: {
+      ...fakeEnvironment(),
+      close: async () => {
+        closeCount += 1;
+      },
+    },
+    fetchFn: async (url, init) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/daemon-nodes/register") {
+        const registration = await jsonBody<DaemonNodeRegistration>(init);
+        if (registration.status !== "stopped") return jsonResponse({ ok: true });
+        const signal = init?.signal as AbortSignal | undefined;
+        return await new Promise<Response>((_resolve, reject) => {
+          signal?.addEventListener("abort", () => {
+            stoppedRegisterAborted = true;
+            reject(new Error("stopped registration aborted"));
+          }, { once: true });
+        });
+      }
+      if (path.endsWith("/commands")) {
+        stop.abort();
+        return jsonResponse({ commands: [] });
+      }
+      throw new Error(`unexpected URL ${url}`);
+    },
+  });
+
+  await Promise.race([
+    daemon,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("daemon did not stop")), 1_500)),
+  ]);
+
+  assert.equal(stoppedRegisterAborted, true);
+  assert.equal(closeCount, 1);
+});
+
 test("relay daemon posts cancellation during shutdown", async () => {
   const stop = new AbortController();
   const events: DaemonNodeEvent[] = [];
@@ -230,7 +487,8 @@ test("relay daemon posts cancellation during shutdown", async () => {
     logger: testLogger(),
     signal: stop.signal,
     environment: fakeEnvironment({
-      exec: async (_cmd, _args, options) => {
+      exec: async (_cmd, args, options) => {
+        if (isInventoryProbe(args)) return { exit_code: 0, stdout: "", stderr: "" };
         stop.abort();
         while (!options?.signal?.aborted) {
           await new Promise((resolve) => setTimeout(resolve, 1));
@@ -262,6 +520,146 @@ test("relay daemon posts cancellation during shutdown", async () => {
   assert.equal(events.some((event) => event.type === "run.cancelled"), true);
 });
 
+test("relay daemon bounds cancellation event retry during shutdown", async () => {
+  const stop = new AbortController();
+  let closeCount = 0;
+  let commandServed = false;
+  let cancellationAttempts = 0;
+  const command = runCommand("cmd_cancel_retry");
+  const daemon = runRelayDaemon({
+    backendUrl: "http://relay.test",
+    sandboxId: "sbx_test",
+    employeeId: "alice",
+    workspacePath: process.cwd(),
+    token: "node_token",
+    pollIntervalMs: 5,
+    shutdownGraceMs: 1_000,
+    logger: testLogger(),
+    signal: stop.signal,
+    environment: {
+      ...fakeEnvironment({
+        exec: async (_cmd, args, options) => {
+          if (isInventoryProbe(args)) return { exit_code: 0, stdout: "", stderr: "" };
+          stop.abort();
+          while (!options?.signal?.aborted) {
+            await new Promise((resolve) => setTimeout(resolve, 1));
+          }
+          return { exit_code: 143, stdout: "", stderr: "", error_message: "cancelled" };
+        },
+      }),
+      close: async () => {
+        closeCount += 1;
+      },
+    },
+    fetchFn: async (url, init) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/daemon-nodes/register") return jsonResponse({ ok: true });
+      if (path.endsWith("/commands")) {
+        if (!commandServed) {
+          commandServed = true;
+          return jsonResponse({ commands: [command] });
+        }
+        return jsonResponse({ commands: [] });
+      }
+      if (path.endsWith("/events")) {
+        const event = await jsonBody<DaemonNodeEvent>(init);
+        if (event.type === "run.cancelled") {
+          cancellationAttempts += 1;
+          return jsonResponse({ error: "temporary" }, 500);
+        }
+        return jsonResponse({ ok: true }, 202);
+      }
+      throw new Error(`unexpected URL ${url}`);
+    },
+  });
+
+  await Promise.race([
+    daemon,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("daemon did not stop")), 1_500)),
+  ]);
+
+  assert.ok(cancellationAttempts >= 1);
+  assert.equal(closeCount, 1);
+});
+
+test("relay daemon retries normal run.cancel terminal event while running", async () => {
+  const stop = new AbortController();
+  const events: DaemonNodeEvent[] = [];
+  let commandServed = false;
+  let cancelServed = false;
+  let cancellationAttempts = 0;
+  const command = runCommand("cmd_user_cancel");
+  const cancelCommand = {
+    id: "cmd_user_cancel_request",
+    type: "run.cancel",
+    commandId: command.id,
+    sessionId: command.sessionId,
+    runId: command.runId,
+    agent: command.agent,
+    mode: command.mode,
+    reason: "Cancelled from UI.",
+  } satisfies DaemonNodeCommand;
+  const daemon = runRelayDaemon({
+    backendUrl: "http://relay.test",
+    sandboxId: "sbx_test",
+    employeeId: "alice",
+    workspacePath: process.cwd(),
+    token: "node_token",
+    pollIntervalMs: 5,
+    shutdownGraceMs: 200,
+    logger: testLogger(),
+    signal: stop.signal,
+    environment: fakeEnvironment({
+      exec: async (_cmd, args, options) => {
+        if (isInventoryProbe(args)) return { exit_code: 0, stdout: "", stderr: "" };
+        while (!options?.signal?.aborted) {
+          await new Promise((resolve) => setTimeout(resolve, 1));
+        }
+        return { exit_code: 130, stdout: "", stderr: "", error_message: "cancelled" };
+      },
+    }),
+    fetchFn: async (url, init) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/daemon-nodes/register") return jsonResponse({ ok: true });
+      if (path.endsWith("/commands")) {
+        if (!commandServed) {
+          commandServed = true;
+          return jsonResponse({ commands: [command] });
+        }
+        if (!cancelServed) {
+          cancelServed = true;
+          return jsonResponse({ commands: [cancelCommand] });
+        }
+        return jsonResponse({ commands: [] });
+      }
+      if (path.endsWith("/events")) {
+        const event = await jsonBody<DaemonNodeEvent>(init);
+        events.push(event);
+        if (event.type === "run.cancelled") {
+          cancellationAttempts += 1;
+          if (cancellationAttempts === 1) return jsonResponse({ error: "temporary" }, 500);
+          stop.abort();
+        }
+        return jsonResponse({ ok: true }, 202);
+      }
+      throw new Error(`unexpected URL ${url}`);
+    },
+  });
+
+  await Promise.race([
+    daemon,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("daemon did not stop")), 2_500)),
+  ]);
+
+  assert.equal(cancellationAttempts, 2);
+  assert.deepEqual(events.flatMap((event) => event.type === "run.cancelled" ? [event.reason] : []), [
+    "Cancelled from UI.",
+    "Cancelled from UI.",
+  ]);
+});
+
 test("relay daemon rejects a second distinct run while busy", async () => {
   const stop = new AbortController();
   const events: DaemonNodeEvent[] = [];
@@ -279,7 +677,8 @@ test("relay daemon rejects a second distinct run while busy", async () => {
     logger: testLogger(),
     signal: stop.signal,
     environment: fakeEnvironment({
-      exec: async (_cmd, _args, options) => {
+      exec: async (_cmd, args, options) => {
+        if (isInventoryProbe(args)) return { exit_code: 0, stdout: "", stderr: "" };
         while (!events.some((event) => event.type === "run.failed" && event.commandId === "cmd_busy_2")) {
           await new Promise((resolve) => setTimeout(resolve, 1));
         }
@@ -312,6 +711,70 @@ test("relay daemon rejects a second distinct run while busy", async () => {
 
   assert.equal(events.some((event) => event.type === "run.failed" && event.commandId === "cmd_busy_2"), true);
   assert.equal(events.some((event) => event.type === "run.completed" && event.commandId === "cmd_busy_1"), true);
+});
+
+test("relay daemon stops while retrying a busy-command rejection event", async () => {
+  const stop = new AbortController();
+  let closeCount = 0;
+  let commandServed = false;
+  let busyRejectAttempts = 0;
+  const first = runCommand("cmd_busy_stop_1");
+  const second = { ...runCommand("cmd_busy_stop_2"), runId: "run_2", sessionId: "ses_2" } satisfies DaemonNodeCommand;
+  const daemon = runRelayDaemon({
+    backendUrl: "http://relay.test",
+    sandboxId: "sbx_test",
+    employeeId: "alice",
+    workspacePath: process.cwd(),
+    token: "node_token",
+    pollIntervalMs: 5,
+    shutdownGraceMs: 50,
+    logger: testLogger(),
+    signal: stop.signal,
+    environment: {
+      ...fakeEnvironment({
+        exec: async (_cmd, args, options) => {
+          if (isInventoryProbe(args)) return { exit_code: 0, stdout: "", stderr: "" };
+          while (!options?.signal?.aborted) {
+            await new Promise((resolve) => setTimeout(resolve, 1));
+          }
+          return { exit_code: 143, stdout: "", stderr: "", error_message: "cancelled" };
+        },
+      }),
+      close: async () => {
+        closeCount += 1;
+      },
+    },
+    fetchFn: async (url, init) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/daemon-nodes/register") return jsonResponse({ ok: true });
+      if (path.endsWith("/commands")) {
+        if (!commandServed) {
+          commandServed = true;
+          return jsonResponse({ commands: [first, second] });
+        }
+        return jsonResponse({ commands: [] });
+      }
+      if (path.endsWith("/events")) {
+        const event = await jsonBody<DaemonNodeEvent>(init);
+        if (event.type === "run.failed" && event.commandId === "cmd_busy_stop_2") {
+          busyRejectAttempts += 1;
+          stop.abort();
+          return jsonResponse({ error: "temporary" }, 500);
+        }
+        return jsonResponse({ ok: true }, 202);
+      }
+      throw new Error(`unexpected URL ${url}`);
+    },
+  });
+
+  await Promise.race([
+    daemon,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("daemon did not stop")), 500)),
+  ]);
+
+  assert.equal(busyRejectAttempts, 1);
+  assert.equal(closeCount, 1);
 });
 
 test("relay daemon can register, poll, execute, and report through a local backend server", async (t) => {

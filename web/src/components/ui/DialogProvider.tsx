@@ -175,6 +175,9 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                     <input
                       data-dialog-default
                       className="dialog-input"
+                      name="dialog-prompt"
+                      autoComplete="off"
+                      aria-labelledby="dialog-title"
                       value={inputValue}
                       placeholder={request.opts.placeholder}
                       onChange={(event) => setInputValue(event.target.value)}

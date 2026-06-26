@@ -51,13 +51,23 @@ export async function apiJson<T>(
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
   });
   const text = await response.text();
-  const parsed = text.trim() ? JSON.parse(text) as { detail?: unknown; error?: unknown } : undefined;
+  let parsed: unknown;
+  try {
+    parsed = text.trim() ? JSON.parse(text) : undefined;
+  } catch (error) {
+    if (!response.ok) {
+      throw new RelayApiError(text.trim() || response.statusText, response.status);
+    }
+    throw error;
+  }
   if (!response.ok) {
-    const message = parsed && typeof parsed.detail === "string"
-      ? parsed.detail
-      : parsed && typeof parsed.error === "string"
-        ? parsed.error
-        : response.statusText;
+    const detail = parsed && typeof parsed === "object" && "detail" in parsed ? parsed.detail : undefined;
+    const error = parsed && typeof parsed === "object" && "error" in parsed ? parsed.error : undefined;
+    const message = typeof detail === "string"
+      ? detail
+      : typeof error === "string"
+        ? error
+        : text.trim() || response.statusText;
     throw new RelayApiError(message, response.status);
   }
   return parsed as T;

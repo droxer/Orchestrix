@@ -57,7 +57,7 @@ export function dueTone(task: RelayTask, today = isoToday()): "neutral" | "warn"
   return "neutral";
 }
 
-export function isoToday(date = new Date()): string {
+export function localDateKey(date = new Date()): string {
   // Local-date key, not UTC — task due dates are entered as calendar days, so
   // toISOString() (UTC) flips "today" a day early/late for users far from UTC.
   const year = date.getFullYear();
@@ -65,6 +65,8 @@ export function isoToday(date = new Date()): string {
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
+
+export const isoToday = localDateKey;
 
 function compareTasks(left: RelayTask, right: RelayTask): number {
   return priorityRank(left.priority) - priorityRank(right.priority)

@@ -10,7 +10,7 @@ const FOCUSABLE =
  * returned ref to the panel element. Mirrors the behaviour in
  * `components/admin/Drawer.tsx` so the three drawers stay consistent.
  */
-export function useModalDrawer<T extends HTMLElement>(onClose: () => void) {
+export function useModalDrawer<T extends HTMLElement>(onClose: () => void, enabled = true) {
   const panelRef = useRef<T>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
 
@@ -23,6 +23,7 @@ export function useModalDrawer<T extends HTMLElement>(onClose: () => void) {
   });
 
   useEffect(() => {
+    if (!enabled) return;
     previouslyFocused.current = document.activeElement as HTMLElement | null;
     const initial = panelRef.current?.querySelector<HTMLElement>(FOCUSABLE);
     (initial ?? panelRef.current)?.focus();
@@ -69,7 +70,7 @@ export function useModalDrawer<T extends HTMLElement>(onClose: () => void) {
       body.style.overflow = previousOverflow;
       previouslyFocused.current?.focus?.();
     };
-  }, []);
+  }, [enabled]);
 
   return panelRef;
 }

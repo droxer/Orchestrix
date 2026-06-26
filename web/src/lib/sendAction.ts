@@ -14,3 +14,7 @@ export function chooseSendAction(input: {
   }
   return { kind: "create" };
 }
+
+export function suppressActiveSessionDuringPendingSend(action: SendAction): boolean {
+  return action.kind === "create";
+}

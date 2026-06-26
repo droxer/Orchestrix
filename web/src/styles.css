@@ -43,8 +43,7 @@
 @import "./styles/handoff.css";
 @import "./styles/composer.css";
 
-/* 4. Drawers + utility */
-@import "./styles/drawer.css";
+/* 4. Utility */
 @import "./styles/pills.css";
 
 /* 5. Authenticated pages */

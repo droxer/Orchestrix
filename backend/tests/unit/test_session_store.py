@@ -49,6 +49,52 @@ def test_local_session_store_serializes_concurrent_appends() -> None:
         assert {decision["id"] for decision in updated["decisions"]} == {f"dec_{index}" for index in range(25)}
 
 
+def test_session_store_clears_pending_decision_on_terminal_events() -> None:
+    with TemporaryDirectory() as root:
+        store = LocalSessionStore(root)
+        session = store.create_session({
+            "workspacePath": "/workspace",
+            "taskGoal": "finish review",
+            "participants": ["human", "codex"],
+        })
+        store.append_event(session["id"], relay_event("session.status", session["id"], {
+            "status": "waiting_for_human",
+            "phase": "feedback",
+            "pendingDecision": "feedback",
+        }))
+        completed = store.append_event(session["id"], relay_event("session.completed", session["id"], {
+            "outcome": "done",
+        }))
+
+        assert completed["status"] == "completed"
+        assert "pendingDecision" not in completed
+
+
+def test_session_store_clears_pending_decision_on_cancel_decision() -> None:
+    with TemporaryDirectory() as root:
+        store = LocalSessionStore(root)
+        session = store.create_session({
+            "workspacePath": "/workspace",
+            "taskGoal": "cancel review",
+            "participants": ["human", "codex"],
+        })
+        store.append_event(session["id"], relay_event("session.status", session["id"], {
+            "status": "waiting_for_human",
+            "phase": "feedback",
+            "pendingDecision": "feedback",
+        }))
+        cancelled = store.append_event(session["id"], relay_event("human.decision", session["id"], {
+            "decision": {
+                "id": "dec_cancel",
+                "kind": "cancel",
+                "createdAt": "2026-06-20T00:00:00.000Z",
+            }
+        }))
+
+        assert cancelled["status"] == "cancelled"
+        assert "pendingDecision" not in cancelled
+
+
 def test_database_session_store_persists_events_and_artifacts() -> None:
     with TemporaryDirectory() as root:
         store = DatabaseSessionStore(f"sqlite:///{root}/relay.db", root, create_schema=True)

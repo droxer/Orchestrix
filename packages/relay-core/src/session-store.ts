@@ -433,6 +433,7 @@ export function materializeEvents(events: RelayEvent[]): RelaySession {
       if (event.decision.kind === "cancel") {
         session.status = "cancelled";
         session.phase = "cancelled";
+        delete session.pendingDecision;
       }
     } else if (event.type === "review.verdict") {
       session.reviewVerdict = event.verdict;
@@ -442,11 +443,13 @@ export function materializeEvents(events: RelayEvent[]): RelaySession {
       session.phase = "completed";
       session.finalOutcome = event.outcome;
       session.currentAgent = undefined;
+      delete session.pendingDecision;
     } else if (event.type === "session.failed") {
       session.status = "failed";
       session.phase = "failed";
       session.finalOutcome = event.outcome;
       session.currentAgent = undefined;
+      delete session.pendingDecision;
     } else if (event.type === "session.archived") {
       session.archived = true;
     } else if (event.type === "session.renamed") {

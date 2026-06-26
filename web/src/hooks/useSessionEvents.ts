@@ -1,6 +1,9 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { RelaySession } from "../types";
+import { applySessionEvent } from "../lib/sessionEvents";
+import { mergeSessionEventIntoSessions } from "../lib/sessionEventMerge";
+import { lastSessionEventId, sessionEventsUrl } from "../lib/sessionEventStream";
 
 const SESSIONS_KEY = ["relay", "sessions"] as const;
 
@@ -18,7 +21,10 @@ export function useSessionEvents(sessionId: string | undefined, enabled: boolean
   useEffect(() => {
     if (!sessionId || !enabled || typeof window === "undefined") return;
 
-    const source = new EventSource(`/sessions/${encodeURIComponent(sessionId)}/events`, {
+    const source = new EventSource(sessionEventsUrl(
+      sessionId,
+      lastSessionEventId(queryClient.getQueryData<RelaySession[]>(SESSIONS_KEY), sessionId),
+    ), {
       withCredentials: true,
     });
 
@@ -28,17 +34,10 @@ export function useSessionEvents(sessionId: string | undefined, enabled: boolean
 
     const mergeEvent = (event: RelayEvent) => {
       if (seen.has(event.id)) return;
-      seen.add(event.id);
       queryClient.setQueryData<RelaySession[]>(SESSIONS_KEY, (sessions) => {
-        if (!sessions) return sessions;
-        let changed = false;
-        const next = sessions.map((session) => {
-          if (session.id !== sessionId) return session;
-          if (session.events.some((existing) => existing.id === event.id)) return session;
-          changed = true;
-          return { ...session, events: [...session.events, event] };
-        });
-        return changed ? next : sessions;
+        const result = mergeSessionEventIntoSessions(sessions, sessionId, event, applySessionEvent);
+        if (result.consumed) seen.add(event.id);
+        return result.sessions;
       });
     };
 

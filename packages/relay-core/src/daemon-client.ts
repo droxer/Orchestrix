@@ -218,11 +218,16 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
       reject(new Error("Relay daemon request cancelled."));
       return;
     }
-    const timeout = setTimeout(resolve, ms);
-    signal?.addEventListener("abort", () => {
+    const onAbort = () => {
       clearTimeout(timeout);
+      signal?.removeEventListener("abort", onAbort);
       reject(new Error("Relay daemon request cancelled."));
-    }, { once: true });
+    };
+    const timeout = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
   });
 }
 

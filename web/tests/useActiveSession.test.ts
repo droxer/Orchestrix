@@ -19,6 +19,14 @@ describe("pickInitialActiveSessionId", () => {
     assert.equal(pickInitialActiveSessionId(null, sessions), "s2");
   });
 
+  it("falls back to the most recently updated non-archived session", () => {
+    const sessions = [
+      { id: "created-newer", archived: false, createdAt: "2026-06-10", updatedAt: "2026-06-10T00:00:00.000Z" },
+      { id: "updated-newer", archived: false, createdAt: "2026-06-01", updatedAt: "2026-06-20T00:00:00.000Z" },
+    ];
+    assert.equal(pickInitialActiveSessionId(null, sessions), "updated-newer");
+  });
+
   it("skips archived sessions on fallback", () => {
     const sessions = [
       { id: "s1", archived: false, createdAt: "2026-06-01" },

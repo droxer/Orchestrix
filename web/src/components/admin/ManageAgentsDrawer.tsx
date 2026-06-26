@@ -139,6 +139,7 @@ export function ManageAgentsDrawer({ open, onClose, node, onUpdated }: ManageAge
                 </div>
                 <label className="adm-agent-toggle-switch">
                   <input
+                    name={`node-${node.id}-${agent}-enabled`}
                     type="checkbox"
                     checked={isEnabled}
                     onChange={() => toggle(agent)}

@@ -207,26 +207,6 @@
       "custom": "自定义"
     }
   },
-  "settings": {
-    "employee_workspace": "员工工作区",
-    "close": "关闭",
-    "registered_nodes": "已注册守护节点",
-    "no_nodes": "暂无已注册的守护节点。",
-    "sandbox_token": "沙盒令牌",
-    "save_token": "保存令牌",
-    "token_hint": "已在此浏览器中为所选员工本地保存。",
-    "token_placeholder": "tok_…",
-    "live_sandbox": "活跃沙盒",
-    "no_sandbox": "未选择沙盒",
-    "workspace_label": "工作区",
-    "workspace_none": "无",
-    "node_label": "节点",
-    "run_label": "运行",
-    "queued": "排队中",
-    "not_registered": "未注册",
-    "cancel": "取消",
-    "idle": "空闲"
-  },
   "admin": {
     "title": "管理控制台",
     "sub": "守护操作",

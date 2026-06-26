@@ -207,26 +207,6 @@
       "custom": "自訂"
     }
   },
-  "settings": {
-    "employee_workspace": "員工工作區",
-    "close": "關閉",
-    "registered_nodes": "已登錄守護節點",
-    "no_nodes": "尚無已登錄的守護節點。",
-    "sandbox_token": "沙盒憑證",
-    "save_token": "儲存憑證",
-    "token_hint": "已在此瀏覽器中為選定員工本地儲存。",
-    "token_placeholder": "tok_…",
-    "live_sandbox": "活躍沙盒",
-    "no_sandbox": "未選取沙盒",
-    "workspace_label": "工作區",
-    "workspace_none": "無",
-    "node_label": "節點",
-    "run_label": "執行",
-    "queued": "排隊中",
-    "not_registered": "未登錄",
-    "cancel": "取消",
-    "idle": "閒置"
-  },
   "admin": {
     "title": "管理主控台",
     "sub": "守護操作",

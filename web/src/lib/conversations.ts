@@ -15,6 +15,24 @@ export function myConversationSessions(
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
+export function pickActiveConversationSession(input: {
+  conversations: readonly RelaySession[];
+  selectedSessionId?: string;
+  activeSessionId: string | null;
+  composingNew: boolean;
+}): RelaySession | undefined {
+  if (input.composingNew) return undefined;
+  if (input.selectedSessionId) {
+    const selected = input.conversations.find((session) => session.id === input.selectedSessionId);
+    if (selected) return selected;
+  }
+  if (input.activeSessionId) {
+    const active = input.conversations.find((session) => session.id === input.activeSessionId);
+    if (active) return active;
+  }
+  return input.conversations[0];
+}
+
 // The human-facing label for a conversation: the editable title when set,
 // otherwise the originating task goal.
 export function conversationLabel(session: Labelled): string {

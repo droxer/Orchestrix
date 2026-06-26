@@ -172,8 +172,19 @@ _STREAM_MAX_SECONDS = 60 * 30
 
 
 def _sse_frame(data: dict[str, Any], *, event: str | None = None) -> str:
-    prefix = f"event: {event}\n" if event else ""
+    event_id = data.get("id")
+    prefix = f"id: {event_id}\n" if isinstance(event_id, str) and event_id else ""
+    prefix += f"event: {event}\n" if event else ""
     return f"{prefix}data: {json.dumps(data)}\n\n"
+
+
+def _event_start_index(events: list[Any], after_event_id: str | None) -> int:
+    if not after_event_id:
+        return 0
+    for index, event in enumerate(events):
+        if isinstance(event, dict) and event.get("id") == after_event_id:
+            return index + 1
+    return 0
 
 
 @router.get("/sessions/{session_id}/events")
@@ -189,7 +200,8 @@ async def session_events(session_id: str, request: Request, ctx: AppContextDep) 
         # active conversation update at push latency instead of the list poll's
         # cadence. The store rewrites the snapshot on every append, and
         # get_session reads it fresh, so new events are visible here.
-        sent = 0
+        after_event_id = request.query_params.get("after") or request.headers.get("last-event-id")
+        sent: int | None = None
         start = time.monotonic()
         last_heartbeat = start
         while True:
@@ -200,6 +212,8 @@ async def session_events(session_id: str, request: Request, ctx: AppContextDep) 
             except HTTPException:
                 return
             events = session.get("events", [])
+            if sent is None:
+                sent = _event_start_index(events, after_event_id)
             if len(events) > sent:
                 for event in events[sent:]:
                     yield _sse_frame(event)

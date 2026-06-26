@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { chooseSendAction } from "../src/lib/sendAction.js";
+import { chooseSendAction, suppressActiveSessionDuringPendingSend } from "../src/lib/sendAction.js";
 
 describe("chooseSendAction", () => {
   it("appends when active session exists and is open", () => {
@@ -27,5 +27,10 @@ describe("chooseSendAction", () => {
   it("creates when active session id no longer maps to a session", () => {
     const action = chooseSendAction({ activeSessionId: "s_gone", session: undefined });
     assert.deepEqual(action, { kind: "create" });
+  });
+
+  it("suppresses the prior active transcript while a new conversation is pending", () => {
+    assert.equal(suppressActiveSessionDuringPendingSend({ kind: "create" }), true);
+    assert.equal(suppressActiveSessionDuringPendingSend({ kind: "append", sessionId: "s1" }), false);
   });
 });

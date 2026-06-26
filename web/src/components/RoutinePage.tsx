@@ -115,6 +115,10 @@ function RoutineFiltersBar({ filters, onChange }: { filters: RoutineFilters; onC
         <ActionSearch size={15} aria-hidden="true" />
         <input
           className="backlog-filter-search"
+          name="routine-query"
+          type="search"
+          autoComplete="off"
+          spellCheck={false}
           value={filters.query}
           placeholder={t("routine.search")}
           aria-label={t("routine.search")}
@@ -128,20 +132,20 @@ function RoutineFiltersBar({ filters, onChange }: { filters: RoutineFilters; onC
       </div>
       {expanded ? (
         <div className="backlog-filter-secondary">
-          <select value={filters.type} aria-label={t("routine.type")} onChange={(event) => onChange({ ...filters, type: event.target.value as RoutineFilters["type"] })}>
+          <select name="routine-type-filter" value={filters.type} aria-label={t("routine.type")} onChange={(event) => onChange({ ...filters, type: event.target.value as RoutineFilters["type"] })}>
             <option value="all">{t("routine.all_types")}</option>
             {TASK_ROUTINE_TYPES.map((type) => <option key={type} value={type}>{t(`routine.types.${type}`)}</option>)}
           </select>
-          <select value={filters.cadence} aria-label={t("routine.cadence")} onChange={(event) => onChange({ ...filters, cadence: event.target.value as RoutineFilters["cadence"] })}>
+          <select name="routine-cadence-filter" value={filters.cadence} aria-label={t("routine.cadence")} onChange={(event) => onChange({ ...filters, cadence: event.target.value as RoutineFilters["cadence"] })}>
             <option value="all">{t("routine.all_cadences")}</option>
             {TASK_ROUTINE_CADENCES.map((cadence) => <option key={cadence} value={cadence}>{t(`routine.cadences.${cadence}`)}</option>)}
           </select>
-          <select value={filters.agent} aria-label={t("backlog.agent")} onChange={(event) => onChange({ ...filters, agent: event.target.value as RoutineFilters["agent"] })}>
+          <select name="routine-agent-filter" value={filters.agent} aria-label={t("backlog.agent")} onChange={(event) => onChange({ ...filters, agent: event.target.value as RoutineFilters["agent"] })}>
             <option value="all">{t("backlog.all_agents")}</option>
             {AGENT_NAMES.map((agent) => <option key={agent} value={agent}>{agent}</option>)}
           </select>
-          <input value={filters.assignee} placeholder={t("backlog.assignee_filter")} aria-label={t("backlog.assignee_filter")} onChange={(event) => onChange({ ...filters, assignee: event.target.value })} />
-          <select value={filters.state} aria-label={t("routine.state")} onChange={(event) => onChange({ ...filters, state: event.target.value as RoutineFilters["state"] })}>
+          <input name="routine-assignee-filter" autoComplete="off" value={filters.assignee} placeholder={t("backlog.assignee_filter")} aria-label={t("backlog.assignee_filter")} onChange={(event) => onChange({ ...filters, assignee: event.target.value })} />
+          <select name="routine-state-filter" value={filters.state} aria-label={t("routine.state")} onChange={(event) => onChange({ ...filters, state: event.target.value as RoutineFilters["state"] })}>
             <option value="all">{t("routine.all_states")}</option>
             <option value="enabled">{t("routine.enabled")}</option>
             <option value="disabled">{t("routine.disabled")}</option>
@@ -208,6 +212,7 @@ function RoutineCard({
       <div className="backlog-task-actions" role="group" aria-label={t("backlog.actions")}>
         <div className="backlog-action-group" aria-label={t("backlog.actions_dispatch")}>
           <select
+            name={`routine-${task.id}-agent-card`}
             value={task.assignedAgent ?? ""}
             aria-label={t("backlog.assign_agent")}
             onChange={(event) => {
@@ -277,38 +282,38 @@ function RoutineDrawer({
         </header>
         <label>
           <span>{t("backlog.title_field")}</span>
-          <input required value={form.title} onChange={(event) => onChange({ ...form, title: event.target.value })} />
+          <input name="routine-title" required value={form.title} onChange={(event) => onChange({ ...form, title: event.target.value })} />
         </label>
         <label>
           <span>{t("backlog.description")}</span>
-          <textarea value={form.description} rows={5} onChange={(event) => onChange({ ...form, description: event.target.value })} />
+          <textarea name="routine-description" value={form.description} rows={5} onChange={(event) => onChange({ ...form, description: event.target.value })} />
         </label>
         <div className="backlog-form-grid">
           <label>
             <span>{t("routine.type")}</span>
-            <select value={form.routineType} onChange={(event) => onChange({ ...form, routineType: event.target.value as TaskRoutineType })}>
+            <select name="routine-type" value={form.routineType} onChange={(event) => onChange({ ...form, routineType: event.target.value as TaskRoutineType })}>
               {TASK_ROUTINE_TYPES.map((type) => <option key={type} value={type}>{t(`routine.types.${type}`)}</option>)}
             </select>
           </label>
           <label>
             <span>{t("routine.cadence")}</span>
-            <select value={form.routineCadence} onChange={(event) => onChange({ ...form, routineCadence: event.target.value as TaskRoutineCadence })}>
+            <select name="routine-cadence" value={form.routineCadence} onChange={(event) => onChange({ ...form, routineCadence: event.target.value as TaskRoutineCadence })}>
               {TASK_ROUTINE_CADENCES.map((cadence) => <option key={cadence} value={cadence}>{t(`routine.cadences.${cadence}`)}</option>)}
             </select>
           </label>
           <label>
             <span>{t("routine.next_run")}</span>
-            <input type="date" value={form.routineNextRunDate} onChange={(event) => onChange({ ...form, routineNextRunDate: event.target.value })} />
+            <input name="routine-next-run-date" type="date" value={form.routineNextRunDate} onChange={(event) => onChange({ ...form, routineNextRunDate: event.target.value })} />
           </label>
           <label>
             <span>{t("backlog.priority")}</span>
-            <select value={form.priority} onChange={(event) => onChange({ ...form, priority: event.target.value as TaskPriority })}>
+            <select name="routine-priority" value={form.priority} onChange={(event) => onChange({ ...form, priority: event.target.value as TaskPriority })}>
               {TASK_PRIORITIES.map((priority) => <option key={priority} value={priority}>{t(`backlog.priorities.${priority}`)}</option>)}
             </select>
           </label>
           <label>
             <span>{t("backlog.agent")}</span>
-            <select value={form.assignedAgent} onChange={(event) => onChange({ ...form, assignedAgent: event.target.value as "" | AgentName })}>
+            <select name="routine-agent" value={form.assignedAgent} onChange={(event) => onChange({ ...form, assignedAgent: event.target.value as "" | AgentName })}>
               <option value="">{t("backlog.no_agent")}</option>
               {AGENT_NAMES.map((agent) => <option key={agent} value={agent}>{agent}</option>)}
             </select>
@@ -316,13 +321,13 @@ function RoutineDrawer({
         </div>
         <label className="routine-toggle">
           <span>{t("routine.enabled")}</span>
-          <input type="checkbox" checked={form.routineEnabled} onChange={(event) => onChange({ ...form, routineEnabled: event.target.checked })} />
+          <input name="routine-enabled" type="checkbox" checked={form.routineEnabled} onChange={(event) => onChange({ ...form, routineEnabled: event.target.checked })} />
         </label>
         <label>
           <span>{t("backlog.assignee")}</span>
           <div className="backlog-assignee-input">
             <ActionAddPerson size={15} />
-            <input list="routine-employees" value={form.assigneeEmployeeId} onChange={(event) => onChange({ ...form, assigneeEmployeeId: event.target.value })} />
+            <input name="routine-assignee" list="routine-employees" value={form.assigneeEmployeeId} onChange={(event) => onChange({ ...form, assigneeEmployeeId: event.target.value })} />
             <datalist id="routine-employees">
               {employees.map((employee) => <option key={employee} value={employee} />)}
             </datalist>

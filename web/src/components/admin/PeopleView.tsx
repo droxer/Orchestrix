@@ -128,7 +128,10 @@ export function PeopleView({
         <Search size={16} aria-hidden="true" />
         <input
           className="adm-search-input"
+          name="admin-people-search"
           type="search"
+          autoComplete="off"
+          spellCheck={false}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder={t("admin.v2.search_people_placeholder")}

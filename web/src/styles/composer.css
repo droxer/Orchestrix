@@ -43,7 +43,8 @@
   box-shadow: var(--shadow-lift);
 }
 
-.agent-picker button {
+.agent-picker button,
+.agent-picker [role="option"] {
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr);
   align-items: center;
@@ -57,7 +58,9 @@
 }
 
 .agent-picker button:hover,
-.agent-picker button.active {
+.agent-picker button.active,
+.agent-picker [role="option"]:hover,
+.agent-picker [role="option"].active {
   background: var(--color-surface-strong);
 }
 
@@ -175,9 +178,10 @@
   width: min(320px, 100%);
 }
 
-.mention-popover button {
+.mention-popover [role="option"] {
   grid-template-columns: 28px minmax(0, 1fr) auto;
   gap: var(--space-sm);
+  cursor: pointer;
 }
 
 .mention-popover .agent-avatar {
@@ -191,7 +195,7 @@
   font: var(--type-label);
 }
 
-.mention-popover button.active .mention-role {
+.mention-popover [role="option"].active .mention-role {
   color: var(--color-ink);
 }
 

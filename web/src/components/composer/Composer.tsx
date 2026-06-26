@@ -5,6 +5,7 @@ import { ActionSend, ActionStop } from "../icons";
 import { ModeToggle } from "./ModeToggle";
 import { MentionPopover } from "./MentionPopover";
 import { useComposer } from "../../hooks/useComposer";
+import { boundedMentionIndex, mentionOptionId, nextMentionIndex } from "../../lib/mentions";
 
 export type ComposerHandle = {
   clear: () => void;
@@ -34,6 +35,8 @@ const ComposerView = forwardRef<ComposerHandle, {
     composerText, setComposerText, mentionOpen, setMentionOpen, mentionIndex, setMentionIndex,
     setIsComposing, textareaRef, filteredMentionAgents, syncMentionState, insertMention,
   } = composer;
+  const hasMentionOptions = mentionOpen && filteredMentionAgents.length > 0;
+  const activeMentionIndex = boundedMentionIndex(mentionIndex, filteredMentionAgents.length);
 
   useImperativeHandle(ref, () => ({
     clear: () => {
@@ -48,7 +51,7 @@ const ComposerView = forwardRef<ComposerHandle, {
   return (
     <form className="composer" onSubmit={(e) => { e.preventDefault(); onSend(); }}>
       <div className="composer-input-wrap">
-        {mentionOpen && filteredMentionAgents.length > 0 ? <MentionPopover filteredAgents={filteredMentionAgents} mentionIndex={mentionIndex} insertMention={insertMention} /> : null}
+        {hasMentionOptions ? <MentionPopover filteredAgents={filteredMentionAgents} mentionIndex={activeMentionIndex} insertMention={insertMention} /> : null}
         <div className="composer-input">
           <textarea
             ref={textareaRef}
@@ -57,9 +60,9 @@ const ComposerView = forwardRef<ComposerHandle, {
             aria-label={selectedEmployee
               ? t("composer.aria_label", { employee: selectedEmployee, agent: activeAgent })
               : t("composer.aria_label_no_employee", { agent: activeAgent })}
-            aria-controls={mentionOpen ? "mention-popover" : undefined}
-            aria-expanded={mentionOpen}
-            aria-activedescendant={mentionOpen ? `mention-option-${mentionIndex}` : undefined}
+            aria-controls={hasMentionOptions ? "mention-popover" : undefined}
+            aria-expanded={hasMentionOptions}
+            aria-activedescendant={hasMentionOptions ? mentionOptionId(activeMentionIndex) : undefined}
             name="message"
             placeholder={selectedEmployee
               ? t("composer.placeholder")
@@ -73,9 +76,9 @@ const ComposerView = forwardRef<ComposerHandle, {
             onBlur={() => setMentionOpen(false)}
             onKeyDown={(e) => {
               if (mentionOpen && filteredMentionAgents.length > 0) {
-                if (e.key === "ArrowDown") { e.preventDefault(); setMentionIndex((i) => (i + 1) % filteredMentionAgents.length); return; }
-                if (e.key === "ArrowUp") { e.preventDefault(); setMentionIndex((i) => (i - 1 + filteredMentionAgents.length) % filteredMentionAgents.length); return; }
-                if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); insertMention(filteredMentionAgents[mentionIndex]); return; }
+                if (e.key === "ArrowDown") { e.preventDefault(); setMentionIndex((i) => nextMentionIndex(i, filteredMentionAgents.length, 1)); return; }
+                if (e.key === "ArrowUp") { e.preventDefault(); setMentionIndex((i) => nextMentionIndex(i, filteredMentionAgents.length, -1)); return; }
+                if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); insertMention(filteredMentionAgents[activeMentionIndex]); return; }
                 if (e.key === "Escape") { e.preventDefault(); setMentionOpen(false); return; }
               }
               if (e.key === "Tab" && e.shiftKey) {

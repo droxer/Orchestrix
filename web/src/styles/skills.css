@@ -9,15 +9,10 @@
 
 @media (max-width: 820px) {
   .messenger-shell[data-route="mcp"],
-  .messenger-shell[data-route="mcp"][data-settings="open"],
   .messenger-shell[data-route="channels"],
-  .messenger-shell[data-route="channels"][data-settings="open"],
   .messenger-shell[data-route="backlog"],
-  .messenger-shell[data-route="backlog"][data-settings="open"],
   .messenger-shell[data-route="routine"],
-  .messenger-shell[data-route="routine"][data-settings="open"],
-  .messenger-shell[data-route="skills"],
-  .messenger-shell[data-route="skills"][data-settings="open"] {
+  .messenger-shell[data-route="skills"] {
     grid-template-columns: 1fr;
     grid-template-rows: auto minmax(0, 1fr);
   }

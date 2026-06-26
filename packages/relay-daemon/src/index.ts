@@ -139,8 +139,18 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
   setHealth("starting", { employeeId, workspacePath, backendUrl, sandboxMode });
   const activeRuns = new Map<string, { controller: AbortController; promise: Promise<void> }>();
   const shutdownGraceMs = options.shutdownGraceMs ?? positiveIntEnv("RELAY_DAEMON_SHUTDOWN_GRACE_MS") ?? 10_000;
+  const shutdownController = new AbortController();
+  const runtimeSignal = options.signal
+    ? AbortSignal.any([options.signal, shutdownController.signal])
+    : shutdownController.signal;
   let stopping = false;
   let shutdownPromise: Promise<void> | undefined;
+  if (runtimeSignal.aborted) {
+    setHealth("stopping", { signal: "external" });
+    await environment.close();
+    setHealth("stopped");
+    return;
+  }
   const agentHealth = await discoverDaemonAgentHealth(environment, logger, sandboxId, options.signal);
   const supportedAgents = readyAgents(agentHealth);
   const agentInventory = await discoverAgentInventory(environment.execStream, options.signal);
@@ -158,25 +168,26 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
   const register = async (): Promise<void> => {
     const url = `${backendUrl}/daemon-nodes/register`;
     try {
-      await postJson(fetchFn, url, buildRegistration());
+      await postJson(fetchFn, url, buildRegistration(), undefined, runtimeSignal);
     } catch (error) {
       if (
         error instanceof DaemonHttpError &&
         error.status === 400 &&
         error.message.includes("employeeId is required for unprovisioned daemon node registration")
       ) {
-        await postJson(fetchFn, url, buildRegistration(true));
+        await postJson(fetchFn, url, buildRegistration(true), undefined, runtimeSignal);
         return;
       }
       throw error;
     }
   };
   if (options.preflight !== false) {
-    await runStartupPreflight({ backendUrl, sandboxId, token, workspacePath, fetchFn, logger });
+    await runStartupPreflight({ backendUrl, sandboxId, token, workspacePath, fetchFn, logger, signal: runtimeSignal });
   }
   const shutdown = (signal: NodeJS.Signals | "external", exitProcess: boolean): void => {
     shutdownPromise ??= (async () => {
       stopping = true;
+      if (!shutdownController.signal.aborted) shutdownController.abort(`Daemon received ${signal}.`);
       setHealth("stopping", { signal });
       logger.info("daemon stopping", { sandboxId, signal });
       for (const active of activeRuns.values()) active.controller.abort(`Daemon received ${signal}.`);
@@ -184,7 +195,13 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
         Promise.allSettled([...activeRuns.values()].map((active) => active.promise)),
         delay(shutdownGraceMs),
       ]);
-      await postJson(fetchFn, `${backendUrl}/daemon-nodes/register`, buildRegistration(undefined, "stopped")).catch((error: unknown) => {
+      await postJson(
+        fetchFn,
+        `${backendUrl}/daemon-nodes/register`,
+        buildRegistration(undefined, "stopped"),
+        undefined,
+        AbortSignal.timeout(SHUTDOWN_REGISTRATION_TIMEOUT_MS),
+      ).catch((error: unknown) => {
         logger.warn("daemon stopped registration failed", { sandboxId, error: error instanceof Error ? error.message : String(error) });
       });
       await environment.close();
@@ -192,118 +209,167 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
       if (exitProcess) process.exit(0);
     })();
   };
-  process.once("SIGINT", () => shutdown("SIGINT", true));
-  process.once("SIGTERM", () => shutdown("SIGTERM", true));
-  options.signal?.addEventListener("abort", () => shutdown("external", false), { once: true });
-  await withBackendReconnect(register, logger, { sandboxId, what: "registration" });
-  let lastRegisteredAt = Date.now();
-  logger.info("daemon registered", { sandboxId, employeeId, workspacePath, backendUrl, logPath: logger.logPath });
-  setHealth("registered");
-  console.log(`Relay daemon registered sandbox ${sandboxId} with backend at ${backendUrl} (sandbox: ${sandboxMode})`);
-  if (logger.logPath) console.log(`Relay daemon log: ${logger.logPath}`);
-  if (tokenResolution.source === "generated" && tokenResolution.path) {
-    logger.info("daemon generated token", { sandboxId, employeeId, path: tokenResolution.path });
-    console.log(`Relay daemon generated token for ${employeeId}: ${tokenResolution.path}`);
+  const handleSigint = (): void => shutdown("SIGINT", true);
+  const handleSigterm = (): void => shutdown("SIGTERM", true);
+  const handleExternalAbort = (): void => shutdown("external", false);
+  const cleanupShutdownListeners = (): void => {
+    process.off("SIGINT", handleSigint);
+    process.off("SIGTERM", handleSigterm);
+    options.signal?.removeEventListener("abort", handleExternalAbort);
+  };
+  process.once("SIGINT", handleSigint);
+  process.once("SIGTERM", handleSigterm);
+  options.signal?.addEventListener("abort", handleExternalAbort, { once: true });
+  if (options.signal?.aborted) shutdown("external", false);
+  if (stopping) {
+    try {
+      await shutdownPromise;
+    } finally {
+      cleanupShutdownListeners();
+    }
+    return;
   }
+  try {
+    const reconnectControl = { signal: runtimeSignal, shouldStop: () => stopping };
+    await withBackendReconnect(register, logger, { sandboxId, what: "registration" }, reconnectControl);
+    let lastRegisteredAt = Date.now();
+    logger.info("daemon registered", { sandboxId, employeeId, workspacePath, backendUrl, logPath: logger.logPath });
+    setHealth("registered");
+    console.log(`Relay daemon registered sandbox ${sandboxId} with backend at ${backendUrl} (sandbox: ${sandboxMode})`);
+    if (logger.logPath) console.log(`Relay daemon log: ${logger.logPath}`);
+    if (tokenResolution.source === "generated" && tokenResolution.path) {
+      logger.info("daemon generated token", { sandboxId, employeeId, path: tokenResolution.path });
+      console.log(`Relay daemon generated token for ${employeeId}: ${tokenResolution.path}`);
+    }
 
-  setHealth("polling");
-  while (!stopping) {
-    const body = await withBackendReconnect(async () => {
-      if (stopping) return { commands: [] };
-      // Heartbeat re-registration keeps a restarted backend current on this
-      // node's agent roster and busy/ready status without waiting for a poll
-      // rejection.
-      if (Date.now() - lastRegisteredAt >= heartbeatIntervalMs) {
-        await register();
-        lastRegisteredAt = Date.now();
-      }
-      const response = await getJson(fetchFn, `${backendUrl}/daemon-nodes/${encodeURIComponent(sandboxId)}/commands`, token);
-      if (!response.ok) {
-        // The backend may have restarted with fresh state or demoted this node;
-        // re-register before treating the rejection as fatal.
-        const detail = `Command poll failed: ${response.status} ${await response.text()}`;
-        logger.warn("command poll rejected; re-registering", { sandboxId, error: detail });
-        await register();
-        lastRegisteredAt = Date.now();
-        logger.info("daemon re-registered", { sandboxId });
-        return { commands: [] };
-      }
-      return await response.json() as { commands?: DaemonNodeCommand[] };
-    }, logger, { sandboxId, what: "command poll" });
-    if (stopping) break;
-    for (const command of body.commands ?? []) {
-      if (command.type === "run.start") {
-        if (activeRuns.has(command.id)) {
-          logger.warn("duplicate command ignored", commandLogFields(sandboxId, command));
-          continue;
+    setHealth("polling");
+    const cancellationTerminalEventSignal = (): AbortSignal | undefined =>
+      stopping ? AbortSignal.timeout(SHUTDOWN_TERMINAL_EVENT_TIMEOUT_MS) : undefined;
+    while (!stopping) {
+      const body = await withBackendReconnect(async () => {
+        if (stopping) return { commands: [] };
+        // Heartbeat re-registration keeps a restarted backend current on this
+        // node's agent roster and busy/ready status without waiting for a poll
+        // rejection.
+        if (Date.now() - lastRegisteredAt >= heartbeatIntervalMs) {
+          await register();
+          lastRegisteredAt = Date.now();
         }
-        if (activeRuns.size > 0) {
-          const detail = "Daemon node already has an active run; this node runs one command at a time.";
-          logger.warn("command rejected while daemon busy", { ...commandLogFields(sandboxId, command), error: detail });
-          await postJsonWithRetry(fetchFn, `${backendUrl}/daemon-nodes/${encodeURIComponent(sandboxId)}/events`, {
-            type: "run.failed",
-            commandId: command.id,
+        const response = await getJson(fetchFn, `${backendUrl}/daemon-nodes/${encodeURIComponent(sandboxId)}/commands`, token, runtimeSignal);
+        if (!response.ok) {
+          // The backend may have restarted with fresh state or demoted this node;
+          // re-register before treating the rejection as fatal.
+          const detail = `Command poll failed: ${response.status} ${await response.text()}`;
+          logger.warn("command poll rejected; re-registering", { sandboxId, error: detail });
+          await register();
+          lastRegisteredAt = Date.now();
+          logger.info("daemon re-registered", { sandboxId });
+          return { commands: [] };
+        }
+        return await response.json() as { commands?: DaemonNodeCommand[] };
+      }, logger, { sandboxId, what: "command poll" }, reconnectControl);
+      if (stopping) break;
+      for (const command of body.commands ?? []) {
+        if (command.type === "run.start") {
+          if (activeRuns.has(command.id)) {
+            logger.warn("duplicate command ignored", commandLogFields(sandboxId, command));
+            continue;
+          }
+          if (activeRuns.size > 0) {
+            const detail = "Daemon node already has an active run; this node runs one command at a time.";
+            logger.warn("command rejected while daemon busy", { ...commandLogFields(sandboxId, command), error: detail });
+            await postJsonWithRetry(fetchFn, `${backendUrl}/daemon-nodes/${encodeURIComponent(sandboxId)}/events`, {
+              type: "run.failed",
+              commandId: command.id,
+              sessionId: command.sessionId,
+              runId: command.runId,
+              agent: command.agent,
+              mode: command.mode,
+              error: detail,
+              exitCode: 1,
+            } satisfies DaemonNodeEvent, token, runtimeSignal);
+            continue;
+          }
+          logger.info("command received", commandLogFields(sandboxId, command));
+          setHealth("busy", commandLogFields(sandboxId, command));
+          const controller = new AbortController();
+          const promise = Promise.resolve().then(() =>
+            executeCommand(
+              backendUrl,
+              sandboxId,
+              token,
+              command,
+              fetchFn,
+              logger,
+              workspacePath,
+              environment,
+              controller.signal,
+              cancellationTerminalEventSignal,
+            ),
+          ).catch(async (error: unknown) => {
+            const message = error instanceof Error ? error.message : String(error);
+            logger.error("command failed before completion", { ...commandLogFields(sandboxId, command), error: message });
+            const eventUrl = `${backendUrl}/daemon-nodes/${encodeURIComponent(sandboxId)}/events`;
+            const event = controller.signal.aborted
+              ? {
+                  type: "run.cancelled",
+                  commandId: command.id,
+                  sessionId: command.sessionId,
+                  runId: command.runId,
+                  agent: command.agent,
+                  mode: command.mode,
+                  reason: typeof controller.signal.reason === "string" ? controller.signal.reason : "Daemon run cancelled.",
+                } satisfies DaemonNodeEvent
+              : {
+                  type: "run.failed",
+                  commandId: command.id,
+                  sessionId: command.sessionId,
+                  runId: command.runId,
+                  agent: command.agent,
+                  mode: command.mode,
+                  error: message,
+                } satisfies DaemonNodeEvent;
+            await postJsonWithRetry(
+              fetchFn,
+              eventUrl,
+              event,
+              token,
+              controller.signal.aborted ? cancellationTerminalEventSignal() : controller.signal,
+            ).catch((postError: unknown) => {
+              logger.error("terminal event post failed", {
+                ...commandLogFields(sandboxId, command),
+                error: postError instanceof Error ? postError.message : String(postError),
+              });
+            });
+          }).finally(() => {
+            activeRuns.delete(command.id);
+            if (!stopping) setHealth("polling");
+          });
+          activeRuns.set(command.id, { controller, promise });
+        } else if (command.type === "run.cancel") {
+          logger.info("cancel command received", {
+            sandboxId,
+            commandId: command.commandId,
             sessionId: command.sessionId,
             runId: command.runId,
             agent: command.agent,
             mode: command.mode,
-            error: detail,
-            exitCode: 1,
-          } satisfies DaemonNodeEvent, token);
-          continue;
-        }
-        logger.info("command received", commandLogFields(sandboxId, command));
-        setHealth("busy", commandLogFields(sandboxId, command));
-        const controller = new AbortController();
-        const promise = executeCommand(backendUrl, sandboxId, token, command, fetchFn, logger, workspacePath, environment, controller.signal).catch(async (error: unknown) => {
-          const message = error instanceof Error ? error.message : String(error);
-          logger.error("command failed before completion", { ...commandLogFields(sandboxId, command), error: message });
-          const eventUrl = `${backendUrl}/daemon-nodes/${encodeURIComponent(sandboxId)}/events`;
-          const event = controller.signal.aborted
-            ? {
-                type: "run.cancelled",
-                commandId: command.id,
-                sessionId: command.sessionId,
-                runId: command.runId,
-                agent: command.agent,
-                mode: command.mode,
-                reason: typeof controller.signal.reason === "string" ? controller.signal.reason : "Daemon run cancelled.",
-              } satisfies DaemonNodeEvent
-            : {
-                type: "run.failed",
-                commandId: command.id,
-                sessionId: command.sessionId,
-                runId: command.runId,
-                agent: command.agent,
-                mode: command.mode,
-                error: message,
-              } satisfies DaemonNodeEvent;
-          await postJsonWithRetry(fetchFn, eventUrl, event, token, controller.signal.aborted ? undefined : controller.signal).catch((postError: unknown) => {
-            logger.error("terminal event post failed", {
-              ...commandLogFields(sandboxId, command),
-              error: postError instanceof Error ? postError.message : String(postError),
-            });
           });
-        }).finally(() => {
-          activeRuns.delete(command.id);
-          if (!stopping) setHealth("polling");
-        });
-        activeRuns.set(command.id, { controller, promise });
-      } else if (command.type === "run.cancel") {
-        logger.info("cancel command received", {
-          sandboxId,
-          commandId: command.commandId,
-          sessionId: command.sessionId,
-          runId: command.runId,
-          agent: command.agent,
-          mode: command.mode,
-        });
-        activeRuns.get(command.commandId)?.controller.abort(command.reason);
+          activeRuns.get(command.commandId)?.controller.abort(command.reason);
+        }
       }
+      await delay(pollIntervalMs, runtimeSignal);
     }
-    await delay(pollIntervalMs);
+    await shutdownPromise;
+  } catch (error) {
+    if ((error instanceof DaemonStoppedError || runtimeSignal.aborted || stopping) && shutdownPromise) {
+      await shutdownPromise;
+      return;
+    }
+    throw error;
+  } finally {
+    cleanupShutdownListeners();
   }
-  await shutdownPromise;
 }
 
 export async function runRelayDaemonDoctor(options: DaemonRuntimeOptions = {}): Promise<DaemonDoctorReport> {
@@ -340,7 +406,7 @@ export async function runRelayDaemonDoctor(options: DaemonRuntimeOptions = {}): 
   } catch (error) {
     add("token", false, error instanceof Error ? error.message : String(error));
   }
-  await checkBackendReachable(fetchFn, backendUrl).then(
+  await checkBackendReachable(fetchFn, backendUrl, options.signal).then(
     () => add("backend", true, `${backendUrl} is reachable.`),
     (error: unknown) => add("backend", false, error instanceof Error ? error.message : String(error)),
   );
@@ -386,11 +452,12 @@ async function runStartupPreflight(input: {
   workspacePath: string;
   fetchFn: typeof fetch;
   logger: DaemonLogger;
+  signal?: AbortSignal;
 }): Promise<void> {
   if (!input.token.trim()) throw new Error("Daemon node token is required.");
   checkWorkspace(input.workspacePath);
   try {
-    await checkBackendReachable(input.fetchFn, input.backendUrl);
+    await checkBackendReachable(input.fetchFn, input.backendUrl, input.signal);
     input.logger.info("daemon preflight passed", { sandboxId: input.sandboxId, check: "backend" });
   } catch (error) {
     input.logger.warn("daemon backend preflight failed; registration will retry", {
@@ -435,8 +502,8 @@ function readyAgents(health: Partial<Record<AgentName, DaemonAgentHealth>>): Age
   return AGENT_NAMES.filter((agent) => health[agent]?.status === "ready");
 }
 
-async function checkBackendReachable(fetchFn: typeof fetch, backendUrl: string): Promise<void> {
-  const response = await fetchFn(`${backendUrl}/`, { signal: requestSignal() });
+async function checkBackendReachable(fetchFn: typeof fetch, backendUrl: string, signal?: AbortSignal): Promise<void> {
+  const response = await fetchFn(`${backendUrl}/`, { signal: requestSignal(signal) });
   if (!response.ok) {
     throw new DaemonHttpError(`GET ${backendUrl}/ failed: ${response.status} ${await response.text()}`, response.status);
   }
@@ -458,6 +525,7 @@ async function executeCommand(
   nodeWorkspacePath: string,
   environment: DaemonExecutionEnvironment,
   signal?: AbortSignal,
+  cancellationTerminalEventSignal?: () => AbortSignal | undefined,
 ): Promise<void> {
   const eventUrl = `${backendUrl}/daemon-nodes/${encodeURIComponent(sandboxId)}/events`;
   const state = command.state ?? initialAgentState(command.taskGoal);
@@ -469,7 +537,12 @@ async function executeCommand(
   }
   await environment.ensureAgentReady(command.agent, signal);
   if (signal?.aborted) {
-    await postRunCancelled(fetchFn, eventUrl, command, token, signal.reason);
+    await postRunCancelled(fetchFn, eventUrl, command, token, signal.reason, cancellationTerminalEventSignal?.()).catch((error: unknown) => {
+      logger.error("terminal event post failed", {
+        ...commandLogFields(sandboxId, command),
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
     return;
   }
   logger.info("agent ready", commandLogFields(sandboxId, command));
@@ -527,7 +600,12 @@ async function executeCommand(
       ...commandLogFields(sandboxId, command),
       exitCode: next.last_exit_code,
     });
-    await postRunCancelled(fetchFn, eventUrl, command, token, signal.reason);
+    await postRunCancelled(fetchFn, eventUrl, command, token, signal.reason, cancellationTerminalEventSignal?.()).catch((error: unknown) => {
+      logger.error("terminal event post failed", {
+        ...commandLogFields(sandboxId, command),
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
     return;
   }
   if (outputPostFailure) {
@@ -560,6 +638,7 @@ async function postRunCancelled(
   command: DaemonNodeRunCommand,
   token: string,
   reason: unknown,
+  signal?: AbortSignal,
 ): Promise<void> {
   await postJsonWithRetry(fetchFn, eventUrl, {
     type: "run.cancelled",
@@ -569,7 +648,7 @@ async function postRunCancelled(
     agent: command.agent,
     mode: command.mode,
     reason: typeof reason === "string" && reason ? reason : "Cancelled by human.",
-  } satisfies DaemonNodeEvent, token);
+  } satisfies DaemonNodeEvent, token, signal);
 }
 
 function ensureHostAgentReady(agent: AgentName): void {
@@ -784,11 +863,16 @@ function delay(ms: number, signal?: AbortSignal): Promise<void> {
       reject(new Error("Delay aborted."));
       return;
     }
-    const timer = setTimeout(resolve, ms);
-    signal?.addEventListener("abort", () => {
+    const onAbort = () => {
       clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
       reject(new Error("Delay aborted."));
-    }, { once: true });
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
   });
 }
 
@@ -872,6 +956,8 @@ function normalizeWorkspacePath(value?: string): string | undefined {
 }
 
 const REQUEST_TIMEOUT_MS = 30_000;
+const SHUTDOWN_REGISTRATION_TIMEOUT_MS = 250;
+const SHUTDOWN_TERMINAL_EVENT_TIMEOUT_MS = 500;
 const SIGKILL_DELAY_MS = 5_000;
 
 function requestSignal(signal?: AbortSignal): AbortSignal {
@@ -886,6 +972,13 @@ export class DaemonHttpError extends Error {
   }
 }
 
+class DaemonStoppedError extends Error {
+  constructor() {
+    super("Relay daemon stopped.");
+    this.name = "DaemonStoppedError";
+  }
+}
+
 // Retries `action` while the backend is unreachable (network errors) or
 // answering with 5xx, with capped exponential backoff. Client errors (4xx,
 // e.g. a rejected token) are fatal and propagate immediately.
@@ -895,12 +988,15 @@ async function withBackendReconnect<T>(
   action: () => Promise<T>,
   logger: DaemonLogger,
   context: { sandboxId: string; what: string },
+  control: { signal?: AbortSignal; shouldStop?: () => boolean } = {},
 ): Promise<T> {
   let attempt = 0;
   while (true) {
+    if (control.signal?.aborted || control.shouldStop?.()) throw new DaemonStoppedError();
     try {
       return await action();
     } catch (error) {
+      if (control.signal?.aborted || control.shouldStop?.()) throw new DaemonStoppedError();
       if (error instanceof DaemonHttpError && error.status < 500) throw error;
       attempt += 1;
       const message = error instanceof Error ? error.message : String(error);
@@ -911,7 +1007,12 @@ async function withBackendReconnect<T>(
         attempt,
         backoffMs: backoff,
       });
-      await delay(backoff);
+      try {
+        await delay(backoff, control.signal);
+      } catch (delayError) {
+        if (control.signal?.aborted || control.shouldStop?.()) throw new DaemonStoppedError();
+        throw delayError;
+      }
     }
   }
 }
@@ -956,10 +1057,10 @@ async function postJsonWithRetry(
   }
 }
 
-async function getJson(fetchFn: typeof fetch, url: string, token?: string): Promise<Response> {
+async function getJson(fetchFn: typeof fetch, url: string, token?: string, signal?: AbortSignal): Promise<Response> {
   return fetchFn(url, {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-    signal: requestSignal(),
+    signal: requestSignal(signal),
   });
 }
 

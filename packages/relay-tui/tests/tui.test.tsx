@@ -227,6 +227,94 @@ describe("TUI daemon runner", () => {
     );
   });
 
+  it("cleans up daemon run polling abort listeners after each wait", async () => {
+    const { RelayDaemonClient } = await import("../../relay-core/src/index.js");
+    const originalSetTimeout = globalThis.setTimeout;
+    const originalClearTimeout = globalThis.clearTimeout;
+    let abortAdds = 0;
+    let abortRemoves = 0;
+    const signal = {
+      aborted: false,
+      addEventListener: (type: string) => {
+        if (type === "abort") abortAdds += 1;
+      },
+      removeEventListener: (type: string) => {
+        if (type === "abort") abortRemoves += 1;
+      },
+    } as unknown as AbortSignal;
+    const session = (status: "running" | "completed"): RelaySession => ({
+      id: "ses_poll_cleanup",
+      workspacePath: "/workspace/alice",
+      taskGoal: "fix auth",
+      status,
+      phase: status,
+      participants: ["human", "codex"],
+      currentAgent: status === "running" ? "codex" : undefined,
+      pendingDecision: undefined,
+      createdAt: "2026-06-07T00:00:00.000Z",
+      updatedAt: status === "running" ? "2026-06-07T00:00:00.000Z" : "2026-06-07T00:00:01.000Z",
+      events: [],
+      decisions: [],
+      agentRuns: [{
+        id: "run_poll_cleanup",
+        agent: "codex",
+        role: "implementer",
+        mode: "action",
+        status,
+        startedAt: "2026-06-07T00:00:00.000Z",
+        completedAt: status === "running" ? undefined : "2026-06-07T00:00:01.000Z",
+        exitCode: status === "running" ? undefined : 0,
+        artifactIds: [],
+      }],
+      artifacts: [],
+      finalOutcome: status === "running" ? undefined : "done",
+    });
+    const runningSession = session("running");
+    const completedSession = session("completed");
+    let sessionReads = 0;
+    const client = new RelayDaemonClient({
+      baseUrl: "http://daemon.local",
+      fetchFn: (async (input, init) => {
+        const url = new URL(String(input));
+        if (init?.method === "POST" && url.pathname === "/sandboxes/sbx_alice/runs") {
+          return new Response(JSON.stringify(runningSession), { status: 200, headers: { "Content-Type": "application/json" } });
+        }
+        if (url.pathname === "/sessions/ses_poll_cleanup") {
+          sessionReads += 1;
+          return new Response(JSON.stringify(sessionReads === 1 ? runningSession : completedSession), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        return new Response("not found", { status: 404, statusText: "Not Found" });
+      }) as typeof fetch,
+    });
+
+    globalThis.setTimeout = ((handler: Parameters<typeof setTimeout>[0]) => {
+      queueMicrotask(() => {
+        if (typeof handler === "function") handler();
+      });
+      return 0 as unknown as ReturnType<typeof setTimeout>;
+    }) as typeof setTimeout;
+    globalThis.clearTimeout = (() => undefined) as typeof clearTimeout;
+    try {
+      const result = await client.runSandbox({
+        sandboxId: "sbx_alice",
+        taskGoal: "fix auth",
+        assignments: [{ agent: "codex", mode: "action" }],
+        signal,
+      });
+
+      assert.equal(result.status, "completed");
+      assert.equal(sessionReads, 2);
+      assert.equal(abortAdds, 1);
+      assert.equal(abortRemoves, 1);
+    } finally {
+      globalThis.setTimeout = originalSetTimeout;
+      globalThis.clearTimeout = originalClearTimeout;
+    }
+  });
+
   it("matches live local-run daemons by employee and workspace", async () => {
     const oldFetch = globalThis.fetch;
     globalThis.fetch = (async (): Promise<Response> => new Response(JSON.stringify({

@@ -1,4 +1,4 @@
-import { useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 import {
   NavAdmin, NavBacklog, NavChannels, NavConversations, NavLogout, NavMcp, NavPreferences,
@@ -22,6 +22,52 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, setRoute, 
   const { t } = useTranslation();
   const [navTooltip, setNavTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
   const [settingsMenu, setSettingsMenu] = useState<{ x: number; y: number } | null>(null);
+  const settingsButtonRef = useRef<HTMLButtonElement>(null);
+  const settingsMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!settingsMenu) return;
+
+    const firstMenuItem = settingsMenuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]');
+    firstMenuItem?.focus();
+
+    function closeMenu(returnFocus: boolean) {
+      setSettingsMenu(null);
+      if (returnFocus) settingsButtonRef.current?.focus();
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (settingsMenuRef.current?.contains(target) || settingsButtonRef.current?.contains(target)) return;
+      closeMenu(false);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeMenu(true);
+        return;
+      }
+      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+      const items = Array.from(settingsMenuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? []);
+      if (items.length === 0) return;
+      event.preventDefault();
+      const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
+      const direction = event.key === "ArrowDown" ? 1 : -1;
+      const nextIndex = currentIndex < 0
+        ? 0
+        : (currentIndex + direction + items.length) % items.length;
+      items[nextIndex].focus();
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [settingsMenu]);
 
   function showNavTooltip(text: string, el: HTMLElement) {
     if (sidenavExpanded) return;
@@ -189,11 +235,12 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, setRoute, 
       </nav>
       <div className="sidenav-bottom">
         <button
+          ref={settingsButtonRef}
           className={`sidenav-btn ${prefsOpen || settingsMenu ? "active" : ""}`}
           data-nav="settings"
           type="button"
           aria-haspopup="menu"
-          aria-expanded={settingsMenu ? true : undefined}
+          aria-expanded={Boolean(settingsMenu)}
           aria-label={t("nav.settings")}
           title={t("nav.settings")}
           onClick={(event) => toggleSettingsMenu(event.currentTarget)}
@@ -208,6 +255,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, setRoute, 
       </div>
       {settingsMenu ? (
         <div
+          ref={settingsMenuRef}
           className="sidenav-settings-menu"
           role="menu"
           aria-label={t("nav.settings")}

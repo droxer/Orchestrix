@@ -165,21 +165,21 @@ export function ChatIntegrationsView() {
           <div className="adm-chat-form">
             <label>
               <span>{t("admin.v2.chat_provider")}</span>
-              <select value={provider} onChange={(event) => setProvider(event.target.value as ChatProvider)}>
+              <select name="chat-provider" value={provider} onChange={(event) => setProvider(event.target.value as ChatProvider)}>
                 {PROVIDERS.map((item) => <option key={item} value={item}>{providerLabel(item)}</option>)}
               </select>
             </label>
             <label>
               <span>{t("admin.v2.chat_display_name")}</span>
-              <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Engineering Discord" />
+              <input name="chat-display-name" autoComplete="organization" value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Engineering Discord" />
             </label>
             <label>
               <span>{t("admin.v2.chat_tenant")}</span>
-              <input value={tenantId} onChange={(event) => setTenantId(event.target.value)} placeholder={provider === "telegram" ? t("admin.v2.optional") : t("admin.v2.chat_tenant")} />
+              <input name="chat-tenant-id" autoComplete="off" value={tenantId} onChange={(event) => setTenantId(event.target.value)} placeholder={provider === "telegram" ? t("admin.v2.optional") : t("admin.v2.chat_tenant")} />
             </label>
             <label>
               <span>{t("admin.v2.chat_secret")}</span>
-              <input value={secret} onChange={(event) => setSecret(event.target.value)} type="password" placeholder={secretFieldByProvider[provider]} />
+              <input name="chat-secret" autoComplete="new-password" value={secret} onChange={(event) => setSecret(event.target.value)} type="password" placeholder={secretFieldByProvider[provider]} />
             </label>
             <Button type="button" onClick={() => void handleCreate()} disabled={busy !== null}>
               <Link2 size={16} aria-hidden="true" />
@@ -259,9 +259,9 @@ export function ChatIntegrationsView() {
                 <div>
                   <h4>{t("admin.v2.chat_links_title")}</h4>
                   <div className="adm-chat-form compact">
-                    <input value={identityForm.externalUserId} onChange={(event) => setIdentityForm((prev) => ({ ...prev, externalUserId: event.target.value }))} placeholder={t("admin.v2.chat_external_user")} />
-                    <input value={identityForm.employeeId} onChange={(event) => setIdentityForm((prev) => ({ ...prev, employeeId: event.target.value }))} placeholder={t("admin.v2.placeholder_employee_id")} />
-                    <input value={identityForm.defaultSandboxId} onChange={(event) => setIdentityForm((prev) => ({ ...prev, defaultSandboxId: event.target.value }))} placeholder={t("admin.v2.chat_sandbox_placeholder")} />
+                    <input name="chat-external-user-id" autoComplete="off" aria-label={t("admin.v2.chat_external_user")} value={identityForm.externalUserId} onChange={(event) => setIdentityForm((prev) => ({ ...prev, externalUserId: event.target.value }))} placeholder={t("admin.v2.chat_external_user")} />
+                    <input name="chat-employee-id" autoComplete="off" aria-label={t("admin.v2.placeholder_employee_id")} value={identityForm.employeeId} onChange={(event) => setIdentityForm((prev) => ({ ...prev, employeeId: event.target.value }))} placeholder={t("admin.v2.placeholder_employee_id")} />
+                    <input name="chat-default-sandbox-id" autoComplete="off" aria-label={t("admin.v2.chat_sandbox_placeholder")} value={identityForm.defaultSandboxId} onChange={(event) => setIdentityForm((prev) => ({ ...prev, defaultSandboxId: event.target.value }))} placeholder={t("admin.v2.chat_sandbox_placeholder")} />
                     <Button type="button" variant="secondary" onClick={() => void handleAddIdentity()} disabled={busy !== null}>
                       {t("admin.v2.chat_add_link")}
                     </Button>
@@ -281,9 +281,9 @@ export function ChatIntegrationsView() {
                 <div>
                   <h4>{t("admin.v2.chat_allow_title")}</h4>
                   <div className="adm-chat-form compact">
-                    <input value={conversationForm.conversationId} onChange={(event) => setConversationForm((prev) => ({ ...prev, conversationId: event.target.value }))} placeholder={t("admin.v2.chat_conversation_id")} />
-                    <input value={conversationForm.threadId} onChange={(event) => setConversationForm((prev) => ({ ...prev, threadId: event.target.value }))} placeholder={t("admin.v2.chat_thread_optional")} />
-                    <input value={conversationForm.label} onChange={(event) => setConversationForm((prev) => ({ ...prev, label: event.target.value }))} placeholder={t("admin.v2.chat_label")} />
+                    <input name="chat-conversation-id" autoComplete="off" aria-label={t("admin.v2.chat_conversation_id")} value={conversationForm.conversationId} onChange={(event) => setConversationForm((prev) => ({ ...prev, conversationId: event.target.value }))} placeholder={t("admin.v2.chat_conversation_id")} />
+                    <input name="chat-thread-id" autoComplete="off" aria-label={t("admin.v2.chat_thread_optional")} value={conversationForm.threadId} onChange={(event) => setConversationForm((prev) => ({ ...prev, threadId: event.target.value }))} placeholder={t("admin.v2.chat_thread_optional")} />
+                    <input name="chat-conversation-label" autoComplete="off" aria-label={t("admin.v2.chat_label")} value={conversationForm.label} onChange={(event) => setConversationForm((prev) => ({ ...prev, label: event.target.value }))} placeholder={t("admin.v2.chat_label")} />
                     <Button type="button" variant="secondary" onClick={() => void handleAddConversation()} disabled={busy !== null}>
                       {t("admin.v2.chat_add_allow")}
                     </Button>

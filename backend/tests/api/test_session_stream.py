@@ -30,6 +30,10 @@ def _parse_sse(body: str) -> list[tuple[str, str]]:
     return frames
 
 
+def _message_payloads(body: str) -> list[dict[str, object]]:
+    return [json.loads(data) for event, data in _parse_sse(body) if event == "message"]
+
+
 def test_session_events_streams_backlog_then_closes_on_terminal(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
@@ -57,6 +61,51 @@ def test_session_events_streams_backlog_then_closes_on_terminal(monkeypatch) -> 
         message_types = [json.loads(data)["type"] for event, data in frames if event == "message"]
         assert "session.created" in message_types
         assert frames[-1][0] == "done"
+
+
+def test_session_events_cursor_skips_already_cached_history(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+
+        created = client.post("/sessions", json={"taskGoal": "ship it", "assignments": [{"agent": "claude"}]})
+        assert created.status_code == 201
+        session_id = created.json()["id"]
+
+        done = client.post(f"/sessions/{session_id}/decisions", json={"kind": "mark_done"})
+        assert done.status_code == 200
+        events = done.json()["events"]
+
+        after_created = client.get(f"/sessions/{session_id}/events?after={events[0]['id']}")
+        assert after_created.status_code == 200
+        assert [payload["id"] for payload in _message_payloads(after_created.text)] == [
+            event["id"] for event in events[1:]
+        ]
+
+        after_latest = client.get(f"/sessions/{session_id}/events?after={events[-1]['id']}")
+        assert after_latest.status_code == 200
+        assert _message_payloads(after_latest.text) == []
+        assert _parse_sse(after_latest.text)[-1][0] == "done"
+
+
+def test_session_events_cursor_falls_back_to_backlog_for_unknown_event(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+
+        created = client.post("/sessions", json={"taskGoal": "ship it"})
+        assert created.status_code == 201
+        session_id = created.json()["id"]
+        done = client.post(f"/sessions/{session_id}/decisions", json={"kind": "mark_done"})
+        assert done.status_code == 200
+
+        response = client.get(f"/sessions/{session_id}/events?after=evt_missing")
+        assert response.status_code == 200
+        assert [payload["id"] for payload in _message_payloads(response.text)] == [
+            event["id"] for event in done.json()["events"]
+        ]
 
 
 def test_session_events_unauthorized_is_forbidden_before_streaming(monkeypatch) -> None:

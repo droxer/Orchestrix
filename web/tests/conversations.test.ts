@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { conversationLabel, matchesConversationQuery, myConversationSessions } from "../src/lib/conversations.js";
+import { conversationLabel, matchesConversationQuery, myConversationSessions, pickActiveConversationSession } from "../src/lib/conversations.js";
 import { isAwaitingFeedbackDecision, rerunAssignmentForSession } from "../src/lib/workflow.js";
 import type { RelaySession } from "../src/types.js";
 
@@ -52,6 +52,46 @@ describe("web conversation helpers", () => {
     assert.equal(matchesConversationQuery(s, "auth"), true);
     assert.equal(matchesConversationQuery(s, "redirect"), true);
     assert.equal(matchesConversationQuery(s, "deploy"), false);
+  });
+
+  it("picks the selected active conversation only from visible conversations", () => {
+    const visible = session({ id: "visible", ownerEmployeeId: "alice", updatedAt: "2026-06-20T03:00:00.000Z" });
+    const selected = session({ id: "selected", ownerEmployeeId: "alice", updatedAt: "2026-06-20T01:00:00.000Z" });
+
+    assert.equal(pickActiveConversationSession({
+      conversations: [visible, selected],
+      selectedSessionId: "selected",
+      activeSessionId: "visible",
+      composingNew: false,
+    })?.id, "selected");
+  });
+
+  it("falls back when selected conversation is stale, archived, or out of scope", () => {
+    const sessions = [
+      session({ id: "archived", ownerEmployeeId: "alice", archived: true, updatedAt: "2026-06-20T09:00:00.000Z" }),
+      session({ id: "bob", ownerEmployeeId: "bob", updatedAt: "2026-06-20T08:00:00.000Z" }),
+      session({ id: "active", ownerEmployeeId: "alice", updatedAt: "2026-06-20T03:00:00.000Z" }),
+    ];
+    const conversations = myConversationSessions(sessions, "alice");
+
+    assert.deepEqual(conversations.map((item) => item.id), ["active"]);
+    assert.equal(pickActiveConversationSession({
+      conversations,
+      selectedSessionId: "archived",
+      activeSessionId: null,
+      composingNew: false,
+    })?.id, "active");
+  });
+
+  it("suppresses all active conversation fallback while composing a new thread", () => {
+    const conversations = [session({ id: "active", ownerEmployeeId: "alice" })];
+
+    assert.equal(pickActiveConversationSession({
+      conversations,
+      selectedSessionId: "active",
+      activeSessionId: "active",
+      composingNew: true,
+    }), undefined);
   });
 
   it("shows recovery decisions only for explicit feedback waits", () => {
