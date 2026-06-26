@@ -9,6 +9,7 @@
    ===================================================================== */
 
 .messenger-shell[data-route="channels"],
+.messenger-shell[data-route="workspace"],
 .messenger-shell[data-route="mcp"],
 .messenger-shell[data-route="backlog"],
 .messenger-shell[data-route="routine"],
@@ -17,6 +18,7 @@
 }
 
 .messenger-shell[data-route="channels"][data-sidenav="open"],
+.messenger-shell[data-route="workspace"][data-sidenav="open"],
 .messenger-shell[data-route="mcp"][data-sidenav="open"],
 .messenger-shell[data-route="backlog"][data-sidenav="open"],
 .messenger-shell[data-route="routine"][data-sidenav="open"],

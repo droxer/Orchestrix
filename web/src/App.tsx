@@ -14,6 +14,7 @@ import type { DerivedMessage } from "./components/MessageBlock";
 import { AdminConsole } from "./components/AdminConsole";
 import { BacklogPage } from "./components/BacklogPage";
 import { ChannelsPage } from "./components/ChannelsPage";
+import { EmployeeWorkspacePage } from "./components/EmployeeWorkspacePage";
 import { LoginScreen } from "./components/LoginScreen";
 import { McpPage } from "./components/McpPage";
 import { RoutinePage } from "./components/RoutinePage";
@@ -495,7 +496,19 @@ export function App() {
         onLogout={() => void handleLogout()}
       />
 
-      {route === "admin" ? <AdminConsole /> : route === "channels" ? <ChannelsPage /> : route === "backlog" ? (
+      {route === "admin" ? <AdminConsole /> : route === "channels" ? <ChannelsPage /> : route === "workspace" ? (
+        <EmployeeWorkspacePage
+          employeeId={selectedEmployee}
+          currentUser={user}
+          isRefreshing={isRefreshing}
+          onRefresh={() => refresh()}
+          onOpenConversation={(sessionId) => {
+            setRoute("main");
+            openConversation(sessionId);
+          }}
+          setStatus={setStatus}
+        />
+      ) : route === "backlog" ? (
         <BacklogPage
           tasks={tasks}
           sessions={sessions}

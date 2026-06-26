@@ -1,0 +1,385 @@
+/* =====================================================================
+   Employee Workspace — inspection surface for one sandbox owner.
+   Three co-equal panes: artifact feed · file browser · inline preview.
+   ===================================================================== */
+
+.workspace-page {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-canvas);
+}
+
+.workspace-inspect {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- metric strip --------------------------------------------------- */
+
+.workspace-metric-strip {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.workspace-metric-item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+  min-width: 0;
+  border-right: 1px solid var(--color-hairline-soft);
+  padding: var(--space-sm) var(--space-base);
+}
+
+.workspace-metric-item:last-child {
+  border-right: 0;
+}
+
+.workspace-metric-item strong {
+  color: var(--color-ink);
+  font-size: var(--text-lg);
+  font-weight: 560;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.workspace-metric-item span {
+  color: var(--color-muted);
+  font: var(--type-eyebrow);
+  letter-spacing: var(--letter-eyebrow);
+  text-transform: uppercase;
+}
+
+/* ---- three-pane grid ------------------------------------------------ */
+
+.workspace-panes {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 0.9fr) minmax(0, 1.4fr);
+}
+
+.workspace-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-right: 1px solid var(--color-hairline);
+}
+
+.workspace-pane-preview {
+  border-right: 0;
+}
+
+.workspace-pane-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: 44px;
+  border-bottom: 1px solid var(--color-hairline-soft);
+  padding: 0 var(--space-base);
+}
+
+.workspace-pane-head h3 {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-sm);
+  font-weight: 620;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-pane-head > span:not(.workspace-files-path) {
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.workspace-files-path {
+  min-width: 0;
+  margin-left: auto;
+  max-width: 60%;
+  overflow: hidden;
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-pane-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* ---- selectable rows (artifacts + files share .workspace-pick) ------ */
+
+.workspace-pick-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.workspace-pick {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  border-left: 2px solid transparent;
+  border-bottom: 1px solid var(--color-hairline-soft);
+  background: transparent;
+  padding: var(--space-sm) var(--space-base);
+  color: var(--color-ink);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+}
+
+.workspace-pick:hover {
+  background: color-mix(in srgb, var(--color-surface-soft) 72%, transparent);
+}
+
+.workspace-pick.is-active {
+  background: var(--color-surface-strong);
+  border-left-color: var(--color-primary);
+}
+
+.workspace-pick-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-pick-meta {
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.workspace-file-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-muted);
+}
+
+.workspace-file-pick[data-kind="directory"] .workspace-file-icon {
+  color: var(--color-accent);
+}
+
+.workspace-file-up {
+  width: 100%;
+  min-height: 34px;
+  border: 0;
+  border-bottom: 1px solid var(--color-hairline-soft);
+  background: color-mix(in srgb, var(--color-surface-soft) 55%, transparent);
+  padding: 0 var(--space-base);
+  color: var(--color-muted);
+  cursor: pointer;
+  font-size: var(--text-xs);
+  text-align: left;
+}
+
+.workspace-file-up:hover {
+  color: var(--color-ink);
+  background: color-mix(in srgb, var(--color-surface-soft) 80%, transparent);
+}
+
+/* ---- preview pane --------------------------------------------------- */
+
+.workspace-preview-body {
+  padding: var(--space-base);
+}
+
+.workspace-preview-truncated {
+  margin: var(--space-sm) 0 0;
+  color: var(--color-muted);
+  font: var(--type-caption);
+}
+
+.workspace-preview-open {
+  margin-top: var(--space-base);
+  min-height: 30px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--color-canvas);
+  padding: 0 var(--space-sm);
+  color: var(--color-body);
+  cursor: pointer;
+  font: var(--type-caption-strong-sm);
+}
+
+.workspace-preview-open:hover {
+  color: var(--color-ink);
+  border-color: color-mix(in srgb, var(--color-ink) 20%, var(--color-hairline));
+}
+
+/* ---- shared states -------------------------------------------------- */
+
+.workspace-empty {
+  margin: 0;
+  padding: var(--space-lg) var(--space-base);
+  color: var(--color-muted);
+  font: var(--type-body-sm);
+}
+
+.workspace-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--color-canvas);
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.workspace-icon-btn:hover {
+  color: var(--color-ink);
+  border-color: color-mix(in srgb, var(--color-ink) 20%, var(--color-hairline));
+}
+
+.workspace-icon-btn:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+/* ---- loading skeleton + error -------------------------------------- */
+
+.workspace-skeleton {
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-hairline-soft) 82%, transparent),
+    color-mix(in srgb, var(--color-surface-soft) 70%, transparent),
+    color-mix(in srgb, var(--color-hairline-soft) 82%, transparent)
+  );
+  background-size: 220% 100%;
+  animation: workspace-skeleton 1.2s ease-in-out infinite;
+}
+
+.workspace-skeleton-metric {
+  height: 44px;
+  flex: 1;
+  border-radius: 0;
+}
+
+.workspace-skeleton-pane {
+  padding: var(--space-base);
+  gap: var(--space-sm);
+  display: flex;
+  flex-direction: column;
+}
+
+.workspace-skeleton-line {
+  width: 80%;
+  height: 14px;
+}
+
+.workspace-skeleton-line.short {
+  width: 44%;
+}
+
+.workspace-error {
+  max-width: 680px;
+  padding: var(--space-xl);
+}
+
+.workspace-eyebrow {
+  display: block;
+  margin-bottom: var(--space-xs);
+  color: var(--color-muted);
+  font: var(--type-eyebrow);
+  letter-spacing: var(--letter-eyebrow);
+  text-transform: uppercase;
+}
+
+.workspace-error p {
+  margin: var(--space-sm) 0 var(--space-base);
+  color: var(--color-body);
+}
+
+.workspace-error-action {
+  min-height: 34px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--color-ink);
+  padding: 0 var(--space-base);
+  color: var(--color-on-primary);
+  font: var(--type-meta-mono);
+  cursor: pointer;
+}
+
+@keyframes workspace-skeleton {
+  0% { background-position: 120% 0; }
+  100% { background-position: -120% 0; }
+}
+
+/* ---- responsive ----------------------------------------------------- */
+
+@media (pointer: coarse) {
+  .workspace-icon-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .workspace-pick,
+  .workspace-file-up {
+    min-height: 44px;
+  }
+}
+
+/* Mid + narrow: stack the panes and let the whole surface scroll. */
+@media (max-width: 1100px) {
+  .workspace-inspect {
+    overflow-y: auto;
+  }
+
+  .workspace-panes {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .workspace-pane {
+    border-right: 0;
+    border-bottom: 1px solid var(--color-hairline);
+    min-height: 240px;
+  }
+
+  .workspace-pane-preview {
+    border-bottom: 0;
+  }
+
+  .workspace-pane-body {
+    overflow-y: visible;
+  }
+}
+
+@media (max-width: 640px) {
+  .workspace-metric-strip {
+    flex-wrap: wrap;
+  }
+
+  .workspace-metric-item {
+    flex: 1 0 50%;
+    border-bottom: 1px solid var(--color-hairline-soft);
+  }
+}

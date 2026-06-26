@@ -49,7 +49,7 @@
     justify-content: center;
     gap: var(--space-xs);
     min-width: 0;
-    min-height: 40px;
+    min-height: 44px;
     padding: 0 var(--space-sm);
     border-radius: var(--radius-sm);
     color: var(--color-body);
@@ -111,7 +111,7 @@
     display: inline-flex;
     align-items: center;
     gap: var(--space-xs);
-    min-height: 40px;
+    min-height: 44px;
     padding: 0 var(--space-sm);
     border: 1px solid var(--color-hairline);
     border-radius: var(--radius-sm);
@@ -135,9 +135,7 @@
     font-size: var(--text-md);
   }
 
-  .header-agent-tabs {
-    display: none;
-  }
+  /* .header-agent-tabs is already hidden at the 900px breakpoint above. */
 
   .transcript-inner {
     padding: var(--space-md) var(--space-base) var(--space-lg);

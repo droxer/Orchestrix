@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import date
 from tempfile import TemporaryDirectory
 
 from fastapi.testclient import TestClient
 
+from relay.api import task_routes
 from relay.app import create_app
 
 
@@ -122,12 +124,16 @@ def test_assigned_backlog_waits_for_scheduler_and_start_can_dispatch_manually(mo
         started = client.post(f"/tasks/{task['id']}/start", json={"agent": "codex"})
         assert started.status_code == 202
         assert started.json()["session"]["id"]
+        assert started.json()["task"]["id"] == task["id"]
+        assert started.json()["task"]["status"] == "running"
+        assert started.json()["task"]["linkedSessionIds"] == [started.json()["session"]["id"]]
 
         commands = client.get("/daemon-nodes/sbx_alice/commands", headers={"Authorization": "Bearer node_token"})
         assert commands.status_code == 200
         [command] = commands.json()["commands"]
         assert command["type"] == "run.start"
         assert command["agent"] == "codex"
+        assert command["sessionId"] == started.json()["session"]["id"]
         assert command["taskGoal"] == "Run from backlog"
 
 
@@ -160,17 +166,29 @@ def test_scheduler_dispatches_assigned_backlog_task(monkeypatch) -> None:
 
         result = asyncio.run(app.state.task_scheduler.tick())
         assert result.dispatched == 1
+        updated = client.get(f"/tasks/{created.json()['id']}")
+        assert updated.status_code == 200
+        assert updated.json()["status"] == "running"
+        assert updated.json()["linkedSessionIds"]
 
         commands = client.get("/daemon-nodes/sbx_alice/commands", headers={"Authorization": "Bearer node_token"})
         assert commands.status_code == 200
         [command] = commands.json()["commands"]
         assert command["type"] == "run.start"
         assert command["agent"] == "codex"
+        assert command["sessionId"] == updated.json()["linkedSessionIds"][0]
         assert command["taskGoal"] == "Scheduled backlog"
 
 
-def test_routine_assignment_does_not_dispatch_definition(monkeypatch) -> None:
+def test_routine_start_dispatches_occurrence_not_definition(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+
+    class FixedDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return cls(2026, 6, 26)
+
+    monkeypatch.setattr(task_routes, "date", FixedDate)
     with TemporaryDirectory() as root:
         client = TestClient(create_app(root))
         _bootstrap_admin(client)
@@ -204,12 +222,25 @@ def test_routine_assignment_does_not_dispatch_definition(monkeypatch) -> None:
 
         start = client.post(f"/tasks/{task['id']}/start", json={"agent": "codex"})
         assert start.status_code == 202
-        assert start.json()["session"] is None
-        assert start.json()["task"]["status"] == "assigned"
+        assert start.json()["session"]["id"]
+        occurrence = start.json()["task"]
+        assert occurrence["id"] != task["id"]
+        assert occurrence["isRoutine"] is False
+        assert occurrence["status"] == "running"
+        assert occurrence["dueDate"] == "2026-06-25"
+
+        updated_definition = client.get(f"/tasks/{task['id']}").json()
+        assert updated_definition["status"] == "assigned"
+        assert updated_definition["routineNextRunDate"] == "2026-07-02"
+        assert updated_definition["linkedSessionIds"] == [start.json()["session"]["id"]]
 
         commands = client.get("/daemon-nodes/sbx_alice/commands", headers={"Authorization": "Bearer node_token"})
         assert commands.status_code == 200
-        assert commands.json()["commands"] == []
+        [command] = commands.json()["commands"]
+        assert command["type"] == "run.start"
+        assert command["agent"] == "codex"
+        assert command["sessionId"] == start.json()["session"]["id"]
+        assert command["taskGoal"] == "Weekly report"
 
 
 def test_task_rejects_invalid_due_date(monkeypatch) -> None:

@@ -20,15 +20,18 @@ const nextConfig = (phase: string): NextConfig => {
             ];
           },
           async rewrites() {
-            return [
-              { source: "/auth/:path*", destination: `${backendUrl}/auth/:path*` },
-              { source: "/cp", destination: `${backendUrl}/cp` },
-              { source: "/cp/:path*", destination: `${backendUrl}/cp/:path*` },
-              { source: "/sandboxes/:path*", destination: `${backendUrl}/sandboxes/:path*` },
-              { source: "/sessions/:path*", destination: `${backendUrl}/sessions/:path*` },
-              { source: "/daemon-nodes/:path*", destination: `${backendUrl}/daemon-nodes/:path*` },
-              { source: "/tasks/:path*", destination: `${backendUrl}/tasks/:path*` },
-            ];
+            return {
+              beforeFiles: [
+                { source: "/auth/:path*", destination: `${backendUrl}/auth/:path*` },
+                { source: "/cp", destination: `${backendUrl}/cp` },
+                { source: "/cp/:path*", destination: `${backendUrl}/cp/:path*` },
+                { source: "/sandboxes/:path*", destination: `${backendUrl}/sandboxes/:path*` },
+                { source: "/sessions/:path*", destination: `${backendUrl}/sessions/:path*` },
+                { source: "/workspace/:path*", destination: `${backendUrl}/workspace/:path*` },
+                { source: "/daemon-nodes/:path*", destination: `${backendUrl}/daemon-nodes/:path*` },
+                { source: "/tasks/:path*", destination: `${backendUrl}/tasks/:path*` },
+              ],
+            };
           },
         }
       : {}),

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 
 import { useTranslation } from "react-i18next";
 import {
   NavAdmin, NavBacklog, NavChannels, NavConversations, NavLogout, NavMcp, NavPreferences,
-  NavRoutine, NavSidebarCollapse, NavSidebarExpand, NavSkills,
+  NavRoutine, NavSidebarCollapse, NavSidebarExpand, NavSkills, NavWorkspace,
 } from "./icons";
 import { RelayMark } from "./RelayMark";
 import type { AppRoute } from "../lib/viewTypes";
@@ -130,6 +130,22 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, setRoute, 
         >
           <NavConversations size={18} />
           <span className="sidenav-label">{t("nav.conversations")}</span>
+        </button>
+        <button
+          className={`sidenav-btn ${route === "workspace" ? "active" : ""}`}
+          data-nav="workspace"
+          type="button"
+          aria-label={t("nav.workspace_label")}
+          aria-pressed={route === "workspace"}
+          title={t("nav.workspace_label")}
+          onClick={() => setRoute((r) => r === "workspace" ? "main" : "workspace")}
+          onMouseEnter={(e) => showNavTooltip(t("nav.workspace"), e.currentTarget)}
+          onMouseLeave={hideNavTooltip}
+          onFocus={(e) => showNavTooltip(t("nav.workspace"), e.currentTarget)}
+          onBlur={hideNavTooltip}
+        >
+          <NavWorkspace size={18} />
+          <span className="sidenav-label">{t("nav.workspace")}</span>
         </button>
         <button
           className={`sidenav-btn ${route === "backlog" ? "active" : ""}`}

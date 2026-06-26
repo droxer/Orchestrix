@@ -10,6 +10,8 @@
   "nav": {
     "conversations": "Threads",
     "chats": "Chats",
+    "workspace": "Workspace",
+    "workspace_label": "Employee workspace",
     "backlog": "Backlog",
     "backlog_label": "Backlog management",
     "routine": "Routine",
@@ -162,6 +164,32 @@
       "normal": "Normal",
       "low": "Low"
     }
+  },
+  "workspace": {
+    "title": "Workspace",
+    "sub": "@{{employee}} cockpit",
+    "loading": "Loading workspace",
+    "metrics": "Workspace metrics",
+    "metric_runs": "Active runs",
+    "metric_tasks": "Active tasks",
+    "metric_sessions": "Threads",
+    "metric_artifacts": "Artifacts",
+    "artifacts": "Artifacts",
+    "files": "Files",
+    "preview": "Preview",
+    "select_to_preview": "Select an artifact or file to preview.",
+    "open_thread": "Open thread",
+    "loading_preview": "Loading preview.",
+    "binary_file": "Binary file — no preview.",
+    "empty_file": "This file is empty.",
+    "file_truncated": "Preview truncated to {{limit}}.",
+    "no_artifacts": "No artifacts yet.",
+    "no_files": "No files in this directory.",
+    "loading_files": "Loading files.",
+    "files_unavailable": "Workspace path is not available on this host.",
+    "parent_directory": "Parent",
+    "load_failed": "Workspace unavailable",
+    "retry": "Retry"
   },
   "routine": {
     "title": "Routine",

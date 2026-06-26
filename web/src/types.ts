@@ -7,6 +7,7 @@ import type {
   DaemonAgentSkill,
   DaemonMcpTransport,
   DaemonNodeMonitorRecord,
+  RelayArtifact,
   RelayTask,
   RelaySession,
   SandboxRecord,
@@ -26,6 +27,7 @@ export type {
   DaemonAgentSkill,
   DaemonMcpTransport,
   DaemonNodeMonitorRecord,
+  RelayArtifact,
   RelayTask,
   RelaySession,
   SandboxRecord,
@@ -49,6 +51,105 @@ export type Tone = "good" | "bad" | "warn" | "info" | "neutral";
 
 export interface SessionsResponse {
   sessions: RelaySession[];
+}
+
+export interface ArtifactIndexItem extends RelayArtifact {
+  sessionId: string;
+  sessionTitle?: string;
+  taskGoal?: string;
+  ownerEmployeeId?: string;
+  workspacePath?: string;
+  sessionUpdatedAt?: string;
+}
+
+export interface ArtifactsResponse {
+  artifacts: ArtifactIndexItem[];
+}
+
+export interface WorkspaceBriefSession {
+  id: string;
+  title?: string;
+  taskGoal?: string;
+  status?: RelaySession["status"];
+  phase?: string;
+  workspacePath?: string;
+  ownerEmployeeId?: string;
+  currentAgent?: AgentName;
+  pendingDecision?: RelaySession["pendingDecision"];
+  artifactCount: number;
+  runCount: number;
+  updatedAt?: string;
+  createdAt?: string;
+}
+
+export interface WorkspaceBriefTask {
+  id: string;
+  title?: string;
+  status?: TaskStatus;
+  priority?: TaskPriority;
+  ownerEmployeeId?: string;
+  assigneeEmployeeId?: string;
+  assignedAgent?: AgentName;
+  dueDate?: string;
+  isRoutine: boolean;
+  routineEnabled: boolean;
+  linkedSessionIds: string[];
+  updatedAt?: string;
+  createdAt?: string;
+}
+
+export interface WorkspaceBriefResponse {
+  employeeId: string;
+  workspacePath: string;
+  primaryNode?: DaemonNodeMonitorRecord | null;
+  nodes: DaemonNodeMonitorRecord[];
+  activeRuns: DaemonNodeMonitorRecord["activeRuns"];
+  sessions: WorkspaceBriefSession[];
+  tasks: WorkspaceBriefTask[];
+  artifacts: ArtifactIndexItem[];
+  metrics: {
+    nodeCount: number;
+    activeRunCount: number;
+    sessionCount: number;
+    activeSessionCount: number;
+    taskCount: number;
+    activeTaskCount: number;
+    artifactCount: number;
+  };
+  generatedAt: string;
+}
+
+export type WorkspaceFileKind = "directory" | "file" | "symlink" | "other";
+
+export interface WorkspaceFileEntry {
+  name: string;
+  path: string;
+  kind: WorkspaceFileKind;
+  bytes?: number | null;
+  updatedAt: string;
+}
+
+export interface WorkspaceFilesResponse {
+  employeeId: string;
+  workspacePath: string;
+  path: string;
+  exists: boolean;
+  entries: WorkspaceFileEntry[];
+  limit: number;
+  generatedAt: string;
+}
+
+export interface WorkspaceFileContentResponse {
+  employeeId: string;
+  workspacePath: string;
+  path: string;
+  exists: boolean;
+  isBinary: boolean;
+  bytes: number;
+  content: string | null;
+  truncated: boolean;
+  limitBytes: number;
+  generatedAt: string;
 }
 
 export interface TasksResponse {

@@ -410,6 +410,178 @@ def test_user_routes_are_scoped_to_authenticated_employee(monkeypatch) -> None:
         }).status_code == 403
 
 
+def test_artifact_index_is_scoped_to_authenticated_employee(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        admin_client = TestClient(app)
+        _bootstrap_admin(admin_client)
+        _login(admin_client, "admin", "secret123")
+        _create_user(admin_client, "alice")
+        _create_user(admin_client, "bob")
+
+        alice_client = TestClient(app)
+        bob_client = TestClient(app)
+        _login(alice_client, "alice", "userpass")
+        _login(bob_client, "bob", "userpass")
+
+        alice_first = alice_client.post("/sessions", json={
+            "taskGoal": "Alice first",
+            "workspacePath": "/workspace/alice",
+            "assignments": [{"agent": "claude"}],
+        })
+        assert alice_first.status_code == 201
+        alice_second = alice_client.post("/sessions", json={
+            "taskGoal": "Alice second",
+            "workspacePath": "/workspace/alice",
+            "assignments": [{"agent": "codex"}],
+        })
+        assert alice_second.status_code == 201
+        bob_session = bob_client.post("/sessions", json={
+            "taskGoal": "Bob private",
+            "workspacePath": "/workspace/bob",
+            "assignments": [{"agent": "pi"}],
+        })
+        assert bob_session.status_code == 201
+
+        alice_artifacts = alice_client.get("/artifacts")
+        assert alice_artifacts.status_code == 200
+        alice_body = alice_artifacts.json()
+        assert [artifact["ownerEmployeeId"] for artifact in alice_body["artifacts"]] == ["alice", "alice"]
+        assert {artifact["sessionId"] for artifact in alice_body["artifacts"]} == {
+            alice_first.json()["id"],
+            alice_second.json()["id"],
+        }
+
+        assert alice_client.get("/artifacts?employeeId=bob").status_code == 403
+
+        admin_bob_artifacts = admin_client.get("/artifacts?employeeId=bob")
+        assert admin_bob_artifacts.status_code == 200
+        assert [artifact["ownerEmployeeId"] for artifact in admin_bob_artifacts.json()["artifacts"]] == ["bob"]
+
+
+def test_workspace_brief_summarizes_employee_workspace(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        admin_client = TestClient(app)
+        _bootstrap_admin(admin_client)
+        _login(admin_client, "admin", "secret123")
+        _create_user(admin_client, "alice")
+        _create_user(admin_client, "bob")
+
+        register = admin_client.post("/daemon-nodes/register", json={
+            "sandboxId": "sbx_alice",
+            "employeeId": "alice",
+            "token": "node_token",
+            "workspacePath": "/workspace/alice",
+            "protocolVersion": 1,
+            "supportedAgents": ["claude", "codex"],
+            "status": "ready",
+        }, headers={"Authorization": "Bearer ui_token"})
+        assert register.status_code == 200
+
+        alice_client = TestClient(app)
+        bob_client = TestClient(app)
+        _login(alice_client, "alice", "userpass")
+        _login(bob_client, "bob", "userpass")
+
+        session = alice_client.post("/sessions", json={
+            "taskGoal": "Inspect auth flow",
+            "workspacePath": "/workspace/alice",
+            "assignments": [{"agent": "claude"}],
+        })
+        assert session.status_code == 201
+        task = alice_client.post("/tasks", json={
+            "title": "Patch auth",
+            "status": "assigned",
+            "assignedAgent": "codex",
+        })
+        assert task.status_code == 201
+        bob_session = bob_client.post("/sessions", json={
+            "taskGoal": "Bob private",
+            "workspacePath": "/workspace/bob",
+            "assignments": [{"agent": "pi"}],
+        })
+        assert bob_session.status_code == 201
+
+        brief_response = alice_client.get("/workspace/brief")
+        assert brief_response.status_code == 200
+        brief = brief_response.json()
+        assert brief["employeeId"] == "alice"
+        assert brief["workspacePath"] == "/workspace/alice"
+        assert brief["primaryNode"]["id"] == "sbx_alice"
+        assert "nodeToken" not in brief["primaryNode"]
+        assert brief["metrics"]["nodeCount"] == 1
+        assert brief["metrics"]["sessionCount"] == 1
+        assert brief["metrics"]["taskCount"] == 1
+        assert brief["metrics"]["artifactCount"] == 1
+        assert brief["sessions"][0]["id"] == session.json()["id"]
+        assert "events" not in brief["sessions"][0]
+        assert brief["tasks"][0]["id"] == task.json()["id"]
+        assert brief["artifacts"][0]["sessionId"] == session.json()["id"]
+
+        assert alice_client.get("/workspace/brief?employeeId=bob").status_code == 403
+
+        admin_bob = admin_client.get("/workspace/brief?employeeId=bob")
+        assert admin_bob.status_code == 200
+        assert admin_bob.json()["employeeId"] == "bob"
+        assert admin_bob.json()["metrics"]["sessionCount"] == 1
+
+
+def test_workspace_files_lists_employee_workspace(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        workspace = Path(root) / "workspaces" / "alice"
+        (workspace / "src").mkdir(parents=True)
+        (workspace / "README.md").write_text("hello", encoding="utf-8")
+        (workspace / "src" / "app.ts").write_text("export {};\n", encoding="utf-8")
+
+        app = create_app(root)
+        admin_client = TestClient(app)
+        _bootstrap_admin(admin_client)
+        _login(admin_client, "admin", "secret123")
+        _create_user(admin_client, "alice")
+        _create_user(admin_client, "bob")
+
+        register = admin_client.post("/daemon-nodes/register", json={
+            "sandboxId": "sbx_alice",
+            "employeeId": "alice",
+            "token": "node_token",
+            "workspacePath": str(workspace),
+            "protocolVersion": 1,
+            "supportedAgents": ["claude"],
+            "status": "ready",
+        }, headers={"Authorization": "Bearer ui_token"})
+        assert register.status_code == 200
+
+        alice_client = TestClient(app)
+        bob_client = TestClient(app)
+        _login(alice_client, "alice", "userpass")
+        _login(bob_client, "bob", "userpass")
+
+        response = alice_client.get("/workspace/files")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["employeeId"] == "alice"
+        assert body["workspacePath"] == str(workspace)
+        assert body["path"] == ""
+        assert body["exists"] is True
+        assert [(entry["kind"], entry["path"]) for entry in body["entries"]] == [
+            ("directory", "src"),
+            ("file", "README.md"),
+        ]
+        assert body["entries"][1]["bytes"] == 5
+
+        nested = alice_client.get("/workspace/files?path=src")
+        assert nested.status_code == 200
+        assert nested.json()["path"] == "src"
+        assert nested.json()["entries"][0]["path"] == "src/app.ts"
+
+        assert alice_client.get("/workspace/files?path=..").status_code == 403
+        assert bob_client.get("/workspace/files?employeeId=alice").status_code == 403
+
+
 def test_admin_can_create_resources_for_specific_employee(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:

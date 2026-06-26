@@ -1,5 +1,6 @@
 import type {
   AgentName,
+  ArtifactsResponse,
   AssignControlPanelDaemonNodeResponse,
   ChatIntegration,
   ChatIntegrationsResponse,
@@ -25,6 +26,9 @@ import type {
   UserRole,
   TaskMutationInput,
   TasksResponse,
+  WorkspaceBriefResponse,
+  WorkspaceFilesResponse,
+  WorkspaceFileContentResponse,
 } from "./types.js";
 
 export class RelayApiError extends Error {
@@ -197,6 +201,48 @@ export function createUser(input: { username: string; password: string; role?: U
 
 export function listSessions(signal?: AbortSignal): Promise<SessionsResponse> {
   return apiJson<SessionsResponse>("/sessions", { signal });
+}
+
+export function listArtifacts(
+  input: { employeeId?: string; workspacePath?: string } = {},
+  signal?: AbortSignal,
+): Promise<ArtifactsResponse> {
+  const params = new URLSearchParams();
+  if (input.employeeId) params.set("employeeId", input.employeeId);
+  if (input.workspacePath) params.set("workspacePath", input.workspacePath);
+  const query = params.toString();
+  return apiJson<ArtifactsResponse>(`/artifacts${query ? `?${query}` : ""}`, { signal });
+}
+
+export function getWorkspaceBrief(
+  input: { employeeId?: string } = {},
+  signal?: AbortSignal,
+): Promise<WorkspaceBriefResponse> {
+  const params = new URLSearchParams();
+  if (input.employeeId) params.set("employeeId", input.employeeId);
+  const query = params.toString();
+  return apiJson<WorkspaceBriefResponse>(`/workspace/brief${query ? `?${query}` : ""}`, { signal });
+}
+
+export function listWorkspaceFiles(
+  input: { employeeId?: string; path?: string } = {},
+  signal?: AbortSignal,
+): Promise<WorkspaceFilesResponse> {
+  const params = new URLSearchParams();
+  if (input.employeeId) params.set("employeeId", input.employeeId);
+  if (input.path) params.set("path", input.path);
+  const query = params.toString();
+  return apiJson<WorkspaceFilesResponse>(`/workspace/files${query ? `?${query}` : ""}`, { signal });
+}
+
+export function readWorkspaceFile(
+  input: { employeeId?: string; path: string },
+  signal?: AbortSignal,
+): Promise<WorkspaceFileContentResponse> {
+  const params = new URLSearchParams();
+  if (input.employeeId) params.set("employeeId", input.employeeId);
+  params.set("path", input.path);
+  return apiJson<WorkspaceFileContentResponse>(`/workspace/file?${params.toString()}`, { signal });
 }
 
 export function listTasks(signal?: AbortSignal): Promise<TasksResponse> {

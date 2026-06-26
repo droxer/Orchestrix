@@ -42,6 +42,20 @@
   }
 }
 
+/* Touch targets — on coarse pointers (touch), raise interactive controls
+   that sit at 40px to the 44px WCAG 2.5.5 / Apple HIG minimum. Scoped to
+   pointer:coarse so desktop mouse density is unaffected. Loads from a11y.css
+   (last in source order) so it wins the equal-specificity tie. */
+@media (pointer: coarse) {
+  .decision-bar button,
+  .handoff-actions button,
+  .agent-picker button,
+  .agent-picker [role="option"],
+  .people-search {
+    min-height: 44px;
+  }
+}
+
 /* OS “increase contrast” — boost hairlines and body copy when the user
    has not already pinned the dedicated High contrast theme. */
 @media (prefers-contrast: more) {

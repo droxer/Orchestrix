@@ -12,6 +12,8 @@ import {
   CalendarDays,
   Code2,
   Columns3,
+  FileText,
+  FolderClosed,
   Rows3,
   Forward,
   Hash,
@@ -64,6 +66,7 @@ function withStandardStroke(Icon: LucideIcon, displayName: string) {
 // Semantic exports. Anywhere we want to swap the underlying glyph, do it
 // here — no caller in the app has to know which lucide picture we chose.
 export const NavConversations = withStandardStroke(MessagesSquare, "NavConversations");
+export const NavWorkspace = withStandardStroke(Terminal, "NavWorkspace");
 export const NavAdmin = withStandardStroke(UserCog, "NavAdmin");
 export const NavBacklog = withStandardStroke(ListTodo, "NavBacklog");
 export const NavChannels = withStandardStroke(Hash, "NavChannels");
@@ -88,6 +91,8 @@ export const ActionAddPerson = withStandardStroke(UserPlus, "ActionAddPerson");
 export const ActionRemove = withStandardStroke(X, "ActionRemove");
 export const ActionSearch = withStandardStroke(Search, "ActionSearch");
 export const ActionCalendar = withStandardStroke(CalendarDays, "ActionCalendar");
+export const WorkspaceFile = withStandardStroke(FileText, "WorkspaceFile");
+export const WorkspaceFolder = withStandardStroke(FolderClosed, "WorkspaceFolder");
 export const ViewBoard = withStandardStroke(Columns3, "ViewBoard");
 export const ViewList = withStandardStroke(Rows3, "ViewList");
 export const ActionKey = withStandardStroke(KeyRound, "ActionKey");

@@ -9,6 +9,7 @@ from loguru import logger
 from ..core.models import AGENT_NAMES
 from ..persistence.stores import task_priority, task_routine_cadence, task_routine_type, task_status, valid_agent
 from ..services.controller import SessionController
+from ..services.task_scheduler import next_routine_date
 from .deps import AppContextDep
 from .helpers import (
     actor_can_access_record,
@@ -131,6 +132,60 @@ async def start_task_on_ready_node(
     return {"task": updated_task, "session": session}
 
 
+async def start_routine_occurrence_on_ready_node(
+    ctx: AppContextDep,
+    routine: dict[str, Any],
+    actor: dict[str, Any],
+    *,
+    agent: str,
+    mode: str = "action",
+) -> dict[str, Any] | None:
+    if not routine.get("isRoutine") or not routine.get("routineEnabled"):
+        return None
+    today = date.today()
+    scheduled_run_date = routine_next_run_date(routine)
+    occurrence = None
+    if scheduled_run_date and scheduled_run_date <= today:
+        next_run = next_routine_date(scheduled_run_date, routine.get("routineCadence") or "weekly", today)
+        occurrence = ctx.task_store.promote_due_routine(
+            routine["id"],
+            today.isoformat(),
+            next_run.isoformat() if next_run else None,
+        )
+        if not occurrence:
+            return None
+    else:
+        occurrence = ctx.task_store.create_task({
+            "title": routine["title"],
+            "description": routine.get("description", ""),
+            "priority": routine.get("priority", "normal"),
+            "ownerEmployeeId": routine.get("ownerEmployeeId"),
+            "assigneeEmployeeId": routine.get("assigneeEmployeeId"),
+            "dueDate": today.isoformat(),
+            "assignedAgent": agent,
+            "status": "assigned",
+        })
+        ctx.task_store.record_activity(
+            routine["id"],
+            f"Routine occurrence created: {occurrence['id']}.",
+            {"agent": agent},
+        )
+    result = await start_task_on_ready_node(ctx, occurrence, actor, mode=mode)
+    if result and result.get("session"):
+        ctx.task_store.link_session(routine["id"], result["session"]["id"])
+    return result
+
+
+def routine_next_run_date(routine: dict[str, Any]) -> date | None:
+    next_run = routine.get("routineNextRunDate")
+    if not next_run:
+        return None
+    try:
+        return date.fromisoformat(next_run)
+    except ValueError:
+        return None
+
+
 @router.get("/tasks")
 async def list_tasks(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     actor = request_actor(request, ctx.auth_store)
@@ -246,7 +301,11 @@ async def start_task(task_id: str, request: Request, ctx: AppContextDep) -> dict
         raise HTTPException(400, f"agent must be one of: {', '.join(AGENT_NAMES)}.")
     if task.get("assignedAgent") != agent:
         task = ctx.task_store.assign_task(task_id, agent)
-    result = await start_task_on_ready_node(ctx, task, actor, mode="review" if body.get("mode") == "review" else "action")
+    mode = "review" if body.get("mode") == "review" else "action"
+    if task.get("isRoutine"):
+        result = await start_routine_occurrence_on_ready_node(ctx, task, actor, agent=agent, mode=mode)
+    else:
+        result = await start_task_on_ready_node(ctx, task, actor, mode=mode)
     if not result or not result.get("session"):
         return {"task": result["task"] if result else task, "session": None}
     return result
