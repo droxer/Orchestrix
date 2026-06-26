@@ -6,26 +6,28 @@ const backendUrl = process.env.RELAY_BACKEND_URL ?? process.env.RELAY_DAEMON_URL
 const nextConfig = (phase: string): NextConfig => {
   const isDev = phase === PHASE_DEVELOPMENT_SERVER;
   return {
-    basePath: "/web",
     ...(!isDev ? { output: "export" as const } : {}),
     ...(isDev
       ? {
+          // The app is a single-page client app (only src/app/page.tsx). In
+          // production the backend serves index.html for any unmatched path, so
+          // client-side views like /login and /channels resolve. Next dev has no
+          // SPA fallback, so redirect those direct URLs to the app home.
           async redirects() {
             return [
-              { source: "/", destination: "/web", permanent: false, basePath: false },
-              { source: "/login", destination: "/web", permanent: false, basePath: false },
-              { source: "/channels", destination: "/web", permanent: false, basePath: false },
+              { source: "/login", destination: "/", permanent: false },
+              { source: "/channels", destination: "/", permanent: false },
             ];
           },
           async rewrites() {
             return [
-              { source: "/auth/:path*", destination: `${backendUrl}/auth/:path*`, basePath: false },
-              { source: "/cp", destination: `${backendUrl}/cp`, basePath: false },
-              { source: "/cp/:path*", destination: `${backendUrl}/cp/:path*`, basePath: false },
-              { source: "/sandboxes/:path*", destination: `${backendUrl}/sandboxes/:path*`, basePath: false },
-              { source: "/sessions/:path*", destination: `${backendUrl}/sessions/:path*`, basePath: false },
-              { source: "/daemon-nodes/:path*", destination: `${backendUrl}/daemon-nodes/:path*`, basePath: false },
-              { source: "/tasks/:path*", destination: `${backendUrl}/tasks/:path*`, basePath: false },
+              { source: "/auth/:path*", destination: `${backendUrl}/auth/:path*` },
+              { source: "/cp", destination: `${backendUrl}/cp` },
+              { source: "/cp/:path*", destination: `${backendUrl}/cp/:path*` },
+              { source: "/sandboxes/:path*", destination: `${backendUrl}/sandboxes/:path*` },
+              { source: "/sessions/:path*", destination: `${backendUrl}/sessions/:path*` },
+              { source: "/daemon-nodes/:path*", destination: `${backendUrl}/daemon-nodes/:path*` },
+              { source: "/tasks/:path*", destination: `${backendUrl}/tasks/:path*` },
             ];
           },
         }

@@ -55,11 +55,11 @@ export const metadata: Metadata = {
   description: "Coordinate Claude, Pi, and Codex Inside Employee Sandboxes.",
   icons: {
     icon: [
-      { url: "/web/favicon.svg", type: "image/svg+xml" },
-      { url: "/web/brand/relay-mark.svg", type: "image/svg+xml" },
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/brand/relay-mark.svg", type: "image/svg+xml" },
     ],
-    shortcut: "/web/favicon.svg",
-    apple: "/web/brand/relay-mark.svg",
+    shortcut: "/favicon.svg",
+    apple: "/brand/relay-mark.svg",
   },
 };
 

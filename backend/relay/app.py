@@ -28,7 +28,7 @@ from .services.task_scheduler import TaskScheduler
 load_backend_env()
 
 CONTROL_PANEL_VERSION = os.environ.get("RELAY_CONTROL_PANEL_VERSION") or "python"
-WEB_UI_PATH = "/web"
+WEB_UI_PATH = "/"
 
 
 def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
@@ -66,8 +66,8 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     app.state.task_scheduler = scheduler
     app.state.control_panel_version = CONTROL_PANEL_VERSION
 
-    @app.get("/")
-    async def root() -> dict[str, Any]:
+    @app.get("/api")
+    async def api_info() -> dict[str, Any]:
         return {
             "name": "Relay backend",
             "ui": True,
@@ -87,7 +87,6 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
             ],
         }
 
-    app.include_router(web_routes.router)
     app.include_router(auth_routes.router)
     app.include_router(admin_routes.router)
     app.include_router(chat_routes.router)
@@ -95,6 +94,9 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     app.include_router(session_routes.router)
     app.include_router(sandbox_routes.router)
     app.include_router(daemon_node_routes.router)
+    # Registered last: its root catch-all serves the exported web UI and must not
+    # shadow the explicit API routes above.
+    app.include_router(web_routes.router)
     return app
 
 

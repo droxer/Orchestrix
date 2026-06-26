@@ -13,8 +13,10 @@ async def control_panel() -> str:
     return daemon_control_panel_html()
 
 
-@router.get("/web")
-@router.get("/web/{asset_path:path}")
+# Catch-all for the exported web UI served at the root path. Registered last in
+# app.py so explicit API routes (/cp, /auth, /sessions, ...) take precedence;
+# unmatched paths fall back to the SPA's index.html for client-side routing.
+@router.get("/{asset_path:path}")
 async def web_asset(asset_path: str = "") -> Response:
     return web_ui_asset_response(asset_path)
 
