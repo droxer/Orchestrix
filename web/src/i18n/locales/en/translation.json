@@ -508,7 +508,6 @@
     "status_connected": "Connected",
     "status_disconnected": "Disconnected",
     "status_error": "Error",
-    "agent_empty": "No MCP servers configured for this agent.",
     "total": "{{count}} servers"
   },
   "skills": {
@@ -568,8 +567,7 @@
       "vercel-react-best-practices": {
         "desc": "React + Vercel deployment best practices, edge functions, and performance patterns."
       }
-    },
-    "agent_empty": "No skills installed for this agent."
+    }
   },
   "pref": {
     "title": "Preferences",

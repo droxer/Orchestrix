@@ -482,7 +482,6 @@
     "status_connected": "已連線",
     "status_disconnected": "已斷線",
     "status_error": "錯誤",
-    "agent_empty": "此 Agent 未設定 MCP 伺服器。",
     "total": "共 {{count}} 個伺服器"
   },
   "skills": {
@@ -542,8 +541,7 @@
       "vercel-react-best-practices": {
         "desc": "React + Vercel 部署最佳實踐、邊緣函式與效能模式。"
       }
-    },
-    "agent_empty": "此 Agent 未安裝技能。"
+    }
   },
   "pref": {
     "title": "偏好設定",
