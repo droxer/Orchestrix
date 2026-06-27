@@ -1,11 +1,15 @@
 import {
   buildClaudeActionCommand,
+  buildClaudeAskCommand,
   buildClaudeReviewCommand,
   buildCodexActionCommand,
+  buildCodexAskCommand,
   buildCodexReviewCommand,
   buildKimiActionCommand,
+  buildKimiAskCommand,
   buildKimiReviewCommand,
   buildPiActionCommand,
+  buildPiAskCommand,
   buildPiPreflightCommand,
   buildPiReviewCommand,
 } from "./commands.js";
@@ -41,11 +45,15 @@ export interface AgentDefinition {
   actionRole: AgentActionRole;
   buildActionCommand(state: AgentState): string;
   buildReviewCommand(state: AgentState): string;
+  /** Read-only Q&A command (UI "Ask" mode). */
+  buildAskCommand(state: AgentState): string;
   createRenderer(mode: AgentTaskMode): StreamRenderer;
   /** Label shown for the action-mode artifact/log header. */
   actionLabel: string;
   /** Label shown for the review-mode artifact/log header. */
   reviewLabel: string;
+  /** Label shown for the ask-mode artifact/log header. */
+  askLabel: string;
   /** Whether the daemon must provision guest auth files before this agent can run. */
   needsGuestAuth: boolean;
   preflight: { label: string; command(): string };
@@ -61,9 +69,11 @@ export const AGENT_REGISTRY: Record<AgentName, AgentDefinition> = {
     actionRole: "implementer",
     buildActionCommand: buildClaudeActionCommand,
     buildReviewCommand: buildClaudeReviewCommand,
+    buildAskCommand: buildClaudeAskCommand,
     createRenderer: () => new ClaudeStreamRenderer(),
     actionLabel: "Claude Code",
     reviewLabel: "Claude Code Review",
+    askLabel: "Claude Code Ask",
     needsGuestAuth: false,
     preflight: { label: "Claude Code", command: () => runAsAgent("claude --version", "claude") },
   },
@@ -76,9 +86,11 @@ export const AGENT_REGISTRY: Record<AgentName, AgentDefinition> = {
     actionRole: "tester",
     buildActionCommand: buildPiActionCommand,
     buildReviewCommand: buildPiReviewCommand,
+    buildAskCommand: buildPiAskCommand,
     createRenderer: () => new PiStreamRenderer(),
     actionLabel: "Pi",
     reviewLabel: "Pi Review",
+    askLabel: "Pi Ask",
     needsGuestAuth: true,
     preflight: { label: "Pi coding agent", command: buildPiPreflightCommand },
   },
@@ -91,9 +103,11 @@ export const AGENT_REGISTRY: Record<AgentName, AgentDefinition> = {
     actionRole: "implementer",
     buildActionCommand: buildCodexActionCommand,
     buildReviewCommand: buildCodexReviewCommand,
+    buildAskCommand: buildCodexAskCommand,
     createRenderer: () => new CodexStreamRenderer(),
     actionLabel: "Codex Action",
     reviewLabel: "Codex Review",
+    askLabel: "Codex Ask",
     needsGuestAuth: true,
     preflight: { label: "Codex auth", command: () => runAsAgent("codex login status", "codex") },
   },
@@ -106,9 +120,11 @@ export const AGENT_REGISTRY: Record<AgentName, AgentDefinition> = {
     actionRole: "implementer",
     buildActionCommand: buildKimiActionCommand,
     buildReviewCommand: buildKimiReviewCommand,
+    buildAskCommand: buildKimiAskCommand,
     createRenderer: () => new PlainTextStreamRenderer("Kimi", ansi.magenta),
     actionLabel: "Kimi",
     reviewLabel: "Kimi Review",
+    askLabel: "Kimi Ask",
     needsGuestAuth: true,
     preflight: { label: "Kimi", command: () => runAsAgent("kimi --version && kimi doctor", "kimi") },
   },

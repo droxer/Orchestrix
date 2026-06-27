@@ -116,8 +116,6 @@ export function applySessionEvent(session: RelaySession, event: RelayEvent): Rel
         if (event.decision.kind === "cancel") delete updated.pendingDecision;
         return updated;
       }
-    case "review.verdict":
-      return { ...next, reviewVerdict: event.verdict, phase: `review:${event.verdict}` };
     case "session.completed":
       {
         const updated: RelaySession = { ...next, status: "completed", phase: "completed", finalOutcome: event.outcome };

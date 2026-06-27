@@ -14,8 +14,6 @@ export interface ArtifactStat {
   tone: ArtifactStatTone;
 }
 
-const VERDICT_LINE = /^\s*RELAY_REVIEW_VERDICT:\s*(APPROVED|REJECTED)\s*[.!]?\s*$/i;
-
 /** Diff additions/deletions and touched-file count, parsed from unified-diff text. */
 function diffStat(text: string): ArtifactStat {
   let additions = 0;
@@ -53,21 +51,6 @@ function testStat(text: string): ArtifactStat {
   };
 }
 
-/** Review verdict from the RELAY_REVIEW_VERDICT marker. */
-function reviewStat(text: string): ArtifactStat {
-  for (const line of text.split(/\r?\n/)) {
-    const match = VERDICT_LINE.exec(line);
-    if (!match) continue;
-    const approved = match[1].toUpperCase() === "APPROVED";
-    return {
-      key: approved ? "review_approved" : "review_rejected",
-      vars: {},
-      tone: approved ? "up" : "down",
-    };
-  }
-  return { key: "review_pending", vars: {}, tone: "neutral" };
-}
-
 /** Exit code from a command/shell log, when one is recorded. */
 function commandStat(text: string): ArtifactStat {
   const match = /(?:exit(?:\s*code)?|returned)\D*(\d+)/i.exec(text);
@@ -92,8 +75,6 @@ export function summarizeArtifact(kind: ArtifactKind, text: string): ArtifactSta
       return diffStat(text);
     case "test_output":
       return testStat(text);
-    case "review":
-      return reviewStat(text);
     case "command_log":
       return commandStat(text);
     default:

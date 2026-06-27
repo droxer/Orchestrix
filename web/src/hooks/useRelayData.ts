@@ -2,9 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { listDaemonNodes, listSandboxes, listSessions, listTasks } from "../api";
-import type { DaemonNodeMonitorRecord, RelaySession, RelayTask, SandboxRecord, Tone } from "../types";
-
-type StatusUpdate = { tone: Tone; message: string };
+import type { DaemonNodeMonitorRecord, RelaySession, RelayTask, SandboxRecord } from "../types";
 
 const RELAY_KEY = ["relay"] as const;
 const SANDBOXES_KEY = ["relay", "sandboxes"] as const;
@@ -29,7 +27,6 @@ type RelayDataResult = {
 // AbortController + Promise.allSettled. The hook keeps its previous external
 // shape so callers (App.tsx) are unchanged.
 export function useRelayData(
-  setStatus: (status: StatusUpdate) => void,
   token: string | undefined,
   enabled: boolean,
 ): RelayDataResult {
@@ -100,18 +97,6 @@ export function useRelayData(
       queryClient.setQueryData(TASKS_KEY, []);
     }
   }, [enabled, queryClient]);
-
-  // Surface the first failing query as a status warning, mirroring the prior
-  // Promise.allSettled error reporting.
-  const firstError = sandboxesQuery.error ?? nodesQuery.error ?? sessionsQuery.error ?? tasksQuery.error;
-  useEffect(() => {
-    if (firstError) {
-      setStatus({
-        tone: "warn",
-        message: firstError instanceof Error ? firstError.message : String(firstError),
-      });
-    }
-  }, [firstError, setStatus]);
 
   // Refetch under the new credential whenever the active token changes.
   useEffect(() => {

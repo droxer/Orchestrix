@@ -2,8 +2,10 @@ import type { AgentOutputSink } from "./format.js";
 import type { TokenUsage } from "./token-usage.js";
 
 export type AgentName = "claude" | "pi" | "codex" | "kimi";
-export type AgentTaskMode = "action" | "review";
-export type ReviewVerdict = "approved" | "rejected" | "failed";
+// "action" runs the agent with write access (UI label: "Agent"); "ask" is a
+// read-only Q&A pass enforced via each CLI's read-only flag; "review" is the
+// default-workflow Codex review pass and is not user-selectable in the composer.
+export type AgentTaskMode = "action" | "review" | "ask";
 export type { AgentOutputSink };
 
 export const AGENT_USER = "agent";
@@ -15,8 +17,6 @@ export interface AgentState {
   last_exit_code: number;
   /** Per-agent consecutive failure counts; absent entries mean zero. */
   agent_failures: Partial<Record<AgentName, number>>;
-  review_verdict: ReviewVerdict | "";
-  review_feedback: string;
   token_usage?: TokenUsage;
   /** Bridge text from intervening other-agent runs on the shared session, if any. */
   prior_agent_bridge?: string;
@@ -77,8 +77,6 @@ export function initialAgentState(taskGoal: string): AgentState {
     agent_logs: [],
     last_exit_code: 0,
     agent_failures: {},
-    review_verdict: "",
-    review_feedback: "",
   };
 }
 

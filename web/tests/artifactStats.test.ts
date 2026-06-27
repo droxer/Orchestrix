@@ -35,22 +35,8 @@ describe("summarizeArtifact", () => {
     });
   });
 
-  it("reads an approved review verdict", () => {
-    const stat = summarizeArtifact("review", "Looks good.\nRELAY_REVIEW_VERDICT: APPROVED");
-    assert.equal(stat?.key, "review_approved");
-    assert.equal(stat?.tone, "up");
-  });
-
-  it("reads a rejected review verdict", () => {
-    const stat = summarizeArtifact("review", "RELAY_REVIEW_VERDICT: REJECTED.");
-    assert.equal(stat?.key, "review_rejected");
-    assert.equal(stat?.tone, "down");
-  });
-
-  it("falls back to pending when no verdict marker is present", () => {
-    const stat = summarizeArtifact("review", "Some prose without a marker");
-    assert.equal(stat?.key, "review_pending");
-    assert.equal(stat?.tone, "neutral");
+  it("has no semantic stat for review artifacts", () => {
+    assert.equal(summarizeArtifact("review", "Some review prose"), null);
   });
 
   it("tallies passing and failing tests", () => {

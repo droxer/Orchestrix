@@ -10,6 +10,8 @@
   "nav": {
     "conversations": "对话",
     "chats": "消息",
+    "workspace": "工作区",
+    "workspace_label": "员工工作区",
     "backlog": "待办",
     "backlog_label": "待办管理",
     "routine": "例行",
@@ -164,6 +166,36 @@
       "normal": "普通",
       "low": "低"
     }
+  },
+  "workspace": {
+    "title": "工作区",
+    "sub": "@{{employee}} 驾驶舱",
+    "loading": "加载工作区中",
+    "metrics": "工作区指标",
+    "metric_runs": "活跃运行",
+    "metric_tasks": "活跃任务",
+    "metric_sessions": "对话",
+    "metric_artifacts": "产物",
+    "browse": "浏览",
+    "artifacts": "产物",
+    "files": "文件",
+    "preview": "预览",
+    "select_to_preview": "选择产物或文件进行预览。",
+    "open_thread": "打开对话",
+    "loading_preview": "加载预览中。",
+    "binary_file": "二进制文件 — 无法预览。",
+    "empty_file": "此文件为空。",
+    "view_mode": "预览模式",
+    "view_rendered": "渲染视图",
+    "view_source": "源代码",
+    "file_truncated": "预览已截断至 {{limit}}。",
+    "no_artifacts": "暂无产物。",
+    "no_files": "此目录中没有文件。",
+    "loading_files": "加载文件中。",
+    "files_unavailable": "此主机上无可用的工作区路径。",
+    "parent_directory": "上级目录",
+    "load_failed": "工作区不可用",
+    "retry": "重试"
   },
   "routine": {
     "title": "例行",
@@ -618,12 +650,9 @@
     "unknown": "未知"
   },
   "mode": {
-    "action": "执行",
+    "action": "代理",
+    "ask": "询问",
     "review": "审查"
-  },
-  "verdict": {
-    "approved": "已通过",
-    "rejected": "已拒绝"
   },
   "artifact": {
     "kind": {
@@ -649,9 +678,6 @@
       "diff": "+{{additions}} −{{deletions}} · {{files}} 个文件",
       "test": "{{passed}} 通过 · {{failed}} 失败",
       "test_unknown": "测试输出",
-      "review_approved": "已通过",
-      "review_rejected": "需修改",
-      "review_pending": "审阅",
       "command": "退出码 {{code}}",
       "command_unknown": "命令日志"
     },
@@ -683,7 +709,6 @@
     "decision": "你 — {{kind}}",
     "agent_completed": "{{agent}} — {{status}}",
     "exit_code": "退出码 {{exitCode}}",
-    "review_verdict": "{{agent}} 裁决 — {{verdict}}",
     "session_status": "状态 — {{phase}}",
     "session_completed": "会话已完成",
     "session_failed": "会话失败"

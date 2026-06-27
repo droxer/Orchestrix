@@ -11,22 +11,24 @@ import {
   type AgentName,
   agentNameList,
   buildClaudeActionCommand,
+  buildClaudeAskCommand,
   buildClaudeReviewCommand,
   buildCodexActionCommand,
+  buildCodexAskCommand,
   buildCodexReviewCommand,
   buildKimiActionCommand,
+  buildKimiAskCommand,
   buildKimiReviewCommand,
   buildPiActionCommand,
+  buildPiAskCommand,
   buildPiPreflightCommand,
   buildPiReviewCommand,
   claudeActionNode,
   claudeTaskPrompt,
-  classifyReview,
   ClaudeStreamRenderer,
   codexActionPrompt,
   reviewPrompt,
   CodexStreamRenderer,
-  extractReviewFeedback,
   extractTokenUsageFromJsonl,
   failureCount,
   formatClaudeJsonLine,
@@ -80,8 +82,6 @@ function state(overrides: Partial<AgentState> = {}): AgentState {
     agent_logs: [],
     last_exit_code: 0,
     agent_failures: {},
-    review_verdict: "",
-    review_feedback: "",
     ...overrides,
   };
 }
@@ -127,102 +127,42 @@ function writeFakePi(path: string): void {
   chmodSync(path, 0o755);
 }
 
-describe("review parsing", () => {
-  it("classifies rejected zero-exit verdict", () => {
-    const feedback = extractReviewFeedback(
-      codexStdout("Blocking issue found.\nRELAY_REVIEW_VERDICT: REJECTED"),
-    );
-
-    assert.equal(classifyReview(0, feedback), "rejected");
-  });
-
-  it("classifies approved verdict", () => {
-    const feedback = extractReviewFeedback(codexStdout("Looks good.\nRELAY_REVIEW_VERDICT: APPROVED"));
-
-    assert.equal(classifyReview(0, feedback), "approved");
-  });
-
-  it("extracts review verdicts from newer Codex assistant message events", () => {
-    const feedback = extractReviewFeedback(
-      JSON.stringify({
-        type: "message",
-        role: "assistant",
-        content: [{ type: "output_text", text: "Looks good.\nRELAY_REVIEW_VERDICT: APPROVED" }],
-      }) + "\n",
-    );
-
-    assert.equal(feedback, "Looks good.\nRELAY_REVIEW_VERDICT: APPROVED");
-    assert.equal(classifyReview(0, feedback), "approved");
-  });
-
-  it("extracts review verdicts from Pi JSON assistant message events", () => {
-    const feedback = extractReviewFeedback(
-      JSON.stringify({
-        type: "message",
-        message: {
-          role: "assistant",
-          content: [{ type: "text", text: "Looks good.\nRELAY_REVIEW_VERDICT: APPROVED" }],
-        },
-      }) + "\n",
-    );
-
-    assert.equal(feedback, "Looks good.\nRELAY_REVIEW_VERDICT: APPROVED");
-    assert.equal(classifyReview(0, feedback), "approved");
-  });
-
-  it("extracts review verdicts from Claude stream-json events", () => {
-    const feedback = extractReviewFeedback(
-      JSON.stringify({
-        type: "stream_event",
-        event: { type: "content_block_delta", delta: { type: "text_delta", text: "Looks good.\n" } },
-      }) + "\n" +
-      JSON.stringify({
-        type: "stream_event",
-        event: { type: "content_block_delta", delta: { type: "text_delta", text: "RELAY_REVIEW_VERDICT: APPROVED" } },
-      }) + "\n",
-    );
-
-    assert.equal(feedback, "Looks good.\n\nRELAY_REVIEW_VERDICT: APPROVED");
-    assert.equal(classifyReview(0, feedback), "approved");
-  });
-
-  it("does not treat a missing review verdict as success", () => {
-    assert.equal(classifyReview(0, "Looks good."), "failed");
-  });
-
-  it("classifies review node output for every agent", async () => {
+describe("review mode", () => {
+  it("runs a review pass as an informational agent run for every agent", async () => {
     for (const agent of AGENT_NAMES) {
       const stdout = agent === "codex"
-        ? `${codexStdout("Blocking issue found.\nRELAY_REVIEW_VERDICT: REJECTED")}\n`
-        : "Blocking issue found.\nRELAY_REVIEW_VERDICT: REJECTED\n";
+        ? `${codexStdout("Blocking issue found.")}\n`
+        : "Blocking issue found.\n";
       const patch = await runAgentNode(agent, "review", state({ task_goal: "Fix auth" }), {
         sink: () => undefined,
         execStream: async (cmd, args) => {
           assert.equal(cmd, "bash");
-          assert.match(args?.[1] ?? "", /RELAY_REVIEW_VERDICT/);
+          assert.doesNotMatch(args?.[1] ?? "", /RELAY_REVIEW_VERDICT/);
           return { exit_code: 0, stdout, stderr: "" };
         },
       });
 
-      assert.equal(patch.review_verdict, "rejected");
+      assert.equal(patch.last_exit_code, 0);
       assert.equal(patch.agent_failures?.[agent], 0);
-      assert.match(patch.review_feedback ?? "", /Blocking issue found/);
+      assert.match(patch.agent_logs?.[0] ?? "", /Blocking issue found/);
+      assert.equal("review_verdict" in patch, false);
+      assert.equal("review_feedback" in patch, false);
     }
   });
 
-  it("marks missing review verdict as a review failure for every agent", async () => {
+  it("marks a non-zero review exit as a failure for every agent", async () => {
     for (const agent of AGENT_NAMES) {
       const patch = await runAgentNode(agent, "review", state({ task_goal: "Fix auth" }), {
         sink: () => undefined,
-        execStream: async () => ({ exit_code: 0, stdout: "Looks good.\n", stderr: "" }),
+        execStream: async () => ({ exit_code: 1, stdout: "", stderr: "boom" }),
       });
 
-      assert.equal(patch.review_verdict, "failed");
+      assert.equal(patch.last_exit_code, 1);
       assert.equal(patch.agent_failures?.[agent], 1);
     }
   });
 
-  it("builds review commands for every agent", () => {
+  it("builds review commands for every agent without a verdict marker", () => {
     const taskState = state({ task_goal: "Review auth" });
     for (const [agent, command] of [
       ["claude", buildClaudeReviewCommand(taskState)],
@@ -231,43 +171,48 @@ describe("review parsing", () => {
       ["kimi", buildKimiReviewCommand(taskState)],
     ] as Array<[AgentName, string]>) {
       assert.match(command, new RegExp(agent));
-      assert.match(command, /RELAY_REVIEW_VERDICT/);
+      assert.match(command, /Review auth/);
+      assert.doesNotMatch(command, /RELAY_REVIEW_VERDICT/);
     }
+  });
+
+  it("builds read-only ask commands for every agent", () => {
+    const taskState = state({ task_goal: "How does auth work?" });
+    for (const [agent, command] of [
+      ["claude", buildClaudeAskCommand(taskState)],
+      ["codex", buildCodexAskCommand(taskState)],
+      ["pi", buildPiAskCommand(taskState)],
+      ["kimi", buildKimiAskCommand(taskState)],
+    ] as Array<[AgentName, string]>) {
+      assert.match(command, new RegExp(agent));
+      // The ask prompt carries the read-only instruction and never the review marker.
+      assert.match(command, /read-only inspection/);
+      assert.doesNotMatch(command, /RELAY_REVIEW_VERDICT/);
+    }
+  });
+
+  it("confines ask mode to read-only at the CLI level for Claude and Codex", () => {
+    const taskState = state({ task_goal: "Explain the build" });
+    assert.match(buildClaudeAskCommand(taskState), /--permission-mode\s+plan/);
+    assert.doesNotMatch(buildClaudeAskCommand(taskState), /bypassPermissions/);
+    assert.match(buildCodexAskCommand(taskState), /--sandbox\s+read-only/);
+    assert.doesNotMatch(buildCodexAskCommand(taskState), /dangerously-bypass/);
   });
 });
 
 describe("prompts", () => {
-  it("Claude prompt includes review feedback", () => {
-    const prompt = claudeTaskPrompt(
-      state({
-        task_goal: "Fix auth",
-        review_verdict: "rejected",
-        review_feedback: "Token expiry is not checked.",
-      }),
-    );
+  it("Claude action prompt carries the task goal", () => {
+    const prompt = claudeTaskPrompt(state({ task_goal: "Fix auth" }));
 
     assert.match(prompt, /Fix auth/);
-    assert.doesNotMatch(prompt, /Read docs\/plan\.md/);
-    assert.doesNotMatch(prompt, /Run tests/);
-    assert.match(prompt, /Review feedback to fix:/);
-    assert.match(prompt, /Token expiry is not checked\./);
+    assert.doesNotMatch(prompt, /Review feedback to fix:/);
   });
 
-  it("Pi prompt includes review feedback", () => {
-    const prompt = piTaskPrompt(
-      state({
-        task_goal: "Fix auth",
-        review_verdict: "rejected",
-        review_feedback: "Token expiry is not checked.",
-      }),
-    );
+  it("Pi action prompt carries the task goal", () => {
+    const prompt = piTaskPrompt(state({ task_goal: "Fix auth" }));
 
     assert.match(prompt, /Fix auth/);
-    assert.doesNotMatch(prompt, /Read docs\/plan\.md/);
-    assert.doesNotMatch(prompt, /current implementation/);
-    assert.doesNotMatch(prompt, /run tests/);
-    assert.match(prompt, /Review feedback to fix:/);
-    assert.match(prompt, /Token expiry is not checked\./);
+    assert.doesNotMatch(prompt, /Review feedback to fix:/);
   });
 
   it("Codex implementation prompt does not require a review verdict", () => {
@@ -284,16 +229,15 @@ describe("prompts", () => {
     assert.doesNotMatch(command, /RELAY_REVIEW_VERDICT/);
   });
 
-  it("review prompt defines the review contract and verdict marker", () => {
+  it("review prompt defines the review contract without a verdict marker", () => {
     const prompt = reviewPrompt(state({ task_goal: "Review this branch exactly how I asked" }));
     const command = buildCodexReviewCommand(state({ task_goal: "Review this branch exactly how I asked" }));
 
     assert.match(prompt, /Review this branch exactly how I asked/);
     assert.match(prompt, /blocking bugs/);
-    assert.match(prompt, /RELAY_REVIEW_VERDICT: APPROVED/);
-    assert.match(prompt, /RELAY_REVIEW_VERDICT: REJECTED/);
+    assert.doesNotMatch(prompt, /RELAY_REVIEW_VERDICT/);
     assert.match(command, /Review this branch exactly how I asked/);
-    assert.match(command, /RELAY_REVIEW_VERDICT/);
+    assert.doesNotMatch(command, /RELAY_REVIEW_VERDICT/);
   });
 
   it("builds Claude command against the daemon node host workspace when configured", () => {
@@ -474,7 +418,7 @@ describe("agent stream rendering", () => {
     const output = renderer.feed(
       [
         JSON.stringify({ type: "turn.started" }),
-        codexStdout("Looks good.\nRELAY_REVIEW_VERDICT: APPROVED"),
+        codexStdout("Looks good."),
         JSON.stringify({ type: "turn.completed" }),
       ].join("\n") + "\n",
     );

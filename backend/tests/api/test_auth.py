@@ -529,6 +529,47 @@ def test_workspace_brief_summarizes_employee_workspace(monkeypatch) -> None:
         assert admin_bob.json()["metrics"]["sessionCount"] == 1
 
 
+def test_workspace_brief_hides_command_log_artifacts(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        admin_client = TestClient(app)
+        _bootstrap_admin(admin_client)
+        _login(admin_client, "admin", "secret123")
+        _create_user(admin_client, "alice")
+
+        alice_client = TestClient(app)
+        _login(alice_client, "alice", "userpass")
+
+        session = alice_client.post("/sessions", json={
+            "taskGoal": "Run tests",
+            "workspacePath": "/workspace/alice",
+            "assignments": [{"agent": "claude"}],
+        })
+        assert session.status_code == 201
+        session_id = session.json()["id"]
+
+        app.state.session_store.create_artifact(session_id, {
+            "kind": "command_log",
+            "title": "Claude run log",
+            "body": "● agent output",
+            "extension": "txt",
+        })
+        app.state.session_store.create_artifact(session_id, {
+            "kind": "diff",
+            "title": "Auth patch",
+            "body": "diff --git a/auth.ts",
+            "extension": "diff",
+        })
+
+        brief = alice_client.get("/workspace/brief").json()
+        assert brief["metrics"]["artifactCount"] == 2
+        assert {artifact["kind"] for artifact in brief["artifacts"]} == {"plan", "diff"}
+
+        listed = alice_client.get("/artifacts").json()["artifacts"]
+        assert {artifact["kind"] for artifact in listed} == {"plan", "diff"}
+
+
 def test_workspace_files_lists_employee_workspace(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:

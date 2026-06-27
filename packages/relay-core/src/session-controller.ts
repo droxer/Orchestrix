@@ -8,7 +8,6 @@ import {
   type AgentName,
   type AgentRunOptions,
   type AgentState,
-  type ReviewVerdict,
   type AgentTaskMode,
 } from "./state.js";
 import type { AgentOutputSink } from "./format.js";
@@ -49,19 +48,13 @@ export function isReviewAssignment(mode: AgentTaskMode): boolean {
   return mode === "review";
 }
 
-export function assignmentSucceeded(step: WorkflowStep, state: AgentState): boolean {
-  if (state.last_exit_code !== 0) return false;
-  if (isReviewAssignment(step.mode)) return state.review_verdict === "approved";
-  return true;
+export function assignmentSucceeded(_step: WorkflowStep, state: AgentState): boolean {
+  return state.last_exit_code === 0;
 }
 
 export function assignmentFailureOutcome(step: WorkflowStep, state: AgentState): string {
   if (state.last_exit_code !== 0) {
     return `${step.agent} ${step.mode} failed with exit code ${state.last_exit_code}.`;
-  }
-  if (isReviewAssignment(step.mode)) {
-    if (state.review_verdict === "rejected") return `${step.agent} rejected the work.`;
-    return `${step.agent} review did not approve the work.`;
   }
   return `${step.agent} ${step.mode} failed.`;
 }
@@ -261,8 +254,6 @@ export class SessionController implements AgentEventSink {
       status: "completed" | "failed" | "cancelled";
       exitCode: number;
       agentLog: string;
-      reviewVerdict?: ReviewVerdict | "";
-      reviewFeedback?: string;
       tokenUsage?: AgentState["token_usage"];
     },
   ): Promise<AgentState> {
@@ -271,10 +262,6 @@ export class SessionController implements AgentEventSink {
       agent_logs: [input.agentLog],
       last_exit_code: input.exitCode,
     };
-    if (isReviewAssignment(input.mode)) {
-      statePatch.review_verdict = input.reviewVerdict ?? "";
-      statePatch.review_feedback = input.reviewFeedback ?? "";
-    }
     await this.waitForPendingOutputWrites();
     await this.append(sessionId, relayEvent("agent.completed", sessionId, {
       runId: input.runId,
@@ -296,20 +283,6 @@ export class SessionController implements AgentEventSink {
         agent: input.agent,
         sessionId,
       });
-    }
-    if (isReviewAssignment(input.mode)) {
-      const verdict = input.reviewVerdict || "failed";
-      await this.append(sessionId, relayEvent("review.verdict", sessionId, {
-        runId: input.runId,
-        agent: input.agent,
-        verdict,
-        feedback: input.reviewFeedback ?? "",
-      }));
-      if (verdict === "approved") {
-        await this.updateTaskStatus("done", `${input.agent} approved the work.`, { agent: input.agent, sessionId });
-      } else if (verdict === "rejected") {
-        await this.updateTaskStatus("blocked", `${input.agent} rejected the work.`, { agent: input.agent, sessionId });
-      }
     }
     return mergeAgentState(state, statePatch);
   }
@@ -390,19 +363,6 @@ export class SessionController implements AgentEventSink {
         agent: step.agent,
         sessionId,
       });
-    }
-    if (isReviewAssignment(step.mode)) {
-      await this.append(sessionId, relayEvent("review.verdict", sessionId, {
-        runId,
-        agent: step.agent,
-        verdict: next.review_verdict || "failed",
-        feedback: next.review_feedback,
-      }));
-      if (next.review_verdict === "approved") {
-        await this.updateTaskStatus("done", `${step.agent} approved the work.`, { agent: step.agent, sessionId });
-      } else if (next.review_verdict === "rejected") {
-        await this.updateTaskStatus("blocked", `${step.agent} rejected the work.`, { agent: step.agent, sessionId });
-      }
     }
     return next;
   }

@@ -137,6 +137,41 @@ def test_assigned_backlog_waits_for_scheduler_and_start_can_dispatch_manually(mo
         assert command["taskGoal"] == "Run from backlog"
 
 
+def test_task_start_preserves_ask_mode(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _create_user(client, "alice", employee_id="alice")
+        registered = client.post("/daemon-nodes/register", json={
+            "sandboxId": "sbx_alice",
+            "employeeId": "alice",
+            "token": "node_token",
+            "workspacePath": "/workspace/alice",
+            "protocolVersion": 1,
+            "supportedAgents": ["codex"],
+            "status": "ready",
+        }, headers={"Authorization": "Bearer ui_token"})
+        assert registered.status_code == 200
+        created = client.post("/tasks", json={
+            "title": "Explain backlog",
+            "ownerEmployeeId": "alice",
+            "assigneeEmployeeId": "alice",
+            "assignedAgent": "codex",
+        })
+        assert created.status_code == 201
+
+        started = client.post(f"/tasks/{created.json()['id']}/start", json={"agent": "codex", "mode": "ask"})
+        assert started.status_code == 202
+
+        commands = client.get("/daemon-nodes/sbx_alice/commands", headers={"Authorization": "Bearer node_token"})
+        assert commands.status_code == 200
+        [command] = commands.json()["commands"]
+        assert command["agent"] == "codex"
+        assert command["mode"] == "ask"
+        assert command["state"]["task_goal"] == "Explain backlog"
+
+
 def test_scheduler_dispatches_assigned_backlog_task(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:

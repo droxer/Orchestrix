@@ -468,12 +468,6 @@ export function replayDaemonAgentOutput(
       log(`\n⏺ ${event.artifact.kind} · ${event.artifact.title}\n`);
       continue;
     }
-    if (event.type === "review.verdict") {
-      deliveredEventIds.add(event.id);
-      const badge = event.verdict === "approved" ? "OK" : event.verdict === "rejected" ? "ERR" : "INFO";
-      log(`\n${badge}  review · ${event.verdict}\n`);
-      continue;
-    }
     if (event.type === "session.failed") {
       deliveredEventIds.add(event.id);
       log(`\nERR  ${formatDaemonFailureForTui(event.outcome)}\n`);
@@ -580,7 +574,7 @@ export interface RemoteSessionControl {
     sessionId: string;
     targetAgent: AgentName;
     note?: string;
-    mode?: "action" | "review";
+    mode?: AgentTaskMode;
   }): Promise<RelaySession>;
 }
 

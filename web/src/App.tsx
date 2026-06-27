@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActionRemove, NavConversations, NavPreferences } from "./components/icons";
+import { NavConversations, NavPreferences } from "./components/icons";
 import {
   archiveSession, cancelRun, logout, recordDecision, renameSession, runSandbox,
 } from "./api";
@@ -66,8 +66,6 @@ export function App() {
   const setSelectedSessionId = useRelayStore((s) => s.setSelectedSessionId);
   const tokens = useRelayStore((s) => s.tokens);
   const setTokens = useRelayStore((s) => s.setTokens);
-  const status = useRelayStore((s) => s.status);
-  const setStatus = useRelayStore((s) => s.setStatus);
   const [hydrated, setHydrated] = useState(false);
   const [activeAgent, setActiveAgent] = useState<AgentName>("claude");
   const [composerMode, setComposerMode] = useState<AgentTaskMode>("action");
@@ -83,7 +81,6 @@ export function App() {
   const [handoffMode, setHandoffMode] = useState<AgentTaskMode>("action");
   const [handoffNote, setHandoffNote] = useState("");
   const [isRunning, setIsRunning] = useState(false);
-  const [toastVisible, setToastVisible] = useState(false);
   // True while the composer is staging a brand-new conversation: suppresses the
   // fall-back to the most-recent session so the transcript shows the empty state
   // and the next send creates a fresh owner-scoped session.
@@ -94,14 +91,13 @@ export function App() {
   // session, or by text for the goal of a freshly created one).
   const [pendingUserMessage, setPendingUserMessage] = useState<{ id: string; text: string } | null>(null);
   const { user, authChecked, setUser } = useAuthSession();
-  const statusSeenRef = useRef(false);
   const localNodeAdoptionStartedRef = useRef(false);
   const composerRef = useRef<ComposerHandle>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
 
   const selectedEmployeeToken = tokens[selectedEmployee];
-  const { sandboxes, nodes, sessions, tasks, isRefreshing, refresh, setSandboxes } = useRelayData(setStatus, selectedEmployeeToken, Boolean(user));
+  const { sandboxes, nodes, sessions, tasks, isRefreshing, refresh, setSandboxes } = useRelayData(selectedEmployeeToken, Boolean(user));
   const { localNodes, refreshLocalDaemonNodes } = useLocalDaemonNodes(
     localControlPanelNodes,
     hydrated && user?.role === "admin" && canUseLocalControlPanel(),
@@ -113,16 +109,6 @@ export function App() {
     codex: { role: t("agent.codex.role"), blurb: t("agent.codex.blurb") },
     kimi: { role: t("agent.kimi.role"), blurb: t("agent.kimi.blurb") },
   }), [t]);
-
-  useEffect(() => {
-    if (!statusSeenRef.current) { statusSeenRef.current = true; return; }
-    setToastVisible(true);
-    // Errors persist until dismissed — they're often long and actionable, so
-    // auto-hiding them after 4s loses the message before it can be read.
-    if (status.tone === "bad") return;
-    const timer = window.setTimeout(() => setToastVisible(false), 4000);
-    return () => window.clearTimeout(timer);
-  }, [status]);
 
   const selectedSandbox = useMemo(() => sandboxes.find((s) => s.employeeId === selectedEmployee), [sandboxes, selectedEmployee]);
   const selectedNode = useMemo(() => visibleNodes.find((n) => n.employeeId === selectedEmployee || n.id === selectedSandbox?.id), [visibleNodes, selectedEmployee, selectedSandbox?.id]);
@@ -298,8 +284,8 @@ export function App() {
     try {
       await renameSession(session.id, next, selectedToken);
       await refresh();
-    } catch (err) {
-      setStatus({ tone: "bad", message: err instanceof Error ? err.message : String(err) });
+    } catch {
+      // rename errors are silent; the thread list keeps the previous title.
     }
   }
 
@@ -311,20 +297,17 @@ export function App() {
         setActiveSessionId(null);
       }
       await refresh();
-    } catch (err) {
-      setStatus({ tone: "bad", message: err instanceof Error ? err.message : String(err) });
+    } catch {
+      // archive errors are silent; the thread stays open.
     }
   }
 
   async function sendMessage() {
     const raw = composerRef.current?.getText().trim() ?? "";
     if (!raw) return;
-    if (!selectedEmployee) {
-      setStatus({ tone: "warn", message: t("toast.no_node_selected") });
-      return;
-    }
+    if (!selectedEmployee) return;
     const { agent: routedAgent, goal } = routeComposerMessage(raw, activeAgent, agents);
-    if (!goal) { setStatus({ tone: "warn", message: t("toast.add_task", { agent: routedAgent }) }); return; }
+    if (!goal) return;
     if (routedAgent !== activeAgent) setActiveAgent(routedAgent);
     // When staging a new conversation, always create; otherwise continue the
     // open one. composingNew forces a fresh owner-scoped session here.
@@ -354,11 +337,9 @@ export function App() {
       setActiveSessionId(done.id);
       setSelectedSessionId(done.id);
       setComposingNew(false);
-      setStatus({ tone: "good", message: t("toast.message_sent", { employee: selectedEmployee, agent: routedAgent }) });
       await refresh(undefined, token);
-    } catch (err) {
+    } catch {
       setPendingUserMessage(null);
-      setStatus({ tone: "bad", message: err instanceof Error ? err.message : String(err) });
     } finally { setIsRunning(false); }
   }
 
@@ -367,10 +348,9 @@ export function App() {
     try {
       const session = await cancelRun(selectedSandbox.id, activeRun.sessionId, selectedToken, t("cancel.reason"));
       setSelectedSessionId(session.id);
-      setStatus({ tone: "warn", message: t("toast.cancel_requested", { sessionId: activeRun.sessionId }) });
       await refresh();
-    } catch (err) {
-      setStatus({ tone: "bad", message: err instanceof Error ? err.message : String(err) });
+    } catch {
+      // cancel errors are silent; the run state refreshes on the next poll.
     }
   }
 
@@ -380,10 +360,7 @@ export function App() {
   async function sendDecision(kind: "approve" | "reject" | "rerun" | "mark_done") {
     if (!activeSession) return;
     if (kind === "rerun") {
-      if (!selectedEmployee) {
-        setStatus({ tone: "warn", message: t("toast.no_node_selected") });
-        return;
-      }
+      if (!selectedEmployee) return;
       setIsRunning(true);
       try {
         const { sandbox, token } = await provisionEmployeeSandbox(selectedEmployee, selectedToken);
@@ -400,10 +377,9 @@ export function App() {
           decision: { kind: "rerun", targetAgent: assignment.agent },
         }, token);
         setSelectedSessionId(done.id);
-        setStatus({ tone: "good", message: t("toast.decision_recorded", { kind: t("decision.rerun") }) });
         await refresh(undefined, token);
-      } catch (err) {
-        setStatus({ tone: "bad", message: err instanceof Error ? err.message : String(err) });
+      } catch {
+        // rerun errors are silent; the transcript keeps the prior state.
       } finally {
         setIsRunning(false);
       }
@@ -412,19 +388,15 @@ export function App() {
     try {
       const session = await recordDecision(activeSession.id, kind, undefined, selectedToken);
       setSelectedSessionId(session.id);
-      setStatus({ tone: "good", message: t("toast.decision_recorded", { kind: t(`decision.${kind}`) }) });
       await refresh();
-    } catch (err) {
-      setStatus({ tone: "bad", message: err instanceof Error ? err.message : String(err) });
+    } catch {
+      // decision errors are silent; the decision bar stays until refresh succeeds.
     }
   }
 
   async function sendHandoff() {
     if (!activeSession) return;
-    if (!selectedEmployee) {
-      setStatus({ tone: "warn", message: t("toast.no_node_selected") });
-      return;
-    }
+    if (!selectedEmployee) return;
     setIsRunning(true);
     try {
       const { sandbox, token } = await provisionEmployeeSandbox(selectedEmployee, selectedToken);
@@ -440,10 +412,9 @@ export function App() {
         decision: { kind: "handoff", targetAgent: handoffAgent, ...(note ? { note } : {}) },
       }, token);
       setSelectedSessionId(done.id); setHandoffNote(""); setHandoffMode("action"); setHandoffOpen(false); setActiveAgent(handoffAgent);
-      setStatus({ tone: "good", message: t("toast.handed_to", { agent: handoffAgent }) });
       await refresh(undefined, token);
-    } catch (err) {
-      setStatus({ tone: "bad", message: err instanceof Error ? err.message : String(err) });
+    } catch {
+      // handoff errors are silent; the decision bar stays open for retry.
     } finally { setIsRunning(false); }
   }
 
@@ -507,7 +478,6 @@ export function App() {
             setRoute("main");
             openConversation(sessionId);
           }}
-          setStatus={setStatus}
         />
       ) : route === "backlog" ? (
         <BacklogPage
@@ -521,7 +491,6 @@ export function App() {
             setRoute("main");
             openConversation(sessionId);
           }}
-          setStatus={setStatus}
         />
       ) : route === "routine" ? (
         <RoutinePage
@@ -535,7 +504,6 @@ export function App() {
             setRoute("main");
             openConversation(sessionId);
           }}
-          setStatus={setStatus}
         />
       ) : route === "mcp" ? <McpPage /> : route === "skills" ? <SkillsPage /> : (<>
 
@@ -562,29 +530,6 @@ export function App() {
           onRefresh={() => void refresh()}
           onBackToThreads={() => setMobileView("threads")}
         />
-
-        <div
-          className={`toast ${status.tone}`}
-          data-visible={toastVisible}
-          role={status.tone === "bad" ? "alert" : "status"}
-          aria-live={status.tone === "bad" ? "assertive" : "polite"}
-        >
-          {toastVisible ? (
-            <>
-              <span className="toast-message">{status.message}</span>
-              {status.tone === "bad" ? (
-                <button
-                  type="button"
-                  className="toast-dismiss"
-                  aria-label={t("toast.dismiss")}
-                  onClick={() => setToastVisible(false)}
-                >
-                  <ActionRemove size={14} />
-                </button>
-              ) : null}
-            </>
-          ) : null}
-        </div>
 
         <div className="transcript" ref={transcriptRef} onScroll={handleTranscriptScroll}>
           <div className="transcript-inner">

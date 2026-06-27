@@ -81,6 +81,8 @@
 
 .conversation-row {
   position: relative;
+  display: flex;
+  align-items: stretch;
   width: 100%;
   border-bottom: 1px solid var(--color-hairline-soft);
   background: transparent;
@@ -115,7 +117,8 @@
   grid-template-columns: minmax(0, 1fr);
   align-items: center;
   gap: var(--space-sm);
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   min-height: 52px;
   padding: var(--space-sm) var(--space-base);
   border: 0;
@@ -184,6 +187,7 @@
 
 .conversation-name {
   min-width: 0;
+  flex: 1;
   display: inline-flex;
   align-items: center;
   gap: var(--space-xs);
@@ -213,14 +217,12 @@
 }
 
 .conversation-row-actions {
-  position: absolute;
-  top: 50%;
-  right: var(--space-sm);
-  transform: translateY(-50%);
   display: flex;
   align-items: center;
+  align-self: center;
+  flex-shrink: 0;
   gap: 2px;
-  z-index: 1;
+  padding-right: var(--space-sm);
 }
 
 .conversation-rename-btn,

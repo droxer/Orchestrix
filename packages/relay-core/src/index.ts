@@ -54,7 +54,6 @@ export {
   type AgentExecutor,
   type AgentRunOptions,
   type AgentState,
-  type ReviewVerdict,
   type AgentTaskMode,
   type SessionStepRunner,
   type StreamExecResult,
@@ -131,7 +130,7 @@ export { buildBridgedPrompt } from "./bridged-prompt.js";
 export { extractLastAssistantText } from "./last-assistant-text.js";
 
 export {
-  appendReviewFeedback,
+  askPrompt,
   claudeTaskPrompt,
   codexActionPrompt,
   reviewPrompt,
@@ -141,20 +140,19 @@ export {
 
 export {
   buildClaudeActionCommand,
+  buildClaudeAskCommand,
   buildClaudeReviewCommand,
   buildCodexActionCommand,
+  buildCodexAskCommand,
   buildCodexReviewCommand,
   buildKimiActionCommand,
+  buildKimiAskCommand,
   buildKimiReviewCommand,
   buildPiActionCommand,
+  buildPiAskCommand,
   buildPiPreflightCommand,
   buildPiReviewCommand,
 } from "./commands.js";
-
-export {
-  classifyReview,
-  extractReviewFeedback,
-} from "./review.js";
 
 export {
   ClaudeStreamRenderer,

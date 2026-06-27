@@ -18,7 +18,7 @@ from ..core.models import AGENT_NAMES, DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS
 from ..persistence.stores import LocalDaemonStore, LocalSessionStore, LocalTaskStore, role_for_agent
 from ..sessions import compute_prior_agent_bridge
 from ..sessions import compute_conversation_history
-from ..sessions import SessionController, initial_agent_state, is_review_assignment
+from ..sessions import SessionController, initial_agent_state
 
 load_backend_env()
 
@@ -666,16 +666,8 @@ class DaemonNodeRegistry:
             "status": "completed" if event["exitCode"] == 0 else "failed",
             "exitCode": event["exitCode"],
             "agentLog": agent_log,
-            "reviewVerdict": event.get("reviewVerdict", ""),
-            "reviewFeedback": event.get("reviewFeedback", ""),
             "tokenUsage": event.get("tokenUsage"),
         })
-        if is_review_assignment(mode) and event.get("reviewVerdict") != "approved":
-            outcome = f"{assignment['agent']} rejected the work." if event.get("reviewVerdict") == "rejected" else f"{assignment['agent']} review did not approve the work."
-            controller.fail_session(run_request["sessionId"], outcome)
-            self.daemon_store.update_run_request(run_request["id"], {"status": "failed", "state": next_state, "error": outcome})
-            self.update_status(run_request["nodeId"], {"status": "ready", "lastError": outcome})
-            return
         if event["exitCode"] != 0:
             outcome = f"{assignment['agent']} {mode} failed with exit code {event['exitCode']}."
             controller.fail_session(run_request["sessionId"], outcome)

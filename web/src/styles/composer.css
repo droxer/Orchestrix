@@ -88,10 +88,10 @@
     transform 120ms ease;
 }
 
-/* Mode distinction lives in the glyph dot: accent-yellow (action) vs
-   info blue (review) — status hues only, never action fills. */
+/* Mode distinction lives in the glyph dot: accent-yellow (Agent) vs
+   info blue (Ask) — status hues only, never action fills. */
 .mode-chip[data-mode="action"] { --mode-dot: var(--color-accent-yellow); }
-.mode-chip[data-mode="review"]    { --mode-dot: var(--color-info); }
+.mode-chip[data-mode="ask"]    { --mode-dot: var(--color-info); }
 
 .mode-chip:hover {
   background: var(--color-surface-strong);

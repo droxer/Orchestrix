@@ -1,6 +1,6 @@
 /* Conversation artifacts: a compact, kind-aware chip in the transcript that
    opens a full kind-aware viewer in a drawer. The chip stays glanceable — a
-   colored kind tag plus a one-line semantic stat (verdict, +/−, pass/fail) —
+   colored kind tag plus a one-line semantic stat (+/−, pass/fail) —
    so large bodies (diffs, logs) never disrupt the conversation flow. */
 
 /* Per-kind accent. Mirrors the TUI artifact palette so the two surfaces read

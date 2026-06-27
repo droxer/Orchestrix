@@ -265,7 +265,7 @@ def assignment_list(value: Any) -> list[dict[str, Any]]:
             continue
         result.append({
             "agent": agent,
-            "mode": "review" if item.get("mode") == "review" else "action",
+            "mode": agent_task_mode(item.get("mode")),
             **({"role": item["role"]} if role_name(item.get("role")) else {}),
         })
     return result
@@ -280,6 +280,10 @@ def participants_for_assignments(assignments: Any, assigned_agent: str | None) -
 
 def role_name(value: Any) -> str | None:
     return value if value in ("implementer", "reviewer", "planner", "tester", "fixer") else None
+
+
+def agent_task_mode(value: Any) -> str:
+    return value if value in ("action", "review", "ask") else "action"
 
 
 def authorized_sandbox_for_token(registry: DaemonNodeRegistry, token: str | None) -> dict[str, Any] | None:
@@ -319,13 +323,10 @@ def daemon_node_event(value: dict[str, Any]) -> dict[str, Any]:
             "text": value["text"],
             "sequence": int(value["sequence"]),
         }
-    mode = "review" if value.get("mode") == "review" else "action"
+    mode = agent_task_mode(value.get("mode"))
     if event_type == "run.completed":
         if not isinstance(value.get("exitCode"), (int, float)):
             raise ValueError("daemon node run.completed exitCode must be a finite number.")
-        verdict = value.get("reviewVerdict", "")
-        if verdict not in ("approved", "rejected", "failed", ""):
-            raise ValueError(f"invalid reviewVerdict {verdict}.")
         token_usage = token_usage_field(value)
         return {
             "type": event_type,
@@ -337,8 +338,6 @@ def daemon_node_event(value: dict[str, Any]) -> dict[str, Any]:
             "mode": mode,
             "exitCode": int(value["exitCode"]),
             "agentLog": raw_string_field(value, "agentLog"),
-            "reviewVerdict": verdict,
-            "reviewFeedback": string_field(value, "reviewFeedback"),
             **({"tokenUsage": token_usage} if token_usage else {}),
         }
     if event_type == "run.failed":

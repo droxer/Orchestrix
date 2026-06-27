@@ -6,14 +6,12 @@ import { assignTask, createTask, startTask, updateTask } from "../api";
 import { AgentStateBadge } from "./AgentStateBadge";
 import { PriorityBadge } from "./PriorityBadge";
 import { cn } from "@/lib/utils";
-import { AGENT_NAMES, type AgentName, type CurrentUser, type DaemonNodeMonitorRecord, type RelaySession, type RelayTask, type TaskPriority, type TaskStatus, type Tone } from "../types";
+import { AGENT_NAMES, type AgentName, type CurrentUser, type DaemonNodeMonitorRecord, type RelaySession, type RelayTask, type TaskPriority, type TaskStatus } from "../types";
 import { ActionAddPerson, ActionCalendar, ActionCompose, ActionRemove, ActionSearch, ActionStart, NavRefresh, ViewBoard, ViewList } from "./icons";
 import { agentReadyForTask, dueTone, filterTasks, TASK_PRIORITIES, TASK_STATUSES, tasksByStatus, type BacklogFilters } from "../lib/backlog";
 import { PageHeader } from "./PageHeader";
 import { BoardEmpty } from "./BoardEmpty";
 import { useModalDrawer } from "../hooks/useModalDrawer";
-
-type StatusUpdate = { tone: Tone; message: string };
 
 interface BacklogPageProps {
   tasks: RelayTask[];
@@ -23,7 +21,6 @@ interface BacklogPageProps {
   isRefreshing: boolean;
   onRefresh: () => Promise<void>;
   onOpenConversation: (sessionId: string) => void;
-  setStatus: (status: StatusUpdate) => void;
 }
 
 type TaskFormState = {
@@ -569,7 +566,7 @@ function BacklogTaskDrawer({
   );
 }
 
-export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing, onRefresh, onOpenConversation, setStatus }: BacklogPageProps) {
+export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing, onRefresh, onOpenConversation }: BacklogPageProps) {
   const { t } = useTranslation();
   const [filters, setFilters] = useState<BacklogFilters>(initialFilters);
   const [view, setView] = useState<BacklogView>(readView);
@@ -604,13 +601,12 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
     });
   }
 
-  async function mutate(label: string, action: () => Promise<unknown>) {
+  async function mutate(action: () => Promise<unknown>) {
     try {
       await action();
-      setStatus({ tone: "good", message: label });
       await onRefresh();
-    } catch (err) {
-      setStatus({ tone: "bad", message: err instanceof Error ? err.message : String(err) });
+    } catch {
+      // task mutations fail silently; the board refreshes on the next poll.
     }
   }
 
@@ -631,10 +627,9 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
       if (form.id) await updateTask(form.id, payload);
       else await createTask(payload);
       setForm(null);
-      setStatus({ tone: "good", message: form.id ? t("backlog.toast_updated") : t("backlog.toast_created") });
       await onRefresh();
-    } catch (err) {
-      setStatus({ tone: "bad", message: err instanceof Error ? err.message : String(err) });
+    } catch {
+      // form submit errors are silent; the drawer stays open for retry.
     } finally {
       setSaving(false);
     }
@@ -653,14 +648,13 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
   function taskHandlers(task: RelayTask, session?: RelaySession) {
     return {
       onEdit: () => editTask(task),
-      onAssign: (agent: AgentName) => void mutate(t("backlog.toast_assigned"), () => assignTask(task.id, agent)),
-      onStart: () => void mutate(t("backlog.toast_started"), () => startTask(task.id)),
+      onAssign: (agent: AgentName) => void mutate(() => assignTask(task.id, agent)),
+      onStart: () => void mutate(() => startTask(task.id)),
       onOpenThread: () => session && onOpenConversation(session.id),
       onToggleBlock: () => void mutate(
-        t("backlog.toast_updated"),
         () => updateTask(task.id, { status: task.status === "blocked" ? "backlog" : "blocked" }),
       ),
-      onDone: () => void mutate(t("backlog.toast_updated"), () => updateTask(task.id, { status: "done" })),
+      onDone: () => void mutate(() => updateTask(task.id, { status: "done" })),
     };
   }
 

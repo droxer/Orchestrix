@@ -648,12 +648,9 @@
     "unknown": "Unknown"
   },
   "mode": {
-    "action": "Action",
+    "action": "Agent",
+    "ask": "Ask",
     "review": "Review"
-  },
-  "verdict": {
-    "approved": "Approved",
-    "rejected": "Rejected"
   },
   "artifact": {
     "kind": {
@@ -679,9 +676,6 @@
       "diff": "+{{additions}} −{{deletions}} · {{files}} files",
       "test": "{{passed}} passed · {{failed}} failed",
       "test_unknown": "Test output",
-      "review_approved": "Approved",
-      "review_rejected": "Changes requested",
-      "review_pending": "Review",
       "command": "Exit {{code}}",
       "command_unknown": "Command log"
     },
@@ -713,7 +707,6 @@
     "decision": "You — {{kind}}",
     "agent_completed": "{{agent}} — {{status}}",
     "exit_code": "Exit {{exitCode}}",
-    "review_verdict": "Codex verdict — {{verdict}}",
     "session_status": "Status — {{phase}}",
     "session_completed": "Session completed",
     "session_failed": "Session failed"

@@ -1,0 +1,65 @@
+from __future__ import annotations
+
+from tempfile import TemporaryDirectory
+
+from fastapi.testclient import TestClient
+
+from relay.api.session_routes import is_workspace_artifact, workspace_artifacts
+from relay.app import create_app
+
+
+def test_is_workspace_artifact_hides_command_logs() -> None:
+    assert is_workspace_artifact({"kind": "plan"}) is True
+    assert is_workspace_artifact({"kind": "review"}) is True
+    assert is_workspace_artifact({"kind": "command_log"}) is False
+
+
+def test_workspace_artifacts_filters_command_logs() -> None:
+    session = {
+        "artifacts": [
+            {"id": "plan", "kind": "plan"},
+            {"id": "log", "kind": "command_log"},
+            {"id": "diff", "kind": "diff"},
+        ],
+    }
+    filtered = workspace_artifacts(session)
+    assert [artifact["id"] for artifact in filtered] == ["plan", "diff"]
+
+
+def test_session_assignment_and_handoff_preserve_ask_mode(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        response = client.post("/auth/bootstrap", json={
+            "token": "admin_token",
+            "username": "admin",
+            "password": "secret123",
+        })
+        assert response.status_code == 200
+
+        created = client.post("/sessions", json={
+            "taskGoal": "Explain the task",
+            "assignments": [{"agent": "codex", "mode": "ask"}],
+        })
+        assert created.status_code == 201
+        session_id = created.json()["id"]
+
+        [plan] = [artifact for artifact in created.json()["artifacts"] if artifact["title"] == "Assignment plan"]
+        assert '"mode": "ask"' in app.state.session_store.read_artifact(session_id, plan["id"])
+
+        handed = client.post(f"/sessions/{session_id}/handoffs", json={
+            "targetAgent": "claude",
+            "mode": "ask",
+            "note": "Answer without editing files.",
+        })
+        assert handed.status_code == 200
+        assert handed.json()["decisions"][-1]["kind"] == "handoff"
+        assert handed.json()["decisions"][-1]["targetAgent"] == "claude"
+
+        [latest_plan] = [
+            artifact
+            for artifact in handed.json()["artifacts"]
+            if artifact["title"] == "Assignment plan"
+        ][-1:]
+        assert '"mode": "ask"' in app.state.session_store.read_artifact(session_id, latest_plan["id"])

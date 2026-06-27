@@ -165,9 +165,6 @@ def materialize_events(events: list[dict[str, Any]]) -> dict[str, Any]:
                 session["status"] = "cancelled"
                 session["phase"] = "cancelled"
                 session.pop("pendingDecision", None)
-        elif event_type == "review.verdict":
-            session["reviewVerdict"] = event["verdict"]
-            session["phase"] = f"review:{event['verdict']}"
         elif event_type == "session.completed":
             session["status"] = "completed"
             session["phase"] = "completed"

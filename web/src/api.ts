@@ -1,5 +1,6 @@
 import type {
   AgentName,
+  AgentTaskMode,
   ArtifactsResponse,
   AssignControlPanelDaemonNodeResponse,
   ChatIntegration,
@@ -270,7 +271,7 @@ export function assignTask(taskId: string, agent: AgentName): Promise<RelayTask>
   });
 }
 
-export function startTask(taskId: string, input: { agent?: AgentName; mode?: "action" | "review" } = {}): Promise<StartTaskResponse> {
+export function startTask(taskId: string, input: { agent?: AgentName; mode?: AgentTaskMode } = {}): Promise<StartTaskResponse> {
   return apiJson<StartTaskResponse>(`/tasks/${encodeURIComponent(taskId)}/start`, {
     method: "POST",
     body: input,
@@ -467,7 +468,7 @@ export function recordDecision(
 
 export function appendAssignment(
   sessionId: string,
-  assignment: { agent: AgentName; mode: "action" | "review" },
+  assignment: { agent: AgentName; mode: AgentTaskMode },
   token?: string,
 ): Promise<RelaySession> {
   return apiJson<RelaySession>(`/sessions/${encodeURIComponent(sessionId)}/assignments`, {
@@ -495,7 +496,7 @@ export function renameSession(sessionId: string, title: string, token?: string):
 export function recordHandoff(
   sessionId: string,
   targetAgent: AgentName,
-  mode: "action" | "review",
+  mode: AgentTaskMode,
   note?: string,
   token?: string,
 ): Promise<RelaySession> {

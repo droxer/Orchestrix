@@ -21,6 +21,7 @@ from .helpers import (
     assignment_list,
     get_session_for_actor,
     get_task_for_actor,
+    agent_task_mode,
     json_body,
     owner_employee_id_for_create,
     request_actor_or_sandbox,
@@ -35,6 +36,16 @@ ACTIVE_TASK_STATUSES = frozenset({"assigned", "running", "waiting_for_human", "r
 ACTIVE_SESSION_STATUSES = frozenset({"running", "waiting_for_human"})
 WORKSPACE_FILE_LIMIT = 200
 WORKSPACE_FILE_PREVIEW_LIMIT = 256 * 1024  # 256 KB cap for inline file previews
+# Internal run transcripts — stored for bridge/replay but not user-facing outputs.
+WORKSPACE_HIDDEN_ARTIFACT_KINDS = frozenset({"command_log"})
+
+
+def is_workspace_artifact(artifact: dict[str, Any]) -> bool:
+    return artifact.get("kind") not in WORKSPACE_HIDDEN_ARTIFACT_KINDS
+
+
+def workspace_artifacts(session: dict[str, Any]) -> list[dict[str, Any]]:
+    return [artifact for artifact in session.get("artifacts", []) if is_workspace_artifact(artifact)]
 
 
 def artifact_index_item(session: dict[str, Any], artifact: dict[str, Any]) -> dict[str, Any]:
@@ -60,7 +71,7 @@ def session_brief_item(session: dict[str, Any]) -> dict[str, Any]:
         "ownerEmployeeId": session.get("ownerEmployeeId"),
         "currentAgent": session.get("currentAgent"),
         "pendingDecision": session.get("pendingDecision"),
-        "artifactCount": len(session.get("artifacts", [])),
+        "artifactCount": len(workspace_artifacts(session)),
         "runCount": len(session.get("agentRuns", [])),
         "updatedAt": session.get("updatedAt"),
         "createdAt": session.get("createdAt"),
@@ -163,7 +174,7 @@ async def list_artifacts(request: Request, ctx: AppContextDep) -> dict[str, Any]
             continue
         if workspace_path and session.get("workspacePath") != workspace_path:
             continue
-        for artifact in session.get("artifacts", []):
+        for artifact in workspace_artifacts(session):
             artifacts.append(artifact_index_item(session, artifact))
     return {"artifacts": sorted(artifacts, key=lambda item: item.get("createdAt") or "", reverse=True)}
 
@@ -183,7 +194,11 @@ async def workspace_brief(request: Request, ctx: AppContextDep) -> dict[str, Any
         for task in ctx.task_store.list_tasks()
         if task.get("ownerEmployeeId") == employee_id or task.get("assigneeEmployeeId") == employee_id
     ]
-    artifacts = [artifact_index_item(session, artifact) for session in sessions for artifact in session.get("artifacts", [])]
+    artifacts = [
+        artifact_index_item(session, artifact)
+        for session in sessions
+        for artifact in workspace_artifacts(session)
+    ]
 
     workspace_path = workspace_path_for_employee(ctx, employee_id)
     recent_sessions = sorted(sessions, key=lambda item: item.get("updatedAt") or "", reverse=True)[:8]
@@ -424,7 +439,7 @@ async def handoff(session_id: str, request: Request, ctx: AppContextDep) -> dict
     target_agent = valid_agent(body.get("targetAgent"))
     if not target_agent:
         raise HTTPException(400, f"targetAgent must be one of: {', '.join(AGENT_NAMES)}.")
-    mode = "review" if body.get("mode") == "review" else "action"
+    mode = agent_task_mode(body.get("mode"))
     controller = SessionController(ctx.session_store, task_store=ctx.task_store, owner_employee_id=actor["employeeId"])
     result = controller.handoff_session(
         session_id,

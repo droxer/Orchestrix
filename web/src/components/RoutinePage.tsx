@@ -8,15 +8,13 @@ import { AgentStateBadge } from "./AgentStateBadge";
 import { PriorityBadge } from "./PriorityBadge";
 import { TaskStatusBadge } from "./TaskStatusBadge";
 import { cn } from "@/lib/utils";
-import { AGENT_NAMES, type AgentName, type CurrentUser, type DaemonNodeMonitorRecord, type RelaySession, type RelayTask, type TaskPriority, type TaskRoutineCadence, type TaskRoutineType, type Tone } from "../types";
+import { AGENT_NAMES, type AgentName, type CurrentUser, type DaemonNodeMonitorRecord, type RelaySession, type RelayTask, type TaskPriority, type TaskRoutineCadence, type TaskRoutineType } from "../types";
 import { ActionAddPerson, ActionCalendar, ActionCompose, ActionRemove, ActionSearch, ActionStart, NavRefresh } from "./icons";
 import { agentReadyForTask, TASK_PRIORITIES } from "../lib/backlog";
 import { filterRoutineTasks, routineDueTone, TASK_ROUTINE_CADENCES, TASK_ROUTINE_TYPES, type RoutineFilters } from "../lib/routine";
 import { PageHeader } from "./PageHeader";
 import { BoardEmpty } from "./BoardEmpty";
 import { useModalDrawer } from "../hooks/useModalDrawer";
-
-type StatusUpdate = { tone: Tone; message: string };
 
 interface RoutinePageProps {
   tasks: RelayTask[];
@@ -26,7 +24,6 @@ interface RoutinePageProps {
   isRefreshing: boolean;
   onRefresh: () => Promise<void>;
   onOpenConversation: (sessionId: string) => void;
-  setStatus: (status: StatusUpdate) => void;
 }
 
 type RoutineFormState = {
@@ -344,7 +341,7 @@ function RoutineDrawer({
   );
 }
 
-export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing, onRefresh, onOpenConversation, setStatus }: RoutinePageProps) {
+export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing, onRefresh, onOpenConversation }: RoutinePageProps) {
   const { t } = useTranslation();
   const [filters, setFilters] = useState<RoutineFilters>(initialFilters);
   const [form, setForm] = useState<RoutineFormState | null>(null);
@@ -377,13 +374,12 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
     });
   }
 
-  async function mutate(label: string, action: () => Promise<unknown>) {
+  async function mutate(action: () => Promise<unknown>) {
     try {
       await action();
-      setStatus({ tone: "good", message: label });
       await onRefresh();
-    } catch (err) {
-      setStatus({ tone: "bad", message: err instanceof Error ? err.message : String(err) });
+    } catch {
+      // routine mutations fail silently; the board refreshes on the next poll.
     }
   }
 
@@ -407,10 +403,9 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
       if (form.id) await updateTask(form.id, payload);
       else await createTask(payload);
       setForm(null);
-      setStatus({ tone: "good", message: form.id ? t("routine.toast_updated") : t("routine.toast_created") });
       await onRefresh();
-    } catch (err) {
-      setStatus({ tone: "bad", message: err instanceof Error ? err.message : String(err) });
+    } catch {
+      // form submit errors are silent; the drawer stays open for retry.
     } finally {
       setSaving(false);
     }
@@ -460,11 +455,11 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
                 session={session}
                 ready={agentReadyForTask(task, nodes)}
                 onEdit={() => editTask(task)}
-                onAssign={(agent) => void mutate(t("backlog.toast_assigned"), () => assignTask(task.id, agent))}
-                onStart={() => void mutate(t("backlog.toast_started"), () => startTask(task.id))}
+                onAssign={(agent) => void mutate(() => assignTask(task.id, agent))}
+                onStart={() => void mutate(() => startTask(task.id))}
                 onOpenThread={() => session && onOpenConversation(session.id)}
-                onToggleBlock={() => void mutate(t("backlog.toast_updated"), () => updateTask(task.id, { status: task.status === "blocked" ? "backlog" : "blocked" }))}
-                onDone={() => void mutate(t("backlog.toast_updated"), () => updateTask(task.id, { status: "done" }))}
+                onToggleBlock={() => void mutate(() => updateTask(task.id, { status: task.status === "blocked" ? "backlog" : "blocked" }))}
+                onDone={() => void mutate(() => updateTask(task.id, { status: "done" }))}
               />
             );
           })}

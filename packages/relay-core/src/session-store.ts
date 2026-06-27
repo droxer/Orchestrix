@@ -3,7 +3,7 @@ import { basename, join, resolve } from "node:path";
 
 import { getAgent } from "./agents.js";
 import { REPO_ROOT } from "./env.js";
-import type { AgentName, ReviewVerdict } from "./state.js";
+import type { AgentName, AgentTaskMode } from "./state.js";
 import { mergeTokenUsage, type TokenUsage } from "./token-usage.js";
 
 export type AgentRole = "implementer" | "reviewer" | "planner" | "tester" | "fixer";
@@ -15,7 +15,7 @@ export interface AgentRun {
   id: string;
   agent: AgentName;
   role: AgentRole;
-  mode: "action" | "review";
+  mode: AgentTaskMode;
   status: "running" | "completed" | "failed" | "cancelled";
   startedAt: string;
   completedAt?: string;
@@ -65,7 +65,6 @@ export interface RelaySession {
   decisions: HumanDecision[];
   events: RelayEvent[];
   finalOutcome?: string;
-  reviewVerdict?: ReviewVerdict;
   archived?: boolean;
   tokenUsage?: TokenUsage;
 }
@@ -106,7 +105,7 @@ export type RelayEvent =
       runId: string;
       agent: AgentName;
       role: AgentRole;
-      mode: "action" | "review";
+      mode: AgentTaskMode;
     }
   | {
       id: string;
@@ -144,16 +143,6 @@ export type RelayEvent =
       exitCode: number;
       agentLog?: string;
       tokenUsage?: TokenUsage;
-    }
-  | {
-      id: string;
-      type: "review.verdict";
-      sessionId: string;
-      timestamp: string;
-      runId: string;
-      agent: AgentName;
-      verdict: ReviewVerdict;
-      feedback: string;
     }
   | {
       id: string;
@@ -228,8 +217,9 @@ export function newRelayId(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}_${random}`;
 }
 
-export function roleForAgent(agent: AgentName, mode: "action" | "review" = "action"): AgentRole {
+export function roleForAgent(agent: AgentName, mode: AgentTaskMode = "action"): AgentRole {
   if (mode === "review") return "reviewer";
+  // "ask" and "action" both fill the agent's normal action role.
   return getAgent(agent).actionRole;
 }
 
@@ -463,9 +453,6 @@ export function materializeEvents(events: RelayEvent[]): RelaySession {
         session.phase = "cancelled";
         delete session.pendingDecision;
       }
-    } else if (event.type === "review.verdict") {
-      session.reviewVerdict = event.verdict;
-      session.phase = `review:${event.verdict}`;
     } else if (event.type === "session.completed") {
       session.status = "completed";
       session.phase = "completed";

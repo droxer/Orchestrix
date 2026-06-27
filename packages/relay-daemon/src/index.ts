@@ -631,7 +631,6 @@ async function executeCommand(
   logger.info("run completed", {
     ...commandLogFields(sandboxId, command),
     exitCode: next.last_exit_code,
-    reviewVerdict: next.review_verdict,
     agentLogBytes: agentLog.length,
   });
   await postJsonWithRetry(fetchFn, eventUrl, {
@@ -644,8 +643,6 @@ async function executeCommand(
     mode: command.mode,
     exitCode: next.last_exit_code,
     agentLog,
-    reviewVerdict: next.review_verdict,
-    reviewFeedback: next.review_feedback,
     tokenUsage: next.token_usage,
   } satisfies DaemonNodeEvent, token, signal);
 }

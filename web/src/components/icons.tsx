@@ -25,6 +25,7 @@ import {
   ListTodo,
   Palette,
   LogOut,
+  MessageCircleQuestion,
   MessagesSquare,
   PanelLeftClose,
   PanelLeftOpen,
@@ -101,6 +102,7 @@ export const ActionKey = withStandardStroke(KeyRound, "ActionKey");
 
 export const ModeAction = withStandardStroke(Code2, "ModeAction");
 export const ModeReview = withStandardStroke(ScanEye, "ModeReview");
+export const ModeAsk = withStandardStroke(MessageCircleQuestion, "ModeAsk");
 
 // Preferences category glyphs.
 export const PrefAppearance = withStandardStroke(Palette, "PrefAppearance");

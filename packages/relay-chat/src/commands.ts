@@ -142,7 +142,7 @@ function agentOption(options: Map<string, string>): AgentName | undefined {
 
 function modeOption(options: Map<string, string>): AgentTaskMode | undefined {
   const value = stringOption(options, "mode");
-  if (value === "action" || value === "review") return value;
+  if (value === "action" || value === "review" || value === "ask") return value;
   if (value === "implement") return "action";
   return undefined;
 }

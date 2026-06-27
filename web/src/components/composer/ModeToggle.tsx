@@ -1,14 +1,17 @@
 import { useTranslation } from "react-i18next";
 import type { AgentTaskMode } from "../../types";
-import { ModeAction, ModeReview } from "../icons";
+import { ModeAction, ModeAsk } from "../icons";
 
+// The composer toggles between "Ask" (read-only Q&A) and "Agent" (does work,
+// stored as the "action" mode). "review" is a workflow-internal mode and is
+// not user-selectable here.
 export function ModeToggle({ mode, setMode }: {
   mode: AgentTaskMode;
   setMode: (mode: AgentTaskMode) => void;
 }) {
   const { t } = useTranslation();
-  const next: AgentTaskMode = mode === "action" ? "review" : "action";
-  const Icon = mode === "action" ? ModeAction : ModeReview;
+  const next: AgentTaskMode = mode === "action" ? "ask" : "action";
+  const Icon = mode === "ask" ? ModeAsk : ModeAction;
   return (
     <button
       type="button"

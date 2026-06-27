@@ -6,8 +6,7 @@ from pydantic import BaseModel, ConfigDict
 
 
 AgentName = Literal["claude", "pi", "codex", "kimi"]
-AgentTaskMode = Literal["action", "review"]
-ReviewVerdict = Literal["approved", "rejected", "failed"]
+AgentTaskMode = Literal["action", "review", "ask"]
 AgentRole = Literal["implementer", "reviewer", "planner", "tester", "fixer"]
 SessionStatus = Literal["running", "waiting_for_human", "completed", "failed", "cancelled"]
 TaskPriority = Literal["low", "normal", "high"]

@@ -1,6 +1,7 @@
 import { anthropicModel, openaiModel, piModel, piProvider } from "./env.js";
 import { agentWorkspacePath, codexCliConfigOverrides, runAsAgent } from "./guest.js";
 import {
+  askPrompt,
   claudeTaskPrompt,
   codexActionPrompt,
   kimiTaskPrompt,
@@ -21,7 +22,12 @@ export function buildCodexActionCommand(state: AgentState): string {
   return runAsAgent(shellCommand(argv), "codex");
 }
 
-function codexBaseArgv(): string[] {
+export function buildCodexAskCommand(state: AgentState): string {
+  const argv = [...codexBaseArgv({ readOnly: true }), askPrompt(state)];
+  return runAsAgent(shellCommand(argv), "codex");
+}
+
+function codexBaseArgv({ readOnly = false }: { readOnly?: boolean } = {}): string[] {
   const workspace = agentWorkspacePath();
   const argv = [
     "stdbuf",
@@ -34,7 +40,11 @@ function codexBaseArgv(): string[] {
     "exec",
     "--json",
     "--skip-git-repo-check",
-    "--dangerously-bypass-approvals-and-sandbox",
+    // Ask mode confines Codex to a read-only sandbox with no approvals; action
+    // mode keeps full write access.
+    ...(readOnly
+      ? ["--sandbox", "read-only", "--ask-for-approval", "never"]
+      : ["--dangerously-bypass-approvals-and-sandbox"]),
   ];
   const model = openaiModel();
   if (model) argv.push("-m", model);
@@ -49,7 +59,16 @@ export function buildClaudeReviewCommand(state: AgentState): string {
   return buildClaudeCommand(reviewPrompt(state));
 }
 
-function buildClaudeCommand(prompt: string): string {
+export function buildClaudeAskCommand(state: AgentState): string {
+  // Plan mode runs Claude read-only: it can inspect the workspace but cannot
+  // edit files, so it answers the question without making changes.
+  return buildClaudeCommand(askPrompt(state), { permissionMode: "plan" });
+}
+
+function buildClaudeCommand(
+  prompt: string,
+  { permissionMode = "bypassPermissions" }: { permissionMode?: string } = {},
+): string {
   const workspace = agentWorkspacePath();
   const argv = [
     "stdbuf",
@@ -58,7 +77,7 @@ function buildClaudeCommand(prompt: string): string {
     "claude",
     "-p",
     "--permission-mode",
-    "bypassPermissions",
+    permissionMode,
     "--add-dir",
     workspace,
     "--verbose",
@@ -78,6 +97,12 @@ export function buildPiActionCommand(state: AgentState): string {
 
 export function buildPiReviewCommand(state: AgentState): string {
   return buildPiCommand(reviewPrompt(state));
+}
+
+// Pi has no confirmed native read-only flag yet, so ask mode relies on the
+// read-only ask prompt. Tighten with a CLI flag once one is confirmed.
+export function buildPiAskCommand(state: AgentState): string {
+  return buildPiCommand(askPrompt(state));
 }
 
 function buildPiCommand(prompt: string): string {
@@ -107,6 +132,12 @@ export function buildKimiActionCommand(state: AgentState): string {
 
 export function buildKimiReviewCommand(state: AgentState): string {
   return buildKimiCommand(reviewPrompt(state));
+}
+
+// Kimi flags are provisional; ask mode relies on the read-only ask prompt until
+// a native read-only flag is confirmed against the installed CLI.
+export function buildKimiAskCommand(state: AgentState): string {
+  return buildKimiCommand(askPrompt(state));
 }
 
 function buildKimiCommand(prompt: string): string {

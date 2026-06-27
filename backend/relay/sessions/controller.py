@@ -14,8 +14,6 @@ def initial_agent_state(task_goal: str) -> dict[str, Any]:
         "agent_logs": [],
         "last_exit_code": 0,
         "agent_failures": {},
-        "review_verdict": "",
-        "review_feedback": "",
     }
 
 
@@ -245,9 +243,6 @@ class SessionController:
     def record_agent_completed(self, session_id: str, state: dict[str, Any], input: dict[str, Any]) -> dict[str, Any]:
         logger.info("Agent run completed", session_id=session_id, run_id=input["runId"], agent=input["agent"], mode=input["mode"], status=input["status"], exit_code=input["exitCode"])
         state_patch = {"agent_logs": [input.get("agentLog", "")], "last_exit_code": input["exitCode"], "token_usage": input.get("tokenUsage")}
-        if is_review_assignment(input["mode"]):
-            state_patch["review_verdict"] = input.get("reviewVerdict", "")
-            state_patch["review_feedback"] = input.get("reviewFeedback", "")
         completed_payload = {
             "runId": input["runId"],
             "agent": input["agent"],
@@ -270,18 +265,6 @@ class SessionController:
                 "agent": input["agent"],
                 "sessionId": session_id,
             })
-        if is_review_assignment(input["mode"]):
-            verdict = input.get("reviewVerdict") or "failed"
-            self._append(session_id, relay_event("review.verdict", session_id, {
-                "runId": input["runId"],
-                "agent": input["agent"],
-                "verdict": verdict,
-                "feedback": input.get("reviewFeedback", ""),
-            }))
-            if verdict == "approved":
-                self._update_task_status("done", f"{input['agent']} approved the work.", {"agent": input["agent"], "sessionId": session_id})
-            elif verdict == "rejected":
-                self._update_task_status("blocked", f"{input['agent']} rejected the work.", {"agent": input["agent"], "sessionId": session_id})
         return merge_agent_state(state, state_patch)
 
     def _append(self, session_id: str, event: dict[str, Any]) -> dict[str, Any]:

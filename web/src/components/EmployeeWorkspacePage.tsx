@@ -7,7 +7,6 @@ import { getWorkspaceBrief, listWorkspaceFiles, readWorkspaceFile } from "../api
 import type {
   ArtifactIndexItem,
   CurrentUser,
-  Tone,
   WorkspaceFileContentResponse,
   WorkspaceFileEntry,
   WorkspaceFilesResponse,
@@ -18,15 +17,12 @@ import { ArtifactBody } from "./artifact/ArtifactBody";
 import { CodeView, isHtmlFile, isMarkdownFile, isRenderableFile, languageForFile } from "./CodeView";
 import { Markdown } from "./Markdown";
 
-type StatusUpdate = { tone: Tone; message: string };
-
 interface EmployeeWorkspacePageProps {
   employeeId: string;
   currentUser: CurrentUser;
   isRefreshing: boolean;
   onRefresh: () => Promise<void>;
   onOpenConversation: (sessionId: string) => void;
-  setStatus: (status: StatusUpdate) => void;
 }
 
 // One active selection drives the preview pane: an artifact (rendered with the
@@ -77,7 +73,6 @@ export function EmployeeWorkspacePage({
   isRefreshing,
   onRefresh,
   onOpenConversation,
-  setStatus,
 }: EmployeeWorkspacePageProps) {
   const { t, i18n } = useTranslation();
   const [selected, setSelected] = useState<Selection | null>(null);
@@ -111,14 +106,6 @@ export function EmployeeWorkspacePage({
     ? currentUser.displayName || currentUser.username || employeeId
     : employeeId;
 
-  useEffect(() => {
-    if (!query.error) return;
-    setStatus({
-      tone: "warn",
-      message: query.error instanceof Error ? query.error.message : String(query.error),
-    });
-  }, [query.error, setStatus]);
-
   // Switching employees resets navigation + selection so the panes never show
   // another employee's path or a stale preview.
   useEffect(() => {
@@ -126,14 +113,6 @@ export function EmployeeWorkspacePage({
     setSelected(null);
     setBrowseTab("artifacts");
   }, [employeeId]);
-
-  useEffect(() => {
-    if (!fileQuery.error) return;
-    setStatus({
-      tone: "warn",
-      message: fileQuery.error instanceof Error ? fileQuery.error.message : String(fileQuery.error),
-    });
-  }, [fileQuery.error, setStatus]);
 
   async function refreshWorkspace(): Promise<void> {
     await Promise.all([query.refetch(), fileQuery.refetch(), onRefresh()]);

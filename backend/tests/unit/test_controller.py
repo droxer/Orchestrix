@@ -6,7 +6,7 @@ from relay.persistence.stores import LocalSessionStore
 from relay.sessions import SessionController, initial_agent_state
 
 
-def test_session_controller_records_review_verdict() -> None:
+def test_session_controller_records_review_run() -> None:
     with TemporaryDirectory() as root:
         store = LocalSessionStore(root)
         controller = SessionController(store, workspace_path="/workspace")
@@ -19,21 +19,20 @@ def test_session_controller_records_review_verdict() -> None:
             "mode": "review",
             "status": "completed",
             "exitCode": 0,
-            "agentLog": "approved",
-            "reviewVerdict": "approved",
-            "reviewFeedback": "ok",
+            "agentLog": "looks fine",
             "tokenUsage": {"input": 9, "output": 4, "cache": 2, "total": 15, "source": "codex"},
         })
 
         updated = store.get_session(session["id"])
-        assert state["review_verdict"] == "approved"
+        assert "review_verdict" not in state
         assert state["token_usage"]["total"] == 15
-        assert updated["reviewVerdict"] == "approved"
+        assert "reviewVerdict" not in updated
         assert updated["agentRuns"][0]["tokenUsage"]["input"] == 9
         assert updated["tokenUsage"]["total"] == 15
         assert updated["agentRuns"][0]["artifactIds"] == []
-        assert updated["agentRuns"][0]["agentLog"] == "approved"
+        assert updated["agentRuns"][0]["agentLog"] == "looks fine"
         assert updated["artifacts"] == []
+        assert all(event["type"] != "review.verdict" for event in updated["events"])
 
 
 def test_record_cancel_decision_appends_one_cancel_decision() -> None:

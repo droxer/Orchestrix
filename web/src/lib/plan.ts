@@ -17,7 +17,8 @@ export function parsePlanSteps(text: string, agentNames: readonly string[]): Pla
       if (!entry || typeof entry !== "object") return [];
       const { agent, mode } = entry as { agent?: unknown; mode?: unknown };
       if (typeof agent !== "string" || !agentNames.includes(agent)) return [];
-      const taskMode: AgentTaskMode = mode === "review" ? "review" : "action";
+      const taskMode: AgentTaskMode =
+        mode === "review" ? "review" : mode === "ask" ? "ask" : "action";
       return [{ agent: agent as AgentName, mode: taskMode }];
     });
     return steps.length > 0 ? steps : null;

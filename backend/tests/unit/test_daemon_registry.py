@@ -84,14 +84,12 @@ def test_daemon_registration_poll_and_completion_updates_session() -> None:
                 "agent": "codex",
                 "mode": "review",
                 "exitCode": 0,
-                "agentLog": "approved",
-                "reviewVerdict": "approved",
-                "reviewFeedback": "ok",
+                "agentLog": "looks fine",
             }, "node_token")
 
             session = session_store.get_session(session["id"])
             assert session["status"] == "completed"
-            assert session["reviewVerdict"] == "approved"
+            assert "reviewVerdict" not in session
             assert registry.monitor_nodes()[0]["queuedCommandCount"] == 0
 
     asyncio.run(run_flow())

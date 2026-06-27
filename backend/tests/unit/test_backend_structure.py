@@ -86,12 +86,10 @@ def test_daemon_node_event_parser_keeps_error_messages_and_raw_logs() -> None:
         "mode": "review",
         "exitCode": 0,
         "agentLog": raw_log,
-        "reviewVerdict": "approved",
     })
 
     assert parsed["exitCode"] == 0
     assert parsed["leaseId"] == "lease_1"
-    assert parsed["reviewVerdict"] == "approved"
     assert parsed["agentLog"] == raw_log
 
     parsed_failed = daemon_node_event({
@@ -127,15 +125,4 @@ def test_daemon_node_event_parser_keeps_error_messages_and_raw_logs() -> None:
             "agent": "codex",
             "exitCode": 0,
             "tokenUsage": {"input": 1, "output": 1, "cache": 0, "total": 9},
-        })
-
-    with pytest.raises(ValueError, match="invalid reviewVerdict maybe"):
-        daemon_node_event({
-            "type": "run.completed",
-            "commandId": "cmd_1",
-            "sessionId": "ses_1",
-            "runId": "run_1",
-            "agent": "codex",
-            "exitCode": 0,
-            "reviewVerdict": "maybe",
         })

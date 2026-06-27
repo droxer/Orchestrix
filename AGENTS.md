@@ -247,7 +247,7 @@ Before handing off, check:
 Test focus:
 
 - `packages/relay-core/tests/handoff.test.ts`: routing, prompt construction, stream rendering, and
-  Codex review verdict parsing.
+  regression guards that review mode omits verdict markers and feedback injection.
 - `packages/relay-chat/tests/chat.test.ts`: chat gateway, provider adapters,
   command parsing, and relay-client integration.
 - `packages/relay-daemon/tests/daemon.test.ts`: daemon registration, command

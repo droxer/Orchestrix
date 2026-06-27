@@ -21,16 +21,6 @@ describe("prior agent bridge in prompts", () => {
     assert.equal(codexActionPrompt(state), expected);
   });
 
-  it("preserves review feedback inside the user block when both are present", () => {
-    const state = {
-      ...initialAgentState("do thing"),
-      review_feedback: "fix X",
-      prior_agent_bridge: "[Previous from @pi]\nverified",
-    };
-    const out = claudeTaskPrompt(state);
-    assert.match(out, /\[Previous from @pi\]\nverified\n\n\[User\]\ndo thing\n\nReview feedback to fix:\nfix X/);
-  });
-
   it("prependPriorAgentBridge is a no-op without bridge", () => {
     const state = initialAgentState("x");
     assert.equal(prependPriorAgentBridge("hello", state), "hello");

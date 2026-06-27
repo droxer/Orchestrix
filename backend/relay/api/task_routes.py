@@ -13,6 +13,7 @@ from ..tasks import next_routine_date
 from .deps import AppContextDep
 from .helpers import (
     actor_can_access_record,
+    agent_task_mode,
     assignee_employee_id_for_task,
     assignment_list,
     get_task_for_actor,
@@ -115,7 +116,7 @@ async def start_task_on_ready_node(
     try:
         run_request = {
             "taskGoal": task_goal_text(task),
-            "assignments": [{"agent": agent, "mode": "review" if mode == "review" else "action"}],
+            "assignments": [{"agent": agent, "mode": agent_task_mode(mode)}],
             "taskId": task["id"],
             "actorIsAdmin": actor["isAdmin"],
         }
@@ -301,7 +302,7 @@ async def start_task(task_id: str, request: Request, ctx: AppContextDep) -> dict
         raise HTTPException(400, f"agent must be one of: {', '.join(AGENT_NAMES)}.")
     if task.get("assignedAgent") != agent:
         task = ctx.task_store.assign_task(task_id, agent)
-    mode = "review" if body.get("mode") == "review" else "action"
+    mode = agent_task_mode(body.get("mode"))
     if task.get("isRoutine"):
         result = await start_routine_occurrence_on_ready_node(ctx, task, actor, agent=agent, mode=mode)
     else:
@@ -344,7 +345,7 @@ async def pickup_task(task_id: str, request: Request, ctx: AppContextDep) -> dic
         owner_employee_id=current.get("ownerEmployeeId") or actor["employeeId"],
     )
     session = controller.create_session(task_goal_text(task), ["human", agent])
-    mode = "review" if body.get("mode") == "review" else "action"
+    mode = agent_task_mode(body.get("mode"))
     controller.assign_session(session["id"], [{"agent": agent, "mode": mode}])
     task = ctx.task_store.record_activity(
         task["id"],

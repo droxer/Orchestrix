@@ -1,5 +1,4 @@
 import { getAgent } from "./agents.js";
-import { classifyReview, extractReviewFeedback } from "./review.js";
 import { StderrLineRenderer } from "./renderers.js";
 import {
   agentWorkspacePath,
@@ -14,9 +13,11 @@ import {
 import { extractTokenUsageFromJsonl } from "./token-usage.js";
 
 /**
- * Run one agent assignment. Command construction, rendering, failure accounting,
- * and review-verdict parsing are all driven by the agent registry, so adding an
- * agent never requires a new node function — only a registry entry.
+ * Run one agent assignment. Command construction, rendering, and failure
+ * accounting are all driven by the agent registry, so adding an agent never
+ * requires a new node function — only a registry entry. A review pass is just
+ * an agent run with the review prompt; its output is captured in the agent log
+ * like any other run.
  */
 export async function runAgentNode(
   agent: AgentName,
@@ -30,7 +31,13 @@ export async function runAgentNode(
   const stderrRenderer = new StderrLineRenderer();
   const runId = options.runId;
   const reviewMode = mode === "review";
-  const command = reviewMode ? def.buildReviewCommand(state) : def.buildActionCommand(state);
+  const command =
+    mode === "review"
+      ? def.buildReviewCommand(state)
+      : mode === "ask"
+        ? def.buildAskCommand(state)
+        : def.buildActionCommand(state);
+  const actionLabel = mode === "ask" ? def.askLabel : def.actionLabel;
   const result = await execute("bash", ["-c", command], {
     cwd: agentWorkspacePath(),
     stdoutRenderer: (chunk) => {
@@ -47,20 +54,16 @@ export async function runAgentNode(
   const tokenUsage = extractTokenUsageFromJsonl(result.stdout, agent);
 
   if (reviewMode) {
-    const feedback = extractReviewFeedback(result.stdout);
-    const verdict = classifyReview(result.exit_code, feedback);
     return {
       agent_logs: [agentResultLog(def.reviewLabel, result, 4000)],
       last_exit_code: result.exit_code,
-      agent_failures: withFailure(state, agent, verdict === "failed"),
-      review_verdict: verdict,
-      review_feedback: feedback,
+      agent_failures: withFailure(state, agent, result.exit_code !== 0),
       token_usage: tokenUsage,
     };
   }
 
   return {
-    agent_logs: [agentResultLog(def.actionLabel, result)],
+    agent_logs: [agentResultLog(actionLabel, result)],
     last_exit_code: result.exit_code,
     agent_failures: withFailure(state, agent, result.exit_code !== 0),
     token_usage: tokenUsage,

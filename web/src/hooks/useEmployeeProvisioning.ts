@@ -1,5 +1,4 @@
 import { useCallback, type Dispatch, type SetStateAction } from "react";
-import { useTranslation } from "react-i18next";
 import { provisionSandbox, RelayApiError } from "../api";
 import type { ControlPanelDaemonNodeRecord, DaemonNodeMonitorRecord, SandboxRecord } from "../types";
 import { newBrowserSandboxToken, preferLocalControlPanelNode } from "../lib/controlPanel";
@@ -20,11 +19,9 @@ export function useEmployeeProvisioning({ nodes, setSandboxes, refreshLocalDaemo
   rememberSandboxToken: (employeeId: string, sandbox: SandboxRecord, token?: string) => void;
   adoptLocalDaemonNodes: () => Promise<void>;
 } {
-  const { t } = useTranslation();
   const tokens = useRelayStore((s) => s.tokens);
   const selectedEmployee = useRelayStore((s) => s.selectedEmployee);
   const setTokens = useRelayStore((s) => s.setTokens);
-  const setStatus = useRelayStore((s) => s.setStatus);
 
   async function provisionEmployeeSandbox(
     employeeId: string,
@@ -94,12 +91,8 @@ export function useEmployeeProvisioning({ nodes, setSandboxes, refreshLocalDaemo
       ...adoptedSandboxes,
       ...cur.filter((sandbox) => !adoptedSandboxes.some((adopted) => adopted.id === sandbox.id)),
     ]);
-    setStatus({
-      tone: "info",
-      message: t("toast.connected_nodes", { count: adoptedSandboxes.length }),
-    });
     await refreshWithToken(nextTokens[selectedEmployee] ?? nextTokens[adoptedSandboxes[0].id]);
-  }, [nodes, refreshLocalDaemonNodes, refreshWithToken, selectedEmployee, setSandboxes, setStatus, setTokens, t, tokens]);
+  }, [nodes, refreshLocalDaemonNodes, refreshWithToken, selectedEmployee, setSandboxes, setTokens, tokens]);
 
   return { provisionEmployeeSandbox, rememberSandboxToken, adoptLocalDaemonNodes };
 }

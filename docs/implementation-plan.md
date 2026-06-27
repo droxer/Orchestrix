@@ -143,7 +143,7 @@ Implementation rules:
 - Agent CLIs run inside the execution plane.
 - Agent prompts must not contain long-lived secrets.
 - JSON/JSONL output must be rendered into human-readable streams and captured as raw events.
-- Review outputs should include explicit machine-readable verdict markers.
+- Review mode is informational: agents emit prose review notes; no machine-readable verdict marker is required.
 - Agent-specific command builders should stay separate from workflow policy.
 
 ### 2.5 Execution Plane
@@ -325,7 +325,6 @@ tool.denied
 tool.completed
 
 artifact.created
-review.verdict
 memory.candidate_created
 memory.written
 
@@ -747,7 +746,7 @@ persistence and materialization (`backend/relay/stores.py` and
 persistence, artifact files, and session materialization
 (`backend/relay/session_store.py` re-exports). It emits events such as
 `session.created`, `session.status`, `agent.started`, `agent.output`,
-`artifact.created`, `human.decision`, `agent.completed`, `review.verdict`,
+`artifact.created`, `human.decision`, `agent.completed`,
 `session.completed`, and `session.failed`.
 
 When adding a new event type, update the materializer and tests together.
@@ -765,7 +764,6 @@ Responsibilities:
 - create sessions and link them to an optional task
 - emit agent lifecycle and output events
 - write command output artifacts
-- emit Codex review verdicts
 - record human decisions
 - mark sessions completed or failed
 - update linked task status and activity as agent steps progress
@@ -783,7 +781,7 @@ Agent-specific execution lives in `packages/relay-core/src/nodes.ts`.
 | `claudeImplementNode()` | `buildClaudeImplementCommand()` | `ClaudeStreamRenderer` | Last log tail, exit code, Claude failure count |
 | `piImplementNode()` | `buildPiImplementCommand()` | `PlainTextStreamRenderer` | Last log tail, exit code, Pi failure count |
 | `codexImplementNode()` | `buildCodexImplementCommand()` | `CodexStreamRenderer` | Last log tail, exit code, Codex failure count |
-| `codexReviewNode()` | `buildCodexReviewCommand()` | `CodexStreamRenderer` | Full review log, exit code, review verdict, feedback |
+| `codexReviewNode()` | `buildCodexReviewCommand()` | `CodexStreamRenderer` | Full review log, exit code |
 
 Execution contracts:
 
@@ -791,7 +789,7 @@ Execution contracts:
 - Codex runs with `exec --json`; render JSONL through `CodexStreamRenderer`.
 - Pi uses `-P` only when `pi --help` advertises streaming print support; otherwise it falls back to `-p`.
 - Nodes stream human-readable output to the sink and forward raw chunks to `AgentEventSink.agentOutput()`.
-- Review mode requires Codex feedback to include `RELAY_REVIEW_VERDICT: APPROVED` or `RELAY_REVIEW_VERDICT: REJECTED`.
+- Review mode is informational: agents emit prose review notes; no machine-readable verdict marker is required.
 
 ### 10.5 Workflow and BoxLite Runtime
 
@@ -825,10 +823,7 @@ Claude implement -> Pi implement/test follow-up -> Codex review
 Routing helpers live in `packages/relay-core/src/routing.ts`.
 
 - Claude success routes to Pi.
-- Pi success routes to Codex review.
-- Codex `approved` ends the workflow.
-- Codex `rejected` routes feedback back to Claude.
-- Codex runtime failure retries Codex review until the failure limit.
+- Pi success ends the workflow (Codex review is optional via explicit assignment).
 
 The TUI in `packages/relay-tui/src/tui.tsx` accepts leading agent mentions such as:
 
@@ -876,7 +871,7 @@ Test coverage is organized as:
 - `backend/tests/`: Python event stores, artifacts, controller behavior, linked
   task updates, daemon registry behavior, task scheduler/routine promotion, and
   HTTP API routes.
-- `packages/relay-core/tests/handoff.test.ts`: routing, prompt contracts, Codex verdict parsing, command generation, stream renderers, BoxLite execution helpers.
+- `packages/relay-core/tests/handoff.test.ts`: routing, prompt contracts, review-mode command generation (no verdict markers), stream renderers, BoxLite execution helpers.
 - `packages/relay-tui/tests/tui.test.tsx`: TUI parsing, shortcuts, rendering, cancellation, session state updates, slash commands.
 - `web/tests/status.test.ts`: web daemon-node status derivation.
 - `web/tests/backlog.test.ts`: backlog filtering, sorting, and display helpers.

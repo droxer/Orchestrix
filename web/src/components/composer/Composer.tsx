@@ -83,7 +83,7 @@ const ComposerView = forwardRef<ComposerHandle, {
               }
               if (e.key === "Tab" && e.shiftKey) {
                 e.preventDefault();
-                setComposerMode((m) => (m === "action" ? "review" : "action"));
+                setComposerMode((m) => (m === "action" ? "ask" : "action"));
                 return;
               }
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); onSend(); }

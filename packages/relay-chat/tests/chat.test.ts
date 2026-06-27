@@ -29,6 +29,18 @@ describe("relay-chat command parsing", () => {
     });
   });
 
+  it("parses ask mode for read-only chat collaboration", () => {
+    const command = parseChatCommand("/relay run --agent codex --mode ask explain the failing tests");
+    assert.deepEqual(command, {
+      kind: "run",
+      agent: "codex",
+      mode: "ask",
+      sandboxId: undefined,
+      sessionId: undefined,
+      taskGoal: "explain the failing tests",
+    });
+  });
+
   it("turns parsed run command into a chat request", () => {
     const ref = discordConversation({ userId: "u1", channelId: "c1", guildId: "g1" });
     const command = parseChatCommand("/relay run --agent codex implement the chat gateway");

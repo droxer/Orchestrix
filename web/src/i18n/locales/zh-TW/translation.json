@@ -10,6 +10,8 @@
   "nav": {
     "conversations": "對話",
     "chats": "訊息",
+    "workspace": "工作區",
+    "workspace_label": "員工工作區",
     "backlog": "待辦",
     "backlog_label": "待辦管理",
     "routine": "例行",
@@ -164,6 +166,36 @@
       "normal": "一般",
       "low": "低"
     }
+  },
+  "workspace": {
+    "title": "工作區",
+    "sub": "@{{employee}} 駕駛艙",
+    "loading": "載入工作區中",
+    "metrics": "工作區指標",
+    "metric_runs": "活躍執行",
+    "metric_tasks": "活躍任務",
+    "metric_sessions": "對話",
+    "metric_artifacts": "產物",
+    "browse": "瀏覽",
+    "artifacts": "產物",
+    "files": "檔案",
+    "preview": "預覽",
+    "select_to_preview": "選擇產物或檔案進行預覽。",
+    "open_thread": "開啟對話",
+    "loading_preview": "載入預覽中。",
+    "binary_file": "二進位檔案 — 無法預覽。",
+    "empty_file": "此檔案為空。",
+    "view_mode": "預覽模式",
+    "view_rendered": "渲染檢視",
+    "view_source": "原始碼",
+    "file_truncated": "預覽已截斷至 {{limit}}。",
+    "no_artifacts": "暫無產物。",
+    "no_files": "此目錄中沒有檔案。",
+    "loading_files": "載入檔案中。",
+    "files_unavailable": "此主機上無可用的工作區路徑。",
+    "parent_directory": "上層目錄",
+    "load_failed": "工作區不可用",
+    "retry": "重試"
   },
   "routine": {
     "title": "例行",
@@ -618,12 +650,9 @@
     "unknown": "未知"
   },
   "mode": {
-    "action": "執行",
+    "action": "代理",
+    "ask": "詢問",
     "review": "審查"
-  },
-  "verdict": {
-    "approved": "已通過",
-    "rejected": "已拒絕"
   },
   "artifact": {
     "kind": {
@@ -649,9 +678,6 @@
       "diff": "+{{additions}} −{{deletions}} · {{files}} 個檔案",
       "test": "{{passed}} 通過 · {{failed}} 失敗",
       "test_unknown": "測試輸出",
-      "review_approved": "已通過",
-      "review_rejected": "需修改",
-      "review_pending": "審閱",
       "command": "結束碼 {{code}}",
       "command_unknown": "命令日誌"
     },
@@ -683,7 +709,6 @@
     "decision": "你 — {{kind}}",
     "agent_completed": "{{agent}} — {{status}}",
     "exit_code": "結束碼 {{exitCode}}",
-    "review_verdict": "{{agent}} 裁決 — {{verdict}}",
     "session_status": "狀態 — {{phase}}",
     "session_completed": "工作階段已完成",
     "session_failed": "工作階段失敗"

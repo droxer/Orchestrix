@@ -1,4 +1,4 @@
-import type { AgentName, AgentState, ReviewVerdict, AgentTaskMode } from "./state.js";
+import type { AgentName, AgentState, AgentTaskMode } from "./state.js";
 import type { TokenUsage } from "./token-usage.js";
 
 export type DaemonNodeStatus = "ready" | "busy" | "stopped";
@@ -102,8 +102,6 @@ export type DaemonNodeEvent =
       mode: AgentTaskMode;
       exitCode: number;
       agentLog: string;
-      reviewVerdict?: ReviewVerdict | "";
-      reviewFeedback?: string;
       tokenUsage?: TokenUsage;
     }
   | {

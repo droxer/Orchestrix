@@ -4,10 +4,6 @@ export function prependPriorAgentBridge(prompt: string, state: AgentState): stri
   return state.prior_agent_bridge ? `${state.prior_agent_bridge}\n\n[User]\n${prompt}` : prompt;
 }
 
-export function appendReviewFeedback(prompt: string, state: AgentState): string {
-  return state.review_feedback ? `${prompt}\n\nReview feedback to fix:\n${state.review_feedback}` : prompt;
-}
-
 export function reviewPrompt(state: AgentState): string {
   return [
     "Review the current workspace changes for the user's task.",
@@ -16,17 +12,13 @@ export function reviewPrompt(state: AgentState): string {
     "If changes are acceptable, say so briefly.",
     "If changes are not acceptable, list the blocking issues clearly.",
     "",
-    "End your response with exactly one of these lines:",
-    "RELAY_REVIEW_VERDICT: APPROVED",
-    "RELAY_REVIEW_VERDICT: REJECTED",
-    "",
     "User task:",
     state.task_goal,
   ].join("\n");
 }
 
 export function actionPrompt(state: AgentState): string {
-  const task = appendReviewFeedback(state.task_goal, state);
+  const task = state.task_goal;
   // Order: earlier conversation history first, then any within-run bridge from
   // sibling agents, then the current user turn. Both preludes are optional.
   const preludes: string[] = [];
@@ -34,6 +26,17 @@ export function actionPrompt(state: AgentState): string {
   if (state.prior_agent_bridge) preludes.push(state.prior_agent_bridge);
   if (preludes.length === 0) return task;
   return `${preludes.join("\n\n")}\n\n[User]\n${task}`;
+}
+
+// Read-only Q&A prompt. CLI read-only flags are the hard guarantee; this
+// instruction reinforces the intent and covers agents lacking a native flag.
+export function askPrompt(state: AgentState): string {
+  const guard = [
+    "Answer the user's question using only read-only inspection of the workspace.",
+    "Do NOT modify, create, or delete any files, and do NOT run commands that change state.",
+    "If the request would require making changes, explain what you would do instead of doing it.",
+  ].join("\n");
+  return `${guard}\n\n${actionPrompt(state)}`;
 }
 
 export function claudeTaskPrompt(state: AgentState): string {

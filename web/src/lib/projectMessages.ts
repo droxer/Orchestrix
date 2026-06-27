@@ -157,20 +157,6 @@ export function projectMessages(session: RelaySession | undefined, t: TFunction)
         }
         break;
       }
-      case "review.verdict": {
-        out.push({
-          kind: "system",
-          id: event.id,
-          timestamp: event.timestamp,
-          tone: event.verdict === "approved" ? "good" : "bad",
-          label: t("message.review_verdict", {
-            agent: event.agent,
-            verdict: t(`verdict.${event.verdict}`, { defaultValue: event.verdict }),
-          }),
-          detail: event.feedback,
-        });
-        break;
-      }
       case "session.status":
       case "session.completed":
       case "session.failed":

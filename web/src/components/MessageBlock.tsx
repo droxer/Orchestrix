@@ -89,7 +89,7 @@ function ArtifactChip({ artifact, sessionId }: { artifact: RelayArtifact; sessio
   const viewer = useArtifactViewer();
 
   // The body is loaded once (shared with the viewer drawer) so the chip can
-  // show a semantic stat — verdict, +/−, pass/fail — instead of raw byte size.
+  // show a semantic stat — +/−, pass/fail — instead of raw byte size.
   const body = useArtifactBody(sessionId, artifact.id);
   const stat = body.isSuccess ? summarizeArtifact(artifact.kind, body.data ?? "") : null;
   const kindLabel = t(`artifact.kind.${artifact.kind}`, { defaultValue: artifact.kind });
