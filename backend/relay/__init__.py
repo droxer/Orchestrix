@@ -24,11 +24,11 @@ def __getattr__(name: str) -> Any:
 
         return create_app
     if name == "SessionController":
-        from .controller import SessionController
+        from .sessions import SessionController
 
         return SessionController
     if name in {"DaemonNodeRegistry", "ServerDaemonNodeBackend"}:
-        from .daemon import DaemonNodeRegistry, ServerDaemonNodeBackend
+        from .daemon_registry import DaemonNodeRegistry, ServerDaemonNodeBackend
 
         return {"DaemonNodeRegistry": DaemonNodeRegistry, "ServerDaemonNodeBackend": ServerDaemonNodeBackend}[name]
     if name in {
@@ -40,7 +40,15 @@ def __getattr__(name: str) -> Any:
         "LocalSessionStore",
         "LocalTaskStore",
     }:
-        from .stores import DEFAULT_RELAY_DATA_DIR, DatabaseDaemonStore, DatabaseSessionStore, DatabaseTaskStore, LocalDaemonStore, LocalSessionStore, LocalTaskStore
+        from .persistence.stores import (
+            DEFAULT_RELAY_DATA_DIR,
+            DatabaseDaemonStore,
+            DatabaseSessionStore,
+            DatabaseTaskStore,
+            LocalDaemonStore,
+            LocalSessionStore,
+            LocalTaskStore,
+        )
 
         return {
             "DEFAULT_RELAY_DATA_DIR": DEFAULT_RELAY_DATA_DIR,
@@ -52,7 +60,7 @@ def __getattr__(name: str) -> Any:
             "LocalTaskStore": LocalTaskStore,
         }[name]
     if name == "DatabaseUserAuthStore":
-        from .auth import DatabaseUserAuthStore
+        from .security.auth import DatabaseUserAuthStore
 
         return DatabaseUserAuthStore
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

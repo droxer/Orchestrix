@@ -81,14 +81,14 @@
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 168px 1fr;
+  grid-template-columns: 150px 1fr;
 }
 
 .pref-nav {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: var(--space-base) var(--space-sm);
+  padding: var(--space-sm) var(--space-xs);
   border-right: 1px solid var(--color-hairline-soft);
   overflow-y: auto;
 }
@@ -97,6 +97,7 @@
   position: relative;
   display: flex;
   align-items: center;
+  gap: var(--space-xs);
   padding: var(--space-xs) var(--space-sm);
   border-radius: var(--radius-sm);
   font: var(--type-nav-link);
@@ -105,9 +106,26 @@
   transition: background 150ms ease, color 150ms ease;
 }
 
+/* Icon reads as a quiet companion to the label until the row is active or
+   hovered, when it picks up the same ink as the text. */
+.pref-nav-item svg {
+  flex-shrink: 0;
+  color: var(--color-muted);
+  transition: color 150ms ease;
+}
+
+.pref-nav-label {
+  min-width: 0;
+}
+
 .pref-nav-item:hover {
   background: var(--color-surface-soft);
   color: var(--color-ink);
+}
+
+.pref-nav-item:hover svg,
+.pref-nav-item.active svg {
+  color: currentColor;
 }
 
 .pref-nav-item.active {
@@ -150,10 +168,37 @@
 
 /* ── Theme cards ──────────────────────────────────────────────────────────── */
 
+/* Sub-group eyebrow inside the appearance radiogroup. Separates the base
+   themes from the high-contrast accessibility variants without splitting the
+   single radiogroup. */
+.pref-group-label {
+  margin: 0 0 var(--space-sm);
+  font: var(--type-eyebrow);
+  letter-spacing: var(--letter-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+/* Second group sits below the first with breathing room. */
+.pref-theme-grid--contrast + .pref-group-label,
+.pref-theme-grid + .pref-group-label {
+  margin-top: var(--space-lg);
+}
+
 .pref-theme-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
   gap: var(--space-sm);
+}
+
+/* Base themes (light/dark/system) fill a 3-up row; the two high-contrast
+   variants sit in a 2-up row — together they replace the old 5-card grid
+   that left an orphan. */
+.pref-theme-grid--base {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.pref-theme-grid--contrast {
+  grid-template-columns: repeat(2, 1fr);
 }
 
 .pref-theme-card {
@@ -177,8 +222,16 @@
 
 .pref-theme-card.selected {
   border-color: var(--color-primary);
-  box-shadow: var(--ring-focus);
   background: color-mix(in srgb, var(--color-primary) 4%, var(--color-canvas));
+}
+
+/* Keyboard focus is a separate signal from selection — the ring is reserved
+   for :focus-visible so a focused-but-selected card stays distinguishable. */
+.pref-theme-card:focus-visible,
+.pref-lang-btn:focus-visible {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: var(--ring-focus);
 }
 
 .pref-theme-preview-wrap {
@@ -230,6 +283,8 @@
   --preview-action: #f4f4f5;
 }
 
+/* High contrast (light) — solid black-on-white, the maximal-legibility
+   light theme. Pinned primitives so the swatch never flips. */
 .pref-theme-preview[data-preview="contrast"] {
   --preview-canvas: #ffffff;
   --preview-rail: #000000;
@@ -238,6 +293,17 @@
   --preview-line: #000000;
   --preview-ink: #000000;
   --preview-action: #000000;
+}
+
+/* High contrast (dark) — the mirror: solid white-on-black. */
+.pref-theme-preview[data-preview="contrast-dark"] {
+  --preview-canvas: #000000;
+  --preview-rail: #000000;
+  --preview-list: #0d0d0d;
+  --preview-card: #1c1c1c;
+  --preview-line: #ffffff;
+  --preview-ink: #ffffff;
+  --preview-action: #ffffff;
 }
 
 .pref-preview-rail,
@@ -337,17 +403,22 @@
 
 /* ── Language grid ────────────────────────────────────────────────────────── */
 
+/* Single column — a short locale list reads as a clean stack and avoids the
+   orphan cell a 2-column grid leaves when the count is odd. */
 .pref-lang-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: var(--space-xs);
 }
 
+/* Horizontal list rows — native name leads, English label (+ selected check)
+   trails, centered so the trailing check icon aligns cleanly with the text. */
 .pref-lang-btn {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-base);
   padding: var(--space-sm) var(--space-base);
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-md);
@@ -365,7 +436,6 @@
 .pref-lang-btn.selected {
   border-color: var(--color-primary);
   background: color-mix(in srgb, var(--color-primary) 5%, var(--color-canvas));
-  box-shadow: var(--ring-focus);
 }
 
 .pref-lang-native {
@@ -373,7 +443,18 @@
   color: var(--color-ink);
 }
 
+/* Right cluster: English label + (when selected) a check, matching the
+   theme cards' selected affordance. Unselected, this collapses to just the
+   label so the row looks identical to before. */
+.pref-lang-meta {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
 .pref-lang-label {
+  text-align: right;
   font-size: var(--text-xs);
   color: var(--color-muted);
   font-weight: 400;
@@ -381,6 +462,12 @@
 
 .pref-lang-btn.selected .pref-lang-label {
   color: color-mix(in srgb, var(--color-primary) 70%, var(--color-muted));
+}
+
+.pref-lang-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 @media (max-width: 600px) {

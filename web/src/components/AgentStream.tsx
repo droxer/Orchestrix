@@ -1,12 +1,10 @@
 import { StreamCheck, StreamCommand, StreamError, StreamInfo, StreamTool, StreamWarn } from "./icons";
 import { useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import ReactMarkdown, { type Components } from "react-markdown";
-import remarkGfm from "remark-gfm";
 
 import type { AgentName } from "../types";
 import { emptyAgentStreamSegments, parseAgentStream, parseAgentStderr, type AgentSegment } from "../lib/agentStream";
-import { tokenize } from "../lib/highlight";
+import { Markdown } from "./Markdown";
 
 type AgentStreamProps = {
   agent: AgentName;
@@ -106,45 +104,6 @@ function StatusIcon({ tone }: { tone: "good" | "bad" | "warn" | "info" }) {
   return <StreamInfo size={13} aria-hidden="true" />;
 }
 
-const MARKDOWN_COMPONENTS: Components = {
-  pre: ({ children }) => <>{children}</>,
-  code: ({ className, children, ...rest }) => {
-    const text = String(children ?? "").replace(/\n$/, "");
-    const inline = !/(^|\s)language-/.test(className ?? "") && !text.includes("\n");
-    if (inline) {
-      return (
-        <code className={className} {...rest}>
-          {text}
-        </code>
-      );
-    }
-    const lang = /language-([\w+-]+)/.exec(className ?? "")?.[1] ?? null;
-    return (
-      <pre className="agent-code">
-        {lang ? <span className="agent-code-lang">{lang}</span> : null}
-        <code>
-          {tokenize(text).map((token, j) => (
-            <span key={j} className={`hl-${token.kind}`}>
-              {token.text}
-            </span>
-          ))}
-        </code>
-      </pre>
-    );
-  },
-  a: ({ href, children, ...rest }) => (
-    <a href={href} target="_blank" rel="noreferrer noopener" {...rest}>
-      {children}
-    </a>
-  ),
-};
-
 function renderProse(text: string): ReactNode {
-  return (
-    <div className="agent-prose">
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
-        {text}
-      </ReactMarkdown>
-    </div>
-  );
+  return <Markdown text={text} />;
 }

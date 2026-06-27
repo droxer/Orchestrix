@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import timedelta
 from pathlib import Path
 from threading import RLock
 from typing import Any
@@ -140,14 +141,27 @@ class LocalDaemonStore:
             self.append_daemon_event(daemon_event("daemon.command.queued", {"nodeId": node_id, "commandId": command["id"]}))
             return record
 
-    def take_queued_commands(self, node_id: str, limit: int = 2**53) -> list[dict[str, Any]]:
+    def take_queued_commands(self, node_id: str, limit: int = 2**53, lease_seconds: float = 60.0) -> list[dict[str, Any]]:
         with self._lock:
             now = now_iso()
-            records = [record for record in self._list_commands() if record["nodeId"] == node_id and record["status"] == "queued"]
+            records = [
+                record
+                for record in self._list_commands()
+                if record["nodeId"] == node_id and command_is_available(record, now)
+            ]
             records = sorted(records, key=lambda item: item["createdAt"])[:limit]
             result = []
             for record in records:
-                updated = {**record, "status": "dispatched", "updatedAt": now, "dispatchedAt": now}
+                attempt = int(record.get("attempt") or 0) + 1
+                updated = {
+                    **record,
+                    "status": "dispatched",
+                    "updatedAt": now,
+                    "dispatchedAt": now,
+                    "leaseId": new_relay_id("lease"),
+                    "leaseExpiresAt": lease_expires_at(now, lease_seconds),
+                    "attempt": attempt,
+                }
                 if record["command"]["type"] == "run.cancel":
                     updated["status"] = "completed"
                     updated["completedAt"] = now
@@ -157,7 +171,8 @@ class LocalDaemonStore:
             return result
 
     def queued_command_count(self, node_id: str) -> int:
-        return len([record for record in self._list_commands() if record["nodeId"] == node_id and record["status"] == "queued"])
+        now = now_iso()
+        return len([record for record in self._list_commands() if record["nodeId"] == node_id and command_is_available(record, now)])
 
     def list_active_runs(self, node_id: str | None = None) -> list[dict[str, Any]]:
         runs = [_read_json(path) for path in self.runs_dir.glob("*.json")]
@@ -318,6 +333,9 @@ class DatabaseDaemonStore:
         Column("created_at", DateTime(timezone=True), nullable=False),
         Column("updated_at", DateTime(timezone=True), nullable=False),
         Column("dispatched_at", DateTime(timezone=True), nullable=True),
+        Column("lease_id", Text, nullable=True),
+        Column("lease_expires_at", DateTime(timezone=True), nullable=True),
+        Column("attempt", Integer, nullable=False, default=0),
         Column("completed_at", DateTime(timezone=True), nullable=True),
     )
     runs = Table(
@@ -504,14 +522,19 @@ class DatabaseDaemonStore:
             self._append_daemon_event(conn, daemon_event("daemon.command.queued", {"nodeId": node_id, "commandId": command["id"]}))
         return record
 
-    def take_queued_commands(self, node_id: str, limit: int = 2**53) -> list[dict[str, Any]]:
+    def take_queued_commands(self, node_id: str, limit: int = 2**53, lease_seconds: float = 60.0) -> list[dict[str, Any]]:
         now = now_iso()
+        now_dt = _parse_iso(now)
         with self.engine.begin() as conn:
             node_pk = self._node_pk(conn, node_id)
+            available_condition = (
+                (self.commands.c.status == "queued")
+                | ((self.commands.c.status == "dispatched") & (self.commands.c.lease_expires_at <= now_dt))
+            )
             rows = conn.execute(
                 select(self.commands)
                 .where(self.commands.c.node_id == node_pk)
-                .where(self.commands.c.status == "queued")
+                .where(available_condition)
                 .order_by(self.commands.c.created_at)
                 .limit(limit)
                 .with_for_update(skip_locked=True)
@@ -519,14 +542,23 @@ class DatabaseDaemonStore:
             result = []
             for row in rows:
                 record = row_to_command(row)
-                updated = {**record, "status": "dispatched", "updatedAt": now, "dispatchedAt": now}
+                attempt = int(record.get("attempt") or 0) + 1
+                updated = {
+                    **record,
+                    "status": "dispatched",
+                    "updatedAt": now,
+                    "dispatchedAt": now,
+                    "leaseId": new_relay_id("lease"),
+                    "leaseExpiresAt": lease_expires_at(now, lease_seconds),
+                    "attempt": attempt,
+                }
                 if record["command"]["type"] == "run.cancel":
                     updated["status"] = "completed"
                     updated["completedAt"] = now
                 claimed = conn.execute(
                     update(self.commands)
                     .where(self.commands.c.id == record["databaseId"])
-                    .where(self.commands.c.status == "queued")
+                    .where(available_condition)
                     .values(**command_to_row(updated, database_id=record["databaseId"], node_pk=node_pk))
                 )
                 if claimed.rowcount != 1:
@@ -536,9 +568,18 @@ class DatabaseDaemonStore:
         return result
 
     def queued_command_count(self, node_id: str) -> int:
+        now = now_iso()
+        now_dt = _parse_iso(now)
         with self.engine.begin() as conn:
             node_pk = self._node_pk(conn, node_id)
-            return len(conn.execute(select(self.commands.c.id).where(self.commands.c.node_id == node_pk).where(self.commands.c.status == "queued")).all())
+            return len(conn.execute(
+                select(self.commands.c.id)
+                .where(self.commands.c.node_id == node_pk)
+                .where(
+                    (self.commands.c.status == "queued")
+                    | ((self.commands.c.status == "dispatched") & (self.commands.c.lease_expires_at <= now_dt))
+                )
+            ).all())
 
     def list_active_runs(self, node_id: str | None = None) -> list[dict[str, Any]]:
         statement = select(self.runs).where(self.runs.c.status == "running")
@@ -746,6 +787,9 @@ def command_to_row(record: dict[str, Any], *, database_id: str | None = None, no
         "created_at": _parse_iso(record["createdAt"]),
         "updated_at": _parse_iso(record["updatedAt"]),
         "dispatched_at": _parse_iso(record.get("dispatchedAt")),
+        "lease_id": record.get("leaseId"),
+        "lease_expires_at": _parse_iso(record.get("leaseExpiresAt")),
+        "attempt": int(record.get("attempt") or 0),
         "completed_at": _parse_iso(record.get("completedAt")),
     }
 
@@ -760,10 +804,28 @@ def row_to_command(row: Any) -> dict[str, Any]:
         "createdAt": _format_iso(row["created_at"]),
         "updatedAt": _format_iso(row["updated_at"]),
         **({"dispatchedAt": _format_iso(row["dispatched_at"])} if row.get("dispatched_at") else {}),
+        **({"leaseId": row["lease_id"]} if row.get("lease_id") else {}),
+        **({"leaseExpiresAt": _format_iso(row["lease_expires_at"])} if row.get("lease_expires_at") else {}),
+        "attempt": row.get("attempt") or 0,
         **({"completedAt": _format_iso(row["completed_at"])} if row.get("completed_at") else {}),
         **({"exitCode": row["exit_code"]} if row.get("exit_code") is not None else {}),
         **({"error": row["error"]} if row.get("error") else {}),
     }
+
+
+def lease_expires_at(now: str, lease_seconds: float) -> str:
+    expires_at = _parse_iso(now) + timedelta(seconds=max(0.001, lease_seconds))
+    return _format_iso(expires_at)
+
+
+def command_is_available(record: dict[str, Any], now: str) -> bool:
+    status = record.get("status")
+    if status == "queued":
+        return True
+    if status != "dispatched":
+        return False
+    lease_expires_at_value = record.get("leaseExpiresAt")
+    return bool(lease_expires_at_value and _parse_iso(lease_expires_at_value) <= _parse_iso(now))
 
 
 def run_to_row(run: dict[str, Any], *, database_id: str | None = None) -> dict[str, Any]:

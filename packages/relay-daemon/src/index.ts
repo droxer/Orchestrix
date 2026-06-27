@@ -281,6 +281,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
             await postJsonWithRetry(fetchFn, `${backendUrl}/daemon-nodes/${encodeURIComponent(sandboxId)}/events`, {
               type: "run.failed",
               commandId: command.id,
+              ...commandLeaseEventFields(command),
               sessionId: command.sessionId,
               runId: command.runId,
               agent: command.agent,
@@ -314,6 +315,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
               ? {
                   type: "run.cancelled",
                   commandId: command.id,
+                  ...commandLeaseEventFields(command),
                   sessionId: command.sessionId,
                   runId: command.runId,
                   agent: command.agent,
@@ -323,6 +325,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
               : {
                   type: "run.failed",
                   commandId: command.id,
+                  ...commandLeaseEventFields(command),
                   sessionId: command.sessionId,
                   runId: command.runId,
                   agent: command.agent,
@@ -565,6 +568,7 @@ async function executeCommand(
           await postJsonWithRetry(fetchFn, eventUrl, {
             type: "run.output",
             commandId: command.id,
+            ...commandLeaseEventFields(command),
             sessionId: command.sessionId,
             runId: command.runId,
             agent,
@@ -595,6 +599,7 @@ async function executeCommand(
   const patch = await runAgentNode(command.agent, command.mode, state, options);
   const next = mergeAgentState(state, patch);
   await outputPostChain;
+  const agentLog = next.agent_logs.slice(-1)[0] ?? "";
   if (signal?.aborted) {
     logger.info("run cancelled", {
       ...commandLogFields(sandboxId, command),
@@ -609,23 +614,36 @@ async function executeCommand(
     return;
   }
   if (outputPostFailure) {
-    throw new Error(`Daemon lost agent output: ${outputPostFailure.message}`);
+    await postJsonWithRetry(fetchFn, eventUrl, {
+      type: "run.failed",
+      commandId: command.id,
+      ...commandLeaseEventFields(command),
+      sessionId: command.sessionId,
+      runId: command.runId,
+      agent: command.agent,
+      mode: command.mode,
+      error: `Daemon lost agent output: ${outputPostFailure.message}`,
+      agentLog,
+      exitCode: next.last_exit_code || 1,
+    } satisfies DaemonNodeEvent, token, signal);
+    return;
   }
   logger.info("run completed", {
     ...commandLogFields(sandboxId, command),
     exitCode: next.last_exit_code,
     reviewVerdict: next.review_verdict,
-    agentLogBytes: next.agent_logs.slice(-1)[0]?.length ?? 0,
+    agentLogBytes: agentLog.length,
   });
   await postJsonWithRetry(fetchFn, eventUrl, {
     type: "run.completed",
     commandId: command.id,
+    ...commandLeaseEventFields(command),
     sessionId: command.sessionId,
     runId: command.runId,
     agent: command.agent,
     mode: command.mode,
     exitCode: next.last_exit_code,
-    agentLog: next.agent_logs.slice(-1)[0] ?? "",
+    agentLog,
     reviewVerdict: next.review_verdict,
     reviewFeedback: next.review_feedback,
     tokenUsage: next.token_usage,
@@ -643,12 +661,17 @@ async function postRunCancelled(
   await postJsonWithRetry(fetchFn, eventUrl, {
     type: "run.cancelled",
     commandId: command.id,
+    ...commandLeaseEventFields(command),
     sessionId: command.sessionId,
     runId: command.runId,
     agent: command.agent,
     mode: command.mode,
     reason: typeof reason === "string" && reason ? reason : "Cancelled by human.",
   } satisfies DaemonNodeEvent, token, signal);
+}
+
+function commandLeaseEventFields(command: DaemonNodeRunCommand): { leaseId?: string } {
+  return command.leaseId ? { leaseId: command.leaseId } : {};
 }
 
 function ensureHostAgentReady(agent: AgentName): void {

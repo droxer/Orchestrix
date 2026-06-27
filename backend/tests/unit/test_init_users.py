@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from tempfile import TemporaryDirectory
 
-from relay.auth import DatabaseUserAuthStore, UserAuthStore
+from relay.security.auth import DatabaseUserAuthStore, UserAuthStore
 from relay.init_users import main
 
 

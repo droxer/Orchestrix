@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from relay.bridge import compute_prior_agent_bridge, extract_last_assistant_text
+from relay.sessions import compute_prior_agent_bridge, extract_last_assistant_text
 
 
 def test_extract_last_assistant_text_empty_returns_none() -> None:
@@ -52,15 +52,12 @@ def test_compute_prior_agent_bridge_returns_none_when_no_intervening_runs() -> N
 def test_compute_prior_agent_bridge_builds_single_intervening_block() -> None:
     session = _session(
         [
-            {"agent": "claude", "artifactIds": ["a1"]},
-            {"agent": "codex", "artifactIds": ["a2"]},
+            {"agent": "claude", "artifactIds": [], "agentLog": "● claude work"},
+            {"agent": "codex", "artifactIds": [], "agentLog": "● review note\ndetail"},
         ],
-        [
-            {"id": "a1", "kind": "command_log"},
-            {"id": "a2", "kind": "command_log"},
-        ],
+        [],
     )
-    store = _FakeStore({"a1": "● claude work", "a2": "● review note\ndetail"})
+    store = _FakeStore({})
     out = compute_prior_agent_bridge(session, "claude", store)
     assert out == "[Previous from @codex]\nreview note\ndetail"
 

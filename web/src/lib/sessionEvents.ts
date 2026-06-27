@@ -70,6 +70,7 @@ export function applySessionEvent(session: RelaySession, event: RelayEvent): Rel
             status: event.status,
             completedAt: event.timestamp,
             exitCode: event.exitCode,
+            ...(event.agentLog !== undefined ? { agentLog: event.agentLog } : {}),
             ...(event.tokenUsage ? { tokenUsage: event.tokenUsage } : {}),
           }
         : run);

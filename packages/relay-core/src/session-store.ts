@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, appendFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, appendFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 
 import { getAgent } from "./agents.js";
@@ -20,6 +20,7 @@ export interface AgentRun {
   startedAt: string;
   completedAt?: string;
   exitCode?: number;
+  agentLog?: string;
   tokenUsage?: TokenUsage;
   artifactIds: string[];
 }
@@ -116,6 +117,7 @@ export type RelayEvent =
       agent: AgentName;
       stream: "stdout" | "stderr";
       text: string;
+      sequence?: number;
     }
   | {
       id: string;
@@ -140,6 +142,7 @@ export type RelayEvent =
       agent: AgentName;
       status: AgentRun["status"];
       exitCode: number;
+      agentLog?: string;
       tokenUsage?: TokenUsage;
     }
   | {
@@ -199,6 +202,13 @@ export interface SessionStore {
     extension?: string;
     agentRunId?: string;
   }): Promise<RelayArtifact>;
+  createArtifact?(sessionId: string, input: {
+    kind: RelayArtifactKind;
+    title: string;
+    body: string;
+    extension?: string;
+    agentRunId?: string;
+  }): Promise<{ artifact: RelayArtifact; session: RelaySession }>;
   artifactPath(sessionId: string, artifactId: string): Promise<string>;
   readArtifact(sessionId: string, artifactId: string): Promise<string>;
 }
@@ -310,6 +320,23 @@ export class LocalSessionStore implements SessionStore {
     };
   }
 
+  async createArtifact(sessionId: string, input: {
+    kind: RelayArtifactKind;
+    title: string;
+    body: string;
+    extension?: string;
+    agentRunId?: string;
+  }): Promise<{ artifact: RelayArtifact; session: RelaySession }> {
+    const artifact = await this.writeArtifact(sessionId, input);
+    try {
+      const session = await this.appendEvent(sessionId, relayEvent("artifact.created", sessionId, { artifact }));
+      return { artifact, session };
+    } catch (error) {
+      rmSync(artifact.path, { force: true });
+      throw error;
+    }
+  }
+
   async artifactPath(sessionId: string, artifactId: string): Promise<string> {
     const artifact = this.getSessionSync(sessionId).artifacts.find((item) => item.id === artifactId);
     if (!artifact) throw new Error(`Unknown artifact ${artifactId} in session ${sessionId}.`);
@@ -412,6 +439,7 @@ export function materializeEvents(events: RelayEvent[]): RelaySession {
         run.status = event.status;
         run.completedAt = event.timestamp;
         run.exitCode = event.exitCode;
+        if (event.agentLog !== undefined) run.agentLog = event.agentLog;
         if (event.tokenUsage) run.tokenUsage = event.tokenUsage;
       }
       session.tokenUsage = mergeTokenUsage(session.agentRuns.map((item) => item.tokenUsage));

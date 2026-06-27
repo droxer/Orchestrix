@@ -15,7 +15,7 @@ from loguru import logger
 
 from ..core.models import AGENT_NAMES
 from ..persistence.stores import valid_agent
-from ..services.controller import SessionArchivedError, SessionController, SessionRunInFlightError
+from ..sessions import SessionArchivedError, SessionController, SessionRunInFlightError
 from .deps import AppContextDep
 from .helpers import (
     assignment_list,

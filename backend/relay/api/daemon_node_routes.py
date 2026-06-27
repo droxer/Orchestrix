@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import asyncio
+import math
+import time
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -10,6 +13,36 @@ from .deps import AppContextDep
 from .helpers import actor_can_access_sandbox, bearer_token, daemon_node_event, json_body, request_actor_or_none
 
 router = APIRouter()
+
+MAX_COMMAND_POLL_WAIT_SECONDS = 30.0
+MAX_COMMAND_POLL_LIMIT = 50
+MAX_COMMAND_LEASE_SECONDS = 60 * 60.0
+
+
+def bounded_float(value: str | None, *, default: float, minimum: float, maximum: float, field: str) -> float:
+    if value in (None, ""):
+        return default
+    try:
+        parsed = float(value)
+    except ValueError:
+        raise HTTPException(400, f"{field} must be a number.")
+    if not math.isfinite(parsed):
+        raise HTTPException(400, f"{field} must be a finite number.")
+    if parsed < minimum or parsed > maximum:
+        raise HTTPException(400, f"{field} must be between {minimum:g} and {maximum:g}.")
+    return parsed
+
+
+def bounded_int(value: str | None, *, default: int, minimum: int, maximum: int, field: str) -> int:
+    if value in (None, ""):
+        return default
+    try:
+        parsed = int(value)
+    except ValueError:
+        raise HTTPException(400, f"{field} must be an integer.")
+    if parsed < minimum or parsed > maximum:
+        raise HTTPException(400, f"{field} must be between {minimum} and {maximum}.")
+    return parsed
 
 
 @router.get("/daemon-nodes")
@@ -52,8 +85,36 @@ async def register_daemon_node(request: Request, ctx: AppContextDep) -> dict[str
 
 @router.get("/daemon-nodes/{sandbox_id}/commands")
 async def daemon_commands(sandbox_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
+    wait_seconds = bounded_float(
+        request.query_params.get("waitSeconds"),
+        default=0.0,
+        minimum=0.0,
+        maximum=MAX_COMMAND_POLL_WAIT_SECONDS,
+        field="waitSeconds",
+    )
+    limit = bounded_int(
+        request.query_params.get("limit"),
+        default=10,
+        minimum=1,
+        maximum=MAX_COMMAND_POLL_LIMIT,
+        field="limit",
+    )
+    lease_seconds = bounded_float(
+        request.query_params.get("leaseSeconds"),
+        default=60.0,
+        minimum=1.0,
+        maximum=MAX_COMMAND_LEASE_SECONDS,
+        field="leaseSeconds",
+    )
     try:
-        commands = ctx.registry.take_commands(sandbox_id, bearer_token(request))
+        token = bearer_token(request)
+        deadline = time.monotonic() + wait_seconds
+        commands = ctx.registry.take_commands(sandbox_id, token, limit=limit, lease_seconds=lease_seconds)
+        while not commands and time.monotonic() < deadline:
+            await asyncio.sleep(min(0.25, deadline - time.monotonic()))
+            if ctx.registry.available_command_count(sandbox_id, token) == 0:
+                continue
+            commands = ctx.registry.take_commands(sandbox_id, token, limit=limit, lease_seconds=lease_seconds)
         logger.debug("Daemon node commands polled", sandbox_id=sandbox_id, command_count=len(commands))
         return {"commands": commands}
     except PermissionError as error:

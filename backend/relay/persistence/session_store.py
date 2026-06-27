@@ -102,6 +102,17 @@ class LocalSessionStore:
                 "bytes": len(body.encode("utf-8")),
             }
 
+    def create_artifact(self, session_id: str, input: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+        with self._lock:
+            artifact = self.write_artifact(session_id, input)
+            event = relay_event("artifact.created", session_id, {"artifact": artifact})
+            try:
+                session = self.append_event(session_id, event)
+            except Exception:
+                Path(artifact["path"]).unlink(missing_ok=True)
+                raise
+            return artifact, session
+
     def artifact_path(self, session_id: str, artifact_id: str) -> Path:
         for artifact in self.get_session(session_id).get("artifacts", []):
             if artifact["id"] == artifact_id:
@@ -166,6 +177,7 @@ class DatabaseSessionStore:
         Column("kind", Text, nullable=False),
         Column("title", Text, nullable=False),
         Column("path", Text, nullable=True),
+        Column("content", Text, nullable=True),
         Column("content_type", Text, nullable=True),
         Column("byte_size", BigInteger, nullable=False),
         Column("metadata", JSON, nullable=False),
@@ -185,11 +197,12 @@ class DatabaseSessionStore:
         Column("updated_at", DateTime(timezone=True), nullable=False),
     )
 
-    def __init__(self, database_url: str, root_dir: str | Path = DEFAULT_RELAY_DATA_DIR, *, create_schema: bool = False):
+    def __init__(self, database_url: str, root_dir: str | Path | None = None, *, create_schema: bool = False):
         self.engine = create_engine(database_url, future=True)
-        self.root_dir = Path(root_dir)
-        self.artifacts_dir = self.root_dir / "session-artifacts"
-        self.artifacts_dir.mkdir(parents=True, exist_ok=True)
+        self.root_dir = Path(root_dir) if root_dir is not None else None
+        self.artifacts_dir = self.root_dir / "session-artifacts" if self.root_dir is not None else None
+        if self.artifacts_dir is not None:
+            self.artifacts_dir.mkdir(parents=True, exist_ok=True)
         if create_schema:
             self.metadata.create_all(self.engine)
 
@@ -282,25 +295,53 @@ class DatabaseSessionStore:
             raise KeyError(session_id)
         artifact_id = new_relay_id("art")
         extension = input.get("extension") or "txt"
-        artifact_dir = self.artifacts_dir / safe_name(session_id)
-        artifact_dir.mkdir(parents=True, exist_ok=True)
-        path = artifact_dir / f"{artifact_id}.{extension}"
         body = input["body"]
-        path.write_text(body, encoding="utf-8")
         artifact = {
             "id": artifact_id,
             "kind": input["kind"],
             "title": input["title"],
-            "path": str(path),
+            "path": database_artifact_uri(session_id, artifact_id, extension),
             "createdAt": now_iso(),
             **({"agentRunId": input["agentRunId"]} if input.get("agentRunId") else {}),
             "bytes": len(body.encode("utf-8")),
         }
         with self.engine.begin() as conn:
             session_pk = self._session_pk(conn, session_id)
-            conn.execute(insert(self.artifacts).values(**session_artifact_to_row(session_pk, artifact, {"extension": extension})))
+            conn.execute(insert(self.artifacts).values(**session_artifact_to_row(session_pk, artifact, {"extension": extension}, content=body)))
         logger.debug("Database artifact written", session_id=session_id, artifact_id=artifact_id, kind=input.get("kind"), bytes=artifact["bytes"])
         return artifact
+
+    def create_artifact(self, session_id: str, input: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+        artifact_id = new_relay_id("art")
+        extension = input.get("extension") or "txt"
+        body = input["body"]
+        artifact = {
+            "id": artifact_id,
+            "kind": input["kind"],
+            "title": input["title"],
+            "path": database_artifact_uri(session_id, artifact_id, extension),
+            "createdAt": now_iso(),
+            **({"agentRunId": input["agentRunId"]} if input.get("agentRunId") else {}),
+            "bytes": len(body.encode("utf-8")),
+        }
+        event = relay_event("artifact.created", session_id, {"artifact": artifact})
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                select(self.sessions.c.id, self.sessions.c.snapshot, self.sessions.c.version)
+                .where(self.sessions.c.public_id == session_id)
+                .with_for_update()
+            ).mappings().first()
+            if not row:
+                raise KeyError(session_id)
+            session_pk = row["id"]
+            sequence = int(row["version"] or 0)
+            conn.execute(insert(self.artifacts).values(**session_artifact_to_row(session_pk, artifact, {"extension": extension}, content=body)))
+            conn.execute(insert(self.events).values(**session_event_to_row(session_pk, sequence, event)))
+            session = materialize_events([*(row["snapshot"] or {}).get("events", []), event])
+            conn.execute(update(self.sessions).where(self.sessions.c.id == session_pk).values(**session_to_row(session, version=sequence + 1, database_id=session_pk)))
+            self._sync_token_usage(conn, session_pk, session)
+        logger.debug("Database artifact created", session_id=session_id, artifact_id=artifact_id, kind=input.get("kind"), bytes=artifact["bytes"])
+        return artifact, session
 
     def artifact_path(self, session_id: str, artifact_id: str) -> Path:
         with self.engine.begin() as conn:
@@ -318,7 +359,18 @@ class DatabaseSessionStore:
         raise KeyError(f"Unknown artifact {artifact_id} in session {session_id}.")
 
     def read_artifact(self, session_id: str, artifact_id: str) -> str:
-        return self.artifact_path(session_id, artifact_id).read_text(encoding="utf-8")
+        with self.engine.begin() as conn:
+            session_pk = self._session_pk(conn, session_id)
+            row = conn.execute(
+                select(self.artifacts.c.content, self.artifacts.c.path)
+                .where(self.artifacts.c.session_id == session_pk)
+                .where(self.artifacts.c.public_id == artifact_id)
+            ).mappings().first()
+        if row and row["content"] is not None:
+            return row["content"]
+        if row and row["path"]:
+            return Path(row["path"]).read_text(encoding="utf-8")
+        raise KeyError(f"Unknown artifact {artifact_id} in session {session_id}.")
 
     def _session_pk(self, conn: Any, session_id: str, *, lock: bool = False) -> str:
         statement = select(self.sessions.c.id).where(self.sessions.c.public_id == session_id)
@@ -384,7 +436,11 @@ def session_event_to_row(session_pk: str, sequence: int, event: dict[str, Any]) 
     }
 
 
-def session_artifact_to_row(session_pk: str, artifact: dict[str, Any], metadata: dict[str, Any] | None = None) -> dict[str, Any]:
+def database_artifact_uri(session_id: str, artifact_id: str, extension: str) -> str:
+    return f"db://relay/sessions/{safe_name(session_id)}/artifacts/{safe_name(artifact_id)}.{safe_name(extension)}"
+
+
+def session_artifact_to_row(session_pk: str, artifact: dict[str, Any], metadata: dict[str, Any] | None = None, *, content: str | None = None) -> dict[str, Any]:
     return {
         "id": new_database_id(),
         "public_id": artifact["id"],
@@ -393,6 +449,7 @@ def session_artifact_to_row(session_pk: str, artifact: dict[str, Any], metadata:
         "kind": artifact["kind"],
         "title": artifact["title"],
         "path": artifact.get("path"),
+        "content": content,
         "content_type": artifact.get("contentType"),
         "byte_size": artifact.get("bytes", 0),
         "metadata": metadata or {},

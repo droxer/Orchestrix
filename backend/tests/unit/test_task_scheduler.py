@@ -4,11 +4,11 @@ import asyncio
 from datetime import date
 from tempfile import TemporaryDirectory
 
-from relay.daemon import DaemonNodeRegistry, ServerDaemonNodeBackend
-from relay.daemon_store import LocalDaemonStore
-from relay.session_store import LocalSessionStore
-from relay.task_scheduler import TaskScheduler, next_routine_date
-from relay.task_store import LocalTaskStore
+from relay.daemon_registry import DaemonNodeRegistry, ServerDaemonNodeBackend
+from relay.persistence.daemon_store import LocalDaemonStore
+from relay.persistence.session_store import LocalSessionStore
+from relay.persistence.task_store import LocalTaskStore
+from relay.tasks import TaskScheduler, next_routine_date
 
 
 def test_scheduler_dispatches_assigned_task_to_ready_node() -> None:

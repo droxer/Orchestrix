@@ -6,7 +6,7 @@ from tempfile import TemporaryDirectory
 from fastapi.testclient import TestClient
 
 from relay.app import create_app
-from relay.stores import relay_event
+from relay.persistence.stores import relay_event
 
 
 def _bootstrap(client: TestClient) -> None:

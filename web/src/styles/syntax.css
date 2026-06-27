@@ -1,0 +1,76 @@
+/* highlight.js token theme — mapped onto the Relay design tokens to keep the
+   established monochrome-ink-plus-amber-numbers look while letting real
+   per-language grammars classify tokens accurately. Applies anywhere a
+   `code.hljs` block is rendered (workspace file preview, Markdown fences). */
+
+.hljs {
+  color: var(--color-ink);
+  background: transparent;
+}
+
+/* Keywords, types, and language built-ins: emphasized ink. */
+.hljs-keyword,
+.hljs-built_in,
+.hljs-type,
+.hljs-literal,
+.hljs-selector-tag,
+.hljs-name {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+/* Strings and string-like literals: running-text tone, italic. */
+.hljs-string,
+.hljs-regexp,
+.hljs-char.escape_,
+.hljs-template-tag,
+.hljs-quote {
+  color: var(--color-body);
+  font-style: italic;
+}
+
+/* Numeric and symbolic literals: the warm code-number accent. */
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-link {
+  color: var(--color-code-number);
+}
+
+/* Comments and metadata: muted italic, recedes from the code. */
+.hljs-comment,
+.hljs-meta,
+.hljs-meta .hljs-keyword {
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+/* Declarations, attributes, and tags: secondary copy tone. */
+.hljs-title,
+.hljs-title.function_,
+.hljs-title.class_,
+.hljs-section,
+.hljs-attr,
+.hljs-attribute,
+.hljs-property,
+.hljs-variable,
+.hljs-params,
+.hljs-tag {
+  color: var(--color-body);
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: 600;
+}
+
+.hljs-addition {
+  color: color-mix(in srgb, var(--color-semantic-up) 75%, var(--color-ink));
+}
+
+.hljs-deletion {
+  color: color-mix(in srgb, var(--color-semantic-down) 75%, var(--color-ink));
+}

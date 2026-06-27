@@ -7,8 +7,8 @@ from tempfile import TemporaryDirectory
 from fastapi.testclient import TestClient
 
 from relay.app import create_app
-from relay.auth import DatabaseUserAuthStore
-from relay.stores import DatabaseDaemonStore, DatabaseSessionStore, DatabaseTaskStore
+from relay.persistence.stores import DatabaseDaemonStore, DatabaseSessionStore, DatabaseTaskStore
+from relay.security.auth import DatabaseUserAuthStore
 
 
 def _bootstrap_admin(client: TestClient, token: str = "admin_token") -> None:

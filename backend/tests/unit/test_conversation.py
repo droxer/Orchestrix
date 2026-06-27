@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from relay.conversation import compute_conversation_history
+from relay.sessions import compute_conversation_history
 
 
 class _FakeStore:
@@ -50,13 +50,14 @@ def test_compute_conversation_history_includes_turns_before_latest_user_message(
                 "status": "completed",
                 "startedAt": "2026-06-20T00:00:10.000Z",
                 "completedAt": "2026-06-20T00:01:00.000Z",
-                "artifactIds": ["art_1"],
+                "artifactIds": [],
+                "agentLog": "● first answer\nwith detail",
             }
         ],
-        artifacts=[{"id": "art_1", "kind": "command_log"}],
+        artifacts=[],
     )
 
-    out = compute_conversation_history(session, _FakeStore({"art_1": "● first answer\nwith detail"}))
+    out = compute_conversation_history(session, _FakeStore({}))
 
     assert out == (
         "[Conversation so far]\n\n"

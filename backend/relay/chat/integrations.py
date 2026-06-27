@@ -5,8 +5,10 @@ from pathlib import Path
 from threading import RLock
 from typing import Any, Literal
 
+from sqlalchemy import JSON, Column, DateTime, MetaData, Table, Text, create_engine, insert, select, update
+
 from ..core.ids import new_relay_id, now_iso
-from ..persistence.store_common import _append_jsonl, _read_json, _write_json
+from ..persistence.store_common import _append_jsonl, _parse_iso, _read_json, _write_json, database_id_column
 
 ChatProvider = Literal["discord", "telegram", "lark"]
 ChatIntegrationStatus = Literal["draft", "active", "degraded", "disabled"]
@@ -375,6 +377,90 @@ class LocalChatIntegrationStore:
             "timestamp": now_iso(),
             **payload,
         })
+
+
+class DatabaseChatIntegrationStore(LocalChatIntegrationStore):
+    metadata = MetaData()
+
+    documents = Table(
+        "chat_documents",
+        metadata,
+        database_id_column(),
+        Column("document_key", Text, nullable=False, unique=True),
+        Column("payload", JSON, nullable=False),
+        Column("updated_at", DateTime(timezone=True), nullable=False),
+    )
+
+    def __init__(self, database_url: str, *, create_schema: bool = False):
+        self._lock = RLock()
+        self.engine = create_engine(database_url, future=True)
+        if create_schema:
+            self.metadata.create_all(self.engine)
+
+    def audit_events(self, integration_id: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+        with self._lock:
+            events = self._read_document("audit", [])
+            if integration_id:
+                events = [event for event in events if event.get("integrationId") == integration_id]
+            return events[-max(1, min(limit, 200)):]
+
+    def _read_conversations(self) -> list[dict[str, Any]]:
+        return self._read_document("conversations", [])
+
+    def _write_conversations(self, records: list[dict[str, Any]]) -> None:
+        self._write_document("conversations", records)
+
+    def _read_integrations(self) -> list[dict[str, Any]]:
+        return self._read_document("integrations", [])
+
+    def _write_integrations(self, integrations: list[dict[str, Any]]) -> None:
+        self._write_document("integrations", integrations)
+
+    def _read_secrets(self) -> dict[str, dict[str, str]]:
+        return self._read_document("secrets", {})
+
+    def _write_secret_patch(self, integration_id: str, raw: Any) -> None:
+        if not isinstance(raw, dict):
+            return
+        patch = {
+            str(key): str(value)
+            for key, value in raw.items()
+            if key in SECRET_FIELDS and value is not None and str(value).strip()
+        }
+        if not patch:
+            return
+        secrets = self._read_secrets()
+        current = secrets.get(integration_id, {})
+        secrets[integration_id] = {**current, **patch}
+        self._write_document("secrets", secrets)
+
+    def _audit(self, event_type: str, integration_id: str, actor: str | None, payload: dict[str, Any]) -> None:
+        events = self._read_document("audit", [])
+        events.append({
+            "id": new_relay_id("cae"),
+            "type": event_type,
+            "integrationId": integration_id,
+            "actor": actor,
+            "timestamp": now_iso(),
+            **payload,
+        })
+        self._write_document("audit", events)
+
+    def _read_document(self, key: str, default: Any) -> Any:
+        with self.engine.begin() as conn:
+            row = conn.execute(select(self.documents.c.payload).where(self.documents.c.document_key == key)).mappings().first()
+        if not row:
+            return default
+        return row["payload"]
+
+    def _write_document(self, key: str, payload: Any) -> None:
+        now = _parse_iso(now_iso())
+        with self.engine.begin() as conn:
+            existing = conn.scalar(select(self.documents.c.id).where(self.documents.c.document_key == key))
+            if existing:
+                conn.execute(update(self.documents).where(self.documents.c.id == existing).values(payload=payload, updated_at=now))
+            else:
+                conn.execute(insert(self.documents).values(document_key=key, payload=payload, updated_at=now))
 
 
 def _provider(value: Any) -> ChatProvider:

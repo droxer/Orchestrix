@@ -1,6 +1,6 @@
-export type Theme = "light" | "dark" | "system" | "contrast";
+export type Theme = "light" | "dark" | "system" | "contrast" | "contrast-dark";
 
-export const SUPPORTED_THEMES = ["light", "dark", "system", "contrast"] as const;
+export const SUPPORTED_THEMES = ["light", "dark", "system", "contrast", "contrast-dark"] as const;
 
 export const SUPPORTED_LANGUAGES = ["en", "zh-CN", "zh-TW"] as const;
 
@@ -51,13 +51,10 @@ export function systemTheme(): "light" | "dark" {
 
 /** Reflect the user's choice onto data-theme, resolving "system" to a
  *  concrete value so the CSS needs only html[data-theme] blocks (no
- *  parallel prefers-color-scheme media query). */
+ *  parallel prefers-color-scheme media query). "contrast" (light) and
+ *  "contrast-dark" are explicit and map straight through. */
 export function applyTheme(theme: Theme): void {
   if (typeof document === "undefined") return;
-  if (theme === "contrast") {
-    document.documentElement.setAttribute("data-theme", "contrast");
-    return;
-  }
   const resolved = theme === "system" ? systemTheme() : theme;
   document.documentElement.setAttribute("data-theme", resolved);
 }

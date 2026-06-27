@@ -56,13 +56,13 @@
   text-transform: uppercase;
 }
 
-/* ---- three-pane grid ------------------------------------------------ */
+/* ---- two-pane grid: browse (tabbed) · preview ----------------------- */
 
 .workspace-panes {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 0.9fr) minmax(0, 1.4fr);
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.6fr);
 }
 
 .workspace-pane {
@@ -119,6 +119,67 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+}
+
+/* ---- browse pane: artifact/file tab switcher ------------------------ */
+
+.workspace-tabs {
+  display: flex;
+  align-items: stretch;
+  min-height: 44px;
+  border-bottom: 1px solid var(--color-hairline-soft);
+}
+
+.workspace-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  padding: 0 var(--space-base);
+  color: var(--color-muted);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: 560;
+  transition: color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+}
+
+.workspace-tab:hover {
+  color: var(--color-ink);
+}
+
+.workspace-tab.is-active {
+  color: var(--color-ink);
+  border-bottom-color: var(--color-primary);
+}
+
+.workspace-tab-count {
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The files tabpanel stacks a path bar above the scrollable file list. */
+.workspace-tabpanel-files {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.workspace-files-bar {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  border-bottom: 1px solid var(--color-hairline-soft);
+  padding: 0 var(--space-base);
+}
+
+.workspace-files-bar .workspace-files-path {
+  margin-left: 0;
+  max-width: 100%;
+  text-align: left;
 }
 
 /* ---- selectable rows (artifacts + files share .workspace-pick) ------ */
@@ -211,6 +272,110 @@
   margin: var(--space-sm) 0 0;
   color: var(--color-muted);
   font: var(--type-caption);
+}
+
+/* ---- file preview: rendered/source toggle ------------------------- */
+
+.code-view-toolbar {
+  display: inline-flex;
+  margin-bottom: var(--space-sm);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.code-view-toggle {
+  min-height: 26px;
+  padding: 0 var(--space-sm);
+  border: 0;
+  background: var(--color-canvas);
+  color: var(--color-muted);
+  cursor: pointer;
+  font: var(--type-caption-strong-sm);
+}
+
+.code-view-toggle + .code-view-toggle {
+  border-left: 1px solid var(--color-hairline);
+}
+
+.code-view-toggle:hover {
+  color: var(--color-ink);
+}
+
+.code-view-toggle.is-active {
+  background: var(--color-surface-strong);
+  color: var(--color-ink);
+}
+
+/* ---- file preview: highlighted source with gutter ----------------- */
+
+.code-view {
+  margin: 0;
+  border: 1px solid var(--color-hairline-soft);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-strong);
+  overflow: hidden;
+}
+
+.code-view-lang {
+  display: block;
+  padding: var(--space-xs) var(--space-base) 0;
+  color: var(--color-muted);
+  font: var(--type-caption-strong);
+  text-transform: lowercase;
+}
+
+.code-view-scroll {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  overflow-x: auto;
+  font-family: var(--font-number);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+}
+
+.code-view .code-gutter,
+.code-view .code-body {
+  margin: 0;
+  padding: var(--space-sm) 0;
+  font: inherit;
+  background: transparent;
+}
+
+.code-view .code-gutter {
+  padding-left: var(--space-base);
+  padding-right: var(--space-sm);
+  color: var(--color-muted);
+  text-align: right;
+  user-select: none;
+  opacity: 0.55;
+  border-right: 1px solid var(--color-hairline-soft);
+  white-space: pre;
+}
+
+.code-view .code-body {
+  padding-left: var(--space-base);
+  padding-right: var(--space-base);
+  color: var(--color-ink);
+  overflow: visible;
+}
+
+.code-view .code-body code {
+  display: block;
+  font: inherit;
+  background: transparent;
+  padding: 0;
+  white-space: pre;
+}
+
+/* ---- file preview: rendered HTML document ------------------------- */
+
+.html-preview {
+  width: 100%;
+  min-height: 60vh;
+  border: 1px solid var(--color-hairline-soft);
+  border-radius: var(--radius-sm);
+  background: var(--color-on-dark);
 }
 
 .workspace-preview-open {

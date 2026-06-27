@@ -208,6 +208,10 @@ class SessionController:
         }))
 
     def create_artifact(self, session_id: str, input: dict[str, Any]) -> dict[str, Any]:
+        if hasattr(self.store, "create_artifact"):
+            artifact, _session = self.store.create_artifact(session_id, input)
+            logger.debug("Artifact created", session_id=session_id, artifact_id=artifact["id"], kind=input.get("kind"))
+            return artifact
         artifact = self.store.write_artifact(session_id, input)
         self._append(session_id, relay_event("artifact.created", session_id, {"artifact": artifact}))
         logger.debug("Artifact created", session_id=session_id, artifact_id=artifact["id"], kind=input.get("kind"))
@@ -244,17 +248,12 @@ class SessionController:
         if is_review_assignment(input["mode"]):
             state_patch["review_verdict"] = input.get("reviewVerdict", "")
             state_patch["review_feedback"] = input.get("reviewFeedback", "")
-        self.create_artifact(session_id, {
-            "kind": "review" if input["mode"] == "review" else "command_log",
-            "title": f"{input['agent']} {input['mode']} output",
-            "body": input.get("agentLog", ""),
-            "agentRunId": input["runId"],
-        })
         completed_payload = {
             "runId": input["runId"],
             "agent": input["agent"],
             "status": input["status"],
             "exitCode": input["exitCode"],
+            "agentLog": input.get("agentLog", ""),
         }
         if input.get("tokenUsage"):
             completed_payload["tokenUsage"] = input["tokenUsage"]

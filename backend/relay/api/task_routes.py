@@ -8,8 +8,8 @@ from loguru import logger
 
 from ..core.models import AGENT_NAMES
 from ..persistence.stores import task_priority, task_routine_cadence, task_routine_type, task_status, valid_agent
-from ..services.controller import SessionController
-from ..services.task_scheduler import next_routine_date
+from ..sessions import SessionController
+from ..tasks import next_routine_date
 from .deps import AppContextDep
 from .helpers import (
     actor_can_access_record,

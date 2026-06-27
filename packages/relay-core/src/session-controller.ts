@@ -216,6 +216,10 @@ export class SessionController implements AgentEventSink {
       agentRunId?: string;
     },
   ): Promise<RelayArtifact> {
+    if (this.store.createArtifact) {
+      const { artifact } = await this.store.createArtifact(sessionId, input);
+      return artifact;
+    }
     const artifact = await this.store.writeArtifact(sessionId, input);
     await this.append(sessionId, relayEvent("artifact.created", sessionId, { artifact }));
     return artifact;
@@ -272,17 +276,12 @@ export class SessionController implements AgentEventSink {
       statePatch.review_feedback = input.reviewFeedback ?? "";
     }
     await this.waitForPendingOutputWrites();
-    await this.createArtifact(sessionId, {
-      kind: input.mode === "review" ? "review" : "command_log",
-      title: `${input.agent} ${input.mode} output`,
-      body: input.agentLog,
-      agentRunId: input.runId,
-    });
     await this.append(sessionId, relayEvent("agent.completed", sessionId, {
       runId: input.runId,
       agent: input.agent,
       status: input.status,
       exitCode: input.exitCode,
+      agentLog: input.agentLog,
       tokenUsage: input.tokenUsage,
     }));
     if (input.status === "failed") {
@@ -357,6 +356,7 @@ export class SessionController implements AgentEventSink {
         agent: step.agent,
         status,
         exitCode: status === "cancelled" ? 130 : 1,
+        agentLog: error instanceof Error ? error.message : String(error),
         tokenUsage: undefined,
       }));
       const message = error instanceof Error ? error.message : String(error);
@@ -370,18 +370,12 @@ export class SessionController implements AgentEventSink {
     const next = mergeAgentState(runState, patch);
     const status = runOptions.signal?.aborted ? "cancelled" : next.last_exit_code === 0 ? "completed" : "failed";
     await this.waitForPendingOutputWrites();
-    const artifact = await this.store.writeArtifact(sessionId, {
-      kind: step.mode === "review" ? "review" : "command_log",
-      title: `${step.agent} ${step.mode} output`,
-      body: next.agent_logs.slice(-1)[0] ?? "",
-      agentRunId: runId,
-    });
-    await this.append(sessionId, relayEvent("artifact.created", sessionId, { artifact }));
     await this.append(sessionId, relayEvent("agent.completed", sessionId, {
       runId,
       agent: step.agent,
       status,
       exitCode: next.last_exit_code,
+      agentLog: next.agent_logs.slice(-1)[0] ?? "",
       tokenUsage: next.token_usage,
     }));
     if (status === "failed") {
@@ -557,6 +551,15 @@ function bridgeArtifactForRun(session: RelaySession, run: RelaySession["agentRun
 }
 
 async function runAssistantText(session: RelaySession, run: RelaySession["agentRuns"][number], store: SessionStore): Promise<string | undefined> {
+  if (run.agentLog !== undefined) {
+    return extractLastAssistantText(run.agentLog) ?? undefined;
+  }
+  const completed = [...session.events]
+    .reverse()
+    .find((event) => event.type === "agent.completed" && event.runId === run.id);
+  if (completed?.type === "agent.completed" && completed.agentLog !== undefined) {
+    return extractLastAssistantText(completed.agentLog) ?? undefined;
+  }
   const artifact = bridgeArtifactForRun(session, run);
   if (!artifact) return undefined;
   try {

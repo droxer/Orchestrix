@@ -52,6 +52,9 @@ export interface DaemonNodeRegistration {
 export interface DaemonNodeRunCommand {
   id: string;
   type: "run.start";
+  leaseId?: string;
+  leaseExpiresAt?: string;
+  attempt?: number;
   sessionId: string;
   runId: string;
   taskGoal: string;
@@ -64,6 +67,9 @@ export interface DaemonNodeRunCommand {
 export interface DaemonNodeCancelCommand {
   id: string;
   type: "run.cancel";
+  leaseId?: string;
+  leaseExpiresAt?: string;
+  attempt?: number;
   commandId: string;
   sessionId: string;
   runId: string;
@@ -78,6 +84,7 @@ export type DaemonNodeEvent =
   | {
       type: "run.output";
       commandId: string;
+      leaseId?: string;
       sessionId: string;
       runId: string;
       agent: AgentName;
@@ -88,6 +95,7 @@ export type DaemonNodeEvent =
   | {
       type: "run.completed";
       commandId: string;
+      leaseId?: string;
       sessionId: string;
       runId: string;
       agent: AgentName;
@@ -101,16 +109,19 @@ export type DaemonNodeEvent =
   | {
       type: "run.failed";
       commandId: string;
+      leaseId?: string;
       sessionId: string;
       runId: string;
       agent: AgentName;
       mode: AgentTaskMode;
       error: string;
+      agentLog?: string;
       exitCode?: number;
     }
   | {
       type: "run.cancelled";
       commandId: string;
+      leaseId?: string;
       sessionId: string;
       runId: string;
       agent: AgentName;

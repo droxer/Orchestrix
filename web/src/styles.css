@@ -39,6 +39,7 @@
 @import "./styles/thread.css";
 @import "./styles/chat.css";
 @import "./styles/agent-stream.css";
+@import "./styles/syntax.css";
 @import "./styles/artifact.css";
 @import "./styles/handoff.css";
 @import "./styles/composer.css";

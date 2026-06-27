@@ -12,9 +12,9 @@ from fastapi import HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from ..core.models import AGENT_NAMES
+from ..daemon_registry import DaemonNodeRegistry, daemon_node_token_matches, sandbox_ui_token_matches, workspace_paths_match
 from ..persistence.stores import valid_agent
 from ..security.auth import require_user_session
-from ..services.daemon import DaemonNodeRegistry, daemon_node_token_matches, sandbox_ui_token_matches, workspace_paths_match
 
 CHAT_SERVICE_EMPLOYEE_HEADER = "x-relay-employee-id"
 
@@ -36,6 +36,11 @@ def bearer_token(request: Request) -> str | None:
 def string_field(value: dict[str, Any], key: str) -> str:
     field = value.get(key)
     return field.strip() if isinstance(field, str) else ""
+
+
+def raw_string_field(value: dict[str, Any], key: str) -> str:
+    field = value.get(key)
+    return field if isinstance(field, str) else ""
 
 
 def token_usage_field(value: dict[str, Any], key: str = "tokenUsage") -> dict[str, Any] | None:
@@ -298,12 +303,15 @@ def daemon_node_event(value: dict[str, Any]) -> dict[str, Any]:
     agent = valid_agent(value.get("agent"))
     if not command_id or not session_id or not run_id or not agent:
         raise ValueError("daemon node event requires commandId, sessionId, runId, and agent.")
+    lease_id = string_field(value, "leaseId")
+    lease_field = {"leaseId": lease_id} if lease_id else {}
     if event_type == "run.output":
         if value.get("stream") not in ("stdout", "stderr") or not isinstance(value.get("sequence"), (int, float)) or not isinstance(value.get("text"), str):
             raise ValueError("invalid daemon node run.output event.")
         return {
             "type": event_type,
             "commandId": command_id,
+            **lease_field,
             "sessionId": session_id,
             "runId": run_id,
             "agent": agent,
@@ -322,12 +330,13 @@ def daemon_node_event(value: dict[str, Any]) -> dict[str, Any]:
         return {
             "type": event_type,
             "commandId": command_id,
+            **lease_field,
             "sessionId": session_id,
             "runId": run_id,
             "agent": agent,
             "mode": mode,
             "exitCode": int(value["exitCode"]),
-            "agentLog": string_field(value, "agentLog"),
+            "agentLog": raw_string_field(value, "agentLog"),
             "reviewVerdict": verdict,
             "reviewFeedback": string_field(value, "reviewFeedback"),
             **({"tokenUsage": token_usage} if token_usage else {}),
@@ -336,17 +345,20 @@ def daemon_node_event(value: dict[str, Any]) -> dict[str, Any]:
         return {
             "type": event_type,
             "commandId": command_id,
+            **lease_field,
             "sessionId": session_id,
             "runId": run_id,
             "agent": agent,
             "mode": mode,
             "error": string_field(value, "error") or "Daemon node command failed.",
+            **({"agentLog": raw_string_field(value, "agentLog")} if isinstance(value.get("agentLog"), str) else {}),
             **({"exitCode": int(value["exitCode"])} if isinstance(value.get("exitCode"), (int, float)) else {}),
         }
     if event_type == "run.cancelled":
         return {
             "type": event_type,
             "commandId": command_id,
+            **lease_field,
             "sessionId": session_id,
             "runId": run_id,
             "agent": agent,

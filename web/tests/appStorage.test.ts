@@ -29,6 +29,8 @@ describe("Relay web theme storage", () => {
   afterEach(() => {
     delete (globalThis as { localStorage?: Storage }).localStorage;
     delete (globalThis as { document?: Document }).document;
+    delete (globalThis as { window?: Window }).window;
+    delete (globalThis as { matchMedia?: typeof globalThis.matchMedia }).matchMedia;
   });
 
   it("defaults readTheme to system when storage is empty", () => {
@@ -40,9 +42,21 @@ describe("Relay web theme storage", () => {
     assert.equal(readTheme(), "system");
   });
 
-  it("applyTheme sets contrast directly", () => {
+  it("applyTheme maps the explicit contrast themes straight through, ignoring the OS", () => {
+    const matchMedia = (query: string) => ({
+      matches: query.includes("dark"),
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    });
+    globalThis.matchMedia = matchMedia as unknown as typeof globalThis.matchMedia;
+    (globalThis as { window?: Window }).window = {
+      matchMedia: matchMedia as unknown as Window["matchMedia"],
+    } as Window;
     applyTheme("contrast");
     assert.equal(themeAttr, "contrast");
+    applyTheme("contrast-dark");
+    assert.equal(themeAttr, "contrast-dark");
   });
 
   it("applyTheme resolves light and dark literally", () => {
@@ -53,7 +67,7 @@ describe("Relay web theme storage", () => {
   });
 
   it("exports all preference theme options", () => {
-    assert.deepEqual([...SUPPORTED_THEMES], ["light", "dark", "system", "contrast"]);
+    assert.deepEqual([...SUPPORTED_THEMES], ["light", "dark", "system", "contrast", "contrast-dark"]);
   });
 
   it("applyTheme resolves system via matchMedia", () => {

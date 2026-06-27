@@ -550,6 +550,8 @@
     "appearance": "外观",
     "language": "语言",
     "theme": {
+      "group": "主题",
+      "contrast_group": "高对比度",
       "light": "浅色",
       "light_sub": "始终浅色",
       "dark": "深色",
@@ -557,7 +559,9 @@
       "system": "系统",
       "system_sub": "跟随系统设置",
       "contrast": "高对比度",
-      "contrast_sub": "强边框与文字"
+      "contrast_sub": "浅色 · 强边框与文字",
+      "contrast-dark": "高对比度深色",
+      "contrast-dark_sub": "深色 · 强边框与文字"
     }
   },
   "transcript": {

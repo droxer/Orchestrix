@@ -218,6 +218,61 @@ test("relay daemon retries terminal event posts across backend failures", async 
   assert.equal(terminalAttempts, 2);
 });
 
+test("relay daemon preserves final agent log when output event post fails", async () => {
+  const stop = new AbortController();
+  const command = runCommand("cmd_output_post_failed");
+  const events: DaemonNodeEvent[] = [];
+  let commandServed = false;
+  const daemon = runRelayDaemon({
+    backendUrl: "http://relay.test",
+    sandboxId: "sbx_test",
+    employeeId: "alice",
+    workspacePath: process.cwd(),
+    token: "node_token",
+    pollIntervalMs: 5,
+    shutdownGraceMs: 50,
+    logger: testLogger(),
+    signal: stop.signal,
+    environment: fakeEnvironment({
+      exec: async (_cmd, args, options) => {
+        if (!isInventoryProbe(args)) options?.stdoutRenderer?.("  done\n\n");
+        return { exit_code: 0, stdout: "  done\n\n", stderr: "" };
+      },
+    }),
+    fetchFn: async (url, init) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/daemon-nodes/register") return jsonResponse({ ok: true });
+      if (path.endsWith("/commands")) {
+        if (!commandServed) {
+          commandServed = true;
+          return jsonResponse({ commands: [command] });
+        }
+        return jsonResponse({ commands: [] });
+      }
+      if (path.endsWith("/events")) {
+        const event = await jsonBody<DaemonNodeEvent>(init);
+        events.push(event);
+        if (event.type === "run.output") return jsonResponse({ error: "bad output event" }, 400);
+        if (event.type === "run.failed" || event.type === "run.completed") setTimeout(() => stop.abort(), 0);
+        return jsonResponse({ ok: true }, 202);
+      }
+      throw new Error(`unexpected URL ${url}`);
+    },
+  });
+
+  await Promise.race([
+    daemon,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("daemon did not post terminal event")), 1000)),
+  ]);
+
+  const failed = events.find((event) => event.type === "run.failed");
+  assert.equal(failed?.type, "run.failed");
+  if (!failed || failed.type !== "run.failed") throw new Error("missing run.failed event");
+  assert.equal(failed.agentLog, "[Codex Action Exit 0]\nstdout:\n  done\n\n");
+  assert.match(failed.error, /Daemon lost agent output/);
+});
+
 test("relay daemon exits startup preflight after external stop", async () => {
   const stop = new AbortController();
   let closeCount = 0;

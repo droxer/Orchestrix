@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from concurrent.futures import ThreadPoolExecutor
 from tempfile import TemporaryDirectory
 
 import pytest
 
-from relay.daemon import DaemonNodeRegistry, ServerDaemonNodeBackend, sandbox_ui_token_matches
-from relay.stores import DatabaseDaemonStore, LocalDaemonStore, LocalSessionStore
+from relay.daemon_registry import DaemonNodeRegistry, ServerDaemonNodeBackend, sandbox_ui_token_matches
+from relay.persistence.stores import DatabaseDaemonStore, LocalDaemonStore, LocalSessionStore
 
 
 def test_explicit_sandbox_provision_targets_requested_node() -> None:
@@ -92,6 +93,144 @@ def test_daemon_registration_poll_and_completion_updates_session() -> None:
             assert session["status"] == "completed"
             assert session["reviewVerdict"] == "approved"
             assert registry.monitor_nodes()[0]["queuedCommandCount"] == 0
+
+    asyncio.run(run_flow())
+
+
+def test_daemon_rejects_event_agent_metadata_mismatch() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store = LocalSessionStore(root)
+            daemon_store = LocalDaemonStore(root)
+            registry = DaemonNodeRegistry(session_store, daemon_store)
+            backend = ServerDaemonNodeBackend(registry)
+            registry.register({
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex", "claude"],
+                "status": "ready",
+            }, "ui_token")
+
+            session = await backend.run("sbx_alice", {
+                "taskGoal": "review auth",
+                "assignments": [{"agent": "codex", "mode": "action"}],
+            })
+            [command] = registry.take_commands("sbx_alice", "node_token")
+
+            with pytest.raises(PermissionError, match="metadata"):
+                registry.handle_event("sbx_alice", {
+                    "type": "run.completed",
+                    "commandId": command["id"],
+                    "sessionId": command["sessionId"],
+                    "runId": command["runId"],
+                    "agent": "claude",
+                    "mode": "action",
+                    "exitCode": 0,
+                    "agentLog": "wrong agent",
+                }, "node_token")
+
+            assert session_store.get_session(session["id"])["artifacts"] == []
+
+    asyncio.run(run_flow())
+
+
+def test_daemon_rejects_event_lease_mismatch() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store = LocalSessionStore(root)
+            daemon_store = LocalDaemonStore(root)
+            registry = DaemonNodeRegistry(session_store, daemon_store)
+            backend = ServerDaemonNodeBackend(registry)
+            registry.register({
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }, "ui_token")
+
+            session = await backend.run("sbx_alice", {
+                "taskGoal": "review auth",
+                "assignments": [{"agent": "codex", "mode": "action"}],
+            })
+            [command] = registry.take_commands("sbx_alice", "node_token")
+            assert command["leaseId"].startswith("lease_")
+
+            with pytest.raises(PermissionError, match="lease"):
+                registry.handle_event("sbx_alice", {
+                    "type": "run.completed",
+                    "commandId": command["id"],
+                    "leaseId": "lease_stale",
+                    "sessionId": command["sessionId"],
+                    "runId": command["runId"],
+                    "agent": "codex",
+                    "mode": "action",
+                    "exitCode": 0,
+                    "agentLog": "stale completion",
+                }, "node_token")
+
+            registry.handle_event("sbx_alice", {
+                "type": "run.completed",
+                "commandId": command["id"],
+                "leaseId": command["leaseId"],
+                "sessionId": command["sessionId"],
+                "runId": command["runId"],
+                "agent": "codex",
+                "mode": "action",
+                "exitCode": 0,
+                "agentLog": "current completion",
+            }, "node_token")
+
+            assert session_store.get_session(session["id"])["status"] == "completed"
+
+    asyncio.run(run_flow())
+
+
+def test_daemon_failed_event_preserves_agent_log_without_artifact() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store = LocalSessionStore(root)
+            daemon_store = LocalDaemonStore(root)
+            registry = DaemonNodeRegistry(session_store, daemon_store)
+            backend = ServerDaemonNodeBackend(registry)
+            registry.register({
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }, "ui_token")
+
+            raw_log = "  useful output\n\n"
+            session = await backend.run("sbx_alice", {
+                "taskGoal": "implement auth",
+                "assignments": [{"agent": "codex", "mode": "action"}],
+            })
+            [command] = registry.take_commands("sbx_alice", "node_token")
+            registry.handle_event("sbx_alice", {
+                "type": "run.failed",
+                "commandId": command["id"],
+                "sessionId": command["sessionId"],
+                "runId": command["runId"],
+                "agent": "codex",
+                "mode": "action",
+                "error": "stream post failed",
+                "agentLog": raw_log,
+                "exitCode": 1,
+            }, "node_token")
+
+            updated = session_store.get_session(session["id"])
+            assert updated["status"] == "failed"
+            assert updated["agentRuns"][0]["artifactIds"] == []
+            assert updated["agentRuns"][0]["agentLog"] == raw_log
+            assert updated["artifacts"] == []
 
     asyncio.run(run_flow())
 
@@ -307,6 +446,54 @@ def test_daemon_terminal_event_after_registry_restart_finalizes_session() -> Non
     asyncio.run(run_flow())
 
 
+def test_daemon_output_retry_after_registry_restart_is_deduplicated() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store = LocalSessionStore(root)
+            daemon_store = LocalDaemonStore(root)
+            registry = DaemonNodeRegistry(session_store, daemon_store)
+            backend = ServerDaemonNodeBackend(registry)
+            registry.register({
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }, "ui_token")
+
+            session = await backend.run("sbx_alice", {
+                "taskGoal": "implement auth",
+                "assignments": [{"agent": "codex", "mode": "action"}],
+            })
+            [command] = registry.take_commands("sbx_alice", "node_token")
+            output = {
+                "type": "run.output",
+                "commandId": command["id"],
+                "sessionId": command["sessionId"],
+                "runId": command["runId"],
+                "agent": "codex",
+                "stream": "stdout",
+                "text": "progress\n",
+                "sequence": 0,
+            }
+            registry.handle_event("sbx_alice", output, "node_token")
+
+            restarted = DaemonNodeRegistry(session_store, LocalDaemonStore(root))
+            restarted.handle_event("sbx_alice", output, "node_token")
+
+            events = [
+                event for event in session_store.get_session(session["id"])["events"]
+                if event["type"] == "agent.output"
+            ]
+            assert len(events) == 1
+            assert events[0]["sequence"] == 0
+            assert events[0]["text"] == "progress\n"
+
+    asyncio.run(run_flow())
+
+
 def test_daemon_cancel_event_clears_active_run_request() -> None:
     async def run_flow() -> None:
         with TemporaryDirectory() as root:
@@ -373,7 +560,7 @@ def test_daemon_run_timeout_marks_session_failed(monkeypatch) -> None:
             [request] = daemon_store.list_active_run_requests("sbx_alice")
             daemon_store.update_run_request(request["id"], {"currentStartedAt": "2020-01-01T00:00:00.000Z"})
 
-            monkeypatch.setattr("relay.daemon.DAEMON_RUN_TIMEOUT_MS", 1)
+            monkeypatch.setattr("relay.daemon_registry.registry.DAEMON_RUN_TIMEOUT_MS", 1)
             registry.reap_stale_runs()
 
             failed = session_store.get_session(session["id"])
@@ -382,7 +569,7 @@ def test_daemon_run_timeout_marks_session_failed(monkeypatch) -> None:
             assert daemon_store.list_active_run_requests("sbx_alice") == []
             assert command["id"] not in registry.active_commands
 
-    monkeypatch.setattr("relay.daemon.DAEMON_RUN_TIMEOUT_MS", 60_000)
+    monkeypatch.setattr("relay.daemon_registry.registry.DAEMON_RUN_TIMEOUT_MS", 60_000)
     asyncio.run(run_flow())
 
 
@@ -441,6 +628,48 @@ def test_database_daemon_store_claims_queued_commands_once() -> None:
         claimed = [command for commands in results for command in commands]
         assert [command["id"] for command in claimed] == ["cmd_once"]
         assert store.queued_command_count("sbx_alice") == 0
+
+
+@pytest.mark.parametrize("store_factory", [LocalDaemonStore, lambda root: DatabaseDaemonStore(f"sqlite:///{root}/daemon.db", create_schema=True)])
+def test_daemon_store_reclaims_expired_command_leases(store_factory) -> None:
+    with TemporaryDirectory() as root:
+        store = store_factory(root)
+        store.register_node({
+            "id": "sbx_alice",
+            "employeeId": "alice",
+            "workspacePath": "/workspace/alice",
+            "status": "ready",
+            "agents": {"codex": "ready"},
+            "token": None,
+            "nodeToken": "tok_secret",
+            "nodeTokenHash": "sha256:hash",
+            "createdAt": "2026-06-13T00:00:00.000Z",
+            "updatedAt": "2026-06-13T00:00:00.000Z",
+        })
+        store.enqueue_command("sbx_alice", {
+            "id": "cmd_retry",
+            "type": "run.start",
+            "sessionId": "ses_1",
+            "runId": "run_1",
+            "agent": "codex",
+            "mode": "action",
+            "taskGoal": "fix auth",
+        })
+
+        [first] = store.take_queued_commands("sbx_alice", lease_seconds=0.05)
+        assert first["id"] == "cmd_retry"
+        assert first["status"] == "dispatched"
+        assert first["attempt"] == 1
+        assert first["leaseId"].startswith("lease_")
+        assert first["leaseExpiresAt"]
+        assert store.take_queued_commands("sbx_alice") == []
+
+        time.sleep(0.08)
+
+        [second] = store.take_queued_commands("sbx_alice", lease_seconds=0.05)
+        assert second["id"] == "cmd_retry"
+        assert second["attempt"] == 2
+        assert second["leaseId"] != first["leaseId"]
 
 
 def test_daemon_run_rejects_ownerless_sessions() -> None:

@@ -3,8 +3,8 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from tempfile import TemporaryDirectory
 
-from relay.store_common import relay_task_event
-from relay.stores import DatabaseTaskStore, LocalTaskStore
+from relay.persistence.store_common import relay_task_event
+from relay.persistence.stores import DatabaseTaskStore, LocalTaskStore
 
 
 def test_task_store_persists_assignment_status_activity_and_link() -> None:

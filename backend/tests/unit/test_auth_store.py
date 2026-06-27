@@ -4,7 +4,7 @@ from tempfile import TemporaryDirectory
 
 from sqlalchemy import create_engine, text
 
-from relay.auth import DatabaseUserAuthStore, hash_session_token
+from relay.security.auth import DatabaseUserAuthStore, hash_session_token
 
 
 def test_database_auth_store_persists_users_and_hashes_session_tokens() -> None:

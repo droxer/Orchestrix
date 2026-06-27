@@ -15,6 +15,8 @@ import type {
 import { NavRefresh, WorkspaceFile, WorkspaceFolder } from "./icons";
 import { PageHeader } from "./PageHeader";
 import { ArtifactBody } from "./artifact/ArtifactBody";
+import { CodeView, isHtmlFile, isMarkdownFile, isRenderableFile, languageForFile } from "./CodeView";
+import { Markdown } from "./Markdown";
 
 type StatusUpdate = { tone: Tone; message: string };
 
@@ -32,6 +34,10 @@ interface EmployeeWorkspacePageProps {
 type Selection =
   | { type: "artifact"; artifact: ArtifactIndexItem }
   | { type: "file"; path: string; name: string };
+
+// The browse pane folds artifacts + files into one column with a tab switcher,
+// leaving the preview pane the dominant share of the width.
+type BrowseTab = "artifacts" | "files";
 
 const WORKSPACE_BRIEF_POLL_MS = 3000;
 
@@ -76,6 +82,7 @@ export function EmployeeWorkspacePage({
   const { t, i18n } = useTranslation();
   const [selected, setSelected] = useState<Selection | null>(null);
   const [filePath, setFilePath] = useState("");
+  const [browseTab, setBrowseTab] = useState<BrowseTab>("artifacts");
 
   const query = useQuery({
     queryKey: ["workspace-brief", employeeId],
@@ -117,6 +124,7 @@ export function EmployeeWorkspacePage({
   useEffect(() => {
     setFilePath("");
     setSelected(null);
+    setBrowseTab("artifacts");
   }, [employeeId]);
 
   useEffect(() => {
@@ -167,55 +175,86 @@ export function EmployeeWorkspacePage({
           </div>
 
           <div className="workspace-panes">
-            <section className="workspace-pane workspace-pane-artifacts" aria-label={t("workspace.artifacts")}>
-              <PaneHeader title={t("workspace.artifacts")} count={brief?.artifacts.length ?? 0} />
-              <div className="workspace-pane-body">
-                {brief?.artifacts.length ? (
-                  <ul className="workspace-pick-list">
-                    {brief.artifacts.map((artifact) => {
-                      const active = selected?.type === "artifact" && selected.artifact.id === artifact.id;
-                      return (
-                        <li key={artifact.id}>
-                          <button
-                            type="button"
-                            className={`workspace-pick${active ? " is-active" : ""}`}
-                            aria-pressed={active}
-                            onClick={() => setSelected({ type: "artifact", artifact })}
-                          >
-                            <span className={`artifact-kind-tag is-${artifact.kind}`}>
-                              {t(`artifact.kind.${artifact.kind}`, { defaultValue: artifact.kind })}
-                            </span>
-                            <span className="workspace-pick-title">{artifact.title}</span>
-                            <span className="workspace-pick-meta mono">{compactDate(artifact.createdAt, i18n.language)}</span>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                ) : (
-                  <EmptyText text={t("workspace.no_artifacts")} />
-                )}
+            <section className="workspace-pane workspace-pane-browse" aria-label={t("workspace.browse")}>
+              <div className="workspace-tabs" role="tablist" aria-label={t("workspace.browse")}>
+                <button
+                  type="button"
+                  role="tab"
+                  id="workspace-tab-artifacts"
+                  aria-selected={browseTab === "artifacts"}
+                  aria-controls="workspace-tabpanel-artifacts"
+                  tabIndex={browseTab === "artifacts" ? 0 : -1}
+                  className={`workspace-tab${browseTab === "artifacts" ? " is-active" : ""}`}
+                  onClick={() => setBrowseTab("artifacts")}
+                >
+                  {t("workspace.artifacts")}
+                  <span className="workspace-tab-count mono">{brief?.artifacts.length ?? 0}</span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  id="workspace-tab-files"
+                  aria-selected={browseTab === "files"}
+                  aria-controls="workspace-tabpanel-files"
+                  tabIndex={browseTab === "files" ? 0 : -1}
+                  className={`workspace-tab${browseTab === "files" ? " is-active" : ""}`}
+                  onClick={() => setBrowseTab("files")}
+                >
+                  {t("workspace.files")}
+                </button>
               </div>
-            </section>
 
-            <section className="workspace-pane workspace-pane-files" aria-label={t("workspace.files")}>
-              <PaneHeader
-                title={t("workspace.files")}
-                meta={(
-                  <span className="workspace-files-path mono" title={fileQuery.data?.workspacePath}>
-                    /{filePath}
-                  </span>
-                )}
-              />
-              <FilesPane
-                data={fileQuery.data}
-                error={fileQuery.error}
-                isLoading={fileQuery.isLoading}
-                path={filePath}
-                selectedPath={selectedFilePath}
-                onOpenDirectory={openDirectory}
-                onSelectFile={(entry) => setSelected({ type: "file", path: entry.path, name: entry.name })}
-              />
+              {browseTab === "artifacts" ? (
+                <div
+                  className="workspace-pane-body"
+                  role="tabpanel"
+                  id="workspace-tabpanel-artifacts"
+                  aria-labelledby="workspace-tab-artifacts"
+                >
+                  {brief?.artifacts.length ? (
+                    <ul className="workspace-pick-list">
+                      {brief.artifacts.map((artifact) => {
+                        const active = selected?.type === "artifact" && selected.artifact.id === artifact.id;
+                        return (
+                          <li key={artifact.id}>
+                            <button
+                              type="button"
+                              className={`workspace-pick${active ? " is-active" : ""}`}
+                              aria-pressed={active}
+                              onClick={() => setSelected({ type: "artifact", artifact })}
+                            >
+                              <span className={`artifact-kind-tag is-${artifact.kind}`}>
+                                {t(`artifact.kind.${artifact.kind}`, { defaultValue: artifact.kind })}
+                              </span>
+                              <span className="workspace-pick-title">{artifact.title}</span>
+                              <span className="workspace-pick-meta mono">{compactDate(artifact.createdAt, i18n.language)}</span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <EmptyText text={t("workspace.no_artifacts")} />
+                  )}
+                </div>
+              ) : (
+                <div role="tabpanel" id="workspace-tabpanel-files" aria-labelledby="workspace-tab-files" className="workspace-tabpanel-files">
+                  <div className="workspace-files-bar">
+                    <span className="workspace-files-path mono" title={fileQuery.data?.workspacePath}>
+                      /{filePath}
+                    </span>
+                  </div>
+                  <FilesPane
+                    data={fileQuery.data}
+                    error={fileQuery.error}
+                    isLoading={fileQuery.isLoading}
+                    path={filePath}
+                    selectedPath={selectedFilePath}
+                    onOpenDirectory={openDirectory}
+                    onSelectFile={(entry) => setSelected({ type: "file", path: entry.path, name: entry.name })}
+                  />
+                </div>
+              )}
             </section>
 
             <section className="workspace-pane workspace-pane-preview" aria-label={t("workspace.preview")}>
@@ -229,6 +268,7 @@ export function EmployeeWorkspacePage({
                   <ArtifactBody artifact={selected.artifact} sessionId={selected.artifact.sessionId} />
                 ) : (
                   <FilePreview
+                    name={selected.name}
                     data={contentQuery.data}
                     isLoading={contentQuery.isLoading}
                     error={contentQuery.isError ? contentQuery.error : null}
@@ -365,15 +405,26 @@ function WorkspaceFileRow({
 }
 
 function FilePreview({
+  name,
   data,
   isLoading,
   error,
 }: {
+  name: string;
   data?: WorkspaceFileContentResponse;
   isLoading: boolean;
   error: unknown;
 }) {
   const { t } = useTranslation();
+  // Presentation files (Markdown, HTML) have a rendered preview in addition to
+  // their highlighted source; everything else is source-only.
+  const renderable = isRenderableFile(name);
+  const [rendered, setRendered] = useState(renderable);
+  // Re-sync the view mode when the selection changes to a different file kind.
+  useEffect(() => {
+    setRendered(renderable);
+  }, [name, renderable]);
+
   if (isLoading) {
     return <p className="artifact-viewer-status">{t("workspace.loading_preview")}</p>;
   }
@@ -388,13 +439,54 @@ function FilePreview({
   if (!data.content || !data.content.trim()) {
     return <p className="artifact-viewer-status">{t("workspace.empty_file")}</p>;
   }
+  const showRendered = renderable && rendered;
   return (
     <div className="artifact-viewer-body">
-      <pre className="artifact-plain">{data.content}</pre>
+      {renderable ? (
+        <div className="code-view-toolbar" role="group" aria-label={t("workspace.view_mode")}>
+          <button
+            type="button"
+            className={`code-view-toggle${rendered ? " is-active" : ""}`}
+            aria-pressed={rendered}
+            onClick={() => setRendered(true)}
+          >
+            {t("workspace.view_rendered")}
+          </button>
+          <button
+            type="button"
+            className={`code-view-toggle${rendered ? "" : " is-active"}`}
+            aria-pressed={!rendered}
+            onClick={() => setRendered(false)}
+          >
+            {t("workspace.view_source")}
+          </button>
+        </div>
+      ) : null}
+      {showRendered && isMarkdownFile(name) ? (
+        <Markdown text={data.content} />
+      ) : showRendered && isHtmlFile(name) ? (
+        <HtmlPreview html={data.content} title={name} />
+      ) : (
+        <CodeView code={data.content} language={languageForFile(name)} />
+      )}
       {data.truncated ? (
         <p className="workspace-preview-truncated">{t("workspace.file_truncated", { limit: formatBytes(data.limitBytes) })}</p>
       ) : null}
     </div>
+  );
+}
+
+// Renders untrusted workspace HTML inside a fully sandboxed iframe: no
+// scripts, no same-origin access, no form submission — the document can only
+// lay itself out for visual preview.
+function HtmlPreview({ html, title }: { html: string; title: string }) {
+  return (
+    <iframe
+      className="html-preview"
+      title={title}
+      sandbox=""
+      srcDoc={html}
+    />
   );
 }
 

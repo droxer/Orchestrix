@@ -64,6 +64,27 @@ def test_fastapi_daemon_routes_register_and_poll(monkeypatch) -> None:
         response = client.get("/daemon-nodes/sbx_alice/commands", headers={"Authorization": "Bearer node_token"})
         assert response.status_code == 200
         assert response.json() == {"commands": []}
+
+        run = client.post("/sandboxes/sbx_alice/runs", json={
+            "taskGoal": "review auth",
+            "assignments": [{"agent": "codex", "mode": "review"}],
+        }, headers={"Authorization": "Bearer ui_token"})
+        assert run.status_code == 202
+        response = client.get(
+            "/daemon-nodes/sbx_alice/commands?limit=1&leaseSeconds=5",
+            headers={"Authorization": "Bearer node_token"},
+        )
+        assert response.status_code == 200
+        [command] = response.json()["commands"]
+        assert command["type"] == "run.start"
+        assert command["attempt"] == 1
+        assert command["leaseId"].startswith("lease_")
+        assert command["leaseExpiresAt"]
+
+        response = client.get("/daemon-nodes/sbx_alice/commands?limit=0", headers={"Authorization": "Bearer node_token"})
+        assert response.status_code == 400
+        response = client.get("/daemon-nodes/sbx_alice/commands?waitSeconds=NaN", headers={"Authorization": "Bearer node_token"})
+        assert response.status_code == 400
         response = client.get("/cp/daemon-nodes")
         assert response.status_code == 200
         assert response.json()["nodes"][0].get("nodeToken") == "node_token"

@@ -20,8 +20,10 @@ import {
   Play,
   Info,
   KeyRound,
+  Languages,
   Library,
   ListTodo,
+  Palette,
   LogOut,
   MessagesSquare,
   PanelLeftClose,
@@ -99,6 +101,10 @@ export const ActionKey = withStandardStroke(KeyRound, "ActionKey");
 
 export const ModeAction = withStandardStroke(Code2, "ModeAction");
 export const ModeReview = withStandardStroke(ScanEye, "ModeReview");
+
+// Preferences category glyphs.
+export const PrefAppearance = withStandardStroke(Palette, "PrefAppearance");
+export const PrefLanguage = withStandardStroke(Languages, "PrefLanguage");
 
 // Stream markers form a deliberate geometric family: circle / triangle /
 // circle for check / warn / error so they read as a system at a glance.

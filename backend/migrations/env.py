@@ -6,7 +6,7 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from relay.environment import load_backend_env
+from relay.core.environment import load_backend_env
 
 load_backend_env()
 

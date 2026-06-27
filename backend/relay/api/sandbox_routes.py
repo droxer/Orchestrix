@@ -5,7 +5,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
 
-from ..services.daemon import provisioned_sandbox_record, public_sandbox_record, sandbox_ui_auth_error, sandbox_ui_token_matches
+from ..daemon_registry import provisioned_sandbox_record, public_sandbox_record, sandbox_ui_auth_error, sandbox_ui_token_matches
 from .deps import AppContextDep
 from .helpers import actor_can_access_sandbox, assignment_list, bearer_token, json_body, request_actor_or_none, string_field
 

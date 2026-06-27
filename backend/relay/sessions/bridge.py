@@ -53,6 +53,23 @@ def _bridge_artifact_for_run(session: dict[str, Any], run: dict[str, Any]) -> di
     return None
 
 
+def agent_log_for_run(session: dict[str, Any], run: dict[str, Any], store: ArtifactReader) -> str | None:
+    """Return the run transcript without treating it as a user-visible artifact."""
+    if isinstance(run.get("agentLog"), str):
+        return run["agentLog"]
+    run_id = run.get("id")
+    for event in reversed(session.get("events", [])):
+        if event.get("type") == "agent.completed" and event.get("runId") == run_id and isinstance(event.get("agentLog"), str):
+            return event["agentLog"]
+    artifact = _bridge_artifact_for_run(session, run)
+    if not artifact:
+        return None
+    try:
+        return store.read_artifact(session["id"], artifact["id"])
+    except (KeyError, FileNotFoundError):
+        return None
+
+
 def latest_user_turn_timestamp(session: dict[str, Any]) -> str | None:
     """Return the timestamp for the latest user turn in ``session``.
 
@@ -125,14 +142,8 @@ def compute_prior_agent_bridge(
 
     blocks: list[str] = []
     for run in intervening:
-        artifact = _bridge_artifact_for_run(session, run)
-        text: str | None = None
-        if artifact:
-            try:
-                body = store.read_artifact(session["id"], artifact["id"])
-                text = extract_last_assistant_text(body)
-            except (KeyError, FileNotFoundError):
-                text = None
+        body = agent_log_for_run(session, run, store)
+        text = extract_last_assistant_text(body) if body else None
         blocks.append(f"[Previous from @{run.get('agent')}]\n{text or '<no output>'}")
 
     return "\n\n".join(blocks)

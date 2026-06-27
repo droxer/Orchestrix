@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from sqlalchemy import text
 
-from relay.stores import DatabaseSessionStore, LocalSessionStore, relay_event
+from relay.persistence.stores import DatabaseSessionStore, LocalSessionStore, relay_event
 
 
 def test_session_store_persists_events_and_artifacts() -> None:
@@ -25,6 +26,20 @@ def test_session_store_persists_events_and_artifacts() -> None:
         assert updated["events"][0]["type"] == "session.created"
         assert store.get_session(session["id"])["decisions"][0]["kind"] == "approve"
         assert store.read_artifact(session["id"], artifact["id"]) == "Looks good."
+
+
+def test_session_store_create_artifact_indexes_artifact() -> None:
+    with TemporaryDirectory() as root:
+        store = LocalSessionStore(root)
+        session = store.create_session({
+            "workspacePath": "/workspace",
+            "taskGoal": "fix auth",
+            "participants": ["human", "claude"],
+        })
+        artifact, updated = store.create_artifact(session["id"], {"kind": "review", "title": "Agent review", "body": "  Looks good.\n\n", "extension": "md"})
+
+        assert updated["artifacts"][0]["id"] == artifact["id"]
+        assert store.read_artifact(session["id"], artifact["id"]) == "  Looks good.\n\n"
 
 
 def test_local_session_store_serializes_concurrent_appends() -> None:
@@ -97,7 +112,7 @@ def test_session_store_clears_pending_decision_on_cancel_decision() -> None:
 
 def test_database_session_store_persists_events_and_artifacts() -> None:
     with TemporaryDirectory() as root:
-        store = DatabaseSessionStore(f"sqlite:///{root}/relay.db", root, create_schema=True)
+        store = DatabaseSessionStore(f"sqlite:///{root}/relay.db", create_schema=True)
         session = store.create_session({
             "workspacePath": "/workspace",
             "taskGoal": "fix auth",
@@ -126,6 +141,10 @@ def test_database_session_store_persists_events_and_artifacts() -> None:
         assert store.get_session(session["id"])["decisions"][0]["kind"] == "approve"
         assert store.list_sessions()[0]["id"] == session["id"]
         assert store.read_artifact(session["id"], artifact["id"]) == "Looks good."
+        assert not (Path(root) / "session-artifacts").exists()
+        with store.engine.begin() as conn:
+            content = conn.execute(text("select content from session_artifacts where public_id = :artifact_id"), {"artifact_id": artifact["id"]}).scalar_one()
+        assert content == "Looks good."
         usage = store.list_token_usage()[0]
         assert usage["taskGoal"] == "fix auth"
         assert usage["total"] == 10
@@ -133,3 +152,18 @@ def test_database_session_store_persists_events_and_artifacts() -> None:
             row = conn.execute(text("select session_public_id, total_tokens from session_token_usage")).mappings().one()
         assert row["session_public_id"] == session["id"]
         assert row["total_tokens"] == 10
+
+
+def test_database_session_store_create_artifact_indexes_artifact() -> None:
+    with TemporaryDirectory() as root:
+        store = DatabaseSessionStore(f"sqlite:///{root}/relay.db", create_schema=True)
+        session = store.create_session({
+            "workspacePath": "/workspace",
+            "taskGoal": "fix auth",
+            "participants": ["human", "claude"],
+        })
+        artifact, updated = store.create_artifact(session["id"], {"kind": "review", "title": "Agent review", "body": "  Looks good.\n\n", "extension": "md"})
+
+        assert updated["artifacts"][0]["id"] == artifact["id"]
+        assert store.read_artifact(session["id"], artifact["id"]) == "  Looks good.\n\n"
+        assert not (Path(root) / "session-artifacts").exists()

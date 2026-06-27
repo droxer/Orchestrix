@@ -12,18 +12,19 @@ from typing import Any
 
 from loguru import logger
 
-from .bridge import compute_prior_agent_bridge
-from .conversation import compute_conversation_history
-from .controller import SessionController, initial_agent_state, is_review_assignment
 from ..core.environment import load_backend_env
 from ..core.ids import new_relay_id, new_sandbox_id, now_iso
 from ..core.models import AGENT_NAMES, DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS
-from ..persistence.stores import LocalDaemonStore, LocalSessionStore, LocalTaskStore, role_for_agent, valid_agent
+from ..persistence.stores import LocalDaemonStore, LocalSessionStore, LocalTaskStore, role_for_agent
+from ..sessions import compute_prior_agent_bridge
+from ..sessions import compute_conversation_history
+from ..sessions import SessionController, initial_agent_state, is_review_assignment
 
 load_backend_env()
 
 DAEMON_NODE_LIVENESS_TIMEOUT_MS = int(os.environ.get("RELAY_DAEMON_NODE_LIVENESS_TIMEOUT_MS", "15000"))
 DAEMON_RUN_TIMEOUT_MS = int(os.environ.get("RELAY_DAEMON_RUN_TIMEOUT_MS", str(15 * 60 * 1000)))
+DAEMON_COMMAND_LEASE_SECONDS = float(os.environ.get("RELAY_DAEMON_COMMAND_LEASE_SECONDS", "60"))
 
 
 def hash_daemon_node_token(token: str | None) -> str | None:
@@ -135,6 +136,15 @@ def agent_inventory_state(input: dict[str, Any]) -> dict[str, dict[str, list[dic
         if skills or mcp_servers:
             inventory[agent] = {"skills": skills, "mcpServers": mcp_servers}
     return inventory
+
+
+def daemon_command_payload(record: dict[str, Any]) -> dict[str, Any]:
+    return {
+        **record["command"],
+        **({"leaseId": record["leaseId"]} if record.get("leaseId") else {}),
+        **({"leaseExpiresAt": record["leaseExpiresAt"]} if record.get("leaseExpiresAt") else {}),
+        **({"attempt": record["attempt"]} if record.get("attempt") is not None else {}),
+    }
 
 
 def _clean_skills(value: Any) -> list[dict[str, str]]:
@@ -434,11 +444,18 @@ class DaemonNodeRegistry:
                 "startedAt": now_iso(),
             }
 
-    def take_commands(self, sandbox_id: str, token: str | None) -> list[dict[str, Any]]:
+    def take_commands(
+        self,
+        sandbox_id: str,
+        token: str | None,
+        *,
+        limit: int = 2**53,
+        lease_seconds: float = DAEMON_COMMAND_LEASE_SECONDS,
+    ) -> list[dict[str, Any]]:
         self._assert_authorized(sandbox_id, token)
         self.reap_stale_runs()
         self._mark_seen(sandbox_id)
-        records = self.daemon_store.take_queued_commands(sandbox_id)
+        records = self.daemon_store.take_queued_commands(sandbox_id, limit=limit, lease_seconds=lease_seconds)
         logger.debug("Commands taken by daemon node", sandbox_id=sandbox_id, command_count=len(records))
         for record in records:
             command = record["command"]
@@ -446,6 +463,7 @@ class DaemonNodeRegistry:
                 self.active_commands[command["id"]] = {
                     "sandboxId": sandbox_id,
                     "commandId": command["id"],
+                    **({"leaseId": record["leaseId"]} if record.get("leaseId") else {}),
                     "sessionId": command["sessionId"],
                     "runId": command["runId"],
                     "agent": command["agent"],
@@ -454,7 +472,11 @@ class DaemonNodeRegistry:
                     **({"workspacePath": command["workspacePath"]} if command.get("workspacePath") else {}),
                     "startedAt": record.get("dispatchedAt", now_iso()),
                 }
-        return [record["command"] for record in records]
+        return [daemon_command_payload(record) for record in records]
+
+    def available_command_count(self, sandbox_id: str, token: str | None) -> int:
+        self._assert_authorized(sandbox_id, token)
+        return self.daemon_store.queued_command_count(sandbox_id)
 
     async def wait_for_completion(self, command_id: str, timeout_ms: int = DAEMON_RUN_TIMEOUT_MS) -> dict[str, Any]:
         future: asyncio.Future[dict[str, Any]] = asyncio.get_running_loop().create_future()
@@ -502,9 +524,18 @@ class DaemonNodeRegistry:
         if active["sandboxId"] != sandbox_id or active["runId"] != event["runId"] or active["sessionId"] != event["sessionId"]:
             logger.warning("Daemon node event mismatch", sandbox_id=sandbox_id, command_id=event["commandId"], run_id=event["runId"])
             raise PermissionError("Unauthorized daemon node event: command belongs to a different sandbox.")
+        if active.get("leaseId") and event.get("leaseId") and active["leaseId"] != event["leaseId"]:
+            logger.warning("Daemon node event lease mismatch", sandbox_id=sandbox_id, command_id=event["commandId"], run_id=event["runId"])
+            raise PermissionError("Unauthorized daemon node event: command lease does not match the active command.")
+        if active["agent"] != event["agent"] or (event["type"] != "run.output" and active["mode"] != event.get("mode")):
+            logger.warning("Daemon node event command metadata mismatch", sandbox_id=sandbox_id, command_id=event["commandId"], run_id=event["runId"])
+            raise PermissionError("Unauthorized daemon node event: command metadata does not match the active command.")
         if event["type"] == "run.output":
             seen = self.output_sequences.setdefault(event["runId"], set())
             if event["sequence"] in seen:
+                return
+            if self._session_has_output_sequence(event["sessionId"], event["runId"], event["stream"], event["sequence"]):
+                seen.add(event["sequence"])
                 return
             seen.add(event["sequence"])
             self.outputs.setdefault(event["runId"], []).append(event["text"])
@@ -517,6 +548,7 @@ class DaemonNodeRegistry:
                 "agent": event["agent"],
                 "stream": event["stream"],
                 "text": event["text"],
+                "sequence": event["sequence"],
             })
             return
         self.active_commands.pop(event["commandId"], None)
@@ -611,8 +643,9 @@ class DaemonNodeRegistry:
         mode = assignment.get("mode") or "action"
         state = run_request["state"]
         if event["type"] == "run.failed":
+            agent_log = event.get("agentLog") or event["error"]
             self.clear_run_output(event["runId"])
-            controller.record_agent_completed(run_request["sessionId"], state, {"runId": event["runId"], "agent": event["agent"], "mode": mode, "status": "failed", "exitCode": event.get("exitCode", 1), "agentLog": event["error"]})
+            controller.record_agent_completed(run_request["sessionId"], state, {"runId": event["runId"], "agent": event["agent"], "mode": mode, "status": "failed", "exitCode": event.get("exitCode", 1), "agentLog": agent_log})
             controller.fail_session(run_request["sessionId"], event["error"])
             self.daemon_store.update_run_request(run_request["id"], {"status": "failed", "error": event["error"]})
             self.update_status(run_request["nodeId"], {"status": "ready", "lastError": event["error"]})
@@ -726,6 +759,19 @@ class DaemonNodeRegistry:
         self.outputs.pop(run_id, None)
         self.output_sequences.pop(run_id, None)
 
+    def _session_has_output_sequence(self, session_id: str, run_id: str, stream: str, sequence: int) -> bool:
+        try:
+            session = self.store.get_session(session_id)
+        except Exception:
+            return False
+        return any(
+            event.get("type") == "agent.output"
+            and event.get("runId") == run_id
+            and event.get("stream") == stream
+            and event.get("sequence") == sequence
+            for event in session.get("events", [])
+        )
+
     def _assert_authorized(self, sandbox_id: str, token: str | None) -> None:
         sandbox = self.sandboxes.get(sandbox_id)
         if not sandbox:
@@ -784,183 +830,5 @@ class DaemonNodeRegistry:
             logger.debug("Daemon node stale", sandbox_id=sandbox["id"], last_seen_age_ms=age)
         return {"online": online, "stale": not online, "lastSeenAgeMs": age}
 
-
-class ServerDaemonNodeBackend:
-    def __init__(self, registry: DaemonNodeRegistry):
-        self.registry = registry
-
-    def provision(self, input: dict[str, Any]) -> dict[str, Any]:
-        requested_sandbox_id = input.get("sandboxId")
-        existing = self.registry.get(requested_sandbox_id) if requested_sandbox_id else self.registry.find_by_employee(input["employeeId"], input.get("workspacePath"))
-        if existing:
-            if input.get("actorEmployeeId"):
-                return existing
-            ui_error = sandbox_ui_auth_error(existing, input.get("token"))
-            if not ui_error:
-                return existing
-            node_error = sandbox_node_auth_error(existing, input.get("nodeToken"))
-            if not node_error and input.get("token"):
-                employee_id = existing.get("employeeId") or input["employeeId"]
-                return self.registry.register({
-                    "sandboxId": existing["id"],
-                    "employeeId": employee_id,
-                    "token": input.get("nodeToken", ""),
-                    "workspacePath": existing.get("workspacePath"),
-                    "protocolVersion": DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS[0],
-                    "supportedAgents": [agent for agent, status in existing.get("agents", {}).items() if status == "ready"],
-                    "status": "busy" if existing["status"] == "running" else existing["status"],
-                }, input["token"])
-            raise PermissionError(node_error or ui_error)
-        if not input.get("token"):
-            raise PermissionError("Sandbox token is required.")
-        if not input.get("nodeToken"):
-            raise PermissionError("Daemon node token is required.")
-        sandbox_id = requested_sandbox_id or new_sandbox_id(input["employeeId"])
-        now = now_iso()
-        sandbox = {
-            "id": sandbox_id,
-            "employeeId": input["employeeId"],
-            **({"workspacePath": input["workspacePath"]} if input.get("workspacePath") else {}),
-            "status": "provisioning",
-            "agents": {agent: "unknown" for agent in AGENT_NAMES},
-            "token": input["token"],
-            "createdAt": now,
-            "updatedAt": now,
-            "lastError": "Waiting for daemon node registration.",
-        }
-        self.registry.register({
-            "sandboxId": sandbox_id,
-            "employeeId": input["employeeId"],
-            "token": input["nodeToken"],
-            "workspacePath": input.get("workspacePath"),
-            "protocolVersion": DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS[0],
-            "supportedAgents": [],
-            "status": "stopped",
-        }, input["token"])
-        stored = self.registry.get(sandbox_id) or {}
-        return {**sandbox, **stored, "token": input["token"]}
-
-    def get(self, sandbox_id: str) -> dict[str, Any] | None:
-        return self.registry.get(sandbox_id)
-
-    def list(self) -> list[dict[str, Any]]:
-        return self.registry.list_ready()
-
-    def provision_daemon_node(self, input: dict[str, Any]) -> dict[str, Any]:
-        sandbox, ui_token, node_token = self.registry.provision_pending(input["employeeId"], input.get("workspacePath"))
-        return {
-            **sandbox,
-            **({"token": ui_token, "sandboxToken": ui_token} if ui_token else {}),
-            **({"nodeToken": node_token} if node_token else {}),
-        }
-
-    async def run(self, sandbox_id: str, request: dict[str, Any]) -> dict[str, Any]:
-        with self.registry.dispatch_lock:
-            self.registry.reap_stale_runs()
-            sandbox = self.registry.get(sandbox_id)
-            if not sandbox:
-                raise KeyError(f"Sandbox {sandbox_id} has no registered daemon node.")
-            if not sandbox.get("employeeId"):
-                raise ValueError(f"Sandbox {sandbox_id} daemon node is not assigned to an employee.")
-            if sandbox["status"] != "ready":
-                raise ValueError(f"Sandbox {sandbox_id} daemon node is not ready.")
-            if not self.registry.is_live(sandbox_id):
-                raise ValueError(f"Sandbox {sandbox_id} daemon node heartbeat expired.")
-            disabled = set(sandbox.get("disabledAgents") or [])
-            requested_agents = [assignment["agent"] for assignment in request["assignments"]]
-            disabled_hit = [agent for agent in requested_agents if agent in disabled]
-            not_ready = [
-                agent
-                for agent in requested_agents
-                if agent not in disabled and sandbox.get("agents", {}).get(agent) != "ready"
-            ]
-            if disabled_hit:
-                detail = ", ".join(dict.fromkeys(disabled_hit))
-                raise ValueError(
-                    f"Sandbox {sandbox_id} daemon node has disabled agent(s): {detail}. "
-                    "Re-enable them from the admin console to dispatch work."
-                )
-            if not_ready:
-                detail = ", ".join(dict.fromkeys(not_ready))
-                raise ValueError(f"Sandbox {sandbox_id} daemon node does not have ready agent(s): {detail}.")
-            actor_employee_id = request.get("actorEmployeeId")
-            owner_employee_id = actor_employee_id or sandbox["employeeId"]
-            if request.get("sessionId"):
-                session_owner = session_owner_employee_id(self.registry.store, request["sessionId"])
-                if actor_employee_id and not request.get("actorIsAdmin"):
-                    assert_session_owned_by_employee(self.registry.store, request["sessionId"], actor_employee_id)
-                if not actor_employee_id:
-                    assert_session_owned_by_employee(self.registry.store, request["sessionId"], sandbox["employeeId"])
-                owner_employee_id = session_owner
-                if self.registry.daemon_store.active_run_request_for_session(sandbox_id, request["sessionId"]):
-                    raise ValueError(f"Session {request['sessionId']} already has an active daemon run.")
-            self.registry.update_status(sandbox_id, {"status": "running", "lastError": None})
-            task_id = request.get("taskId") if isinstance(request.get("taskId"), str) and request.get("taskId") else None
-            controller = SessionController(
-                self.registry.store,
-                task_store=self.registry.task_store,
-                task_id=task_id,
-                workspace_path=sandbox.get("workspacePath") or "/workspace",
-                owner_employee_id=owner_employee_id,
-            )
-            session_id = request.get("sessionId") or controller.create_session(
-                request["taskGoal"],
-                ["human", *dict.fromkeys(assignment["agent"] for assignment in request["assignments"])],
-            )["id"]
-            # A follow-up turn on an existing session: persist the new user
-            # message so it renders in the transcript and feeds the next run's
-            # conversation history. A fresh session already captures the first
-            # turn as its taskGoal via session.created.
-            if request.get("sessionId"):
-                controller.record_user_message(
-                    session_id,
-                    request["taskGoal"],
-                    actor_employee_id=actor_employee_id,
-                    message_id=request.get("userMessageId"),
-                )
-            decision = request.get("decision") if isinstance(request.get("decision"), dict) else None
-            if decision:
-                kind = decision.get("kind")
-                note = decision.get("note") if isinstance(decision.get("note"), str) else None
-                target_agent = valid_agent(decision.get("targetAgent"))
-                if kind == "rerun":
-                    controller.record_decision(session_id, "rerun", note, target_agent)
-                elif kind == "handoff" and target_agent:
-                    controller.handoff_session(session_id, target_agent, request["assignments"], note)
-            state = initial_agent_state(request["taskGoal"])
-            self.registry.start_run_request(sandbox_id, session_id, request["taskGoal"], request["assignments"], state, task_id)
-            return self.registry.store.get_session(session_id)
-
-    def cancel_run(self, sandbox_id: str, session_id: str, reason: str, actor_employee_id: str | None = None) -> dict[str, Any]:
-        sandbox = self.registry.get(sandbox_id)
-        if not sandbox:
-            raise KeyError(f"Sandbox {sandbox_id} has no registered daemon node.")
-        if actor_employee_id:
-            assert_session_owned_by_employee(self.registry.store, session_id, actor_employee_id)
-        active = self.registry.cancel_active_run(sandbox_id, session_id, reason)
-        if not active:
-            raise KeyError(f"Session {session_id} has no active daemon node run.")
-        return self.registry.store.get_session(session_id)
-
-
 def daemon_active_run(run: dict[str, Any]) -> dict[str, Any]:
     return {key: run[key] for key in ("commandId", "sessionId", "runId", "agent", "mode", "taskGoal", "workspacePath", "startedAt") if key in run}
-
-
-def assert_session_owned_by_employee(store: LocalSessionStore, session_id: str, employee_id: str) -> None:
-    try:
-        session = store.get_session(session_id)
-    except Exception:
-        return
-    if not session.get("ownerEmployeeId"):
-        raise PermissionError(f"Session {session_id} has no owner; {employee_id} is not authorized to run it.")
-    if session["ownerEmployeeId"] != employee_id:
-        raise PermissionError(f"Session {session_id} is owned by {session['ownerEmployeeId']}; {employee_id} is not authorized to run it.")
-
-
-def session_owner_employee_id(store: LocalSessionStore, session_id: str) -> str:
-    session = store.get_session(session_id)
-    owner = session.get("ownerEmployeeId")
-    if not owner:
-        raise PermissionError(f"Session {session_id} has no owner; cannot start daemon run.")
-    return owner

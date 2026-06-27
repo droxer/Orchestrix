@@ -521,6 +521,60 @@ html[data-theme="contrast"] {
   color-scheme: light;
 }
 
+/* High contrast — dark variant. The mirror of html[data-theme="contrast"]:
+   pure white on black, solid hairlines, no grain, status hues at maximum
+   legibility on the black canvas. `applyTheme("contrast")` resolves to this
+   when the OS prefers dark, so a single "High contrast" choice follows the
+   light/dark preference instead of forcing light. */
+html[data-theme="contrast-dark"] {
+  --color-ink: #ffffff;
+  --color-body: #ffffff;
+  --color-muted: #d4d4d4;
+  --color-muted-soft: #b0b0b0;
+
+  --color-canvas: #000000;
+  --color-surface-card: #000000;
+  --color-surface-soft: #0d0d0d;
+  --color-surface-strong: #1c1c1c;
+  --color-surface-raised: #000000;
+
+  --color-hairline: #ffffff;
+  --color-hairline-soft: #9a9a9a;
+
+  --color-primary: #ffffff;
+  --color-primary-active: #d4d4d4;
+  --color-primary-disabled: #6a6a6a;
+  --color-on-primary: #000000;
+
+  --color-semantic-up: #00e676;
+  --color-semantic-down: #ff6b75;
+  --color-info: #5aa9ff;
+  --color-accent-yellow: #ffce4d;
+  --color-warning-text: #ffce4d;
+  --color-danger-text: #ff8088;
+  --color-code-number: #ffb266;
+
+  /* Artifact kind accents collapse to ink — the high-contrast theme drops
+     decorative hue, so the chip left-border reads as a neutral ink bar.
+     --color-diff-hunk is exempt: it lives on the always-dark diff surface. */
+  --color-kind-plan: var(--color-ink);
+  --color-kind-diff: var(--color-ink);
+  --color-kind-test: var(--color-ink);
+  --color-kind-log: var(--color-ink);
+  --color-kind-summary: var(--color-ink);
+
+  --color-overlay: color-mix(in srgb, #000 85%, transparent);
+  --shadow-soft: none;
+  --shadow-lift: 0 0 0 2px #ffffff;
+  --ring-focus: 0 0 0 3px #ffffff;
+
+  --atmosphere-wash: none;
+  --atmosphere-grain-opacity: 0;
+  --atmosphere-background: var(--color-surface-soft);
+
+  color-scheme: dark;
+}
+
 * { box-sizing: border-box; }
 
 html,

@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .bridge import ArtifactReader, _bridge_artifact_for_run, extract_last_assistant_text, latest_user_turn_marker, run_marker
+from .bridge import ArtifactReader, agent_log_for_run, extract_last_assistant_text, latest_user_turn_marker, run_marker
 
 
 def _created_marker(session: dict[str, Any]) -> tuple[str, int]:
@@ -40,13 +40,8 @@ def _agent_turns(session: dict[str, Any], store: ArtifactReader) -> list[tuple[t
     for run in session.get("agentRuns", []):
         if run.get("status") != "completed":
             continue
-        artifact = _bridge_artifact_for_run(session, run)
-        text: str | None = None
-        if artifact:
-            try:
-                text = extract_last_assistant_text(store.read_artifact(session["id"], artifact["id"]))
-            except (KeyError, FileNotFoundError):
-                text = None
+        body = agent_log_for_run(session, run, store)
+        text = extract_last_assistant_text(body) if body else None
         turns.append((run_marker(session, run), run.get("agent", "agent"), text))
     return turns
 

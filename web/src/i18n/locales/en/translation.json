@@ -174,6 +174,7 @@
     "metric_tasks": "Active tasks",
     "metric_sessions": "Threads",
     "metric_artifacts": "Artifacts",
+    "browse": "Browse",
     "artifacts": "Artifacts",
     "files": "Files",
     "preview": "Preview",
@@ -182,6 +183,9 @@
     "loading_preview": "Loading preview.",
     "binary_file": "Binary file — no preview.",
     "empty_file": "This file is empty.",
+    "view_mode": "Preview mode",
+    "view_rendered": "Rendered",
+    "view_source": "Source",
     "file_truncated": "Preview truncated to {{limit}}.",
     "no_artifacts": "No artifacts yet.",
     "no_files": "No files in this directory.",
@@ -576,6 +580,8 @@
     "appearance": "Appearance",
     "language": "Language",
     "theme": {
+      "group": "Theme",
+      "contrast_group": "High contrast",
       "light": "Light",
       "light_sub": "Always light",
       "dark": "Dark",
@@ -583,7 +589,9 @@
       "system": "System",
       "system_sub": "Follows OS setting",
       "contrast": "High contrast",
-      "contrast_sub": "Strong borders & text"
+      "contrast_sub": "Light · strong borders & text",
+      "contrast-dark": "High contrast dark",
+      "contrast-dark_sub": "Dark · strong borders & text"
     }
   },
   "transcript": {

@@ -20,10 +20,10 @@ from .persistence.stores import (
     LocalSessionStore,
     LocalTaskStore,
 )
+from .daemon_registry import DaemonNodeRegistry, ServerDaemonNodeBackend
 from .security.auth import auth_store_from_env
-from .services.chat_integrations import LocalChatIntegrationStore
-from .services.daemon import DaemonNodeRegistry, ServerDaemonNodeBackend
-from .services.task_scheduler import TaskScheduler
+from .chat import DatabaseChatIntegrationStore, LocalChatIntegrationStore
+from .tasks import TaskScheduler
 
 load_backend_env()
 
@@ -38,7 +38,7 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     session_store = session_store_from_env(root_dir)
     task_store = task_store_from_env(root_dir)
     daemon_store = daemon_store_from_env(root_dir)
-    chat_store = LocalChatIntegrationStore(root_dir)
+    chat_store = chat_store_from_env(root_dir)
     registry = DaemonNodeRegistry(session_store, daemon_store, task_store=task_store)
     backend = ServerDaemonNodeBackend(registry)
     auth_store = auth_store_from_env(root_dir)
@@ -112,13 +112,21 @@ def daemon_store_from_env(root_dir: Path) -> Any:
 def session_store_from_env(root_dir: Path) -> Any:
     if not use_postgres_storage():
         return LocalSessionStore(root_dir)
-    return DatabaseSessionStore(database_url_from_env(), root_dir)
+    return DatabaseSessionStore(database_url_from_env())
 
 
 def task_store_from_env(root_dir: Path) -> Any:
     if not use_postgres_storage():
         return LocalTaskStore(root_dir)
     return DatabaseTaskStore(database_url_from_env())
+
+
+def chat_store_from_env(root_dir: Path) -> Any:
+    chat_store = os.environ.get("RELAY_CHAT_STORE", "").strip().lower()
+    if chat_store != "database" and not use_postgres_storage():
+        return LocalChatIntegrationStore(root_dir)
+    setting = "RELAY_CHAT_STORE=database" if chat_store == "database" else "RELAY_STORAGE=postgres"
+    return DatabaseChatIntegrationStore(database_url_from_env(setting=setting))
 
 
 def task_scheduler_from_env(*, task_store: Any, registry: DaemonNodeRegistry, backend: ServerDaemonNodeBackend) -> TaskScheduler | None:

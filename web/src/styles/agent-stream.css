@@ -178,14 +178,8 @@
   padding: 0;
 }
 
-/* Syntax highlight tokens — monochrome ink + weight for keywords, muted
-   italic for strings, warm number token for literals, muted italic for
-   comments. Geist Mono carries the block; hue stays status-only elsewhere. */
-.hl-keyword { color: var(--color-ink);  font-weight: 600; }
-.hl-string  { color: var(--color-body); font-style: italic; }
-.hl-number  { color: var(--color-code-number); }
-.hl-comment { color: var(--color-muted); font-style: italic; }
-.hl-plain   { /* inherits agent-code color */ }
+/* Syntax-highlight token colors live in styles/syntax.css (highlight.js
+   `hljs-*` classes), shared with the workspace file preview. */
 
 .agent-code-lang {
   display: block;

@@ -138,6 +138,8 @@ def materialize_events(events: list[dict[str, Any]]) -> dict[str, Any]:
                     run["status"] = event["status"]
                     run["completedAt"] = event["timestamp"]
                     run["exitCode"] = event["exitCode"]
+                    if "agentLog" in event:
+                        run["agentLog"] = event["agentLog"]
                     if event.get("tokenUsage"):
                         run["tokenUsage"] = event["tokenUsage"]
             token_usage = merge_token_usage([run.get("tokenUsage") for run in session["agentRuns"]])

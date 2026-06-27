@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from tempfile import TemporaryDirectory
 
-from relay.controller import SessionController, initial_agent_state
-from relay.stores import LocalSessionStore
+from relay.persistence.stores import LocalSessionStore
+from relay.sessions import SessionController, initial_agent_state
 
 
 def test_session_controller_records_review_verdict() -> None:
@@ -31,7 +31,9 @@ def test_session_controller_records_review_verdict() -> None:
         assert updated["reviewVerdict"] == "approved"
         assert updated["agentRuns"][0]["tokenUsage"]["input"] == 9
         assert updated["tokenUsage"]["total"] == 15
-        assert updated["agentRuns"][0]["artifactIds"]
+        assert updated["agentRuns"][0]["artifactIds"] == []
+        assert updated["agentRuns"][0]["agentLog"] == "approved"
+        assert updated["artifacts"] == []
 
 
 def test_record_cancel_decision_appends_one_cancel_decision() -> None:
@@ -47,7 +49,7 @@ def test_record_cancel_decision_appends_one_cancel_decision() -> None:
 
 
 def test_record_user_message_appends_event_with_given_id() -> None:
-    from relay.controller import SessionController, initial_agent_state  # noqa: F401
+    from relay.sessions import SessionController, initial_agent_state  # noqa: F401
     with TemporaryDirectory() as root:
         store = LocalSessionStore(root)
         controller = SessionController(store, workspace_path="/workspace")
@@ -61,7 +63,7 @@ def test_record_user_message_appends_event_with_given_id() -> None:
 
 
 def test_compute_conversation_history_excludes_current_turn() -> None:
-    from relay.conversation import compute_conversation_history
+    from relay.sessions import compute_conversation_history
     with TemporaryDirectory() as root:
         store = LocalSessionStore(root)
         controller = SessionController(store, workspace_path="/workspace")

@@ -245,10 +245,11 @@ export function App() {
   useEffect(() => {
     applyTheme(theme);
     writeTheme(theme);
-    // "system" no longer rides a CSS media query, so re-resolve on OS change.
-    if (theme !== "system" || typeof window === "undefined" || !window.matchMedia) return;
+    // "system" and "contrast" both follow the OS preference off any CSS media
+    // query, so re-resolve them on OS change.
+    if ((theme !== "system" && theme !== "contrast") || typeof window === "undefined" || !window.matchMedia) return;
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => applyTheme("system");
+    const onChange = () => applyTheme(theme);
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
   }, [theme]);

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from fastapi.testclient import TestClient
 
 from relay.app import create_app
-from relay.chat_integrations import LocalChatIntegrationStore
+from relay.chat import DatabaseChatIntegrationStore, LocalChatIntegrationStore
 
 
 def _bootstrap_admin(client: TestClient) -> None:
@@ -158,3 +159,25 @@ def test_chat_integration_store_serializes_concurrent_creates() -> None:
         assert len(integrations) == 20
         assert {item["id"] for item in integrations} == set(ids)
         assert all(item["secretConfigured"] for item in integrations)
+
+
+def test_database_chat_integration_store_persists_without_local_files() -> None:
+    with TemporaryDirectory() as root:
+        store = DatabaseChatIntegrationStore(f"sqlite:///{root}/chat.db", create_schema=True)
+        integration = store.create_integration({
+            "provider": "discord",
+            "displayName": "Engineering Discord",
+            "secrets": {"botToken": "secret-token"},
+        }, actor="admin")
+        store.add_identity_link(integration["id"], {"externalUserId": "u1", "employeeId": "alice"})
+        store.add_allowed_conversation(integration["id"], {"conversationId": "c1"})
+        activated = store.activate_integration(integration["id"], actor="admin")
+
+        assert activated["status"] == "active"
+        assert store.resolve_identity({
+            "provider": "discord",
+            "externalUserId": "u1",
+            "conversationId": "c1",
+        })["employeeId"] == "alice"
+        assert store.audit_events(integration["id"])[-1]["type"] == "chat.integration.activated"
+        assert not (Path(root) / "chat").exists()

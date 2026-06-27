@@ -6,8 +6,8 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response
 
+from ..daemon_registry import public_sandbox_record
 from ..security.auth import require_admin_session
-from ..services.daemon import public_sandbox_record
 from .deps import AppContextDep
 from .helpers import daemon_start_command, daemon_start_env, employee_record, json_body, string_field
 
