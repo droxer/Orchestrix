@@ -89,9 +89,9 @@ class SessionController:
         logger.info("User message recorded", session_id=session_id, message_id=event["id"])
         return session
 
-    def complete_session(self, session_id: str, outcome: str) -> dict[str, Any]:
+    def complete_session(self, session_id: str, outcome: str, task_status: str = "done") -> dict[str, Any]:
         session = self._append(session_id, relay_event("session.completed", session_id, {"outcome": outcome}))
-        self._update_task_status("done", outcome, {"sessionId": session_id})
+        self._update_task_status(task_status, outcome, {"sessionId": session_id})
         logger.info("Session completed", session_id=session_id, outcome=outcome)
         return session
 

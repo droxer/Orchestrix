@@ -55,6 +55,8 @@ export interface DaemonRuntimeOptions {
   logger?: DaemonLogger;
   signal?: AbortSignal;
   shutdownGraceMs?: number;
+  maxConcurrentRuns?: number;
+  runCapacityByMode?: Partial<Record<AgentTaskMode, number>>;
   environment?: DaemonExecutionEnvironment;
   preflight?: boolean;
 }
@@ -137,7 +139,9 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
   };
   logger.info("daemon starting", { sandboxId, employeeId, workspacePath, backendUrl, sandboxMode });
   setHealth("starting", { employeeId, workspacePath, backendUrl, sandboxMode });
-  const activeRuns = new Map<string, { controller: AbortController; promise: Promise<void> }>();
+  const runCapacityByMode = resolveRunCapacityByMode(options.runCapacityByMode);
+  const maxConcurrentRuns = options.maxConcurrentRuns ?? positiveIntEnv("RELAY_DAEMON_MAX_CONCURRENT_RUNS") ?? Math.max(...Object.values(runCapacityByMode));
+  const activeRuns = new Map<string, { command: DaemonNodeRunCommand; controller: AbortController; promise: Promise<void> }>();
   const shutdownGraceMs = options.shutdownGraceMs ?? positiveIntEnv("RELAY_DAEMON_SHUTDOWN_GRACE_MS") ?? 10_000;
   const shutdownController = new AbortController();
   const runtimeSignal = options.signal
@@ -163,6 +167,8 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
     supportedAgents,
     agentHealth,
     ...(Object.keys(agentInventory).length > 0 ? { agentInventory } : {}),
+    maxConcurrentRuns,
+    runCapacityByMode,
     status: status ?? (activeRuns.size > 0 ? "busy" : "ready"),
   });
   const register = async (): Promise<void> => {
@@ -275,8 +281,8 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
             logger.warn("duplicate command ignored", commandLogFields(sandboxId, command));
             continue;
           }
-          if (activeRuns.size > 0) {
-            const detail = "Daemon node already has an active run; this node runs one command at a time.";
+          if (!canStartCommand(command, activeRuns, maxConcurrentRuns, runCapacityByMode)) {
+            const detail = "Daemon node has no available execution slot for this run.";
             logger.warn("command rejected while daemon busy", { ...commandLogFields(sandboxId, command), error: detail });
             await postJsonWithRetry(fetchFn, `${backendUrl}/daemon-nodes/${encodeURIComponent(sandboxId)}/events`, {
               type: "run.failed",
@@ -348,7 +354,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
             activeRuns.delete(command.id);
             if (!stopping) setHealth("polling");
           });
-          activeRuns.set(command.id, { controller, promise });
+          activeRuns.set(command.id, { command, controller, promise });
         } else if (command.type === "run.cancel") {
           logger.info("cancel command received", {
             sandboxId,
@@ -899,6 +905,32 @@ function delay(ms: number, signal?: AbortSignal): Promise<void> {
 function positiveIntEnv(name: string): number | undefined {
   const value = Number(process.env[name]);
   return Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined;
+}
+
+function resolveRunCapacityByMode(input?: Partial<Record<AgentTaskMode, number>>): Record<AgentTaskMode, number> {
+  return {
+    action: positiveCapacity(input?.action) ?? positiveIntEnv("RELAY_DAEMON_MAX_CONCURRENT_ACTION_RUNS") ?? 1,
+    review: positiveCapacity(input?.review) ?? positiveIntEnv("RELAY_DAEMON_MAX_CONCURRENT_REVIEW_RUNS") ?? 1,
+    ask: positiveCapacity(input?.ask) ?? positiveIntEnv("RELAY_DAEMON_MAX_CONCURRENT_ASK_RUNS") ?? 2,
+  };
+}
+
+function positiveCapacity(value: number | undefined): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined;
+}
+
+function canStartCommand(
+  command: DaemonNodeRunCommand,
+  activeRuns: Map<string, { command: DaemonNodeRunCommand }>,
+  maxConcurrentRuns: number,
+  runCapacityByMode: Record<AgentTaskMode, number>,
+): boolean {
+  const active = [...activeRuns.values()].map((run) => run.command);
+  const activeExclusive = active.some((run) => run.mode !== "ask");
+  if (command.mode !== "ask") return active.length === 0;
+  if (activeExclusive) return false;
+  const activeAsk = active.filter((run) => run.mode === "ask").length;
+  return active.length < maxConcurrentRuns && activeAsk < runCapacityByMode.ask;
 }
 
 export function createDaemonLogger(input: {

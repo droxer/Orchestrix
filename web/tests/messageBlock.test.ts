@@ -117,6 +117,9 @@ describe("projectMessages artifact projection", () => {
       ["art_plan"],
       ["art_review"],
     ]);
+    // The agent-turn eyebrow renders `<agent> · <mode>`; the mode is carried
+    // from agent.started so action and review turns read distinctly.
+    assert.deepEqual(agentMessages.map((message) => message.mode), ["action", "review"]);
   });
 
   it("renders runless artifacts as standalone system rows", () => {

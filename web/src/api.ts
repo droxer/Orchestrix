@@ -1,5 +1,6 @@
 import type {
   AgentName,
+  AgentRole,
   AgentTaskMode,
   ArtifactsResponse,
   AssignControlPanelDaemonNodeResponse,
@@ -154,6 +155,27 @@ export function updateControlPanelDaemonNodeDisabledAgents(
   );
 }
 
+export function updateControlPanelDaemonNodeAgentRoleDefaults(
+  nodeId: string,
+  agentRoleDefaults: Partial<Record<AgentName, AgentRole>>,
+): Promise<UnassignControlPanelDaemonNodeResponse> {
+  return apiJson<UnassignControlPanelDaemonNodeResponse>(
+    `/cp/daemon-nodes/${encodeURIComponent(nodeId)}/agent-role-defaults`,
+    { method: "PATCH", body: { agentRoleDefaults } },
+  );
+}
+
+export function updateDaemonNodeAgentRoleOverrides(
+  nodeId: string,
+  agentRoleOverrides: Partial<Record<AgentName, AgentRole>>,
+  token?: string,
+): Promise<UnassignControlPanelDaemonNodeResponse> {
+  return apiJson<UnassignControlPanelDaemonNodeResponse>(
+    `/daemon-nodes/${encodeURIComponent(nodeId)}/agent-role-overrides`,
+    { method: "PATCH", body: { agentRoleOverrides }, token },
+  );
+}
+
 export function deleteControlPanelEmployee(
   employeeId: string,
 ): Promise<{ employee: { id: string; deletedAt: string }; unassignedNodes: string[] }> {
@@ -271,7 +293,7 @@ export function assignTask(taskId: string, agent: AgentName): Promise<RelayTask>
   });
 }
 
-export function startTask(taskId: string, input: { agent?: AgentName; mode?: AgentTaskMode } = {}): Promise<StartTaskResponse> {
+export function startTask(taskId: string, input: { agent?: AgentName; mode?: AgentTaskMode; assignments?: RunInput["assignments"] } = {}): Promise<StartTaskResponse> {
   return apiJson<StartTaskResponse>(`/tasks/${encodeURIComponent(taskId)}/start`, {
     method: "POST",
     body: input,

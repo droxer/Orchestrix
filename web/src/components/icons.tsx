@@ -4,13 +4,13 @@
 
 import {
   ArrowUp,
+  Bot,
   Check,
   CircleAlert,
   CircleCheck,
   CircleStop,
   CalendarClock,
   CalendarDays,
-  Code2,
   Columns3,
   FileText,
   FolderClosed,
@@ -100,12 +100,15 @@ export const ViewBoard = withStandardStroke(Columns3, "ViewBoard");
 export const ViewList = withStandardStroke(Rows3, "ViewList");
 export const ActionKey = withStandardStroke(KeyRound, "ActionKey");
 
-export const ModeAction = withStandardStroke(Code2, "ModeAction");
+// Agent mode (智能体): a bot glyph reads as an autonomous agent doing work,
+// not just "coding" — better matches the renamed mode than the old Code2.
+export const ModeAction = withStandardStroke(Bot, "ModeAction");
 export const ModeReview = withStandardStroke(ScanEye, "ModeReview");
 export const ModeAsk = withStandardStroke(MessageCircleQuestion, "ModeAsk");
 
 // Preferences category glyphs.
 export const PrefAppearance = withStandardStroke(Palette, "PrefAppearance");
+export const PrefAgents = withStandardStroke(Bot, "PrefAgents");
 export const PrefLanguage = withStandardStroke(Languages, "PrefLanguage");
 
 // Stream markers form a deliberate geometric family: circle / triangle /

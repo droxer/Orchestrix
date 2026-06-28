@@ -33,8 +33,10 @@ import {
   failureCount,
   formatClaudeJsonLine,
   formatCodexJsonLine,
+  formatKimiJsonLine,
   formatPiJsonLine,
   getAgent,
+  KimiStreamRenderer,
   agentCredentialEnv,
   guestCodexConfigToml,
   guestAgentEnv,
@@ -186,7 +188,8 @@ describe("review mode", () => {
     ] as Array<[AgentName, string]>) {
       assert.match(command, new RegExp(agent));
       // The ask prompt carries the read-only instruction and never the review marker.
-      assert.match(command, /read-only inspection/);
+      assert.match(command, /read-only planning discussion/);
+      assert.match(command, /respond to them directly/);
       assert.doesNotMatch(command, /RELAY_REVIEW_VERDICT/);
     }
   });
@@ -556,6 +559,67 @@ describe("agent stream rendering", () => {
     }));
 
     assert.match(output, /Pi error: Connection error\./);
+  });
+
+  it("renders Kimi stream-json assistant messages without raw JSON", () => {
+    const renderer = new KimiStreamRenderer();
+    const output = renderer.feed(
+      JSON.stringify({ role: "assistant", content: "Loop engineering is the latest paradigm." }) + "\n",
+    );
+
+    assert.match(output, /● Loop engineering is the latest paradigm\./);
+    assert.doesNotMatch(output, /"role":"assistant"/);
+  });
+
+  it("renders Kimi assistant content arrays and tool_calls", () => {
+    const output = formatKimiJsonLine(JSON.stringify({
+      role: "assistant",
+      content: [{ type: "text", text: "Searching the web." }],
+      tool_calls: [{ id: "call_1", function: { name: "web_search" } }],
+    }));
+
+    assert.match(output, /● Searching the web\./);
+    assert.match(output, /⏺ .*tool.* web_search/);
+    assert.doesNotMatch(output, /"tool_calls"/);
+  });
+
+  it("drops Kimi tool-result and non-assistant messages", () => {
+    const renderer = new KimiStreamRenderer();
+    const output = [
+      { role: "user", content: "最新的 loop engineering 是？" },
+      { role: "tool", tool_call_id: "call_1", content: "raw tool output" },
+    ].map((event) => renderer.feed(`${JSON.stringify(event)}\n`)).join("");
+
+    assert.equal(output, "");
+  });
+
+  it("falls back to sanitized plain text for non-JSON Kimi lines", () => {
+    const renderer = new KimiStreamRenderer();
+    const output = renderer.feed("plain text leak\n");
+
+    assert.match(output, /● plain text leak/);
+  });
+
+  it("surfaces Kimi error events as visible status", () => {
+    const output = formatKimiJsonLine(JSON.stringify({ type: "error", message: "auth required" }));
+
+    assert.match(output, /Kimi error: auth required/);
+  });
+
+  it("filters the Kimi resume-session notice from stderr", () => {
+    const renderer = new StderrLineRenderer();
+    const output = renderer.feed(
+      "To resume this session: kimi -r session_4df5ca77-7d81-4e28-8bdd-65d31e9b5864\n",
+    );
+
+    assert.equal(output, "");
+  });
+
+  it("builds the Kimi action command in stream-json mode", () => {
+    const command = buildKimiActionCommand(state({ task_goal: "Do the thing" }));
+
+    assert.match(command, /--output-format stream-json/);
+    assert.match(command, /--prompt/);
   });
 
   it("filters noisy seccomp stderr warnings", () => {
@@ -1348,13 +1412,12 @@ describe("agent registry", () => {
       },
       () => {
         const command = buildKimiActionCommand(state({ task_goal: "Wire up Kimi" }));
-        assert.match(command, /kimi --model kimi-test --prompt/);
+        assert.match(command, /kimi --model kimi-test --output-format stream-json --prompt/);
         assert.match(command, /Wire up Kimi/);
         assert.ok(command.indexOf("--model kimi-test") < command.indexOf("--prompt"));
         assert.doesNotMatch(command, /--yolo/);
         assert.doesNotMatch(command, /--auto/);
         assert.doesNotMatch(command, /stdbuf/);
-        assert.doesNotMatch(command, /stream-json/);
       },
     );
   });

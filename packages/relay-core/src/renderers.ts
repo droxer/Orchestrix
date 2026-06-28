@@ -150,12 +150,19 @@ export class StderrLineRenderer {
     if (!line) return "";
     if (line.includes("seccomp not available")) return "";
     if (isCodexStdinNotice(line)) return "";
+    if (isKimiResumeNotice(line)) return "";
     return `${status("warn", line)}\n`;
   }
 }
 
 function isCodexStdinNotice(line: string): boolean {
   return /^Reading additional input from stdin(?:\.{1,3}|…)?$/.test(line);
+}
+
+// Kimi prints a "To resume this session: kimi -r <id>" footer to stderr after a
+// non-interactive run; it is an interactive-resume hint, not a warning.
+function isKimiResumeNotice(line: string): boolean {
+  return /resume this session\s*:/i.test(line) || /\bkimi\s+-(?:r|S|-session)\b/.test(line);
 }
 
 export class JsonLineRenderer {
@@ -298,6 +305,60 @@ export class CodexStreamRenderer {
     }
     return "";
   }
+}
+
+/**
+ * Renders Kimi's `--output-format stream-json` stream. Each stdout line is an
+ * OpenAI-chat-style message object (`role` + `content`, with `tool_calls` on
+ * assistant turns; tool results arrive as `role:"tool"` messages). Kimi keeps
+ * thinking content and the "resuming session" notice out of stdout, so we only
+ * surface assistant text and tool invocations and drop everything else. Lines
+ * that fail to parse (e.g. text-mode leakage) fall back to sanitized plain text.
+ */
+export class KimiStreamRenderer {
+  private readonly text = new BlockStreamRenderer(TEXT_MARK, ansi.magenta);
+  private readonly plain = new PlainTextStreamRenderer("Kimi", ansi.magenta);
+  private readonly lines = new JsonLineRenderer((line) => this.formatLine(line));
+
+  feed(chunk: string): string {
+    return this.lines.feed(chunk);
+  }
+
+  private formatLine(line: string): string {
+    const event = parseJsonObject(line);
+    if (!event) return this.plain.feed(`${sanitizeUntrustedText(line)}\n`);
+
+    if (event.type === "error") {
+      return `\n${status("error", `Kimi error: ${String(event.message ?? "unknown error")}`)}\n`;
+    }
+
+    // Accept both the bare message shape ({role,content,...}) and a wrapped
+    // form ({type,message:{...}}) for forward compatibility.
+    const message = asRecord(event.message ?? event);
+    const role = message.role ?? event.role;
+    if (role !== undefined && role !== "assistant") return "";
+
+    const output: string[] = [];
+    const text = textFromContentRecord(message).trim();
+    if (text) {
+      this.text.resetBlock();
+      output.push(`\n${this.text.feed(`${text}\n`)}`);
+    }
+
+    const toolCalls = Array.isArray(message.tool_calls) ? message.tool_calls : [];
+    for (const call of toolCalls) {
+      const record = asRecord(call);
+      const fn = asRecord(record.function);
+      const name = String(fn.name ?? record.name ?? "tool");
+      output.push(toolLine(ansi.magenta, "tool", name));
+    }
+
+    return output.join("");
+  }
+}
+
+export function formatKimiJsonLine(line: string): string {
+  return new KimiStreamRenderer().feed(`${line}\n`);
 }
 
 function textFromContentRecord(record: Record<string, unknown>): string {

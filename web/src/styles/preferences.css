@@ -166,6 +166,95 @@
   color: var(--color-muted);
 }
 
+.pref-empty,
+.pref-group-note {
+  margin: 0 0 var(--space-md);
+  color: var(--color-muted);
+  font: var(--type-caption);
+  line-height: 1.5;
+}
+
+.pref-agent-role-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.pref-agent-role-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-base);
+  padding: var(--space-sm);
+  border: 1px solid var(--color-hairline-soft);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+}
+
+.pref-agent-role-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pref-agent-role-name {
+  font: var(--type-caption-strong-sm);
+  color: var(--color-ink);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.pref-agent-role-sub {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+}
+
+.pref-agent-role-row select {
+  min-width: 9rem;
+  height: 2rem;
+  padding: 0 var(--space-xs);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-xs);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font: var(--type-caption-strong-sm);
+}
+
+.pref-agent-role-row select:focus-visible {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: var(--ring-focus);
+}
+
+.pref-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  margin-top: var(--space-base);
+}
+
+.pref-save {
+  min-height: 2rem;
+  padding: 0 var(--space-base);
+  border-radius: var(--radius-sm);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font: var(--type-caption-strong-sm);
+}
+
+.pref-save:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pref-error {
+  margin: 0;
+  color: var(--color-semantic-down);
+  font-size: var(--text-xs);
+}
+
 /* ── Theme cards ──────────────────────────────────────────────────────────── */
 
 /* Sub-group eyebrow inside the appearance radiogroup. Separates the base

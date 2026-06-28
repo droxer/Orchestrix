@@ -2,15 +2,19 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { updateControlPanelDaemonNodeDisabledAgents } from "../../api";
+import { updateControlPanelDaemonNodeAgentRoleDefaults, updateControlPanelDaemonNodeDisabledAgents } from "../../api";
 import {
+  AGENT_ROLE_VALUES,
+  agentRoleMapsEqual,
   disabledSetsEqual,
   newlyDisabledReadyAgents,
+  normalizeAgentRoleMapPayload,
   normalizeDisabledAgentsPayload,
   shouldSnapshotDisabledAgents,
+  type AgentRoleMap,
 } from "../../lib/manageAgents";
 import { AGENT_NAMES } from "../../types";
-import type { AgentName, ControlPanelDaemonNodeRecord } from "../../types";
+import type { AgentName, AgentRole, ControlPanelDaemonNodeRecord } from "../../types";
 import { useDialogs } from "@/components/ui/DialogProvider";
 import { Drawer } from "./Drawer";
 import { agentStatusTone } from "./helpers";
@@ -27,6 +31,8 @@ export function ManageAgentsDrawer({ open, onClose, node, onUpdated }: ManageAge
   const { confirm } = useDialogs();
   const [initialDisabled, setInitialDisabled] = useState<Set<AgentName>>(() => new Set());
   const [disabled, setDisabled] = useState<Set<AgentName>>(() => new Set());
+  const [initialRoleDefaults, setInitialRoleDefaults] = useState<AgentRoleMap>(() => ({}));
+  const [roleDefaults, setRoleDefaults] = useState<AgentRoleMap>(() => ({}));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,6 +50,9 @@ export function ManageAgentsDrawer({ open, onClose, node, onUpdated }: ManageAge
     const snapshot = new Set((node?.disabledAgents ?? []) as AgentName[]);
     setInitialDisabled(snapshot);
     setDisabled(new Set(snapshot));
+    const roles = normalizeAgentRoleMapPayload(node?.agentRoleDefaults ?? {});
+    setInitialRoleDefaults(roles);
+    setRoleDefaults(roles);
     setError(null);
     setSaving(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -54,6 +63,15 @@ export function ManageAgentsDrawer({ open, onClose, node, onUpdated }: ManageAge
       const next = new Set(prev);
       if (next.has(agent)) next.delete(agent);
       else next.add(agent);
+      return next;
+    });
+  }
+
+  function setRole(agent: AgentName, role: AgentRole | "") {
+    setRoleDefaults((prev) => {
+      const next = { ...prev };
+      if (role) next[agent] = role;
+      else delete next[agent];
       return next;
     });
   }
@@ -77,11 +95,22 @@ export function ManageAgentsDrawer({ open, onClose, node, onUpdated }: ManageAge
     setSaving(true);
     setError(null);
     try {
-      const result = await updateControlPanelDaemonNodeDisabledAgents(
-        node.id,
-        normalizeDisabledAgentsPayload(disabled),
-      );
-      onUpdated(result.node);
+      let updatedNode = node;
+      if (!disabledSetsEqual(disabled, initialDisabled)) {
+        const result = await updateControlPanelDaemonNodeDisabledAgents(
+          node.id,
+          normalizeDisabledAgentsPayload(disabled),
+        );
+        updatedNode = result.node;
+      }
+      if (!agentRoleMapsEqual(roleDefaults, initialRoleDefaults)) {
+        const result = await updateControlPanelDaemonNodeAgentRoleDefaults(
+          node.id,
+          normalizeAgentRoleMapPayload(roleDefaults),
+        );
+        updatedNode = result.node;
+      }
+      onUpdated(updatedNode);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -105,7 +134,7 @@ export function ManageAgentsDrawer({ open, onClose, node, onUpdated }: ManageAge
     );
   }
 
-  const dirty = !disabledSetsEqual(disabled, initialDisabled);
+  const dirty = !disabledSetsEqual(disabled, initialDisabled) || !agentRoleMapsEqual(roleDefaults, initialRoleDefaults);
 
   return (
     <Drawer
@@ -120,8 +149,9 @@ export function ManageAgentsDrawer({ open, onClose, node, onUpdated }: ManageAge
       closeLabel={t("admin.v2.close_drawer")}
       ariaLabel={t("admin.v2.manage_agents_title")}
       layer={1}
+      width={520}
     >
-      <p className="adm-cred-note">{t("admin.v2.manage_agents_help")}</p>
+      <p className="adm-cred-note adm-agent-drawer-note">{t("admin.v2.manage_agents_help")}</p>
       <ul className="adm-agent-toggle-list">
         {AGENT_NAMES.map((agent) => {
           const agentStatus = node.agents[agent] ?? "unknown";
@@ -131,7 +161,10 @@ export function ManageAgentsDrawer({ open, onClose, node, onUpdated }: ManageAge
           const skills = inventory?.skills ?? [];
           const mcpServers = inventory?.mcpServers ?? [];
           return (
-            <li key={agent} className="adm-agent-toggle-item">
+            <li
+              key={agent}
+              className={`adm-agent-toggle-item${isEnabled ? "" : " is-disabled"}`}
+            >
               <div className="adm-agent-toggle-row">
                 <div className="adm-agent-toggle-meta">
                   <span className="adm-agent-toggle-name" translate="no">{agent}</span>
@@ -150,9 +183,26 @@ export function ManageAgentsDrawer({ open, onClose, node, onUpdated }: ManageAge
                         : t("admin.v2.enable_agent", { agent })
                     }
                   />
-                  <span>{isEnabled ? t("admin.v2.agent_enabled") : t("admin.v2.agent_disabled")}</span>
+                  <span className="adm-agent-toggle-track" aria-hidden="true" />
+                  <span className="adm-agent-toggle-label">
+                    {isEnabled ? t("admin.v2.agent_enabled") : t("admin.v2.agent_disabled")}
+                  </span>
                 </label>
               </div>
+              <label className="adm-agent-role-field">
+                <span className="adm-agent-role-field-label">{t("admin.v2.agent_default_role")}</span>
+                <select
+                  value={roleDefaults[agent] ?? ""}
+                  onChange={(event) => setRole(agent, event.target.value as AgentRole | "")}
+                  disabled={saving || !isEnabled}
+                  aria-label={t("admin.v2.agent_default_role_for", { agent })}
+                >
+                  <option value="">{t("admin.v2.agent_role_builtin")}</option>
+                  {AGENT_ROLE_VALUES.map((role) => (
+                    <option key={role} value={role}>{t(`agent_role.${role}`)}</option>
+                  ))}
+                </select>
+              </label>
               <div className="adm-agent-inventory">
                 {skills.length === 0 && mcpServers.length === 0 ? (
                   <span className="adm-agent-inventory-empty">{t("admin.v2.agent_no_inventory")}</span>

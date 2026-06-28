@@ -795,10 +795,18 @@ def test_admin_updates_disabled_agents_for_daemon_node(monkeypatch) -> None:
         assert disable.status_code == 200
         assert disable.json()["node"]["disabledAgents"] == ["codex", "pi"]
 
+        defaults = client.patch(
+            f"/cp/daemon-nodes/{node_id}/agent-role-defaults",
+            json={"agentRoleDefaults": {"codex": "planner", "pi": "tester"}},
+        )
+        assert defaults.status_code == 200
+        assert defaults.json()["node"]["agentRoleDefaults"] == {"codex": "planner", "pi": "tester"}
+
         listing = client.get("/cp/daemon-nodes")
         assert listing.status_code == 200
         match = next(item for item in listing.json()["nodes"] if item["id"] == node_id)
         assert match["disabledAgents"] == ["codex", "pi"]
+        assert match["agentRoleDefaults"] == {"codex": "planner", "pi": "tester"}
 
         invalid_name = client.patch(
             f"/cp/daemon-nodes/{node_id}/disabled-agents",
@@ -812,6 +820,12 @@ def test_admin_updates_disabled_agents_for_daemon_node(monkeypatch) -> None:
         )
         assert invalid_shape.status_code == 400
 
+        invalid_role = client.patch(
+            f"/cp/daemon-nodes/{node_id}/agent-role-defaults",
+            json={"agentRoleDefaults": {"codex": "builder"}},
+        )
+        assert invalid_role.status_code == 400
+
         missing = client.patch(
             "/cp/daemon-nodes/node_missing/disabled-agents",
             json={"disabledAgents": []},
@@ -824,3 +838,52 @@ def test_admin_updates_disabled_agents_for_daemon_node(monkeypatch) -> None:
         )
         assert clear.status_code == 200
         assert "disabledAgents" not in clear.json()["node"]
+        clear_defaults = client.patch(
+            f"/cp/daemon-nodes/{node_id}/agent-role-defaults",
+            json={"agentRoleDefaults": {}},
+        )
+        assert clear_defaults.status_code == 200
+        assert "agentRoleDefaults" not in clear_defaults.json()["node"]
+
+
+def test_employee_updates_agent_role_overrides_for_own_daemon_node(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        admin_client = TestClient(app)
+        alice_client = TestClient(app)
+        bob_client = TestClient(app)
+        anon_client = TestClient(app)
+        _bootstrap_admin(admin_client)
+        _login_admin(admin_client)
+        _create_user(admin_client, "alice", employee_id="alice")
+        _create_user(admin_client, "bob", employee_id="bob")
+        nodes = admin_client.get("/cp/daemon-nodes").json()["nodes"]
+        alice_node = next(node for node in nodes if node.get("employeeId") == "alice")
+
+        _login(alice_client, "alice", "userpass")
+        update = alice_client.patch(
+            f"/daemon-nodes/{alice_node['id']}/agent-role-overrides",
+            json={"agentRoleOverrides": {"codex": "fixer", "claude": "planner"}},
+        )
+        assert update.status_code == 200
+        assert update.json()["node"]["agentRoleOverrides"] == {"claude": "planner", "codex": "fixer"}
+
+        _login(bob_client, "bob", "userpass")
+        forbidden = bob_client.patch(
+            f"/daemon-nodes/{alice_node['id']}/agent-role-overrides",
+            json={"agentRoleOverrides": {"codex": "tester"}},
+        )
+        assert forbidden.status_code == 403
+
+        unauthenticated = anon_client.patch(
+            f"/daemon-nodes/{alice_node['id']}/agent-role-overrides",
+            json={"agentRoleOverrides": {"codex": "tester"}},
+        )
+        assert unauthenticated.status_code == 401
+
+        invalid = alice_client.patch(
+            f"/daemon-nodes/{alice_node['id']}/agent-role-overrides",
+            json={"agentRoleOverrides": {"codex": "builder"}},
+        )
+        assert invalid.status_code == 400

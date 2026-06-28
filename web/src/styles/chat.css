@@ -278,6 +278,37 @@ html[data-theme="contrast"] .chat-header::after {
   gap: var(--space-xs);
 }
 
+/* The mode half of the agent-turn eyebrow (`claude · action`). The agent name
+   stays ink; the mode token drops to muted so the pair reads as one mono label
+   without competing for weight (design-system.md agent-turn). A leading `·`
+   binds it to the name. */
+.msg header .agent-mode {
+  color: var(--color-muted);
+}
+
+.msg header .agent-mode::before {
+  content: "· ";
+}
+
+/* A review turn earns the one hue in the eyebrow — an info-blue status dot and
+   label, mirroring the composer's Review mode chip — so reviews read distinctly
+   from the run of action turns. Status color only; never an action fill
+   (design-system.md: info is status-only, the Review mode chip). */
+.msg header .agent-mode[data-mode="review"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--color-info);
+}
+
+.msg header .agent-mode[data-mode="review"]::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-info);
+}
+
 .msg header .agent-title-mark {
   flex-shrink: 0;
 }
@@ -316,7 +347,7 @@ html[data-theme="contrast"] .chat-header::after {
   border-radius: var(--radius-md);
   background: var(--color-primary);
   color: var(--color-on-primary);
-  font-size: var(--text-md);
+  font-size: var(--text-base);
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;

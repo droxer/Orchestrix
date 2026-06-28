@@ -1,5 +1,6 @@
 import type {
   AgentName,
+  AgentRole,
   AgentTaskMode,
   ControlPanelDaemonNodeRecord,
   DaemonAgentInventory,
@@ -20,6 +21,7 @@ import type {
 
 export type {
   AgentName,
+  AgentRole,
   AgentTaskMode,
   ControlPanelDaemonNodeRecord,
   DaemonAgentInventory,
@@ -225,6 +227,7 @@ export interface RunInput {
   assignments: Array<{
     agent: AgentName;
     mode: AgentTaskMode;
+    role?: AgentRole;
   }>;
   sessionId?: string;
   /** Client-generated id for the follow-up user message, so the optimistic echo

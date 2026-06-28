@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 import type { RelayArtifact } from "relay-core";
-import type { AgentName, RelaySession, Tone } from "../types.js";
+import type { AgentName, AgentTaskMode, RelaySession, Tone } from "../types.js";
 
 export type DerivedMessage =
   | {
@@ -14,6 +14,7 @@ export type DerivedMessage =
       id: string;
       timestamp: string;
       agent: AgentName;
+      mode: AgentTaskMode;
       runId: string;
       streaming: boolean;
       stdout: string;
@@ -60,7 +61,12 @@ export function projectMessages(session: RelaySession | undefined, t: TFunction)
     }
   >();
 
-  const ensureRun = (runId: string, agent: AgentName, timestamp: string): number => {
+  const ensureRun = (
+    runId: string,
+    agent: AgentName,
+    timestamp: string,
+    mode: AgentTaskMode = "action",
+  ): number => {
     const existing = runState.get(runId);
     if (existing) return existing.index;
     const block: DerivedMessage = {
@@ -68,6 +74,7 @@ export function projectMessages(session: RelaySession | undefined, t: TFunction)
       id: `${session.id}:run:${runId}`,
       timestamp,
       agent,
+      mode,
       runId,
       streaming: true,
       stdout: "",
@@ -99,7 +106,13 @@ export function projectMessages(session: RelaySession | undefined, t: TFunction)
         break;
       }
       case "agent.started": {
-        ensureRun(event.runId, event.agent, event.timestamp);
+        const index = ensureRun(event.runId, event.agent, event.timestamp, event.mode);
+        // The run can be created by an out-of-order agent.output first (default
+        // mode); agent.started carries the authoritative mode — reconcile it.
+        const block = out[index];
+        if (block.kind === "agent" && block.mode !== event.mode) {
+          out[index] = { ...block, mode: event.mode };
+        }
         break;
       }
       case "agent.output": {

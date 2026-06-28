@@ -453,7 +453,7 @@ export class SessionController implements AgentEventSink {
     delete next.prior_conversation;
 
     const session = await this.store.getSession(sessionId);
-    const bridge = await computePriorAgentBridge(session, agent, this.store);
+    const bridge = await computePriorAgentBridge(session, this.store);
     if (bridge) next.prior_agent_bridge = bridge;
     const conversation = await computeConversationHistory(session, this.store);
     if (conversation) next.prior_conversation = conversation;
@@ -529,24 +529,15 @@ async function runAssistantText(session: RelaySession, run: RelaySession["agentR
   }
 }
 
-async function computePriorAgentBridge(session: RelaySession, agent: AgentName, store: SessionStore): Promise<string | undefined> {
+async function computePriorAgentBridge(session: RelaySession, store: SessionStore): Promise<string | undefined> {
   const runs = session.agentRuns ?? [];
-  let lastOwnIndex = -1;
-  for (let i = runs.length - 1; i >= 0; i--) {
-    if (runs[i].agent === agent) {
-      lastOwnIndex = i;
-      break;
-    }
-  }
-
   const latestUser = latestUserTurnMarker(session);
-  const intervening = runs
-    .slice(lastOwnIndex + 1)
-    .filter((run) => run.agent !== agent && (!latestUser || markerAfter(runMarker(session, run), latestUser)));
-  if (intervening.length === 0) return undefined;
+  const priorRuns = runs
+    .filter((run) => run.status === "completed" && (!latestUser || markerAfter(runMarker(session, run), latestUser)));
+  if (priorRuns.length === 0) return undefined;
 
   const blocks: string[] = [];
-  for (const run of intervening) {
+  for (const run of priorRuns) {
     blocks.push(`[Previous from @${run.agent}]\n${(await runAssistantText(session, run, store)) ?? "<no output>"}`);
   }
   return blocks.join("\n\n");

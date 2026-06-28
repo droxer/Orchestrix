@@ -768,6 +768,66 @@ test("relay daemon rejects a second distinct run while busy", async () => {
   assert.equal(events.some((event) => event.type === "run.completed" && event.commandId === "cmd_busy_1"), true);
 });
 
+test("relay daemon runs concurrent ask commands within capacity", async () => {
+  const stop = new AbortController();
+  const events: DaemonNodeEvent[] = [];
+  const started = new Set<string>();
+  let commandServed = false;
+  const first = { ...runCommand("cmd_ask_1"), mode: "ask" as const };
+  const second = { ...runCommand("cmd_ask_2"), mode: "ask" as const, runId: "run_2", sessionId: "ses_2" };
+  const daemon = runRelayDaemon({
+    backendUrl: "http://relay.test",
+    sandboxId: "sbx_test",
+    employeeId: "alice",
+    workspacePath: process.cwd(),
+    token: "node_token",
+    pollIntervalMs: 5,
+    shutdownGraceMs: 100,
+    runCapacityByMode: { ask: 2, action: 1, review: 1 },
+    logger: testLogger(),
+    signal: stop.signal,
+    environment: fakeEnvironment({
+      exec: async (_cmd, args, options) => {
+        if (isInventoryProbe(args)) return { exit_code: 0, stdout: "", stderr: "" };
+        const runId = started.size === 0 ? "run_1" : "run_2";
+        started.add(runId);
+        while (started.size < 2) {
+          await new Promise((resolve) => setTimeout(resolve, 1));
+        }
+        options?.sink?.(`${runId} done\n`);
+        return { exit_code: 0, stdout: `${runId} done\n`, stderr: "" };
+      },
+    }),
+    fetchFn: async (url, init) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/daemon-nodes/register") return jsonResponse({ ok: true });
+      if (path.endsWith("/commands")) {
+        if (!commandServed) {
+          commandServed = true;
+          return jsonResponse({ commands: [first, second] });
+        }
+        return jsonResponse({ commands: [] });
+      }
+      if (path.endsWith("/events")) {
+        const event = await jsonBody<DaemonNodeEvent>(init);
+        events.push(event);
+        if (events.filter((item) => item.type === "run.completed").length === 2) stop.abort();
+        return jsonResponse({ ok: true }, 202);
+      }
+      throw new Error(`unexpected URL ${url}`);
+    },
+  });
+
+  await daemon;
+
+  assert.deepEqual(
+    events.filter((event) => event.type === "run.completed").map((event) => event.commandId).sort(),
+    ["cmd_ask_1", "cmd_ask_2"],
+  );
+  assert.equal(events.some((event) => event.type === "run.failed"), false);
+});
+
 test("relay daemon stops while retrying a busy-command rejection event", async () => {
   const stop = new AbortController();
   let closeCount = 0;

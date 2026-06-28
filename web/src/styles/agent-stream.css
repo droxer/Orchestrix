@@ -11,8 +11,10 @@
 .agent-text {
   color: var(--color-ink);
   font-family: var(--font-sans);
-  font-size: var(--text-md);
-  line-height: 1.6;
+  /* body-sm metrics — 14px/1.5 — shared with the user bubble so both voices in
+     the transcript read at the same, denser rhythm. */
+  font-size: var(--text-base);
+  line-height: 1.5;
 }
 
 .agent-prose p {
@@ -65,12 +67,12 @@
   margin-top: 0;
 }
 
-.agent-prose h1 { font-size: calc(var(--text-md) * 1.35); }
-.agent-prose h2 { font-size: calc(var(--text-md) * 1.2); }
-.agent-prose h3 { font-size: calc(var(--text-md) * 1.1); }
+.agent-prose h1 { font-size: calc(var(--text-base) * 1.35); }
+.agent-prose h2 { font-size: calc(var(--text-base) * 1.2); }
+.agent-prose h3 { font-size: calc(var(--text-base) * 1.1); }
 .agent-prose h4,
 .agent-prose h5,
-.agent-prose h6 { font-size: var(--text-md); }
+.agent-prose h6 { font-size: var(--text-base); }
 
 .agent-prose ul,
 .agent-prose ol {

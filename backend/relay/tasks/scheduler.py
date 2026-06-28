@@ -8,6 +8,7 @@ from typing import Any, Callable
 from loguru import logger
 
 from ..core.models import AgentName
+from ..daemon_registry import node_accepts_run
 from ..persistence.stores import valid_agent
 
 
@@ -144,11 +145,16 @@ def ready_node_for_task(registry: Any, task: dict[str, Any], agent: str) -> dict
     for node in registry.list_ready():
         if employee_id and node.get("employeeId") != employee_id:
             continue
-        if node.get("status") != "ready" or not registry.is_live(node["id"]):
+        if node.get("status") in ("stopped", "failed", "provisioning") or not registry.is_live(node["id"]):
             continue
         if agent in set(node.get("disabledAgents") or []):
             continue
-        if node.get("agents", {}).get(agent) == "ready":
+        active_runs = registry.daemon_store.list_active_runs(node["id"])
+        if node.get("agents", {}).get(agent) == "ready" and node_accepts_run(
+            node,
+            assignments=[{"agent": agent, "mode": "action"}],
+            active_runs=active_runs,
+        ):
             return node
     return None
 

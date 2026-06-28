@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NavConversations, NavPreferences } from "./components/icons";
 import {
-  archiveSession, cancelRun, logout, recordDecision, renameSession, runSandbox,
+  archiveSession, cancelRun, logout, recordDecision, renameSession, runSandbox, updateDaemonNodeAgentRoleOverrides,
 } from "./api";
 import { AGENT_NAMES } from "./types";
 import type { AgentName, AgentTaskMode, ControlPanelDaemonNodeRecord, CurrentUser, RelaySession } from "./types";
@@ -29,6 +29,7 @@ import { useSessionEvents } from "./hooks/useSessionEvents";
 import { useLocalDaemonNodes } from "./hooks/useLocalDaemonNodes";
 import { mergeVisibleDaemonNodes } from "./lib/daemonNodes";
 import { routeComposerMessage } from "./lib/messageRouting";
+import { effectiveAgentRoleMap, type AgentRoleMap } from "./lib/manageAgents";
 import { applyTheme, readLanguage, readTheme, readTokens, selectedEmployeeKey, writeLanguage, writeTheme } from "./lib/appStorage";
 import { canUseLocalControlPanel, localControlPanelNodes } from "./lib/controlPanel";
 import { useRelayStore } from "./lib/store";
@@ -103,15 +104,20 @@ export function App() {
     hydrated && user?.role === "admin" && canUseLocalControlPanel(),
   );
   const visibleNodes = useMemo(() => mergeVisibleDaemonNodes(nodes, localNodes), [nodes, localNodes]);
-  const agentDescriptors = useMemo<Record<AgentName, { role: string; blurb: string }>>(() => ({
-    claude: { role: t("agent.claude.role"), blurb: t("agent.claude.blurb") },
-    pi: { role: t("agent.pi.role"), blurb: t("agent.pi.blurb") },
-    codex: { role: t("agent.codex.role"), blurb: t("agent.codex.blurb") },
-    kimi: { role: t("agent.kimi.role"), blurb: t("agent.kimi.blurb") },
-  }), [t]);
-
   const selectedSandbox = useMemo(() => sandboxes.find((s) => s.employeeId === selectedEmployee), [sandboxes, selectedEmployee]);
   const selectedNode = useMemo(() => visibleNodes.find((n) => n.employeeId === selectedEmployee || n.id === selectedSandbox?.id), [visibleNodes, selectedEmployee, selectedSandbox?.id]);
+  const agentRoleLabels = useMemo<Partial<Record<AgentName, string>>>(() => {
+    const roleMap = effectiveAgentRoleMap(selectedNode);
+    return Object.fromEntries(
+      agents.map((agent) => [agent, roleMap[agent] ? t(`agent_role.${roleMap[agent]}`) : t(`agent.${agent}.role`)]),
+    ) as Partial<Record<AgentName, string>>;
+  }, [selectedNode, t]);
+  const agentDescriptors = useMemo<Record<AgentName, { role: string; blurb: string }>>(() => ({
+    claude: { role: agentRoleLabels.claude ?? t("agent.claude.role"), blurb: t("agent.claude.blurb") },
+    pi: { role: agentRoleLabels.pi ?? t("agent.pi.role"), blurb: t("agent.pi.blurb") },
+    codex: { role: agentRoleLabels.codex ?? t("agent.codex.role"), blurb: t("agent.codex.blurb") },
+    kimi: { role: agentRoleLabels.kimi ?? t("agent.kimi.role"), blurb: t("agent.kimi.blurb") },
+  }), [agentRoleLabels, t]);
   // The logged-in user is themselves an employee; their conversations are the
   // sessions they own. The backend already owner-scopes /sessions, so this is
   // just the non-archived sessions sorted most-recent first.
@@ -135,7 +141,7 @@ export function App() {
   useSessionEvents(activeSession?.id, Boolean(user));
 
   const selectedToken = selectedSandbox ? (tokens[selectedSandbox.id] ?? tokens[selectedEmployee]) : tokens[selectedEmployee];
-  const activeRun = selectedNode?.activeRuns[0];
+  const activeRun = activeSession ? selectedNode?.activeRuns.find((run) => run.sessionId === activeSession.id) : undefined;
   const messages = useMemo<DerivedMessage[]>(() => projectMessages(activeSession, t), [activeSession, t]);
   const displayMessages = useMemo<DerivedMessage[]>(() => {
     if (!pendingUserMessage) return messages;
@@ -357,6 +363,12 @@ export function App() {
   const handleComposerSend = useStableEvent(() => { void sendMessage(); });
   const handleCancelRun = useStableEvent(() => { void cancelActiveRun(); });
 
+  async function updateAgentRoleOverrides(overrides: AgentRoleMap) {
+    if (!selectedNode) return;
+    await updateDaemonNodeAgentRoleOverrides(selectedNode.id, overrides, selectedToken);
+    await refresh(undefined, selectedToken);
+  }
+
   async function sendDecision(kind: "approve" | "reject" | "rerun" | "mark_done") {
     if (!activeSession) return;
     if (kind === "rerun") {
@@ -551,6 +563,7 @@ export function App() {
           composerMode={composerMode}
           setComposerMode={setComposerMode}
           activeAgent={activeAgent}
+          agentRoleLabels={agentRoleLabels}
           selectedEmployee={selectedEmployee}
           running={Boolean(activeRun)}
           onAgentPicked={setActiveAgent}
@@ -569,6 +582,8 @@ export function App() {
           onThemeChange: setTheme,
           language,
           onLanguageChange: setLanguage,
+          agentNode: selectedNode,
+          onAgentRoleOverridesChange: updateAgentRoleOverrides,
         }}
       />
     </main>

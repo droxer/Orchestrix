@@ -13,13 +13,12 @@ import {
   buildPiPreflightCommand,
   buildPiReviewCommand,
 } from "./commands.js";
-import { ansi } from "./format.js";
 import { runAsAgent } from "./guest.js";
 import {
   ClaudeStreamRenderer,
   CodexStreamRenderer,
+  KimiStreamRenderer,
   PiStreamRenderer,
-  PlainTextStreamRenderer,
 } from "./renderers.js";
 import type { AgentName, AgentState, AgentTaskMode } from "./state.js";
 
@@ -121,7 +120,7 @@ export const AGENT_REGISTRY: Record<AgentName, AgentDefinition> = {
     buildActionCommand: buildKimiActionCommand,
     buildReviewCommand: buildKimiReviewCommand,
     buildAskCommand: buildKimiAskCommand,
-    createRenderer: () => new PlainTextStreamRenderer("Kimi", ansi.magenta),
+    createRenderer: () => new KimiStreamRenderer(),
     actionLabel: "Kimi",
     reviewLabel: "Kimi Review",
     askLabel: "Kimi Ask",

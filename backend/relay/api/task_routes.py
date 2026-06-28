@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
 
 from ..core.models import AGENT_NAMES
+from ..daemon_registry import node_accepts_run
 from ..persistence.stores import task_priority, task_routine_cadence, task_routine_type, task_status, valid_agent
 from ..sessions import SessionController
 from ..tasks import next_routine_date
@@ -79,16 +80,32 @@ def routine_fields(body: dict[str, Any], *, current: dict[str, Any] | None = Non
     }
 
 
-def ready_node_for_task(ctx: AppContextDep, task: dict[str, Any], agent: str) -> dict[str, Any] | None:
+def ready_node_for_task(
+    ctx: AppContextDep,
+    task: dict[str, Any],
+    agent: str | None = None,
+    mode: str = "action",
+    assignments: list[dict[str, Any]] | None = None,
+) -> dict[str, Any] | None:
+    requested = assignments or ([{"agent": agent, "mode": mode}] if agent else [])
+    if not requested:
+        return None
+    requested_agents = [item["agent"] for item in requested]
     employee_id = task.get("assigneeEmployeeId") or task.get("ownerEmployeeId")
     for node in ctx.registry.list_ready():
         if employee_id and node.get("employeeId") != employee_id:
             continue
-        if node.get("status") != "ready" or not ctx.registry.is_live(node["id"]):
+        if node.get("status") in ("stopped", "failed", "provisioning") or not ctx.registry.is_live(node["id"]):
             continue
-        if agent in set(node.get("disabledAgents") or []):
+        disabled = set(node.get("disabledAgents") or [])
+        if any(item in disabled for item in requested_agents):
             continue
-        if node.get("agents", {}).get(agent) == "ready":
+        active_runs = ctx.registry.daemon_store.list_active_runs(node["id"])
+        if all(node.get("agents", {}).get(item) == "ready" for item in requested_agents) and node_accepts_run(
+            node,
+            assignments=requested,
+            active_runs=active_runs,
+        ):
             return node
     return None
 
@@ -99,24 +116,29 @@ async def start_task_on_ready_node(
     actor: dict[str, Any],
     *,
     mode: str = "action",
+    assignments: list[dict[str, Any]] | None = None,
     record_pending: bool = True,
 ) -> dict[str, Any] | None:
-    agent = valid_agent(task.get("assignedAgent"))
+    run_assignments = assignments or []
+    agent = valid_agent(task.get("assignedAgent")) or (run_assignments[0]["agent"] if run_assignments else None)
     if not agent:
         return None
+    if not run_assignments:
+        run_assignments = [{"agent": agent, "mode": agent_task_mode(mode)}]
     if task.get("isRoutine"):
         return None
-    if task.get("status") in ("running", "review", "waiting_for_human", "done"):
+    if task.get("status") in ("running", "review", "done"):
         return None
-    node = ready_node_for_task(ctx, task, agent)
+    node = ready_node_for_task(ctx, task, agent, mode, run_assignments)
     if not node:
         if record_pending:
-            return {"task": ctx.task_store.record_activity(task["id"], f"No ready node is available for {agent}.", {"agent": agent}), "session": None}
+            label = ", ".join(dict.fromkeys(item["agent"] for item in run_assignments))
+            return {"task": ctx.task_store.record_activity(task["id"], f"No ready node is available for {label}.", {"agent": agent}), "session": None}
         return None
     try:
         run_request = {
             "taskGoal": task_goal_text(task),
-            "assignments": [{"agent": agent, "mode": agent_task_mode(mode)}],
+            "assignments": run_assignments,
             "taskId": task["id"],
             "actorIsAdmin": actor["isAdmin"],
         }
@@ -128,8 +150,9 @@ async def start_task_on_ready_node(
             updated = ctx.task_store.record_activity(task["id"], str(error), {"agent": agent})
             return {"task": updated, "session": None}
         raise
-    updated_task = ctx.task_store.record_activity(task["id"], f"{agent} started the task.", {"agent": agent, "sessionId": session["id"]})
-    logger.info("Task started", task_id=task["id"], session_id=session["id"], agent=agent, node_id=node["id"])
+    message = "Discussion started." if all(item.get("mode") == "ask" for item in run_assignments) and len(run_assignments) > 1 else f"{agent} started the task."
+    updated_task = ctx.task_store.record_activity(task["id"], message, {"agent": agent, "sessionId": session["id"]})
+    logger.info("Task started", task_id=task["id"], session_id=session["id"], agent=agent, assignments=run_assignments, node_id=node["id"])
     return {"task": updated_task, "session": session}
 
 
@@ -297,16 +320,19 @@ async def start_task(task_id: str, request: Request, ctx: AppContextDep) -> dict
     actor = request_actor(request, ctx.auth_store)
     task = get_task_for_actor(ctx.task_store, task_id, actor)
     body = await json_body(request)
+    assignments = assignment_list(body.get("assignments"))
     agent = valid_agent(body.get("agent")) or valid_agent(task.get("assignedAgent"))
+    if not agent and assignments:
+        agent = assignments[0]["agent"]
     if not agent:
         raise HTTPException(400, f"agent must be one of: {', '.join(AGENT_NAMES)}.")
-    if task.get("assignedAgent") != agent:
+    if not assignments and task.get("assignedAgent") != agent:
         task = ctx.task_store.assign_task(task_id, agent)
     mode = agent_task_mode(body.get("mode"))
     if task.get("isRoutine"):
         result = await start_routine_occurrence_on_ready_node(ctx, task, actor, agent=agent, mode=mode)
     else:
-        result = await start_task_on_ready_node(ctx, task, actor, mode=mode)
+        result = await start_task_on_ready_node(ctx, task, actor, mode=mode, assignments=assignments or None)
     if not result or not result.get("session"):
         return {"task": result["task"] if result else task, "session": None}
     return result

@@ -32,9 +32,11 @@ export function actionPrompt(state: AgentState): string {
 // instruction reinforces the intent and covers agents lacking a native flag.
 export function askPrompt(state: AgentState): string {
   const guard = [
-    "Answer the user's question using only read-only inspection of the workspace.",
+    "Participate in a read-only planning discussion about the user's goal or question.",
     "Do NOT modify, create, or delete any files, and do NOT run commands that change state.",
     "If the request would require making changes, explain what you would do instead of doing it.",
+    "When prior agent messages are present, respond to them directly: agree, disagree, identify risks, refine the plan, and call out open questions.",
+    "Prefer a concrete plan or recommendation over independent brainstorming.",
   ].join("\n");
   return `${guard}\n\n${actionPrompt(state)}`;
 }

@@ -6,6 +6,7 @@ import { useFleetMetrics } from "../hooks/useFleetMetrics";
 import { useTranslation } from "react-i18next";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "./PageHeader";
 import { deleteControlPanelDaemonNode, deleteControlPanelEmployee, getAuthStatus, getMe, unassignControlPanelDaemonNode } from "../api";
 import type {
   AssignControlPanelDaemonNodeResponse,
@@ -220,36 +221,33 @@ export function AdminConsole() {
       : view === "people"
         ? t("admin.v2.title_people")
         : t("admin.v2.title_fleet");
-  const viewSub =
-    view === "dashboard"
-      ? t("admin.v2.sub_dashboard")
-      : view === "people"
-        ? t("admin.v2.sub_people")
-        : t("admin.v2.sub_fleet");
-
   return (
     <section className="admin-console adm-shell">
       <NavRail view={view} onChange={setView} />
 
       <div className="adm-main">
-        <header className="adm-header">
-          <div className="adm-header-text">
-            <h1 className="adm-header-title">{viewTitle}</h1>
-            <p className="adm-header-sub">{viewSub}</p>
-          </div>
-          <div className="adm-header-meta">
-            <span className={`adm-live-dot ${headerError ? "offline" : isFetching ? "fetching" : ""}`} aria-hidden="true" />
-            {headerError ? (
-              <span className="adm-header-error">{t("admin.fetch_error", { message: headerError })}</span>
-            ) : lastUpdatedStr ? (
-              <span className="adm-header-time mono">{t("admin.updated_at", { time: lastUpdatedStr })}</span>
-            ) : null}
-            <Button type="button" onClick={() => setOnboardOpen(true)}>
-              <Plus size={16} aria-hidden="true" />
-              <span>{t("admin.v2.onboard_cta")}</span>
-            </Button>
-          </div>
-        </header>
+        <PageHeader
+          title={viewTitle}
+          actions={
+            <>
+              <span className="flex items-center gap-xs text-xs text-muted-foreground">
+                <span
+                  className={`adm-live-dot ${headerError ? "offline" : isFetching ? "fetching" : ""}`}
+                  aria-hidden="true"
+                />
+                {headerError ? (
+                  <span className="text-danger">{t("admin.fetch_error", { message: headerError })}</span>
+                ) : lastUpdatedStr ? (
+                  <span className="mono">{t("admin.updated_at", { time: lastUpdatedStr })}</span>
+                ) : null}
+              </span>
+              <Button type="button" onClick={() => setOnboardOpen(true)}>
+                <Plus size={16} aria-hidden="true" />
+                <span>{t("admin.v2.onboard_cta")}</span>
+              </Button>
+            </>
+          }
+        />
 
         <PulseStrip
           nodes={metrics.total}

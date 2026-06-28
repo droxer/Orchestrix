@@ -21,7 +21,7 @@ export function ModeToggle({ mode, setMode }: {
       title={`${t(`mode.${next}`)} (Shift+Tab)`}
       onClick={() => setMode(next)}
     >
-      <Icon className="mode-chip-icon" size={13} aria-hidden="true" />
+      <Icon className="mode-chip-icon" size={14} aria-hidden="true" />
       <span className="mode-chip-label">{t(`mode.${mode}`)}</span>
       <span className="mode-chip-hint" aria-hidden="true">⇧⇥</span>
     </button>

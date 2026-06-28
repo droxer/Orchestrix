@@ -83,12 +83,44 @@ class LocalDaemonStore:
         }))
         return updated
 
+    def update_node_agent_role_defaults(self, node_id: str, role_defaults: dict[str, str]) -> dict[str, Any]:
+        node = self.get_node(node_id)
+        if not node:
+            raise KeyError(node_id)
+        updated = {**node, "updatedAt": now_iso()}
+        if role_defaults:
+            updated["agentRoleDefaults"] = dict(role_defaults)
+        else:
+            updated.pop("agentRoleDefaults", None)
+        _write_json(self.nodes_dir / f"{safe_name(node_id)}.json", updated, 0o600)
+        self.append_daemon_event(daemon_event("daemon.node.agent_role_defaults_updated", {
+            "nodeId": node_id,
+            "agentRoleDefaults": dict(role_defaults),
+        }))
+        return updated
+
+    def update_node_agent_role_overrides(self, node_id: str, role_overrides: dict[str, str]) -> dict[str, Any]:
+        node = self.get_node(node_id)
+        if not node:
+            raise KeyError(node_id)
+        updated = {**node, "updatedAt": now_iso()}
+        if role_overrides:
+            updated["agentRoleOverrides"] = dict(role_overrides)
+        else:
+            updated.pop("agentRoleOverrides", None)
+        _write_json(self.nodes_dir / f"{safe_name(node_id)}.json", updated, 0o600)
+        self.append_daemon_event(daemon_event("daemon.node.agent_role_overrides_updated", {
+            "nodeId": node_id,
+            "agentRoleOverrides": dict(role_overrides),
+        }))
+        return updated
+
     def unassign_node_employee(self, node_id: str) -> dict[str, Any]:
         node = self.get_node(node_id)
         if not node:
             raise KeyError(node_id)
         previous = node.get("employeeId")
-        updated = {k: v for k, v in node.items() if k != "employeeId"}
+        updated = {k: v for k, v in node.items() if k not in ("employeeId", "agentRoleOverrides")}
         updated["updatedAt"] = now_iso()
         _write_json(self.nodes_dir / f"{safe_name(node_id)}.json", updated, 0o600)
         self.append_daemon_event(daemon_event("daemon.node.unassigned", {"nodeId": node_id, "previousEmployeeId": previous}))
@@ -308,7 +340,11 @@ class DatabaseDaemonStore:
         Column("status", Text, nullable=False),
         Column("agents", JSON, nullable=False),
         Column("agent_details", JSON, nullable=False, default=dict),
+        Column("max_concurrent_runs", Integer, nullable=False, default=1),
+        Column("run_capacity_by_mode", JSON, nullable=False, default=dict),
         Column("disabled_agents", JSON, nullable=False, default=list),
+        Column("agent_role_defaults", JSON, nullable=False, default=dict),
+        Column("agent_role_overrides", JSON, nullable=False, default=dict),
         Column("ui_token_hash", Text, nullable=True),
         Column("node_token_hash", Text, nullable=True),
         Column("node_token", Text, nullable=True),
@@ -461,12 +497,48 @@ class DatabaseDaemonStore:
             }))
         return updated
 
+    def update_node_agent_role_defaults(self, node_id: str, role_defaults: dict[str, str]) -> dict[str, Any]:
+        node = self.get_node(node_id)
+        if not node:
+            raise KeyError(node_id)
+        updated = {**node, "updatedAt": now_iso()}
+        if role_defaults:
+            updated["agentRoleDefaults"] = dict(role_defaults)
+        else:
+            updated.pop("agentRoleDefaults", None)
+        with self.engine.begin() as conn:
+            node_pk = self._node_pk(conn, node_id)
+            conn.execute(update(self.nodes).where(self.nodes.c.id == node_pk).values(**node_to_row(updated, database_id=node_pk)))
+            self._append_daemon_event(conn, daemon_event("daemon.node.agent_role_defaults_updated", {
+                "nodeId": node_id,
+                "agentRoleDefaults": dict(role_defaults),
+            }))
+        return updated
+
+    def update_node_agent_role_overrides(self, node_id: str, role_overrides: dict[str, str]) -> dict[str, Any]:
+        node = self.get_node(node_id)
+        if not node:
+            raise KeyError(node_id)
+        updated = {**node, "updatedAt": now_iso()}
+        if role_overrides:
+            updated["agentRoleOverrides"] = dict(role_overrides)
+        else:
+            updated.pop("agentRoleOverrides", None)
+        with self.engine.begin() as conn:
+            node_pk = self._node_pk(conn, node_id)
+            conn.execute(update(self.nodes).where(self.nodes.c.id == node_pk).values(**node_to_row(updated, database_id=node_pk)))
+            self._append_daemon_event(conn, daemon_event("daemon.node.agent_role_overrides_updated", {
+                "nodeId": node_id,
+                "agentRoleOverrides": dict(role_overrides),
+            }))
+        return updated
+
     def unassign_node_employee(self, node_id: str) -> dict[str, Any]:
         node = self.get_node(node_id)
         if not node:
             raise KeyError(node_id)
         previous = node.get("employeeId")
-        updated = {k: v for k, v in node.items() if k != "employeeId"}
+        updated = {k: v for k, v in node.items() if k not in ("employeeId", "agentRoleOverrides")}
         updated["updatedAt"] = now_iso()
         with self.engine.begin() as conn:
             node_pk = self._node_pk(conn, node_id)
@@ -739,7 +811,11 @@ def node_to_row(node: dict[str, Any], *, database_id: str | None = None) -> dict
         "status": node["status"],
         "agents": node.get("agents") or {},
         "agent_details": node.get("agentDetails") or {},
+        "max_concurrent_runs": int(node.get("maxConcurrentRuns") or 1),
+        "run_capacity_by_mode": node.get("runCapacityByMode") or {},
         "disabled_agents": list(node.get("disabledAgents") or []),
+        "agent_role_defaults": node.get("agentRoleDefaults") or {},
+        "agent_role_overrides": node.get("agentRoleOverrides") or {},
         "ui_token_hash": node.get("uiTokenHash"),
         "node_token_hash": node.get("nodeTokenHash"),
         # Legacy column kept for migrations/backward compatibility. Plaintext
@@ -761,7 +837,11 @@ def row_to_node(row: Any) -> dict[str, Any]:
         "status": row["status"],
         "agents": row["agents"] or {},
         **({"agentDetails": row["agent_details"]} if row.get("agent_details") else {}),
+        "maxConcurrentRuns": int(row.get("max_concurrent_runs") or 1),
+        "runCapacityByMode": row.get("run_capacity_by_mode") or {},
         **({"disabledAgents": list(row["disabled_agents"])} if row.get("disabled_agents") else {}),
+        **({"agentRoleDefaults": dict(row["agent_role_defaults"])} if row.get("agent_role_defaults") else {}),
+        **({"agentRoleOverrides": dict(row["agent_role_overrides"])} if row.get("agent_role_overrides") else {}),
         "token": None,
         **({"tokenHash": row["token_hash"]} if row.get("token_hash") else {}),
         **({"uiTokenHash": row["ui_token_hash"]} if row.get("ui_token_hash") else {}),

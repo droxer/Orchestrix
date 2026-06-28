@@ -251,6 +251,25 @@ async def update_control_panel_daemon_node_disabled_agents(node_id: str, request
     return {"node": public_node}
 
 
+@router.patch("/cp/daemon-nodes/{node_id}/agent-role-defaults")
+async def update_control_panel_daemon_node_agent_role_defaults(node_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
+    require_admin_session(request, ctx.auth_store)
+    body = await json_body(request)
+    raw = body.get("agentRoleDefaults")
+    if not isinstance(raw, dict):
+        raise HTTPException(400, "agentRoleDefaults must be an object keyed by agent name.")
+    if not ctx.registry.get(node_id):
+        raise HTTPException(404, "Daemon node not found.")
+    try:
+        updated = ctx.registry.set_agent_role_defaults(node_id, raw)
+    except KeyError as error:
+        raise HTTPException(404, "Daemon node not found.") from error
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from error
+    public_node = _public_control_panel_node(ctx, updated)
+    return {"node": public_node}
+
+
 @router.delete("/cp/daemon-nodes/{node_id}", status_code=204)
 async def delete_control_panel_daemon_node(node_id: str, request: Request, ctx: AppContextDep) -> Response:
     require_admin_session(request, ctx.auth_store)

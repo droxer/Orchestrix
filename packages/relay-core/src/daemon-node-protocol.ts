@@ -46,6 +46,8 @@ export interface DaemonNodeRegistration {
   supportedAgents: AgentName[];
   agentHealth?: Partial<Record<AgentName, DaemonAgentHealth>>;
   agentInventory?: Partial<Record<AgentName, DaemonAgentInventory>>;
+  maxConcurrentRuns?: number;
+  runCapacityByMode?: Partial<Record<AgentTaskMode, number>>;
   status?: DaemonNodeStatus;
 }
 

@@ -9,8 +9,9 @@ from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
 
 from ..core.models import DaemonNodeRegistration
+from ..daemon_registry import public_sandbox_record
 from .deps import AppContextDep
-from .helpers import actor_can_access_sandbox, bearer_token, daemon_node_event, json_body, request_actor_or_none
+from .helpers import actor_can_access_sandbox, authorized_sandbox_for_token, bearer_token, daemon_node_event, json_body, request_actor_or_none
 
 router = APIRouter()
 
@@ -58,6 +59,35 @@ async def list_daemon_nodes(request: Request, ctx: AppContextDep) -> dict[str, A
     else:
         nodes = ctx.registry.monitor_nodes()
     return {"nodes": nodes}
+
+
+@router.patch("/daemon-nodes/{sandbox_id}/agent-role-overrides")
+async def update_daemon_node_agent_role_overrides(sandbox_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
+    sandbox = ctx.registry.get(sandbox_id)
+    if not sandbox:
+        raise HTTPException(404, "Daemon node not found.")
+    token = bearer_token(request)
+    authorized_sandbox = authorized_sandbox_for_token(ctx.registry, token)
+    actor = None if authorized_sandbox else request_actor_or_none(request, ctx.auth_store)
+    if authorized_sandbox:
+        if authorized_sandbox["id"] != sandbox_id:
+            raise HTTPException(403, "Daemon node access denied.")
+    elif actor:
+        if not actor_can_access_sandbox(actor, sandbox):
+            raise HTTPException(403, "Daemon node access denied.")
+    else:
+        raise HTTPException(401, "Authentication required.")
+    body = await json_body(request)
+    raw = body.get("agentRoleOverrides")
+    if not isinstance(raw, dict):
+        raise HTTPException(400, "agentRoleOverrides must be an object keyed by agent name.")
+    try:
+        updated = ctx.registry.set_agent_role_overrides(sandbox_id, raw)
+    except KeyError as error:
+        raise HTTPException(404, "Daemon node not found.") from error
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from error
+    return {"node": next((node for node in ctx.registry.monitor_nodes() if node["id"] == sandbox_id), public_sandbox_record(updated))}
 
 
 @router.post("/daemon-nodes/register")

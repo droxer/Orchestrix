@@ -7,8 +7,8 @@ import { AgentStateBadge } from "./AgentStateBadge";
 import { PriorityBadge } from "./PriorityBadge";
 import { cn } from "@/lib/utils";
 import { AGENT_NAMES, type AgentName, type CurrentUser, type DaemonNodeMonitorRecord, type RelaySession, type RelayTask, type TaskPriority, type TaskStatus } from "../types";
-import { ActionAddPerson, ActionCalendar, ActionCompose, ActionRemove, ActionSearch, ActionStart, NavRefresh, ViewBoard, ViewList } from "./icons";
-import { agentReadyForTask, dueTone, filterTasks, TASK_PRIORITIES, TASK_STATUSES, tasksByStatus, type BacklogFilters } from "../lib/backlog";
+import { ActionAddPerson, ActionCalendar, ActionCompose, ActionRemove, ActionSearch, ActionStart, ModeAsk, NavRefresh, ViewBoard, ViewList } from "./icons";
+import { agentReadyForTask, discussionAgentsForTask, dueTone, filterTasks, TASK_PRIORITIES, TASK_STATUSES, tasksByStatus, type BacklogFilters } from "../lib/backlog";
 import { PageHeader } from "./PageHeader";
 import { BoardEmpty } from "./BoardEmpty";
 import { useModalDrawer } from "../hooks/useModalDrawer";
@@ -229,9 +229,11 @@ function BacklogTaskCard({
   task,
   session,
   ready,
+  canDiscuss,
   onEdit,
   onAssign,
   onStart,
+  onDiscuss,
   onOpenThread,
   onToggleBlock,
   onDone,
@@ -239,9 +241,11 @@ function BacklogTaskCard({
   task: RelayTask;
   session?: RelaySession;
   ready: boolean;
+  canDiscuss: boolean;
   onEdit: () => void;
   onAssign: (agent: AgentName) => void;
   onStart: () => void;
+  onDiscuss: () => void;
   onOpenThread: () => void;
   onToggleBlock: () => void;
   onDone: () => void;
@@ -296,6 +300,16 @@ function BacklogTaskCard({
             title={t("backlog.start")}
           >
             <ActionStart size={14} />
+          </button>
+          <button
+            type="button"
+            className="backlog-action-icon"
+            onClick={onDiscuss}
+            disabled={!canDiscuss || task.status === "running" || task.status === "done"}
+            aria-label={t("backlog.discuss")}
+            title={t("backlog.discuss")}
+          >
+            <ModeAsk size={14} />
           </button>
         </div>
         {session ? (
@@ -352,9 +366,11 @@ function BacklogTaskRow({
   task,
   session,
   ready,
+  canDiscuss,
   onEdit,
   onAssign,
   onStart,
+  onDiscuss,
   onOpenThread,
   onToggleBlock,
   onDone,
@@ -362,9 +378,11 @@ function BacklogTaskRow({
   task: RelayTask;
   session?: RelaySession;
   ready: boolean;
+  canDiscuss: boolean;
   onEdit: () => void;
   onAssign: (agent: AgentName) => void;
   onStart: () => void;
+  onDiscuss: () => void;
   onOpenThread: () => void;
   onToggleBlock: () => void;
   onDone: () => void;
@@ -413,6 +431,16 @@ function BacklogTaskRow({
             title={t("backlog.start")}
           >
             <ActionStart size={14} />
+          </button>
+          <button
+            type="button"
+            className="backlog-action-icon"
+            onClick={onDiscuss}
+            disabled={!canDiscuss || task.status === "running" || task.status === "done"}
+            aria-label={t("backlog.discuss")}
+            title={t("backlog.discuss")}
+          >
+            <ModeAsk size={14} />
           </button>
         </div>
         {session ? (
@@ -646,10 +674,18 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
   }
 
   function taskHandlers(task: RelayTask, session?: RelaySession) {
+    const discussionAgents = discussionAgentsForTask(task, nodes);
     return {
       onEdit: () => editTask(task),
       onAssign: (agent: AgentName) => void mutate(() => assignTask(task.id, agent)),
       onStart: () => void mutate(() => startTask(task.id)),
+      onDiscuss: () => void mutate(async () => {
+        if (discussionAgents.length === 0) return;
+        const result = await startTask(task.id, {
+          assignments: discussionAgents.map((agent) => ({ agent, mode: "ask" })),
+        });
+        if (result.session) onOpenConversation(result.session.id);
+      }),
       onOpenThread: () => session && onOpenConversation(session.id),
       onToggleBlock: () => void mutate(
         () => updateTask(task.id, { status: task.status === "blocked" ? "backlog" : "blocked" }),
@@ -709,12 +745,14 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
           </div>
           {filteredTasks.map((task) => {
             const session = linkedSession(task);
+            const discussionAgents = discussionAgentsForTask(task, nodes);
             return (
               <BacklogTaskRow
                 key={task.id}
                 task={task}
                 session={session}
                 ready={agentReadyForTask(task, nodes)}
+                canDiscuss={discussionAgents.length > 0}
                 {...taskHandlers(task, session)}
               />
             );
@@ -733,12 +771,14 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
                   <p className="backlog-empty">{t("backlog.empty_lane")}</p>
                 ) : grouped[status].map((task) => {
                   const session = linkedSession(task);
+                  const discussionAgents = discussionAgentsForTask(task, nodes);
                   return (
                     <BacklogTaskCard
                       key={task.id}
                       task={task}
                       session={session}
                       ready={agentReadyForTask(task, nodes)}
+                      canDiscuss={discussionAgents.length > 0}
                       {...taskHandlers(task, session)}
                     />
                   );

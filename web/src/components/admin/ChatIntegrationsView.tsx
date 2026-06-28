@@ -138,19 +138,6 @@ export function ChatIntegrationsView() {
 
   return (
     <div className="adm-view adm-chat">
-      <section className="adm-chat-band">
-        <div className="adm-chat-intro">
-          <span className="adm-eyebrow">{t("admin.v2.chat_eyebrow")}</span>
-          <h2>{t("admin.v2.chat_title")}</h2>
-          <p>{t("admin.v2.chat_sub")}</p>
-        </div>
-        <div className="adm-chat-metrics" aria-label={t("admin.v2.chat_metrics_label")}>
-          <div><strong className="mono">{integrations.length}</strong><span>{t("admin.v2.chat_metric_integrations")}</span></div>
-          <div><strong className="mono">{integrations.filter((item) => item.status === "active").length}</strong><span>{t("admin.v2.chat_metric_active")}</span></div>
-          <div><strong className="mono">{integrations.reduce((sum, item) => sum + item.identityLinkCount, 0)}</strong><span>{t("admin.v2.chat_metric_links")}</span></div>
-        </div>
-      </section>
-
       {error ? <p className="adm-people-error">{t("admin.v2.action_failed", { message: error })}</p> : null}
 
       <div className="adm-chat-grid">

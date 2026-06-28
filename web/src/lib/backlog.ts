@@ -2,6 +2,7 @@ import type { AgentName, DaemonNodeMonitorRecord, RelayTask, TaskPriority, TaskS
 
 export const TASK_STATUSES: TaskStatus[] = ["backlog", "assigned", "running", "waiting_for_human", "review", "blocked", "done"];
 export const TASK_PRIORITIES: TaskPriority[] = ["high", "normal", "low"];
+const DISCUSSION_AGENT_NAMES: AgentName[] = ["claude", "pi", "codex", "kimi"];
 
 export interface BacklogFilters {
   query: string;
@@ -43,11 +44,29 @@ export function agentReadyForTask(task: RelayTask, nodes: DaemonNodeMonitorRecor
   const employeeId = task.assigneeEmployeeId ?? task.ownerEmployeeId;
   return nodes.some((node) =>
     (!employeeId || node.employeeId === employeeId)
-    && node.status === "ready"
+    && node.status !== "stopped"
+    && node.status !== "failed"
+    && node.status !== "provisioning"
     && node.online !== false
+    && node.activeRuns.length === 0
     && !(node.disabledAgents ?? []).includes(task.assignedAgent!)
     && node.agents?.[task.assignedAgent!] === "ready"
   );
+}
+
+export function discussionAgentsForTask(task: RelayTask, nodes: DaemonNodeMonitorRecord[]): AgentName[] {
+  const employeeId = task.assigneeEmployeeId ?? task.ownerEmployeeId;
+  const node = nodes.find((item) =>
+    (!employeeId || item.employeeId === employeeId)
+    && item.status !== "stopped"
+    && item.status !== "failed"
+    && item.status !== "provisioning"
+    && item.online !== false
+    && nodeAcceptsAskRun(item)
+  );
+  if (!node) return [];
+  const disabled = new Set(node.disabledAgents ?? []);
+  return DISCUSSION_AGENT_NAMES.filter((agent) => !disabled.has(agent) && node.agents?.[agent] === "ready");
 }
 
 export function dueTone(task: RelayTask, today = isoToday()): "neutral" | "warn" | "bad" {
@@ -76,4 +95,17 @@ function compareTasks(left: RelayTask, right: RelayTask): number {
 
 function priorityRank(priority: TaskPriority): number {
   return { high: 0, normal: 1, low: 2 }[priority] ?? 1;
+}
+
+function nodeAcceptsAskRun(node: DaemonNodeMonitorRecord): boolean {
+  if (node.activeRuns.some((run) => run.mode !== "ask")) return false;
+  const byMode = node.runCapacityByMode ?? {};
+  const askCapacity = positiveInteger(byMode.ask) ?? 1;
+  const maxConcurrent = positiveInteger(node.maxConcurrentRuns) ?? Math.max(askCapacity, 1);
+  const activeAsk = node.activeRuns.filter((run) => run.mode === "ask").length;
+  return node.activeRuns.length < maxConcurrent && activeAsk < askCapacity;
+}
+
+function positiveInteger(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : undefined;
 }

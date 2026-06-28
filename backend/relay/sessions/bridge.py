@@ -1,8 +1,8 @@
 """Compute the prior-agent bridge string for a multi-agent session.
 
 When a session contains runs from multiple agents, the daemon prompt for the
-next agent gets a short prepended block summarizing each intervening other-agent
-run's last assistant text. See
+next agent gets a short prepended block summarizing completed current-turn
+agent runs' last assistant text. See
 ``docs/superpowers/specs/2026-06-17-shared-agent-thread-design.md``.
 """
 
@@ -118,30 +118,23 @@ def compute_prior_agent_bridge(
 ) -> str | None:
     """Build the bridge string for the next run of ``agent`` on ``session``.
 
-    Walks ``session["agentRuns"]``, finds the index of this agent's last run
-    (``-1`` if none), and for each subsequent run by a different agent
-    reads the rendered transcript artifact and extracts the last assistant
-    text block. Returns the joined bridge string, or ``None`` when no
-    intervening runs produced usable text.
+    Every completed run in the current user turn is shared with the next
+    agent, even when the next run uses the same agent again. This keeps
+    handoffs continuous inside one conversation while older turns remain in
+    ``prior_conversation``.
     """
     runs = session.get("agentRuns") or []
-    last_own_index = -1
-    for i in range(len(runs) - 1, -1, -1):
-        if runs[i].get("agent") == agent:
-            last_own_index = i
-            break
-
     latest_user = latest_user_turn_marker(session)
-    intervening = [
+    prior_runs = [
         r
-        for r in runs[last_own_index + 1:]
-        if r.get("agent") != agent and (not latest_user or run_marker(session, r) > latest_user)
+        for r in runs
+        if r.get("status") in (None, "completed") and (not latest_user or run_marker(session, r) > latest_user)
     ]
-    if not intervening:
+    if not prior_runs:
         return None
 
     blocks: list[str] = []
-    for run in intervening:
+    for run in prior_runs:
         body = agent_log_for_run(session, run, store)
         text = extract_last_assistant_text(body) if body else None
         blocks.append(f"[Previous from @{run.get('agent')}]\n{text or '<no output>'}")

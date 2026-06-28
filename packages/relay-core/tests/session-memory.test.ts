@@ -17,7 +17,7 @@ function tempStore(): LocalSessionStore {
 }
 
 describe("SessionController prompt memory", () => {
-  it("passes same-turn multi-agent output through the bridge", async () => {
+  it("shares same-turn multi-agent output through the full handoff bridge", async () => {
     const store = tempStore();
     const commands: string[] = [];
     const execStream: AgentExecutor = async (_cmd, args) => {
@@ -29,11 +29,15 @@ describe("SessionController prompt memory", () => {
 
     let state = initialAgentState("ship it");
     state = await controller.runStep(session.id, state, { agent: "claude", mode: "action" });
-    await controller.runStep(session.id, state, { agent: "codex", mode: "action" });
+    state = await controller.runStep(session.id, state, { agent: "codex", mode: "action" });
+    await controller.runStep(session.id, state, { agent: "claude", mode: "action" });
 
     assert.doesNotMatch(commands[0], /\[Previous from/);
     assert.match(commands[1], /\[Previous from @claude\]\nimplementation note/);
     assert.doesNotMatch(commands[1], /\[Conversation so far\]/);
+    assert.match(commands[2], /\[Previous from @claude\]\nimplementation note/);
+    assert.match(commands[2], /\[Previous from @codex\]\nimplementation note/);
+    assert.doesNotMatch(commands[2], /\[Conversation so far\]/);
   });
 
   it("passes earlier turns as prior conversation on follow-up runs", async () => {

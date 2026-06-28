@@ -13,7 +13,7 @@
 
 .adm-content-main {
   overflow-y: auto;
-  padding: var(--space-xl) var(--space-xxl);
+  padding: var(--space-xl);
   min-width: 0;
 }
 
@@ -348,7 +348,7 @@
   gap: var(--space-base);
   padding: var(--space-base);
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: var(--color-canvas);
   transition: box-shadow 160ms ease, border-color 160ms ease;
   overflow: hidden;
@@ -499,7 +499,6 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-xxs);
-  flex: 1;
   height: 24px;
   padding: 0 var(--space-xs);
   font: var(--type-micro-strong);
@@ -508,6 +507,12 @@
   border-radius: var(--radius-xs);
   background: var(--color-surface-soft);
   color: var(--color-muted);
+  flex: none;
+}
+
+/* Node cards stretch chips evenly across the agent row. */
+.adm-agents .adm-agent-chip {
+  flex: 1;
 }
 
 /* Dot inherits the chip's tone color, so a failed agent reads red at a
@@ -529,10 +534,15 @@
   text-decoration-thickness: 1px;
 }
 
+.adm-agent-drawer-note {
+  margin-top: 0;
+  margin-bottom: var(--space-base);
+}
+
 .adm-agent-toggle-list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
+  gap: var(--space-sm);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -541,9 +551,19 @@
 .adm-agent-toggle-item {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
-  padding: var(--space-xs) var(--space-sm);
-  border-radius: var(--radius-xs);
+  gap: var(--space-sm);
+  padding: var(--space-base);
+  border: 1px solid var(--color-hairline-soft);
+  border-radius: var(--radius-sm);
+  background: var(--color-canvas);
+  transition:
+    border-color 160ms ease,
+    opacity 160ms ease,
+    background 160ms ease;
+}
+
+.adm-agent-toggle-item.is-disabled {
+  opacity: 0.72;
   background: var(--color-surface-soft);
 }
 
@@ -551,14 +571,56 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-sm);
+  gap: var(--space-base);
+  min-width: 0;
+}
+
+.adm-agent-role-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+}
+
+.adm-agent-role-field-label {
+  font: var(--type-micro-strong);
+  letter-spacing: var(--letter-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.adm-agent-role-field select {
+  width: 100%;
+  height: 2rem;
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-xs);
+  background: var(--color-surface-raised);
+  color: var(--color-ink);
+  font: var(--type-caption-strong-sm);
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    opacity 160ms ease;
+}
+
+.adm-agent-role-field select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.adm-agent-role-field select:focus-visible {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: var(--ring-focus);
 }
 
 .adm-agent-inventory {
   display: flex;
   flex-direction: column;
   gap: var(--space-xxs);
-  padding-left: var(--space-xs);
+  padding-top: var(--space-xxs);
+  border-top: 1px solid var(--color-hairline-soft);
 }
 
 .adm-agent-inventory-empty {
@@ -597,22 +659,86 @@
 .adm-agent-toggle-meta {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  min-width: 0;
 }
 
 .adm-agent-toggle-name {
   font: var(--type-caption-strong-sm);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  color: var(--color-ink);
 }
 
 .adm-agent-toggle-switch {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: var(--space-xxs);
+  gap: var(--space-xs);
+  flex: none;
   font-size: var(--text-xs);
   color: var(--color-muted);
   cursor: pointer;
+  user-select: none;
+}
+
+.adm-agent-toggle-switch input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+}
+
+.adm-agent-toggle-track {
+  position: relative;
+  width: 34px;
+  height: 18px;
+  flex: none;
+  border-radius: var(--radius-full);
+  background: var(--color-hairline);
+  transition: background 180ms var(--ease-emphasized);
+}
+
+.adm-agent-toggle-track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-full);
+  background: var(--color-canvas);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--color-ink) 12%, transparent);
+  transition: transform 180ms var(--ease-emphasized);
+}
+
+.adm-agent-toggle-switch input:checked + .adm-agent-toggle-track {
+  background: var(--color-primary);
+}
+
+.adm-agent-toggle-switch input:checked + .adm-agent-toggle-track::after {
+  transform: translateX(16px);
+}
+
+.adm-agent-toggle-switch input:focus-visible + .adm-agent-toggle-track {
+  box-shadow: var(--ring-focus);
+}
+
+.adm-agent-toggle-switch input:disabled + .adm-agent-toggle-track {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.adm-agent-toggle-label {
+  min-width: 4.5rem;
+  font: var(--type-caption-strong-sm);
+  color: var(--color-body);
+}
+
+.adm-agent-toggle-switch input:not(:checked) ~ .adm-agent-toggle-label {
+  color: var(--color-muted);
 }
 
 .adm-node-card-foot {

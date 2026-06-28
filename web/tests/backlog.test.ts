@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { agentReadyForTask, dueTone, filterTasks, localDateKey, tasksByStatus, type BacklogFilters } from "../src/lib/backlog.js";
+import { agentReadyForTask, discussionAgentsForTask, dueTone, filterTasks, localDateKey, tasksByStatus, type BacklogFilters } from "../src/lib/backlog.js";
 import type { DaemonNodeMonitorRecord, RelayTask } from "../src/types.js";
 
 const baseFilters: BacklogFilters = {
@@ -45,6 +45,8 @@ function node(input: Partial<DaemonNodeMonitorRecord> & { id: string }): DaemonN
     online: input.online ?? true,
     agents: input.agents ?? { claude: "ready", pi: "ready", codex: "ready", kimi: "ready" },
     disabledAgents: input.disabledAgents,
+    maxConcurrentRuns: input.maxConcurrentRuns,
+    runCapacityByMode: input.runCapacityByMode,
     activeRuns: input.activeRuns ?? [],
     queuedCommandCount: input.queuedCommandCount ?? 0,
   } as DaemonNodeMonitorRecord;
@@ -89,6 +91,41 @@ describe("agentReadyForTask", () => {
     assert.equal(agentReadyForTask(backlogTask, [node({ id: "n1", employeeId: "alice" })]), true);
     assert.equal(agentReadyForTask(backlogTask, [node({ id: "n2", employeeId: "bob" })]), false);
     assert.equal(agentReadyForTask(backlogTask, [node({ id: "n3", employeeId: "alice", disabledAgents: ["codex"] })]), false);
+    assert.equal(agentReadyForTask(backlogTask, [node({
+      id: "n4",
+      employeeId: "alice",
+      status: "running",
+      activeRuns: [{ commandId: "cmd_1", sessionId: "ses_1", runId: "run_1", agent: "codex", mode: "ask", taskGoal: "question", startedAt: "2026-06-28T00:00:00.000Z" }],
+    })]), false);
+  });
+});
+
+describe("discussionAgentsForTask", () => {
+  it("returns ready enabled agents from the matching employee node", () => {
+    const backlogTask = task({ id: "a", title: "A", assigneeEmployeeId: "alice" });
+
+    assert.deepEqual(discussionAgentsForTask(backlogTask, [
+      node({ id: "n1", employeeId: "bob" }),
+      node({ id: "n2", employeeId: "alice", agents: { claude: "ready", pi: "failed", codex: "ready", kimi: "unknown" }, disabledAgents: ["codex"] }),
+    ]), ["claude"]);
+  });
+
+  it("requires ask-mode capacity without an exclusive active run", () => {
+    const backlogTask = task({ id: "a", title: "A", assigneeEmployeeId: "alice" });
+    const activeAsk = { commandId: "cmd_1", sessionId: "ses_1", runId: "run_1", agent: "codex" as const, mode: "ask" as const, taskGoal: "question", startedAt: "2026-06-28T00:00:00.000Z" };
+
+    assert.deepEqual(discussionAgentsForTask(backlogTask, [node({
+      id: "n1",
+      employeeId: "alice",
+      maxConcurrentRuns: 2,
+      runCapacityByMode: { ask: 2 },
+      activeRuns: [activeAsk],
+    })]), ["claude", "pi", "codex", "kimi"]);
+    assert.deepEqual(discussionAgentsForTask(backlogTask, [node({
+      id: "n2",
+      employeeId: "alice",
+      activeRuns: [{ ...activeAsk, mode: "action" }],
+    })]), []);
   });
 });
 

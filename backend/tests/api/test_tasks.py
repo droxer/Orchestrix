@@ -172,6 +172,88 @@ def test_task_start_preserves_ask_mode(monkeypatch) -> None:
         assert command["state"]["task_goal"] == "Explain backlog"
 
 
+def test_task_start_discussion_runs_multi_agent_ask_and_keeps_task_open(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _create_user(client, "alice", employee_id="alice")
+        registered = client.post("/daemon-nodes/register", json={
+            "sandboxId": "sbx_alice",
+            "employeeId": "alice",
+            "token": "node_token",
+            "workspacePath": "/workspace/alice",
+            "protocolVersion": 1,
+            "supportedAgents": ["claude", "codex"],
+            "status": "ready",
+        }, headers={"Authorization": "Bearer ui_token"})
+        assert registered.status_code == 200
+        created = client.post("/tasks", json={
+            "title": "Plan onboarding",
+            "description": "Discuss rollout and implementation.",
+            "ownerEmployeeId": "alice",
+            "assigneeEmployeeId": "alice",
+        })
+        assert created.status_code == 201
+
+        started = client.post(f"/tasks/{created.json()['id']}/start", json={
+            "assignments": [
+                {"agent": "claude", "mode": "ask"},
+                {"agent": "codex", "mode": "ask"},
+            ],
+        })
+        assert started.status_code == 202
+        session_id = started.json()["session"]["id"]
+        assert started.json()["task"]["linkedSessionIds"] == [session_id]
+        assert started.json()["task"]["status"] == "running"
+
+        commands = client.get("/daemon-nodes/sbx_alice/commands", headers={"Authorization": "Bearer node_token"})
+        assert commands.status_code == 200
+        [first] = commands.json()["commands"]
+        assert first["agent"] == "claude"
+        assert first["mode"] == "ask"
+        assert first["taskGoal"] == "Plan onboarding\n\nDiscuss rollout and implementation."
+
+        completed_first = client.post("/daemon-nodes/sbx_alice/events", json={
+            "type": "run.completed",
+            "commandId": first["id"],
+            **({"leaseId": first["leaseId"]} if first.get("leaseId") else {}),
+            "sessionId": first["sessionId"],
+            "runId": first["runId"],
+            "agent": "claude",
+            "mode": "ask",
+            "exitCode": 0,
+            "agentLog": "Planner says define milestones.",
+        }, headers={"Authorization": "Bearer node_token"})
+        assert completed_first.status_code == 202
+
+        commands = client.get("/daemon-nodes/sbx_alice/commands", headers={"Authorization": "Bearer node_token"})
+        assert commands.status_code == 200
+        [second] = commands.json()["commands"]
+        assert second["agent"] == "codex"
+        assert second["mode"] == "ask"
+        assert "prior_agent_bridge" in second["state"]
+
+        completed_second = client.post("/daemon-nodes/sbx_alice/events", json={
+            "type": "run.completed",
+            "commandId": second["id"],
+            **({"leaseId": second["leaseId"]} if second.get("leaseId") else {}),
+            "sessionId": second["sessionId"],
+            "runId": second["runId"],
+            "agent": "codex",
+            "mode": "ask",
+            "exitCode": 0,
+            "agentLog": "Engineer says implementation is feasible.",
+        }, headers={"Authorization": "Bearer node_token"})
+        assert completed_second.status_code == 202
+
+        task = client.get(f"/tasks/{created.json()['id']}")
+        assert task.status_code == 200
+        assert task.json()["status"] == "waiting_for_human"
+        assert task.json()["linkedSessionIds"] == [session_id]
+        assert any(item["message"] == "Discussion started." for item in task.json()["activity"])
+
+
 def test_scheduler_dispatches_assigned_backlog_task(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:

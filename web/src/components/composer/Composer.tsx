@@ -23,12 +23,13 @@ const ComposerView = forwardRef<ComposerHandle, {
   composerMode: AgentTaskMode;
   setComposerMode: Dispatch<SetStateAction<AgentTaskMode>>;
   activeAgent: AgentName;
+  agentRoleLabels?: Partial<Record<AgentName, string>>;
   selectedEmployee: string;
   running: boolean;
   onAgentPicked: (agent: AgentName) => void;
   onSend: () => void;
   onCancelRun: () => void;
-}>(function Composer({ agentNames, disabledAgents, composerMode, setComposerMode, activeAgent, selectedEmployee, running, onAgentPicked, onSend, onCancelRun }, ref) {
+}>(function Composer({ agentNames, disabledAgents, composerMode, setComposerMode, activeAgent, agentRoleLabels, selectedEmployee, running, onAgentPicked, onSend, onCancelRun }, ref) {
   const { t } = useTranslation();
   const composer = useComposer({ agentNames, disabledAgents, onAgentPicked });
   const {
@@ -51,7 +52,14 @@ const ComposerView = forwardRef<ComposerHandle, {
   return (
     <form className="composer" onSubmit={(e) => { e.preventDefault(); onSend(); }}>
       <div className="composer-input-wrap">
-        {hasMentionOptions ? <MentionPopover filteredAgents={filteredMentionAgents} mentionIndex={activeMentionIndex} insertMention={insertMention} /> : null}
+        {hasMentionOptions ? (
+          <MentionPopover
+            filteredAgents={filteredMentionAgents}
+            mentionIndex={activeMentionIndex}
+            roleLabels={agentRoleLabels}
+            insertMention={insertMention}
+          />
+        ) : null}
         <div className="composer-input">
           <textarea
             ref={textareaRef}

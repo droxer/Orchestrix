@@ -158,11 +158,13 @@ export {
   ClaudeStreamRenderer,
   CodexStreamRenderer,
   JsonLineRenderer,
+  KimiStreamRenderer,
   PiStreamRenderer,
   PlainTextStreamRenderer,
   StderrLineRenderer,
   formatClaudeJsonLine,
   formatCodexJsonLine,
+  formatKimiJsonLine,
   formatPiJsonLine,
 } from "./renderers.js";
 

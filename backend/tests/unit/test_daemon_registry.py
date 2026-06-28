@@ -7,7 +7,7 @@ from tempfile import TemporaryDirectory
 
 import pytest
 
-from relay.daemon_registry import DaemonNodeRegistry, ServerDaemonNodeBackend, sandbox_ui_token_matches
+from relay.daemon_registry import DaemonNodeRegistry, ServerDaemonNodeBackend, effective_role_for_assignment, sandbox_ui_token_matches
 from relay.persistence.stores import DatabaseDaemonStore, LocalDaemonStore, LocalSessionStore
 
 
@@ -91,6 +91,77 @@ def test_daemon_registration_poll_and_completion_updates_session() -> None:
             assert session["status"] == "completed"
             assert "reviewVerdict" not in session
             assert registry.monitor_nodes()[0]["queuedCommandCount"] == 0
+
+    asyncio.run(run_flow())
+
+
+def test_daemon_capacity_allows_concurrent_ask_runs_only() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store = LocalSessionStore(root)
+            daemon_store = LocalDaemonStore(root)
+            registry = DaemonNodeRegistry(session_store, daemon_store)
+            backend = ServerDaemonNodeBackend(registry)
+            registry.register({
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "maxConcurrentRuns": 2,
+                "runCapacityByMode": {"ask": 2, "review": 1, "action": 1},
+                "status": "ready",
+            }, "ui_token")
+
+            first = await backend.run("sbx_alice", {
+                "taskGoal": "explain auth",
+                "assignments": [{"agent": "codex", "mode": "ask"}],
+            })
+            second = await backend.run("sbx_alice", {
+                "taskGoal": "explain billing",
+                "assignments": [{"agent": "codex", "mode": "ask"}],
+            })
+            assert first["id"] != second["id"]
+            commands = registry.take_commands("sbx_alice", "node_token")
+            assert [command["mode"] for command in commands] == ["ask", "ask"]
+            assert len(registry.monitor_nodes()[0]["activeRuns"]) == 2
+
+            with pytest.raises(ValueError, match="no available execution slot"):
+                await backend.run("sbx_alice", {
+                    "taskGoal": "edit files",
+                    "assignments": [{"agent": "codex", "mode": "action"}],
+                })
+
+    asyncio.run(run_flow())
+
+
+def test_legacy_daemon_capacity_remains_single_slot() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store = LocalSessionStore(root)
+            daemon_store = LocalDaemonStore(root)
+            registry = DaemonNodeRegistry(session_store, daemon_store)
+            backend = ServerDaemonNodeBackend(registry)
+            registry.register({
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }, "ui_token")
+
+            await backend.run("sbx_alice", {
+                "taskGoal": "explain auth",
+                "assignments": [{"agent": "codex", "mode": "ask"}],
+            })
+            with pytest.raises(ValueError, match="no available execution slot"):
+                await backend.run("sbx_alice", {
+                    "taskGoal": "explain billing",
+                    "assignments": [{"agent": "codex", "mode": "ask"}],
+                })
 
     asyncio.run(run_flow())
 
@@ -285,7 +356,7 @@ def test_daemon_follow_up_run_gets_prior_conversation_state() -> None:
     asyncio.run(run_flow())
 
 
-def test_daemon_multi_agent_same_turn_uses_bridge_without_conversation_duplication() -> None:
+def test_daemon_multi_agent_same_turn_shares_full_handoff_context() -> None:
     async def run_flow() -> None:
         with TemporaryDirectory() as root:
             session_store = LocalSessionStore(root)
@@ -307,6 +378,7 @@ def test_daemon_multi_agent_same_turn_uses_bridge_without_conversation_duplicati
                 "assignments": [
                     {"agent": "claude", "mode": "action"},
                     {"agent": "codex", "mode": "action"},
+                    {"agent": "claude", "mode": "action"},
                 ],
             })
             [first_command] = registry.take_commands("sbx_alice", "node_token")
@@ -325,6 +397,24 @@ def test_daemon_multi_agent_same_turn_uses_bridge_without_conversation_duplicati
             state = second_command["state"]
             assert "prior_conversation" not in state
             assert state["prior_agent_bridge"] == "[Previous from @claude]\nimplementation note"
+            registry.handle_event("sbx_alice", {
+                "type": "run.completed",
+                "commandId": second_command["id"],
+                "sessionId": second_command["sessionId"],
+                "runId": second_command["runId"],
+                "agent": "codex",
+                "mode": "action",
+                "exitCode": 0,
+                "agentLog": "● review note",
+            }, "node_token")
+            [third_command] = registry.take_commands("sbx_alice", "node_token")
+
+            state = third_command["state"]
+            assert "prior_conversation" not in state
+            assert state["prior_agent_bridge"] == (
+                "[Previous from @claude]\nimplementation note\n\n"
+                "[Previous from @codex]\nreview note"
+            )
 
     asyncio.run(run_flow())
 
@@ -670,6 +760,28 @@ def test_daemon_store_reclaims_expired_command_leases(store_factory) -> None:
         assert second["leaseId"] != first["leaseId"]
 
 
+@pytest.mark.parametrize("store_factory", [LocalDaemonStore, lambda root: DatabaseDaemonStore(f"sqlite:///{root}/daemon.db", create_schema=True)])
+def test_daemon_store_persists_agent_role_maps(store_factory) -> None:
+    with TemporaryDirectory() as root:
+        store = store_factory(root)
+        store.register_node({
+            "id": "sbx_alice",
+            "employeeId": "alice",
+            "workspacePath": "/workspace/alice",
+            "status": "ready",
+            "agents": {"codex": "ready"},
+            "token": None,
+            "createdAt": "2026-06-13T00:00:00.000Z",
+            "updatedAt": "2026-06-13T00:00:00.000Z",
+        })
+
+        store.update_node_agent_role_defaults("sbx_alice", {"codex": "planner"})
+        store.update_node_agent_role_overrides("sbx_alice", {"codex": "fixer"})
+
+        assert store.get_node("sbx_alice")["agentRoleDefaults"] == {"codex": "planner"}
+        assert store.get_node("sbx_alice")["agentRoleOverrides"] == {"codex": "fixer"}
+
+
 def test_daemon_run_rejects_ownerless_sessions() -> None:
     async def run_flow() -> None:
         with TemporaryDirectory() as root:
@@ -732,7 +844,7 @@ def test_daemon_run_dispatch_rejects_concurrent_second_claim() -> None:
             results = list(pool.map(lambda _: run_once(), range(2)))
 
         assert results.count("started") == 1
-        assert any("not ready" in result for result in results)
+        assert any("no available execution slot" in result for result in results)
 
 
 def test_set_disabled_agents_blocks_dispatch_and_survives_restart() -> None:
@@ -754,6 +866,10 @@ def test_set_disabled_agents_blocks_dispatch_and_survives_restart() -> None:
 
             registry.set_disabled_agents("sbx_alice", ["codex"])
             assert registry.get("sbx_alice")["disabledAgents"] == ["codex"]
+            registry.set_agent_role_defaults("sbx_alice", {"claude": "planner", "codex": "fixer"})
+            registry.set_agent_role_overrides("sbx_alice", {"claude": "tester"})
+            assert registry.get("sbx_alice")["agentRoleDefaults"] == {"claude": "planner", "codex": "fixer"}
+            assert registry.get("sbx_alice")["agentRoleOverrides"] == {"claude": "tester"}
 
             with pytest.raises(ValueError, match="disabled agent\\(s\\): codex"):
                 await backend.run("sbx_alice", {
@@ -769,12 +885,64 @@ def test_set_disabled_agents_blocks_dispatch_and_survives_restart() -> None:
 
             registry2 = DaemonNodeRegistry(LocalSessionStore(root), LocalDaemonStore(root))
             assert registry2.get("sbx_alice")["disabledAgents"] == ["codex"]
+            assert registry2.get("sbx_alice")["agentRoleDefaults"] == {"claude": "planner", "codex": "fixer"}
+            assert registry2.get("sbx_alice")["agentRoleOverrides"] == {"claude": "tester"}
 
             registry.set_disabled_agents("sbx_alice", [])
             assert "disabledAgents" not in registry.get("sbx_alice")
+            registry.set_agent_role_defaults("sbx_alice", {})
+            registry.set_agent_role_overrides("sbx_alice", {})
+            assert "agentRoleDefaults" not in registry.get("sbx_alice")
+            assert "agentRoleOverrides" not in registry.get("sbx_alice")
 
             with pytest.raises(ValueError, match="Unknown agent"):
                 registry.set_disabled_agents("sbx_alice", ["bogus"])
+            with pytest.raises(ValueError, match="Unknown agent"):
+                registry.set_agent_role_defaults("sbx_alice", {"bogus": "planner"})
+            with pytest.raises(ValueError, match="Unknown agent role"):
+                registry.set_agent_role_overrides("sbx_alice", {"claude": "bogus"})
+
+    asyncio.run(run_flow())
+
+
+def test_effective_agent_roles_use_overrides_defaults_and_review_fallback() -> None:
+    node = {
+        "agentRoleDefaults": {"codex": "planner", "claude": "fixer"},
+        "agentRoleOverrides": {"codex": "tester"},
+    }
+    assert effective_role_for_assignment(node, {"agent": "codex"}, "action") == "tester"
+    assert effective_role_for_assignment(node, {"agent": "claude"}, "action") == "fixer"
+    assert effective_role_for_assignment(node, {"agent": "codex", "role": "reviewer"}, "action") == "reviewer"
+    assert effective_role_for_assignment(node, {"agent": "codex"}, "review") == "reviewer"
+    assert effective_role_for_assignment({}, {"agent": "pi"}, "action") == "tester"
+
+
+def test_daemon_run_records_effective_agent_role_override() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store = LocalSessionStore(root)
+            daemon_store = LocalDaemonStore(root)
+            registry = DaemonNodeRegistry(session_store, daemon_store)
+            backend = ServerDaemonNodeBackend(registry)
+            registry.register({
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }, "ui_token")
+            registry.set_agent_role_defaults("sbx_alice", {"codex": "planner"})
+            registry.set_agent_role_overrides("sbx_alice", {"codex": "fixer"})
+
+            session = await backend.run("sbx_alice", {
+                "taskGoal": "implement auth",
+                "assignments": [{"agent": "codex", "mode": "action"}],
+            })
+
+            stored = session_store.get_session(session["id"])
+            assert stored["agentRuns"][0]["role"] == "fixer"
 
     asyncio.run(run_flow())
 

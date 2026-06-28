@@ -126,6 +126,7 @@
     "actions_dispatch": "派發",
     "actions_state": "變更狀態",
     "start": "開始",
+    "discuss": "討論",
     "open_thread": "開啟對話",
     "block": "阻塞",
     "reopen": "重開",
@@ -495,6 +496,9 @@
       "agent_disabled": "已停用",
       "enable_agent": "在此節點啟用 {{agent}}",
       "disable_agent": "在此節點停用 {{agent}}",
+      "agent_default_role": "預設角色",
+      "agent_default_role_for": "{{agent}} 的預設角色",
+      "agent_role_builtin": "內建",
       "save": "儲存",
       "saving": "儲存中…",
       "agent_skills": "技能（{{count}}）",
@@ -581,6 +585,18 @@
     "close": "關閉偏好設定",
     "appearance": "外觀",
     "language": "語言",
+    "agents": "代理",
+    "save": "儲存",
+    "saving": "儲存中…",
+    "action_failed": "操作失敗：{{message}}",
+    "agent_roles": {
+      "help": "覆寫 Relay 在代理以行動模式執行時記錄的角色。",
+      "no_node": "尚無可用於代理偏好的已指派守護節點。",
+      "system_default": "系統預設：{{role}}",
+      "override_for": "{{agent}} 的角色覆寫",
+      "use_system_default": "系統預設",
+      "builtin": "內建"
+    },
     "theme": {
       "group": "主題",
       "contrast_group": "高對比",
@@ -595,6 +611,13 @@
       "contrast-dark": "高對比深色",
       "contrast-dark_sub": "深色 · 強邊框與文字"
     }
+  },
+  "agent_role": {
+    "planner": "規劃者",
+    "implementer": "建置者",
+    "reviewer": "審查者",
+    "tester": "測試者",
+    "fixer": "修復者"
   },
   "transcript": {
     "new_session": "新工作區工作階段",
@@ -650,8 +673,8 @@
     "unknown": "未知"
   },
   "mode": {
-    "action": "代理",
-    "ask": "詢問",
+    "action": "智能體",
+    "ask": "問答",
     "review": "審查"
   },
   "artifact": {

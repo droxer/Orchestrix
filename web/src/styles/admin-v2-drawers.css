@@ -60,7 +60,7 @@
 .adm-empty-title {
   margin: 0;
   font-size: var(--text-2xl);
-  font-weight: 400;
+  font-weight: 500;
   letter-spacing: var(--letter-display);
   color: var(--color-ink);
   line-height: 1.1;
@@ -145,7 +145,7 @@ html[data-theme="light"] .adm-drawer.dark {
   margin: 0;
   font-family: var(--font-sans);
   font-size: var(--text-2xl);
-  font-weight: 400;
+  font-weight: 500;
   letter-spacing: var(--letter-display);
   line-height: 1.1;
   color: var(--color-ink);
@@ -731,7 +731,7 @@ html[data-theme="light"] .adm-drawer.dark {
   margin: 0;
   font-family: var(--font-sans);
   font-size: var(--text-3xl);
-  font-weight: 400;
+  font-weight: 500;
   letter-spacing: var(--letter-display);
   line-height: 1.1;
   color: var(--color-ink);
@@ -787,13 +787,6 @@ html[data-theme="light"] .adm-drawer.dark {
   .adm-nav-foot { margin-top: 0; margin-left: auto; }
   .adm-nav-user { border-top: none; padding-top: 0; }
 
-  .adm-header {
-    padding: var(--space-base) var(--space-base) var(--space-base);
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-xs);
-  }
-  .adm-header-title { font-size: var(--text-2xl); }
   .adm-pulse { padding: var(--space-base); grid-template-columns: repeat(2, 1fr); }
   .adm-content-main { padding: var(--space-base); }
   .adm-emp-row { grid-template-columns: 1fr; gap: var(--space-xs); }

@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { claudeTaskPrompt, piTaskPrompt, kimiTaskPrompt, codexActionPrompt, prependPriorAgentBridge } from "../src/prompts.js";
+import { askPrompt, claudeTaskPrompt, piTaskPrompt, kimiTaskPrompt, codexActionPrompt, prependPriorAgentBridge } from "../src/prompts.js";
 import { initialAgentState } from "../src/state.js";
 
 describe("prior agent bridge in prompts", () => {
@@ -44,5 +44,17 @@ describe("prior agent bridge in prompts", () => {
       out,
       "[Conversation so far]\n\n[User]\nfirst thing\n\n[Previous from @codex]\nreview note\n\n[User]\nnext thing",
     );
+  });
+
+  it("uses prior agent messages as discussion context in ask mode", () => {
+    const state = {
+      ...initialAgentState("design the rollout"),
+      prior_agent_bridge: "[Previous from @claude]\nStart with a read-only audit.",
+    };
+    const out = askPrompt(state);
+    assert.match(out, /planning discussion/);
+    assert.match(out, /respond to them directly/);
+    assert.match(out, /\[Previous from @claude\]\nStart with a read-only audit/);
+    assert.match(out, /\[User\]\ndesign the rollout/);
   });
 });

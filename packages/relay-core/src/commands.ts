@@ -144,7 +144,9 @@ function buildKimiCommand(prompt: string): string {
   const argv = ["kimi"];
   const model = kimiModel();
   if (model) argv.push("--model", model);
-  argv.push("--prompt", prompt);
+  // stream-json emits one JSON message object per stdout line (parsed by
+  // KimiStreamRenderer) and keeps thinking + the resume notice off stdout.
+  argv.push("--output-format", "stream-json", "--prompt", prompt);
   return runAsAgent(shellCommand(argv), "kimi");
 }
 

@@ -18,6 +18,7 @@ RunStatus = Literal["running", "completed", "failed", "cancelled"]
 CommandStatus = Literal["queued", "dispatched", "completed", "failed", "cancelled"]
 
 AGENT_NAMES: tuple[str, ...] = ("claude", "pi", "codex", "kimi")
+AGENT_ROLES: tuple[str, ...] = ("implementer", "reviewer", "planner", "tester", "fixer")
 DAEMON_NODE_PROTOCOL_VERSION = 1
 DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS = (1,)
 
@@ -61,6 +62,8 @@ class DaemonNodeRegistration(RelayModel):
     protocol_version: int
     supported_agents: list[AgentName] = []
     agent_health: dict[str, dict[str, Any]] | None = None
+    max_concurrent_runs: int | None = None
+    run_capacity_by_mode: dict[AgentTaskMode, int] | None = None
     status: Literal["ready", "busy", "stopped"] = "ready"
 
 

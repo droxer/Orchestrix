@@ -124,6 +124,7 @@
     "actions_dispatch": "Dispatch",
     "actions_state": "Change state",
     "start": "Start",
+    "discuss": "Discuss",
     "open_thread": "Open thread",
     "block": "Block",
     "reopen": "Reopen",
@@ -493,6 +494,9 @@
       "agent_disabled": "Disabled",
       "enable_agent": "Enable {{agent}} on this node",
       "disable_agent": "Disable {{agent}} on this node",
+      "agent_default_role": "Default role",
+      "agent_default_role_for": "Default role for {{agent}}",
+      "agent_role_builtin": "Built-in",
       "save": "Save",
       "saving": "Saving…",
       "agent_skills": "Skills ({{count}})",
@@ -579,6 +583,18 @@
     "close": "Close preferences",
     "appearance": "Appearance",
     "language": "Language",
+    "agents": "Agents",
+    "save": "Save",
+    "saving": "Saving…",
+    "action_failed": "Action failed: {{message}}",
+    "agent_roles": {
+      "help": "Override the role Relay records when your agents run in action mode.",
+      "no_node": "No assigned daemon node is available for agent preferences.",
+      "system_default": "System default: {{role}}",
+      "override_for": "Role override for {{agent}}",
+      "use_system_default": "System default",
+      "builtin": "Built-in"
+    },
     "theme": {
       "group": "Theme",
       "contrast_group": "High contrast",
@@ -593,6 +609,13 @@
       "contrast-dark": "High contrast dark",
       "contrast-dark_sub": "Dark · strong borders & text"
     }
+  },
+  "agent_role": {
+    "planner": "Planner",
+    "implementer": "Builder",
+    "reviewer": "Reviewer",
+    "tester": "Tester",
+    "fixer": "Fixer"
   },
   "transcript": {
     "new_session": "New workspace session",

@@ -44,12 +44,12 @@ def _session(
 
 
 def test_compute_prior_agent_bridge_returns_none_when_no_intervening_runs() -> None:
-    session = _session([{"agent": "claude", "artifactIds": ["a1"]}], [{"id": "a1", "kind": "command_log"}])
+    session = _session([], [])
     store = _FakeStore({"a1": "● anything\nbody"})
     assert compute_prior_agent_bridge(session, "claude", store) is None
 
 
-def test_compute_prior_agent_bridge_builds_single_intervening_block() -> None:
+def test_compute_prior_agent_bridge_shares_all_current_turn_blocks() -> None:
     session = _session(
         [
             {"agent": "claude", "artifactIds": [], "agentLog": "● claude work"},
@@ -59,7 +59,7 @@ def test_compute_prior_agent_bridge_builds_single_intervening_block() -> None:
     )
     store = _FakeStore({})
     out = compute_prior_agent_bridge(session, "claude", store)
-    assert out == "[Previous from @codex]\nreview note\ndetail"
+    assert out == "[Previous from @claude]\nclaude work\n\n[Previous from @codex]\nreview note\ndetail"
 
 
 def test_compute_prior_agent_bridge_uses_no_output_when_artifact_missing() -> None:
@@ -72,10 +72,10 @@ def test_compute_prior_agent_bridge_uses_no_output_when_artifact_missing() -> No
     )
     store = _FakeStore({"a1": "● claude work"})
     out = compute_prior_agent_bridge(session, "claude", store)
-    assert out == "[Previous from @codex]\n<no output>"
+    assert out == "[Previous from @claude]\nclaude work\n\n[Previous from @codex]\n<no output>"
 
 
-def test_compute_prior_agent_bridge_skips_runs_before_last_own_run() -> None:
+def test_compute_prior_agent_bridge_keeps_own_earlier_run_for_handoff_continuity() -> None:
     session = _session(
         [
             {"agent": "codex", "artifactIds": ["old"]},
@@ -90,7 +90,8 @@ def test_compute_prior_agent_bridge_skips_runs_before_last_own_run() -> None:
     )
     store = _FakeStore({"old": "● old work", "mine": "● my work", "recent": "● recent work"})
     out = compute_prior_agent_bridge(session, "claude", store)
-    assert "old work" not in out
+    assert "[Previous from @codex]\nold work" in out
+    assert "[Previous from @claude]\nmy work" in out
     assert "[Previous from @codex]\nrecent work" in out
 
 

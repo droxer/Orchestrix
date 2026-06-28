@@ -14,7 +14,7 @@ from loguru import logger
 
 from ..core.environment import load_backend_env
 from ..core.ids import new_relay_id, new_sandbox_id, now_iso
-from ..core.models import AGENT_NAMES, DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS
+from ..core.models import AGENT_NAMES, AGENT_ROLES, DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS
 from ..persistence.stores import LocalDaemonStore, LocalSessionStore, LocalTaskStore, role_for_agent
 from ..sessions import compute_prior_agent_bridge
 from ..sessions import compute_conversation_history
@@ -25,6 +25,7 @@ load_backend_env()
 DAEMON_NODE_LIVENESS_TIMEOUT_MS = int(os.environ.get("RELAY_DAEMON_NODE_LIVENESS_TIMEOUT_MS", "15000"))
 DAEMON_RUN_TIMEOUT_MS = int(os.environ.get("RELAY_DAEMON_RUN_TIMEOUT_MS", str(15 * 60 * 1000)))
 DAEMON_COMMAND_LEASE_SECONDS = float(os.environ.get("RELAY_DAEMON_COMMAND_LEASE_SECONDS", "60"))
+AGENT_TASK_MODES = ("action", "review", "ask")
 
 
 def hash_daemon_node_token(token: str | None) -> str | None:
@@ -81,6 +82,68 @@ def provisioned_sandbox_record(sandbox: dict[str, Any]) -> dict[str, Any]:
     if sandbox.get("token"):
         public["token"] = sandbox["token"]
     return public
+
+
+def normalize_agent_role_map(value: Any) -> dict[str, str]:
+    if not isinstance(value, dict):
+        raise ValueError("agent role map must be an object keyed by agent name.")
+    invalid_agents = [name for name in value if name not in AGENT_NAMES]
+    if invalid_agents:
+        raise ValueError(f"Unknown agent name(s): {', '.join(invalid_agents)}.")
+    invalid_roles = [role for role in value.values() if role not in AGENT_ROLES]
+    if invalid_roles:
+        raise ValueError(f"Unknown agent role(s): {', '.join(str(role) for role in invalid_roles)}.")
+    return {agent: value[agent] for agent in AGENT_NAMES if agent in value}
+
+
+def effective_role_for_assignment(node: dict[str, Any], assignment: dict[str, Any], mode: str) -> str:
+    explicit_role = assignment.get("role")
+    if explicit_role in AGENT_ROLES:
+        return explicit_role
+    agent = assignment["agent"]
+    if mode == "review":
+        return role_for_agent(agent, mode)
+    overrides = node.get("agentRoleOverrides") if isinstance(node.get("agentRoleOverrides"), dict) else {}
+    defaults = node.get("agentRoleDefaults") if isinstance(node.get("agentRoleDefaults"), dict) else {}
+    return overrides.get(agent) or defaults.get(agent) or role_for_agent(agent, mode)
+
+
+def normalize_run_capacity(input: dict[str, Any]) -> tuple[int, dict[str, int]]:
+    raw_by_mode = input.get("runCapacityByMode") if isinstance(input.get("runCapacityByMode"), dict) else {}
+    by_mode: dict[str, int] = {}
+    for mode in AGENT_TASK_MODES:
+        raw = raw_by_mode.get(mode)
+        by_mode[mode] = raw if isinstance(raw, int) and raw > 0 else 1
+    raw_max = input.get("maxConcurrentRuns")
+    max_concurrent = raw_max if isinstance(raw_max, int) and raw_max > 0 else max(by_mode.values())
+    return max(1, max_concurrent), by_mode
+
+
+def node_accepts_run(
+    node: dict[str, Any],
+    *,
+    assignments: list[dict[str, Any]],
+    active_runs: list[dict[str, Any]],
+    session_id: str | None = None,
+) -> bool:
+    if session_id and any(run.get("sessionId") == session_id for run in active_runs):
+        return False
+    requested_modes = [assignment.get("mode") or "action" for assignment in assignments]
+    exclusive_request = any(mode != "ask" for mode in requested_modes)
+    active_exclusive = any(run.get("mode") != "ask" for run in active_runs)
+    if exclusive_request:
+        return len(active_runs) == 0
+    if active_exclusive:
+        return False
+    max_concurrent, by_mode = normalize_run_capacity(node)
+    active_ask = sum(1 for run in active_runs if run.get("mode") == "ask")
+    return len(active_runs) < max_concurrent and active_ask < by_mode.get("ask", 1)
+
+
+def node_status_for_active_runs(node: dict[str, Any], active_runs: list[dict[str, Any]]) -> str:
+    if node.get("status") in ("stopped", "failed", "provisioning"):
+        return node["status"]
+    return "running" if active_runs else "ready"
 
 
 def workspace_paths_match(left: str | None, right: str | None) -> bool:
@@ -228,6 +291,14 @@ class DaemonNodeRegistry:
         agents, agent_details = agent_registration_state(input)
         agent_inventory = agent_inventory_state(input)
         prior_disabled = list((existing or {}).get("disabledAgents") or [])
+        prior_role_defaults = dict((existing or {}).get("agentRoleDefaults") or {})
+        prior_role_overrides = dict((existing or {}).get("agentRoleOverrides") or {})
+        capacity_input = {
+            **({"maxConcurrentRuns": (existing or {}).get("maxConcurrentRuns")} if (existing or {}).get("maxConcurrentRuns") and "maxConcurrentRuns" not in input else {}),
+            **({"runCapacityByMode": (existing or {}).get("runCapacityByMode")} if (existing or {}).get("runCapacityByMode") and "runCapacityByMode" not in input else {}),
+            **input,
+        }
+        max_concurrent_runs, run_capacity_by_mode = normalize_run_capacity(capacity_input)
         sandbox = {
             "id": input["sandboxId"],
             **({"employeeId": employee_id} if employee_id else {}),
@@ -237,6 +308,10 @@ class DaemonNodeRegistry:
             **({"agentDetails": agent_details} if agent_details else {}),
             **({"agentInventory": agent_inventory} if agent_inventory else {}),
             **({"disabledAgents": prior_disabled} if prior_disabled else {}),
+            **({"agentRoleDefaults": prior_role_defaults} if prior_role_defaults else {}),
+            **({"agentRoleOverrides": prior_role_overrides} if prior_role_overrides else {}),
+            "maxConcurrentRuns": max_concurrent_runs,
+            "runCapacityByMode": run_capacity_by_mode,
             "token": None,
             "tokenHash": next_ui_hash,
             "uiTokenHash": next_ui_hash,
@@ -263,8 +338,14 @@ class DaemonNodeRegistry:
         sandbox = self.sandboxes.get(sandbox_id)
         if not sandbox:
             return
-        status = patch.get("status", sandbox.get("status"))
-        updated = {**sandbox, **{k: v for k, v in patch.items() if v is not None}, "updatedAt": now_iso()}
+        next_patch = {k: v for k, v in patch.items() if v is not None}
+        if next_patch.get("status") in ("ready", "running"):
+            next_patch["status"] = node_status_for_active_runs(
+                {**sandbox, **next_patch},
+                self.daemon_store.list_active_runs(sandbox_id),
+            )
+        status = next_patch.get("status", sandbox.get("status"))
+        updated = {**sandbox, **next_patch, "updatedAt": now_iso()}
         if "lastError" in patch and patch["lastError"] is None:
             updated.pop("lastError", None)
         self.sandboxes[sandbox_id] = updated
@@ -329,7 +410,7 @@ class DaemonNodeRegistry:
         if not sandbox.get("employeeId"):
             raise ValueError("Daemon node is not assigned.")
         previous = sandbox["employeeId"]
-        updated = {k: v for k, v in sandbox.items() if k != "employeeId"}
+        updated = {k: v for k, v in sandbox.items() if k not in ("employeeId", "agentRoleOverrides")}
         updated["updatedAt"] = now_iso()
         self.sandboxes[sandbox_id] = updated
         self.daemon_store.unassign_node_employee(sandbox_id)
@@ -350,6 +431,32 @@ class DaemonNodeRegistry:
         self.sandboxes[sandbox_id] = updated
         self.daemon_store.update_node_disabled_agents(sandbox_id, normalized)
         logger.info("Daemon node disabled agents updated", sandbox_id=sandbox_id, disabled_agents=normalized)
+        return updated
+
+    def set_agent_role_defaults(self, sandbox_id: str, role_defaults: dict[str, str]) -> dict[str, Any]:
+        sandbox = self.sandboxes.get(sandbox_id)
+        if not sandbox:
+            raise KeyError(sandbox_id)
+        normalized = normalize_agent_role_map(role_defaults)
+        updated = {**sandbox, "agentRoleDefaults": normalized, "updatedAt": now_iso()}
+        if not normalized:
+            updated.pop("agentRoleDefaults", None)
+        self.sandboxes[sandbox_id] = updated
+        self.daemon_store.update_node_agent_role_defaults(sandbox_id, normalized)
+        logger.info("Daemon node agent role defaults updated", sandbox_id=sandbox_id, agent_role_defaults=normalized)
+        return updated
+
+    def set_agent_role_overrides(self, sandbox_id: str, role_overrides: dict[str, str]) -> dict[str, Any]:
+        sandbox = self.sandboxes.get(sandbox_id)
+        if not sandbox:
+            raise KeyError(sandbox_id)
+        normalized = normalize_agent_role_map(role_overrides)
+        updated = {**sandbox, "agentRoleOverrides": normalized, "updatedAt": now_iso()}
+        if not normalized:
+            updated.pop("agentRoleOverrides", None)
+        self.sandboxes[sandbox_id] = updated
+        self.daemon_store.update_node_agent_role_overrides(sandbox_id, normalized)
+        logger.info("Daemon node agent role overrides updated", sandbox_id=sandbox_id, agent_role_overrides=normalized)
         return updated
 
     def delete(self, sandbox_id: str) -> None:
@@ -386,6 +493,8 @@ class DaemonNodeRegistry:
             **({"workspacePath": workspace_path} if workspace_path else {}),
             "status": "provisioning",
             "agents": {agent: "unknown" for agent in AGENT_NAMES},
+            "maxConcurrentRuns": 1,
+            "runCapacityByMode": {mode: 1 for mode in AGENT_TASK_MODES},
             "token": None,
             "tokenHash": hash_daemon_node_token(ui_token),
             "uiTokenHash": hash_daemon_node_token(ui_token),
@@ -413,12 +522,13 @@ class DaemonNodeRegistry:
     def _selection_key(self, sandbox: dict[str, Any]) -> tuple[int, int, float, str]:
         liveness = self._liveness(sandbox)
         timestamp = sandbox.get("lastSeenAt") or sandbox.get("updatedAt") or sandbox.get("createdAt") or ""
+        active_runs = self.daemon_store.list_active_runs(sandbox["id"])
         try:
             seen_at = __import__("datetime").datetime.fromisoformat(timestamp.replace("Z", "+00:00")).timestamp()
         except Exception:
             seen_at = 0.0
         return (
-            0 if liveness["online"] and sandbox.get("status") == "ready" else 1,
+            0 if liveness["online"] and node_accepts_run(sandbox, assignments=[{"mode": "ask"}], active_runs=active_runs) else 1,
             0 if liveness["online"] else 1,
             -seen_at,
             sandbox["id"],
@@ -609,7 +719,7 @@ class DaemonNodeRegistry:
         controller.record_agent_started(run_request["sessionId"], {
             "runId": run_id,
             "agent": assignment["agent"],
-            "role": role_for_agent(assignment["agent"], mode),
+            "role": effective_role_for_assignment(sandbox, assignment, mode),
             "mode": mode,
         })
         command = {
@@ -692,7 +802,8 @@ class DaemonNodeRegistry:
     def _complete_run_request(self, run_request: dict[str, Any], outcome: str) -> None:
         sandbox = self.sandboxes.get(run_request["nodeId"])
         controller = self._controller_for_sandbox(sandbox, run_request.get("taskId")) if sandbox else SessionController(self.store, task_store=self.task_store, task_id=run_request.get("taskId"))
-        controller.complete_session(run_request["sessionId"], outcome)
+        task_status = "waiting_for_human" if all((assignment.get("mode") or "action") == "ask" for assignment in run_request.get("assignments", [])) else "done"
+        controller.complete_session(run_request["sessionId"], outcome, task_status=task_status)
         self.daemon_store.update_run_request(run_request["id"], {"status": "completed", "error": None})
         self.update_status(run_request["nodeId"], {"status": "ready", "lastError": None})
 

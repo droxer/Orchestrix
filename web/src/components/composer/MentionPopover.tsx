@@ -3,8 +3,11 @@ import type { AgentName } from "../../types";
 import { AgentMark } from "../AgentMark";
 import { mentionOptionId } from "../../lib/mentions";
 
-export function MentionPopover({ filteredAgents, mentionIndex, insertMention }: {
-  filteredAgents: AgentName[]; mentionIndex: number; insertMention: (a: AgentName) => void;
+export function MentionPopover({ filteredAgents, mentionIndex, roleLabels, insertMention }: {
+  filteredAgents: AgentName[];
+  mentionIndex: number;
+  roleLabels?: Partial<Record<AgentName, string>>;
+  insertMention: (a: AgentName) => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -20,7 +23,7 @@ export function MentionPopover({ filteredAgents, mentionIndex, insertMention }: 
         >
           <span className="agent-avatar" data-agent={a} aria-hidden="true"><AgentMark agent={a} size={16} /></span>
           <span translate="no">@{a}</span>
-          <span className="mention-role">{t(`agent.${a}.role`)}</span>
+          <span className="mention-role">{roleLabels?.[a] ?? t(`agent.${a}.role`)}</span>
         </div>
       ))}
     </div>
