@@ -286,7 +286,7 @@ function BacklogTaskCard({
               if (agent) onAssign(agent);
             }}
           >
-            <option value="">{t("backlog.no_agent")}</option>
+            <option value="">{t("backlog.agent_team")}</option>
             {AGENT_NAMES.map((agent) => (
               <option key={agent} value={agent}>{agent}</option>
             ))}
@@ -295,9 +295,9 @@ function BacklogTaskCard({
             type="button"
             className="backlog-action-primary backlog-action-icon"
             onClick={onStart}
-            disabled={!task.assignedAgent || task.status === "running" || task.status === "done"}
-            aria-label={t("backlog.start")}
-            title={t("backlog.start")}
+            disabled={(!task.assignedAgent && !canDiscuss) || task.status === "running" || task.status === "done"}
+            aria-label={task.assignedAgent ? t("backlog.start") : t("backlog.start_team")}
+            title={task.assignedAgent ? t("backlog.start") : t("backlog.start_team")}
           >
             <ActionStart size={14} />
           </button>
@@ -417,7 +417,7 @@ function BacklogTaskRow({
               if (agent) onAssign(agent);
             }}
           >
-            <option value="">{t("backlog.no_agent")}</option>
+            <option value="">{t("backlog.agent_team")}</option>
             {AGENT_NAMES.map((agent) => (
               <option key={agent} value={agent}>{agent}</option>
             ))}
@@ -426,9 +426,9 @@ function BacklogTaskRow({
             type="button"
             className="backlog-action-primary backlog-action-icon"
             onClick={onStart}
-            disabled={!task.assignedAgent || task.status === "running" || task.status === "done"}
-            aria-label={t("backlog.start")}
-            title={t("backlog.start")}
+            disabled={(!task.assignedAgent && !canDiscuss) || task.status === "running" || task.status === "done"}
+            aria-label={task.assignedAgent ? t("backlog.start") : t("backlog.start_team")}
+            title={task.assignedAgent ? t("backlog.start") : t("backlog.start_team")}
           >
             <ActionStart size={14} />
           </button>
@@ -561,7 +561,7 @@ function BacklogTaskDrawer({
               value={form.assignedAgent}
               onChange={(event) => onChange({ ...form, assignedAgent: event.target.value as "" | AgentName })}
             >
-              <option value="">{t("backlog.no_agent")}</option>
+              <option value="">{t("backlog.agent_team")}</option>
               {AGENT_NAMES.map((agent) => (
                 <option key={agent} value={agent}>{agent}</option>
               ))}
@@ -678,7 +678,14 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
     return {
       onEdit: () => editTask(task),
       onAssign: (agent: AgentName) => void mutate(() => assignTask(task.id, agent)),
-      onStart: () => void mutate(() => startTask(task.id)),
+      onStart: () => void mutate(async () => {
+        const result = task.assignedAgent
+          ? await startTask(task.id)
+          : await startTask(task.id, {
+            assignments: discussionAgents.map((agent) => ({ agent, mode: "ask" })),
+          });
+        if (!task.assignedAgent && result.session) onOpenConversation(result.session.id);
+      }),
       onDiscuss: () => void mutate(async () => {
         if (discussionAgents.length === 0) return;
         const result = await startTask(task.id, {

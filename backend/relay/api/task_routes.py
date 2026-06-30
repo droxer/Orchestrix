@@ -110,6 +110,27 @@ def ready_node_for_task(
     return None
 
 
+def team_assignments_for_task(ctx: AppContextDep, task: dict[str, Any]) -> list[dict[str, Any]]:
+    employee_id = task.get("assigneeEmployeeId") or task.get("ownerEmployeeId")
+    for node in ctx.registry.list_ready():
+        if employee_id and node.get("employeeId") != employee_id:
+            continue
+        if node.get("status") in ("stopped", "failed", "provisioning") or not ctx.registry.is_live(node["id"]):
+            continue
+        disabled = set(node.get("disabledAgents") or [])
+        assignments = [
+            {"agent": agent, "mode": "ask"}
+            for agent in AGENT_NAMES
+            if agent not in disabled and node.get("agents", {}).get(agent) == "ready"
+        ]
+        if not assignments:
+            continue
+        active_runs = ctx.registry.daemon_store.list_active_runs(node["id"])
+        if node_accepts_run(node, assignments=assignments, active_runs=active_runs):
+            return assignments
+    return []
+
+
 async def start_task_on_ready_node(
     ctx: AppContextDep,
     task: dict[str, Any],
@@ -324,8 +345,15 @@ async def start_task(task_id: str, request: Request, ctx: AppContextDep) -> dict
     agent = valid_agent(body.get("agent")) or valid_agent(task.get("assignedAgent"))
     if not agent and assignments:
         agent = assignments[0]["agent"]
+    if not agent and not assignments:
+        assignments = team_assignments_for_task(ctx, task)
+        if assignments:
+            agent = assignments[0]["agent"]
     if not agent:
-        raise HTTPException(400, f"agent must be one of: {', '.join(AGENT_NAMES)}.")
+        return {
+            "task": ctx.task_store.record_activity(task_id, "No ready agent team is available."),
+            "session": None,
+        }
     if not assignments and task.get("assignedAgent") != agent:
         task = ctx.task_store.assign_task(task_id, agent)
     mode = agent_task_mode(body.get("mode"))
