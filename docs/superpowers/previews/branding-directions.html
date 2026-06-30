@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Relay — Branding Directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Geist+Mono:wght@400..600&family=Space+Grotesk:wght@400..700&family=Hanken+Grotesk:wght@400..700&family=Inter:wght@400..700&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #e7e7ea;
+    font-family: "Geist", -apple-system, sans-serif;
+    color: #18181b;
+    padding: 40px 32px 80px;
+  }
+  .page-head { max-width: 1180px; margin: 0 auto 36px; }
+  .page-head h1 { font-size: 26px; font-weight: 600; letter-spacing: -0.5px; }
+  .page-head p { margin-top: 8px; color: #52525b; font-size: 15px; max-width: 720px; line-height: 1.55; }
+  .grid { max-width: 1180px; margin: 0 auto; display: grid; grid-template-columns: 1fr; gap: 40px; }
+
+  .variant { border-radius: 18px; overflow: hidden; box-shadow: 0 30px 60px -28px rgba(0,0,0,.35); }
+  .variant-label {
+    display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+    padding: 16px 22px; background: #18181b; color: #fff;
+  }
+  .variant-label .n { font-size: 13px; font-family: "Geist Mono", monospace; opacity: .55; }
+  .variant-label .t { font-size: 17px; font-weight: 600; letter-spacing: -0.3px; }
+  .variant-label .d { font-size: 13px; opacity: .65; }
+  .swatches { display: flex; gap: 6px; margin-left: auto; }
+  .swatches span { width: 22px; height: 22px; border-radius: 6px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.15); }
+
+  /* ============ SHARED APP SHELL ============ */
+  .app {
+    --rail-w: 60px; --list-w: 248px;
+    display: grid; grid-template-columns: var(--rail-w) var(--list-w) 1fr;
+    height: 560px;
+    background: var(--canvas);
+    color: var(--ink);
+    font-family: var(--font);
+    border-top: 1px solid var(--hair);
+  }
+  /* icon rail */
+  .rail { background: var(--rail-bg); border-right: 1px solid var(--hair); display: flex; flex-direction: column; align-items: center; padding: 16px 0; gap: 8px; }
+  .logo { width: 34px; height: 34px; border-radius: 10px; background: var(--brand); display: grid; place-items: center; color: var(--on-brand); font-weight: 700; font-size: 18px; font-family: var(--font-display); margin-bottom: 14px; box-shadow: var(--brand-glow); }
+  .rail-ic { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; color: var(--muted); font-size: 17px; }
+  .rail-ic.active { background: var(--brand-soft); color: var(--brand-ink); }
+  /* conversation list */
+  .list { background: var(--list-bg); border-right: 1px solid var(--hair); padding: 18px 14px; overflow: hidden; }
+  .list h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.4px; font-family: var(--font-display); }
+  .list .eyebrow { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 18px 4px 8px; }
+  .conv { padding: 10px 12px; border-radius: var(--radius); margin-bottom: 4px; cursor: pointer; }
+  .conv.sel { background: var(--brand-soft); }
+  .conv .top { display: flex; justify-content: space-between; align-items: center; }
+  .conv .name { font-size: 13.5px; font-weight: 600; }
+  .conv.sel .name { color: var(--brand-ink); }
+  .conv .time { font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
+  .conv .prev { font-size: 12px; color: var(--muted); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* main */
+  .main { display: flex; flex-direction: column; background: var(--canvas); }
+  .hdr { height: 56px; border-bottom: 1px solid var(--hair); display: flex; align-items: center; padding: 0 22px; gap: 12px; }
+  .hdr .title { font-size: 15px; font-weight: 600; font-family: var(--font-display); letter-spacing: -0.2px; }
+  .pill { font-family: var(--font-mono); font-size: 10.5px; padding: 3px 9px; border-radius: 999px; font-weight: 600; }
+  .pill.run { background: var(--brand-soft); color: var(--brand-ink); }
+  .pill.ok { color: var(--up); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--up) 35%, transparent); }
+  .pill .dot { display:inline-block; width:6px; height:6px; border-radius:50%; background: currentColor; margin-right:5px; vertical-align: middle; }
+  .stream { flex: 1; padding: 24px 26px; overflow: hidden; display: flex; flex-direction: column; gap: 20px; }
+  .msg { display: flex; gap: 12px; }
+  .av { width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0; display: grid; place-items: center; font-family: var(--font-mono); font-size: 11px; font-weight: 600; }
+  .av.user { background: var(--surface-strong); color: var(--ink); }
+  .av.claude { background: var(--brand-soft); color: var(--brand-ink); }
+  .msg .body { flex: 1; }
+  .msg .who { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--muted); margin-bottom: 5px; }
+  .msg .text { font-size: 14px; line-height: 1.55; color: var(--body); }
+  .tool { margin-top: 8px; font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); padding-left: 12px; border-left: 2px solid var(--hair); }
+  .tool b { color: var(--brand-ink); font-weight: 600; }
+  /* composer */
+  .composer { padding: 14px 22px 18px; border-top: 1px solid var(--hair); }
+  .inputrow { display: flex; gap: 10px; align-items: center; background: var(--surface-soft); border: 1px solid var(--hair); border-radius: var(--radius-lg); padding: 8px 8px 8px 16px; }
+  .inputrow .ph { flex: 1; font-size: 13.5px; color: var(--muted); }
+  .btn { font-family: var(--font); font-size: 13px; font-weight: 600; padding: 9px 18px; border-radius: var(--radius); background: var(--brand); color: var(--on-brand); border: none; cursor: pointer; box-shadow: var(--brand-glow); }
+  .btn:hover { filter: brightness(.95); }
+
+  /* ============ DIRECTION 1 — Technical & trustworthy ============ */
+  .v-technical .app {
+    --font: "Geist", sans-serif; --font-display: "Geist", sans-serif; --font-mono: "Geist Mono", monospace;
+    --canvas: #ffffff; --rail-bg: #fafafa; --list-bg: #fcfcfd; --surface-soft: #fafafa; --surface-strong: #f1f1f4;
+    --ink: #0f1115; --body: #3f434d; --muted: #8a8f9a; --hair: #e8e9ee;
+    --brand: #2f54eb; --on-brand: #ffffff; --brand-soft: #eef1fe; --brand-ink: #2f54eb; --brand-glow: none;
+    --up: #18a957; --radius: 7px; --radius-lg: 10px;
+  }
+
+  /* ============ DIRECTION 2 — Energetic & modern ============ */
+  .v-energetic .app {
+    --font: "Space Grotesk", sans-serif; --font-display: "Space Grotesk", sans-serif; --font-mono: "Geist Mono", monospace;
+    --canvas: #ffffff; --rail-bg: #ffffff; --list-bg: #fdfcff; --surface-soft: #f8f6ff; --surface-strong: #f1ecfe;
+    --ink: #140d1f; --body: #463d57; --muted: #948aa6; --hair: #ece7f5;
+    --brand: #6d28e8; --on-brand: #ffffff; --brand-soft: #f1eafe; --brand-ink: #6d28e8; --brand-glow: 0 6px 18px -6px rgba(109,40,232,.55);
+    --up: #06b66b; --radius: 10px; --radius-lg: 14px;
+  }
+
+  /* ============ DIRECTION 3 — Warm & human ============ */
+  .v-warm .app {
+    --font: "Hanken Grotesk", sans-serif; --font-display: "Hanken Grotesk", sans-serif; --font-mono: "Geist Mono", monospace;
+    --canvas: #fdfbf7; --rail-bg: #f7f2ea; --list-bg: #faf6ef; --surface-soft: #f5efe5; --surface-strong: #efe7d9;
+    --ink: #2a2420; --body: #5c5249; --muted: #a39684; --hair: #ece3d5;
+    --brand: #d9663f; --on-brand: #ffffff; --brand-soft: #fbeae1; --brand-ink: #b8502d; --brand-glow: 0 4px 14px -5px rgba(217,102,63,.5);
+    --up: #4f9d69; --radius: 12px; --radius-lg: 16px;
+  }
+
+  /* ============ DIRECTION 4 — Futuristic & intelligent ============ */
+  .v-futuristic .app {
+    --font: "Inter", sans-serif; --font-display: "Space Grotesk", sans-serif; --font-mono: "Geist Mono", monospace;
+    --canvas: #0a0c12; --rail-bg: #0c0f16; --list-bg: #0b0e15; --surface-soft: #12151f; --surface-strong: #1a1f2c;
+    --ink: #f3f5fa; --body: #aab2c5; --muted: #6b7488; --hair: #1c2230;
+    --brand: #00e5c4; --on-brand: #04201c; --brand-soft: rgba(0,229,196,.12); --brand-ink: #2ff0d4; --brand-glow: 0 0 22px -4px rgba(0,229,196,.6);
+    --up: #28e08a; --radius: 9px; --radius-lg: 12px;
+  }
+  .v-futuristic .logo { background: linear-gradient(135deg,#00e5c4,#6d28e8); color:#04201c; }
+</style>
+</head>
+<body>
+  <div class="page-head">
+    <h1>Relay — Branding Directions</h1>
+    <p>Four personalities for the full rebrand, each applied to the same operational chat surface: icon rail, conversation list, agent transcript, status, and the primary action. Compare the signature color, type, geometry, and feel — then tell me which direction (or which pieces of each) to take forward.</p>
+  </div>
+  <div class="grid">
+
+    <!-- 1 TECHNICAL -->
+    <div class="variant v-technical">
+      <div class="variant-label">
+        <span class="n">01</span><span class="t">Technical &amp; trustworthy</span>
+        <span class="d">Geist · cobalt blue · tight geometry · infrastructure-grade calm</span>
+        <span class="swatches"><span style="background:#2f54eb"></span><span style="background:#0f1115"></span><span style="background:#eef1fe"></span><span style="background:#18a957"></span></span>
+      </div>
+      <div class="app"></div>
+    </div>
+
+    <!-- 2 ENERGETIC -->
+    <div class="variant v-energetic">
+      <div class="variant-label">
+        <span class="n">02</span><span class="t">Energetic &amp; modern</span>
+        <span class="d">Space Grotesk · electric violet · rounded · momentum-forward</span>
+        <span class="swatches"><span style="background:#6d28e8"></span><span style="background:#140d1f"></span><span style="background:#f1eafe"></span><span style="background:#06b66b"></span></span>
+      </div>
+      <div class="app"></div>
+    </div>
+
+    <!-- 3 WARM -->
+    <div class="variant v-warm">
+      <div class="variant-label">
+        <span class="n">03</span><span class="t">Warm &amp; human</span>
+        <span class="d">Hanken Grotesk · terracotta · soft cream canvas · teammate framing</span>
+        <span class="swatches"><span style="background:#d9663f"></span><span style="background:#2a2420"></span><span style="background:#fbeae1"></span><span style="background:#4f9d69"></span></span>
+      </div>
+      <div class="app"></div>
+    </div>
+
+    <!-- 4 FUTURISTIC -->
+    <div class="variant v-futuristic">
+      <div class="variant-label">
+        <span class="n">04</span><span class="t">Futuristic &amp; intelligent</span>
+        <span class="d">Inter + Space Grotesk · luminous cyan→violet · deep base · machine intelligence</span>
+        <span class="swatches"><span style="background:linear-gradient(135deg,#00e5c4,#6d28e8)"></span><span style="background:#0a0c12"></span><span style="background:#1a1f2c"></span><span style="background:#28e08a"></span></span>
+      </div>
+      <div class="app"></div>
+    </div>
+
+  </div>
+
+<script>
+  // shared app shell markup injected into every .app so all variants stay identical
+  const shell = `
+    <div class="rail">
+      <div class="logo">R</div>
+      <div class="rail-ic active">◆</div>
+      <div class="rail-ic">☷</div>
+      <div class="rail-ic">↻</div>
+      <div class="rail-ic">⚙</div>
+    </div>
+    <div class="list">
+      <h2>Conversations</h2>
+      <div class="eyebrow">Active</div>
+      <div class="conv sel">
+        <div class="top"><span class="name">Migrate auth service</span><span class="time">2m</span></div>
+        <div class="prev">claude · running preflight…</div>
+      </div>
+      <div class="conv">
+        <div class="top"><span class="name">Dashboard token chart</span><span class="time">14m</span></div>
+        <div class="prev">codex · review requested</div>
+      </div>
+      <div class="conv">
+        <div class="top"><span class="name">Nightly backlog sweep</span><span class="time">1h</span></div>
+        <div class="prev">pi · 3 tasks dispatched</div>
+      </div>
+      <div class="eyebrow">Idle</div>
+      <div class="conv">
+        <div class="top"><span class="name">Refactor session store</span><span class="time">3h</span></div>
+        <div class="prev">kimi · awaiting approval</div>
+      </div>
+    </div>
+    <div class="main">
+      <div class="hdr">
+        <span class="title">Migrate auth service</span>
+        <span class="pill run"><span class="dot"></span>running</span>
+        <span class="pill ok" style="margin-left:auto"><span class="dot"></span>daemon ready</span>
+      </div>
+      <div class="stream">
+        <div class="msg">
+          <div class="av user">FH</div>
+          <div class="body">
+            <div class="who">you</div>
+            <div class="text">Port the auth routes to the new daemon registry and keep the token contract intact.</div>
+          </div>
+        </div>
+        <div class="msg">
+          <div class="av claude">CL</div>
+          <div class="body">
+            <div class="who">claude · action</div>
+            <div class="text">On it. I'll thread the employee id through the run dispatch and verify the ownership checkpoint stays the single seam.</div>
+            <div class="tool">⏺ <b>Edit</b> backend/relay/api/session_routes.py</div>
+            <div class="tool">⏺ <b>Bash</b> make test · 142 passed</div>
+          </div>
+        </div>
+      </div>
+      <div class="composer">
+        <div class="inputrow">
+          <span class="ph">Message the agent, or @mention claude · pi · codex · kimi…</span>
+          <button class="btn">Send</button>
+        </div>
+      </div>
+    </div>`;
+  document.querySelectorAll('.app').forEach(a => a.innerHTML = shell);
+</script>
+</body>
+</html>

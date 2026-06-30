@@ -49,7 +49,10 @@
     "agent_failed_title": "{{agent}} is not ready on this node.",
     "agent_disabled_option": "{{agent}} (disabled)",
     "no_conversations": "No threads yet. Start a new one.",
-    "no_matches": "No threads match your search."
+    "no_matches": "No threads match your search.",
+    "group_needs_you": "Needs you",
+    "group_running": "Running",
+    "group_idle": "Idle"
   },
   "conversation": {
     "agent_working": "{{agent}} is working",
@@ -686,7 +689,8 @@
       "test_output": "Test output",
       "command_log": "Command log",
       "summary": "Summary",
-      "agent_output": "Agent output"
+      "agent_output": "Agent output",
+      "workspace_file": "File"
     },
     "view": "View",
     "view_named": "View {{title}}",
@@ -697,6 +701,7 @@
     "preview_error": "Could not load preview: {{message}}",
     "preview_empty": "No artifact content.",
     "preview_truncated": "Preview truncated. Open raw to inspect the full artifact.",
+    "workspace_file_preview": "Generated workspace file. Open raw to download or view it.",
     "stat": {
       "diff": "+{{additions}} −{{deletions}} · {{files}} files",
       "test": "{{passed}} passed · {{failed}} failed",

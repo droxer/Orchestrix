@@ -1,12 +1,13 @@
 ---
 version: alpha
 name: Relay-design
-description: A precision/technical design system for an agent-orchestration control plane, in the Linear / Vercel / Resend lineage. The canvas is white (near-black in dark mode); near-black ink is the single ACTION color and inverts to white-on-black in dark mode. Color is reserved exclusively for status — success, danger, warning, and a single info blue — and is never used for actions or decoration. Type is Geist for all interface and display text (display is weighted Geist at 600 with tight tracking, not an editorial serif), with Geist Mono as a deliberate identity signal carrying eyebrows, metadata, agent labels, tool lines, numbers, and code. Geometry is tight: 4px on buttons and badges, 6px on inputs, 8–10px on cards; the pill is retired. Depth comes from hairline borders, not shadows. The result reads as serious engineering tooling — calm, dense, monochrome, terminal-native.
+description: A precision/technical design system for an agent-orchestration control plane, in the Linear / Vercel / Resend lineage. The canvas is white (near-black in dark mode); cobalt (#2f54eb) is the single brand ACTION color and lifts to periwinkle (#5b7cff) on the dark canvas. The action carries the hue; status is reserved for success, danger, and warning (green / amber / red), and the former info blue folds into the cobalt brand — no competing second blue. Type is Geist for all interface and display text (display is weighted Geist at 600 with tight tracking, not an editorial serif), with Geist Mono as a deliberate identity signal carrying eyebrows, metadata, agent labels, tool lines, numbers, and code. Geometry is tight: 4px on buttons and badges, 6px on inputs, 8–10px on cards; the pill is retired. Depth comes from hairline borders, not shadows. The result reads as serious engineering tooling — calm, dense, cobalt-accented, terminal-native.
 
 colors:
-  primary: "#0a0a0a"
-  primary-active: "#27272a"
-  primary-disabled: "#d4d4d8"
+  primary: "#2f54eb"
+  primary-active: "#1e3bb8"
+  primary-disabled: "#c3cefb"
+  brand-soft: "#eef1fe"
   ink: "#0a0a0a"
   body: "#52525b"
   body-strong: "#0a0a0a"
@@ -18,15 +19,15 @@ colors:
   surface-soft: "#fafafa"
   surface-card: "#ffffff"
   surface-strong: "#f4f4f5"
-  surface-dark: "#0b0b0d"
-  surface-dark-elevated: "#111114"
+  surface-dark: "#0d0c0a"
+  surface-dark-elevated: "#1a1815"
   on-primary: "#ffffff"
   on-dark: "#ffffff"
   on-dark-soft: "#a1a1aa"
   semantic-up: "#10b981"
   semantic-down: "#e5484d"
   accent-yellow: "#f5a623"
-  info: "#3b82f6"
+  info: "#2f54eb"
 
 typography:
   display-lg:
@@ -212,7 +213,7 @@ components:
     rounded: "{rounded.sm}"
   link-inline:
     backgroundColor: transparent
-    textColor: "{colors.ink}"
+    textColor: "{colors.primary}"
     decoration: underline
   card:
     backgroundColor: "{colors.surface-card}"
@@ -301,10 +302,10 @@ components:
 
 ## Overview
 
-Relay reads like serious engineering tooling — precise, dense, and almost
-entirely monochrome. The system is in the **Linear / Vercel / Resend** lineage:
-a white canvas (near-black in dark mode), near-black ink as the single **action**
-color, cool neutral hairlines, and color reserved strictly for status.
+Relay reads like serious engineering tooling — precise, dense, and restrained.
+The system is in the **Linear / Vercel / Resend** lineage: a white canvas
+(near-black in dark mode), **cobalt** (`#2f54eb`) as the single brand **action**
+color, cool neutral hairlines, and the remaining color reserved for status.
 
 Type is **Geist** for every line of interface and display text, with **Geist Mono**
 elevated to an identity signal — it carries eyebrows, metadata, agent labels, tool
@@ -316,8 +317,8 @@ The 100px pill is retired. Depth comes from 1px hairline borders, not decorative
 shadows.
 
 **Key Characteristics:**
-- Monochrome action: `{colors.primary}` (#0a0a0a) carries every primary action and inverts to white-on-black (`#f4f4f5`) in dark mode. No brand hue.
-- Color = status only: `{colors.semantic-up}`, `{colors.semantic-down}`, `{colors.accent-yellow}`, and `{colors.info}` are the only hues on screen — text, dots, and borders, never fills, never actions.
+- Cobalt action: `{colors.primary}` (#2f54eb) carries every primary action — buttons, links, the focus ring, text selection, the operator's message fill, and the brand mark — and lifts to periwinkle (`#5b7cff`) on the dark canvas. `{colors.brand-soft}` (#eef1fe) is the matching tint for selected/active affordances. The brand hue is the action; it never bleeds into running text or neutral surfaces.
+- Color = status: `{colors.semantic-up}`, `{colors.semantic-down}`, and `{colors.accent-yellow}` (green / amber / red) carry status as text, dots, and borders — never fills. The former info blue folds into the cobalt brand.
 - Mono as signal: eyebrows, metadata, agent labels (`claude · action`), tool lines, timestamps, and numbers render in Geist Mono.
 - Tight geometry: `{rounded.sm}` (4px) interactive, `{rounded.xl}` (10px) cards. Pills and large radii absent.
 - Hairline depth: 1px `{colors.hairline}` borders over shadows; elevation is restrained.
@@ -325,23 +326,24 @@ shadows.
 
 ## Colors
 
-### Action (monochrome)
-- **Ink** (`{colors.primary}` — #0a0a0a): The single action color — every primary button, the strongest text. In dark mode it inverts to near-white (`#f4f4f5`) with ink text.
-- **Ink Active** (`{colors.primary-active}` — #27272a): Press/hover darken on the action fill.
-- **Ink Disabled** (`{colors.primary-disabled}` — #d4d4d8): Neutral gray for disabled actions.
+### Action (cobalt brand)
+- **Cobalt** (`{colors.primary}` — #2f54eb): The single brand action color — every primary button, link, the focus ring, text selection, the operator's message fill, and the brand mark. On the dark canvas it lifts to periwinkle (`#5b7cff`) with white text.
+- **Cobalt Active** (`{colors.primary-active}` — #1e3bb8): Press/hover darken on the action fill.
+- **Cobalt Disabled** (`{colors.primary-disabled}` — #c3cefb): Faded cobalt tint for disabled actions.
+- **Brand Soft** (`{colors.brand-soft}` — #eef1fe): The cobalt tint token for selected/active affordances — selected rows, active nav, "running" pills.
 
-### Status — the only hues
+### Status hues
 - **Success** (`{colors.semantic-up}` — #10b981): positive status green — verdict approved, node ready. Text/dot/border only.
 - **Danger** (`{colors.semantic-down}` — #e5484d): failures, reject, destructive. Text/dot/border only.
 - **Warning** (`{colors.accent-yellow}` — #f5a623): attention dot only, never an action.
-- **Info** (`{colors.info}` — #3b82f6): the sole surviving blue — neutral "info" status dots and the Review mode chip. Status-only; never an action or link color.
+- **Info** (`{colors.info}` — #2f54eb): folded into the cobalt brand — neutral "info" dots and the Review mode chip now read in brand cobalt rather than a separate blue. Never a background fill.
 
 ### Surface
 - **Canvas** (`{colors.canvas}` — #ffffff): The default page floor.
 - **Surface Soft** (`{colors.surface-soft}` — #fafafa): Subtle cool tint — quotes, code, hover.
 - **Surface Strong** (`{colors.surface-strong}` — #f4f4f5): Fills behind secondary buttons, search, avatars.
-- **Surface Dark** (`{colors.surface-dark}` — #0b0b0d): The dark-mode canvas and the featured-tier inversion fill.
-- **Surface Dark Elevated** (`{colors.surface-dark-elevated}` — #111114): One step above the dark canvas for cards.
+- **Surface Dark** (`{colors.surface-dark}` — #0d0c0a): The dark-mode canvas — warm near-black with a trace of amber lift off cold zinc. The featured-tier inversion fill uses the same token.
+- **Surface Dark Elevated** (`{colors.surface-dark-elevated}` — #1a1815): One step above the dark canvas for cards and floating chrome.
 
 ### Hairlines
 - **Hairline** (`{colors.hairline}` — #e4e4e7): Default 1px divider and card border on white.
@@ -352,7 +354,7 @@ shadows.
 - **Body** (`{colors.body}` — #52525b): Default running text — cool neutral (zinc-600).
 - **Muted** (`{colors.muted}` — #71717a): Sub-titles, secondary labels (zinc-500).
 - **Muted Soft** (`{colors.muted-soft}` — #a1a1aa): Timestamps, disabled (zinc-400).
-- **On Primary** (`{colors.on-primary}` — #ffffff): Text on the ink action fill (flips to #0a0a0a in dark mode).
+- **On Primary** (`{colors.on-primary}` — #ffffff): Text on the cobalt action fill — stays white in dark mode (white-on-cobalt, no inversion).
 - **On Dark** (`{colors.on-dark}` — #ffffff): Text on dark surfaces.
 
 ## Typography
@@ -461,7 +463,7 @@ status dots. The pill is gone.
 **`top-nav-light`** — Default top nav on white. Background `{colors.canvas}`, text `{colors.ink}`, height 60px. Wordmark left, menu center, search + actions right.
 
 ### Buttons
-**`button-primary`** — The ink action. Background `{colors.primary}`, text `{colors.on-primary}`, type `{typography.button}`, padding 8px × 16px, height 36px, rounded `{rounded.sm}` (4px). Inverts to white-on-black in dark mode.
+**`button-primary`** — The cobalt action. Background `{colors.primary}`, text `{colors.on-primary}`, type `{typography.button}`, padding 8px × 16px, height 36px, rounded `{rounded.sm}` (4px). Lifts to periwinkle (`#5b7cff`) in dark mode, keeping white text.
 
 **`button-primary-active`** — Press/hover. Background `{colors.primary-active}`.
 
@@ -471,24 +473,24 @@ status dots. The pill is gone.
 
 **`button-ghost`** — Transparent. Text `{colors.ink}`; surfaces a `{colors.surface-strong}` wash on hover.
 
-**`link-inline`** — Inline link. Text `{colors.ink}` with an underline — links are disambiguated by underline, not hue.
+**`link-inline`** — Inline link. Text `{colors.primary}` (cobalt) with an underline — links now read in the brand hue and stay underlined.
 
 ### Cards
-**`card`** — The default container. Background `{colors.surface-card}`, 1px `{colors.hairline}` border, rounded `{rounded.xl}` (12px), padding 16px. Depth from the hairline, not a shadow.
+**`card`** — The default container. Background `{colors.surface-card}`, 1px `{colors.hairline}` border, rounded `{rounded.xl}` (10px), padding 16px. Depth from the hairline, not a shadow.
 
 **`card-soft`** — Quiet variant on `{colors.surface-soft}` for quotes, code blocks, and grouped content.
 
 ### Operational Surfaces
-**`agent-turn`** — A message turn. A mono `{typography.meta-mono}` eyebrow (`claude · action`) identifies the agent and mode; body in `{typography.body-md}`; tool lines in mono. One `●` marker per turn, `○` for thinking, `⏺` for tool/command lines. No surrounding card.
+**`agent-turn`** — A message turn on the transcript rail. A square monochrome rail node (glyph shape, not vendor hue) marks the gutter; a mono `{typography.meta-mono}` eyebrow (`claude · action`) identifies the agent and mode; body in `{typography.body-md}`; tool lines in mono. One `●` marker per turn, `○` for thinking, `⏺` for tool/command lines. No surrounding card. Consecutive same-agent turns group and drop the repeated eyebrow.
 
 **`review-card`** — Codex review result. `{colors.surface-soft}` fill, 1px hairline, mono title, verdict word colored by status (`{colors.semantic-up}` approved / `{colors.semantic-down}` rejected).
 
 **`status-up-cell`** + **`status-down-cell`** — Inline status cells. Color-only text in `{typography.number}`, no background fill.
 
-**`avatar`** — Employee and agent avatars. Rounded-square (`{rounded.md}`), 36px, `{colors.surface-strong}` fill, ink glyph. Agents are differentiated by their vendor glyph shape (via `AgentMark`), **not** by color — the monochrome rule applies. A corner status pip (`{rounded.full}`) carries tone.
+**`avatar`** — Employee and agent avatars. Rounded-square (`{rounded.md}`), 36px, `{colors.surface-strong}` fill, ink glyph. Agents are differentiated by their vendor glyph shape (via `AgentMark`), **not** by vendor brand color — agent identity is shape, not hue, and the cobalt brand is reserved for actions. A corner status pip (`{rounded.full}`) carries tone.
 
 ### Forms
-**`text-input`** — Background `{colors.canvas}`, rounded `{rounded.md}` (6px), padding 9px × 12px, height 40px, 1px hairline. Focus adds `--ring-focus` (3px ink-alpha halo).
+**`text-input`** — Background `{colors.canvas}`, rounded `{rounded.md}` (6px), padding 9px × 12px, height 40px, 1px hairline. Focus adds `--ring-focus` (3px cobalt-alpha halo).
 
 **`search-input`** — Background `{colors.surface-strong}`, rounded `{rounded.md}`, height 38px. No pill.
 
@@ -508,20 +510,28 @@ status dots. The pill is gone.
 ## Do's and Don'ts
 
 ### Do
-- Use `{colors.primary}` (ink) for actions; let it invert to white-on-black in dark mode.
-- Reserve color for status only — `{colors.semantic-up}` / `{colors.semantic-down}` / `{colors.accent-yellow}` / `{colors.info}`, as text/dots/borders.
+- Use `{colors.primary}` (cobalt) for actions; let it lift to periwinkle in dark mode.
+- Reserve the other hues for status — `{colors.semantic-up}` / `{colors.semantic-down}` / `{colors.accent-yellow}`, as text/dots/borders.
 - Render eyebrows, agent labels, tool lines, timestamps, and numbers in Geist Mono.
 - Use tight radii: `{rounded.sm}` interactive, `{rounded.xl}` cards.
 - Carry depth with 1px hairlines first; reach for shadows only on floating chrome.
-- Disambiguate links with an underline, not a hue.
+- Render links in cobalt (`{colors.primary}`) with an underline.
+- Use `--atmosphere-*` tokens sparingly on login, empty states, and admin hero tiles — controlled grain/wash, disabled in high-contrast mode.
 
 ### Don't
-- Don't reintroduce a brand accent hue or use any status color as an action.
-- Don't use status green/red/blue as a background fill.
+- Don't use a status color (green/amber/red) as an action — cobalt is the only action hue.
+- Don't introduce a second brand hue or use status green/amber/red as general UI background fills.
 - Don't use the pill (100px) or large radii on actions, inputs, or cards.
 - Don't tint agent avatars with vendor brand colors — glyph shape carries identity.
 - Don't bring back an editorial serif or 700+ display weights.
-- Don't add decorative gradients/gloss — surfaces are flat.
+- Don't add ad-hoc decorative gradients or gloss outside the `--atmosphere-*` exception.
+
+### Status fill exceptions
+Status hues stay text/dot/border in most UI. These narrow fills are allowed:
+- **Status dots and pips** — `{rounded.full}` fills on 6–10px indicators (avatar pips, mode-chip dots, row status dots).
+- **Destructive stop** — the composer's cancel/send-stop control may use an outlined danger treatment (hairline + danger text) while a run is active; never a second action hue beside cobalt.
+- **Success confirmation** — transient copy/feedback controls may flip to an outlined success treatment (hairline + success text), not a solid green plate.
+- **Data visualization** — chart segments and stacked bars (token usage: input = cobalt, output = success green, cache = muted gray; fleet health uses the status ramp for segment fills only inside charts).
 
 ## Operational Surfaces (in-product)
 
@@ -564,21 +574,31 @@ reach for `var(--font-display)` — now weighted Geist, not a serif.
 ### Operational components
 
 - **`messenger-shell`** — three-pane CSS grid (`sidenav | thread | chat`), with an optional fourth `drawer` column. Below 768px it collapses to one pane at a time.
-- **`sidenav-panel`** — vertical rail, labeled by default. 48px square buttons (collapsed) / 38px labeled rows at `--radius-sm`; expands to 260px revealing `--type-nav-link` labels. Active route = a quiet monochrome surface fill (no left bar).
-- **`thread-panel`** — conversation list. Flat 68px rows with a rounded-square avatar, name (`--text-base` / 600), and a 13px preview line. Separated by hairlines, not cards.
-- **`chat-panel`** — message canvas. 18px ink header title; messages render as block-grouped `.msg` units with mono eyebrows. Depth from typography, not boxes.
-- **`msg-user`** — the operator's voice. Right-aligned against the left-aligned agent turns so the transcript reads as a dialogue. It earns the single solid fill in the stream — flat `{colors.primary}` ink on white with `{colors.on-primary}` text — at a tight, symmetric `{rounded.md}` (no messenger tail), **no shadow**. Attribution comes from alignment and fill, not an avatar or "You" label. The ink fill is the one intentional box in the otherwise typography-led canvas; agent turns stay card-less.
-- **`composer`** — bottom-pinned input. Outer wrap uses `--shadow-lift`; inner field is a flat textarea. The send button is a 36px rounded-square (`--radius-sm`) ink plate — flat, no gloss. The mode chip (Implement / Review) sits bottom-left with a leading status dot — `accent-yellow` for implement, `info` blue for review — never a colored fill.
+- **`sidenav-panel`** — vertical rail, labeled by default. 48px square buttons (collapsed) / 38px labeled rows at `--radius-sm`; expands to 260px revealing `--type-nav-link` labels. Active route = a quiet neutral `{colors.surface-strong}` fill (no left bar).
+- **`thread-panel`** — conversation list grouped by state (Needs you → Running → Idle). Flat **68px** rows with name (`--text-base` / 600) and a 13px preview line. Active row = `{colors.brand-soft}` fill, **no left bar** (mirrors sidenav active). Separated by hairlines, not cards. The Needs-you section label stays muted; a leading warning dot carries the hue.
+- **`chat-panel`** — message canvas. 18px ink header title; messages render on a continuous **rail** — a 1.5px hairline spine with square agent nodes and a circular ink node for the human. Block-grouped `.msg` units carry mono eyebrows. Depth from typography and the rail, not boxes.
+- **`msg-user`** — the operator's voice **on the rail**. A filled circular ink node (agents stay square) plus a mono `YOU` eyebrow and timestamp; message body in 14px Geist medium, ink, no bubble and no cobalt fill. The human reads as a peer turn in the same spine as agents — attribution is node shape + eyebrow, not alignment or a messenger bubble.
+- **`composer`** — bottom-pinned input. The **outer wrap** (`.composer-input-wrap`) carries `--shadow-lift`; the inner field is a flat textarea with no extra drop shadow. The send button is a **36×36px** rounded-square (`--radius-sm`) cobalt plate — flat, no gloss. The mode chip (Implement / Review) sits bottom-left with a leading status dot — `accent-yellow` for implement, brand cobalt (`info`) for review — never a colored chip fill.
 - **`ac-*` (Admin Console)** — metric cards. Titles use `var(--font-display)` at `--text-3xl`; values use `--font-number` at `--text-4xl`. Cards are `--radius-xl`, hairline-bordered, lift on hover.
 - **`adm-drawer`** — right-edge sheet. Light variant is white canvas; dark variant fills with `--color-surface-dark` and uses `--color-hairline-on-dark` for dividers.
 
 ### Focus, motion, dark mode
-- **Focus ring** — every interactive surface uses `var(--ring-focus)`, a 3px ink-alpha halo. No ad-hoc 1px/2px variants.
-- **Status tone driver** — `tone-good` / `tone-info` / `tone-bad` / `tone-warn` / `tone-neutral` set a single `--tone` variable consumed by dots and outlined pills. `tone-info` maps to `--color-info` (blue), never the ink action color.
-- **Dark mode** — one definition, `html[data-theme="dark"]`, resolved before first paint. The action color inverts to near-white with ink text; status hues are lifted for legibility on the dark canvas.
+- **Focus ring** — every interactive surface uses `var(--ring-focus)`, a 3px cobalt-alpha halo. No ad-hoc 1px/2px outline variants. Destructive controls on focus may use a danger-alpha halo of the same geometry.
+- **Status tone driver** — `tone-good` / `tone-info` / `tone-bad` / `tone-warn` / `tone-neutral` set a single `--tone` variable consumed by dots and outlined pills. `tone-info` maps to `--color-info`, which now resolves to the cobalt brand (info folded into brand).
+- **Dark mode** — one definition, `html[data-theme="dark"]`, resolved before first paint. Canvas uses warm charcoal (`#0d0c0a` / `#1a1815` elevated). The action color lifts to periwinkle (`#5b7cff`) with white text; status hues are lifted for legibility on the dark canvas.
 - **Motion** — canonical curves/durations on a shared shelf (`--ease-standard`, `--ease-out-quint`, `--ease-spring`). Precision favors `--ease-standard`; overshoot is used sparingly.
+
+### Atmosphere (controlled exception)
+Login, transcript empty, admin KPI hero, and `.relay-atmosphere` panels may read `--atmosphere-background` — a corner radial wash plus subtle grain from `--atmosphere-grain-*`. High-contrast themes disable grain and wash. This is the only approved decorative texture; do not invent new gradients elsewhere.
+
+### Data visualization
+The admin token-usage chart uses a fixed three-segment ramp that reuses existing tokens:
+- **Input tokens** — `{colors.primary}` (cobalt)
+- **Output tokens** — `{colors.semantic-up}` (green)
+- **Cache tokens** — `{colors.muted-soft}` (neutral gray)
+
+Fleet-health stacked bars and activity charts use the status tone ramp (`semantic-up` / `semantic-down` / `accent-yellow` / muted) **inside chart segments only**. Artifact kind accents (`--color-kind-*` in `tokens.css`) are a separate decorative chip palette mirrored from the TUI — not status, not action.
 
 ## Known Gaps
 - Geist and Geist Mono are the default open-source font choices.
-- Data-viz beyond the token-usage chart (input ink / output green / cache gray) is not yet specified; charts may need a small, deliberate categorical ramp that stays distinct from status hues.
 - Form validation states beyond focus are not fully specified.

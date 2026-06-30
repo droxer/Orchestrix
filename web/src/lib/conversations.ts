@@ -1,4 +1,13 @@
-import type { RelaySession } from "../types.js";
+import type { AgentName, RelaySession } from "../types.js";
+
+// A conversation is one owner-scoped session. The row binds to the session
+// itself (not an employee), so the logged-in employee can hold several in
+// parallel and switch between them.
+export type ConversationItem = {
+  session: RelaySession;
+  /** Agent of an in-flight run for this conversation, if any. */
+  runningAgent?: AgentName;
+};
 
 type Labelled = { title?: string; taskGoal: string };
 

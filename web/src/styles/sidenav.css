@@ -158,8 +158,7 @@
 }
 
 .sidenav-settings-menu button:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: -2px;
+  outline: none;
 }
 
 .sidenav-settings-menu button.danger {
@@ -220,8 +219,7 @@
 }
 
 .sidenav-btn:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: -2px;
+  outline: none;
 }
 
 .sidenav-btn[data-nav="logout"]:hover {

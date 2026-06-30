@@ -8,22 +8,24 @@ from relay.api.session_routes import is_workspace_artifact, workspace_artifacts
 from relay.app import create_app
 
 
-def test_is_workspace_artifact_hides_command_logs() -> None:
-    assert is_workspace_artifact({"kind": "plan"}) is True
-    assert is_workspace_artifact({"kind": "review"}) is True
+def test_is_workspace_artifact_only_allows_generated_files() -> None:
+    assert is_workspace_artifact({"kind": "workspace_file"}) is True
+    assert is_workspace_artifact({"kind": "plan"}) is False
+    assert is_workspace_artifact({"kind": "review"}) is False
     assert is_workspace_artifact({"kind": "command_log"}) is False
 
 
-def test_workspace_artifacts_filters_command_logs() -> None:
+def test_workspace_artifacts_filters_to_generated_files() -> None:
     session = {
         "artifacts": [
             {"id": "plan", "kind": "plan"},
             {"id": "log", "kind": "command_log"},
             {"id": "diff", "kind": "diff"},
+            {"id": "deck", "kind": "workspace_file"},
         ],
     }
     filtered = workspace_artifacts(session)
-    assert [artifact["id"] for artifact in filtered] == ["plan", "diff"]
+    assert [artifact["id"] for artifact in filtered] == ["deck"]
 
 
 def test_session_assignment_and_handoff_preserve_ask_mode(monkeypatch) -> None:

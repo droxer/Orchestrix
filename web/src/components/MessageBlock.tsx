@@ -87,11 +87,12 @@ function ArtifactCard({ artifact, sessionId }: { artifact: RelayArtifact; sessio
 function ArtifactChip({ artifact, sessionId }: { artifact: RelayArtifact; sessionId: string }) {
   const { t } = useTranslation();
   const viewer = useArtifactViewer();
+  const shouldLoadBody = artifact.kind !== "workspace_file";
 
   // The body is loaded once (shared with the viewer drawer) so the chip can
   // show a semantic stat — +/−, pass/fail — instead of raw byte size.
-  const body = useArtifactBody(sessionId, artifact.id);
-  const stat = body.isSuccess ? summarizeArtifact(artifact.kind, body.data ?? "") : null;
+  const body = useArtifactBody(sessionId, artifact.id, { enabled: shouldLoadBody });
+  const stat = shouldLoadBody && body.isSuccess ? summarizeArtifact(artifact.kind, body.data ?? "") : null;
   const kindLabel = t(`artifact.kind.${artifact.kind}`, { defaultValue: artifact.kind });
 
   return (
@@ -138,10 +139,14 @@ export function MessageBlock({
   const { t } = useTranslation();
   if (message.kind === "user") {
     return (
-      <article className="msg msg-user" aria-label={t("message.user_label")}>
-        <div className="bubble">
-          <p>{message.text}</p>
-          <time className="msg-user-time mono">{formatTime(message.timestamp)}</time>
+      <article className="msg msg-user">
+        <span className="rail-node rail-node-user" aria-hidden="true" />
+        <div className="turn-body">
+          <header>
+            <span className="turn-who" translate="no">{t("message.user_label")}</span>
+            <time className="mono">{formatTime(message.timestamp)}</time>
+          </header>
+          <p className="user-text">{message.text}</p>
         </div>
       </article>
     );
@@ -152,10 +157,12 @@ export function MessageBlock({
       <article
         className={`msg msg-agent ${message.streaming ? "streaming" : ""} ${grouped ? "grouped" : ""}`}
       >
-        <div className="bubble">
+        <span className="rail-node rail-node-agent" aria-hidden="true">
+          <AgentMark agent={message.agent} size={12} />
+        </span>
+        <div className="turn-body">
           <header>
             <span className="agent-title" translate="no">
-              <AgentMark agent={message.agent} size={14} className="agent-title-mark" />
               {message.agent}
               <span className="agent-mode" data-mode={message.mode}>{message.mode}</span>
             </span>

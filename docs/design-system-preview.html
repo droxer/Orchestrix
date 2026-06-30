@@ -12,9 +12,10 @@
     />
     <style>
       :root {
-        --primary: #0a0a0a;
-        --primary-active: #27272a;
-        --primary-disabled: #d4d4d8;
+        --primary: #2f54eb;
+        --primary-active: #1e3bb8;
+        --primary-disabled: #c3cefb;
+        --brand-soft: #eef1fe;
         --ink: #0a0a0a;
         --body: #52525b;
         --muted: #71717a;
@@ -24,19 +25,19 @@
         --canvas: #ffffff;
         --surface-soft: #fafafa;
         --surface-strong: #f4f4f5;
-        --surface-dark: #0b0b0d;
-        --surface-dark-elevated: #111114;
+        --surface-dark: #0d0c0a;
+        --surface-dark-elevated: #1a1815;
         --on-primary: #ffffff;
         --on-dark: #ffffff;
         --on-dark-soft: #a1a1aa;
         --success: #10b981;
         --danger: #e5484d;
         --warning: #f5a623;
-        --info: #3b82f6;
-        --radius-sm: 6px;
-        --radius-md: 8px;
-        --radius-lg: 10px;
-        --radius-xl: 12px;
+        --info: #2f54eb;
+        --radius-sm: 4px;
+        --radius-md: 6px;
+        --radius-lg: 8px;
+        --radius-xl: 10px;
         --radius-full: 9999px;
         --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.04);
         --shadow-lift: 0 0 0 1px rgba(10, 10, 10, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
@@ -103,7 +104,7 @@
         border: 0;
         border-radius: var(--radius-sm);
         padding: 8px 16px;
-        font-size: 14px;
+        font-size: 16px;
         font-weight: 600;
         white-space: nowrap;
         cursor: pointer;
@@ -114,7 +115,7 @@
       .button--secondary { background: var(--surface-strong); color: var(--ink); }
       .button--ghost { background: transparent; color: var(--ink); }
       .button--ghost:hover { background: var(--surface-strong); }
-      .link { color: var(--ink); font-weight: 550; text-decoration: underline; }
+      .link { color: var(--primary); font-weight: 550; text-decoration: underline; }
 
       .hero { padding: 72px 0 56px; }
       .hero h1 { font-size: clamp(34px, 5vw, 52px); font-weight: 600; line-height: 1.06; letter-spacing: -1px; max-width: 18ch; }
@@ -159,8 +160,8 @@
       /* Operational chat surface */
       .apps { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
       .app { border: 1px solid var(--app-ln); border-radius: var(--radius-xl); overflow: hidden; background: var(--app-bg); }
-      .app--light { --app-bg: #fff; --app-ln: #e4e4e7; --app-head: #fafafa; --app-ink: #0a0a0a; --app-body: #52525b; --app-soft: #fafafa; --app-tool: #f4f4f5; --app-btn: #0a0a0a; --app-on: #fff; }
-      .app--dark { --app-bg: #0b0b0d; --app-ln: #1e1e22; --app-head: #111114; --app-ink: #f4f4f5; --app-body: #a1a1aa; --app-soft: #111114; --app-tool: #15151a; --app-btn: #f4f4f5; --app-on: #0a0a0a; }
+      .app--light { --app-bg: #fff; --app-ln: #e4e4e7; --app-head: #fafafa; --app-ink: #0a0a0a; --app-body: #52525b; --app-soft: #fafafa; --app-tool: #f4f4f5; --app-btn: #2f54eb; --app-on: #fff; --app-link: #2f54eb; }
+      .app--dark { --app-bg: #0d0c0a; --app-ln: #1e1e22; --app-head: #1a1815; --app-ink: #f4f4f5; --app-body: #a1a1aa; --app-soft: #1a1815; --app-tool: #15151a; --app-btn: #5b7cff; --app-on: #fff; --app-link: #85a0ff; }
       .app-head { display: flex; align-items: center; gap: 8px; padding: 11px 14px; background: var(--app-head); border-bottom: 1px solid var(--app-ln); }
       .app-title { font-size: 13px; font-weight: 600; color: var(--app-ink); }
       .app-body { padding: 16px 14px; display: flex; flex-direction: column; gap: 14px; }
@@ -172,7 +173,7 @@
       .rcard-p { font-size: 12px; color: var(--app-body); }
       .app-actions { display: flex; align-items: center; gap: 10px; }
       .app-btn { height: 30px; padding: 0 14px; border: 0; border-radius: var(--radius-sm); background: var(--app-btn); color: var(--app-on); font-size: 12px; font-weight: 600; }
-      .app-link { font-size: 12px; font-weight: 550; color: var(--app-ink); text-decoration: underline; }
+      .app-link { font-size: 12px; font-weight: 550; color: var(--app-link); text-decoration: underline; }
       .app-badge { margin-left: auto; font-family: var(--mono); font-size: 11px; border: 1px solid var(--app-ln); border-radius: var(--radius-sm); padding: 2px 8px; color: var(--app-body); }
       .app-avatar { width: 26px; height: 26px; border-radius: var(--radius-md); background: var(--app-tool); color: var(--app-ink); display: grid; place-items: center; font-size: 11px; font-weight: 600; }
 
@@ -218,11 +219,11 @@
       <section class="hero">
         <div class="container">
           <span class="eyebrow">Precision control plane</span>
-          <h1 style="margin-top: 12px">Orchestrate agents with monochrome precision.</h1>
+          <h1 style="margin-top: 12px">Orchestrate agents with cobalt precision.</h1>
           <p>
-            A preview of the Relay design language: white canvas, near-black ink as the only action
-            color, Geist Mono as the identity signal, tight geometry, and color reserved strictly for
-            status. In the Linear / Vercel / Resend lineage.
+            A preview of the Relay design language: white canvas, cobalt (#2f54eb) as the single brand
+            action color, Geist Mono as the identity signal, tight geometry, and the remaining color
+            reserved for status. In the Linear / Vercel / Resend lineage.
           </p>
           <div class="hero__actions">
             <a class="button button--primary" href="#tokens">Review tokens</a>
@@ -234,18 +235,18 @@
       <section class="section" id="tokens">
         <div class="container">
           <div class="section-heading">
-            <h2>Monochrome action, color for status.</h2>
-            <p>Ink carries every action and inverts to white-on-black in dark mode. The only hues on screen are status — success, danger, warning, info.</p>
+            <h2>Cobalt action, color for status.</h2>
+            <p>Cobalt carries every action and lifts to periwinkle in dark mode. The remaining hues are status — success, danger, warning; the former info blue folds into the brand.</p>
           </div>
           <div class="swatch-grid">
-            <article class="swatch"><div class="swatch__color" style="background: var(--primary)"></div><div class="swatch__body"><strong>Ink / Action</strong><code>#0a0a0a</code></div></article>
+            <article class="swatch"><div class="swatch__color" style="background: var(--primary)"></div><div class="swatch__body"><strong>Cobalt / Action</strong><code>#2f54eb</code></div></article>
             <article class="swatch"><div class="swatch__color" style="background: var(--surface-strong)"></div><div class="swatch__body"><strong>Surface Strong</strong><code>#f4f4f5</code></div></article>
             <article class="swatch"><div class="swatch__color" style="background: var(--surface-dark)"></div><div class="swatch__body"><strong>Surface Dark</strong><code>#0b0b0d</code></div></article>
             <article class="swatch"><div class="swatch__color" style="background: var(--hairline)"></div><div class="swatch__body"><strong>Hairline</strong><code>#e4e4e7</code></div></article>
             <article class="swatch"><div class="swatch__color" style="background: var(--success)"></div><div class="swatch__body"><strong>Success</strong><code>#10b981</code><span>status only</span></div></article>
             <article class="swatch"><div class="swatch__color" style="background: var(--danger)"></div><div class="swatch__body"><strong>Danger</strong><code>#e5484d</code><span>status only</span></div></article>
             <article class="swatch"><div class="swatch__color" style="background: var(--warning)"></div><div class="swatch__body"><strong>Warning</strong><code>#f5a623</code><span>dot only</span></div></article>
-            <article class="swatch"><div class="swatch__color" style="background: var(--info)"></div><div class="swatch__body"><strong>Info</strong><code>#3b82f6</code><span>sole status blue</span></div></article>
+            <article class="swatch"><div class="swatch__color" style="background: var(--brand-soft)"></div><div class="swatch__body"><strong>Brand Soft</strong><code>#eef1fe</code><span>selected / active tint</span></div></article>
           </div>
         </div>
       </section>
@@ -283,7 +284,7 @@
         <div class="container">
           <div class="section-heading">
             <h2>Component checks.</h2>
-            <p>Tight 6–8px geometry, hairline depth, status-only color, underlined links.</p>
+            <p>Tight 4–10px geometry, hairline depth, status-only color, underlined links. Buttons at 16px/600.</p>
           </div>
           <div class="grid-3">
             <article class="panel">
@@ -323,7 +324,7 @@
         <div class="container">
           <div class="section-heading">
             <h2>Operational surface — light &amp; dark.</h2>
-            <p>The action inverts to white-on-black in dark mode. Mono eyebrows identify the agent; color appears only on the verdict and status dot.</p>
+            <p>The cobalt action lifts to periwinkle in dark mode. Mono eyebrows identify the agent; status hues appear only on the verdict and status dot.</p>
           </div>
           <div class="apps">
             <article class="app app--light">
@@ -381,7 +382,7 @@
         <div class="container">
           <div class="section-heading">
             <h2>Pricing inversion.</h2>
-            <p>The featured tier highlights via dark inversion, not a colored ribbon. The action stays ink.</p>
+            <p>The featured tier highlights via dark inversion, not a colored ribbon. The action stays cobalt.</p>
           </div>
           <div class="pricing-grid">
             <article class="pricing-card">

@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Relay — Technical Direction, Refined</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Geist+Mono:wght@400..600&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #e7e7ea; font-family: "Geist", sans-serif; color: #18181b; padding: 40px 32px 80px; }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  h1 { font-size: 26px; font-weight: 600; letter-spacing: -0.5px; }
+  .sub { margin-top: 8px; color: #52525b; font-size: 15px; max-width: 760px; line-height: 1.55; }
+  h2.sec { font-size: 13px; font-family: "Geist Mono", monospace; letter-spacing: .08em; text-transform: uppercase; color: #71717a; margin: 44px 0 16px; }
+
+  /* ---- cobalt candidates ---- */
+  .hues { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
+  .hue { background: #fff; border: 1px solid #e4e4e7; border-radius: 14px; padding: 18px; }
+  .hue .chip { height: 64px; border-radius: 10px; display:flex; align-items:flex-end; padding:10px; color:#fff; font-family:"Geist Mono",monospace; font-size:12px; font-weight:600; }
+  .hue .meta { margin-top: 12px; display:flex; justify-content:space-between; align-items:baseline; }
+  .hue .nm { font-size: 14px; font-weight: 600; }
+  .hue .hx { font-family:"Geist Mono",monospace; font-size:12px; color:#71717a; }
+  .hue .note { margin-top:6px; font-size:12.5px; color:#71717a; line-height:1.45; }
+  .hue .ramp { display:flex; margin-top:12px; border-radius:7px; overflow:hidden; }
+  .hue .ramp span { flex:1; height:20px; }
+
+  /* ---- app shells (light + dark) ---- */
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .frame { border-radius: 16px; overflow: hidden; box-shadow: 0 26px 56px -30px rgba(0,0,0,.4); }
+  .frame .cap { padding: 11px 18px; font-size: 12.5px; font-family:"Geist Mono",monospace; letter-spacing:.05em; }
+  .cap-l { background:#18181b; color:#fff; }
+  .cap-d { background:#000; color:#fff; }
+
+  .app {
+    --rail-w: 58px; --list-w: 232px;
+    display: grid; grid-template-columns: var(--rail-w) var(--list-w) 1fr;
+    height: 540px; background: var(--canvas); color: var(--ink);
+    font-family:"Geist",sans-serif; font-size:14px;
+  }
+  .rail { background: var(--rail-bg); border-right:1px solid var(--hair); display:flex; flex-direction:column; align-items:center; padding:16px 0; gap:6px; }
+  .logo { width:34px; height:34px; border-radius:10px; background:var(--brand); display:grid; place-items:center; color:#fff; font-weight:700; font-size:18px; margin-bottom:14px; }
+  .ric { width:38px; height:38px; border-radius:10px; display:grid; place-items:center; color:var(--muted); font-size:16px; }
+  .ric.on { background:var(--brand-soft); color:var(--brand-ink); box-shadow: inset 2px 0 0 var(--brand) ; }
+  .list { background:var(--list-bg); border-right:1px solid var(--hair); padding:18px 14px; overflow:hidden; }
+  .list h3 { font-size:18px; font-weight:600; letter-spacing:-0.4px; }
+  .eb { font-family:"Geist Mono",monospace; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin:18px 4px 8px; }
+  .conv { padding:9px 12px; border-radius:7px; margin-bottom:3px; }
+  .conv.sel { background:var(--brand-soft); }
+  .conv .tp { display:flex; justify-content:space-between; align-items:center; }
+  .conv .nm { font-size:13.5px; font-weight:600; }
+  .conv.sel .nm { color:var(--brand-ink); }
+  .conv .tm { font-family:"Geist Mono",monospace; font-size:10px; color:var(--muted); }
+  .conv .pv { font-size:12px; color:var(--muted); margin-top:2px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+  .conv .pv a, .lnk { color:var(--brand-ink); text-decoration:none; font-weight:500; }
+  .main { display:flex; flex-direction:column; background:var(--canvas); }
+  .hdr { height:54px; border-bottom:1px solid var(--hair); display:flex; align-items:center; padding:0 20px; gap:10px; }
+  .hdr .t { font-size:15px; font-weight:600; letter-spacing:-0.2px; }
+  .pill { font-family:"Geist Mono",monospace; font-size:10.5px; padding:3px 9px; border-radius:999px; font-weight:600; }
+  .pill .dot { display:inline-block; width:6px; height:6px; border-radius:50%; background:currentColor; margin-right:5px; vertical-align:middle; }
+  .pill.run { background:var(--brand-soft); color:var(--brand-ink); }
+  .pill.ok { color:var(--up); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--up) 35%,transparent); }
+  .pill.warn { color:var(--warn); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--warn) 35%,transparent); }
+  .stream { flex:1; padding:22px 24px; display:flex; flex-direction:column; gap:18px; overflow:hidden; }
+  .msg { display:flex; gap:11px; }
+  .av { width:30px; height:30px; border-radius:9px; flex-shrink:0; display:grid; place-items:center; font-family:"Geist Mono",monospace; font-size:11px; font-weight:600; }
+  .av.u { background:var(--surface-strong); color:var(--ink); }
+  .av.c { background:var(--brand); color:#fff; }
+  .who { font-family:"Geist Mono",monospace; font-size:11px; font-weight:600; color:var(--muted); margin-bottom:4px; }
+  .txt { font-size:14px; line-height:1.55; color:var(--body); }
+  .tool { margin-top:7px; font-family:"Geist Mono",monospace; font-size:11.5px; color:var(--muted); padding-left:11px; border-left:2px solid var(--hair); }
+  .tool b { color:var(--brand-ink); font-weight:600; }
+  .composer { padding:13px 20px 16px; border-top:1px solid var(--hair); }
+  .inputrow { display:flex; gap:10px; align-items:center; background:var(--surface-soft); border:1px solid var(--input-bd); border-radius:11px; padding:7px 7px 7px 15px; box-shadow: var(--focus); }
+  .inputrow .ph { flex:1; font-size:13.5px; color:var(--muted); }
+  .btn { font-family:"Geist",sans-serif; font-size:13px; font-weight:600; padding:9px 18px; border-radius:8px; background:var(--brand); color:#fff; border:none; cursor:pointer; }
+  .btn.ghost { background:transparent; color:var(--ink); box-shadow: inset 0 0 0 1px var(--hair); }
+
+  /* LIGHT */
+  .light .app {
+    --canvas:#fff; --rail-bg:#fafafa; --list-bg:#fcfcfd; --surface-soft:#fafafa; --surface-strong:#f1f1f4;
+    --ink:#0f1115; --body:#3f434d; --muted:#8a8f9a; --hair:#e8e9ee; --input-bd:#dcdde3;
+    --brand:#2f54eb; --brand-soft:#eef1fe; --brand-ink:#2f54eb;
+    --up:#18a957; --warn:#b7791f;
+    --focus: 0 0 0 3px color-mix(in srgb,#2f54eb 22%,transparent);
+  }
+  /* DARK */
+  .dark .app {
+    --canvas:#0b0d12; --rail-bg:#0d0f15; --list-bg:#0c0e13; --surface-soft:#13161e; --surface-strong:#1b1f29;
+    --ink:#eef0f6; --body:#a9afbd; --muted:#6a7282; --hair:#1d212b; --input-bd:#262b37;
+    --brand:#5b7cff; --brand-soft:rgba(91,124,255,.14); --brand-ink:#85a0ff;
+    --up:#34d399; --warn:#e0a83a;
+    --focus: 0 0 0 3px color-mix(in srgb,#5b7cff 26%,transparent);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Technical &amp; trustworthy — refined</h1>
+  <p class="sub">Cobalt as the single action color, applied to primary buttons, links, active nav, the focus ring, and "running" status — while green/amber/red stay reserved for success/attention/danger. Shown in light and dark. Pick the cobalt below and I'll lock the design.</p>
+
+  <h2 class="sec">Cobalt candidates — which signature blue?</h2>
+  <div class="hues">
+    <div class="hue">
+      <div class="chip" style="background:#2f54eb">Aa</div>
+      <div class="meta"><span class="nm">A · Cobalt</span><span class="hx">#2f54eb</span></div>
+      <div class="note">Deep, saturated, confident. Clearly distinct from the #3b82f6 "info" status. Reads as infrastructure (Stripe / Linear lineage).</div>
+      <div class="ramp"><span style="background:#eef1fe"></span><span style="background:#c3cefb"></span><span style="background:#7c93f5"></span><span style="background:#2f54eb"></span><span style="background:#1e3bb8"></span></div>
+    </div>
+    <div class="hue">
+      <div class="chip" style="background:#3056d4">Aa</div>
+      <div class="meta"><span class="nm">B · Royal</span><span class="hx">#3056d4</span></div>
+      <div class="note">A touch softer and more classic. Slightly more approachable, still unmistakably "trust blue". Safe, timeless.</div>
+      <div class="ramp"><span style="background:#eef1fc"></span><span style="background:#c1cdf4"></span><span style="background:#7790e6"></span><span style="background:#3056d4"></span><span style="background:#1f3aa0"></span></div>
+    </div>
+    <div class="hue">
+      <div class="chip" style="background:#3d3df0">Aa</div>
+      <div class="meta"><span class="nm">C · Indigo</span><span class="hx">#3d3df0</span></div>
+      <div class="note">Pushes toward violet — more distinctive and "AI-forward" without leaving the blue family. Most ownable, slightly less corporate-safe.</div>
+      <div class="ramp"><span style="background:#eeeefe"></span><span style="background:#c7c7fb"></span><span style="background:#8585f6"></span><span style="background:#3d3df0"></span><span style="background:#2727b5"></span></div>
+    </div>
+  </div>
+
+  <h2 class="sec">Applied — light &amp; dark (using candidate A · Cobalt)</h2>
+  <div class="pair">
+    <div class="frame light"><div class="cap cap-l">LIGHT — white canvas</div><div class="app" id="light"></div></div>
+    <div class="frame dark"><div class="cap cap-d">DARK — cobalt lifts to periwinkle for contrast</div><div class="app" id="dark"></div></div>
+  </div>
+</div>
+
+<script>
+  const shell = `
+    <div class="rail">
+      <div class="logo">R</div>
+      <div class="ric on">◆</div><div class="ric">☷</div><div class="ric">↻</div><div class="ric">⚙</div>
+    </div>
+    <div class="list">
+      <h3>Conversations</h3>
+      <div class="eb">Active</div>
+      <div class="conv sel"><div class="tp"><span class="nm">Migrate auth service</span><span class="tm">2m</span></div><div class="pv">claude · running preflight…</div></div>
+      <div class="conv"><div class="tp"><span class="nm">Dashboard token chart</span><span class="tm">14m</span></div><div class="pv">codex · <a>review requested</a></div></div>
+      <div class="conv"><div class="tp"><span class="nm">Nightly backlog sweep</span><span class="tm">1h</span></div><div class="pv">pi · 3 tasks dispatched</div></div>
+      <div class="eb">Idle</div>
+      <div class="conv"><div class="tp"><span class="nm">Refactor session store</span><span class="tm">3h</span></div><div class="pv">kimi · awaiting approval</div></div>
+    </div>
+    <div class="main">
+      <div class="hdr">
+        <span class="t">Migrate auth service</span>
+        <span class="pill run"><span class="dot"></span>running</span>
+        <span class="pill warn"><span class="dot"></span>approval</span>
+        <span class="pill ok" style="margin-left:auto"><span class="dot"></span>daemon ready</span>
+      </div>
+      <div class="stream">
+        <div class="msg"><div class="av u">FH</div><div><div class="who">you</div><div class="txt">Port the auth routes to the new daemon registry and keep the <span class="lnk">token contract</span> intact.</div></div></div>
+        <div class="msg"><div class="av c">CL</div><div><div class="who">claude · action</div><div class="txt">On it. I'll thread the employee id through run dispatch and keep the ownership checkpoint the single seam.</div>
+          <div class="tool">⏺ <b>Edit</b> backend/relay/api/session_routes.py</div>
+          <div class="tool">⏺ <b>Bash</b> make test · 142 passed</div></div></div>
+      </div>
+      <div class="composer">
+        <div class="inputrow"><span class="ph">Message the agent, or @mention claude · pi · codex · kimi…</span><button class="btn">Send</button></div>
+      </div>
+    </div>`;
+  document.getElementById('light').innerHTML = shell;
+  document.getElementById('dark').innerHTML = shell;
+</script>
+</body>
+</html>

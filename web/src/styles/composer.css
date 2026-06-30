@@ -2,7 +2,7 @@
 
 .composer {
   display: grid;
-  padding: var(--space-xs) var(--space-base) var(--space-base);
+  padding: var(--space-xs) 0 var(--space-base);
   border-top: 1px solid var(--color-hairline-soft);
   background: var(--color-canvas);
 }
@@ -102,7 +102,6 @@
 
 .mode-chip:focus-visible {
   outline: none;
-  box-shadow: var(--ring-focus);
 }
 
 .mode-chip-icon {
@@ -157,16 +156,26 @@
 
 .composer-input-wrap {
   position: relative;
+  width: min(100%, 960px);
+  margin: 0 auto;
+  padding-inline: var(--space-lg);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lift);
+  transition: box-shadow var(--duration-fast) ease;
+}
+
+.composer-input-wrap:has(.composer-input:focus-within) {
+  box-shadow: var(--ring-focus), var(--shadow-lift);
 }
 
 .composer-input {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-md);
+  border: 0;
+  border-radius: inherit;
   background: var(--color-canvas);
-  box-shadow: 0 1px 0 color-mix(in srgb, var(--color-ink) 4%, transparent);
-  transition: border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
+  box-shadow: none;
+  transition: border-color var(--duration-fast) ease;
 }
 
 .mention-popover {
@@ -200,10 +209,7 @@
 }
 
 .composer-input:focus-within {
-  border-color: color-mix(in srgb, var(--color-primary) 60%, var(--color-hairline));
-  box-shadow:
-    var(--ring-focus),
-    0 1px 0 color-mix(in srgb, var(--color-ink) 4%, transparent);
+  border-color: transparent;
 }
 
 .composer-input textarea {
@@ -218,6 +224,10 @@
   color: var(--color-ink);
   font-size: var(--text-md);
   line-height: 1.5;
+}
+
+.composer-input textarea:focus-visible {
+  box-shadow: none;
 }
 
 .composer-input textarea::placeholder {
@@ -244,16 +254,13 @@
   flex-wrap: wrap;
 }
 
-/* Send control — the one filled action in the composer. Kept flat and calm to
-   match the mode-chip / input house style: a square ink fill, a hairline-quiet
-   hover, scale(0.97) on press, and the shared focus ring. No ripple, hover
-   lift, icon rotation, or idle nudge — those read louder than the rest of the
-   surface. Square footprint matches the 28px footer control height. */
+/* Send control — the one filled action in the composer. 36×36px cobalt plate
+   matching the thread new-btn and design-system.md button-primary geometry. */
 .send-button {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 36px;
+  height: 36px;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: var(--color-primary);
@@ -275,7 +282,6 @@
 
 .send-button:focus-visible {
   outline: none;
-  box-shadow: var(--ring-focus);
 }
 
 .send-button:disabled {
@@ -285,15 +291,17 @@
   cursor: not-allowed;
 }
 
-/* Cancel variant — replaces send in-place while an agent run is active. A flat
-   red fill makes it an unambiguous stop affordance; everything else matches. */
+/* Cancel variant — outlined danger stop while a run is active. Status hue as
+   border/text only; cobalt remains the sole filled action in the composer. */
 .send-button.send-button-cancel {
-  background: var(--color-semantic-down);
-  color: var(--color-on-primary);
+  background: var(--color-canvas);
+  border-color: var(--border-danger);
+  color: var(--color-danger-text);
 }
 
 .send-button.send-button-cancel:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--color-semantic-down) 88%, black 12%);
+  background: color-mix(in srgb, var(--color-semantic-down) 6%, var(--color-canvas));
+  border-color: var(--color-semantic-down);
 }
 
 .send-button.send-button-cancel:focus-visible {

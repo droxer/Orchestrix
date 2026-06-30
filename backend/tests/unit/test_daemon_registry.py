@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import time
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pytest
@@ -91,6 +93,69 @@ def test_daemon_registration_poll_and_completion_updates_session() -> None:
             assert session["status"] == "completed"
             assert "reviewVerdict" not in session
             assert registry.monitor_nodes()[0]["queuedCommandCount"] == 0
+
+    asyncio.run(run_flow())
+
+
+def test_daemon_completion_indexes_generated_pptx_artifact() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            workspace = Path(root) / "workspace"
+            workspace.mkdir()
+            stale = workspace / "old-deck.pptx"
+            stale.write_bytes(b"old")
+            stale_time = time.time() - 3600
+            os.utime(stale, (stale_time, stale_time))
+            existing = workspace / "existing-deck.pptx"
+            existing.write_bytes(b"already here")
+
+            session_store = LocalSessionStore(root)
+            daemon_store = LocalDaemonStore(root)
+            registry = DaemonNodeRegistry(session_store, daemon_store)
+            backend = ServerDaemonNodeBackend(registry)
+            registry.register({
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": str(workspace),
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }, "ui_token")
+
+            session = await backend.run("sbx_alice", {
+                "taskGoal": "generate a deck",
+                "assignments": [{"agent": "codex", "mode": "action"}],
+            })
+            [command] = registry.take_commands("sbx_alice", "node_token")
+            generated = workspace / "quarterly-review.pptx"
+            generated.write_bytes(b"pptx bytes")
+            outside = Path(root) / "outside.pptx"
+            outside.write_bytes(b"outside")
+            linked = workspace / "linked-outside.pptx"
+            try:
+                linked.symlink_to(outside)
+            except OSError as exc:
+                pytest.skip(f"symlinks unavailable: {exc}")
+
+            registry.handle_event("sbx_alice", {
+                "type": "run.completed",
+                "commandId": command["id"],
+                "sessionId": command["sessionId"],
+                "runId": command["runId"],
+                "agent": "codex",
+                "mode": "action",
+                "exitCode": 0,
+                "agentLog": "created quarterly-review.pptx",
+            }, "node_token")
+
+            updated = session_store.get_session(session["id"])
+            [artifact] = [item for item in updated["artifacts"] if item["kind"] == "workspace_file"]
+            assert artifact["title"] == "quarterly-review.pptx"
+            assert artifact["path"] == str(generated.resolve())
+            assert artifact["workspaceRelativePath"] == "quarterly-review.pptx"
+            assert artifact["agentRunId"] == command["runId"]
+            assert artifact["id"] in updated["agentRuns"][0]["artifactIds"]
 
     asyncio.run(run_flow())
 
@@ -716,6 +781,47 @@ def test_database_daemon_store_claims_queued_commands_once() -> None:
         claimed = [command for commands in results for command in commands]
         assert [command["id"] for command in claimed] == ["cmd_once"]
         assert store.queued_command_count("sbx_alice") == 0
+
+
+def test_database_daemon_store_preserves_artifact_snapshot_state() -> None:
+    with TemporaryDirectory() as root:
+        store = DatabaseDaemonStore(f"sqlite:///{root}/daemon.db", create_schema=True)
+        store.register_node({
+            "id": "sbx_alice",
+            "employeeId": "alice",
+            "workspacePath": "/workspace/alice",
+            "status": "ready",
+            "agents": {"codex": "ready"},
+            "token": None,
+            "nodeToken": "tok_secret",
+            "nodeTokenHash": "sha256:hash",
+            "createdAt": "2026-06-13T00:00:00.000Z",
+            "updatedAt": "2026-06-13T00:00:00.000Z",
+        })
+        request = store.create_run_request({
+            "nodeId": "sbx_alice",
+            "sessionId": "ses_1",
+            "taskGoal": "generate deck",
+            "assignments": [{"agent": "codex", "mode": "action"}],
+            "state": {"task_goal": "generate deck"},
+        })
+
+        updated = store.update_run_request(request["id"], {
+            "currentCommandId": "cmd_1",
+            "currentRunId": "run_1",
+            "currentAgent": "codex",
+            "currentMode": "action",
+            "currentStartedAt": "2026-06-30T00:00:00.000Z",
+            "state": {
+                "task_goal": "generate deck",
+                "_relay_artifact_snapshot": {
+                    "/workspace/alice/existing.pptx": {"mtime": 1.0, "bytes": 10},
+                },
+            },
+        })
+
+        assert updated["state"]["_relay_artifact_snapshot"]["/workspace/alice/existing.pptx"]["bytes"] == 10
+        assert store.run_request_for_command("cmd_1")["state"]["_relay_artifact_snapshot"]
 
 
 @pytest.mark.parametrize("store_factory", [LocalDaemonStore, lambda root: DatabaseDaemonStore(f"sqlite:///{root}/daemon.db", create_schema=True)])

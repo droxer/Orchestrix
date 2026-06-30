@@ -2,7 +2,8 @@
 
 /* The .pill status vocabulary (good/info/warn/bad, each with a leading dot)
    moved into the shadcn Badge tone variants (src/components/ui/badge.tsx),
-   consumed via <StatusPill>. The motion + focus helpers below remain global. */
+   consumed via <StatusPill>. Focus ring lives in tokens.css; motion helpers
+   below remain global. */
 
 .spin { animation: spin 0.9s linear infinite; }
 
@@ -17,14 +18,4 @@
     scroll-behavior: auto !important;
     transition-duration: 1ms !important;
   }
-}
-
-:where(button, a, input, textarea, select):focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 3px;
-}
-
-.chat-panel:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: -2px;
 }

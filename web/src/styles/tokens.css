@@ -10,11 +10,12 @@
         utilities used by src/components/ui.
 
    Visual language: precision/technical (Linear / Vercel / Resend
-   lineage). White canvas, near-black ink as the single ACTION color
-   (it inverts to white-on-black in dark mode), cool neutral hairlines
-   in light and warm charcoal in dark. Color is reserved exclusively
-   for status (success / danger / warning / info) and never used for
-   actions. Geist carries interface and display text; Geist Mono is a
+   lineage). White canvas, cobalt (#2f54eb) as the single brand ACTION
+   color (it lifts to periwinkle on the dark canvas), cool neutral
+   hairlines in light and warm charcoal in dark. The action carries the
+   hue; status narrows to success / danger / warning (green / amber /
+   red) and "info" folds into the cobalt brand — no competing second
+   blue. Geist carries interface and display text; Geist Mono is a
    deliberate identity signal — eyebrows, metadata, agent labels, tool
    lines, numbers, and code. No editorial serif; no pill geometry.
    ===================================================================== */
@@ -61,6 +62,7 @@
   --color-danger: var(--color-semantic-down);
   --color-warning: var(--color-accent-yellow);
   --color-info: var(--color-info);
+  --color-brand-soft: var(--color-brand-soft);
 
   /* Radii — tight precision geometry; expose the whole token scale so
      rounded-sm / rounded-md / rounded-xl replace the
@@ -115,11 +117,13 @@
 :root {
   /* ----- 1. Primitives ---------------------------------------- */
 
-  /* Action — near-black ink is the only action color (monochrome).
-     Color is reserved for status; actions never carry a hue. */
-  --color-primary: #0a0a0a;
-  --color-primary-active: #27272a;
-  --color-primary-disabled: #d4d4d8;
+  /* Action — cobalt brand is the single action color. Hue now carries the
+     action; status narrows to green/amber/red. --color-ink stays #0a0a0a
+     (text), decoupled from the action color it was previously fused with. */
+  --color-primary: #2f54eb;
+  --color-primary-active: #1e3bb8;
+  --color-primary-disabled: #c3cefb;
+  --color-brand-soft: #eef1fe; /* tint — selected rows, active nav, running pills */
 
   /* Text — cool neutral ramp (zinc) */
   --color-ink: #0a0a0a;        /* headings, primary copy, emphasized body */
@@ -165,7 +169,7 @@
   --color-semantic-up: #10b981;
   --color-semantic-down: #e5484d;
   --color-accent-yellow: #f5a623; /* attention dot only, not an action color */
-  --color-info: #3b82f6;          /* neutral "info" status — the sole surviving blue, status-only */
+  --color-info: var(--color-primary);  /* info folds into the cobalt brand — no competing second blue */
 
   /* Status-as-TEXT — the dot/border values above are tuned for fills on a
      white canvas and fail WCAG contrast as small foreground text (amber is
@@ -419,19 +423,20 @@ html[data-theme="dark"] {
   --color-hairline: color-mix(in srgb, var(--color-on-dark) 14%, var(--color-surface-dark));
   --color-hairline-soft: color-mix(in srgb, var(--color-on-dark) 8%, var(--color-surface-dark));
 
-  /* Action — monochrome invert. In dark mode the action fill flips to
-     near-white with ink text (the Vercel signature). Primary also drives
-     links and the focus ring, so they read as white-on-dark; status hues
-     stay separate via --color-info etc. */
-  --color-primary: #f4f4f5;
-  --color-primary-active: #e4e4e7;
-  --color-primary-disabled: color-mix(in srgb, var(--color-on-dark) 24%, var(--color-surface-dark));
-  --color-on-primary: #0a0a0a; /* ink text on the white action fill */
+  /* Action — cobalt lifts to periwinkle on the dark canvas for contrast,
+     mirroring how status hues lift in dark mode. The action now carries a
+     hue in both modes (no black<->white inversion); on-primary stays white
+     against the cobalt fill. Primary also drives links and the focus ring. */
+  --color-primary: #5b7cff;
+  --color-primary-active: #7d97ff;
+  --color-primary-disabled: color-mix(in srgb, #5b7cff 30%, var(--color-surface-dark));
+  --color-on-primary: #ffffff; /* white text on the cobalt action fill */
+  --color-brand-soft: rgba(91, 124, 255, 0.14);
 
   /* Status — text/dots authored for white; lift for legibility on dark. */
   --color-semantic-up: #2ed391;
   --color-semantic-down: #ff6b75;
-  --color-info: #60a5fa;
+  --color-info: var(--color-primary);
   --color-code-number: #f0a868;
   --color-accent-yellow: #f7b84d; /* attention dot — brightened for dark canvas */
 
@@ -487,14 +492,15 @@ html[data-theme="contrast"] {
   --color-hairline: #000000;
   --color-hairline-soft: #5c5c5c;
 
-  --color-primary: #000000;
-  --color-primary-active: #2e2e2e;
-  --color-primary-disabled: #8a8a8a;
+  --color-primary: #1730a8;
+  --color-primary-active: #102179;
+  --color-primary-disabled: #9aa9e8;
   --color-on-primary: #ffffff;
+  --color-brand-soft: #e6eaff;
 
   --color-semantic-up: #006b3d;
   --color-semantic-down: #b00020;
-  --color-info: #0033cc;
+  --color-info: var(--color-primary);
   --color-accent-yellow: #8a5a00;
   --color-warning-text: #5c3b00;
   --color-danger-text: #b00020;
@@ -541,14 +547,15 @@ html[data-theme="contrast-dark"] {
   --color-hairline: #ffffff;
   --color-hairline-soft: #9a9a9a;
 
-  --color-primary: #ffffff;
-  --color-primary-active: #d4d4d4;
-  --color-primary-disabled: #6a6a6a;
+  --color-primary: #7d9bff;
+  --color-primary-active: #9db3ff;
+  --color-primary-disabled: #4a5a8a;
   --color-on-primary: #000000;
+  --color-brand-soft: rgba(125, 155, 255, 0.18);
 
   --color-semantic-up: #00e676;
   --color-semantic-down: #ff6b75;
-  --color-info: #5aa9ff;
+  --color-info: var(--color-primary);
   --color-accent-yellow: #ffce4d;
   --color-warning-text: #ffce4d;
   --color-danger-text: #ff8088;
@@ -586,7 +593,7 @@ body {
   background: var(--color-canvas);
   color: var(--color-body);
   font-family: var(--font-sans);
-  font-size: var(--text-md);
+  font-size: var(--text-base);
   line-height: 1.5;
 }
 
@@ -643,6 +650,20 @@ button:disabled {
   opacity: 0.55;
 }
 
+/* Focus — single ring contract. Components that need a stacked shadow
+   (composer wrap, cards on hover) override locally; everything else picks
+   up the cobalt-alpha halo here. */
+:where(button, a, input, textarea, select):focus-visible {
+  outline: none;
+  box-shadow: var(--ring-focus);
+}
+
+.chat-panel:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-focus);
+  outline-offset: 0;
+}
+
 /* Primary CTA enabled — the unlayered `button { background: none }` reset above
    outranks Tailwind's layered `bg-primary`/`text-primary-foreground` utilities
    (an unlayered rule beats any @layer regardless of specificity), so the
@@ -688,7 +709,14 @@ button[data-slot="button"][data-variant="default"]:disabled {
   font-weight: 500;
 }
 
-.eyebrow,
+.eyebrow {
+  margin: 0;
+  color: var(--color-muted);
+  font: var(--type-eyebrow);
+  letter-spacing: var(--letter-eyebrow);
+  text-transform: uppercase;
+}
+
 .panel-kicker {
   margin: 0;
   color: var(--color-muted);

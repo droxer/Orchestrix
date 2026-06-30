@@ -49,7 +49,10 @@
     "agent_failed_title": "{{agent}} 在此節點尚未就緒。",
     "agent_disabled_option": "{{agent}}（已停用）",
     "no_conversations": "尚無對話，開始新對話吧。",
-    "no_matches": "沒有符合的對話。"
+    "no_matches": "沒有符合的對話。",
+    "group_needs_you": "待處理",
+    "group_running": "運行中",
+    "group_idle": "閒置"
   },
   "conversation": {
     "agent_working": "{{agent}} 正在運作",
@@ -688,7 +691,8 @@
       "test_output": "測試輸出",
       "command_log": "命令日誌",
       "summary": "摘要",
-      "agent_output": "Agent 輸出"
+      "agent_output": "Agent 輸出",
+      "workspace_file": "檔案"
     },
     "view": "檢視",
     "view_named": "檢視 {{title}}",
@@ -699,6 +703,7 @@
     "preview_error": "無法載入預覽：{{message}}",
     "preview_empty": "暫無產物內容。",
     "preview_truncated": "預覽已截斷。開啟原文可查看完整產物。",
+    "workspace_file_preview": "已產生工作區檔案。開啟原文可下載或檢視。",
     "stat": {
       "diff": "+{{additions}} −{{deletions}} · {{files}} 個檔案",
       "test": "{{passed}} 通過 · {{failed}} 失敗",

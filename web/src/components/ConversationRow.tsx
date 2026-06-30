@@ -1,17 +1,8 @@
 import { ActionRemove } from "./icons";
 import { useTranslation } from "react-i18next";
 import { useDialogs } from "./ui/DialogProvider";
-import type { AgentName, RelaySession } from "../types";
-import { conversationLabel } from "../lib/conversations";
-
-// A conversation is one owner-scoped session. The row binds to the session
-// itself (not an employee), so the logged-in employee can hold several in
-// parallel and switch between them.
-type ConversationItem = {
-  session: RelaySession;
-  /** Agent of an in-flight run for this conversation, if any. */
-  runningAgent?: AgentName;
-};
+import type { RelaySession } from "../types";
+import { conversationLabel, type ConversationItem } from "../lib/conversations";
 
 export type { ConversationItem };
 

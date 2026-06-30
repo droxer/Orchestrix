@@ -8,7 +8,7 @@ import { mergeTokenUsage, type TokenUsage } from "./token-usage.js";
 
 export type AgentRole = "implementer" | "reviewer" | "planner" | "tester" | "fixer";
 export type SessionStatus = "running" | "waiting_for_human" | "completed" | "failed" | "cancelled";
-export type RelayArtifactKind = "plan" | "diff" | "review" | "test_output" | "command_log" | "summary" | "agent_output";
+export type RelayArtifactKind = "plan" | "diff" | "review" | "test_output" | "command_log" | "summary" | "agent_output" | "workspace_file";
 export type HumanDecisionKind = "approve" | "reject" | "cancel" | "rerun" | "handoff" | "mark_done";
 
 export interface AgentRun {
@@ -33,6 +33,8 @@ export interface RelayArtifact {
   createdAt: string;
   agentRunId?: string;
   bytes?: number;
+  contentType?: string;
+  workspaceRelativePath?: string;
 }
 
 export interface HumanDecision {

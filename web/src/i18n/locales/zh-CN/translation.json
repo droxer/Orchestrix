@@ -49,7 +49,10 @@
     "agent_failed_title": "{{agent}} 在该节点尚未就绪。",
     "agent_disabled_option": "{{agent}}（已禁用）",
     "no_conversations": "暂无对话，开始新对话吧。",
-    "no_matches": "没有匹配的对话。"
+    "no_matches": "没有匹配的对话。",
+    "group_needs_you": "待处理",
+    "group_running": "运行中",
+    "group_idle": "空闲"
   },
   "conversation": {
     "agent_working": "{{agent}} 正在工作",
@@ -688,7 +691,8 @@
       "test_output": "测试输出",
       "command_log": "命令日志",
       "summary": "摘要",
-      "agent_output": "Agent 输出"
+      "agent_output": "Agent 输出",
+      "workspace_file": "文件"
     },
     "view": "查看",
     "view_named": "查看 {{title}}",
@@ -699,6 +703,7 @@
     "preview_error": "无法加载预览：{{message}}",
     "preview_empty": "暂无产物内容。",
     "preview_truncated": "预览已截断。打开原文可查看完整产物。",
+    "workspace_file_preview": "已生成工作区文件。打开原文可下载或查看。",
     "stat": {
       "diff": "+{{additions}} −{{deletions}} · {{files}} 个文件",
       "test": "{{passed}} 通过 · {{failed}} 失败",

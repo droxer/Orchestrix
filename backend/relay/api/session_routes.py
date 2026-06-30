@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import PlainTextResponse, StreamingResponse
+from fastapi.responses import FileResponse, PlainTextResponse, StreamingResponse
 from loguru import logger
 
 from ..core.models import AGENT_NAMES
@@ -36,12 +36,8 @@ ACTIVE_TASK_STATUSES = frozenset({"assigned", "running", "waiting_for_human", "r
 ACTIVE_SESSION_STATUSES = frozenset({"running", "waiting_for_human"})
 WORKSPACE_FILE_LIMIT = 200
 WORKSPACE_FILE_PREVIEW_LIMIT = 256 * 1024  # 256 KB cap for inline file previews
-# Internal run transcripts — stored for bridge/replay but not user-facing outputs.
-WORKSPACE_HIDDEN_ARTIFACT_KINDS = frozenset({"command_log"})
-
-
 def is_workspace_artifact(artifact: dict[str, Any]) -> bool:
-    return artifact.get("kind") not in WORKSPACE_HIDDEN_ARTIFACT_KINDS
+    return artifact.get("kind") == "workspace_file"
 
 
 def workspace_artifacts(session: dict[str, Any]) -> list[dict[str, Any]]:
@@ -58,6 +54,30 @@ def artifact_index_item(session: dict[str, Any], artifact: dict[str, Any]) -> di
         "workspacePath": session.get("workspacePath"),
         "sessionUpdatedAt": session.get("updatedAt"),
     }
+
+
+def session_artifact(session: dict[str, Any], artifact_id: str) -> dict[str, Any] | None:
+    return next((artifact for artifact in session.get("artifacts", []) if artifact.get("id") == artifact_id), None)
+
+
+def workspace_artifact_path(session: dict[str, Any], artifact: dict[str, Any]) -> Path | None:
+    workspace_path = session.get("workspacePath")
+    artifact_path = artifact.get("path")
+    if not workspace_path or not artifact_path:
+        return None
+    try:
+        root = Path(str(workspace_path)).resolve()
+        path = Path(str(artifact_path))
+        if path.is_symlink():
+            return None
+        target = path.resolve()
+    except OSError:
+        return None
+    if target != root and root not in target.parents:
+        return None
+    if not target.is_file():
+        return None
+    return target
 
 
 def session_brief_item(session: dict[str, Any]) -> dict[str, Any]:
@@ -528,9 +548,19 @@ async def session_events(session_id: str, request: Request, ctx: AppContextDep) 
 
 
 @router.get("/sessions/{session_id}/artifacts/{artifact_id}")
-async def read_artifact(session_id: str, artifact_id: str, request: Request, ctx: AppContextDep) -> PlainTextResponse:
+async def read_artifact(session_id: str, artifact_id: str, request: Request, ctx: AppContextDep) -> Any:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
-    get_session_for_actor(ctx.session_store, session_id, actor)
+    session = get_session_for_actor(ctx.session_store, session_id, actor)
+    artifact = session_artifact(session, artifact_id)
+    if artifact and artifact.get("kind") == "workspace_file":
+        path = workspace_artifact_path(session, artifact)
+        if path:
+            return FileResponse(
+                path,
+                media_type=artifact.get("contentType") or "application/octet-stream",
+                filename=artifact.get("title") or path.name,
+            )
+        raise HTTPException(404, "Artifact not found.")
     try:
         return PlainTextResponse(ctx.session_store.read_artifact(session_id, artifact_id))
     except Exception:

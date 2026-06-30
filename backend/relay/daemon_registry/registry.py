@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import hmac
+import mimetypes
 import os
 import secrets
 from threading import RLock
@@ -15,7 +16,7 @@ from loguru import logger
 from ..core.environment import load_backend_env
 from ..core.ids import new_relay_id, new_sandbox_id, now_iso
 from ..core.models import AGENT_NAMES, AGENT_ROLES, DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS
-from ..persistence.stores import LocalDaemonStore, LocalSessionStore, LocalTaskStore, role_for_agent
+from ..persistence.stores import LocalDaemonStore, LocalSessionStore, LocalTaskStore, relay_event, role_for_agent
 from ..sessions import compute_prior_agent_bridge
 from ..sessions import compute_conversation_history
 from ..sessions import SessionController, initial_agent_state
@@ -26,6 +27,41 @@ DAEMON_NODE_LIVENESS_TIMEOUT_MS = int(os.environ.get("RELAY_DAEMON_NODE_LIVENESS
 DAEMON_RUN_TIMEOUT_MS = int(os.environ.get("RELAY_DAEMON_RUN_TIMEOUT_MS", str(15 * 60 * 1000)))
 DAEMON_COMMAND_LEASE_SECONDS = float(os.environ.get("RELAY_DAEMON_COMMAND_LEASE_SECONDS", "60"))
 AGENT_TASK_MODES = ("action", "review", "ask")
+GENERATED_ARTIFACT_EXTENSIONS = frozenset({
+    ".csv",
+    ".doc",
+    ".docx",
+    ".gif",
+    ".html",
+    ".jpeg",
+    ".jpg",
+    ".key",
+    ".pdf",
+    ".png",
+    ".ppt",
+    ".pptx",
+    ".svg",
+    ".tsv",
+    ".webp",
+    ".xls",
+    ".xlsx",
+    ".zip",
+})
+GENERATED_ARTIFACT_EXCLUDED_DIRS = frozenset({
+    ".git",
+    ".next",
+    ".oci",
+    ".relay",
+    ".pytest_cache",
+    ".venv",
+    "__pycache__",
+    "dist",
+    "node_modules",
+    "out",
+    "venv",
+})
+GENERATED_ARTIFACT_LIMIT = 20
+ARTIFACT_SNAPSHOT_STATE_KEY = "_relay_artifact_snapshot"
 
 
 def hash_daemon_node_token(token: str | None) -> str | None:
@@ -71,6 +107,67 @@ def sandbox_node_auth_error(sandbox: dict[str, Any], token: str | None) -> str |
     if not daemon_node_token_matches(sandbox, token):
         return "Invalid daemon node token."
     return None
+
+
+def _workspace_artifact_candidates(workspace_path: str | None) -> list[dict[str, Any]]:
+    if not workspace_path:
+        return []
+    root = Path(workspace_path)
+    if not root.exists() or not root.is_dir():
+        return []
+    root_resolved = root.resolve()
+    files: list[dict[str, Any]] = []
+    try:
+        for dirpath, dirnames, filenames in os.walk(root_resolved):
+            dirnames[:] = [
+                name
+                for name in dirnames
+                if name not in GENERATED_ARTIFACT_EXCLUDED_DIRS and not (Path(dirpath) / name).is_symlink()
+            ]
+            for filename in filenames:
+                path = Path(dirpath) / filename
+                if path.suffix.lower() not in GENERATED_ARTIFACT_EXTENSIONS:
+                    continue
+                if filename.startswith("~$") or path.is_symlink():
+                    continue
+                try:
+                    stat = path.stat()
+                    if not path.is_file():
+                        continue
+                    relative = path.relative_to(root_resolved)
+                except (OSError, ValueError):
+                    continue
+                content_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+                files.append({
+                    "path": str(path.resolve()),
+                    "relativePath": relative.as_posix(),
+                    "title": path.name,
+                    "bytes": stat.st_size,
+                    "mtime": stat.st_mtime,
+                    "contentType": content_type,
+                })
+    except OSError:
+        return []
+    files.sort(key=lambda item: item["mtime"], reverse=True)
+    return files
+
+
+def _workspace_generated_file_snapshot(workspace_path: str | None) -> dict[str, dict[str, float | int]]:
+    return {
+        item["path"]: {"mtime": item["mtime"], "bytes": item["bytes"]}
+        for item in _workspace_artifact_candidates(workspace_path)
+    }
+
+
+def _workspace_generated_files(workspace_path: str | None, before: dict[str, Any] | None) -> list[dict[str, Any]]:
+    before = before or {}
+    files: list[dict[str, Any]] = []
+    for item in _workspace_artifact_candidates(workspace_path):
+        previous = before.get(item["path"])
+        if previous and previous.get("mtime") == item["mtime"] and previous.get("bytes") == item["bytes"]:
+            continue
+        files.append(item)
+    return files[:GENERATED_ARTIFACT_LIMIT]
 
 
 def public_sandbox_record(sandbox: dict[str, Any]) -> dict[str, Any]:
@@ -709,6 +806,7 @@ class DaemonNodeRegistry:
         state = dict(run_request["state"] or {})
         state.pop("prior_agent_bridge", None)
         state.pop("prior_conversation", None)
+        state.pop(ARTIFACT_SNAPSHOT_STATE_KEY, None)
         session_snapshot = self.store.get_session(run_request["sessionId"])
         bridge = compute_prior_agent_bridge(session_snapshot, assignment["agent"], self.store)
         if bridge:
@@ -733,6 +831,7 @@ class DaemonNodeRegistry:
             **({"workspacePath": sandbox["workspacePath"]} if sandbox.get("workspacePath") else {}),
             "state": state,
         }
+        artifact_snapshot = _workspace_generated_file_snapshot(sandbox.get("workspacePath"))
         self.enqueue(run_request["nodeId"], command)
         return self.daemon_store.update_run_request(run_request["id"], {
             "currentCommandId": command["id"],
@@ -740,6 +839,7 @@ class DaemonNodeRegistry:
             "currentAgent": assignment["agent"],
             "currentMode": mode,
             "currentStartedAt": now_iso(),
+            "state": {**state, ARTIFACT_SNAPSHOT_STATE_KEY: artifact_snapshot},
         })
 
     def _advance_run_request(self, run_request: dict[str, Any], event: dict[str, Any]) -> None:
@@ -751,7 +851,8 @@ class DaemonNodeRegistry:
         assignments = run_request["assignments"]
         assignment = assignments[run_request.get("currentIndex", 0)]
         mode = assignment.get("mode") or "action"
-        state = run_request["state"]
+        state = dict(run_request["state"])
+        artifact_snapshot = state.pop(ARTIFACT_SNAPSHOT_STATE_KEY, None)
         if event["type"] == "run.failed":
             agent_log = event.get("agentLog") or event["error"]
             self.clear_run_output(event["runId"])
@@ -778,6 +879,8 @@ class DaemonNodeRegistry:
             "agentLog": agent_log,
             "tokenUsage": event.get("tokenUsage"),
         })
+        if event["exitCode"] == 0:
+            self._record_generated_workspace_artifacts(sandbox, run_request, event, artifact_snapshot)
         if event["exitCode"] != 0:
             outcome = f"{assignment['agent']} {mode} failed with exit code {event['exitCode']}."
             controller.fail_session(run_request["sessionId"], outcome)
@@ -798,6 +901,39 @@ class DaemonNodeRegistry:
             self._complete_run_request(updated, "Assignments completed.")
         else:
             self._enqueue_current_assignment(updated)
+
+    def _record_generated_workspace_artifacts(self, sandbox: dict[str, Any], run_request: dict[str, Any], event: dict[str, Any], artifact_snapshot: dict[str, Any] | None) -> None:
+        session_id = run_request["sessionId"]
+        session = self.store.get_session(session_id)
+        existing_paths = {
+            str(Path(artifact["path"]).resolve())
+            for artifact in session.get("artifacts", [])
+            if artifact.get("kind") == "workspace_file" and artifact.get("path")
+        }
+        for item in _workspace_generated_files(sandbox.get("workspacePath"), artifact_snapshot):
+            path = str(Path(item["path"]).resolve())
+            if path in existing_paths:
+                continue
+            artifact = {
+                "id": new_relay_id("art"),
+                "kind": "workspace_file",
+                "title": item["title"],
+                "path": path,
+                "createdAt": now_iso(),
+                "agentRunId": event["runId"],
+                "bytes": item["bytes"],
+                "contentType": item["contentType"],
+                "workspaceRelativePath": item["relativePath"],
+            }
+            self.store.append_event(session_id, relay_event("artifact.created", session_id, {"artifact": artifact}))
+            existing_paths.add(path)
+            logger.info(
+                "Generated workspace artifact indexed",
+                session_id=session_id,
+                run_id=event["runId"],
+                artifact_id=artifact["id"],
+                path=item["relativePath"],
+            )
 
     def _complete_run_request(self, run_request: dict[str, Any], outcome: str) -> None:
         sandbox = self.sandboxes.get(run_request["nodeId"])

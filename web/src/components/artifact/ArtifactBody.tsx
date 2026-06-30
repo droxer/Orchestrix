@@ -61,9 +61,25 @@ function renderBody(kind: RelayArtifact["kind"], text: string) {
   }
 }
 
+function WorkspaceFileBody({ artifact }: { artifact: RelayArtifact }) {
+  const { t } = useTranslation();
+  const path = artifact.workspaceRelativePath ?? artifact.path;
+  return (
+    <div className="artifact-viewer-body">
+      <p className="artifact-viewer-status">{t("artifact.workspace_file_preview")}</p>
+      {path ? <pre className="artifact-plain">{path}</pre> : null}
+    </div>
+  );
+}
+
 export function ArtifactBody({ artifact, sessionId }: { artifact: RelayArtifact; sessionId: string }) {
   const { t } = useTranslation();
-  const query = useArtifactBody(sessionId, artifact.id);
+  const isWorkspaceFile = artifact.kind === "workspace_file";
+  const query = useArtifactBody(sessionId, artifact.id, { enabled: !isWorkspaceFile });
+
+  if (isWorkspaceFile) {
+    return <WorkspaceFileBody artifact={artifact} />;
+  }
 
   if (query.isLoading) {
     return <p className="artifact-viewer-status">{t("artifact.loading_preview")}</p>;

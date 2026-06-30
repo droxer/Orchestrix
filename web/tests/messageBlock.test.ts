@@ -95,6 +95,23 @@ describe("projectMessages artifact projection", () => {
         },
       },
       {
+        id: "ev_deck",
+        type: "artifact.created",
+        sessionId: "ses_1",
+        timestamp,
+        artifact: {
+          id: "art_deck",
+          kind: "workspace_file",
+          title: "Quarterly review.pptx",
+          path: "/workspace/Quarterly review.pptx",
+          createdAt: timestamp,
+          agentRunId: "run_b",
+          bytes: 4096,
+          contentType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+          workspaceRelativePath: "Quarterly review.pptx",
+        },
+      },
+      {
         id: "ev_command_log",
         type: "artifact.created",
         sessionId: "ses_1",
@@ -115,7 +132,7 @@ describe("projectMessages artifact projection", () => {
     assert.equal(agentMessages.length, 2);
     assert.deepEqual(agentMessages.map((message) => message.attachments.map((artifact) => artifact.id)), [
       ["art_plan"],
-      ["art_review"],
+      ["art_review", "art_deck"],
     ]);
     // The agent-turn eyebrow renders `<agent> · <mode>`; the mode is carried
     // from agent.started so action and review turns read distinctly.

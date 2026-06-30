@@ -12,15 +12,15 @@
   text-wrap: balance;
 }
 
-/* Focus replacement for inputs that hide outline */
+/* Focus replacement for containers that delegate focus to descendants */
 .adm-search:focus-within {
-  outline: 2px solid var(--color-primary);
-  outline-offset: -2px;
+  outline: none;
+  box-shadow: var(--ring-focus);
 }
 
 .pref-modal:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: -2px;
+  outline: none;
+  box-shadow: var(--ring-focus);
 }
 
 /* Reduced motion — system-wide safety net. Individual surfaces

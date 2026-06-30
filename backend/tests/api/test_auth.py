@@ -7,7 +7,7 @@ from tempfile import TemporaryDirectory
 from fastapi.testclient import TestClient
 
 from relay.app import create_app
-from relay.persistence.stores import DatabaseDaemonStore, DatabaseSessionStore, DatabaseTaskStore
+from relay.persistence.stores import DatabaseDaemonStore, DatabaseSessionStore, DatabaseTaskStore, relay_event
 from relay.security.auth import DatabaseUserAuthStore
 
 
@@ -36,6 +36,20 @@ def _create_user(client: TestClient, username: str, *, employee_id: str | None =
         **({"employeeId": employee_id} if employee_id else {}),
     })
     assert response.status_code == 201
+
+
+def _add_workspace_file_artifact(app, session_id: str, title: str, path: str) -> None:
+    artifact = {
+        "id": f"art_{Path(path).stem.replace('-', '_')}",
+        "kind": "workspace_file",
+        "title": title,
+        "path": path,
+        "createdAt": "2026-06-30T00:00:00.000Z",
+        "bytes": 128,
+        "contentType": "application/octet-stream",
+        "workspaceRelativePath": Path(path).name,
+    }
+    app.state.session_store.append_event(session_id, relay_event("artifact.created", session_id, {"artifact": artifact}))
 
 
 def _assert_no_secret_fields(value: object) -> None:
@@ -443,6 +457,9 @@ def test_artifact_index_is_scoped_to_authenticated_employee(monkeypatch) -> None
             "assignments": [{"agent": "pi"}],
         })
         assert bob_session.status_code == 201
+        _add_workspace_file_artifact(app, alice_first.json()["id"], "alice-first.pptx", "/workspace/alice/alice-first.pptx")
+        _add_workspace_file_artifact(app, alice_second.json()["id"], "alice-second.pdf", "/workspace/alice/alice-second.pdf")
+        _add_workspace_file_artifact(app, bob_session.json()["id"], "bob-report.xlsx", "/workspace/bob/bob-report.xlsx")
 
         alice_artifacts = alice_client.get("/artifacts")
         assert alice_artifacts.status_code == 200
@@ -492,6 +509,7 @@ def test_workspace_brief_summarizes_employee_workspace(monkeypatch) -> None:
             "assignments": [{"agent": "claude"}],
         })
         assert session.status_code == 201
+        _add_workspace_file_artifact(app, session.json()["id"], "auth-flow.pptx", "/workspace/alice/auth-flow.pptx")
         task = alice_client.post("/tasks", json={
             "title": "Patch auth",
             "status": "assigned",
@@ -529,7 +547,7 @@ def test_workspace_brief_summarizes_employee_workspace(monkeypatch) -> None:
         assert admin_bob.json()["metrics"]["sessionCount"] == 1
 
 
-def test_workspace_brief_hides_command_log_artifacts(monkeypatch) -> None:
+def test_workspace_brief_only_lists_generated_artifacts(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
         app = create_app(root)
@@ -561,13 +579,14 @@ def test_workspace_brief_hides_command_log_artifacts(monkeypatch) -> None:
             "body": "diff --git a/auth.ts",
             "extension": "diff",
         })
+        _add_workspace_file_artifact(app, session_id, "test-results.pptx", "/workspace/alice/test-results.pptx")
 
         brief = alice_client.get("/workspace/brief").json()
-        assert brief["metrics"]["artifactCount"] == 2
-        assert {artifact["kind"] for artifact in brief["artifacts"]} == {"plan", "diff"}
+        assert brief["metrics"]["artifactCount"] == 1
+        assert {artifact["kind"] for artifact in brief["artifacts"]} == {"workspace_file"}
 
         listed = alice_client.get("/artifacts").json()["artifacts"]
-        assert {artifact["kind"] for artifact in listed} == {"plan", "diff"}
+        assert {artifact["kind"] for artifact in listed} == {"workspace_file"}
 
 
 def test_workspace_files_lists_employee_workspace(monkeypatch) -> None:

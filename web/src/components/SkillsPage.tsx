@@ -143,7 +143,7 @@ export function SkillsPage() {
         />
         {query && (
           <button
-            className="flex size-5 shrink-0 items-center justify-center rounded-full bg-surface-strong text-base leading-none text-muted-foreground transition-[background,color] duration-[120ms] hover:bg-hairline hover:text-ink"
+            className="flex size-5 shrink-0 items-center justify-center rounded-sm bg-surface-strong text-base leading-none text-muted-foreground transition-[background,color] duration-[120ms] hover:bg-hairline hover:text-ink"
             type="button"
             aria-label={t("skills.clear_search")}
             onClick={() => setQuery("")}

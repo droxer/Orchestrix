@@ -591,18 +591,22 @@ html[data-theme="light"] .adm-drawer.dark {
   gap: var(--space-xxs);
   height: 28px;
   padding: 0 var(--space-sm);
-  border: none;
+  border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: var(--color-primary);
   color: var(--color-on-primary);
   font: var(--type-caption-strong);
   cursor: pointer;
-  transition: background 160ms ease;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
   flex-shrink: 0;
 }
 
 .adm-copy-pill:hover { background: var(--color-primary-active); }
-.adm-copy-pill.copied { background: var(--color-semantic-up); }
+.adm-copy-pill.copied {
+  background: var(--color-canvas);
+  border-color: var(--border-success);
+  color: var(--color-semantic-up);
+}
 
 .adm-cred-note {
   margin: var(--space-base) 0 0;
