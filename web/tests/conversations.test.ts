@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { conversationLabel, matchesConversationQuery, myConversationSessions, pickActiveConversationSession } from "../src/lib/conversations.js";
+import { conversationLabel, matchesConversationQuery, myConversationSessions, pickActiveConversationSession, sessionAgents } from "../src/lib/conversations.js";
 import { isAwaitingFeedbackDecision, rerunAssignmentForSession } from "../src/lib/workflow.js";
 import type { RelaySession } from "../src/types.js";
+
+type AgentRuns = RelaySession["agentRuns"];
+const runs = (...agents: string[]): AgentRuns => agents.map((agent) => ({ agent }) as AgentRuns[number]);
 
 function session(partial: Partial<RelaySession>): RelaySession {
   return {
@@ -22,6 +25,26 @@ function session(partial: Partial<RelaySession>): RelaySession {
     ...partial,
   } as RelaySession;
 }
+
+describe("sessionAgents", () => {
+  it("returns distinct agents in first-appearance order, deduped across runs", () => {
+    assert.deepEqual(
+      sessionAgents(session({ agentRuns: runs("codex", "claude", "claude"), currentAgent: undefined })),
+      ["codex", "claude"],
+    );
+  });
+
+  it("includes the current agent even without a recorded run", () => {
+    assert.deepEqual(
+      sessionAgents(session({ agentRuns: runs("pi"), currentAgent: "kimi" })),
+      ["pi", "kimi"],
+    );
+  });
+
+  it("is empty for a fresh session with no runs", () => {
+    assert.deepEqual(sessionAgents(session({ agentRuns: runs(), currentAgent: undefined })), []);
+  });
+});
 
 describe("web conversation helpers", () => {
   it("lists only the employee's own non-archived sessions, newest first", () => {

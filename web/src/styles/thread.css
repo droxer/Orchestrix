@@ -171,6 +171,21 @@
   gap: var(--space-xs);
 }
 
+/* The agents that have worked this thread — a tight cluster of monochrome
+   marks (shape carries identity, never vendor hue). Muted so the title stays
+   the row's anchor. */
+.conversation-agents {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--color-muted);
+}
+
+.conversation-row.active .conversation-agents {
+  color: var(--color-ink);
+}
+
 .conversation-name strong {
   min-width: 0;
   color: var(--color-ink);

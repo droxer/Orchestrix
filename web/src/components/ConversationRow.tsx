@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useDialogs } from "./ui/DialogProvider";
 import { AgentMark } from "./AgentMark";
 import type { AgentName, RelaySession } from "../types";
-import { conversationLabel, type ConversationItem } from "../lib/conversations";
+import { conversationLabel, sessionAgents, type ConversationItem } from "../lib/conversations";
 import {
   conversationActivity,
   type ConversationActivityKind,
@@ -60,6 +60,7 @@ export function ConversationRow({ item, selected, onSelect, onRename, onClose }:
   const { session, runningAgent } = item;
   const label = conversationLabel(session);
   const stamp = relativeTime(session.updatedAt);
+  const agents = sessionAgents(session);
   const activity = conversationActivity(session.status, runningAgent);
   const activityStyle = activity ? ACTIVITY_STYLE[activity.kind] : null;
 
@@ -84,7 +85,13 @@ export function ConversationRow({ item, selected, onSelect, onRename, onClose }:
         <span className="conversation-copy">
           <span className="conversation-topline">
             <span className="conversation-name">
-              {runningAgent ? <AgentMark agent={runningAgent} size={14} /> : null}
+              {agents.length > 0 ? (
+                <span className="conversation-agents" role="img" aria-label={agents.join(", ")}>
+                  {agents.map((agent) => (
+                    <AgentMark key={agent} agent={agent} size={14} />
+                  ))}
+                </span>
+              ) : null}
               <strong>{label}</strong>
             </span>
             {stamp ? (

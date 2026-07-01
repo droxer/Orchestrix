@@ -48,6 +48,25 @@ export function conversationLabel(session: Labelled): string {
   return session.title?.trim() || session.taskGoal;
 }
 
+// The distinct agents that have worked a conversation — every agent that has a
+// run, plus the current one — in first-appearance order so the row's mark
+// cluster is deterministic per session and reflects who touched it, in order.
+export function sessionAgents(
+  session: Pick<RelaySession, "agentRuns" | "currentAgent">,
+): AgentName[] {
+  const seen = new Set<AgentName>();
+  const order: AgentName[] = [];
+  const add = (agent: AgentName | undefined) => {
+    if (agent && !seen.has(agent)) {
+      seen.add(agent);
+      order.push(agent);
+    }
+  };
+  for (const run of session.agentRuns ?? []) add(run.agent);
+  add(session.currentAgent);
+  return order;
+}
+
 // Title/goal substring search used by the conversation list filter.
 export function matchesConversationQuery(session: Labelled, query: string): boolean {
   const q = query.trim().toLowerCase();
