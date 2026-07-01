@@ -103,6 +103,28 @@ describe("agent stream parsing", () => {
     ]);
   });
 
+  it("carries the file/command target on Claude tool_use lines", () => {
+    const raw = [
+      JSON.stringify({
+        type: "assistant",
+        message: {
+          role: "assistant",
+          content: [
+            { type: "tool_use", name: "Read", input: { file_path: "backend/relay/app.py" } },
+            { type: "tool_use", name: "Bash", input: { command: "npm run build\n(second line ignored)" } },
+            { type: "tool_use", name: "Think", input: {} },
+          ],
+        },
+      }),
+    ].join("\n");
+
+    assert.deepEqual(parseAgentStream("claude", raw), [
+      { kind: "tool", name: "Read", target: "backend/relay/app.py" },
+      { kind: "tool", name: "Bash", target: "npm run build" },
+      { kind: "tool", name: "Think", target: undefined },
+    ]);
+  });
+
   it("ignores Pi JSON empty assistant lifecycle events", () => {
     const raw = JSON.stringify({
       type: "message_end",

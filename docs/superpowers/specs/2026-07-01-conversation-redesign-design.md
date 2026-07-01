@@ -54,8 +54,9 @@ Each agent turn, top to bottom:
 
 - **Eyebrow** — mono (`var(--type-meta-mono)`), `agent · mode`. The agent
   name is ink; the mode token is muted. A `review` turn earns the one hue:
-  an info-blue dot + info-blue mode label (existing `[data-mode="review"]`
-  treatment).
+  an info dot + info mode label (existing `[data-mode="review"]`
+  treatment). Post-cobalt-rebrand, `--color-info` folds into the brand, so
+  this resolves to cobalt — not the legacy `#3b82f6` blue.
 - **Timestamp** — mono, muted, right-aligned (existing).
 - **Work stream** — rendered by `AgentStream` unchanged. Three permanent
   type tiers carry legibility in place of collapse:

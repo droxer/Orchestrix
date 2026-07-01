@@ -52,7 +52,10 @@
     "no_matches": "No threads match your search.",
     "group_needs_you": "Needs you",
     "group_running": "Running",
-    "group_idle": "Idle"
+    "group_idle": "Idle",
+    "statuses": {
+      "waiting_for_human": "Needs human"
+    }
   },
   "conversation": {
     "agent_working": "{{agent}} is working",
@@ -715,8 +718,6 @@
     "size_mb": "{{count}} MB"
   },
   "agent_stream": {
-    "thinking": "Thinking",
-    "tool": "Tool",
     "empty_working": "Working…",
     "empty_done": "No output.",
     "claude_error": "Claude error",

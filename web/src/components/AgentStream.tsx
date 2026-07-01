@@ -1,4 +1,4 @@
-import { StreamCheck, StreamCommand, StreamError, StreamInfo, StreamTool, StreamWarn } from "./icons";
+import { StreamCheck, StreamError, StreamInfo, StreamWarn } from "./icons";
 import { useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -52,28 +52,31 @@ function SegmentView({ segment }: { segment: AgentSegment }) {
     return <div className="agent-text">{renderProse(segment.text)}</div>;
   }
   if (segment.kind === "thinking") {
+    // Full stream, always: reasoning is a permanent, inline type tier — a `○`
+    // marker + 13px muted italic — never a collapse (conversation spec §2).
     return (
-      <details className="agent-thinking">
-        <summary>
-          <span className="agent-segment-label">{t("agent_stream.thinking")}</span>
-        </summary>
+      <div className="agent-thinking">
+        <span className="agent-thinking-marker" aria-hidden="true">○</span>
         <div className="agent-thinking-body">{renderProse(segment.text)}</div>
-      </details>
+      </div>
     );
   }
   if (segment.kind === "tool") {
+    // A tool call is a single inline `⏺` mono line — the tool name plus the
+    // file/command it acted on (design-system.md agent-turn: "⏺ for tool
+    // lines"). No bordered chip; consecutive calls read as a compact log.
     return (
       <div className="agent-tool">
-        <StreamTool size={13} aria-hidden="true" />
-        <span className="agent-segment-label">{t("agent_stream.tool")}</span>
+        <span className="agent-tool-marker" aria-hidden="true">⏺</span>
         <span className="agent-tool-name">{segment.name}</span>
+        {segment.target ? <span className="agent-tool-target">{segment.target}</span> : null}
       </div>
     );
   }
   if (segment.kind === "command") {
     return (
       <div className="agent-command">
-        <StreamCommand size={13} aria-hidden="true" />
+        <span className="agent-tool-marker" aria-hidden="true">⏺</span>
         <code>{segment.command}</code>
       </div>
     );

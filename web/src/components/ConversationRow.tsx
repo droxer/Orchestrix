@@ -1,10 +1,30 @@
 import { ActionRemove } from "./icons";
 import { useTranslation } from "react-i18next";
 import { useDialogs } from "./ui/DialogProvider";
-import type { RelaySession } from "../types";
+import { AgentMark } from "./AgentMark";
+import type { AgentName, RelaySession } from "../types";
 import { conversationLabel, type ConversationItem } from "../lib/conversations";
+import {
+  conversationActivity,
+  type ConversationActivityKind,
+} from "../lib/conversationActivity";
 
 export type { ConversationItem };
+
+// How each activity kind renders: the leading indicator (a cobalt pulse for a
+// live run, else a status pip) and whether the line reads muted. The tone→pip
+// class table lives once here; the kind decision is the pure
+// `conversationActivity` (see conversationActivity.ts).
+const ACTIVITY_STYLE: Record<
+  ConversationActivityKind,
+  { className: string; dotClass: string; pulse?: boolean }
+> = {
+  working: { className: "working", dotClass: "", pulse: true },
+  warn: { className: "", dotClass: "status-dot status-dot-warn" },
+  bad: { className: "", dotClass: "status-dot status-dot-bad" },
+  good: { className: "muted", dotClass: "status-dot status-dot-good" },
+  neutral: { className: "muted", dotClass: "status-dot status-dot-neutral" },
+};
 
 function relativeTime(iso?: string): string {
   if (!iso) return "";
@@ -40,6 +60,8 @@ export function ConversationRow({ item, selected, onSelect, onRename, onClose }:
   const { session, runningAgent } = item;
   const label = conversationLabel(session);
   const stamp = relativeTime(session.updatedAt);
+  const activity = conversationActivity(session.status, runningAgent);
+  const activityStyle = activity ? ACTIVITY_STYLE[activity.kind] : null;
 
   async function handleClose() {
     if (!onClose) return;
@@ -52,7 +74,7 @@ export function ConversationRow({ item, selected, onSelect, onRename, onClose }:
   }
 
   return (
-    <div className={`conversation-row ${selected ? "active" : ""} ${runningAgent ? "has-activity" : ""}`}>
+    <div className={`conversation-row ${selected ? "active" : ""}`.trimEnd()}>
       <button
         className="conversation-row-inner"
         type="button"
@@ -62,6 +84,7 @@ export function ConversationRow({ item, selected, onSelect, onRename, onClose }:
         <span className="conversation-copy">
           <span className="conversation-topline">
             <span className="conversation-name">
+              {runningAgent ? <AgentMark agent={runningAgent} size={14} /> : null}
               <strong>{label}</strong>
             </span>
             {stamp ? (
@@ -70,6 +93,20 @@ export function ConversationRow({ item, selected, onSelect, onRename, onClose }:
               </span>
             ) : null}
           </span>
+          {activity && activityStyle ? (
+            <span className={`conversation-activity ${activityStyle.className}`.trimEnd()}>
+              {activityStyle.pulse ? (
+                <span className="conversation-activity-pulse" aria-hidden="true" />
+              ) : (
+                <span className={activityStyle.dotClass} aria-hidden="true" />
+              )}
+              {activity.kind === "working" ? (
+                <em>{t(activity.labelKey, { agent: runningAgent })}</em>
+              ) : (
+                <span>{t(activity.labelKey)}</span>
+              )}
+            </span>
+          ) : null}
         </span>
       </button>
       <span className="conversation-row-actions">

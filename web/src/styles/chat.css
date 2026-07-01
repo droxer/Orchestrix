@@ -94,7 +94,7 @@ html[data-theme="contrast"] .chat-header::after {
   padding: 1px 7px;
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-canvas));
+  background: var(--color-brand-soft);
   color: var(--color-primary);
   font: var(--type-caption-strong);
 }

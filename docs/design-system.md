@@ -317,7 +317,7 @@ The 100px pill is retired. Depth comes from 1px hairline borders, not decorative
 shadows.
 
 **Key Characteristics:**
-- Cobalt action: `{colors.primary}` (#2f54eb) carries every primary action — buttons, links, the focus ring, text selection, the operator's message fill, and the brand mark — and lifts to periwinkle (`#5b7cff`) on the dark canvas. `{colors.brand-soft}` (#eef1fe) is the matching tint for selected/active affordances. The brand hue is the action; it never bleeds into running text or neutral surfaces.
+- Cobalt action: `{colors.primary}` (#2f54eb) carries every primary action — buttons, links, the focus ring, text selection, and the brand mark — and lifts to periwinkle (`#5b7cff`) on the dark canvas. `{colors.brand-soft}` (#eef1fe) is the matching tint for selected/active affordances. The brand hue is the action; it never bleeds into running text or neutral surfaces.
 - Color = status: `{colors.semantic-up}`, `{colors.semantic-down}`, and `{colors.accent-yellow}` (green / amber / red) carry status as text, dots, and borders — never fills. The former info blue folds into the cobalt brand.
 - Mono as signal: eyebrows, metadata, agent labels (`claude · action`), tool lines, timestamps, and numbers render in Geist Mono.
 - Tight geometry: `{rounded.sm}` (4px) interactive, `{rounded.xl}` (10px) cards. Pills and large radii absent.

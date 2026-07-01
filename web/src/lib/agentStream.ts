@@ -4,7 +4,7 @@ import type { TFunction } from "i18next";
 export type AgentSegment =
   | { kind: "text"; text: string }
   | { kind: "thinking"; text: string }
-  | { kind: "tool"; name: string }
+  | { kind: "tool"; name: string; target?: string }
   | { kind: "command"; command: string }
   | { kind: "status"; tone: StatusTone; text: string }
   | { kind: "narration"; key: string; params?: Record<string, string | number> }
@@ -126,6 +126,34 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
 }
 
+// A concise, single-line target for a tool call — the file it touched or the
+// command it ran — pulled from the tool_use input so the transcript shows
+// "Read backend/app.py" instead of a bare "Read". Best-effort: returns
+// undefined when no recognizable field is present (or input hasn't streamed
+// in yet), in which case the line renders as just the tool name.
+const TOOL_TARGET_KEYS = [
+  "command",
+  "file_path",
+  "path",
+  "notebook_path",
+  "pattern",
+  "url",
+  "query",
+  "prompt",
+  "description",
+] as const;
+
+function toolTarget(input: Record<string, unknown>): string | undefined {
+  for (const key of TOOL_TARGET_KEYS) {
+    const value = input[key];
+    if (typeof value === "string" && value.trim()) {
+      const oneLine = value.trim().split("\n")[0]!.trim();
+      return oneLine.length > 120 ? `${oneLine.slice(0, 119)}…` : oneLine;
+    }
+  }
+  return undefined;
+}
+
 class TextBuffer {
   private value = "";
 
@@ -166,7 +194,7 @@ function parseClaude(raw: string): AgentSegment[] {
         if (block.type === "tool_use") {
           text.flush(out, "text");
           thinking.flush(out, "thinking");
-          out.push({ kind: "tool", name: String(block.name ?? "tool") });
+          out.push({ kind: "tool", name: String(block.name ?? "tool"), target: toolTarget(asRecord(block.input)) });
         }
         continue;
       }
@@ -195,7 +223,7 @@ function parseClaude(raw: string): AgentSegment[] {
         } else if (block.type === "tool_use") {
           text.flush(out, "text");
           thinking.flush(out, "thinking");
-          out.push({ kind: "tool", name: String(block.name ?? "tool") });
+          out.push({ kind: "tool", name: String(block.name ?? "tool"), target: toolTarget(asRecord(block.input)) });
         }
       }
       continue;

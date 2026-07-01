@@ -52,7 +52,10 @@
     "no_matches": "没有匹配的对话。",
     "group_needs_you": "待处理",
     "group_running": "运行中",
-    "group_idle": "空闲"
+    "group_idle": "空闲",
+    "statuses": {
+      "waiting_for_human": "等待人工"
+    }
   },
   "conversation": {
     "agent_working": "{{agent}} 正在工作",
@@ -717,8 +720,6 @@
     "size_mb": "{{count}} MB"
   },
   "agent_stream": {
-    "thinking": "思考中",
-    "tool": "工具",
     "empty_working": "运行中…",
     "empty_done": "暂无输出。",
     "claude_error": "Claude 错误",

@@ -149,21 +149,6 @@
   line-height: 1.5;
 }
 
-.conversation-connect-hint {
-  grid-template-columns: 36px minmax(0, 1fr);
-}
-
-.connect-hint-icon {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-full);
-  background: var(--color-surface-strong);
-  color: var(--color-primary);
-  flex-shrink: 0;
-}
-
 .conversation-copy {
   min-width: 0;
   display: grid;
@@ -294,23 +279,6 @@
   color: var(--color-muted);
 }
 
-/* Activity state: an agent is running in this conversation. */
-.conversation-badge {
-  flex-shrink: 0;
-  min-width: 22px;
-  padding: var(--space-xxs) var(--space-xs);
-  border-radius: var(--radius-sm);
-  background: var(--color-primary);
-  color: var(--color-on-primary);
-  font: var(--type-caption-strong);
-  text-align: center;
-}
-
-.conversation-row.has-activity .conversation-preview {
-  color: var(--color-ink);
-  font-weight: 500;
-}
-
 .status-dot {
   flex-shrink: 0;
   width: 6px;
@@ -320,25 +288,11 @@
 }
 
 .status-dot-good    { background: var(--color-semantic-up); }
-.status-dot-info    { background: var(--color-primary); }
 .status-dot-bad     { background: var(--color-semantic-down); }
 .status-dot-warn    { background: var(--color-accent-yellow); }
 .status-dot-neutral { background: var(--color-muted-soft); }
 
-/* Preview and meta indent past the 6px status dot + its gap so they
-   align with the employee name above. */
-.conversation-preview {
-  min-width: 0;
-  padding-left: 0;
-  color: var(--color-body);
-  font-size: var(--text-sm);
-  line-height: 1.5;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Single activity line — replaces preview + working dual-state. */
+/* Single activity line — the row's live signal (running pulse / status pip). */
 .conversation-activity {
   min-width: 0;
   display: inline-flex;
@@ -380,67 +334,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .conversation-activity-pulse { animation: none; }
-}
-
-.conversation-meta {
-  min-width: 0;
-  padding-left: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  color: var(--color-muted);
-  font: var(--type-label);
-}
-
-.conversation-meta-status {
-  text-transform: lowercase;
-  letter-spacing: 0.02em;
-}
-
-.conversation-meta-status.tone-good { color: var(--color-semantic-up); }
-.conversation-meta-status.tone-info { color: var(--color-info); }
-.conversation-meta-status.tone-bad  { color: var(--color-semantic-down); }
-.conversation-meta-status.tone-warn { color: var(--color-warning-text); }
-
-.conversation-meta-count {
-  margin-left: auto;
-  flex: 0 0 auto;
-  padding: 0 6px;
-  border-radius: var(--radius-sm);
-  background: var(--color-surface-strong);
-  color: var(--color-muted);
-  font-size: var(--text-micro);
-  font-weight: 600;
-  letter-spacing: 0.04em;
-}
-
-.conversation-row.active .conversation-meta-count {
-  background: color-mix(in srgb, var(--color-primary) 14%, var(--color-canvas));
-  color: var(--color-primary);
-}
-
-.conversation-meta-tokens {
-  flex: 0 0 auto;
-  padding: 0 6px;
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-canvas));
-  color: var(--color-primary);
-  font-weight: 600;
-}
-
-.conversation-meta-sep {
-  flex-shrink: 0;
-  width: 3px;
-  height: 3px;
-  border-radius: var(--radius-full);
-  background: var(--color-muted-soft);
-}
-
-.conversation-meta span:not(.conversation-meta-sep) {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .icon-button {

@@ -191,56 +191,31 @@
   text-transform: lowercase;
 }
 
+/* Reasoning tier — permanent and inline (never collapsed): a quiet `○` marker
+   in the gutter beside 13px muted italic prose (conversation spec §2). */
 .agent-thinking {
-  display: block;
-  width: fit-content;
-  max-width: 100%;
-  padding: 0;
-  border: 0;
-  color: var(--color-body);
-}
-
-.agent-thinking summary {
-  display: inline-flex;
-  align-items: center;
+  display: flex;
+  align-items: baseline;
   gap: var(--space-xs);
-  min-height: 32px;
-  padding: 0 var(--space-sm);
-  border: 1px solid var(--color-hairline-soft);
-  border-radius: var(--radius-sm);
-  background: var(--color-canvas);
+  max-width: 100%;
   color: var(--color-muted);
-  cursor: pointer;
-  list-style: none;
 }
 
-.agent-thinking summary::-webkit-details-marker {
-  display: none;
-}
-
-.agent-thinking summary::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-right: 1.5px solid currentColor;
-  border-bottom: 1.5px solid currentColor;
-  transform: rotate(-45deg);
-  transition: transform var(--duration-fast) ease;
-}
-
-.agent-thinking[open] summary::before {
-  transform: rotate(45deg);
+.agent-thinking-marker {
+  flex: none;
+  font-family: var(--font-number);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--color-muted-soft);
 }
 
 .agent-thinking-body {
-  margin-top: var(--space-xs);
-  padding: var(--space-xs) 0 var(--space-xs) var(--space-sm);
-  border-left: 2px solid var(--color-hairline);
+  min-width: 0;
   font-family: var(--font-sans);
   font-size: var(--text-sm);
   font-style: italic;
   line-height: 1.55;
-  color: var(--color-body);
+  color: var(--color-muted);
 }
 
 .agent-thinking-body p {
@@ -251,52 +226,51 @@
   margin-bottom: 0;
 }
 
-.agent-segment-label {
-  color: var(--color-muted);
-  font: var(--type-caption-strong);
-}
-
-.agent-tool {
-  display: inline-flex;
-  align-items: center;
+/* Tool / command lines — inline `⏺` mono lines, not bordered chips. A run of
+   tool calls reads as a compact, scannable log; the marker is quiet, the tool
+   name carries weight, the target is muted (design-system.md agent-turn). */
+.agent-tool,
+.agent-command {
+  display: flex;
+  align-items: baseline;
   gap: var(--space-xs);
-  align-self: flex-start;
-  padding: 4px var(--space-sm);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-sm);
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font: var(--type-label);
+  min-width: 0;
+  font-family: var(--font-number);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--color-body);
 }
 
-.agent-tool > svg {
-  color: var(--color-muted);
+/* Consecutive tool/command lines pull tight against the stream's default gap
+   so a long tool run doesn't sprawl. */
+.agent-tool + .agent-tool,
+.agent-tool + .agent-command,
+.agent-command + .agent-tool,
+.agent-command + .agent-command {
+  margin-top: calc(var(--space-xxs) - var(--space-sm));
+}
+
+.agent-tool-marker {
+  flex: none;
+  color: var(--color-muted-soft);
 }
 
 .agent-tool-name {
-  font-family: var(--font-number);
+  flex: none;
   font-weight: 500;
+  color: var(--color-ink);
+}
+
+.agent-tool-target {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-muted);
 }
 
 .agent-command {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  padding: var(--space-xs) var(--space-sm);
-  border: 1px solid var(--color-hairline-soft);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-soft);
-  color: var(--color-ink);
-  font-family: var(--font-number);
-  font-size: var(--text-sm);
-  font-weight: 500;
-  line-height: 1.5;
   overflow-x: auto;
-}
-
-.agent-command > svg {
-  flex-shrink: 0;
-  color: var(--color-muted);
 }
 
 .agent-command code {
@@ -304,6 +278,7 @@
   padding: 0;
   font: inherit;
   white-space: pre;
+  color: var(--color-body);
 }
 
 .agent-status {
