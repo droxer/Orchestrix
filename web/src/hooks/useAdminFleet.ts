@@ -22,6 +22,7 @@ export function useAdminFleet(enabled: boolean): {
   pollError: string | null;
   isFetching: boolean;
   mergeFleet: (updater: (prev: AdminFleet) => AdminFleet) => void;
+  refetch: () => Promise<unknown>;
 } {
   const queryClient = useQueryClient();
 
@@ -52,5 +53,6 @@ export function useAdminFleet(enabled: boolean): {
     pollError: query.error instanceof Error ? query.error.message : query.error ? String(query.error) : null,
     isFetching: query.isFetching,
     mergeFleet,
+    refetch: () => query.refetch(),
   };
 }

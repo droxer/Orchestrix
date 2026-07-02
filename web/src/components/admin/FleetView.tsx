@@ -3,7 +3,9 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
+import { RelayEmptyState } from "@/components/RelayEmptyState";
 import type { ControlPanelDaemonNodeRecord, EmployeeRecord } from "../../types";
+import { Server } from "lucide-react";
 import { visualStatus } from "./helpers";
 import { NodeCard } from "./NodeCard";
 
@@ -65,29 +67,31 @@ export function FleetView({ nodes, employees, onRevealCredentials, onManageAgent
 
   return (
     <div className="adm-view">
-      <div className="adm-tabs" role="tablist" aria-label={t("admin.v2.filter_label")}>
+      <div className="adm-fleet-filters" role="group" aria-label={t("admin.v2.filter_label")}>
         {FILTERS.map((id) => {
           const active = filter === id;
           return (
             <button
               key={id}
               type="button"
-              role="tab"
-              aria-selected={active}
-              className={`adm-tab ${active ? "active" : ""}`}
+              className={`adm-fleet-chip ${active ? "active" : ""}`}
+              aria-pressed={active}
               onClick={() => setFilter(id)}
             >
               <span>{filterLabel(id, t)}</span>
-              <span className="adm-tab-count mono">{counts[id]}</span>
+              <span className="adm-fleet-chip-count mono">{counts[id]}</span>
             </button>
           );
         })}
       </div>
 
       {filtered.length === 0 ? (
-        <div className="adm-empty-block">
-          <p className="adm-empty-body">{t("admin.v2.no_nodes_for_filter")}</p>
-        </div>
+        <RelayEmptyState
+          className="adm-fleet-empty"
+          fill
+          title={t("admin.v2.no_nodes_for_filter")}
+          illustration={<Server size={40} strokeWidth={1.25} aria-hidden="true" />}
+        />
       ) : (
         <div className="adm-fleet-grid">
           {filtered.map((node) => (

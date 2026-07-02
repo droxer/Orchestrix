@@ -51,10 +51,24 @@
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-base);
-  padding: var(--space-section) 0;
-  max-width: 480px;
+  padding: var(--space-section) var(--space-xl);
+  max-width: 520px;
   border-left: 2px solid var(--color-primary);
-  padding-left: var(--space-xl);
+}
+
+.adm-empty-block--editorial {
+  border-left: none;
+  padding: var(--space-xxl);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-hairline);
+}
+
+.adm-empty-kicker {
+  margin: 0;
+  font-size: var(--text-2xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-primary);
 }
 
 .adm-empty-title {
@@ -725,6 +739,12 @@ html[data-theme="light"] .adm-drawer.dark {
   box-shadow: inset 2px 0 0 var(--color-primary), var(--shadow-lift);
 }
 
+.adm-auth-brand {
+  display: flex;
+  align-items: center;
+  color: var(--color-ink);
+}
+
 .adm-auth-head {
   display: flex;
   flex-direction: column;
@@ -733,11 +753,7 @@ html[data-theme="light"] .adm-drawer.dark {
 
 .adm-auth-title {
   margin: 0;
-  font-family: var(--font-sans);
-  font-size: var(--text-3xl);
-  font-weight: 500;
-  letter-spacing: var(--letter-display);
-  line-height: 1.1;
+  font: var(--type-display-sm);
   color: var(--color-ink);
 }
 
@@ -752,9 +768,6 @@ html[data-theme="light"] .adm-drawer.dark {
 @media (max-width: 1024px) {
   .adm-content {
     grid-template-columns: minmax(0, 1fr);
-  }
-  .adm-rail {
-    display: none;
   }
   .adm-pulse {
     display: flex;
@@ -772,26 +785,9 @@ html[data-theme="light"] .adm-drawer.dark {
   .admin-console.adm-shell {
     grid-template-columns: minmax(0, 1fr);
   }
-  .adm-nav {
-    flex-direction: row;
-    align-items: center;
-    border-right: none;
-    border-bottom: 1px solid var(--color-hairline);
-    padding: var(--space-xs) var(--space-base);
-  }
-  .adm-nav-items { flex-direction: row; margin-top: 0; gap: var(--space-base); }
-  .adm-nav-item.active::before {
-    left: 12px;
-    right: 12px;
-    top: auto;
-    bottom: 0;
-    width: auto;
-    height: 2px;
-  }
-  .adm-nav-foot { margin-top: 0; margin-left: auto; }
-  .adm-nav-user { border-top: none; padding-top: 0; }
 
-  .adm-pulse { padding: var(--space-base); grid-template-columns: repeat(2, 1fr); }
+  .adm-pulse { padding: var(--space-base); }
+  .adm-pulse--alerts { display: grid; grid-template-columns: repeat(3, 1fr); }
   .adm-content-main { padding: var(--space-base); }
   .adm-emp-row { grid-template-columns: 1fr; gap: var(--space-xs); }
   .adm-drawer { width: 100%; }

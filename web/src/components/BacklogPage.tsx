@@ -2,16 +2,20 @@
 
 import { useMemo, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { assignTask, createTask, startTask, updateTask } from "../api";
+import { Drawer } from "./admin/Drawer";
 import { AgentStateBadge } from "./AgentStateBadge";
 import { PriorityBadge } from "./PriorityBadge";
 import { cn } from "@/lib/utils";
 import { AGENT_NAMES, type AgentName, type CurrentUser, type DaemonNodeMonitorRecord, type RelaySession, type RelayTask, type TaskPriority, type TaskStatus } from "../types";
-import { ActionAddPerson, ActionCalendar, ActionCompose, ActionRemove, ActionSearch, ActionStart, ModeAsk, NavRefresh, ViewBoard, ViewList } from "./icons";
+import { ActionAddPerson, ActionCalendar, ActionSearch, ActionStart, ModeAsk, ViewBoard, ViewList } from "./icons";
 import { agentReadyForTask, discussionAgentsForTask, dueTone, filterTasks, TASK_PRIORITIES, TASK_STATUSES, tasksByStatus, type BacklogFilters } from "../lib/backlog";
 import { PageHeader } from "./PageHeader";
 import { BoardEmpty } from "./BoardEmpty";
-import { useModalDrawer } from "../hooks/useModalDrawer";
+import { TaskBoardHeaderActions } from "./TaskBoardHeaderActions";
 
 interface BacklogPageProps {
   tasks: RelayTask[];
@@ -133,37 +137,44 @@ function BacklogFiltersBar({
   return (
     <div className="backlog-filter-bar" aria-label={t("backlog.filters")}>
       <div className="backlog-filter-primary">
-        <ActionSearch size={15} aria-hidden="true" />
-        <input
-          className="backlog-filter-search"
-          name="backlog-query"
-          type="search"
-          autoComplete="off"
-          spellCheck={false}
-          value={filters.query}
-          placeholder={t("backlog.search")}
-          aria-label={t("backlog.search")}
-          onChange={(event) => onChange({ ...filters, query: event.target.value })}
-        />
-        <button
-          type="button"
-          className="backlog-filter-chip"
-          data-active={expanded ? "true" : "false"}
-          aria-expanded={expanded}
-          onClick={() => setExpanded((value) => !value)}
-        >
-          {expanded ? t("backlog.hide_filters") : t("backlog.show_filters")}
-          {activeCount > 0 ? ` · ${activeCount}` : ""}
-        </button>
-        {activeCount > 0 ? (
+        <div className="backlog-filter-search-wrap">
+          <ActionSearch size={15} aria-hidden="true" />
+          <input
+            className="backlog-filter-search"
+            name="backlog-query"
+            type="search"
+            autoComplete="off"
+            spellCheck={false}
+            value={filters.query}
+            placeholder={t("backlog.search")}
+            aria-label={t("backlog.search")}
+            onChange={(event) => onChange({ ...filters, query: event.target.value })}
+          />
+        </div>
+        <div className="backlog-filter-actions">
           <button
             type="button"
             className="backlog-filter-chip"
-            onClick={() => onChange(initialFilters)}
+            data-active={expanded ? "true" : "false"}
+            data-applied={activeCount > 0 ? "true" : "false"}
+            aria-expanded={expanded}
+            onClick={() => setExpanded((value) => !value)}
           >
-            {t("backlog.clear_filters")}
+            {expanded ? t("backlog.hide_filters") : t("backlog.show_filters")}
+            {activeCount > 0 ? (
+              <span className="backlog-filter-count" aria-hidden="true">{activeCount}</span>
+            ) : null}
           </button>
-        ) : null}
+          {activeCount > 0 ? (
+            <button
+              type="button"
+              className="backlog-filter-clear"
+              onClick={() => onChange(initialFilters)}
+            >
+              {t("backlog.clear_filters")}
+            </button>
+          ) : null}
+        </div>
       </div>
       {expanded ? (
         <div className="backlog-filter-secondary">
@@ -479,49 +490,43 @@ function BacklogTaskDrawer({
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   const { t } = useTranslation();
-  const panelRef = useModalDrawer<HTMLFormElement>(onClose);
+  const title = form.id ? t("backlog.edit_task") : t("backlog.new_task");
 
   return (
-    <div className="backlog-drawer-shell">
-      <button type="button" className="backlog-drawer-scrim" aria-label={t("dialog.cancel")} onClick={onClose} />
-      <form
-        ref={panelRef}
-        className="backlog-drawer"
-        role="dialog"
-        aria-modal="true"
-        aria-label={form.id ? t("backlog.edit_task") : t("backlog.new_task")}
-        tabIndex={-1}
-        onSubmit={onSubmit}
-      >
-        <header>
-          <div>
-            <h2>{form.id ? t("backlog.edit_task") : t("backlog.new_task")}</h2>
-            <p>{form.id ?? t("backlog.new_task_id")}</p>
-          </div>
-          <button type="button" className="backlog-icon-btn" aria-label={t("dialog.cancel")} onClick={onClose}>
-            <ActionRemove size={16} />
-          </button>
-        </header>
-        <label>
+    <Drawer
+      open
+      onClose={() => {
+        if (!saving) onClose();
+      }}
+      title={title}
+      subtitle={form.id ?? t("backlog.new_task_id")}
+      variant="light"
+      width={420}
+      closeLabel={t("dialog.cancel")}
+      ariaLabel={title}
+      bodyClassName="adm-drawer-body--column"
+    >
+      <form className="adm-form task-board-drawer-form" onSubmit={onSubmit}>
+        <label className="adm-field">
           <span>{t("backlog.title_field")}</span>
-          <input
+          <Input
             name="task-title"
             required
             value={form.title}
             onChange={(event) => onChange({ ...form, title: event.target.value })}
           />
         </label>
-        <label>
+        <label className="adm-field">
           <span>{t("backlog.description")}</span>
-          <textarea
+          <Textarea
             name="task-description"
             value={form.description}
             rows={5}
             onChange={(event) => onChange({ ...form, description: event.target.value })}
           />
         </label>
-        <div className="backlog-form-grid">
-          <label>
+        <div className="task-drawer-form-grid">
+          <label className="adm-field">
             <span>{t("backlog.priority")}</span>
             <select
               name="task-priority"
@@ -533,7 +538,7 @@ function BacklogTaskDrawer({
               ))}
             </select>
           </label>
-          <label>
+          <label className="adm-field">
             <span>{t("backlog.status")}</span>
             <select
               name="task-status"
@@ -545,16 +550,16 @@ function BacklogTaskDrawer({
               ))}
             </select>
           </label>
-          <label>
+          <label className="adm-field">
             <span>{t("backlog.due")}</span>
-            <input
+            <Input
               name="task-due-date"
               type="date"
               value={form.dueDate}
               onChange={(event) => onChange({ ...form, dueDate: event.target.value })}
             />
           </label>
-          <label>
+          <label className="adm-field">
             <span>{t("backlog.agent")}</span>
             <select
               name="task-agent"
@@ -568,29 +573,32 @@ function BacklogTaskDrawer({
             </select>
           </label>
         </div>
-        <label>
+        <label className="adm-field">
           <span>{t("backlog.assignee")}</span>
-          <div className="backlog-assignee-input">
-            <ActionAddPerson size={15} />
-            <input
+          <div className="task-drawer-assignee">
+            <ActionAddPerson size={15} aria-hidden="true" />
+            <Input
               name="task-assignee"
               list="backlog-employees"
               value={form.assigneeEmployeeId}
               onChange={(event) => onChange({ ...form, assigneeEmployeeId: event.target.value })}
+              className="h-auto min-h-0 border-0 bg-transparent px-0 py-0 shadow-none focus-visible:border-transparent focus-visible:shadow-none"
             />
             <datalist id="backlog-employees">
               {employees.map((employee) => <option key={employee} value={employee} />)}
             </datalist>
           </div>
         </label>
-        <footer>
-          <button type="button" onClick={onClose}>{t("dialog.cancel")}</button>
-          <button type="submit" className="backlog-primary" disabled={saving || !form.title.trim()}>
+        <div className="adm-form-actions">
+          <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
+            {t("dialog.cancel")}
+          </Button>
+          <Button type="submit" disabled={saving || !form.title.trim()}>
             {saving ? t("admin.saving") : t("dialog.confirm")}
-          </button>
-        </footer>
+          </Button>
+        </div>
       </form>
-    </div>
+    </Drawer>
   );
 }
 
@@ -707,22 +715,14 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
         title={t("backlog.title")}
         count={t("backlog.sub", { count: tasks.length })}
         actions={
-          <>
-            <BacklogViewToggle view={view} onChange={changeView} />
-            <button
-              type="button"
-              className="backlog-icon-btn"
-              aria-label={t("nav.refresh")}
-              onClick={() => void onRefresh()}
-              disabled={isRefreshing}
-            >
-              <NavRefresh size={16} />
-            </button>
-            <button type="button" className="backlog-primary" onClick={() => setForm(emptyForm(currentUser))}>
-              <ActionCompose size={16} />
-              <span>{t("backlog.new_task")}</span>
-            </button>
-          </>
+          <TaskBoardHeaderActions
+            leading={<BacklogViewToggle view={view} onChange={changeView} />}
+            refreshLabel={t("nav.refresh")}
+            createLabel={t("backlog.new_task")}
+            isRefreshing={isRefreshing}
+            onRefresh={() => void onRefresh()}
+            onCreate={() => setForm(emptyForm(currentUser))}
+          />
         }
       />
 

@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Plus, Search, Trash2 } from "lucide-react";
+import { Plus, Search, Trash2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useDialogs } from "@/components/ui/DialogProvider";
+import { RelayEmptyState } from "@/components/RelayEmptyState";
 import type { ControlPanelDaemonNodeRecord } from "../../types";
 import {
   buildEmployeeSummaries,
@@ -112,13 +113,19 @@ export function PeopleView({
 
   if (summaries.length === 0) {
     return (
-      <div className="adm-empty-block">
-        <p className="adm-empty-title">{t("admin.v2.empty_people_title")}</p>
-        <p className="adm-empty-body">{t("admin.v2.empty_people_body")}</p>
-        <Button type="button" onClick={onOnboard}>
-          {t("admin.v2.onboard_cta")}
-        </Button>
-      </div>
+      <RelayEmptyState
+        className="adm-people-empty"
+        fill
+        atmosphere
+        title={t("admin.v2.empty_people_title")}
+        body={t("admin.v2.empty_people_body")}
+        illustration={<Users size={40} strokeWidth={1.25} aria-hidden="true" />}
+        actions={(
+          <Button type="button" onClick={onOnboard}>
+            {t("admin.v2.onboard_cta")}
+          </Button>
+        )}
+      />
     );
   }
 
@@ -211,7 +218,7 @@ export function PeopleView({
                       </button>
                     </div>
                     <div className="adm-emp-metrics">
-                      <span className={`adm-emp-running mono ${member.runningCount > 0 ? "tone-info" : "tone-muted"}`}>
+                      <span className={`adm-emp-running mono ${member.runningCount > 0 ? "tone-neutral" : "tone-muted"}`}>
                         {member.runningCount}
                       </span>
                       <span className="adm-emp-ratio mono tone-muted">

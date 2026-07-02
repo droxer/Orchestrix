@@ -16,8 +16,8 @@ interface ActivityChartProps {
 }
 
 const WIDTH = 720;
-const HEIGHT = 220;
-const PADDING = { top: 16, right: 16, bottom: 28, left: 36 };
+const HEIGHT = 160;
+const PADDING = { top: 12, right: 12, bottom: 24, left: 32 };
 
 export function ActivityChart({ daily, ready }: ActivityChartProps) {
   const { t } = useTranslation();
@@ -69,7 +69,7 @@ export function ActivityChart({ daily, ready }: ActivityChartProps) {
   }, [daily]);
 
   return (
-    <section className="adm-dash-card">
+    <section className="adm-dash-card adm-dash-card--chart">
       <header className="adm-dash-card-head">
         <div className="adm-dash-card-eyebrow">{t("admin.v2.dash_sessions_eyebrow")}</div>
         <h3 className="adm-dash-card-title">{t("admin.v2.dash_sessions_title")}</h3>

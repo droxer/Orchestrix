@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
+import { Radio, X } from "lucide-react";
 import type { ControlPanelDaemonNodeRecord } from "../../types";
 import type { DaemonNodeActiveRun } from "relay-core";
 import { buildAttentionItems, isStale, type AttentionItem } from "./helpers";
@@ -18,6 +20,8 @@ interface RailEntry {
   meta: string;
   body: string;
 }
+
+const COMPACT_BREAKPOINT = "(max-width: 1024px)";
 
 function attentionTone(kind: AttentionItem["kind"]): RailEntry["tone"] {
   if (kind === "error") return "bad";
@@ -61,14 +65,23 @@ function buildEntries(nodes: ControlPanelDaemonNodeRecord[], t: TFunction): Rail
   return [...runEntries, ...attentionEntries].slice(0, 24);
 }
 
-export function AttentionRail({ nodes }: AttentionRailProps) {
+function RailBody({
+  entries,
+  runCount,
+  attentionCount,
+  onClose,
+  showClose,
+}: {
+  entries: RailEntry[];
+  runCount: number;
+  attentionCount: number;
+  onClose?: () => void;
+  showClose?: boolean;
+}) {
   const { t } = useTranslation();
-  const entries = buildEntries(nodes, t);
-  const runCount = entries.filter((entry) => entry.kind === "run").length;
-  const attentionCount = entries.length - runCount;
 
   return (
-    <aside className="adm-rail" aria-label={t("admin.v2.rail_label")}>
+    <>
       <header className="adm-rail-head">
         <h2 className="adm-rail-title">{t("admin.v2.rail_title")}</h2>
         <span className="adm-rail-counts mono">
@@ -76,6 +89,11 @@ export function AttentionRail({ nodes }: AttentionRailProps) {
           <span aria-hidden="true">·</span>
           <span className={attentionCount > 0 ? "tone-bad" : "tone-muted"}>{attentionCount}</span>
         </span>
+        {showClose ? (
+          <button type="button" className="adm-rail-close" onClick={onClose} aria-label={t("admin.v2.rail_close")}>
+            <X size={16} aria-hidden="true" />
+          </button>
+        ) : null}
       </header>
       {entries.length === 0 ? (
         <div className="adm-rail-empty">{t("admin.v2.rail_empty")}</div>
@@ -94,6 +112,83 @@ export function AttentionRail({ nodes }: AttentionRailProps) {
           ))}
         </ul>
       )}
+    </>
+  );
+}
+
+export function AttentionRail({ nodes }: AttentionRailProps) {
+  const { t } = useTranslation();
+  const [compact, setCompact] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia(COMPACT_BREAKPOINT);
+    const sync = () => {
+      setCompact(media.matches);
+      if (!media.matches) setSheetOpen(false);
+    };
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
+
+  useEffect(() => {
+    if (!sheetOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSheetOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [sheetOpen]);
+
+  const entries = buildEntries(nodes, t);
+  const runCount = entries.filter((entry) => entry.kind === "run").length;
+  const attentionCount = entries.length - runCount;
+
+  if (compact) {
+    return (
+      <div className="adm-rail-portal">
+        <button
+          type="button"
+          className="adm-rail-fab"
+          onClick={() => setSheetOpen(true)}
+          aria-expanded={sheetOpen}
+          aria-controls="adm-rail-sheet"
+          aria-label={t("admin.v2.rail_fab_label", { runs: runCount, alerts: attentionCount })}
+        >
+          <Radio size={16} aria-hidden="true" />
+          <span className="adm-rail-fab-counts mono">
+            <span className="tone-info">{runCount}</span>
+            <span aria-hidden="true">·</span>
+            <span className={attentionCount > 0 ? "tone-bad" : "tone-muted"}>{attentionCount}</span>
+          </span>
+        </button>
+        {sheetOpen ? (
+          <div
+            className="adm-rail-sheet-backdrop"
+            role="presentation"
+            onClick={(event) => {
+              if (event.target === event.currentTarget) setSheetOpen(false);
+            }}
+          >
+            <aside id="adm-rail-sheet" className="adm-rail-sheet" aria-label={t("admin.v2.rail_label")}>
+              <RailBody
+                entries={entries}
+                runCount={runCount}
+                attentionCount={attentionCount}
+                showClose
+                onClose={() => setSheetOpen(false)}
+              />
+            </aside>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <aside className="adm-rail" aria-label={t("admin.v2.rail_label")}>
+      <RailBody entries={entries} runCount={runCount} attentionCount={attentionCount} />
     </aside>
   );
 }

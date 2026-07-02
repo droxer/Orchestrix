@@ -1,41 +1,57 @@
 "use client";
 
 import { useTranslation } from "react-i18next";
+import type { AdminView } from "./AdminViewToggle";
 
 interface PulseStripProps {
-  nodes: number;
-  employees: number;
-  ready: number;
+  view: AdminView;
   running: number;
   failed: number;
   queued: number;
+  unassignedNodes: number;
 }
 
-const TONE: Record<keyof PulseStripProps, "neutral" | "good" | "info" | "bad"> = {
-  nodes: "neutral",
-  employees: "neutral",
-  ready: "good",
-  running: "info",
-  failed: "bad",
-  queued: "neutral",
-};
+type Tone = "neutral" | "good" | "info" | "bad";
 
-export function PulseStrip(props: PulseStripProps) {
+interface PulseCell {
+  key: string;
+  value: number;
+  label: string;
+  tone: Tone;
+}
+
+export function PulseStrip({
+  view,
+  running,
+  failed,
+  queued,
+  unassignedNodes,
+}: PulseStripProps) {
   const { t } = useTranslation();
-  const cells: Array<{ key: keyof PulseStripProps; label: string }> = [
-    { key: "nodes", label: t("admin.metric_nodes") },
-    { key: "employees", label: t("admin.metric_employees") },
-    { key: "ready", label: t("admin.metric_ready") },
-    { key: "running", label: t("admin.metric_running") },
-    { key: "failed", label: t("admin.metric_failed") },
-    { key: "queued", label: t("admin.metric_queued") },
-  ];
+
+  if (view === "dashboard") return null;
+
+  const cells: PulseCell[] =
+    view === "people"
+      ? [
+          { key: "unassigned", value: unassignedNodes, label: t("admin.metric_unassigned"), tone: "neutral" },
+          { key: "running", value: running, label: t("admin.metric_running"), tone: "neutral" },
+          { key: "failed", value: failed, label: t("admin.metric_failed"), tone: "bad" },
+        ]
+      : [
+          { key: "running", value: running, label: t("admin.metric_running"), tone: "neutral" },
+          { key: "failed", value: failed, label: t("admin.metric_failed"), tone: "bad" },
+          { key: "queued", value: queued, label: t("admin.metric_queued"), tone: "neutral" },
+        ];
+
+  const ariaLabel =
+    view === "people" ? t("admin.v2.pulse_people_label") : t("admin.v2.pulse_alerts_label");
 
   return (
-    <div className="adm-pulse" role="group" aria-label={t("admin.v2.pulse_label")}>
+    <div className="adm-pulse adm-pulse--alerts" role="group" aria-label={ariaLabel}>
       {cells.map((cell) => (
         <div key={cell.key} className="adm-pulse-cell">
-          <span className={`adm-pulse-value mono tone-${TONE[cell.key]}`}>{props[cell.key]}</span>
+          <span className={`adm-pulse-value mono tone-${cell.tone}`}>{cell.value}</span>
           <span className="adm-pulse-label">{cell.label}</span>
         </div>
       ))}

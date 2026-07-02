@@ -2,9 +2,9 @@
    Backlog — agent dispatch board
 
    Operational kanban for task routing: mono numerals, status-colored
-   lane rails, hairline grid texture, hover-reveal card actions.
-   Component markup lives in BacklogPage.tsx; this file holds layout
-   and atmosphere that are awkward as one-off Tailwind strings.
+   lane rails, hairline lane grid, hover-reveal card actions.
+   Tokens follow docs/design-system.md — hairline depth, 10px cards,
+   6px inputs, cobalt actions only, brand-soft active affordances.
    ===================================================================== */
 
 .backlog-page {
@@ -65,7 +65,7 @@
   color: var(--color-ink);
 }
 
-.backlog-stat-value.tone-active { color: var(--color-info); }
+.backlog-stat-value.tone-active { color: var(--color-ink); }
 .backlog-stat-value.tone-blocked { color: var(--color-danger-text); }
 .backlog-stat-value.tone-overdue { color: var(--color-danger-text); }
 
@@ -85,9 +85,22 @@
   padding: var(--space-sm) var(--space-xl);
 }
 
-.backlog-filter-primary:focus-within {
-  outline: 2px solid color-mix(in srgb, var(--color-primary) 28%, transparent);
-  outline-offset: -2px;
+.backlog-filter-search-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: 38px;
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-strong);
+  color: var(--color-muted);
+}
+
+.backlog-filter-search-wrap:focus-within {
+  box-shadow: var(--ring-focus);
 }
 
 .backlog-filter-search {
@@ -97,11 +110,90 @@
   background: transparent;
   padding: var(--space-xs) 0;
   color: var(--color-ink);
-  font: var(--type-body-sm);
+  font: var(--type-body-md);
 }
 
 .backlog-filter-search::placeholder {
   color: var(--color-muted-soft);
+}
+
+.backlog-filter-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex-shrink: 0;
+}
+
+/* button-secondary — toggles the filter panel; count uses badge-mono. */
+.backlog-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-strong);
+  color: var(--color-ink);
+  font: var(--type-nav-link);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
+}
+
+.backlog-filter-chip:hover {
+  background: color-mix(in srgb, var(--color-ink) 5%, var(--color-surface-strong));
+}
+
+.backlog-filter-chip[data-applied="true"],
+.backlog-filter-chip[data-active="true"] {
+  background: var(--color-brand-soft);
+  border-color: color-mix(in srgb, var(--color-primary) 24%, var(--color-hairline));
+}
+
+.backlog-filter-chip:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-focus);
+}
+
+.backlog-filter-count {
+  display: inline-flex;
+  align-items: center;
+  min-width: 18px;
+  justify-content: center;
+  padding: 2px 8px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-muted);
+  font: var(--type-eyebrow);
+  letter-spacing: var(--letter-eyebrow);
+  text-transform: uppercase;
+}
+
+/* link-inline — cobalt text action beside the filter button. */
+.backlog-filter-clear {
+  min-height: 36px;
+  border: 0;
+  background: transparent;
+  padding: 8px 4px;
+  color: var(--color-primary);
+  font: var(--type-nav-link);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-standard);
+}
+
+.backlog-filter-clear:hover {
+  color: var(--color-primary-active);
+}
+
+.backlog-filter-clear:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-focus);
+  border-radius: var(--radius-xs);
 }
 
 .backlog-filter-secondary {
@@ -113,39 +205,13 @@
 
 .backlog-filter-secondary select,
 .backlog-filter-secondary input {
-  min-height: 34px;
+  min-height: 40px;
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: var(--color-canvas);
-  padding: 0 var(--space-sm);
+  padding: 9px var(--space-sm);
   color: var(--color-ink);
-  font: var(--type-meta-mono);
-}
-
-.backlog-filter-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-xxs);
-  min-height: 28px;
-  padding: 0 var(--space-sm);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface-soft);
-  color: var(--color-muted);
-  font: var(--type-meta-mono);
-  cursor: pointer;
-  transition: border-color 120ms, color 120ms, background 120ms;
-}
-
-.backlog-filter-chip:hover {
-  border-color: color-mix(in srgb, var(--color-ink) 18%, var(--color-hairline));
-  color: var(--color-ink);
-}
-
-.backlog-filter-chip[data-active="true"] {
-  border-color: var(--color-ink);
-  background: var(--color-ink);
-  color: var(--color-on-primary);
+  font: var(--type-body-md);
 }
 
 /* ── Pipeline board ──────────────────────────────────────────────────── */
@@ -234,17 +300,15 @@
 .backlog-task {
   position: relative;
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
   background: var(--color-canvas);
   padding: var(--space-base);
-  box-shadow: var(--shadow-soft);
-  transition: border-color 150ms, box-shadow 150ms, transform 150ms;
+  transition: border-color 150ms, box-shadow 150ms;
 }
 
 .backlog-task:hover {
   border-color: color-mix(in srgb, var(--color-ink) 12%, var(--color-hairline));
-  box-shadow: var(--shadow-lift);
-  transform: translateY(-1px);
+  box-shadow: var(--shadow-soft);
 }
 
 .backlog-task[data-priority="high"] {
@@ -252,7 +316,7 @@
 }
 
 .backlog-task[data-priority="normal"] {
-  border-left: 3px solid var(--color-info);
+  border-left: 3px solid var(--color-ink);
 }
 
 .backlog-task[data-priority="low"] {
@@ -587,186 +651,39 @@
   text-align: center;
 }
 
-/* ── Drawer ────────────────────────────────────────────────────────── */
+/* ── Task board drawer forms (adm-drawer + adm-form) ──────────────── */
 
-.backlog-drawer-shell {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  animation: backlog-scrim-in 180ms ease-out;
-}
-
-@keyframes backlog-scrim-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.backlog-drawer-scrim {
-  position: absolute;
-  inset: 0;
-  border: 0;
-  background: var(--color-overlay);
-  cursor: pointer;
-}
-
-.backlog-drawer {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: min(420px, 100vw);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-base);
-  padding: var(--space-lg);
-  border-left: 1px solid var(--color-hairline);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  background:
-    linear-gradient(135deg, color-mix(in srgb, var(--color-surface-soft) 40%, transparent), transparent 40%),
-    var(--color-surface-raised);
-  box-shadow: -24px 0 60px color-mix(in srgb, var(--color-ink) 12%, transparent);
-  animation: backlog-drawer-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-@keyframes backlog-drawer-in {
-  from { transform: translateX(100%); }
-  to { transform: translateX(0); }
-}
-
-.backlog-drawer header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-base);
-}
-
-.backlog-drawer h2 {
-  margin: 0;
-  color: var(--color-ink);
-  font: var(--type-title-lg);
-}
-
-.backlog-drawer header p {
-  margin: var(--space-xxs) 0 0;
-  color: var(--color-muted);
-  font: var(--type-meta-mono);
-}
-
-.backlog-drawer label {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-  color: var(--color-muted);
-  font: var(--type-meta-mono);
-}
-
-.backlog-drawer input,
-.backlog-drawer textarea,
-.backlog-drawer select {
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-sm);
-  background: var(--color-canvas);
-  padding: var(--space-sm);
-  color: var(--color-ink);
-  font: var(--type-body-sm);
-}
-
-.backlog-drawer textarea {
-  min-height: 120px;
-  resize: vertical;
-}
-
-.backlog-form-grid {
+.task-drawer-form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--space-sm);
+  gap: var(--space-base);
 }
 
-.backlog-assignee-input {
+.task-board-drawer-form .adm-field select {
+  min-height: 40px;
+  width: 100%;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-md);
+  background: var(--color-canvas);
+  padding: 0 var(--space-sm);
+  color: var(--color-ink);
+  font: var(--type-body-md);
+}
+
+.task-drawer-assignee {
   display: flex;
   align-items: center;
   gap: var(--space-xs);
+  min-height: 40px;
   padding: 0 var(--space-sm);
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: var(--color-canvas);
 }
 
-.backlog-assignee-input input {
-  flex: 1;
-  border: 0;
-  padding-inline: 0;
-}
-
-.backlog-drawer footer {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--space-xs);
-  margin-top: auto;
-  padding-top: var(--space-base);
-  border-top: 1px solid var(--color-hairline-soft);
-}
-
-.backlog-drawer footer button {
-  min-height: 36px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-sm);
-  padding: 0 var(--space-sm);
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font: var(--type-caption-strong);
-  cursor: pointer;
-}
-
-.backlog-drawer footer .backlog-primary {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: var(--color-on-primary);
-}
-
-.backlog-drawer footer .backlog-primary:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.backlog-icon-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-sm);
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  cursor: pointer;
-}
-
-.backlog-icon-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.backlog-primary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-xs);
-  min-height: 34px;
-  padding: 0 var(--space-sm);
-  border: 1px solid var(--color-primary);
-  border-radius: var(--radius-sm);
-  background: var(--color-primary);
-  color: var(--color-on-primary);
-  font: var(--type-caption-strong);
-  cursor: pointer;
-}
-
-.backlog-primary:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+.task-drawer-assignee svg {
+  flex: none;
+  color: var(--color-muted);
 }
 
 /* ── Empty board — uses RelayEmptyState (empty-state.css) ─────────── */
@@ -801,6 +718,14 @@
     padding-inline: var(--space-base);
   }
 
+  .backlog-filter-primary {
+    flex-wrap: wrap;
+  }
+
+  .backlog-filter-search-wrap {
+    flex: 1 1 100%;
+  }
+
   .backlog-filter-secondary {
     grid-template-columns: 1fr 1fr;
   }
@@ -816,11 +741,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .backlog-drawer-shell,
-  .backlog-drawer,
   .backlog-task,
   .backlog-task-actions {
-    animation: none;
     transition: none;
   }
 
@@ -914,7 +836,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-base);
-  min-height: 52px;
+  min-height: 68px;
   padding: var(--space-xs) var(--space-sm);
   border-bottom: 1px solid var(--color-hairline-soft);
   transition: background 120ms;
@@ -1162,18 +1084,18 @@
 
 /* The enabled switch is its own row beneath the field grid — a horizontal
    label+control pair, not a faux grid cell aligned with min-height hacks. */
-.routine-toggle {
+.adm-field.routine-toggle {
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-sm);
   padding: var(--space-sm);
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   color: var(--color-ink);
 }
 
-.routine-toggle input {
+.adm-field.routine-toggle input {
   width: 18px;
   height: 18px;
   padding: 0;

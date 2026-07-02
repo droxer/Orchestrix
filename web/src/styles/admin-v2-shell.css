@@ -1,9 +1,8 @@
 /* =====================================================================
    Admin Console v2  (adm-* namespace)
-   Editorial command-center: white canvas, hairlines, Geist Mono
-   numerals, near-black ink as the sole action color. Two views
-   (People / Fleet) share a shell with left nav rail, top header,
-   pulse strip, and right attention rail.
+   Operational control plane: white canvas, hairline grids, Geist Mono
+   numerals, cobalt action color. Shares PageHeader + view-toggle chrome
+   with Backlog/MCP/Skills; pulse strip and attention rail are admin-only.
    ===================================================================== */
 
 /* Outer shell columns for the admin route: collapse the thread pane so the
@@ -70,82 +69,89 @@
   letter-spacing: 0.04em;
 }
 
-/* ── Nav bar (horizontal) ─────────────────────────────────────────── */
-.adm-nav {
-  display: flex;
-  flex-direction: row;
+/* ── View toggle (matches .backlog-view-toggle) ─────────────────────── */
+.adm-view-toggle {
+  display: inline-flex;
   align-items: center;
-  border-bottom: 1px solid var(--color-hairline);
-  background: var(--color-canvas);
-  padding: 0 var(--space-xxl);
-  gap: var(--space-lg);
-  height: 56px;
+  gap: 0;
+  padding: 2px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-soft);
   flex-shrink: 0;
 }
 
-.adm-nav-brand {
-  display: flex;
-  align-items: center;
-  color: var(--color-ink);
-  padding-right: var(--space-lg);
-  border-right: 1px solid var(--color-hairline);
-  height: 100%;
-}
-
-.adm-nav-items {
-  display: flex;
-  flex-direction: row;
-  align-items: stretch;
-  gap: 0;
-  height: 100%;
-}
-
-.adm-nav-item {
-  position: relative;
+.adm-view-toggle-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--space-xs);
-  padding: 0 var(--space-base);
-  border: none;
+  height: 28px;
+  padding: 0 var(--space-sm);
+  border: 0;
+  border-radius: calc(var(--radius-sm) - 2px);
   background: transparent;
   color: var(--color-muted);
   cursor: pointer;
-  transition: color 160ms ease;
-  font-size: var(--text-sm);
+  font: var(--type-nav-link);
+  transition: background 120ms var(--ease-standard), color 120ms var(--ease-standard), box-shadow 120ms var(--ease-standard);
 }
 
-.adm-nav-item:hover { color: var(--color-ink); }
-
-.adm-nav-item.active {
+.adm-view-toggle-btn:not([data-active="true"]):hover {
+  background: color-mix(in srgb, var(--color-ink) 6%, transparent);
   color: var(--color-ink);
 }
 
-.adm-nav-item.active::after {
-  content: "";
-  position: absolute;
-  left: var(--space-base);
-  right: var(--space-base);
-  bottom: -1px;
-  height: 2px;
-  background: var(--color-primary);
+.adm-view-toggle-btn[data-active="true"] {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-soft);
 }
 
-.adm-nav-item-label {
-  font-weight: 500;
-  letter-spacing: 0.01em;
+.adm-view-toggle-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-focus);
 }
 
-.adm-nav-foot {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
+.adm-view-toggle-btn[data-active="true"]:focus-visible {
+  box-shadow: var(--shadow-soft), var(--ring-focus);
 }
 
-.adm-nav-user {
-  display: inline-block;
-  font-size: var(--text-2xs);
-  color: var(--color-muted);
-  letter-spacing: 0.04em;
+@media (max-width: 640px) {
+  .adm-view-toggle-label,
+  .adm-command-onboard-label,
+  .adm-command-status-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .admin-console .page-header-title--display {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .adm-view-toggle-btn {
+    width: 32px;
+    padding: 0;
+  }
+
+  .adm-command-onboard {
+    padding-inline: var(--space-sm);
+  }
 }
 
 /* ── Main column ──────────────────────────────────────────────────── */
@@ -157,11 +163,6 @@
   overflow: hidden;
 }
 
-/* ── Header ───────────────────────────────────────────────────────────
-   The admin top bar now renders through the shared <PageHeader> (60px bar,
-   hairline border, 18px title + mono meta) so it matches every other route.
-   Only the live status dot remains bespoke — it rides in the header actions
-   alongside the Onboard CTA. */
 .adm-live-dot {
   width: 8px;
   height: 8px;
@@ -173,18 +174,17 @@
 .adm-live-dot.fetching { background: var(--color-info); }
 .adm-live-dot.offline { background: var(--color-semantic-down); }
 
-/* Buttons in admin surfaces now route through the shadcn <Button> primitive
-   (src/components/ui/button.tsx) — the standalone .adm-button-* system was
-   removed during the Tailwind/shadcn consolidation. */
-
 /* ── Pulse strip ──────────────────────────────────────────────────── */
 .adm-pulse {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
   padding: var(--space-lg) var(--space-xl);
   border-bottom: 1px solid var(--color-hairline);
   flex-shrink: 0;
   gap: 0;
+}
+
+.adm-pulse--alerts {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .adm-pulse-cell {
@@ -199,11 +199,7 @@
 .adm-pulse-cell:last-child { border-right: none; padding-right: 0; }
 
 .adm-pulse-value {
-  font-family: var(--font-number);
-  font-size: var(--text-3xl);
-  font-weight: 500;
-  line-height: 1.0;
-  letter-spacing: var(--letter-display);
+  font: var(--type-number);
   color: var(--color-ink);
   font-feature-settings: "tnum" 1;
 }
@@ -214,8 +210,8 @@
 .adm-pulse-value.tone-neutral { color: var(--color-ink); }
 
 .adm-pulse-label {
-  font: var(--type-micro-strong);
-  letter-spacing: 0.06em;
+  font: var(--type-eyebrow);
+  letter-spacing: var(--letter-eyebrow);
   text-transform: uppercase;
   color: var(--color-muted);
 }

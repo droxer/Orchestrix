@@ -19,3 +19,16 @@
 .mobile-topbar {
   display: none;
 }
+
+/* Admin (and future display-scale routes) — design-system display-lg title */
+.page-header-title--display {
+  font: var(--type-display-lg);
+  letter-spacing: var(--letter-display);
+}
+
+@media (max-width: 720px) {
+  .page-header-title--display {
+    font: var(--type-title-lg);
+    letter-spacing: -0.2px;
+  }
+}

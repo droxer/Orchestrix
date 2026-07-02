@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { bootstrapUser, login } from "../../api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { RelayMark } from "../RelayMark";
 
 interface LoginScreenProps {
   onLogin: () => void;
@@ -20,7 +21,12 @@ interface BootstrapScreenProps {
 function AuthShell({ children }: { children: React.ReactNode }) {
   return (
     <section className="adm-auth-shell">
-      <div className="adm-auth-card">{children}</div>
+      <div className="adm-auth-card">
+        <div className="adm-auth-brand" aria-hidden="true">
+          <RelayMark width={32} height={32} />
+        </div>
+        {children}
+      </div>
     </section>
   );
 }

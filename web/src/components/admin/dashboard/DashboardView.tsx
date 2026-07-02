@@ -31,7 +31,6 @@ export function DashboardView({ nodes, employees, metrics }: DashboardViewProps)
 
   const dash = "—";
 
-  const recentSpark = sessions.dailyCounts.slice(-14).map((p) => p.count);
   const fleetSpark = sparkFromCounts([metrics.failed, metrics.running, metrics.ready]);
 
   const last24h = sessions.last24h;
@@ -57,7 +56,6 @@ export function DashboardView({ nodes, employees, metrics }: DashboardViewProps)
                 }
               : undefined
           }
-          spark={sessionsReady && recentSpark.some((v) => v > 0) ? recentSpark : undefined}
         />
         <KpiTile
           enterIndex={1}
@@ -84,9 +82,8 @@ export function DashboardView({ nodes, employees, metrics }: DashboardViewProps)
         />
       </section>
 
-      <ActivityChart daily={sessions.dailyCounts} ready={sessionsReady} />
-
       <div className="adm-dash-belt">
+        <ActivityChart daily={sessions.dailyCounts} ready={sessionsReady} />
         <FleetHealthCard nodes={nodes} />
         <TopEmployees employees={employees} nodes={nodes} ranked={sessions.topEmployees} />
         <TokenUsageChart snapshot={tokens} compact />

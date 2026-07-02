@@ -2,19 +2,23 @@
 
 import { useMemo, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { assignTask, createTask, startTask, updateTask } from "../api";
+import { Drawer } from "./admin/Drawer";
 import { Badge } from "@/components/ui/badge";
 import { AgentStateBadge } from "./AgentStateBadge";
 import { PriorityBadge } from "./PriorityBadge";
 import { TaskStatusBadge } from "./TaskStatusBadge";
 import { cn } from "@/lib/utils";
 import { AGENT_NAMES, type AgentName, type CurrentUser, type DaemonNodeMonitorRecord, type RelaySession, type RelayTask, type TaskPriority, type TaskRoutineCadence, type TaskRoutineType } from "../types";
-import { ActionAddPerson, ActionCalendar, ActionCompose, ActionRemove, ActionSearch, ActionStart, NavRefresh } from "./icons";
+import { ActionAddPerson, ActionCalendar, ActionSearch, ActionStart } from "./icons";
 import { agentReadyForTask, TASK_PRIORITIES } from "../lib/backlog";
 import { filterRoutineTasks, routineDueTone, TASK_ROUTINE_CADENCES, TASK_ROUTINE_TYPES, type RoutineFilters } from "../lib/routine";
 import { PageHeader } from "./PageHeader";
 import { BoardEmpty } from "./BoardEmpty";
-import { useModalDrawer } from "../hooks/useModalDrawer";
+import { TaskBoardHeaderActions } from "./TaskBoardHeaderActions";
 
 interface RoutinePageProps {
   tasks: RelayTask[];
@@ -109,23 +113,40 @@ function RoutineFiltersBar({ filters, onChange }: { filters: RoutineFilters; onC
   return (
     <div className="backlog-filter-bar" aria-label={t("routine.filters")}>
       <div className="backlog-filter-primary">
-        <ActionSearch size={15} aria-hidden="true" />
-        <input
-          className="backlog-filter-search"
-          name="routine-query"
-          type="search"
-          autoComplete="off"
-          spellCheck={false}
-          value={filters.query}
-          placeholder={t("routine.search")}
-          aria-label={t("routine.search")}
-          onChange={(event) => onChange({ ...filters, query: event.target.value })}
-        />
-        <button type="button" className="backlog-filter-chip" data-active={expanded ? "true" : "false"} aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
-          {expanded ? t("backlog.hide_filters") : t("backlog.show_filters")}
-          {activeCount > 0 ? ` · ${activeCount}` : ""}
-        </button>
-        {activeCount > 0 ? <button type="button" className="backlog-filter-chip" onClick={() => onChange(initialFilters)}>{t("backlog.clear_filters")}</button> : null}
+        <div className="backlog-filter-search-wrap">
+          <ActionSearch size={15} aria-hidden="true" />
+          <input
+            className="backlog-filter-search"
+            name="routine-query"
+            type="search"
+            autoComplete="off"
+            spellCheck={false}
+            value={filters.query}
+            placeholder={t("routine.search")}
+            aria-label={t("routine.search")}
+            onChange={(event) => onChange({ ...filters, query: event.target.value })}
+          />
+        </div>
+        <div className="backlog-filter-actions">
+          <button
+            type="button"
+            className="backlog-filter-chip"
+            data-active={expanded ? "true" : "false"}
+            data-applied={activeCount > 0 ? "true" : "false"}
+            aria-expanded={expanded}
+            onClick={() => setExpanded((value) => !value)}
+          >
+            {expanded ? t("backlog.hide_filters") : t("backlog.show_filters")}
+            {activeCount > 0 ? (
+              <span className="backlog-filter-count" aria-hidden="true">{activeCount}</span>
+            ) : null}
+          </button>
+          {activeCount > 0 ? (
+            <button type="button" className="backlog-filter-clear" onClick={() => onChange(initialFilters)}>
+              {t("backlog.clear_filters")}
+            </button>
+          ) : null}
+        </div>
       </div>
       {expanded ? (
         <div className="backlog-filter-secondary">
@@ -254,61 +275,70 @@ function RoutineDrawer({
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   const { t } = useTranslation();
-  const panelRef = useModalDrawer<HTMLFormElement>(onClose);
+  const title = form.id ? t("routine.edit") : t("routine.new");
 
   return (
-    <div className="backlog-drawer-shell">
-      <button type="button" className="backlog-drawer-scrim" aria-label={t("dialog.cancel")} onClick={onClose} />
-      <form
-        ref={panelRef}
-        className="backlog-drawer"
-        role="dialog"
-        aria-modal="true"
-        aria-label={form.id ? t("routine.edit") : t("routine.new")}
-        tabIndex={-1}
-        onSubmit={onSubmit}
-      >
-        <header>
-          <div>
-            <h2>{form.id ? t("routine.edit") : t("routine.new")}</h2>
-            <p>{form.id ?? t("routine.new_routine_id")}</p>
-          </div>
-          <button type="button" className="backlog-icon-btn" aria-label={t("dialog.cancel")} onClick={onClose}>
-            <ActionRemove size={16} />
-          </button>
-        </header>
-        <label>
+    <Drawer
+      open
+      onClose={() => {
+        if (!saving) onClose();
+      }}
+      title={title}
+      subtitle={form.id ?? t("routine.new_routine_id")}
+      variant="light"
+      width={420}
+      closeLabel={t("dialog.cancel")}
+      ariaLabel={title}
+      bodyClassName="adm-drawer-body--column"
+    >
+      <form className="adm-form task-board-drawer-form" onSubmit={onSubmit}>
+        <label className="adm-field">
           <span>{t("backlog.title_field")}</span>
-          <input name="routine-title" required value={form.title} onChange={(event) => onChange({ ...form, title: event.target.value })} />
+          <Input
+            name="routine-title"
+            required
+            value={form.title}
+            onChange={(event) => onChange({ ...form, title: event.target.value })}
+          />
         </label>
-        <label>
+        <label className="adm-field">
           <span>{t("backlog.description")}</span>
-          <textarea name="routine-description" value={form.description} rows={5} onChange={(event) => onChange({ ...form, description: event.target.value })} />
+          <Textarea
+            name="routine-description"
+            value={form.description}
+            rows={5}
+            onChange={(event) => onChange({ ...form, description: event.target.value })}
+          />
         </label>
-        <div className="backlog-form-grid">
-          <label>
+        <div className="task-drawer-form-grid">
+          <label className="adm-field">
             <span>{t("routine.type")}</span>
             <select name="routine-type" value={form.routineType} onChange={(event) => onChange({ ...form, routineType: event.target.value as TaskRoutineType })}>
               {TASK_ROUTINE_TYPES.map((type) => <option key={type} value={type}>{t(`routine.types.${type}`)}</option>)}
             </select>
           </label>
-          <label>
+          <label className="adm-field">
             <span>{t("routine.cadence")}</span>
             <select name="routine-cadence" value={form.routineCadence} onChange={(event) => onChange({ ...form, routineCadence: event.target.value as TaskRoutineCadence })}>
               {TASK_ROUTINE_CADENCES.map((cadence) => <option key={cadence} value={cadence}>{t(`routine.cadences.${cadence}`)}</option>)}
             </select>
           </label>
-          <label>
+          <label className="adm-field">
             <span>{t("routine.next_run")}</span>
-            <input name="routine-next-run-date" type="date" value={form.routineNextRunDate} onChange={(event) => onChange({ ...form, routineNextRunDate: event.target.value })} />
+            <Input
+              name="routine-next-run-date"
+              type="date"
+              value={form.routineNextRunDate}
+              onChange={(event) => onChange({ ...form, routineNextRunDate: event.target.value })}
+            />
           </label>
-          <label>
+          <label className="adm-field">
             <span>{t("backlog.priority")}</span>
             <select name="routine-priority" value={form.priority} onChange={(event) => onChange({ ...form, priority: event.target.value as TaskPriority })}>
               {TASK_PRIORITIES.map((priority) => <option key={priority} value={priority}>{t(`backlog.priorities.${priority}`)}</option>)}
             </select>
           </label>
-          <label>
+          <label className="adm-field">
             <span>{t("backlog.agent")}</span>
             <select name="routine-agent" value={form.assignedAgent} onChange={(event) => onChange({ ...form, assignedAgent: event.target.value as "" | AgentName })}>
               <option value="">{t("backlog.no_agent")}</option>
@@ -316,28 +346,36 @@ function RoutineDrawer({
             </select>
           </label>
         </div>
-        <label className="routine-toggle">
+        <label className="adm-field routine-toggle">
           <span>{t("routine.enabled")}</span>
           <input name="routine-enabled" type="checkbox" checked={form.routineEnabled} onChange={(event) => onChange({ ...form, routineEnabled: event.target.checked })} />
         </label>
-        <label>
+        <label className="adm-field">
           <span>{t("backlog.assignee")}</span>
-          <div className="backlog-assignee-input">
-            <ActionAddPerson size={15} />
-            <input name="routine-assignee" list="routine-employees" value={form.assigneeEmployeeId} onChange={(event) => onChange({ ...form, assigneeEmployeeId: event.target.value })} />
+          <div className="task-drawer-assignee">
+            <ActionAddPerson size={15} aria-hidden="true" />
+            <Input
+              name="routine-assignee"
+              list="routine-employees"
+              value={form.assigneeEmployeeId}
+              onChange={(event) => onChange({ ...form, assigneeEmployeeId: event.target.value })}
+              className="h-auto min-h-0 border-0 bg-transparent px-0 py-0 shadow-none focus-visible:border-transparent focus-visible:shadow-none"
+            />
             <datalist id="routine-employees">
               {employees.map((employee) => <option key={employee} value={employee} />)}
             </datalist>
           </div>
         </label>
-        <footer>
-          <button type="button" onClick={onClose}>{t("dialog.cancel")}</button>
-          <button type="submit" className="backlog-primary" disabled={saving || !form.title.trim()}>
+        <div className="adm-form-actions">
+          <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
+            {t("dialog.cancel")}
+          </Button>
+          <Button type="submit" disabled={saving || !form.title.trim()}>
             {saving ? t("admin.saving") : t("dialog.confirm")}
-          </button>
-        </footer>
+          </Button>
+        </div>
       </form>
-    </div>
+    </Drawer>
   );
 }
 
@@ -422,15 +460,13 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
         title={t("routine.title")}
         count={t("routine.sub", { count: routineTasks.length })}
         actions={
-          <>
-            <button type="button" className="backlog-icon-btn" aria-label={t("nav.refresh")} onClick={() => void onRefresh()} disabled={isRefreshing}>
-              <NavRefresh size={16} />
-            </button>
-            <button type="button" className="backlog-primary" onClick={() => setForm(emptyForm(currentUser))}>
-              <ActionCompose size={16} />
-              <span>{t("routine.new")}</span>
-            </button>
-          </>
+          <TaskBoardHeaderActions
+            refreshLabel={t("nav.refresh")}
+            createLabel={t("routine.new")}
+            isRefreshing={isRefreshing}
+            onRefresh={() => void onRefresh()}
+            onCreate={() => setForm(emptyForm(currentUser))}
+          />
         }
       />
 

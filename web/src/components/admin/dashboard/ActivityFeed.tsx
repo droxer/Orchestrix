@@ -22,7 +22,7 @@ export function ActivityFeed({ items, employees }: ActivityFeedProps) {
   const employeeMap = new Map(employees.map((e) => [e.id, e.displayName] as const));
 
   return (
-    <section className="adm-dash-card">
+    <section className="adm-dash-card adm-dash-card--feed">
       <header className="adm-dash-card-head">
         <div className="adm-dash-card-eyebrow">{t("admin.v2.dash_feed_eyebrow")}</div>
         <h3 className="adm-dash-card-title">{t("admin.v2.dash_feed_title")}</h3>

@@ -6,7 +6,7 @@ import { useFleetMetrics } from "../hooks/useFleetMetrics";
 import { useTranslation } from "react-i18next";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { PageHeader } from "./PageHeader";
+import { NavRefresh } from "./icons";
 import { deleteControlPanelDaemonNode, deleteControlPanelEmployee, getAuthStatus, getMe, unassignControlPanelDaemonNode } from "../api";
 import type {
   AssignControlPanelDaemonNodeResponse,
@@ -21,7 +21,8 @@ import { BootstrapScreen, LoginScreen } from "./admin/AuthScreens";
 import { CredentialsDrawer } from "./admin/CredentialsDrawer";
 import { FleetView } from "./admin/FleetView";
 import { ManageAgentsDrawer } from "./admin/ManageAgentsDrawer";
-import { NavRail, type AdminView } from "./admin/NavRail";
+import { PageHeader } from "./PageHeader";
+import { AdminViewToggle, type AdminView } from "./admin/AdminViewToggle";
 import { OnboardDrawer } from "./admin/OnboardDrawer";
 import { PeopleView } from "./admin/PeopleView";
 import { PulseStrip } from "./admin/PulseStrip";
@@ -43,7 +44,7 @@ export function AdminConsole() {
   const [authScreen, setAuthScreen] = useState<AuthScreen>("login");
   const [authError, setAuthError] = useState<string | null>(null);
 
-  const { nodes, employees, lastUpdated, pollError, isFetching, mergeFleet } = useAdminFleet(Boolean(admin));
+  const { nodes, employees, lastUpdated, pollError, isFetching, mergeFleet, refetch } = useAdminFleet(Boolean(admin));
 
   const [view, setView] = useState<AdminView>("dashboard");
   const [onboardOpen, setOnboardOpen] = useState(false);
@@ -215,73 +216,92 @@ export function AdminConsole() {
   const lastUpdatedStr = lastUpdated
     ? lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
     : null;
-  const viewTitle =
-    view === "dashboard"
-      ? t("admin.v2.title_dashboard")
-      : view === "people"
-        ? t("admin.v2.title_people")
-        : t("admin.v2.title_fleet");
   return (
     <section className="admin-console adm-shell">
-      <NavRail view={view} onChange={setView} />
+      <PageHeader
+        title={t("nav.admin")}
+        titleVariant="display"
+        actions={
+          <>
+            <AdminViewToggle view={view} onChange={setView} />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              aria-label={t("nav.refresh")}
+              disabled={isFetching}
+              onClick={() => void refetch()}
+            >
+              <NavRefresh size={16} className={isFetching ? "spin" : undefined} />
+            </Button>
+            <span
+              className="adm-command-status flex items-center gap-xs text-xs text-muted-foreground"
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              <span
+                className={`adm-live-dot ${headerError ? "offline" : isFetching ? "fetching" : ""}`}
+                aria-hidden="true"
+              />
+              {headerError ? (
+                <span className="adm-command-status-text text-danger">
+                  {t("admin.fetch_error", { message: headerError })}
+                </span>
+              ) : lastUpdatedStr ? (
+                <span className="adm-command-status-text mono">
+                  {t("admin.updated_at", { time: lastUpdatedStr })}
+                </span>
+              ) : null}
+            </span>
+            <Button
+              type="button"
+              className="adm-command-onboard"
+              onClick={() => setOnboardOpen(true)}
+              aria-label={t("admin.v2.onboard_cta")}
+            >
+              <Plus size={16} aria-hidden="true" />
+              <span className="adm-command-onboard-label">{t("admin.v2.onboard_cta")}</span>
+            </Button>
+          </>
+        }
+      />
 
       <div className="adm-main">
-        <PageHeader
-          title={viewTitle}
-          actions={
-            <>
-              <span className="flex items-center gap-xs text-xs text-muted-foreground">
-                <span
-                  className={`adm-live-dot ${headerError ? "offline" : isFetching ? "fetching" : ""}`}
-                  aria-hidden="true"
-                />
-                {headerError ? (
-                  <span className="text-danger">{t("admin.fetch_error", { message: headerError })}</span>
-                ) : lastUpdatedStr ? (
-                  <span className="mono">{t("admin.updated_at", { time: lastUpdatedStr })}</span>
-                ) : null}
-              </span>
-              <Button type="button" onClick={() => setOnboardOpen(true)}>
-                <Plus size={16} aria-hidden="true" />
-                <span>{t("admin.v2.onboard_cta")}</span>
-              </Button>
-            </>
-          }
-        />
-
         <PulseStrip
-          nodes={metrics.total}
-          employees={metrics.employeeTotal}
-          ready={metrics.ready}
+          view={view}
           running={metrics.running}
           failed={metrics.failed}
           queued={metrics.queued}
+          unassignedNodes={unassignedNodes.length}
         />
 
         <div className={`adm-content${view === "fleet" ? "" : " adm-content--solo"}`}>
           <div className="adm-content-main">
-            {view === "dashboard" ? (
-              <DashboardView nodes={nodes} employees={employees} metrics={metrics} />
-            ) : view === "people" ? (
-              <PeopleView
-                employees={employees}
-                nodes={nodes}
-                onRevealCredentials={handleRevealCredentials}
-                onOnboard={() => setOnboardOpen(true)}
-                onRequestAssign={(employeeId) => setAssignTarget({ employeeId })}
-                onDeleteEmployee={handleDeleteEmployee}
-                unassignedNodeCount={unassignedNodes.length}
-                highlightedEmployeeId={highlightedEmployeeId}
-              />
-            ) : (
-              <FleetView
-                nodes={nodes}
-                employees={employees}
-                onRevealCredentials={handleRevealCredentials}
-                onManageAgents={handleManageAgents}
-                onDeleteNode={handleDeleteNode}
-              />
-            )}
+            <div key={view} className="adm-view-stage">
+              {view === "dashboard" ? (
+                <DashboardView nodes={nodes} employees={employees} metrics={metrics} />
+              ) : view === "people" ? (
+                <PeopleView
+                  employees={employees}
+                  nodes={nodes}
+                  onRevealCredentials={handleRevealCredentials}
+                  onOnboard={() => setOnboardOpen(true)}
+                  onRequestAssign={(employeeId) => setAssignTarget({ employeeId })}
+                  onDeleteEmployee={handleDeleteEmployee}
+                  unassignedNodeCount={unassignedNodes.length}
+                  highlightedEmployeeId={highlightedEmployeeId}
+                />
+              ) : (
+                <FleetView
+                  nodes={nodes}
+                  employees={employees}
+                  onRevealCredentials={handleRevealCredentials}
+                  onManageAgents={handleManageAgents}
+                  onDeleteNode={handleDeleteNode}
+                />
+              )}
+            </div>
           </div>
           {view === "fleet" ? <AttentionRail nodes={nodes} /> : null}
         </div>
