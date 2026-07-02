@@ -328,6 +328,9 @@ def daemon_node_event(value: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(value.get("exitCode"), (int, float)):
             raise ValueError("daemon node run.completed exitCode must be a finite number.")
         token_usage = token_usage_field(value)
+        # Passed through raw; the registry sanitizes each entry (path
+        # confinement, extension allowlist, content caps) before indexing.
+        generated_files = value.get("generatedFiles")
         return {
             "type": event_type,
             "commandId": command_id,
@@ -339,6 +342,7 @@ def daemon_node_event(value: dict[str, Any]) -> dict[str, Any]:
             "exitCode": int(value["exitCode"]),
             "agentLog": raw_string_field(value, "agentLog"),
             **({"tokenUsage": token_usage} if token_usage else {}),
+            **({"generatedFiles": generated_files} if isinstance(generated_files, list) else {}),
         }
     if event_type == "run.failed":
         return {

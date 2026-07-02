@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import hashlib
 import hmac
 import mimetypes
 import os
 import secrets
+from datetime import datetime
 from threading import RLock
 import time
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from loguru import logger
@@ -27,6 +29,8 @@ DAEMON_NODE_LIVENESS_TIMEOUT_MS = int(os.environ.get("RELAY_DAEMON_NODE_LIVENESS
 DAEMON_RUN_TIMEOUT_MS = int(os.environ.get("RELAY_DAEMON_RUN_TIMEOUT_MS", str(15 * 60 * 1000)))
 DAEMON_COMMAND_LEASE_SECONDS = float(os.environ.get("RELAY_DAEMON_COMMAND_LEASE_SECONDS", "60"))
 AGENT_TASK_MODES = ("action", "review", "ask")
+# ".key" is deliberately absent: it matches TLS/SSH private keys far more
+# often than Keynote decks, and indexed files become downloadable artifacts.
 GENERATED_ARTIFACT_EXTENSIONS = frozenset({
     ".csv",
     ".doc",
@@ -35,7 +39,6 @@ GENERATED_ARTIFACT_EXTENSIONS = frozenset({
     ".html",
     ".jpeg",
     ".jpg",
-    ".key",
     ".pdf",
     ".png",
     ".ppt",
@@ -48,20 +51,35 @@ GENERATED_ARTIFACT_EXTENSIONS = frozenset({
     ".zip",
 })
 GENERATED_ARTIFACT_EXCLUDED_DIRS = frozenset({
+    ".cache",
     ".git",
+    ".gradle",
+    ".mypy_cache",
     ".next",
     ".oci",
     ".relay",
     ".pytest_cache",
+    ".ruff_cache",
+    ".tox",
+    ".turbo",
     ".venv",
     "__pycache__",
+    "coverage",
     "dist",
     "node_modules",
     "out",
+    "target",
     "venv",
 })
 GENERATED_ARTIFACT_LIMIT = 20
+# Bound the fallback workspace walk so a pathological tree cannot stall the
+# backend event loop; daemons that report generated files skip it entirely.
+GENERATED_ARTIFACT_WALK_MAX_ENTRIES = 50_000
+# Per-file cap for content snapshots kept alongside the artifact record.
+WORKSPACE_ARTIFACT_CONTENT_MAX_BYTES = int(os.environ.get("RELAY_WORKSPACE_ARTIFACT_SNAPSHOT_MAX_BYTES", str(2 * 1024 * 1024)))
 ARTIFACT_SNAPSHOT_STATE_KEY = "_relay_artifact_snapshot"
+DAEMON_CAPABILITY_GENERATED_FILES = "generated-files"
+DAEMON_NODE_CAPABILITIES = frozenset({DAEMON_CAPABILITY_GENERATED_FILES})
 
 
 def hash_daemon_node_token(token: str | None) -> str | None:
@@ -117,6 +135,7 @@ def _workspace_artifact_candidates(workspace_path: str | None) -> list[dict[str,
         return []
     root_resolved = root.resolve()
     files: list[dict[str, Any]] = []
+    visited = 0
     try:
         for dirpath, dirnames, filenames in os.walk(root_resolved):
             dirnames[:] = [
@@ -124,6 +143,10 @@ def _workspace_artifact_candidates(workspace_path: str | None) -> list[dict[str,
                 for name in dirnames
                 if name not in GENERATED_ARTIFACT_EXCLUDED_DIRS and not (Path(dirpath) / name).is_symlink()
             ]
+            visited += len(dirnames) + len(filenames)
+            if visited > GENERATED_ARTIFACT_WALK_MAX_ENTRIES:
+                logger.warning("Workspace artifact walk truncated", workspace_path=str(root_resolved), max_entries=GENERATED_ARTIFACT_WALK_MAX_ENTRIES)
+                break
             for filename in filenames:
                 path = Path(dirpath) / filename
                 if path.suffix.lower() not in GENERATED_ARTIFACT_EXTENSIONS:
@@ -168,6 +191,73 @@ def _workspace_generated_files(workspace_path: str | None, before: dict[str, Any
             continue
         files.append(item)
     return files[:GENERATED_ARTIFACT_LIMIT]
+
+
+def _local_generated_file_item(item: dict[str, Any]) -> dict[str, Any]:
+    """Attach a content snapshot to a walk-detected file when it is small enough."""
+    content: bytes | None = None
+    if isinstance(item.get("bytes"), int) and item["bytes"] <= WORKSPACE_ARTIFACT_CONTENT_MAX_BYTES:
+        try:
+            content = Path(item["path"]).read_bytes()
+        except OSError:
+            content = None
+    return {**item, "content": content}
+
+
+def _clean_workspace_relative_path(value: Any) -> str | None:
+    """Validate a daemon-reported workspace-relative path (untrusted input)."""
+    if not isinstance(value, str) or not value.strip():
+        return None
+    relative = PurePosixPath(value.strip().replace("\\", "/"))
+    if relative.is_absolute():
+        return None
+    parts = relative.parts
+    if not parts or any(part in ("..", ".") for part in parts):
+        return None
+    return relative.as_posix()
+
+
+def _daemon_reported_generated_files(workspace_path: str | None, raw_files: list[Any]) -> list[dict[str, Any]]:
+    """Sanitize the daemon's generated-file report into indexable items.
+
+    The daemon is authenticated but still an external process: paths must stay
+    inside its workspace and inline content must respect the snapshot cap.
+    """
+    items: list[dict[str, Any]] = []
+    for raw in raw_files:
+        if not isinstance(raw, dict):
+            continue
+        relative = _clean_workspace_relative_path(raw.get("relativePath"))
+        if not relative:
+            continue
+        # Gate on the actual file's extension, not the display title, so a
+        # report cannot smuggle e.g. a private key behind a document title.
+        if PurePosixPath(relative).suffix.lower() not in GENERATED_ARTIFACT_EXTENSIONS:
+            continue
+        title = raw.get("title") if isinstance(raw.get("title"), str) and raw.get("title", "").strip() else PurePosixPath(relative).name
+        content: bytes | None = None
+        encoded = raw.get("contentBase64")
+        if isinstance(encoded, str) and encoded:
+            try:
+                decoded = base64.b64decode(encoded, validate=True)
+            except (ValueError, TypeError):
+                decoded = None
+            if decoded is not None and len(decoded) <= WORKSPACE_ARTIFACT_CONTENT_MAX_BYTES:
+                content = decoded
+        size = raw.get("bytes")
+        bytes_count = len(content) if content is not None else size if isinstance(size, int) and size >= 0 else 0
+        content_type = raw.get("contentType") if isinstance(raw.get("contentType"), str) and raw.get("contentType") else None
+        items.append({
+            "path": str(Path(workspace_path) / relative) if workspace_path else relative,
+            "relativePath": relative,
+            "title": title,
+            "bytes": bytes_count,
+            "contentType": content_type or mimetypes.guess_type(title)[0] or "application/octet-stream",
+            "content": content,
+        })
+        if len(items) >= GENERATED_ARTIFACT_LIMIT:
+            break
+    return items
 
 
 def public_sandbox_record(sandbox: dict[str, Any]) -> dict[str, Any]:
@@ -396,10 +486,15 @@ class DaemonNodeRegistry:
             **input,
         }
         max_concurrent_runs, run_capacity_by_mode = normalize_run_capacity(capacity_input)
+        capabilities = sorted({
+            value for value in (input.get("capabilities") or [])
+            if isinstance(value, str) and value in DAEMON_NODE_CAPABILITIES
+        })
         sandbox = {
             "id": input["sandboxId"],
             **({"employeeId": employee_id} if employee_id else {}),
             **({"workspacePath": input["workspacePath"]} if input.get("workspacePath") else {}),
+            **({"capabilities": capabilities} if capabilities else {}),
             "status": "running" if input.get("status") == "busy" else "stopped" if input.get("status") == "stopped" else "ready",
             "agents": agents,
             **({"agentDetails": agent_details} if agent_details else {}),
@@ -621,8 +716,8 @@ class DaemonNodeRegistry:
         timestamp = sandbox.get("lastSeenAt") or sandbox.get("updatedAt") or sandbox.get("createdAt") or ""
         active_runs = self.daemon_store.list_active_runs(sandbox["id"])
         try:
-            seen_at = __import__("datetime").datetime.fromisoformat(timestamp.replace("Z", "+00:00")).timestamp()
-        except Exception:
+            seen_at = datetime.fromisoformat(timestamp.replace("Z", "+00:00")).timestamp()
+        except ValueError:
             seen_at = 0.0
         return (
             0 if liveness["online"] and node_accepts_run(sandbox, assignments=[{"mode": "ask"}], active_runs=active_runs) else 1,
@@ -831,7 +926,13 @@ class DaemonNodeRegistry:
             **({"workspacePath": sandbox["workspacePath"]} if sandbox.get("workspacePath") else {}),
             "state": state,
         }
-        artifact_snapshot = _workspace_generated_file_snapshot(sandbox.get("workspacePath"))
+        # Daemons that report generated files themselves make the backend-side
+        # workspace walk unnecessary (and it only works on a shared filesystem).
+        artifact_snapshot = (
+            None
+            if self._node_reports_generated_files(sandbox)
+            else _workspace_generated_file_snapshot(sandbox.get("workspacePath"))
+        )
         self.enqueue(run_request["nodeId"], command)
         return self.daemon_store.update_run_request(run_request["id"], {
             "currentCommandId": command["id"],
@@ -839,7 +940,7 @@ class DaemonNodeRegistry:
             "currentAgent": assignment["agent"],
             "currentMode": mode,
             "currentStartedAt": now_iso(),
-            "state": {**state, ARTIFACT_SNAPSHOT_STATE_KEY: artifact_snapshot},
+            "state": {**state, **({ARTIFACT_SNAPSHOT_STATE_KEY: artifact_snapshot} if artifact_snapshot is not None else {})},
         })
 
     def _advance_run_request(self, run_request: dict[str, Any], event: dict[str, Any]) -> None:
@@ -904,18 +1005,28 @@ class DaemonNodeRegistry:
         else:
             self._enqueue_current_assignment(updated)
 
+    def _node_reports_generated_files(self, sandbox: dict[str, Any]) -> bool:
+        return DAEMON_CAPABILITY_GENERATED_FILES in (sandbox.get("capabilities") or [])
+
     def _record_generated_workspace_artifacts(self, sandbox: dict[str, Any], run_request: dict[str, Any], event: dict[str, Any], artifact_snapshot: dict[str, Any] | None) -> None:
         session_id = run_request["sessionId"]
-        session = self.store.get_session(session_id)
-        existing_paths = {
-            str(Path(artifact["path"]).resolve())
-            for artifact in session.get("artifacts", [])
-            if artifact.get("kind") == "workspace_file" and artifact.get("path")
-        }
-        for item in _workspace_generated_files(sandbox.get("workspacePath"), artifact_snapshot):
-            path = str(Path(item["path"]).resolve())
-            if path in existing_paths:
+        workspace_path = sandbox.get("workspacePath")
+        if isinstance(event.get("generatedFiles"), list):
+            items = _daemon_reported_generated_files(workspace_path, event["generatedFiles"])
+        elif self._node_reports_generated_files(sandbox):
+            # A capable daemon reported nothing for this run.
+            items = []
+        else:
+            items = [_local_generated_file_item(item) for item in _workspace_generated_files(workspace_path, artifact_snapshot)]
+        # A file may legitimately be re-generated by a later run; each change
+        # gets its own artifact attributed to the run that produced it. Only
+        # duplicates within one report are dropped.
+        seen_paths: set[str] = set()
+        for item in items:
+            path = item["path"]
+            if path in seen_paths:
                 continue
+            seen_paths.add(path)
             artifact = {
                 "id": new_relay_id("art"),
                 "kind": "workspace_file",
@@ -927,14 +1038,17 @@ class DaemonNodeRegistry:
                 "contentType": item["contentType"],
                 "workspaceRelativePath": item["relativePath"],
             }
-            self.store.append_event(session_id, relay_event("artifact.created", session_id, {"artifact": artifact}))
-            existing_paths.add(path)
+            if hasattr(self.store, "index_workspace_artifact"):
+                artifact, _session = self.store.index_workspace_artifact(session_id, artifact, item.get("content"))
+            else:
+                self.store.append_event(session_id, relay_event("artifact.created", session_id, {"artifact": artifact}))
             logger.info(
                 "Generated workspace artifact indexed",
                 session_id=session_id,
                 run_id=event["runId"],
                 artifact_id=artifact["id"],
                 path=item["relativePath"],
+                snapshot=item.get("content") is not None,
             )
 
     def _complete_run_request(self, run_request: dict[str, Any], outcome: str) -> None:

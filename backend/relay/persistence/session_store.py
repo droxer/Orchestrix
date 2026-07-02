@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import time
 from threading import RLock
@@ -112,6 +113,44 @@ class LocalSessionStore:
                 Path(artifact["path"]).unlink(missing_ok=True)
                 raise
             return artifact, session
+
+    def index_workspace_artifact(self, session_id: str, artifact: dict[str, Any], content: bytes | None) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Record a generated workspace file, keeping a content snapshot when available.
+
+        The artifact's ``path`` points at the live workspace file; the snapshot
+        copy under the session's artifact directory keeps the artifact servable
+        after the workspace copy is rewritten or deleted.
+        """
+        with self._lock:
+            snapshot_path: Path | None = None
+            if content is not None:
+                artifact_dir = self._session_dir(session_id) / "artifacts"
+                artifact_dir.mkdir(parents=True, exist_ok=True)
+                snapshot_path = artifact_dir / f"{artifact['id']}.{artifact_snapshot_extension(artifact.get('title'))}"
+                snapshot_path.write_bytes(content)
+                artifact = {**artifact, "snapshotPath": str(snapshot_path), "bytes": len(content)}
+            try:
+                session = self.append_event(session_id, relay_event("artifact.created", session_id, {"artifact": artifact}))
+            except Exception:
+                if snapshot_path is not None:
+                    snapshot_path.unlink(missing_ok=True)
+                raise
+            logger.debug("Workspace artifact indexed", session_id=session_id, artifact_id=artifact["id"], snapshot=snapshot_path is not None)
+            return artifact, session
+
+    def read_artifact_content(self, session_id: str, artifact_id: str) -> bytes | None:
+        """Return the stored snapshot bytes for an artifact, if one was kept."""
+        for artifact in self.get_session(session_id).get("artifacts", []):
+            if artifact["id"] != artifact_id:
+                continue
+            snapshot_path = artifact.get("snapshotPath")
+            if snapshot_path:
+                try:
+                    return Path(snapshot_path).read_bytes()
+                except OSError:
+                    return None
+            return None
+        return None
 
     def artifact_path(self, session_id: str, artifact_id: str) -> Path:
         for artifact in self.get_session(session_id).get("artifacts", []):
@@ -289,40 +328,54 @@ class DatabaseSessionStore:
             for row in rows
         ]
 
+    def _new_artifact_record(self, session_id: str, input: dict[str, Any]) -> tuple[dict[str, Any], str, str]:
+        artifact_id = new_relay_id("art")
+        extension = input.get("extension") or "txt"
+        body = input["body"]
+        artifact = {
+            "id": artifact_id,
+            "kind": input["kind"],
+            "title": input["title"],
+            "path": database_artifact_uri(session_id, artifact_id, extension),
+            "createdAt": now_iso(),
+            **({"agentRunId": input["agentRunId"]} if input.get("agentRunId") else {}),
+            "bytes": len(body.encode("utf-8")),
+        }
+        return artifact, extension, body
+
     def write_artifact(self, session_id: str, input: dict[str, Any]) -> dict[str, Any]:
         if not self.get_session(session_id):
             raise KeyError(session_id)
-        artifact_id = new_relay_id("art")
-        extension = input.get("extension") or "txt"
-        body = input["body"]
-        artifact = {
-            "id": artifact_id,
-            "kind": input["kind"],
-            "title": input["title"],
-            "path": database_artifact_uri(session_id, artifact_id, extension),
-            "createdAt": now_iso(),
-            **({"agentRunId": input["agentRunId"]} if input.get("agentRunId") else {}),
-            "bytes": len(body.encode("utf-8")),
-        }
+        artifact, extension, body = self._new_artifact_record(session_id, input)
         with self.engine.begin() as conn:
             session_pk = self._session_pk(conn, session_id)
             conn.execute(insert(self.artifacts).values(**session_artifact_to_row(session_pk, artifact, {"extension": extension}, content=body)))
-        logger.debug("Database artifact written", session_id=session_id, artifact_id=artifact_id, kind=input.get("kind"), bytes=artifact["bytes"])
+        logger.debug("Database artifact written", session_id=session_id, artifact_id=artifact["id"], kind=input.get("kind"), bytes=artifact["bytes"])
         return artifact
 
     def create_artifact(self, session_id: str, input: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
-        artifact_id = new_relay_id("art")
-        extension = input.get("extension") or "txt"
-        body = input["body"]
-        artifact = {
-            "id": artifact_id,
-            "kind": input["kind"],
-            "title": input["title"],
-            "path": database_artifact_uri(session_id, artifact_id, extension),
-            "createdAt": now_iso(),
-            **({"agentRunId": input["agentRunId"]} if input.get("agentRunId") else {}),
-            "bytes": len(body.encode("utf-8")),
-        }
+        artifact, extension, body = self._new_artifact_record(session_id, input)
+        session = self._insert_artifact_with_event(session_id, artifact, {"extension": extension}, content=body)
+        logger.debug("Database artifact created", session_id=session_id, artifact_id=artifact["id"], kind=input.get("kind"), bytes=artifact["bytes"])
+        return artifact, session
+
+    def index_workspace_artifact(self, session_id: str, artifact: dict[str, Any], content: bytes | None) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Record a generated workspace file with an optional content snapshot.
+
+        Binary content goes into the artifacts table base64-encoded so the
+        backend can serve it without access to the daemon's filesystem.
+        """
+        metadata: dict[str, Any] = {"extension": artifact_snapshot_extension(artifact.get("title"))}
+        encoded: str | None = None
+        if content is not None:
+            encoded = base64.b64encode(content).decode("ascii")
+            metadata["contentEncoding"] = "base64"
+            artifact = {**artifact, "bytes": len(content)}
+        session = self._insert_artifact_with_event(session_id, artifact, metadata, content=encoded)
+        logger.debug("Database workspace artifact indexed", session_id=session_id, artifact_id=artifact["id"], snapshot=content is not None)
+        return artifact, session
+
+    def _insert_artifact_with_event(self, session_id: str, artifact: dict[str, Any], metadata: dict[str, Any], *, content: str | None) -> dict[str, Any]:
         event = relay_event("artifact.created", session_id, {"artifact": artifact})
         with self.engine.begin() as conn:
             row = conn.execute(
@@ -334,13 +387,30 @@ class DatabaseSessionStore:
                 raise KeyError(session_id)
             session_pk = row["id"]
             sequence = int(row["version"] or 0)
-            conn.execute(insert(self.artifacts).values(**session_artifact_to_row(session_pk, artifact, {"extension": extension}, content=body)))
+            conn.execute(insert(self.artifacts).values(**session_artifact_to_row(session_pk, artifact, metadata, content=content)))
             conn.execute(insert(self.events).values(**session_event_to_row(session_pk, sequence, event)))
             session = materialize_events([*(row["snapshot"] or {}).get("events", []), event])
             conn.execute(update(self.sessions).where(self.sessions.c.id == session_pk).values(**session_to_row(session, version=sequence + 1, database_id=session_pk)))
             self._sync_token_usage(conn, session_pk, session)
-        logger.debug("Database artifact created", session_id=session_id, artifact_id=artifact_id, kind=input.get("kind"), bytes=artifact["bytes"])
-        return artifact, session
+        return session
+
+    def read_artifact_content(self, session_id: str, artifact_id: str) -> bytes | None:
+        """Return the stored snapshot bytes for an artifact, if one was kept."""
+        with self.engine.begin() as conn:
+            session_pk = self._session_pk(conn, session_id)
+            row = conn.execute(
+                select(self.artifacts.c.content, self.artifacts.c.metadata)
+                .where(self.artifacts.c.session_id == session_pk)
+                .where(self.artifacts.c.public_id == artifact_id)
+            ).mappings().first()
+        if not row or row["content"] is None:
+            return None
+        if (row["metadata"] or {}).get("contentEncoding") == "base64":
+            try:
+                return base64.b64decode(row["content"], validate=True)
+            except (ValueError, TypeError):
+                return None
+        return str(row["content"]).encode("utf-8")
 
     def artifact_path(self, session_id: str, artifact_id: str) -> Path:
         with self.engine.begin() as conn:
@@ -436,6 +506,13 @@ def session_event_to_row(session_pk: str, sequence: int, event: dict[str, Any]) 
 
 def database_artifact_uri(session_id: str, artifact_id: str, extension: str) -> str:
     return f"db://relay/sessions/{safe_name(session_id)}/artifacts/{safe_name(artifact_id)}.{safe_name(extension)}"
+
+
+def artifact_snapshot_extension(title: Any) -> str:
+    """Derive a safe file extension for a workspace-artifact snapshot copy."""
+    suffix = Path(str(title or "")).suffix.lstrip(".").lower()
+    cleaned = "".join(ch for ch in suffix if ch.isalnum())
+    return cleaned or "bin"
 
 
 def session_artifact_to_row(session_pk: str, artifact: dict[str, Any], metadata: dict[str, Any] | None = None, *, content: str | None = None) -> dict[str, Any]:

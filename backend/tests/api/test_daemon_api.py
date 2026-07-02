@@ -887,3 +887,71 @@ def test_employee_updates_agent_role_overrides_for_own_daemon_node(monkeypatch) 
             json={"agentRoleOverrides": {"codex": "builder"}},
         )
         assert invalid.status_code == 400
+
+
+def test_run_completed_generated_files_flow_over_http(monkeypatch) -> None:
+    """The full wire path: daemon reports generated files in run.completed and
+    the artifact becomes listable and downloadable, with no shared filesystem."""
+    import base64
+
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _login_admin(client)
+        response = client.post("/daemon-nodes/register", json={
+            "sandboxId": "sbx_alice",
+            "employeeId": "alice",
+            "token": "node_token",
+            "workspacePath": "/remote/daemon/workspace",
+            "protocolVersion": 1,
+            "supportedAgents": ["codex"],
+            "capabilities": ["generated-files"],
+            "status": "ready",
+        }, headers={"Authorization": "Bearer ui_token"})
+        assert response.status_code == 200
+        assert response.json()["capabilities"] == ["generated-files"]
+
+        run = client.post("/sandboxes/sbx_alice/runs", json={
+            "taskGoal": "generate the quarterly report",
+            "assignments": [{"agent": "codex", "mode": "action"}],
+        }, headers={"Authorization": "Bearer ui_token"})
+        assert run.status_code == 202
+        session_id = run.json()["id"]
+        [command] = client.get(
+            "/daemon-nodes/sbx_alice/commands",
+            headers={"Authorization": "Bearer node_token"},
+        ).json()["commands"]
+
+        response = client.post("/daemon-nodes/sbx_alice/events", json={
+            "type": "run.completed",
+            "commandId": command["id"],
+            "leaseId": command.get("leaseId"),
+            "sessionId": command["sessionId"],
+            "runId": command["runId"],
+            "agent": "codex",
+            "mode": "action",
+            "exitCode": 0,
+            "agentLog": "created q2.pdf",
+            "generatedFiles": [
+                {
+                    "relativePath": "reports/q2.pdf",
+                    "title": "q2.pdf",
+                    "bytes": 9,
+                    "contentType": "application/pdf",
+                    "contentBase64": base64.b64encode(b"pdf bytes").decode("ascii"),
+                },
+                {"relativePath": "../escape.pdf", "title": "escape.pdf", "bytes": 3},
+            ],
+        }, headers={"Authorization": "Bearer node_token"})
+        assert response.status_code == 202
+
+        listed = client.get("/artifacts").json()["artifacts"]
+        assert [item["workspaceRelativePath"] for item in listed] == ["reports/q2.pdf"]
+        assert listed[0]["sessionId"] == session_id
+
+        download = client.get(f"/sessions/{session_id}/artifacts/{listed[0]['id']}")
+        assert download.status_code == 200
+        assert download.content == b"pdf bytes"
+        assert download.headers["content-type"].startswith("application/pdf")

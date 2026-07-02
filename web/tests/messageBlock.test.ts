@@ -161,6 +161,35 @@ describe("projectMessages artifact projection", () => {
     assert.ok(system);
     assert.equal(system.id, "ev_summary");
     assert.equal(system.detail, "Session summary");
+    // The row carries the artifact so the transcript can render its card.
+    assert.equal(system.kind === "system" ? system.artifact?.id : undefined, "art_summary");
+  });
+
+  it("carries runless plan artifacts so the plan card can render", () => {
+    // Assignment plans are created before any agent run exists (no
+    // agentRunId); they must still reach the UI as artifacts, not just as a
+    // label line, so PlanCard renders the step summary.
+    const messages = projectMessages(session([
+      {
+        id: "ev_plan_runless",
+        type: "artifact.created",
+        sessionId: "ses_1",
+        timestamp,
+        artifact: {
+          id: "art_plan_runless",
+          kind: "plan",
+          title: "Assignment plan",
+          path: "/tmp/art_plan.json",
+          createdAt: timestamp,
+          bytes: 128,
+        },
+      },
+    ]), t);
+
+    const system = messages.find((message) => message.kind === "system");
+    assert.ok(system && system.kind === "system");
+    assert.equal(system.artifact?.kind, "plan");
+    assert.equal(system.artifact?.id, "art_plan_runless");
   });
 
   it("renders a follow-up user.message as a user turn after the goal", () => {

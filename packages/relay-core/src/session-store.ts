@@ -35,6 +35,8 @@ export interface RelayArtifact {
   bytes?: number;
   contentType?: string;
   workspaceRelativePath?: string;
+  /** Backend-side content snapshot kept for generated workspace files. */
+  snapshotPath?: string;
 }
 
 export interface HumanDecision {

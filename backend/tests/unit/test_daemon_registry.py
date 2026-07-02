@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -156,6 +157,131 @@ def test_daemon_completion_indexes_generated_pptx_artifact() -> None:
             assert artifact["workspaceRelativePath"] == "quarterly-review.pptx"
             assert artifact["agentRunId"] == command["runId"]
             assert artifact["id"] in updated["agentRuns"][0]["artifactIds"]
+            # A snapshot copy is kept so the artifact survives workspace changes.
+            assert session_store.read_artifact_content(session["id"], artifact["id"]) == b"pptx bytes"
+
+    asyncio.run(run_flow())
+
+
+def test_daemon_reported_generated_files_index_without_shared_filesystem() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store = LocalSessionStore(root)
+            daemon_store = LocalDaemonStore(root)
+            registry = DaemonNodeRegistry(session_store, daemon_store)
+            backend = ServerDaemonNodeBackend(registry)
+            registry.register({
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                # This path does not exist on the backend host: the daemon
+                # report alone must be enough to index and serve the artifact.
+                "workspacePath": "/remote/daemon/workspace",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "capabilities": ["generated-files", "bogus-capability"],
+                "status": "ready",
+            }, "ui_token")
+            assert registry.get("sbx_alice")["capabilities"] == ["generated-files"]
+
+            session = await backend.run("sbx_alice", {
+                "taskGoal": "generate a report",
+                "assignments": [{"agent": "codex", "mode": "action"}],
+            })
+            [command] = registry.take_commands("sbx_alice", "node_token")
+            registry.handle_event("sbx_alice", {
+                "type": "run.completed",
+                "commandId": command["id"],
+                "sessionId": command["sessionId"],
+                "runId": command["runId"],
+                "agent": "codex",
+                "mode": "action",
+                "exitCode": 0,
+                "agentLog": "created report.pdf",
+                "generatedFiles": [
+                    {
+                        "relativePath": "reports/q2.pdf",
+                        "title": "q2.pdf",
+                        "bytes": 9,
+                        "contentType": "application/pdf",
+                        "contentBase64": base64.b64encode(b"pdf bytes").decode("ascii"),
+                    },
+                    {"relativePath": "../escape.pdf", "title": "escape.pdf", "bytes": 3},
+                    {"relativePath": "secrets/server.key", "title": "cover.pdf", "bytes": 3},
+                ],
+            }, "node_token")
+
+            updated = session_store.get_session(session["id"])
+            [artifact] = [item for item in updated["artifacts"] if item["kind"] == "workspace_file"]
+            assert artifact["workspaceRelativePath"] == "reports/q2.pdf"
+            assert artifact["agentRunId"] == command["runId"]
+            assert artifact["bytes"] == 9
+            assert session_store.read_artifact_content(session["id"], artifact["id"]) == b"pdf bytes"
+
+    asyncio.run(run_flow())
+
+
+def test_regenerated_workspace_file_gets_artifact_per_producing_run() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            workspace = Path(root) / "workspace"
+            workspace.mkdir()
+            session_store = LocalSessionStore(root)
+            daemon_store = LocalDaemonStore(root)
+            registry = DaemonNodeRegistry(session_store, daemon_store)
+            backend = ServerDaemonNodeBackend(registry)
+            registry.register({
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": str(workspace),
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }, "ui_token")
+
+            report = workspace / "report.pdf"
+            session = await backend.run("sbx_alice", {
+                "taskGoal": "generate a report",
+                "assignments": [{"agent": "codex", "mode": "action"}],
+            })
+            [first_command] = registry.take_commands("sbx_alice", "node_token")
+            report.write_bytes(b"v1")
+            registry.handle_event("sbx_alice", {
+                "type": "run.completed",
+                "commandId": first_command["id"],
+                "sessionId": first_command["sessionId"],
+                "runId": first_command["runId"],
+                "agent": "codex",
+                "mode": "action",
+                "exitCode": 0,
+                "agentLog": "created report.pdf",
+            }, "node_token")
+
+            await backend.run("sbx_alice", {
+                "taskGoal": "refresh the report",
+                "sessionId": session["id"],
+                "assignments": [{"agent": "codex", "mode": "action"}],
+            })
+            [second_command] = registry.take_commands("sbx_alice", "node_token")
+            report.write_bytes(b"v2 with more bytes")
+            registry.handle_event("sbx_alice", {
+                "type": "run.completed",
+                "commandId": second_command["id"],
+                "sessionId": second_command["sessionId"],
+                "runId": second_command["runId"],
+                "agent": "codex",
+                "mode": "action",
+                "exitCode": 0,
+                "agentLog": "refreshed report.pdf",
+            }, "node_token")
+
+            updated = session_store.get_session(session["id"])
+            workspace_files = [item for item in updated["artifacts"] if item["kind"] == "workspace_file"]
+            assert len(workspace_files) == 2
+            assert {item["agentRunId"] for item in workspace_files} == {first_command["runId"], second_command["runId"]}
+            latest = max(workspace_files, key=lambda item: item["createdAt"])
+            assert session_store.read_artifact_content(session["id"], latest["id"]) == b"v2 with more bytes"
 
     asyncio.run(run_flow())
 

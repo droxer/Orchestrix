@@ -1037,3 +1037,92 @@ test("discoverAgentInventory returns empty on non-zero exit and never throws", a
   };
   assert.deepEqual(await discoverAgentInventory(throwing), {});
 });
+
+test("relay daemon reports generated workspace documents in run.completed", async (t: TestContext) => {
+  const { mkdtempSync, rmSync, writeFileSync: writeFile } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join: joinPath } = await import("node:path");
+  const workspace = mkdtempSync(joinPath(tmpdir(), "relay-daemon-generated-"));
+  t.after(() => rmSync(workspace, { recursive: true, force: true }));
+
+  const stop = new AbortController();
+  const events: DaemonNodeEvent[] = [];
+  const registrations: DaemonNodeRegistration[] = [];
+  let commandServed = false;
+  const base = runCommand();
+  assert.ok(base.type === "run.start");
+  const command: DaemonNodeCommand = { ...base, workspacePath: workspace };
+  await runRelayDaemon({
+    backendUrl: "http://relay.test",
+    sandboxId: "sbx_test",
+    employeeId: "alice",
+    workspacePath: workspace,
+    token: "node_token",
+    pollIntervalMs: 5,
+    shutdownGraceMs: 50,
+    logger: testLogger(),
+    signal: stop.signal,
+    environment: fakeEnvironment({
+      exec: async (_cmd, args, options) => {
+        if (!isInventoryProbe(args)) {
+          writeFile(joinPath(workspace, "quarterly-report.pdf"), "pdf bytes");
+          writeFile(joinPath(workspace, "server.key"), "not a document");
+        }
+        const rendered = options?.stdoutRenderer?.("done\n") ?? "done\n";
+        options?.sink?.(rendered);
+        return { exit_code: 0, stdout: "done\n", stderr: "" };
+      },
+    }),
+    fetchFn: async (url, init) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/daemon-nodes/register") {
+        registrations.push(await jsonBody<DaemonNodeRegistration>(init));
+        return jsonResponse({ ok: true });
+      }
+      if (path.endsWith("/commands")) {
+        if (!commandServed) {
+          commandServed = true;
+          return jsonResponse({ commands: [command] });
+        }
+        return jsonResponse({ commands: [] });
+      }
+      if (path.endsWith("/events")) {
+        events.push(await jsonBody<DaemonNodeEvent>(init));
+        if (events.some((event) => event.type === "run.completed")) stop.abort();
+        return jsonResponse({ ok: true }, 202);
+      }
+      throw new Error(`unexpected URL ${url}`);
+    },
+  });
+
+  assert.equal(registrations[0]?.capabilities?.includes("generated-files"), true);
+  const completed = events.find((event) => event.type === "run.completed");
+  assert.ok(completed && completed.type === "run.completed");
+  assert.equal(completed.generatedFiles?.length, 1);
+  const [file] = completed.generatedFiles ?? [];
+  assert.equal(file.relativePath, "quarterly-report.pdf");
+  assert.equal(file.contentType, "application/pdf");
+  assert.equal(Buffer.from(file.contentBase64 ?? "", "base64").toString("utf-8"), "pdf bytes");
+});
+
+test("generated-file diff detects changed files and skips excluded directories", async (t: TestContext) => {
+  const { mkdtempSync, mkdirSync: makeDir, rmSync, writeFileSync: writeFile } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join: joinPath } = await import("node:path");
+  const { snapshotGeneratedFiles, diffGeneratedFiles } = await import("../src/generated-files.js");
+  const workspace = mkdtempSync(joinPath(tmpdir(), "relay-generated-diff-"));
+  t.after(() => rmSync(workspace, { recursive: true, force: true }));
+
+  writeFile(joinPath(workspace, "data.csv"), "a,b\n");
+  makeDir(joinPath(workspace, "node_modules"));
+  writeFile(joinPath(workspace, "node_modules", "vendored.pdf"), "ignored");
+  const before = snapshotGeneratedFiles(workspace);
+
+  writeFile(joinPath(workspace, "report.html"), "<h1>hi</h1>");
+  writeFile(joinPath(workspace, "data.csv"), "a,b\nc,d\n");
+
+  const changed = diffGeneratedFiles(workspace, before);
+  assert.deepEqual(changed.map((file) => file.relativePath).sort(), ["data.csv", "report.html"]);
+  assert.deepEqual(diffGeneratedFiles(workspace, snapshotGeneratedFiles(workspace)), []);
+});
