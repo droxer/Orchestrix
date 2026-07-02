@@ -538,6 +538,7 @@ export function App() {
           disabledAgents={selectedNode?.disabledAgents}
           agentHealth={selectedNode?.agents}
           activeSession={activeSession}
+          runningAgent={activeRun?.agent}
           isRefreshing={isRefreshing}
           onRefresh={() => void refresh()}
           onBackToThreads={() => setMobileView("threads")}

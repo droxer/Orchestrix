@@ -12,15 +12,15 @@
   .header-agent-tabs button {
     padding-inline: var(--space-xs);
   }
-
-  .chat-title-status {
-    display: none;
-  }
 }
 
 @media (max-width: 900px) {
   .header-agent-tabs {
     display: none;
+  }
+
+  .chat-active-agent {
+    display: inline-flex;
   }
 }
 
@@ -124,15 +124,8 @@
     display: none;
   }
 
-  .chat-title .employee-avatar,
-  .chat-tools .pill {
+  .chat-title .employee-avatar {
     display: none;
-  }
-
-  /* Keep the conversation title as the header centerpiece on mobile; the
-     back button replaces the avatar, so the title carries the context. */
-  .chat-title h2 {
-    font-size: var(--text-md);
   }
 
   /* .header-agent-tabs is already hidden at the 900px breakpoint above. */

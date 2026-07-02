@@ -3,17 +3,33 @@ import { useTranslation } from "react-i18next";
 import type { AgentName, RelaySession } from "../types";
 import { NavConversations, NavRefresh } from "./icons";
 import { AgentMark } from "./AgentMark";
+import { Badge } from "@/components/ui/badge";
+import {
+  conversationActivity,
+  type ConversationActivityKind,
+} from "../lib/conversationActivity";
 import { formatCompactTokens } from "../lib/tokenUsage";
 
-// Chat-panel header: who/which agent/session identity, the per-agent tabs,
-// session status pill, and the refresh control.
-export function ChatHeader({ activeAgent, setActiveAgent, agentNames, disabledAgents, agentHealth, activeSession, isRefreshing, onRefresh, onBackToThreads }: {
+const ACTIVITY_BADGE: Record<
+  ConversationActivityKind,
+  "success" | "info" | "danger" | "warning" | "neutral"
+> = {
+  working: "info",
+  warn: "warning",
+  bad: "danger",
+  good: "success",
+  neutral: "neutral",
+};
+
+// Chat-panel header: session identity, status, agent tabs, and refresh.
+export function ChatHeader({ activeAgent, setActiveAgent, agentNames, disabledAgents, agentHealth, activeSession, runningAgent, isRefreshing, onRefresh, onBackToThreads }: {
   activeAgent: AgentName;
   setActiveAgent: Dispatch<SetStateAction<AgentName>>;
   agentNames: AgentName[];
   disabledAgents?: AgentName[];
   agentHealth?: Partial<Record<AgentName, "unknown" | "ready" | "failed">>;
   activeSession: RelaySession | undefined;
+  runningAgent?: AgentName;
   isRefreshing: boolean;
   onRefresh: () => void;
   onBackToThreads: () => void;
@@ -41,6 +57,10 @@ export function ChatHeader({ activeAgent, setActiveAgent, agentNames, disabledAg
         cache: tokenUsage.cache.toLocaleString(),
       })
     : "";
+  const activity = activeSession
+    ? conversationActivity(activeSession.status, runningAgent)
+    : null;
+  const showMeta = Boolean(activity || tokenUsage);
   return (
     <header className="chat-header">
       <div className="chat-title">
@@ -48,21 +68,34 @@ export function ChatHeader({ activeAgent, setActiveAgent, agentNames, disabledAg
           <NavConversations size={16} /><span>{t("nav.conversations")}</span>
         </button>
         <div className="chat-title-text">
-          <p className="chat-title-meta">
-            {tokenUsage ? (
-              <span
-                className="chat-title-tokens mono"
-                title={tokenUsageTitle}
-                aria-label={tokenUsageTitle}
-              >
-                {formatCompactTokens(tokenUsage.total)} {t("conversation.tokens_short")}
-              </span>
-            ) : null}
-          </p>
           <h2 title={activeSession ? (activeSession.title?.trim() || activeSession.taskGoal) : undefined}>{activeSession ? (activeSession.title?.trim() || activeSession.taskGoal) : t("thread.new_conversation")}</h2>
+          {showMeta ? (
+            <div className="chat-title-meta">
+              {activity ? (
+                <Badge variant={ACTIVITY_BADGE[activity.kind]} className="chat-title-status">
+                  {activity.kind === "working"
+                    ? t(activity.labelKey, { agent: runningAgent })
+                    : t(activity.labelKey)}
+                </Badge>
+              ) : null}
+              {tokenUsage ? (
+                <span
+                  className="chat-title-tokens mono"
+                  title={tokenUsageTitle}
+                  aria-label={tokenUsageTitle}
+                >
+                  {formatCompactTokens(tokenUsage.total)} {t("conversation.tokens_short")}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </div>
       <div className="chat-tools">
+        <div className="chat-active-agent" aria-label={t("thread.talk_to_agent")}>
+          <AgentMark agent={activeAgent} size={14} className="chat-active-agent-mark" />
+          <span className="mono" translate="no">{activeAgent}</span>
+        </div>
         <div className="header-agent-tabs" role="radiogroup" aria-label={t("thread.talk_to_agent")} ref={tabsRef}>
           {agentNames.map((a) => {
             const isDisabled = disabledSet.has(a);
