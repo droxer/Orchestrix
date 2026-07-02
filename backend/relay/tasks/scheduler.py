@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any, Callable
@@ -10,6 +11,11 @@ from loguru import logger
 from ..core.models import AgentName
 from ..daemon_registry import node_accepts_run
 from ..persistence.stores import valid_agent
+from ..persistence.task_store import task_claim_sort_key
+
+MAX_DISPATCH_BACKOFF_SECONDS = 3600.0
+
+ROUTINE_SKIP_NO_AGENT_MESSAGE = "Routine skipped: no assigned agent. Assign an agent so the scheduler can run it."
 
 
 def task_goal_text(task: dict[str, Any]) -> str:
@@ -42,6 +48,8 @@ class TaskScheduler:
         self._today = today
         self._loop_task: asyncio.Task[None] | None = None
         self._tick_lock = asyncio.Lock()
+        # task id → (consecutive failures, monotonic time before which dispatch is skipped)
+        self._dispatch_backoff: dict[str, tuple[int, float]] = {}
 
     def start(self) -> None:
         if self._loop_task and not self._loop_task.done():
@@ -63,9 +71,13 @@ class TaskScheduler:
     async def tick(self) -> SchedulerTickResult:
         async with self._tick_lock:
             today = self._today()
-            promoted = self._promote_due_routines(today)
-            dispatched = await self._dispatch_assigned_tasks()
-            return SchedulerTickResult(promoted=promoted, dispatched=dispatched)
+            promoted, promote_skipped = self._promote_due_routines(today)
+            dispatched, dispatch_skipped = await self._dispatch_assigned_tasks()
+            return SchedulerTickResult(
+                promoted=promoted,
+                dispatched=dispatched,
+                skipped=promote_skipped + dispatch_skipped,
+            )
 
     async def _run_loop(self) -> None:
         while True:
@@ -77,38 +89,71 @@ class TaskScheduler:
                 logger.exception("Task scheduler tick failed")
             await asyncio.sleep(self.interval_seconds)
 
-    def _promote_due_routines(self, today: date) -> int:
+    def _promote_due_routines(self, today: date) -> tuple[int, int]:
         promoted = 0
+        skipped = 0
         for routine in self.task_store.list_tasks():
             if not self._routine_due(routine, today):
                 continue
             agent = valid_agent(routine.get("assignedAgent"))
             if not agent:
+                skipped += 1
+                self._record_routine_skip(routine)
                 continue
             run_date = date.fromisoformat(routine["routineNextRunDate"])
             next_run = next_routine_date(run_date, routine.get("routineCadence") or "weekly", today)
             occurrence = self.task_store.promote_due_routine(routine["id"], today.isoformat(), next_run.isoformat() if next_run else None)
             if occurrence:
                 promoted += 1
-        return promoted
+        return promoted, skipped
 
-    async def _dispatch_assigned_tasks(self) -> int:
+    def _record_routine_skip(self, routine: dict[str, Any]) -> None:
+        activities = routine.get("activity") or []
+        if activities and activities[-1].get("message") == ROUTINE_SKIP_NO_AGENT_MESSAGE:
+            return
+        self.task_store.record_activity(routine["id"], ROUTINE_SKIP_NO_AGENT_MESSAGE)
+        logger.warning("Due routine skipped: no assigned agent", task_id=routine["id"])
+
+    async def _dispatch_assigned_tasks(self) -> tuple[int, int]:
         dispatched = 0
-        for task in self.task_store.list_tasks():
-            if dispatched >= self.max_dispatches_per_tick:
+        skipped = 0
+        attempts = 0
+        now = time.monotonic()
+        candidates = [
+            task for task in self.task_store.list_tasks()
+            if task.get("status") == "assigned"
+            and not task.get("isRoutine")
+            and valid_agent(task.get("assignedAgent"))
+        ]
+        candidates.sort(key=task_claim_sort_key)
+        candidate_ids = {task["id"] for task in candidates}
+        self._dispatch_backoff = {
+            task_id: entry
+            for task_id, entry in self._dispatch_backoff.items()
+            if task_id in candidate_ids
+        }
+        for task in candidates:
+            if attempts >= self.max_dispatches_per_tick:
                 break
-            agent = valid_agent(task.get("assignedAgent"))
-            if not agent or task.get("status") != "assigned" or task.get("isRoutine"):
+            if self._backoff_active(task["id"], now):
+                skipped += 1
                 continue
-            node = ready_node_for_task(self.registry, task, agent)
+            agent = valid_agent(task.get("assignedAgent"))
+            node = ready_node_for_task(self.registry, task, [{"agent": agent, "mode": "action"}])
             if not node:
+                skipped += 1
                 continue
             claimed = self.task_store.claim_task_for_dispatch(task["id"], agent)
             if not claimed:
+                skipped += 1
                 continue
+            attempts += 1
             if await self._dispatch_claimed_task(claimed, agent, node["id"]):
                 dispatched += 1
-        return dispatched
+                self._dispatch_backoff.pop(task["id"], None)
+            else:
+                self._register_dispatch_failure(task["id"])
+        return dispatched, skipped
 
     async def _dispatch_claimed_task(self, task: dict[str, Any], agent: AgentName, node_id: str) -> bool:
         try:
@@ -131,6 +176,15 @@ class TaskScheduler:
         logger.info("Scheduled task dispatched", task_id=task["id"], session_id=session["id"], agent=agent, node_id=node_id)
         return True
 
+    def _backoff_active(self, task_id: str, now: float) -> bool:
+        entry = self._dispatch_backoff.get(task_id)
+        return entry is not None and now < entry[1]
+
+    def _register_dispatch_failure(self, task_id: str) -> None:
+        failures = self._dispatch_backoff.get(task_id, (0, 0.0))[0] + 1
+        delay = min(self.interval_seconds * (2 ** failures), MAX_DISPATCH_BACKOFF_SECONDS)
+        self._dispatch_backoff[task_id] = (failures, time.monotonic() + delay)
+
     def _routine_due(self, task: dict[str, Any], today: date) -> bool:
         if not task.get("isRoutine") or not task.get("routineEnabled") or not task.get("routineNextRunDate"):
             return False
@@ -140,19 +194,23 @@ class TaskScheduler:
             return False
         return next_run <= today
 
-def ready_node_for_task(registry: Any, task: dict[str, Any], agent: str) -> dict[str, Any] | None:
+def ready_node_for_task(registry: Any, task: dict[str, Any], assignments: list[dict[str, Any]]) -> dict[str, Any] | None:
+    if not assignments:
+        return None
+    requested_agents = [assignment["agent"] for assignment in assignments]
     employee_id = task.get("assigneeEmployeeId") or task.get("ownerEmployeeId")
     for node in registry.list_ready():
         if employee_id and node.get("employeeId") != employee_id:
             continue
         if node.get("status") in ("stopped", "failed", "provisioning") or not registry.is_live(node["id"]):
             continue
-        if agent in set(node.get("disabledAgents") or []):
+        disabled = set(node.get("disabledAgents") or [])
+        if any(agent in disabled for agent in requested_agents):
             continue
         active_runs = registry.daemon_store.list_active_runs(node["id"])
-        if node.get("agents", {}).get(agent) == "ready" and node_accepts_run(
+        if all(node.get("agents", {}).get(agent) == "ready" for agent in requested_agents) and node_accepts_run(
             node,
-            assignments=[{"agent": agent, "mode": "action"}],
+            assignments=assignments,
             active_runs=active_runs,
         ):
             return node

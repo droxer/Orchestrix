@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from datetime import date, datetime
 import os
 from pathlib import Path
-from typing import Any, AsyncIterator
+from typing import Any, AsyncIterator, Callable
+from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI
 from loguru import logger
@@ -139,4 +141,15 @@ def task_scheduler_from_env(*, task_store: Any, registry: DaemonNodeRegistry, ba
         backend=backend,
         interval_seconds=float(os.environ.get("RELAY_TASK_SCHEDULER_INTERVAL_SECONDS", "10")),
         max_dispatches_per_tick=max(1, int(os.environ.get("RELAY_TASK_SCHEDULER_MAX_DISPATCHES", "5"))),
+        today=scheduler_today_from_env(),
     )
+
+
+def scheduler_today_from_env() -> Callable[[], date]:
+    """Routine due dates are calendar days; without a configured timezone they
+    roll over at server-local midnight, which surprises users in other zones."""
+    timezone_name = os.environ.get("RELAY_TASK_SCHEDULER_TIMEZONE", "").strip()
+    if not timezone_name:
+        return date.today
+    zone = ZoneInfo(timezone_name)  # invalid names fail fast at startup
+    return lambda: datetime.now(zone).date()

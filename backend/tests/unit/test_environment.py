@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from relay import environment
+from relay.core import environment
 
 
 def test_load_backend_env_reads_backend_root_env(monkeypatch, tmp_path) -> None:

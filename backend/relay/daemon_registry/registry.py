@@ -870,6 +870,7 @@ class DaemonNodeRegistry:
             return
         agent_log = event.get("agentLog") or self.output_for_run(event["runId"])
         self.clear_run_output(event["runId"])
+        has_next = event["exitCode"] == 0 and run_request.get("currentIndex", 0) + 1 < len(assignments)
         next_state = controller.record_agent_completed(run_request["sessionId"], state, {
             "runId": event["runId"],
             "agent": event["agent"],
@@ -878,6 +879,7 @@ class DaemonNodeRegistry:
             "exitCode": event["exitCode"],
             "agentLog": agent_log,
             "tokenUsage": event.get("tokenUsage"),
+            **({"pipelineHasNext": True} if has_next else {}),
         })
         if event["exitCode"] == 0:
             self._record_generated_workspace_artifacts(sandbox, run_request, event, artifact_snapshot)
@@ -938,7 +940,15 @@ class DaemonNodeRegistry:
     def _complete_run_request(self, run_request: dict[str, Any], outcome: str) -> None:
         sandbox = self.sandboxes.get(run_request["nodeId"])
         controller = self._controller_for_sandbox(sandbox, run_request.get("taskId")) if sandbox else SessionController(self.store, task_store=self.task_store, task_id=run_request.get("taskId"))
-        task_status = "waiting_for_human" if all((assignment.get("mode") or "action") == "ask" for assignment in run_request.get("assignments", [])) else "done"
+        modes = [(assignment.get("mode") or "action") for assignment in run_request.get("assignments", [])]
+        # ask-only discussions and review pipelines both end with a human in
+        # the loop; only pure action work is closed out automatically.
+        if all(mode == "ask" for mode in modes):
+            task_status = "waiting_for_human"
+        elif any(mode == "review" for mode in modes):
+            task_status = "review"
+        else:
+            task_status = "done"
         controller.complete_session(run_request["sessionId"], outcome, task_status=task_status)
         self.daemon_store.update_run_request(run_request["id"], {"status": "completed", "error": None})
         self.update_status(run_request["nodeId"], {"status": "ready", "lastError": None})
