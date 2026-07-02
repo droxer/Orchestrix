@@ -28,6 +28,10 @@ export type DerivedMessage =
       tone: Tone;
       label: string;
       detail?: string;
+      /** Set for artifacts that arrive outside an agent run (e.g. plans),
+       * so the transcript can render the artifact card instead of a bare
+       * label line. */
+      artifact?: RelayArtifact;
     };
 
 export function isGroupedContinuation(messages: DerivedMessage[], index: number): boolean {
@@ -145,6 +149,7 @@ export function projectMessages(session: RelaySession | undefined, t: TFunction)
             tone: "neutral",
             label: t("message.artifact", { kind: t(`artifact.kind.${event.artifact.kind}`, { defaultValue: event.artifact.kind }) }),
             detail: event.artifact.title,
+            artifact: event.artifact,
           });
         }
         break;

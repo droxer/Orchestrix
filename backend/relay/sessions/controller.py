@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from loguru import logger
@@ -196,7 +197,7 @@ class SessionController:
         self.create_artifact(session_id, {
             "kind": "plan",
             "title": "Assignment plan",
-            "body": __import__("json").dumps({"assignments": assignments}, indent=2),
+            "body": json.dumps({"assignments": assignments}, indent=2),
             "extension": "json",
         })
         logger.info("Session assignments updated", session_id=session_id, assignments=[{"agent": a["agent"], "mode": a["mode"]} for a in assignments])

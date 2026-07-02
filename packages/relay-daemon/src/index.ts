@@ -13,6 +13,7 @@ import type {
   StreamExecResult,
 } from "relay-core";
 import { startOrchestratorSession, ensureAgentReady as ensureSandboxAgentReady, type ActiveOrchestratorSession } from "./sandbox-session.js";
+import { diffGeneratedFiles, snapshotGeneratedFiles } from "./generated-files.js";
 import { discoverAgentInventory } from "./agent-inventory.js";
 import { defaultExecutionManager } from "./execution.js";
 import { hasHostKimiCodeAuth, prepareHostAgentSkills, prepareHostKimiCodeHome } from "./box.js";
@@ -31,6 +32,7 @@ import {
   agentHomePath,
   kimiApiKey,
   openaiApiKey,
+  DAEMON_CAPABILITY_GENERATED_FILES,
   DAEMON_NODE_PROTOCOL_VERSION,
 } from "relay-core";
 
@@ -165,6 +167,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
     workspacePath,
     protocolVersion: DAEMON_NODE_PROTOCOL_VERSION,
     supportedAgents,
+    capabilities: [DAEMON_CAPABILITY_GENERATED_FILES],
     agentHealth,
     ...(Object.keys(agentInventory).length > 0 ? { agentInventory } : {}),
     maxConcurrentRuns,
@@ -602,6 +605,9 @@ async function executeCommand(
     agent: command.agent,
     signal,
   };
+  // Snapshot document-type workspace files so a successful run can report
+  // exactly what it created or changed (see generated-files.ts).
+  const workspaceSnapshot = snapshotGeneratedFiles(nodeWorkspacePath);
   const patch = await runAgentNode(command.agent, command.mode, state, options);
   const next = mergeAgentState(state, patch);
   await outputPostChain;
@@ -634,10 +640,12 @@ async function executeCommand(
     } satisfies DaemonNodeEvent, token, signal);
     return;
   }
+  const generatedFiles = next.last_exit_code === 0 ? diffGeneratedFiles(nodeWorkspacePath, workspaceSnapshot) : [];
   logger.info("run completed", {
     ...commandLogFields(sandboxId, command),
     exitCode: next.last_exit_code,
     agentLogBytes: agentLog.length,
+    generatedFileCount: generatedFiles.length,
   });
   await postJsonWithRetry(fetchFn, eventUrl, {
     type: "run.completed",
@@ -650,6 +658,7 @@ async function executeCommand(
     exitCode: next.last_exit_code,
     agentLog,
     tokenUsage: next.token_usage,
+    ...(generatedFiles.length > 0 ? { generatedFiles } : {}),
   } satisfies DaemonNodeEvent, token, signal);
 }
 

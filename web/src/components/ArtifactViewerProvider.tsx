@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 import { useTranslation } from "react-i18next";
 import type { RelayArtifact } from "relay-core";
 
+import { artifactRawHref } from "../lib/artifactPreview";
 import { Drawer } from "./admin/Drawer";
 import { ArtifactBody } from "./artifact/ArtifactBody";
 
@@ -17,10 +18,6 @@ interface ArtifactViewerContextValue {
 }
 
 const ArtifactViewerContext = createContext<ArtifactViewerContextValue | null>(null);
-
-function artifactRawHref(sessionId: string, artifactId: string): string {
-  return `/sessions/${encodeURIComponent(sessionId)}/artifacts/${encodeURIComponent(artifactId)}`;
-}
 
 export function ArtifactViewerProvider({ children }: { children: ReactNode }) {
   const { t } = useTranslation();

@@ -89,6 +89,60 @@ def test_workspace_file_artifact_downloads_raw_file(monkeypatch) -> None:
         assert response.headers["content-type"].startswith("application/vnd.openxmlformats-officedocument.presentationml.presentation")
 
 
+def test_workspace_file_artifact_serves_snapshot_when_live_file_is_gone(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root, TemporaryDirectory() as ws:
+        deck = Path(ws) / "deck.pptx"
+        deck.write_bytes(b"pptx bytes")
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap(client)
+        session_id = _create_session(client, ws)
+        artifact = {
+            "id": "art_deck",
+            "kind": "workspace_file",
+            "title": "deck.pptx",
+            "path": str(deck),
+            "createdAt": "2026-06-30T00:00:00.000Z",
+            "bytes": deck.stat().st_size,
+            "contentType": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            "workspaceRelativePath": "deck.pptx",
+        }
+        app.state.session_store.index_workspace_artifact(session_id, artifact, deck.read_bytes())
+        deck.unlink()
+
+        response = client.get(f"/sessions/{session_id}/artifacts/art_deck")
+        assert response.status_code == 200, response.text
+        assert response.content == b"pptx bytes"
+        assert response.headers["content-type"].startswith("application/vnd.openxmlformats-officedocument.presentationml.presentation")
+
+
+def test_workspace_file_artifact_without_snapshot_is_404_when_live_file_is_gone(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root, TemporaryDirectory() as ws:
+        deck = Path(ws) / "deck.pptx"
+        deck.write_bytes(b"pptx bytes")
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap(client)
+        session_id = _create_session(client, ws)
+        artifact = {
+            "id": "art_deck",
+            "kind": "workspace_file",
+            "title": "deck.pptx",
+            "path": str(deck),
+            "createdAt": "2026-06-30T00:00:00.000Z",
+            "bytes": deck.stat().st_size,
+            "contentType": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            "workspaceRelativePath": "deck.pptx",
+        }
+        app.state.session_store.append_event(session_id, relay_event("artifact.created", session_id, {"artifact": artifact}))
+        deck.unlink()
+
+        response = client.get(f"/sessions/{session_id}/artifacts/art_deck")
+        assert response.status_code == 404
+
+
 def test_workspace_file_artifact_rejects_paths_outside_workspace(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root, TemporaryDirectory() as ws:

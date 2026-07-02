@@ -244,3 +244,20 @@
   font: inherit;
   color: inherit;
 }
+
+/* Inline previews for generated workspace files. */
+.artifact-image-preview {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-sm);
+}
+
+.artifact-frame-preview {
+  display: block;
+  width: 100%;
+  min-height: 480px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: #fff;
+}

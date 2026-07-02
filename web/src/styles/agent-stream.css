@@ -451,3 +451,14 @@
 .msg-system.tone-good .msg-system-label::before { background: var(--color-semantic-up); }
 .msg-system.tone-bad  .msg-system-label::before { background: var(--color-semantic-down); }
 .msg-system.tone-info .msg-system-label::before { background: var(--color-info); }
+
+/* System rows that carry an artifact (assignment plans) render the card
+   itself; align to the top since the card is taller than one text line. */
+.msg-system-artifact {
+  align-items: flex-start;
+}
+
+.msg-system-artifact > :first-child {
+  flex: 1;
+  min-width: 0;
+}

@@ -37,6 +37,30 @@ export interface DaemonAgentInventory {
 export const DAEMON_NODE_PROTOCOL_VERSION = 1 as const;
 export const DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS: readonly number[] = [1];
 
+/**
+ * Daemon-advertised optional behaviors. "generated-files" means the daemon
+ * detects document-type files created or changed by a run and reports them
+ * in its run.completed event, so the backend never has to walk the workspace
+ * itself (which only works when they share a filesystem).
+ */
+export type DaemonNodeCapability = "generated-files";
+export const DAEMON_CAPABILITY_GENERATED_FILES: DaemonNodeCapability = "generated-files";
+
+/** A workspace file a run created or changed, reported by the daemon. */
+export interface DaemonGeneratedFile {
+  /** Path relative to the daemon's workspace root (posix separators). */
+  relativePath: string;
+  title: string;
+  bytes: number;
+  contentType: string;
+  /**
+   * Base64 file content for files small enough to snapshot, so the backend
+   * can serve the artifact even without access to the daemon's filesystem
+   * and after the workspace copy is deleted or rewritten.
+   */
+  contentBase64?: string;
+}
+
 export interface DaemonNodeRegistration {
   sandboxId: string;
   employeeId?: string;
@@ -44,6 +68,7 @@ export interface DaemonNodeRegistration {
   workspacePath?: string;
   protocolVersion: number;
   supportedAgents: AgentName[];
+  capabilities?: DaemonNodeCapability[];
   agentHealth?: Partial<Record<AgentName, DaemonAgentHealth>>;
   agentInventory?: Partial<Record<AgentName, DaemonAgentInventory>>;
   maxConcurrentRuns?: number;
@@ -105,6 +130,7 @@ export type DaemonNodeEvent =
       exitCode: number;
       agentLog: string;
       tokenUsage?: TokenUsage;
+      generatedFiles?: DaemonGeneratedFile[];
     }
   | {
       type: "run.failed";

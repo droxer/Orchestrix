@@ -78,6 +78,7 @@ export {
 } from "./agents.js";
 
 export {
+  DAEMON_CAPABILITY_GENERATED_FILES,
   DAEMON_NODE_PROTOCOL_VERSION,
   DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS,
   type DaemonAgentAdapter,
@@ -86,7 +87,9 @@ export {
   type DaemonAgentInventory,
   type DaemonAgentMcpServer,
   type DaemonAgentSkill,
+  type DaemonGeneratedFile,
   type DaemonMcpTransport,
+  type DaemonNodeCapability,
   type DaemonNodeCommand,
   type DaemonNodeEvent,
   type DaemonNodeRegistration,

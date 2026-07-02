@@ -84,10 +84,16 @@ function ArtifactCard({ artifact, sessionId }: { artifact: RelayArtifact; sessio
   return <ArtifactChip artifact={artifact} sessionId={sessionId} />;
 }
 
+// Chips only fetch bodies small enough that the stat is worth the transfer;
+// beyond this the chip shows byte size and the drawer fetches on demand.
+const ARTIFACT_STAT_FETCH_MAX_BYTES = 256 * 1024;
+
 function ArtifactChip({ artifact, sessionId }: { artifact: RelayArtifact; sessionId: string }) {
   const { t } = useTranslation();
   const viewer = useArtifactViewer();
-  const shouldLoadBody = artifact.kind !== "workspace_file";
+  const shouldLoadBody =
+    artifact.kind !== "workspace_file" &&
+    (artifact.bytes === undefined || artifact.bytes <= ARTIFACT_STAT_FETCH_MAX_BYTES);
 
   // The body is loaded once (shared with the viewer drawer) so the chip can
   // show a semantic stat — +/−, pass/fail — instead of raw byte size.
@@ -183,6 +189,18 @@ export function MessageBlock({
           ) : null}
         </div>
       </article>
+    );
+  }
+
+  // Artifacts created outside an agent run (assignment plans, most notably)
+  // render as their card — a plan reads as its step summary, not a bare
+  // "Artifact — Plan" line.
+  if (message.artifact) {
+    return (
+      <div className={`msg msg-system msg-system-artifact tone-${message.tone}`}>
+        <ArtifactCard artifact={message.artifact} sessionId={sessionId} />
+        <time className="mono">{formatTime(message.timestamp)}</time>
+      </div>
     );
   }
 

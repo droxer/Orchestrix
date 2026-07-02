@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { RelayArtifact } from "relay-core";
 
+import { artifactRawHref, workspaceFilePreviewMode } from "../../lib/artifactPreview";
 import { useArtifactBody } from "../../lib/useArtifactBody";
 
 type DiffLineKind = "add" | "del" | "meta" | "hunk" | "context";
@@ -61,9 +62,51 @@ function renderBody(kind: RelayArtifact["kind"], text: string) {
   }
 }
 
-function WorkspaceFileBody({ artifact }: { artifact: RelayArtifact }) {
+// Renders untrusted generated HTML inside a fully sandboxed iframe: no
+// scripts, no same-origin access — the document can only lay itself out.
+function SandboxedHtml({ html, title }: { html: string; title: string }) {
+  return <iframe className="artifact-frame-preview" title={title} sandbox="" srcDoc={html} />;
+}
+
+function WorkspaceFileBody({ artifact, sessionId }: { artifact: RelayArtifact; sessionId: string }) {
   const { t } = useTranslation();
+  const mode = workspaceFilePreviewMode(artifact.contentType);
+  const rawHref = artifactRawHref(sessionId, artifact.id);
+  const wantsText = mode === "html" || mode === "text";
+  const query = useArtifactBody(sessionId, artifact.id, { enabled: wantsText });
   const path = artifact.workspaceRelativePath ?? artifact.path;
+
+  if (mode === "image") {
+    return (
+      <div className="artifact-viewer-body">
+        <img className="artifact-image-preview" src={rawHref} alt={artifact.title} />
+      </div>
+    );
+  }
+  if (mode === "pdf") {
+    return (
+      <div className="artifact-viewer-body">
+        <iframe className="artifact-frame-preview" src={rawHref} title={artifact.title} />
+      </div>
+    );
+  }
+  if (wantsText) {
+    if (query.isLoading) {
+      return <p className="artifact-viewer-status">{t("artifact.loading_preview")}</p>;
+    }
+    if (query.isSuccess && query.data?.trim()) {
+      return (
+        <div className="artifact-viewer-body">
+          {mode === "html" ? (
+            <SandboxedHtml html={query.data} title={artifact.title} />
+          ) : (
+            <pre className="artifact-plain">{query.data}</pre>
+          )}
+        </div>
+      );
+    }
+    // Fetch failed or came back empty: fall through to the download hint.
+  }
   return (
     <div className="artifact-viewer-body">
       <p className="artifact-viewer-status">{t("artifact.workspace_file_preview")}</p>
@@ -78,7 +121,7 @@ export function ArtifactBody({ artifact, sessionId }: { artifact: RelayArtifact;
   const query = useArtifactBody(sessionId, artifact.id, { enabled: !isWorkspaceFile });
 
   if (isWorkspaceFile) {
-    return <WorkspaceFileBody artifact={artifact} />;
+    return <WorkspaceFileBody artifact={artifact} sessionId={sessionId} />;
   }
 
   if (query.isLoading) {

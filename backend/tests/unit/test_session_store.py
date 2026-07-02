@@ -167,3 +167,59 @@ def test_database_session_store_create_artifact_indexes_artifact() -> None:
         assert updated["artifacts"][0]["id"] == artifact["id"]
         assert store.read_artifact(session["id"], artifact["id"]) == "  Looks good.\n\n"
         assert not (Path(root) / "session-artifacts").exists()
+
+
+def _workspace_file_artifact(session_id: str) -> dict:
+    return {
+        "id": "art_deck",
+        "kind": "workspace_file",
+        "title": "deck.pptx",
+        "path": f"/workspace/{session_id}/deck.pptx",
+        "createdAt": "2026-07-01T00:00:00.000Z",
+        "agentRunId": "run_1",
+        "bytes": 10,
+        "contentType": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "workspaceRelativePath": "deck.pptx",
+    }
+
+
+def test_local_session_store_workspace_artifact_snapshot_roundtrip() -> None:
+    with TemporaryDirectory() as root:
+        store = LocalSessionStore(root)
+        session = store.create_session({
+            "workspacePath": "/workspace",
+            "taskGoal": "build a deck",
+            "participants": ["human", "codex"],
+        })
+        artifact, updated = store.index_workspace_artifact(session["id"], _workspace_file_artifact(session["id"]), b"pptx binary \x00 bytes")
+
+        assert updated["artifacts"][0]["id"] == artifact["id"]
+        assert artifact["bytes"] == len(b"pptx binary \x00 bytes")
+        assert artifact["snapshotPath"].endswith(".pptx")
+        assert store.read_artifact_content(session["id"], artifact["id"]) == b"pptx binary \x00 bytes"
+
+        # Metadata-only indexing (no snapshot) still records the artifact.
+        no_content, _updated = store.index_workspace_artifact(session["id"], {**_workspace_file_artifact(session["id"]), "id": "art_big"}, None)
+        assert "snapshotPath" not in no_content
+        assert store.read_artifact_content(session["id"], no_content["id"]) is None
+
+
+def test_database_session_store_workspace_artifact_snapshot_roundtrip() -> None:
+    with TemporaryDirectory() as root:
+        store = DatabaseSessionStore(f"sqlite:///{root}/relay.db", create_schema=True)
+        session = store.create_session({
+            "workspacePath": "/workspace",
+            "taskGoal": "build a deck",
+            "participants": ["human", "codex"],
+        })
+        artifact, updated = store.index_workspace_artifact(session["id"], _workspace_file_artifact(session["id"]), b"pptx binary \x00 bytes")
+
+        assert updated["artifacts"][0]["id"] == artifact["id"]
+        assert artifact["bytes"] == len(b"pptx binary \x00 bytes")
+        assert store.read_artifact_content(session["id"], artifact["id"]) == b"pptx binary \x00 bytes"
+        with store.engine.begin() as conn:
+            row = conn.execute(text("select kind, metadata from session_artifacts where public_id = :artifact_id"), {"artifact_id": artifact["id"]}).mappings().one()
+        assert row["kind"] == "workspace_file"
+
+        no_content, _updated = store.index_workspace_artifact(session["id"], {**_workspace_file_artifact(session["id"]), "id": "art_big"}, None)
+        assert store.read_artifact_content(session["id"], no_content["id"]) is None
