@@ -37,7 +37,10 @@ function fakeEnvironment(input: {
     sandboxMode: "none",
     ensureAgentReady: input.ensure ?? (async () => undefined),
     execStream: input.exec ?? (async (_cmd, _args, options): Promise<StreamExecResult> => {
-      options?.sink?.("done\n");
+      // Mirror collectExecution: raw chunks go through the stdout renderer
+      // (which is what surfaces run.output events), the rendered text to the sink.
+      const rendered = options?.stdoutRenderer?.("done\n") ?? "done\n";
+      options?.sink?.(rendered);
       return { exit_code: 0, stdout: "done\n", stderr: "" };
     }),
     close: async () => undefined,
