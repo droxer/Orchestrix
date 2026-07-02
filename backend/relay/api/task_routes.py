@@ -10,7 +10,7 @@ from ..core.models import AGENT_NAMES
 from ..daemon_registry import node_accepts_run
 from ..persistence.stores import task_priority, task_routine_cadence, task_routine_type, task_status, valid_agent
 from ..sessions import SessionController
-from ..tasks import next_routine_date
+from ..tasks import next_routine_date, ready_node_for_task, task_goal_text
 from .deps import AppContextDep
 from .helpers import (
     actor_can_access_record,
@@ -26,10 +26,6 @@ from .helpers import (
 )
 
 router = APIRouter()
-
-
-def task_goal_text(task: dict[str, Any]) -> str:
-    return f"{task['title']}\n\n{task['description']}" if task.get("description") else task["title"]
 
 
 def date_field(body: dict[str, Any], key: str) -> str | None:
@@ -80,36 +76,6 @@ def routine_fields(body: dict[str, Any], *, current: dict[str, Any] | None = Non
     }
 
 
-def ready_node_for_task(
-    ctx: AppContextDep,
-    task: dict[str, Any],
-    agent: str | None = None,
-    mode: str = "action",
-    assignments: list[dict[str, Any]] | None = None,
-) -> dict[str, Any] | None:
-    requested = assignments or ([{"agent": agent, "mode": mode}] if agent else [])
-    if not requested:
-        return None
-    requested_agents = [item["agent"] for item in requested]
-    employee_id = task.get("assigneeEmployeeId") or task.get("ownerEmployeeId")
-    for node in ctx.registry.list_ready():
-        if employee_id and node.get("employeeId") != employee_id:
-            continue
-        if node.get("status") in ("stopped", "failed", "provisioning") or not ctx.registry.is_live(node["id"]):
-            continue
-        disabled = set(node.get("disabledAgents") or [])
-        if any(item in disabled for item in requested_agents):
-            continue
-        active_runs = ctx.registry.daemon_store.list_active_runs(node["id"])
-        if all(node.get("agents", {}).get(item) == "ready" for item in requested_agents) and node_accepts_run(
-            node,
-            assignments=requested,
-            active_runs=active_runs,
-        ):
-            return node
-    return None
-
-
 def team_assignments_for_task(ctx: AppContextDep, task: dict[str, Any]) -> list[dict[str, Any]]:
     employee_id = task.get("assigneeEmployeeId") or task.get("ownerEmployeeId")
     for node in ctx.registry.list_ready():
@@ -150,12 +116,22 @@ async def start_task_on_ready_node(
         return None
     if task.get("status") in ("running", "review", "done"):
         return None
-    node = ready_node_for_task(ctx, task, agent, mode, run_assignments)
+    node = ready_node_for_task(ctx.registry, task, run_assignments)
     if not node:
         if record_pending:
             label = ", ".join(dict.fromkeys(item["agent"] for item in run_assignments))
             return {"task": ctx.task_store.record_activity(task["id"], f"No ready node is available for {label}.", {"agent": agent}), "session": None}
         return None
+    # Claim the task before dispatching so the background scheduler (which only
+    # dispatches "assigned" tasks it can claim) cannot start a second session
+    # for the same task in the window before the run flips it to running.
+    claim_agent = valid_agent(task.get("assignedAgent"))
+    claimed = None
+    if claim_agent and task.get("status") == "assigned":
+        claimed = ctx.task_store.claim_task_for_dispatch(task["id"], claim_agent, message=f"Claimed by {agent}.")
+        if not claimed:
+            return {"task": ctx.task_store.get_task(task["id"]), "session": None}
+        task = claimed
     try:
         run_request = {
             "taskGoal": task_goal_text(task),
@@ -167,6 +143,8 @@ async def start_task_on_ready_node(
             run_request["actorEmployeeId"] = actor["employeeId"]
         session = await ctx.backend.run(node["id"], run_request)
     except ValueError as error:
+        if claimed:
+            ctx.task_store.assign_task(task["id"], claim_agent)
         if record_pending:
             updated = ctx.task_store.record_activity(task["id"], str(error), {"agent": agent})
             return {"task": updated, "session": None}
@@ -184,13 +162,16 @@ async def start_routine_occurrence_on_ready_node(
     *,
     agent: str,
     mode: str = "action",
+    assignments: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any] | None:
     if not routine.get("isRoutine") or not routine.get("routineEnabled"):
         return None
     today = date.today()
     scheduled_run_date = routine_next_run_date(routine)
     occurrence = None
-    if scheduled_run_date and scheduled_run_date <= today:
+    # Promotion requires the routine's own assigned agent; an agentless routine
+    # started manually (e.g. as a team discussion) takes the ad-hoc path below.
+    if scheduled_run_date and scheduled_run_date <= today and valid_agent(routine.get("assignedAgent")):
         next_run = next_routine_date(scheduled_run_date, routine.get("routineCadence") or "weekly", today)
         occurrence = ctx.task_store.promote_due_routine(
             routine["id"],
@@ -215,7 +196,7 @@ async def start_routine_occurrence_on_ready_node(
             f"Routine occurrence created: {occurrence['id']}.",
             {"agent": agent},
         )
-    result = await start_task_on_ready_node(ctx, occurrence, actor, mode=mode)
+    result = await start_task_on_ready_node(ctx, occurrence, actor, mode=mode, assignments=assignments)
     if result and result.get("session"):
         ctx.task_store.link_session(routine["id"], result["session"]["id"])
     return result
@@ -358,7 +339,7 @@ async def start_task(task_id: str, request: Request, ctx: AppContextDep) -> dict
         task = ctx.task_store.assign_task(task_id, agent)
     mode = agent_task_mode(body.get("mode"))
     if task.get("isRoutine"):
-        result = await start_routine_occurrence_on_ready_node(ctx, task, actor, agent=agent, mode=mode)
+        result = await start_routine_occurrence_on_ready_node(ctx, task, actor, agent=agent, mode=mode, assignments=assignments or None)
     else:
         result = await start_task_on_ready_node(ctx, task, actor, mode=mode, assignments=assignments or None)
     if not result or not result.get("session"):

@@ -118,7 +118,7 @@ class LocalTaskStore:
             logger.debug("Task claimed", task_id=task["id"], agent=agent, assignee=assignee_employee_id)
             return self.record_activity(task["id"], f"Claimed by {agent}.", {"agent": agent})
 
-    def claim_task_for_dispatch(self, task_id: str, agent: AgentName) -> dict[str, Any] | None:
+    def claim_task_for_dispatch(self, task_id: str, agent: AgentName, message: str | None = None) -> dict[str, Any] | None:
         with self._lock:
             task = self.get_task(task_id)
             if task.get("status") != "assigned" or task.get("assignedAgent") != agent:
@@ -126,8 +126,8 @@ class LocalTaskStore:
             if task.get("isRoutine"):
                 return None
             self.append_event(task_id, relay_task_event("task.status", task_id, {"status": "running"}))
-            logger.debug("Task claimed for scheduled dispatch", task_id=task_id, agent=agent)
-            return self.record_activity(task_id, f"Scheduled dispatch claimed by {agent}.", {"agent": agent})
+            logger.debug("Task claimed for dispatch", task_id=task_id, agent=agent)
+            return self.record_activity(task_id, message or f"Scheduled dispatch claimed by {agent}.", {"agent": agent})
 
     def promote_due_routine(self, task_id: str, today: str, next_run_date: str | None) -> dict[str, Any] | None:
         with self._lock:
@@ -371,7 +371,7 @@ class DatabaseTaskStore:
         logger.debug("Database task claimed", task_id=claimed["id"], agent=agent, assignee=assignee_employee_id)
         return claimed
 
-    def claim_task_for_dispatch(self, task_id: str, agent: AgentName) -> dict[str, Any] | None:
+    def claim_task_for_dispatch(self, task_id: str, agent: AgentName, message: str | None = None) -> dict[str, Any] | None:
         with self.engine.begin() as conn:
             row = conn.execute(
                 select(self.tasks.c.id, self.tasks.c.snapshot, self.tasks.c.version)
@@ -389,7 +389,7 @@ class DatabaseTaskStore:
                     "activity": {
                         "id": new_relay_id("act"),
                         "createdAt": now_iso(),
-                        "message": f"Scheduled dispatch claimed by {agent}.",
+                        "message": message or f"Scheduled dispatch claimed by {agent}.",
                         "agent": agent,
                     }
                 }),

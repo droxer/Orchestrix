@@ -8,7 +8,7 @@ from relay.daemon_registry import DaemonNodeRegistry, ServerDaemonNodeBackend
 from relay.persistence.daemon_store import LocalDaemonStore
 from relay.persistence.session_store import LocalSessionStore
 from relay.persistence.task_store import LocalTaskStore
-from relay.tasks import TaskScheduler, next_routine_date
+from relay.tasks import ROUTINE_SKIP_NO_AGENT_MESSAGE, TaskScheduler, next_routine_date
 
 
 def test_scheduler_dispatches_assigned_task_to_ready_node() -> None:
@@ -101,6 +101,133 @@ def test_scheduler_promotes_due_routine_and_advances_next_run() -> None:
             assert occurrence["isRoutine"] is False
             assert occurrence["status"] == "running"
             assert occurrence["linkedSessionIds"]
+
+    asyncio.run(run_flow())
+
+
+def test_scheduler_dispatches_by_priority_not_recency() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store = LocalSessionStore(root)
+            task_store = LocalTaskStore(root)
+            registry = DaemonNodeRegistry(session_store, LocalDaemonStore(root), task_store=task_store)
+            backend = ServerDaemonNodeBackend(registry)
+            registry.register({
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }, "ui_token")
+            high = task_store.create_task({
+                "title": "Older high priority",
+                "priority": "high",
+                "assignedAgent": "codex",
+                "assigneeEmployeeId": "alice",
+                "status": "assigned",
+            })
+            low = task_store.create_task({
+                "title": "Newer low priority",
+                "priority": "low",
+                "assignedAgent": "codex",
+                "assigneeEmployeeId": "alice",
+                "status": "assigned",
+            })
+            scheduler = TaskScheduler(task_store=task_store, registry=registry, backend=backend)
+
+            result = await scheduler.tick()
+
+            # The node has one exclusive slot, so only the high-priority task
+            # runs even though the low-priority one was touched more recently.
+            assert result.dispatched == 1
+            assert task_store.get_task(high["id"])["status"] == "running"
+            assert task_store.get_task(low["id"])["status"] == "assigned"
+
+    asyncio.run(run_flow())
+
+
+def test_scheduler_records_skip_activity_once_for_agentless_due_routine() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store = LocalSessionStore(root)
+            task_store = LocalTaskStore(root)
+            registry = DaemonNodeRegistry(session_store, LocalDaemonStore(root), task_store=task_store)
+            backend = ServerDaemonNodeBackend(registry)
+            routine = task_store.create_task({
+                "title": "Agentless routine",
+                "assigneeEmployeeId": "alice",
+                "isRoutine": True,
+                "routineCadence": "weekly",
+                "routineNextRunDate": "2026-06-25",
+                "routineEnabled": True,
+            })
+            scheduler = TaskScheduler(
+                task_store=task_store,
+                registry=registry,
+                backend=backend,
+                today=lambda: date(2026, 6, 25),
+            )
+
+            first = await scheduler.tick()
+            second = await scheduler.tick()
+
+            assert first.promoted == 0
+            assert first.skipped == 1
+            assert second.skipped == 1
+            skips = [
+                activity for activity in task_store.get_task(routine["id"])["activity"]
+                if activity["message"] == ROUTINE_SKIP_NO_AGENT_MESSAGE
+            ]
+            assert len(skips) == 1
+
+    asyncio.run(run_flow())
+
+
+def test_scheduler_backs_off_after_failed_dispatch() -> None:
+    class FailingBackend:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def run(self, node_id: str, request: dict) -> dict:
+            self.calls += 1
+            raise ValueError("dispatch rejected")
+
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store = LocalSessionStore(root)
+            task_store = LocalTaskStore(root)
+            registry = DaemonNodeRegistry(session_store, LocalDaemonStore(root), task_store=task_store)
+            backend = FailingBackend()
+            registry.register({
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }, "ui_token")
+            task = task_store.create_task({
+                "title": "Keeps failing",
+                "assignedAgent": "codex",
+                "assigneeEmployeeId": "alice",
+                "status": "assigned",
+            })
+            scheduler = TaskScheduler(task_store=task_store, registry=registry, backend=backend)
+
+            first = await scheduler.tick()
+            second = await scheduler.tick()
+
+            assert first.dispatched == 0
+            assert backend.calls == 1
+            # The failed task is back in the queue but skipped until its
+            # backoff window elapses, so the immediate retick does not re-run.
+            assert task_store.get_task(task["id"])["status"] == "assigned"
+            assert second.dispatched == 0
+            assert second.skipped == 1
+            assert backend.calls == 1
 
     asyncio.run(run_flow())
 

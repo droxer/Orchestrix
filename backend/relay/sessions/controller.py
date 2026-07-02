@@ -258,6 +258,13 @@ class SessionController:
                 "agent": input["agent"],
                 "sessionId": session_id,
             })
+        elif input.get("pipelineHasNext"):
+            # Another assignment follows immediately; keep the task running
+            # instead of flapping through waiting_for_human/review between steps.
+            self._update_task_status("running", f"{input['agent']} {input['mode']} completed.", {
+                "agent": input["agent"],
+                "sessionId": session_id,
+            })
         elif input["mode"] == "review":
             self._update_task_status("review", f"{input['agent']} review completed.", {"agent": input["agent"], "sessionId": session_id})
         else:

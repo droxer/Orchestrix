@@ -39,6 +39,11 @@ export function tasksByStatus(tasks: RelayTask[]): Record<TaskStatus, RelayTask[
   }, {} as Record<TaskStatus, RelayTask[]>);
 }
 
+// agentReadyForTask and nodeAcceptsAskRun mirror the backend's
+// ready_node_for_task (relay/tasks/scheduler.py) and node_accepts_run
+// (relay/daemon_registry/registry.py); keep them in sync when capacity
+// rules change. Action dispatches are exclusive, so readiness for an
+// assigned agent requires an idle node.
 export function agentReadyForTask(task: RelayTask, nodes: DaemonNodeMonitorRecord[]): boolean {
   if (!task.assignedAgent) return false;
   const employeeId = task.assigneeEmployeeId ?? task.ownerEmployeeId;
@@ -101,7 +106,8 @@ function nodeAcceptsAskRun(node: DaemonNodeMonitorRecord): boolean {
   if (node.activeRuns.some((run) => run.mode !== "ask")) return false;
   const byMode = node.runCapacityByMode ?? {};
   const askCapacity = positiveInteger(byMode.ask) ?? 1;
-  const maxConcurrent = positiveInteger(node.maxConcurrentRuns) ?? Math.max(askCapacity, 1);
+  const modeCapacities = (["action", "review", "ask"] as const).map((mode) => positiveInteger(byMode[mode]) ?? 1);
+  const maxConcurrent = positiveInteger(node.maxConcurrentRuns) ?? Math.max(...modeCapacities);
   const activeAsk = node.activeRuns.filter((run) => run.mode === "ask").length;
   return node.activeRuns.length < maxConcurrent && activeAsk < askCapacity;
 }

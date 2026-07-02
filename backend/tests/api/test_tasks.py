@@ -334,6 +334,109 @@ def test_task_start_without_agent_runs_ready_team_discussion(monkeypatch) -> Non
         assert any(item["message"] == "Discussion started." for item in task.json()["activity"])
 
 
+def test_review_run_leaves_task_in_review_for_human(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _create_user(client, "alice", employee_id="alice")
+        registered = client.post("/daemon-nodes/register", json={
+            "sandboxId": "sbx_alice",
+            "employeeId": "alice",
+            "token": "node_token",
+            "workspacePath": "/workspace/alice",
+            "protocolVersion": 1,
+            "supportedAgents": ["codex"],
+            "status": "ready",
+        }, headers={"Authorization": "Bearer ui_token"})
+        assert registered.status_code == 200
+        created = client.post("/tasks", json={
+            "title": "Audit the release",
+            "ownerEmployeeId": "alice",
+            "assigneeEmployeeId": "alice",
+        })
+        assert created.status_code == 201
+
+        started = client.post(f"/tasks/{created.json()['id']}/start", json={
+            "assignments": [{"agent": "codex", "mode": "review"}],
+        })
+        assert started.status_code == 202
+
+        commands = client.get("/daemon-nodes/sbx_alice/commands", headers={"Authorization": "Bearer node_token"})
+        assert commands.status_code == 200
+        [command] = commands.json()["commands"]
+        assert command["mode"] == "review"
+
+        completed = client.post("/daemon-nodes/sbx_alice/events", json={
+            "type": "run.completed",
+            "commandId": command["id"],
+            **({"leaseId": command["leaseId"]} if command.get("leaseId") else {}),
+            "sessionId": command["sessionId"],
+            "runId": command["runId"],
+            "agent": "codex",
+            "mode": "review",
+            "exitCode": 0,
+            "agentLog": "Review passed with notes.",
+        }, headers={"Authorization": "Bearer node_token"})
+        assert completed.status_code == 202
+
+        task = client.get(f"/tasks/{created.json()['id']}")
+        assert task.status_code == 200
+        assert task.json()["status"] == "review"
+
+
+def test_routine_start_preserves_discussion_assignments(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+
+    class FixedDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return cls(2026, 6, 26)
+
+    monkeypatch.setattr(task_routes, "date", FixedDate)
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _create_user(client, "alice", employee_id="alice")
+        registered = client.post("/daemon-nodes/register", json={
+            "sandboxId": "sbx_alice",
+            "employeeId": "alice",
+            "token": "node_token",
+            "workspacePath": "/workspace/alice",
+            "protocolVersion": 1,
+            "supportedAgents": ["claude", "codex"],
+            "status": "ready",
+        }, headers={"Authorization": "Bearer ui_token"})
+        assert registered.status_code == 200
+        created = client.post("/tasks", json={
+            "title": "Weekly retro",
+            "ownerEmployeeId": "alice",
+            "assigneeEmployeeId": "alice",
+            "assignedAgent": "codex",
+            "isRoutine": True,
+            "routineCadence": "weekly",
+            "routineNextRunDate": "2026-06-25",
+            "routineEnabled": True,
+        })
+        assert created.status_code == 201
+
+        started = client.post(f"/tasks/{created.json()['id']}/start", json={
+            "assignments": [
+                {"agent": "claude", "mode": "ask"},
+                {"agent": "codex", "mode": "ask"},
+            ],
+        })
+        assert started.status_code == 202
+        occurrence = started.json()["task"]
+        assert occurrence["id"] != created.json()["id"]
+
+        commands = client.get("/daemon-nodes/sbx_alice/commands", headers={"Authorization": "Bearer node_token"})
+        assert commands.status_code == 200
+        [first] = commands.json()["commands"]
+        assert first["agent"] == "claude"
+        assert first["mode"] == "ask"
+
+
 def test_scheduler_dispatches_assigned_backlog_task(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
