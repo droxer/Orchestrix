@@ -161,6 +161,11 @@
     "no_tasks_body": "建立任務以透過 Agent 佇列分配工作。",
     "no_match_title": "沒有符合的任務",
     "no_match_body": "請調整搜尋或篩選條件。",
+    "artifacts": "生成的產物",
+    "artifacts_loading": "正在載入產物…",
+    "artifacts_empty": "尚無生成檔案。Agent 執行產出的文件、簡報和試算表會顯示在這裡。",
+    "artifacts_error": "無法載入產物。",
+    "artifact_download": "下載",
     "statuses": {
       "backlog": "待辦",
       "assigned": "已分配",

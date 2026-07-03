@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 
-import { apiJson, getWorkspaceBrief, listArtifacts, listWorkspaceFiles, readWorkspaceFile, RelayApiError } from "../src/api.js";
+import { apiJson, getWorkspaceBrief, listArtifacts, listTaskArtifacts, listWorkspaceFiles, readWorkspaceFile, RelayApiError } from "../src/api.js";
 
 const originalFetch = globalThis.fetch;
 
@@ -54,6 +54,36 @@ describe("apiJson", () => {
 
     assert.deepEqual(result, { artifacts: [] });
     assert.equal(requestedUrl, "/artifacts?employeeId=alice&workspacePath=%2Fworkspace%2Falice+repo");
+  });
+
+  it("lists a task's generated artifacts", async () => {
+    let requestedUrl = "";
+    globalThis.fetch = (async (input) => {
+      requestedUrl = String(input);
+      return new Response(JSON.stringify({
+        taskId: "task 1",
+        artifacts: [{
+          id: "art_deck",
+          kind: "workspace_file",
+          title: "deck.pptx",
+          path: "/workspace/deck.pptx",
+          createdAt: "2026-07-01T00:00:00Z",
+          sessionId: "ses_1",
+          taskId: "task 1",
+        }],
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    const result = await listTaskArtifacts("task 1");
+
+    assert.equal(requestedUrl, "/tasks/task%201/artifacts");
+    assert.equal(result.taskId, "task 1");
+    assert.equal(result.artifacts.length, 1);
+    assert.equal(result.artifacts[0].title, "deck.pptx");
+    assert.equal(result.artifacts[0].sessionId, "ses_1");
   });
 
   it("fetches a workspace brief for a specific employee", async () => {

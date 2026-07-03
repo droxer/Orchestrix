@@ -686,6 +686,97 @@
   color: var(--color-muted);
 }
 
+/* ── Task drawer generated artifacts ──────────────────────────────── */
+
+.task-drawer-artifacts {
+  margin-top: var(--space-base);
+  padding-top: var(--space-base);
+  border-top: 1px solid color-mix(in srgb, var(--color-hairline) 80%, transparent);
+}
+
+.task-drawer-artifacts-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: 0 0 var(--space-sm);
+  color: var(--color-ink);
+  font: var(--type-label);
+}
+
+.task-drawer-artifacts-count {
+  color: var(--color-muted);
+  font: var(--type-caption);
+}
+
+.task-drawer-artifacts-empty {
+  margin: 0;
+  color: var(--color-muted-soft);
+  font: var(--type-caption);
+}
+
+.task-drawer-artifact-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.task-drawer-artifact {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.task-drawer-artifact-main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+  padding: var(--space-xxs) var(--space-xs);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--color-ink);
+  font: var(--type-body-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.task-drawer-artifact-main:hover {
+  border-color: var(--color-hairline);
+  background: color-mix(in srgb, var(--color-ink) 4%, transparent);
+}
+
+.task-drawer-artifact-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-drawer-artifact-meta {
+  flex: none;
+  color: var(--color-muted);
+  font: var(--type-caption);
+}
+
+.task-drawer-artifact-download {
+  flex: none;
+  color: var(--color-muted);
+  font: var(--type-caption);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.task-drawer-artifact-download:hover {
+  color: var(--color-ink);
+}
+
 /* ── Empty board — uses RelayEmptyState (empty-state.css) ─────────── */
 
 .backlog-board-empty {

@@ -159,6 +159,11 @@
     "no_tasks_body": "Create a task to route work through your agent fleet.",
     "no_match_title": "No matching tasks",
     "no_match_body": "Try adjusting your search or filters.",
+    "artifacts": "Generated artifacts",
+    "artifacts_loading": "Loading artifacts…",
+    "artifacts_empty": "No generated files yet. Documents, decks, and spreadsheets produced by agent runs will appear here.",
+    "artifacts_error": "Could not load artifacts.",
+    "artifact_download": "Download",
     "statuses": {
       "backlog": "Backlog",
       "assigned": "Assigned",

@@ -1,0 +1,167 @@
+from __future__ import annotations
+
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from typing import Any
+
+from fastapi.testclient import TestClient
+
+from relay.app import create_app
+from relay.persistence.stores import relay_event
+
+
+def _bootstrap(client: TestClient) -> None:
+    assert client.post("/auth/bootstrap", json={
+        "token": "admin_token",
+        "username": "admin",
+        "password": "secret123",
+    }).status_code == 200
+    assert client.post("/auth/login", json={"username": "admin", "password": "secret123"}).status_code == 200
+
+
+def _create_task_with_session(client: TestClient, workspace_path: str, *, title: str = "Ship the quarterly deck") -> dict[str, Any]:
+    response = client.post("/tasks", json={
+        "title": title,
+        "assignedAgent": "claude",
+        "createSession": True,
+        "workspacePath": workspace_path,
+    })
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def _workspace_artifact(workspace: str, name: str, *, artifact_id: str, created_at: str, content_type: str) -> dict[str, Any]:
+    path = Path(workspace) / name
+    return {
+        "id": artifact_id,
+        "kind": "workspace_file",
+        "title": name,
+        "path": str(path),
+        "createdAt": created_at,
+        "bytes": 8,
+        "contentType": content_type,
+        "workspaceRelativePath": name,
+    }
+
+
+PPTX_TYPE = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+DOCX_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+
+def test_task_artifacts_lists_generated_files_from_linked_sessions(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root, TemporaryDirectory() as ws:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap(client)
+        task = _create_task_with_session(client, ws)
+        session_id = task["linkedSessionIds"][0]
+
+        deck = _workspace_artifact(ws, "deck.pptx", artifact_id="art_deck", created_at="2026-06-30T00:00:00.000Z", content_type=PPTX_TYPE)
+        doc = _workspace_artifact(ws, "notes.docx", artifact_id="art_doc", created_at="2026-07-01T00:00:00.000Z", content_type=DOCX_TYPE)
+        store = app.state.session_store
+        store.append_event(session_id, relay_event("artifact.created", session_id, {"artifact": deck}))
+        store.append_event(session_id, relay_event("artifact.created", session_id, {"artifact": doc}))
+
+        response = client.get(f"/tasks/{task['id']}/artifacts")
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["taskId"] == task["id"]
+        assert [item["id"] for item in body["artifacts"]] == ["art_doc", "art_deck"]
+        item = body["artifacts"][1]
+        assert item["sessionId"] == session_id
+        assert item["taskId"] == task["id"]
+        assert item["contentType"] == PPTX_TYPE
+        assert item["workspacePath"] == ws
+
+
+def test_task_artifacts_dedupes_regenerated_file_across_sessions(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root, TemporaryDirectory() as ws:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap(client)
+        task = _create_task_with_session(client, ws)
+        first_session = task["linkedSessionIds"][0]
+
+        # A second run of the same task regenerates deck.pptx in a new session.
+        pickup = client.post(f"/tasks/{task['id']}/pickup", json={"agent": "claude", "workspacePath": ws})
+        assert pickup.status_code == 200, pickup.text
+        second_session = pickup.json()["session"]["id"]
+
+        stale = _workspace_artifact(ws, "deck.pptx", artifact_id="art_v1", created_at="2026-06-29T00:00:00.000Z", content_type=PPTX_TYPE)
+        fresh = _workspace_artifact(ws, "deck.pptx", artifact_id="art_v2", created_at="2026-07-02T00:00:00.000Z", content_type=PPTX_TYPE)
+        store = app.state.session_store
+        store.append_event(first_session, relay_event("artifact.created", first_session, {"artifact": stale}))
+        store.append_event(second_session, relay_event("artifact.created", second_session, {"artifact": fresh}))
+
+        response = client.get(f"/tasks/{task['id']}/artifacts")
+        assert response.status_code == 200, response.text
+        artifacts = response.json()["artifacts"]
+        assert len(artifacts) == 1
+        assert artifacts[0]["id"] == "art_v2"
+        assert artifacts[0]["sessionId"] == second_session
+
+
+def test_task_artifacts_ignores_non_workspace_artifacts(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root, TemporaryDirectory() as ws:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap(client)
+        task = _create_task_with_session(client, ws)
+        session_id = task["linkedSessionIds"][0]
+        log = {
+            "id": "art_log",
+            "kind": "agent_output",
+            "title": "claude output",
+            "path": str(Path(ws) / "output.txt"),
+            "createdAt": "2026-06-30T00:00:00.000Z",
+        }
+        app.state.session_store.append_event(session_id, relay_event("artifact.created", session_id, {"artifact": log}))
+
+        response = client.get(f"/tasks/{task['id']}/artifacts")
+        assert response.status_code == 200, response.text
+        assert response.json()["artifacts"] == []
+
+
+def test_task_artifacts_empty_for_task_without_sessions(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap(client)
+        response = client.post("/tasks", json={"title": "No sessions yet"})
+        assert response.status_code == 201, response.text
+        task_id = response.json()["id"]
+
+        listing = client.get(f"/tasks/{task_id}/artifacts")
+        assert listing.status_code == 200, listing.text
+        assert listing.json() == {"taskId": task_id, "artifacts": []}
+
+
+def test_task_artifacts_unknown_task_is_404(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap(client)
+        assert client.get("/tasks/task_missing/artifacts").status_code == 404
+
+
+def test_task_artifacts_denied_for_other_employee(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root, TemporaryDirectory() as ws:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap(client)
+        task = _create_task_with_session(client, ws)
+
+        assert client.post("/cp/users", json={
+            "username": "worker",
+            "password": "secret123",
+            "employeeId": "emp_worker",
+        }).status_code == 201
+        worker = TestClient(app)
+        assert worker.post("/auth/login", json={"username": "worker", "password": "secret123"}).status_code == 200
+
+        response = worker.get(f"/tasks/{task['id']}/artifacts")
+        assert response.status_code == 403
