@@ -15,6 +15,7 @@ from .deps import AppContextDep
 from .helpers import (
     actor_can_access_record,
     agent_task_mode,
+    artifact_index_item,
     assignee_employee_id_for_task,
     assignment_list,
     get_task_for_actor,
@@ -23,6 +24,8 @@ from .helpers import (
     participants_for_assignments,
     request_actor,
     string_field,
+    workspace_artifact_key,
+    workspace_artifacts,
 )
 
 router = APIRouter()
@@ -395,3 +398,28 @@ async def pickup_task(task_id: str, request: Request, ctx: AppContextDep) -> dic
 async def task_events(task_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     actor = request_actor(request, ctx.auth_store)
     return {"events": get_task_for_actor(ctx.task_store, task_id, actor)["events"]}
+
+
+@router.get("/tasks/{task_id}/artifacts")
+async def task_artifacts(task_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
+    """Generated files (documents, decks, spreadsheets, …) produced while working the task.
+
+    Aggregates workspace artifacts across the task's linked sessions and dedupes
+    to the newest record per workspace file, so a file regenerated in a later
+    session surfaces once at its latest state.
+    """
+    actor = request_actor(request, ctx.auth_store)
+    task = get_task_for_actor(ctx.task_store, task_id, actor)
+    newest: dict[str, dict[str, Any]] = {}
+    for session_id in task.get("linkedSessionIds", []):
+        try:
+            session = ctx.session_store.get_session(session_id)
+        except Exception:
+            continue  # A linked session may have been deleted; skip it.
+        for artifact in workspace_artifacts(session):
+            key = workspace_artifact_key(session, artifact)
+            current = newest.get(key)
+            if current is None or (artifact.get("createdAt") or "") >= (current.get("createdAt") or ""):
+                newest[key] = {**artifact_index_item(session, artifact), "taskId": task_id}
+    ordered = sorted(newest.values(), key=lambda item: item.get("createdAt") or "", reverse=True)
+    return {"taskId": task_id, "artifacts": ordered}

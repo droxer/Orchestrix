@@ -161,6 +161,11 @@
     "no_tasks_body": "创建任务以通过 Agent 队列分配工作。",
     "no_match_title": "没有匹配的任务",
     "no_match_body": "请调整搜索或筛选条件。",
+    "artifacts": "生成的产物",
+    "artifacts_loading": "正在加载产物…",
+    "artifacts_empty": "暂无生成文件。Agent 运行产出的文档、演示文稿和表格会显示在这里。",
+    "artifacts_error": "无法加载产物。",
+    "artifact_download": "下载",
     "statuses": {
       "backlog": "待办",
       "assigned": "已分配",

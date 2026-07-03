@@ -26,6 +26,7 @@ import type {
   SessionsResponse,
   StartTaskResponse,
   UserRole,
+  TaskArtifactsResponse,
   TaskMutationInput,
   TasksResponse,
   WorkspaceBriefResponse,
@@ -298,6 +299,10 @@ export function startTask(taskId: string, input: { agent?: AgentName; mode?: Age
     method: "POST",
     body: input,
   });
+}
+
+export function listTaskArtifacts(taskId: string, signal?: AbortSignal): Promise<TaskArtifactsResponse> {
+  return apiJson<TaskArtifactsResponse>(`/tasks/${encodeURIComponent(taskId)}/artifacts`, { signal });
 }
 
 export async function readArtifactText(

@@ -64,9 +64,15 @@ export interface ArtifactIndexItem extends RelayArtifact {
   ownerEmployeeId?: string;
   workspacePath?: string;
   sessionUpdatedAt?: string;
+  taskId?: string;
 }
 
 export interface ArtifactsResponse {
+  artifacts: ArtifactIndexItem[];
+}
+
+export interface TaskArtifactsResponse {
+  taskId: string;
   artifacts: ArtifactIndexItem[];
 }
 
