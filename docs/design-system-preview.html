@@ -160,22 +160,29 @@
       /* Operational chat surface */
       .apps { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
       .app { border: 1px solid var(--app-ln); border-radius: var(--radius-xl); overflow: hidden; background: var(--app-bg); }
-      .app--light { --app-bg: #fff; --app-ln: #e4e4e7; --app-head: #fafafa; --app-ink: #0a0a0a; --app-body: #52525b; --app-soft: #fafafa; --app-tool: #f4f4f5; --app-btn: #2f54eb; --app-on: #fff; --app-link: #2f54eb; }
-      .app--dark { --app-bg: #0d0c0a; --app-ln: #1e1e22; --app-head: #1a1815; --app-ink: #f4f4f5; --app-body: #a1a1aa; --app-soft: #1a1815; --app-tool: #15151a; --app-btn: #5b7cff; --app-on: #fff; --app-link: #85a0ff; }
-      .app-head { display: flex; align-items: center; gap: 8px; padding: 11px 14px; background: var(--app-head); border-bottom: 1px solid var(--app-ln); }
-      .app-title { font-size: 13px; font-weight: 600; color: var(--app-ink); }
-      .app-body { padding: 16px 14px; display: flex; flex-direction: column; gap: 14px; }
-      .turn-eye { font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--app-body); margin-bottom: 5px; }
-      .turn-text { font-size: 13px; line-height: 1.5; color: var(--app-ink); }
+      .app--light { --app-bg: #fff; --app-ln: #e4e4e7; --app-head: #fafafa; --app-ink: #0a0a0a; --app-body: #52525b; --app-soft: #fafafa; --app-tool: #f4f4f5; }
+      .app--dark { --app-bg: #0d0c0a; --app-ln: #1e1e22; --app-head: #1a1815; --app-ink: #f4f4f5; --app-body: #a1a1aa; --app-soft: #1a1815; --app-tool: #15151a; }
       .tool-line { font-family: var(--mono); font-size: 12px; padding: 7px 10px; border-radius: var(--radius-md); background: var(--app-tool); color: var(--app-body); }
       .rcard { border: 1px solid var(--app-ln); border-radius: var(--radius-lg); background: var(--app-soft); padding: 11px 12px; }
       .rcard-h { font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--app-ink); margin-bottom: 3px; }
       .rcard-p { font-size: 12px; color: var(--app-body); }
-      .app-actions { display: flex; align-items: center; gap: 10px; }
-      .app-btn { height: 30px; padding: 0 14px; border: 0; border-radius: var(--radius-sm); background: var(--app-btn); color: var(--app-on); font-size: 12px; font-weight: 600; }
-      .app-link { font-size: 12px; font-weight: 550; color: var(--app-link); text-decoration: underline; }
       .app-badge { margin-left: auto; font-family: var(--mono); font-size: 11px; border: 1px solid var(--app-ln); border-radius: var(--radius-sm); padding: 2px 8px; color: var(--app-body); }
-      .app-avatar { width: 26px; height: 26px; border-radius: var(--radius-md); background: var(--app-tool); color: var(--app-ink); display: grid; place-items: center; font-size: 11px; font-weight: 600; }
+      .ops-shell { display: grid; grid-template-columns: 142px minmax(0, 1fr); min-height: 286px; }
+      .ops-nav { display: flex; flex-direction: column; gap: 4px; border-right: 1px solid var(--app-ln); background: var(--app-head); padding: 10px; }
+      .ops-brand { display: flex; align-items: center; gap: 8px; height: 32px; margin-bottom: 6px; color: var(--app-ink); font-weight: 600; }
+      .ops-mark { display: grid; width: 24px; height: 24px; place-items: center; border-radius: var(--radius-md); background: var(--app-tool); font-family: var(--mono); font-size: 12px; }
+      .ops-nav-item { display: flex; align-items: center; gap: 8px; height: 30px; border-radius: var(--radius-sm); padding: 0 8px; color: var(--app-body); font-size: 12px; font-weight: 500; }
+      .ops-nav-item::before { content: ""; width: 10px; height: 10px; border: 1px solid currentColor; border-radius: 3px; opacity: 0.7; }
+      .ops-nav-item.is-active { background: var(--app-tool); color: var(--app-ink); }
+      .ops-nav-divider { height: 1px; margin: 6px 0; background: var(--app-ln); }
+      .ops-main { display: grid; grid-template-rows: auto 1fr; min-width: 0; }
+      .ops-top { display: flex; align-items: center; gap: 8px; height: 48px; border-bottom: 1px solid var(--app-ln); padding: 0 14px; background: var(--app-bg); }
+      .ops-title { color: var(--app-ink); font-size: 13px; font-weight: 600; }
+      .ops-content { display: grid; gap: 10px; padding: 14px; }
+      .ops-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; border: 1px solid var(--app-ln); border-radius: var(--radius-lg); background: var(--app-soft); padding: 10px 12px; }
+      .ops-row-title { color: var(--app-ink); font-size: 13px; font-weight: 600; }
+      .ops-row-meta { color: var(--app-body); font-family: var(--mono); font-size: 11px; }
+      .ops-note { color: var(--app-body); font-size: 12px; line-height: 1.45; }
 
       .pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
       .pricing-card { border: 1px solid var(--hairline); border-radius: var(--radius-xl); padding: 24px; background: var(--canvas); }
@@ -195,6 +202,8 @@
         .swatch-grid, .grid-3, .pricing-grid, .apps, .footer__grid { grid-template-columns: 1fr; }
         .nav-links { display: none; }
         .type-row { grid-template-columns: 1fr; gap: 6px; }
+        .ops-shell { grid-template-columns: 1fr; }
+        .ops-nav { border-right: 0; border-bottom: 1px solid var(--app-ln); }
       }
     </style>
   </head>
@@ -324,53 +333,79 @@
         <div class="container">
           <div class="section-heading">
             <h2>Operational surface — light &amp; dark.</h2>
-            <p>The cobalt action lifts to periwinkle in dark mode. Mono eyebrows identify the agent; status hues appear only on the verdict and status dot.</p>
+            <p>The side rail shows the current product routes: Threads, Workspace, Backlog, Routine, with Channels and Admin for admins. MCP and Skills are retired until they become usable workflows.</p>
           </div>
           <div class="apps">
             <article class="app app--light">
-              <div class="app-head">
-                <span class="dot dot--up"></span>
-                <span class="app-title">#refactor-token-store</span>
-                <span class="app-badge">3 agents</span>
-              </div>
-              <div class="app-body">
-                <div>
-                  <div class="turn-eye">claude · action</div>
-                  <div class="turn-text">I'll split the token store into session and task modules to keep each under 400 lines.</div>
-                </div>
-                <div class="tool-line">⏺ edit session-store.ts · +84 −31</div>
-                <div class="rcard">
-                  <div class="rcard-h">codex · review</div>
-                  <div class="rcard-p">Verdict <b style="color: var(--success)">approved</b>. Clean separation, no behavior change.</div>
-                </div>
-                <div class="app-actions">
-                  <button class="app-btn" type="button">Approve</button>
-                  <span class="app-link">View diff</span>
-                  <span class="app-badge">running</span>
+              <div class="ops-shell">
+                <nav class="ops-nav" aria-label="Light route preview">
+                  <div class="ops-brand"><span class="ops-mark">R</span>Relay</div>
+                  <div class="ops-nav-item is-active">Threads</div>
+                  <div class="ops-nav-item">Workspace</div>
+                  <div class="ops-nav-item">Backlog</div>
+                  <div class="ops-nav-item">Routine</div>
+                  <div class="ops-nav-divider"></div>
+                  <div class="ops-nav-item">Channels</div>
+                  <div class="ops-nav-item">Admin</div>
+                </nav>
+                <div class="ops-main">
+                  <div class="ops-top">
+                    <span class="dot dot--up"></span>
+                    <span class="ops-title">Threads</span>
+                    <span class="app-badge">3 agents</span>
+                  </div>
+                  <div class="ops-content">
+                    <div class="ops-row">
+                      <div>
+                        <div class="ops-row-title">#refactor-token-store</div>
+                        <div class="ops-row-meta">claude · action</div>
+                      </div>
+                      <span class="badge"><span class="dot dot--up"></span>ready</span>
+                    </div>
+                    <div class="tool-line">⏺ edit session-store.ts · +84 −31</div>
+                    <div class="rcard">
+                      <div class="rcard-h">codex · review</div>
+                      <div class="rcard-p">Verdict <b style="color: var(--success)">approved</b>. Clean separation, no behavior change.</div>
+                    </div>
+                    <div class="ops-note">Full-page routes use the same rail and collapse the thread pane to focus the selected work surface.</div>
+                  </div>
                 </div>
               </div>
             </article>
 
             <article class="app app--dark">
-              <div class="app-head">
-                <span class="dot" style="background: #2ed391"></span>
-                <span class="app-title">#refactor-token-store</span>
-                <span class="app-badge">3 agents</span>
-              </div>
-              <div class="app-body">
-                <div>
-                  <div class="turn-eye">claude · action</div>
-                  <div class="turn-text">I'll split the token store into session and task modules to keep each under 400 lines.</div>
-                </div>
-                <div class="tool-line">⏺ edit session-store.ts · +84 −31</div>
-                <div class="rcard">
-                  <div class="rcard-h">codex · review</div>
-                  <div class="rcard-p">Verdict <b style="color: #2ed391">approved</b>. Clean separation, no behavior change.</div>
-                </div>
-                <div class="app-actions">
-                  <button class="app-btn" type="button">Approve</button>
-                  <span class="app-link">View diff</span>
-                  <span class="app-badge">running</span>
+              <div class="ops-shell">
+                <nav class="ops-nav" aria-label="Dark route preview">
+                  <div class="ops-brand"><span class="ops-mark">R</span>Relay</div>
+                  <div class="ops-nav-item is-active">Threads</div>
+                  <div class="ops-nav-item">Workspace</div>
+                  <div class="ops-nav-item">Backlog</div>
+                  <div class="ops-nav-item">Routine</div>
+                  <div class="ops-nav-divider"></div>
+                  <div class="ops-nav-item">Channels</div>
+                  <div class="ops-nav-item">Admin</div>
+                </nav>
+                <div class="ops-main">
+                  <div class="ops-top">
+                    <span class="dot" style="background: #2ed391"></span>
+                    <span class="ops-title">Threads</span>
+                    <span class="app-badge">3 agents</span>
+                  </div>
+                  <div class="ops-content">
+                    <div class="ops-row">
+                      <div>
+                        <div class="ops-row-title">#refactor-token-store</div>
+                        <div class="ops-row-meta">claude · action</div>
+                      </div>
+                      <span class="app-badge">running</span>
+                    </div>
+                    <div class="tool-line">⏺ edit session-store.ts · +84 −31</div>
+                    <div class="rcard">
+                      <div class="rcard-h">codex · review</div>
+                      <div class="rcard-p">Verdict <b style="color: #2ed391">approved</b>. Clean separation, no behavior change.</div>
+                    </div>
+                    <div class="ops-note">Cobalt actions lift to periwinkle in dark mode; status remains dot, text, or border only.</div>
+                  </div>
                 </div>
               </div>
             </article>

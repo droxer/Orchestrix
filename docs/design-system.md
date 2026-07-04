@@ -184,6 +184,19 @@ components:
     textColor: "{colors.ink}"
     typography: "{typography.nav-link}"
     height: 60px
+  side-nav:
+    backgroundColor: "{colors.canvas}"
+    activeBackgroundColor: "{colors.surface-strong}"
+    textColor: "{colors.ink}"
+    typography: "{typography.nav-link}"
+    widthCollapsed: 96px
+    widthExpanded: 260px
+    itemHeight: 38px
+    rounded: "{rounded.sm}"
+  authenticated-route-shell:
+    backgroundColor: "{colors.canvas}"
+    columns: "sidenav | route"
+    routes: "workspace, backlog, routine, channels, admin"
   button-primary:
     backgroundColor: "{colors.primary}"
     textColor: "{colors.on-primary}"
@@ -462,6 +475,11 @@ status dots. The pill is gone.
 ### Top Navigation
 **`top-nav-light`** — Default top nav on white. Background `{colors.canvas}`, text `{colors.ink}`, height 60px. Wordmark left, menu center, search + actions right.
 
+### Application Navigation
+**`sidenav-panel`** — Authenticated app rail. White canvas, 1px hairline border, 48px square collapsed buttons, 38px labeled rows when expanded, rounded `{rounded.sm}`. Active route = quiet `{colors.surface-strong}` fill with ink text, no left bar or colored plate. Route order is **Threads → Workspace → Backlog → Routine**; admins additionally see **Channels** and **Admin** after a separator.
+
+**Retired routes** — The standalone **MCP** and **Skills** pages are removed because they are not usable workflows. Do not reserve side-nav buttons, route-shell selectors, locale keys, or preview panels for them until they are rebuilt as real product surfaces.
+
 ### Buttons
 **`button-primary`** — The cobalt action. Background `{colors.primary}`, text `{colors.on-primary}`, type `{typography.button}`, padding 8px × 16px, height 36px, rounded `{rounded.sm}` (4px). Lifts to periwinkle (`#5b7cff`) in dark mode, keeping white text.
 
@@ -574,7 +592,8 @@ reach for `var(--font-display)` — now weighted Geist, not a serif.
 ### Operational components
 
 - **`messenger-shell`** — three-pane CSS grid (`sidenav | thread | chat`), with an optional fourth `drawer` column. Below 768px it collapses to one pane at a time.
-- **`sidenav-panel`** — vertical rail, labeled by default. 48px square buttons (collapsed) / 38px labeled rows at `--radius-sm`; expands to 260px revealing `--type-nav-link` labels. Active route = a quiet neutral `{colors.surface-strong}` fill (no left bar).
+- **Route shell** — top-level work pages collapse the thread pane to `sidenav | route`. Current full-page routes are `workspace`, `backlog`, `routine`, `channels`, and `admin`; route CSS should not include retired `mcp` or `skills` selectors.
+- **`sidenav-panel`** — vertical rail, labeled by default. 48px square buttons (collapsed) / 38px labeled rows at `--radius-sm`; expands to 260px revealing `--type-nav-link` labels. Active route = a quiet neutral `{colors.surface-strong}` fill (no left bar). The visible route set is Threads, Workspace, Backlog, Routine, with Channels and Admin added for admins.
 - **`thread-panel`** — conversation list grouped by state (Needs you → Running → Idle). Flat **68px** rows with name (`--text-base` / 600) and a 13px preview line. Active row = `{colors.brand-soft}` fill, **no left bar** (mirrors sidenav active). Separated by hairlines, not cards. The Needs-you section label stays muted; a leading warning dot carries the hue.
 - **`chat-panel`** — message canvas. 18px ink header title; messages render on a continuous **rail** — a 1.5px hairline spine with square agent nodes and a circular ink node for the human. Block-grouped `.msg` units carry mono eyebrows. Depth from typography and the rail, not boxes.
 - **`msg-user`** — the operator's voice **on the rail**. A filled circular ink node (agents stay square) plus a mono `YOU` eyebrow and timestamp; message body in 14px Geist medium, ink, no bubble and no cobalt fill. The human reads as a peer turn in the same spine as agents — attribution is node shape + eyebrow, not alignment or a messenger bubble.
