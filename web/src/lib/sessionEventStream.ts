@@ -1,4 +1,14 @@
-import type { RelaySession } from "../types.js";
+import type { RelaySession, SessionStatus } from "../types.js";
+
+const TERMINAL_SESSION_STATUSES: ReadonlySet<SessionStatus> = new Set(["completed", "failed", "cancelled"]);
+
+export function isTerminalSessionStatus(status: SessionStatus | undefined): boolean {
+  return Boolean(status && TERMINAL_SESSION_STATUSES.has(status));
+}
+
+export function shouldTailSessionEvents(status: SessionStatus | undefined): boolean {
+  return Boolean(status && !isTerminalSessionStatus(status));
+}
 
 export function lastSessionEventId(sessions: readonly RelaySession[] | undefined, sessionId: string): string | undefined {
   const events = sessions?.find((session) => session.id === sessionId)?.events;

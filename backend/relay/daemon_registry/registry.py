@@ -28,6 +28,7 @@ load_backend_env()
 DAEMON_NODE_LIVENESS_TIMEOUT_MS = int(os.environ.get("RELAY_DAEMON_NODE_LIVENESS_TIMEOUT_MS", "15000"))
 DAEMON_RUN_TIMEOUT_MS = int(os.environ.get("RELAY_DAEMON_RUN_TIMEOUT_MS", str(15 * 60 * 1000)))
 DAEMON_COMMAND_LEASE_SECONDS = float(os.environ.get("RELAY_DAEMON_COMMAND_LEASE_SECONDS", "60"))
+DAEMON_ACTIVE_COMMAND_LEASE_SECONDS = max(DAEMON_COMMAND_LEASE_SECONDS, (DAEMON_RUN_TIMEOUT_MS / 1000) + 60)
 AGENT_TASK_MODES = ("action", "review", "ask")
 # ".key" is deliberately absent: it matches TLS/SSH private keys far more
 # often than Keynote decks, and indexed files become downloadable artifacts.
@@ -309,13 +310,13 @@ def effective_role_for_assignment(node: dict[str, Any], assignment: dict[str, An
     return overrides.get(agent) or defaults.get(agent) or role_for_agent(agent, mode)
 
 
-def normalize_run_capacity(input: dict[str, Any]) -> tuple[int, dict[str, int]]:
-    raw_by_mode = input.get("runCapacityByMode") if isinstance(input.get("runCapacityByMode"), dict) else {}
+def normalize_run_capacity(payload: dict[str, Any]) -> tuple[int, dict[str, int]]:
+    raw_by_mode = payload.get("runCapacityByMode") if isinstance(payload.get("runCapacityByMode"), dict) else {}
     by_mode: dict[str, int] = {}
     for mode in AGENT_TASK_MODES:
         raw = raw_by_mode.get(mode)
         by_mode[mode] = raw if isinstance(raw, int) and raw > 0 else 1
-    raw_max = input.get("maxConcurrentRuns")
+    raw_max = payload.get("maxConcurrentRuns")
     max_concurrent = raw_max if isinstance(raw_max, int) and raw_max > 0 else max(by_mode.values())
     return max(1, max_concurrent), by_mode
 
@@ -358,9 +359,9 @@ def _string_metadata(value: Any, limit: int = 500) -> str | None:
     return text[:limit] if text else None
 
 
-def agent_registration_state(input: dict[str, Any]) -> tuple[dict[str, str], dict[str, dict[str, str]]]:
-    supported = set(input.get("supportedAgents") or [])
-    raw_health = input.get("agentHealth") if isinstance(input.get("agentHealth"), dict) else {}
+def agent_registration_state(payload: dict[str, Any]) -> tuple[dict[str, str], dict[str, dict[str, str]]]:
+    supported = set(payload.get("supportedAgents") or [])
+    raw_health = payload.get("agentHealth") if isinstance(payload.get("agentHealth"), dict) else {}
     agents: dict[str, str] = {}
     details: dict[str, dict[str, str]] = {}
     for agent in AGENT_NAMES:
@@ -381,13 +382,13 @@ def agent_registration_state(input: dict[str, Any]) -> tuple[dict[str, str], dic
 _MCP_TRANSPORTS = ("stdio", "sse", "http")
 
 
-def agent_inventory_state(input: dict[str, Any]) -> dict[str, dict[str, list[dict[str, str]]]]:
+def agent_inventory_state(payload: dict[str, Any]) -> dict[str, dict[str, list[dict[str, str]]]]:
     """Sanitize the daemon-reported per-agent skill/MCP inventory.
 
     Untrusted daemon payload: keep only known agents and well-typed fields, and
     drop agents that report nothing so the record stays compact.
     """
-    raw = input.get("agentInventory")
+    raw = payload.get("agentInventory")
     if not isinstance(raw, dict):
         return {}
     inventory: dict[str, dict[str, list[dict[str, str]]]] = {}
@@ -476,37 +477,37 @@ class DaemonNodeRegistry:
         self.dispatch_lock = RLock()
         self._load_persisted_state()
 
-    def register(self, input: dict[str, Any], ui_token: str | None = None) -> dict[str, Any]:
-        if input["protocolVersion"] not in DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS:
-            raise ValueError(f"daemon node protocolVersion {input['protocolVersion']} is not supported.")
+    def register(self, payload: dict[str, Any], ui_token: str | None = None) -> dict[str, Any]:
+        if payload["protocolVersion"] not in DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS:
+            raise ValueError(f"daemon node protocolVersion {payload['protocolVersion']} is not supported.")
         now = now_iso()
-        existing = self.sandboxes.get(input["sandboxId"])
-        if (existing and (existing.get("nodeTokenHash") or existing.get("tokenHash"))) and not daemon_node_token_matches(existing, input["token"]):
-            logger.warning("Unauthorized daemon node registration", sandbox_id=input["sandboxId"])
-            raise PermissionError(f"Unauthorized daemon node registration for {input['sandboxId']}: token does not match the token issued at provisioning.")
-        employee_id = (existing or {}).get("employeeId") if existing else input.get("employeeId")
+        existing = self.sandboxes.get(payload["sandboxId"])
+        if (existing and (existing.get("nodeTokenHash") or existing.get("tokenHash"))) and not daemon_node_token_matches(existing, payload["token"]):
+            logger.warning("Unauthorized daemon node registration", sandbox_id=payload["sandboxId"])
+            raise PermissionError(f"Unauthorized daemon node registration for {payload['sandboxId']}: token does not match the token issued at provisioning.")
+        employee_id = (existing or {}).get("employeeId") if existing else payload.get("employeeId")
         next_ui_hash = hash_daemon_node_token(ui_token) if ui_token else (existing or {}).get("uiTokenHash") or (existing or {}).get("tokenHash")
-        agents, agent_details = agent_registration_state(input)
-        agent_inventory = agent_inventory_state(input)
+        agents, agent_details = agent_registration_state(payload)
+        agent_inventory = agent_inventory_state(payload)
         prior_disabled = list((existing or {}).get("disabledAgents") or [])
         prior_role_defaults = dict((existing or {}).get("agentRoleDefaults") or {})
         prior_role_overrides = dict((existing or {}).get("agentRoleOverrides") or {})
         capacity_input = {
-            **({"maxConcurrentRuns": (existing or {}).get("maxConcurrentRuns")} if (existing or {}).get("maxConcurrentRuns") and "maxConcurrentRuns" not in input else {}),
-            **({"runCapacityByMode": (existing or {}).get("runCapacityByMode")} if (existing or {}).get("runCapacityByMode") and "runCapacityByMode" not in input else {}),
-            **input,
+            **({"maxConcurrentRuns": (existing or {}).get("maxConcurrentRuns")} if (existing or {}).get("maxConcurrentRuns") and "maxConcurrentRuns" not in payload else {}),
+            **({"runCapacityByMode": (existing or {}).get("runCapacityByMode")} if (existing or {}).get("runCapacityByMode") and "runCapacityByMode" not in payload else {}),
+            **payload,
         }
         max_concurrent_runs, run_capacity_by_mode = normalize_run_capacity(capacity_input)
         capabilities = sorted({
-            value for value in (input.get("capabilities") or [])
+            value for value in (payload.get("capabilities") or [])
             if isinstance(value, str) and value in DAEMON_NODE_CAPABILITIES
         })
         sandbox = {
-            "id": input["sandboxId"],
+            "id": payload["sandboxId"],
             **({"employeeId": employee_id} if employee_id else {}),
-            **({"workspacePath": input["workspacePath"]} if input.get("workspacePath") else {}),
+            **({"workspacePath": payload["workspacePath"]} if payload.get("workspacePath") else {}),
             **({"capabilities": capabilities} if capabilities else {}),
-            "status": "running" if input.get("status") == "busy" else "stopped" if input.get("status") == "stopped" else "ready",
+            "status": "running" if payload.get("status") == "busy" else "stopped" if payload.get("status") == "stopped" else "ready",
             "agents": agents,
             **({"agentDetails": agent_details} if agent_details else {}),
             **({"agentInventory": agent_inventory} if agent_inventory else {}),
@@ -518,15 +519,15 @@ class DaemonNodeRegistry:
             "token": None,
             "tokenHash": next_ui_hash,
             "uiTokenHash": next_ui_hash,
-            "nodeTokenHash": hash_daemon_node_token(input.get("token")) or (existing or {}).get("nodeTokenHash") or (existing or {}).get("tokenHash"),
-            "nodeToken": input.get("token") or (existing or {}).get("nodeToken") or self.plain_node_tokens.get(input["sandboxId"]),
+            "nodeTokenHash": hash_daemon_node_token(payload.get("token")) or (existing or {}).get("nodeTokenHash") or (existing or {}).get("tokenHash"),
+            "nodeToken": payload.get("token") or (existing or {}).get("nodeToken") or self.plain_node_tokens.get(payload["sandboxId"]),
             "createdAt": (existing or {}).get("createdAt", now),
             "updatedAt": now,
             "lastSeenAt": now,
         }
         self.sandboxes[sandbox["id"]] = sandbox
-        if input.get("token"):
-            self.plain_node_tokens[sandbox["id"]] = input["token"]
+        if payload.get("token"):
+            self.plain_node_tokens[sandbox["id"]] = payload["token"]
         self.daemon_store.register_node(sandbox)
         logger.info("Daemon node registered", sandbox_id=sandbox["id"], employee_id=sandbox.get("employeeId"), status=sandbox["status"], agents={agent: status for agent, status in sandbox["agents"].items()})
         return sandbox
@@ -790,7 +791,29 @@ class DaemonNodeRegistry:
 
     def available_command_count(self, sandbox_id: str, token: str | None) -> int:
         self._assert_authorized(sandbox_id, token)
+        self._mark_seen(sandbox_id)
         return self.daemon_store.queued_command_count(sandbox_id)
+
+    def renew_active_command_leases(
+        self,
+        sandbox_id: str,
+        token: str | None,
+        command_ids: list[str],
+        *,
+        lease_seconds: float = DAEMON_ACTIVE_COMMAND_LEASE_SECONDS,
+    ) -> None:
+        self._assert_authorized(sandbox_id, token)
+        self._mark_seen(sandbox_id)
+        if not command_ids:
+            return
+        active_ids = {
+            command["commandId"]
+            for command in self.active_commands.values()
+            if command.get("sandboxId") == sandbox_id
+        }
+        renewable = [command_id for command_id in dict.fromkeys(command_ids) if command_id in active_ids]
+        if renewable and hasattr(self.daemon_store, "renew_command_leases"):
+            self.daemon_store.renew_command_leases(sandbox_id, renewable, lease_seconds=lease_seconds)
 
     async def wait_for_completion(self, command_id: str, timeout_ms: int = DAEMON_RUN_TIMEOUT_MS) -> dict[str, Any]:
         future: asyncio.Future[dict[str, Any]] = asyncio.get_running_loop().create_future()
@@ -844,6 +867,8 @@ class DaemonNodeRegistry:
         if active["agent"] != event["agent"] or (event["type"] != "run.output" and active["mode"] != event.get("mode")):
             logger.warning("Daemon node event command metadata mismatch", sandbox_id=sandbox_id, command_id=event["commandId"], run_id=event["runId"])
             raise PermissionError("Unauthorized daemon node event: command metadata does not match the active command.")
+        if hasattr(self.daemon_store, "renew_command_leases"):
+            self.daemon_store.renew_command_leases(sandbox_id, [event["commandId"]], lease_seconds=DAEMON_ACTIVE_COMMAND_LEASE_SECONDS)
         if event["type"] == "run.output":
             seen = self.output_sequences.setdefault(event["runId"], set())
             if event["sequence"] in seen:
@@ -853,17 +878,13 @@ class DaemonNodeRegistry:
                 return
             seen.add(event["sequence"])
             self.outputs.setdefault(event["runId"], []).append(event["text"])
-            self.store.append_event(event["sessionId"], {
-                "id": new_relay_id("evt"),
-                "type": "agent.output",
-                "sessionId": event["sessionId"],
-                "timestamp": now_iso(),
+            self.store.append_event(event["sessionId"], relay_event("agent.output", event["sessionId"], {
                 "runId": event["runId"],
                 "agent": event["agent"],
                 "stream": event["stream"],
                 "text": event["text"],
                 "sequence": event["sequence"],
-            })
+            }))
             return
         self.active_commands.pop(event["commandId"], None)
         if event["type"] == "run.completed":
@@ -908,7 +929,10 @@ class DaemonNodeRegistry:
         assignment = assignments[index]
         mode = assignment.get("mode") or "action"
         run_id = new_relay_id("run")
-        sandbox = self.sandboxes[run_request["nodeId"]]
+        sandbox = self.sandboxes.get(run_request["nodeId"])
+        if not sandbox:
+            self._fail_run_request(run_request, f"Sandbox {run_request['nodeId']} was removed before the run could start.")
+            return run_request
         controller = self._controller_for_sandbox(sandbox, run_request.get("taskId"))
         state = dict(run_request["state"] or {})
         state.pop("prior_agent_bridge", None)
@@ -1122,9 +1146,10 @@ class DaemonNodeRegistry:
     def _age_ms(self, iso_timestamp: str) -> int:
         try:
             timestamp = iso_timestamp.replace("Z", "+00:00")
-            seen_ms = __import__("datetime").datetime.fromisoformat(timestamp).timestamp() * 1000
+            seen_ms = datetime.fromisoformat(timestamp).timestamp() * 1000
             return max(0, int(time.time() * 1000 - seen_ms))
         except Exception:
+            logger.warning("Failed to parse timestamp for age calculation", iso_timestamp=iso_timestamp)
             return 0
 
     def output_for_run(self, run_id: str) -> str:
@@ -1138,6 +1163,7 @@ class DaemonNodeRegistry:
         try:
             session = self.store.get_session(session_id)
         except Exception:
+            logger.warning("Failed to read session when checking output sequence", session_id=session_id, run_id=run_id)
             return False
         return any(
             event.get("type") == "agent.output"
@@ -1196,8 +1222,9 @@ class DaemonNodeRegistry:
             return {"online": False, "stale": True}
         try:
             timestamp = sandbox["lastSeenAt"].replace("Z", "+00:00")
-            seen_ms = __import__("datetime").datetime.fromisoformat(timestamp).timestamp() * 1000
+            seen_ms = datetime.fromisoformat(timestamp).timestamp() * 1000
         except Exception:
+            logger.warning("Failed to parse lastSeenAt for sandbox liveness", sandbox_id=sandbox.get("id"), last_seen=sandbox.get("lastSeenAt"))
             return {"online": False, "stale": True}
         age = max(0, int(time.time() * 1000 - seen_ms))
         online = age <= self.liveness_timeout_ms

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -18,16 +19,16 @@ def database_id_column() -> Column[Any]:
     return Column("id", Uuid(as_uuid=False), primary_key=True, default=new_database_id)
 
 
-def _parse_iso(value: str | None) -> Any:
+def _parse_iso(value: str | None) -> datetime | None:
     if not value:
         return None
-    return __import__("datetime").datetime.fromisoformat(value.replace("Z", "+00:00"))
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
-def _format_iso(value: Any) -> str | None:
+def _format_iso(value: datetime | None) -> str | None:
     if value is None:
         return None
-    return value.astimezone(__import__("datetime").timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    return value.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
 def _read_json(path: Path) -> Any:

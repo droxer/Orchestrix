@@ -18,60 +18,60 @@ class ServerDaemonNodeBackend:
     def __init__(self, registry: DaemonNodeRegistry):
         self.registry = registry
 
-    def provision(self, input: dict[str, Any]) -> dict[str, Any]:
-        requested_sandbox_id = input.get("sandboxId")
-        existing = self.registry.get(requested_sandbox_id) if requested_sandbox_id else self.registry.find_by_employee(input["employeeId"], input.get("workspacePath"))
+    def provision(self, payload: dict[str, Any]) -> dict[str, Any]:
+        requested_sandbox_id = payload.get("sandboxId")
+        existing = self.registry.get(requested_sandbox_id) if requested_sandbox_id else self.registry.find_by_employee(payload["employeeId"], payload.get("workspacePath"))
         if existing:
-            if input.get("actorEmployeeId"):
+            if payload.get("actorEmployeeId"):
                 return existing
-            ui_error = sandbox_ui_auth_error(existing, input.get("token"))
+            ui_error = sandbox_ui_auth_error(existing, payload.get("token"))
             if not ui_error:
                 return existing
-            node_error = sandbox_node_auth_error(existing, input.get("nodeToken"))
-            if not node_error and input.get("token"):
-                employee_id = existing.get("employeeId") or input["employeeId"]
+            node_error = sandbox_node_auth_error(existing, payload.get("nodeToken"))
+            if not node_error and payload.get("token"):
+                employee_id = existing.get("employeeId") or payload["employeeId"]
                 return self.registry.register({
                     "sandboxId": existing["id"],
                     "employeeId": employee_id,
-                    "token": input.get("nodeToken", ""),
+                    "token": payload.get("nodeToken", ""),
                     "workspacePath": existing.get("workspacePath"),
                     "protocolVersion": DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS[0],
                     "supportedAgents": [agent for agent, status in existing.get("agents", {}).items() if status == "ready"],
                     "maxConcurrentRuns": existing.get("maxConcurrentRuns"),
                     "runCapacityByMode": existing.get("runCapacityByMode"),
                     "status": "busy" if existing["status"] == "running" else existing["status"],
-                }, input["token"])
+                }, payload["token"])
             raise PermissionError(node_error or ui_error)
-        if not input.get("token"):
+        if not payload.get("token"):
             raise PermissionError("Sandbox token is required.")
-        if not input.get("nodeToken"):
+        if not payload.get("nodeToken"):
             raise PermissionError("Daemon node token is required.")
-        sandbox_id = requested_sandbox_id or new_sandbox_id(input["employeeId"])
+        sandbox_id = requested_sandbox_id or new_sandbox_id(payload["employeeId"])
         now = now_iso()
         sandbox = {
             "id": sandbox_id,
-            "employeeId": input["employeeId"],
-            **({"workspacePath": input["workspacePath"]} if input.get("workspacePath") else {}),
+            "employeeId": payload["employeeId"],
+            **({"workspacePath": payload["workspacePath"]} if payload.get("workspacePath") else {}),
             "status": "provisioning",
             "agents": {agent: "unknown" for agent in AGENT_NAMES},
             "maxConcurrentRuns": 1,
             "runCapacityByMode": {"action": 1, "review": 1, "ask": 1},
-            "token": input["token"],
+            "token": payload["token"],
             "createdAt": now,
             "updatedAt": now,
             "lastError": "Waiting for daemon node registration.",
         }
         self.registry.register({
             "sandboxId": sandbox_id,
-            "employeeId": input["employeeId"],
-            "token": input["nodeToken"],
-            "workspacePath": input.get("workspacePath"),
+            "employeeId": payload["employeeId"],
+            "token": payload["nodeToken"],
+            "workspacePath": payload.get("workspacePath"),
             "protocolVersion": DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS[0],
             "supportedAgents": [],
             "status": "stopped",
-        }, input["token"])
+        }, payload["token"])
         stored = self.registry.get(sandbox_id) or {}
-        return {**sandbox, **stored, "token": input["token"]}
+        return {**sandbox, **stored, "token": payload["token"]}
 
     def get(self, sandbox_id: str) -> dict[str, Any] | None:
         return self.registry.get(sandbox_id)
@@ -79,8 +79,8 @@ class ServerDaemonNodeBackend:
     def list(self) -> list[dict[str, Any]]:
         return self.registry.list_ready()
 
-    def provision_daemon_node(self, input: dict[str, Any]) -> dict[str, Any]:
-        sandbox, ui_token, node_token = self.registry.provision_pending(input.get("employeeId"), input.get("workspacePath"))
+    def provision_daemon_node(self, payload: dict[str, Any]) -> dict[str, Any]:
+        sandbox, ui_token, node_token = self.registry.provision_pending(payload.get("employeeId"), payload.get("workspacePath"))
         return {
             **sandbox,
             **({"token": ui_token, "sandboxToken": ui_token} if ui_token else {}),
@@ -188,8 +188,10 @@ class ServerDaemonNodeBackend:
 def assert_session_owned_by_employee(store: LocalSessionStore, session_id: str, employee_id: str) -> None:
     try:
         session = store.get_session(session_id)
-    except Exception:
-        return
+    except Exception as exc:
+        raise PermissionError(
+            f"Session {session_id} could not be verified for {employee_id}."
+        ) from exc
     if not session.get("ownerEmployeeId"):
         raise PermissionError(f"Session {session_id} has no owner; {employee_id} is not authorized to run it.")
     if session["ownerEmployeeId"] != employee_id:

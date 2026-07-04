@@ -145,7 +145,7 @@ async def start_task_on_ready_node(
         if not actor["isAdmin"]:
             run_request["actorEmployeeId"] = actor["employeeId"]
         session = await ctx.backend.run(node["id"], run_request)
-    except ValueError as error:
+    except (ValueError, PermissionError) as error:
         if claimed:
             ctx.task_store.assign_task(task["id"], claim_agent)
         if record_pending:
@@ -220,7 +220,10 @@ def complete_linked_task_sessions(ctx: AppContextDep, task: dict[str, Any], outc
     for session_id in task.get("linkedSessionIds", []):
         try:
             session = ctx.session_store.get_session(session_id)
+        except (KeyError, FileNotFoundError):
+            continue
         except Exception:
+            logger.warning("Unexpected error reading linked session", session_id=session_id, exc_info=True)
             continue
         if session.get("status") in ("completed", "failed", "cancelled"):
             continue
@@ -429,8 +432,11 @@ async def task_artifacts(task_id: str, request: Request, ctx: AppContextDep) -> 
     for session_id in task.get("linkedSessionIds", []):
         try:
             session = ctx.session_store.get_session(session_id)
-        except Exception:
+        except (KeyError, FileNotFoundError):
             continue  # A linked session may have been deleted; skip it.
+        except Exception:
+            logger.warning("Unexpected error reading linked session for artifact aggregation", session_id=session_id, exc_info=True)
+            continue
         for artifact in workspace_artifacts(session):
             key = workspace_artifact_key(session, artifact)
             current = newest.get(key)

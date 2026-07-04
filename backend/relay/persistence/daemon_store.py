@@ -206,6 +206,28 @@ class LocalDaemonStore:
         now = now_iso()
         return len([record for record in self._list_commands() if record["nodeId"] == node_id and command_is_available(record, now)])
 
+    def renew_command_leases(self, node_id: str, command_ids: list[str], lease_seconds: float = 60.0) -> None:
+        if not command_ids:
+            return
+        with self._lock:
+            now = now_iso()
+            requested = set(command_ids)
+            for record in self._list_commands():
+                if record["nodeId"] != node_id or record["id"] not in requested or record.get("status") != "dispatched":
+                    continue
+                updated = {
+                    **record,
+                    "updatedAt": now,
+                    "leaseExpiresAt": lease_expires_at(now, lease_seconds),
+                }
+                _write_json(self.commands_dir / f"{safe_name(record['id'])}.json", updated)
+                self.append_daemon_event(daemon_event("daemon.command.lease_renewed", {
+                    "nodeId": node_id,
+                    "commandId": record["id"],
+                    "leaseId": record.get("leaseId"),
+                    "leaseExpiresAt": updated["leaseExpiresAt"],
+                }))
+
     def list_active_runs(self, node_id: str | None = None) -> list[dict[str, Any]]:
         runs = [_read_json(path) for path in self.runs_dir.glob("*.json")]
         return [run for run in runs if run.get("status") == "running" and (node_id is None or run.get("nodeId") == node_id)]
@@ -652,6 +674,38 @@ class DatabaseDaemonStore:
                     | ((self.commands.c.status == "dispatched") & (self.commands.c.lease_expires_at <= now_dt))
                 )
             ).all())
+
+    def renew_command_leases(self, node_id: str, command_ids: list[str], lease_seconds: float = 60.0) -> None:
+        if not command_ids:
+            return
+        now = now_iso()
+        requested = set(command_ids)
+        with self.engine.begin() as conn:
+            node_pk = self._node_pk(conn, node_id)
+            rows = conn.execute(
+                select(self.commands)
+                .where(self.commands.c.node_id == node_pk)
+                .where(self.commands.c.public_id.in_(requested))
+                .where(self.commands.c.status == "dispatched")
+            ).mappings().all()
+            for row in rows:
+                record = row_to_command(row)
+                updated = {
+                    **record,
+                    "updatedAt": now,
+                    "leaseExpiresAt": lease_expires_at(now, lease_seconds),
+                }
+                conn.execute(
+                    update(self.commands)
+                    .where(self.commands.c.id == record["databaseId"])
+                    .values(**command_to_row(updated, database_id=record["databaseId"], node_pk=node_pk))
+                )
+                self._append_daemon_event(conn, daemon_event("daemon.command.lease_renewed", {
+                    "nodeId": node_id,
+                    "commandId": record["id"],
+                    "leaseId": record.get("leaseId"),
+                    "leaseExpiresAt": updated["leaseExpiresAt"],
+                }))
 
     def list_active_runs(self, node_id: str | None = None) -> list[dict[str, Any]]:
         statement = select(self.runs).where(self.runs.c.status == "running")

@@ -206,14 +206,14 @@ class SessionController:
             "phase": "assigned",
         }))
 
-    def create_artifact(self, session_id: str, input: dict[str, Any]) -> dict[str, Any]:
+    def create_artifact(self, session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         if hasattr(self.store, "create_artifact"):
-            artifact, _session = self.store.create_artifact(session_id, input)
-            logger.debug("Artifact created", session_id=session_id, artifact_id=artifact["id"], kind=input.get("kind"))
+            artifact, _session = self.store.create_artifact(session_id, payload)
+            logger.debug("Artifact created", session_id=session_id, artifact_id=artifact["id"], kind=payload.get("kind"))
             return artifact
-        artifact = self.store.write_artifact(session_id, input)
+        artifact = self.store.write_artifact(session_id, payload)
         self._append(session_id, relay_event("artifact.created", session_id, {"artifact": artifact}))
-        logger.debug("Artifact created", session_id=session_id, artifact_id=artifact["id"], kind=input.get("kind"))
+        logger.debug("Artifact created", session_id=session_id, artifact_id=artifact["id"], kind=payload.get("kind"))
         return artifact
 
     def record_agent_started(self, session_id: str, step: dict[str, Any]) -> dict[str, Any]:
@@ -241,36 +241,36 @@ class SessionController:
             "text": text,
         }))
 
-    def record_agent_completed(self, session_id: str, state: dict[str, Any], input: dict[str, Any]) -> dict[str, Any]:
-        logger.info("Agent run completed", session_id=session_id, run_id=input["runId"], agent=input["agent"], mode=input["mode"], status=input["status"], exit_code=input["exitCode"])
-        state_patch = {"agent_logs": [input.get("agentLog", "")], "last_exit_code": input["exitCode"], "token_usage": input.get("tokenUsage")}
+    def record_agent_completed(self, session_id: str, state: dict[str, Any], step_result: dict[str, Any]) -> dict[str, Any]:
+        logger.info("Agent run completed", session_id=session_id, run_id=step_result["runId"], agent=step_result["agent"], mode=step_result["mode"], status=step_result["status"], exit_code=step_result["exitCode"])
+        state_patch = {"agent_logs": [step_result.get("agentLog", "")], "last_exit_code": step_result["exitCode"], "token_usage": step_result.get("tokenUsage")}
         completed_payload = {
-            "runId": input["runId"],
-            "agent": input["agent"],
-            "status": input["status"],
-            "exitCode": input["exitCode"],
-            "agentLog": input.get("agentLog", ""),
+            "runId": step_result["runId"],
+            "agent": step_result["agent"],
+            "status": step_result["status"],
+            "exitCode": step_result["exitCode"],
+            "agentLog": step_result.get("agentLog", ""),
         }
-        if input.get("tokenUsage"):
-            completed_payload["tokenUsage"] = input["tokenUsage"]
+        if step_result.get("tokenUsage"):
+            completed_payload["tokenUsage"] = step_result["tokenUsage"]
         self._append(session_id, relay_event("agent.completed", session_id, completed_payload))
-        if input["status"] == "failed":
-            self._update_task_status("blocked", f"{input['agent']} {input['mode']} failed with exit code {input['exitCode']}.", {
-                "agent": input["agent"],
+        if step_result["status"] == "failed":
+            self._update_task_status("blocked", f"{step_result['agent']} {step_result['mode']} failed with exit code {step_result['exitCode']}.", {
+                "agent": step_result["agent"],
                 "sessionId": session_id,
             })
-        elif input.get("pipelineHasNext"):
+        elif step_result.get("pipelineHasNext"):
             # Another assignment follows immediately; keep the task running
             # instead of flapping through waiting_for_human/review between steps.
-            self._update_task_status("running", f"{input['agent']} {input['mode']} completed.", {
-                "agent": input["agent"],
+            self._update_task_status("running", f"{step_result['agent']} {step_result['mode']} completed.", {
+                "agent": step_result["agent"],
                 "sessionId": session_id,
             })
-        elif input["mode"] == "review":
-            self._update_task_status("review", f"{input['agent']} review completed.", {"agent": input["agent"], "sessionId": session_id})
+        elif step_result["mode"] == "review":
+            self._update_task_status("review", f"{step_result['agent']} review completed.", {"agent": step_result["agent"], "sessionId": session_id})
         else:
-            self._update_task_status("waiting_for_human", f"{input['agent']} {input['mode']} completed.", {
-                "agent": input["agent"],
+            self._update_task_status("waiting_for_human", f"{step_result['agent']} {step_result['mode']} completed.", {
+                "agent": step_result["agent"],
                 "sessionId": session_id,
             })
         return merge_agent_state(state, state_patch)
@@ -285,9 +285,9 @@ class SessionController:
         if session_id not in task["linkedSessionIds"]:
             self.task_store.link_session(self.task_id, session_id)
 
-    def _update_task_status(self, status: str, message: str, input: dict[str, Any] | None = None) -> None:
+    def _update_task_status(self, status: str, message: str, extras: dict[str, Any] | None = None) -> None:
         if not self.task_store or not self.task_id:
             return
-        input = input or {}
+        extras = extras or {}
         self.task_store.append_event(self.task_id, relay_task_event("task.status", self.task_id, {"status": status}))
-        self.task_store.record_activity(self.task_id, message, input)
+        self.task_store.record_activity(self.task_id, message, extras)

@@ -11,7 +11,7 @@ import {
   type DaemonExecutionEnvironment,
   type DaemonLogger,
 } from "../src/index.js";
-import type { DaemonNodeCommand, DaemonNodeEvent, DaemonNodeRegistration, StreamExecResult } from "relay-core";
+import type { DaemonNodeCommand, DaemonNodeEvent, DaemonNodeRegistration, DaemonNodeRunCommand, StreamExecResult } from "relay-core";
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -47,7 +47,7 @@ function fakeEnvironment(input: {
   };
 }
 
-function runCommand(id = "cmd_1"): DaemonNodeCommand {
+function runCommand(id = "cmd_1"): DaemonNodeRunCommand {
   return {
     id,
     type: "run.start",
@@ -113,6 +113,118 @@ test("relay daemon ignores duplicate run.start commands already active", async (
 
   assert.equal(execCount, 1);
   assert.equal(events.filter((event) => event.type === "run.completed").length, 1);
+});
+
+test("relay daemon advertises active command ids while polling", async () => {
+  const stop = new AbortController();
+  const command = { ...runCommand("cmd_active_poll"), leaseId: "lease_1", leaseExpiresAt: new Date(Date.now() + 60_000).toISOString() };
+  let commandServed = false;
+  let activePollSeen = false;
+  let commandLeaseSeconds = 0;
+  const daemon = runRelayDaemon({
+    backendUrl: "http://relay.test",
+    sandboxId: "sbx_test",
+    employeeId: "alice",
+    workspacePath: process.cwd(),
+    token: "node_token",
+    pollIntervalMs: 5,
+    commandPollWaitMs: 25_000,
+    shutdownGraceMs: 50,
+    logger: testLogger(),
+    signal: stop.signal,
+    environment: fakeEnvironment({
+      exec: async (_cmd, args, options) => {
+        if (isInventoryProbe(args)) return { exit_code: 0, stdout: "", stderr: "" };
+        while (!activePollSeen) {
+          await new Promise((resolve) => setTimeout(resolve, 1));
+        }
+        options?.sink?.("done\n");
+        return { exit_code: 0, stdout: "done\n", stderr: "" };
+      },
+    }),
+    fetchFn: async (url, init) => {
+      const parsed = new URL(String(url));
+      const path = parsed.pathname;
+      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/daemon-nodes/register") return jsonResponse({ ok: true });
+      if (path.endsWith("/commands")) {
+        commandLeaseSeconds = Number(parsed.searchParams.get("leaseSeconds") ?? "0");
+        if (!commandServed) {
+          commandServed = true;
+          return jsonResponse({ commands: [command] });
+        }
+        if (parsed.searchParams.get("activeCommandIds") === command.id) activePollSeen = true;
+        return jsonResponse({ commands: [] });
+      }
+      if (path.endsWith("/events")) {
+        const event = await jsonBody<DaemonNodeEvent>(init);
+        if (event.type === "run.completed") stop.abort();
+        return jsonResponse({ ok: true }, 202);
+      }
+      throw new Error(`unexpected URL ${url}`);
+    },
+  });
+
+  await daemon;
+
+  assert.equal(activePollSeen, true);
+  assert.ok(commandLeaseSeconds >= 15 * 60);
+});
+
+test("relay daemon refreshes an active command lease from a duplicate dispatch", async () => {
+  const stop = new AbortController();
+  const events: DaemonNodeEvent[] = [];
+  const first = { ...runCommand("cmd_duplicate_lease"), leaseId: "lease_old", leaseExpiresAt: new Date(Date.now() + 1_000).toISOString(), attempt: 1 };
+  const duplicate = { ...first, leaseId: "lease_new", leaseExpiresAt: new Date(Date.now() + 60_000).toISOString(), attempt: 2 };
+  let pollCount = 0;
+  let duplicateServed = false;
+  const daemon = runRelayDaemon({
+    backendUrl: "http://relay.test",
+    sandboxId: "sbx_test",
+    employeeId: "alice",
+    workspacePath: process.cwd(),
+    token: "node_token",
+    pollIntervalMs: 5,
+    shutdownGraceMs: 50,
+    logger: testLogger(),
+    signal: stop.signal,
+    environment: fakeEnvironment({
+      exec: async (_cmd, args, options) => {
+        if (isInventoryProbe(args)) return { exit_code: 0, stdout: "", stderr: "" };
+        while (!duplicateServed) {
+          await new Promise((resolve) => setTimeout(resolve, 1));
+        }
+        options?.sink?.("done\n");
+        return { exit_code: 0, stdout: "done\n", stderr: "" };
+      },
+    }),
+    fetchFn: async (url, init) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/daemon-nodes/register") return jsonResponse({ ok: true });
+      if (path.endsWith("/commands")) {
+        pollCount += 1;
+        if (pollCount === 1) return jsonResponse({ commands: [first] });
+        if (pollCount === 2) {
+          duplicateServed = true;
+          return jsonResponse({ commands: [duplicate] });
+        }
+        return jsonResponse({ commands: [] });
+      }
+      if (path.endsWith("/events")) {
+        const event = await jsonBody<DaemonNodeEvent>(init);
+        events.push(event);
+        if (event.type === "run.completed") stop.abort();
+        return jsonResponse({ ok: true }, 202);
+      }
+      throw new Error(`unexpected URL ${url}`);
+    },
+  });
+
+  await daemon;
+
+  const completed = events.find((event) => event.type === "run.completed");
+  assert.equal(completed?.leaseId, "lease_new");
 });
 
 test("relay daemon advertises only agents with passing capability preflight", async () => {
@@ -909,7 +1021,8 @@ test("relay daemon can register, poll, execute, and report through a local backe
       sendJson(res, 200, { ok: true });
       return;
     }
-    if (req.url === "/daemon-nodes/sbx_http/commands" && req.method === "GET") {
+    const url = new URL(req.url ?? "/", "http://127.0.0.1");
+    if (url.pathname === "/daemon-nodes/sbx_http/commands" && req.method === "GET") {
       sendJson(res, 200, { commands: commandServed ? [] : [command] });
       commandServed = true;
       return;

@@ -29,6 +29,6 @@
 @media (max-width: 720px) {
   .page-header-title--display {
     font: var(--type-title-lg);
-    letter-spacing: -0.2px;
+    letter-spacing: var(--letter-tight);
   }
 }

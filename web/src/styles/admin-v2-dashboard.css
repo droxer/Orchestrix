@@ -121,7 +121,7 @@
   gap: 4px;
   font-size: var(--text-xs);
   font-family: var(--font-number);
-  letter-spacing: 0.02em;
+  letter-spacing: var(--letter-open);
 }
 
 .adm-dash-delta.tone-up { color: var(--color-semantic-up); }
@@ -156,7 +156,7 @@
   background: var(--color-canvas);
   min-width: 0;
   height: 100%;
-  transition: box-shadow 160ms ease, border-color 160ms ease;
+  transition: box-shadow var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
 }
 
 .adm-dash-card:hover {
@@ -225,7 +225,7 @@
 
 .adm-dash-chart-area {
   opacity: 0;
-  animation: adm-chart-area-in 0.8s ease 0.5s forwards;
+  animation: adm-chart-area-in 0.8s var(--ease-standard) 0.5s forwards;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -362,7 +362,7 @@
     var(--color-hairline) 6px,
     var(--color-hairline) 7px
   );
-  animation: adm-bar-hatch 1.2s ease forwards;
+  animation: adm-bar-hatch 1.2s var(--ease-standard) forwards;
 }
 
 @keyframes adm-bar-hatch {
@@ -444,7 +444,7 @@
 .adm-dash-top-rank {
   font-size: var(--text-2xs);
   color: var(--color-muted);
-  letter-spacing: 0.06em;
+  letter-spacing: var(--letter-caps-wide);
 }
 
 .adm-dash-top-meta {
@@ -465,7 +465,7 @@
 .adm-dash-top-sub {
   font-size: var(--text-2xs);
   color: var(--color-muted);
-  letter-spacing: 0.04em;
+  letter-spacing: var(--letter-caps);
 }
 
 .adm-dash-top-bar {
@@ -560,13 +560,13 @@
 .adm-dash-feed-owner {
   font-size: var(--text-2xs);
   color: var(--color-muted);
-  letter-spacing: 0.04em;
+  letter-spacing: var(--letter-caps);
 }
 
 .adm-dash-feed-time {
   font-size: var(--text-2xs);
   color: var(--color-muted);
-  letter-spacing: 0.06em;
+  letter-spacing: var(--letter-caps-wide);
   white-space: nowrap;
   padding-top: 2px;
   font-variant-numeric: tabular-nums;

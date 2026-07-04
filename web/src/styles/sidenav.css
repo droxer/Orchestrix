@@ -132,7 +132,7 @@
   background: var(--color-canvas);
   box-shadow: var(--shadow-lift);
   transform: translateY(-100%);
-  z-index: 120;
+  z-index: var(--z-float);
   animation: settings-menu-in var(--duration-fast) var(--ease-standard) both;
 }
 
@@ -249,8 +249,8 @@
   font: var(--type-caption-strong);
   box-shadow: var(--shadow-lift);
   pointer-events: none;
-  z-index: 100;
-  animation: tooltip-in var(--duration-fast) ease both;
+  z-index: var(--z-float);
+  animation: tooltip-in var(--duration-fast) var(--ease-standard) both;
 }
 
 @keyframes tooltip-in {
@@ -306,7 +306,7 @@
   white-space: nowrap;
   border: 0;
   /* Fade-in when visible */
-  transition: opacity 150ms ease 60ms;
+  transition: opacity var(--duration-fast) var(--ease-standard) 60ms;
   opacity: 0;
 }
 

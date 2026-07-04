@@ -190,7 +190,7 @@
   min-width: 0;
   color: var(--color-ink);
   font: var(--type-label-strong);
-  letter-spacing: -0.005em;
+  letter-spacing: var(--letter-body);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -231,7 +231,7 @@
   background: transparent;
   color: var(--color-muted);
   cursor: pointer;
-  transition: color 100ms ease, background 100ms ease;
+  transition: color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
   opacity: 0;
   font-size: var(--text-xs);
   line-height: 1;
@@ -269,7 +269,7 @@
   color: var(--color-on-primary);
   background: var(--color-primary);
   cursor: pointer;
-  transition: background 120ms ease, transform 80ms ease, box-shadow 120ms ease;
+  transition: background var(--duration-fast) var(--ease-standard), transform 80ms var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
 }
 
 .conversation-header .conversation-new-btn:hover {
@@ -360,7 +360,7 @@
   border-radius: var(--radius-full);
   color: var(--color-muted);
   background: transparent;
-  transition: background var(--duration-fast) ease, color var(--duration-fast) ease, border-color var(--duration-fast) ease;
+  transition: background var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
 }
 
 .icon-button:hover,
@@ -381,7 +381,7 @@
   gap: var(--space-xs);
   padding: var(--space-xs) var(--space-base) var(--space-xxs);
   font: var(--type-meta-mono);
-  letter-spacing: 0.06em;
+  letter-spacing: var(--letter-caps-wide);
   text-transform: uppercase;
   color: var(--color-muted);
 }

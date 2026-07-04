@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import math
 import mimetypes
 import os
@@ -22,7 +23,7 @@ CHAT_SERVICE_EMPLOYEE_HEADER = "x-relay-employee-id"
 async def json_body(request: Request) -> dict[str, Any]:
     try:
         value = await request.json()
-    except Exception:
+    except json.JSONDecodeError:
         return {}
     return value if isinstance(value, dict) else {}
 
@@ -130,15 +131,21 @@ def daemon_start_command(request: Request, node: dict[str, Any]) -> str:
 
 def get_session_or_404(store: Any, session_id: str) -> dict[str, Any]:
     try:
-        return store.get_session(session_id)
-    except Exception:
+        session = store.get_session(session_id)
+        if not session.get("id"):
+            raise HTTPException(404, "Session not found.")
+        return session
+    except KeyError:
         raise HTTPException(404, "Session not found.")
 
 
 def get_task_or_404(store: Any, task_id: str) -> dict[str, Any]:
     try:
-        return store.get_task(task_id)
-    except Exception:
+        task = store.get_task(task_id)
+        if not task.get("id"):
+            raise HTTPException(404, "Task not found.")
+        return task
+    except KeyError:
         raise HTTPException(404, "Task not found.")
 
 

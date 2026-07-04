@@ -100,7 +100,7 @@ class TaskScheduler:
                 skipped += 1
                 self._record_routine_skip(routine)
                 continue
-            run_date = date.fromisoformat(routine["routineNextRunDate"])
+            run_date = date.fromisoformat(routine["routineNextRunDate"]) if routine.get("routineNextRunDate") else today
             next_run = next_routine_date(run_date, routine.get("routineCadence") or "weekly", today)
             occurrence = self.task_store.promote_due_routine(routine["id"], today.isoformat(), next_run.isoformat() if next_run else None)
             if occurrence:
@@ -197,7 +197,7 @@ class TaskScheduler:
 def ready_node_for_task(registry: Any, task: dict[str, Any], assignments: list[dict[str, Any]]) -> dict[str, Any] | None:
     if not assignments:
         return None
-    requested_agents = [assignment["agent"] for assignment in assignments]
+    requested_agents = [assignment.get("agent") for assignment in assignments if assignment.get("agent")]
     employee_id = task.get("assigneeEmployeeId") or task.get("ownerEmployeeId")
     for node in registry.list_ready():
         if employee_id and node.get("employeeId") != employee_id:

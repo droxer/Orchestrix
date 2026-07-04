@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { RelaySession } from "../types";
 import { applySessionEvent } from "../lib/sessionEvents";
 import { mergeSessionEventIntoSessions } from "../lib/sessionEventMerge";
-import { lastSessionEventId, sessionEventsUrl } from "../lib/sessionEventStream";
+import { isTerminalSessionStatus, lastSessionEventId, sessionEventsUrl } from "../lib/sessionEventStream";
 
 const SESSIONS_KEY = ["relay", "sessions"] as const;
 
@@ -50,8 +50,21 @@ export function useSessionEvents(sessionId: string | undefined, enabled: boolean
       }
     };
 
-    // The server closes the stream at a terminal status; stop reconnecting.
-    source.addEventListener("done", () => source.close());
+    // The server emits `done` before closing terminal sessions and long-lived
+    // timeout windows. Only terminal sessions should stop reconnecting; active
+    // runs should let EventSource reconnect with its last event id.
+    source.addEventListener("done", (event) => {
+      let status: RelaySession["status"] | undefined;
+      try {
+        const data = JSON.parse((event as MessageEvent<string>).data) as { status?: RelaySession["status"] };
+        status = data.status;
+      } catch {
+        // Unknown control frames should not loop forever.
+        source.close();
+        return;
+      }
+      if (isTerminalSessionStatus(status)) source.close();
+    });
 
     // EventSource auto-reconnects on transient errors, but it cannot read the
     // HTTP status, so a permanent failure (auth lost, session gone) would loop

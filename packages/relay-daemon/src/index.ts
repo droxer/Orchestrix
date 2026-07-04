@@ -51,6 +51,8 @@ export interface DaemonRuntimeOptions {
   employeeId?: string;
   workspacePath?: string;
   pollIntervalMs?: number;
+  commandPollWaitMs?: number;
+  commandLeaseSeconds?: number;
   heartbeatIntervalMs?: number;
   fetchFn?: typeof fetch;
   token?: string;
@@ -118,6 +120,18 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
   const token = tokenResolution.token;
   const fetchFn = options.fetchFn ?? fetch;
   const pollIntervalMs = options.pollIntervalMs ?? 1000;
+  const commandPollWaitMs = boundedNumber(
+    options.commandPollWaitMs ?? positiveIntEnv("RELAY_DAEMON_COMMAND_POLL_WAIT_MS") ?? DEFAULT_COMMAND_POLL_WAIT_MS,
+    0,
+    MAX_COMMAND_POLL_WAIT_MS,
+  );
+  const commandLeaseSeconds = boundedNumber(
+    options.commandLeaseSeconds
+      ?? positiveIntEnv("RELAY_DAEMON_COMMAND_LEASE_SECONDS")
+      ?? Math.ceil((positiveIntEnv("RELAY_DAEMON_RUN_TIMEOUT_MS") ?? DEFAULT_DAEMON_RUN_TIMEOUT_MS) / 1000) + 60,
+    1,
+    MAX_COMMAND_LEASE_SECONDS,
+  );
   const logger = options.logger ?? createDaemonLogger({
     workspacePath,
     sandboxId,
@@ -256,7 +270,16 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
           await register();
           lastRegisteredAt = Date.now();
         }
-        const response = await getJson(fetchFn, `${backendUrl}/daemon-nodes/${encodeURIComponent(sandboxId)}/commands`, token, runtimeSignal);
+        const response = await getJson(
+          fetchFn,
+          daemonCommandsUrl(backendUrl, sandboxId, {
+            waitSeconds: commandPollWaitMs / 1000,
+            leaseSeconds: commandLeaseSeconds,
+            activeCommandIds: [...activeRuns.keys()],
+          }),
+          token,
+          runtimeSignal,
+        );
         if (!response.ok) {
           // The backend may have restarted with fresh state or demoted this node;
           // re-register before treating the rejection as fatal.
@@ -272,8 +295,14 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
       if (stopping) break;
       for (const command of body.commands ?? []) {
         if (command.type === "run.start") {
-          if (activeRuns.has(command.id)) {
-            logger.warn("duplicate command ignored", commandLogFields(sandboxId, command));
+          const active = activeRuns.get(command.id);
+          if (active) {
+            refreshCommandLease(active.command, command);
+            logger.warn("duplicate command ignored", {
+              ...commandLogFields(sandboxId, command),
+              leaseId: command.leaseId,
+              attempt: command.attempt,
+            });
             continue;
           }
           if (!canStartCommand(command, activeRuns, maxConcurrentRuns, runCapacityByMode)) {
@@ -931,6 +960,30 @@ function positiveIntEnv(name: string): number | undefined {
   return Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined;
 }
 
+function boundedNumber(value: number, minimum: number, maximum: number): number {
+  if (!Number.isFinite(value)) return minimum;
+  return Math.min(Math.max(value, minimum), maximum);
+}
+
+function daemonCommandsUrl(
+  backendUrl: string,
+  sandboxId: string,
+  input: { waitSeconds: number; leaseSeconds: number; activeCommandIds: string[] },
+): string {
+  const url = new URL(`${backendUrl}/daemon-nodes/${encodeURIComponent(sandboxId)}/commands`);
+  url.searchParams.set("waitSeconds", formatQueryNumber(input.waitSeconds));
+  url.searchParams.set("leaseSeconds", formatQueryNumber(input.leaseSeconds));
+  url.searchParams.set("limit", "10");
+  if (input.activeCommandIds.length > 0) {
+    url.searchParams.set("activeCommandIds", input.activeCommandIds.join(","));
+  }
+  return url.toString();
+}
+
+function formatQueryNumber(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(3).replace(/0+$/, "").replace(/\.$/, "");
+}
+
 function resolveRunCapacityByMode(input?: Partial<Record<AgentTaskMode, number>>): Record<AgentTaskMode, number> {
   return {
     action: positiveCapacity(input?.action) ?? positiveIntEnv("RELAY_DAEMON_MAX_CONCURRENT_ACTION_RUNS") ?? 1,
@@ -1016,6 +1069,12 @@ function commandLogFields(sandboxId: string, command: DaemonNodeRunCommand): Dae
   };
 }
 
+function refreshCommandLease(active: DaemonNodeRunCommand, received: DaemonNodeRunCommand): void {
+  if (received.leaseId) active.leaseId = received.leaseId;
+  if (received.leaseExpiresAt) active.leaseExpiresAt = received.leaseExpiresAt;
+  if (received.attempt !== undefined) active.attempt = received.attempt;
+}
+
 function safeLogFileName(value: string): string {
   return value.replace(/[^A-Za-z0-9._-]+/g, "_") || "daemon-node";
 }
@@ -1035,6 +1094,10 @@ const REQUEST_TIMEOUT_MS = 30_000;
 const SHUTDOWN_REGISTRATION_TIMEOUT_MS = 250;
 const SHUTDOWN_TERMINAL_EVENT_TIMEOUT_MS = 500;
 const SIGKILL_DELAY_MS = 5_000;
+const DEFAULT_COMMAND_POLL_WAIT_MS = 25_000;
+const MAX_COMMAND_POLL_WAIT_MS = 25_000;
+const MAX_COMMAND_LEASE_SECONDS = 60 * 60;
+const DEFAULT_DAEMON_RUN_TIMEOUT_MS = 15 * 60 * 1000;
 
 function requestSignal(signal?: AbortSignal): AbortSignal {
   const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);

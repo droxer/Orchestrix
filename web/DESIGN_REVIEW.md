@@ -73,3 +73,19 @@ Scoped visual pass on the v2 `adm-*` admin console — dashboard signature momen
 **Verify manually:** dashboard / people / fleet at 1440 / 1024 / 390px; dark + high-contrast themes; `prefers-reduced-motion`.
 
 _Live screenshots captured: login light/dark desktop + light/dark mobile + post-change verify (`/tmp/relay-shots/login-*.png`). Gated-surface screenshots pending a session at `http://127.0.0.1:8790/`._
+
+## Token consistency pass (2026-07-05)
+
+Full drift audit of component CSS against the `tokens.css` shelf; ~150 declarations consolidated. Build ✓, web tests 167/167 ✓.
+
+**Motion — the biggest drift, now closed.** Component CSS had grown a de-facto 100/120/150/160/180/200/240ms duration scale plus ~60 bare `ease` keywords alongside the published shelf. All transitions and entrance animations now use `var(--duration-fast|base)` + a named curve (100–160ms → fast, 180–240ms → base; deltas ≤40ms, imperceptible). Two unregistered cubic-beziers folded into the shelf: the drawer/sheet slide-in `(0.22,0.61,0.36,1)` → `--ease-emphasized`, the composer spring `(0.5,1.4,0.4,1)` → `--ease-spring`. Intentionally untouched: stagger `animation-delay` rhythms (thread rows, login, empty-state, sidenav labels), pulse/blink/caret keyframe cycles, and bespoke chart-draw choreography (durations kept; curves moved onto the shelf).
+
+**Tracking — three new intent tokens.** The raw `letter-spacing` clusters were real intents missing from the shelf, now registered and consumed: `--letter-body` (−0.005em, prose optical tightening), `--letter-open` (0.02em, compact chips / mono metadata — the 0.01em sites were unified into it), `--letter-caps` (0.04em) and `--letter-caps-wide` (0.06em) for uppercase chrome labels. Exact-value strays mapped to existing tokens (0.08em → `--letter-eyebrow`, 0.12em → `--letter-eyebrow-wide`, −0.2px → `--letter-tight`). Left alone: em-based `−0.02em` on clamp() fluid display type (em tracking is correct there).
+
+**Z-index — ladder extended and fully tokenized.** The named scale (20/30/40) now continues through the tiers that already existed as magic numbers: `--z-sheet: 50` (mobile bottom sheets), `--z-float: 120` (sidenav flyouts/tooltips; the tooltip's 100 joined the menu at 120 — pointer-events: none, no conflict), `--z-overlay: 200` (preferences), `--z-dialog: 300` (confirm dialogs, topmost). The composer mention-popover dropped from 30 to `--z-popover` to match the agent-picker.
+
+**Focus rings.** Drifted 14%/16% halos snapped to `--ring-focus`; new `--ring-focus-danger` token (same 3px/28% recipe on the status red) consumed by the composer cancel-send and admin destructive rows, with solid overrides in both high-contrast themes.
+
+**Point fixes.** Chat unread badge: raw `10px/700` → `--text-micro`/600 (system caps emphasis at 600). Artifact library active index button: literal `#fff` → `var(--color-canvas)` — fixes white-on-white in contrast-dark, where kind accents collapse to white ink. Artifact iframe preview keeps literal white with an intent comment (document paper is white in every theme). `tokens.css` skip-link transition now uses its own shelf.
+
+**Verify manually:** hover/focus transitions across admin views + backlog (timing snaps), composer mode-chip spring, drawer/sheet entrances, preferences-over-sidenav and dialog-over-preferences stacking, contrast-dark artifact library.

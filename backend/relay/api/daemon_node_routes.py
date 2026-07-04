@@ -18,6 +18,7 @@ router = APIRouter()
 MAX_COMMAND_POLL_WAIT_SECONDS = 30.0
 MAX_COMMAND_POLL_LIMIT = 50
 MAX_COMMAND_LEASE_SECONDS = 60 * 60.0
+MAX_ACTIVE_COMMAND_IDS = 50
 
 
 def bounded_float(value: str | None, *, default: float, minimum: float, maximum: float, field: str) -> float:
@@ -44,6 +45,21 @@ def bounded_int(value: str | None, *, default: int, minimum: int, maximum: int, 
     if parsed < minimum or parsed > maximum:
         raise HTTPException(400, f"{field} must be between {minimum} and {maximum}.")
     return parsed
+
+
+def active_command_ids(request: Request) -> list[str]:
+    raw_values = list(request.query_params.getlist("activeCommandId"))
+    comma_value = request.query_params.get("activeCommandIds")
+    if comma_value:
+        raw_values.extend(comma_value.split(","))
+    ids = []
+    for raw in raw_values:
+        command_id = raw.strip()
+        if command_id and command_id not in ids:
+            ids.append(command_id)
+        if len(ids) >= MAX_ACTIVE_COMMAND_IDS:
+            break
+    return ids
 
 
 @router.get("/daemon-nodes")
@@ -138,10 +154,13 @@ async def daemon_commands(sandbox_id: str, request: Request, ctx: AppContextDep)
     )
     try:
         token = bearer_token(request)
+        active_ids = active_command_ids(request)
         deadline = time.monotonic() + wait_seconds
+        ctx.registry.renew_active_command_leases(sandbox_id, token, active_ids, lease_seconds=lease_seconds)
         commands = ctx.registry.take_commands(sandbox_id, token, limit=limit, lease_seconds=lease_seconds)
         while not commands and time.monotonic() < deadline:
             await asyncio.sleep(min(0.25, deadline - time.monotonic()))
+            ctx.registry.renew_active_command_leases(sandbox_id, token, active_ids, lease_seconds=lease_seconds)
             if ctx.registry.available_command_count(sandbox_id, token) == 0:
                 continue
             commands = ctx.registry.take_commands(sandbox_id, token, limit=limit, lease_seconds=lease_seconds)

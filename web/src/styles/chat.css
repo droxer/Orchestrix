@@ -82,7 +82,7 @@
   font: var(--type-title-md);
   font-size: var(--text-lg);
   line-height: var(--leading-snug);
-  letter-spacing: -0.005em;
+  letter-spacing: var(--letter-body);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -147,8 +147,8 @@
   border-radius: var(--radius-full);
   background: var(--color-ink);
   color: var(--color-canvas);
-  font-size: 10px;
-  font-weight: 700;
+  font-size: var(--text-micro);
+  font-weight: 600;
   line-height: 1;
   box-shadow: 0 2px 8px color-mix(in srgb, var(--color-ink) 18%, transparent);
 }
@@ -179,7 +179,7 @@
 .header-agent-tab-mark {
   flex: 0 0 auto;
   opacity: 0.75;
-  transition: opacity var(--duration-fast) ease;
+  transition: opacity var(--duration-fast) var(--ease-standard);
 }
 
 .header-agent-tabs button:hover {
@@ -306,7 +306,7 @@
   /* Agents are squares; the human is a circle (overridden below). Monochrome
      only — agent identity is the glyph inside, never color. */
   border-radius: var(--radius-xs);
-  animation: node-in 120ms ease-out both;
+  animation: node-in var(--duration-fast) var(--ease-standard) both;
 }
 
 .rail-node-agent > svg { display: block; }
@@ -410,7 +410,7 @@
    human instruction reads as a peer turn in the same thread as the agents. */
 .msg-user .turn-who {
   font: var(--type-meta-mono);
-  letter-spacing: 0.06em;
+  letter-spacing: var(--letter-caps-wide);
   text-transform: uppercase;
   color: var(--color-ink);
 }

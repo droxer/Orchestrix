@@ -19,11 +19,11 @@
   background: transparent;
   color: var(--color-muted);
   font: var(--type-label-strong);
-  letter-spacing: 0.04em;
+  letter-spacing: var(--letter-caps);
   text-transform: uppercase;
   border-radius: var(--radius-none);
   cursor: pointer;
-  transition: color 200ms var(--ease-emphasized);
+  transition: color var(--duration-base) var(--ease-emphasized);
 }
 
 .adm-mode-tab::after {
@@ -36,7 +36,7 @@
   background: var(--color-primary);
   transform: scaleX(0);
   transform-origin: left center;
-  transition: transform 240ms var(--ease-emphasized);
+  transition: transform var(--duration-base) var(--ease-emphasized);
 }
 
 .adm-mode-tab:hover:not(:disabled) { color: var(--color-ink); }
@@ -66,7 +66,7 @@
 .adm-empty-kicker {
   margin: 0;
   font-size: var(--text-2xs);
-  letter-spacing: 0.12em;
+  letter-spacing: var(--letter-eyebrow-wide);
   text-transform: uppercase;
   color: var(--color-primary);
 }
@@ -95,7 +95,7 @@
   backdrop-filter: blur(2px);
   display: flex;
   justify-content: flex-end;
-  animation: adm-fade-in 200ms ease;
+  animation: adm-fade-in var(--duration-base) var(--ease-standard);
 }
 
 .adm-drawer-backdrop.dark {
@@ -115,7 +115,7 @@
   flex-direction: column;
   background: var(--color-surface-raised);
   border-left: 1px solid var(--color-hairline);
-  animation: adm-slide-in 240ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  animation: adm-slide-in var(--duration-base) var(--ease-emphasized);
   overflow: hidden;
 }
 
@@ -197,7 +197,7 @@ html[data-theme="light"] .adm-drawer.dark {
   background: transparent;
   color: var(--color-muted);
   cursor: pointer;
-  transition: background 160ms ease, color 160ms ease;
+  transition: background var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
 }
 
 .adm-drawer-close:hover {
@@ -255,7 +255,7 @@ html[data-theme="light"] .adm-drawer.dark {
 
 .adm-form-legend {
   font: var(--type-caption-strong);
-  letter-spacing: 0.06em;
+  letter-spacing: var(--letter-caps-wide);
   text-transform: uppercase;
   color: var(--color-muted);
   padding: 0;
@@ -388,7 +388,7 @@ html[data-theme="light"] .adm-drawer.dark {
   background: var(--color-primary);
   color: var(--color-on-primary);
   font: var(--type-caption-strong-sm);
-  letter-spacing: 0.04em;
+  letter-spacing: var(--letter-caps);
   flex-shrink: 0;
 }
 
@@ -430,7 +430,7 @@ html[data-theme="light"] .adm-drawer.dark {
 .adm-assign-nodes-count {
   font-size: var(--text-2xs);
   color: var(--color-muted);
-  letter-spacing: 0.04em;
+  letter-spacing: var(--letter-caps);
 }
 
 .adm-assign-node-list {
@@ -471,10 +471,10 @@ html[data-theme="light"] .adm-drawer.dark {
   font: inherit;
   color: inherit;
   transition:
-    border-color 160ms ease,
-    background 160ms ease,
-    box-shadow 160ms ease,
-    transform 160ms ease;
+    border-color var(--duration-fast) var(--ease-standard),
+    background var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
 }
 
 .adm-assign-node:hover {
@@ -552,7 +552,7 @@ html[data-theme="light"] .adm-drawer.dark {
   color: var(--color-on-primary);
   background: transparent;
   flex-shrink: 0;
-  transition: background 160ms ease;
+  transition: background var(--duration-fast) var(--ease-standard);
 }
 
 .adm-assign-node.selected .adm-assign-node-check {
@@ -633,7 +633,7 @@ html[data-theme="light"] .adm-drawer.dark {
   color: var(--color-on-primary);
   font: var(--type-caption-strong);
   cursor: pointer;
-  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+  transition: background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
   flex-shrink: 0;
 }
 
@@ -675,7 +675,7 @@ html[data-theme="light"] .adm-drawer.dark {
   margin: 0;
   font-size: var(--text-xs);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--letter-eyebrow);
   color: var(--color-muted);
 }
 
@@ -695,7 +695,7 @@ html[data-theme="light"] .adm-drawer.dark {
   font-size: var(--text-sm);
   text-align: left;
   cursor: pointer;
-  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+  transition: background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
 }
 
 .adm-cred-actions--row .adm-cred-action-button {

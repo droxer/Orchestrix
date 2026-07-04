@@ -232,11 +232,16 @@
   --drawer-w: 360px;
   --header-h: 60px;
 
-  /* Z-index scale — three named layers cover all floating chrome. Pick by
-     role, not by number, so stacking context additions stay consistent. */
-  --z-popover: 20;  /* popovers, dropdowns, pickers (composer agent-picker) */
+  /* Z-index scale — named layers cover all floating chrome. Pick by role,
+     not by number, so stacking context additions stay consistent.
+     Ladder: popover < drawer < modal < sheet < float < overlay < dialog. */
+  --z-popover: 20;  /* popovers, dropdowns, pickers (composer agent/mention pickers) */
   --z-drawer: 30;   /* side drawers, detail panels */
-  --z-modal: 40;    /* dialogs, full-screen overlays */
+  --z-modal: 40;    /* in-pane modal chrome, floating action buttons */
+  --z-sheet: 50;    /* mobile bottom sheets + their scrims — must beat the FAB that opens them */
+  --z-float: 120;   /* transient nav chrome above every pane: sidenav flyout menus, tooltips */
+  --z-overlay: 200; /* full-screen modal overlays (preferences) — beats --z-float */
+  --z-dialog: 300;  /* confirm dialogs — topmost interactive layer, can stack over overlays */
 
   /* Font families. Precision system: Geist handles every line of UI and
      display text at modern grotesque crispness; Geist Mono is the
@@ -262,6 +267,10 @@
   --letter-display: -0.6px;       /* Geist sans display (24–34px) */
   --letter-display-strong: -0.5px; /* admin metric values, Geist Mono 36px+ */
   --letter-tight: -0.2px;
+  --letter-body: -0.005em;        /* optical tightening for message/prose body text */
+  --letter-open: 0.02em;          /* micro open tracking — compact chips, mono metadata, attributions */
+  --letter-caps: 0.04em;          /* uppercase chrome labels (table heads, pills, metric captions) */
+  --letter-caps-wide: 0.06em;     /* wider caps — section labels, sparse table heads */
   --letter-eyebrow: 0.08em;       /* the 11/12px 600-weight kicker tracking */
   --letter-eyebrow-wide: 0.12em;  /* drawer section labels */
 
@@ -339,6 +348,9 @@
      3px primary-alpha halo with no inner solid keeps WCAG contrast
      without overpowering the brand color. */
   --ring-focus: 0 0 0 3px color-mix(in srgb, var(--color-primary) 28%, transparent);
+  /* Danger counterpart — destructive controls (cancel-send, delete rows)
+     swap the cobalt halo for the status red at the same 3px/28% recipe. */
+  --ring-focus-danger: 0 0 0 3px color-mix(in srgb, var(--color-semantic-down) 28%, transparent);
 
   /* Motion — canonical curves + durations. Every component CSS picks from
      this shelf instead of inventing its own cubic-bezier; that's how the
@@ -534,6 +546,7 @@ html[data-theme="contrast"] {
   --shadow-soft: none;
   --shadow-lift: 0 0 0 2px #000000;
   --ring-focus: 0 0 0 3px #000000;
+  --ring-focus-danger: 0 0 0 3px #000000;
 
   --atmosphere-wash: none;
   --atmosphere-grain-opacity: 0;
@@ -590,6 +603,7 @@ html[data-theme="contrast-dark"] {
   --shadow-soft: none;
   --shadow-lift: 0 0 0 2px #ffffff;
   --ring-focus: 0 0 0 3px #ffffff;
+  --ring-focus-danger: 0 0 0 3px #ffffff;
 
   --atmosphere-wash: none;
   --atmosphere-grain-opacity: 0;
@@ -631,7 +645,7 @@ body {
   font-size: var(--text-base);
   font-weight: 600;
   text-decoration: none;
-  transition: transform 140ms ease;
+  transition: transform var(--duration-fast) var(--ease-standard);
 }
 
 .skip-link:focus-visible {

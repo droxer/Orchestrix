@@ -1052,6 +1052,39 @@ def test_daemon_store_reclaims_expired_command_leases(store_factory) -> None:
 
 
 @pytest.mark.parametrize("store_factory", [LocalDaemonStore, lambda root: DatabaseDaemonStore(f"sqlite:///{root}/daemon.db", create_schema=True)])
+def test_daemon_store_renews_active_command_leases(store_factory) -> None:
+    with TemporaryDirectory() as root:
+        store = store_factory(root)
+        store.register_node({
+            "id": "sbx_alice",
+            "employeeId": "alice",
+            "workspacePath": "/workspace/alice",
+            "status": "ready",
+            "agents": {"codex": "ready"},
+            "token": None,
+            "nodeToken": "tok_secret",
+            "nodeTokenHash": "sha256:hash",
+            "createdAt": "2026-06-13T00:00:00.000Z",
+            "updatedAt": "2026-06-13T00:00:00.000Z",
+        })
+        store.enqueue_command("sbx_alice", {
+            "id": "cmd_long",
+            "type": "run.start",
+            "sessionId": "ses_1",
+            "runId": "run_1",
+            "agent": "codex",
+            "mode": "action",
+            "taskGoal": "fix auth",
+        })
+
+        [first] = store.take_queued_commands("sbx_alice", lease_seconds=0.05)
+        time.sleep(0.08)
+        store.renew_command_leases("sbx_alice", [first["id"]], lease_seconds=10)
+
+        assert store.take_queued_commands("sbx_alice") == []
+
+
+@pytest.mark.parametrize("store_factory", [LocalDaemonStore, lambda root: DatabaseDaemonStore(f"sqlite:///{root}/daemon.db", create_schema=True)])
 def test_daemon_store_persists_agent_role_maps(store_factory) -> None:
     with TemporaryDirectory() as root:
         store = store_factory(root)

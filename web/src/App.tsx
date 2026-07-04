@@ -37,6 +37,7 @@ import { useAuthSession } from "./hooks/useAuthSession";
 import { useActiveSession } from "./hooks/useActiveSession";
 import { chooseSendAction, suppressActiveSessionDuringPendingSend } from "./lib/sendAction";
 import { myConversationSessions, matchesConversationQuery, pickActiveConversationSession } from "./lib/conversations";
+import { shouldTailSessionEvents } from "./lib/sessionEventStream";
 import { useEmployeeProvisioning } from "./hooks/useEmployeeProvisioning";
 import { isAwaitingFeedbackDecision, rerunAssignmentForSession } from "./lib/workflow";
 import { useDialogs } from "./components/ui/DialogProvider";
@@ -143,7 +144,7 @@ export function App() {
 
   // Live SSE tail of the open conversation; merges new events into the
   // sessions cache so the active thread updates at push latency.
-  useSessionEvents(activeSession?.id, Boolean(user));
+  useSessionEvents(activeSession?.id, Boolean(user) && shouldTailSessionEvents(activeSession?.status));
 
   const selectedToken = selectedSandbox ? (tokens[selectedSandbox.id] ?? tokens[selectedEmployee]) : tokens[selectedEmployee];
   const activeRun = activeSession ? selectedNode?.activeRuns.find((run) => run.sessionId === activeSession.id) : undefined;

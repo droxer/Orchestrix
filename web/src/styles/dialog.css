@@ -10,7 +10,7 @@
 .dialog-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 300;
+  z-index: var(--z-dialog);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -18,7 +18,7 @@
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(2px);
   padding: var(--space-base);
-  animation: pref-backdrop-in var(--duration-fast) ease both;
+  animation: pref-backdrop-in var(--duration-fast) var(--ease-standard) both;
 }
 
 .dialog-modal {
@@ -31,7 +31,7 @@
   background: var(--color-surface-raised);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lift);
-  animation: pref-modal-in 180ms var(--ease-emphasized) both;
+  animation: pref-modal-in var(--duration-base) var(--ease-emphasized) both;
   outline: none;
 }
 
@@ -60,7 +60,7 @@
   background: var(--color-canvas);
   color: var(--color-ink);
   font-size: var(--text-md);
-  transition: border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
+  transition: border-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
 }
 
 .dialog-input:focus-visible {

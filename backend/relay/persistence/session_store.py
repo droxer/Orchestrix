@@ -35,23 +35,23 @@ class LocalSessionStore:
         self._lock = RLock()
         self.sessions_dir.mkdir(parents=True, exist_ok=True)
 
-    def create_session(self, input: dict[str, Any]) -> dict[str, Any]:
+    def create_session(self, payload: dict[str, Any]) -> dict[str, Any]:
         with self._lock:
             session_id = new_relay_id("ses")
             (self._session_dir(session_id) / "artifacts").mkdir(parents=True, exist_ok=True)
-            logger.debug("Creating session", session_id=session_id, workspace_path=input.get("workspacePath"))
+            logger.debug("Creating session", session_id=session_id, workspace_path=payload.get("workspacePath"))
             event = relay_event("session.created", session_id, {
-                "workspacePath": input["workspacePath"],
-                **({"ownerEmployeeId": input["ownerEmployeeId"]} if input.get("ownerEmployeeId") else {}),
-                "taskGoal": input["taskGoal"],
-                "participants": input.get("participants", ["human"]),
+                "workspacePath": payload["workspacePath"],
+                **({"ownerEmployeeId": payload["ownerEmployeeId"]} if payload.get("ownerEmployeeId") else {}),
+                "taskGoal": payload["taskGoal"],
+                "participants": payload.get("participants", ["human"]),
             })
             events = [event]
-            if input.get("status") or input.get("pendingDecision"):
+            if payload.get("status") or payload.get("pendingDecision"):
                 events.append(relay_event("session.status", session_id, {
-                    "status": input.get("status", "running"),
-                    "phase": f"waiting:{input['pendingDecision']}" if input.get("pendingDecision") else "created",
-                    **({"pendingDecision": input["pendingDecision"]} if input.get("pendingDecision") else {}),
+                    "status": payload.get("status", "running"),
+                    "phase": f"waiting:{payload['pendingDecision']}" if payload.get("pendingDecision") else "created",
+                    **({"pendingDecision": payload["pendingDecision"]} if payload.get("pendingDecision") else {}),
                 }))
             session = materialize_events(events)
             self._events_path(session_id).write_text("".join(json.dumps(item, separators=(",", ":")) + "\n" for item in events), encoding="utf-8")
@@ -83,29 +83,29 @@ class LocalSessionStore:
         sessions = [self.get_session(path.name) for path in self.sessions_dir.iterdir() if path.is_dir()]
         return sorted(sessions, key=lambda item: item["updatedAt"], reverse=True)
 
-    def write_artifact(self, session_id: str, input: dict[str, Any]) -> dict[str, Any]:
+    def write_artifact(self, session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         with self._lock:
             artifact_id = new_relay_id("art")
-            extension = input.get("extension") or "txt"
+            extension = payload.get("extension") or "txt"
             artifact_dir = self._session_dir(session_id) / "artifacts"
             artifact_dir.mkdir(parents=True, exist_ok=True)
             path = artifact_dir / f"{artifact_id}.{extension}"
-            body = input["body"]
+            body = payload["body"]
             path.write_text(body, encoding="utf-8")
-            logger.debug("Artifact written", session_id=session_id, artifact_id=artifact_id, kind=input.get("kind"), bytes=len(body.encode("utf-8")))
+            logger.debug("Artifact written", session_id=session_id, artifact_id=artifact_id, kind=payload.get("kind"), bytes=len(body.encode("utf-8")))
             return {
                 "id": artifact_id,
-                "kind": input["kind"],
-                "title": input["title"],
+                "kind": payload["kind"],
+                "title": payload["title"],
                 "path": str(path),
                 "createdAt": now_iso(),
-                **({"agentRunId": input["agentRunId"]} if input.get("agentRunId") else {}),
+                **({"agentRunId": payload["agentRunId"]} if payload.get("agentRunId") else {}),
                 "bytes": len(body.encode("utf-8")),
             }
 
-    def create_artifact(self, session_id: str, input: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    def create_artifact(self, session_id: str, payload: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
         with self._lock:
-            artifact = self.write_artifact(session_id, input)
+            artifact = self.write_artifact(session_id, payload)
             event = relay_event("artifact.created", session_id, {"artifact": artifact})
             try:
                 session = self.append_event(session_id, event)
@@ -244,20 +244,20 @@ class DatabaseSessionStore:
         if create_schema:
             self.metadata.create_all(self.engine)
 
-    def create_session(self, input: dict[str, Any]) -> dict[str, Any]:
+    def create_session(self, payload: dict[str, Any]) -> dict[str, Any]:
         session_id = new_relay_id("ses")
-        logger.debug("Creating database session", session_id=session_id, workspace_path=input.get("workspacePath"))
+        logger.debug("Creating database session", session_id=session_id, workspace_path=payload.get("workspacePath"))
         events = [relay_event("session.created", session_id, {
-            "workspacePath": input["workspacePath"],
-            **({"ownerEmployeeId": input["ownerEmployeeId"]} if input.get("ownerEmployeeId") else {}),
-            "taskGoal": input["taskGoal"],
-            "participants": input.get("participants", ["human"]),
+            "workspacePath": payload["workspacePath"],
+            **({"ownerEmployeeId": payload["ownerEmployeeId"]} if payload.get("ownerEmployeeId") else {}),
+            "taskGoal": payload["taskGoal"],
+            "participants": payload.get("participants", ["human"]),
         })]
-        if input.get("status") or input.get("pendingDecision"):
+        if payload.get("status") or payload.get("pendingDecision"):
             events.append(relay_event("session.status", session_id, {
-                "status": input.get("status", "running"),
-                "phase": f"waiting:{input['pendingDecision']}" if input.get("pendingDecision") else "created",
-                **({"pendingDecision": input["pendingDecision"]} if input.get("pendingDecision") else {}),
+                "status": payload.get("status", "running"),
+                "phase": f"waiting:{payload['pendingDecision']}" if payload.get("pendingDecision") else "created",
+                **({"pendingDecision": payload["pendingDecision"]} if payload.get("pendingDecision") else {}),
             }))
         session = materialize_events(events)
         with self.engine.begin() as conn:
@@ -328,35 +328,35 @@ class DatabaseSessionStore:
             for row in rows
         ]
 
-    def _new_artifact_record(self, session_id: str, input: dict[str, Any]) -> tuple[dict[str, Any], str, str]:
+    def _new_artifact_record(self, session_id: str, payload: dict[str, Any]) -> tuple[dict[str, Any], str, str]:
         artifact_id = new_relay_id("art")
-        extension = input.get("extension") or "txt"
-        body = input["body"]
+        extension = payload.get("extension") or "txt"
+        body = payload["body"]
         artifact = {
             "id": artifact_id,
-            "kind": input["kind"],
-            "title": input["title"],
+            "kind": payload["kind"],
+            "title": payload["title"],
             "path": database_artifact_uri(session_id, artifact_id, extension),
             "createdAt": now_iso(),
-            **({"agentRunId": input["agentRunId"]} if input.get("agentRunId") else {}),
+            **({"agentRunId": payload["agentRunId"]} if payload.get("agentRunId") else {}),
             "bytes": len(body.encode("utf-8")),
         }
         return artifact, extension, body
 
-    def write_artifact(self, session_id: str, input: dict[str, Any]) -> dict[str, Any]:
+    def write_artifact(self, session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         if not self.get_session(session_id):
             raise KeyError(session_id)
-        artifact, extension, body = self._new_artifact_record(session_id, input)
+        artifact, extension, body = self._new_artifact_record(session_id, payload)
         with self.engine.begin() as conn:
             session_pk = self._session_pk(conn, session_id)
             conn.execute(insert(self.artifacts).values(**session_artifact_to_row(session_pk, artifact, {"extension": extension}, content=body)))
-        logger.debug("Database artifact written", session_id=session_id, artifact_id=artifact["id"], kind=input.get("kind"), bytes=artifact["bytes"])
+        logger.debug("Database artifact written", session_id=session_id, artifact_id=artifact["id"], kind=payload.get("kind"), bytes=artifact["bytes"])
         return artifact
 
-    def create_artifact(self, session_id: str, input: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
-        artifact, extension, body = self._new_artifact_record(session_id, input)
+    def create_artifact(self, session_id: str, payload: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+        artifact, extension, body = self._new_artifact_record(session_id, payload)
         session = self._insert_artifact_with_event(session_id, artifact, {"extension": extension}, content=body)
-        logger.debug("Database artifact created", session_id=session_id, artifact_id=artifact["id"], kind=input.get("kind"), bytes=artifact["bytes"])
+        logger.debug("Database artifact created", session_id=session_id, artifact_id=artifact["id"], kind=payload.get("kind"), bytes=artifact["bytes"])
         return artifact, session
 
     def index_workspace_artifact(self, session_id: str, artifact: dict[str, Any], content: bytes | None) -> tuple[dict[str, Any], dict[str, Any]]:

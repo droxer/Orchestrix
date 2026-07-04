@@ -20,7 +20,7 @@
   background: var(--color-canvas);
   color: var(--color-ink);
   font: var(--type-caption-strong-sm);
-  transition: border-color var(--duration-fast) ease, background var(--duration-fast) ease, color var(--duration-fast) ease;
+  transition: border-color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
 }
 
 .agent-picker-trigger:hover {
@@ -79,13 +79,13 @@
   background: transparent;
   color: var(--color-ink);
   font: var(--type-caption-strong);
-  letter-spacing: 0.01em;
+  letter-spacing: var(--letter-open);
   cursor: pointer;
   white-space: nowrap;
   transition:
-    background 200ms ease,
-    border-color 200ms ease,
-    transform 120ms ease;
+    background var(--duration-base) var(--ease-standard),
+    border-color var(--duration-base) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
 }
 
 /* Mode distinction lives in the glyph dot: accent-yellow (Agent) vs
@@ -107,7 +107,7 @@
 .mode-chip-icon {
   flex: 0 0 auto;
   color: var(--color-ink);
-  transition: transform var(--duration-base) cubic-bezier(0.5, 1.4, 0.4, 1);
+  transition: transform var(--duration-base) var(--ease-spring);
 }
 
 .mode-chip-icon::before {
@@ -136,8 +136,8 @@
   opacity: 0;
   transform: rotate(-20deg);
   transition:
-    opacity 180ms ease,
-    transform 280ms cubic-bezier(0.5, 1.4, 0.4, 1);
+    opacity var(--duration-base) var(--ease-standard),
+    transform var(--duration-base) var(--ease-spring);
 }
 
 .mode-chip:hover .mode-chip-hint,
@@ -151,7 +151,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mode-chip-hint { transition: opacity 120ms ease; transform: none !important; }
+  .mode-chip-hint { transition: opacity var(--duration-fast) var(--ease-standard); transform: none !important; }
 }
 
 .composer-input-wrap {
@@ -161,7 +161,7 @@
   padding-inline: var(--space-lg);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lift);
-  transition: box-shadow var(--duration-fast) ease;
+  transition: box-shadow var(--duration-fast) var(--ease-standard);
 }
 
 .composer-input-wrap:has(.composer-input:focus-within) {
@@ -175,7 +175,7 @@
   border-radius: inherit;
   background: var(--color-canvas);
   box-shadow: none;
-  transition: border-color var(--duration-fast) ease;
+  transition: border-color var(--duration-fast) var(--ease-standard);
 }
 
 .mention-popover {
@@ -183,7 +183,7 @@
   bottom: calc(100% + 8px);
   left: 0;
   right: auto;
-  z-index: 30;
+  z-index: var(--z-popover);
   width: min(320px, 100%);
 }
 
@@ -267,9 +267,9 @@
   color: var(--color-on-primary);
   cursor: pointer;
   transition:
-    background 200ms ease,
-    border-color 200ms ease,
-    transform 120ms ease;
+    background var(--duration-base) var(--ease-standard),
+    border-color var(--duration-base) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
 }
 
 .send-button:hover:not(:disabled) {
@@ -305,7 +305,7 @@
 }
 
 .send-button.send-button-cancel:focus-visible {
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-semantic-down) 28%, transparent);
+  box-shadow: var(--ring-focus-danger);
 }
 
 @media (prefers-reduced-motion: reduce) {

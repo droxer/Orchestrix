@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { lastSessionEventId, sessionEventsUrl } from "../src/lib/sessionEventStream.js";
+import { isTerminalSessionStatus, lastSessionEventId, sessionEventsUrl, shouldTailSessionEvents } from "../src/lib/sessionEventStream.js";
 import type { RelaySession } from "../src/types.js";
 
 function session(partial: Partial<RelaySession>): RelaySession {
@@ -44,5 +44,23 @@ describe("session event stream helpers", () => {
   it("builds an encoded session stream URL with an optional cursor", () => {
     assert.equal(sessionEventsUrl("ses 1"), "/sessions/ses%201/events");
     assert.equal(sessionEventsUrl("ses 1", "evt/2"), "/sessions/ses%201/events?after=evt%2F2");
+  });
+
+  it("tails only sessions that can still receive events", () => {
+    assert.equal(shouldTailSessionEvents("running"), true);
+    assert.equal(shouldTailSessionEvents("waiting_for_human"), true);
+    assert.equal(shouldTailSessionEvents("completed"), false);
+    assert.equal(shouldTailSessionEvents("failed"), false);
+    assert.equal(shouldTailSessionEvents("cancelled"), false);
+    assert.equal(shouldTailSessionEvents(undefined), false);
+  });
+
+  it("identifies terminal session statuses", () => {
+    assert.equal(isTerminalSessionStatus("completed"), true);
+    assert.equal(isTerminalSessionStatus("failed"), true);
+    assert.equal(isTerminalSessionStatus("cancelled"), true);
+    assert.equal(isTerminalSessionStatus("running"), false);
+    assert.equal(isTerminalSessionStatus("waiting_for_human"), false);
+    assert.equal(isTerminalSessionStatus(undefined), false);
   });
 });

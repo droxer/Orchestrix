@@ -536,7 +536,7 @@ async def session_events(session_id: str, request: Request, ctx: AppContextDep) 
                 return
             now = time.monotonic()
             if now - last_heartbeat >= _STREAM_HEARTBEAT_SECONDS:
-                yield _sse_frame({"timestamp": datetime.utcnow().isoformat() + "Z"}, event="heartbeat")
+                yield _sse_frame({"timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")}, event="heartbeat")
                 last_heartbeat = now
             if now - start >= _STREAM_MAX_SECONDS:
                 yield _sse_frame({"status": status, "reason": "timeout"}, event="done")

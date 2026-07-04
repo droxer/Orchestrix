@@ -22,6 +22,12 @@ Optional:
 - `RELAY_USE_LOCAL_AGENT_HOME`: set to `1` in local mode to use this user's
   existing Claude/Codex/Kimi login and config directories.
 - `RELAY_DAEMON_HEARTBEAT_MS`: registration heartbeat interval.
+- `RELAY_DAEMON_COMMAND_POLL_WAIT_MS`: long-poll wait for command requests
+  (capped at 25 seconds).
+- `RELAY_DAEMON_COMMAND_LEASE_SECONDS`: command lease duration requested from
+  the backend. Defaults to the run timeout plus 60 seconds, capped at one hour.
+- `RELAY_DAEMON_MAX_CONCURRENT_ASK_RUNS`: concurrent ask-mode capacity. Work
+  modes (`action` and `review`) stay exclusive.
 - `RELAY_DAEMON_SHUTDOWN_GRACE_MS`: max time to wait for active runs to report
   cancellation during shutdown.
 
@@ -63,6 +69,7 @@ relay-daemon \
   --use-local-agent-home
 ```
 
-The daemon intentionally runs one active command at a time. If a backend sends a
-second distinct `run.start` while the node is busy, the daemon reports that
-command as failed instead of starting parallel agent work in the same workspace.
+The daemon has two scheduling classes. `action` and `review` are exclusive work
+modes: only one can run in the workspace at a time. `ask` mode can run
+concurrently up to the configured ask capacity so lightweight conversations do
+not block each other.

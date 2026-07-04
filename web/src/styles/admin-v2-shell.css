@@ -66,7 +66,7 @@
   color: var(--color-muted);
   font-family: var(--font-number);
   font-size: var(--text-sm);
-  letter-spacing: 0.04em;
+  letter-spacing: var(--letter-caps);
 }
 
 /* ── View toggle (matches .backlog-view-toggle) ─────────────────────── */
@@ -94,7 +94,7 @@
   color: var(--color-muted);
   cursor: pointer;
   font: var(--type-nav-link);
-  transition: background 120ms var(--ease-standard), color 120ms var(--ease-standard), box-shadow 120ms var(--ease-standard);
+  transition: background var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
 }
 
 .adm-view-toggle-btn:not([data-active="true"]):hover {
@@ -168,7 +168,7 @@
   height: 8px;
   border-radius: var(--radius-full);
   background: var(--color-muted-soft);
-  transition: background 200ms ease;
+  transition: background var(--duration-base) var(--ease-standard);
 }
 
 .adm-live-dot.fetching { background: var(--color-info); }

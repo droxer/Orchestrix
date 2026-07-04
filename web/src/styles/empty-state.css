@@ -165,7 +165,7 @@ html[data-theme="contrast"] .relay-empty-avatar::after {
   font: var(--type-label-md);
   color: var(--color-primary);
   text-decoration: none;
-  transition: opacity var(--duration-fast) ease;
+  transition: opacity var(--duration-fast) var(--ease-standard);
 }
 
 .relay-empty-link:hover {
