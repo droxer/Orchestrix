@@ -420,7 +420,7 @@
   color: var(--color-ink);
   font-size: var(--text-base);
   font-weight: 500;
-  line-height: 1.5;
+  line-height: var(--leading-loose);
   white-space: pre-wrap;
   word-break: break-word;
 }

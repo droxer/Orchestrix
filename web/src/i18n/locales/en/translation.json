@@ -19,12 +19,8 @@
     "sandboxes": "Sandboxes",
     "admin": "Admin",
     "admin_label": "Admin console",
-    "mcp": "MCP",
-    "mcp_label": "MCP integrations",
     "channels": "Channels",
     "channels_label": "Chat channels",
-    "skills": "Skills",
-    "skills_label": "Skills library",
     "refresh": "Refresh",
     "preferences": "Preferences",
     "logout": "Logout",
@@ -529,82 +525,9 @@
       "agent_no_inventory": "No skills or MCP installed"
     }
   },
-  "mcp": {
-    "title": "MCP integrations",
-    "sub": "Model Context Protocol",
-    "connected_stat": "{{connected}} / {{total}} connected",
-    "configured_servers": "Configured servers",
-    "no_servers_title": "No MCP servers configured",
-    "no_servers_body": "Add MCP servers to ~/.claude/settings.json under mcpServers to connect external tools and services to your agents.",
-    "learn_more": "Learn about MCP →",
-    "tools": "Tools",
-    "status_connected": "Connected",
-    "status_disconnected": "Disconnected",
-    "status_error": "Error",
-    "total": "{{count}} servers"
-  },
-  "skills": {
-    "title": "Skills library",
-    "sub": "Agent capabilities",
-    "total": "{{count}} skills",
-    "search_placeholder": "Search skills…",
-    "search_label": "Search skills",
-    "clear_search": "Clear search",
-    "no_match_title": "No skills match “{{query}}”",
-    "no_match_body": "Try a different search term.",
-    "no_skills_title": "No skills found",
-    "no_skills_body": "Add skills to ~/.claude/skills/ to see them here.",
-    "ns": {
-      "superpowers": "Superpowers",
-      "frontend-design": "Frontend Design",
-      "ui-ux-pro-max": "UI/UX Pro Max",
-      "document-skills": "Document Skills",
-      "everything-claude-code": "Everything Claude Code",
-      "built-in": "Built-In",
-      "code-review": "Code Review"
-    },
-    "sample": {
-      "using-superpowers": {
-        "desc": "Establishes how to find and use skills, requiring skill tool invocation before any response."
-      },
-      "brainstorming": {
-        "desc": "Structured brainstorming before entering plan mode for complex tasks."
-      },
-      "writing-plans": {
-        "desc": "Write implementation plans with context, approach, and verification steps."
-      },
-      "executing-plans": {
-        "desc": "Execute approved plans step by step with task tracking."
-      },
-      "systematic-debugging": {
-        "desc": "Systematic debugging workflow from reproduction to root cause analysis."
-      },
-      "frontend-design": {
-        "desc": "Create distinctive, production-grade frontend interfaces with high design quality. Avoids generic AI aesthetics."
-      },
-      "ui-ux-pro-max": {
-        "desc": "Advanced UI/UX guidance for production-grade interfaces with strong aesthetic direction."
-      },
-      "web-design-guidelines": {
-        "desc": "Guidelines for consistent, accessible, and visually refined web design."
-      },
-      "code-simplifier": {
-        "desc": "Simplify overly complex code — reduce nesting, extract functions, improve naming."
-      },
-      "find-skills": {
-        "desc": "Discover and navigate available skills in the workspace."
-      },
-      "next-best-practices": {
-        "desc": "Next.js best practices for production apps: routing, data fetching, performance."
-      },
-      "vercel-react-best-practices": {
-        "desc": "React + Vercel deployment best practices, edge functions, and performance patterns."
-      }
-    }
-  },
   "pref": {
     "title": "Preferences",
-    "sub": "Display & language",
+    "sub": "Display, language & agents",
     "close": "Close preferences",
     "appearance": "Appearance",
     "language": "Language",

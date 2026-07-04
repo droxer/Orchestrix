@@ -21,7 +21,6 @@ import {
   Info,
   KeyRound,
   Languages,
-  Library,
   ListTodo,
   Palette,
   LogOut,
@@ -30,7 +29,6 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Paperclip,
-  Plug,
   Plus,
   RefreshCw,
   ScanEye,
@@ -73,9 +71,7 @@ export const NavWorkspace = withStandardStroke(Terminal, "NavWorkspace");
 export const NavAdmin = withStandardStroke(UserCog, "NavAdmin");
 export const NavBacklog = withStandardStroke(ListTodo, "NavBacklog");
 export const NavChannels = withStandardStroke(Hash, "NavChannels");
-export const NavMcp = withStandardStroke(Plug, "NavMcp");
 export const NavRoutine = withStandardStroke(CalendarClock, "NavRoutine");
-export const NavSkills = withStandardStroke(Library, "NavSkills");
 export const NavPreferences = withStandardStroke(Settings, "NavPreferences");
 export const NavLogout = withStandardStroke(LogOut, "NavLogout");
 export const NavRefresh = withStandardStroke(RefreshCw, "NavRefresh");

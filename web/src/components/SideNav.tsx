@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  NavAdmin, NavBacklog, NavChannels, NavConversations, NavLogout, NavMcp, NavPreferences,
-  NavRoutine, NavSidebarCollapse, NavSidebarExpand, NavSkills, NavWorkspace,
+  NavAdmin, NavBacklog, NavChannels, NavConversations, NavLogout, NavPreferences,
+  NavRoutine, NavSidebarCollapse, NavSidebarExpand, NavWorkspace,
 } from "./icons";
 import { RelayMark } from "./RelayMark";
 import type { AppRoute } from "../lib/viewTypes";
@@ -179,74 +179,42 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, setRoute, 
           <NavRoutine size={18} />
           <span className="sidenav-label">{t("nav.routine")}</span>
         </button>
-        <div className="sidenav-separator" aria-hidden="true" />
-        <button
-          className={`sidenav-btn ${route === "mcp" ? "active" : ""}`}
-          data-nav="mcp"
-          type="button"
-          aria-label={t("nav.mcp_label")}
-          aria-pressed={route === "mcp"}
-          title={t("nav.mcp_label")}
-          onClick={() => setRoute((r) => r === "mcp" ? "main" : "mcp")}
-          onMouseEnter={(e) => showNavTooltip(t("nav.mcp"), e.currentTarget)}
-          onMouseLeave={hideNavTooltip}
-          onFocus={(e) => showNavTooltip(t("nav.mcp"), e.currentTarget)}
-          onBlur={hideNavTooltip}
-        >
-          <NavMcp size={18} />
-          <span className="sidenav-label">{t("nav.mcp")}</span>
-        </button>
-        <button
-          className={`sidenav-btn ${route === "skills" ? "active" : ""}`}
-          data-nav="skills"
-          type="button"
-          aria-label={t("nav.skills_label")}
-          aria-pressed={route === "skills"}
-          title={t("nav.skills_label")}
-          onClick={() => setRoute((r) => r === "skills" ? "main" : "skills")}
-          onMouseEnter={(e) => showNavTooltip(t("nav.skills"), e.currentTarget)}
-          onMouseLeave={hideNavTooltip}
-          onFocus={(e) => showNavTooltip(t("nav.skills"), e.currentTarget)}
-          onBlur={hideNavTooltip}
-        >
-          <NavSkills size={18} />
-          <span className="sidenav-label">{t("nav.skills")}</span>
-        </button>
         {isAdmin ? (
-          <button
-            className={`sidenav-btn ${route === "channels" ? "active" : ""}`}
-            data-nav="channels"
-            type="button"
-            aria-label={t("nav.channels_label")}
-            aria-pressed={route === "channels"}
-            title={t("nav.channels_label")}
-            onClick={() => setRoute((r) => r === "channels" ? "main" : "channels")}
-            onMouseEnter={(e) => showNavTooltip(t("nav.channels"), e.currentTarget)}
-            onMouseLeave={hideNavTooltip}
-            onFocus={(e) => showNavTooltip(t("nav.channels"), e.currentTarget)}
-            onBlur={hideNavTooltip}
-          >
-            <NavChannels size={18} />
-            <span className="sidenav-label">{t("nav.channels")}</span>
-          </button>
-        ) : null}
-        {isAdmin ? (
-          <button
-            className={`sidenav-btn ${route === "admin" ? "active" : ""}`}
-            data-nav="admin"
-            type="button"
-            aria-label={t("nav.admin_label")}
-            aria-pressed={route === "admin"}
-            title={t("nav.admin_label")}
-            onClick={() => setRoute((r) => r === "admin" ? "main" : "admin")}
-            onMouseEnter={(e) => showNavTooltip(t("nav.admin"), e.currentTarget)}
-            onMouseLeave={hideNavTooltip}
-            onFocus={(e) => showNavTooltip(t("nav.admin"), e.currentTarget)}
-            onBlur={hideNavTooltip}
-          >
-            <NavAdmin size={18} />
-            <span className="sidenav-label">{t("nav.admin")}</span>
-          </button>
+          <>
+            <div className="sidenav-separator" aria-hidden="true" />
+            <button
+              className={`sidenav-btn ${route === "channels" ? "active" : ""}`}
+              data-nav="channels"
+              type="button"
+              aria-label={t("nav.channels_label")}
+              aria-pressed={route === "channels"}
+              title={t("nav.channels_label")}
+              onClick={() => setRoute((r) => r === "channels" ? "main" : "channels")}
+              onMouseEnter={(e) => showNavTooltip(t("nav.channels"), e.currentTarget)}
+              onMouseLeave={hideNavTooltip}
+              onFocus={(e) => showNavTooltip(t("nav.channels"), e.currentTarget)}
+              onBlur={hideNavTooltip}
+            >
+              <NavChannels size={18} />
+              <span className="sidenav-label">{t("nav.channels")}</span>
+            </button>
+            <button
+              className={`sidenav-btn ${route === "admin" ? "active" : ""}`}
+              data-nav="admin"
+              type="button"
+              aria-label={t("nav.admin_label")}
+              aria-pressed={route === "admin"}
+              title={t("nav.admin_label")}
+              onClick={() => setRoute((r) => r === "admin" ? "main" : "admin")}
+              onMouseEnter={(e) => showNavTooltip(t("nav.admin"), e.currentTarget)}
+              onMouseLeave={hideNavTooltip}
+              onFocus={(e) => showNavTooltip(t("nav.admin"), e.currentTarget)}
+              onBlur={hideNavTooltip}
+            >
+              <NavAdmin size={18} />
+              <span className="sidenav-label">{t("nav.admin")}</span>
+            </button>
+          </>
         ) : null}
       </nav>
       <div className="sidenav-bottom">

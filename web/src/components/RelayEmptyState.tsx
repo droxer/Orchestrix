@@ -10,6 +10,7 @@ type RelayEmptyStateProps = {
   className?: string;
   titleId?: string;
   atmosphere?: boolean;
+  mark?: boolean;
   fill?: boolean;
   animate?: boolean;
 };
@@ -23,6 +24,7 @@ export function RelayEmptyState({
   className,
   titleId = "relay-empty-title",
   atmosphere = false,
+  mark = false,
   fill = false,
   animate = true,
 }: RelayEmptyStateProps) {
@@ -39,6 +41,9 @@ export function RelayEmptyState({
       )}
       aria-labelledby={titleId}
     >
+      {mark ? (
+        <span className="relay-bleed-mark" aria-hidden="true">R</span>
+      ) : null}
       {illustration ? (
         <div className={cn("relay-empty-illustration", enter(1))} aria-hidden="true">
           {illustration}

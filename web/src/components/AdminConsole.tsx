@@ -240,7 +240,7 @@ export function AdminConsole() {
     ? lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
     : null;
   return (
-    <section className="admin-console adm-shell">
+    <section className="admin-console adm-shell" data-density="compact">
       <PageHeader
         title={t("nav.admin")}
         titleVariant="display"

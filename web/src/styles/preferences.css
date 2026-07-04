@@ -341,11 +341,11 @@
 .pref-theme-preview {
   --preview-canvas: #ffffff;
   --preview-rail: var(--color-surface-dark);
-  --preview-list: #fafafa;
-  --preview-card: #f4f4f5;
-  --preview-line: #e4e4e7;
+  --preview-list: #faf8f4;
+  --preview-card: #f5f2ec;
+  --preview-line: #eae5dd;
   --preview-ink: var(--color-surface-dark);
-  --preview-action: #2f54eb;
+  --preview-action: #115e59;
   display: grid;
   grid-template-columns: 16% 27% 1fr;
   width: 100%;
@@ -359,17 +359,17 @@
   --preview-list: #1a1815;
   --preview-card: color-mix(in srgb, #ffffff 12%, #0d0c0a);
   --preview-line: color-mix(in srgb, #ffffff 14%, #0d0c0a);
-  --preview-ink: #f4f4f5;
-  --preview-action: #5b7cff;
+  --preview-ink: #fdfcfa;
+  --preview-action: #2dd4bf;
 }
 
 .pref-theme-preview[data-preview="system"] {
   --preview-canvas: linear-gradient(110deg, #ffffff 0 49%, var(--color-surface-dark) 50% 100%);
-  --preview-list: linear-gradient(110deg, #fafafa 0 49%, var(--color-surface-dark-elevated) 50% 100%);
-  --preview-card: linear-gradient(110deg, #f4f4f5 0 49%, color-mix(in srgb, var(--color-on-dark) 9%, var(--color-surface-dark)) 50% 100%);
-  --preview-line: color-mix(in srgb, #0a0a0a 28%, #e4e4e7);
-  --preview-ink: #0a0a0a;
-  --preview-action: #2f54eb;
+  --preview-list: linear-gradient(110deg, #faf8f4 0 49%, var(--color-surface-dark-elevated) 50% 100%);
+  --preview-card: linear-gradient(110deg, #f5f2ec 0 49%, color-mix(in srgb, var(--color-on-dark) 9%, var(--color-surface-dark)) 50% 100%);
+  --preview-line: color-mix(in srgb, #171412 28%, #eae5dd);
+  --preview-ink: #171412;
+  --preview-action: #115e59;
 }
 
 /* High contrast (light) — solid black-on-white, the maximal-legibility
@@ -381,7 +381,7 @@
   --preview-card: #ebebeb;
   --preview-line: #000000;
   --preview-ink: #000000;
-  --preview-action: #1730a8;
+  --preview-action: #0f4c47;
 }
 
 /* High contrast (dark) — the mirror: solid white-on-black. */
@@ -392,7 +392,7 @@
   --preview-card: #1c1c1c;
   --preview-line: #ffffff;
   --preview-ink: #ffffff;
-  --preview-action: #7d9bff;
+  --preview-action: #5eead4;
 }
 
 .pref-preview-rail,

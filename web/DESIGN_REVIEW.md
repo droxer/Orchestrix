@@ -89,3 +89,37 @@ Full drift audit of component CSS against the `tokens.css` shelf; ~150 declarati
 **Point fixes.** Chat unread badge: raw `10px/700` → `--text-micro`/600 (system caps emphasis at 600). Artifact library active index button: literal `#fff` → `var(--color-canvas)` — fixes white-on-white in contrast-dark, where kind accents collapse to white ink. Artifact iframe preview keeps literal white with an intent comment (document paper is white in every theme). `tokens.css` skip-link transition now uses its own shelf.
 
 **Verify manually:** hover/focus transitions across admin views + backlog (timing snaps), composer mode-chip spring, drawer/sheet entrances, preferences-over-sidenav and dialog-over-preferences stacking, contrast-dark artifact library.
+
+## Warm Precision identity pass (2026-07-05)
+
+Evolved the web identity from cold precision to Warm Precision while preserving the existing three-tier token architecture and product layout. Build and tests are green: `npm run build -w web` ✓, `make web-test` ✓, `npm test` ✓ (TypeScript 368 pass / 1 environment skip; Python 194 pass / 1 warning).
+
+**Shipped:**
+
+- **Typography** — Geist Sans removed from the app font stack; Instrument Sans now drives UI/display text through `--font-app-sans`. Geist Mono remains the mono identity signal. CJK stacks now lead with Instrument Sans before Noto Sans SC/TC.
+- **Palette** — light primitives moved to ecru/stone surfaces, warm stone text, and deep teal action. Dark and high-contrast themes now use the teal family; dark CTA text flips to near-black on luminous teal.
+- **Geometry and rhythm** — radii softened one step, `--leading-loose` relaxed to 1.65, thread row padding moved to `--space-row-y`, and backlog/admin roots opt into `data-density="compact"`.
+- **Signature moments** — light atmosphere wash warmed; `.relay-bleed-mark` extends the login "R" treatment to transcript empty states and the admin KPI band, hidden in high-contrast themes.
+- **Theme previews** — preview swatches now depict the Warm Precision palette rather than the old cobalt/zinc set.
+
+**Contrast audit:**
+
+- Dark theme CTA: `#04201c` on `#2dd4bf` = 9.18:1.
+- Dark disabled CTA: `#04201c` on the 68% teal disabled mix (`#239485`) = 4.60:1. This intentionally lifts the plan's initial 30% mix after screenshot review; 30% made the disabled sign-in label read too low-contrast.
+- Light CTA: `#ffffff` on `#115e59` = 7.58:1.
+- High-contrast light CTA: `#ffffff` on `#0f4c47` = 9.79:1.
+- High-contrast dark CTA: `#000000` on `#5eead4` = 14.20:1.
+- Teal link/action text on ecru: `#115e59` on `#fdfcfa` = 7.40:1.
+- Success text on ecru: `#15803d` on `#fdfcfa` = 4.89:1.
+- Warning text on ecru: `#92400e` on `#fdfcfa` = 6.91:1.
+- Danger text on ecru: `#c2161c` on `#fdfcfa` = 5.98:1.
+
+**Screenshot findings:**
+
+- Captured login at 1440 / 1024 / 390 px in light, dark, and high-contrast via headless Chrome against `http://127.0.0.1:3000`.
+- Evidence paths: `/tmp/relay-warm-precision-shots/login-light-desktop-1440x900.png`, `/tmp/relay-warm-precision-shots/login-light-tablet-1024x768.png`, `/tmp/relay-warm-precision-shots/login-light-mobile-390x900.png`, plus matching `dark` and `contrast` files in the same directory.
+- Light reads as warm ecru rather than white/zinc; teal disabled CTA is visibly tinted, not grey. Dark reads as warm charcoal with luminous teal; the adjusted disabled CTA label remains readable. Mobile login fits without text overlap at 390 px. High-contrast removes the subtle atmosphere/grain dependency and keeps solid hairlines.
+
+**Deferred / carried forward:**
+
+- The old **Authenticated visual pass** item remains carried forward. No authenticated session was available during this pass, so chat shell, backlog, admin dashboard, and drawers still need live screenshots at 1440 / 1024 / 390 across light, dark, and high-contrast. The code paths for transcript/admin signature marks are implemented and covered by build/type checks, but their gated surfaces still need visual capture with a real session.

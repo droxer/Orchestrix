@@ -33,6 +33,7 @@ export function TranscriptEmpty({
       body={body}
       hint={selectedEmployee ? t("transcript.hint_mention") : undefined}
       atmosphere
+      mark
       illustration={(
         <span className="relay-empty-avatar agent-avatar" data-agent={activeAgent}>
           <AgentMark agent={activeAgent} size={28} />

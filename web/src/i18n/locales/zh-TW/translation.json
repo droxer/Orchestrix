@@ -19,12 +19,8 @@
     "sandboxes": "沙盒",
     "admin": "管理",
     "admin_label": "管理主控台",
-    "mcp": "MCP",
-    "mcp_label": "MCP 整合",
     "channels": "頻道",
     "channels_label": "聊天頻道",
-    "skills": "技能",
-    "skills_label": "技能庫",
     "refresh": "重新整理",
     "preferences": "偏好設定",
     "logout": "登出",
@@ -531,82 +527,9 @@
       "agent_no_inventory": "未安裝技能或 MCP"
     }
   },
-  "mcp": {
-    "title": "MCP 整合",
-    "sub": "模型上下文協定",
-    "connected_stat": "{{connected}} / {{total}} 已連線",
-    "configured_servers": "已設定伺服器",
-    "no_servers_title": "未設定 MCP 伺服器",
-    "no_servers_body": "在 ~/.claude/settings.json 的 mcpServers 下新增 MCP 伺服器，將外部工具與服務接入您的 Agent。",
-    "learn_more": "瞭解 MCP →",
-    "tools": "工具",
-    "status_connected": "已連線",
-    "status_disconnected": "已斷線",
-    "status_error": "錯誤",
-    "total": "共 {{count}} 個伺服器"
-  },
-  "skills": {
-    "title": "技能庫",
-    "sub": "Agent 能力",
-    "total": "共 {{count}} 個技能",
-    "search_placeholder": "搜尋技能…",
-    "search_label": "搜尋技能",
-    "clear_search": "清除搜尋",
-    "no_match_title": "未找到符合「{{query}}」的技能",
-    "no_match_body": "請嘗試其他搜尋詞。",
-    "no_skills_title": "未找到技能",
-    "no_skills_body": "在 ~/.claude/skills/ 中新增技能後可在此查看。",
-    "ns": {
-      "superpowers": "超能力",
-      "frontend-design": "前端設計",
-      "ui-ux-pro-max": "UI/UX 專業版",
-      "document-skills": "文件技能",
-      "everything-claude-code": "Claude Code 全集",
-      "built-in": "內建",
-      "code-review": "程式碼審查"
-    },
-    "sample": {
-      "using-superpowers": {
-        "desc": "確立如何發現與使用技能，要求在做出任何回應之前呼叫 Skill 工具。"
-      },
-      "brainstorming": {
-        "desc": "在複雜任務進入計畫模式前進行結構化腦力激盪。"
-      },
-      "writing-plans": {
-        "desc": "撰寫包含上下文、方法與驗證步驟的實作計畫。"
-      },
-      "executing-plans": {
-        "desc": "逐步執行已核准的計畫並追蹤任務。"
-      },
-      "systematic-debugging": {
-        "desc": "從重現到根因分析的系統化除錯流程。"
-      },
-      "frontend-design": {
-        "desc": "創造獨特、生產級的前端介面，具備高品質設計，避免通用 AI 審美。"
-      },
-      "ui-ux-pro-max": {
-        "desc": "針對生產級介面的進階 UI/UX 指引，具備強而有力的設計方向。"
-      },
-      "web-design-guidelines": {
-        "desc": "一致、可存取且精緻網頁設計的指導原則。"
-      },
-      "code-simplifier": {
-        "desc": "簡化過度複雜的程式碼——減少巢狀、提取函式、改善命名。"
-      },
-      "find-skills": {
-        "desc": "探索並導覽工作區中可用的技能。"
-      },
-      "next-best-practices": {
-        "desc": "生產級應用 Next.js 最佳實踐：路由、資料取得、效能。"
-      },
-      "vercel-react-best-practices": {
-        "desc": "React + Vercel 部署最佳實踐、邊緣函式與效能模式。"
-      }
-    }
-  },
   "pref": {
     "title": "偏好設定",
-    "sub": "顯示與語言",
+    "sub": "顯示、語言與代理",
     "close": "關閉偏好設定",
     "appearance": "外觀",
     "language": "語言",

@@ -19,12 +19,8 @@
     "sandboxes": "沙盒",
     "admin": "管理",
     "admin_label": "管理控制台",
-    "mcp": "MCP",
-    "mcp_label": "MCP 集成",
     "channels": "频道",
     "channels_label": "聊天频道",
-    "skills": "技能",
-    "skills_label": "技能库",
     "refresh": "刷新",
     "preferences": "偏好设置",
     "logout": "退出登录",
@@ -531,82 +527,9 @@
       "agent_no_inventory": "未安装技能或 MCP"
     }
   },
-  "mcp": {
-    "title": "MCP 集成",
-    "sub": "模型上下文协议",
-    "connected_stat": "{{connected}} / {{total}} 已连接",
-    "configured_servers": "已配置服务器",
-    "no_servers_title": "未配置 MCP 服务器",
-    "no_servers_body": "在 ~/.claude/settings.json 的 mcpServers 下添加 MCP 服务器，将外部工具和服务接入您的 Agent。",
-    "learn_more": "了解 MCP →",
-    "tools": "工具",
-    "status_connected": "已连接",
-    "status_disconnected": "已断开",
-    "status_error": "错误",
-    "total": "共 {{count}} 个服务器"
-  },
-  "skills": {
-    "title": "技能库",
-    "sub": "Agent 能力",
-    "total": "共 {{count}} 个技能",
-    "search_placeholder": "搜索技能…",
-    "search_label": "搜索技能",
-    "clear_search": "清除搜索",
-    "no_match_title": "未找到匹配「{{query}}」的技能",
-    "no_match_body": "请尝试其他搜索词。",
-    "no_skills_title": "未找到技能",
-    "no_skills_body": "在 ~/.claude/skills/ 中添加技能后可在此查看。",
-    "ns": {
-      "superpowers": "超能力",
-      "frontend-design": "前端设计",
-      "ui-ux-pro-max": "UI/UX 专业版",
-      "document-skills": "文档技能",
-      "everything-claude-code": "Claude Code 全集",
-      "built-in": "内置",
-      "code-review": "代码审查"
-    },
-    "sample": {
-      "using-superpowers": {
-        "desc": "确立如何发现和使用技能，要求在做出任何响应之前调用 Skill 工具。"
-      },
-      "brainstorming": {
-        "desc": "在复杂任务进入计划模式之前进行结构化头脑风暴。"
-      },
-      "writing-plans": {
-        "desc": "编写包含上下文、方法和验证步骤的实现计划。"
-      },
-      "executing-plans": {
-        "desc": "逐步执行已批准的计划并跟踪任务。"
-      },
-      "systematic-debugging": {
-        "desc": "从复现到根因分析的系统化调试流程。"
-      },
-      "frontend-design": {
-        "desc": "创建独特、生产级的前端界面，具有高品质设计，避免通用 AI 审美。"
-      },
-      "ui-ux-pro-max": {
-        "desc": "针对生产级界面的高级 UI/UX 指导，具备强有力的审美方向。"
-      },
-      "web-design-guidelines": {
-        "desc": "一致、可访问且精致网页设计的指导原则。"
-      },
-      "code-simplifier": {
-        "desc": "简化过度复杂的代码——减少嵌套、提取函数、改进命名。"
-      },
-      "find-skills": {
-        "desc": "发现并导航工作区中可用的技能。"
-      },
-      "next-best-practices": {
-        "desc": "生产级应用 Next.js 最佳实践：路由、数据获取、性能。"
-      },
-      "vercel-react-best-practices": {
-        "desc": "React + Vercel 部署最佳实践、边缘函数和性能模式。"
-      }
-    }
-  },
   "pref": {
     "title": "偏好设置",
-    "sub": "显示与语言",
+    "sub": "显示、语言与智能体",
     "close": "关闭偏好设置",
     "appearance": "外观",
     "language": "语言",

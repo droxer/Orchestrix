@@ -16,9 +16,7 @@ import { BacklogPage } from "./components/BacklogPage";
 import { ChannelsPage } from "./components/ChannelsPage";
 import { EmployeeWorkspacePage } from "./components/EmployeeWorkspacePage";
 import { LoginScreen } from "./components/LoginScreen";
-import { McpPage } from "./components/McpPage";
 import { RoutinePage } from "./components/RoutinePage";
-import { SkillsPage } from "./components/SkillsPage";
 import { PreferencesDialog } from "./components/PreferencesDialog";
 import { type Theme, type Language } from "./components/PreferencesPanel";
 import type { ConversationItem } from "./components/ConversationRow";
@@ -248,9 +246,8 @@ export function App() {
   useEffect(() => {
     applyTheme(theme);
     writeTheme(theme);
-    // "system" and "contrast" both follow the OS preference off any CSS media
-    // query, so re-resolve them on OS change.
-    if ((theme !== "system" && theme !== "contrast") || typeof window === "undefined" || !window.matchMedia) return;
+    // Re-resolve "system" when the OS color scheme changes.
+    if (theme !== "system" || typeof window === "undefined" || !window.matchMedia) return;
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = () => applyTheme(theme);
     mq.addEventListener("change", onChange);
@@ -534,7 +531,7 @@ export function App() {
             openConversation(sessionId);
           }}
         />
-      ) : route === "mcp" ? <McpPage /> : route === "skills" ? <SkillsPage /> : (<>
+      ) : (<>
 
       <ThreadPanel
         conversations={filteredConversations}

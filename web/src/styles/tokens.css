@@ -9,15 +9,15 @@
      3. shadcn/ui  — the @theme bridge exposing tokens to Tailwind
         utilities used by src/components/ui.
 
-   Visual language: precision/technical (Linear / Vercel / Resend
-   lineage). White canvas, cobalt (#2f54eb) as the single brand ACTION
-   color (it lifts to periwinkle on the dark canvas), cool neutral
-   hairlines in light and warm charcoal in dark. The action carries the
-   hue; status narrows to success / danger / warning (green / amber /
-   red) and "info" folds into the cobalt brand — no competing second
-   blue. Geist carries interface and display text; Geist Mono is a
-   deliberate identity signal — eyebrows, metadata, agent labels, tool
-   lines, numbers, and code. No editorial serif; no pill geometry.
+   Visual language: warm precision. Ecru/stone surfaces replace cold
+   zinc, deep teal is the single brand ACTION color (lifting to luminous
+   teal on the dark canvas), and warm hairlines soften the product
+   chrome. The action carries the hue; status narrows to success /
+   danger / warning (green / amber / red) and "info" folds into the teal
+   brand — no competing second blue. Instrument Sans carries interface
+   and display text; Geist Mono is a deliberate identity signal —
+   eyebrows, metadata, agent labels, tool lines, numbers, and code.
+   No editorial serif; no pill geometry.
    ===================================================================== */
 
 @theme inline {
@@ -64,7 +64,7 @@
   --color-info: var(--color-info);
   --color-brand-soft: var(--color-brand-soft);
 
-  /* Radii — tight precision geometry; expose the whole token scale so
+  /* Radii — softened precision geometry; expose the whole token scale so
      rounded-sm / rounded-md / rounded-xl replace the
      rounded-[var(--radius-*)] arbitrary values the primitives carried.
      The pill is retired — all former consumers now use rounded-sm. */
@@ -117,35 +117,34 @@
 :root {
   /* ----- 1. Primitives ---------------------------------------- */
 
-  /* Action — cobalt brand is the single action color. Hue now carries the
-     action; status narrows to green/amber/red. --color-ink stays #0a0a0a
-     (text), decoupled from the action color it was previously fused with. */
-  --color-primary: #2f54eb;
-  --color-primary-active: #1e3bb8;
-  --color-primary-disabled: #c3cefb;
+  /* Action — deep teal brand is the single action color. Hue carries the
+     action; status narrows to green/amber/red and remains distinct. */
+  --color-primary: #115e59;
+  --color-primary-active: #0f766e;
+  --color-primary-disabled: #b5d6d1;
   --color-brand-soft: color-mix(in srgb, var(--color-primary) 8%, var(--color-canvas)); /* tint — selected rows, active nav, running pills */
 
-  /* Text — cool neutral ramp (zinc) */
-  --color-ink: #0a0a0a;        /* headings, primary copy, emphasized body */
-  --color-body: #52525b;       /* running text */
-  --color-muted: #71717a;      /* secondary labels */
-  --color-muted-soft: #a1a1aa; /* timestamps, disabled */
+  /* Text — warm stone ramp */
+  --color-ink: #171412;        /* headings, primary copy, emphasized body */
+  --color-body: #57534e;       /* running text */
+  --color-muted: #79716b;      /* secondary labels */
+  --color-muted-soft: #a8a29e; /* timestamps, disabled */
   --color-on-primary: #ffffff; /* text on the ink action fill */
   --color-on-dark: #ffffff;    /* text on ink fills */
 
-  /* Surfaces — cool, neutral */
-  --color-canvas: #ffffff;
-  --color-surface-card: #ffffff;   /* feature/product cards on white */
-  --color-surface-soft: #fafafa;   /* subtle tint — quotes, code, hover */
-  --color-surface-strong: #f4f4f5; /* fills, search, avatars */
-  --color-surface-raised: #ffffff; /* modals, drawers, floating chrome */
+  /* Surfaces — warm ecru/stone */
+  --color-canvas: #fdfcfa;
+  --color-surface-card: #fdfcfa;   /* feature/product cards on canvas */
+  --color-surface-soft: #faf8f4;   /* subtle tint — quotes, code, hover */
+  --color-surface-strong: #f5f2ec; /* fills, search, avatars */
+  --color-surface-raised: #fdfcfa; /* modals, drawers, floating chrome */
   --color-surface-dark: #0d0c0a;
   --color-surface-dark-elevated: #1a1815;
   --color-on-dark-soft: #a1a1aa;
 
   /* Hairlines */
-  --color-hairline: #e4e4e7;
-  --color-hairline-soft: #f0f0f0;
+  --color-hairline: #eae5dd;
+  --color-hairline-soft: #f1ede6;
   /* --color-hairline-on-dark: always-dark surface hairline (diff viewer, ink-fill buttons).
      NOT a dark-mode hairline — used on dark fills that appear in BOTH themes (e.g. the
      diff block background, the dark artifact viewer). Consumed by artifact.css and
@@ -168,15 +167,15 @@
   --color-kind-test: #7c3aed;     /* violet */
   --color-kind-log: #c026d3;      /* magenta */
   --color-kind-summary: #2563eb;  /* blue */
-  --color-kind-review: #10b981;   /* green — matches semantic-up but named separately as a decorative alias */
+  --color-kind-review: #10b981;   /* green — named separately as a decorative alias */
   --color-diff-hunk: #5eb3f5;
 
   /* Status — the ONLY hues in the system. Text, dots, and borders
      only; never background fills, never actions. */
-  --color-semantic-up: #10b981;
+  --color-semantic-up: #15803d;
   --color-semantic-down: #e5484d;
   --color-accent-yellow: #f5a623; /* attention dot only, not an action color */
-  --color-info: var(--color-primary);  /* info folds into the cobalt brand — no competing second blue */
+  --color-info: var(--color-primary);  /* info folds into the teal brand — no competing second blue */
 
   /* Status-as-TEXT — the dot/border values above are tuned for fills on a
      white canvas and fail WCAG contrast as small foreground text (amber is
@@ -201,17 +200,13 @@
   --text-2xs: 11px;  /* compact labels, tiny metadata */
   --text-micro: 10px; /* minimap / token abbreviations */
 
-  /* Radii — tight precision geometry, tightened a step sharper. sm (4px)
-     for buttons/badges, md (6px) for inputs/popovers, xl (10px) for cards.
-     The pill is retired: all former --radius-pill consumers now use
-     --radius-sm and render as tight 4px corners instead of 100px capsules.
-     --radius-full stays for any genuine circles (status dots, pips). */
+  /* Radii — softened one step while retaining precision geometry. */
   --radius-none: 0;
   --radius-xs: 2px;
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 10px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
   --radius-full: 9999px;
 
   /* Spacing — 4px base unit */
@@ -224,6 +219,9 @@
   --space-xl: 32px;
   --space-xxl: 48px;
   --space-section: 96px; /* editorial section rhythm — consumed by admin-v2-drawers onboard section */
+  /* Row rhythm — relaxed default; dense surfaces opt back down via
+     [data-density="compact"] on their subtree root. */
+  --space-row-y: var(--space-base);
 
   /* Shell dimensions */
   --sidenav-w: 96px;
@@ -243,13 +241,10 @@
   --z-overlay: 200; /* full-screen modal overlays (preferences) — beats --z-float */
   --z-dialog: 300;  /* confirm dialogs — topmost interactive layer, can stack over overlays */
 
-  /* Font families. Precision system: Geist handles every line of UI and
-     display text at modern grotesque crispness; Geist Mono is the
-     identity signal for eyebrows, metadata, agent labels, numbers, and
-     code. The editorial serif is retired — --font-display now aliases the
-     Geist sans stack so display moments render as tight, weighted sans.
-     Both families load as variable fonts via next/font in app/layout.tsx. */
-  --font-sans: var(--font-geist), "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  /* Font families. Warm precision system: Instrument Sans carries UI and
+     display text; Geist Mono remains the identity signal for eyebrows,
+     metadata, agent labels, numbers, and code. */
+  --font-sans: var(--font-app-sans), "Instrument Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   --font-display: var(--font-sans);
   --font-mono: var(--font-geist-mono), "Geist Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
   --font-number: var(--font-mono);
@@ -259,13 +254,12 @@
   --leading-tight: 1.15;   /* button labels, single-line CTAs */
   --leading-snug: 1.33;    /* title-md, dense headings */
   --leading-normal: 1.5;   /* body, captions */
-  --leading-loose: 1.6;    /* long-form prose, agent text */
+  --leading-loose: 1.65;   /* long-form prose, agent text */
 
   /* Tracking scale — one token per intent, not per pixel. Display values
-     are tuned for weighted Geist: a grotesque sans at 24–34px wants a
-     firmer optical pull than the retired serif did. */
-  --letter-display: -0.6px;       /* Geist sans display (24–34px) */
-  --letter-display-strong: -0.5px; /* admin metric values, Geist Mono 36px+ */
+     are tuned for Instrument Sans' wider letterforms. */
+  --letter-display: -0.4px;       /* Instrument Sans display (24–34px) */
+  --letter-display-strong: -0.35px; /* admin metric values, Geist Mono 36px+ */
   --letter-tight: -0.2px;
   --letter-body: -0.005em;        /* optical tightening for message/prose body text */
   --letter-open: 0.02em;          /* micro open tracking — compact chips, mono metadata, attributions */
@@ -276,7 +270,7 @@
 
   /* Semantic typography. Each role bundles size + weight + line-height
      + family so components can apply one variable instead of re-inlining
-     the triple. Display is weighted Geist (600) with tight tracking;
+     the triple. Display is weighted Instrument Sans (600) with tight tracking;
      emphasis elsewhere steps to 600, never 700+. Eyebrows and metadata
      go mono as the identity signal. */
   --type-display-lg: 600 34px/1.08 var(--font-display);  /* admin page title */
@@ -316,7 +310,7 @@
      --atmosphere-background directly. Disabled in high-contrast mode. */
   --atmosphere-wash: radial-gradient(
     ellipse 90% 70% at 100% 0%,
-    color-mix(in srgb, var(--color-ink) 4%, transparent),
+    color-mix(in srgb, #b0995f 7%, transparent),
     transparent 65%
   );
   --atmosphere-grain-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
@@ -349,7 +343,7 @@
      without overpowering the brand color. */
   --ring-focus: 0 0 0 3px color-mix(in srgb, var(--color-primary) 28%, transparent);
   /* Danger counterpart — destructive controls (cancel-send, delete rows)
-     swap the cobalt halo for the status red at the same 3px/28% recipe. */
+     swap the teal halo for the status red at the same 3px/28% recipe. */
   --ring-focus-danger: 0 0 0 3px color-mix(in srgb, var(--color-semantic-down) 28%, transparent);
 
   /* Motion — canonical curves + durations. Every component CSS picks from
@@ -401,9 +395,9 @@
   -webkit-font-smoothing: antialiased;
 }
 
-/* International type — CJK coverage. Geist and Geist Mono carry no Han
-   glyphs, so under a Chinese locale we keep the Latin face first (Geist
-   for body and display) and resolve Han characters to Noto Sans SC/TC
+/* International type — CJK coverage. Instrument Sans and Geist Mono carry
+   no Han glyphs, so under a Chinese locale we keep the Latin face first
+   (Instrument Sans for body and display) and resolve Han characters to Noto Sans SC/TC
    (loaded by next/font in layout.tsx). --font-display aliases --font-sans
    in :root, so overriding --font-sans here also retargets display — no
    separate display stack is needed. The trailing names cover machines
@@ -411,13 +405,21 @@
    (Windows), Source Han. --font-number aliases --font-mono and inherits
    these via substitution. */
 html:lang(zh-CN) {
-  --font-sans: var(--font-geist), var(--font-noto-sans-sc), "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", "Source Han Sans SC", sans-serif;
+  --font-sans: var(--font-app-sans), var(--font-noto-sans-sc), "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", "Source Han Sans SC", sans-serif;
   --font-mono: var(--font-geist-mono), var(--font-noto-sans-sc), "Noto Sans SC", "PingFang SC", "Microsoft YaHei", monospace;
 }
 
 html:lang(zh-TW) {
-  --font-sans: var(--font-geist), var(--font-noto-sans-tc), "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "Source Han Sans TC", sans-serif;
+  --font-sans: var(--font-app-sans), var(--font-noto-sans-tc), "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "Source Han Sans TC", sans-serif;
   --font-mono: var(--font-geist-mono), var(--font-noto-sans-tc), "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", monospace;
+}
+
+/* Density escape hatch — data-dense surfaces (admin tables, backlog
+   board) restore the compact rhythm for their subtree. One override
+   block; never fork per component. */
+[data-density="compact"] {
+  --leading-loose: 1.5;
+  --space-row-y: var(--space-sm);
 }
 
 /* Dark + high-contrast themes — ONE selector each. `applyTheme`
@@ -426,7 +428,7 @@ html:lang(zh-TW) {
    app/layout.tsx mirrors the same logic to avoid a flash. */
 html[data-theme="dark"] {
   /* Warm charcoal base — a trace of amber lifts the void off cold zinc
-     without breaking the monochrome precision identity. Light stays cool. */
+     without breaking the precision identity. Light now stays warm. */
   --color-surface-dark: #0d0c0a;
   --color-surface-dark-elevated: #1a1815;
 
@@ -448,18 +450,17 @@ html[data-theme="dark"] {
   --color-hairline: color-mix(in srgb, var(--color-on-dark) 14%, var(--color-surface-dark));
   --color-hairline-soft: color-mix(in srgb, var(--color-on-dark) 8%, var(--color-surface-dark));
 
-  /* Action — cobalt lifts to periwinkle on the dark canvas for contrast,
-     mirroring how status hues lift in dark mode. The action now carries a
-     hue in both modes (no black<->white inversion); on-primary stays white
-     against the cobalt fill. Primary also drives links and the focus ring. */
-  --color-primary: #5b7cff;
-  --color-primary-active: #7d97ff;
-  --color-primary-disabled: color-mix(in srgb, #5b7cff 30%, var(--color-surface-dark));
-  --color-on-primary: #ffffff; /* white text on the cobalt action fill */
+  /* Action — deep teal lifts to luminous teal on the dark canvas. The fill
+     is bright, so on-primary flips to near-black; selection and CTA rules
+     inherit this automatically. */
+  --color-primary: #2dd4bf;
+  --color-primary-active: #5eead4;
+  --color-primary-disabled: color-mix(in srgb, #2dd4bf 68%, var(--color-surface-dark));
+  --color-on-primary: #04201c;
   --color-brand-soft: color-mix(in srgb, var(--color-primary) 14%, transparent);
 
   /* Status — text/dots authored for white; lift for legibility on dark. */
-  --color-semantic-up: #2ed391;
+  --color-semantic-up: #34d399;
   --color-semantic-down: #ff6b75;
   --color-info: var(--color-primary);
   --color-code-number: #f0a868;
@@ -472,7 +473,7 @@ html[data-theme="dark"] {
   --color-kind-test: #a78bfa;
   --color-kind-log: #e879f9;
   --color-kind-summary: #60a5fa;
-  --color-kind-review: #2ed391;   /* tracks semantic-up on dark canvas */
+  --color-kind-review: #34d399;   /* tracks semantic-up on dark canvas */
 
   /* On the dark canvas the bright status hues clear contrast as text, so the
      text-safe ramps track them rather than the light-mode deepened values. */
@@ -518,11 +519,11 @@ html[data-theme="contrast"] {
   --color-hairline: #000000;
   --color-hairline-soft: #5c5c5c;
 
-  --color-primary: #1730a8;
-  --color-primary-active: #102179;
-  --color-primary-disabled: #9aa9e8;
+  --color-primary: #0f4c47;
+  --color-primary-active: #0a3733;
+  --color-primary-disabled: #9ec7c2;
   --color-on-primary: #ffffff;
-  --color-brand-soft: #e6eaff;
+  --color-brand-soft: #e0f2ef;
 
   --color-semantic-up: #006b3d;
   --color-semantic-down: #b00020;
@@ -575,11 +576,11 @@ html[data-theme="contrast-dark"] {
   --color-hairline: #ffffff;
   --color-hairline-soft: #9a9a9a;
 
-  --color-primary: #7d9bff;
-  --color-primary-active: #9db3ff;
-  --color-primary-disabled: #4a5a8a;
+  --color-primary: #5eead4;
+  --color-primary-active: #99f6e4;
+  --color-primary-disabled: #2d5a54;
   --color-on-primary: #000000;
-  --color-brand-soft: rgba(125, 155, 255, 0.18);
+  --color-brand-soft: rgba(94, 234, 212, 0.18);
 
   --color-semantic-up: #00e676;
   --color-semantic-down: #ff6b75;
@@ -682,7 +683,7 @@ button:disabled {
 
 /* Focus — single ring contract. Components that need a stacked shadow
    (composer wrap, cards on hover) override locally; everything else picks
-   up the cobalt-alpha halo here. */
+   up the teal-alpha halo here. */
 :where(button, a, input, textarea, select):focus-visible {
   outline: none;
   box-shadow: var(--ring-focus);

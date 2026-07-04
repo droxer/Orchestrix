@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ComponentType, type KeyboardEvent, type MutableRefObject } from "react";
+import { useEffect, useRef, useState, type ComponentType, type KeyboardEvent } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import {
@@ -17,6 +17,7 @@ import {
 } from "../lib/manageAgents";
 import { AGENT_NAMES } from "../types";
 import type { AgentName, AgentRole, DaemonNodeMonitorRecord } from "../types";
+import { moveRadioSelection } from "../lib/radioGroupKeyboard";
 import { PrefAgents, PrefAppearance, PrefLanguage } from "./icons";
 
 export type { Language, Theme };
@@ -36,34 +37,6 @@ const THEME_VALUES: Theme[] = ["light", "dark", "system", "contrast", "contrast-
 const BASE_THEMES: Theme[] = ["light", "dark", "system"];
 const CONTRAST_THEMES: Theme[] = ["contrast", "contrast-dark"];
 const LANGUAGE_VALUES: Language[] = LANGUAGES.map((l) => l.code);
-
-/* Roving-tabindex keyboard handling for an ARIA radiogroup: arrows + Home/End
-   move the selection and focus together, so the group is one tab stop and the
-   checked option is the only one reachable by Tab (WAI-ARIA radio pattern). */
-function moveRadioSelection<T>(
-  event: KeyboardEvent,
-  values: readonly T[],
-  current: T,
-  refs: MutableRefObject<Map<T, HTMLButtonElement | null>>,
-  onChange: (value: T) => void,
-): void {
-  const index = values.indexOf(current);
-  if (index < 0) return;
-  let next: number;
-  switch (event.key) {
-    case "ArrowRight":
-    case "ArrowDown": next = (index + 1) % values.length; break;
-    case "ArrowLeft":
-    case "ArrowUp":   next = (index - 1 + values.length) % values.length; break;
-    case "Home":      next = 0; break;
-    case "End":       next = values.length - 1; break;
-    default: return;
-  }
-  event.preventDefault();
-  const value = values[next];
-  onChange(value);
-  refs.current.get(value)?.focus();
-}
 
 /* Settings categories. Adding a new settings area = one entry here plus a
    case in renderSection (and its `pref.<id>` i18n label). The left nav and
@@ -366,6 +339,29 @@ export interface PreferencesPanelProps {
   onAgentRoleOverridesChange?: (overrides: AgentRoleMap) => Promise<void>;
 }
 
+const CATEGORY_IDS: CategoryId[] = CATEGORIES.map((c) => c.id);
+
+function moveTabSelection(
+  event: KeyboardEvent,
+  current: CategoryId,
+  onChange: (id: CategoryId) => void,
+): void {
+  const index = CATEGORY_IDS.indexOf(current);
+  if (index < 0) return;
+  let next: number;
+  switch (event.key) {
+    case "ArrowRight":
+    case "ArrowDown": next = (index + 1) % CATEGORY_IDS.length; break;
+    case "ArrowLeft":
+    case "ArrowUp":   next = (index - 1 + CATEGORY_IDS.length) % CATEGORY_IDS.length; break;
+    case "Home":      next = 0; break;
+    case "End":       next = CATEGORY_IDS.length - 1; break;
+    default: return;
+  }
+  event.preventDefault();
+  onChange(CATEGORY_IDS[next]!);
+}
+
 export function PreferencesPanel({
   theme,
   onThemeChange,
@@ -376,17 +372,32 @@ export function PreferencesPanel({
 }: PreferencesPanelProps) {
   const { t } = useTranslation();
   const [active, setActive] = useState<CategoryId>("appearance");
-  const headingId = `pref-section-${active}`;
+  const tabRefs = useRef<Map<CategoryId, HTMLButtonElement | null>>(new Map());
 
   return (
     <div className="pref-body">
-      <nav className="pref-nav" aria-label={t("pref.title")}>
+      <nav
+        className="pref-nav"
+        role="tablist"
+        aria-label={t("pref.title")}
+        onKeyDown={(event) => {
+          moveTabSelection(event, active, (id) => {
+            setActive(id);
+            tabRefs.current.get(id)?.focus();
+          });
+        }}
+      >
         {CATEGORIES.map(({ id, labelKey, Icon }) => (
           <button
             key={id}
+            ref={(el) => { tabRefs.current.set(id, el); }}
             type="button"
+            role="tab"
+            id={`pref-tab-${id}`}
             className={`pref-nav-item ${active === id ? "active" : ""}`}
-            aria-current={active === id ? "page" : undefined}
+            aria-selected={active === id}
+            aria-controls={`pref-panel-${id}`}
+            tabIndex={active === id ? 0 : -1}
             onClick={() => setActive(id)}
           >
             <Icon size={16} />
@@ -395,28 +406,49 @@ export function PreferencesPanel({
         ))}
       </nav>
 
-      <div className="pref-content" role="region" aria-labelledby={headingId}>
-        {active === "appearance" && (
-          <AppearanceSection
-            theme={theme}
-            onThemeChange={onThemeChange}
-            headingId={headingId}
-          />
-        )}
-        {active === "language" && (
-          <LanguageSection
-            language={language}
-            onLanguageChange={onLanguageChange}
-            headingId={headingId}
-          />
-        )}
-        {active === "agents" && (
-          <AgentRolesSection
-            node={agentNode}
-            onSave={onAgentRoleOverridesChange}
-            headingId={headingId}
-          />
-        )}
+      <div className="pref-content">
+        <div
+          role="tabpanel"
+          id="pref-panel-appearance"
+          aria-labelledby="pref-tab-appearance"
+          hidden={active !== "appearance"}
+        >
+          {active === "appearance" && (
+            <AppearanceSection
+              theme={theme}
+              onThemeChange={onThemeChange}
+              headingId="pref-section-appearance"
+            />
+          )}
+        </div>
+        <div
+          role="tabpanel"
+          id="pref-panel-language"
+          aria-labelledby="pref-tab-language"
+          hidden={active !== "language"}
+        >
+          {active === "language" && (
+            <LanguageSection
+              language={language}
+              onLanguageChange={onLanguageChange}
+              headingId="pref-section-language"
+            />
+          )}
+        </div>
+        <div
+          role="tabpanel"
+          id="pref-panel-agents"
+          aria-labelledby="pref-tab-agents"
+          hidden={active !== "agents"}
+        >
+          {active === "agents" && (
+            <AgentRolesSection
+              node={agentNode}
+              onSave={onAgentRoleOverridesChange}
+              headingId="pref-section-agents"
+            />
+          )}
+        </div>
       </div>
     </div>
   );

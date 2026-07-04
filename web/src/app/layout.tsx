@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import {
-  Geist,
   Geist_Mono,
+  Instrument_Sans,
   Noto_Sans_SC,
   Noto_Sans_TC,
 } from "next/font/google";
@@ -11,15 +11,14 @@ import "../styles.css";
 
 import { Providers } from "./providers";
 
-// Precision system — Geist handles every line of UI and display text at
-// modern grotesque crispness; Geist Mono is the identity signal for
-// eyebrows, metadata, agent labels, numbers, and code. The editorial
-// serif is retired — display moments now use weighted Geist via the
-// --font-display alias in tokens.css. latin-ext widens coverage to
-// accented European/Vietnamese names in employee and sandbox labels.
-const geist = Geist({
+// Warm precision system — Instrument Sans carries UI and display text
+// with humanist warmth; Geist Mono stays as the identity signal for
+// eyebrows, metadata, agent labels, numbers, and code. latin-ext widens
+// coverage to accented European/Vietnamese names in employee and
+// sandbox labels.
+const appSans = Instrument_Sans({
   subsets: ["latin", "latin-ext"],
-  variable: "--font-geist",
+  variable: "--font-app-sans",
   display: "swap",
   weight: "variable",
 });
@@ -34,7 +33,7 @@ const geistMono = Geist_Mono({
 // CJK coverage for the zh-CN / zh-TW locales. The Latin families above
 // ship no Han glyphs, so under a Chinese locale the :lang() rules in
 // tokens.css fall through to Noto Sans SC/TC for Han characters while
-// keeping Geist for Latin. preload is off — CJK has no single subset to
+// keeping Instrument Sans for Latin. preload is off — CJK has no single subset to
 // preload — so these only download on a Chinese locale.
 const notoSansSC = Noto_Sans_SC({
   variable: "--font-noto-sans-sc",
@@ -70,7 +69,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
       lang="en"
-      className={`${geist.variable} ${geistMono.variable} ${notoSansSC.variable} ${notoSansTC.variable}`}
+      className={`${appSans.variable} ${geistMono.variable} ${notoSansSC.variable} ${notoSansTC.variable}`}
       suppressHydrationWarning
     >
       <head>

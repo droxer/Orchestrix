@@ -1,8 +1,8 @@
 /* =====================================================================
    Relay empty states + shared enter motion
 
-   One visual language for transcript, board, skills, and MCP zero-data
-   surfaces. Login reuses the same relay-rise keyframes (see login.css).
+   One visual language for transcript, board, and setup zero-data surfaces.
+   Login reuses the same relay-rise keyframes (see login.css).
    Atmosphere tokens live in tokens.css (--atmosphere-*).
    ===================================================================== */
 
@@ -58,6 +58,32 @@
   background-image: var(--atmosphere-grain-image);
   background-size: var(--atmosphere-grain-size);
   mix-blend-mode: var(--atmosphere-grain-blend);
+}
+
+/* Bled "R" mark — the login signature extended to other atmosphere
+   surfaces. Rendered as an element because both pseudo-elements of
+   .relay-atmosphere hosts are already in use. */
+.relay-bleed-mark {
+  position: absolute;
+  right: -0.12em;
+  bottom: -0.28em;
+  z-index: -1;
+  font-family: var(--font-display);
+  font-size: clamp(160px, 24vw, 320px);
+  font-weight: 400;
+  line-height: 1;
+  color: color-mix(in srgb, var(--color-ink) 5%, transparent);
+  pointer-events: none;
+  user-select: none;
+}
+
+html[data-theme="dark"] .relay-bleed-mark {
+  color: color-mix(in srgb, var(--color-ink) 3%, transparent);
+}
+
+html[data-theme="contrast"] .relay-bleed-mark,
+html[data-theme="contrast-dark"] .relay-bleed-mark {
+  display: none;
 }
 
 /* ── Empty state layout ───────────────────────────────────────────── */

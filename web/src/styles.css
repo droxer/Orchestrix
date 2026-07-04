@@ -49,8 +49,7 @@
 
 /* 5. Authenticated pages */
 @import "./styles/login.css";
-@import "./styles/mcp.css";
-@import "./styles/skills.css";
+@import "./styles/routes.css";
 @import "./styles/workspace.css";
 @import "./styles/backlog.css";
 @import "./styles/preferences.css";
