@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { assignControlPanelDaemonNode, createControlPanelEmployee } from "../../api";
+import { assignControlPanelDaemonNode, createControlPanelDaemonNode, createControlPanelEmployee } from "../../api";
 import type {
   AssignControlPanelDaemonNodeResponse,
   ControlPanelDaemonNodeRecord,
+  CreateControlPanelDaemonNodeResponse,
   CreateControlPanelEmployeeResponse,
   EmployeeRecord,
 } from "../../types";
@@ -20,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-type OnboardMode = "new" | "existing";
+type OnboardMode = "new" | "existing" | "local-node";
 
 interface OnboardDrawerProps {
   open: boolean;
@@ -29,6 +30,7 @@ interface OnboardDrawerProps {
   unassignedNodes: ControlPanelDaemonNodeRecord[];
   onSuccess: (result: CreateControlPanelEmployeeResponse) => void;
   onAssignSuccess: (result: AssignControlPanelDaemonNodeResponse) => void;
+  onCreateNodeSuccess: (result: CreateControlPanelDaemonNodeResponse) => void;
 }
 
 export function OnboardDrawer({
@@ -38,6 +40,7 @@ export function OnboardDrawer({
   unassignedNodes,
   onSuccess,
   onAssignSuccess,
+  onCreateNodeSuccess,
 }: OnboardDrawerProps) {
   const { t } = useTranslation();
   const [mode, setMode] = useState<OnboardMode>("new");
@@ -50,6 +53,7 @@ export function OnboardDrawer({
   const [selectedNodeId, setSelectedNodeId] = useState("");
   const [existingEmployeeId, setExistingEmployeeId] = useState("");
   const [existingNodeId, setExistingNodeId] = useState("");
+  const [localWorkspacePath, setLocalWorkspacePath] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
 
@@ -63,6 +67,7 @@ export function OnboardDrawer({
       setSelectedNodeId("");
       setExistingEmployeeId("");
       setExistingNodeId("");
+      setLocalWorkspacePath("");
       setError(null);
       setIsBusy(false);
       setMode("new");
@@ -116,7 +121,25 @@ export function OnboardDrawer({
     }
   }
 
-  const tabRefs = useRef<Record<OnboardMode, HTMLButtonElement | null>>({ new: null, existing: null });
+  async function handleSubmitLocalNode(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const nextWorkspacePath = localWorkspacePath.trim();
+
+    setIsBusy(true);
+    setError(null);
+    try {
+      const result = await createControlPanelDaemonNode({
+        workspacePath: nextWorkspacePath,
+      });
+      onCreateNodeSuccess(result);
+    } catch (err) {
+      setError(t("admin.v2.create_node_error", { message: err instanceof Error ? err.message : String(err) }));
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  const tabRefs = useRef<Record<OnboardMode, HTMLButtonElement | null>>({ new: null, existing: null, "local-node": null });
 
   function switchMode(next: OnboardMode) {
     setMode(next);
@@ -126,8 +149,8 @@ export function OnboardDrawer({
   // WAI-ARIA tabs keyboard support: Left/Right cycle, Home/End jump to ends.
   // The "existing" tab is skipped when disabled (no employees yet).
   function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
-    const order: OnboardMode[] = ["new", "existing"];
-    const enabled = order.filter((m) => m === "new" || employees.length > 0);
+    const order: OnboardMode[] = ["new", "existing", "local-node"];
+    const enabled = order.filter((m) => m !== "existing" || employees.length > 0);
     if (enabled.length < 2) return;
 
     let next: OnboardMode | null = null;
@@ -162,6 +185,7 @@ export function OnboardDrawer({
       closeLabel={t("admin.v2.close_drawer")}
       ariaLabel={t("admin.v2.onboard_title")}
       bodyClassName="adm-drawer-body--column"
+      kicker={t("admin.v2.onboard_kicker")}
     >
       <div className="adm-mode-tabs" role="tablist" aria-label={t("admin.v2.onboard_mode_label")}>
         <button
@@ -192,6 +216,20 @@ export function OnboardDrawer({
           disabled={employees.length === 0}
         >
           {t("admin.v2.mode_existing")}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          id="onboard-tab-local-node"
+          aria-controls="onboard-panel-local-node"
+          aria-selected={mode === "local-node"}
+          tabIndex={mode === "local-node" ? 0 : -1}
+          ref={(node) => { tabRefs.current["local-node"] = node; }}
+          className={`adm-mode-tab ${mode === "local-node" ? "active" : ""}`}
+          onClick={() => switchMode("local-node")}
+          onKeyDown={handleTabKeyDown}
+        >
+          {t("admin.v2.mode_local_node")}
         </button>
       </div>
 
@@ -286,33 +324,31 @@ export function OnboardDrawer({
 
           <fieldset className="adm-form-section">
             <legend className="adm-form-legend">{t("admin.v2.section_assignment")}</legend>
-            <label className="adm-field">
-              <span>
-                {t("admin.assign_node")}
-                <span className="adm-field-opt">{t("admin.v2.optional")}</span>
-              </span>
-              <Select
-                value={selectedNodeId || undefined}
-                onValueChange={setSelectedNodeId}
-                disabled={unassignedNodes.length === 0}
-              >
-                <SelectTrigger className="w-full mono">
-                  <SelectValue
-                    placeholder={unassignedNodes.length === 0 ? t("admin.no_unassigned_nodes") : t("admin.select_node")}
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {unassignedNodes.map((node) => (
-                    <SelectItem key={node.id} value={node.id}>
-                      {node.id}{node.workspacePath ? ` / ${node.workspacePath}` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </label>
             {unassignedNodes.length === 0 ? (
-              <p className="adm-form-hint">{t("admin.unassigned_hint")}</p>
-            ) : null}
+              <p className="adm-form-hint adm-form-hint--notice">{t("admin.unassigned_hint")}</p>
+            ) : (
+              <label className="adm-field">
+                <span>
+                  {t("admin.assign_node")}
+                  <span className="adm-field-opt">{t("admin.v2.optional")}</span>
+                </span>
+                <Select
+                  value={selectedNodeId || undefined}
+                  onValueChange={setSelectedNodeId}
+                >
+                  <SelectTrigger className="w-full mono">
+                    <SelectValue placeholder={t("admin.select_node")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {unassignedNodes.map((node) => (
+                      <SelectItem key={node.id} value={node.id}>
+                        {node.id}{node.workspacePath ? ` / ${node.workspacePath}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </label>
+            )}
           </fieldset>
 
           {error ? <div className="adm-form-error">{error}</div> : null}
@@ -326,7 +362,7 @@ export function OnboardDrawer({
             </Button>
           </div>
         </form>
-      ) : (
+      ) : mode === "existing" ? (
         <form
           className="adm-form"
           onSubmit={(event) => void handleSubmitExisting(event)}
@@ -401,6 +437,46 @@ export function OnboardDrawer({
             </Button>
             <Button type="submit" disabled={isBusy || !canSubmitExisting}>
               {isBusy ? t("admin.assigning") : t("admin.assign")}
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <form
+          className="adm-form"
+          onSubmit={(event) => void handleSubmitLocalNode(event)}
+          noValidate
+          role="tabpanel"
+          id="onboard-panel-local-node"
+          aria-labelledby="onboard-tab-local-node"
+        >
+          <fieldset className="adm-form-section">
+            <legend className="adm-form-legend">{t("admin.v2.section_local_node")}</legend>
+            <p className="adm-form-hint">{t("admin.v2.local_node_help")}</p>
+            <label className="adm-field">
+              <span>
+                {t("admin.workspace_path")}
+                <span className="adm-field-opt">{t("admin.v2.optional")}</span>
+              </span>
+              <Input
+                name="local-node-workspace"
+                className="mono"
+                value={localWorkspacePath}
+                onChange={(event) => setLocalWorkspacePath(event.target.value)}
+                autoComplete="off"
+                spellCheck={false}
+                placeholder={t("admin.v2.placeholder_workspace_path")}
+              />
+            </label>
+          </fieldset>
+
+          {error ? <div className="adm-form-error">{error}</div> : null}
+
+          <div className="adm-form-actions">
+            <Button type="button" variant="ghost" onClick={onClose} disabled={isBusy}>
+              {t("admin.v2.cancel")}
+            </Button>
+            <Button type="submit" disabled={isBusy}>
+              {isBusy ? t("admin.creating") : t("admin.v2.generate_node")}
             </Button>
           </div>
         </form>

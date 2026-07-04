@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { accessSync, appendFileSync, chmodSync, constants, mkdirSync, statSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 
 import type {
@@ -57,6 +58,7 @@ export interface DaemonRuntimeOptions {
   logger?: DaemonLogger;
   signal?: AbortSignal;
   shutdownGraceMs?: number;
+  agentHome?: string;
   maxConcurrentRuns?: number;
   runCapacityByMode?: Partial<Record<AgentTaskMode, number>>;
   environment?: DaemonExecutionEnvironment;
@@ -107,17 +109,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
   const employeeId = configuredEmployeeId ?? process.env.USER ?? "local";
   const workspacePath = firstNonBlank(options.workspacePath, process.env.RELAY_WORKSPACE, process.env.WORKSPACE) ?? process.cwd();
   const sandboxMode = resolveSandboxMode(options.sandbox ?? process.env.RELAY_SANDBOX_MODE);
-  if (sandboxMode === "boxlite") {
-    // Agent commands run inside the BoxLite guest, where the host workspace
-    // is mounted at GUEST_WORKSPACE.
-    process.env.RELAY_AGENT_WORKSPACE = GUEST_WORKSPACE;
-  } else {
-    process.env.RELAY_AGENT_WORKSPACE = workspacePath;
-    if (workspacePath !== GUEST_WORKSPACE) {
-      process.env.RELAY_RUN_AS_CURRENT_USER ??= "1";
-      process.env.RELAY_AGENT_HOME ??= join(workspacePath, ".relay", "daemon-node-home");
-    }
-  }
+  configureAgentProcessEnvironment(sandboxMode, workspacePath, options.agentHome);
   const tokenResolution = ensureDaemonNodeToken({
     workspacePath,
     employeeId,
@@ -391,11 +383,7 @@ export async function runRelayDaemonDoctor(options: DaemonRuntimeOptions = {}): 
   const employeeId = configuredEmployeeId ?? process.env.USER ?? "local";
   const workspacePath = firstNonBlank(options.workspacePath, process.env.RELAY_WORKSPACE, process.env.WORKSPACE) ?? process.cwd();
   const sandboxMode = resolveSandboxMode(options.sandbox ?? process.env.RELAY_SANDBOX_MODE);
-  if (sandboxMode === "boxlite") {
-    process.env.RELAY_AGENT_WORKSPACE = GUEST_WORKSPACE;
-  } else {
-    process.env.RELAY_AGENT_WORKSPACE = workspacePath;
-  }
+  configureAgentProcessEnvironment(sandboxMode, workspacePath, options.agentHome);
   const logger = options.logger ?? createDaemonLogger({ workspacePath, sandboxId: sandboxId ?? "doctor", logDir: options.logDir });
   const fetchFn = options.fetchFn ?? fetch;
   const checks: DaemonDoctorCheck[] = [];
@@ -451,6 +439,33 @@ export async function runRelayDaemonDoctor(options: DaemonRuntimeOptions = {}): 
   }
   await environment.close().catch(() => undefined);
   return { ok: checks.every((check) => check.ok), checks };
+}
+
+function configureAgentProcessEnvironment(
+  sandboxMode: DaemonSandboxMode,
+  workspacePath: string,
+  agentHome?: string,
+): void {
+  if (sandboxMode === "boxlite") {
+    // Agent commands run inside the BoxLite guest, where the host workspace
+    // is mounted at GUEST_WORKSPACE.
+    process.env.RELAY_AGENT_WORKSPACE = GUEST_WORKSPACE;
+  } else {
+    process.env.RELAY_AGENT_WORKSPACE = workspacePath;
+    process.env.RELAY_RUN_AS_CURRENT_USER ??= "1";
+    const resolvedAgentHome = agentHome ?? localAgentHomeFromEnv();
+    if (resolvedAgentHome) {
+      process.env.RELAY_AGENT_HOME = resolvedAgentHome;
+    } else {
+      process.env.RELAY_AGENT_HOME ??= join(workspacePath, ".relay", "daemon-node-home");
+    }
+  }
+}
+
+function localAgentHomeFromEnv(): string | undefined {
+  const value = process.env.RELAY_USE_LOCAL_AGENT_HOME;
+  if (!value || value === "0" || value.toLowerCase() === "false") return undefined;
+  return process.env.HOME || homedir();
 }
 
 function firstNonBlank(...values: Array<string | undefined>): string | undefined {

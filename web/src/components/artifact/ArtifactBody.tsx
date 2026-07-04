@@ -27,8 +27,9 @@ function DiffView({ text }: { text: string }) {
         const sign = kind === "add" ? "+" : kind === "del" ? "-" : " ";
         return (
           <div key={index} className={`artifact-diff-line is-${kind}`}>
+            <span className="artifact-diff-ln" aria-hidden="true">{index + 1}</span>
             <span className="artifact-diff-sign" aria-hidden="true">{sign}</span>
-            <span className="artifact-diff-text">{line || " "}</span>
+            <span className="artifact-diff-text">{line || " "}</span>
           </div>
         );
       })}

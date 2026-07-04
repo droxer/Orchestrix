@@ -19,6 +19,8 @@ Optional:
 - `RELAY_EMPLOYEE_ID`: employee id bound to this daemon node when preassigned.
 - `RELAY_SANDBOX_MODE`: `none` when the daemon already runs inside an agent box,
   or `boxlite` when it should boot and own a BoxLite VM.
+- `RELAY_USE_LOCAL_AGENT_HOME`: set to `1` in local mode to use this user's
+  existing Claude/Codex/Kimi login and config directories.
 - `RELAY_DAEMON_HEARTBEAT_MS`: registration heartbeat interval.
 - `RELAY_DAEMON_SHUTDOWN_GRACE_MS`: max time to wait for active runs to report
   cancellation during shutdown.
@@ -46,6 +48,19 @@ Run the daemon:
 
 ```sh
 relay-daemon --sandbox-id "$RELAY_SANDBOX_ID"
+```
+
+Run a local daemon against a specific host workspace using the user's installed
+Claude, Codex, and Kimi CLIs:
+
+```sh
+relay-daemon \
+  --backend-url "$RELAY_BACKEND_URL" \
+  --sandbox-id "$RELAY_SANDBOX_ID" \
+  --token "$RELAY_DAEMON_NODE_TOKEN" \
+  --sandbox none \
+  --workspace "$RELAY_WORKSPACE" \
+  --use-local-agent-home
 ```
 
 The daemon intentionally runs one active command at a time. If a backend sends a

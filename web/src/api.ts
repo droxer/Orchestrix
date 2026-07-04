@@ -127,7 +127,7 @@ export function createControlPanelDaemonNode(
   return apiJson<CreateControlPanelDaemonNodeResponse>("/cp/daemon-nodes", {
     method: "POST",
     body: {
-      employeeId: input.employeeId,
+      ...(input.employeeId ? { employeeId: input.employeeId } : {}),
       ...(input.workspacePath ? { workspacePath: input.workspacePath } : {}),
     },
   });

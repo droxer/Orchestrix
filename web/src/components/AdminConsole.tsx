@@ -11,6 +11,7 @@ import { deleteControlPanelDaemonNode, deleteControlPanelEmployee, getAuthStatus
 import type {
   AssignControlPanelDaemonNodeResponse,
   ControlPanelDaemonNodeRecord,
+  CreateControlPanelDaemonNodeResponse,
   CreateControlPanelEmployeeResponse,
   CurrentUser,
   EmployeeRecord,
@@ -188,6 +189,28 @@ export function AdminConsole() {
     setView("people");
   }
 
+  function handleCreateNodeSuccess(result: CreateControlPanelDaemonNodeResponse) {
+    const { node } = result;
+    mergeFleet((prev) => ({
+      ...prev,
+      nodes: [node, ...prev.nodes.filter((current) => current.id !== node.id)],
+    }));
+
+    writeStoredNodeToken(node.id, {
+      employeeId: node.employeeId,
+      sandboxToken: result.sandboxToken,
+      nodeToken: result.nodeToken,
+      daemonCommand: result.daemonCommand,
+      savedAt: new Date().toISOString(),
+    });
+    setStoredTokens(readStoredNodeTokens());
+    setHighlightedEmployeeId(node.employeeId ?? null);
+    window.setTimeout(() => setHighlightedEmployeeId((prev) => (prev === node.employeeId ? null : prev)), 2400);
+    setOnboardOpen(false);
+    setView("fleet");
+    setCredentialsNodeId(node.id);
+  }
+
   if (!authChecked) {
     return (
       <section className="admin-console adm-bare">
@@ -314,6 +337,7 @@ export function AdminConsole() {
         unassignedNodes={unassignedNodes}
         onSuccess={handleOnboardSuccess}
         onAssignSuccess={handleAssignSuccess}
+        onCreateNodeSuccess={handleCreateNodeSuccess}
       />
       <AssignNodeDrawer
         open={assignTarget !== null}
@@ -322,6 +346,7 @@ export function AdminConsole() {
         unassignedNodes={unassignedNodes}
         defaultEmployeeId={assignTarget?.employeeId}
         onAssignSuccess={handleAssignSuccess}
+        onCreateNodeSuccess={handleCreateNodeSuccess}
       />
       <CredentialsDrawer
         open={credentialsNodeId !== null}

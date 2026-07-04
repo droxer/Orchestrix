@@ -80,7 +80,7 @@ class ServerDaemonNodeBackend:
         return self.registry.list_ready()
 
     def provision_daemon_node(self, input: dict[str, Any]) -> dict[str, Any]:
-        sandbox, ui_token, node_token = self.registry.provision_pending(input["employeeId"], input.get("workspacePath"))
+        sandbox, ui_token, node_token = self.registry.provision_pending(input.get("employeeId"), input.get("workspacePath"))
         return {
             **sandbox,
             **({"token": ui_token, "sandboxToken": ui_token} if ui_token else {}),

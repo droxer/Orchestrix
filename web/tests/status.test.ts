@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { assignControlPanelDaemonNode, createControlPanelEmployee } from "../src/api.js";
+import { assignControlPanelDaemonNode, createControlPanelDaemonNode, createControlPanelEmployee } from "../src/api.js";
 import { conversationDaemonStatus } from "../src/lib/conversationStatus.js";
 import {
   mergeVisibleDaemonNodes,
@@ -199,7 +199,43 @@ describe("Relay web conversation status", () => {
         email: "alice@example.com",
         displayName: "Alice",
       });
-      assert.equal(result.node.employeeId, "alice");
+      assert.equal(result.node?.employeeId, "alice");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("posts ownerless daemon node creation when no employee is supplied", async () => {
+    const originalFetch = globalThis.fetch;
+    let requestPath = "";
+    let requestInit: RequestInit | undefined;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      requestPath = String(input);
+      requestInit = init;
+      return new Response(JSON.stringify({
+        node: controlPanelNode({
+          id: "sbx_node_1",
+        }),
+        nodeToken: "node_token",
+        daemonEnv: {
+          RELAY_SANDBOX_ID: "sbx_node_1",
+        },
+      }), {
+        status: 201,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+    try {
+      const result = await createControlPanelDaemonNode({
+        workspacePath: "/workspace/shared",
+      });
+
+      assert.equal(requestPath, "/cp/daemon-nodes");
+      assert.equal(requestInit?.method, "POST");
+      assert.deepEqual(JSON.parse(String(requestInit?.body)), {
+        workspacePath: "/workspace/shared",
+      });
+      assert.equal(result.node.employeeId, undefined);
     } finally {
       globalThis.fetch = originalFetch;
     }

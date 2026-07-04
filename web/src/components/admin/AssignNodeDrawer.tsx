@@ -3,15 +3,17 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Check, Inbox } from "lucide-react";
-import { assignControlPanelDaemonNode } from "../../api";
+import { assignControlPanelDaemonNode, createControlPanelDaemonNode } from "../../api";
 import type {
   AssignControlPanelDaemonNodeResponse,
   ControlPanelDaemonNodeRecord,
+  CreateControlPanelDaemonNodeResponse,
   EmployeeRecord,
 } from "../../types";
 import { Drawer } from "./Drawer";
 import { statusTone, visualStatus } from "./helpers";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -27,6 +29,7 @@ interface AssignNodeDrawerProps {
   unassignedNodes: ControlPanelDaemonNodeRecord[];
   defaultEmployeeId?: string;
   onAssignSuccess: (result: AssignControlPanelDaemonNodeResponse) => void;
+  onCreateNodeSuccess: (result: CreateControlPanelDaemonNodeResponse) => void;
 }
 
 function initialsOf(value: string): string {
@@ -44,10 +47,12 @@ export function AssignNodeDrawer({
   unassignedNodes,
   defaultEmployeeId,
   onAssignSuccess,
+  onCreateNodeSuccess,
 }: AssignNodeDrawerProps) {
   const { t } = useTranslation();
   const [employeeId, setEmployeeId] = useState("");
   const [nodeId, setNodeId] = useState("");
+  const [localWorkspacePath, setLocalWorkspacePath] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
 
@@ -55,6 +60,7 @@ export function AssignNodeDrawer({
     if (open) {
       setEmployeeId(defaultEmployeeId ?? "");
       setNodeId("");
+      setLocalWorkspacePath("");
       setError(null);
       setIsBusy(false);
     }
@@ -70,20 +76,29 @@ export function AssignNodeDrawer({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextEmployeeId = employeeId.trim().replace(/^@/, "");
+    const nextWorkspacePath = localWorkspacePath.trim();
     if (!nextEmployeeId) return setError(t("admin.employee_required"));
-    if (!nodeId) return setError(t("admin.node_required"));
+    if (hasNodes && !nodeId) return setError(t("admin.node_required"));
 
     setIsBusy(true);
     setError(null);
     try {
-      const result = await assignControlPanelDaemonNode({
-        employeeId: nextEmployeeId,
-        nodeId,
-      });
-      onAssignSuccess(result);
+      if (hasNodes) {
+        const result = await assignControlPanelDaemonNode({
+          employeeId: nextEmployeeId,
+          nodeId,
+        });
+        onAssignSuccess(result);
+      } else {
+        const result = await createControlPanelDaemonNode({
+          employeeId: nextEmployeeId,
+          workspacePath: nextWorkspacePath,
+        });
+        onCreateNodeSuccess(result);
+      }
     } catch (err) {
       setError(
-        t("admin.v2.assign_error", {
+        t(hasNodes ? "admin.v2.assign_error" : "admin.v2.create_node_error", {
           message: err instanceof Error ? err.message : String(err),
         }),
       );
@@ -92,7 +107,9 @@ export function AssignNodeDrawer({
     }
   }
 
-  const canSubmit = Boolean(employeeId && nodeId);
+  const canSubmit = hasNodes
+    ? Boolean(employeeId && nodeId)
+    : Boolean(employeeId.trim());
   const displayHandle = selectedEmployee
     ? `@${selectedEmployee.id}`
     : employeeId
@@ -244,12 +261,33 @@ export function AssignNodeDrawer({
                   {t("admin.no_unassigned_nodes")}
                 </p>
                 <p className="adm-assign-empty-body">
-                  {t("admin.unassigned_hint")}
+                  {t("admin.v2.local_node_help")}
                 </p>
               </div>
             </div>
           )}
         </section>
+
+        {!hasNodes ? (
+          <fieldset className="adm-form-section">
+            <legend className="adm-form-legend">{t("admin.v2.section_local_node")}</legend>
+            <label className="adm-field">
+              <span>
+                {t("admin.workspace_path")}
+                <span className="adm-field-opt">{t("admin.v2.optional")}</span>
+              </span>
+              <Input
+                name="assign-local-node-workspace"
+                className="mono"
+                value={localWorkspacePath}
+                onChange={(event) => setLocalWorkspacePath(event.target.value)}
+                autoComplete="off"
+                spellCheck={false}
+                placeholder={t("admin.v2.placeholder_workspace_path")}
+              />
+            </label>
+          </fieldset>
+        ) : null}
 
         {error ? <div className="adm-form-error">{error}</div> : null}
 
@@ -263,7 +301,11 @@ export function AssignNodeDrawer({
             {t("admin.v2.cancel")}
           </Button>
           <Button type="submit" disabled={isBusy || !canSubmit}>
-            {isBusy ? t("admin.assigning") : t("admin.assign")}
+            {isBusy
+              ? hasNodes ? t("admin.assigning") : t("admin.creating")
+              : hasNodes
+                ? t("admin.assign")
+                : t("admin.v2.generate_node")}
           </Button>
         </div>
       </form>

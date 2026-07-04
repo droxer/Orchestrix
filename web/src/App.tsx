@@ -43,7 +43,7 @@ import { useDialogs } from "./components/ui/DialogProvider";
 import { SideNav } from "./components/SideNav";
 import { ThreadPanel } from "./components/ThreadPanel";
 import { ChatHeader } from "./components/ChatHeader";
-import { ConversationArtifactsDrawer } from "./components/ConversationArtifactsDrawer";
+import { ArtifactLibraryDrawer } from "./components/artifact/ArtifactLibraryDrawer";
 import type { AppRoute, MobileView } from "./lib/viewTypes";
 import { visibleConversationArtifacts } from "./lib/conversationArtifacts";
 import "./i18n";
@@ -81,7 +81,7 @@ export function App() {
   const [language, setLanguage] = useState<Language>(readLanguage);
   const [handoffOpen, setHandoffOpen] = useState(false);
   const [artifactsDrawerOpen, setArtifactsDrawerOpen] = useState(false);
-  const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
+  const [initialArtifactId, setInitialArtifactId] = useState<string | null>(null);
   const [handoffAgent, setHandoffAgent] = useState<AgentName>("codex");
   const [handoffMode, setHandoffMode] = useState<AgentTaskMode>("action");
   const [handoffNote, setHandoffNote] = useState("");
@@ -241,7 +241,7 @@ export function App() {
 
   useEffect(() => {
     setArtifactsDrawerOpen(false);
-    setSelectedArtifactId(null);
+    setInitialArtifactId(null);
   }, [activeSession?.id]);
 
   useEffect(() => {
@@ -290,7 +290,7 @@ export function App() {
 
   function openArtifactsDrawer(artifact?: RelayArtifact) {
     if (!activeSession) return;
-    setSelectedArtifactId(artifact?.id ?? visibleArtifacts[0]?.id ?? null);
+    setInitialArtifactId(artifact?.id ?? null);
     setArtifactsDrawerOpen(true);
   }
 
@@ -591,13 +591,12 @@ export function App() {
         />
       </section>
 
-      <ConversationArtifactsDrawer
+      <ArtifactLibraryDrawer
         open={artifactsDrawerOpen}
         onClose={() => setArtifactsDrawerOpen(false)}
-        sessionId={activeSession?.id}
+        sessionId={activeSession?.id ?? ""}
         artifacts={visibleArtifacts}
-        selectedArtifactId={selectedArtifactId}
-        onSelectArtifact={setSelectedArtifactId}
+        initialArtifactId={initialArtifactId ?? undefined}
       />
 
       </>)}

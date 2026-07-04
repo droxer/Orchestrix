@@ -527,7 +527,7 @@ function TaskDrawerArtifacts({ taskId }: { taskId: string }) {
               <button
                 type="button"
                 className="task-drawer-artifact-main"
-                onClick={() => open(artifact, artifact.sessionId)}
+                onClick={() => open(artifact, artifact.sessionId, artifacts ?? [artifact])}
                 title={t("artifact.view_named", { title: artifact.title })}
               >
                 <span className={`artifact-kind-tag is-${artifact.kind}`}>

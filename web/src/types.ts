@@ -204,7 +204,7 @@ export interface CreateControlPanelEmployeeInput {
 export interface CreateControlPanelEmployeeResponse {
   employee: EmployeeRecord;
   user: CurrentUser;
-  node: ControlPanelDaemonNodeRecord;
+  node?: ControlPanelDaemonNodeRecord;
 }
 
 export interface AssignControlPanelDaemonNodeResponse {
@@ -217,7 +217,7 @@ export interface UnassignControlPanelDaemonNodeResponse {
 }
 
 export interface CreateControlPanelDaemonNodeInput {
-  employeeId: string;
+  employeeId?: string;
   workspacePath?: string;
 }
 

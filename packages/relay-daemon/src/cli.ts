@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { homedir } from "node:os";
 import { pathToFileURL } from "node:url";
 import { loadPackageEnv } from "relay-core";
 import { resolveSandboxMode, runRelayDaemon, runRelayDaemonDoctor } from "./index.js";
@@ -13,9 +14,14 @@ Options:
   --sandbox-id <id>     Sandbox identifier (required; also RELAY_SANDBOX_ID).
   --employee-id <id>    Employee identifier (also RELAY_EMPLOYEE_ID).
   --token <token>       Daemon node token (also RELAY_DAEMON_NODE_TOKEN).
+  --workspace <path>    Host workspace to expose to local agent CLIs
+                        (also RELAY_WORKSPACE or WORKSPACE).
   --sandbox <mode>      Sandbox mode: "boxlite" boots a BoxLite VM and runs
                         agents inside it; "none" runs agents as local
                         processes (default; also RELAY_SANDBOX_MODE).
+  --use-local-agent-home
+                        In local mode, use this user's HOME for Claude/Codex/
+                        Kimi auth and config instead of Relay's isolated home.
   --doctor              Check backend, token, workspace, auth, and agent CLIs,
                         then exit without running the daemon loop.
   --help                Show this help message.
@@ -32,7 +38,9 @@ export interface DaemonCliArgs {
   sandboxId?: string;
   employeeId?: string;
   token?: string;
+  workspace?: string;
   sandbox?: string;
+  useLocalAgentHome: boolean;
   doctor: boolean;
   help: boolean;
   version: boolean;
@@ -43,7 +51,9 @@ export function parseArgs(argv: string[]): DaemonCliArgs {
   let sandboxId: string | undefined;
   let employeeId: string | undefined;
   let token: string | undefined;
+  let workspace: string | undefined;
   let sandbox: string | undefined;
+  let useLocalAgentHome = false;
   let doctor = false;
   let help = false;
   let version = false;
@@ -55,6 +65,8 @@ export function parseArgs(argv: string[]): DaemonCliArgs {
       version = true;
     } else if (arg === "--doctor") {
       doctor = true;
+    } else if (arg === "--use-local-agent-home") {
+      useLocalAgentHome = true;
     } else if (arg === "--backend-url") {
       const value = argv[i + 1];
       if (!value || value.startsWith("-")) {
@@ -83,6 +95,13 @@ export function parseArgs(argv: string[]): DaemonCliArgs {
       }
       token = value;
       i += 1;
+    } else if (arg === "--workspace") {
+      const value = argv[i + 1];
+      if (!value || value.startsWith("-")) {
+        throw new Error("--workspace requires a value.");
+      }
+      workspace = value;
+      i += 1;
     } else if (arg === "--sandbox") {
       const value = argv[i + 1];
       if (!value || value.startsWith("-")) {
@@ -94,7 +113,7 @@ export function parseArgs(argv: string[]): DaemonCliArgs {
       throw new Error(`Unknown argument: ${arg}`);
     }
   }
-  return { backendUrl, sandboxId, employeeId, token, sandbox, doctor, help, version };
+  return { backendUrl, sandboxId, employeeId, token, workspace, sandbox, useLocalAgentHome, doctor, help, version };
 }
 
 export async function main(argv: string[] = process.argv): Promise<void> {
@@ -123,7 +142,9 @@ export async function main(argv: string[] = process.argv): Promise<void> {
       sandboxId,
       employeeId: args.employeeId ?? process.env.RELAY_EMPLOYEE_ID,
       token: args.token ?? process.env.RELAY_DAEMON_NODE_TOKEN ?? process.env.RELAY_DAEMON_TOKEN,
+      workspacePath: args.workspace ?? process.env.RELAY_WORKSPACE ?? process.env.WORKSPACE,
       sandbox: resolveSandboxMode(args.sandbox ?? process.env.RELAY_SANDBOX_MODE),
+      agentHome: args.useLocalAgentHome ? homedir() : undefined,
     });
     for (const check of report.checks) {
       console.log(`${check.ok ? "OK" : "FAIL"} ${check.name}: ${check.detail}`);
@@ -136,7 +157,9 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     sandboxId,
     employeeId: args.employeeId ?? process.env.RELAY_EMPLOYEE_ID,
     token: args.token ?? process.env.RELAY_DAEMON_NODE_TOKEN ?? process.env.RELAY_DAEMON_TOKEN,
+    workspacePath: args.workspace ?? process.env.RELAY_WORKSPACE ?? process.env.WORKSPACE,
     sandbox: resolveSandboxMode(args.sandbox ?? process.env.RELAY_SANDBOX_MODE),
+    agentHome: args.useLocalAgentHome ? homedir() : undefined,
   });
 }
 

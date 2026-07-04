@@ -9,6 +9,7 @@ export interface DrawerProps {
   onClose: () => void;
   title: ReactNode;
   subtitle?: ReactNode;
+  kicker?: ReactNode;
   variant?: "light" | "dark";
   width?: number;
   children: ReactNode;
@@ -26,6 +27,7 @@ export function Drawer({
   onClose,
   title,
   subtitle,
+  kicker,
   variant = "light",
   width = 480,
   children,
@@ -125,6 +127,7 @@ export function Drawer({
       >
         <header className="adm-drawer-head">
           <div className="adm-drawer-head-text">
+            {kicker ? <p className="adm-drawer-kicker">{kicker}</p> : null}
             <h2 className="adm-drawer-title">{title}</h2>
             {subtitle ? <p className="adm-drawer-sub">{subtitle}</p> : null}
           </div>

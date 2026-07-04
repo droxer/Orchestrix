@@ -96,6 +96,8 @@ def daemon_start_env(request: Request, node: dict[str, Any]) -> dict[str, str]:
     env = {
         "RELAY_BACKEND_URL": backend_base_url(request),
         "RELAY_SANDBOX_ID": node["id"],
+        "RELAY_SANDBOX_MODE": "none",
+        "RELAY_USE_LOCAL_AGENT_HOME": "1",
     }
     if node.get("employeeId"):
         env["RELAY_EMPLOYEE_ID"] = node["employeeId"]
@@ -115,9 +117,14 @@ def daemon_start_command(request: Request, node: dict[str, Any]) -> str:
         node["id"],
         "--token",
         node.get("nodeToken") or "",
+        "--sandbox",
+        "none",
+        "--use-local-agent-home",
     ]
     if node.get("employeeId"):
-        parts[5:5] = ["--employee-id", node["employeeId"]]
+        parts.extend(["--employee-id", node["employeeId"]])
+    if node.get("workspacePath"):
+        parts.extend(["--workspace", node["workspacePath"]])
     return " ".join(shlex.quote(part) for part in parts)
 
 

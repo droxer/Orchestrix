@@ -232,8 +232,8 @@ def test_create_employee_rejects_invalid_node_assignment(monkeypatch) -> None:
         _bootstrap_admin(client)
         _login_admin(client)
 
-        # Node assignment is optional: onboarding without a nodeId succeeds and
-        # automatically creates a pending daemon node for the employee.
+        # Node assignment is optional: onboarding without a nodeId creates only
+        # the employee/user record. Nodes are managed separately.
         without_node = client.post("/cp/employees", json={
             "employeeId": "nodeless",
             "username": "nodeless",
@@ -241,9 +241,8 @@ def test_create_employee_rejects_invalid_node_assignment(monkeypatch) -> None:
         })
         assert without_node.status_code == 201
         without_node_body = without_node.json()
-        assert without_node_body["node"]["employeeId"] == "nodeless"
-        assert without_node_body["node"]["status"] == "provisioning"
-        assert without_node_body["node"]["nodeToken"].startswith("tok_")
+        assert without_node_body["employee"]["id"] == "nodeless"
+        assert "node" not in without_node_body
 
         missing_node = client.post("/cp/employees", json={
             "employeeId": "alice",
@@ -335,8 +334,7 @@ def test_control_panel_accepts_admin_bearer_token_for_supervisor(monkeypatch) ->
         assert created.status_code == 201
         body = created.json()
         assert body["user"]["employeeId"] == "alice"
-        assert body["node"]["employeeId"] == "alice"
-        assert body["node"]["status"] == "provisioning"
+        assert "node" not in body
 
 
 def test_control_panel_creates_pending_daemon_node_and_reuses_duplicate(monkeypatch) -> None:
@@ -360,9 +358,15 @@ def test_control_panel_creates_pending_daemon_node_and_reuses_duplicate(monkeypa
         assert body["sandboxToken"].startswith("tok_")
         assert body["nodeToken"].startswith("tok_")
         assert body["nodeToken"] in body["daemonCommand"]
+        assert "--sandbox none" in body["daemonCommand"]
+        assert "--use-local-agent-home" in body["daemonCommand"]
+        assert "--workspace /workspace/alice" in body["daemonCommand"]
         assert body["daemonEnv"]["RELAY_SANDBOX_ID"] == node["id"]
         assert body["daemonEnv"]["RELAY_EMPLOYEE_ID"] == "alice"
         assert body["daemonEnv"]["RELAY_DAEMON_NODE_TOKEN"] == body["nodeToken"]
+        assert body["daemonEnv"]["RELAY_SANDBOX_MODE"] == "none"
+        assert body["daemonEnv"]["RELAY_WORKSPACE"] == "/workspace/alice"
+        assert body["daemonEnv"]["RELAY_USE_LOCAL_AGENT_HOME"] == "1"
 
         sandboxes = client.get("/sandboxes", headers={"Authorization": f"Bearer {body['sandboxToken']}"})
         assert sandboxes.status_code == 200
@@ -385,14 +389,15 @@ def test_control_panel_creates_pending_daemon_node_and_reuses_duplicate(monkeypa
 
         mismatched_register = client.post("/daemon-nodes/register", json={
             "sandboxId": node["id"],
-            "employeeId": "mallory",
+            "employeeId": "Alice",
             "token": body["nodeToken"],
             "workspacePath": "/workspace/alice",
             "protocolVersion": 1,
             "supportedAgents": ["claude", "codex"],
             "status": "ready",
         })
-        assert mismatched_register.status_code == 401
+        assert mismatched_register.status_code == 200
+        assert mismatched_register.json()["employeeId"] == "alice"
 
         poll = client.get(f"/daemon-nodes/{node['id']}/commands", headers={"Authorization": f"Bearer {body['nodeToken']}"})
         assert poll.status_code == 200
@@ -419,6 +424,53 @@ def test_control_panel_creates_pending_daemon_node_and_reuses_duplicate(monkeypa
         listing = client.get("/cp/daemon-nodes")
         assert listing.status_code == 200
         assert all(item["id"] != node["id"] for item in listing.json()["nodes"])
+
+
+def test_control_panel_creates_unassigned_pending_daemon_node(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _login_admin(client)
+
+        response = client.post("/cp/daemon-nodes", json={
+            "workspacePath": "/workspace/shared",
+        })
+
+        assert response.status_code == 201
+        body = response.json()
+        node = body["node"]
+        assert node["id"].startswith("sbx_node_")
+        assert "employeeId" not in node
+        assert node["workspacePath"] == "/workspace/shared"
+        assert node["status"] == "provisioning"
+        assert body["sandboxToken"].startswith("tok_")
+        assert body["nodeToken"].startswith("tok_")
+        assert "--employee-id" not in body["daemonCommand"]
+        assert "RELAY_EMPLOYEE_ID" not in body["daemonEnv"]
+
+        register = client.post("/daemon-nodes/register", json={
+            "sandboxId": node["id"],
+            "token": body["nodeToken"],
+            "workspacePath": "/workspace/shared",
+            "protocolVersion": 1,
+            "supportedAgents": ["claude"],
+            "status": "ready",
+        })
+        assert register.status_code == 200
+        assert "employeeId" not in register.json()
+
+        register_with_employee = client.post("/daemon-nodes/register", json={
+            "sandboxId": node["id"],
+            "employeeId": "clark",
+            "token": body["nodeToken"],
+            "workspacePath": "/workspace/shared",
+            "protocolVersion": 1,
+            "supportedAgents": ["claude"],
+            "status": "ready",
+        })
+        assert register_with_employee.status_code == 200
+        assert "employeeId" not in register_with_employee.json()
 
 
 def test_sandbox_ui_token_can_manage_owned_sessions(monkeypatch) -> None:
@@ -858,6 +910,8 @@ def test_employee_updates_agent_role_overrides_for_own_daemon_node(monkeypatch) 
         _login_admin(admin_client)
         _create_user(admin_client, "alice", employee_id="alice")
         _create_user(admin_client, "bob", employee_id="bob")
+        created_node = admin_client.post("/cp/daemon-nodes", json={"employeeId": "alice"})
+        assert created_node.status_code == 201
         nodes = admin_client.get("/cp/daemon-nodes").json()["nodes"]
         alice_node = next(node for node in nodes if node.get("employeeId") == "alice")
 

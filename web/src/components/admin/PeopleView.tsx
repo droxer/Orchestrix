@@ -206,12 +206,7 @@ export function PeopleView({
                         type="button"
                         className="adm-emp-add-node"
                         onClick={() => onRequestAssign(member.id)}
-                        disabled={unassignedNodeCount === 0}
-                        title={
-                          unassignedNodeCount === 0
-                            ? t("admin.v2.add_node_disabled_hint")
-                            : t("admin.v2.add_node_for", { id: member.id })
-                        }
+                        title={t("admin.v2.add_node_for", { id: member.id })}
                       >
                         <Plus size={12} aria-hidden="true" />
                         <span>{t("admin.v2.add_node")}</span>

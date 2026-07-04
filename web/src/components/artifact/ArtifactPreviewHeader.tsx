@@ -1,0 +1,80 @@
+import { useState, useCallback, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
+import type { RelayArtifact } from "relay-core";
+import { artifactRawHref } from "../../lib/artifactPreview";
+
+const TEXT_KINDS: ReadonlySet<RelayArtifact["kind"]> = new Set([
+  "diff",
+  "review",
+  "summary",
+  "agent_output",
+  "command_log",
+  "test_output",
+  "plan",
+]);
+
+export function ArtifactPreviewHeader({
+  artifact,
+  sessionId,
+}: {
+  artifact: RelayArtifact;
+  sessionId: string;
+}) {
+  const { t } = useTranslation();
+  const [copied, setCopied] = useState(false);
+  const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const kindLabel = t(`artifact.kind.${artifact.kind}`, { defaultValue: artifact.kind });
+  const rawHref = artifactRawHref(sessionId, artifact.id);
+  const canCopy = TEXT_KINDS.has(artifact.kind);
+
+  useEffect(() => () => { if (resetTimerRef.current) clearTimeout(resetTimerRef.current); }, []);
+
+  const handleCopy = useCallback(async () => {
+    try {
+      const response = await fetch(rawHref);
+      const text = await response.text();
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+      resetTimerRef.current = setTimeout(() => setCopied(false), 1800);
+    } catch {
+      // Clipboard unavailable — silently no-op
+    }
+  }, [rawHref]);
+
+  return (
+    <header className="artifact-preview-header">
+      <span className={`artifact-kind-tag is-${artifact.kind}`}>{kindLabel}</span>
+      <span className="artifact-preview-header-title">{artifact.title}</span>
+      <div className="artifact-preview-actions">
+        {canCopy ? (
+          <button
+            type="button"
+            className="artifact-preview-action-btn"
+            onClick={handleCopy}
+            aria-label={copied ? t("artifact.copied") : t("artifact.action_copy")}
+          >
+            {copied ? t("artifact.copied") : t("artifact.action_copy")}
+          </button>
+        ) : null}
+        <a
+          className="artifact-preview-action-btn"
+          href={rawHref}
+          download={artifact.title}
+          aria-label={t("artifact.action_download")}
+        >
+          {t("artifact.action_download")}
+        </a>
+        <a
+          className="artifact-preview-action-btn"
+          href={rawHref}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={t("artifact.action_raw")}
+        >
+          {t("artifact.action_raw")}
+        </a>
+      </div>
+    </header>
+  );
+}

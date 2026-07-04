@@ -12,14 +12,14 @@
 
 .adm-mode-tab {
   position: relative;
-  height: 38px;
+  height: 40px;
   padding: 0 var(--space-base) 0 0;
   margin-right: var(--space-lg);
   border: none;
   background: transparent;
   color: var(--color-muted);
-  font: var(--type-micro-strong);
-  letter-spacing: var(--letter-eyebrow-wide);
+  font: var(--type-label-strong);
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   border-radius: var(--radius-none);
   cursor: pointer;
@@ -156,6 +156,16 @@ html[data-theme="light"] .adm-drawer.dark {
   gap: var(--space-xxs);
 }
 
+.adm-drawer-kicker {
+  margin: 0 0 var(--space-xxs);
+  font: var(--type-eyebrow);
+  letter-spacing: var(--letter-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+
+.adm-drawer.dark .adm-drawer-kicker { color: var(--color-primary); }
+
 .adm-drawer-title {
   margin: 0;
   font-family: var(--font-sans);
@@ -233,7 +243,7 @@ html[data-theme="light"] .adm-drawer.dark {
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-base);
+  gap: var(--space-md);
   padding-bottom: var(--space-lg);
   border-bottom: 1px solid var(--color-hairline-soft);
 }
@@ -244,26 +254,27 @@ html[data-theme="light"] .adm-drawer.dark {
 }
 
 .adm-form-legend {
-  font: var(--type-micro-strong);
-  letter-spacing: var(--letter-eyebrow);
+  font: var(--type-caption-strong);
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--color-muted);
-  /* Spacing to the first field is owned by the section's flex gap. */
-  margin-bottom: 0;
   padding: 0;
+  margin-bottom: var(--space-xxs);
+  padding-left: var(--space-sm);
+  border-left: 2px solid var(--color-primary);
 }
 
 .adm-field {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xxs);
+  gap: 6px;
 }
 
 .adm-field > span {
   display: inline-flex;
   align-items: baseline;
   gap: var(--space-xxs);
-  font: var(--type-label);
+  font: var(--type-label-md);
   color: var(--color-body);
 }
 
@@ -290,6 +301,16 @@ html[data-theme="light"] .adm-drawer.dark {
   font-size: var(--text-xs);
   color: var(--color-muted);
   line-height: 1.5;
+}
+
+.adm-form-hint--notice {
+  padding: var(--space-sm) var(--space-base);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-hairline-soft);
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  line-height: 1.55;
 }
 
 .adm-form-error {

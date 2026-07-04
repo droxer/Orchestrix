@@ -484,10 +484,7 @@ class DaemonNodeRegistry:
         if (existing and (existing.get("nodeTokenHash") or existing.get("tokenHash"))) and not daemon_node_token_matches(existing, input["token"]):
             logger.warning("Unauthorized daemon node registration", sandbox_id=input["sandboxId"])
             raise PermissionError(f"Unauthorized daemon node registration for {input['sandboxId']}: token does not match the token issued at provisioning.")
-        if existing and existing.get("employeeId") and input.get("employeeId") and input["employeeId"] != existing["employeeId"]:
-            logger.warning("Daemon node registration employee mismatch", sandbox_id=input["sandboxId"], expected_employee_id=existing["employeeId"], provided_employee_id=input["employeeId"])
-            raise PermissionError(f"Daemon node registration for {input['sandboxId']} does not match the provisioned employee.")
-        employee_id = (existing or {}).get("employeeId") or input.get("employeeId")
+        employee_id = (existing or {}).get("employeeId") if existing else input.get("employeeId")
         next_ui_hash = hash_daemon_node_token(ui_token) if ui_token else (existing or {}).get("uiTokenHash") or (existing or {}).get("tokenHash")
         agents, agent_details = agent_registration_state(input)
         agent_inventory = agent_inventory_state(input)
@@ -685,17 +682,18 @@ class DaemonNodeRegistry:
                 self.output_sequences.pop(command_id, None)
         logger.info("Daemon node deleted", sandbox_id=sandbox_id)
 
-    def provision_pending(self, employee_id: str, workspace_path: str | None = None) -> tuple[dict[str, Any], str | None, str | None]:
-        existing = self.find_by_employee(employee_id, workspace_path)
-        if existing:
-            return existing, None, None
-        sandbox_id = new_sandbox_id(employee_id)
+    def provision_pending(self, employee_id: str | None = None, workspace_path: str | None = None) -> tuple[dict[str, Any], str | None, str | None]:
+        if employee_id:
+            existing = self.find_by_employee(employee_id, workspace_path)
+            if existing:
+                return existing, None, None
+        sandbox_id = new_sandbox_id(employee_id or "node")
         ui_token = new_daemon_node_token()
         node_token = new_daemon_node_token()
         now = now_iso()
         sandbox = {
             "id": sandbox_id,
-            "employeeId": employee_id,
+            **({"employeeId": employee_id} if employee_id else {}),
             **({"workspacePath": workspace_path} if workspace_path else {}),
             "status": "provisioning",
             "agents": {agent: "unknown" for agent in AGENT_NAMES},

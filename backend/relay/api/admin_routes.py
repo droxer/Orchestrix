@@ -21,18 +21,6 @@ def _public_control_panel_node(ctx: AppContextDep, node: dict[str, Any]) -> dict
     )
 
 
-def _ensure_employee_daemon_node(
-    ctx: AppContextDep,
-    employee_id: str,
-    workspace_path: str | None = None,
-) -> dict[str, Any]:
-    node = ctx.backend.provision_daemon_node({
-        "employeeId": employee_id,
-        "workspacePath": workspace_path,
-    })
-    return _public_control_panel_node(ctx, node)
-
-
 @router.get("/cp/users")
 async def list_users(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
@@ -56,8 +44,7 @@ async def create_user(request: Request, ctx: AppContextDep) -> dict[str, Any]:
         )
     except ValueError as error:
         raise HTTPException(400, str(error)) from error
-    node = _ensure_employee_daemon_node(ctx, user["employeeId"]) if user.get("employeeId") else None
-    return {"user": user, **({"node": node} if node else {})}
+    return {"user": user}
 
 
 @router.get("/cp/departments")
@@ -184,9 +171,7 @@ async def create_employee(request: Request, ctx: AppContextDep) -> dict[str, Any
         except ValueError as error:
             raise HTTPException(409, str(error)) from error
         public_node = _public_control_panel_node(ctx, assigned_node)
-    else:
-        public_node = _ensure_employee_daemon_node(ctx, employee_id)
-    return {"employee": employee, "user": user, "node": public_node}
+    return {"employee": employee, "user": user, **({"node": public_node} if public_node else {})}
 
 
 @router.post("/cp/daemon-nodes/{node_id}/assign")
@@ -294,13 +279,12 @@ async def control_panel_nodes(request: Request, ctx: AppContextDep) -> dict[str,
 async def create_control_panel_daemon_node(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     body = await json_body(request)
-    employee_id = string_field(body, "employeeId")
-    if not employee_id:
-        raise HTTPException(400, "employeeId is required.")
+    employee_id = string_field(body, "employeeId") or None
     if hasattr(ctx.auth_store, "ensure_employee"):
-        ctx.auth_store.ensure_employee(employee_id)
+        if employee_id:
+            ctx.auth_store.ensure_employee(employee_id)
     node = ctx.backend.provision_daemon_node({
-        "employeeId": employee_id,
+        **({"employeeId": employee_id} if employee_id else {}),
         "workspacePath": string_field(body, "workspacePath") or None,
     })
     public_node = _public_control_panel_node(ctx, node)

@@ -77,18 +77,18 @@ function PlanCard({ artifact, sessionId }: { artifact: RelayArtifact; sessionId:
   );
 }
 
-function ArtifactCard({ artifact, sessionId, onOpenArtifact }: { artifact: RelayArtifact; sessionId: string; onOpenArtifact?: (artifact: RelayArtifact) => void }) {
+function ArtifactCard({ artifact, sessionId, allArtifacts, onOpenArtifact }: { artifact: RelayArtifact; sessionId: string; allArtifacts?: RelayArtifact[]; onOpenArtifact?: (artifact: RelayArtifact) => void }) {
   if (artifact.kind === "plan") {
     return <PlanCard artifact={artifact} sessionId={sessionId} />;
   }
-  return <ArtifactChip artifact={artifact} sessionId={sessionId} onOpenArtifact={onOpenArtifact} />;
+  return <ArtifactChip artifact={artifact} sessionId={sessionId} allArtifacts={allArtifacts} onOpenArtifact={onOpenArtifact} />;
 }
 
 // Chips only fetch bodies small enough that the stat is worth the transfer;
 // beyond this the chip shows byte size and the drawer fetches on demand.
 const ARTIFACT_STAT_FETCH_MAX_BYTES = 256 * 1024;
 
-function ArtifactChip({ artifact, sessionId, onOpenArtifact }: { artifact: RelayArtifact; sessionId: string; onOpenArtifact?: (artifact: RelayArtifact) => void }) {
+function ArtifactChip({ artifact, sessionId, allArtifacts, onOpenArtifact }: { artifact: RelayArtifact; sessionId: string; allArtifacts?: RelayArtifact[]; onOpenArtifact?: (artifact: RelayArtifact) => void }) {
   const { t } = useTranslation();
   const viewer = useArtifactViewer();
   const shouldLoadBody =
@@ -108,7 +108,7 @@ function ArtifactChip({ artifact, sessionId, onOpenArtifact }: { artifact: Relay
         className="artifact-chip-main"
         onClick={() => {
           if (onOpenArtifact) onOpenArtifact(artifact);
-          else viewer.open(artifact, sessionId);
+          else viewer.open(artifact, sessionId, allArtifacts);
         }}
         aria-label={t("artifact.view_named", { title: artifact.title })}
       >
@@ -188,7 +188,7 @@ export function MessageBlock({
           {message.attachments.length > 0 ? (
             <div className="attachment-list">
               {message.attachments.map((artifact) => (
-                <ArtifactCard key={artifact.id} artifact={artifact} sessionId={sessionId} onOpenArtifact={onOpenArtifact} />
+                <ArtifactCard key={artifact.id} artifact={artifact} sessionId={sessionId} allArtifacts={message.attachments} onOpenArtifact={onOpenArtifact} />
               ))}
             </div>
           ) : null}
