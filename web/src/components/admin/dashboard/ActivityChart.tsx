@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 
 interface DailyPoint {
@@ -13,14 +13,17 @@ interface DailyPoint {
 interface ActivityChartProps {
   daily: DailyPoint[];
   ready: boolean;
+  className?: string;
 }
 
 const WIDTH = 720;
 const HEIGHT = 160;
 const PADDING = { top: 12, right: 12, bottom: 24, left: 32 };
 
-export function ActivityChart({ daily, ready }: ActivityChartProps) {
+export function ActivityChart({ daily, ready, className }: ActivityChartProps) {
   const { t } = useTranslation();
+  const lineRef = useRef<SVGPathElement>(null);
+  const [lineLength, setLineLength] = useState(0);
 
   const { areaPath, linePath, gridLines, xTicks, yTicks, max } = useMemo(() => {
     const points = daily.length > 0 ? daily : Array.from({ length: 14 }, (_, i) => ({
@@ -68,8 +71,14 @@ export function ActivityChart({ daily, ready }: ActivityChartProps) {
     return { areaPath, linePath, gridLines, xTicks, yTicks, max };
   }, [daily]);
 
+  useEffect(() => {
+    const path = lineRef.current;
+    if (!path) return;
+    setLineLength(path.getTotalLength());
+  }, [linePath]);
+
   return (
-    <section className="adm-dash-card adm-dash-card--chart">
+    <section className={`adm-dash-card adm-dash-card--chart${className ? ` ${className}` : ""}`}>
       <header className="adm-dash-card-head">
         <div className="adm-dash-card-eyebrow">{t("admin.v2.dash_sessions_eyebrow")}</div>
         <h3 className="adm-dash-card-title">{t("admin.v2.dash_sessions_title")}</h3>
@@ -99,8 +108,16 @@ export function ActivityChart({ daily, ready }: ActivityChartProps) {
             strokeDasharray={i === gridLines.length - 1 ? "0" : "2 3"}
           />
         ))}
-        <path d={areaPath} fill="url(#adm-dash-area)" />
-        <path d={linePath} fill="none" stroke="var(--color-primary)" strokeWidth={1.5} />
+        <path d={areaPath} fill="url(#adm-dash-area)" className="adm-dash-chart-area" />
+        <path
+          ref={lineRef}
+          d={linePath}
+          fill="none"
+          stroke="var(--color-primary)"
+          strokeWidth={1.5}
+          className="adm-dash-chart-line"
+          style={lineLength > 0 ? { "--chart-path-length": `${lineLength}px` } as CSSProperties : undefined}
+        />
         {yTicks.map((tick) => (
           <text
             key={tick.value}

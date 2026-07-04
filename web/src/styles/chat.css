@@ -119,6 +119,40 @@
   border-radius: var(--radius-sm);
 }
 
+.chat-header .icon-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.chat-header .icon-button:disabled:hover {
+  color: var(--color-muted);
+  background: transparent;
+  border-color: transparent;
+}
+
+.chat-artifacts-button {
+  position: relative;
+}
+
+.chat-artifacts-count {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  min-width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  padding: 0 4px;
+  border: 1px solid var(--color-canvas);
+  border-radius: var(--radius-full);
+  background: var(--color-ink);
+  color: var(--color-canvas);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-ink) 18%, transparent);
+}
+
 .header-agent-tabs {
   display: inline-flex;
   align-items: center;

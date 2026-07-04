@@ -32,7 +32,7 @@
   position: absolute;
   bottom: calc(100% + 6px);
   left: 0;
-  z-index: 20;
+  z-index: var(--z-popover);
   width: 200px;
   display: grid;
   gap: 2px;
@@ -70,7 +70,7 @@
   --mode-color: var(--color-muted);
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   height: 28px;
   min-width: 120px;            /* fits "Implement" + icon + hint without reflow */
   padding: 0 10px 0 9px;

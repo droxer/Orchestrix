@@ -39,7 +39,7 @@ export function DashboardView({ nodes, employees, metrics }: DashboardViewProps)
 
   return (
     <div className="adm-dash">
-      <section className="adm-dash-kpis" aria-label={t("admin.v2.dash_kpis_label")}>
+      <section className="adm-dash-kpis relay-atmosphere" aria-label={t("admin.v2.dash_kpis_label")}>
         <KpiTile
           hero
           enterIndex={0}
@@ -83,13 +83,22 @@ export function DashboardView({ nodes, employees, metrics }: DashboardViewProps)
       </section>
 
       <div className="adm-dash-belt">
-        <ActivityChart daily={sessions.dailyCounts} ready={sessionsReady} />
-        <FleetHealthCard nodes={nodes} />
-        <TopEmployees employees={employees} nodes={nodes} ranked={sessions.topEmployees} />
-        <TokenUsageChart snapshot={tokens} compact />
+        <ActivityChart
+          daily={sessions.dailyCounts}
+          ready={sessionsReady}
+          className="relay-enter relay-enter-delay-5"
+        />
+        <FleetHealthCard nodes={nodes} className="relay-enter relay-enter-delay-6" />
+        <TopEmployees
+          employees={employees}
+          nodes={nodes}
+          ranked={sessions.topEmployees}
+          className="relay-enter relay-enter-delay-7"
+        />
+        <TokenUsageChart snapshot={tokens} compact className="relay-enter relay-enter-delay-8" />
       </div>
 
-      <ActivityFeed items={activity.items} employees={employees} />
+      <ActivityFeed items={activity.items} employees={employees} className="relay-enter relay-enter-delay-9" />
     </div>
   );
 }

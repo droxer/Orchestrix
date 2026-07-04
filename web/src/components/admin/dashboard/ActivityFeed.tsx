@@ -8,6 +8,7 @@ import type { EmployeeRecord } from "../../../types";
 interface ActivityFeedProps {
   items: DashboardActivityItem[];
   employees: EmployeeRecord[];
+  className?: string;
 }
 
 const ICONS: Record<string, { Icon: LucideIcon; tone: "info" | "good" | "bad" | "muted" }> = {
@@ -17,12 +18,12 @@ const ICONS: Record<string, { Icon: LucideIcon; tone: "info" | "good" | "bad" | 
   "task.created": { Icon: MessageSquarePlus, tone: "muted" },
 };
 
-export function ActivityFeed({ items, employees }: ActivityFeedProps) {
+export function ActivityFeed({ items, employees, className }: ActivityFeedProps) {
   const { t } = useTranslation();
   const employeeMap = new Map(employees.map((e) => [e.id, e.displayName] as const));
 
   return (
-    <section className="adm-dash-card adm-dash-card--feed">
+    <section className={`adm-dash-card adm-dash-card--feed${className ? ` ${className}` : ""}`}>
       <header className="adm-dash-card-head">
         <div className="adm-dash-card-eyebrow">{t("admin.v2.dash_feed_eyebrow")}</div>
         <h3 className="adm-dash-card-title">{t("admin.v2.dash_feed_title")}</h3>
@@ -35,6 +36,7 @@ export function ActivityFeed({ items, employees }: ActivityFeedProps) {
             const meta = ICONS[item.kind] ?? { Icon: CircleDot, tone: "muted" as const };
             const Icon = meta.Icon;
             const ownerName = item.employeeId ? employeeMap.get(item.employeeId) ?? item.employeeId : null;
+            const relativeTime = formatRelative(item.timestamp);
             return (
               <li key={`${item.kind}-${index}-${item.timestamp}`} className="adm-dash-feed-row">
                 <span className={`adm-dash-feed-icon tone-${meta.tone}`} aria-hidden="true">
@@ -42,11 +44,13 @@ export function ActivityFeed({ items, employees }: ActivityFeedProps) {
                 </span>
                 <div className="adm-dash-feed-body">
                   <span className="adm-dash-feed-message">{item.message}</span>
-                  <span className="adm-dash-feed-meta mono">
-                    {ownerName ? `${ownerName} · ` : ""}
-                    {formatRelative(item.timestamp)}
-                  </span>
+                  {ownerName ? (
+                    <span className="adm-dash-feed-owner">{ownerName}</span>
+                  ) : null}
                 </div>
+                <time className="adm-dash-feed-time mono" dateTime={item.timestamp}>
+                  {relativeTime}
+                </time>
               </li>
             );
           })}

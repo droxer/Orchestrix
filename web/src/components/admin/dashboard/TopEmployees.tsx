@@ -9,9 +9,10 @@ interface TopEmployeesProps {
   employees: EmployeeRecord[];
   nodes: ControlPanelDaemonNodeRecord[];
   ranked: Array<{ employeeId: string; sessionCount: number }>;
+  className?: string;
 }
 
-export function TopEmployees({ employees, nodes, ranked }: TopEmployeesProps) {
+export function TopEmployees({ employees, nodes, ranked, className }: TopEmployeesProps) {
   const { t } = useTranslation();
 
   const rows = useMemo(() => {
@@ -35,7 +36,7 @@ export function TopEmployees({ employees, nodes, ranked }: TopEmployeesProps) {
   }, [ranked, employees, nodes]);
 
   return (
-    <section className="adm-dash-card">
+    <section className={`adm-dash-card${className ? ` ${className}` : ""}`}>
       <header className="adm-dash-card-head">
         <div className="adm-dash-card-eyebrow">{t("admin.v2.dash_top_eyebrow")}</div>
         <h3 className="adm-dash-card-title">{t("admin.v2.dash_top_title")}</h3>

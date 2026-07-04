@@ -24,6 +24,38 @@
   grid-template-columns: 2fr 1fr 1fr 1fr;
   border: 1px solid var(--color-hairline);
   background: var(--color-canvas);
+  position: relative;
+  isolation: isolate;
+}
+
+/* Hairline grid overlay — control-room depth on the full KPI band. */
+.adm-dash-kpis.relay-atmosphere::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent calc(25% - 1px),
+      var(--color-hairline-soft) calc(25% - 1px),
+      var(--color-hairline-soft) 25%
+    ),
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 31px,
+      var(--color-hairline-soft) 31px,
+      var(--color-hairline-soft) 32px
+    );
+  opacity: 0.55;
+}
+
+.adm-dash-kpis > .adm-dash-tile {
+  position: relative;
+  z-index: 1;
 }
 
 @media (min-width: 1200px) {
@@ -175,6 +207,40 @@
 }
 
 /* ── Charts ───────────────────────────────────────────────────────── */
+@keyframes adm-chart-draw {
+  from { stroke-dashoffset: var(--chart-path-length, 1000); }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes adm-chart-area-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.adm-dash-chart-line {
+  stroke-dasharray: var(--chart-path-length, 1000);
+  stroke-dashoffset: var(--chart-path-length, 1000);
+  animation: adm-chart-draw 1.1s var(--ease-out-quint) 0.15s forwards;
+}
+
+.adm-dash-chart-area {
+  opacity: 0;
+  animation: adm-chart-area-in 0.8s ease 0.5s forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .adm-dash-chart-line {
+    stroke-dasharray: none;
+    stroke-dashoffset: 0;
+    animation: none;
+  }
+
+  .adm-dash-chart-area {
+    opacity: 1;
+    animation: none;
+  }
+}
+
 .adm-dash-chart {
   width: 100%;
   height: auto;
@@ -296,6 +362,18 @@
     var(--color-hairline) 6px,
     var(--color-hairline) 7px
   );
+  animation: adm-bar-hatch 1.2s ease forwards;
+}
+
+@keyframes adm-bar-hatch {
+  from { opacity: 0.4; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .adm-dash-bar-empty {
+    animation: none;
+  }
 }
 
 .adm-dash-stat-grid {
@@ -409,26 +487,38 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* ── Activity feed ────────────────────────────────────────────────── */
+/* ── Activity feed — vertical timeline ────────────────────────────── */
 .adm-dash-feed {
   list-style: none;
   margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  column-gap: var(--space-lg);
+  padding: 0 0 0 var(--space-xs);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.adm-dash-feed::before {
+  content: "";
+  position: absolute;
+  left: 11px;
+  top: var(--space-sm);
+  bottom: var(--space-sm);
+  width: 1px;
+  background: var(--color-hairline);
 }
 
 .adm-dash-feed-row {
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr);
+  grid-template-columns: 24px minmax(0, 1fr) auto;
   gap: var(--space-sm);
   padding: var(--space-sm) 0;
-  border-bottom: 1px solid var(--color-hairline-soft);
   align-items: start;
+  position: relative;
 }
 
-.adm-dash-feed-row:last-child { border-bottom: none; }
+.adm-dash-feed-row:not(:last-child) {
+  border-bottom: 1px solid var(--color-hairline-soft);
+}
 
 .adm-dash-feed-icon {
   display: inline-flex;
@@ -438,6 +528,9 @@
   height: 24px;
   border-radius: var(--radius-full);
   border: 1px solid currentColor;
+  background: var(--color-canvas);
+  position: relative;
+  z-index: 1;
 }
 
 .adm-dash-feed-icon.tone-good { color: var(--color-semantic-up); }
@@ -464,10 +557,29 @@
   line-height: 1.4;
 }
 
-.adm-dash-feed-meta {
+.adm-dash-feed-owner {
   font-size: var(--text-2xs);
   color: var(--color-muted);
   letter-spacing: 0.04em;
+}
+
+.adm-dash-feed-time {
+  font-size: var(--text-2xs);
+  color: var(--color-muted);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  padding-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (min-width: 900px) {
+  .adm-dash-feed-row {
+    grid-template-columns: 24px minmax(0, 1fr) 4.5rem;
+  }
+
+  .adm-dash-feed-time {
+    text-align: right;
+  }
 }
 
 /* ── Responsive ───────────────────────────────────────────────────── */
@@ -488,5 +600,4 @@
   .adm-dash-tile:nth-child(3) { border-right: none; }
   .adm-dash-tile:nth-child(2),
   .adm-dash-tile:nth-child(3) { border-bottom: 1px solid var(--color-hairline); }
-  .adm-dash-feed { grid-template-columns: minmax(0, 1fr); }
 }

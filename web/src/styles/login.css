@@ -66,7 +66,7 @@
   gap: var(--space-sm);
   color: var(--color-ink);
   opacity: 0;
-  animation: login-rise var(--duration-slow) var(--ease-out-quint) forwards;
+  animation: relay-rise var(--duration-slow) var(--ease-out-quint) forwards;
   animation-delay: 40ms;
 }
 
@@ -94,7 +94,7 @@
   letter-spacing: var(--letter-display);
   color: var(--color-ink);
   opacity: 0;
-  animation: login-rise var(--duration-editorial) var(--ease-out-quint) forwards;
+  animation: relay-rise var(--duration-editorial) var(--ease-out-quint) forwards;
   animation-delay: 120ms;
 }
 
@@ -110,7 +110,7 @@
   line-height: var(--leading-loose);
   color: var(--color-body);
   opacity: 0;
-  animation: login-rise var(--duration-editorial) var(--ease-out-quint) forwards;
+  animation: relay-rise var(--duration-editorial) var(--ease-out-quint) forwards;
   animation-delay: 200ms;
 }
 
@@ -119,7 +119,7 @@
   flex-direction: column;
   gap: var(--space-base);
   opacity: 0;
-  animation: login-rise var(--duration-editorial) var(--ease-out-quint) forwards;
+  animation: relay-rise var(--duration-editorial) var(--ease-out-quint) forwards;
   animation-delay: 280ms;
 }
 
@@ -170,7 +170,7 @@
   font-size: var(--text-sm);
   color: var(--color-muted);
   opacity: 0;
-  animation: login-rise var(--duration-editorial) var(--ease-out-quint) forwards;
+  animation: relay-rise var(--duration-editorial) var(--ease-out-quint) forwards;
   animation-delay: 360ms;
 }
 
@@ -273,7 +273,7 @@ html[data-theme="dark"] .login-atmosphere::before {
   text-transform: uppercase;
   color: var(--color-muted);
   opacity: 0;
-  animation: login-rise var(--duration-editorial) var(--ease-out-quint) forwards;
+  animation: relay-rise var(--duration-editorial) var(--ease-out-quint) forwards;
   animation-delay: 160ms;
 }
 
@@ -295,7 +295,7 @@ html[data-theme="dark"] .login-atmosphere::before {
   letter-spacing: var(--letter-display);
   color: var(--color-ink);
   opacity: 0;
-  animation: login-rise 880ms var(--ease-out-quint) forwards;
+  animation: relay-rise 880ms var(--ease-out-quint) forwards;
   animation-delay: 240ms;
 }
 
@@ -334,7 +334,7 @@ html[data-theme="dark"] .login-atmosphere::before {
   font-size: var(--text-xs);
   color: var(--color-body);
   opacity: 0;
-  animation: login-rise var(--duration-editorial) var(--ease-out-quint) forwards;
+  animation: relay-rise var(--duration-editorial) var(--ease-out-quint) forwards;
   animation-delay: 380ms;
 }
 
@@ -443,17 +443,7 @@ html[data-theme="dark"] .login-atmosphere::before {
 }
 
 /* ---------- Motion ---------------------------------------------- */
-
-@keyframes login-rise {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
+/* relay-rise keyframe is defined in empty-state.css which loads before login.css */
 
 @media (prefers-reduced-motion: reduce) {
   .login-kicker,

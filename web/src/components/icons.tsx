@@ -122,6 +122,17 @@ export const StreamWarn = withStandardStroke(TriangleAlert, "StreamWarn");
 export const StreamError = withStandardStroke(CircleAlert, "StreamError");
 export const StreamAttachment = withStandardStroke(Paperclip, "StreamAttachment");
 
+// Artifact library glyphs. These deliberately reuse the existing semantic
+// family so generated outputs scan by kind without adding a second icon style.
+export const ArtifactPlan = withStandardStroke(ListTodo, "ArtifactPlan");
+export const ArtifactDiff = withStandardStroke(FileText, "ArtifactDiff");
+export const ArtifactReview = withStandardStroke(ScanEye, "ArtifactReview");
+export const ArtifactTest = withStandardStroke(CircleCheck, "ArtifactTest");
+export const ArtifactCommand = withStandardStroke(Terminal, "ArtifactCommand");
+export const ArtifactSummary = withStandardStroke(FileText, "ArtifactSummary");
+export const ArtifactOutput = withStandardStroke(Bot, "ArtifactOutput");
+export const ArtifactFile = withStandardStroke(FileText, "ArtifactFile");
+
 // shadcn primitives (sheet, select) reach for these by their original
 // names; wrap them so they share ICON_STROKE with the rest of the app.
 export const CheckIcon = withStandardStroke(LucideCheck, "CheckIcon");

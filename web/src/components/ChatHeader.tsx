@@ -1,7 +1,7 @@
 import { useRef, type Dispatch, type SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 import type { AgentName, RelaySession } from "../types";
-import { NavConversations, NavRefresh } from "./icons";
+import { NavConversations, NavRefresh, StreamAttachment } from "./icons";
 import { AgentMark } from "./AgentMark";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -22,7 +22,7 @@ const ACTIVITY_BADGE: Record<
 };
 
 // Chat-panel header: session identity, status, agent tabs, and refresh.
-export function ChatHeader({ activeAgent, setActiveAgent, agentNames, disabledAgents, agentHealth, activeSession, runningAgent, isRefreshing, onRefresh, onBackToThreads }: {
+export function ChatHeader({ activeAgent, setActiveAgent, agentNames, disabledAgents, agentHealth, activeSession, runningAgent, isRefreshing, artifactCount, onOpenArtifacts, onRefresh, onBackToThreads }: {
   activeAgent: AgentName;
   setActiveAgent: Dispatch<SetStateAction<AgentName>>;
   agentNames: AgentName[];
@@ -31,6 +31,8 @@ export function ChatHeader({ activeAgent, setActiveAgent, agentNames, disabledAg
   activeSession: RelaySession | undefined;
   runningAgent?: AgentName;
   isRefreshing: boolean;
+  artifactCount: number;
+  onOpenArtifacts: () => void;
   onRefresh: () => void;
   onBackToThreads: () => void;
 }) {
@@ -134,6 +136,21 @@ export function ChatHeader({ activeAgent, setActiveAgent, agentNames, disabledAg
             );
           })}
         </div>
+        <button
+          className="icon-button chat-artifacts-button"
+          type="button"
+          aria-label={t("artifact.open_drawer")}
+          title={t("artifact.open_drawer")}
+          disabled={!activeSession}
+          onClick={onOpenArtifacts}
+        >
+          <StreamAttachment size={16} />
+          {artifactCount > 0 ? (
+            <span className="chat-artifacts-count mono" aria-label={t("artifact.drawer_subtitle", { count: artifactCount })}>
+              {artifactCount}
+            </span>
+          ) : null}
+        </button>
         <button className="icon-button" type="button" aria-label={t("nav.refresh")} title={t("nav.refresh")} onClick={onRefresh}>
           <NavRefresh size={16} className={isRefreshing ? "spin" : ""} />
         </button>

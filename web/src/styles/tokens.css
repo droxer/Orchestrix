@@ -123,7 +123,7 @@
   --color-primary: #2f54eb;
   --color-primary-active: #1e3bb8;
   --color-primary-disabled: #c3cefb;
-  --color-brand-soft: #eef1fe; /* tint — selected rows, active nav, running pills */
+  --color-brand-soft: color-mix(in srgb, var(--color-primary) 8%, var(--color-canvas)); /* tint — selected rows, active nav, running pills */
 
   /* Text — cool neutral ramp (zinc) */
   --color-ink: #0a0a0a;        /* headings, primary copy, emphasized body */
@@ -146,6 +146,10 @@
   /* Hairlines */
   --color-hairline: #e4e4e7;
   --color-hairline-soft: #f0f0f0;
+  /* --color-hairline-on-dark: always-dark surface hairline (diff viewer, ink-fill buttons).
+     NOT a dark-mode hairline — used on dark fills that appear in BOTH themes (e.g. the
+     diff block background, the dark artifact viewer). Consumed by artifact.css and
+     admin-v2-drawers.css. Value auto-lifts in dark mode because --color-on-dark is white. */
   --color-hairline-on-dark: color-mix(in srgb, var(--color-on-dark) 14%, transparent);
 
   /* Syntax-highlight numerals — Geist Mono numeric literal in code blocks */
@@ -156,12 +160,15 @@
      artifact palette so the transcript chip's left-border kind tag reads
      identically across the two surfaces. Tokenized (not inlined) so dark and
      contrast can retune them; consumed only by artifact.css. --color-diff-hunk
-     is the hunk header inside the always-dark diff viewer, so it does not flip. */
+     is the hunk header inside the always-dark diff viewer, so it does not flip.
+     --color-kind-review is a named alias for the "review passed" green so the
+     kind accent does not borrow the status-semantic-up token directly. */
   --color-kind-plan: #0891b2;     /* cyan */
   --color-kind-diff: #b45309;     /* amber */
   --color-kind-test: #7c3aed;     /* violet */
   --color-kind-log: #c026d3;      /* magenta */
   --color-kind-summary: #2563eb;  /* blue */
+  --color-kind-review: #10b981;   /* green — matches semantic-up but named separately as a decorative alias */
   --color-diff-hunk: #5eb3f5;
 
   /* Status — the ONLY hues in the system. Text, dots, and borders
@@ -216,7 +223,7 @@
   --space-lg: 24px;
   --space-xl: 32px;
   --space-xxl: 48px;
-  --space-section: 96px; /* editorial section rhythm */
+  --space-section: 96px; /* editorial section rhythm — consumed by admin-v2-drawers onboard section */
 
   /* Shell dimensions */
   --sidenav-w: 96px;
@@ -224,6 +231,12 @@
   --thread-w: 296px;
   --drawer-w: 360px;
   --header-h: 60px;
+
+  /* Z-index scale — three named layers cover all floating chrome. Pick by
+     role, not by number, so stacking context additions stay consistent. */
+  --z-popover: 20;  /* popovers, dropdowns, pickers (composer agent-picker) */
+  --z-drawer: 30;   /* side drawers, detail panels */
+  --z-modal: 40;    /* dialogs, full-screen overlays */
 
   /* Font families. Precision system: Geist handles every line of UI and
      display text at modern grotesque crispness; Geist Mono is the
@@ -431,7 +444,7 @@ html[data-theme="dark"] {
   --color-primary-active: #7d97ff;
   --color-primary-disabled: color-mix(in srgb, #5b7cff 30%, var(--color-surface-dark));
   --color-on-primary: #ffffff; /* white text on the cobalt action fill */
-  --color-brand-soft: rgba(91, 124, 255, 0.14);
+  --color-brand-soft: color-mix(in srgb, var(--color-primary) 14%, transparent);
 
   /* Status — text/dots authored for white; lift for legibility on dark. */
   --color-semantic-up: #2ed391;
@@ -447,6 +460,7 @@ html[data-theme="dark"] {
   --color-kind-test: #a78bfa;
   --color-kind-log: #e879f9;
   --color-kind-summary: #60a5fa;
+  --color-kind-review: #2ed391;   /* tracks semantic-up on dark canvas */
 
   /* On the dark canvas the bright status hues clear contrast as text, so the
      text-safe ramps track them rather than the light-mode deepened values. */
@@ -514,6 +528,7 @@ html[data-theme="contrast"] {
   --color-kind-test: var(--color-ink);
   --color-kind-log: var(--color-ink);
   --color-kind-summary: var(--color-ink);
+  --color-kind-review: var(--color-ink);
 
   --color-overlay: color-mix(in srgb, #000 80%, transparent);
   --shadow-soft: none;
@@ -569,6 +584,7 @@ html[data-theme="contrast-dark"] {
   --color-kind-test: var(--color-ink);
   --color-kind-log: var(--color-ink);
   --color-kind-summary: var(--color-ink);
+  --color-kind-review: var(--color-ink);
 
   --color-overlay: color-mix(in srgb, #000 85%, transparent);
   --shadow-soft: none;

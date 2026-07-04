@@ -163,6 +163,56 @@ def test_daemon_completion_indexes_generated_pptx_artifact() -> None:
     asyncio.run(run_flow())
 
 
+def test_daemon_completion_indexes_text_files_under_output_folder() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            workspace = Path(root) / "workspace"
+            workspace.mkdir()
+            output = workspace / "output"
+            output.mkdir()
+
+            session_store = LocalSessionStore(root)
+            daemon_store = LocalDaemonStore(root)
+            registry = DaemonNodeRegistry(session_store, daemon_store)
+            backend = ServerDaemonNodeBackend(registry)
+            registry.register({
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": str(workspace),
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }, "ui_token")
+
+            session = await backend.run("sbx_alice", {
+                "taskGoal": "generate a markdown report",
+                "assignments": [{"agent": "codex", "mode": "action"}],
+            })
+            [command] = registry.take_commands("sbx_alice", "node_token")
+            generated = output / "summary.md"
+            generated.write_text("# Summary\n", encoding="utf-8")
+            (workspace / "notes.md").write_text("normal docs edit\n", encoding="utf-8")
+
+            registry.handle_event("sbx_alice", {
+                "type": "run.completed",
+                "commandId": command["id"],
+                "sessionId": command["sessionId"],
+                "runId": command["runId"],
+                "agent": "codex",
+                "mode": "action",
+                "exitCode": 0,
+                "agentLog": "created output/summary.md",
+            }, "node_token")
+
+            updated = session_store.get_session(session["id"])
+            files = [item for item in updated["artifacts"] if item["kind"] == "workspace_file"]
+            assert [artifact["workspaceRelativePath"] for artifact in files] == ["output/summary.md"]
+            assert session_store.read_artifact_content(session["id"], files[0]["id"]) == b"# Summary\n"
+
+    asyncio.run(run_flow())
+
+
 def test_daemon_reported_generated_files_index_without_shared_filesystem() -> None:
     async def run_flow() -> None:
         with TemporaryDirectory() as root:
@@ -206,17 +256,26 @@ def test_daemon_reported_generated_files_index_without_shared_filesystem() -> No
                         "contentType": "application/pdf",
                         "contentBase64": base64.b64encode(b"pdf bytes").decode("ascii"),
                     },
+                    {
+                        "relativePath": "output/summary.md",
+                        "title": "summary.md",
+                        "bytes": 10,
+                        "contentType": "text/markdown",
+                        "contentBase64": base64.b64encode(b"# Summary\n").decode("ascii"),
+                    },
                     {"relativePath": "../escape.pdf", "title": "escape.pdf", "bytes": 3},
                     {"relativePath": "secrets/server.key", "title": "cover.pdf", "bytes": 3},
+                    {"relativePath": "notes.md", "title": "notes.md", "bytes": 3},
                 ],
             }, "node_token")
 
             updated = session_store.get_session(session["id"])
-            [artifact] = [item for item in updated["artifacts"] if item["kind"] == "workspace_file"]
-            assert artifact["workspaceRelativePath"] == "reports/q2.pdf"
-            assert artifact["agentRunId"] == command["runId"]
-            assert artifact["bytes"] == 9
-            assert session_store.read_artifact_content(session["id"], artifact["id"]) == b"pdf bytes"
+            files = [item for item in updated["artifacts"] if item["kind"] == "workspace_file"]
+            assert [artifact["workspaceRelativePath"] for artifact in files] == ["reports/q2.pdf", "output/summary.md"]
+            assert all(artifact["agentRunId"] == command["runId"] for artifact in files)
+            assert files[0]["bytes"] == 9
+            assert session_store.read_artifact_content(session["id"], files[0]["id"]) == b"pdf bytes"
+            assert session_store.read_artifact_content(session["id"], files[1]["id"]) == b"# Summary\n"
 
     asyncio.run(run_flow())
 

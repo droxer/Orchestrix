@@ -20,7 +20,7 @@ export function KpiTile({ eyebrow, value, hero, enterIndex = 0, delta, hint, spa
   const enterDelay = Math.min(enterIndex + 1, 4);
   return (
     <div
-      className={`adm-dash-tile relay-enter relay-enter-delay-${enterDelay}${hero ? " adm-dash-tile--hero relay-atmosphere" : ""}`}
+      className={`adm-dash-tile relay-enter relay-enter-delay-${enterDelay}${hero ? " adm-dash-tile--hero" : ""}`}
     >
       <div className="adm-dash-tile-eyebrow">{eyebrow}</div>
       <div className="adm-dash-tile-value mono">{value}</div>

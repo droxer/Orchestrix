@@ -56,14 +56,15 @@ function PlaceholderBars({ compact }: { compact?: boolean }) {
 interface TokenUsageChartProps {
   snapshot: TokenUsageSnapshot;
   compact?: boolean;
+  className?: string;
 }
 
-export function TokenUsageChart({ snapshot, compact }: TokenUsageChartProps) {
+export function TokenUsageChart({ snapshot, compact, className }: TokenUsageChartProps) {
   const { t } = useTranslation();
 
   if (!snapshot.available || snapshot.daily.length === 0) {
     return (
-      <section className="adm-dash-card">
+      <section className={`adm-dash-card${className ? ` ${className}` : ""}`}>
         <header className="adm-dash-card-head">
           <div className="adm-dash-card-eyebrow">{t("admin.v2.dash_tokens_eyebrow")}</div>
           <h3 className="adm-dash-card-title">{t("admin.v2.dash_tokens_title")}</h3>
@@ -95,7 +96,7 @@ export function TokenUsageChart({ snapshot, compact }: TokenUsageChartProps) {
   const barW = Math.max(4, (innerW - gap * Math.max(0, points.length - 1)) / Math.max(1, points.length));
 
   return (
-    <section className="adm-dash-card">
+    <section className={`adm-dash-card${className ? ` ${className}` : ""}`}>
       <header className="adm-dash-card-head">
         <div className="adm-dash-card-eyebrow">{t("admin.v2.dash_tokens_eyebrow")}</div>
         <h3 className="adm-dash-card-title">{t("admin.v2.dash_tokens_title")}</h3>

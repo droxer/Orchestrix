@@ -7,6 +7,7 @@ import type { ControlPanelDaemonNodeRecord } from "../../../types";
 
 interface FleetHealthCardProps {
   nodes: ControlPanelDaemonNodeRecord[];
+  className?: string;
 }
 
 type Tone = "good" | "info" | "bad" | "muted";
@@ -20,7 +21,7 @@ const ORDER: Array<{ key: string; tone: Tone }> = [
   { key: "unknown", tone: "muted" },
 ];
 
-export function FleetHealthCard({ nodes }: FleetHealthCardProps) {
+export function FleetHealthCard({ nodes, className }: FleetHealthCardProps) {
   const { t } = useTranslation();
 
   const { slots, total } = useMemo(() => {
@@ -41,7 +42,7 @@ export function FleetHealthCard({ nodes }: FleetHealthCardProps) {
   const grid = slots.filter((s) => s.key !== "unknown" || s.count > 0);
 
   return (
-    <section className="adm-dash-card">
+    <section className={`adm-dash-card${className ? ` ${className}` : ""}`}>
       <header className="adm-dash-card-head">
         <div className="adm-dash-card-eyebrow">{t("admin.v2.dash_health_eyebrow")}</div>
         <h3 className="adm-dash-card-title">{t("admin.v2.dash_health_title")}</h3>

@@ -215,6 +215,18 @@ def routine_next_run_date(routine: dict[str, Any]) -> date | None:
         return None
 
 
+def complete_linked_task_sessions(ctx: AppContextDep, task: dict[str, Any], outcome: str) -> None:
+    controller = SessionController(ctx.session_store)
+    for session_id in task.get("linkedSessionIds", []):
+        try:
+            session = ctx.session_store.get_session(session_id)
+        except Exception:
+            continue
+        if session.get("status") in ("completed", "failed", "cancelled"):
+            continue
+        controller.complete_session(session_id, outcome)
+
+
 @router.get("/tasks")
 async def list_tasks(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     actor = request_actor(request, ctx.auth_store)
@@ -305,6 +317,9 @@ async def update_task(task_id: str, request: Request, ctx: AppContextDep) -> dic
     })
     if agent:
         task = ctx.task_store.assign_task(task_id, agent)
+    if status == "done":
+        complete_linked_task_sessions(ctx, task, "Task marked done.")
+        task = ctx.task_store.get_task(task_id)
     return task
 
 

@@ -1119,10 +1119,13 @@ test("generated-file diff detects changed files and skips excluded directories",
   writeFile(joinPath(workspace, "node_modules", "vendored.pdf"), "ignored");
   const before = snapshotGeneratedFiles(workspace);
 
+  makeDir(joinPath(workspace, "output"));
   writeFile(joinPath(workspace, "report.html"), "<h1>hi</h1>");
   writeFile(joinPath(workspace, "data.csv"), "a,b\nc,d\n");
+  writeFile(joinPath(workspace, "output", "summary.md"), "# Summary\n");
+  writeFile(joinPath(workspace, "notes.md"), "not a generated artifact\n");
 
   const changed = diffGeneratedFiles(workspace, before);
-  assert.deepEqual(changed.map((file) => file.relativePath).sort(), ["data.csv", "report.html"]);
+  assert.deepEqual(changed.map((file) => file.relativePath).sort(), ["data.csv", "output/summary.md", "report.html"]);
   assert.deepEqual(diffGeneratedFiles(workspace, snapshotGeneratedFiles(workspace)), []);
 });

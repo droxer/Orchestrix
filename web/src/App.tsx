@@ -7,7 +7,7 @@ import {
   archiveSession, cancelRun, logout, recordDecision, renameSession, runSandbox, updateDaemonNodeAgentRoleOverrides,
 } from "./api";
 import { AGENT_NAMES } from "./types";
-import type { AgentName, AgentTaskMode, ControlPanelDaemonNodeRecord, CurrentUser, RelaySession } from "./types";
+import type { AgentName, AgentTaskMode, ControlPanelDaemonNodeRecord, CurrentUser, RelayArtifact, RelaySession } from "./types";
 import { TranscriptEmpty } from "./components/TranscriptEmpty";
 import { MessageBlock, projectMessages, isGroupedContinuation } from "./components/MessageBlock";
 import type { DerivedMessage } from "./components/MessageBlock";
@@ -43,7 +43,9 @@ import { useDialogs } from "./components/ui/DialogProvider";
 import { SideNav } from "./components/SideNav";
 import { ThreadPanel } from "./components/ThreadPanel";
 import { ChatHeader } from "./components/ChatHeader";
+import { ConversationArtifactsDrawer } from "./components/ConversationArtifactsDrawer";
 import type { AppRoute, MobileView } from "./lib/viewTypes";
+import { visibleConversationArtifacts } from "./lib/conversationArtifacts";
 import "./i18n";
 
 const agents: AgentName[] = AGENT_NAMES;
@@ -78,6 +80,8 @@ export function App() {
   const [theme, setTheme] = useState<Theme>(readTheme);
   const [language, setLanguage] = useState<Language>(readLanguage);
   const [handoffOpen, setHandoffOpen] = useState(false);
+  const [artifactsDrawerOpen, setArtifactsDrawerOpen] = useState(false);
+  const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
   const [handoffAgent, setHandoffAgent] = useState<AgentName>("codex");
   const [handoffMode, setHandoffMode] = useState<AgentTaskMode>("action");
   const [handoffNote, setHandoffNote] = useState("");
@@ -135,6 +139,7 @@ export function App() {
     }),
     [activeSessionId, composingNew, myConversations, selectedSessionId],
   );
+  const visibleArtifacts = useMemo(() => visibleConversationArtifacts(activeSession), [activeSession]);
 
   // Live SSE tail of the open conversation; merges new events into the
   // sessions cache so the active thread updates at push latency.
@@ -235,6 +240,11 @@ export function App() {
   }, [displayMessages.length, activeSession?.id]);
 
   useEffect(() => {
+    setArtifactsDrawerOpen(false);
+    setSelectedArtifactId(null);
+  }, [activeSession?.id]);
+
+  useEffect(() => {
     applyTheme(theme);
     writeTheme(theme);
     // "system" and "contrast" both follow the OS preference off any CSS media
@@ -276,6 +286,12 @@ export function App() {
     composerRef.current?.clear();
     setMobileView("chat");
     atBottomRef.current = true;
+  }
+
+  function openArtifactsDrawer(artifact?: RelayArtifact) {
+    if (!activeSession) return;
+    setSelectedArtifactId(artifact?.id ?? visibleArtifacts[0]?.id ?? null);
+    setArtifactsDrawerOpen(true);
   }
 
   async function renameConversation(session: RelaySession) {
@@ -540,6 +556,8 @@ export function App() {
           activeSession={activeSession}
           runningAgent={activeRun?.agent}
           isRefreshing={isRefreshing}
+          artifactCount={visibleArtifacts.length}
+          onOpenArtifacts={openArtifactsDrawer}
           onRefresh={() => void refresh()}
           onBackToThreads={() => setMobileView("threads")}
         />
@@ -548,7 +566,7 @@ export function App() {
           <div className="transcript-inner">
             {activeSession || pendingUserMessage ? (
               <>
-                {displayMessages.map((msg, i) => <MessageBlock key={msg.id} message={msg} sessionId={activeSession?.id ?? ""} grouped={isGroupedContinuation(displayMessages, i)} />)}
+                {displayMessages.map((msg, i) => <MessageBlock key={msg.id} message={msg} sessionId={activeSession?.id ?? ""} grouped={isGroupedContinuation(displayMessages, i)} onOpenArtifact={openArtifactsDrawer} />)}
                 {awaitingDecision ? <DecisionBar agentNames={agents} disabledAgents={selectedNode?.disabledAgents} sendDecision={sendDecision} handoffOpen={handoffOpen} setHandoffOpen={setHandoffOpen} handoffAgent={handoffAgent} setHandoffAgent={setHandoffAgent} handoffMode={handoffMode} setHandoffMode={setHandoffMode} handoffNote={handoffNote} setHandoffNote={setHandoffNote} sendHandoff={sendHandoff} /> : null}
               </>
             ) : (
@@ -572,6 +590,15 @@ export function App() {
           onCancelRun={handleCancelRun}
         />
       </section>
+
+      <ConversationArtifactsDrawer
+        open={artifactsDrawerOpen}
+        onClose={() => setArtifactsDrawerOpen(false)}
+        sessionId={activeSession?.id}
+        artifacts={visibleArtifacts}
+        selectedArtifactId={selectedArtifactId}
+        onSelectArtifact={setSelectedArtifactId}
+      />
 
       </>)}
 

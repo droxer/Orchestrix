@@ -427,6 +427,23 @@
   overflow: hidden;
 }
 
+.adm-node-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: var(--space-base);
+  bottom: var(--space-base);
+  width: 2px;
+  background: var(--color-hairline);
+}
+
+.adm-node-card.tone-good::before { background: var(--color-semantic-up); }
+.adm-node-card.tone-info::before { background: var(--color-info); }
+.adm-node-card.tone-bad::before { background: var(--color-semantic-down); }
+.adm-node-card.tone-warn::before { background: var(--color-accent-yellow); }
+.adm-node-card.tone-muted::before { background: var(--color-muted-soft); }
+.adm-node-card.tone-neutral::before { background: var(--color-muted-soft); }
+
 .adm-node-card:hover {
   box-shadow: var(--shadow-soft);
   border-color: var(--color-ink);

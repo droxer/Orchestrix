@@ -29,10 +29,14 @@ export function PulseStrip({
 }: PulseStripProps) {
   const { t } = useTranslation();
 
-  if (view === "dashboard") return null;
-
   const cells: PulseCell[] =
-    view === "people"
+    view === "dashboard"
+      ? [
+          { key: "running", value: running, label: t("admin.metric_running"), tone: "neutral" },
+          { key: "failed", value: failed, label: t("admin.metric_failed"), tone: "bad" },
+          { key: "queued", value: queued, label: t("admin.metric_queued"), tone: "neutral" },
+        ]
+      : view === "people"
       ? [
           { key: "unassigned", value: unassignedNodes, label: t("admin.metric_unassigned"), tone: "neutral" },
           { key: "running", value: running, label: t("admin.metric_running"), tone: "neutral" },
@@ -45,7 +49,11 @@ export function PulseStrip({
         ];
 
   const ariaLabel =
-    view === "people" ? t("admin.v2.pulse_people_label") : t("admin.v2.pulse_alerts_label");
+    view === "dashboard"
+      ? t("admin.v2.pulse_label")
+      : view === "people"
+        ? t("admin.v2.pulse_people_label")
+        : t("admin.v2.pulse_alerts_label");
 
   return (
     <div className="adm-pulse adm-pulse--alerts" role="group" aria-label={ariaLabel}>

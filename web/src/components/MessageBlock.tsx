@@ -77,18 +77,18 @@ function PlanCard({ artifact, sessionId }: { artifact: RelayArtifact; sessionId:
   );
 }
 
-function ArtifactCard({ artifact, sessionId }: { artifact: RelayArtifact; sessionId: string }) {
+function ArtifactCard({ artifact, sessionId, onOpenArtifact }: { artifact: RelayArtifact; sessionId: string; onOpenArtifact?: (artifact: RelayArtifact) => void }) {
   if (artifact.kind === "plan") {
     return <PlanCard artifact={artifact} sessionId={sessionId} />;
   }
-  return <ArtifactChip artifact={artifact} sessionId={sessionId} />;
+  return <ArtifactChip artifact={artifact} sessionId={sessionId} onOpenArtifact={onOpenArtifact} />;
 }
 
 // Chips only fetch bodies small enough that the stat is worth the transfer;
 // beyond this the chip shows byte size and the drawer fetches on demand.
 const ARTIFACT_STAT_FETCH_MAX_BYTES = 256 * 1024;
 
-function ArtifactChip({ artifact, sessionId }: { artifact: RelayArtifact; sessionId: string }) {
+function ArtifactChip({ artifact, sessionId, onOpenArtifact }: { artifact: RelayArtifact; sessionId: string; onOpenArtifact?: (artifact: RelayArtifact) => void }) {
   const { t } = useTranslation();
   const viewer = useArtifactViewer();
   const shouldLoadBody =
@@ -106,7 +106,10 @@ function ArtifactChip({ artifact, sessionId }: { artifact: RelayArtifact; sessio
       <button
         type="button"
         className="artifact-chip-main"
-        onClick={() => viewer.open(artifact, sessionId)}
+        onClick={() => {
+          if (onOpenArtifact) onOpenArtifact(artifact);
+          else viewer.open(artifact, sessionId);
+        }}
         aria-label={t("artifact.view_named", { title: artifact.title })}
       >
         <span className="artifact-chip-icon" aria-hidden="true">
@@ -135,12 +138,14 @@ type MessageBlockProps = {
   message: DerivedMessage;
   sessionId: string;
   grouped?: boolean;
+  onOpenArtifact?: (artifact: RelayArtifact) => void;
 };
 
 export function MessageBlock({
   message,
   sessionId,
   grouped = false,
+  onOpenArtifact,
 }: MessageBlockProps) {
   const { t } = useTranslation();
   if (message.kind === "user") {
@@ -183,7 +188,7 @@ export function MessageBlock({
           {message.attachments.length > 0 ? (
             <div className="attachment-list">
               {message.attachments.map((artifact) => (
-                <ArtifactCard key={artifact.id} artifact={artifact} sessionId={sessionId} />
+                <ArtifactCard key={artifact.id} artifact={artifact} sessionId={sessionId} onOpenArtifact={onOpenArtifact} />
               ))}
             </div>
           ) : null}
@@ -198,7 +203,7 @@ export function MessageBlock({
   if (message.artifact) {
     return (
       <div className={`msg msg-system msg-system-artifact tone-${message.tone}`}>
-        <ArtifactCard artifact={message.artifact} sessionId={sessionId} />
+        <ArtifactCard artifact={message.artifact} sessionId={sessionId} onOpenArtifact={onOpenArtifact} />
         <time className="mono">{formatTime(message.timestamp)}</time>
       </div>
     );

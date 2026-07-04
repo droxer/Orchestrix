@@ -27,6 +27,11 @@
 .relay-enter-delay-2 { animation-delay: 140ms; }
 .relay-enter-delay-3 { animation-delay: 220ms; }
 .relay-enter-delay-4 { animation-delay: 300ms; }
+.relay-enter-delay-5 { animation-delay: 380ms; }
+.relay-enter-delay-6 { animation-delay: 460ms; }
+.relay-enter-delay-7 { animation-delay: 540ms; }
+.relay-enter-delay-8 { animation-delay: 620ms; }
+.relay-enter-delay-9 { animation-delay: 700ms; }
 
 @media (prefers-reduced-motion: reduce) {
   .relay-enter {

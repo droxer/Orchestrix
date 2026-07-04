@@ -50,6 +50,12 @@ GENERATED_ARTIFACT_EXTENSIONS = frozenset({
     ".xlsx",
     ".zip",
 })
+OUTPUT_ARTIFACT_TEXT_EXTENSIONS = frozenset({
+    ".json",
+    ".log",
+    ".md",
+    ".txt",
+})
 GENERATED_ARTIFACT_EXCLUDED_DIRS = frozenset({
     ".cache",
     ".git",
@@ -80,6 +86,14 @@ WORKSPACE_ARTIFACT_CONTENT_MAX_BYTES = int(os.environ.get("RELAY_WORKSPACE_ARTIF
 ARTIFACT_SNAPSHOT_STATE_KEY = "_relay_artifact_snapshot"
 DAEMON_CAPABILITY_GENERATED_FILES = "generated-files"
 DAEMON_NODE_CAPABILITIES = frozenset({DAEMON_CAPABILITY_GENERATED_FILES})
+
+
+def _is_generated_artifact_path(relative_path: str) -> bool:
+    path = PurePosixPath(relative_path)
+    suffix = path.suffix.lower()
+    if suffix in GENERATED_ARTIFACT_EXTENSIONS:
+        return True
+    return bool(path.parts and path.parts[0] == "output" and suffix in OUTPUT_ARTIFACT_TEXT_EXTENSIONS)
 
 
 def hash_daemon_node_token(token: str | None) -> str | None:
@@ -149,8 +163,6 @@ def _workspace_artifact_candidates(workspace_path: str | None) -> list[dict[str,
                 break
             for filename in filenames:
                 path = Path(dirpath) / filename
-                if path.suffix.lower() not in GENERATED_ARTIFACT_EXTENSIONS:
-                    continue
                 if filename.startswith("~$") or path.is_symlink():
                     continue
                 try:
@@ -159,6 +171,8 @@ def _workspace_artifact_candidates(workspace_path: str | None) -> list[dict[str,
                         continue
                     relative = path.relative_to(root_resolved)
                 except (OSError, ValueError):
+                    continue
+                if not _is_generated_artifact_path(relative.as_posix()):
                     continue
                 content_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
                 files.append({
@@ -230,9 +244,9 @@ def _daemon_reported_generated_files(workspace_path: str | None, raw_files: list
         relative = _clean_workspace_relative_path(raw.get("relativePath"))
         if not relative:
             continue
-        # Gate on the actual file's extension, not the display title, so a
-        # report cannot smuggle e.g. a private key behind a document title.
-        if PurePosixPath(relative).suffix.lower() not in GENERATED_ARTIFACT_EXTENSIONS:
+        # Gate on the actual file path, not the display title, so a report
+        # cannot smuggle e.g. a private key behind a document title.
+        if not _is_generated_artifact_path(relative):
             continue
         title = raw.get("title") if isinstance(raw.get("title"), str) and raw.get("title", "").strip() else PurePosixPath(relative).name
         content: bytes | None = None

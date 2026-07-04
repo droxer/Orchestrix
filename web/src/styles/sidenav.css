@@ -45,7 +45,7 @@
   height: 48px;
   flex-shrink: 0;
   color: var(--color-ink);
-  transition: width var(--duration-base) ease, padding var(--duration-base) ease;
+  transition: width var(--duration-base) var(--ease-standard), padding var(--duration-base) var(--ease-standard);
 }
 
 .sidenav-panel[data-expanded="true"] .sidenav-brand {
@@ -69,7 +69,7 @@
   color: var(--color-ink);
   font: var(--type-title-sm);
   opacity: 0;
-  transition: opacity 150ms ease 80ms;
+  transition: opacity var(--duration-fast) var(--ease-standard) 80ms;
 }
 
 .sidenav-panel[data-expanded="true"] .sidenav-brand-word {

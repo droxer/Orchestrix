@@ -57,4 +57,19 @@ Verification: `npm run build -w web` ✓, `make web-test` ✓ (11/11), login re-
 1. ~~P2 admin font-size → tokens~~ — **closed: retracted as a false finding** (see Consistency & tokens above; typography is already fully tokenized).
 2. **Authenticated visual pass** across all gated surfaces (3-pane shell breakpoints, backlog reflow, admin dashboard grid, drawers) — blocked on a login session. Fold concrete per-surface nits back into this doc once captured.
 
+## Admin console elevation (2026-07-03)
+
+Scoped visual pass on the v2 `adm-*` admin console — dashboard signature moment, operational continuity, fleet accents, activity timeline. No font or palette changes; stays within the precision design language.
+
+**Shipped:**
+
+- **KPI band atmosphere** — `.relay-atmosphere` on the full `.adm-dash-kpis` row with hairline grid overlay; hero tile no longer double-grains.
+- **Choreographed dashboard load** — staggered `relay-enter-delay-5` through `-9` on belt cards and activity feed (KPIs keep `-1`–`-4`).
+- **Activity chart anchor** — cobalt gradient fill (existing) plus stroke draw-in and area fade-in; `prefers-reduced-motion` noop.
+- **Dashboard pulse strip** — running / failed / queued metrics visible on dashboard (same geometry as fleet).
+- **Fleet card accent** — tone-colored 2px left bar on `.adm-node-card` (mirrors attention rail; no fill tint).
+- **Activity feed timeline** — vertical spine, icon nodes on canvas, mono timestamps in dedicated column.
+
+**Verify manually:** dashboard / people / fleet at 1440 / 1024 / 390px; dark + high-contrast themes; `prefers-reduced-motion`.
+
 _Live screenshots captured: login light/dark desktop + light/dark mobile + post-change verify (`/tmp/relay-shots/login-*.png`). Gated-surface screenshots pending a session at `http://127.0.0.1:8790/`._

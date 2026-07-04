@@ -34,6 +34,13 @@ export const GENERATED_FILE_EXTENSIONS = new Set([
   ".zip",
 ]);
 
+const OUTPUT_FILE_TEXT_EXTENSIONS = new Set([
+  ".json",
+  ".log",
+  ".md",
+  ".txt",
+]);
+
 export const GENERATED_FILE_EXCLUDED_DIRS = new Set([
   ".cache",
   ".git",
@@ -72,12 +79,16 @@ const CONTENT_TYPES: Record<string, string> = {
   ".html": "text/html",
   ".jpeg": "image/jpeg",
   ".jpg": "image/jpeg",
+  ".json": "application/json",
+  ".log": "text/plain",
+  ".md": "text/markdown",
   ".pdf": "application/pdf",
   ".png": "image/png",
   ".ppt": "application/vnd.ms-powerpoint",
   ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   ".svg": "image/svg+xml",
   ".tsv": "text/tab-separated-values",
+  ".txt": "text/plain",
   ".webp": "image/webp",
   ".xls": "application/vnd.ms-excel",
   ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -98,6 +109,11 @@ export type GeneratedFileSnapshot = Record<string, { mtimeMs: number; bytes: num
 function fileExtension(name: string): string {
   const dot = name.lastIndexOf(".");
   return dot > 0 ? name.slice(dot).toLowerCase() : "";
+}
+
+function isOutputFile(relativePath: string, extension: string): boolean {
+  const [first] = relativePath.split("/");
+  return first === "output" && OUTPUT_FILE_TEXT_EXTENSIONS.has(extension);
 }
 
 function listCandidates(workspacePath: string | undefined): GeneratedFileCandidate[] {
@@ -128,7 +144,6 @@ function listCandidates(workspacePath: string | undefined): GeneratedFileCandida
       }
       if (!entry.isFile() || entry.name.startsWith("~$")) continue;
       const extension = fileExtension(entry.name);
-      if (!GENERATED_FILE_EXTENSIONS.has(extension)) continue;
       let stat;
       try {
         stat = lstatSync(path);
@@ -136,9 +151,11 @@ function listCandidates(workspacePath: string | undefined): GeneratedFileCandida
         continue;
       }
       if (!stat.isFile()) continue;
+      const relativePath = relative(workspacePath, path).split(sep).join("/");
+      if (!GENERATED_FILE_EXTENSIONS.has(extension) && !isOutputFile(relativePath, extension)) continue;
       files.push({
         path,
-        relativePath: relative(workspacePath, path).split(sep).join("/"),
+        relativePath,
         title: entry.name,
         bytes: stat.size,
         mtimeMs: stat.mtimeMs,

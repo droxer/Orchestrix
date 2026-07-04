@@ -89,6 +89,39 @@ def test_task_create_update_and_claim_next(monkeypatch) -> None:
         assert claimed.json()["task"]["status"] == "running"
 
 
+def test_marking_task_done_completes_linked_running_session(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _create_user(client, "alice", employee_id="alice")
+
+        created = client.post("/tasks", json={
+            "title": "Write the report",
+            "ownerEmployeeId": "alice",
+            "assigneeEmployeeId": "alice",
+            "createSession": True,
+        })
+        assert created.status_code == 201
+        task = created.json()
+        [session_id] = task["linkedSessionIds"]
+
+        session = client.get(f"/sessions/{session_id}")
+        assert session.status_code == 200
+        assert session.json()["status"] == "running"
+
+        updated = client.patch(f"/tasks/{task['id']}", json={"status": "done"})
+        assert updated.status_code == 200
+        assert updated.json()["status"] == "done"
+
+        completed = client.get(f"/sessions/{session_id}")
+        assert completed.status_code == 200
+        body = completed.json()
+        assert body["status"] == "completed"
+        assert body["finalOutcome"] == "Task marked done."
+        assert body["events"][-1]["type"] == "session.completed"
+
+
 def test_assigned_backlog_waits_for_scheduler_and_start_can_dispatch_manually(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
