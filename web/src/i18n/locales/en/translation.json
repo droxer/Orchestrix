@@ -7,6 +7,7 @@
     "cancel": "Cancel"
   },
   "skip_to_conversation": "Skip to thread",
+  "skip_to_content": "Skip to content",
   "nav": {
     "conversations": "Threads",
     "chats": "Chats",
@@ -28,7 +29,8 @@
     "expand": "Expand",
     "collapse_sidebar": "Collapse sidebar",
     "expand_sidebar": "Expand sidebar",
-    "settings": "Settings"
+    "settings": "Settings",
+    "mobile_section": "Relay"
   },
   "thread": {
     "messages": "Messages",

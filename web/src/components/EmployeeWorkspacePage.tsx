@@ -123,7 +123,7 @@ export function EmployeeWorkspacePage({
   }
 
   return (
-    <section className="workspace-page" aria-label={t("workspace.title")}>
+    <section id="workspace-panel" className="workspace-page" aria-label={t("workspace.title")} tabIndex={-1}>
       <PageHeader
         title={t("workspace.title")}
         count={brief ? t("workspace.sub", { employee: displayName }) : t("workspace.loading")}

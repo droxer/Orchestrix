@@ -76,15 +76,17 @@
   flex-shrink: 0;
 }
 
-/* Master-detail body — left category rail + content panel */
+/* Master-detail body — left category rail + content panel + account footer */
 .pref-body {
   flex: 1;
   min-height: 0;
   display: grid;
   grid-template-columns: 150px 1fr;
+  grid-template-rows: minmax(0, 1fr) auto;
 }
 
 .pref-nav {
+  grid-row: 1;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -152,10 +154,44 @@
    tallest (Appearance) instead of the modal resizing on tab switch.
    Content owns the scroll so the header and rail stay pinned. */
 .pref-content {
+  grid-row: 1;
   min-width: 0;
   min-height: 18rem;
   padding: var(--space-lg);
   overflow-y: auto;
+}
+
+.pref-account {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-start;
+  padding: var(--space-sm) var(--space-lg) var(--space-base);
+  border-top: 1px solid var(--color-hairline-soft);
+}
+
+.pref-logout {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: 44px;
+  padding: 0 var(--space-base);
+  border: 1px solid var(--border-danger);
+  border-radius: var(--radius-sm);
+  background: var(--color-canvas);
+  color: var(--color-danger-text);
+  font: var(--type-label-strong);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+}
+
+.pref-logout:hover {
+  background: color-mix(in srgb, var(--color-semantic-down) 8%, var(--color-canvas));
+  border-color: var(--color-semantic-down);
+}
+
+.pref-logout:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-focus-danger);
 }
 
 .pref-section-label {
@@ -167,64 +203,11 @@
 }
 
 .pref-empty,
-.pref-group-note {
+.pref-section-note {
   margin: 0 0 var(--space-md);
   color: var(--color-muted);
   font: var(--type-caption);
   line-height: 1.5;
-}
-
-.pref-agent-role-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-}
-
-.pref-agent-role-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-base);
-  padding: var(--space-sm);
-  border: 1px solid var(--color-hairline-soft);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-soft);
-}
-
-.pref-agent-role-copy {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.pref-agent-role-name {
-  font: var(--type-caption-strong-sm);
-  color: var(--color-ink);
-  text-transform: uppercase;
-  letter-spacing: var(--letter-caps);
-}
-
-.pref-agent-role-sub {
-  font-size: var(--text-xs);
-  color: var(--color-muted);
-}
-
-.pref-agent-role-row select {
-  min-width: 9rem;
-  height: 2rem;
-  padding: 0 var(--space-xs);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-xs);
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font: var(--type-caption-strong-sm);
-}
-
-.pref-agent-role-row select:focus-visible {
-  outline: none;
-  border-color: var(--color-primary);
-  box-shadow: var(--ring-focus);
 }
 
 .pref-actions {
@@ -255,11 +238,8 @@
   font-size: var(--text-xs);
 }
 
-/* ── Theme cards ──────────────────────────────────────────────────────────── */
+/* ── Shared option rows (theme, language, agents) ─────────────────────────── */
 
-/* Sub-group eyebrow inside the appearance radiogroup. Separates the base
-   themes from the high-contrast accessibility variants without splitting the
-   single radiogroup. */
 .pref-group-label {
   margin: 0 0 var(--space-sm);
   font: var(--type-eyebrow);
@@ -268,316 +248,254 @@
   color: var(--color-muted);
 }
 
-/* Second group sits below the first with breathing room. */
-.pref-theme-grid--contrast + .pref-group-label,
-.pref-theme-grid + .pref-group-label {
+.pref-group-label--spaced {
   margin-top: var(--space-lg);
 }
 
-.pref-theme-grid {
-  display: grid;
-  gap: var(--space-sm);
-}
-
-/* Base themes (light/dark/system) fill a 3-up row; the two high-contrast
-   variants sit in a 2-up row — together they replace the old 5-card grid
-   that left an orphan. */
-.pref-theme-grid--base {
-  grid-template-columns: repeat(3, 1fr);
-}
-
-.pref-theme-grid--contrast {
-  grid-template-columns: repeat(2, 1fr);
-}
-
-.pref-theme-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-xs);
-  padding: var(--space-xs);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-md);
-  background: var(--color-canvas);
-  cursor: pointer;
-  transition: border-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
-  text-align: center;
-}
-
-.pref-theme-card:hover {
-  border-color: var(--color-muted-soft);
-  background: var(--color-surface-soft);
-}
-
-.pref-theme-card.selected {
-  border-color: var(--color-primary);
-  background: color-mix(in srgb, var(--color-primary) 4%, var(--color-canvas));
-}
-
-/* Keyboard focus is a separate signal from selection — the ring is reserved
-   for :focus-visible so a focused-but-selected card stays distinguishable. */
-.pref-theme-card:focus-visible,
-.pref-lang-btn:focus-visible {
-  outline: none;
-  border-color: var(--color-primary);
-  box-shadow: var(--ring-focus);
-}
-
-.pref-theme-preview-wrap {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 88 / 56;
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  background: var(--color-surface-strong);
-}
-
-/* A theme swatch must depict a FIXED theme regardless of the active one, so
-   the light preview cannot use the flipping semantic tokens (--color-canvas,
-   --color-ink, …) — under dark mode they'd render the "Light" swatch dark.
-   Mirror the dark preview, which already pins non-flipping primitives: ink
-   and rail reuse --color-surface-dark (#0d0c0a, never flips); the light
-   surface tints are literal because no non-flipping light alias exists. */
-.pref-theme-preview {
-  --preview-canvas: #ffffff;
-  --preview-rail: var(--color-surface-dark);
-  --preview-list: #faf8f4;
-  --preview-card: #f5f2ec;
-  --preview-line: #eae5dd;
-  --preview-ink: var(--color-surface-dark);
-  --preview-action: #115e59;
-  display: grid;
-  grid-template-columns: 16% 27% 1fr;
-  width: 100%;
-  height: 100%;
-  background: var(--preview-canvas);
-}
-
-.pref-theme-preview[data-preview="dark"] {
-  --preview-canvas: #0d0c0a;
-  --preview-rail: #0d0c0a;
-  --preview-list: #1a1815;
-  --preview-card: color-mix(in srgb, #ffffff 12%, #0d0c0a);
-  --preview-line: color-mix(in srgb, #ffffff 14%, #0d0c0a);
-  --preview-ink: #fdfcfa;
-  --preview-action: #2dd4bf;
-}
-
-.pref-theme-preview[data-preview="system"] {
-  --preview-canvas: linear-gradient(110deg, #ffffff 0 49%, var(--color-surface-dark) 50% 100%);
-  --preview-list: linear-gradient(110deg, #faf8f4 0 49%, var(--color-surface-dark-elevated) 50% 100%);
-  --preview-card: linear-gradient(110deg, #f5f2ec 0 49%, color-mix(in srgb, var(--color-on-dark) 9%, var(--color-surface-dark)) 50% 100%);
-  --preview-line: color-mix(in srgb, #171412 28%, #eae5dd);
-  --preview-ink: #171412;
-  --preview-action: #115e59;
-}
-
-/* High contrast (light) — solid black-on-white, the maximal-legibility
-   light theme. Pinned primitives so the swatch never flips. */
-.pref-theme-preview[data-preview="contrast"] {
-  --preview-canvas: #ffffff;
-  --preview-rail: #000000;
-  --preview-list: #f5f5f5;
-  --preview-card: #ebebeb;
-  --preview-line: #000000;
-  --preview-ink: #000000;
-  --preview-action: #0f4c47;
-}
-
-/* High contrast (dark) — the mirror: solid white-on-black. */
-.pref-theme-preview[data-preview="contrast-dark"] {
-  --preview-canvas: #000000;
-  --preview-rail: #000000;
-  --preview-list: #0d0d0d;
-  --preview-card: #1c1c1c;
-  --preview-line: #ffffff;
-  --preview-ink: #ffffff;
-  --preview-action: #5eead4;
-}
-
-.pref-preview-rail,
-.pref-preview-list,
-.pref-preview-chat {
-  display: grid;
-  align-content: start;
-}
-
-.pref-preview-rail {
-  gap: var(--space-xxs);
-  padding: var(--space-xs) var(--space-xxs);
-  background: var(--preview-rail);
-}
-
-.pref-preview-rail span {
-  width: 9px;
-  height: 3px;
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--color-on-dark) 22%, transparent);
-}
-
-.pref-preview-rail span:first-child {
-  height: 9px;
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--color-on-dark) 16%, transparent);
-}
-
-.pref-preview-list {
-  gap: var(--space-xs);
-  padding: 8px 4px;
-  background: var(--preview-list);
-}
-
-.pref-preview-list span,
-.pref-preview-chat span {
-  height: 4px;
-  border-radius: var(--radius-sm);
-  background: var(--preview-line);
-}
-
-.pref-preview-list span:nth-child(1) { width: 72%; }
-.pref-preview-list span:nth-child(2) { width: 92%; }
-.pref-preview-list span:nth-child(3) { width: 62%; }
-
-.pref-preview-chat {
-  gap: 8px;
-  padding: var(--space-xs) var(--space-xxs);
-  background: var(--preview-canvas);
-}
-
-.pref-preview-chat span:first-child {
-  width: 46%;
-  height: 5px;
-  background: var(--preview-ink);
-}
-
-.pref-preview-chat span:nth-child(2) {
-  width: 72%;
-  background: var(--preview-card);
-}
-
-.pref-preview-chat span:nth-child(3) {
-  width: 72%;
-  justify-self: end;
-  background: var(--preview-action);
-}
-
-.pref-preview-chat span:nth-child(4) {
-  width: 88%;
-  align-self: end;
-  margin-top: auto;
-  background: var(--preview-list);
-  outline: 1px solid var(--preview-line);
-}
-
-.pref-theme-check {
-  position: absolute;
-  top: var(--space-xxs);
-  right: var(--space-xxs);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.25));
-}
-
-.pref-theme-label {
-  font: var(--type-caption-strong-sm);
-  color: var(--color-ink);
-}
-
-.pref-theme-sub {
-  font-size: var(--text-xs);
-  color: var(--color-muted);
-  line-height: 1.3;
-}
-
-/* ── Language grid ────────────────────────────────────────────────────────── */
-
-/* Single column — a short locale list reads as a clean stack and avoids the
-   orphan cell a 2-column grid leaves when the count is odd. */
-.pref-lang-grid {
+.pref-option-list {
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
 }
 
-/* Horizontal list rows — native name leads, English label (+ selected check)
-   trails, centered so the trailing check icon aligns cleanly with the text. */
-.pref-lang-btn {
+/* Badge · label stack · trailing control — one rhythm across all tabs. */
+.pref-option-row,
+.pref-agent-row {
   display: flex;
   flex-direction: row;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-base);
   padding: var(--space-sm) var(--space-base);
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-md);
   background: var(--color-canvas);
-  cursor: pointer;
   text-align: left;
-  transition: border-color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    background var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
 }
 
-.pref-lang-btn:hover {
+.pref-option-row {
+  cursor: pointer;
+}
+
+.pref-option-row:hover,
+.pref-agent-row:hover {
   border-color: var(--color-muted-soft);
   background: var(--color-surface-soft);
 }
 
-.pref-lang-btn.selected {
+.pref-option-row.selected {
   border-color: var(--color-primary);
   background: color-mix(in srgb, var(--color-primary) 5%, var(--color-canvas));
 }
 
-.pref-lang-native {
+.pref-option-row:focus-visible {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: var(--ring-focus);
+}
+
+.pref-option-copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pref-option-label {
   font: var(--type-label-strong);
   color: var(--color-ink);
 }
 
-/* Right cluster: English label + (when selected) a check, matching the
-   theme cards' selected affordance. Unselected, this collapses to just the
-   label so the row looks identical to before. */
-.pref-lang-meta {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-}
-
-.pref-lang-label {
-  text-align: right;
+.pref-option-sub {
   font-size: var(--text-xs);
   color: var(--color-muted);
-  font-weight: 400;
+  line-height: 1.35;
 }
 
-.pref-lang-btn.selected .pref-lang-label {
-  color: color-mix(in srgb, var(--color-primary) 70%, var(--color-muted));
+.pref-option-row.selected .pref-option-sub {
+  color: color-mix(in srgb, var(--color-primary) 65%, var(--color-muted));
 }
 
-.pref-lang-check {
+.pref-option-check {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-@media (max-width: 600px) {
+/* ── Theme swatches ───────────────────────────────────────────────────────── */
+
+.pref-theme-swatch {
+  flex-shrink: 0;
+  width: 2.75rem;
+  height: 1.75rem;
+  border-radius: var(--radius-xs);
+  border: 1px solid color-mix(in srgb, var(--color-ink) 10%, transparent);
+  position: relative;
+  overflow: hidden;
+}
+
+.pref-theme-swatch::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+}
+
+.pref-theme-swatch[data-tone="light"] {
+  background: #faf8f4;
+}
+
+.pref-theme-swatch[data-tone="light"]::after {
+  background: #115e59;
+}
+
+.pref-theme-swatch[data-tone="dark"] {
+  background: #0d0c0a;
+  border-color: color-mix(in srgb, #ffffff 14%, transparent);
+}
+
+.pref-theme-swatch[data-tone="dark"]::after {
+  background: #2dd4bf;
+}
+
+.pref-theme-swatch[data-tone="system"] {
+  background: linear-gradient(135deg, #faf8f4 0 50%, #0d0c0a 50% 100%);
+  border-color: color-mix(in srgb, var(--color-ink) 10%, transparent);
+}
+
+.pref-theme-swatch[data-tone="system"]::after {
+  background: linear-gradient(90deg, #115e59 0 50%, #2dd4bf 50% 100%);
+}
+
+.pref-theme-swatch[data-tone="contrast"] {
+  background: #ffffff;
+  border: 2px solid #000000;
+}
+
+.pref-theme-swatch[data-tone="contrast"]::after {
+  background: #000000;
+  height: 4px;
+}
+
+.pref-theme-swatch[data-tone="contrast-dark"] {
+  background: #000000;
+  border: 2px solid #ffffff;
+}
+
+.pref-theme-swatch[data-tone="contrast-dark"]::after {
+  background: #ffffff;
+  height: 4px;
+}
+
+/* ── Language badges ──────────────────────────────────────────────────────── */
+
+.pref-lang-badge {
+  flex-shrink: 0;
+  width: 2.75rem;
+  height: 1.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--color-hairline);
+  background: var(--color-surface-soft);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: var(--letter-caps);
+  color: var(--color-ink);
+}
+
+/* ── Agent rows ───────────────────────────────────────────────────────────── */
+
+.pref-agent-badge {
+  flex-shrink: 0;
+  width: 2.75rem;
+  height: 1.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--color-hairline);
+  background: var(--color-surface-soft);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: var(--letter-caps);
+  color: var(--color-ink);
+  text-transform: lowercase;
+}
+
+.pref-agent-select {
+  flex-shrink: 0;
+  min-width: 8.5rem;
+  height: 2.25rem;
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font: var(--type-caption-strong-sm);
+  cursor: pointer;
+}
+
+.pref-agent-select:focus-visible {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: var(--ring-focus);
+}
+
+.pref-agent-select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+@media (max-width: 820px) {
   .pref-modal {
     max-height: 92dvh;
     border-radius: var(--radius-lg);
   }
 
+  .pref-agent-row {
+    flex-wrap: wrap;
+  }
+
+  .pref-agent-select {
+    flex-basis: 100%;
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+  }
+
+  .pref-option-row {
+    min-height: 44px;
+  }
+
   /* Rail collapses to a horizontal scroller above the content */
   .pref-body {
     grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr;
+    grid-template-rows: auto minmax(0, 1fr) auto;
   }
 
   .pref-nav {
+    grid-row: 1;
     flex-direction: row;
     gap: var(--space-xxs);
     overflow-x: auto;
     padding: var(--space-sm);
     border-right: none;
     border-bottom: 1px solid var(--color-hairline-soft);
+  }
+
+  .pref-content {
+    grid-row: 2;
   }
 
   .pref-nav-item {
@@ -591,6 +509,11 @@
     min-height: 0;
   }
 
+  .pref-account {
+    grid-row: 3;
+    padding-inline: var(--space-base);
+  }
+
   /* Active cue moves to the bottom edge in the horizontal rail */
   .pref-nav-item.active::before {
     left: var(--space-sm);
@@ -601,10 +524,6 @@
     height: 2px;
     border-radius: var(--radius-sm) var(--radius-sm) 0 0;
     transform: none;
-  }
-
-  .pref-theme-grid {
-    gap: var(--space-xs);
   }
 }
 

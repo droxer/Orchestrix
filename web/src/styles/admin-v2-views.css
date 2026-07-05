@@ -1023,6 +1023,12 @@
   }
 }
 
+@media (max-width: 820px) {
+  .adm-rail-fab {
+    bottom: calc(58px + max(env(safe-area-inset-bottom), 4px) + var(--space-sm));
+  }
+}
+
 .adm-rail-title {
   margin: 0;
   font: var(--type-eyebrow);

@@ -49,6 +49,22 @@ import "./i18n";
 
 const agents: AgentName[] = AGENT_NAMES;
 
+const WORK_ROUTE_LABEL_KEYS: Record<Exclude<AppRoute, "main">, string> = {
+  workspace: "nav.workspace",
+  backlog: "nav.backlog",
+  routine: "nav.routine",
+  channels: "nav.channels",
+  admin: "nav.admin",
+};
+
+const WORK_ROUTE_SKIP_IDS: Record<Exclude<AppRoute, "main">, string> = {
+  workspace: "workspace-panel",
+  backlog: "backlog-panel",
+  routine: "routine-panel",
+  channels: "channels-panel",
+  admin: "admin-panel",
+};
+
 function useStableEvent<TArgs extends unknown[], TResult>(handler: (...args: TArgs) => TResult): (...args: TArgs) => TResult {
   const handlerRef = useRef(handler);
   useEffect(() => {
@@ -169,6 +185,11 @@ export function App() {
   const activeConversationLabel = activeSession
     ? (activeSession.title?.trim() || activeSession.taskGoal)
     : t("thread.new_conversation");
+
+  const skipLinkHref = useMemo(() => {
+    if (route === "main") return mobileView === "threads" ? "#thread-panel" : "#chat-panel";
+    return `#${WORK_ROUTE_SKIP_IDS[route]}`;
+  }, [route, mobileView]);
 
   const awaitingDecision = useMemo(() => isAwaitingFeedbackDecision(activeSession), [activeSession]);
 
@@ -469,15 +490,38 @@ export function App() {
 
   return (
     <main className="messenger-shell" data-mobile-view={mobileView} data-route={route} data-sidenav={sidenavExpanded ? "open" : "closed"}>
-      <a className="skip-link" href="#chat-panel">{t("skip_to_conversation")}</a>
+      <a className="skip-link" href={skipLinkHref}>{t("skip_to_content")}</a>
 
-      <div className="mobile-topbar" aria-label={t("nav.conversations")}>
-        <button type="button" className={mobileView === "threads" ? "active" : ""} aria-label={t("nav.conversations")} aria-pressed={mobileView === "threads"} onClick={() => setMobileView("threads")}>
-          <NavConversations size={16} /><span>{t("nav.chats")}</span>
-        </button>
-        <button type="button" className={mobileView === "chat" ? "active" : ""} aria-pressed={mobileView === "chat"} onClick={() => setMobileView("chat")}>
-          <span>{activeConversationLabel}</span>
-        </button>
+      <div
+        className={`mobile-topbar ${route === "main" ? "mobile-topbar--chat" : "mobile-topbar--route"}`}
+        aria-label={route === "main" ? t("nav.conversations") : t(WORK_ROUTE_LABEL_KEYS[route])}
+      >
+        {route === "main" ? (
+          <>
+            <button
+              type="button"
+              className={mobileView === "threads" ? "active" : ""}
+              aria-label={t("nav.conversations")}
+              aria-pressed={mobileView === "threads"}
+              onClick={() => { setRoute("main"); setMobileView("threads"); }}
+            >
+              <NavConversations size={16} /><span>{t("nav.chats")}</span>
+            </button>
+            <button
+              type="button"
+              className={mobileView === "chat" ? "active" : ""}
+              aria-pressed={mobileView === "chat"}
+              onClick={() => { setRoute("main"); setMobileView("chat"); }}
+            >
+              <span>{activeConversationLabel}</span>
+            </button>
+          </>
+        ) : (
+          <div className="mobile-topbar-route">
+            <span className="mobile-topbar-eyebrow">{t("nav.mobile_section")}</span>
+            <span className="mobile-topbar-title">{t(WORK_ROUTE_LABEL_KEYS[route])}</span>
+          </div>
+        )}
         <button type="button" className={`mobile-settings ${prefsOpen ? "active" : ""}`} aria-label={t("nav.settings")} aria-haspopup="dialog" aria-expanded={prefsOpen} onClick={() => setPrefsOpen((v) => !v)}>
           <NavPreferences size={16} />
         </button>
@@ -602,6 +646,7 @@ export function App() {
       <PreferencesDialog
         open={prefsOpen}
         onClose={() => setPrefsOpen(false)}
+        onLogout={() => void handleLogout()}
         preferences={{
           theme,
           onThemeChange: setTheme,

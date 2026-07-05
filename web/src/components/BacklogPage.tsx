@@ -792,7 +792,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
   }
 
   return (
-    <section className="backlog-page" data-density="compact" aria-label={t("backlog.title")}>
+    <section id="backlog-panel" className="backlog-page" data-density="compact" aria-label={t("backlog.title")} tabIndex={-1}>
       <PageHeader
         title={t("backlog.title")}
         count={t("backlog.sub", { count: tasks.length })}

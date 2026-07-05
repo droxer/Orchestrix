@@ -7,6 +7,7 @@
     "cancel": "取消"
   },
   "skip_to_conversation": "跳至對話",
+  "skip_to_content": "跳至內容",
   "nav": {
     "conversations": "對話",
     "chats": "訊息",
@@ -28,7 +29,8 @@
     "expand": "展開",
     "collapse_sidebar": "收合側欄",
     "expand_sidebar": "展開側欄",
-    "settings": "設定"
+    "settings": "設定",
+    "mobile_section": "Relay"
   },
   "thread": {
     "messages": "訊息",

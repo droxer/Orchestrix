@@ -59,6 +59,7 @@
 @import "./styles/admin-v2-views.css";
 @import "./styles/admin-v2-drawers.css";
 @import "./styles/admin-v2-dashboard.css";
+@import "./styles/mobile-overlays.css";
 
 /* 6. Responsive + a11y — must come last to win source order */
 @import "./styles/responsive.css";

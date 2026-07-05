@@ -18,7 +18,8 @@
 }
 
 @media (max-width: 820px) {
-  .messenger-shell[data-route="admin"] {
+  .messenger-shell[data-route="admin"],
+  .messenger-shell[data-route="admin"][data-sidenav="open"] {
     grid-template-columns: 1fr;
     grid-template-rows: auto minmax(0, 1fr);
   }

@@ -33,9 +33,9 @@ export function TaskBoardHeaderActions({
       >
         <NavRefresh size={16} />
       </Button>
-      <Button type="button" onClick={onCreate}>
+      <Button type="button" className="task-board-create-btn" aria-label={createLabel} onClick={onCreate}>
         <ActionCompose size={16} />
-        <span>{createLabel}</span>
+        <span className="task-board-create-label">{createLabel}</span>
       </Button>
     </>
   );

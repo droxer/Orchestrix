@@ -67,12 +67,11 @@
 /* Mode chip — single-state status indicator styled after Codex/Claude Code
    CLI mode pickers. Click cycles to the next mode. */
 .mode-chip {
-  --mode-color: var(--color-muted);
   display: inline-flex;
   align-items: center;
   gap: 6px;
   height: 28px;
-  min-width: 120px;            /* fits "Implement" + icon + hint without reflow */
+  min-width: 132px;            /* fits "Agent" / "智能体" + icon + hint without reflow */
   padding: 0 10px 0 9px;
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-sm);
@@ -88,10 +87,16 @@
     transform var(--duration-fast) var(--ease-standard);
 }
 
-/* Mode distinction lives in the glyph dot: accent-yellow (Agent) vs
-   info blue (Ask) — status hues only, never action fills. */
-.mode-chip[data-mode="action"] { --mode-dot: var(--color-accent-yellow); }
-.mode-chip[data-mode="ask"]    { --mode-dot: var(--color-info); }
+/* Mode distinction: teal dot + tinted icon for Agent (power mode), muted dot
+   for Ask — status hues only, never action fills. */
+.mode-chip[data-mode="action"] {
+  --mode-dot: var(--color-primary);
+  --mode-icon: var(--color-primary);
+}
+.mode-chip[data-mode="ask"] {
+  --mode-dot: var(--color-muted);
+  --mode-icon: var(--color-ink);
+}
 
 .mode-chip:hover {
   background: var(--color-surface-strong);
@@ -105,23 +110,35 @@
 }
 
 .mode-chip-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   flex: 0 0 auto;
-  color: var(--color-ink);
   transition: transform var(--duration-base) var(--ease-spring);
+  animation: mode-chip-icon-in var(--duration-fast) var(--ease-standard);
 }
 
 .mode-chip-icon::before {
   content: "";
-  display: inline-block;
+  display: block;
   width: 6px;
   height: 6px;
-  margin-right: 6px;
   border-radius: var(--radius-full);
   background: var(--mode-dot);
-  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.mode-chip-icon svg {
+  color: var(--mode-icon);
+  flex-shrink: 0;
 }
 
 .mode-chip:hover .mode-chip-icon { transform: rotate(-4deg); }
+
+@keyframes mode-chip-icon-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
 
 .mode-chip-label {
   flex: 1 1 auto;
@@ -151,6 +168,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .mode-chip-icon { animation: none; }
   .mode-chip-hint { transition: opacity var(--duration-fast) var(--ease-standard); transform: none !important; }
 }
 

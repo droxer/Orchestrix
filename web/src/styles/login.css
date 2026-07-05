@@ -24,6 +24,36 @@
   .login-screen {
     grid-template-columns: 1fr;
   }
+
+  .login-pane {
+    min-height: 100svh;
+    padding-top: max(env(safe-area-inset-top), var(--space-lg));
+    padding-bottom: max(env(safe-area-inset-bottom), var(--space-lg));
+    padding-inline: max(env(safe-area-inset-left), var(--space-base)) max(env(safe-area-inset-right), var(--space-base));
+  }
+
+  .login-pane-body {
+    padding-block: var(--space-lg);
+  }
+}
+
+@media (max-width: 480px) {
+  .login-toggle {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-sm);
+  }
+
+  .login-toggle-button {
+    justify-content: center;
+    min-height: 44px;
+  }
+
+  .login-foot {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-xs);
+  }
 }
 
 /* ---------- Left rail: the form ---------------------------------- */

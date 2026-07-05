@@ -20,6 +20,16 @@
    No editorial serif; no pill geometry.
    ===================================================================== */
 
+/* Layout breakpoints — reference values for @media queries (custom
+   properties cannot be used in @media conditions without @custom-media).
+   --bp-mobile: 820px   primary shell collapse
+   --bp-tablet: 1040px  narrow thread pane
+   --bp-login-stack: 879px  login editorial pane drop
+   --bp-admin-drawer: 768px  full-width admin drawers
+   --bp-admin-compact: 640px  icon-only admin chrome
+   --bp-preferences: 600px  horizontal preferences nav
+   --bp-artifact-chip: 560px  hide artifact chip CTA text */
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

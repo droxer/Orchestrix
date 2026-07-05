@@ -7,6 +7,7 @@
     "cancel": "取消"
   },
   "skip_to_conversation": "跳至对话",
+  "skip_to_content": "跳至内容",
   "nav": {
     "conversations": "对话",
     "chats": "消息",
@@ -28,7 +29,8 @@
     "expand": "展开",
     "collapse_sidebar": "收起侧栏",
     "expand_sidebar": "展开侧栏",
-    "settings": "设置"
+    "settings": "设置",
+    "mobile_section": "Relay"
   },
   "thread": {
     "messages": "消息",

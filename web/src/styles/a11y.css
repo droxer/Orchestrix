@@ -48,10 +48,62 @@
 @media (pointer: coarse) {
   .decision-bar button,
   .handoff-actions button,
+  .dialog-actions [data-slot="button"],
+  .conversation-header button,
+  .conversation-header .conversation-new-btn,
+  .chat-header .icon-button,
+  .agent-picker-trigger,
   .agent-picker button,
   .agent-picker [role="option"],
+  .mode-chip,
+  .send-button,
+  .backlog-filter-chip,
+  .backlog-filter-clear,
+  .backlog-task-actions select,
+  .backlog-task-actions button,
+  .backlog-row-actions select,
+  .backlog-row-actions button,
+  .workspace-preview-open,
+  .code-view-toggle,
+  .adm-view-toggle-btn,
+  .adm-mode-tab,
+  .adm-copy-pill,
+  .adm-cred-action-button,
+  .adm-drawer-close,
+  .adm-chat-rows button,
   .people-search {
     min-height: 44px;
+  }
+
+  .sidenav-btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .artifact-index-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .backlog-view-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .conversation-header button,
+  .conversation-header .conversation-new-btn,
+  .chat-header .icon-button,
+  .send-button,
+  .backlog-task-actions .backlog-action-icon,
+  .backlog-row-actions .backlog-action-icon,
+  .adm-drawer-close,
+  .adm-chat-rows button {
+    width: 44px;
+    height: 44px;
+  }
+
+  .adm-view-toggle-btn {
+    min-width: 44px;
   }
 }
 

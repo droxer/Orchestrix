@@ -37,7 +37,7 @@ export function ThreadPanel({
   ] as const;
 
   return (
-    <aside className="thread-panel" aria-label={t("nav.conversations")}>
+    <aside id="thread-panel" className="thread-panel" aria-label={t("nav.conversations")} tabIndex={-1}>
       <div className="conversation-header">
         <div className="conversation-heading">
           <span className="conversation-heading-eyebrow">{t("nav.conversations")}</span>

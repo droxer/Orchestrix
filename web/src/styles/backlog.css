@@ -795,6 +795,27 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .backlog-view-toggle {
+    flex-shrink: 0;
+  }
+
+  .task-board-create-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .task-board-create-btn {
+    width: 44px;
+    padding-inline: 0;
+  }
+
   .backlog-stat:nth-child(2) {
     border-right: 0;
   }

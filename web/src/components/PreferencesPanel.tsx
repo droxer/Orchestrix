@@ -18,7 +18,7 @@ import {
 import { AGENT_NAMES } from "../types";
 import type { AgentName, AgentRole, DaemonNodeMonitorRecord } from "../types";
 import { moveRadioSelection } from "../lib/radioGroupKeyboard";
-import { PrefAgents, PrefAppearance, PrefLanguage } from "./icons";
+import { NavLogout, PrefAgents, PrefAppearance, PrefLanguage } from "./icons";
 
 export type { Language, Theme };
 export { SUPPORTED_LANGUAGES, SUPPORTED_THEMES };
@@ -51,30 +51,44 @@ const CATEGORIES: { id: CategoryId; labelKey: string; Icon: IconComponent }[] = 
   { id: "agents", labelKey: "pref.agents", Icon: PrefAgents },
 ];
 
-function ThemePreview({ tone }: { tone: Theme }) {
+const LANGUAGE_BADGES: Record<Language, string> = {
+  en: "EN",
+  "zh-CN": "简",
+  "zh-TW": "繁",
+};
+
+function PrefSelectedCheck() {
   return (
-    <div className="pref-theme-preview" data-preview={tone} aria-hidden="true">
-      <span className="pref-preview-rail">
-        <span />
-        <span />
-        <span />
-      </span>
-      <span className="pref-preview-list">
-        <span />
-        <span />
-        <span />
-      </span>
-      <span className="pref-preview-chat">
-        <span />
-        <span />
-        <span />
-        <span />
-      </span>
-    </div>
+    <span className="pref-option-check" aria-hidden="true">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <circle cx="7" cy="7" r="7" fill="var(--color-primary)" />
+        <path d="M4 7l2 2 4-4" stroke="var(--color-on-primary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </span>
   );
 }
 
-function ThemeCard({
+function ThemeSwatch({ tone }: { tone: Theme }) {
+  return <span className="pref-theme-swatch" data-tone={tone} aria-hidden="true" />;
+}
+
+function LanguageBadge({ code }: { code: Language }) {
+  return (
+    <span className="pref-lang-badge" lang={code} aria-hidden="true">
+      {LANGUAGE_BADGES[code]}
+    </span>
+  );
+}
+
+function AgentBadge({ agent }: { agent: AgentName }) {
+  return (
+    <span className="pref-agent-badge" data-agent={agent} translate="no" aria-hidden="true">
+      {agent.slice(0, 2)}
+    </span>
+  );
+}
+
+function ThemeOption({
   value,
   selected,
   onSelect,
@@ -91,24 +105,17 @@ function ThemeCard({
       ref={(el) => { registerRef(value, el); }}
       type="button"
       role="radio"
-      className={`pref-theme-card ${selected ? "selected" : ""}`}
+      className={`pref-option-row ${selected ? "selected" : ""}`}
       aria-checked={selected}
       tabIndex={selected ? 0 : -1}
       onClick={() => onSelect(value)}
     >
-      <div className="pref-theme-preview-wrap">
-        <ThemePreview tone={value} />
-        {selected && (
-          <span className="pref-theme-check" aria-hidden="true">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <circle cx="7" cy="7" r="7" fill="var(--color-primary)" />
-              <path d="M4 7l2 2 4-4" stroke="var(--color-on-primary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </span>
-        )}
-      </div>
-      <span className="pref-theme-label">{t(`pref.theme.${value}`)}</span>
-      <span className="pref-theme-sub">{t(`pref.theme.${value}_sub`)}</span>
+      <ThemeSwatch tone={value} />
+      <span className="pref-option-copy">
+        <span className="pref-option-label">{t(`pref.theme.${value}`)}</span>
+        <span className="pref-option-sub">{t(`pref.theme.${value}_sub`)}</span>
+      </span>
+      {selected ? <PrefSelectedCheck /> : null}
     </button>
   );
 }
@@ -125,8 +132,8 @@ function AppearanceSection({
   const { t } = useTranslation();
   const refs = useRef<Map<Theme, HTMLButtonElement | null>>(new Map());
   const registerRef = (value: Theme, el: HTMLButtonElement | null) => { refs.current.set(value, el); };
-  const renderCard = (value: Theme) => (
-    <ThemeCard
+  const renderOption = (value: Theme) => (
+    <ThemeOption
       key={value}
       value={value}
       selected={theme === value}
@@ -147,15 +154,51 @@ function AppearanceSection({
         onKeyDown={(e) => moveRadioSelection(e, THEME_VALUES, theme, refs, onThemeChange)}
       >
         <p className="pref-group-label">{t("pref.theme.group")}</p>
-        <div className="pref-theme-grid pref-theme-grid--base">
-          {BASE_THEMES.map(renderCard)}
+        <div className="pref-option-list">
+          {BASE_THEMES.map(renderOption)}
         </div>
-        <p className="pref-group-label">{t("pref.theme.contrast_group")}</p>
-        <div className="pref-theme-grid pref-theme-grid--contrast">
-          {CONTRAST_THEMES.map(renderCard)}
+        <p className="pref-group-label pref-group-label--spaced">{t("pref.theme.contrast_group")}</p>
+        <div className="pref-option-list">
+          {CONTRAST_THEMES.map(renderOption)}
         </div>
       </div>
     </>
+  );
+}
+
+function LanguageOption({
+  code,
+  label,
+  native,
+  selected,
+  onSelect,
+  registerRef,
+}: {
+  code: Language;
+  label: string;
+  native: string;
+  selected: boolean;
+  onSelect: (language: Language) => void;
+  registerRef: (code: Language, el: HTMLButtonElement | null) => void;
+}) {
+  return (
+    <button
+      ref={(el) => { registerRef(code, el); }}
+      type="button"
+      role="radio"
+      className={`pref-option-row ${selected ? "selected" : ""}`}
+      aria-checked={selected}
+      tabIndex={selected ? 0 : -1}
+      lang={code}
+      onClick={() => onSelect(code)}
+    >
+      <LanguageBadge code={code} />
+      <span className="pref-option-copy">
+        <span className="pref-option-label">{native}</span>
+        <span className="pref-option-sub">{label}</span>
+      </span>
+      {selected ? <PrefSelectedCheck /> : null}
+    </button>
   );
 }
 
@@ -170,42 +213,28 @@ function LanguageSection({
 }) {
   const { t } = useTranslation();
   const refs = useRef<Map<Language, HTMLButtonElement | null>>(new Map());
+  const registerRef = (code: Language, el: HTMLButtonElement | null) => { refs.current.set(code, el); };
   return (
     <>
       <h4 id={headingId} className="pref-section-label">
         {t("pref.language")}
       </h4>
       <div
-        className="pref-lang-grid"
+        className="pref-option-list"
         role="radiogroup"
         aria-labelledby={headingId}
         onKeyDown={(e) => moveRadioSelection(e, LANGUAGE_VALUES, language, refs, onLanguageChange)}
       >
         {LANGUAGES.map(({ code, label, native }) => (
-          <button
+          <LanguageOption
             key={code}
-            ref={(el) => { refs.current.set(code, el); }}
-            type="button"
-            role="radio"
-            className={`pref-lang-btn ${language === code ? "selected" : ""}`}
-            aria-checked={language === code}
-            tabIndex={language === code ? 0 : -1}
-            lang={code}
-            onClick={() => onLanguageChange(code)}
-          >
-            <span className="pref-lang-native">{native}</span>
-            <span className="pref-lang-meta">
-              <span className="pref-lang-label">{label}</span>
-              {language === code && (
-                <span className="pref-lang-check" aria-hidden="true">
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                    <circle cx="7" cy="7" r="7" fill="var(--color-primary)" />
-                    <path d="M4 7l2 2 4-4" stroke="var(--color-on-primary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </span>
-              )}
-            </span>
-          </button>
+            code={code}
+            label={label}
+            native={native}
+            selected={language === code}
+            onSelect={onLanguageChange}
+            registerRef={registerRef}
+          />
         ))}
       </div>
     </>
@@ -291,17 +320,19 @@ function AgentRolesSection({
       <h4 id={headingId} className="pref-section-label">
         {t("pref.agents")}
       </h4>
-      <p className="pref-group-note">{t("pref.agent_roles.help")}</p>
-      <div className="pref-agent-role-list">
+      <p className="pref-section-note">{t("pref.agent_roles.help")}</p>
+      <div className="pref-option-list">
         {AGENT_NAMES.map((agent) => (
-          <label key={agent} className="pref-agent-role-row">
-            <span className="pref-agent-role-copy">
-              <span className="pref-agent-role-name" translate="no">{agent}</span>
-              <span className="pref-agent-role-sub">
+          <label key={agent} className="pref-agent-row">
+            <AgentBadge agent={agent} />
+            <span className="pref-option-copy">
+              <span className="pref-option-label" translate="no">{agent}</span>
+              <span className="pref-option-sub">
                 {t("pref.agent_roles.system_default", { role: roleLabel(t, defaults[agent]) })}
               </span>
             </span>
             <select
+              className="pref-agent-select"
               value={overrides[agent] ?? ""}
               onChange={(event) => setRole(agent, event.target.value as AgentRole | "")}
               disabled={saving || !onSave}
@@ -337,6 +368,7 @@ export interface PreferencesPanelProps {
   onLanguageChange: (language: Language) => void;
   agentNode?: DaemonNodeMonitorRecord | null;
   onAgentRoleOverridesChange?: (overrides: AgentRoleMap) => Promise<void>;
+  onLogout?: () => void;
 }
 
 const CATEGORY_IDS: CategoryId[] = CATEGORIES.map((c) => c.id);
@@ -369,6 +401,7 @@ export function PreferencesPanel({
   onLanguageChange,
   agentNode,
   onAgentRoleOverridesChange,
+  onLogout,
 }: PreferencesPanelProps) {
   const { t } = useTranslation();
   const [active, setActive] = useState<CategoryId>("appearance");
@@ -450,6 +483,15 @@ export function PreferencesPanel({
           )}
         </div>
       </div>
+
+      {onLogout ? (
+        <footer className="pref-account">
+          <button type="button" className="pref-logout" onClick={onLogout}>
+            <NavLogout size={16} />
+            <span>{t("nav.logout")}</span>
+          </button>
+        </footer>
+      ) : null}
     </div>
   );
 }

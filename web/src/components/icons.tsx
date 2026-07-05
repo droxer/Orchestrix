@@ -37,6 +37,7 @@ import {
   Sparkles,
   SquarePen,
   Terminal,
+  Zap,
   TriangleAlert,
   UserCog,
   UserPlus,
@@ -96,9 +97,9 @@ export const ViewBoard = withStandardStroke(Columns3, "ViewBoard");
 export const ViewList = withStandardStroke(Rows3, "ViewList");
 export const ActionKey = withStandardStroke(KeyRound, "ActionKey");
 
-// Agent mode (智能体): a bot glyph reads as an autonomous agent doing work,
-// not just "coding" — better matches the renamed mode than the old Code2.
-export const ModeAction = withStandardStroke(Bot, "ModeAction");
+// Agent mode (智能体): a zap glyph reads as "execute work" without reusing
+// the Bot mark reserved for preferences and artifact output types.
+export const ModeAction = withStandardStroke(Zap, "ModeAction");
 export const ModeReview = withStandardStroke(ScanEye, "ModeReview");
 export const ModeAsk = withStandardStroke(MessageCircleQuestion, "ModeAsk");
 

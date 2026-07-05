@@ -34,7 +34,8 @@ export function ArtifactLibraryDrawer({
   useEffect(() => {
     if (!open) return;
     setSelectedId(initialArtifactId ?? artifactsRef.current[0]?.id ?? null);
-    setStripExpanded(false);
+    const isMobile = typeof window !== "undefined" && window.matchMedia("(max-width: 820px)").matches;
+    setStripExpanded(isMobile);
   }, [open, initialArtifactId]);
 
   const selectedArtifact = useMemo(

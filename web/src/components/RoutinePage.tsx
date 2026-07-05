@@ -455,7 +455,7 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
   }
 
   return (
-    <section className="routine-page backlog-page" aria-label={t("routine.title")}>
+    <section id="routine-panel" className="routine-page backlog-page" aria-label={t("routine.title")} tabIndex={-1}>
       <PageHeader
         title={t("routine.title")}
         count={t("routine.sub", { count: routineTasks.length })}

@@ -55,7 +55,7 @@ Verification: `npm run build -w web` ✓, `make web-test` ✓ (11/11), login re-
 ## Still open
 
 1. ~~P2 admin font-size → tokens~~ — **closed: retracted as a false finding** (see Consistency & tokens above; typography is already fully tokenized).
-2. **Authenticated visual pass** across all gated surfaces (3-pane shell breakpoints, backlog reflow, admin dashboard grid, drawers) — blocked on a login session. Fold concrete per-surface nits back into this doc once captured.
+2. ~~Authenticated visual pass across all gated surfaces~~ — **closed in the Warm Precision pass below** with local admin screenshots across chat, backlog, routine, admin dashboard, and drawer states.
 
 ## Admin console elevation (2026-07-03)
 
@@ -65,7 +65,7 @@ Scoped visual pass on the v2 `adm-*` admin console — dashboard signature momen
 
 - **KPI band atmosphere** — `.relay-atmosphere` on the full `.adm-dash-kpis` row with hairline grid overlay; hero tile no longer double-grains.
 - **Choreographed dashboard load** — staggered `relay-enter-delay-5` through `-9` on belt cards and activity feed (KPIs keep `-1`–`-4`).
-- **Activity chart anchor** — cobalt gradient fill (existing) plus stroke draw-in and area fade-in; `prefers-reduced-motion` noop.
+- **Activity chart anchor** — primary-token gradient fill plus stroke draw-in and area fade-in; `prefers-reduced-motion` noop.
 - **Dashboard pulse strip** — running / failed / queued metrics visible on dashboard (same geometry as fleet).
 - **Fleet card accent** — tone-colored 2px left bar on `.adm-node-card` (mirrors attention rail; no fill tint).
 - **Activity feed timeline** — vertical spine, icon nodes on canvas, mono timestamps in dedicated column.
@@ -107,6 +107,7 @@ Evolved the web identity from cold precision to Warm Precision while preserving 
 - Dark theme CTA: `#04201c` on `#2dd4bf` = 9.18:1.
 - Dark disabled CTA: `#04201c` on the 68% teal disabled mix (`#239485`) = 4.60:1. This intentionally lifts the plan's initial 30% mix after screenshot review; 30% made the disabled sign-in label read too low-contrast.
 - Light CTA: `#ffffff` on `#115e59` = 7.58:1.
+- Light active CTA: `#ffffff` on `#0f766e` = 5.47:1.
 - High-contrast light CTA: `#ffffff` on `#0f4c47` = 9.79:1.
 - High-contrast dark CTA: `#000000` on `#5eead4` = 14.20:1.
 - Teal link/action text on ecru: `#115e59` on `#fdfcfa` = 7.40:1.
@@ -119,7 +120,89 @@ Evolved the web identity from cold precision to Warm Precision while preserving 
 - Captured login at 1440 / 1024 / 390 px in light, dark, and high-contrast via headless Chrome against `http://127.0.0.1:3000`.
 - Evidence paths: `/tmp/relay-warm-precision-shots/login-light-desktop-1440x900.png`, `/tmp/relay-warm-precision-shots/login-light-tablet-1024x768.png`, `/tmp/relay-warm-precision-shots/login-light-mobile-390x900.png`, plus matching `dark` and `contrast` files in the same directory.
 - Light reads as warm ecru rather than white/zinc; teal disabled CTA is visibly tinted, not grey. Dark reads as warm charcoal with luminous teal; the adjusted disabled CTA label remains readable. Mobile login fits without text overlap at 390 px. High-contrast removes the subtle atmosphere/grain dependency and keeps solid hairlines.
+- Captured authenticated chat, backlog, routine, admin dashboard, and admin onboard drawer at 1440 / 1024 / 390 px in light, dark, and high-contrast via a local admin session. Evidence paths are under `/tmp/relay-warm-precision-auth-shots/`, for example `main-light-desktop-1440x900.png`, `backlog-dark-mobile-390x900.png`, `admin-light-desktop-1440x900.png`, and `admin-drawer-contrast-mobile-390x900.png`.
+- Authenticated visual fixes from review: light active CTA now matches the specified `#0f766e`; mobile authenticated shells now override `[data-sidenav="open"]` at `max-width: 820px`, so chat, backlog, routine, admin, and drawers occupy the 390px viewport instead of rendering after the hidden sidenav column.
+- Gated-surface result: backlog/admin retain compact operational density; the admin bled "R" is subtle in light/dark and hidden in high-contrast; drawer headers, tabs, fields, and footer actions stay legible at 390px without text overlap.
 
 **Deferred / carried forward:**
 
-- The old **Authenticated visual pass** item remains carried forward. No authenticated session was available during this pass, so chat shell, backlog, admin dashboard, and drawers still need live screenshots at 1440 / 1024 / 390 across light, dark, and high-contrast. The code paths for transcript/admin signature marks are implemented and covered by build/type checks, but their gated surfaces still need visual capture with a real session.
+- None for Warm Precision alignment. Future review can use seeded task/session data for richer content states, but the specified login and gated surfaces are captured.
+
+## Mobile experience pass (2026-07-05)
+
+Full implementation of the mobile UX review plan — P1 blockers, P2 polish, and P3 bottom-nav refinement. Build ✓ (`npm run build -w web`), web tests ✓ (`make web-test`).
+
+### Shipped
+
+**P1 — blockers**
+
+- **Logout on mobile** — `PreferencesPanel` footer with logout button; wired through `PreferencesDialog` → `App.tsx` `handleLogout`. Replaces the desktop-only sidenav settings flyout hidden at ≤820px.
+- **Route-aware mobile topbar** — `mobile-topbar--chat` keeps Chats ↔ conversation pivot on `main`; `mobile-topbar--route` shows centered mono eyebrow + route title on backlog, routine, workspace, channels, admin. Settings stays top-right.
+- **Admin attention FAB offset** — `.adm-rail-fab` lifts above the 58px bottom tab bar + safe-area at `max-width: 820px`.
+
+**P2 — polish**
+
+- **Chat header density** — hide token count and active-agent pill below 820px; title wraps cleanly.
+- **Composer padding** — `composer-input-wrap` uses `--space-base` inline padding on mobile; softer shadow.
+- **Artifact library drawer** — vertical stack at 820px; opens with expanded index list on mobile (`ArtifactLibraryDrawer` + `artifact.css`).
+- **Dynamic skip link** — `#thread-panel` / `#chat-panel` / work-route panel ids (`#backlog-panel`, etc.) with `tabIndex={-1}` on targets; i18n `skip_to_content`.
+- **Task board create** — icon-only create button below 820px (visually hidden label, `aria-label` preserved).
+
+**P3 — bottom nav refinement**
+
+- Teal 2px top-edge accent on active `.sidenav-btn` in the bottom tab bar.
+- Horizontal scroll edge fade via `mask-image` on `.sidenav-panel`.
+- Staggered `relay-rise` entrance on tab items (`prefers-reduced-motion` noop).
+- `.relay-bleed-mark` scaled down on mobile empty states.
+- Breakpoint reference block documented in `tokens.css` (820 / 1040 / 879 / 768 / 640 / 600 / 560).
+
+**Touch targets (extended)**
+
+- `@media (pointer: coarse)` bumps for `.sidenav-btn`, `.artifact-index-btn`, `.backlog-view-btn`.
+
+### Verify manually
+
+| Viewport | Surfaces |
+|----------|----------|
+| 390×844 | Login, chat thread↔chat toggle, route topbar titles, bottom nav accent, preferences logout, artifact drawer stack, admin FAB clearance |
+| 820×1180 | Tablet shell, backlog board scroll, admin KPI 2×2 |
+| 1024×768 | Desktop-narrow thread pane (1040 breakpoint) |
+
+**Screenshot evidence (login, post-pass):**
+
+- `/tmp/relay-mobile-pass-shots/login-light-mobile-390x844.png`
+- `/tmp/relay-mobile-pass-shots/login-light-tablet-820x1180.png`
+
+Prior authenticated gated-surface shots remain under `/tmp/relay-warm-precision-auth-shots/`. Re-capture authenticated mobile flows after login with seeded task data if richer content states are needed.
+
+### Mobile polish pass 2 (2026-07-05)
+
+Second review targeted remaining chrome duplication and density issues visible at 390px.
+
+**Fixed:**
+
+- **Duplicate headers on work routes** — mobile topbar already shows the route name; in-page `PageHeader` title/count are visually hidden below 820px, leaving a compact actions toolbar only.
+- **Chat triple chrome** — mobile topbar is contextual per view: threads shows only “Chats”, chat shows only the conversation title (non-interactive; back button navigates). Duplicate `h2` in chat header is sr-only on chat view; thread list “Messages” heading hidden.
+- **Topbar active pills** — switched from filled teal to quiet surface-strong (navigation, not CTA).
+- **Bottom tab bar** — removed aggressive scroll mask that clipped tab labels; active tab uses teal top accent + transparent fill instead of desktop surface fill.
+- **Composer** — `mode-chip` min-width relaxed; footer wraps on narrow widths.
+- **Admin** — pulse/KPI/content padding tightened at 820px (not only 768px).
+- **Login mobile** — safe-area padding on pane; create-admin row stacks below 480px; toggle button meets 44px touch target.
+
+**Verify manually:** chat thread↔chat flow (topbar + back button), backlog/admin with single title band, login footer at 390px.
+
+### Mobile popups pass (2026-07-05)
+
+Audit of every overlay surface at ≤820px — drawers, modals, sheets, and composer popovers. New module: [`web/src/styles/mobile-overlays.css`](web/src/styles/mobile-overlays.css).
+
+| Surface | Mobile treatment |
+|---------|------------------|
+| **Admin/task drawers** (`Drawer.tsx`) | Full `100dvh` takeover; tighter head/body padding; sticky form footer with safe-area; 44px close; action buttons stack/wrap |
+| **Preferences** (`PreferencesDialog`) | Bottom-anchored sheet (`92dvh`); horizontal nav at 820px; theme cards single-column |
+| **Confirm/prompt** (`DialogProvider`) | Full-width card; stacked action buttons (destructive/primary last); 44px inputs |
+| **Attention rail** (`AttentionRail`) | Full-width bottom sheet; `78dvh` max; safe-area padding |
+| **Agent picker / @mention** | Fixed lower panel above bottom nav + composer (no longer clipped off-screen) |
+| **Handoff panel** | Full-width; stacked action buttons |
+| **Artifact library drawer** | Inherits drawer takeover + existing vertical index stack |
+
+**Verify manually:** open task drawer, preferences, rename confirm dialog, @mention popover, admin attention sheet, artifact drawer at 390px with keyboard up.

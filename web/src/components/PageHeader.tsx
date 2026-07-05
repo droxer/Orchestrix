@@ -19,8 +19,8 @@ export function PageHeader({
   titleVariant?: "default" | "display";
 }) {
   return (
-    <header className="flex min-h-[var(--header-h)] shrink-0 items-center justify-between gap-base border-b border-hairline px-xl max-[820px]:px-base">
-      <div className="flex min-w-0 items-baseline gap-sm">
+    <header className="page-header flex min-h-[var(--header-h)] shrink-0 items-center justify-between gap-base border-b border-hairline px-xl max-[820px]:px-base max-[820px]:py-sm">
+      <div className="page-header-lead flex min-w-0 items-baseline gap-sm">
         <h1
           className={cn(
             "m-0 text-balance text-ink",
@@ -35,7 +35,7 @@ export function PageHeader({
           <span className="mono truncate text-xs font-medium text-muted-foreground">{count}</span>
         ) : null}
       </div>
-      {actions ? <div className="flex shrink-0 items-center gap-xs">{actions}</div> : null}
+      {actions ? <div className="page-header-actions flex shrink-0 flex-wrap items-center justify-end gap-xs">{actions}</div> : null}
     </header>
   );
 }

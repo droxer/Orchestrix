@@ -11,9 +11,10 @@ export type PreferencesDialogProps = {
   open: boolean;
   onClose: () => void;
   preferences: PreferencesPanelProps;
+  onLogout?: () => void;
 };
 
-export function PreferencesDialog({ open, onClose, preferences }: PreferencesDialogProps) {
+export function PreferencesDialog({ open, onClose, preferences, onLogout }: PreferencesDialogProps) {
   const { t } = useTranslation();
   const dialogRef = useModalDrawer<HTMLDivElement>(onClose, open);
 
@@ -54,7 +55,10 @@ export function PreferencesDialog({ open, onClose, preferences }: PreferencesDia
           </Button>
         </header>
 
-        <PreferencesPanel {...preferences} />
+        <PreferencesPanel
+          {...preferences}
+          onLogout={onLogout ? () => { onClose(); onLogout(); } : undefined}
+        />
       </div>
     </div>,
     document.body,
