@@ -6,6 +6,7 @@ from ..core.ids import new_sandbox_id, now_iso
 from ..core.models import AGENT_NAMES, DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS
 from ..persistence.stores import LocalSessionStore, valid_agent
 from ..sessions import SessionController, initial_agent_state
+from ..sessions.bridge import latest_user_turn_marker
 from .registry import (
     DaemonNodeRegistry,
     node_accepts_run,
@@ -145,22 +146,37 @@ class ServerDaemonNodeBackend:
                 workspace_path=sandbox.get("workspacePath") or "/workspace",
                 owner_employee_id=owner_employee_id,
             )
+            decision = request.get("decision") if isinstance(request.get("decision"), dict) else None
+            existing_session = self.registry.store.get_session(request["sessionId"]) if request.get("sessionId") else None
             session_id = request.get("sessionId") or controller.create_session(
                 request["taskGoal"],
                 ["human", *dict.fromkeys(assignment["agent"] for assignment in request["assignments"])],
             )["id"]
+            dispatch_task_goal = request["taskGoal"]
+            decision_kind = decision.get("kind") if decision else None
+            prior_decision_kind = _latest_decision_kind_after_latest_user(existing_session) if existing_session else None
+            is_decision_dispatch = decision_kind in ("rerun", "handoff") or (
+                decision is None
+                and prior_decision_kind in ("rerun", "handoff")
+                and existing_session is not None
+                and request["taskGoal"] == existing_session.get("taskGoal")
+            )
+            # A rerun or handoff is a decision about the existing user turn,
+            # not a new user turn. Use the canonical session goal even if an
+            # older client sent a note-spliced taskGoal.
+            if existing_session and is_decision_dispatch:
+                dispatch_task_goal = existing_session.get("taskGoal") or request["taskGoal"]
             # A follow-up turn on an existing session: persist the new user
             # message so it renders in the transcript and feeds the next run's
             # conversation history. A fresh session already captures the first
             # turn as its taskGoal via session.created.
-            if request.get("sessionId"):
+            elif existing_session:
                 controller.record_user_message(
                     session_id,
                     request["taskGoal"],
                     actor_employee_id=actor_employee_id,
                     message_id=request.get("userMessageId"),
                 )
-            decision = request.get("decision") if isinstance(request.get("decision"), dict) else None
             if decision:
                 kind = decision.get("kind")
                 note = decision.get("note") if isinstance(decision.get("note"), str) else None
@@ -169,8 +185,8 @@ class ServerDaemonNodeBackend:
                     controller.record_decision(session_id, "rerun", note, target_agent)
                 elif kind == "handoff" and target_agent:
                     controller.handoff_session(session_id, target_agent, request["assignments"], note)
-            state = initial_agent_state(request["taskGoal"])
-            self.registry.start_run_request(sandbox_id, session_id, request["taskGoal"], request["assignments"], state, task_id)
+            state = initial_agent_state(dispatch_task_goal)
+            self.registry.start_run_request(sandbox_id, session_id, dispatch_task_goal, request["assignments"], state, task_id)
             return self.registry.store.get_session(session_id)
 
     def cancel_run(self, sandbox_id: str, session_id: str, reason: str, actor_employee_id: str | None = None) -> dict[str, Any]:
@@ -204,3 +220,21 @@ def session_owner_employee_id(store: LocalSessionStore, session_id: str) -> str:
     if not owner:
         raise PermissionError(f"Session {session_id} has no owner; cannot start daemon run.")
     return owner
+
+
+def _latest_decision_kind_after_latest_user(session: dict[str, Any]) -> str | None:
+    latest_user = latest_user_turn_marker(session)
+    latest: tuple[tuple[str, int], str] | None = None
+    for index, event in enumerate(session.get("events", [])):
+        if event.get("type") != "human.decision":
+            continue
+        marker = (event.get("timestamp") or "", index)
+        if latest_user and marker <= latest_user:
+            continue
+        decision = event.get("decision") or {}
+        kind = decision.get("kind")
+        if not isinstance(kind, str):
+            continue
+        if latest is None or marker > latest[0]:
+            latest = (marker, kind)
+    return latest[1] if latest else None

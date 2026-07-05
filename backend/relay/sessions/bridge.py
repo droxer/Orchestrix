@@ -18,6 +18,9 @@ class ArtifactReader(Protocol):
 
 _NOISE_PREFIXES = ("○ ", "⏺ ")  # "○ ", "⏺ "
 _ASSISTANT_SPLIT = re.compile(r"\n?● ")  # "● "
+_CONTINUITY_STATUSES = {None, "completed", "failed", "cancelled"}
+_OUTPUT_TAIL_LINES = 20
+_OUTPUT_TAIL_CHARS = 1200
 
 
 def extract_last_assistant_text(transcript: str) -> str | None:
@@ -38,6 +41,45 @@ def extract_last_assistant_text(transcript: str) -> str | None:
         if cleaned:
             return cleaned
     return None
+
+
+def include_run_in_continuity(run: dict[str, Any]) -> bool:
+    return run.get("status") in _CONTINUITY_STATUSES
+
+
+def run_continuity_suffix(run: dict[str, Any]) -> str:
+    status = run.get("status") or "completed"
+    if status == "completed":
+        return ""
+    if status == "failed":
+        exit_code = run.get("exitCode")
+        return f" - failed, exit {exit_code}" if exit_code is not None else " - failed"
+    if status == "cancelled":
+        return " - cancelled"
+    return f" - {status}"
+
+
+def _output_tail(transcript: str | None) -> str | None:
+    if not transcript:
+        return None
+    lines = [
+        line
+        for line in transcript.splitlines()
+        if line.strip() and not any(line.startswith(prefix) for prefix in _NOISE_PREFIXES)
+    ]
+    if not lines:
+        return None
+    tail = "\n".join(lines[-_OUTPUT_TAIL_LINES:]).strip()
+    if len(tail) > _OUTPUT_TAIL_CHARS:
+        tail = tail[-_OUTPUT_TAIL_CHARS:].lstrip()
+    return tail or None
+
+
+def run_continuity_text(run: dict[str, Any], transcript: str | None) -> str | None:
+    assistant_text = extract_last_assistant_text(transcript) if transcript else None
+    if assistant_text or (run.get("status") or "completed") == "completed":
+        return assistant_text
+    return _output_tail(transcript)
 
 
 def _bridge_artifact_for_run(session: dict[str, Any], run: dict[str, Any]) -> dict[str, Any] | None:
@@ -128,7 +170,7 @@ def compute_prior_agent_bridge(
     prior_runs = [
         r
         for r in runs
-        if r.get("status") in (None, "completed") and (not latest_user or run_marker(session, r) > latest_user)
+        if include_run_in_continuity(r) and (not latest_user or run_marker(session, r) > latest_user)
     ]
     if not prior_runs:
         return None
@@ -136,7 +178,7 @@ def compute_prior_agent_bridge(
     blocks: list[str] = []
     for run in prior_runs:
         body = agent_log_for_run(session, run, store)
-        text = extract_last_assistant_text(body) if body else None
-        blocks.append(f"[Previous from @{run.get('agent')}]\n{text or '<no output>'}")
+        text = run_continuity_text(run, body)
+        blocks.append(f"[Previous from @{run.get('agent')}{run_continuity_suffix(run)}]\n{text or '<no output>'}")
 
     return "\n\n".join(blocks)

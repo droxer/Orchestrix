@@ -451,12 +451,15 @@ export class SessionController implements AgentEventSink {
     const next: AgentState = { ...state };
     delete next.prior_agent_bridge;
     delete next.prior_conversation;
+    delete next.prior_handoff_note;
 
     const session = await this.store.getSession(sessionId);
     const bridge = await computePriorAgentBridge(session, this.store);
     if (bridge) next.prior_agent_bridge = bridge;
     const conversation = await computeConversationHistory(session, this.store);
     if (conversation) next.prior_conversation = conversation;
+    const handoffNote = computePriorHandoffNote(session, agent);
+    if (handoffNote) next.prior_handoff_note = handoffNote;
     return next;
   }
 }
@@ -466,6 +469,12 @@ function abortReason(signal: AbortSignal): string | undefined {
 }
 
 type TurnMarker = [timestamp: string, eventIndex: number];
+const HISTORY_HEADER = "[Conversation so far]";
+const HISTORY_ELISION = "[Earlier conversation omitted]";
+const DEFAULT_MAX_HISTORY_BLOCKS = 24;
+const DEFAULT_MAX_HISTORY_CHARS = 16000;
+const OUTPUT_TAIL_LINES = 20;
+const OUTPUT_TAIL_CHARS = 1200;
 
 function latestUserTurnMarker(session: RelaySession): TurnMarker | undefined {
   const markers: TurnMarker[] = [[session.createdAt, -1]];
@@ -511,34 +520,67 @@ function bridgeArtifactForRun(session: RelaySession, run: RelaySession["agentRun
 }
 
 async function runAssistantText(session: RelaySession, run: RelaySession["agentRuns"][number], store: SessionStore): Promise<string | undefined> {
-  if (run.agentLog !== undefined) {
-    return extractLastAssistantText(run.agentLog) ?? undefined;
-  }
+  const log = await runLogForRun(session, run, store);
+  return runContinuityText(run, log);
+}
+
+async function runLogForRun(session: RelaySession, run: RelaySession["agentRuns"][number], store: SessionStore): Promise<string | undefined> {
+  if (run.agentLog !== undefined) return run.agentLog;
   const completed = [...session.events]
     .reverse()
     .find((event) => event.type === "agent.completed" && event.runId === run.id);
   if (completed?.type === "agent.completed" && completed.agentLog !== undefined) {
-    return extractLastAssistantText(completed.agentLog) ?? undefined;
+    return completed.agentLog;
   }
   const artifact = bridgeArtifactForRun(session, run);
   if (!artifact) return undefined;
   try {
-    return extractLastAssistantText(await store.readArtifact(session.id, artifact.id)) ?? undefined;
+    return await store.readArtifact(session.id, artifact.id);
   } catch {
     return undefined;
   }
+}
+
+function includeRunInContinuity(run: RelaySession["agentRuns"][number]): boolean {
+  return run.status === "completed" || run.status === "failed" || run.status === "cancelled";
+}
+
+function runContinuitySuffix(run: RelaySession["agentRuns"][number]): string {
+  if (run.status === "completed") return "";
+  if (run.status === "failed") {
+    return run.exitCode === undefined ? " - failed" : ` - failed, exit ${run.exitCode}`;
+  }
+  if (run.status === "cancelled") return " - cancelled";
+  return ` - ${run.status}`;
+}
+
+function outputTail(transcript: string | undefined): string | undefined {
+  if (!transcript?.trim()) return undefined;
+  const lines = transcript
+    .split(/\r?\n/)
+    .filter((line) => line.trim() && !line.startsWith("○ ") && !line.startsWith("⏺ "));
+  if (lines.length === 0) return undefined;
+  const tail = lines.slice(-OUTPUT_TAIL_LINES).join("\n").trim();
+  if (tail.length <= OUTPUT_TAIL_CHARS) return tail;
+  return tail.slice(-OUTPUT_TAIL_CHARS).trimStart();
+}
+
+function runContinuityText(run: RelaySession["agentRuns"][number], transcript: string | undefined): string | undefined {
+  const assistantText = transcript ? extractLastAssistantText(transcript) ?? undefined : undefined;
+  if (assistantText || run.status === "completed") return assistantText;
+  return outputTail(transcript);
 }
 
 async function computePriorAgentBridge(session: RelaySession, store: SessionStore): Promise<string | undefined> {
   const runs = session.agentRuns ?? [];
   const latestUser = latestUserTurnMarker(session);
   const priorRuns = runs
-    .filter((run) => run.status === "completed" && (!latestUser || markerAfter(runMarker(session, run), latestUser)));
+    .filter((run) => includeRunInContinuity(run) && (!latestUser || markerAfter(runMarker(session, run), latestUser)));
   if (priorRuns.length === 0) return undefined;
 
   const blocks: string[] = [];
   for (const run of priorRuns) {
-    blocks.push(`[Previous from @${run.agent}]\n${(await runAssistantText(session, run, store)) ?? "<no output>"}`);
+    blocks.push(`[Previous from @${run.agent}${runContinuitySuffix(run)}]\n${(await runAssistantText(session, run, store)) ?? "<no output>"}`);
   }
   return blocks.join("\n\n");
 }
@@ -559,16 +601,87 @@ async function computeConversationHistory(session: RelaySession, store: SessionS
     }
   }
   for (const run of session.agentRuns) {
-    if (run.status !== "completed") continue;
+    if (!includeRunInContinuity(run)) continue;
     const marker = runMarker(session, run);
     if (latestUser && !markerBefore(marker, latestUser)) continue;
     items.push({
       marker,
-      block: `[Assistant @${run.agent}]\n${(await runAssistantText(session, run, store)) ?? "<no output>"}`,
+      block: `[Assistant @${run.agent}${runContinuitySuffix(run)}]\n${(await runAssistantText(session, run, store)) ?? "<no output>"}`,
     });
   }
 
   items.sort((a, b) => compareMarkers(a.marker, b.marker));
   if (items.length === 0) return undefined;
-  return `[Conversation so far]\n\n${items.map((item) => item.block).join("\n\n")}`;
+  return `${HISTORY_HEADER}\n\n${capHistoryBlocks(items.map((item) => item.block)).join("\n\n")}`;
+}
+
+function historyLength(blocks: string[]): number {
+  return blocks.join("\n\n").length;
+}
+
+function truncateTail(block: string, budget: number): string {
+  if (budget <= HISTORY_ELISION.length) return HISTORY_ELISION;
+  if (block.length <= budget) return block;
+  const marker = "[Earlier content omitted]\n";
+  return marker + block.slice(-(budget - marker.length)).trimStart();
+}
+
+function capHistoryBlocks(
+  blocks: string[],
+  maxBlocks = DEFAULT_MAX_HISTORY_BLOCKS,
+  maxChars = DEFAULT_MAX_HISTORY_CHARS,
+): string[] {
+  const contentBudget = maxChars - HISTORY_HEADER.length - 2;
+  if (blocks.length === 0) return [];
+  if (maxBlocks <= 0 || contentBudget <= 0) return [HISTORY_ELISION];
+
+  const keptReversed: string[] = [];
+  let omitted = false;
+  let currentLength = 0;
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    const separatorLength = keptReversed.length > 0 ? 2 : 0;
+    const nextLength = currentLength + separatorLength + blocks[i].length;
+    if (keptReversed.length >= maxBlocks || (keptReversed.length > 0 && nextLength > contentBudget)) {
+      omitted = true;
+      break;
+    }
+    if (keptReversed.length === 0 && nextLength > contentBudget) {
+      keptReversed.push(truncateTail(blocks[i], contentBudget));
+      omitted = true;
+      break;
+    }
+    keptReversed.push(blocks[i]);
+    currentLength = nextLength;
+  }
+
+  const kept = keptReversed.reverse();
+  if (!omitted) return kept;
+
+  kept.unshift(HISTORY_ELISION);
+  while (kept.length > 1 && historyLength(kept) > contentBudget) {
+    if (kept.length === 2) {
+      const available = contentBudget - HISTORY_ELISION.length - 2;
+      kept[1] = truncateTail(kept[1], Math.max(0, available));
+      break;
+    }
+    kept.splice(1, 1);
+  }
+  return kept;
+}
+
+function computePriorHandoffNote(session: RelaySession, agent?: AgentName): string | undefined {
+  const latestUser = latestUserTurnMarker(session);
+  let latest: { marker: TurnMarker; decision: RelaySession["decisions"][number] } | undefined;
+  session.events.forEach((event, index) => {
+    if (event.type !== "human.decision") return;
+    const marker: TurnMarker = [event.timestamp, index];
+    if (latestUser && !markerAfter(marker, latestUser)) return;
+    if (!latest || markerAfter(marker, latest.marker)) {
+      latest = { marker, decision: event.decision };
+    }
+  });
+  if (!latest || latest.decision.kind !== "handoff") return undefined;
+  if (agent && latest.decision.targetAgent && latest.decision.targetAgent !== agent) return undefined;
+  const note = latest.decision.note?.trim();
+  return note ? `[Handoff note]\n${note}` : undefined;
 }

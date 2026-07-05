@@ -59,4 +59,51 @@ describe("SessionController prompt memory", () => {
     assert.doesNotMatch(commands[1], /\[Previous from @claude\]/);
     assert.match(commands[1], /\[User\]\nfollow up/);
   });
+
+  it("passes recorded handoff notes as prompt context without changing the task goal", async () => {
+    const store = tempStore();
+    const commands: string[] = [];
+    const execStream: AgentExecutor = async (_cmd, args) => {
+      commands.push(args?.[1] ?? "");
+      return { exit_code: 0, stdout: "● checked it", stderr: "" };
+    };
+    const controller = new SessionController(store, { execStream });
+    const session = await controller.createSession("fix auth", ["human", "claude", "codex"]);
+
+    await controller.handoffSession(
+      session.id,
+      "codex",
+      [{ agent: "codex", mode: "action" }],
+      "verify token refresh",
+    );
+    await controller.runStep(session.id, initialAgentState("fix auth"), { agent: "codex", mode: "action" });
+
+    assert.match(commands[0], /\[Handoff note\]\nverify token refresh/);
+    assert.match(commands[0], /\[User\]\nfix auth/);
+    assert.doesNotMatch(commands[0], /Handoff note:\nverify token refresh/);
+  });
+
+  it("does not reuse an older handoff note after a newer rerun decision", async () => {
+    const store = tempStore();
+    const commands: string[] = [];
+    const execStream: AgentExecutor = async (_cmd, args) => {
+      commands.push(args?.[1] ?? "");
+      return { exit_code: 0, stdout: "● checked it", stderr: "" };
+    };
+    const controller = new SessionController(store, { execStream });
+    const session = await controller.createSession("fix auth", ["human", "claude", "codex"]);
+
+    await controller.handoffSession(
+      session.id,
+      "codex",
+      [{ agent: "codex", mode: "action" }],
+      "verify token refresh",
+    );
+    await controller.recordDecision(session.id, "rerun", "run it again", "codex");
+    await controller.runStep(session.id, initialAgentState("fix auth"), { agent: "codex", mode: "action" });
+
+    assert.doesNotMatch(commands[0], /\[Handoff note\]/);
+    assert.doesNotMatch(commands[0], /\[User\]/);
+    assert.match(commands[0], /fix auth/);
+  });
 });

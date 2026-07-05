@@ -498,11 +498,10 @@ export function App() {
       rememberSandboxToken(selectedEmployee, sandbox, token);
       const note = handoffNote.trim();
       const assignment = { agent: handoffAgent, mode: handoffMode };
-      const taskGoal = note ? `${activeSession.taskGoal}\n\nHandoff note:\n${note}` : activeSession.taskGoal;
       const done = await runSandboxMutation.mutateAsync({
         input: {
           sandboxId: sandbox.id,
-          taskGoal,
+          taskGoal: activeSession.taskGoal,
           assignments: [assignment],
           sessionId: activeSession.id,
           decision: { kind: "handoff", targetAgent: handoffAgent, ...(note ? { note } : {}) },

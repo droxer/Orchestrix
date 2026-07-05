@@ -1210,7 +1210,6 @@ export function RelayTui({
       const note = noteParts.join(" ").trim();
       const assignment = { agent, mode };
       const defaultAssignment = { agent, mode };
-      const task = note ? `${current.taskGoal}\n\nHandoff note:\n${note}` : current.taskGoal;
       void (async () => {
         if (localSessionControl) {
           const updated = await controllerRef.current.handoffSession(
@@ -1238,7 +1237,7 @@ export function RelayTui({
         }
         setCurrentAgent(formatAssignmentLabel(assignment));
         setDefaultAssignments([defaultAssignment]);
-        executeParsedTask({ assignments: [assignment], task }, current.id);
+        executeParsedTask({ assignments: [assignment], task: current.taskGoal }, current.id);
       })().catch((error: unknown) => {
         const detail = error instanceof Error ? error.message : String(error);
         setMessage(`Failed to hand off session: ${detail}`);

@@ -21,6 +21,7 @@ from ..core.models import AGENT_NAMES, AGENT_ROLES, DAEMON_NODE_SUPPORTED_PROTOC
 from ..persistence.stores import LocalDaemonStore, LocalSessionStore, LocalTaskStore, relay_event, role_for_agent
 from ..sessions import compute_prior_agent_bridge
 from ..sessions import compute_conversation_history
+from ..sessions import compute_prior_handoff_note
 from ..sessions import SessionController, initial_agent_state
 
 load_backend_env()
@@ -937,6 +938,7 @@ class DaemonNodeRegistry:
         state = dict(run_request["state"] or {})
         state.pop("prior_agent_bridge", None)
         state.pop("prior_conversation", None)
+        state.pop("prior_handoff_note", None)
         state.pop(ARTIFACT_SNAPSHOT_STATE_KEY, None)
         session_snapshot = self.store.get_session(run_request["sessionId"])
         bridge = compute_prior_agent_bridge(session_snapshot, assignment["agent"], self.store)
@@ -945,6 +947,9 @@ class DaemonNodeRegistry:
         conversation = compute_conversation_history(session_snapshot, self.store)
         if conversation:
             state["prior_conversation"] = conversation
+        handoff_note = compute_prior_handoff_note(session_snapshot, assignment["agent"])
+        if handoff_note:
+            state["prior_handoff_note"] = handoff_note
         controller.record_agent_started(run_request["sessionId"], {
             "runId": run_id,
             "agent": assignment["agent"],

@@ -22,6 +22,8 @@ export interface AgentState {
   prior_agent_bridge?: string;
   /** Rendered transcript of earlier conversation turns on this session, if any. */
   prior_conversation?: string;
+  /** Latest handoff note for the current turn, if any. */
+  prior_handoff_note?: string;
 }
 
 export interface AgentRunOptions {

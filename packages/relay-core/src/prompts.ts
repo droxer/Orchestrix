@@ -5,12 +5,14 @@ export function prependPriorAgentBridge(prompt: string, state: AgentState): stri
 }
 
 export function reviewPrompt(state: AgentState): string {
+  const preludes = promptPreludes(state);
   return [
     "Review the current workspace changes for the user's task.",
     "",
     "Focus on blocking bugs, regressions, unsafe behavior, and missing tests.",
     "If changes are acceptable, say so briefly.",
     "If changes are not acceptable, list the blocking issues clearly.",
+    ...(preludes.length > 0 ? ["", preludes.join("\n\n")] : []),
     "",
     "User task:",
     state.task_goal,
@@ -20,12 +22,19 @@ export function reviewPrompt(state: AgentState): string {
 export function actionPrompt(state: AgentState): string {
   const task = state.task_goal;
   // Order: earlier conversation history first, then any within-run bridge from
-  // sibling agents, then the current user turn. Both preludes are optional.
+  // sibling agents, then handoff notes, then the current user turn. All
+  // preludes are optional.
+  const preludes = promptPreludes(state);
+  if (preludes.length === 0) return task;
+  return `${preludes.join("\n\n")}\n\n[User]\n${task}`;
+}
+
+function promptPreludes(state: AgentState): string[] {
   const preludes: string[] = [];
   if (state.prior_conversation) preludes.push(state.prior_conversation);
   if (state.prior_agent_bridge) preludes.push(state.prior_agent_bridge);
-  if (preludes.length === 0) return task;
-  return `${preludes.join("\n\n")}\n\n[User]\n${task}`;
+  if (state.prior_handoff_note) preludes.push(state.prior_handoff_note);
+  return preludes;
 }
 
 // Read-only Q&A prompt. CLI read-only flags are the hard guarantee; this

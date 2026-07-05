@@ -12,6 +12,7 @@ import pytest
 
 from relay.daemon_registry import DaemonNodeRegistry, ServerDaemonNodeBackend, effective_role_for_assignment, sandbox_ui_token_matches
 from relay.persistence.stores import DatabaseDaemonStore, LocalDaemonStore, LocalSessionStore
+from relay.sessions import SessionController
 
 
 def test_explicit_sandbox_provision_targets_requested_node() -> None:
@@ -704,6 +705,89 @@ def test_daemon_run_records_decision_metadata_after_validation() -> None:
             assert updated["decisions"][0]["targetAgent"] == "codex"
             [command] = registry.take_commands("sbx_alice", "node_token")
             assert command["sessionId"] == session["id"]
+
+    asyncio.run(run_flow())
+
+
+def test_daemon_handoff_decision_injects_note_without_duplicate_user_turn() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store = LocalSessionStore(root)
+            daemon_store = LocalDaemonStore(root)
+            registry = DaemonNodeRegistry(session_store, daemon_store)
+            backend = ServerDaemonNodeBackend(registry)
+            registry.register({
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }, "ui_token")
+            session = session_store.create_session({
+                "workspacePath": "/workspace/alice",
+                "ownerEmployeeId": "alice",
+                "taskGoal": "fix auth",
+                "participants": ["human", "claude"],
+            })
+
+            await backend.run("sbx_alice", {
+                "taskGoal": "fix auth\n\nHandoff note:\nverify the fix",
+                "sessionId": session["id"],
+                "assignments": [{"agent": "codex", "mode": "action"}],
+                "decision": {"kind": "handoff", "targetAgent": "codex", "note": "verify the fix"},
+            })
+
+            [command] = registry.take_commands("sbx_alice", "node_token")
+            assert command["taskGoal"] == "fix auth"
+            assert command["state"]["task_goal"] == "fix auth"
+            assert command["state"]["prior_handoff_note"] == "[Handoff note]\nverify the fix"
+            updated = session_store.get_session(session["id"])
+            assert [event["type"] for event in updated["events"]].count("user.message") == 0
+
+    asyncio.run(run_flow())
+
+
+def test_daemon_prerecorded_handoff_decision_skips_duplicate_user_turn() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store = LocalSessionStore(root)
+            daemon_store = LocalDaemonStore(root)
+            registry = DaemonNodeRegistry(session_store, daemon_store)
+            backend = ServerDaemonNodeBackend(registry)
+            registry.register({
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }, "ui_token")
+            session = session_store.create_session({
+                "workspacePath": "/workspace/alice",
+                "ownerEmployeeId": "alice",
+                "taskGoal": "fix auth",
+                "participants": ["human", "claude"],
+            })
+            SessionController(session_store, owner_employee_id="alice").handoff_session(
+                session["id"],
+                "codex",
+                [{"agent": "codex", "mode": "action"}],
+                "verify the fix",
+            )
+
+            await backend.run("sbx_alice", {
+                "taskGoal": "fix auth",
+                "sessionId": session["id"],
+                "assignments": [{"agent": "codex", "mode": "action"}],
+            })
+
+            [command] = registry.take_commands("sbx_alice", "node_token")
+            assert command["state"]["prior_handoff_note"] == "[Handoff note]\nverify the fix"
+            updated = session_store.get_session(session["id"])
+            assert [event["type"] for event in updated["events"]].count("user.message") == 0
 
     asyncio.run(run_flow())
 

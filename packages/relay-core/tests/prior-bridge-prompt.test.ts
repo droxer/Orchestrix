@@ -1,6 +1,14 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { askPrompt, claudeTaskPrompt, piTaskPrompt, kimiTaskPrompt, codexActionPrompt, prependPriorAgentBridge } from "../src/prompts.js";
+import {
+  askPrompt,
+  claudeTaskPrompt,
+  piTaskPrompt,
+  kimiTaskPrompt,
+  codexActionPrompt,
+  prependPriorAgentBridge,
+  reviewPrompt,
+} from "../src/prompts.js";
 import { initialAgentState } from "../src/state.js";
 
 describe("prior agent bridge in prompts", () => {
@@ -44,6 +52,32 @@ describe("prior agent bridge in prompts", () => {
       out,
       "[Conversation so far]\n\n[User]\nfirst thing\n\n[Previous from @codex]\nreview note\n\n[User]\nnext thing",
     );
+  });
+
+  it("places handoff notes after prior agent context", () => {
+    const state = {
+      ...initialAgentState("continue the fix"),
+      prior_agent_bridge: "[Previous from @claude]\nimplementation note",
+      prior_handoff_note: "[Handoff note]\ncheck the auth edge case",
+    };
+
+    assert.equal(
+      codexActionPrompt(state),
+      "[Previous from @claude]\nimplementation note\n\n[Handoff note]\ncheck the auth edge case\n\n[User]\ncontinue the fix",
+    );
+  });
+
+  it("includes conversation preludes in review prompts", () => {
+    const state = {
+      ...initialAgentState("review the branch"),
+      prior_conversation: "[Conversation so far]\n\n[User]\nfix auth",
+      prior_handoff_note: "[Handoff note]\nfocus on token refresh",
+    };
+    const out = reviewPrompt(state);
+
+    assert.match(out, /\[Conversation so far\]\n\n\[User\]\nfix auth/);
+    assert.match(out, /\[Handoff note\]\nfocus on token refresh/);
+    assert.match(out, /User task:\nreview the branch/);
   });
 
   it("uses prior agent messages as discussion context in ask mode", () => {

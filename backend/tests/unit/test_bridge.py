@@ -75,6 +75,26 @@ def test_compute_prior_agent_bridge_uses_no_output_when_artifact_missing() -> No
     assert out == "[Previous from @claude]\nclaude work\n\n[Previous from @codex]\n<no output>"
 
 
+def test_compute_prior_agent_bridge_includes_failed_run_tail() -> None:
+    session = _session(
+        [
+            {
+                "agent": "claude",
+                "status": "failed",
+                "exitCode": 2,
+                "artifactIds": [],
+                "agentLog": "command failed\nstack line\nfinal error",
+            },
+        ],
+        [],
+    )
+    store = _FakeStore({})
+
+    out = compute_prior_agent_bridge(session, "codex", store)
+
+    assert out == "[Previous from @claude - failed, exit 2]\ncommand failed\nstack line\nfinal error"
+
+
 def test_compute_prior_agent_bridge_keeps_own_earlier_run_for_handoff_continuity() -> None:
     session = _session(
         [

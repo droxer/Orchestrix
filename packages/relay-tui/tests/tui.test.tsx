@@ -1672,19 +1672,23 @@ describe("RelayTui component", () => {
     assert.doesNotMatch(lastFrame() ?? "", /waiting for \/approve|Approve session/);
     assert.equal(requests.length, 2);
     assert.deepEqual(requests[1].assignments, [{ agent: "codex", mode: "action" }]);
-    assert.match(requests[1].task, /fix auth/);
-    assert.match(requests[1].task, /verify the fix/);
+    assert.equal(requests[1].task, "fix auth");
     assert.equal(requests[1].sessionId, requests[0].sessionId);
     const session = await store.getSession(requests[0].sessionId ?? "");
-    assert.ok(session.decisions.some((decision) => decision.kind === "handoff" && decision.targetAgent === "codex"));
+    assert.ok(session.decisions.some((decision) => (
+      decision.kind === "handoff"
+      && decision.targetAgent === "codex"
+      && decision.note === "verify the fix"
+    )));
     assert.ok(session.artifacts.some((artifact) => artifact.kind === "plan" && artifact.title === "Assignment plan"));
   });
 
   it("runs an explicit review handoff for any agent", async () => {
     const requests: RunRequest[] = [];
+    const store = testSessionStore();
     const { lastFrame, stdin } = render(
       <RelayTui
-        sessionStore={testSessionStore()}
+        sessionStore={store}
         runner={async (request) => {
           requests.push(request);
         }}
@@ -1703,7 +1707,13 @@ describe("RelayTui component", () => {
     assert.match(lastFrame() ?? "", /· @pi:review/);
     assert.equal(requests.length, 2);
     assert.deepEqual(requests[1].assignments, [{ agent: "pi", mode: "review" }]);
-    assert.match(requests[1].task, /verify the fix/);
+    assert.equal(requests[1].task, "fix auth");
+    const session = await store.getSession(requests[0].sessionId ?? "");
+    assert.ok(session.decisions.some((decision) => (
+      decision.kind === "handoff"
+      && decision.targetAgent === "pi"
+      && decision.note === "verify the fix"
+    )));
   });
 
   it("runs an active-session handoff in daemon mode", async () => {
@@ -1747,7 +1757,7 @@ describe("RelayTui component", () => {
     assert.equal(requests[0].sessionId, undefined);
     assert.equal(requests[1].sessionId, "ses_daemon");
     assert.deepEqual(requests[1].assignments, [{ agent: "codex", mode: "action" }]);
-    assert.match(requests[1].task, /verify the fix/);
+    assert.equal(requests[1].task, "fix auth");
     assert.match(lastFrame() ?? "", /· @codex/);
   });
 
@@ -1846,7 +1856,8 @@ describe("RelayTui component", () => {
           recordDecision: async () => {
             throw new Error("unexpected decision");
           },
-          recordHandoff: async () => {
+          recordHandoff: async (input) => {
+            assert.equal(input.note, "verify the fix");
             events.push("handoff:start");
             await new Promise<void>((resolve) => {
               releaseHandoff = resolve;
@@ -1869,7 +1880,8 @@ describe("RelayTui component", () => {
           },
         }}
         runner={async (request) => {
-          events.push(request.task.includes("Handoff note:") ? "run:handoff" : "run:initial");
+          assert.equal(request.task, "fix auth");
+          events.push(events.includes("run:initial") ? "run:handoff" : "run:initial");
           request.onSessionUpdate?.({
             id: request.sessionId ?? "ses_daemon",
             workspacePath: request.workspacePath ?? "/workspace/alice",

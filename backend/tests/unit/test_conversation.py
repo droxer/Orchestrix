@@ -108,3 +108,65 @@ def test_compute_conversation_history_excludes_agent_runs_after_latest_user_mess
     assert "older answer" in out
     assert "follow up" not in out
     assert "current-turn answer" not in out
+
+
+def test_compute_conversation_history_includes_failed_runs_before_latest_user_message() -> None:
+    session = _session(
+        events=[
+            {
+                "type": "user.message",
+                "timestamp": "2026-06-20T00:02:00.000Z",
+                "text": "follow up",
+            }
+        ],
+        runs=[
+            {
+                "id": "run_1",
+                "agent": "claude",
+                "status": "failed",
+                "exitCode": 1,
+                "startedAt": "2026-06-20T00:00:10.000Z",
+                "completedAt": "2026-06-20T00:01:00.000Z",
+                "artifactIds": [],
+                "agentLog": "fatal setup error",
+            }
+        ],
+    )
+
+    out = compute_conversation_history(session, _FakeStore({}))
+
+    assert out == (
+        "[Conversation so far]\n\n"
+        "[User]\nfirst question\n\n"
+        "[Assistant @claude - failed, exit 1]\nfatal setup error"
+    )
+
+
+def test_compute_conversation_history_caps_oldest_blocks() -> None:
+    session = _session(
+        events=[
+            {
+                "type": "user.message",
+                "timestamp": "2026-06-20T00:01:00.000Z",
+                "text": "old follow up",
+            },
+            {
+                "type": "user.message",
+                "timestamp": "2026-06-20T00:02:00.000Z",
+                "text": "near current follow up",
+            },
+            {
+                "type": "user.message",
+                "timestamp": "2026-06-20T00:03:00.000Z",
+                "text": "current turn",
+            },
+        ]
+    )
+
+    out = compute_conversation_history(session, _FakeStore({}), max_blocks=1, max_chars=1000)
+
+    assert out == (
+        "[Conversation so far]\n\n"
+        "[Earlier conversation omitted]\n\n"
+        "[User]\nnear current follow up"
+    )
