@@ -4,7 +4,9 @@ import type { AddressInfo } from "node:net";
 import test, { type TestContext } from "node:test";
 
 import {
+  collectExecution,
   discoverAgentInventory,
+  localProcessExecStream,
   parseInventoryOutput,
   runRelayDaemon,
   runRelayDaemonDoctor,
@@ -63,6 +65,69 @@ function runCommand(id = "cmd_1"): DaemonNodeRunCommand {
 function isInventoryProbe(args: string[] | undefined): boolean {
   return Boolean(args?.[1]?.includes("printf 'SKILL"));
 }
+
+test("local process execution preserves UTF-8 split across chunks", async () => {
+  const stdout = "你好，Relay\n";
+  const stderr = "错误输出\n";
+  const script = `
+    const stdout = Buffer.from(${JSON.stringify(stdout)});
+    const stderr = Buffer.from(${JSON.stringify(stderr)});
+    process.stdout.write(stdout.subarray(0, 1));
+    setTimeout(() => process.stdout.write(stdout.subarray(1)), 10);
+    process.stderr.write(stderr.subarray(0, 2));
+    setTimeout(() => process.stderr.write(stderr.subarray(2)), 20);
+  `;
+  const rendered: string[] = [];
+
+  const result = await localProcessExecStream(process.execPath, ["-e", script], {
+    stdoutRenderer: (chunk) => `stdout:${chunk}`,
+    stderrRenderer: (chunk) => `stderr:${chunk}`,
+    sink: (text) => rendered.push(text),
+  });
+
+  assert.equal(result.exit_code, 0);
+  assert.equal(result.stdout, stdout);
+  assert.equal(result.stderr, stderr);
+  assert.equal(result.stdout.includes("\uFFFD"), false);
+  assert.equal(result.stderr.includes("\uFFFD"), false);
+  assert.equal(rendered.some((chunk) => chunk.includes("\uFFFD")), false);
+  assert.equal(rendered.includes(`stdout:${stdout}`), true);
+  assert.equal(rendered.includes(`stderr:${stderr}`), true);
+});
+
+test("collectExecution preserves UTF-8 split across byte chunks", async () => {
+  const stdout = "你好，BoxLite\n";
+  const stderr = "错误输出\n";
+  const stdoutBytes = Buffer.from(stdout);
+  const stderrBytes = Buffer.from(stderr);
+  const stdoutChunks: Array<Buffer | null> = [stdoutBytes.subarray(0, 1), stdoutBytes.subarray(1), null];
+  const stderrChunks: Array<Buffer | null> = [stderrBytes.subarray(0, 2), stderrBytes.subarray(2), null];
+  const rendered: string[] = [];
+  const execution = {
+    stdout: async () => ({
+      next: async () => stdoutChunks.shift() ?? null,
+    }),
+    stderr: async () => ({
+      next: async () => stderrChunks.shift() ?? null,
+    }),
+    wait: async () => ({ exitCode: 0 }),
+  };
+
+  const result = await collectExecution(
+    execution,
+    true,
+    (chunk) => `stdout:${chunk}`,
+    (chunk) => `stderr:${chunk}`,
+    (text) => rendered.push(text),
+  );
+
+  assert.equal(result.exit_code, 0);
+  assert.equal(result.stdout, stdout);
+  assert.equal(result.stderr, stderr);
+  assert.equal(rendered.includes(`stdout:${stdout}`), true);
+  assert.equal(rendered.includes(`stderr:${stderr}`), true);
+  assert.equal(rendered.some((chunk) => chunk.includes("\uFFFD")), false);
+});
 
 test("relay daemon ignores duplicate run.start commands already active", async () => {
   const stop = new AbortController();

@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, posix, relative, resolve, sep } from "node:path";
+import { TextDecoder } from "node:util";
 
 import {
   DEVBOX_IMAGE,
@@ -316,26 +317,31 @@ export async function collectExecution(
 
   async function readStream(name: "stdout" | "stderr", parts: string[]): Promise<void> {
     const reader = await execution[name]();
+    const decoder = new TextDecoder("utf-8");
+    const pushText = (text: string): void => {
+      if (!text) return;
+      parts.push(text);
+      if (!echo) return;
+      const rendered = name === "stderr"
+        ? stderrRenderer ? stderrRenderer(text) : text
+        : stdoutRenderer ? stdoutRenderer(text) : text;
+      if (sink) {
+        sink(rendered);
+        return;
+      }
+      if (name === "stderr") {
+        process.stderr.write(rendered);
+      } else {
+        process.stdout.write(rendered);
+      }
+    };
     while (true) {
       const chunk = await reader.next();
       if (chunk === null) break;
-      const text = String(chunk);
-      parts.push(text);
-      if (echo) {
-        const rendered = name === "stderr"
-          ? stderrRenderer ? stderrRenderer(text) : text
-          : stdoutRenderer ? stdoutRenderer(text) : text;
-        if (sink) {
-          sink(rendered);
-          continue;
-        }
-        if (name === "stderr") {
-          process.stderr.write(rendered);
-        } else {
-          process.stdout.write(rendered);
-        }
-      }
+      const text = typeof chunk === "string" ? chunk : decoder.decode(chunk, { stream: true });
+      pushText(text);
     }
+    pushText(decoder.decode());
   }
 
   try {

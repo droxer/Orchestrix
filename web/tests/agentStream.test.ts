@@ -103,6 +103,47 @@ describe("agent stream parsing", () => {
     ]);
   });
 
+  it("renders Kimi assistant text without raw JSON", () => {
+    const raw = JSON.stringify({ role: "assistant", content: "Loop engineering is the latest paradigm." });
+
+    const segments = parseAgentStream("kimi", raw);
+
+    assert.deepEqual(segments, [
+      { kind: "text", text: "Loop engineering is the latest paradigm." },
+    ]);
+    assert.equal(JSON.stringify(segments).includes("\"role\":\"assistant\""), false);
+  });
+
+  it("renders Kimi content arrays and tool calls", () => {
+    const raw = JSON.stringify({
+      role: "assistant",
+      content: [{ type: "text", text: "Searching the web." }],
+      tool_calls: [{ id: "call_1", function: { name: "web_search" } }],
+    });
+
+    assert.deepEqual(parseAgentStream("kimi", raw), [
+      { kind: "text", text: "Searching the web." },
+      { kind: "tool", name: "web_search" },
+    ]);
+  });
+
+  it("drops Kimi tool-result and non-assistant messages", () => {
+    const raw = [
+      JSON.stringify({ role: "user", content: "最新的 loop engineering 是？" }),
+      JSON.stringify({ role: "tool", tool_call_id: "call_1", content: "raw tool output" }),
+    ].join("\n");
+
+    assert.deepEqual(parseAgentStream("kimi", raw), []);
+  });
+
+  it("renders Kimi error events as bad status", () => {
+    const raw = JSON.stringify({ type: "error", message: "auth required" });
+
+    assert.deepEqual(parseAgentStream("kimi", raw), [
+      { kind: "status", tone: "bad", text: "Kimi error: auth required" },
+    ]);
+  });
+
   it("carries the file/command target on Claude tool_use lines", () => {
     const raw = [
       JSON.stringify({

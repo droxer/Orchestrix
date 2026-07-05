@@ -902,14 +902,14 @@ export async function localProcessExecStream(
     };
     options.signal?.addEventListener("abort", abort, { once: true });
     if (options.signal?.aborted) abort();
-    child.stdout.on("data", (chunk) => {
-      const text = String(chunk);
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (text: string) => {
       stdoutParts.push(text);
       const rendered = options.stdoutRenderer ? options.stdoutRenderer(text) : text;
       if (rendered) options.sink?.(rendered);
     });
-    child.stderr.on("data", (chunk) => {
-      const text = String(chunk);
+    child.stderr.on("data", (text: string) => {
       stderrParts.push(text);
       const rendered = options.stderrRenderer ? options.stderrRenderer(text) : text;
       if (rendered) options.sink?.(rendered);

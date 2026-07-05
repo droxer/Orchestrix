@@ -23,6 +23,7 @@ export function parseAgentStream(agent: AgentName, raw: string): AgentSegment[] 
   if (agent === "claude") return parseClaude(raw);
   if (agent === "codex") return parseCodex(raw);
   if (agent === "pi") return parsePi(raw);
+  if (agent === "kimi") return parseKimi(raw);
   return parsePlain(raw);
 }
 
@@ -388,6 +389,37 @@ function parsePi(raw: string): AgentSegment[] {
   }
   textBuffer.flush(out, "text");
   thinkingBuffer.flush(out, "thinking");
+  return out;
+}
+
+function parseKimi(raw: string): AgentSegment[] {
+  const out: AgentSegment[] = [];
+  for (const record of streamRecords(raw)) {
+    if (record.kind === "text") {
+      const text = stripAnsi(record.text).trim();
+      if (text) out.push({ kind: "text", text });
+      continue;
+    }
+    const event = record.value;
+    if (event.type === "error") {
+      out.push({ kind: "status", tone: "bad", text: `Kimi error: ${String(event.message ?? "unknown error")}` });
+      continue;
+    }
+
+    const message = asRecord(event.message ?? event);
+    const role = message.role ?? event.role;
+    if (role !== undefined && role !== "assistant") continue;
+
+    const text = textFromContent(message).trim();
+    if (text) out.push({ kind: "text", text });
+
+    const toolCalls = Array.isArray(message.tool_calls) ? message.tool_calls : [];
+    for (const call of toolCalls) {
+      const callRecord = asRecord(call);
+      const fn = asRecord(callRecord.function);
+      out.push({ kind: "tool", name: String(fn.name ?? callRecord.name ?? "tool") });
+    }
+  }
   return out;
 }
 
