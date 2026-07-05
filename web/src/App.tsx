@@ -281,6 +281,23 @@ export function App() {
     if (el && atBottomRef.current) el.scrollTop = el.scrollHeight;
   }, [displayMessages.length, activeSession?.id]);
 
+  // The effect above only fires when a block is added or the session changes.
+  // A single agent turn streaming a long response grows one block's height
+  // without changing the count, so in a conversation tall enough to overflow
+  // the transcript the new output scrolls below the fold and the view freezes
+  // at the start of the response. Observe the content height and keep the
+  // transcript pinned to the newest output whenever the user is at the bottom.
+  useEffect(() => {
+    const el = transcriptRef.current;
+    const content = el?.firstElementChild;
+    if (!el || !content || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => {
+      if (atBottomRef.current) el.scrollTop = el.scrollHeight;
+    });
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, [activeSession?.id]);
+
   useEffect(() => {
     setArtifactsDrawerOpen(false);
     setInitialArtifactId(null);
