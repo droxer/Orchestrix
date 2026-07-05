@@ -1,28 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { NavConversations, NavPreferences } from "./components/icons";
 import {
-  archiveSession, cancelRun, logout, recordDecision, renameSession, runSandbox, updateDaemonNodeAgentRoleOverrides,
+  logout, updateDaemonNodeAgentRoleOverrides,
 } from "./api";
 import { AGENT_NAMES } from "./types";
-import type { AgentName, AgentTaskMode, ControlPanelDaemonNodeRecord, CurrentUser, RelayArtifact, RelaySession } from "./types";
-import { TranscriptEmpty } from "./components/TranscriptEmpty";
-import { MessageBlock, projectMessages, isGroupedContinuation } from "./components/MessageBlock";
-import type { DerivedMessage } from "./components/MessageBlock";
-import { AdminConsole } from "./components/AdminConsole";
-import { BacklogPage } from "./components/BacklogPage";
-import { ChannelsPage } from "./components/ChannelsPage";
-import { EmployeeWorkspacePage } from "./components/EmployeeWorkspacePage";
+import type { AgentName, AgentTaskMode, CurrentUser, DaemonNodeMonitorRecord, RelayArtifact, RelaySession } from "./types";
 import { LoginScreen } from "./components/LoginScreen";
-import { RoutinePage } from "./components/RoutinePage";
-import { PreferencesDialog } from "./components/PreferencesDialog";
 import { type Theme, type Language } from "./components/PreferencesPanel";
 import type { ConversationItem } from "./components/ConversationRow";
-import { DecisionBar } from "./components/composer/DecisionBar";
-import { Composer, type ComposerHandle } from "./components/composer/Composer";
 import { useRelayData } from "./hooks/useRelayData";
+import { useRelayMutations } from "./hooks/useRelayMutations";
+import { useMutationError } from "./hooks/useMutationError";
+import { useAppHash } from "./hooks/useAppHash";
 import { useSessionEvents } from "./hooks/useSessionEvents";
 import { useLocalDaemonNodes } from "./hooks/useLocalDaemonNodes";
 import { mergeVisibleDaemonNodes } from "./lib/daemonNodes";
@@ -39,23 +30,21 @@ import { shouldTailSessionEvents } from "./lib/sessionEventStream";
 import { useEmployeeProvisioning } from "./hooks/useEmployeeProvisioning";
 import { isAwaitingFeedbackDecision, rerunAssignmentForSession } from "./lib/workflow";
 import { useDialogs } from "./components/ui/DialogProvider";
-import { SideNav } from "./components/SideNav";
-import { ThreadPanel } from "./components/ThreadPanel";
-import { ChatHeader } from "./components/ChatHeader";
-import { ArtifactLibraryDrawer } from "./components/artifact/ArtifactLibraryDrawer";
-import type { AppRoute, MobileView } from "./lib/viewTypes";
+import { AppShell, RouteFallback } from "./components/AppShell";
+import { MainChatView } from "./components/MainChatView";
+import type { ComposerHandle } from "./components/composer/Composer";
+import type { DerivedMessage } from "./components/MessageBlock";
+import { projectMessages } from "./components/MessageBlock";
+import type { AppRoute } from "./lib/viewTypes";
 import { visibleConversationArtifacts } from "./lib/conversationArtifacts";
-import "./i18n";
+
+const AdminConsole = lazy(() => import("./components/AdminConsole").then((m) => ({ default: m.AdminConsole })));
+const BacklogPage = lazy(() => import("./components/BacklogPage").then((m) => ({ default: m.BacklogPage })));
+const ChannelsPage = lazy(() => import("./components/ChannelsPage").then((m) => ({ default: m.ChannelsPage })));
+const EmployeeWorkspacePage = lazy(() => import("./components/EmployeeWorkspacePage").then((m) => ({ default: m.EmployeeWorkspacePage })));
+const RoutinePage = lazy(() => import("./components/RoutinePage").then((m) => ({ default: m.RoutinePage })));
 
 const agents: AgentName[] = AGENT_NAMES;
-
-const WORK_ROUTE_LABEL_KEYS: Record<Exclude<AppRoute, "main">, string> = {
-  workspace: "nav.workspace",
-  backlog: "nav.backlog",
-  routine: "nav.routine",
-  channels: "nav.channels",
-  admin: "nav.admin",
-};
 
 const WORK_ROUTE_SKIP_IDS: Record<Exclude<AppRoute, "main">, string> = {
   workspace: "workspace-panel",
@@ -78,6 +67,15 @@ function useStableEvent<TArgs extends unknown[], TResult>(handler: (...args: TAr
 export function App() {
   const { t, i18n } = useTranslation();
   const { prompt } = useDialogs();
+  const { reportMutationError } = useMutationError();
+  const {
+    renameSessionMutation,
+    archiveSessionMutation,
+    cancelRunMutation,
+    recordDecisionMutation,
+    runSandboxMutation,
+    invalidateRelay,
+  } = useRelayMutations();
   const selectedEmployee = useRelayStore((s) => s.selectedEmployee);
   const setSelectedEmployee = useRelayStore((s) => s.setSelectedEmployee);
   const selectedSessionId = useRelayStore((s) => s.selectedSessionId);
@@ -89,8 +87,6 @@ export function App() {
   const [composerMode, setComposerMode] = useState<AgentTaskMode>("action");
   const [employeeQuery, setEmployeeQuery] = useState("");
   const [prefsOpen, setPrefsOpen] = useState(false);
-  const [mobileView, setMobileView] = useState<MobileView>("chat");
-  const [route, setRoute] = useState<AppRoute>("main");
   const [sidenavExpanded, setSidenavExpanded] = useState(true);
   const [theme, setTheme] = useState<Theme>(readTheme);
   const [language, setLanguage] = useState<Language>(readLanguage);
@@ -155,6 +151,32 @@ export function App() {
     [activeSessionId, composingNew, myConversations, selectedSessionId],
   );
   const visibleArtifacts = useMemo(() => visibleConversationArtifacts(activeSession), [activeSession]);
+
+  const applySessionFromHash = useCallback((sessionId: string) => {
+    setComposingNew(false);
+    setSelectedSessionId(sessionId);
+    setActiveSessionId(sessionId);
+  }, [setActiveSessionId, setSelectedSessionId]);
+
+  const clearPendingMessage = useCallback(() => {
+    setPendingUserMessage(null);
+  }, []);
+
+  const {
+    route,
+    mobileView,
+    navigateToRoute,
+    navigateToMobileView,
+    hrefForSideNavRoute,
+    syncChatHash,
+  } = useAppHash({
+    composingNew,
+    activeSessionId,
+    selectedSessionId,
+    activeSession,
+    onApplySessionFromHash: applySessionFromHash,
+    onClearPendingMessage: clearPendingMessage,
+  });
 
   // Live SSE tail of the open conversation; merges new events into the
   // sessions cache so the active thread updates at push latency.
@@ -251,9 +273,9 @@ export function App() {
   }, [selectedNode?.disabledAgents, activeAgent, handoffAgent]);
   useEffect(() => {
     if ((route === "admin" || route === "channels") && user && user.role !== "admin") {
-      setRoute("main");
+      navigateToRoute("main");
     }
-  }, [route, user]);
+  }, [navigateToRoute, route, user]);
   useEffect(() => {
     const el = transcriptRef.current;
     if (el && atBottomRef.current) el.scrollTop = el.scrollHeight;
@@ -289,12 +311,12 @@ export function App() {
     if (el) atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
   }
 
-  function openConversation(sessionId: string) {
+  function openConversation(sessionId: string, replace = false) {
     setComposingNew(false);
     setPendingUserMessage(null);
     setSelectedSessionId(sessionId);
     setActiveSessionId(sessionId);
-    setMobileView("chat");
+    syncChatHash(sessionId, replace);
   }
 
   function startNewConversation() {
@@ -303,8 +325,8 @@ export function App() {
     setSelectedSessionId(undefined);
     setActiveSessionId(null);
     composerRef.current?.clear();
-    setMobileView("chat");
     atBottomRef.current = true;
+    syncChatHash(null);
   }
 
   function openArtifactsDrawer(artifact?: RelayArtifact) {
@@ -323,23 +345,22 @@ export function App() {
     const next = result?.trim();
     if (!next || next === current) return;
     try {
-      await renameSession(session.id, next, selectedToken);
-      await refresh();
+      await renameSessionMutation.mutateAsync({ sessionId: session.id, title: next, token: selectedToken });
     } catch {
-      // rename errors are silent; the thread list keeps the previous title.
+      // mutation onError surfaces a toast.
     }
   }
 
   async function closeConversation(sessionId: string) {
     try {
-      await archiveSession(sessionId, selectedToken);
+      await archiveSessionMutation.mutateAsync({ sessionId, token: selectedToken });
       if (activeSession?.id === sessionId) {
         setSelectedSessionId(undefined);
         setActiveSessionId(null);
+        syncChatHash(null, true);
       }
-      await refresh();
     } catch {
-      // archive errors are silent; the thread stays open.
+      // mutation onError surfaces a toast.
     }
   }
 
@@ -364,34 +385,48 @@ export function App() {
     // While creating a fresh conversation, keep suppressing the previous active
     // thread so the optimistic user turn does not appear in the wrong transcript.
     if (!creatingSession) setComposingNew(false);
-    setMobileView("chat"); atBottomRef.current = true;
+    navigateToRoute("main");
+    atBottomRef.current = true;
     try {
       const { sandbox, token } = await provisionEmployeeSandbox(selectedEmployee, selectedToken);
       rememberSandboxToken(selectedEmployee, sandbox, token);
       const assignment = { agent: routedAgent, mode: composerMode };
       // The active session now tails live over SSE (useSessionEvents), so no
       // per-run polling loop is needed while the run is in flight.
-      const done = await runSandbox(
-        { sandboxId: sandbox.id, taskGoal: goal, assignments: [assignment], sessionId, ...(sessionId ? { userMessageId } : {}) },
+      const done = await runSandboxMutation.mutateAsync({
+        input: {
+          sandboxId: sandbox.id,
+          taskGoal: goal,
+          assignments: [assignment],
+          sessionId,
+          ...(sessionId ? { userMessageId } : {}),
+        },
         token,
-      );
+      });
       setActiveSessionId(done.id);
       setSelectedSessionId(done.id);
       setComposingNew(false);
+      syncChatHash(done.id, true);
       await refresh(undefined, token);
-    } catch {
+    } catch (error) {
       setPendingUserMessage(null);
+      reportMutationError("Failed to send message", error, t("errors.send_message"));
     } finally { setIsRunning(false); }
   }
 
   async function cancelActiveRun() {
     if (!selectedSandbox || !activeRun) return;
     try {
-      const session = await cancelRun(selectedSandbox.id, activeRun.sessionId, selectedToken, t("cancel.reason"));
+      const session = await cancelRunMutation.mutateAsync({
+        sandboxId: selectedSandbox.id,
+        sessionId: activeRun.sessionId,
+        token: selectedToken,
+        reason: t("cancel.reason"),
+      });
       setSelectedSessionId(session.id);
-      await refresh();
+      syncChatHash(session.id, true);
     } catch {
-      // cancel errors are silent; the run state refreshes on the next poll.
+      // mutation onError surfaces a toast.
     }
   }
 
@@ -400,8 +435,12 @@ export function App() {
 
   async function updateAgentRoleOverrides(overrides: AgentRoleMap) {
     if (!selectedNode) return;
-    await updateDaemonNodeAgentRoleOverrides(selectedNode.id, overrides, selectedToken);
-    await refresh(undefined, selectedToken);
+    try {
+      await updateDaemonNodeAgentRoleOverrides(selectedNode.id, overrides, selectedToken);
+      await invalidateRelay();
+    } catch (error) {
+      reportMutationError("Failed to update agent roles", error, t("errors.task_action"));
+    }
   }
 
   async function sendDecision(kind: "approve" | "reject" | "rerun" | "mark_done") {
@@ -415,29 +454,38 @@ export function App() {
         const assignment = rerunAssignmentForSession(activeSession, activeAgent, composerMode);
         setActiveAgent(assignment.agent);
         setSelectedSessionId(activeSession.id);
-        setMobileView("chat"); atBottomRef.current = true;
-        const done = await runSandbox({
-          sandboxId: sandbox.id,
-          taskGoal: activeSession.taskGoal,
-          assignments: [assignment],
-          sessionId: activeSession.id,
-          decision: { kind: "rerun", targetAgent: assignment.agent },
-        }, token);
+        navigateToRoute("main");
+        atBottomRef.current = true;
+        const done = await runSandboxMutation.mutateAsync({
+          input: {
+            sandboxId: sandbox.id,
+            taskGoal: activeSession.taskGoal,
+            assignments: [assignment],
+            sessionId: activeSession.id,
+            decision: { kind: "rerun", targetAgent: assignment.agent },
+          },
+          token,
+        });
         setSelectedSessionId(done.id);
+        syncChatHash(done.id, true);
         await refresh(undefined, token);
-      } catch {
-        // rerun errors are silent; the transcript keeps the prior state.
+      } catch (error) {
+        reportMutationError("Failed to rerun assignment", error, t("errors.rerun_assignment"));
       } finally {
         setIsRunning(false);
       }
       return;
     }
     try {
-      const session = await recordDecision(activeSession.id, kind, undefined, selectedToken);
+      const session = await recordDecisionMutation.mutateAsync({
+        sessionId: activeSession.id,
+        kind,
+        token: selectedToken,
+      });
       setSelectedSessionId(session.id);
-      await refresh();
+      syncChatHash(session.id, true);
     } catch {
-      // decision errors are silent; the decision bar stays until refresh succeeds.
+      // mutation onError surfaces a toast.
     }
   }
 
@@ -451,17 +499,21 @@ export function App() {
       const note = handoffNote.trim();
       const assignment = { agent: handoffAgent, mode: handoffMode };
       const taskGoal = note ? `${activeSession.taskGoal}\n\nHandoff note:\n${note}` : activeSession.taskGoal;
-      const done = await runSandbox({
-        sandboxId: sandbox.id,
-        taskGoal,
-        assignments: [assignment],
-        sessionId: activeSession.id,
-        decision: { kind: "handoff", targetAgent: handoffAgent, ...(note ? { note } : {}) },
-      }, token);
+      const done = await runSandboxMutation.mutateAsync({
+        input: {
+          sandboxId: sandbox.id,
+          taskGoal,
+          assignments: [assignment],
+          sessionId: activeSession.id,
+          decision: { kind: "handoff", targetAgent: handoffAgent, ...(note ? { note } : {}) },
+        },
+        token,
+      });
       setSelectedSessionId(done.id); setHandoffNote(""); setHandoffMode("action"); setHandoffOpen(false); setActiveAgent(handoffAgent);
+      syncChatHash(done.id, true);
       await refresh(undefined, token);
-    } catch {
-      // handoff errors are silent; the decision bar stays open for retry.
+    } catch (error) {
+      reportMutationError("Failed to send handoff", error, t("errors.send_handoff"));
     } finally { setIsRunning(false); }
   }
 
@@ -473,7 +525,8 @@ export function App() {
       // ignore
     }
     setUser(null);
-    setRoute("main");
+    navigateToRoute("main");
+    syncChatHash(null, true);
   }
 
   if (!authChecked) {
@@ -489,173 +542,109 @@ export function App() {
   }
 
   return (
-    <main className="messenger-shell" data-mobile-view={mobileView} data-route={route} data-sidenav={sidenavExpanded ? "open" : "closed"}>
-      <a className="skip-link" href={skipLinkHref}>{t("skip_to_content")}</a>
-
-      <div
-        className={`mobile-topbar ${route === "main" ? "mobile-topbar--chat" : "mobile-topbar--route"}`}
-        aria-label={route === "main" ? t("nav.conversations") : t(WORK_ROUTE_LABEL_KEYS[route])}
-      >
-        {route === "main" ? (
-          <>
-            <button
-              type="button"
-              className={mobileView === "threads" ? "active" : ""}
-              aria-label={t("nav.conversations")}
-              aria-pressed={mobileView === "threads"}
-              onClick={() => { setRoute("main"); setMobileView("threads"); }}
-            >
-              <NavConversations size={16} /><span>{t("nav.chats")}</span>
-            </button>
-            <button
-              type="button"
-              className={mobileView === "chat" ? "active" : ""}
-              aria-pressed={mobileView === "chat"}
-              onClick={() => { setRoute("main"); setMobileView("chat"); }}
-            >
-              <span>{activeConversationLabel}</span>
-            </button>
-          </>
+    <AppShell
+      route={route}
+      onNavigateRoute={navigateToRoute}
+      hrefForRoute={hrefForSideNavRoute}
+      mobileView={mobileView}
+      onMobileViewChange={navigateToMobileView}
+      sidenavExpanded={sidenavExpanded}
+      setSidenavExpanded={setSidenavExpanded}
+      prefsOpen={prefsOpen}
+      setPrefsOpen={setPrefsOpen}
+      skipLinkHref={skipLinkHref}
+      activeConversationLabel={activeConversationLabel}
+      user={user}
+      onLogout={() => void handleLogout()}
+      theme={theme}
+      onThemeChange={setTheme}
+      language={language}
+      onLanguageChange={setLanguage}
+      selectedNode={selectedNode}
+      onAgentRoleOverridesChange={updateAgentRoleOverrides}
+    >
+      <Suspense fallback={<RouteFallback />}>
+        {route === "admin" ? <AdminConsole /> : route === "channels" ? <ChannelsPage /> : route === "workspace" ? (
+          <EmployeeWorkspacePage
+            employeeId={selectedEmployee}
+            currentUser={user}
+            isRefreshing={isRefreshing}
+            onRefresh={() => refresh()}
+            onOpenConversation={openConversation}
+          />
+        ) : route === "backlog" ? (
+          <BacklogPage
+            tasks={tasks}
+            sessions={sessions}
+            nodes={visibleNodes}
+            currentUser={user}
+            isRefreshing={isRefreshing}
+            onRefresh={() => refresh()}
+            onOpenConversation={openConversation}
+          />
+        ) : route === "routine" ? (
+          <RoutinePage
+            tasks={tasks}
+            sessions={sessions}
+            nodes={visibleNodes}
+            currentUser={user}
+            isRefreshing={isRefreshing}
+            onRefresh={() => refresh()}
+            onOpenConversation={openConversation}
+          />
         ) : (
-          <div className="mobile-topbar-route">
-            <span className="mobile-topbar-eyebrow">{t("nav.mobile_section")}</span>
-            <span className="mobile-topbar-title">{t(WORK_ROUTE_LABEL_KEYS[route])}</span>
-          </div>
+          <MainChatView
+            filteredConversations={filteredConversations}
+            employeeQuery={employeeQuery}
+            setEmployeeQuery={setEmployeeQuery}
+            activeSession={activeSession}
+            pendingUserMessage={pendingUserMessage}
+            displayMessages={displayMessages}
+            awaitingDecision={awaitingDecision}
+            transcriptRef={transcriptRef}
+            composerRef={composerRef}
+            onTranscriptScroll={handleTranscriptScroll}
+            onSelectConversation={openConversation}
+            onNewConversation={startNewConversation}
+            onRenameConversation={(session) => void renameConversation(session)}
+            onCloseConversation={(id) => void closeConversation(id)}
+            activeAgent={activeAgent}
+            setActiveAgent={setActiveAgent}
+            agentNames={agents}
+            disabledAgents={selectedNode?.disabledAgents}
+            agentHealth={selectedNode?.agents}
+            runningAgent={activeRun?.agent}
+            isRefreshing={isRefreshing}
+            artifactCount={visibleArtifacts.length}
+            visibleArtifacts={visibleArtifacts}
+            artifactsDrawerOpen={artifactsDrawerOpen}
+            initialArtifactId={initialArtifactId}
+            onOpenArtifacts={openArtifactsDrawer}
+            onCloseArtifactsDrawer={() => setArtifactsDrawerOpen(false)}
+            onRefresh={() => void refresh()}
+            onBackToThreads={() => navigateToMobileView("threads")}
+            selectedEmployee={selectedEmployee}
+            agentDescriptors={agentDescriptors}
+            agentRoleLabels={agentRoleLabels}
+            composerMode={composerMode}
+            setComposerMode={setComposerMode}
+            handoffOpen={handoffOpen}
+            setHandoffOpen={setHandoffOpen}
+            handoffAgent={handoffAgent}
+            setHandoffAgent={setHandoffAgent}
+            handoffMode={handoffMode}
+            setHandoffMode={setHandoffMode}
+            handoffNote={handoffNote}
+            setHandoffNote={setHandoffNote}
+            sendDecision={sendDecision}
+            sendHandoff={sendHandoff}
+            onAgentPicked={setActiveAgent}
+            onSend={handleComposerSend}
+            onCancelRun={handleCancelRun}
+            running={Boolean(activeRun)}
+          />
         )}
-        <button type="button" className={`mobile-settings ${prefsOpen ? "active" : ""}`} aria-label={t("nav.settings")} aria-haspopup="dialog" aria-expanded={prefsOpen} onClick={() => setPrefsOpen((v) => !v)}>
-          <NavPreferences size={16} />
-        </button>
-      </div>
-
-      <SideNav
-        sidenavExpanded={sidenavExpanded}
-        setSidenavExpanded={setSidenavExpanded}
-        route={route}
-        setRoute={setRoute}
-        isAdmin={user.role === "admin"}
-        prefsOpen={prefsOpen}
-        setPrefsOpen={setPrefsOpen}
-        onLogout={() => void handleLogout()}
-      />
-
-      {route === "admin" ? <AdminConsole /> : route === "channels" ? <ChannelsPage /> : route === "workspace" ? (
-        <EmployeeWorkspacePage
-          employeeId={selectedEmployee}
-          currentUser={user}
-          isRefreshing={isRefreshing}
-          onRefresh={() => refresh()}
-          onOpenConversation={(sessionId) => {
-            setRoute("main");
-            openConversation(sessionId);
-          }}
-        />
-      ) : route === "backlog" ? (
-        <BacklogPage
-          tasks={tasks}
-          sessions={sessions}
-          nodes={visibleNodes}
-          currentUser={user}
-          isRefreshing={isRefreshing}
-          onRefresh={() => refresh()}
-          onOpenConversation={(sessionId) => {
-            setRoute("main");
-            openConversation(sessionId);
-          }}
-        />
-      ) : route === "routine" ? (
-        <RoutinePage
-          tasks={tasks}
-          sessions={sessions}
-          nodes={visibleNodes}
-          currentUser={user}
-          isRefreshing={isRefreshing}
-          onRefresh={() => refresh()}
-          onOpenConversation={(sessionId) => {
-            setRoute("main");
-            openConversation(sessionId);
-          }}
-        />
-      ) : (<>
-
-      <ThreadPanel
-        conversations={filteredConversations}
-        query={employeeQuery}
-        setQuery={setEmployeeQuery}
-        selectedSessionId={activeSession?.id}
-        onSelectConversation={openConversation}
-        onNewConversation={startNewConversation}
-        onRenameConversation={(session) => void renameConversation(session)}
-        onCloseConversation={(id) => void closeConversation(id)}
-      />
-
-      <section id="chat-panel" className="chat-panel" aria-label={t("nav.conversations")} tabIndex={-1}>
-        <ChatHeader
-          activeAgent={activeAgent}
-          setActiveAgent={setActiveAgent}
-          agentNames={agents}
-          disabledAgents={selectedNode?.disabledAgents}
-          agentHealth={selectedNode?.agents}
-          activeSession={activeSession}
-          runningAgent={activeRun?.agent}
-          isRefreshing={isRefreshing}
-          artifactCount={visibleArtifacts.length}
-          onOpenArtifacts={openArtifactsDrawer}
-          onRefresh={() => void refresh()}
-          onBackToThreads={() => setMobileView("threads")}
-        />
-
-        <div className="transcript" ref={transcriptRef} onScroll={handleTranscriptScroll}>
-          <div className="transcript-inner">
-            {activeSession || pendingUserMessage ? (
-              <>
-                {displayMessages.map((msg, i) => <MessageBlock key={msg.id} message={msg} sessionId={activeSession?.id ?? ""} grouped={isGroupedContinuation(displayMessages, i)} onOpenArtifact={openArtifactsDrawer} />)}
-                {awaitingDecision ? <DecisionBar agentNames={agents} disabledAgents={selectedNode?.disabledAgents} sendDecision={sendDecision} handoffOpen={handoffOpen} setHandoffOpen={setHandoffOpen} handoffAgent={handoffAgent} setHandoffAgent={setHandoffAgent} handoffMode={handoffMode} setHandoffMode={setHandoffMode} handoffNote={handoffNote} setHandoffNote={setHandoffNote} sendHandoff={sendHandoff} /> : null}
-              </>
-            ) : (
-              <TranscriptEmpty selectedEmployee={selectedEmployee} activeAgent={activeAgent} agentDescriptors={agentDescriptors} />
-            )}
-          </div>
-        </div>
-
-        <Composer
-          ref={composerRef}
-          agentNames={agents}
-          disabledAgents={selectedNode?.disabledAgents}
-          composerMode={composerMode}
-          setComposerMode={setComposerMode}
-          activeAgent={activeAgent}
-          agentRoleLabels={agentRoleLabels}
-          selectedEmployee={selectedEmployee}
-          running={Boolean(activeRun)}
-          onAgentPicked={setActiveAgent}
-          onSend={handleComposerSend}
-          onCancelRun={handleCancelRun}
-        />
-      </section>
-
-      <ArtifactLibraryDrawer
-        open={artifactsDrawerOpen}
-        onClose={() => setArtifactsDrawerOpen(false)}
-        sessionId={activeSession?.id ?? ""}
-        artifacts={visibleArtifacts}
-        initialArtifactId={initialArtifactId ?? undefined}
-      />
-
-      </>)}
-
-      <PreferencesDialog
-        open={prefsOpen}
-        onClose={() => setPrefsOpen(false)}
-        onLogout={() => void handleLogout()}
-        preferences={{
-          theme,
-          onThemeChange: setTheme,
-          language,
-          onLanguageChange: setLanguage,
-          agentNode: selectedNode,
-          onAgentRoleOverridesChange: updateAgentRoleOverrides,
-        }}
-      />
-    </main>
+      </Suspense>
+    </AppShell>
   );
 }

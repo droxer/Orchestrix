@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useRef, useState, type Dispatch, type MouseEvent, type SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 import {
   NavAdmin, NavBacklog, NavChannels, NavConversations, NavLogout, NavPreferences,
@@ -9,11 +9,12 @@ import type { AppRoute } from "../lib/viewTypes";
 
 // Left rail: brand, collapse toggle, route nav, settings/logout. Owns its own
 // collapsed-state hover tooltip (only shown while the rail is collapsed).
-export function SideNav({ sidenavExpanded, setSidenavExpanded, route, setRoute, isAdmin, prefsOpen, setPrefsOpen, onLogout }: {
+export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigateRoute, hrefForRoute, isAdmin, prefsOpen, setPrefsOpen, onLogout }: {
   sidenavExpanded: boolean;
   setSidenavExpanded: Dispatch<SetStateAction<boolean>>;
   route: AppRoute;
-  setRoute: Dispatch<SetStateAction<AppRoute>>;
+  onNavigateRoute: (route: AppRoute) => void;
+  hrefForRoute: (route: AppRoute) => string;
   isAdmin: boolean;
   prefsOpen: boolean;
   setPrefsOpen: Dispatch<SetStateAction<boolean>>;
@@ -91,6 +92,11 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, setRoute, 
     setSettingsMenu(null);
     onLogout();
   }
+  function handleRouteClick(event: MouseEvent<HTMLAnchorElement>, nextRoute: AppRoute) {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.altKey || event.ctrlKey || event.shiftKey) return;
+    event.preventDefault();
+    onNavigateRoute(nextRoute);
+  }
 
   return (
     <aside className="sidenav-panel" aria-label="Relay" data-expanded={sidenavExpanded ? "true" : "false"}>
@@ -115,14 +121,14 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, setRoute, 
         </button>
       </div>
       <nav className="sidenav-nav" aria-label={t("nav.conversations")}>
-        <button
+        <a
           className={`sidenav-btn ${route === "main" ? "active" : ""}`}
           data-nav="conversations"
-          type="button"
+          href={hrefForRoute("main")}
           aria-label={t("nav.conversations")}
-          aria-pressed={route === "main"}
+          aria-current={route === "main" ? "page" : undefined}
           title={t("nav.conversations")}
-          onClick={() => setRoute("main")}
+          onClick={(event) => handleRouteClick(event, "main")}
           onMouseEnter={(e) => showNavTooltip(t("nav.conversations"), e.currentTarget)}
           onMouseLeave={hideNavTooltip}
           onFocus={(e) => showNavTooltip(t("nav.conversations"), e.currentTarget)}
@@ -130,15 +136,15 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, setRoute, 
         >
           <NavConversations size={18} />
           <span className="sidenav-label">{t("nav.conversations")}</span>
-        </button>
-        <button
+        </a>
+        <a
           className={`sidenav-btn ${route === "workspace" ? "active" : ""}`}
           data-nav="workspace"
-          type="button"
+          href={hrefForRoute("workspace")}
           aria-label={t("nav.workspace_label")}
-          aria-pressed={route === "workspace"}
+          aria-current={route === "workspace" ? "page" : undefined}
           title={t("nav.workspace_label")}
-          onClick={() => setRoute((r) => r === "workspace" ? "main" : "workspace")}
+          onClick={(event) => handleRouteClick(event, "workspace")}
           onMouseEnter={(e) => showNavTooltip(t("nav.workspace"), e.currentTarget)}
           onMouseLeave={hideNavTooltip}
           onFocus={(e) => showNavTooltip(t("nav.workspace"), e.currentTarget)}
@@ -146,15 +152,15 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, setRoute, 
         >
           <NavWorkspace size={18} />
           <span className="sidenav-label">{t("nav.workspace")}</span>
-        </button>
-        <button
+        </a>
+        <a
           className={`sidenav-btn ${route === "backlog" ? "active" : ""}`}
           data-nav="backlog"
-          type="button"
+          href={hrefForRoute("backlog")}
           aria-label={t("nav.backlog_label")}
-          aria-pressed={route === "backlog"}
+          aria-current={route === "backlog" ? "page" : undefined}
           title={t("nav.backlog_label")}
-          onClick={() => setRoute((r) => r === "backlog" ? "main" : "backlog")}
+          onClick={(event) => handleRouteClick(event, "backlog")}
           onMouseEnter={(e) => showNavTooltip(t("nav.backlog"), e.currentTarget)}
           onMouseLeave={hideNavTooltip}
           onFocus={(e) => showNavTooltip(t("nav.backlog"), e.currentTarget)}
@@ -162,15 +168,15 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, setRoute, 
         >
           <NavBacklog size={18} />
           <span className="sidenav-label">{t("nav.backlog")}</span>
-        </button>
-        <button
+        </a>
+        <a
           className={`sidenav-btn ${route === "routine" ? "active" : ""}`}
           data-nav="routine"
-          type="button"
+          href={hrefForRoute("routine")}
           aria-label={t("nav.routine_label")}
-          aria-pressed={route === "routine"}
+          aria-current={route === "routine" ? "page" : undefined}
           title={t("nav.routine_label")}
-          onClick={() => setRoute((r) => r === "routine" ? "main" : "routine")}
+          onClick={(event) => handleRouteClick(event, "routine")}
           onMouseEnter={(e) => showNavTooltip(t("nav.routine"), e.currentTarget)}
           onMouseLeave={hideNavTooltip}
           onFocus={(e) => showNavTooltip(t("nav.routine"), e.currentTarget)}
@@ -178,18 +184,18 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, setRoute, 
         >
           <NavRoutine size={18} />
           <span className="sidenav-label">{t("nav.routine")}</span>
-        </button>
+        </a>
         {isAdmin ? (
           <>
             <div className="sidenav-separator" aria-hidden="true" />
-            <button
+            <a
               className={`sidenav-btn ${route === "channels" ? "active" : ""}`}
               data-nav="channels"
-              type="button"
+              href={hrefForRoute("channels")}
               aria-label={t("nav.channels_label")}
-              aria-pressed={route === "channels"}
+              aria-current={route === "channels" ? "page" : undefined}
               title={t("nav.channels_label")}
-              onClick={() => setRoute((r) => r === "channels" ? "main" : "channels")}
+              onClick={(event) => handleRouteClick(event, "channels")}
               onMouseEnter={(e) => showNavTooltip(t("nav.channels"), e.currentTarget)}
               onMouseLeave={hideNavTooltip}
               onFocus={(e) => showNavTooltip(t("nav.channels"), e.currentTarget)}
@@ -197,15 +203,15 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, setRoute, 
             >
               <NavChannels size={18} />
               <span className="sidenav-label">{t("nav.channels")}</span>
-            </button>
-            <button
+            </a>
+            <a
               className={`sidenav-btn ${route === "admin" ? "active" : ""}`}
               data-nav="admin"
-              type="button"
+              href={hrefForRoute("admin")}
               aria-label={t("nav.admin_label")}
-              aria-pressed={route === "admin"}
+              aria-current={route === "admin" ? "page" : undefined}
               title={t("nav.admin_label")}
-              onClick={() => setRoute((r) => r === "admin" ? "main" : "admin")}
+              onClick={(event) => handleRouteClick(event, "admin")}
               onMouseEnter={(e) => showNavTooltip(t("nav.admin"), e.currentTarget)}
               onMouseLeave={hideNavTooltip}
               onFocus={(e) => showNavTooltip(t("nav.admin"), e.currentTarget)}
@@ -213,7 +219,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, setRoute, 
             >
               <NavAdmin size={18} />
               <span className="sidenav-label">{t("nav.admin")}</span>
-            </button>
+            </a>
           </>
         ) : null}
       </nav>

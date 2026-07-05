@@ -106,7 +106,7 @@
 .mode-chip:active { transform: scale(0.97); }
 
 .mode-chip:focus-visible {
-  outline: none;
+  box-shadow: var(--ring-focus);
 }
 
 .mode-chip-icon {

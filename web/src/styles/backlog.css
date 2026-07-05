@@ -299,6 +299,8 @@
 
 .backlog-task {
   position: relative;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 180px;
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-xl);
   background: var(--color-canvas);
@@ -949,6 +951,8 @@
   align-items: center;
   gap: var(--space-base);
   min-height: 68px;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 68px;
   padding: var(--space-xs) var(--space-sm);
   border-bottom: 1px solid var(--color-hairline-soft);
   transition: background var(--duration-fast) var(--ease-standard);

@@ -1,20 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { assignTask, createTask, listTaskArtifacts, startTask, updateTask } from "../api";
-import { artifactRawHref } from "../lib/artifactPreview";
-import { Drawer } from "./admin/Drawer";
+import { useRelayMutations } from "../hooks/useRelayMutations";
+import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
 import { AgentStateBadge } from "./AgentStateBadge";
-import { useArtifactViewer } from "./ArtifactViewerProvider";
 import { PriorityBadge } from "./PriorityBadge";
 import { cn } from "@/lib/utils";
-import { AGENT_NAMES, type AgentName, type ArtifactIndexItem, type CurrentUser, type DaemonNodeMonitorRecord, type RelaySession, type RelayTask, type TaskPriority, type TaskStatus } from "../types";
-import { ActionAddPerson, ActionCalendar, ActionSearch, ActionStart, ModeAsk, ViewBoard, ViewList } from "./icons";
+import { AGENT_NAMES, type AgentName, type CurrentUser, type DaemonNodeMonitorRecord, type RelaySession, type RelayTask, type TaskStatus } from "../types";
+import { ActionCalendar, ActionSearch, ActionStart, ModeAsk, ViewBoard, ViewList } from "./icons";
 import { agentReadyForTask, discussionAgentsForTask, dueTone, filterTasks, TASK_PRIORITIES, TASK_STATUSES, tasksByStatus, type BacklogFilters } from "../lib/backlog";
+import { emptyBacklogForm, taskBoardFormsEqual, type BacklogTaskFormState } from "../lib/taskBoardForm";
+import { TaskDrawer } from "./task-board/TaskDrawer";
 import { PageHeader } from "./PageHeader";
 import { BoardEmpty } from "./BoardEmpty";
 import { TaskBoardHeaderActions } from "./TaskBoardHeaderActions";
@@ -28,27 +25,6 @@ interface BacklogPageProps {
   onRefresh: () => Promise<void>;
   onOpenConversation: (sessionId: string) => void;
 }
-
-type TaskFormState = {
-  id?: string;
-  title: string;
-  description: string;
-  priority: TaskPriority;
-  status: TaskStatus;
-  dueDate: string;
-  assigneeEmployeeId: string;
-  assignedAgent: "" | AgentName;
-};
-
-const emptyForm = (currentUser: CurrentUser): TaskFormState => ({
-  title: "",
-  description: "",
-  priority: "normal",
-  status: "backlog",
-  dueDate: "",
-  assigneeEmployeeId: currentUser.employeeId ?? currentUser.username,
-  assignedAgent: "",
-});
 
 const initialFilters: BacklogFilters = {
   query: "",
@@ -82,7 +58,6 @@ function writeView(view: BacklogView): void {
 }
 
 const ACTIVE_STATUSES: TaskStatus[] = ["assigned", "running", "waiting_for_human", "review"];
-
 
 function activeFilterCount(filters: BacklogFilters): number {
   let count = 0;
@@ -476,220 +451,21 @@ function BacklogTaskRow({
   );
 }
 
-function taskArtifactDate(value: string | undefined, locale: string): string {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat(locale || undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
-
-function TaskDrawerArtifacts({ taskId }: { taskId: string }) {
-  const { t, i18n } = useTranslation();
-  const { open } = useArtifactViewer();
-  const [artifacts, setArtifacts] = useState<ArtifactIndexItem[] | null>(null);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    setArtifacts(null);
-    setFailed(false);
-    listTaskArtifacts(taskId, controller.signal)
-      .then((response) => setArtifacts(response.artifacts))
-      .catch(() => {
-        if (!controller.signal.aborted) setFailed(true);
-      });
-    return () => controller.abort();
-  }, [taskId]);
-
-  return (
-    <section className="task-drawer-artifacts" aria-label={t("backlog.artifacts")}>
-      <h3 className="task-drawer-artifacts-title">
-        {t("backlog.artifacts")}
-        {artifacts && artifacts.length > 0 ? (
-          <span className="task-drawer-artifacts-count mono">{artifacts.length}</span>
-        ) : null}
-      </h3>
-      {failed ? (
-        <p className="task-drawer-artifacts-empty">{t("backlog.artifacts_error")}</p>
-      ) : artifacts === null ? (
-        <p className="task-drawer-artifacts-empty">{t("backlog.artifacts_loading")}</p>
-      ) : artifacts.length === 0 ? (
-        <p className="task-drawer-artifacts-empty">{t("backlog.artifacts_empty")}</p>
-      ) : (
-        <ul className="task-drawer-artifact-list">
-          {artifacts.map((artifact) => (
-            <li key={artifact.id} className="task-drawer-artifact">
-              <button
-                type="button"
-                className="task-drawer-artifact-main"
-                onClick={() => open(artifact, artifact.sessionId, artifacts ?? [artifact])}
-                title={t("artifact.view_named", { title: artifact.title })}
-              >
-                <span className={`artifact-kind-tag is-${artifact.kind}`}>
-                  {t(`artifact.kind.${artifact.kind}`, { defaultValue: artifact.kind })}
-                </span>
-                <span className="task-drawer-artifact-name">{artifact.title}</span>
-                <span className="task-drawer-artifact-meta mono">
-                  {taskArtifactDate(artifact.createdAt, i18n.language)}
-                </span>
-              </button>
-              <a
-                className="task-drawer-artifact-download"
-                href={artifactRawHref(artifact.sessionId, artifact.id)}
-                target="_blank"
-                rel="noreferrer"
-                download={artifact.title}
-              >
-                {t("backlog.artifact_download")}
-              </a>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
-function BacklogTaskDrawer({
-  form,
-  employees,
-  saving,
-  onClose,
-  onChange,
-  onSubmit,
-}: {
-  form: TaskFormState;
-  employees: string[];
-  saving: boolean;
-  onClose: () => void;
-  onChange: (next: TaskFormState) => void;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-}) {
-  const { t } = useTranslation();
-  const title = form.id ? t("backlog.edit_task") : t("backlog.new_task");
-
-  return (
-    <Drawer
-      open
-      onClose={() => {
-        if (!saving) onClose();
-      }}
-      title={title}
-      subtitle={form.id ?? t("backlog.new_task_id")}
-      variant="light"
-      width={420}
-      closeLabel={t("dialog.cancel")}
-      ariaLabel={title}
-      bodyClassName="adm-drawer-body--column"
-    >
-      <form className="adm-form task-board-drawer-form" onSubmit={onSubmit}>
-        <label className="adm-field">
-          <span>{t("backlog.title_field")}</span>
-          <Input
-            name="task-title"
-            required
-            value={form.title}
-            onChange={(event) => onChange({ ...form, title: event.target.value })}
-          />
-        </label>
-        <label className="adm-field">
-          <span>{t("backlog.description")}</span>
-          <Textarea
-            name="task-description"
-            value={form.description}
-            rows={5}
-            onChange={(event) => onChange({ ...form, description: event.target.value })}
-          />
-        </label>
-        <div className="task-drawer-form-grid">
-          <label className="adm-field">
-            <span>{t("backlog.priority")}</span>
-            <select
-              name="task-priority"
-              value={form.priority}
-              onChange={(event) => onChange({ ...form, priority: event.target.value as TaskPriority })}
-            >
-              {TASK_PRIORITIES.map((priority) => (
-                <option key={priority} value={priority}>{t(`backlog.priorities.${priority}`)}</option>
-              ))}
-            </select>
-          </label>
-          <label className="adm-field">
-            <span>{t("backlog.status")}</span>
-            <select
-              name="task-status"
-              value={form.status}
-              onChange={(event) => onChange({ ...form, status: event.target.value as TaskStatus })}
-            >
-              {TASK_STATUSES.map((status) => (
-                <option key={status} value={status}>{t(`backlog.statuses.${status}`)}</option>
-              ))}
-            </select>
-          </label>
-          <label className="adm-field">
-            <span>{t("backlog.due")}</span>
-            <Input
-              name="task-due-date"
-              type="date"
-              value={form.dueDate}
-              onChange={(event) => onChange({ ...form, dueDate: event.target.value })}
-            />
-          </label>
-          <label className="adm-field">
-            <span>{t("backlog.agent")}</span>
-            <select
-              name="task-agent"
-              value={form.assignedAgent}
-              onChange={(event) => onChange({ ...form, assignedAgent: event.target.value as "" | AgentName })}
-            >
-              <option value="">{t("backlog.agent_team")}</option>
-              {AGENT_NAMES.map((agent) => (
-                <option key={agent} value={agent}>{agent}</option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <label className="adm-field">
-          <span>{t("backlog.assignee")}</span>
-          <div className="task-drawer-assignee">
-            <ActionAddPerson size={15} aria-hidden="true" />
-            <Input
-              name="task-assignee"
-              list="backlog-employees"
-              value={form.assigneeEmployeeId}
-              onChange={(event) => onChange({ ...form, assigneeEmployeeId: event.target.value })}
-              className="h-auto min-h-0 border-0 bg-transparent px-0 py-0 shadow-none focus-visible:border-transparent focus-visible:shadow-none"
-            />
-            <datalist id="backlog-employees">
-              {employees.map((employee) => <option key={employee} value={employee} />)}
-            </datalist>
-          </div>
-        </label>
-        <div className="adm-form-actions">
-          <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
-            {t("dialog.cancel")}
-          </Button>
-          <Button type="submit" disabled={saving || !form.title.trim()}>
-            {saving ? t("admin.saving") : t("dialog.confirm")}
-          </Button>
-        </div>
-      </form>
-      {form.id ? <TaskDrawerArtifacts taskId={form.id} /> : null}
-    </Drawer>
-  );
-}
-
 export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing, onRefresh, onOpenConversation }: BacklogPageProps) {
   const { t } = useTranslation();
+  const {
+    assignTaskMutation,
+    startTaskMutation,
+    updateTaskMutation,
+    createTaskMutation,
+  } = useRelayMutations();
   const [filters, setFilters] = useState<BacklogFilters>(initialFilters);
   const [view, setView] = useState<BacklogView>(readView);
-  const [form, setForm] = useState<TaskFormState | null>(null);
+  const [form, setForm] = useState<BacklogTaskFormState | null>(null);
+  const [formBaseline, setFormBaseline] = useState<BacklogTaskFormState | null>(null);
   const [saving, setSaving] = useState(false);
+  const formDirty = Boolean(form && formBaseline && !taskBoardFormsEqual(form, formBaseline));
+  const confirmDiscardChanges = useUnsavedChangesGuard(formDirty && !saving);
   const filteredTasks = useMemo(() => filterTasks(tasks, filters), [tasks, filters]);
   const grouped = useMemo(() => tasksByStatus(filteredTasks), [filteredTasks]);
   const employees = useMemo(() => {
@@ -706,8 +482,21 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
   const hasFilterResults = filteredTasks.length > 0;
   const showEmptyBoard = tasks.length === 0 || !hasFilterResults;
 
+  function openTaskForm(next: BacklogTaskFormState) {
+    setForm(next);
+    setFormBaseline(next);
+  }
+
+  async function closeTaskForm() {
+    if (saving) return;
+    if (!(await confirmDiscardChanges())) return;
+    setForm(null);
+    setFormBaseline(null);
+  }
+
   function editTask(task: RelayTask) {
-    setForm({
+    openTaskForm({
+      variant: "backlog",
       id: task.id,
       title: task.title,
       description: task.description,
@@ -717,15 +506,6 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
       assigneeEmployeeId: task.assigneeEmployeeId ?? task.ownerEmployeeId ?? currentUser.employeeId ?? currentUser.username,
       assignedAgent: task.assignedAgent ?? "",
     });
-  }
-
-  async function mutate(action: () => Promise<unknown>) {
-    try {
-      await action();
-      await onRefresh();
-    } catch {
-      // task mutations fail silently; the board refreshes on the next poll.
-    }
   }
 
   async function submitTask(event: FormEvent<HTMLFormElement>) {
@@ -742,12 +522,12 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
         assigneeEmployeeId: form.assigneeEmployeeId.trim(),
         ...(form.assignedAgent ? { assignedAgent: form.assignedAgent } : {}),
       };
-      if (form.id) await updateTask(form.id, payload);
-      else await createTask(payload);
+      if (form.id) await updateTaskMutation.mutateAsync({ taskId: form.id, input: payload });
+      else await createTaskMutation.mutateAsync(payload);
       setForm(null);
-      await onRefresh();
+      setFormBaseline(null);
     } catch {
-      // form submit errors are silent; the drawer stays open for retry.
+      // mutation onError surfaces a toast; keep the drawer open for retry.
     } finally {
       setSaving(false);
     }
@@ -767,27 +547,34 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
     const discussionAgents = discussionAgentsForTask(task, nodes);
     return {
       onEdit: () => editTask(task),
-      onAssign: (agent: AgentName) => void mutate(() => assignTask(task.id, agent)),
-      onStart: () => void mutate(async () => {
-        const result = task.assignedAgent
-          ? await startTask(task.id)
-          : await startTask(task.id, {
-            assignments: discussionAgents.map((agent) => ({ agent, mode: "ask" })),
-          });
-        if (!task.assignedAgent && result.session) onOpenConversation(result.session.id);
-      }),
-      onDiscuss: () => void mutate(async () => {
-        if (discussionAgents.length === 0) return;
-        const result = await startTask(task.id, {
-          assignments: discussionAgents.map((agent) => ({ agent, mode: "ask" })),
-        });
-        if (result.session) onOpenConversation(result.session.id);
-      }),
-      onOpenThread: () => session && onOpenConversation(session.id),
-      onToggleBlock: () => void mutate(
-        () => updateTask(task.id, { status: task.status === "blocked" ? "backlog" : "blocked" }),
+      onAssign: (agent: AgentName) => void assignTaskMutation.mutate({ taskId: task.id, agent }),
+      onStart: () => void startTaskMutation.mutate(
+        task.assignedAgent
+          ? { taskId: task.id }
+          : { taskId: task.id, assignments: discussionAgents.map((agent) => ({ agent, mode: "ask" as const })) },
+        {
+          onSuccess: (result) => {
+            if (!task.assignedAgent && result.session) onOpenConversation(result.session.id);
+          },
+        },
       ),
-      onDone: () => void mutate(() => updateTask(task.id, { status: "done" })),
+      onDiscuss: () => void startTaskMutation.mutate(
+        {
+          taskId: task.id,
+          assignments: discussionAgents.map((agent) => ({ agent, mode: "ask" as const })),
+        },
+        {
+          onSuccess: (result) => {
+            if (result.session) onOpenConversation(result.session.id);
+          },
+        },
+      ),
+      onOpenThread: () => session && onOpenConversation(session.id),
+      onToggleBlock: () => void updateTaskMutation.mutate({
+        taskId: task.id,
+        input: { status: task.status === "blocked" ? "backlog" : "blocked" },
+      }),
+      onDone: () => void updateTaskMutation.mutate({ taskId: task.id, input: { status: "done" } }),
     };
   }
 
@@ -803,7 +590,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
             createLabel={t("backlog.new_task")}
             isRefreshing={isRefreshing}
             onRefresh={() => void onRefresh()}
-            onCreate={() => setForm(emptyForm(currentUser))}
+            onCreate={() => openTaskForm(emptyBacklogForm(currentUser))}
           />
         }
       />
@@ -819,7 +606,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
               title={filtered ? t("backlog.no_match_title") : t("backlog.no_tasks_title")}
               body={filtered ? t("backlog.no_match_body") : t("backlog.no_tasks_body")}
               createLabel={filtered ? undefined : t("backlog.new_task")}
-              onCreate={filtered ? undefined : () => setForm(emptyForm(currentUser))}
+              onCreate={filtered ? undefined : () => openTaskForm(emptyBacklogForm(currentUser))}
             />
           );
         })()
@@ -879,12 +666,17 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
       )}
 
       {form ? (
-        <BacklogTaskDrawer
+        <TaskDrawer
           form={form}
           employees={employees}
           saving={saving}
-          onClose={() => setForm(null)}
-          onChange={setForm}
+          title={form.id ? t("backlog.edit_task") : t("backlog.new_task")}
+          subtitle={form.id ?? t("backlog.new_task_id")}
+          employeeDatalistId="backlog-employees"
+          onClose={() => { void closeTaskForm(); }}
+          onChange={(next) => {
+            if (next.variant === "backlog") setForm(next);
+          }}
           onSubmit={(event) => void submitTask(event)}
         />
       ) : null}

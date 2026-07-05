@@ -13,6 +13,7 @@ import type {
 import { Drawer } from "./Drawer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import {
   Select,
   SelectContent,
@@ -56,6 +57,18 @@ export function OnboardDrawer({
   const [localWorkspacePath, setLocalWorkspacePath] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
+  const hasUnsavedChanges = Boolean(
+    employeeId.trim()
+    || displayName.trim()
+    || email.trim()
+    || username.trim()
+    || password
+    || selectedNodeId
+    || existingEmployeeId
+    || existingNodeId
+    || localWorkspacePath.trim(),
+  );
+  const confirmDiscardChanges = useUnsavedChangesGuard(open && hasUnsavedChanges && !isBusy);
 
   useEffect(() => {
     if (!open) {
@@ -146,6 +159,11 @@ export function OnboardDrawer({
     setError(null);
   }
 
+  async function requestClose() {
+    if (isBusy) return;
+    if (await confirmDiscardChanges()) onClose();
+  }
+
   // WAI-ARIA tabs keyboard support: Left/Right cycle, Home/End jump to ends.
   // The "existing" tab is skipped when disabled (no employees yet).
   function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
@@ -176,9 +194,7 @@ export function OnboardDrawer({
   return (
     <Drawer
       open={open}
-      onClose={() => {
-        if (!isBusy) onClose();
-      }}
+      onClose={() => { void requestClose(); }}
       title={t("admin.v2.onboard_title")}
       subtitle={t("admin.v2.onboard_sub")}
       variant="light"
@@ -354,7 +370,7 @@ export function OnboardDrawer({
           {error ? <div className="adm-form-error">{error}</div> : null}
 
           <div className="adm-form-actions">
-            <Button type="button" variant="ghost" onClick={onClose} disabled={isBusy}>
+            <Button type="button" variant="ghost" onClick={() => void requestClose()} disabled={isBusy}>
               {t("admin.v2.cancel")}
             </Button>
             <Button type="submit" disabled={isBusy || !canSubmitNew}>
@@ -432,7 +448,7 @@ export function OnboardDrawer({
           {error ? <div className="adm-form-error">{error}</div> : null}
 
           <div className="adm-form-actions">
-            <Button type="button" variant="ghost" onClick={onClose} disabled={isBusy}>
+            <Button type="button" variant="ghost" onClick={() => void requestClose()} disabled={isBusy}>
               {t("admin.v2.cancel")}
             </Button>
             <Button type="submit" disabled={isBusy || !canSubmitExisting}>
@@ -472,7 +488,7 @@ export function OnboardDrawer({
           {error ? <div className="adm-form-error">{error}</div> : null}
 
           <div className="adm-form-actions">
-            <Button type="button" variant="ghost" onClick={onClose} disabled={isBusy}>
+            <Button type="button" variant="ghost" onClick={() => void requestClose()} disabled={isBusy}>
               {t("admin.v2.cancel")}
             </Button>
             <Button type="submit" disabled={isBusy}>

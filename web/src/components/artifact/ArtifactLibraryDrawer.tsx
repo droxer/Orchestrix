@@ -54,7 +54,7 @@ export function ArtifactLibraryDrawer({
       open={open}
       onClose={onClose}
       width={900}
-      variant="dark"
+      variant="light"
       closeLabel={t("sheet.close")}
       ariaLabel={t("artifact.drawer_title")}
       title={t("artifact.drawer_title")}

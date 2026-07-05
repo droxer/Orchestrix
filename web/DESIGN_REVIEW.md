@@ -102,6 +102,16 @@ Evolved the web identity from cold precision to Warm Precision while preserving 
 - **Signature moments** — light atmosphere wash warmed; `.relay-bleed-mark` extends the login "R" treatment to transcript empty states and the admin KPI band, hidden in high-contrast themes.
 - **Theme previews** — preview swatches now depict the Warm Precision palette rather than the old cobalt/zinc set.
 
+## Unified Geist type pass (2026-07-05)
+
+Rethought the font families for both English and Chinese. Latin identity moves from Instrument Sans to a unified Geist superfamily — Geist Sans for UI/display, Geist Mono unchanged as the identity signal — giving the product a cooler, terminal-grade instrument-panel character.
+
+**Shipped:**
+
+- **Latin** — `--font-app-sans` now loads Geist Sans (`layout.tsx`); base `--font-sans` fallback updated. Display tracking softened for Geist's tighter grotesk letterforms (`--letter-display`/`--letter-display-strong` → -0.25px, `--letter-body` → 0).
+- **CJK strategy** — `html:lang(zh-*)` stacks are now system-first (PingFang, HarmonyOS Sans / MiSans, Microsoft YaHei/JhengHei) with the Noto Sans SC/TC webfonts demoted to last-resort fallback; their chunks only download when every system font misses a Han glyph.
+- **CJK typographic corrections** — a shared `html:lang(zh-CN/zh-TW)` block neutralizes negative/caps tracking on Han text, loosens `--leading-normal`/`--leading-loose` to 1.7/1.8, and restates the reading-heavy `--type-body-*`/`--type-caption` roles with CJK-appropriate leading.
+
 **Contrast audit:**
 
 - Dark theme CTA: `#04201c` on `#2dd4bf` = 9.18:1.

@@ -1,4 +1,5 @@
 export type Theme = "light" | "dark" | "system" | "contrast" | "contrast-dark";
+export type ResolvedTheme = Exclude<Theme, "system">;
 
 export const SUPPORTED_THEMES = ["light", "dark", "system", "contrast", "contrast-dark"] as const;
 
@@ -49,12 +50,42 @@ export function systemTheme(): "light" | "dark" {
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
+export function resolveTheme(theme: Theme): ResolvedTheme {
+  return theme === "system" ? systemTheme() : theme;
+}
+
+const THEME_COLOR_BY_THEME: Record<ResolvedTheme, string> = {
+  light: "#fdfcfa",
+  dark: "#0d0c0a",
+  contrast: "#ffffff",
+  "contrast-dark": "#000000",
+};
+
+export function themeColorForTheme(theme: Theme): string {
+  return THEME_COLOR_BY_THEME[resolveTheme(theme)];
+}
+
+export function syncThemeColor(theme: Theme): void {
+  if (typeof document === "undefined" || !document.head || typeof document.createElement !== "function") return;
+  const query = typeof document.querySelector === "function" ? document.querySelector.bind(document) : null;
+  let meta = query?.('meta[name="theme-color"][data-relay-theme-color]') as HTMLMetaElement | null | undefined;
+  if (!meta) {
+    meta = document.createElement("meta");
+    meta.setAttribute("name", "theme-color");
+    meta.setAttribute("data-relay-theme-color", "");
+    document.head.appendChild(meta);
+  }
+  meta.removeAttribute("media");
+  meta.setAttribute("content", themeColorForTheme(theme));
+}
+
 /** Reflect the user's choice onto data-theme, resolving "system" to a
  *  concrete value so the CSS needs only html[data-theme] blocks (no
  *  parallel prefers-color-scheme media query). "contrast" (light) and
  *  "contrast-dark" are explicit and map straight through. */
 export function applyTheme(theme: Theme): void {
   if (typeof document === "undefined") return;
-  const resolved = theme === "system" ? systemTheme() : theme;
+  const resolved = resolveTheme(theme);
   document.documentElement.setAttribute("data-theme", resolved);
+  syncThemeColor(theme);
 }

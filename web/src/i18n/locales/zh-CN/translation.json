@@ -6,6 +6,25 @@
     "confirm": "确认",
     "cancel": "取消"
   },
+  "unsaved": {
+    "title": "放弃未保存的更改？",
+    "message": "关闭此抽屉会丢失当前更改。",
+    "confirm": "放弃更改"
+  },
+  "errors": {
+    "rename_conversation": "无法重命名对话。请刷新对话列表后重试。",
+    "archive_conversation": "无法关闭对话。请检查连接后重试。",
+    "send_message": "无法发送消息。请检查 daemon 连接后重试。",
+    "cancel_run": "无法取消运行。请刷新对话后重试。",
+    "rerun_assignment": "无法重新运行任务。请检查 daemon 连接后重试。",
+    "record_decision": "无法记录决策。请保持决策栏打开后重试。",
+    "send_handoff": "无法发送移交。请保持移交抽屉打开后重试。",
+    "save_task": "无法保存任务。请检查连接后重试。",
+    "task_action": "无法更新任务。请刷新看板后重试。",
+    "admin_unassign_node": "无法取消分配节点。请检查连接后重试。",
+    "admin_delete_node": "无法删除节点。请检查连接后重试。",
+    "admin_delete_employee": "无法删除员工。请检查连接后重试。"
+  },
   "skip_to_conversation": "跳至对话",
   "skip_to_content": "跳至内容",
   "nav": {
@@ -182,7 +201,7 @@
   "workspace": {
     "title": "工作区",
     "sub": "@{{employee}} 驾驶舱",
-    "loading": "加载工作区中",
+    "loading": "加载工作区中…",
     "metrics": "工作区指标",
     "metric_runs": "活跃运行",
     "metric_tasks": "活跃任务",
@@ -194,7 +213,7 @@
     "preview": "预览",
     "select_to_preview": "选择产物或文件进行预览。",
     "open_thread": "打开对话",
-    "loading_preview": "加载预览中。",
+    "loading_preview": "加载预览中…",
     "binary_file": "二进制文件 — 无法预览。",
     "empty_file": "此文件为空。",
     "view_mode": "预览模式",
@@ -203,7 +222,7 @@
     "file_truncated": "预览已截断至 {{limit}}。",
     "no_artifacts": "暂无产物。",
     "no_files": "此目录中没有文件。",
-    "loading_files": "加载文件中。",
+    "loading_files": "加载文件中…",
     "files_unavailable": "此主机上无可用的工作区路径。",
     "parent_directory": "上级目录",
     "load_failed": "工作区不可用",

@@ -14,7 +14,7 @@
    teal on the dark canvas), and warm hairlines soften the product
    chrome. The action carries the hue; status narrows to success /
    danger / warning (green / amber / red) and "info" folds into the teal
-   brand — no competing second blue. Instrument Sans carries interface
+   brand — no competing second blue. Geist Sans carries interface
    and display text; Geist Mono is a deliberate identity signal —
    eyebrows, metadata, agent labels, tool lines, numbers, and code.
    No editorial serif; no pill geometry.
@@ -251,10 +251,10 @@
   --z-overlay: 200; /* full-screen modal overlays (preferences) — beats --z-float */
   --z-dialog: 300;  /* confirm dialogs — topmost interactive layer, can stack over overlays */
 
-  /* Font families. Warm precision system: Instrument Sans carries UI and
-     display text; Geist Mono remains the identity signal for eyebrows,
+  /* Font families. Unified Geist superfamily: Geist Sans carries UI and
+     display text; Geist Mono is the identity signal for eyebrows,
      metadata, agent labels, numbers, and code. */
-  --font-sans: var(--font-app-sans), "Instrument Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-sans: var(--font-app-sans), "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   --font-display: var(--font-sans);
   --font-mono: var(--font-geist-mono), "Geist Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
   --font-number: var(--font-mono);
@@ -267,11 +267,12 @@
   --leading-loose: 1.65;   /* long-form prose, agent text */
 
   /* Tracking scale — one token per intent, not per pixel. Display values
-     are tuned for Instrument Sans' wider letterforms. */
-  --letter-display: -0.4px;       /* Instrument Sans display (24–34px) */
-  --letter-display-strong: -0.35px; /* admin metric values, Geist Mono 36px+ */
+     are tuned for Geist's neutral grotesk letterforms (tighter default
+     spacing than a humanist face — lighter compensation needed). */
+  --letter-display: -0.25px;       /* Geist Sans display (24–34px) */
+  --letter-display-strong: -0.25px; /* admin metric values, Geist Mono 36px+ */
   --letter-tight: -0.2px;
-  --letter-body: -0.005em;        /* optical tightening for message/prose body text */
+  --letter-body: 0;               /* Geist body needs no optical tightening */
   --letter-open: 0.02em;          /* micro open tracking — compact chips, mono metadata, attributions */
   --letter-caps: 0.04em;          /* uppercase chrome labels (table heads, pills, metric captions) */
   --letter-caps-wide: 0.06em;     /* wider caps — section labels, sparse table heads */
@@ -280,7 +281,7 @@
 
   /* Semantic typography. Each role bundles size + weight + line-height
      + family so components can apply one variable instead of re-inlining
-     the triple. Display is weighted Instrument Sans (600) with tight tracking;
+     the triple. Display is weighted Geist Sans (600) with tight tracking;
      emphasis elsewhere steps to 600, never 700+. Eyebrows and metadata
      go mono as the identity signal. */
   --type-display-lg: 600 34px/1.08 var(--font-display);  /* admin page title */
@@ -405,23 +406,48 @@
   -webkit-font-smoothing: antialiased;
 }
 
-/* International type — CJK coverage. Instrument Sans and Geist Mono carry
+/* International type — CJK coverage. Geist Sans and Geist Mono carry
    no Han glyphs, so under a Chinese locale we keep the Latin face first
-   (Instrument Sans for body and display) and resolve Han characters to Noto Sans SC/TC
-   (loaded by next/font in layout.tsx). --font-display aliases --font-sans
-   in :root, so overriding --font-sans here also retargets display — no
-   separate display stack is needed. The trailing names cover machines
-   without the webfont — PingFang (macOS), Microsoft YaHei/JhengHei
-   (Windows), Source Han. --font-number aliases --font-mono and inherits
-   these via substitution. */
+   and let Han characters fall through the stack. System CJK fonts come
+   first — PingFang (macOS/iOS), HarmonyOS Sans / MiSans, Microsoft
+   YaHei/JhengHei (Windows) — because native rendering is sharper and
+   costs no download; the Noto Sans SC/TC webfonts (loaded by next/font
+   in layout.tsx, preload off) are the last-resort fallback whose
+   unicode-range chunks only download when every system font misses.
+   --font-display aliases --font-sans in :root, so overriding --font-sans
+   here also retargets display — no separate display stack is needed.
+   --font-number aliases --font-mono and inherits these via substitution. */
 html:lang(zh-CN) {
-  --font-sans: var(--font-app-sans), var(--font-noto-sans-sc), "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", "Source Han Sans SC", sans-serif;
-  --font-mono: var(--font-geist-mono), var(--font-noto-sans-sc), "Noto Sans SC", "PingFang SC", "Microsoft YaHei", monospace;
+  --font-sans: var(--font-app-sans), "PingFang SC", "HarmonyOS Sans SC", "MiSans", "Microsoft YaHei UI", "Microsoft YaHei", var(--font-noto-sans-sc), "Noto Sans SC", sans-serif;
+  --font-mono: var(--font-geist-mono), "PingFang SC", "Microsoft YaHei", var(--font-noto-sans-sc), "Noto Sans SC", monospace;
 }
 
 html:lang(zh-TW) {
-  --font-sans: var(--font-app-sans), var(--font-noto-sans-tc), "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "Source Han Sans TC", sans-serif;
-  --font-mono: var(--font-geist-mono), var(--font-noto-sans-tc), "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", monospace;
+  --font-sans: var(--font-app-sans), "PingFang TC", "Microsoft JhengHei UI", "Microsoft JhengHei", var(--font-noto-sans-tc), "Noto Sans TC", sans-serif;
+  --font-mono: var(--font-geist-mono), "PingFang TC", "Microsoft JhengHei", var(--font-noto-sans-tc), "Noto Sans TC", monospace;
+}
+
+/* CJK typographic corrections — Han glyphs are full-width squares:
+   negative Latin tracking cramps them and wide caps tracking is
+   meaningless, so neutralize per-intent; CJK reading also wants looser
+   leading. Token overrides propagate to every consumer; the reading-heavy
+   type roles hardcode their leading in the shorthand, so restate them. */
+html:lang(zh-CN),
+html:lang(zh-TW) {
+  --letter-display: 0;
+  --letter-display-strong: 0;
+  --letter-tight: 0;
+  --letter-body: 0;
+  --letter-caps: 0.02em;
+  --letter-caps-wide: 0.03em;
+  --letter-eyebrow: 0.05em;
+  --letter-eyebrow-wide: 0.08em;
+  --leading-normal: 1.7;
+  --leading-loose: 1.8;
+  --type-body-md:     400 16px/1.7 var(--font-sans);
+  --type-body-strong: 600 16px/1.7 var(--font-sans);
+  --type-body-sm:     400 14px/1.7 var(--font-sans);
+  --type-caption:     400 13px/1.65 var(--font-sans);
 }
 
 /* Density escape hatch — data-dense surfaces (admin tables, backlog

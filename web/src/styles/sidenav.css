@@ -191,6 +191,10 @@
   color: var(--color-muted);
   background: transparent;
   border: 1px solid transparent;
+  font: inherit;
+  text-decoration: none;
+  -webkit-appearance: none;
+  appearance: none;
   cursor: pointer;
   transition: color var(--duration-fast) var(--ease-standard),
     background var(--duration-fast) var(--ease-standard),

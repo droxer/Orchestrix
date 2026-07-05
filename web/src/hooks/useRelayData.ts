@@ -4,7 +4,8 @@ import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { listDaemonNodes, listSandboxes, listSessions, listTasks } from "../api";
 import type { DaemonNodeMonitorRecord, RelaySession, RelayTask, SandboxRecord } from "../types";
 
-const RELAY_KEY = ["relay"] as const;
+export const RELAY_QUERY_KEY = ["relay"] as const;
+const RELAY_KEY = RELAY_QUERY_KEY;
 const SANDBOXES_KEY = ["relay", "sandboxes"] as const;
 const NODES_KEY = ["relay", "daemon-nodes"] as const;
 const SESSIONS_KEY = ["relay", "sessions"] as const;

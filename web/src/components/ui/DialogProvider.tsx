@@ -37,13 +37,27 @@ type PromptOptions = {
   cancelLabel?: string;
 };
 
+type AnnouncementTone = "info" | "success" | "error";
+
+type AnnouncementOptions = {
+  message: string;
+  tone?: AnnouncementTone;
+};
+
 type Request =
   | { kind: "confirm"; opts: ConfirmOptions; resolve: (value: boolean) => void }
   | { kind: "prompt"; opts: PromptOptions; resolve: (value: string | null) => void };
 
+type Announcement = {
+  id: number;
+  message: string;
+  tone: AnnouncementTone;
+};
+
 interface DialogApi {
   confirm: (opts: ConfirmOptions) => Promise<boolean>;
   prompt: (opts: PromptOptions) => Promise<string | null>;
+  announce: (opts: AnnouncementOptions | string) => void;
 }
 
 const DialogContext = createContext<DialogApi | null>(null);
@@ -57,9 +71,11 @@ export function useDialogs(): DialogApi {
 export function DialogProvider({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const [request, setRequest] = useState<Request | null>(null);
+  const [announcement, setAnnouncement] = useState<Announcement | null>(null);
   const [inputValue, setInputValue] = useState("");
   const dialogRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
+  const announcementId = useRef(0);
 
   const confirm = useCallback(
     (opts: ConfirmOptions) =>
@@ -75,6 +91,16 @@ export function DialogProvider({ children }: { children: ReactNode }) {
       }),
     [],
   );
+
+  const announce = useCallback((opts: AnnouncementOptions | string) => {
+    const next = typeof opts === "string" ? { message: opts } : opts;
+    setAnnouncement({
+      id: announcementId.current + 1,
+      message: next.message,
+      tone: next.tone ?? "info",
+    });
+    announcementId.current += 1;
+  }, []);
 
   // Resolve the pending promise and tear down. `cancelled` carries the
   // negative result (false / null); a positive result passes the value.
@@ -134,9 +160,27 @@ export function DialogProvider({ children }: { children: ReactNode }) {
     };
   }, [request, settle]);
 
+  useEffect(() => {
+    if (!announcement) return;
+    const timeout = window.setTimeout(() => setAnnouncement(null), 6000);
+    return () => window.clearTimeout(timeout);
+  }, [announcement]);
+
   return (
-    <DialogContext.Provider value={{ confirm, prompt }}>
+    <DialogContext.Provider value={{ confirm, prompt, announce }}>
       {children}
+      {announcement ? (
+        <div
+          key={announcement.id}
+          className="dialog-toast"
+          data-tone={announcement.tone}
+          role="status"
+          aria-live={announcement.tone === "error" ? "assertive" : "polite"}
+          aria-atomic="true"
+        >
+          {announcement.message}
+        </div>
+      ) : null}
       {request && typeof document !== "undefined"
         ? createPortal(
             <div

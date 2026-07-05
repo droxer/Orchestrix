@@ -155,6 +155,10 @@
   font-size: var(--text-sm);
   line-height: 1.55;
   overflow-x: auto;
+  color: var(--color-ink);
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-sm);
 }
 .artifact-diff-line {
   display: grid;
@@ -181,22 +185,22 @@
 }
 .artifact-diff-line.is-add {
   background: color-mix(in srgb, var(--color-semantic-up) 16%, transparent);
-  color: color-mix(in srgb, var(--color-semantic-up) 70%, var(--color-on-dark));
+  color: color-mix(in srgb, var(--color-semantic-up) 65%, var(--color-ink));
 }
 .artifact-diff-line.is-del {
   background: color-mix(in srgb, var(--color-semantic-down) 16%, transparent);
-  color: color-mix(in srgb, var(--color-semantic-down) 70%, var(--color-on-dark));
+  color: color-mix(in srgb, var(--color-semantic-down) 65%, var(--color-ink));
 }
 .artifact-diff-line.is-hunk {
   color: var(--color-diff-hunk);
   opacity: 0.9;
 }
 .artifact-diff-line.is-meta {
-  color: var(--color-on-dark);
+  color: var(--color-muted);
   opacity: 0.55;
 }
 .artifact-diff-line.is-context {
-  color: var(--color-on-dark);
+  color: var(--color-ink);
   opacity: 0.85;
 }
 
@@ -205,11 +209,15 @@
 .artifact-plain {
   margin: 0;
   padding: var(--space-base);
-  color: var(--color-on-dark);
+  color: var(--color-ink);
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-sm);
   font-family: var(--font-number);
   font-size: var(--text-sm);
   line-height: 1.55;
   white-space: pre-wrap;
+  overflow-x: auto;
   overflow-wrap: anywhere;
 }
 .artifact-terminal code {
@@ -220,9 +228,12 @@
 /* Inline previews for generated workspace files. */
 .artifact-image-preview {
   display: block;
-  max-width: 100%;
-  height: auto;
+  width: min(100%, 960px);
+  max-height: min(70vh, 720px);
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
   border-radius: var(--radius-sm);
+  background: var(--color-surface-strong);
 }
 
 .artifact-frame-preview {
@@ -268,6 +279,7 @@
   gap: 4px;
   padding: var(--space-xs);
   overflow-y: auto;
+  overscroll-behavior: contain;
   flex: 1 1 0;
 }
 
@@ -382,6 +394,7 @@
 .artifact-index-list {
   flex: 1 1 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   padding: var(--space-xs);

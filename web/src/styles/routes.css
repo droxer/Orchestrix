@@ -28,3 +28,12 @@
     grid-template-rows: auto minmax(0, 1fr);
   }
 }
+
+.route-loading {
+  display: grid;
+  place-items: center;
+  min-height: 12rem;
+  padding: var(--space-xl);
+  color: var(--color-muted);
+  font: var(--type-body-sm);
+}

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it, beforeEach, afterEach } from "node:test";
 
-import { applyTheme, readTheme, SUPPORTED_THEMES } from "../src/lib/appStorage.js";
+import { applyTheme, readTheme, SUPPORTED_THEMES, themeColorForTheme } from "../src/lib/appStorage.js";
 
 describe("Relay web theme storage", () => {
   const storage = new Map<string, string>();
@@ -68,6 +68,13 @@ describe("Relay web theme storage", () => {
 
   it("exports all preference theme options", () => {
     assert.deepEqual([...SUPPORTED_THEMES], ["light", "dark", "system", "contrast", "contrast-dark"]);
+  });
+
+  it("maps explicit themes to browser chrome colors", () => {
+    assert.equal(themeColorForTheme("light"), "#fdfcfa");
+    assert.equal(themeColorForTheme("dark"), "#0d0c0a");
+    assert.equal(themeColorForTheme("contrast"), "#ffffff");
+    assert.equal(themeColorForTheme("contrast-dark"), "#000000");
   });
 
   it("applyTheme resolves system via matchMedia", () => {

@@ -1,8 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import {
+  Geist,
   Geist_Mono,
-  Instrument_Sans,
   Noto_Sans_SC,
   Noto_Sans_TC,
 } from "next/font/google";
@@ -11,12 +11,13 @@ import "../styles.css";
 
 import { Providers } from "./providers";
 
-// Warm precision system — Instrument Sans carries UI and display text
-// with humanist warmth; Geist Mono stays as the identity signal for
-// eyebrows, metadata, agent labels, numbers, and code. latin-ext widens
+// Unified Geist superfamily — Geist Sans carries UI and display text;
+// Geist Mono is the identity signal for eyebrows, metadata, agent
+// labels, numbers, and code. One harmonized family gives the UI a
+// cool, terminal-grade instrument-panel character. latin-ext widens
 // coverage to accented European/Vietnamese names in employee and
 // sandbox labels.
-const appSans = Instrument_Sans({
+const appSans = Geist({
   subsets: ["latin", "latin-ext"],
   variable: "--font-app-sans",
   display: "swap",
@@ -30,11 +31,11 @@ const geistMono = Geist_Mono({
   weight: "variable",
 });
 
-// CJK coverage for the zh-CN / zh-TW locales. The Latin families above
-// ship no Han glyphs, so under a Chinese locale the :lang() rules in
-// tokens.css fall through to Noto Sans SC/TC for Han characters while
-// keeping Instrument Sans for Latin. preload is off — CJK has no single subset to
-// preload — so these only download on a Chinese locale.
+// CJK fallback for the zh-CN / zh-TW locales. The :lang() stacks in
+// tokens.css are system-first (PingFang, HarmonyOS Sans, YaHei…), so
+// Noto Sans SC/TC only download when a Han glyph misses every system
+// font (e.g. bare Linux). preload is off — CJK has no single subset to
+// preload — so the unicode-range chunks stay untouched until needed.
 const notoSansSC = Noto_Sans_SC({
   variable: "--font-noto-sans-sc",
   display: "swap",
@@ -62,6 +63,13 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#fdfcfa" },
+    { media: "(prefers-color-scheme: dark)", color: "#0d0c0a" },
+  ],
+};
+
 export default function RootLayout({ children }: { children: ReactNode }) {
   // The default language is English; the client App updates both
   // document.documentElement.lang and document.title from the user's
@@ -79,7 +87,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "(function(){try{var t=localStorage.getItem('relay-web.theme')||'system';var d=matchMedia('(prefers-color-scheme: dark)').matches;if(t==='contrast'||t==='contrast-dark'){document.documentElement.setAttribute('data-theme',t);}else{var dk=t==='dark'||(t!=='light'&&d);document.documentElement.setAttribute('data-theme',dk?'dark':'light');}}catch(e){}})();",
+              "(function(){try{var t=localStorage.getItem('relay-web.theme')||'system';var d=matchMedia('(prefers-color-scheme: dark)').matches;var r;if(t==='contrast'||t==='contrast-dark'){r=t;}else{var dk=t==='dark'||(t!=='light'&&d);r=dk?'dark':'light';}document.documentElement.setAttribute('data-theme',r);var c={light:'#fdfcfa',dark:'#0d0c0a',contrast:'#ffffff','contrast-dark':'#000000'}[r]||'#fdfcfa';var m=document.querySelector('meta[name=\"theme-color\"][data-relay-theme-color]');if(!m){m=document.createElement('meta');m.setAttribute('name','theme-color');m.setAttribute('data-relay-theme-color','');document.head.appendChild(m);}m.removeAttribute('media');m.setAttribute('content',c);}catch(e){}})();",
           }}
         />
       </head>

@@ -215,6 +215,7 @@
 .transcript {
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   background: var(--color-canvas);
 }
 
@@ -262,6 +263,8 @@
 .msg {
   position: relative;
   padding-left: 30px;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 160px;
   animation: message-in var(--duration-base) ease-out both;
 }
 

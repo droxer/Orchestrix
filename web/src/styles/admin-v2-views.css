@@ -425,6 +425,8 @@
   background: var(--color-canvas);
   transition: box-shadow var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
   overflow: hidden;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 240px;
 }
 
 .adm-node-card::before {

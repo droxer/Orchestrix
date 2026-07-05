@@ -2,20 +2,20 @@
 
 import { useMemo, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { assignTask, createTask, startTask, updateTask } from "../api";
-import { Drawer } from "./admin/Drawer";
-import { Badge } from "@/components/ui/badge";
+import { useRelayMutations } from "../hooks/useRelayMutations";
+import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
 import { AgentStateBadge } from "./AgentStateBadge";
+import { Badge } from "@/components/ui/badge";
 import { PriorityBadge } from "./PriorityBadge";
 import { TaskStatusBadge } from "./TaskStatusBadge";
 import { cn } from "@/lib/utils";
-import { AGENT_NAMES, type AgentName, type CurrentUser, type DaemonNodeMonitorRecord, type RelaySession, type RelayTask, type TaskPriority, type TaskRoutineCadence, type TaskRoutineType } from "../types";
-import { ActionAddPerson, ActionCalendar, ActionSearch, ActionStart } from "./icons";
-import { agentReadyForTask, TASK_PRIORITIES } from "../lib/backlog";
+import { AGENT_NAMES, type AgentName, type CurrentUser, type DaemonNodeMonitorRecord, type RelaySession, type RelayTask } from "../types";
+import { ActionCalendar, ActionSearch, ActionStart } from "./icons";
+import { agentReadyForTask } from "../lib/backlog";
 import { filterRoutineTasks, routineDueTone, TASK_ROUTINE_CADENCES, TASK_ROUTINE_TYPES, type RoutineFilters } from "../lib/routine";
+import { emptyRoutineForm, taskBoardFormsEqual, type RoutineTaskFormState } from "../lib/taskBoardForm";
+import { TaskDrawer } from "./task-board/TaskDrawer";
 import { PageHeader } from "./PageHeader";
 import { BoardEmpty } from "./BoardEmpty";
 import { TaskBoardHeaderActions } from "./TaskBoardHeaderActions";
@@ -30,19 +30,6 @@ interface RoutinePageProps {
   onOpenConversation: (sessionId: string) => void;
 }
 
-type RoutineFormState = {
-  id?: string;
-  title: string;
-  description: string;
-  priority: TaskPriority;
-  assigneeEmployeeId: string;
-  assignedAgent: "" | AgentName;
-  routineType: TaskRoutineType;
-  routineCadence: TaskRoutineCadence;
-  routineNextRunDate: string;
-  routineEnabled: boolean;
-};
-
 const initialFilters: RoutineFilters = {
   query: "",
   type: "all",
@@ -51,18 +38,6 @@ const initialFilters: RoutineFilters = {
   assignee: "",
   state: "all",
 };
-
-const emptyForm = (currentUser: CurrentUser): RoutineFormState => ({
-  title: "",
-  description: "",
-  priority: "normal",
-  assigneeEmployeeId: currentUser.employeeId ?? currentUser.username,
-  assignedAgent: "",
-  routineType: "task",
-  routineCadence: "weekly",
-  routineNextRunDate: "",
-  routineEnabled: true,
-});
 
 function activeFilterCount(filters: RoutineFilters): number {
   let count = 0;
@@ -259,131 +234,20 @@ function RoutineCard({
   );
 }
 
-function RoutineDrawer({
-  form,
-  employees,
-  saving,
-  onClose,
-  onChange,
-  onSubmit,
-}: {
-  form: RoutineFormState;
-  employees: string[];
-  saving: boolean;
-  onClose: () => void;
-  onChange: (next: RoutineFormState) => void;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-}) {
-  const { t } = useTranslation();
-  const title = form.id ? t("routine.edit") : t("routine.new");
-
-  return (
-    <Drawer
-      open
-      onClose={() => {
-        if (!saving) onClose();
-      }}
-      title={title}
-      subtitle={form.id ?? t("routine.new_routine_id")}
-      variant="light"
-      width={420}
-      closeLabel={t("dialog.cancel")}
-      ariaLabel={title}
-      bodyClassName="adm-drawer-body--column"
-    >
-      <form className="adm-form task-board-drawer-form" onSubmit={onSubmit}>
-        <label className="adm-field">
-          <span>{t("backlog.title_field")}</span>
-          <Input
-            name="routine-title"
-            required
-            value={form.title}
-            onChange={(event) => onChange({ ...form, title: event.target.value })}
-          />
-        </label>
-        <label className="adm-field">
-          <span>{t("backlog.description")}</span>
-          <Textarea
-            name="routine-description"
-            value={form.description}
-            rows={5}
-            onChange={(event) => onChange({ ...form, description: event.target.value })}
-          />
-        </label>
-        <div className="task-drawer-form-grid">
-          <label className="adm-field">
-            <span>{t("routine.type")}</span>
-            <select name="routine-type" value={form.routineType} onChange={(event) => onChange({ ...form, routineType: event.target.value as TaskRoutineType })}>
-              {TASK_ROUTINE_TYPES.map((type) => <option key={type} value={type}>{t(`routine.types.${type}`)}</option>)}
-            </select>
-          </label>
-          <label className="adm-field">
-            <span>{t("routine.cadence")}</span>
-            <select name="routine-cadence" value={form.routineCadence} onChange={(event) => onChange({ ...form, routineCadence: event.target.value as TaskRoutineCadence })}>
-              {TASK_ROUTINE_CADENCES.map((cadence) => <option key={cadence} value={cadence}>{t(`routine.cadences.${cadence}`)}</option>)}
-            </select>
-          </label>
-          <label className="adm-field">
-            <span>{t("routine.next_run")}</span>
-            <Input
-              name="routine-next-run-date"
-              type="date"
-              value={form.routineNextRunDate}
-              onChange={(event) => onChange({ ...form, routineNextRunDate: event.target.value })}
-            />
-          </label>
-          <label className="adm-field">
-            <span>{t("backlog.priority")}</span>
-            <select name="routine-priority" value={form.priority} onChange={(event) => onChange({ ...form, priority: event.target.value as TaskPriority })}>
-              {TASK_PRIORITIES.map((priority) => <option key={priority} value={priority}>{t(`backlog.priorities.${priority}`)}</option>)}
-            </select>
-          </label>
-          <label className="adm-field">
-            <span>{t("backlog.agent")}</span>
-            <select name="routine-agent" value={form.assignedAgent} onChange={(event) => onChange({ ...form, assignedAgent: event.target.value as "" | AgentName })}>
-              <option value="">{t("backlog.no_agent")}</option>
-              {AGENT_NAMES.map((agent) => <option key={agent} value={agent}>{agent}</option>)}
-            </select>
-          </label>
-        </div>
-        <label className="adm-field routine-toggle">
-          <span>{t("routine.enabled")}</span>
-          <input name="routine-enabled" type="checkbox" checked={form.routineEnabled} onChange={(event) => onChange({ ...form, routineEnabled: event.target.checked })} />
-        </label>
-        <label className="adm-field">
-          <span>{t("backlog.assignee")}</span>
-          <div className="task-drawer-assignee">
-            <ActionAddPerson size={15} aria-hidden="true" />
-            <Input
-              name="routine-assignee"
-              list="routine-employees"
-              value={form.assigneeEmployeeId}
-              onChange={(event) => onChange({ ...form, assigneeEmployeeId: event.target.value })}
-              className="h-auto min-h-0 border-0 bg-transparent px-0 py-0 shadow-none focus-visible:border-transparent focus-visible:shadow-none"
-            />
-            <datalist id="routine-employees">
-              {employees.map((employee) => <option key={employee} value={employee} />)}
-            </datalist>
-          </div>
-        </label>
-        <div className="adm-form-actions">
-          <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
-            {t("dialog.cancel")}
-          </Button>
-          <Button type="submit" disabled={saving || !form.title.trim()}>
-            {saving ? t("admin.saving") : t("dialog.confirm")}
-          </Button>
-        </div>
-      </form>
-    </Drawer>
-  );
-}
-
 export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing, onRefresh, onOpenConversation }: RoutinePageProps) {
   const { t } = useTranslation();
+  const {
+    assignTaskMutation,
+    startTaskMutation,
+    updateTaskMutation,
+    createTaskMutation,
+  } = useRelayMutations();
   const [filters, setFilters] = useState<RoutineFilters>(initialFilters);
-  const [form, setForm] = useState<RoutineFormState | null>(null);
+  const [form, setForm] = useState<RoutineTaskFormState | null>(null);
+  const [formBaseline, setFormBaseline] = useState<RoutineTaskFormState | null>(null);
   const [saving, setSaving] = useState(false);
+  const formDirty = Boolean(form && formBaseline && !taskBoardFormsEqual(form, formBaseline));
+  const confirmDiscardChanges = useUnsavedChangesGuard(formDirty && !saving);
   const routineTasks = useMemo(() => tasks.filter((task) => task.isRoutine), [tasks]);
   const filteredTasks = useMemo(() => filterRoutineTasks(tasks, filters), [tasks, filters]);
   const employees = useMemo(() => {
@@ -397,8 +261,21 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
     return [...values].sort((a, b) => a.localeCompare(b));
   }, [currentUser.employeeId, nodes, tasks]);
 
+  function openRoutineForm(next: RoutineTaskFormState) {
+    setForm(next);
+    setFormBaseline(next);
+  }
+
+  async function closeRoutineForm() {
+    if (saving) return;
+    if (!(await confirmDiscardChanges())) return;
+    setForm(null);
+    setFormBaseline(null);
+  }
+
   function editTask(task: RelayTask) {
-    setForm({
+    openRoutineForm({
+      variant: "routine",
       id: task.id,
       title: task.title,
       description: task.description,
@@ -410,15 +287,6 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
       routineNextRunDate: task.routineNextRunDate ?? "",
       routineEnabled: task.routineEnabled,
     });
-  }
-
-  async function mutate(action: () => Promise<unknown>) {
-    try {
-      await action();
-      await onRefresh();
-    } catch {
-      // routine mutations fail silently; the board refreshes on the next poll.
-    }
   }
 
   async function submitRoutine(event: FormEvent<HTMLFormElement>) {
@@ -438,12 +306,12 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
         routineEnabled: form.routineEnabled,
         ...(form.assignedAgent ? { assignedAgent: form.assignedAgent } : {}),
       };
-      if (form.id) await updateTask(form.id, payload);
-      else await createTask(payload);
+      if (form.id) await updateTaskMutation.mutateAsync({ taskId: form.id, input: payload });
+      else await createTaskMutation.mutateAsync(payload);
       setForm(null);
-      await onRefresh();
+      setFormBaseline(null);
     } catch {
-      // form submit errors are silent; the drawer stays open for retry.
+      // mutation onError surfaces a toast; keep the drawer open for retry.
     } finally {
       setSaving(false);
     }
@@ -465,7 +333,7 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
             createLabel={t("routine.new")}
             isRefreshing={isRefreshing}
             onRefresh={() => void onRefresh()}
-            onCreate={() => setForm(emptyForm(currentUser))}
+            onCreate={() => openRoutineForm(emptyRoutineForm(currentUser))}
           />
         }
       />
@@ -478,7 +346,7 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
           title={routineTasks.length === 0 ? t("routine.no_routines_title") : t("routine.no_match_title")}
           body={routineTasks.length === 0 ? t("routine.no_routines_body") : t("routine.no_match_body")}
           createLabel={routineTasks.length === 0 ? t("routine.new") : undefined}
-          onCreate={routineTasks.length === 0 ? () => setForm(emptyForm(currentUser)) : undefined}
+          onCreate={routineTasks.length === 0 ? () => openRoutineForm(emptyRoutineForm(currentUser)) : undefined}
         />
       ) : (
         <div className="routine-list">
@@ -491,11 +359,14 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
                 session={session}
                 ready={agentReadyForTask(task, nodes)}
                 onEdit={() => editTask(task)}
-                onAssign={(agent) => void mutate(() => assignTask(task.id, agent))}
-                onStart={() => void mutate(() => startTask(task.id))}
+                onAssign={(agent) => void assignTaskMutation.mutate({ taskId: task.id, agent })}
+                onStart={() => void startTaskMutation.mutate({ taskId: task.id })}
                 onOpenThread={() => session && onOpenConversation(session.id)}
-                onToggleBlock={() => void mutate(() => updateTask(task.id, { status: task.status === "blocked" ? "backlog" : "blocked" }))}
-                onDone={() => void mutate(() => updateTask(task.id, { status: "done" }))}
+                onToggleBlock={() => void updateTaskMutation.mutate({
+                  taskId: task.id,
+                  input: { status: task.status === "blocked" ? "backlog" : "blocked" },
+                })}
+                onDone={() => void updateTaskMutation.mutate({ taskId: task.id, input: { status: "done" } })}
               />
             );
           })}
@@ -503,12 +374,17 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
       )}
 
       {form ? (
-        <RoutineDrawer
+        <TaskDrawer
           form={form}
           employees={employees}
           saving={saving}
-          onClose={() => setForm(null)}
-          onChange={setForm}
+          title={form.id ? t("routine.edit") : t("routine.new")}
+          subtitle={form.id ?? t("routine.new_routine_id")}
+          employeeDatalistId="routine-employees"
+          onClose={() => { void closeRoutineForm(); }}
+          onChange={(next) => {
+            if (next.variant === "routine") setForm(next);
+          }}
           onSubmit={(event) => void submitRoutine(event)}
         />
       ) : null}

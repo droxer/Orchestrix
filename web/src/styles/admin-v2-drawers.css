@@ -211,6 +211,7 @@ html[data-theme="light"] .adm-drawer.dark {
 .adm-drawer-body {
   flex: 1;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: var(--space-xl);
 }
 

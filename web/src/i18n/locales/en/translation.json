@@ -6,6 +6,25 @@
     "confirm": "Confirm",
     "cancel": "Cancel"
   },
+  "unsaved": {
+    "title": "Discard unsaved changes?",
+    "message": "Your changes will be lost if you close this drawer.",
+    "confirm": "Discard changes"
+  },
+  "errors": {
+    "rename_conversation": "Couldn't rename the thread. Refresh the thread list and try again.",
+    "archive_conversation": "Couldn't close the thread. Check the connection and try again.",
+    "send_message": "Couldn't send the message. Check the daemon connection and try again.",
+    "cancel_run": "Couldn't cancel the run. Refresh the thread and try again.",
+    "rerun_assignment": "Couldn't rerun the assignment. Check the daemon connection and try again.",
+    "record_decision": "Couldn't record the decision. Keep the decision bar open and try again.",
+    "send_handoff": "Couldn't send the handoff. Keep the handoff drawer open and try again.",
+    "save_task": "Couldn't save the task. Check the connection and try again.",
+    "task_action": "Couldn't update the task. Refresh the board and try again.",
+    "admin_unassign_node": "Couldn't unassign the node. Check the connection and try again.",
+    "admin_delete_node": "Couldn't delete the node. Check the connection and try again.",
+    "admin_delete_employee": "Couldn't delete the employee. Check the connection and try again."
+  },
   "skip_to_conversation": "Skip to thread",
   "skip_to_content": "Skip to content",
   "nav": {
@@ -180,7 +199,7 @@
   "workspace": {
     "title": "Workspace",
     "sub": "@{{employee}} cockpit",
-    "loading": "Loading workspace",
+    "loading": "Loading workspace…",
     "metrics": "Workspace metrics",
     "metric_runs": "Active runs",
     "metric_tasks": "Active tasks",
@@ -192,7 +211,7 @@
     "preview": "Preview",
     "select_to_preview": "Select an artifact or file to preview.",
     "open_thread": "Open thread",
-    "loading_preview": "Loading preview.",
+    "loading_preview": "Loading preview…",
     "binary_file": "Binary file — no preview.",
     "empty_file": "This file is empty.",
     "view_mode": "Preview mode",
@@ -201,7 +220,7 @@
     "file_truncated": "Preview truncated to {{limit}}.",
     "no_artifacts": "No artifacts yet.",
     "no_files": "No files in this directory.",
-    "loading_files": "Loading files.",
+    "loading_files": "Loading files…",
     "files_unavailable": "Workspace path is not available on this host.",
     "parent_directory": "Parent",
     "load_failed": "Workspace unavailable",

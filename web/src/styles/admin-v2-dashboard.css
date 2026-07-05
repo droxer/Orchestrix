@@ -514,6 +514,8 @@
   padding: var(--space-sm) 0;
   align-items: start;
   position: relative;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 56px;
 }
 
 .adm-dash-feed-row:not(:last-child) {

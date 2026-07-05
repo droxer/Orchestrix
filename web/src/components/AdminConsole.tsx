@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { DashboardView } from "./admin/dashboard/DashboardView";
 import { useFleetMetrics } from "../hooks/useFleetMetrics";
 import { useTranslation } from "react-i18next";
+import { useMutationError } from "../hooks/useMutationError";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NavRefresh } from "./icons";
@@ -38,6 +39,7 @@ type AuthScreen = "login" | "bootstrap";
 
 export function AdminConsole() {
   const { t } = useTranslation();
+  const { reportMutationError } = useMutationError();
 
   const [admin, setAdmin] = useState<CurrentUser | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
@@ -124,31 +126,46 @@ export function AdminConsole() {
   }
 
   async function handleUnassignNode(node: ControlPanelDaemonNodeRecord) {
-    const result = await unassignControlPanelDaemonNode(node.id);
-    mergeFleet((prev) => ({
-      ...prev,
-      nodes: prev.nodes.map((current) => (current.id === result.node.id ? result.node : current)),
-    }));
+    try {
+      const result = await unassignControlPanelDaemonNode(node.id);
+      mergeFleet((prev) => ({
+        ...prev,
+        nodes: prev.nodes.map((current) => (current.id === result.node.id ? result.node : current)),
+      }));
+    } catch (error) {
+      reportMutationError("Failed to unassign node", error, t("errors.admin_unassign_node"));
+      throw error;
+    }
   }
 
   async function handleDeleteNode(node: ControlPanelDaemonNodeRecord) {
-    await deleteControlPanelDaemonNode(node.id);
-    mergeFleet((prev) => ({
-      ...prev,
-      nodes: prev.nodes.filter((current) => current.id !== node.id),
-    }));
-    setCredentialsNodeId(null);
+    try {
+      await deleteControlPanelDaemonNode(node.id);
+      mergeFleet((prev) => ({
+        ...prev,
+        nodes: prev.nodes.filter((current) => current.id !== node.id),
+      }));
+      setCredentialsNodeId(null);
+    } catch (error) {
+      reportMutationError("Failed to delete node", error, t("errors.admin_delete_node"));
+      throw error;
+    }
   }
 
   async function handleDeleteEmployee(employee: EmployeeRecord) {
-    const result = await deleteControlPanelEmployee(employee.id);
-    const unassignedSet = new Set(result.unassignedNodes);
-    mergeFleet((prev) => ({
-      employees: prev.employees.filter((current) => current.id !== employee.id),
-      nodes: prev.nodes.map((current) =>
-        unassignedSet.has(current.id) ? (({ employeeId: _ignored, ...rest }) => rest)(current) : current,
-      ),
-    }));
+    try {
+      const result = await deleteControlPanelEmployee(employee.id);
+      const unassignedSet = new Set(result.unassignedNodes);
+      mergeFleet((prev) => ({
+        employees: prev.employees.filter((current) => current.id !== employee.id),
+        nodes: prev.nodes.map((current) =>
+          unassignedSet.has(current.id) ? (({ employeeId: _ignored, ...rest }) => rest)(current) : current,
+        ),
+      }));
+    } catch (error) {
+      reportMutationError("Failed to delete employee", error, t("errors.admin_delete_employee"));
+      throw error;
+    }
   }
 
   function handleOnboardSuccess(result: CreateControlPanelEmployeeResponse) {

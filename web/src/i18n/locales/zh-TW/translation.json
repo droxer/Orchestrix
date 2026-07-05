@@ -6,6 +6,25 @@
     "confirm": "確認",
     "cancel": "取消"
   },
+  "unsaved": {
+    "title": "放棄未儲存的變更？",
+    "message": "關閉此抽屜會遺失目前變更。",
+    "confirm": "放棄變更"
+  },
+  "errors": {
+    "rename_conversation": "無法重新命名對話。請重新整理對話列表後重試。",
+    "archive_conversation": "無法關閉對話。請檢查連線後重試。",
+    "send_message": "無法傳送訊息。請檢查 daemon 連線後重試。",
+    "cancel_run": "無法取消執行。請重新整理對話後重試。",
+    "rerun_assignment": "無法重新執行任務。請檢查 daemon 連線後重試。",
+    "record_decision": "無法記錄決策。請保持決策列開啟後重試。",
+    "send_handoff": "無法傳送移交。請保持移交抽屜開啟後重試。",
+    "save_task": "無法儲存任務。請檢查連線後重試。",
+    "task_action": "無法更新任務。請重新整理看板後重試。",
+    "admin_unassign_node": "無法取消指派節點。請檢查連線後重試。",
+    "admin_delete_node": "無法刪除節點。請檢查連線後重試。",
+    "admin_delete_employee": "無法刪除員工。請檢查連線後重試。"
+  },
   "skip_to_conversation": "跳至對話",
   "skip_to_content": "跳至內容",
   "nav": {
@@ -182,7 +201,7 @@
   "workspace": {
     "title": "工作區",
     "sub": "@{{employee}} 駕駛艙",
-    "loading": "載入工作區中",
+    "loading": "載入工作區中…",
     "metrics": "工作區指標",
     "metric_runs": "活躍執行",
     "metric_tasks": "活躍任務",
@@ -194,7 +213,7 @@
     "preview": "預覽",
     "select_to_preview": "選擇產物或檔案進行預覽。",
     "open_thread": "開啟對話",
-    "loading_preview": "載入預覽中。",
+    "loading_preview": "載入預覽中…",
     "binary_file": "二進位檔案 — 無法預覽。",
     "empty_file": "此檔案為空。",
     "view_mode": "預覽模式",
@@ -203,7 +222,7 @@
     "file_truncated": "預覽已截斷至 {{limit}}。",
     "no_artifacts": "暫無產物。",
     "no_files": "此目錄中沒有檔案。",
-    "loading_files": "載入檔案中。",
+    "loading_files": "載入檔案中…",
     "files_unavailable": "此主機上無可用的工作區路徑。",
     "parent_directory": "上層目錄",
     "load_failed": "工作區不可用",
