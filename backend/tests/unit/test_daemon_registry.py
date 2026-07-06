@@ -511,6 +511,62 @@ def test_daemon_rejects_event_lease_mismatch() -> None:
     asyncio.run(run_flow())
 
 
+def test_daemon_poll_renews_known_active_command_before_reclaim() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store = LocalSessionStore(root)
+            daemon_store = LocalDaemonStore(root)
+            registry = DaemonNodeRegistry(session_store, daemon_store)
+            backend = ServerDaemonNodeBackend(registry)
+            registry.register({
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }, "ui_token")
+
+            session = await backend.run("sbx_alice", {
+                "taskGoal": "review auth",
+                "assignments": [{"agent": "codex", "mode": "action"}],
+            })
+            [command] = registry.take_commands("sbx_alice", "node_token", lease_seconds=0.05)
+
+            time.sleep(0.08)
+
+            assert registry.take_commands("sbx_alice", "node_token", lease_seconds=0.05) == []
+            registry.handle_event("sbx_alice", {
+                "type": "run.output",
+                "commandId": command["id"],
+                "leaseId": command["leaseId"],
+                "sessionId": command["sessionId"],
+                "runId": command["runId"],
+                "agent": "codex",
+                "stream": "stdout",
+                "text": "final response",
+                "sequence": 0,
+            }, "node_token")
+            registry.handle_event("sbx_alice", {
+                "type": "run.completed",
+                "commandId": command["id"],
+                "leaseId": command["leaseId"],
+                "sessionId": command["sessionId"],
+                "runId": command["runId"],
+                "agent": "codex",
+                "mode": "action",
+                "exitCode": 0,
+                "agentLog": "final response",
+            }, "node_token")
+
+            completed = session_store.get_session(session["id"])
+            assert completed["status"] == "completed"
+            assert completed["agentRuns"][0]["agentLog"] == "final response"
+
+    asyncio.run(run_flow())
+
+
 def test_daemon_failed_event_preserves_agent_log_without_artifact() -> None:
     async def run_flow() -> None:
         with TemporaryDirectory() as root:

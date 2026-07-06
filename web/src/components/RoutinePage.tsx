@@ -10,9 +10,11 @@ import { Badge } from "@/components/ui/badge";
 import { PriorityBadge } from "./PriorityBadge";
 import { TaskStatusBadge } from "./TaskStatusBadge";
 import { cn } from "@/lib/utils";
-import { AGENT_NAMES, type AgentName, type CurrentUser, type DaemonNodeMonitorRecord, type RelaySession, type RelayTask } from "../types";
-import { ActionCalendar, ActionSearch, ActionStart } from "./icons";
+import { AGENT_NAMES, type CurrentUser, type DaemonNodeMonitorRecord, type RelaySession, type RelayTask } from "../types";
+import { ActionApprove, ActionCalendar, ActionSearch, ActionStart, ActionStop, NavConversations, NavRefresh, ViewGrid, ViewList } from "./icons";
 import { agentReadyForTask } from "../lib/backlog";
+import { TaskAssignee } from "./TaskAssignee";
+import { readViewPreference, writeViewPreference } from "../lib/viewPreference";
 import { filterRoutineTasks, routineDueTone, TASK_ROUTINE_CADENCES, TASK_ROUTINE_TYPES, type RoutineFilters } from "../lib/routine";
 import { emptyRoutineForm, taskBoardFormsEqual, type RoutineTaskFormState } from "../lib/taskBoardForm";
 import { TaskDrawer } from "./task-board/TaskDrawer";
@@ -38,6 +40,11 @@ const initialFilters: RoutineFilters = {
   assignee: "",
   state: "all",
 };
+
+type RoutineView = "card" | "list";
+
+const ROUTINE_VIEW_STORAGE_KEY = "relay-web.routineView";
+const ROUTINE_VIEWS: readonly RoutineView[] = ["card", "list"];
 
 function activeFilterCount(filters: RoutineFilters): number {
   let count = 0;
@@ -156,7 +163,6 @@ function RoutineCard({
   session,
   ready,
   onEdit,
-  onAssign,
   onStart,
   onOpenThread,
   onToggleBlock,
@@ -166,7 +172,6 @@ function RoutineCard({
   session?: RelaySession;
   ready: boolean;
   onEdit: () => void;
-  onAssign: (agent: AgentName) => void;
   onStart: () => void;
   onOpenThread: () => void;
   onToggleBlock: () => void;
@@ -187,7 +192,7 @@ function RoutineCard({
       <div className="backlog-meta">
         <span>{t(`routine.types.${task.routineType ?? "task"}`)} · {t(`routine.cadences.${task.routineCadence ?? "weekly"}`)}</span>
         <span className="backlog-meta-sep" aria-hidden="true">·</span>
-        <span>@{task.assigneeEmployeeId ?? task.ownerEmployeeId ?? t("backlog.unassigned")}</span>
+        <TaskAssignee task={task} ready={ready} unassignedLabel={t("backlog.unassigned")} showAgent={false} />
         <span className="backlog-meta-sep" aria-hidden="true">·</span>
         <span className={cn("backlog-due", tone !== "neutral" && tone)}>
           <ActionCalendar size={13} />
@@ -204,18 +209,6 @@ function RoutineCard({
       </div>
       <div className="backlog-task-actions" role="group" aria-label={t("backlog.actions")}>
         <div className="backlog-action-group" aria-label={t("backlog.actions_dispatch")}>
-          <select
-            name={`routine-${task.id}-agent-card`}
-            value={task.assignedAgent ?? ""}
-            aria-label={t("backlog.assign_agent")}
-            onChange={(event) => {
-              const agent = event.target.value as AgentName;
-              if (agent) onAssign(agent);
-            }}
-          >
-            <option value="">{t("backlog.no_agent")}</option>
-            {AGENT_NAMES.map((agent) => <option key={agent} value={agent}>{agent}</option>)}
-          </select>
           <button type="button" className="backlog-action-primary backlog-action-icon" onClick={onStart} disabled={!task.assignedAgent || !task.routineEnabled || task.status === "running" || task.status === "done"} aria-label={t("backlog.start")} title={t("backlog.start")}>
             <ActionStart size={14} />
           </button>
@@ -234,15 +227,135 @@ function RoutineCard({
   );
 }
 
+function RoutineViewToggle({ view, onChange }: { view: RoutineView; onChange: (view: RoutineView) => void }) {
+  const { t } = useTranslation();
+  return (
+    <div className="backlog-view-toggle" role="group" aria-label={t("routine.view")}>
+      <button
+        type="button"
+        className="backlog-view-btn"
+        data-active={view === "card" ? "true" : "false"}
+        aria-pressed={view === "card"}
+        aria-label={t("routine.view_card")}
+        title={t("routine.view_card")}
+        onClick={() => onChange("card")}
+      >
+        <ViewGrid size={15} />
+      </button>
+      <button
+        type="button"
+        className="backlog-view-btn"
+        data-active={view === "list" ? "true" : "false"}
+        aria-pressed={view === "list"}
+        aria-label={t("routine.view_list")}
+        title={t("routine.view_list")}
+        onClick={() => onChange("list")}
+      >
+        <ViewList size={15} />
+      </button>
+    </div>
+  );
+}
+
+function RoutineRow({
+  task,
+  session,
+  ready,
+  onEdit,
+  onStart,
+  onOpenThread,
+  onToggleBlock,
+  onDone,
+}: {
+  task: RelayTask;
+  session?: RelaySession;
+  ready: boolean;
+  onEdit: () => void;
+  onStart: () => void;
+  onOpenThread: () => void;
+  onToggleBlock: () => void;
+  onDone: () => void;
+}) {
+  const { t } = useTranslation();
+  const tone = routineDueTone(task);
+
+  return (
+    <article className="backlog-row group" role="listitem" data-status={task.status} data-priority={task.priority}>
+      <div className="backlog-row-lead">
+        <span className="backlog-row-dot" aria-hidden="true" />
+        <button type="button" className="backlog-row-title" onClick={onEdit}>{task.title}</button>
+      </div>
+      <span className="backlog-row-status">{task.routineEnabled ? t("routine.enabled") : t("routine.disabled")}</span>
+      <div className="backlog-row-tags">
+        <PriorityBadge priority={task.priority} />
+      </div>
+      <span className="backlog-row-assignee">
+        <TaskAssignee task={task} ready={ready} unassignedLabel={t("backlog.unassigned")} />
+      </span>
+      <span className={cn("backlog-row-due", tone !== "neutral" && tone)}>
+        <ActionCalendar size={13} />
+        {task.routineNextRunDate || t("routine.no_next_run")}
+      </span>
+      <div className="backlog-row-actions" role="group" aria-label={t("backlog.actions")}>
+        <div className="backlog-action-group" aria-label={t("backlog.actions_dispatch")}>
+          <button
+            type="button"
+            className="backlog-action-primary backlog-action-icon"
+            onClick={onStart}
+            disabled={!task.assignedAgent || !task.routineEnabled || task.status === "running" || task.status === "done"}
+            aria-label={t("backlog.start")}
+            title={t("backlog.start")}
+          >
+            <ActionStart size={14} />
+          </button>
+        </div>
+        {session ? (
+          <div className="backlog-action-group">
+            <button
+              type="button"
+              className="backlog-action-icon"
+              onClick={onOpenThread}
+              aria-label={t("backlog.open_thread")}
+              title={t("backlog.open_thread")}
+            >
+              <NavConversations size={14} />
+            </button>
+          </div>
+        ) : null}
+        <div className="backlog-action-group" aria-label={t("backlog.actions_state")}>
+          <button
+            type="button"
+            className={cn("backlog-action-icon", task.status !== "blocked" && "backlog-action-block")}
+            onClick={onToggleBlock}
+            aria-label={task.status === "blocked" ? t("backlog.reopen") : t("backlog.block")}
+            title={task.status === "blocked" ? t("backlog.reopen") : t("backlog.block")}
+          >
+            {task.status === "blocked" ? <NavRefresh size={14} /> : <ActionStop size={14} />}
+          </button>
+          <button
+            type="button"
+            className="backlog-action-icon backlog-action-done"
+            onClick={onDone}
+            aria-label={t("backlog.done")}
+            title={t("backlog.done")}
+          >
+            <ActionApprove size={14} />
+          </button>
+        </div>
+      </div>
+    </article>
+  );
+}
+
 export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing, onRefresh, onOpenConversation }: RoutinePageProps) {
   const { t } = useTranslation();
   const {
-    assignTaskMutation,
     startTaskMutation,
     updateTaskMutation,
     createTaskMutation,
   } = useRelayMutations();
   const [filters, setFilters] = useState<RoutineFilters>(initialFilters);
+  const [view, setView] = useState<RoutineView>(() => readViewPreference(ROUTINE_VIEW_STORAGE_KEY, "list", ROUTINE_VIEWS));
   const [form, setForm] = useState<RoutineTaskFormState | null>(null);
   const [formBaseline, setFormBaseline] = useState<RoutineTaskFormState | null>(null);
   const [saving, setSaving] = useState(false);
@@ -260,6 +373,11 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
     if (currentUser.employeeId) values.add(currentUser.employeeId);
     return [...values].sort((a, b) => a.localeCompare(b));
   }, [currentUser.employeeId, nodes, tasks]);
+
+  function changeView(next: RoutineView) {
+    setView(next);
+    writeViewPreference(ROUTINE_VIEW_STORAGE_KEY, next);
+  }
 
   function openRoutineForm(next: RoutineTaskFormState) {
     setForm(next);
@@ -322,6 +440,19 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
     return latest ? sessions.find((session) => session.id === latest) : undefined;
   }
 
+  function routineHandlers(task: RelayTask, session?: RelaySession) {
+    return {
+      onEdit: () => editTask(task),
+      onStart: () => void startTaskMutation.mutate({ taskId: task.id }),
+      onOpenThread: () => session && onOpenConversation(session.id),
+      onToggleBlock: () => void updateTaskMutation.mutate({
+        taskId: task.id,
+        input: { status: task.status === "blocked" ? "backlog" : "blocked" },
+      }),
+      onDone: () => void updateTaskMutation.mutate({ taskId: task.id, input: { status: "done" } }),
+    };
+  }
+
   return (
     <section id="routine-panel" className="routine-page backlog-page" aria-label={t("routine.title")} tabIndex={-1}>
       <PageHeader
@@ -329,6 +460,7 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
         count={t("routine.sub", { count: routineTasks.length })}
         actions={
           <TaskBoardHeaderActions
+            leading={<RoutineViewToggle view={view} onChange={changeView} />}
             refreshLabel={t("nav.refresh")}
             createLabel={t("routine.new")}
             isRefreshing={isRefreshing}
@@ -348,6 +480,29 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
           createLabel={routineTasks.length === 0 ? t("routine.new") : undefined}
           onCreate={routineTasks.length === 0 ? () => openRoutineForm(emptyRoutineForm(currentUser)) : undefined}
         />
+      ) : view === "list" ? (
+        <div className="backlog-rows" role="list" aria-label={t("routine.title")}>
+          <div className="backlog-rows-head" aria-hidden="true">
+            <span className="backlog-rows-head-cell backlog-rows-head-lead">{t("backlog.col_task")}</span>
+            <span className="backlog-rows-head-cell backlog-rows-head-status">{t("routine.state")}</span>
+            <span className="backlog-rows-head-cell backlog-rows-head-tags">{t("backlog.priority")}</span>
+            <span className="backlog-rows-head-cell backlog-rows-head-assignee">{t("backlog.assignee")}</span>
+            <span className="backlog-rows-head-cell backlog-rows-head-due">{t("routine.next_run")}</span>
+            <span className="backlog-rows-head-cell backlog-rows-head-actions">{t("backlog.actions")}</span>
+          </div>
+          {filteredTasks.map((task) => {
+            const session = linkedSession(task);
+            return (
+              <RoutineRow
+                key={task.id}
+                task={task}
+                session={session}
+                ready={agentReadyForTask(task, nodes)}
+                {...routineHandlers(task, session)}
+              />
+            );
+          })}
+        </div>
       ) : (
         <div className="routine-list">
           {filteredTasks.map((task) => {
@@ -358,15 +513,7 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
                 task={task}
                 session={session}
                 ready={agentReadyForTask(task, nodes)}
-                onEdit={() => editTask(task)}
-                onAssign={(agent) => void assignTaskMutation.mutate({ taskId: task.id, agent })}
-                onStart={() => void startTaskMutation.mutate({ taskId: task.id })}
-                onOpenThread={() => session && onOpenConversation(session.id)}
-                onToggleBlock={() => void updateTaskMutation.mutate({
-                  taskId: task.id,
-                  input: { status: task.status === "blocked" ? "backlog" : "blocked" },
-                })}
-                onDone={() => void updateTaskMutation.mutate({ taskId: task.id, input: { status: "done" } })}
+                {...routineHandlers(task, session)}
               />
             );
           })}

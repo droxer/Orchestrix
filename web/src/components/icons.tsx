@@ -21,6 +21,7 @@ import {
   Info,
   KeyRound,
   Languages,
+  LayoutGrid,
   ListTodo,
   Palette,
   LogOut,
@@ -95,6 +96,7 @@ export const WorkspaceFile = withStandardStroke(FileText, "WorkspaceFile");
 export const WorkspaceFolder = withStandardStroke(FolderClosed, "WorkspaceFolder");
 export const ViewBoard = withStandardStroke(Columns3, "ViewBoard");
 export const ViewList = withStandardStroke(Rows3, "ViewList");
+export const ViewGrid = withStandardStroke(LayoutGrid, "ViewGrid");
 export const ActionKey = withStandardStroke(KeyRound, "ActionKey");
 
 // Agent mode (智能体): a zap glyph reads as "execute work" without reusing

@@ -771,6 +771,7 @@ class DaemonNodeRegistry:
         self._assert_authorized(sandbox_id, token)
         self.reap_stale_runs()
         self._mark_seen(sandbox_id)
+        self._renew_known_active_command_leases(sandbox_id, lease_seconds=lease_seconds)
         records = self.daemon_store.take_queued_commands(sandbox_id, limit=limit, lease_seconds=lease_seconds)
         logger.debug("Commands taken by daemon node", sandbox_id=sandbox_id, command_count=len(records))
         for record in records:
@@ -815,6 +816,17 @@ class DaemonNodeRegistry:
         renewable = [command_id for command_id in dict.fromkeys(command_ids) if command_id in active_ids]
         if renewable and hasattr(self.daemon_store, "renew_command_leases"):
             self.daemon_store.renew_command_leases(sandbox_id, renewable, lease_seconds=lease_seconds)
+
+    def _renew_known_active_command_leases(self, sandbox_id: str, *, lease_seconds: float) -> None:
+        if not hasattr(self.daemon_store, "renew_command_leases"):
+            return
+        active_ids = [
+            command["commandId"]
+            for command in self.active_commands.values()
+            if command.get("sandboxId") == sandbox_id
+        ]
+        if active_ids:
+            self.daemon_store.renew_command_leases(sandbox_id, active_ids, lease_seconds=lease_seconds)
 
     async def wait_for_completion(self, command_id: str, timeout_ms: int = DAEMON_RUN_TIMEOUT_MS) -> dict[str, Any]:
         future: asyncio.Future[dict[str, Any]] = asyncio.get_running_loop().create_future()

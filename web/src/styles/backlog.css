@@ -14,6 +14,15 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  /* Default (list) surface: just the soft top wash. The vertical lane grid is
+     board-only — behind list rows it aligns to nothing and reads as noise. */
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-surface-soft) 55%, transparent), transparent 180px),
+    var(--color-canvas);
+}
+
+/* Board view repaints the lane grid so the kanban columns sit on their rails. */
+.backlog-page[data-view="board"] {
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--color-surface-soft) 55%, transparent), transparent 180px),
     repeating-linear-gradient(
@@ -940,9 +949,10 @@
 
 .backlog-rows-head-lead { flex: 1 1 auto; min-width: 0; padding-left: calc(8px + var(--space-sm)); }
 .backlog-rows-head-status { flex: none; width: 96px; }
-.backlog-rows-head-tags { flex: none; width: 200px; }
-.backlog-rows-head-assignee { flex: none; width: 132px; }
+.backlog-rows-head-tags { flex: none; width: 104px; }
+.backlog-rows-head-assignee { flex: none; width: 150px; }
 .backlog-rows-head-due { flex: none; width: 116px; }
+.backlog-rows-head-actions { flex: none; width: 176px; text-align: right; }
 
 .backlog-row {
   --row-accent: var(--color-muted-soft);
@@ -964,7 +974,7 @@
   align-items: center;
   flex-wrap: nowrap;
   gap: var(--space-xxs);
-  width: 200px;
+  width: 104px;
   overflow: hidden;
 }
 
@@ -1037,12 +1047,57 @@
 
 .backlog-row-assignee {
   flex: none;
-  width: 132px;
-  color: var(--color-muted);
-  font: var(--type-meta-mono);
-  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  width: 150px;
+  overflow: hidden;
+}
+
+/* ── Assignee identity chip (avatar monogram + handle + agent glyph) ── */
+
+.task-assignee {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.task-assignee-avatar {
+  flex: none;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--color-ink);
+  background: color-mix(in srgb, hsl(var(--avatar-hue, 0) 70% 55%) 16%, transparent);
+  border: 1px solid color-mix(in srgb, hsl(var(--avatar-hue, 0) 70% 55%) 42%, var(--color-hairline));
+}
+
+.task-assignee[data-unassigned="true"] .task-assignee-avatar {
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--color-hairline);
+}
+
+.task-assignee-name {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink);
+  font: var(--type-meta-mono);
+}
+
+.task-assignee[data-unassigned="true"] .task-assignee-name {
+  color: var(--color-muted);
 }
 
 .backlog-row-due {
@@ -1058,44 +1113,18 @@
 .backlog-row-due.warn { color: var(--color-warning-text); }
 .backlog-row-due.bad { color: var(--color-danger-text); }
 
-/* Hover-reveal actions dock as a clean panel over the trailing meta. The
-   leading edge fades the panel surface in over ~28px so it never hard-clips
-   a tag badge mid-glyph; a soft divider sits just inside the fade so it still
-   reads as a deliberate toolbar rather than buttons floating over the data. */
+/* Quick-action column — always visible, right-aligned icon toolbar so every
+   row exposes its actions without a hover reveal. Shorter action sets (no
+   linked thread / non-blockable) simply leave space on the leading edge. */
 .backlog-row-actions {
-  position: absolute;
-  inset-block: 0;
-  inset-inline-end: 0;
+  flex: none;
+  width: 176px;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: var(--space-xxs);
-  padding-inline: calc(var(--space-base) + 28px) var(--space-sm);
-  background: linear-gradient(
-    to right,
-    transparent,
-    color-mix(in srgb, var(--color-surface-soft) 60%, var(--color-canvas)) 28px
-  );
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--duration-fast) var(--ease-standard);
 }
 
-.backlog-row-actions::before {
-  content: "";
-  position: absolute;
-  inset-block: var(--space-xs);
-  inset-inline-start: 28px;
-  width: 1px;
-  background: var(--color-hairline-soft);
-}
-
-.backlog-row:hover .backlog-row-actions,
-.backlog-row:focus-within .backlog-row-actions {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.backlog-row-actions select,
 .backlog-row-actions button {
   min-height: 28px;
   border: 1px solid var(--color-hairline);
@@ -1106,10 +1135,6 @@
   font: var(--type-meta-mono);
   cursor: pointer;
   transition: background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
-}
-
-.backlog-row-actions select {
-  max-width: 96px;
 }
 
 .backlog-row-actions button:hover:not(:disabled) {
@@ -1149,19 +1174,6 @@
   .backlog-rows { padding-inline: var(--space-base); }
 
   .backlog-rows-head { display: none; }
-
-  .backlog-row-actions {
-    position: static;
-    padding-inline: 0;
-    background: none;
-    box-shadow: none;
-    opacity: 1;
-    pointer-events: auto;
-  }
-
-  .backlog-row-actions::before {
-    display: none;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
