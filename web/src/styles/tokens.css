@@ -10,14 +10,19 @@
         utilities used by src/components/ui.
 
    Visual language: warm precision. Ecru/stone surfaces replace cold
-   zinc, deep teal is the single brand ACTION color (lifting to luminous
-   teal on the dark canvas), and warm hairlines soften the product
+   zinc, iris blue is the single brand ACTION color (lifting to luminous
+   periwinkle on the dark canvas), and warm hairlines soften the product
    chrome. The action carries the hue; status narrows to success /
-   danger / warning (green / amber / red) and "info" folds into the teal
-   brand — no competing second blue. Geist Sans carries interface
+   danger / warning (green / amber / red) and "info" folds into the brand
+   action — no separate info hue. Geist Sans carries interface
    and display text; Geist Mono is a deliberate identity signal —
    eyebrows, metadata, agent labels, tool lines, numbers, and code.
    No editorial serif; no pill geometry.
+
+   Structure follows Linear's discipline: tight, consistent radii; fast,
+   un-bouncy motion; modest display sizes; dense row rhythm; and near-flat
+   surfaces where hairlines — not shadows or grain — carry the chrome. The
+   palette above is unchanged; only the structural language was retuned.
    ===================================================================== */
 
 /* Layout breakpoints — reference values for @media queries (custom
@@ -97,7 +102,7 @@
 
   /* Type scale — the operational chat surface sizes (px). Registering these
      makes the documented scale the source of truth for text-* utilities, so
-     text-md / text-2xs / text-micro exist and text-base means 14px. The
+     text-md / text-2xs / text-micro exist and text-base means 13px. The
      shadcn primitives were updated to the matching role token (text-md for
      16px controls) so this does not resize them. */
   --text-micro: var(--text-micro);
@@ -127,11 +132,11 @@
 :root {
   /* ----- 1. Primitives ---------------------------------------- */
 
-  /* Action — deep teal brand is the single action color. Hue carries the
+  /* Action — iris blue is the single action color. Hue carries the
      action; status narrows to green/amber/red and remains distinct. */
-  --color-primary: #115e59;
-  --color-primary-active: #0f766e;
-  --color-primary-disabled: #b5d6d1;
+  --color-primary: #4c6ef5;
+  --color-primary-active: #3b5bdb;
+  --color-primary-disabled: #c1cbf7;
   --color-brand-soft: color-mix(in srgb, var(--color-primary) 8%, var(--color-canvas)); /* tint — selected rows, active nav, running pills */
 
   /* Text — warm stone ramp */
@@ -185,7 +190,7 @@
   --color-semantic-up: #15803d;
   --color-semantic-down: #e5484d;
   --color-accent-yellow: #f5a623; /* attention dot only, not an action color */
-  --color-info: var(--color-primary);  /* info folds into the teal brand — no competing second blue */
+  --color-info: var(--color-primary);  /* info folds into the brand action — no separate info hue */
 
   /* Status-as-TEXT — the dot/border values above are tuned for fills on a
      white canvas and fail WCAG contrast as small foreground text (amber is
@@ -200,23 +205,24 @@
      scale tight, but admin metric highlights need a 32–36px display step. */
   --text-xs: 12px;   /* badges, timestamps, meta rows */
   --text-sm: 13px;   /* captions, previews, secondary UI */
-  --text-base: 14px; /* default UI chrome */
+  --text-base: 13px; /* default UI chrome — Linear's true base size */
   --text-md: 16px;   /* message bodies, inputs (≥16px avoids iOS zoom) */
   --text-lg: 18px;   /* chat header title, brand mark */
   --text-xl: 22px;   /* panel headings */
-  --text-2xl: 28px;  /* empty-state display, mobile metric values */
-  --text-3xl: 32px;  /* admin page title */
-  --text-4xl: 36px;  /* admin metric values */
+  --text-2xl: 24px;  /* empty-state display, mobile metric values */
+  --text-3xl: 26px;  /* admin page title */
+  --text-4xl: 30px;  /* admin metric values */
   --text-2xs: 11px;  /* compact labels, tiny metadata */
   --text-micro: 10px; /* minimap / token abbreviations */
 
-  /* Radii — softened one step while retaining precision geometry. */
+  /* Radii — Linear-tight geometry: small, consistent rounding that reads as
+     precise chrome rather than soft, rounded cards. */
   --radius-none: 0;
-  --radius-xs: 2px;
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 10px;
-  --radius-xl: 12px;
+  --radius-xs: 3px;
+  --radius-sm: 5px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
   --radius-full: 9999px;
 
   /* Spacing — 4px base unit */
@@ -228,10 +234,10 @@
   --space-lg: 24px;
   --space-xl: 32px;
   --space-xxl: 48px;
-  --space-section: 96px; /* editorial section rhythm — consumed by admin-v2-drawers onboard section */
-  /* Row rhythm — relaxed default; dense surfaces opt back down via
-     [data-density="compact"] on their subtree root. */
-  --space-row-y: var(--space-base);
+  --space-section: 64px; /* section rhythm — consumed by admin-v2-drawers onboard section */
+  /* Row rhythm — Linear-dense default; surfaces that need air opt up locally,
+     dense surfaces opt further down via [data-density="compact"]. */
+  --space-row-y: var(--space-sm);
 
   /* Shell dimensions */
   --sidenav-w: 96px;
@@ -276,37 +282,37 @@
   --letter-open: 0.02em;          /* micro open tracking — compact chips, mono metadata, attributions */
   --letter-caps: 0.04em;          /* uppercase chrome labels (table heads, pills, metric captions) */
   --letter-caps-wide: 0.06em;     /* wider caps — section labels, sparse table heads */
-  --letter-eyebrow: 0.08em;       /* the 11/12px 600-weight kicker tracking */
-  --letter-eyebrow-wide: 0.12em;  /* drawer section labels */
+  --letter-eyebrow: 0.05em;       /* the 11/12px 600-weight kicker tracking — Linear-calm, not shouty */
+  --letter-eyebrow-wide: 0.08em;  /* drawer section labels */
 
   /* Semantic typography. Each role bundles size + weight + line-height
      + family so components can apply one variable instead of re-inlining
      the triple. Display is weighted Geist Sans (600) with tight tracking;
      emphasis elsewhere steps to 600, never 700+. Eyebrows and metadata
      go mono as the identity signal. */
-  --type-display-lg: 600 34px/1.08 var(--font-display);  /* admin page title */
-  --type-display-sm: 600 24px/1.1  var(--font-display);
-  --type-title-lg:   600 22px/1.13 var(--font-sans);
-  --type-title-md:   600 18px/1.33 var(--font-sans);
-  --type-title-sm:   600 16px/1.25 var(--font-sans);
+  --type-display-lg: 600 26px/1.15 var(--font-display);  /* admin page title */
+  --type-display-sm: 600 20px/1.2  var(--font-display);
+  --type-title-lg:   600 20px/1.2  var(--font-sans);
+  --type-title-md:   600 17px/1.35 var(--font-sans);
+  --type-title-sm:   600 15px/1.3  var(--font-sans);
   --type-body-md:    400 16px/1.5  var(--font-sans);
   --type-body-strong: 600 16px/1.5 var(--font-sans);
-  --type-body-sm:    400 14px/1.5  var(--font-sans);
+  --type-body-sm:    400 13px/1.5  var(--font-sans);
   --type-caption:    400 13px/1.5  var(--font-sans);
   --type-caption-strong: 600 12px/1.5 var(--font-sans);
-  --type-button:     600 16px/1.15 var(--font-sans);
-  --type-nav-link:   500 14px/1.4  var(--font-sans);
+  --type-button:     600 13px/1.15 var(--font-sans);
+  --type-nav-link:   500 13px/1.4  var(--font-sans);
   /* Chrome labels — the dense small-text roles that fill operational UI
      (table heads, field labels, pills, metric captions). Tight 1.4 leading;
      these are single-line by nature. Fills the gap below caption/caption-strong
      so small bold/medium chrome has a semantic home instead of raw size+weight. */
-  --type-label-strong:      600 14px/1.4 var(--font-sans);  /* 14px bold chrome */
+  --type-label-strong:      600 13px/1.4 var(--font-sans);  /* 13px bold chrome */
   --type-caption-strong-sm: 600 13px/1.4 var(--font-sans);  /* 13px bold */
   --type-label-md:          500 13px/1.4 var(--font-sans);  /* 13px medium */
   --type-label:             500 12px/1.4 var(--font-sans);  /* 12px medium */
   --type-micro-strong:      600 11px/1.4 var(--font-sans);  /* 11px bold */
   --type-number:     500 18px/1.4  var(--font-number);
-  --type-number-display: 500 36px/1.1 var(--font-number);  /* admin metric values */
+  --type-number-display: 500 30px/1.12 var(--font-number);  /* admin metric values */
   --type-meta-mono:  500 12px/1.4 var(--font-mono);  /* agent labels, tool lines, timestamps */
   --type-eyebrow:    500 11px/1.5 var(--font-mono);  /* mono signal; pair with letter-spacing: var(--letter-eyebrow) */
 
@@ -325,7 +331,7 @@
     transparent 65%
   );
   --atmosphere-grain-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
-  --atmosphere-grain-opacity: 0.35;
+  --atmosphere-grain-opacity: 0.14;
   --atmosphere-grain-size: 180px 180px;
   --atmosphere-grain-blend: multiply;
   --atmosphere-background: var(--atmosphere-wash), var(--color-surface-soft);
@@ -343,10 +349,10 @@
      as the edge in place of a hairline border.
      Pick by the surface, not by intuition: bordered card hover → soft;
      unbordered floating chrome → lift. */
-  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-soft: 0 1px 1px rgba(0, 0, 0, 0.03);
   --shadow-lift:
-    0 0 0 1px color-mix(in srgb, var(--color-ink) 6%, transparent),
-    var(--shadow-soft);
+    0 0 0 1px color-mix(in srgb, var(--color-ink) 8%, transparent),
+    0 1px 3px rgba(0, 0, 0, 0.04);
 
   /* Focus ring — single token, used by every interactive surface so the
      focus treatment never drifts between buttons, inputs, and rows.
@@ -354,7 +360,7 @@
      without overpowering the brand color. */
   --ring-focus: 0 0 0 3px color-mix(in srgb, var(--color-primary) 28%, transparent);
   /* Danger counterpart — destructive controls (cancel-send, delete rows)
-     swap the teal halo for the status red at the same 3px/28% recipe. */
+     swap the brand halo for the status red at the same 3px/28% recipe. */
   --ring-focus-danger: 0 0 0 3px color-mix(in srgb, var(--color-semantic-down) 28%, transparent);
 
   /* Motion — canonical curves + durations. Every component CSS picks from
@@ -365,16 +371,16 @@
      the mode-chip; `--ease-standard` is everything else. */
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-out-quint: cubic-bezier(0.2, 0.7, 0.2, 1);
-  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-spring: cubic-bezier(0.34, 1.28, 0.64, 1);
   /* `--ease-emphasized` is the firmer decelerate used by the admin tab
      underline, drawer mode-tabs, and the preferences modal rise — a
      distinct curve from out-quint, promoted to the shelf so its ~5 sites
      stop re-declaring the same cubic-bezier inline. */
   --ease-emphasized: cubic-bezier(0.22, 1, 0.36, 1);
-  --duration-fast: 140ms;
-  --duration-base: 220ms;
-  --duration-slow: 540ms;
-  --duration-editorial: 720ms;
+  --duration-fast: 120ms;
+  --duration-base: 160ms;
+  --duration-slow: 360ms;
+  --duration-editorial: 480ms;
 
   /* ----- 3. shadcn/ui bridge ----------------------------------- */
 
@@ -455,7 +461,7 @@ html:lang(zh-TW) {
    block; never fork per component. */
 [data-density="compact"] {
   --leading-loose: 1.5;
-  --space-row-y: var(--space-sm);
+  --space-row-y: var(--space-xs);
 }
 
 /* Dark + high-contrast themes — ONE selector each. `applyTheme`
@@ -486,13 +492,13 @@ html[data-theme="dark"] {
   --color-hairline: color-mix(in srgb, var(--color-on-dark) 14%, var(--color-surface-dark));
   --color-hairline-soft: color-mix(in srgb, var(--color-on-dark) 8%, var(--color-surface-dark));
 
-  /* Action — deep teal lifts to luminous teal on the dark canvas. The fill
-     is bright, so on-primary flips to near-black; selection and CTA rules
-     inherit this automatically. */
-  --color-primary: #2dd4bf;
-  --color-primary-active: #5eead4;
-  --color-primary-disabled: color-mix(in srgb, #2dd4bf 68%, var(--color-surface-dark));
-  --color-on-primary: #04201c;
+  /* Action — iris blue lifts to a luminous periwinkle on the dark canvas.
+     The fill is bright, so on-primary flips to deep navy; selection and CTA
+     rules inherit this automatically. */
+  --color-primary: #7c9bff;
+  --color-primary-active: #9cb4ff;
+  --color-primary-disabled: color-mix(in srgb, #7c9bff 68%, var(--color-surface-dark));
+  --color-on-primary: #081231;
   --color-brand-soft: color-mix(in srgb, var(--color-primary) 14%, transparent);
 
   /* Status — text/dots authored for white; lift for legibility on dark. */
@@ -525,7 +531,7 @@ html[data-theme="dark"] {
      as modal without washing out to grey. */
   --color-overlay: color-mix(in srgb, #000 72%, transparent);
 
-  --atmosphere-grain-opacity: 0.2;
+  --atmosphere-grain-opacity: 0.08;
   --atmosphere-grain-blend: soft-light;
   --atmosphere-wash: radial-gradient(
     ellipse 90% 70% at 100% 0%,
@@ -555,11 +561,11 @@ html[data-theme="contrast"] {
   --color-hairline: #000000;
   --color-hairline-soft: #5c5c5c;
 
-  --color-primary: #0f4c47;
-  --color-primary-active: #0a3733;
-  --color-primary-disabled: #9ec7c2;
+  --color-primary: #1e40af;
+  --color-primary-active: #17339a;
+  --color-primary-disabled: #a9b8e8;
   --color-on-primary: #ffffff;
-  --color-brand-soft: #e0f2ef;
+  --color-brand-soft: #e6ebfd;
 
   --color-semantic-up: #006b3d;
   --color-semantic-down: #b00020;
@@ -612,11 +618,11 @@ html[data-theme="contrast-dark"] {
   --color-hairline: #ffffff;
   --color-hairline-soft: #9a9a9a;
 
-  --color-primary: #5eead4;
-  --color-primary-active: #99f6e4;
-  --color-primary-disabled: #2d5a54;
+  --color-primary: #93b0ff;
+  --color-primary-active: #b7cbff;
+  --color-primary-disabled: #2f3d78;
   --color-on-primary: #000000;
-  --color-brand-soft: rgba(94, 234, 212, 0.18);
+  --color-brand-soft: rgba(147, 176, 255, 0.18);
 
   --color-semantic-up: #00e676;
   --color-semantic-down: #ff6b75;
@@ -719,7 +725,7 @@ button:disabled {
 
 /* Focus — single ring contract. Components that need a stacked shadow
    (composer wrap, cards on hover) override locally; everything else picks
-   up the teal-alpha halo here. */
+   up the brand-alpha halo here. */
 :where(button, a, input, textarea, select):focus-visible {
   outline: none;
   box-shadow: var(--ring-focus);
