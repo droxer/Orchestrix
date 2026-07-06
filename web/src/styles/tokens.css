@@ -132,11 +132,11 @@
 :root {
   /* ----- 1. Primitives ---------------------------------------- */
 
-  /* Action — iris blue is the single action color. Hue carries the
+  /* Action — cobalt blue is the single action color. Hue carries the
      action; status narrows to green/amber/red and remains distinct. */
-  --color-primary: #4c6ef5;
-  --color-primary-active: #3b5bdb;
-  --color-primary-disabled: #c1cbf7;
+  --color-primary: #3b5bdb;
+  --color-primary-active: #2f4bc4;
+  --color-primary-disabled: #c1cbf0;
   --color-brand-soft: color-mix(in srgb, var(--color-primary) 8%, var(--color-canvas)); /* tint — selected rows, active nav, running pills */
 
   /* Text — warm stone ramp */
@@ -190,7 +190,7 @@
   --color-semantic-up: #15803d;
   --color-semantic-down: #e5484d;
   --color-accent-yellow: #f5a623; /* attention dot only, not an action color */
-  --color-info: var(--color-primary);  /* info folds into the brand action — no separate info hue */
+  --color-info: #5b6779;  /* neutral cool slate — decoupled from the action hue so brand marks action/selection/focus only */
 
   /* Status-as-TEXT — the dot/border values above are tuned for fills on a
      white canvas and fail WCAG contrast as small foreground text (amber is
