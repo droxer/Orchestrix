@@ -492,19 +492,19 @@ html[data-theme="dark"] {
   --color-hairline: color-mix(in srgb, var(--color-on-dark) 14%, var(--color-surface-dark));
   --color-hairline-soft: color-mix(in srgb, var(--color-on-dark) 8%, var(--color-surface-dark));
 
-  /* Action — iris blue lifts to a luminous periwinkle on the dark canvas.
+  /* Action — cobalt blue lifts to a luminous periwinkle on the dark canvas.
      The fill is bright, so on-primary flips to deep navy; selection and CTA
      rules inherit this automatically. */
-  --color-primary: #7c9bff;
-  --color-primary-active: #9cb4ff;
-  --color-primary-disabled: color-mix(in srgb, #7c9bff 68%, var(--color-surface-dark));
-  --color-on-primary: #081231;
+  --color-primary: #7089ff;
+  --color-primary-active: #8fa3ff;
+  --color-primary-disabled: color-mix(in srgb, #7089ff 68%, var(--color-surface-dark));
+  --color-on-primary: #08112e;
   --color-brand-soft: color-mix(in srgb, var(--color-primary) 14%, transparent);
 
   /* Status — text/dots authored for white; lift for legibility on dark. */
   --color-semantic-up: #34d399;
   --color-semantic-down: #ff6b75;
-  --color-info: var(--color-primary);
+  --color-info: #8c98ac;
   --color-code-number: #f0a868;
   --color-accent-yellow: #f7b84d; /* attention dot — brightened for dark canvas */
 
