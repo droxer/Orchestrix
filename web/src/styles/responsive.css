@@ -53,7 +53,7 @@
     padding: max(env(safe-area-inset-top), var(--space-xs)) max(env(safe-area-inset-right), var(--space-base)) var(--space-xs) max(env(safe-area-inset-left), var(--space-base));
     border-bottom: 1px solid var(--color-hairline);
     background: var(--color-canvas);
-    z-index: 30;
+    z-index: var(--z-drawer);
   }
 
   /* Chat route — one contextual segment per mobile view (not two competing
@@ -254,13 +254,13 @@
   }
 
   .sidenav-btn.active {
-    color: var(--color-primary);
-    background: transparent;
-    border-color: transparent;
+    color: var(--color-ink);
+    background: var(--color-brand-soft);
+    border-color: color-mix(in srgb, var(--color-primary) 18%, var(--color-hairline));
   }
 
   .sidenav-btn.active:hover {
-    background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+    background: var(--color-brand-soft);
   }
 
   .messenger-shell .sidenav-btn {

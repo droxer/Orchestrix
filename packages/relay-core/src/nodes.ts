@@ -12,6 +12,8 @@ import {
 } from "./state.js";
 import { extractTokenUsageFromJsonl } from "./token-usage.js";
 
+const AGENT_RESULT_LOG_LIMIT = 12_000;
+
 /**
  * Run one agent assignment. Command construction, rendering, and failure
  * accounting are all driven by the agent registry, so adding an agent never
@@ -55,7 +57,7 @@ export async function runAgentNode(
 
   if (reviewMode) {
     return {
-      agent_logs: [agentResultLog(def.reviewLabel, result, 4000)],
+      agent_logs: [agentResultLog(def.reviewLabel, result)],
       last_exit_code: result.exit_code,
       agent_failures: withFailure(state, agent, result.exit_code !== 0),
       token_usage: tokenUsage,
@@ -90,7 +92,7 @@ function requiredExecStream(options: AgentRunOptions) {
   return options.execStream;
 }
 
-function agentResultLog(label: string, result: { exit_code: number; stdout: string; stderr: string; error_message?: string }, limit = 500): string {
+function agentResultLog(label: string, result: { exit_code: number; stdout: string; stderr: string; error_message?: string }, limit = AGENT_RESULT_LOG_LIMIT): string {
   const parts = [`[${label} Exit ${result.exit_code}]`];
   if (result.error_message) parts.push(`Error: ${result.error_message}`);
   if (result.stderr.trim()) parts.push(`stderr:\n${result.stderr.slice(-limit)}`);

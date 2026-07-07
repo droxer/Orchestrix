@@ -15,9 +15,11 @@
    chrome. The action carries the hue; status narrows to success /
    danger / warning (green / amber / red); "info" is a neutral cool slate,
    decoupled — the brand hue marks action, selection, and focus only.
-   Geist Sans carries interface and display text; Geist Mono is a
-   deliberate identity signal — eyebrows, metadata, agent labels, tool
-   lines, numbers, and code. No editorial serif; no pill geometry.
+   Geist Sans carries interface, display, AND chrome text — eyebrows,
+   metadata, agent labels, and numbers — the Linear model where the sans
+   does the work. Geist Mono is reserved for code-like content: tool /
+   command lines, raw logs, code blocks, and IDs. No editorial serif; no
+   pill geometry.
 
    Structure follows Linear's discipline: tight, consistent radii; fast,
    un-bouncy motion; modest display sizes; dense row rhythm; and near-flat
@@ -257,13 +259,16 @@
   --z-overlay: 200; /* full-screen modal overlays (preferences) — beats --z-float */
   --z-dialog: 300;  /* confirm dialogs — topmost interactive layer, can stack over overlays */
 
-  /* Font families. Unified Geist superfamily: Geist Sans carries UI and
-     display text; Geist Mono is the identity signal for eyebrows,
-     metadata, agent labels, numbers, and code. */
+  /* Font families. Unified Geist superfamily: Geist Sans carries UI, display,
+     AND chrome text (eyebrows, metadata, agent labels, numbers) — the Linear
+     model, where the sans does the work and mono is reserved for code-like
+     content. Geist Mono now signals only tool/command lines, raw logs, code
+     blocks, and IDs. --font-number aliases the sans (tabular figures via
+     font-variant-numeric) so metric numerals read in-family, not mono. */
   --font-sans: var(--font-app-sans), "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   --font-display: var(--font-sans);
   --font-mono: var(--font-geist-mono), "Geist Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-  --font-number: var(--font-mono);
+  --font-number: var(--font-sans);
 
   /* Leading scale — exposed so the 432 inline font-size declarations can
      pick a consistent line-height without re-deriving it each time. */
@@ -272,18 +277,22 @@
   --leading-normal: 1.5;   /* body, captions */
   --leading-loose: 1.65;   /* long-form prose, agent text */
 
-  /* Tracking scale — one token per intent, not per pixel. Display values
-     are tuned for Geist's neutral grotesk letterforms (tighter default
-     spacing than a humanist face — lighter compensation needed). */
-  --letter-display: -0.25px;       /* Geist Sans display (24–34px) */
-  --letter-display-strong: -0.25px; /* admin metric values, Geist Mono 36px+ */
-  --letter-tight: -0.2px;
+  /* Tracking scale — one token per intent, not per pixel. Display tracking is
+     em-based (not fixed px) so it scales with size, matching Linear's curve
+     where negative tracking grows with the display size: headline 28px ≈
+     -0.021em, display 40px ≈ -0.025em. The former flat -0.25px under-tracked
+     every display size (only ~-0.008em at 30px), leaving headings looser and
+     softer than Linear's crisp condensed display. */
+  --letter-display: -0.022em;       /* display band (20–44px): admin/section titles, login headline, pullquote */
+  --letter-display-strong: -0.028em; /* mega/metric (30px+): admin metric values, largest display */
+  --letter-tight: -0.014em;         /* title band (17–20px): card/panel titles */
   --letter-body: 0;               /* Geist body needs no optical tightening */
   --letter-open: 0.02em;          /* micro open tracking — compact chips, mono metadata, attributions */
   --letter-caps: 0.04em;          /* uppercase chrome labels (table heads, pills, metric captions) */
   --letter-caps-wide: 0.06em;     /* wider caps — section labels, sparse table heads */
   --letter-eyebrow: 0.05em;       /* the 11/12px 600-weight kicker tracking — Linear-calm, not shouty */
   --letter-eyebrow-wide: 0.08em;  /* drawer section labels */
+  --letter-number-fluid: -0.02em; /* proportional tightening for clamp()-sized mono metric numerals (admin hero tile, backlog stat) — scales with the fluid size where the fixed-px display tokens cannot */
 
   /* Semantic typography. Each role bundles size + weight + line-height
      + family so components can apply one variable instead of re-inlining
@@ -313,8 +322,8 @@
   --type-micro-strong:      600 11px/1.4 var(--font-sans);  /* 11px bold */
   --type-number:     500 18px/1.4  var(--font-number);
   --type-number-display: 500 30px/1.12 var(--font-number);  /* admin metric values */
-  --type-meta-mono:  500 12px/1.4 var(--font-mono);  /* agent labels, tool lines, timestamps */
-  --type-eyebrow:    500 11px/1.5 var(--font-mono);  /* mono signal; pair with letter-spacing: var(--letter-eyebrow) */
+  --type-meta:  500 12px/1.4 var(--font-sans);  /* agent labels, metadata, timestamps — sans per Linear (mono reserved for tool lines + code) */
+  --type-eyebrow:    500 11px/1.5 var(--font-sans);  /* sans kicker per Linear; pair with letter-spacing: var(--letter-eyebrow) + uppercase */
 
   /* ----- 2. Semantic aliases ----------------------------------- */
 
@@ -336,10 +345,11 @@
   --atmosphere-grain-blend: multiply;
   --atmosphere-background: var(--atmosphere-wash), var(--color-surface-soft);
 
-  /* Status borders for outlined pills and danger buttons */
+  /* Status borders for outlined pills and danger buttons. Info is a
+     standalone slate tone, not a brand/action alias. */
   --border-success: color-mix(in srgb, var(--color-semantic-up) 28%, transparent);
   --border-danger: color-mix(in srgb, var(--color-semantic-down) 32%, transparent);
-  --border-info: color-mix(in srgb, var(--color-primary) 24%, transparent);
+  --border-info: color-mix(in srgb, var(--color-info) 30%, transparent);
 
   /* Elevation — two surface contracts.
      --shadow-soft: just the drop. For surfaces that ALREADY have a 1px
@@ -679,7 +689,9 @@ body {
   position: fixed;
   left: var(--space-base);
   top: var(--space-base);
-  z-index: 100;
+  /* Topmost when focused so it clears the float layer (sidenav flyouts,
+     tooltips at --z-float) that a literal 100 sat beneath. */
+  z-index: var(--z-dialog);
   transform: translateY(calc(-100% - var(--space-base)));
   padding: var(--space-xs) var(--space-sm);
   border-radius: var(--radius-sm);
@@ -775,6 +787,9 @@ button[data-slot="button"][data-variant="default"]:disabled {
   letter-spacing: 0.02em;
 }
 
+/* Tabular numerals — now renders in the sans (--font-number aliases --font-sans
+   per the Linear model); the name is retained for its many consumers. Elements
+   that must stay monospace (session IDs, hashes) re-specify --font-mono locally. */
 .mono {
   font-family: var(--font-number);
   font-feature-settings: "tnum" 1;

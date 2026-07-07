@@ -31,7 +31,7 @@
   border-radius: var(--radius-xs);
   background: var(--color-surface-strong);
   color: var(--color-ink);
-  font-family: var(--font-number);
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
   font-weight: 500;
 }
@@ -167,7 +167,7 @@
   border-radius: var(--radius-sm);
   background: var(--color-surface-strong);
   color: var(--color-ink);
-  font-family: var(--font-number);
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
   line-height: var(--leading-loose);
   white-space: pre;
@@ -191,8 +191,8 @@
   text-transform: lowercase;
 }
 
-/* Reasoning tier — permanent and inline (never collapsed): a quiet `○` marker
-   in the gutter beside 13px muted italic prose (conversation spec §2). */
+/* Reasoning tier kept for diagnostic/debug renderers. The main chat transcript
+   filters reasoning out before it reaches this view. */
 .agent-thinking {
   display: flex;
   align-items: baseline;
@@ -203,7 +203,7 @@
 
 .agent-thinking-marker {
   flex: none;
-  font-family: var(--font-number);
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
   line-height: var(--leading-loose);
   color: var(--color-muted-soft);
@@ -235,7 +235,7 @@
   align-items: baseline;
   gap: var(--space-xs);
   min-width: 0;
-  font-family: var(--font-number);
+  font-family: var(--font-mono);
   font-size: var(--text-xs);
   line-height: 1.5;
   color: var(--color-body);
@@ -296,12 +296,12 @@
 
 .agent-status-good    { color: var(--color-semantic-up); }
 .agent-status-good    > svg { color: var(--color-semantic-up); }
-.agent-status-bad { color: var(--color-semantic-down); }
+.agent-status-bad { color: var(--color-danger-text); }
 .agent-status-bad > svg { color: var(--color-semantic-down); }
 .agent-status-warn  { color: var(--color-muted); }
 .agent-status-warn  > svg { color: var(--color-warning-text); }
 .agent-status-info  { color: var(--color-body); }
-.agent-status-info  > svg { color: var(--color-primary); }
+.agent-status-info  > svg { color: var(--color-info); }
 
 .agent-raw {
   margin: 0;
@@ -310,7 +310,7 @@
   border-radius: var(--radius-md);
   background: var(--color-surface-soft);
   color: var(--color-body);
-  font-family: var(--font-number);
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
   line-height: var(--leading-loose);
   white-space: pre-wrap;

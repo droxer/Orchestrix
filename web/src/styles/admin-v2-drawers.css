@@ -91,6 +91,7 @@
 .adm-drawer-backdrop {
   position: fixed;
   inset: 0;
+  z-index: var(--z-drawer);
   background: var(--color-overlay);
   backdrop-filter: blur(2px);
   display: flex;
@@ -319,7 +320,7 @@ html[data-theme="light"] .adm-drawer.dark {
   padding: var(--space-sm) var(--space-base);
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--color-semantic-down) 6%, transparent);
-  color: var(--color-semantic-down);
+  color: var(--color-danger-text);
   font-size: var(--text-sm);
   line-height: 1.5;
 }
@@ -726,7 +727,7 @@ html[data-theme="light"] .adm-drawer.dark {
 }
 
 .adm-cred-action-button.danger {
-  color: var(--color-semantic-down);
+  color: var(--color-danger-text);
   border-color: color-mix(in srgb, var(--color-semantic-down) 35%, var(--color-hairline));
 }
 
@@ -738,7 +739,7 @@ html[data-theme="light"] .adm-drawer.dark {
 .adm-cred-action-error {
   margin: 0;
   font-size: var(--text-xs);
-  color: var(--color-semantic-down);
+  color: var(--color-danger-text);
 }
 
 /* ── Auth screens ─────────────────────────────────────────────────── */

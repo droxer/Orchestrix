@@ -514,6 +514,11 @@ def test_workspace_brief_summarizes_employee_workspace(monkeypatch) -> None:
             "title": "Patch auth",
             "status": "assigned",
             "assignedAgent": "codex",
+            "isRoutine": True,
+            "routineType": "job",
+            "routineCadence": "weekly",
+            "routineNextRunDate": "2026-07-07",
+            "routineEnabled": True,
         })
         assert task.status_code == 201
         bob_session = bob_client.post("/sessions", json={
@@ -537,6 +542,9 @@ def test_workspace_brief_summarizes_employee_workspace(monkeypatch) -> None:
         assert brief["sessions"][0]["id"] == session.json()["id"]
         assert "events" not in brief["sessions"][0]
         assert brief["tasks"][0]["id"] == task.json()["id"]
+        assert brief["tasks"][0]["routineType"] == "job"
+        assert brief["tasks"][0]["routineCadence"] == "weekly"
+        assert brief["tasks"][0]["routineNextRunDate"] == "2026-07-07"
         assert brief["artifacts"][0]["sessionId"] == session.json()["id"]
 
         assert alice_client.get("/workspace/brief?employeeId=bob").status_code == 403

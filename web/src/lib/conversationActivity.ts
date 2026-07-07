@@ -1,7 +1,7 @@
 import type { AgentName, SessionStatus } from "../types.js";
 
 // The kind of a conversation row's one-line activity signal. Maps to a leading
-// indicator (a cobalt pulse for a live run, a status pip otherwise) and, for
+// indicator (a slate pulse for a live run, a status pip otherwise) and, for
 // the settled states, whether the line reads muted.
 export type ConversationActivityKind = "working" | "warn" | "bad" | "good" | "neutral";
 

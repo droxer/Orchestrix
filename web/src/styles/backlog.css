@@ -1,7 +1,7 @@
 /* =====================================================================
    Backlog — agent dispatch board
 
-   Operational kanban for task routing: mono numerals, status-colored
+   Operational kanban for task routing: sans-tabular numerals, status-colored
    lane rails, hairline lane grid, hover-reveal card actions.
    Tokens follow docs/design-system.md — hairline depth, 10px cards,
    6px inputs, cobalt actions only, brand-soft active affordances.
@@ -69,7 +69,7 @@
   font-size: clamp(1.25rem, 2vw, 1.625rem);
   font-weight: 500;
   line-height: 1;
-  letter-spacing: -0.02em;
+  letter-spacing: var(--letter-number-fluid);
   font-variant-numeric: tabular-nums;
   color: var(--color-ink);
 }
@@ -281,7 +281,7 @@
 .backlog-lane-label {
   padding-left: var(--space-xs);
   color: var(--color-ink);
-  font: var(--type-meta-mono);
+  font: var(--type-meta);
   letter-spacing: var(--letter-caps);
   text-transform: uppercase;
 }
@@ -412,7 +412,7 @@
   border-radius: var(--radius-sm);
   background: var(--color-canvas);
   color: var(--color-body);
-  font: var(--type-meta-mono);
+  font: var(--type-meta);
   letter-spacing: var(--letter-open);
 }
 
@@ -458,7 +458,7 @@
   align-items: center;
   gap: var(--space-xs);
   color: var(--color-body);
-  font: var(--type-meta-mono);
+  font: var(--type-meta);
 }
 
 .task-status::before {
@@ -524,7 +524,7 @@
   gap: var(--space-xs);
   margin-top: var(--space-sm);
   color: var(--color-muted);
-  font: var(--type-meta-mono);
+  font: var(--type-meta);
 }
 
 .backlog-meta-sep {
@@ -582,7 +582,7 @@
   background: var(--color-canvas);
   padding: 0 var(--space-xs);
   color: var(--color-ink);
-  font: var(--type-meta-mono);
+  font: var(--type-meta);
   cursor: pointer;
   transition: background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
 }
@@ -1041,7 +1041,7 @@
   flex: none;
   width: 96px;
   color: var(--color-muted);
-  font: var(--type-meta-mono);
+  font: var(--type-meta);
   letter-spacing: var(--letter-open);
 }
 
@@ -1093,7 +1093,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--color-ink);
-  font: var(--type-meta-mono);
+  font: var(--type-meta);
 }
 
 .task-assignee[data-unassigned="true"] .task-assignee-name {
@@ -1107,7 +1107,7 @@
   gap: var(--space-xxs);
   width: 116px;
   color: var(--color-muted);
-  font: var(--type-meta-mono);
+  font: var(--type-meta);
 }
 
 .backlog-row-due.warn { color: var(--color-warning-text); }
@@ -1132,7 +1132,7 @@
   background: var(--color-canvas);
   padding: 0 var(--space-xs);
   color: var(--color-ink);
-  font: var(--type-meta-mono);
+  font: var(--type-meta);
   cursor: pointer;
   transition: background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
 }

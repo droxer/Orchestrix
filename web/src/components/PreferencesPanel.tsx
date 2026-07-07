@@ -18,7 +18,7 @@ import {
 import { AGENT_NAMES } from "../types";
 import type { AgentName, AgentRole, DaemonNodeMonitorRecord } from "../types";
 import { moveRadioSelection } from "../lib/radioGroupKeyboard";
-import { NavLogout, PrefAgents, PrefAppearance, PrefLanguage } from "./icons";
+import { PrefAgents, PrefAppearance, PrefLanguage } from "./icons";
 
 export type { Language, Theme };
 export { SUPPORTED_LANGUAGES, SUPPORTED_THEMES };
@@ -368,7 +368,6 @@ export interface PreferencesPanelProps {
   onLanguageChange: (language: Language) => void;
   agentNode?: DaemonNodeMonitorRecord | null;
   onAgentRoleOverridesChange?: (overrides: AgentRoleMap) => Promise<void>;
-  onLogout?: () => void;
 }
 
 const CATEGORY_IDS: CategoryId[] = CATEGORIES.map((c) => c.id);
@@ -401,7 +400,6 @@ export function PreferencesPanel({
   onLanguageChange,
   agentNode,
   onAgentRoleOverridesChange,
-  onLogout,
 }: PreferencesPanelProps) {
   const { t } = useTranslation();
   const [active, setActive] = useState<CategoryId>("appearance");
@@ -484,14 +482,6 @@ export function PreferencesPanel({
         </div>
       </div>
 
-      {onLogout ? (
-        <footer className="pref-account">
-          <button type="button" className="pref-logout" onClick={onLogout}>
-            <NavLogout size={16} />
-            <span>{t("nav.logout")}</span>
-          </button>
-        </footer>
-      ) : null}
     </div>
   );
 }

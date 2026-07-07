@@ -329,7 +329,7 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   overflow-x: auto;
-  font-family: var(--font-number);
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
   line-height: 1.55;
 }
@@ -489,7 +489,7 @@
   background: var(--color-ink);
   padding: 0 var(--space-base);
   color: var(--color-on-primary);
-  font: var(--type-meta-mono);
+  font: var(--type-meta);
   cursor: pointer;
 }
 

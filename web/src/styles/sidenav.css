@@ -162,7 +162,7 @@
 }
 
 .sidenav-settings-menu button.danger {
-  color: var(--color-semantic-down);
+  color: var(--color-danger-text);
 }
 
 .sidenav-settings-menu svg {
@@ -208,18 +208,17 @@
   border-color: var(--color-hairline-soft);
 }
 
-/* Active = ink text on a quiet monochrome surface fill (Vercel-style), no
-   left bar. The surface fill is neutral, not the ink action fill, so it stays
-   distinct from true CTAs (send button, primary buttons). */
+/* Active = ink text on the quiet brand-soft selection tint, no left bar. The
+   tint keeps selected navigation distinct from true CTAs. */
 .sidenav-btn.active {
   color: var(--color-ink);
-  background: var(--color-surface-strong);
-  border-color: transparent;
+  background: var(--color-brand-soft);
+  border-color: color-mix(in srgb, var(--color-primary) 18%, var(--color-hairline));
 }
 
 .sidenav-btn.active:hover {
-  background: var(--color-surface-strong);
-  border-color: transparent;
+  background: var(--color-brand-soft);
+  border-color: color-mix(in srgb, var(--color-primary) 18%, var(--color-hairline));
 }
 
 .sidenav-btn:focus-visible {
@@ -227,7 +226,7 @@
 }
 
 .sidenav-btn[data-nav="logout"]:hover {
-  color: var(--color-semantic-down);
+  color: var(--color-danger-text);
   background: var(--color-surface-strong);
   border-color: var(--color-hairline-soft);
 }

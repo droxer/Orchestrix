@@ -102,6 +102,9 @@ export interface WorkspaceBriefTask {
   assignedAgent?: AgentName;
   dueDate?: string;
   isRoutine: boolean;
+  routineType?: TaskRoutineType;
+  routineCadence?: TaskRoutineCadence;
+  routineNextRunDate?: string;
   routineEnabled: boolean;
   linkedSessionIds: string[];
   updatedAt?: string;

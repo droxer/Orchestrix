@@ -23,8 +23,8 @@ export function RelayMark({ className, width = 32, height = 32 }: RelayMarkProps
         strokeLinecap="round"
         strokeLinejoin="round"
       >
-        <path d="M12 14 L32 32 L12 50" stroke="var(--color-primary)" />
-        <path d="M32 14 L52 32 L32 50" stroke="currentColor" opacity="0.5" />
+        <path d="M12 14 L32 32 L12 50" stroke="currentColor" />
+        <path d="M32 14 L52 32 L32 50" stroke="currentColor" opacity="0.45" />
       </g>
     </svg>
   );

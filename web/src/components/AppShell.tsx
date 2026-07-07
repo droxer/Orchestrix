@@ -121,7 +121,6 @@ export function AppShell({
       <PreferencesDialog
         open={prefsOpen}
         onClose={() => setPrefsOpen(false)}
-        onLogout={onLogout}
         preferences={{
           theme,
           onThemeChange,

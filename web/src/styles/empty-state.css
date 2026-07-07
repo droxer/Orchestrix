@@ -179,7 +179,7 @@ html[data-theme="contrast"] .relay-empty-avatar::after {
 
 .relay-empty-hint {
   margin: var(--space-xxs) 0 0;
-  font: var(--type-meta-mono);
+  font: var(--type-meta);
   letter-spacing: var(--letter-eyebrow);
   text-transform: uppercase;
   color: var(--color-muted);

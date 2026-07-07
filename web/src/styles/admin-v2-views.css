@@ -204,7 +204,7 @@
   width: 4px;
   height: 4px;
   border-radius: var(--radius-full);
-  background: var(--color-primary);
+  background: var(--color-info);
   animation: adm-blink 1400ms ease-in-out infinite;
 }
 
@@ -276,13 +276,14 @@
 .adm-people-error {
   margin: 0 0 var(--space-base);
   font-size: var(--text-sm);
-  color: var(--color-semantic-down);
+  color: var(--color-danger-text);
 }
 
-/* tone helpers */
+/* tone helpers — text-safe red for the word/number case; icons and dots read
+   the raw --color-semantic-down (graphical 3:1) elsewhere. */
 .tone-info { color: var(--color-info); }
 .tone-good { color: var(--color-semantic-up); }
-.tone-bad { color: var(--color-semantic-down); }
+.tone-bad { color: var(--color-danger-text); }
 .tone-warn { color: var(--color-warning-text); }
 .tone-muted { color: var(--color-muted); }
 .tone-neutral { color: var(--color-ink); }
@@ -618,7 +619,7 @@
 }
 
 .adm-agent-chip.tone-good { color: var(--color-semantic-up); }
-.adm-agent-chip.tone-bad { color: var(--color-semantic-down); }
+.adm-agent-chip.tone-bad { color: var(--color-danger-text); }
 .adm-agent-chip.tone-neutral .adm-agent-dot { background: var(--color-muted-soft); }
 .adm-agent-chip.is-disabled {
   opacity: 0.45;
@@ -897,7 +898,7 @@
 .adm-node-card-error {
   margin: var(--space-xs) 0 0;
   font-size: var(--text-2xs);
-  color: var(--color-semantic-down);
+  color: var(--color-danger-text);
 }
 
 /* ── Attention rail ───────────────────────────────────────────────── */
@@ -1208,8 +1209,8 @@
   align-self: flex-start;
 }
 
-/* Provider-branded monogram avatar — gives each integration a scannable
-   identity in the list and detail header without leaning on logos. */
+/* Provider monogram avatar — identity comes from the glyph, while the color
+   stays neutral unless a specific provider token is supplied. */
 .adm-chat-avatar {
   display: inline-flex;
   align-items: center;
@@ -1218,9 +1219,9 @@
   width: 32px;
   height: 32px;
   border-radius: var(--radius-sm);
-  color: var(--brand, var(--color-primary));
-  background: color-mix(in srgb, var(--brand, var(--color-primary)) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--brand, var(--color-primary)) 22%, transparent);
+  color: var(--brand, var(--color-ink));
+  background: color-mix(in srgb, var(--brand, var(--color-muted)) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand, var(--color-muted)) 22%, transparent);
   font: var(--type-caption-strong-sm);
 }
 
@@ -1231,11 +1232,9 @@
   font-size: var(--text-md);
 }
 
-/* Chat-provider avatars stay monochrome — the precision system reserves
-   color for status, so Discord / Telegram / Lark are not tinted with their
-   vendor brand hues. They inherit the ink-on-neutral default (--brand
-   falls back to --color-primary) like agent avatars; the provider glyph
-   carries identity. */
+/* Chat-provider avatars stay monochrome — the precision system reserves color
+   for status and action, so Discord / Telegram / Lark are not tinted with their
+   vendor brand hues by default. The provider glyph carries identity. */
 
 .adm-chat-panel-head h3,
 .adm-chat-split h4 {

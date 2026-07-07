@@ -87,8 +87,8 @@
     transform var(--duration-fast) var(--ease-standard);
 }
 
-/* Mode distinction: teal dot + tinted icon for Agent (power mode), muted dot
-   for Ask — status hues only, never action fills. */
+/* Mode distinction: the Agent chip uses a cobalt action cue because it changes
+   execution mode; Ask stays neutral. Chips never become colored fills. */
 .mode-chip[data-mode="action"] {
   --mode-dot: var(--color-primary);
   --mode-icon: var(--color-primary);

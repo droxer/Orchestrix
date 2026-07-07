@@ -80,6 +80,26 @@
     min-width: 44px;
   }
 
+  /* Conversation row actions are hover-revealed (opacity:0) on fine pointers.
+     Touch has no hover, so they'd stay invisible yet still occupy layout and
+     absorb taps. Pin them visible and give them a real 32px target (≥ WCAG
+     2.5.8) so rename/close are discoverable and hittable on touch. */
+  .conversation-rename-btn,
+  .conversation-remove-btn {
+    opacity: 1;
+    width: 32px;
+    height: 32px;
+  }
+
+  /* Inline connect affordance inside the (already-boosted 44px) people-search
+     field. A full 44px plate would overflow the field, so raise it to the 36px
+     icon-button base — comfortably past the 24px WCAG 2.5.8 floor and centered
+     in the taller touch field. */
+  .search-connect-btn {
+    width: 36px;
+    height: 36px;
+  }
+
   .artifact-index-btn {
     width: 44px;
     height: 44px;

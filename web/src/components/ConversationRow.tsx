@@ -11,7 +11,7 @@ import {
 
 export type { ConversationItem };
 
-// How each activity kind renders: the leading indicator (a cobalt pulse for a
+// How each activity kind renders: the leading indicator (a slate pulse for a
 // live run, else a status pip) and whether the line reads muted. The tone→pip
 // class table lives once here; the kind decision is the pure
 // `conversationActivity` (see conversationActivity.ts).
@@ -63,6 +63,12 @@ export function ConversationRow({ item, selected, onSelect, onRename, onClose }:
   const agents = sessionAgents(session);
   const activity = conversationActivity(session.status, runningAgent);
   const activityStyle = activity ? ACTIVITY_STYLE[activity.kind] : null;
+  const activityText = activity
+    ? activity.kind === "working"
+      ? t(activity.labelKey, { agent: runningAgent })
+      : t(activity.labelKey)
+    : undefined;
+  const rowLabel = [label, stamp, activityText].filter(Boolean).join(" · ");
 
   async function handleClose() {
     if (!onClose) return;
@@ -79,6 +85,7 @@ export function ConversationRow({ item, selected, onSelect, onRename, onClose }:
       <button
         className="conversation-row-inner"
         type="button"
+        aria-label={rowLabel}
         aria-pressed={selected}
         onClick={() => onSelect(session.id)}
       >
@@ -108,9 +115,9 @@ export function ConversationRow({ item, selected, onSelect, onRename, onClose }:
                 <span className={activityStyle.dotClass} aria-hidden="true" />
               )}
               {activity.kind === "working" ? (
-                <em>{t(activity.labelKey, { agent: runningAgent })}</em>
+                <em>{activityText}</em>
               ) : (
-                <span>{t(activity.labelKey)}</span>
+                <span>{activityText}</span>
               )}
             </span>
           ) : null}

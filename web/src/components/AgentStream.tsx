@@ -3,7 +3,7 @@ import { useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { AgentName } from "../types";
-import { emptyAgentStreamSegments, parseAgentStream, parseAgentStderr, type AgentSegment } from "../lib/agentStream";
+import { emptyAgentStreamSegments, parseAgentStderr, parseAgentStream, userVisibleAgentSegments, type AgentSegment } from "../lib/agentStream";
 import { Markdown } from "./Markdown";
 
 type AgentStreamProps = {
@@ -19,7 +19,7 @@ export function AgentStream({ agent, stdout, stderr, streaming }: AgentStreamPro
   // memoization every streamed delta would re-parse the full string from
   // scratch (O(n²) over a run). Key the parse on its raw inputs only.
   const segments = useMemo(
-    () => [...parseAgentStream(agent, stdout), ...parseAgentStderr(stderr)],
+    () => userVisibleAgentSegments([...parseAgentStream(agent, stdout), ...parseAgentStderr(stderr)]),
     [agent, stdout, stderr],
   );
 
@@ -52,14 +52,7 @@ function SegmentView({ segment }: { segment: AgentSegment }) {
     return <div className="agent-text">{renderProse(segment.text)}</div>;
   }
   if (segment.kind === "thinking") {
-    // Full stream, always: reasoning is a permanent, inline type tier — a `○`
-    // marker + 13px muted italic — never a collapse (conversation spec §2).
-    return (
-      <div className="agent-thinking">
-        <span className="agent-thinking-marker" aria-hidden="true">○</span>
-        <div className="agent-thinking-body">{renderProse(segment.text)}</div>
-      </div>
-    );
+    return null;
   }
   if (segment.kind === "tool") {
     // A tool call is a single inline `⏺` mono line — the tool name plus the

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { TFunction } from "i18next";
 
-import { emptyAgentStreamSegments, parseAgentStderr, parseAgentStream } from "../src/lib/agentStream.js";
+import { emptyAgentStreamSegments, parseAgentStderr, parseAgentStream, userVisibleAgentSegments } from "../src/lib/agentStream.js";
 
 describe("agent stream parsing", () => {
   it("filters Codex stdin notice from stderr", () => {
@@ -76,7 +76,7 @@ describe("agent stream parsing", () => {
     ]);
   });
 
-  it("renders Pi JSON thinking and tool progress as visible stream segments", () => {
+  it("parses Pi JSON thinking and tool progress as internal stream segments", () => {
     const raw = [
       JSON.stringify({
         type: "message_update",
@@ -100,6 +100,44 @@ describe("agent stream parsing", () => {
       { kind: "thinking", text: "Checking files." },
       { kind: "tool", name: "read" },
       { kind: "tool", name: "bash" },
+    ]);
+  });
+
+  it("filters internal reasoning and tool progress from the user-visible stream", () => {
+    const raw = [
+      JSON.stringify({ type: "turn.started" }),
+      JSON.stringify({
+        type: "item.completed",
+        item: { id: "reason_1", type: "reasoning", text: "Inspecting private chain of thought." },
+      }),
+      JSON.stringify({
+        type: "item.started",
+        item: { id: "cmd_1", type: "command_execution", command: "cat secret.txt" },
+      }),
+      JSON.stringify({
+        type: "item.completed",
+        item: { id: "msg_1", type: "agent_message", text: "Here is the answer." },
+      }),
+      "truncated protocol fragment",
+      JSON.stringify({ type: "turn.completed" }),
+    ].join("\n");
+
+    assert.deepEqual(userVisibleAgentSegments(parseAgentStream("codex", raw)), [
+      { kind: "narration", key: "agent_stream.codex_started", params: { tone: "info" } },
+      { kind: "text", text: "Here is the answer." },
+      { kind: "narration", key: "agent_stream.codex_finished", params: { tone: "good" } },
+    ]);
+  });
+
+  it("recovers Codex agent_message objects from truncated completed-log tails", () => {
+    const raw = "leted\",\"item\":" + JSON.stringify({
+      id: "item_0",
+      type: "agent_message",
+      text: "Recovered completed answer.",
+    });
+
+    assert.deepEqual(userVisibleAgentSegments(parseAgentStream("codex", raw)), [
+      { kind: "text", text: "Recovered completed answer." },
     ]);
   });
 
@@ -163,6 +201,63 @@ describe("agent stream parsing", () => {
       { kind: "tool", name: "Read", target: "backend/relay/app.py" },
       { kind: "tool", name: "Bash", target: "npm run build" },
       { kind: "tool", name: "Think", target: undefined },
+    ]);
+  });
+
+  it("does not duplicate Claude assistant text after streamed deltas", () => {
+    const raw = [
+      JSON.stringify({
+        type: "stream_event",
+        event: { type: "content_block_start", content_block: { type: "text" } },
+      }),
+      JSON.stringify({
+        type: "stream_event",
+        event: { type: "content_block_delta", delta: { type: "text_delta", text: "Final Claude answer." } },
+      }),
+      JSON.stringify({
+        type: "stream_event",
+        event: { type: "content_block_stop" },
+      }),
+      JSON.stringify({
+        type: "assistant",
+        message: { role: "assistant", content: [{ type: "text", text: "Final Claude answer." }] },
+      }),
+    ].join("\n");
+
+    assert.deepEqual(parseAgentStream("claude", raw), [
+      { kind: "text", text: "Final Claude answer." },
+    ]);
+  });
+
+  it("does not duplicate replayed Claude streamed text blocks", () => {
+    const streamedAnswer = [
+      JSON.stringify({
+        type: "stream_event",
+        event: { type: "content_block_start", content_block: { type: "text" } },
+      }),
+      JSON.stringify({
+        type: "stream_event",
+        event: { type: "content_block_delta", delta: { type: "text_delta", text: "Replayed Claude answer." } },
+      }),
+      JSON.stringify({
+        type: "stream_event",
+        event: { type: "content_block_stop" },
+      }),
+    ].join("\n");
+
+    assert.deepEqual(parseAgentStream("claude", `${streamedAnswer}\n${streamedAnswer}`), [
+      { kind: "text", text: "Replayed Claude answer." },
+    ]);
+  });
+
+  it("keeps Claude assistant text when no streamed delta was emitted", () => {
+    const raw = JSON.stringify({
+      type: "assistant",
+      message: { role: "assistant", content: [{ type: "text", text: "Fallback Claude answer." }] },
+    });
+
+    assert.deepEqual(parseAgentStream("claude", raw), [
+      { kind: "text", text: "Fallback Claude answer." },
     ]);
   });
 

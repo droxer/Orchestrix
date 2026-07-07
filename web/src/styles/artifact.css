@@ -4,10 +4,11 @@
    so large bodies (diffs, logs) never disrupt the conversation flow. */
 
 /* Per-kind accent. Mirrors the TUI artifact palette so the two surfaces read
-   the same. Falls back to the primary ink for unrecognized kinds. */
+   the same. Falls back to neutral slate for unrecognized kinds so cobalt stays
+   reserved for action, selection, and focus. */
 .artifact-chip,
 .artifact-kind-tag {
-  --artifact-accent: var(--color-primary);
+  --artifact-accent: var(--color-info);
 }
 [data-kind="plan"],
 .artifact-kind-tag.is-plan {
@@ -125,7 +126,7 @@
   color: var(--color-semantic-up);
 }
 .artifact-stat.tone-down {
-  color: var(--color-semantic-down);
+  color: var(--color-danger-text);
 }
 
 .artifact-chip-cta {
@@ -151,7 +152,7 @@
 
 /* Diff: per-line add/delete coloring with a sign gutter. */
 .artifact-diff {
-  font-family: var(--font-number);
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
   line-height: 1.55;
   overflow-x: auto;
@@ -213,7 +214,7 @@
   background: var(--color-surface-soft);
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-sm);
-  font-family: var(--font-number);
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
   line-height: 1.55;
   white-space: pre-wrap;
@@ -291,18 +292,18 @@
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--artifact-accent, var(--color-primary));
+  color: var(--artifact-accent, var(--color-info));
   cursor: pointer;
   transition: background var(--duration-fast) var(--ease-standard);
   flex: 0 0 auto;
 }
 
 .artifact-index-btn:hover {
-  background: color-mix(in srgb, var(--artifact-accent, var(--color-primary)) 12%, transparent);
+  background: color-mix(in srgb, var(--artifact-accent, var(--color-info)) 12%, transparent);
 }
 
 .artifact-index-btn.is-active {
-  background: color-mix(in srgb, var(--artifact-accent, var(--color-primary)) 85%, transparent);
+  background: color-mix(in srgb, var(--artifact-accent, var(--color-info)) 85%, transparent);
   color: var(--color-canvas);
 }
 
@@ -436,8 +437,8 @@
   width: 28px;
   height: 28px;
   border-radius: var(--radius-sm);
-  color: var(--artifact-accent, var(--color-primary));
-  background: color-mix(in srgb, var(--artifact-accent, var(--color-primary)) 14%, transparent);
+  color: var(--artifact-accent, var(--color-info));
+  background: color-mix(in srgb, var(--artifact-accent, var(--color-info)) 14%, transparent);
 }
 
 .artifact-index-row-copy {
@@ -544,7 +545,7 @@
 }
 
 .artifact-preview-error {
-  color: var(--color-semantic-down);
+  color: var(--color-danger-text);
 }
 
 /* Viewer status (reused by ArtifactBody loading/error states) */
@@ -554,7 +555,7 @@
   font-size: var(--text-sm);
 }
 .artifact-viewer-error {
-  color: var(--color-semantic-down);
+  color: var(--color-danger-text);
 }
 .artifact-viewer-body {
   min-width: 0;

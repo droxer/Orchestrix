@@ -241,4 +241,98 @@ describe("projectMessages artifact projection", () => {
     assert.equal(messages.filter((message) => message.kind === "agent").length, 0);
     assert.equal(messages.filter((message) => message.kind === "system").length, 1);
   });
+
+  it("uses the completed agent log when streamed output missed the final answer", () => {
+    const finalFrame = `${JSON.stringify({
+      type: "item.completed",
+      item: { type: "agent_message", text: "Final answer from Codex." },
+    })}\n${JSON.stringify({ type: "turn.completed" })}\n`;
+    const messages = projectMessages(session([
+      {
+        id: "ev_run",
+        type: "agent.started",
+        sessionId: "ses_1",
+        timestamp,
+        runId: "run_1",
+        agent: "codex",
+        role: "implementer",
+        mode: "action",
+      },
+      {
+        id: "ev_output",
+        type: "agent.output",
+        sessionId: "ses_1",
+        timestamp,
+        runId: "run_1",
+        agent: "codex",
+        stream: "stdout",
+        text: `${JSON.stringify({
+          type: "item.started",
+          item: { type: "command_execution", command: "npm test" },
+        })}\n`,
+      },
+      {
+        id: "ev_completed",
+        type: "agent.completed",
+        sessionId: "ses_1",
+        timestamp,
+        runId: "run_1",
+        agent: "codex",
+        status: "completed",
+        exitCode: 0,
+        agentLog: `[Codex Action Exit 0]\nstderr:\nReading additional input from stdin...\n\nstdout:\n${finalFrame}`,
+      },
+    ]), t);
+
+    const agent = messages.find((message) => message.kind === "agent");
+    assert.ok(agent && agent.kind === "agent");
+    assert.equal(agent.streaming, false);
+    assert.match(agent.stdout, /npm test/);
+    assert.match(agent.stdout, /Final answer from Codex/);
+    assert.match(agent.stderr, /Reading additional input/);
+  });
+
+  it("does not duplicate completed log output that was already streamed", () => {
+    const finalFrame = `${JSON.stringify({
+      type: "item.completed",
+      item: { type: "agent_message", text: "Already streamed." },
+    })}\n`;
+    const messages = projectMessages(session([
+      {
+        id: "ev_run",
+        type: "agent.started",
+        sessionId: "ses_1",
+        timestamp,
+        runId: "run_1",
+        agent: "codex",
+        role: "implementer",
+        mode: "action",
+      },
+      {
+        id: "ev_output",
+        type: "agent.output",
+        sessionId: "ses_1",
+        timestamp,
+        runId: "run_1",
+        agent: "codex",
+        stream: "stdout",
+        text: finalFrame,
+      },
+      {
+        id: "ev_completed",
+        type: "agent.completed",
+        sessionId: "ses_1",
+        timestamp,
+        runId: "run_1",
+        agent: "codex",
+        status: "completed",
+        exitCode: 0,
+        agentLog: `[Codex Action Exit 0]\nstdout:\n${finalFrame}`,
+      },
+    ]), t);
+
+    const agent = messages.find((message) => message.kind === "agent");
+    assert.ok(agent && agent.kind === "agent");
+    assert.equal(agent.stdout.match(/Already streamed/g)?.length, 1);
+  });
 });

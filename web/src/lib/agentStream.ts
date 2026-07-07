@@ -27,6 +27,10 @@ export function parseAgentStream(agent: AgentName, raw: string): AgentSegment[] 
   return parsePlain(raw);
 }
 
+export function userVisibleAgentSegments(segments: AgentSegment[]): AgentSegment[] {
+  return segments.filter((segment) => segment.kind === "text" || segment.kind === "status" || segment.kind === "narration");
+}
+
 export function emptyAgentStreamSegments(_agent: AgentName, _streaming: boolean, _t: TFunction): AgentSegment[] {
   return [];
 }
@@ -144,6 +148,11 @@ const TOOL_TARGET_KEYS = [
   "description",
 ] as const;
 
+function hasSegmentText(out: AgentSegment[], kind: "text" | "thinking", text: string): boolean {
+  const normalized = text.trim();
+  return out.some((segment) => segment.kind === kind && segment.text.trim() === normalized);
+}
+
 function toolTarget(input: Record<string, unknown>): string | undefined {
   for (const key of TOOL_TARGET_KEYS) {
     const value = input[key];
@@ -164,7 +173,7 @@ class TextBuffer {
 
   flush(out: AgentSegment[], kind: "text" | "thinking"): void {
     const trimmed = this.value.trimEnd();
-    if (trimmed) out.push({ kind, text: trimmed });
+    if (trimmed && !hasSegmentText(out, kind, trimmed)) out.push({ kind, text: trimmed });
     this.value = "";
   }
 }
@@ -219,8 +228,9 @@ function parseClaude(raw: string): AgentSegment[] {
       for (const item of content) {
         const block = asRecord(item);
         if (block.type === "text") {
+          const blockText = String(block.text ?? "");
           thinking.flush(out, "thinking");
-          text.push(String(block.text ?? ""));
+          if (blockText && !hasSegmentText(out, "text", blockText)) text.push(blockText);
         } else if (block.type === "tool_use") {
           text.flush(out, "text");
           thinking.flush(out, "thinking");
@@ -277,6 +287,11 @@ function parseCodex(raw: string): AgentSegment[] {
     }
     if (event.type === "error") {
       out.push(narration("agent_stream.codex_error", { message: String(event.message ?? "unknown") }, "bad"));
+      continue;
+    }
+    if (event.type === "agent_message") {
+      const text = textFromContent(event).trim();
+      if (text) out.push({ kind: "text", text });
       continue;
     }
     if (typeof event.type === "string" && event.type.startsWith("item.")) {

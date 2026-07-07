@@ -201,7 +201,7 @@
 
 .pref-error {
   margin: 0;
-  color: var(--color-semantic-down);
+  color: var(--color-danger-text);
   font-size: var(--text-xs);
 }
 

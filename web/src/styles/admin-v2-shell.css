@@ -1,6 +1,6 @@
 /* =====================================================================
    Admin Console v2  (adm-* namespace)
-   Operational control plane: white canvas, hairline grids, Geist Mono
+   Operational control plane: white canvas, hairline grids, sans-tabular
    numerals, cobalt action color. Shares PageHeader + view-toggle chrome
    with Backlog and Routine; pulse strip and attention rail are admin-only.
    ===================================================================== */
@@ -207,7 +207,7 @@
 
 .adm-pulse-value.tone-good { color: var(--color-semantic-up); }
 .adm-pulse-value.tone-info { color: var(--color-info); }
-.adm-pulse-value.tone-bad { color: var(--color-semantic-down); }
+.adm-pulse-value.tone-bad { color: var(--color-danger-text); }
 .adm-pulse-value.tone-neutral { color: var(--color-ink); }
 
 .adm-pulse-label {

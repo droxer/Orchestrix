@@ -37,6 +37,11 @@ import type { DerivedMessage } from "./components/MessageBlock";
 import { projectMessages } from "./components/MessageBlock";
 import type { AppRoute } from "./lib/viewTypes";
 import { visibleConversationArtifacts } from "./lib/conversationArtifacts";
+import {
+  canCancelConversationRun,
+  findActiveRunForSession,
+  isConversationRunInFlight,
+} from "./lib/conversationRunning";
 
 const AdminConsole = lazy(() => import("./components/AdminConsole").then((m) => ({ default: m.AdminConsole })));
 const BacklogPage = lazy(() => import("./components/BacklogPage").then((m) => ({ default: m.BacklogPage })));
@@ -183,7 +188,13 @@ export function App() {
   useSessionEvents(activeSession?.id, Boolean(user) && shouldTailSessionEvents(activeSession?.status));
 
   const selectedToken = selectedSandbox ? (tokens[selectedSandbox.id] ?? tokens[selectedEmployee]) : tokens[selectedEmployee];
-  const activeRun = activeSession ? selectedNode?.activeRuns.find((run) => run.sessionId === activeSession.id) : undefined;
+  const activeRun = findActiveRunForSession(selectedNode, activeSession?.id);
+  const conversationRunning = isConversationRunInFlight({
+    activeRun,
+    session: activeSession,
+    pendingSend: pendingUserMessage !== null,
+    dispatchingRun: isRunning,
+  });
   const messages = useMemo<DerivedMessage[]>(() => projectMessages(activeSession, t), [activeSession, t]);
   const displayMessages = useMemo<DerivedMessage[]>(() => {
     if (!pendingUserMessage) return messages;
@@ -385,6 +396,7 @@ export function App() {
     const raw = composerRef.current?.getText().trim() ?? "";
     if (!raw) return;
     if (!selectedEmployee) return;
+    if (conversationRunning) return;
     const { agent: routedAgent, goal } = routeComposerMessage(raw, activeAgent, agents);
     if (!goal) return;
     if (routedAgent !== activeAgent) setActiveAgent(routedAgent);
@@ -432,11 +444,12 @@ export function App() {
   }
 
   async function cancelActiveRun() {
-    if (!selectedSandbox || !activeRun) return;
+    if (!selectedSandbox || !activeSession) return;
+    if (!canCancelConversationRun({ activeRun, session: activeSession })) return;
     try {
       const session = await cancelRunMutation.mutateAsync({
         sandboxId: selectedSandbox.id,
-        sessionId: activeRun.sessionId,
+        sessionId: activeRun?.sessionId ?? activeSession.id,
         token: selectedToken,
         reason: t("cancel.reason"),
       });
@@ -464,6 +477,7 @@ export function App() {
     if (!activeSession) return;
     if (kind === "rerun") {
       if (!selectedEmployee) return;
+      if (conversationRunning) return;
       setIsRunning(true);
       try {
         const { sandbox, token } = await provisionEmployeeSandbox(selectedEmployee, selectedToken);
@@ -509,6 +523,7 @@ export function App() {
   async function sendHandoff() {
     if (!activeSession) return;
     if (!selectedEmployee) return;
+    if (conversationRunning) return;
     setIsRunning(true);
     try {
       const { sandbox, token } = await provisionEmployeeSandbox(selectedEmployee, selectedToken);
@@ -657,7 +672,7 @@ export function App() {
             onAgentPicked={setActiveAgent}
             onSend={handleComposerSend}
             onCancelRun={handleCancelRun}
-            running={Boolean(activeRun)}
+            running={conversationRunning}
           />
         )}
       </Suspense>

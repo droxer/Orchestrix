@@ -89,6 +89,44 @@ def test_task_create_update_and_claim_next(monkeypatch) -> None:
         assert claimed.json()["task"]["status"] == "running"
 
 
+def test_routine_create_defaults_next_run_when_omitted(monkeypatch) -> None:
+    class FixedDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return cls(2026, 7, 7)
+
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    monkeypatch.setattr(task_routes, "date", FixedDate)
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _create_user(client, "alice", employee_id="alice")
+
+        created = client.post("/tasks", json={
+            "title": "Daily routine",
+            "ownerEmployeeId": "alice",
+            "assigneeEmployeeId": "alice",
+            "isRoutine": True,
+            "routineCadence": "daily",
+        })
+
+        assert created.status_code == 201
+        task = created.json()
+        assert task["routineNextRunDate"] == "2026-07-07"
+        assert task["routineEnabled"] is True
+
+        explicit_unscheduled = client.post("/tasks", json={
+            "title": "Manual routine",
+            "ownerEmployeeId": "alice",
+            "assigneeEmployeeId": "alice",
+            "isRoutine": True,
+            "routineNextRunDate": "",
+        })
+
+        assert explicit_unscheduled.status_code == 201
+        assert "routineNextRunDate" not in explicit_unscheduled.json()
+
+
 def test_marking_task_done_completes_linked_running_session(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:

@@ -20,8 +20,9 @@ describe("taskBoardForm", () => {
   });
 
   it("detects equal routine forms", () => {
-    const a = emptyRoutineForm(user);
+    const a = emptyRoutineForm(user, new Date(2026, 6, 7, 9));
     const b: RoutineTaskFormState = { ...a, routineEnabled: false };
+    assert.equal(a.routineNextRunDate, "2026-07-07");
     assert.equal(taskBoardFormsEqual(a, a), true);
     assert.equal(taskBoardFormsEqual(a, b), false);
   });

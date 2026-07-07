@@ -7,40 +7,45 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Geist:wght@400..600&family=Geist+Mono:wght@400..500&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400..600&amp;family=Geist+Mono:wght@400..500&amp;display=swap"
       rel="stylesheet"
     />
     <style>
       :root {
-        --primary: #2f54eb;
-        --primary-active: #1e3bb8;
-        --primary-disabled: #c3cefb;
-        --brand-soft: #eef1fe;
-        --ink: #0a0a0a;
-        --body: #52525b;
-        --muted: #71717a;
-        --muted-soft: #a1a1aa;
-        --hairline: #e4e4e7;
-        --hairline-soft: #f0f0f0;
-        --canvas: #ffffff;
-        --surface-soft: #fafafa;
-        --surface-strong: #f4f4f5;
+        --primary: #3b5bdb;
+        --primary-active: #2f4bc4;
+        --primary-disabled: #c1cbf0;
+        --primary-dark: #7089ff;
+        --primary-dark-active: #8fa3ff;
+        --on-primary-dark: #08112e;
+        --brand-soft: #edeff8;
+        --brand-soft-dark: rgba(112, 137, 255, 0.14);
+        --ink: #171412;
+        --body: #57534e;
+        --muted: #79716b;
+        --muted-soft: #a8a29e;
+        --hairline: #eae5dd;
+        --hairline-soft: #f1ede6;
+        --canvas: #fdfcfa;
+        --surface-soft: #faf8f4;
+        --surface-strong: #f5f2ec;
         --surface-dark: #0d0c0a;
         --surface-dark-elevated: #1a1815;
         --on-primary: #ffffff;
         --on-dark: #ffffff;
         --on-dark-soft: #a1a1aa;
-        --success: #10b981;
+        --success: #15803d;
         --danger: #e5484d;
         --warning: #f5a623;
-        --info: #2f54eb;
-        --radius-sm: 4px;
+        --info: #5b6779;
+        --radius-xs: 3px;
+        --radius-sm: 5px;
         --radius-md: 6px;
         --radius-lg: 8px;
         --radius-xl: 10px;
         --radius-full: 9999px;
-        --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.04);
-        --shadow-lift: 0 0 0 1px rgba(10, 10, 10, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+        --shadow-soft: 0 1px 1px rgba(0, 0, 0, 0.03);
+        --shadow-lift: 0 0 0 1px rgba(23, 20, 18, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04);
         --max: 1080px;
         --sans: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
         --mono: "Geist Mono", "SFMono-Regular", Consolas, Menlo, monospace;
@@ -54,21 +59,23 @@
         background: var(--canvas);
         color: var(--ink);
         font-family: var(--sans);
-        font-size: 14px;
+        font-size: 13px;
         line-height: 1.5;
         -webkit-font-smoothing: antialiased;
       }
 
-      h1, h2, h3 { margin: 0; letter-spacing: -0.6px; }
+      h1, h2, h3 { margin: 0; letter-spacing: -0.022em; }
       button, input { font: inherit; }
       a { color: inherit; }
-      code, .mono { font-family: var(--mono); }
+      code { font-family: var(--mono); }
+      /* Numbers ride the sans (tabular) per the Linear model; mono is code-only. */
+      .mono { font-family: var(--sans); font-variant-numeric: tabular-nums; }
 
       .eyebrow {
-        font-family: var(--mono);
+        font-family: var(--sans);
         font-size: 11px;
         font-weight: 500;
-        letter-spacing: 0.04em;
+        letter-spacing: 0.05em;
         text-transform: uppercase;
         color: var(--muted);
       }
@@ -91,7 +98,7 @@
         height: 60px;
       }
       .brand { font-weight: 600; font-size: 16px; letter-spacing: -0.3px; }
-      .nav-links { display: flex; gap: 20px; margin-left: 8px; font-size: 14px; font-weight: 500; color: var(--body); }
+      .nav-links { display: flex; gap: 20px; margin-left: 8px; font-size: 13px; font-weight: 500; color: var(--body); }
       .nav-links a { text-decoration: none; }
       .nav-links a:hover { color: var(--ink); }
       .nav-actions { display: flex; gap: 8px; margin-left: auto; align-items: center; }
@@ -104,7 +111,7 @@
         border: 0;
         border-radius: var(--radius-sm);
         padding: 8px 16px;
-        font-size: 16px;
+        font-size: 13px;
         font-weight: 600;
         white-space: nowrap;
         cursor: pointer;
@@ -115,23 +122,24 @@
       .button--secondary { background: var(--surface-strong); color: var(--ink); }
       .button--ghost { background: transparent; color: var(--ink); }
       .button--ghost:hover { background: var(--surface-strong); }
+      .button--focus { box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 28%, transparent); }
       .link { color: var(--primary); font-weight: 550; text-decoration: underline; }
 
       .hero { padding: 72px 0 56px; }
-      .hero h1 { font-size: clamp(34px, 5vw, 52px); font-weight: 600; line-height: 1.06; letter-spacing: -1px; max-width: 18ch; }
+      .hero h1 { font-size: clamp(28px, 4vw, 40px); font-weight: 600; line-height: 1.08; letter-spacing: -0.4px; max-width: 18ch; }
       .hero p { max-width: 60ch; margin: 18px 0 0; color: var(--body); font-size: 16px; }
       .hero__actions { display: flex; gap: 12px; margin-top: 28px; }
 
       .section { padding: 56px 0; border-top: 1px solid var(--hairline); }
       .section-heading { margin-bottom: 28px; }
-      .section-heading h2 { font-size: 24px; font-weight: 600; line-height: 1.1; }
+      .section-heading h2 { font-size: 20px; font-weight: 600; line-height: 1.2; }
       .section-heading p { margin: 8px 0 0; color: var(--body); max-width: 60ch; }
 
       .swatch-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
       .swatch { border: 1px solid var(--hairline); border-radius: var(--radius-xl); overflow: hidden; background: var(--canvas); }
       .swatch__color { height: 72px; }
       .swatch__body { padding: 12px 14px; }
-      .swatch__body strong { display: block; font-size: 14px; font-weight: 600; }
+      .swatch__body strong { display: block; font-size: 13px; font-weight: 600; }
       .swatch__body code { color: var(--muted); font-size: 12px; }
       .swatch__body span { color: var(--muted-soft); font-size: 12px; }
 
@@ -142,15 +150,15 @@
 
       .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
       .panel { border: 1px solid var(--hairline); border-radius: var(--radius-xl); padding: 20px; background: var(--canvas); }
-      .panel h3 { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
+      .panel h3 { font-size: 15px; font-weight: 600; margin-bottom: 16px; }
       .stack { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 
-      .input { width: 100%; height: 40px; border: 1px solid var(--hairline); border-radius: var(--radius-md); padding: 9px 12px; color: var(--ink); background: var(--canvas); font-size: 14px; }
+      .input { width: 100%; height: 40px; border: 1px solid var(--hairline); border-radius: var(--radius-md); padding: 9px 12px; color: var(--ink); background: var(--canvas); font-size: 16px; }
       .input:focus { outline: 0; border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent); }
-      .search { width: 100%; height: 38px; border: 0; border-radius: var(--radius-md); padding: 8px 12px; background: var(--surface-strong); color: var(--ink); font-size: 14px; }
+      .search { width: 100%; height: 38px; border: 0; border-radius: var(--radius-md); padding: 8px 12px; background: var(--surface-strong); color: var(--ink); font-size: 16px; }
 
       .badge { display: inline-flex; align-items: center; gap: 6px; height: 24px; border: 1px solid var(--hairline); border-radius: var(--radius-sm); padding: 0 9px; color: var(--body); font-size: 12px; font-weight: 600; background: transparent; }
-      .badge-mono { font-family: var(--mono); font-weight: 500; letter-spacing: 0.02em; color: var(--muted); }
+      .badge-mono { font-family: var(--sans); font-variant-numeric: tabular-nums; font-weight: 500; letter-spacing: 0.02em; color: var(--muted); }
       .dot { width: 8px; height: 8px; border-radius: var(--radius-full); display: inline-block; }
       .dot--up { background: var(--success); }
       .dot--down { background: var(--danger); }
@@ -160,35 +168,41 @@
       /* Operational chat surface */
       .apps { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
       .app { border: 1px solid var(--app-ln); border-radius: var(--radius-xl); overflow: hidden; background: var(--app-bg); }
-      .app--light { --app-bg: #fff; --app-ln: #e4e4e7; --app-head: #fafafa; --app-ink: #0a0a0a; --app-body: #52525b; --app-soft: #fafafa; --app-tool: #f4f4f5; }
-      .app--dark { --app-bg: #0d0c0a; --app-ln: #1e1e22; --app-head: #1a1815; --app-ink: #f4f4f5; --app-body: #a1a1aa; --app-soft: #1a1815; --app-tool: #15151a; }
+      .app--light { --app-bg: #fdfcfa; --app-ln: #eae5dd; --app-head: #faf8f4; --app-ink: #171412; --app-body: #57534e; --app-soft: #faf8f4; --app-tool: #f5f2ec; --app-selection: #edeff8; --app-primary: #3b5bdb; --app-info: #5b6779; --app-success: #15803d; }
+      .app--dark { --app-bg: #0d0c0a; --app-ln: #26231e; --app-head: #1a1815; --app-ink: #f4f2ee; --app-body: #a1a1aa; --app-soft: #1a1815; --app-tool: #15140f; --app-selection: rgba(112, 137, 255, 0.14); --app-primary: #7089ff; --app-info: #8c98ac; --app-success: #34d399; }
       .tool-line { font-family: var(--mono); font-size: 12px; padding: 7px 10px; border-radius: var(--radius-md); background: var(--app-tool); color: var(--app-body); }
       .rcard { border: 1px solid var(--app-ln); border-radius: var(--radius-lg); background: var(--app-soft); padding: 11px 12px; }
-      .rcard-h { font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--app-ink); margin-bottom: 3px; }
+      .rcard-h { display: flex; align-items: center; gap: 6px; font-family: var(--sans); font-size: 12px; font-weight: 500; color: var(--app-ink); margin-bottom: 3px; }
       .rcard-p { font-size: 12px; color: var(--app-body); }
-      .app-badge { margin-left: auto; font-family: var(--mono); font-size: 11px; border: 1px solid var(--app-ln); border-radius: var(--radius-sm); padding: 2px 8px; color: var(--app-body); }
+      .app-badge { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; font-family: var(--sans); font-size: 11px; border: 1px solid var(--app-ln); border-radius: var(--radius-sm); padding: 2px 8px; color: var(--app-body); }
+      .app-dot { width: 7px; height: 7px; border-radius: var(--radius-full); display: inline-block; }
+      .app-dot--success { background: var(--app-success); }
+      .app-dot--info { background: var(--app-info); }
       .ops-shell { display: grid; grid-template-columns: 142px minmax(0, 1fr); min-height: 286px; }
       .ops-nav { display: flex; flex-direction: column; gap: 4px; border-right: 1px solid var(--app-ln); background: var(--app-head); padding: 10px; }
       .ops-brand { display: flex; align-items: center; gap: 8px; height: 32px; margin-bottom: 6px; color: var(--app-ink); font-weight: 600; }
       .ops-mark { display: grid; width: 24px; height: 24px; place-items: center; border-radius: var(--radius-md); background: var(--app-tool); font-family: var(--mono); font-size: 12px; }
       .ops-nav-item { display: flex; align-items: center; gap: 8px; height: 30px; border-radius: var(--radius-sm); padding: 0 8px; color: var(--app-body); font-size: 12px; font-weight: 500; }
       .ops-nav-item::before { content: ""; width: 10px; height: 10px; border: 1px solid currentColor; border-radius: 3px; opacity: 0.7; }
-      .ops-nav-item.is-active { background: var(--app-tool); color: var(--app-ink); }
+      .ops-nav-item.is-active { background: var(--app-selection); color: var(--app-ink); }
       .ops-nav-divider { height: 1px; margin: 6px 0; background: var(--app-ln); }
       .ops-main { display: grid; grid-template-rows: auto 1fr; min-width: 0; }
       .ops-top { display: flex; align-items: center; gap: 8px; height: 48px; border-bottom: 1px solid var(--app-ln); padding: 0 14px; background: var(--app-bg); }
       .ops-title { color: var(--app-ink); font-size: 13px; font-weight: 600; }
       .ops-content { display: grid; gap: 10px; padding: 14px; }
       .ops-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; border: 1px solid var(--app-ln); border-radius: var(--radius-lg); background: var(--app-soft); padding: 10px 12px; }
+      .ops-row.is-selected { background: var(--app-selection); border-color: color-mix(in srgb, var(--app-primary) 24%, var(--app-ln)); }
       .ops-row-title { color: var(--app-ink); font-size: 13px; font-weight: 600; }
-      .ops-row-meta { color: var(--app-body); font-family: var(--mono); font-size: 11px; }
+      .ops-row-meta { color: var(--app-body); font-family: var(--sans); font-size: 11px; }
       .ops-note { color: var(--app-body); font-size: 12px; line-height: 1.45; }
 
       .pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
       .pricing-card { border: 1px solid var(--hairline); border-radius: var(--radius-xl); padding: 24px; background: var(--canvas); }
       .pricing-card--featured { background: var(--surface-dark); color: var(--on-dark); border-color: var(--surface-dark); }
-      .pricing-card h3 { font-size: 16px; font-weight: 600; }
-      .price { font-family: var(--mono); font-size: 28px; font-weight: 500; margin: 16px 0 4px; letter-spacing: -0.5px; }
+      .pricing-card--featured .button--primary { background: var(--primary-dark); color: var(--on-primary-dark); }
+      .pricing-card--featured .button--primary:hover { background: var(--primary-dark-active); }
+      .pricing-card h3 { font-size: 15px; font-weight: 600; }
+      .price { font-family: var(--sans); font-variant-numeric: tabular-nums; font-size: 30px; font-weight: 500; margin: 16px 0 4px; letter-spacing: -0.028em; }
       .pricing-card ul { list-style: none; padding: 0; margin: 18px 0; display: grid; gap: 9px; font-size: 13px; color: var(--body); }
       .pricing-card--featured ul { color: var(--on-dark-soft); }
 
@@ -230,9 +244,9 @@
           <span class="eyebrow">Precision control plane</span>
           <h1 style="margin-top: 12px">Orchestrate agents with cobalt precision.</h1>
           <p>
-            A preview of the Relay design language: white canvas, cobalt (#2f54eb) as the single brand
-            action color, Geist Mono as the identity signal, tight geometry, and the remaining color
-            reserved for status. In the Linear / Vercel / Resend lineage.
+            A preview of the Relay design language: warm ecru canvas, cobalt (#3b5bdb) for action,
+            selection, and focus only, Geist Sans across UI and chrome (mono reserved for code), tight geometry, and slate
+            info/status cues. Linear's structural discipline, in the Linear / Vercel / Resend lineage.
           </p>
           <div class="hero__actions">
             <a class="button button--primary" href="#tokens">Review tokens</a>
@@ -244,18 +258,18 @@
       <section class="section" id="tokens">
         <div class="container">
           <div class="section-heading">
-            <h2>Cobalt action, color for status.</h2>
-            <p>Cobalt carries every action and lifts to periwinkle in dark mode. The remaining hues are status — success, danger, warning; the former info blue folds into the brand.</p>
+            <h2>Cobalt for action, selection, and focus.</h2>
+            <p>Cobalt carries every action and lifts to periwinkle in dark mode. The remaining hues are status — success, danger, warning; "info" is now a neutral cool slate, decoupled from the action so the brand hue marks action, selection, and focus only.</p>
           </div>
           <div class="swatch-grid">
-            <article class="swatch"><div class="swatch__color" style="background: var(--primary)"></div><div class="swatch__body"><strong>Cobalt / Action</strong><code>#2f54eb</code></div></article>
-            <article class="swatch"><div class="swatch__color" style="background: var(--surface-strong)"></div><div class="swatch__body"><strong>Surface Strong</strong><code>#f4f4f5</code></div></article>
-            <article class="swatch"><div class="swatch__color" style="background: var(--surface-dark)"></div><div class="swatch__body"><strong>Surface Dark</strong><code>#0b0b0d</code></div></article>
-            <article class="swatch"><div class="swatch__color" style="background: var(--hairline)"></div><div class="swatch__body"><strong>Hairline</strong><code>#e4e4e7</code></div></article>
-            <article class="swatch"><div class="swatch__color" style="background: var(--success)"></div><div class="swatch__body"><strong>Success</strong><code>#10b981</code><span>status only</span></div></article>
+            <article class="swatch"><div class="swatch__color" style="background: var(--primary)"></div><div class="swatch__body"><strong>Cobalt / Action</strong><code>#3b5bdb</code></div></article>
+            <article class="swatch"><div class="swatch__color" style="background: var(--surface-strong)"></div><div class="swatch__body"><strong>Surface Strong</strong><code>#f5f2ec</code></div></article>
+            <article class="swatch"><div class="swatch__color" style="background: var(--surface-dark)"></div><div class="swatch__body"><strong>Surface Dark</strong><code>#0d0c0a</code></div></article>
+            <article class="swatch"><div class="swatch__color" style="background: var(--hairline)"></div><div class="swatch__body"><strong>Hairline</strong><code>#eae5dd</code></div></article>
+            <article class="swatch"><div class="swatch__color" style="background: var(--success)"></div><div class="swatch__body"><strong>Success</strong><code>#15803d</code><span>status only</span></div></article>
             <article class="swatch"><div class="swatch__color" style="background: var(--danger)"></div><div class="swatch__body"><strong>Danger</strong><code>#e5484d</code><span>status only</span></div></article>
-            <article class="swatch"><div class="swatch__color" style="background: var(--warning)"></div><div class="swatch__body"><strong>Warning</strong><code>#f5a623</code><span>dot only</span></div></article>
-            <article class="swatch"><div class="swatch__color" style="background: var(--brand-soft)"></div><div class="swatch__body"><strong>Brand Soft</strong><code>#eef1fe</code><span>selected / active tint</span></div></article>
+            <article class="swatch"><div class="swatch__color" style="background: var(--info)"></div><div class="swatch__body"><strong>Info / Slate</strong><code>#5b6779</code><span>status · decoupled</span></div></article>
+            <article class="swatch"><div class="swatch__color" style="background: var(--brand-soft)"></div><div class="swatch__body"><strong>Brand Soft</strong><code>#edeff8</code><span>selected / active tint</span></div></article>
           </div>
         </div>
       </section>
@@ -263,28 +277,28 @@
       <section class="section" id="type">
         <div class="container">
           <div class="section-heading">
-            <h2>Weighted-sans display, mono signal.</h2>
-            <p>Display is Geist 600 with tight tracking — no serif. Eyebrows, metadata, and numbers render in Geist Mono.</p>
+            <h2>Weighted-sans display, sans chrome.</h2>
+            <p>Display is Geist 600 with tight, size-scaling tracking (−0.022em → −0.028em) and modest sizes — no serif. Eyebrows, metadata, and numbers render in Geist Sans (the Linear model); mono is reserved for tool lines, logs, code, and IDs. Base UI text is 13px.</p>
           </div>
           <div class="type-row">
             <span class="type-name">display-lg</span>
-            <p class="type-sample" style="font-size: 34px; font-weight: 600; letter-spacing: -0.6px">Fleet overview</p>
-            <span class="type-detail">34 / 600</span>
+            <p class="type-sample" style="font-size: 26px; font-weight: 600; letter-spacing: -0.022em">Fleet overview</p>
+            <span class="type-detail">26 / 600</span>
           </div>
           <div class="type-row">
             <span class="type-name">title-md</span>
-            <p class="type-sample" style="font-size: 18px; font-weight: 600">Component titles and panel headings</p>
-            <span class="type-detail">18 / 600</span>
+            <p class="type-sample" style="font-size: 17px; font-weight: 600">Component titles and panel headings</p>
+            <span class="type-detail">17 / 600</span>
           </div>
           <div class="type-row">
             <span class="type-name">eyebrow</span>
             <p class="type-sample eyebrow" style="font-size: 11px">claude · action</p>
-            <span class="type-detail">mono 11 / 500</span>
+            <span class="type-detail">sans 11 / 500</span>
           </div>
           <div class="type-row">
             <span class="type-name">number-display</span>
-            <p class="type-sample mono" style="font-size: 36px; font-weight: 500; letter-spacing: -0.5px">128.4k</p>
-            <span class="type-detail">mono 36 / 500</span>
+            <p class="type-sample mono" style="font-size: 30px; font-weight: 500; letter-spacing: -0.028em">128.4k</p>
+            <span class="type-detail">sans 30 / 500 · tabular</span>
           </div>
         </div>
       </section>
@@ -293,7 +307,7 @@
         <div class="container">
           <div class="section-heading">
             <h2>Component checks.</h2>
-            <p>Tight 4–10px geometry, hairline depth, status-only color, underlined links. Buttons at 16px/600.</p>
+            <p>Tight 5–10px geometry, hairline depth, status-only color, underlined links. Buttons at 13px/600.</p>
           </div>
           <div class="grid-3">
             <article class="panel">
@@ -301,6 +315,7 @@
               <div class="stack">
                 <button class="button button--primary" type="button">Approve</button>
                 <button class="button button--secondary" type="button">Secondary</button>
+                <button class="button button--secondary button--focus" type="button">Focused</button>
                 <button class="button button--primary" type="button" disabled>Disabled</button>
               </div>
               <div class="stack" style="margin-top: 12px"><a class="link" href="#components">View diff</a></div>
@@ -355,7 +370,7 @@
                     <span class="app-badge">3 agents</span>
                   </div>
                   <div class="ops-content">
-                    <div class="ops-row">
+                    <div class="ops-row is-selected">
                       <div>
                         <div class="ops-row-title">#refactor-token-store</div>
                         <div class="ops-row-meta">claude · action</div>
@@ -364,8 +379,8 @@
                     </div>
                     <div class="tool-line">⏺ edit session-store.ts · +84 −31</div>
                     <div class="rcard">
-                      <div class="rcard-h">codex · review</div>
-                      <div class="rcard-p">Verdict <b style="color: var(--success)">approved</b>. Clean separation, no behavior change.</div>
+                      <div class="rcard-h"><span class="app-dot app-dot--info"></span>codex · review</div>
+                      <div class="rcard-p">Verdict <b style="color: var(--app-success)">approved</b>. Clean separation, no behavior change.</div>
                     </div>
                     <div class="ops-note">Full-page routes use the same rail and collapse the thread pane to focus the selected work surface.</div>
                   </div>
@@ -387,12 +402,12 @@
                 </nav>
                 <div class="ops-main">
                   <div class="ops-top">
-                    <span class="dot" style="background: #2ed391"></span>
+                    <span class="app-dot app-dot--success"></span>
                     <span class="ops-title">Threads</span>
                     <span class="app-badge">3 agents</span>
                   </div>
                   <div class="ops-content">
-                    <div class="ops-row">
+                    <div class="ops-row is-selected">
                       <div>
                         <div class="ops-row-title">#refactor-token-store</div>
                         <div class="ops-row-meta">claude · action</div>
@@ -401,10 +416,10 @@
                     </div>
                     <div class="tool-line">⏺ edit session-store.ts · +84 −31</div>
                     <div class="rcard">
-                      <div class="rcard-h">codex · review</div>
-                      <div class="rcard-p">Verdict <b style="color: #2ed391">approved</b>. Clean separation, no behavior change.</div>
+                      <div class="rcard-h"><span class="app-dot app-dot--info"></span>codex · review</div>
+                      <div class="rcard-p">Verdict <b style="color: var(--app-success)">approved</b>. Clean separation, no behavior change.</div>
                     </div>
-                    <div class="ops-note">Cobalt actions lift to periwinkle in dark mode; status remains dot, text, or border only.</div>
+                    <div class="ops-note">Selected rows use the cobalt soft tint. Review/info cues use slate, while status remains dot, text, or border only.</div>
                   </div>
                 </div>
               </div>
@@ -430,7 +445,7 @@
               <h3>Team</h3>
               <div class="price">$29</div>
               <ul><li>Governed approvals</li><li>Read-only API surface</li><li>Agent readiness checks</li></ul>
-              <button class="button button--primary" type="button" style="background: var(--on-dark); color: var(--surface-dark)">Start</button>
+              <button class="button button--primary" type="button">Start</button>
             </article>
             <article class="pricing-card">
               <h3>Enterprise</h3>

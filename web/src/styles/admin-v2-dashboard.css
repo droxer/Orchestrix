@@ -1,6 +1,6 @@
 /* =====================================================================
    Admin Dashboard  (adm-dash-* namespace)
-   Editorial control-room overview: oversized Geist Mono numerals,
+   Editorial control-room overview: oversized sans-tabular numerals,
    hairline grids, monochrome ink actions. Reuses the admin-v2
    tokens so the page reads as the same product as People and Fleet.
    ===================================================================== */
@@ -99,7 +99,7 @@
   font-size: clamp(2.5rem, 4vw, 3.25rem);
   font-weight: 500;
   line-height: 1;
-  letter-spacing: -0.02em;
+  letter-spacing: var(--letter-number-fluid);
 }
 
 .adm-dash-tile-foot {
@@ -125,11 +125,11 @@
 }
 
 .adm-dash-delta.tone-up { color: var(--color-semantic-up); }
-.adm-dash-delta.tone-down { color: var(--color-semantic-down); }
+.adm-dash-delta.tone-down { color: var(--color-danger-text); }
 .adm-dash-delta.tone-flat { color: var(--color-muted); }
 
 .adm-dash-spark {
-  color: var(--color-primary);
+  color: var(--color-info);
   display: block;
 }
 
@@ -348,6 +348,9 @@
 }
 
 .adm-dash-bar-seg:last-child { border-right: none; }
+/* Data-viz exception to "hue is status text/dot only, never fills": a stacked
+   bar segment IS the datum, so it takes the status hue as its fill. Scoped to
+   the chart; canvas chrome elsewhere keeps status to text and dots. */
 .adm-dash-bar-seg.tone-good { background: var(--color-semantic-up); }
 .adm-dash-bar-seg.tone-info { background: var(--color-info); }
 .adm-dash-bar-seg.tone-bad  { background: var(--color-semantic-down); }
@@ -410,7 +413,7 @@
 
 .adm-dash-stat.tone-good { color: var(--color-semantic-up); }
 .adm-dash-stat.tone-info { color: var(--color-info); }
-.adm-dash-stat.tone-bad  { color: var(--color-semantic-down); }
+.adm-dash-stat.tone-bad  { color: var(--color-danger-text); }
 .adm-dash-stat.tone-muted { color: var(--color-muted); }
 
 .adm-dash-stat-value {

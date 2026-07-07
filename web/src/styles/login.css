@@ -182,7 +182,8 @@
   padding: var(--space-sm) var(--space-base);
   border-left: 2px solid var(--color-semantic-down);
   background: color-mix(in srgb, var(--color-semantic-down) 8%, var(--color-canvas));
-  color: var(--color-semantic-down);
+  /* Text-safe red — the raw dot value fails ~3.4:1 as 13px copy. */
+  color: var(--color-danger-text);
   font-size: var(--text-sm);
   line-height: var(--leading-normal);
 }

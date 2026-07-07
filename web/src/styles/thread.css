@@ -330,7 +330,7 @@
 
 .conversation-activity.working em {
   font-style: italic;
-  color: var(--color-primary);
+  color: var(--color-info);
   font-weight: 500;
 }
 
@@ -382,7 +382,7 @@
   align-items: baseline;
   gap: var(--space-xs);
   padding: var(--space-xs) var(--space-base) var(--space-xxs);
-  font: var(--type-meta-mono);
+  font: var(--type-meta);
   letter-spacing: var(--letter-caps-wide);
   text-transform: uppercase;
   color: var(--color-muted);

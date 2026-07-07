@@ -11,12 +11,12 @@ import "../styles.css";
 
 import { Providers } from "./providers";
 
-// Unified Geist superfamily — Geist Sans carries UI and display text;
-// Geist Mono is the identity signal for eyebrows, metadata, agent
-// labels, numbers, and code. One harmonized family gives the UI a
-// cool, terminal-grade instrument-panel character. latin-ext widens
-// coverage to accented European/Vietnamese names in employee and
-// sandbox labels.
+// Unified Geist superfamily — Geist Sans carries UI, display, and chrome
+// text (eyebrows, metadata, agent labels, numbers) per the Linear model.
+// Geist Mono is reserved for code-like content: tool/command lines, raw
+// logs, code blocks, and IDs. One harmonized family keeps the two cuts in
+// register. latin-ext widens coverage to accented European/Vietnamese
+// names in employee and sandbox labels.
 const appSans = Geist({
   subsets: ["latin", "latin-ext"],
   variable: "--font-app-sans",

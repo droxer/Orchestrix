@@ -45,6 +45,100 @@ export function isGroupedContinuation(messages: DerivedMessage[], index: number)
   return false;
 }
 
+function streamsFromAgentLog(agentLog: string): { stdout: string; stderr: string } {
+  if (!agentLog.trim()) return { stdout: "", stderr: "" };
+  const matches = Array.from(agentLog.matchAll(/(?:^|\n)(stdout|stderr):\n/g));
+  if (matches.length === 0) return { stdout: "", stderr: agentLog };
+
+  const streams = { stdout: "", stderr: "" };
+  for (let i = 0; i < matches.length; i += 1) {
+    const match = matches[i];
+    const stream = match[1] as "stdout" | "stderr";
+    const contentStart = (match.index ?? 0) + match[0].length;
+    const contentEnd = i + 1 < matches.length ? matches[i + 1].index ?? agentLog.length : agentLog.length;
+    streams[stream] += agentLog.slice(contentStart, contentEnd);
+  }
+  return streams;
+}
+
+function appendMissingStream(current: string, fallback: string): string {
+  if (!fallback.trim()) return current;
+  const trimmed = fallback.trim();
+  if (current.includes(fallback) || current.includes(trimmed)) return current;
+  const separator = current && !current.endsWith("\n") && !fallback.startsWith("\n") ? "\n" : "";
+  return `${current}${separator}${fallback}`;
+}
+
+function safeJsonLine(line: string): Record<string, unknown> | null {
+  try {
+    const value = JSON.parse(line) as unknown;
+    return value && typeof value === "object" ? value as Record<string, unknown> : null;
+  } catch {
+    return null;
+  }
+}
+
+function recordText(value: unknown): string {
+  if (!value || typeof value !== "object") return "";
+  const record = value as Record<string, unknown>;
+  if (typeof record.text === "string") return record.text;
+  if (typeof record.content === "string") return record.content;
+  if (!Array.isArray(record.content)) return "";
+  return record.content
+    .map((chunk) => {
+      if (!chunk || typeof chunk !== "object") return "";
+      const item = chunk as Record<string, unknown>;
+      if (typeof item.text === "string") return item.text;
+      if (typeof item.content === "string") return item.content;
+      return "";
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
+function visibleLogText(stdout: string, stderr: string): string {
+  const lines = stdout.split(/\r?\n/);
+  const text: string[] = [];
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    const event = safeJsonLine(line);
+    if (!event) {
+      text.push(line);
+      continue;
+    }
+    if (typeof event.type === "string" && event.type.startsWith("item.")) {
+      const item = event.item && typeof event.item === "object" ? event.item as Record<string, unknown> : {};
+      if (item.type === "agent_message" && event.type === "item.completed") {
+        const itemText = recordText(item).trim();
+        if (itemText) text.push(itemText);
+      }
+      continue;
+    }
+    if (event.type === "assistant") {
+      const messageText = recordText(event.message).trim();
+      if (messageText) text.push(messageText);
+      continue;
+    }
+    if (event.type === "message" || event.type === "assistant_message" || event.role === "assistant") {
+      const message = event.message && typeof event.message === "object" ? event.message : event;
+      const messageText = recordText(message).trim();
+      if (messageText) text.push(messageText);
+    }
+  }
+  return [...text, stderr.trim()].filter(Boolean).join("\n").trim();
+}
+
+function applyCompletedLogFallback(state: { stdout: string; stderr: string }, agentLog: string): void {
+  const fallback = streamsFromAgentLog(agentLog);
+  const fallbackVisible = visibleLogText(fallback.stdout, fallback.stderr);
+  if (!fallbackVisible) return;
+  const currentVisible = visibleLogText(state.stdout, state.stderr);
+  if (currentVisible.includes(fallbackVisible)) return;
+  state.stdout = appendMissingStream(state.stdout, fallback.stdout);
+  state.stderr = appendMissingStream(state.stderr, fallback.stderr);
+}
+
 export function projectMessages(session: RelaySession | undefined, t: TFunction): DerivedMessage[] {
   if (!session) return [];
   const out: DerivedMessage[] = [];
@@ -166,11 +260,20 @@ export function projectMessages(session: RelaySession | undefined, t: TFunction)
         break;
       }
       case "agent.completed": {
+        const index = ensureRun(event.runId, event.agent, event.timestamp);
         const state = runState.get(event.runId);
         if (state) {
-          const block = out[state.index];
+          if (event.agentLog) {
+            applyCompletedLogFallback(state, event.agentLog);
+          }
+          const block = out[index];
           if (block.kind === "agent") {
-            out[state.index] = { ...block, streaming: false };
+            out[index] = {
+              ...block,
+              streaming: false,
+              stdout: state.stdout,
+              stderr: state.stderr,
+            };
           }
         }
         break;

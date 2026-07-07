@@ -55,7 +55,7 @@
 
 .chat-title-status {
   padding: 1px 7px;
-  font: var(--type-meta-mono);
+  font: var(--type-meta);
   font-weight: 500;
   text-transform: none;
 }
@@ -104,7 +104,7 @@
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-sm);
   color: var(--color-muted);
-  font: var(--type-meta-mono);
+  font: var(--type-meta);
   white-space: nowrap;
 }
 
@@ -171,7 +171,7 @@
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   color: var(--color-body);
-  font: var(--type-meta-mono);
+  font: var(--type-meta);
   background: transparent;
   white-space: nowrap;
 }
@@ -209,7 +209,7 @@
 }
 
 .header-agent-tabs button.agent-tab-failed {
-  color: var(--color-semantic-down);
+  color: var(--color-danger-text);
 }
 
 .transcript {
@@ -345,22 +345,21 @@
   gap: var(--space-xs);
 }
 
-/* Agent-turn eyebrow — Geist Mono is the identity signal (design-system.md
-   agent-turn / chat-panel: "mono eyebrows", {typography.meta-mono} 12px). The
-   header was drifting to 13/14px sans; meta-mono realigns it to the documented
-   agent-label role and keeps it in family with the mono timestamp beside it. */
+/* Agent-turn eyebrow — the agent label + timestamp in --type-meta (12px sans,
+   the Linear model: chrome text rides the sans, mono is reserved for tool
+   lines and code). The mono tool `⏺` lines below carry the code-like signal. */
 .msg header {
   display: flex;
   align-items: baseline;
   gap: var(--space-sm);
   padding: 0;
   color: var(--color-muted);
-  font: var(--type-meta-mono);
+  font: var(--type-meta);
 }
 
 .msg header > span:first-child {
   color: var(--color-ink);
-  font: var(--type-meta-mono);
+  font: var(--type-meta);
 }
 
 .msg header .agent-title {
@@ -370,7 +369,7 @@
 }
 
 /* The mode half of the agent-turn eyebrow (`claude · action`). The agent name
-   stays ink; the mode token drops to muted so the pair reads as one mono label
+   stays ink; the mode token drops to muted so the pair reads as one label
    without competing for weight (design-system.md agent-turn). A leading `·`
    binds it to the name. */
 .msg header .agent-mode {
@@ -381,10 +380,9 @@
   content: "· ";
 }
 
-/* A review turn earns the one hue in the eyebrow — an info-blue status dot and
-   label, mirroring the composer's Review mode chip — so reviews read distinctly
-   from the run of action turns. Status color only; never an action fill
-   (design-system.md: info is status-only, the Review mode chip). */
+/* A review turn earns a slate info dot and label so reviews read distinctly
+   from action turns without borrowing the cobalt action hue. Status color only;
+   never an action fill. */
 .msg header .agent-mode[data-mode="review"] {
   display: inline-flex;
   align-items: center;
@@ -412,7 +410,7 @@
    eyebrow carry attribution; the text is plain ink, medium weight, so the
    human instruction reads as a peer turn in the same thread as the agents. */
 .msg-user .turn-who {
-  font: var(--type-meta-mono);
+  font: var(--type-meta);
   letter-spacing: var(--letter-caps-wide);
   text-transform: uppercase;
   color: var(--color-ink);

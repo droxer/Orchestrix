@@ -68,14 +68,23 @@ def routine_fields(body: dict[str, Any], *, current: dict[str, Any] | None = Non
         raise HTTPException(400, "routineType must be one of: task, job.")
     if "routineCadence" in body and body.get("routineCadence") and not cadence:
         raise HTTPException(400, "routineCadence must be one of: daily, weekly, monthly, custom.")
-    next_run = date_field(body, "routineNextRunDate") if "routineNextRunDate" in body else None
+    has_next_run_input = "routineNextRunDate" in body
+    next_run = date_field(body, "routineNextRunDate") if has_next_run_input else None
     next_is_routine = bool(is_routine if is_routine is not None else current.get("isRoutine") if current else True)
+    next_enabled = enabled if enabled is not None else (bool((current or {}).get("routineEnabled")) if current else next_is_routine)
+    if (
+        not has_next_run_input
+        and next_is_routine
+        and next_enabled
+        and (current is None or (enabled is True and not current.get("routineNextRunDate")))
+    ):
+        next_run = date.today().isoformat()
     return {
         "isRoutine": is_routine if is_routine is not None else next_is_routine,
         "routineType": routine_type or (current or {}).get("routineType") or "task",
         "routineCadence": cadence or (current or {}).get("routineCadence") or "weekly",
         "routineNextRunDate": next_run,
-        "routineEnabled": enabled if enabled is not None else (bool((current or {}).get("routineEnabled")) if current else next_is_routine),
+        "routineEnabled": next_enabled,
     }
 
 

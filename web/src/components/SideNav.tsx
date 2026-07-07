@@ -81,7 +81,13 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
     setSettingsMenu((current) => {
       if (current) return null;
       const rect = el.getBoundingClientRect();
-      return { x: rect.right + 10, y: rect.top - 8 };
+      // Collapsed: fly out to the right of the icon (like the nav tooltips).
+      // Expanded: the button is full-width, so align the menu to its left edge
+      // and rise above it — otherwise rect.right lands out in the main content
+      // area and the menu overlaps the page (e.g. the admin dashboard).
+      return sidenavExpanded
+        ? { x: rect.left, y: rect.top - 8 }
+        : { x: rect.right + 10, y: rect.top - 8 };
     });
   }
   function openPreferences() {
