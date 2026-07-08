@@ -41,7 +41,8 @@ Options:
   --admin-token <token>     Admin bearer token (also RELAY_ADMIN_TOKEN).
   --workspace-root <path>   Root for local employee workspaces.
   --provider <name>         "local" or "command" (default: local).
-  --sandbox <mode>          Local provider sandbox mode: "none" or "boxlite".
+  --sandbox <mode>          Local provider sandbox mode: "none" or "boxlite"
+                            (default: boxlite).
   --command <template>      Command provider template.
   --interval-ms <ms>        Reconcile interval (default: 10000).
   --once                    Run one reconcile pass and exit.
@@ -164,7 +165,7 @@ function buildLauncher(args: SupervisorCliArgs, backendUrl: string, workspaceRoo
 
 function sandboxModeFromEnv(): "none" | "boxlite" {
   const value = process.env.RELAY_SANDBOX_MODE;
-  return value === "boxlite" ? "boxlite" : "none";
+  return value === "none" ? "none" : "boxlite";
 }
 
 function requiredValue(argv: string[], index: number, flag: string): string {

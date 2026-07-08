@@ -33,7 +33,7 @@ export class LocalDaemonLauncher implements DaemonLauncher {
   constructor(options: LocalDaemonLauncherOptions) {
     this.backendUrl = options.backendUrl.replace(/\/+$/, "");
     this.workspaceRoot = options.workspaceRoot;
-    this.sandboxMode = options.sandboxMode ?? "none";
+    this.sandboxMode = options.sandboxMode ?? "boxlite";
     this.command = options.command ?? "relay-daemon";
     this.logger = options.logger;
   }

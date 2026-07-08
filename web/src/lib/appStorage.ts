@@ -55,8 +55,8 @@ export function resolveTheme(theme: Theme): ResolvedTheme {
 }
 
 const THEME_COLOR_BY_THEME: Record<ResolvedTheme, string> = {
-  light: "#fdfcfa",
-  dark: "#0d0c0a",
+  light: "#fcfcfd",
+  dark: "#0f1011",
   contrast: "#ffffff",
   "contrast-dark": "#000000",
 };

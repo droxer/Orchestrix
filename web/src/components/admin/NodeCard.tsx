@@ -150,6 +150,11 @@ export function NodeCard({ node, employee, onReveal, onManageAgents, onDelete, t
       </div>
 
       <footer className="adm-node-card-foot">
+        {node.sandboxMode ? (
+          <span className="adm-node-card-meta mono tone-muted" title="sandbox mode" translate="no">
+            {node.sandboxMode}
+          </span>
+        ) : null}
         <span className="adm-node-card-meta mono tone-muted">{formatRelativeTime(node.lastSeenAt, t)}</span>
         {node.queuedCommandCount > 0 ? (
           <span className="adm-node-card-queued mono tone-info">{node.queuedCommandCount} {t("admin.queued")}</span>

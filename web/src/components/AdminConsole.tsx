@@ -37,12 +37,17 @@ import {
 
 type AuthScreen = "login" | "bootstrap";
 
-export function AdminConsole() {
+export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null }) {
   const { t } = useTranslation();
   const { reportMutationError } = useMutationError();
 
-  const [admin, setAdmin] = useState<CurrentUser | null>(null);
-  const [authChecked, setAuthChecked] = useState(false);
+  // App only mounts this component for an authenticated admin, so seed the auth
+  // state from the session it already holds. This skips the redundant /auth/me
+  // probe on mount that would otherwise flash the admin login/loading card
+  // before resolving.
+  const seededAdmin = currentUser?.role === "admin" ? currentUser : null;
+  const [admin, setAdmin] = useState<CurrentUser | null>(seededAdmin);
+  const [authChecked, setAuthChecked] = useState(seededAdmin !== null);
   const [needsBootstrap, setNeedsBootstrap] = useState(false);
   const [authScreen, setAuthScreen] = useState<AuthScreen>("login");
   const [authError, setAuthError] = useState<string | null>(null);
@@ -83,6 +88,8 @@ export function AdminConsole() {
   }
 
   useEffect(() => {
+    // Already authenticated via the app session — no probe needed on mount.
+    if (seededAdmin) return;
     const controller = new AbortController();
     void checkAuth(controller.signal);
     return () => controller.abort();

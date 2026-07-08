@@ -379,12 +379,14 @@ def test_control_panel_creates_pending_daemon_node_and_reuses_duplicate(monkeypa
             "sandboxId": node["id"],
             "token": body["nodeToken"],
             "workspacePath": "/workspace/alice",
+            "sandboxMode": "boxlite",
             "protocolVersion": 1,
             "supportedAgents": ["claude", "codex"],
             "status": "ready",
         })
         assert register.status_code == 200
         assert register.json()["employeeId"] == "alice"
+        assert register.json()["sandboxMode"] == "boxlite"
         assert register.json()["agents"]["codex"] == "ready"
 
         mismatched_register = client.post("/daemon-nodes/register", json={

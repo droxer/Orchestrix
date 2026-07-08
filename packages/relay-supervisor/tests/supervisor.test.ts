@@ -1,7 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { ChildProcess } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { ControlPanelDaemonNodeRecord } from "relay-core";
+import { LocalDaemonLauncher } from "../src/launchers.js";
 import { RelaySupervisor } from "../src/reconcile.js";
 import type {
   DaemonLaunchRequest,
@@ -117,6 +121,28 @@ test("supervisor provisions and starts missing employee daemon nodes", async () 
   assert.deepEqual(backend.provisionCalls, [{ employeeId: "alice", workspacePath: "/workspaces/alice" }]);
   assert.equal(launcher.starts[0].node.id, "sbx_alice");
   assert.equal(launcher.starts[0].env.RELAY_DAEMON_NODE_TOKEN, "tok_alice");
+});
+
+test("local supervisor launcher defaults daemon nodes to BoxLite mode", async () => {
+  const workspaceRoot = mkdtempSync(join(tmpdir(), "relay-supervisor-launcher-"));
+  try {
+    const launcher = new LocalDaemonLauncher({
+      backendUrl: "http://backend.test",
+      workspaceRoot,
+      command: "/usr/bin/true",
+    });
+    const managed = await launcher.start({
+      employee: { id: "alice" },
+      node: node({ id: "sbx_alice", employeeId: "alice", nodeToken: "tok_alice" }),
+      workspacePath: join(workspaceRoot, "alice"),
+      env: { RELAY_DAEMON_NODE_TOKEN: "tok_alice" },
+    });
+
+    assert.ok(managed.child?.spawnargs.includes("boxlite"));
+    await managed.stop();
+  } finally {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+  }
 });
 
 test("supervisor skips online nodes and does not assume a BoxLite provider", async () => {

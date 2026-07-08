@@ -232,6 +232,43 @@ def test_scheduler_backs_off_after_failed_dispatch() -> None:
     asyncio.run(run_flow())
 
 
+def test_scheduler_uses_targeted_task_queue_queries() -> None:
+    class QueryOnlyTaskStore:
+        def __init__(self) -> None:
+            self.due_queries = 0
+            self.dispatch_queries = 0
+
+        def list_due_routines(self, today: str) -> list[dict]:
+            self.due_queries += 1
+            return []
+
+        def list_dispatchable_tasks(self) -> list[dict]:
+            self.dispatch_queries += 1
+            return []
+
+        def list_tasks(self) -> list[dict]:
+            raise AssertionError("scheduler should use targeted queue queries")
+
+    async def run_flow() -> None:
+        store = QueryOnlyTaskStore()
+        scheduler = TaskScheduler(
+            task_store=store,
+            registry=object(),
+            backend=object(),
+            today=lambda: date(2026, 6, 25),
+        )
+
+        result = await scheduler.tick()
+
+        assert result.promoted == 0
+        assert result.dispatched == 0
+        assert result.skipped == 0
+        assert store.due_queries == 1
+        assert store.dispatch_queries == 1
+
+    asyncio.run(run_flow())
+
+
 def test_next_routine_date_skips_past_missed_windows_and_handles_custom() -> None:
     assert next_routine_date(date(2026, 6, 1), "daily", date(2026, 6, 25)) == date(2026, 6, 26)
     assert next_routine_date(date(2026, 1, 31), "monthly", date(2026, 2, 1)) == date(2026, 2, 28)

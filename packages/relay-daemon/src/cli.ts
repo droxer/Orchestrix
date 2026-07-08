@@ -18,7 +18,7 @@ Options:
                         (also RELAY_WORKSPACE or WORKSPACE).
   --sandbox <mode>      Sandbox mode: "boxlite" boots a BoxLite VM and runs
                         agents inside it; "none" runs agents as local
-                        processes (default; also RELAY_SANDBOX_MODE).
+                        processes (default: boxlite; also RELAY_SANDBOX_MODE).
   --use-local-agent-home
                         In local mode, use this user's HOME for Claude/Codex/
                         Kimi auth and config instead of Relay's isolated home.

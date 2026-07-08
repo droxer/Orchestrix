@@ -1075,6 +1075,27 @@ def test_database_daemon_store_redacts_plaintext_node_token() -> None:
         assert node["token"] is None
 
 
+@pytest.mark.parametrize("store_factory", [LocalDaemonStore, lambda root: DatabaseDaemonStore(f"sqlite:///{root}/daemon.db", create_schema=True)])
+def test_daemon_store_persists_sandbox_mode(store_factory) -> None:
+    with TemporaryDirectory() as root:
+        store = store_factory(root)
+        store.register_node({
+            "id": "sbx_alice",
+            "employeeId": "alice",
+            "workspacePath": "/workspace/alice",
+            "sandboxMode": "boxlite",
+            "status": "ready",
+            "agents": {"codex": "ready"},
+            "token": None,
+            "nodeTokenHash": "sha256:hash",
+            "createdAt": "2026-06-13T00:00:00.000Z",
+            "updatedAt": "2026-06-13T00:00:00.000Z",
+        })
+
+        [node] = store.list_nodes()
+        assert node["sandboxMode"] == "boxlite"
+
+
 def test_database_daemon_store_claims_queued_commands_once() -> None:
     with TemporaryDirectory() as root:
         store = DatabaseDaemonStore(f"sqlite:///{root}/daemon.db", create_schema=True)

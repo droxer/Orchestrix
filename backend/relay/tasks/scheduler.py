@@ -11,7 +11,7 @@ from loguru import logger
 from ..core.models import AgentName
 from ..daemon_registry import node_accepts_run
 from ..persistence.stores import valid_agent
-from ..persistence.task_store import task_claim_sort_key
+from ..persistence.task_store import routine_due_sort_key, task_claim_sort_key
 
 MAX_DISPATCH_BACKOFF_SECONDS = 3600.0
 
@@ -92,9 +92,7 @@ class TaskScheduler:
     def _promote_due_routines(self, today: date) -> tuple[int, int]:
         promoted = 0
         skipped = 0
-        for routine in self.task_store.list_tasks():
-            if not self._routine_due(routine, today):
-                continue
+        for routine in self._due_routines(today):
             agent = valid_agent(routine.get("assignedAgent"))
             if not agent:
                 skipped += 1
@@ -120,12 +118,9 @@ class TaskScheduler:
         attempts = 0
         now = time.monotonic()
         candidates = [
-            task for task in self.task_store.list_tasks()
-            if task.get("status") == "assigned"
-            and not task.get("isRoutine")
-            and valid_agent(task.get("assignedAgent"))
+            task for task in self._dispatchable_tasks()
+            if valid_agent(task.get("assignedAgent"))
         ]
-        candidates.sort(key=task_claim_sort_key)
         candidate_ids = {task["id"] for task in candidates}
         self._dispatch_backoff = {
             task_id: entry
@@ -193,6 +188,26 @@ class TaskScheduler:
         except ValueError:
             return False
         return next_run <= today
+
+    def _due_routines(self, today: date) -> list[dict[str, Any]]:
+        if hasattr(self.task_store, "list_due_routines"):
+            return list(self.task_store.list_due_routines(today.isoformat()))
+        routines = [
+            task for task in self.task_store.list_tasks()
+            if self._routine_due(task, today)
+        ]
+        return sorted(routines, key=routine_due_sort_key)
+
+    def _dispatchable_tasks(self) -> list[dict[str, Any]]:
+        if hasattr(self.task_store, "list_dispatchable_tasks"):
+            return list(self.task_store.list_dispatchable_tasks())
+        tasks = [
+            task for task in self.task_store.list_tasks()
+            if task.get("status") == "assigned"
+            and not task.get("isRoutine")
+            and task.get("assignedAgent")
+        ]
+        return sorted(tasks, key=task_claim_sort_key)
 
 def ready_node_for_task(registry: Any, task: dict[str, Any], assignments: list[dict[str, Any]]) -> dict[str, Any] | None:
     if not assignments:

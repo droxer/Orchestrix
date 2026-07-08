@@ -59,6 +59,7 @@ class DaemonNodeRegistration(RelayModel):
     employee_id: str | None = None
     token: str
     workspace_path: str | None = None
+    sandbox_mode: Literal["none", "boxlite"] | None = None
     protocol_version: int
     supported_agents: list[AgentName] = []
     agent_health: dict[str, dict[str, Any]] | None = None

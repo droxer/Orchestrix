@@ -316,7 +316,7 @@
 }
 
 .pref-theme-swatch[data-tone="light"] {
-  background: #faf8f4;
+  background: #f8f8fa;
 }
 
 .pref-theme-swatch[data-tone="light"]::after {
@@ -324,7 +324,7 @@
 }
 
 .pref-theme-swatch[data-tone="dark"] {
-  background: #0d0c0a;
+  background: #0f1011;
   border-color: color-mix(in srgb, #ffffff 14%, transparent);
 }
 
@@ -333,7 +333,7 @@
 }
 
 .pref-theme-swatch[data-tone="system"] {
-  background: linear-gradient(135deg, #faf8f4 0 50%, #0d0c0a 50% 100%);
+  background: linear-gradient(135deg, #f8f8fa 0 50%, #0f1011 50% 100%);
   border-color: color-mix(in srgb, var(--color-ink) 10%, transparent);
 }
 

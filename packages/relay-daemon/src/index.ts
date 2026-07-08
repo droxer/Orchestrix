@@ -9,6 +9,7 @@ import type {
   DaemonAgentHealth,
   DaemonNodeRegistration,
   DaemonNodeRunCommand,
+  DaemonNodeSandboxMode,
   AgentName,
   AgentTaskMode,
   StreamExecResult,
@@ -37,7 +38,8 @@ import {
   DAEMON_NODE_PROTOCOL_VERSION,
 } from "relay-core";
 
-export type DaemonSandboxMode = "none" | "boxlite";
+export type DaemonSandboxMode = DaemonNodeSandboxMode;
+const DEFAULT_DAEMON_SANDBOX_MODE: DaemonSandboxMode = "boxlite";
 
 export interface DaemonRuntimeOptions {
   backendUrl?: string;
@@ -171,6 +173,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
     ...(includeEmployeeId ? { employeeId } : {}),
     token,
     workspacePath,
+    sandboxMode,
     protocolVersion: DAEMON_NODE_PROTOCOL_VERSION,
     supportedAgents,
     capabilities: [DAEMON_CAPABILITY_GENERATED_FILES],
@@ -453,6 +456,7 @@ export async function runRelayDaemonDoctor(options: DaemonRuntimeOptions = {}): 
       ...(configuredEmployeeId ? { employeeId } : {}),
       token,
       workspacePath,
+      sandboxMode,
       protocolVersion: DAEMON_NODE_PROTOCOL_VERSION,
       supportedAgents: readyAgents(agentHealth),
       agentHealth,
@@ -479,9 +483,11 @@ function configureAgentProcessEnvironment(
     // Agent commands run inside the BoxLite guest, where the host workspace
     // is mounted at GUEST_WORKSPACE.
     process.env.RELAY_AGENT_WORKSPACE = GUEST_WORKSPACE;
+    delete process.env.RELAY_RUN_AS_CURRENT_USER;
+    delete process.env.RELAY_AGENT_HOME;
   } else {
     process.env.RELAY_AGENT_WORKSPACE = workspacePath;
-    process.env.RELAY_RUN_AS_CURRENT_USER ??= "1";
+    process.env.RELAY_RUN_AS_CURRENT_USER = "1";
     const resolvedAgentHome = agentHome ?? localAgentHomeFromEnv();
     if (resolvedAgentHome) {
       process.env.RELAY_AGENT_HOME = resolvedAgentHome;
@@ -773,7 +779,8 @@ export interface DaemonExecutionEnvironment {
 
 export function resolveSandboxMode(value: string | undefined): DaemonSandboxMode {
   const trimmed = value?.trim();
-  if (!trimmed || trimmed === "none") return "none";
+  if (!trimmed) return DEFAULT_DAEMON_SANDBOX_MODE;
+  if (trimmed === "none") return "none";
   if (trimmed === "boxlite") return "boxlite";
   throw new Error(`Unknown sandbox mode ${JSON.stringify(trimmed)}. Use "boxlite" or "none".`);
 }
@@ -877,6 +884,7 @@ export async function localProcessExecStream(
     const detached = process.platform !== "win32";
     const child = spawn(cmd, args, {
       cwd: options.cwd,
+      env: localAgentSubprocessEnv(),
       stdio: ["ignore", "pipe", "pipe"],
       detached,
     });
@@ -934,6 +942,49 @@ export async function localProcessExecStream(
       });
     });
   });
+}
+
+const AGENT_SUBPROCESS_ENV_DENY = new Set([
+  "DATABASE_URL",
+  "RELAY_CONTROL_PANEL_VERSION",
+  "RELAY_DATABASE_URL",
+  "RELAY_DATA_DIR",
+  "RELAY_EMPLOYEE_ID",
+  "RELAY_SANDBOX_ID",
+  "RELAY_SANDBOX_MODE",
+  "RELAY_STORAGE",
+  "RELAY_USE_LOCAL_AGENT_HOME",
+  "RELAY_WEB_UI_DIST_DIR",
+]);
+
+const AGENT_SUBPROCESS_ENV_DENY_PREFIXES = [
+  "RELAY_ADMIN_",
+  "RELAY_AUTH_",
+  "RELAY_BACKEND_",
+  "RELAY_CHAT_",
+  "RELAY_DAEMON_",
+  "RELAY_SUPERVISOR_",
+  "RELAY_TASK_SCHEDULER_",
+];
+
+function localAgentSubprocessEnv(): NodeJS.ProcessEnv {
+  const env = { ...process.env };
+  for (const key of Object.keys(env)) {
+    if (isDeniedAgentSubprocessEnv(key)) {
+      delete env[key];
+    }
+  }
+  const home = agentHomePath();
+  env.HOME = home;
+  env.CODEX_HOME = join(home, ".codex");
+  env.PI_CODING_AGENT_DIR = join(home, ".pi", "agent");
+  env.KIMI_CODE_HOME = join(home, ".kimi-code");
+  return env;
+}
+
+function isDeniedAgentSubprocessEnv(key: string): boolean {
+  return AGENT_SUBPROCESS_ENV_DENY.has(key)
+    || AGENT_SUBPROCESS_ENV_DENY_PREFIXES.some((prefix) => key.startsWith(prefix));
 }
 
 function delay(ms: number, signal?: AbortSignal): Promise<void> {

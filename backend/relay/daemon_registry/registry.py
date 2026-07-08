@@ -88,6 +88,7 @@ WORKSPACE_ARTIFACT_CONTENT_MAX_BYTES = int(os.environ.get("RELAY_WORKSPACE_ARTIF
 ARTIFACT_SNAPSHOT_STATE_KEY = "_relay_artifact_snapshot"
 DAEMON_CAPABILITY_GENERATED_FILES = "generated-files"
 DAEMON_NODE_CAPABILITIES = frozenset({DAEMON_CAPABILITY_GENERATED_FILES})
+DAEMON_SANDBOX_MODES = frozenset({"none", "boxlite"})
 
 
 def _is_generated_artifact_path(relative_path: str) -> bool:
@@ -503,10 +504,14 @@ class DaemonNodeRegistry:
             value for value in (payload.get("capabilities") or [])
             if isinstance(value, str) and value in DAEMON_NODE_CAPABILITIES
         })
+        sandbox_mode = payload.get("sandboxMode")
+        if sandbox_mode not in DAEMON_SANDBOX_MODES:
+            sandbox_mode = (existing or {}).get("sandboxMode")
         sandbox = {
             "id": payload["sandboxId"],
             **({"employeeId": employee_id} if employee_id else {}),
             **({"workspacePath": payload["workspacePath"]} if payload.get("workspacePath") else {}),
+            **({"sandboxMode": sandbox_mode} if sandbox_mode else {}),
             **({"capabilities": capabilities} if capabilities else {}),
             "status": "running" if payload.get("status") == "busy" else "stopped" if payload.get("status") == "stopped" else "ready",
             "agents": agents,

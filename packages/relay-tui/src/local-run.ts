@@ -10,6 +10,7 @@ loadPackageEnv("relay-tui");
 
 const DEFAULT_BACKEND_URL = "http://127.0.0.1:8790";
 const STARTUP_TIMEOUT_MS = 15_000;
+const DAEMON_STARTUP_TIMEOUT_MS = 120_000;
 const CHILD_LOG_LIMIT = 64_000;
 
 interface ManagedChild {
@@ -72,8 +73,15 @@ async function main(): Promise<void> {
     // when a live daemon for this employee is already registered (e.g. from a
     // previous local run or a remote sandbox) so two pollers never compete
     // for the same command queue.
-    if (!(await liveDaemonExists(backendUrl, employeeId, workspacePath))) {
-      children.push(startChild("daemon", process.execPath, [daemonCli, ...daemonArgs(sandboxId, sandboxMode)], childEnv));
+    if (!(await liveDaemonExists(backendUrl, employeeId, workspacePath, sandboxId))) {
+      const daemon = startChild("daemon", process.execPath, [daemonCli, ...daemonArgs(sandboxId, sandboxMode)], childEnv, { echo: true });
+      children.push(daemon);
+      await waitFor(
+        () => liveDaemonExists(backendUrl, employeeId, workspacePath, sandboxId),
+        "Relay daemon",
+        [daemon],
+        DAEMON_STARTUP_TIMEOUT_MS,
+      );
     }
 
     const tui = spawn(process.execPath, [tuiCli], {
@@ -159,18 +167,25 @@ function safeId(value: string): string {
   return value.replace(/[^A-Za-z0-9._-]+/g, "_") || "local";
 }
 
-function startChild(name: string, command: string, args: string[], env: NodeJS.ProcessEnv): ManagedChild {
+function startChild(
+  name: string,
+  command: string,
+  args: string[],
+  env: NodeJS.ProcessEnv,
+  options: { echo?: boolean } = {},
+): ManagedChild {
   const child = spawn(command, args, {
     env,
     stdio: ["ignore", "pipe", "pipe"],
   });
   let log = "";
-  const append = (chunk: Buffer): void => {
+  const append = (chunk: Buffer, stream: NodeJS.WriteStream): void => {
     log = `${log}${chunk.toString("utf8")}`;
     if (log.length > CHILD_LOG_LIMIT) log = log.slice(-CHILD_LOG_LIMIT);
+    if (options.echo) stream.write(chunk);
   };
-  child.stdout?.on("data", append);
-  child.stderr?.on("data", append);
+  child.stdout?.on("data", (chunk: Buffer) => append(chunk, process.stdout));
+  child.stderr?.on("data", (chunk: Buffer) => append(chunk, process.stderr));
   return { name, child, log: () => log.trim() };
 }
 
@@ -183,12 +198,18 @@ async function backendStatus(backendUrl: string): Promise<BackendStatus> {
   }
 }
 
-export async function liveDaemonExists(backendUrl: string, employeeId: string, workspacePath: string): Promise<boolean> {
+export async function liveDaemonExists(
+  backendUrl: string,
+  employeeId: string,
+  workspacePath: string,
+  sandboxId?: string,
+): Promise<boolean> {
   try {
     const response = await fetch(`${backendUrl}/daemon-nodes`, { signal: AbortSignal.timeout(1000) });
     if (!response.ok) return false;
-    const body = await response.json() as { nodes?: Array<{ employeeId?: string; online?: boolean; stale?: boolean; workspacePath?: string }> };
+    const body = await response.json() as { nodes?: Array<{ id?: string; employeeId?: string; online?: boolean; stale?: boolean; workspacePath?: string }> };
     return (body.nodes ?? []).some((node) =>
+      (!sandboxId || node.id === sandboxId) &&
       node.employeeId === employeeId &&
       node.online !== false &&
       node.stale !== true &&
@@ -210,9 +231,14 @@ function normalizeWorkspacePath(value?: string): string | undefined {
   return trimmed ? resolve(trimmed) : undefined;
 }
 
-async function waitFor(check: () => Promise<boolean>, label: string, children: ManagedChild[]): Promise<void> {
+async function waitFor(
+  check: () => Promise<boolean>,
+  label: string,
+  children: ManagedChild[],
+  timeoutMs = STARTUP_TIMEOUT_MS,
+): Promise<void> {
   const start = Date.now();
-  while (Date.now() - start < STARTUP_TIMEOUT_MS) {
+  while (Date.now() - start < timeoutMs) {
     for (const managed of children) {
       if (managed.child.exitCode !== null) {
         throw new Error(`${managed.name} exited during startup.${formatChildLog(managed)}`);

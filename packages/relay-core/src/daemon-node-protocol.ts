@@ -2,6 +2,7 @@ import type { AgentName, AgentState, AgentTaskMode } from "./state.js";
 import type { TokenUsage } from "./token-usage.js";
 
 export type DaemonNodeStatus = "ready" | "busy" | "stopped";
+export type DaemonNodeSandboxMode = "none" | "boxlite";
 export type DaemonAgentAdapter = "cli" | "service";
 export type DaemonAgentHealthStatus = "ready" | "failed";
 
@@ -66,6 +67,7 @@ export interface DaemonNodeRegistration {
   employeeId?: string;
   token: string;
   workspacePath?: string;
+  sandboxMode?: DaemonNodeSandboxMode;
   protocolVersion: number;
   supportedAgents: AgentName[];
   capabilities?: DaemonNodeCapability[];

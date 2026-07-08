@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from loguru import logger
-from sqlalchemy import BigInteger, Boolean, JSON, Column, Date, DateTime, ForeignKey, MetaData, Table, Text, UniqueConstraint, Uuid, create_engine, insert, select, update
+from sqlalchemy import BigInteger, Boolean, JSON, Column, Date, DateTime, ForeignKey, MetaData, Table, Text, UniqueConstraint, Uuid, case, create_engine, insert, select, update
 from sqlalchemy.exc import IntegrityError
 
 from datetime import date as _date
@@ -86,6 +86,20 @@ class LocalTaskStore:
             return []
         tasks = [self.get_task(path.name) for path in self.tasks_dir.iterdir() if path.is_dir()]
         return sorted(tasks, key=lambda item: item["updatedAt"], reverse=True)
+
+    def list_due_routines(self, today: str) -> list[dict[str, Any]]:
+        tasks = [task for task in self.list_tasks() if routine_due_for_promotion(task, today)]
+        return sorted(tasks, key=routine_due_sort_key)
+
+    def list_dispatchable_tasks(self, limit: int | None = None) -> list[dict[str, Any]]:
+        tasks = [
+            task for task in self.list_tasks()
+            if task.get("status") == "assigned"
+            and not task.get("isRoutine")
+            and task.get("assignedAgent")
+        ]
+        ordered = sorted(tasks, key=task_claim_sort_key)
+        return ordered[:limit] if limit is not None else ordered
 
     def update_task(self, task_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         task = self.append_event(task_id, relay_task_event("task.updated", task_id, {
@@ -306,6 +320,36 @@ class DatabaseTaskStore:
     def list_tasks(self) -> list[dict[str, Any]]:
         with self.engine.begin() as conn:
             rows = conn.execute(select(self.tasks.c.snapshot).order_by(self.tasks.c.updated_at.desc())).mappings().all()
+        return [row["snapshot"] for row in rows]
+
+    def list_due_routines(self, today: str) -> list[dict[str, Any]]:
+        try:
+            today_date = _parse_date(today)
+        except ValueError:
+            return []
+        with self.engine.begin() as conn:
+            rows = conn.execute(
+                select(self.tasks.c.snapshot)
+                .where(self.tasks.c.is_routine.is_(True))
+                .where(self.tasks.c.routine_enabled.is_(True))
+                .where(self.tasks.c.routine_next_run_date.is_not(None))
+                .where(self.tasks.c.routine_next_run_date <= today_date)
+                .order_by(self.tasks.c.routine_next_run_date.asc(), _priority_order_expression(), self.tasks.c.created_at.asc())
+            ).mappings().all()
+        return [row["snapshot"] for row in rows if routine_due_for_promotion(row["snapshot"], today)]
+
+    def list_dispatchable_tasks(self, limit: int | None = None) -> list[dict[str, Any]]:
+        statement = (
+            select(self.tasks.c.snapshot)
+            .where(self.tasks.c.status == "assigned")
+            .where(self.tasks.c.assigned_agent.is_not(None))
+            .where(self.tasks.c.is_routine.is_(False))
+            .order_by(_priority_order_expression(), _due_date_missing_expression(), self.tasks.c.due_date.asc(), self.tasks.c.created_at.asc())
+        )
+        if limit is not None:
+            statement = statement.limit(limit)
+        with self.engine.begin() as conn:
+            rows = conn.execute(statement).mappings().all()
         return [row["snapshot"] for row in rows]
 
     def update_task(self, task_id: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -536,15 +580,41 @@ def _parse_date(value: str | None) -> Any:
     return _date.fromisoformat(value)
 
 
+def _priority_rank(priority: Any) -> int:
+    return {"high": 0, "normal": 1, "low": 2}.get(priority, 1)
+
+
 def task_claim_sort_key(task: dict[str, Any]) -> tuple[int, str, str]:
-    priority_rank = {"high": 0, "normal": 1, "low": 2}.get(task.get("priority"), 1)
+    priority_rank = _priority_rank(task.get("priority"))
     due_date = task.get("dueDate") or "9999-12-31"
     return (priority_rank, due_date, task.get("createdAt") or "")
 
 
+def routine_due_sort_key(task: dict[str, Any]) -> tuple[str, int, str]:
+    return (task.get("routineNextRunDate") or "9999-12-31", _priority_rank(task.get("priority")), task.get("createdAt") or "")
+
+
+def _priority_order_expression() -> Any:
+    return case(
+        (DatabaseTaskStore.tasks.c.priority == "high", 0),
+        (DatabaseTaskStore.tasks.c.priority == "normal", 1),
+        (DatabaseTaskStore.tasks.c.priority == "low", 2),
+        else_=1,
+    )
+
+
+def _due_date_missing_expression() -> Any:
+    return case((DatabaseTaskStore.tasks.c.due_date.is_(None), 1), else_=0)
+
+
 def routine_due_for_promotion(routine: dict[str, Any], today: str) -> bool:
     next_run = routine.get("routineNextRunDate")
-    return bool(routine.get("isRoutine") and routine.get("routineEnabled") and next_run and next_run <= today)
+    if not routine.get("isRoutine") or not routine.get("routineEnabled") or not next_run:
+        return False
+    try:
+        return _date.fromisoformat(next_run) <= _date.fromisoformat(today)
+    except (TypeError, ValueError):
+        return False
 
 
 def routine_occurrence_events(routine: dict[str, Any], agent: AgentName) -> list[dict[str, Any]]:

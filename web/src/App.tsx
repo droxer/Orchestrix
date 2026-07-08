@@ -39,6 +39,7 @@ import type { AppRoute } from "./lib/viewTypes";
 import { visibleConversationArtifacts } from "./lib/conversationArtifacts";
 import {
   canCancelConversationRun,
+  conversationCancelNodeId,
   findActiveRunForSession,
   isConversationRunInFlight,
 } from "./lib/conversationRunning";
@@ -444,11 +445,13 @@ export function App() {
   }
 
   async function cancelActiveRun() {
-    if (!selectedSandbox || !activeSession) return;
+    if (!activeSession) return;
     if (!canCancelConversationRun({ activeRun, session: activeSession })) return;
+    const cancelNodeId = conversationCancelNodeId({ node: selectedNode, sandbox: selectedSandbox });
+    if (!cancelNodeId) return;
     try {
       const session = await cancelRunMutation.mutateAsync({
-        sandboxId: selectedSandbox.id,
+        sandboxId: cancelNodeId,
         sessionId: activeRun?.sessionId ?? activeSession.id,
         token: selectedToken,
         reason: t("cancel.reason"),
@@ -595,7 +598,7 @@ export function App() {
       onAgentRoleOverridesChange={updateAgentRoleOverrides}
     >
       <Suspense fallback={<RouteFallback />}>
-        {route === "admin" ? <AdminConsole /> : route === "channels" ? <ChannelsPage /> : route === "workspace" ? (
+        {route === "admin" ? <AdminConsole currentUser={user} /> : route === "channels" ? <ChannelsPage /> : route === "workspace" ? (
           <EmployeeWorkspacePage
             employeeId={selectedEmployee}
             currentUser={user}

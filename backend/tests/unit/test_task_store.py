@@ -192,6 +192,74 @@ def test_database_task_store_claims_exact_task_for_dispatch() -> None:
         assert second_claim is None
 
 
+def assert_store_lists_scheduler_queues(store: LocalTaskStore | DatabaseTaskStore) -> None:
+    low = store.create_task({
+        "title": "Low priority",
+        "priority": "low",
+        "assignedAgent": "codex",
+        "status": "assigned",
+        "dueDate": "2026-05-01",
+    })
+    high = store.create_task({
+        "title": "High priority",
+        "priority": "high",
+        "assignedAgent": "codex",
+        "status": "assigned",
+        "dueDate": "2026-07-10",
+    })
+    normal = store.create_task({
+        "title": "Normal priority",
+        "priority": "normal",
+        "assignedAgent": "codex",
+        "status": "assigned",
+        "dueDate": "2026-06-01",
+    })
+    store.create_task({"title": "Unassigned", "status": "assigned"})
+    store.create_task({"title": "Backlog", "assignedAgent": "codex"})
+    store.create_task({"title": "Done", "assignedAgent": "codex", "status": "done"})
+    store.create_task({"title": "Routine occurrence source", "assignedAgent": "codex", "status": "assigned", "isRoutine": True, "routineEnabled": True})
+
+    due_routine = store.create_task({
+        "title": "Due routine",
+        "isRoutine": True,
+        "routineEnabled": True,
+        "routineCadence": "weekly",
+        "routineNextRunDate": "2026-06-25",
+        "assignedAgent": "codex",
+    })
+    store.create_task({
+        "title": "Future routine",
+        "isRoutine": True,
+        "routineEnabled": True,
+        "routineCadence": "weekly",
+        "routineNextRunDate": "2026-07-25",
+        "assignedAgent": "codex",
+    })
+    if isinstance(store, LocalTaskStore):
+        store.create_task({
+            "title": "Invalid routine",
+            "isRoutine": True,
+            "routineEnabled": True,
+            "routineCadence": "weekly",
+            "routineNextRunDate": "not-a-date",
+            "assignedAgent": "codex",
+        })
+
+    assert [task["id"] for task in store.list_dispatchable_tasks()] == [high["id"], normal["id"], low["id"]]
+    assert [task["id"] for task in store.list_dispatchable_tasks(limit=2)] == [high["id"], normal["id"]]
+    assert [task["id"] for task in store.list_due_routines("2026-06-25")] == [due_routine["id"]]
+
+
+def test_local_task_store_lists_scheduler_queues() -> None:
+    with TemporaryDirectory() as root:
+        assert_store_lists_scheduler_queues(LocalTaskStore(root))
+
+
+def test_database_task_store_lists_scheduler_queues() -> None:
+    with TemporaryDirectory() as root:
+        assert_store_lists_scheduler_queues(DatabaseTaskStore(f"sqlite:///{root}/relay.db", create_schema=True))
+
+
 def test_database_task_store_promotes_due_routine_once() -> None:
     with TemporaryDirectory() as root:
         store = DatabaseTaskStore(f"sqlite:///{root}/relay.db", create_schema=True)

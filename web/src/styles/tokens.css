@@ -9,9 +9,10 @@
      3. shadcn/ui  — the @theme bridge exposing tokens to Tailwind
         utilities used by src/components/ui.
 
-   Visual language: warm precision. Ecru/stone surfaces replace cold
-   zinc, cobalt blue is the single brand ACTION color (lifting to luminous
-   periwinkle on the dark canvas), and warm hairlines soften the product
+   Visual language: cool precision. Near-achromatic cool neutrals carry
+   the surfaces (Linear's graphite/off-white ramp), cobalt blue is the
+   single brand ACTION color (lifting to luminous periwinkle on the dark
+   canvas), and cool hairlines draw the product
    chrome. The action carries the hue; status narrows to success /
    danger / warning (green / amber / red); "info" is a neutral cool slate,
    decoupled — the brand hue marks action, selection, and focus only.
@@ -24,7 +25,8 @@
    Structure follows Linear's discipline: tight, consistent radii; fast,
    un-bouncy motion; modest display sizes; dense row rhythm; and near-flat
    surfaces where hairlines — not shadows or grain — carry the chrome. The
-   palette above is unchanged; only the structural language was retuned.
+   neutral ramp follows the same discipline: cool graphite dark, cool
+   off-white light, atmosphere reduced to a faint brand-tinted wash.
    ===================================================================== */
 
 /* Layout breakpoints — reference values for @media queries (custom
@@ -141,27 +143,27 @@
   --color-primary-disabled: #c1cbf0;
   --color-brand-soft: color-mix(in srgb, var(--color-primary) 8%, var(--color-canvas)); /* tint — selected rows, active nav, running pills */
 
-  /* Text — warm stone ramp */
-  --color-ink: #171412;        /* headings, primary copy, emphasized body */
-  --color-body: #57534e;       /* running text */
-  --color-muted: #79716b;      /* secondary labels */
-  --color-muted-soft: #a8a29e; /* timestamps, disabled */
+  /* Text — cool near-neutral ramp */
+  --color-ink: #16181d;        /* headings, primary copy, emphasized body */
+  --color-body: #52555e;       /* running text */
+  --color-muted: #6f727c;      /* secondary labels */
+  --color-muted-soft: #9ba0aa; /* timestamps, disabled */
   --color-on-primary: #ffffff; /* text on the ink action fill */
-  --color-on-dark: #ffffff;    /* text on ink fills */
+  --color-on-dark: #f7f8f8;    /* text on ink fills */
 
-  /* Surfaces — warm ecru/stone */
-  --color-canvas: #fdfcfa;
-  --color-surface-card: #fdfcfa;   /* feature/product cards on canvas */
-  --color-surface-soft: #faf8f4;   /* subtle tint — quotes, code, hover */
-  --color-surface-strong: #f5f2ec; /* fills, search, avatars */
-  --color-surface-raised: #fdfcfa; /* modals, drawers, floating chrome */
-  --color-surface-dark: #0d0c0a;
-  --color-surface-dark-elevated: #1a1815;
-  --color-on-dark-soft: #a1a1aa;
+  /* Surfaces — cool off-white */
+  --color-canvas: #fcfcfd;
+  --color-surface-card: #fcfcfd;   /* feature/product cards on canvas */
+  --color-surface-soft: #f8f8fa;   /* subtle tint — quotes, code, hover */
+  --color-surface-strong: #f0f1f5; /* fills, search, avatars */
+  --color-surface-raised: #ffffff; /* modals, drawers, floating chrome */
+  --color-surface-dark: #0f1011;
+  --color-surface-dark-elevated: #17181a;
+  --color-on-dark-soft: #8a8f98;
 
   /* Hairlines */
-  --color-hairline: #eae5dd;
-  --color-hairline-soft: #f1ede6;
+  --color-hairline: #e4e5ea;
+  --color-hairline-soft: #edeef2;
   /* --color-hairline-on-dark: always-dark surface hairline (diff viewer, ink-fill buttons).
      NOT a dark-mode hairline — used on dark fills that appear in BOTH themes (e.g. the
      diff block background, the dark artifact viewer). Consumed by artifact.css and
@@ -336,11 +338,11 @@
      --atmosphere-background directly. Disabled in high-contrast mode. */
   --atmosphere-wash: radial-gradient(
     ellipse 90% 70% at 100% 0%,
-    color-mix(in srgb, #b0995f 7%, transparent),
+    color-mix(in srgb, var(--color-primary) 5%, transparent),
     transparent 65%
   );
   --atmosphere-grain-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
-  --atmosphere-grain-opacity: 0.14;
+  --atmosphere-grain-opacity: 0.1;
   --atmosphere-grain-size: 180px 180px;
   --atmosphere-grain-blend: multiply;
   --atmosphere-background: var(--atmosphere-wash), var(--color-surface-soft);
@@ -479,10 +481,11 @@ html:lang(zh-TW) {
    sets data-theme="contrast" directly. Pre-hydration script in
    app/layout.tsx mirrors the same logic to avoid a flash. */
 html[data-theme="dark"] {
-  /* Warm charcoal base — a trace of amber lifts the void off cold zinc
-     without breaking the precision identity. Light now stays warm. */
-  --color-surface-dark: #0d0c0a;
-  --color-surface-dark-elevated: #1a1815;
+  /* Cool graphite base — Linear's dark register: near-neutral with a
+     trace of blue, so the periwinkle action and cool text ramp sit
+     in-family instead of fighting a warm void. */
+  --color-surface-dark: #0f1011;
+  --color-surface-dark-elevated: #17181a;
 
   /* Text — keep four distinct steps; body must stay lighter (more
      prominent) than muted, mirroring the light ramp where body is darker
@@ -519,7 +522,7 @@ html[data-theme="dark"] {
   --color-accent-yellow: #f7b84d; /* attention dot — brightened for dark canvas */
 
   /* Artifact kind accents — brightened so the chip left-border keeps its hue
-     separation on the warm dark canvas. */
+     separation on the graphite dark canvas. */
   --color-kind-plan: #22b8d4;
   --color-kind-diff: #e0913a;
   --color-kind-test: #a78bfa;
@@ -529,7 +532,7 @@ html[data-theme="dark"] {
 
   /* On the dark canvas the bright status hues clear contrast as text, so the
      text-safe ramps track them rather than the light-mode deepened values. */
-  --color-warning-text: #fbbf24; /* amber-400 — ~7:1 on warm dark canvas at 12px */
+  --color-warning-text: #fbbf24; /* amber-400 — ~7:1 on graphite dark canvas at 12px */
   --color-danger-text: var(--color-semantic-down);
 
   /* Elevation — the rgba(0,0,0,.04) drop is invisible on dark; deepen it.
@@ -541,11 +544,11 @@ html[data-theme="dark"] {
      as modal without washing out to grey. */
   --color-overlay: color-mix(in srgb, #000 72%, transparent);
 
-  --atmosphere-grain-opacity: 0.08;
+  --atmosphere-grain-opacity: 0.06;
   --atmosphere-grain-blend: soft-light;
   --atmosphere-wash: radial-gradient(
     ellipse 90% 70% at 100% 0%,
-    color-mix(in srgb, #e8dcc8 7%, transparent),
+    color-mix(in srgb, var(--color-primary) 7%, transparent),
     transparent 65%
   );
   --atmosphere-background: var(--atmosphere-wash), var(--color-surface-soft);

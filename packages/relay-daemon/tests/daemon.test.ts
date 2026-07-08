@@ -8,6 +8,7 @@ import {
   discoverAgentInventory,
   localProcessExecStream,
   parseInventoryOutput,
+  resolveSandboxMode,
   runRelayDaemon,
   runRelayDaemonDoctor,
   type DaemonExecutionEnvironment,
@@ -49,6 +50,22 @@ function fakeEnvironment(input: {
   };
 }
 
+function captureEnv(keys: string[]): Map<string, string | undefined> {
+  return new Map(keys.map((key) => [key, process.env[key]]));
+}
+
+function restoreCapturedEnv(previous: Map<string, string | undefined>): void {
+  for (const [key, value] of previous) restoreEnv(key, value);
+}
+
+function restoreEnv(key: string, value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[key];
+  } else {
+    process.env[key] = value;
+  }
+}
+
 function runCommand(id = "cmd_1"): DaemonNodeRunCommand {
   return {
     id,
@@ -65,6 +82,94 @@ function runCommand(id = "cmd_1"): DaemonNodeRunCommand {
 function isInventoryProbe(args: string[] | undefined): boolean {
   return Boolean(args?.[1]?.includes("printf 'SKILL"));
 }
+
+test("relay daemon defaults to BoxLite sandbox mode unless none is explicit", () => {
+  assert.equal(resolveSandboxMode(undefined), "boxlite");
+  assert.equal(resolveSandboxMode(""), "boxlite");
+  assert.equal(resolveSandboxMode("none"), "none");
+});
+
+test("BoxLite mode clears local agent process flags", async () => {
+  const previousRunAs = process.env.RELAY_RUN_AS_CURRENT_USER;
+  const previousAgentHome = process.env.RELAY_AGENT_HOME;
+  const stop = new AbortController();
+  stop.abort();
+  process.env.RELAY_RUN_AS_CURRENT_USER = "1";
+  process.env.RELAY_AGENT_HOME = "/tmp/relay-host-home";
+  try {
+    await runRelayDaemon({
+      backendUrl: "http://relay.test",
+      sandboxId: "sbx_boxlite_env",
+      employeeId: "alice",
+      workspacePath: process.cwd(),
+      token: "node_token",
+      logger: testLogger(),
+      signal: stop.signal,
+      environment: fakeEnvironment(),
+    });
+
+    assert.equal(process.env.RELAY_RUN_AS_CURRENT_USER, undefined);
+    assert.equal(process.env.RELAY_AGENT_HOME, undefined);
+  } finally {
+    restoreEnv("RELAY_RUN_AS_CURRENT_USER", previousRunAs);
+    restoreEnv("RELAY_AGENT_HOME", previousAgentHome);
+  }
+});
+
+test("local process execution strips daemon tokens from agent subprocess env", async () => {
+  const previous = captureEnv([
+    "DATABASE_URL",
+    "RELAY_AGENT_HOME",
+    "RELAY_AUTH_STORE",
+    "RELAY_BACKEND_URL",
+    "RELAY_DATABASE_URL",
+    "RELAY_DAEMON_NODE_TOKEN",
+    "RELAY_DAEMON_UI_TOKEN",
+    "RELAY_ADMIN_TOKEN",
+    "RELAY_TASK_SCHEDULER_ENABLED",
+  ]);
+  const agentHome = "/tmp/relay-agent-home-test";
+  process.env.DATABASE_URL = "postgres://user:secret@localhost/relay";
+  process.env.RELAY_AGENT_HOME = agentHome;
+  process.env.RELAY_AUTH_STORE = "database";
+  process.env.RELAY_BACKEND_URL = "http://backend.test";
+  process.env.RELAY_DATABASE_URL = "postgres://user:relay_secret@localhost/relay";
+  process.env.RELAY_DAEMON_NODE_TOKEN = "node_secret";
+  process.env.RELAY_DAEMON_UI_TOKEN = "ui_secret";
+  process.env.RELAY_ADMIN_TOKEN = "admin_secret";
+  process.env.RELAY_TASK_SCHEDULER_ENABLED = "1";
+  try {
+    const script = [
+      "console.log(JSON.stringify({",
+      "home: process.env.HOME,",
+      "codexHome: process.env.CODEX_HOME,",
+      "databaseUrl: process.env.DATABASE_URL || null,",
+      "relayAuthStore: process.env.RELAY_AUTH_STORE || null,",
+      "backendUrl: process.env.RELAY_BACKEND_URL || null,",
+      "relayDatabaseUrl: process.env.RELAY_DATABASE_URL || null,",
+      "nodeToken: process.env.RELAY_DAEMON_NODE_TOKEN || null,",
+      "uiToken: process.env.RELAY_DAEMON_UI_TOKEN || null,",
+      "adminToken: process.env.RELAY_ADMIN_TOKEN || null,",
+      "taskSchedulerEnabled: process.env.RELAY_TASK_SCHEDULER_ENABLED || null",
+      "}));",
+    ].join("");
+    const result = await localProcessExecStream(process.execPath, ["-e", script]);
+    assert.equal(result.exit_code, 0, result.stderr || result.error_message);
+    const env = JSON.parse(result.stdout) as Record<string, string | null>;
+    assert.equal(env.home, agentHome);
+    assert.equal(env.codexHome, `${agentHome}/.codex`);
+    assert.equal(env.databaseUrl, null);
+    assert.equal(env.relayAuthStore, null);
+    assert.equal(env.backendUrl, null);
+    assert.equal(env.relayDatabaseUrl, null);
+    assert.equal(env.nodeToken, null);
+    assert.equal(env.uiToken, null);
+    assert.equal(env.adminToken, null);
+    assert.equal(env.taskSchedulerEnabled, null);
+  } finally {
+    restoreCapturedEnv(previous);
+  }
+});
 
 test("local process execution preserves UTF-8 split across chunks", async () => {
   const stdout = "你好，Relay\n";
@@ -329,6 +434,7 @@ test("relay daemon advertises only agents with passing capability preflight", as
 
   assert.equal(registrations[0].supportedAgents.includes("codex"), true);
   assert.equal(registrations[0].supportedAgents.includes("kimi"), false);
+  assert.equal(registrations[0].sandboxMode, "boxlite");
   assert.equal(registrations[0].agentHealth?.kimi?.status, "failed");
   assert.match(registrations[0].agentHealth?.kimi?.detail ?? "", /not logged in/);
 });

@@ -320,6 +320,7 @@ describe("TUI daemon runner", () => {
     globalThis.fetch = (async (): Promise<Response> => new Response(JSON.stringify({
       nodes: [
         {
+          id: "sbx_other",
           employeeId: "alice",
           workspacePath: "/workspace/other",
           online: true,
@@ -328,7 +329,7 @@ describe("TUI daemon runner", () => {
       ],
     }), { status: 200, headers: { "Content-Type": "application/json" } })) as typeof fetch;
     try {
-      assert.equal(await liveDaemonExists("http://daemon.local", "alice", "/workspace/current"), false);
+      assert.equal(await liveDaemonExists("http://daemon.local", "alice", "/workspace/current", "sbx_alice"), false);
     } finally {
       globalThis.fetch = oldFetch;
     }
@@ -336,6 +337,7 @@ describe("TUI daemon runner", () => {
     globalThis.fetch = (async (): Promise<Response> => new Response(JSON.stringify({
       nodes: [
         {
+          id: "sbx_other",
           employeeId: "alice",
           workspacePath: "/workspace/current",
           online: true,
@@ -344,7 +346,8 @@ describe("TUI daemon runner", () => {
       ],
     }), { status: 200, headers: { "Content-Type": "application/json" } })) as typeof fetch;
     try {
-      assert.equal(await liveDaemonExists("http://daemon.local", "alice", "/workspace/current"), true);
+      assert.equal(await liveDaemonExists("http://daemon.local", "alice", "/workspace/current", "sbx_alice"), false);
+      assert.equal(await liveDaemonExists("http://daemon.local", "alice", "/workspace/current", "sbx_other"), true);
     } finally {
       globalThis.fetch = oldFetch;
     }

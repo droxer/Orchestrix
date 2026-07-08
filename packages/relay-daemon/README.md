@@ -17,8 +17,8 @@ Required:
 Optional:
 
 - `RELAY_EMPLOYEE_ID`: employee id bound to this daemon node when preassigned.
-- `RELAY_SANDBOX_MODE`: `none` when the daemon already runs inside an agent box,
-  or `boxlite` when it should boot and own a BoxLite VM.
+- `RELAY_SANDBOX_MODE`: defaults to `boxlite`, where the daemon boots and owns a
+  BoxLite VM. Set `none` only when the daemon already runs inside an agent box.
 - `RELAY_USE_LOCAL_AGENT_HOME`: set to `1` in local mode to use this user's
   existing Claude/Codex/Kimi login and config directories.
 - `RELAY_DAEMON_HEARTBEAT_MS`: registration heartbeat interval.
@@ -56,8 +56,8 @@ Run the daemon:
 relay-daemon --sandbox-id "$RELAY_SANDBOX_ID"
 ```
 
-Run a local daemon against a specific host workspace using the user's installed
-Claude, Codex, and Kimi CLIs:
+Run a daemon that is already inside an agent box against a specific workspace
+using that box's installed Claude, Codex, and Kimi CLIs:
 
 ```sh
 relay-daemon \

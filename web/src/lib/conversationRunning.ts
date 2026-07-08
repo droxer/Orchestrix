@@ -27,3 +27,10 @@ export function canCancelConversationRun(input: {
 }): boolean {
   return Boolean(input.activeRun || input.session?.status === "running");
 }
+
+export function conversationCancelNodeId(input: {
+  node: Pick<DaemonNodeMonitorRecord, "id"> | undefined;
+  sandbox: { id: string } | undefined;
+}): string | undefined {
+  return input.node?.id ?? input.sandbox?.id;
+}

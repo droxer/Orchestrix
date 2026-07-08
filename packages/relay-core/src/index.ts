@@ -94,6 +94,7 @@ export {
   type DaemonNodeEvent,
   type DaemonNodeRegistration,
   type DaemonNodeRunCommand,
+  type DaemonNodeSandboxMode,
   type DaemonNodeStatus,
 } from "./daemon-node-protocol.js";
 

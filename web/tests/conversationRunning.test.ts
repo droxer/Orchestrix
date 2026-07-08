@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import {
   canCancelConversationRun,
+  conversationCancelNodeId,
   findActiveRunForSession,
   isConversationRunInFlight,
 } from "../src/lib/conversationRunning.js";
@@ -79,5 +80,19 @@ describe("conversationRunning", () => {
       activeRun: undefined,
       session: session("running"),
     }), true);
+  });
+
+  it("targets the visible daemon node before the sandbox snapshot when cancelling", () => {
+    assert.equal(conversationCancelNodeId({
+      node,
+      sandbox: { id: "sbx_stale_snapshot" },
+    }), "sbx_alice");
+  });
+
+  it("falls back to the sandbox snapshot when no visible daemon node exists", () => {
+    assert.equal(conversationCancelNodeId({
+      node: undefined,
+      sandbox: { id: "sbx_alice" },
+    }), "sbx_alice");
   });
 });
