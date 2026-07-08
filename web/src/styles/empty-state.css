@@ -3,7 +3,6 @@
 
    One visual language for transcript, board, and setup zero-data surfaces.
    Login reuses the same relay-rise keyframes (see login.css).
-   Atmosphere tokens live in tokens.css (--atmosphere-*).
    ===================================================================== */
 
 @keyframes relay-rise {
@@ -41,28 +40,7 @@
   }
 }
 
-/* Subtle grain + corner wash — reads --atmosphere-* from tokens.css */
-.relay-atmosphere {
-  position: relative;
-  isolation: isolate;
-  background: var(--atmosphere-background);
-}
-
-.relay-atmosphere::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  opacity: var(--atmosphere-grain-opacity);
-  background-image: var(--atmosphere-grain-image);
-  background-size: var(--atmosphere-grain-size);
-  mix-blend-mode: var(--atmosphere-grain-blend);
-}
-
-/* Bled "R" mark — the login signature extended to other atmosphere
-   surfaces. Rendered as an element because both pseudo-elements of
-   .relay-atmosphere hosts are already in use. */
+/* Bled "R" mark — the login signature extended to soft empty-state surfaces. */
 .relay-bleed-mark {
   position: absolute;
   right: -0.12em;
@@ -97,6 +75,8 @@ html[data-theme="contrast-dark"] .relay-bleed-mark {
 /* ── Empty state layout ───────────────────────────────────────────── */
 
 .relay-empty {
+  position: relative;
+  isolation: isolate;
   margin: auto;
   display: flex;
   flex-direction: column;
@@ -106,11 +86,6 @@ html[data-theme="contrast-dark"] .relay-bleed-mark {
   padding: var(--space-xxl) var(--space-xl);
   text-align: center;
   color: var(--color-ink);
-}
-
-.relay-empty--atmosphere {
-  border-radius: var(--radius-xl);
-  padding: var(--space-xxl) var(--space-lg);
 }
 
 .relay-empty--fill {

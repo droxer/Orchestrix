@@ -26,7 +26,7 @@
    un-bouncy motion; modest display sizes; dense row rhythm; and near-flat
    surfaces where hairlines — not shadows or grain — carry the chrome. The
    neutral ramp follows the same discipline: cool graphite dark, cool
-   off-white light, atmosphere reduced to a faint brand-tinted wash.
+   off-white light, and flat panels where hairlines carry the chrome.
    ===================================================================== */
 
 /* Layout breakpoints — reference values for @media queries (custom
@@ -153,7 +153,6 @@
 
   /* Surfaces — cool off-white */
   --color-canvas: #fcfcfd;
-  --color-surface-card: #fcfcfd;   /* feature/product cards on canvas */
   --color-surface-soft: #f8f8fa;   /* subtle tint — quotes, code, hover */
   --color-surface-strong: #f0f1f5; /* fills, search, avatars */
   --color-surface-raised: #ffffff; /* modals, drawers, floating chrome */
@@ -247,7 +246,6 @@
   --sidenav-w: 96px;
   --sidenav-w-open: 260px;
   --thread-w: 296px;
-  --drawer-w: 360px;
   --header-h: 60px;
 
   /* Z-index scale — named layers cover all floating chrome. Pick by role,
@@ -286,7 +284,6 @@
      every display size (only ~-0.008em at 30px), leaving headings looser and
      softer than Linear's crisp condensed display. */
   --letter-display: -0.022em;       /* display band (20–44px): admin/section titles, login headline, pullquote */
-  --letter-display-strong: -0.028em; /* mega/metric (30px+): admin metric values, largest display */
   --letter-tight: -0.014em;         /* title band (17–20px): card/panel titles */
   --letter-body: 0;               /* Geist body needs no optical tightening */
   --letter-open: 0.02em;          /* micro open tracking — compact chips, mono metadata, attributions */
@@ -307,7 +304,6 @@
   --type-title-md:   600 17px/1.35 var(--font-sans);
   --type-title-sm:   600 15px/1.3  var(--font-sans);
   --type-body-md:    400 16px/1.5  var(--font-sans);
-  --type-body-strong: 600 16px/1.5 var(--font-sans);
   --type-body-sm:    400 13px/1.5  var(--font-sans);
   --type-caption:    400 13px/1.5  var(--font-sans);
   --type-caption-strong: 600 12px/1.5 var(--font-sans);
@@ -318,7 +314,6 @@
      these are single-line by nature. Fills the gap below caption/caption-strong
      so small bold/medium chrome has a semantic home instead of raw size+weight. */
   --type-label-strong:      600 13px/1.4 var(--font-sans);  /* 13px bold chrome */
-  --type-caption-strong-sm: 600 13px/1.4 var(--font-sans);  /* 13px bold */
   --type-label-md:          500 13px/1.4 var(--font-sans);  /* 13px medium */
   --type-label:             500 12px/1.4 var(--font-sans);  /* 12px medium */
   --type-micro-strong:      600 11px/1.4 var(--font-sans);  /* 11px bold */
@@ -333,25 +328,10 @@
      floating surface dims the canvas identically. */
   --color-overlay: color-mix(in srgb, #000 55%, transparent);
 
-  /* Atmosphere — grain + corner wash for soft panels (login rail, KPI
-     hero, transcript empty). Components add .relay-atmosphere or read
-     --atmosphere-background directly. Disabled in high-contrast mode. */
-  --atmosphere-wash: radial-gradient(
-    ellipse 90% 70% at 100% 0%,
-    color-mix(in srgb, var(--color-primary) 5%, transparent),
-    transparent 65%
-  );
-  --atmosphere-grain-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
-  --atmosphere-grain-opacity: 0.1;
-  --atmosphere-grain-size: 180px 180px;
-  --atmosphere-grain-blend: multiply;
-  --atmosphere-background: var(--atmosphere-wash), var(--color-surface-soft);
-
   /* Status borders for outlined pills and danger buttons. Info is a
      standalone slate tone, not a brand/action alias. */
   --border-success: color-mix(in srgb, var(--color-semantic-up) 28%, transparent);
   --border-danger: color-mix(in srgb, var(--color-semantic-down) 32%, transparent);
-  --border-info: color-mix(in srgb, var(--color-info) 30%, transparent);
 
   /* Elevation — two surface contracts.
      --shadow-soft: just the drop. For surfaces that ALREADY have a 1px
@@ -453,7 +433,6 @@ html:lang(zh-TW) {
 html:lang(zh-CN),
 html:lang(zh-TW) {
   --letter-display: 0;
-  --letter-display-strong: 0;
   --letter-tight: 0;
   --letter-body: 0;
   --letter-caps: 0.02em;
@@ -463,7 +442,6 @@ html:lang(zh-TW) {
   --leading-normal: 1.7;
   --leading-loose: 1.8;
   --type-body-md:     400 16px/1.7 var(--font-sans);
-  --type-body-strong: 600 16px/1.7 var(--font-sans);
   --type-body-sm:     400 14px/1.7 var(--font-sans);
   --type-caption:     400 13px/1.65 var(--font-sans);
 }
@@ -498,7 +476,6 @@ html[data-theme="dark"] {
   /* Surfaces + hairlines — widen the dark ramp so canvas, fills, cards,
      and floating chrome read as distinct layers (not one flat void). */
   --color-canvas: var(--color-surface-dark);
-  --color-surface-card: color-mix(in srgb, var(--color-on-dark) 12%, var(--color-surface-dark));
   --color-surface-soft: color-mix(in srgb, var(--color-on-dark) 6%, var(--color-surface-dark));
   --color-surface-strong: color-mix(in srgb, var(--color-on-dark) 10%, var(--color-surface-dark));
   --color-surface-raised: color-mix(in srgb, var(--color-on-dark) 14%, var(--color-surface-dark));
@@ -544,20 +521,11 @@ html[data-theme="dark"] {
      as modal without washing out to grey. */
   --color-overlay: color-mix(in srgb, #000 72%, transparent);
 
-  --atmosphere-grain-opacity: 0.06;
-  --atmosphere-grain-blend: soft-light;
-  --atmosphere-wash: radial-gradient(
-    ellipse 90% 70% at 100% 0%,
-    color-mix(in srgb, var(--color-primary) 7%, transparent),
-    transparent 65%
-  );
-  --atmosphere-background: var(--atmosphere-wash), var(--color-surface-soft);
-
   color-scheme: dark;
 }
 
 /* High contrast — accessibility theme. Near-black on white, solid
-   hairlines, no grain, status hues at maximum legibility. Independent of
+   hairlines, flat panels, status hues at maximum legibility. Independent of
    the OS light/dark preference. */
 html[data-theme="contrast"] {
   --color-ink: #000000;
@@ -566,7 +534,6 @@ html[data-theme="contrast"] {
   --color-muted-soft: #454545;
 
   --color-canvas: #ffffff;
-  --color-surface-card: #ffffff;
   --color-surface-soft: #f5f5f5;
   --color-surface-strong: #ebebeb;
   --color-surface-raised: #ffffff;
@@ -604,15 +571,11 @@ html[data-theme="contrast"] {
   --ring-focus: 0 0 0 3px #000000;
   --ring-focus-danger: 0 0 0 3px #000000;
 
-  --atmosphere-wash: none;
-  --atmosphere-grain-opacity: 0;
-  --atmosphere-background: var(--color-surface-soft);
-
   color-scheme: light;
 }
 
 /* High contrast — dark variant. The mirror of html[data-theme="contrast"]:
-   pure white on black, solid hairlines, no grain, status hues at maximum
+   pure white on black, solid hairlines, flat panels, status hues at maximum
    legibility on the black canvas. `applyTheme("contrast")` resolves to this
    when the OS prefers dark, so a single "High contrast" choice follows the
    light/dark preference instead of forcing light. */
@@ -623,7 +586,6 @@ html[data-theme="contrast-dark"] {
   --color-muted-soft: #b0b0b0;
 
   --color-canvas: #000000;
-  --color-surface-card: #000000;
   --color-surface-soft: #0d0d0d;
   --color-surface-strong: #1c1c1c;
   --color-surface-raised: #000000;
@@ -660,10 +622,6 @@ html[data-theme="contrast-dark"] {
   --shadow-lift: 0 0 0 2px #ffffff;
   --ring-focus: 0 0 0 3px #ffffff;
   --ring-focus-danger: 0 0 0 3px #ffffff;
-
-  --atmosphere-wash: none;
-  --atmosphere-grain-opacity: 0;
-  --atmosphere-background: var(--color-surface-soft);
 
   color-scheme: dark;
 }
@@ -813,9 +771,6 @@ button[data-slot="button"][data-variant="default"]:disabled {
   color: var(--color-muted);
   font: var(--type-caption-strong);
   text-transform: none;
-}
-
-.panel-kicker {
   display: flex;
   align-items: center;
   gap: var(--space-sm);

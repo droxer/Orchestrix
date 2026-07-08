@@ -2,7 +2,7 @@
    Login — editorial split surface
 
    Two-pane composition: a left rail carrying the form and a right pane
-   carrying atmosphere (pull-quote + system status). The split collapses
+   carrying the pull-quote + system status. The split collapses
    to a single column under 880px; the right pane is hidden rather than
    stacked, since stacking the editorial moment under a form turns it
    into decorative noise instead of context.
@@ -242,39 +242,27 @@
 
 /* ---------- Right pane: the editorial moment --------------------- */
 
-.login-atmosphere {
+.login-editorial {
   position: relative;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   padding: var(--space-xxl) clamp(var(--space-lg), 5vw, var(--space-xxl));
-  background: var(--atmosphere-background);
+  background: var(--color-surface-soft);
   color: var(--color-ink);
   overflow: hidden;
   isolation: isolate;
 }
 
 @media (max-width: 879px) {
-  .login-atmosphere {
+  .login-editorial {
     display: none;
   }
 }
 
-.login-atmosphere::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -2;
-  pointer-events: none;
-  opacity: var(--atmosphere-grain-opacity);
-  background-image: var(--atmosphere-grain-image);
-  background-size: var(--atmosphere-grain-size);
-  mix-blend-mode: var(--atmosphere-grain-blend);
-}
-
-/* Atmospheric mark — a single oversized character bled to the
+/* Bled mark — a single oversized character bled to the
    corner. Adds depth without competing with the pull-quote. */
-.login-atmosphere::before {
+.login-editorial::before {
   content: "R";
   position: absolute;
   right: -0.12em;
@@ -291,11 +279,11 @@
   user-select: none;
 }
 
-html[data-theme="dark"] .login-atmosphere::before {
+html[data-theme="dark"] .login-editorial::before {
   color: color-mix(in srgb, var(--color-ink) 3%, transparent);
 }
 
-.login-atmosphere-top {
+.login-editorial-top {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
@@ -308,7 +296,7 @@ html[data-theme="dark"] .login-atmosphere::before {
   animation-delay: 160ms;
 }
 
-.login-atmosphere-top::after {
+.login-editorial-top::after {
   content: "";
   flex: 1;
   height: 1px;
@@ -483,7 +471,7 @@ html[data-theme="dark"] .login-atmosphere::before {
   .login-lede,
   .login-form,
   .login-toggle,
-  .login-atmosphere-top,
+  .login-editorial-top,
   .login-pullquote,
   .login-system {
     animation: none;

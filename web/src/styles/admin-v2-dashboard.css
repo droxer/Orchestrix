@@ -29,7 +29,7 @@
 }
 
 /* Hairline grid overlay — control-room depth on the full KPI band. */
-.adm-dash-kpis.relay-atmosphere::after {
+.adm-dash-kpis::after {
   content: "";
   position: absolute;
   inset: 0;

@@ -191,7 +191,7 @@
   border-radius: var(--radius-sm);
   background: var(--color-primary);
   color: var(--color-on-primary);
-  font: var(--type-caption-strong-sm);
+  font: var(--type-label-strong);
 }
 
 .pref-save:disabled {
@@ -409,7 +409,7 @@
   border-radius: var(--radius-sm);
   background: var(--color-canvas);
   color: var(--color-ink);
-  font: var(--type-caption-strong-sm);
+  font: var(--type-label-strong);
   cursor: pointer;
 }
 

@@ -36,31 +36,12 @@
 }
 
 .admin-console.adm-bare {
-  background: var(--atmosphere-background);
+  background: var(--color-surface-soft);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: var(--space-xxl) var(--space-lg);
   min-height: 100%;
-  position: relative;
-  isolation: isolate;
-}
-
-.admin-console.adm-bare::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  opacity: var(--atmosphere-grain-opacity);
-  background-image: var(--atmosphere-grain-image);
-  background-size: var(--atmosphere-grain-size);
-  mix-blend-mode: var(--atmosphere-grain-blend);
-}
-
-.admin-console.adm-bare > * {
-  position: relative;
-  z-index: 1;
 }
 
 .adm-loading {

@@ -499,7 +499,7 @@
 }
 
 .adm-node-card-name {
-  font: var(--type-caption-strong-sm);
+  font: var(--type-label-strong);
   color: var(--color-ink);
   max-width: 100%;
   overflow: hidden;
@@ -689,7 +689,7 @@
   border-radius: var(--radius-xs);
   background: var(--color-surface-raised);
   color: var(--color-ink);
-  font: var(--type-caption-strong-sm);
+  font: var(--type-label-strong);
   cursor: pointer;
   transition:
     border-color var(--duration-fast) var(--ease-standard),
@@ -758,7 +758,7 @@
 }
 
 .adm-agent-toggle-name {
-  font: var(--type-caption-strong-sm);
+  font: var(--type-label-strong);
   text-transform: uppercase;
   letter-spacing: var(--letter-caps);
   color: var(--color-ink);
@@ -826,7 +826,7 @@
 
 .adm-agent-toggle-label {
   min-width: 4.5rem;
-  font: var(--type-caption-strong-sm);
+  font: var(--type-label-strong);
   color: var(--color-body);
 }
 
@@ -1222,7 +1222,7 @@
   color: var(--brand, var(--color-ink));
   background: color-mix(in srgb, var(--brand, var(--color-muted)) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--brand, var(--color-muted)) 22%, transparent);
-  font: var(--type-caption-strong-sm);
+  font: var(--type-label-strong);
 }
 
 .adm-chat-avatar--lg {

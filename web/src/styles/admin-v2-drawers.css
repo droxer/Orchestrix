@@ -389,7 +389,7 @@ html[data-theme="light"] .adm-drawer.dark {
   border-radius: var(--radius-full);
   background: var(--color-primary);
   color: var(--color-on-primary);
-  font: var(--type-caption-strong-sm);
+  font: var(--type-label-strong);
   letter-spacing: var(--letter-caps);
   flex-shrink: 0;
 }
@@ -519,7 +519,7 @@ html[data-theme="light"] .adm-drawer.dark {
 }
 
 .adm-assign-node-id {
-  font: var(--type-caption-strong-sm);
+  font: var(--type-label-strong);
   color: var(--color-ink);
   word-break: break-all;
 }
@@ -575,7 +575,7 @@ html[data-theme="light"] .adm-drawer.dark {
 
 .adm-assign-empty-title {
   margin: 0 0 var(--space-xxs);
-  font: var(--type-caption-strong-sm);
+  font: var(--type-label-strong);
   color: var(--color-ink);
 }
 

@@ -116,7 +116,6 @@ export function PeopleView({
       <RelayEmptyState
         className="adm-people-empty"
         fill
-        atmosphere
         title={t("admin.v2.empty_people_title")}
         body={t("admin.v2.empty_people_body")}
         illustration={<Users size={40} strokeWidth={1.25} aria-hidden="true" />}

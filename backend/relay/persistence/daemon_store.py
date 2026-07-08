@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from collections import defaultdict
 from datetime import timedelta
 from pathlib import Path
 from threading import RLock
 from typing import Any
 
-from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, MetaData, Table, Text, Uuid, create_engine, delete, insert, select, update
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, MetaData, Table, Text, Uuid, create_engine, delete, func, insert, select, update
 
 from .store_common import (
     DEFAULT_RELAY_DATA_DIR,
@@ -23,10 +24,52 @@ from .store_common import (
 )
 
 
+TERMINAL_DAEMON_STATUSES = frozenset({"completed", "failed", "cancelled"})
+
+
+def _node_for_storage(node: dict[str, Any]) -> dict[str, Any]:
+    stored = {**node, "token": None}
+    stored.pop("nodeToken", None)
+    return stored
+
+
+def _terminal_timestamp(record: dict[str, Any]) -> str:
+    return record.get("completedAt") or record.get("updatedAt") or record.get("createdAt") or ""
+
+
+def _database_terminal_timestamp(row: Any) -> str:
+    value = row.get("completed_at") or row.get("updated_at") or row.get("created_at")
+    if isinstance(value, str):
+        return value
+    return _format_iso(value) or ""
+
+
+def terminal_database_ids_to_prune(rows: list[Any], cutoff: str, per_node_limit: int) -> list[str]:
+    records_by_node: dict[str, list[Any]] = defaultdict(list)
+    for row in rows:
+        records_by_node[row["node_public_id"]].append(row)
+    database_ids: list[str] = []
+    for records in records_by_node.values():
+        records.sort(key=_database_terminal_timestamp, reverse=True)
+        for index, row in enumerate(records):
+            if index < per_node_limit and _database_terminal_timestamp(row) > cutoff:
+                continue
+            database_ids.append(row["id"])
+    return database_ids
+
+
 class LocalDaemonStore:
+    """File-backed daemon store for a single backend process.
+
+    The in-process lock and queued-command index are intentionally not
+    interprocess coordination primitives. Multi-process deployments must use
+    DatabaseDaemonStore.
+    """
+
     def __init__(self, root_dir: str | Path = DEFAULT_RELAY_DATA_DIR):
         root = Path(root_dir)
         self._lock = RLock()
+        self._nonterminal_command_ids_by_node: dict[str, set[str]] = {}
         self.nodes_dir = root / "daemon" / "nodes"
         self.commands_dir = root / "daemon" / "commands"
         self.runs_dir = root / "daemon" / "runs"
@@ -34,11 +77,12 @@ class LocalDaemonStore:
         self.events_dir = root / "daemon" / "events"
         for path in (self.nodes_dir, self.commands_dir, self.runs_dir, self.run_requests_dir, self.events_dir):
             path.mkdir(parents=True, exist_ok=True)
+        self._rebuild_command_index()
 
     def register_node(self, sandbox: dict[str, Any]) -> dict[str, Any]:
         with self._lock:
-            node = {**sandbox, "token": None}
-            _write_json(self.nodes_dir / f"{safe_name(node['id'])}.json", node, 0o600)
+            node = _node_for_storage(sandbox)
+            self._write_node(node)
             self.append_daemon_event(daemon_event("daemon.node.registered", {"node": node}))
             return node
 
@@ -52,7 +96,7 @@ class LocalDaemonStore:
             updated = {**node, **{k: v for k, v in patch.items() if v is not None}, "updatedAt": now, "lastSeenAt": now}
             if patch.get("lastError") is None and "lastError" in patch:
                 updated.pop("lastError", None)
-            _write_json(self.nodes_dir / f"{safe_name(node_id)}.json", updated, 0o600)
+            self._write_node(updated)
             self.append_daemon_event(daemon_event("daemon.node.seen", {"nodeId": node_id, "patch": {**patch, "lastSeenAt": now}}))
             return updated
 
@@ -63,7 +107,7 @@ class LocalDaemonStore:
         if node.get("employeeId"):
             raise ValueError("Daemon node is already assigned.")
         updated = {**node, "employeeId": employee_id, "updatedAt": now_iso()}
-        _write_json(self.nodes_dir / f"{safe_name(node_id)}.json", updated, 0o600)
+        self._write_node(updated)
         self.append_daemon_event(daemon_event("daemon.node.assigned", {"nodeId": node_id, "employeeId": employee_id}))
         return updated
 
@@ -76,7 +120,7 @@ class LocalDaemonStore:
             updated["disabledAgents"] = list(disabled_agents)
         else:
             updated.pop("disabledAgents", None)
-        _write_json(self.nodes_dir / f"{safe_name(node_id)}.json", updated, 0o600)
+        self._write_node(updated)
         self.append_daemon_event(daemon_event("daemon.node.disabled_agents_updated", {
             "nodeId": node_id,
             "disabledAgents": list(disabled_agents),
@@ -92,7 +136,7 @@ class LocalDaemonStore:
             updated["agentRoleDefaults"] = dict(role_defaults)
         else:
             updated.pop("agentRoleDefaults", None)
-        _write_json(self.nodes_dir / f"{safe_name(node_id)}.json", updated, 0o600)
+        self._write_node(updated)
         self.append_daemon_event(daemon_event("daemon.node.agent_role_defaults_updated", {
             "nodeId": node_id,
             "agentRoleDefaults": dict(role_defaults),
@@ -108,7 +152,7 @@ class LocalDaemonStore:
             updated["agentRoleOverrides"] = dict(role_overrides)
         else:
             updated.pop("agentRoleOverrides", None)
-        _write_json(self.nodes_dir / f"{safe_name(node_id)}.json", updated, 0o600)
+        self._write_node(updated)
         self.append_daemon_event(daemon_event("daemon.node.agent_role_overrides_updated", {
             "nodeId": node_id,
             "agentRoleOverrides": dict(role_overrides),
@@ -122,7 +166,7 @@ class LocalDaemonStore:
         previous = node.get("employeeId")
         updated = {k: v for k, v in node.items() if k not in ("employeeId", "agentRoleOverrides")}
         updated["updatedAt"] = now_iso()
-        _write_json(self.nodes_dir / f"{safe_name(node_id)}.json", updated, 0o600)
+        self._write_node(updated)
         self.append_daemon_event(daemon_event("daemon.node.unassigned", {"nodeId": node_id, "previousEmployeeId": previous}))
         return updated
 
@@ -134,6 +178,7 @@ class LocalDaemonStore:
             if record.get("nodeId") == node_id:
                 command_path = self.commands_dir / f"{safe_name(record['id'])}.json"
                 command_path.unlink(missing_ok=True)
+                self._remove_command_from_index(node_id, record["id"])
         for path in self.runs_dir.glob("*.json"):
             run = _read_json(path)
             if run.get("nodeId") == node_id:
@@ -170,15 +215,17 @@ class LocalDaemonStore:
                     "status": "running",
                     "startedAt": now,
                 })
+            self._index_command(record)
             self.append_daemon_event(daemon_event("daemon.command.queued", {"nodeId": node_id, "commandId": command["id"]}))
             return record
 
     def take_queued_commands(self, node_id: str, limit: int = 2**53, lease_seconds: float = 60.0) -> list[dict[str, Any]]:
         with self._lock:
             now = now_iso()
+            # Safe only inside the single backend process that owns this store.
             records = [
                 record
-                for record in self._list_commands()
+                for record in self._command_records_for_node(node_id)
                 if record["nodeId"] == node_id and command_is_available(record, now)
             ]
             records = sorted(records, key=lambda item: item["createdAt"])[:limit]
@@ -198,13 +245,24 @@ class LocalDaemonStore:
                     updated["status"] = "completed"
                     updated["completedAt"] = now
                 _write_json(self.commands_dir / f"{safe_name(record['id'])}.json", updated)
+                if updated["status"] in TERMINAL_DAEMON_STATUSES:
+                    self._remove_command_from_index(node_id, updated["id"])
+                else:
+                    self._index_command(updated)
                 self.append_daemon_event(daemon_event("daemon.command.dispatched", {"nodeId": node_id, "commandId": record["id"]}))
                 result.append(updated)
             return result
 
     def queued_command_count(self, node_id: str) -> int:
         now = now_iso()
-        return len([record for record in self._list_commands() if record["nodeId"] == node_id and command_is_available(record, now)])
+        return len([record for record in self._command_records_for_node(node_id) if command_is_available(record, now)])
+
+    def queued_command_counts(self) -> dict[str, int]:
+        now = now_iso()
+        return {
+            node_id: len([record for record in self._command_records_for_node(node_id) if command_is_available(record, now)])
+            for node_id in list(self._nonterminal_command_ids_by_node.keys())
+        }
 
     def renew_command_leases(self, node_id: str, command_ids: list[str], lease_seconds: float = 60.0) -> None:
         if not command_ids:
@@ -212,7 +270,7 @@ class LocalDaemonStore:
         with self._lock:
             now = now_iso()
             requested = set(command_ids)
-            for record in self._list_commands():
+            for record in self._command_records_for_node(node_id):
                 if record["nodeId"] != node_id or record["id"] not in requested or record.get("status") != "dispatched":
                     continue
                 updated = {
@@ -293,6 +351,23 @@ class LocalDaemonStore:
     def mark_command_cancelled(self, node_id: str, event: dict[str, Any]) -> None:
         self._mark_command_terminal(node_id, event, "cancelled", None, event.get("reason"))
 
+    def prune_terminal_records(self, retention_seconds: float, per_node_limit: int) -> dict[str, int]:
+        cutoff = _format_iso(_parse_iso(now_iso()) - timedelta(seconds=max(0.0, retention_seconds)))
+        per_node_limit = max(0, per_node_limit)
+        with self._lock:
+            deleted_commands = self._prune_terminal_files(
+                self.commands_dir,
+                cutoff=cutoff,
+                per_node_limit=per_node_limit,
+                on_delete=lambda record: self._remove_command_from_index(record["nodeId"], record["id"]),
+            )
+            deleted_runs = self._prune_terminal_files(
+                self.runs_dir,
+                cutoff=cutoff,
+                per_node_limit=per_node_limit,
+            )
+        return {"commands": deleted_commands, "runs": deleted_runs}
+
     def append_daemon_event(self, event: dict[str, Any]) -> None:
         _append_jsonl(self.events_dir / "events.jsonl", event)
 
@@ -308,6 +383,7 @@ class LocalDaemonStore:
                 **({"exitCode": exit_code} if exit_code is not None else {}),
                 **({"error": error} if error else {}),
             })
+            self._remove_command_from_index(node_id, command["id"])
         run = self._get_run(event["runId"]) or {
             "nodeId": node_id,
             "commandId": event["commandId"],
@@ -334,12 +410,73 @@ class LocalDaemonStore:
             **({"error": error} if error else {}),
         }))
 
+    def _write_node(self, node: dict[str, Any]) -> None:
+        stored = _node_for_storage(node)
+        _write_json(self.nodes_dir / f"{safe_name(stored['id'])}.json", stored, 0o600)
+
     def _list_commands(self) -> list[dict[str, Any]]:
         return [_read_json(path) for path in self.commands_dir.glob("*.json")]
 
     def _get_command(self, command_id: str) -> dict[str, Any] | None:
         path = self.commands_dir / f"{safe_name(command_id)}.json"
         return _read_json(path) if path.exists() else None
+
+    def _rebuild_command_index(self) -> None:
+        self._nonterminal_command_ids_by_node = {}
+        for record in self._list_commands():
+            self._index_command(record)
+
+    def _index_command(self, record: dict[str, Any]) -> None:
+        if record.get("status") in TERMINAL_DAEMON_STATUSES:
+            self._remove_command_from_index(record["nodeId"], record["id"])
+            return
+        self._nonterminal_command_ids_by_node.setdefault(record["nodeId"], set()).add(record["id"])
+
+    def _remove_command_from_index(self, node_id: str, command_id: str) -> None:
+        command_ids = self._nonterminal_command_ids_by_node.get(node_id)
+        if not command_ids:
+            return
+        command_ids.discard(command_id)
+        if not command_ids:
+            self._nonterminal_command_ids_by_node.pop(node_id, None)
+
+    def _command_records_for_node(self, node_id: str) -> list[dict[str, Any]]:
+        records = []
+        for command_id in list(self._nonterminal_command_ids_by_node.get(node_id, set())):
+            record = self._get_command(command_id)
+            if not record:
+                self._remove_command_from_index(node_id, command_id)
+                continue
+            if record.get("status") in TERMINAL_DAEMON_STATUSES:
+                self._remove_command_from_index(node_id, command_id)
+                continue
+            records.append(record)
+        return records
+
+    def _prune_terminal_files(
+        self,
+        directory: Path,
+        *,
+        cutoff: str,
+        per_node_limit: int,
+        on_delete: Any | None = None,
+    ) -> int:
+        records_by_node: dict[str, list[tuple[dict[str, Any], Path]]] = defaultdict(list)
+        for path in directory.glob("*.json"):
+            record = _read_json(path)
+            if record.get("status") in TERMINAL_DAEMON_STATUSES:
+                records_by_node[record["nodeId"]].append((record, path))
+        deleted = 0
+        for records in records_by_node.values():
+            records.sort(key=lambda item: _terminal_timestamp(item[0]), reverse=True)
+            for index, (record, path) in enumerate(records):
+                if index < per_node_limit and _terminal_timestamp(record) > cutoff:
+                    continue
+                path.unlink(missing_ok=True)
+                if on_delete:
+                    on_delete(record)
+                deleted += 1
+        return deleted
 
     def _get_run(self, run_id: str) -> dict[str, Any] | None:
         path = self.runs_dir / f"{safe_name(run_id)}.json"
@@ -463,7 +600,7 @@ class DatabaseDaemonStore:
             self.metadata.create_all(self.engine)
 
     def register_node(self, sandbox: dict[str, Any]) -> dict[str, Any]:
-        node = {**sandbox, "token": None}
+        node = _node_for_storage(sandbox)
         values = node_to_row(node)
         with self.engine.begin() as conn:
             existing = conn.scalar(select(self.nodes.c.id).where(self.nodes.c.public_id == node["id"]))
@@ -676,6 +813,20 @@ class DatabaseDaemonStore:
                 )
             ).all())
 
+    def queued_command_counts(self) -> dict[str, int]:
+        now = now_iso()
+        now_dt = _parse_iso(now)
+        with self.engine.begin() as conn:
+            rows = conn.execute(
+                select(self.commands.c.node_public_id, func.count(self.commands.c.id))
+                .where(
+                    (self.commands.c.status == "queued")
+                    | ((self.commands.c.status == "dispatched") & (self.commands.c.lease_expires_at <= now_dt))
+                )
+                .group_by(self.commands.c.node_public_id)
+            ).all()
+        return {row[0]: row[1] for row in rows}
+
     def renew_command_leases(self, node_id: str, command_ids: list[str], lease_seconds: float = 60.0) -> None:
         if not command_ids:
             return
@@ -791,6 +942,29 @@ class DatabaseDaemonStore:
 
     def mark_command_cancelled(self, node_id: str, event: dict[str, Any]) -> None:
         self._mark_command_terminal(node_id, event, "cancelled", None, event.get("reason"))
+
+    def prune_terminal_records(self, retention_seconds: float, per_node_limit: int) -> dict[str, int]:
+        cutoff = _format_iso(_parse_iso(now_iso()) - timedelta(seconds=max(0.0, retention_seconds)))
+        per_node_limit = max(0, per_node_limit)
+        deleted_commands = 0
+        deleted_runs = 0
+        with self.engine.begin() as conn:
+            command_rows = conn.execute(
+                select(self.commands)
+                .where(self.commands.c.status.in_(TERMINAL_DAEMON_STATUSES))
+            ).mappings().all()
+            command_ids = terminal_database_ids_to_prune(command_rows, cutoff, per_node_limit)
+            if command_ids:
+                deleted_commands = conn.execute(delete(self.commands).where(self.commands.c.id.in_(command_ids))).rowcount or 0
+
+            run_rows = conn.execute(
+                select(self.runs)
+                .where(self.runs.c.status.in_(TERMINAL_DAEMON_STATUSES))
+            ).mappings().all()
+            run_ids = terminal_database_ids_to_prune(run_rows, cutoff, per_node_limit)
+            if run_ids:
+                deleted_runs = conn.execute(delete(self.runs).where(self.runs.c.id.in_(run_ids))).rowcount or 0
+        return {"commands": deleted_commands, "runs": deleted_runs}
 
     def append_daemon_event(self, event: dict[str, Any]) -> None:
         with self.engine.begin() as conn:

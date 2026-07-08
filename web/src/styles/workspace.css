@@ -291,7 +291,7 @@
   background: var(--color-canvas);
   color: var(--color-muted);
   cursor: pointer;
-  font: var(--type-caption-strong-sm);
+  font: var(--type-label-strong);
 }
 
 .code-view-toggle + .code-view-toggle {
@@ -387,7 +387,7 @@
   padding: 0 var(--space-sm);
   color: var(--color-body);
   cursor: pointer;
-  font: var(--type-caption-strong-sm);
+  font: var(--type-label-strong);
 }
 
 .workspace-preview-open:hover {

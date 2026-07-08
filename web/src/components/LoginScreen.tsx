@@ -196,8 +196,8 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
         </footer>
       </section>
 
-      <aside className="login-atmosphere" aria-hidden="true">
-        <div className="login-atmosphere-top">
+      <aside className="login-editorial" aria-hidden="true">
+        <div className="login-editorial-top">
           <span>{t("login.system_label")}</span>
         </div>
 

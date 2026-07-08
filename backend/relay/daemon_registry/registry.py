@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import asyncio
 import base64
+from collections import defaultdict
 import hashlib
 import hmac
 import mimetypes
@@ -30,6 +30,9 @@ DAEMON_NODE_LIVENESS_TIMEOUT_MS = int(os.environ.get("RELAY_DAEMON_NODE_LIVENESS
 DAEMON_RUN_TIMEOUT_MS = int(os.environ.get("RELAY_DAEMON_RUN_TIMEOUT_MS", str(15 * 60 * 1000)))
 DAEMON_COMMAND_LEASE_SECONDS = float(os.environ.get("RELAY_DAEMON_COMMAND_LEASE_SECONDS", "60"))
 DAEMON_ACTIVE_COMMAND_LEASE_SECONDS = max(DAEMON_COMMAND_LEASE_SECONDS, (DAEMON_RUN_TIMEOUT_MS / 1000) + 60)
+DAEMON_COMMAND_RETENTION_SECONDS = float(os.environ.get("RELAY_DAEMON_COMMAND_RETENTION_SECONDS", str(6 * 60 * 60)))
+DAEMON_TERMINAL_RECORD_LIMIT = int(os.environ.get("RELAY_DAEMON_TERMINAL_RECORD_LIMIT", "500"))
+DAEMON_RECORD_PRUNE_INTERVAL_SECONDS = float(os.environ.get("RELAY_DAEMON_RECORD_PRUNE_INTERVAL_SECONDS", "60"))
 AGENT_TASK_MODES = ("action", "review", "ask")
 # ".key" is deliberately absent: it matches TLS/SSH private keys far more
 # often than Keynote decks, and indexed files become downloadable artifacts.
@@ -472,11 +475,13 @@ class DaemonNodeRegistry:
         self.liveness_timeout_ms = liveness_timeout_ms
         self.sandboxes: dict[str, dict[str, Any]] = {}
         self.active_commands: dict[str, dict[str, Any]] = {}
-        self.completions: dict[str, asyncio.Future[dict[str, Any]]] = {}
         self.outputs: dict[str, list[str]] = {}
-        self.output_sequences: dict[str, set[int]] = {}
+        self.output_sequences: dict[str, set[tuple[str, int]]] = {}
+        self.output_sequences_hydrated: set[str] = set()
         self.plain_node_tokens: dict[str, str] = {}
         self.dispatch_lock = RLock()
+        self._last_reap_at = 0.0
+        self._last_prune_at = 0.0
         self._load_persisted_state()
 
     def register(self, payload: dict[str, Any], ui_token: str | None = None) -> dict[str, Any]:
@@ -563,14 +568,18 @@ class DaemonNodeRegistry:
         logger.debug("Daemon node status updated", sandbox_id=sandbox_id, status=status)
 
     def monitor_nodes(self) -> list[dict[str, Any]]:
-        self.reap_stale_runs()
+        self.reap_stale_runs(force=False)
+        active_runs_by_node: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        for run in self.daemon_store.list_active_runs():
+            active_runs_by_node[run["nodeId"]].append(run)
+        queued_counts = self.daemon_store.queued_command_counts()
         nodes = []
-        for sandbox in self.list_ready():
+        for sandbox in sorted(self.sandboxes.values(), key=lambda item: self._selection_key(item, active_runs_by_node.get(item["id"], []))):
             liveness = self._liveness(sandbox)
             nodes.append({
                 **public_sandbox_record(sandbox),
-                "queuedCommandCount": self.daemon_store.queued_command_count(sandbox["id"]),
-                "activeRuns": [daemon_active_run(run) for run in self.daemon_store.list_active_runs(sandbox["id"])],
+                "queuedCommandCount": queued_counts.get(sandbox["id"], 0),
+                "activeRuns": [daemon_active_run(run) for run in active_runs_by_node.get(sandbox["id"], [])],
                 "online": liveness["online"],
                 "stale": liveness["stale"],
                 **({"lastSeenAgeMs": liveness["lastSeenAgeMs"]} if "lastSeenAgeMs" in liveness else {}),
@@ -682,11 +691,8 @@ class DaemonNodeRegistry:
         for command_id, command in list(self.active_commands.items()):
             if command.get("sandboxId") == sandbox_id or command.get("nodeId") == sandbox_id:
                 self.active_commands.pop(command_id, None)
-                future = self.completions.pop(command_id, None)
-                if future and not future.done():
-                    future.set_exception(RuntimeError("Daemon node deleted."))
-                self.outputs.pop(command_id, None)
-                self.output_sequences.pop(command_id, None)
+                if command.get("runId"):
+                    self.clear_run_output(command["runId"])
         logger.info("Daemon node deleted", sandbox_id=sandbox_id)
 
     def provision_pending(self, employee_id: str | None = None, workspace_path: str | None = None) -> tuple[dict[str, Any], str | None, str | None]:
@@ -730,10 +736,10 @@ class DaemonNodeRegistry:
             return None
         return sorted(matches, key=self._selection_key)[0]
 
-    def _selection_key(self, sandbox: dict[str, Any]) -> tuple[int, int, float, str]:
+    def _selection_key(self, sandbox: dict[str, Any], active_runs: list[dict[str, Any]] | None = None) -> tuple[int, int, float, str]:
         liveness = self._liveness(sandbox)
         timestamp = sandbox.get("lastSeenAt") or sandbox.get("updatedAt") or sandbox.get("createdAt") or ""
-        active_runs = self.daemon_store.list_active_runs(sandbox["id"])
+        active_runs = active_runs if active_runs is not None else self.daemon_store.list_active_runs(sandbox["id"])
         try:
             seen_at = datetime.fromisoformat(timestamp.replace("Z", "+00:00")).timestamp()
         except ValueError:
@@ -833,11 +839,6 @@ class DaemonNodeRegistry:
         if active_ids:
             self.daemon_store.renew_command_leases(sandbox_id, active_ids, lease_seconds=lease_seconds)
 
-    async def wait_for_completion(self, command_id: str, timeout_ms: int = DAEMON_RUN_TIMEOUT_MS) -> dict[str, Any]:
-        future: asyncio.Future[dict[str, Any]] = asyncio.get_running_loop().create_future()
-        self.completions[command_id] = future
-        return await asyncio.wait_for(future, timeout=timeout_ms / 1000)
-
     def start_run_request(self, sandbox_id: str, session_id: str, task_goal: str, assignments: list[dict[str, Any]], state: dict[str, Any], task_id: str | None = None) -> dict[str, Any]:
         if self.daemon_store.active_run_request_for_session(sandbox_id, session_id):
             raise ValueError(f"Session {session_id} already has an active daemon run.")
@@ -888,13 +889,11 @@ class DaemonNodeRegistry:
         if hasattr(self.daemon_store, "renew_command_leases"):
             self.daemon_store.renew_command_leases(sandbox_id, [event["commandId"]], lease_seconds=DAEMON_ACTIVE_COMMAND_LEASE_SECONDS)
         if event["type"] == "run.output":
-            seen = self.output_sequences.setdefault(event["runId"], set())
-            if event["sequence"] in seen:
+            seen = self._output_sequences_for_run(event["sessionId"], event["runId"])
+            sequence_key = (event["stream"], event["sequence"])
+            if sequence_key in seen:
                 return
-            if self._session_has_output_sequence(event["sessionId"], event["runId"], event["stream"], event["sequence"]):
-                seen.add(event["sequence"])
-                return
-            seen.add(event["sequence"])
+            seen.add(sequence_key)
             self.outputs.setdefault(event["runId"], []).append(event["text"])
             self.store.append_event(event["sessionId"], relay_event("agent.output", event["sessionId"], {
                 "runId": event["runId"],
@@ -914,17 +913,19 @@ class DaemonNodeRegistry:
         else:
             logger.warning("Agent run failed on daemon node", sandbox_id=sandbox_id, command_id=event["commandId"], run_id=event["runId"], agent=event["agent"], mode=event["mode"], error=event.get("error"))
             self.daemon_store.mark_command_failed(sandbox_id, event)
-        future = self.completions.pop(event["commandId"], None)
-        if future and not future.done():
-            future.set_result(event)
-            return
         run_request = self.daemon_store.run_request_for_command(event["commandId"])
         if run_request:
             self._advance_run_request(run_request, event)
         else:
             self.clear_run_output(event["runId"])
 
-    def reap_stale_runs(self) -> None:
+    def reap_stale_runs(self, *, force: bool = True) -> None:
+        monotonic_now = time.monotonic()
+        if not force and monotonic_now - self._last_reap_at < max(0.001, self.liveness_timeout_ms / 1000):
+            self._maybe_prune_terminal_records(monotonic_now)
+            return
+        self._last_reap_at = monotonic_now
+        self._maybe_prune_terminal_records(monotonic_now)
         for request in self.daemon_store.list_active_run_requests():
             sandbox = self.sandboxes.get(request["nodeId"])
             if not sandbox:
@@ -937,6 +938,17 @@ class DaemonNodeRegistry:
                 continue
             if not self._liveness(sandbox)["online"]:
                 self._fail_run_request(request, "Daemon node heartbeat expired while run was active.")
+
+    def _maybe_prune_terminal_records(self, monotonic_now: float) -> None:
+        if not hasattr(self.daemon_store, "prune_terminal_records"):
+            return
+        if monotonic_now - self._last_prune_at < DAEMON_RECORD_PRUNE_INTERVAL_SECONDS:
+            return
+        self._last_prune_at = monotonic_now
+        self.daemon_store.prune_terminal_records(
+            retention_seconds=DAEMON_COMMAND_RETENTION_SECONDS,
+            per_node_limit=DAEMON_TERMINAL_RECORD_LIMIT,
+        )
 
     def _enqueue_current_assignment(self, run_request: dict[str, Any]) -> dict[str, Any]:
         assignments = run_request["assignments"]
@@ -1180,20 +1192,29 @@ class DaemonNodeRegistry:
     def clear_run_output(self, run_id: str) -> None:
         self.outputs.pop(run_id, None)
         self.output_sequences.pop(run_id, None)
+        self.output_sequences_hydrated.discard(run_id)
 
-    def _session_has_output_sequence(self, session_id: str, run_id: str, stream: str, sequence: int) -> bool:
+    def _output_sequences_for_run(self, session_id: str, run_id: str) -> set[tuple[str, int]]:
+        seen = self.output_sequences.setdefault(run_id, set())
+        if run_id not in self.output_sequences_hydrated:
+            seen.update(self._session_output_sequences(session_id, run_id))
+            self.output_sequences_hydrated.add(run_id)
+        return seen
+
+    def _session_output_sequences(self, session_id: str, run_id: str) -> set[tuple[str, int]]:
         try:
             session = self.store.get_session(session_id)
         except Exception:
             logger.warning("Failed to read session when checking output sequence", session_id=session_id, run_id=run_id)
-            return False
-        return any(
-            event.get("type") == "agent.output"
-            and event.get("runId") == run_id
-            and event.get("stream") == stream
-            and event.get("sequence") == sequence
+            return set()
+        return {
+            (event["stream"], event["sequence"])
             for event in session.get("events", [])
-        )
+            if event.get("type") == "agent.output"
+            and event.get("runId") == run_id
+            and isinstance(event.get("stream"), str)
+            and isinstance(event.get("sequence"), int)
+        }
 
     def _assert_authorized(self, sandbox_id: str, token: str | None) -> None:
         sandbox = self.sandboxes.get(sandbox_id)
@@ -1234,8 +1255,6 @@ class DaemonNodeRegistry:
                 "updatedAt": now_iso(),
                 "lastError": sandbox.get("lastError") or "Waiting for daemon node registration.",
             }
-            if sandbox.get("nodeToken"):
-                self.plain_node_tokens[sandbox["id"]] = sandbox["nodeToken"]
         for run in self.daemon_store.list_active_runs():
             self.active_commands[run["commandId"]] = {**run, "sandboxId": run["nodeId"]}
 

@@ -229,30 +229,10 @@
   gap: var(--space-md);
 }
 
-/* Empty transcript — soft atmosphere behind the shared empty state. */
+/* Empty transcript — flat soft surface behind the shared empty state. */
 .transcript-inner:has(.transcript-empty) {
-  background: var(--atmosphere-background);
+  background: var(--color-surface-soft);
   border-radius: var(--radius-xl);
-  position: relative;
-  isolation: isolate;
-}
-
-.transcript-inner:has(.transcript-empty)::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  border-radius: inherit;
-  opacity: var(--atmosphere-grain-opacity);
-  background-image: var(--atmosphere-grain-image);
-  background-size: var(--atmosphere-grain-size);
-  mix-blend-mode: var(--atmosphere-grain-blend);
-}
-
-.transcript-inner:has(.transcript-empty) > * {
-  position: relative;
-  z-index: 1;
 }
 
 /* Transcript empty — layout shell; visual language from empty-state.css */

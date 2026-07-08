@@ -79,7 +79,7 @@
 
 .handoff-row label {
   color: var(--color-muted);
-  font: var(--type-caption-strong-sm);
+  font: var(--type-label-strong);
 }
 
 .handoff-row select,

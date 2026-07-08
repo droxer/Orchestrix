@@ -9,7 +9,6 @@ type RelayEmptyStateProps = {
   actions?: ReactNode;
   className?: string;
   titleId?: string;
-  atmosphere?: boolean;
   mark?: boolean;
   fill?: boolean;
   animate?: boolean;
@@ -23,7 +22,6 @@ export function RelayEmptyState({
   actions,
   className,
   titleId = "relay-empty-title",
-  atmosphere = false,
   mark = false,
   fill = false,
   animate = true,
@@ -35,7 +33,6 @@ export function RelayEmptyState({
     <section
       className={cn(
         "relay-empty",
-        atmosphere && "relay-empty--atmosphere relay-atmosphere",
         fill && "relay-empty--fill",
         className,
       )}

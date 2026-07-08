@@ -39,7 +39,7 @@ export function DashboardView({ nodes, employees, metrics }: DashboardViewProps)
 
   return (
     <div className="adm-dash">
-      <section className="adm-dash-kpis relay-atmosphere" aria-label={t("admin.v2.dash_kpis_label")}>
+      <section className="adm-dash-kpis" aria-label={t("admin.v2.dash_kpis_label")}>
         <span className="relay-bleed-mark" aria-hidden="true">R</span>
         <KpiTile
           hero
