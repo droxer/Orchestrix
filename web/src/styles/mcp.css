@@ -1,24 +1,2 @@
-/* =====================================================================
-   Authenticated route shell grid
-
-   Top-level work pages collapse the thread pane so the route content fills
-   the space beside the sidenav.
-   ===================================================================== */
-
-.messenger-shell[data-route="channels"],
-.messenger-shell[data-route="workspace"],
-.messenger-shell[data-route="mcp"],
-.messenger-shell[data-route="backlog"],
-.messenger-shell[data-route="routine"],
-.messenger-shell[data-route="skills"] {
-  grid-template-columns: var(--sidenav-w) minmax(0, 1fr);
-}
-
-.messenger-shell[data-route="channels"][data-sidenav="open"],
-.messenger-shell[data-route="workspace"][data-sidenav="open"],
-.messenger-shell[data-route="mcp"][data-sidenav="open"],
-.messenger-shell[data-route="backlog"][data-sidenav="open"],
-.messenger-shell[data-route="routine"][data-sidenav="open"],
-.messenger-shell[data-route="skills"][data-sidenav="open"] {
-  grid-template-columns: var(--sidenav-w-open) minmax(0, 1fr);
-}
+/* MCP page component styles live in the React module (Tailwind utilities).
+   Shell grid rules for work routes are in routes.css. */

@@ -1,5 +1,14 @@
 import type { TFunction } from "i18next";
-import type { ControlPanelDaemonNodeRecord, EmployeeRecord, Tone } from "../types.js";
+import type { AgentName, ControlPanelDaemonNodeRecord, EmployeeRecord, Tone } from "../types.js";
+
+const DEFAULT_NODE_AGENT_NAMES: AgentName[] = ["claude", "codex", "kimi"];
+
+/** Agent executors shown on fleet/admin node surfaces (Pi only when the daemon reports it). */
+export function visibleNodeAgentNames(node: Pick<ControlPanelDaemonNodeRecord, "agents">): AgentName[] {
+  const names: AgentName[] = [...DEFAULT_NODE_AGENT_NAMES];
+  if (node.agents.pi && node.agents.pi !== "unknown") names.push("pi");
+  return names;
+}
 
 function shellQuote(value: string): string {
   if (/^[A-Za-z0-9_./:@=-]+$/.test(value)) return value;

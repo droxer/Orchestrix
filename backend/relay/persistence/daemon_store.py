@@ -6,7 +6,23 @@ from pathlib import Path
 from threading import RLock
 from typing import Any
 
-from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, MetaData, Table, Text, Uuid, create_engine, delete, func, insert, select, update
+from sqlalchemy import (
+    JSON,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    MetaData,
+    Table,
+    Text,
+    Uuid,
+    create_engine,
+    delete,
+    func,
+    insert,
+    select,
+    update,
+)
 
 from .store_common import (
     DEFAULT_RELAY_DATA_DIR,
@@ -34,7 +50,12 @@ def _node_for_storage(node: dict[str, Any]) -> dict[str, Any]:
 
 
 def _terminal_timestamp(record: dict[str, Any]) -> str:
-    return record.get("completedAt") or record.get("updatedAt") or record.get("createdAt") or ""
+    return (
+        record.get("completedAt")
+        or record.get("updatedAt")
+        or record.get("createdAt")
+        or ""
+    )
 
 
 def _database_terminal_timestamp(row: Any) -> str:
@@ -44,7 +65,9 @@ def _database_terminal_timestamp(row: Any) -> str:
     return _format_iso(value) or ""
 
 
-def completed_cancel_record(record: dict[str, Any], now: str) -> tuple[dict[str, Any], dict[str, Any]]:
+def completed_cancel_record(
+    record: dict[str, Any], now: str
+) -> tuple[dict[str, Any], dict[str, Any]]:
     command = record["command"]
     updated = {
         **record,
@@ -52,16 +75,21 @@ def completed_cancel_record(record: dict[str, Any], now: str) -> tuple[dict[str,
         "updatedAt": now,
         "completedAt": now,
     }
-    event = daemon_event("daemon.command.completed", {
-        "nodeId": record["nodeId"],
-        "commandId": record["id"],
-        "targetCommandId": command["commandId"],
-        "runId": command["runId"],
-    })
+    event = daemon_event(
+        "daemon.command.completed",
+        {
+            "nodeId": record["nodeId"],
+            "commandId": record["id"],
+            "targetCommandId": command["commandId"],
+            "runId": command["runId"],
+        },
+    )
     return updated, event
 
 
-def terminal_database_ids_to_prune(rows: list[Any], cutoff: str, per_node_limit: int) -> list[str]:
+def terminal_database_ids_to_prune(
+    rows: list[Any], cutoff: str, per_node_limit: int
+) -> list[str]:
     records_by_node: dict[str, list[Any]] = defaultdict(list)
     for row in rows:
         records_by_node[row["node_public_id"]].append(row)
@@ -92,7 +120,13 @@ class LocalDaemonStore:
         self.runs_dir = root / "daemon" / "runs"
         self.run_requests_dir = root / "daemon" / "run-requests"
         self.events_dir = root / "daemon" / "events"
-        for path in (self.nodes_dir, self.commands_dir, self.runs_dir, self.run_requests_dir, self.events_dir):
+        for path in (
+            self.nodes_dir,
+            self.commands_dir,
+            self.runs_dir,
+            self.run_requests_dir,
+            self.events_dir,
+        ):
             path.mkdir(parents=True, exist_ok=True)
         self._rebuild_command_index()
 
@@ -100,21 +134,35 @@ class LocalDaemonStore:
         with self._lock:
             node = _node_for_storage(sandbox)
             self._write_node(node)
-            self.append_daemon_event(daemon_event("daemon.node.registered", {"node": node}))
+            self.append_daemon_event(
+                daemon_event("daemon.node.registered", {"node": node})
+            )
             return node
 
-    def mark_node_seen(self, node_id: str, patch: dict[str, Any] | None = None) -> dict[str, Any] | None:
+    def mark_node_seen(
+        self, node_id: str, patch: dict[str, Any] | None = None
+    ) -> dict[str, Any] | None:
         with self._lock:
             node = self.get_node(node_id)
             if not node:
                 return None
             now = now_iso()
             patch = patch or {}
-            updated = {**node, **{k: v for k, v in patch.items() if v is not None}, "updatedAt": now, "lastSeenAt": now}
+            updated = {
+                **node,
+                **{k: v for k, v in patch.items() if v is not None},
+                "updatedAt": now,
+                "lastSeenAt": now,
+            }
             if patch.get("lastError") is None and "lastError" in patch:
                 updated.pop("lastError", None)
             self._write_node(updated)
-            self.append_daemon_event(daemon_event("daemon.node.seen", {"nodeId": node_id, "patch": {**patch, "lastSeenAt": now}}))
+            self.append_daemon_event(
+                daemon_event(
+                    "daemon.node.seen",
+                    {"nodeId": node_id, "patch": {**patch, "lastSeenAt": now}},
+                )
+            )
             return updated
 
     def assign_node_employee(self, node_id: str, employee_id: str) -> dict[str, Any]:
@@ -125,10 +173,16 @@ class LocalDaemonStore:
             raise ValueError("Daemon node is already assigned.")
         updated = {**node, "employeeId": employee_id, "updatedAt": now_iso()}
         self._write_node(updated)
-        self.append_daemon_event(daemon_event("daemon.node.assigned", {"nodeId": node_id, "employeeId": employee_id}))
+        self.append_daemon_event(
+            daemon_event(
+                "daemon.node.assigned", {"nodeId": node_id, "employeeId": employee_id}
+            )
+        )
         return updated
 
-    def update_node_disabled_agents(self, node_id: str, disabled_agents: list[str]) -> dict[str, Any]:
+    def update_node_disabled_agents(
+        self, node_id: str, disabled_agents: list[str]
+    ) -> dict[str, Any]:
         node = self.get_node(node_id)
         if not node:
             raise KeyError(node_id)
@@ -138,13 +192,20 @@ class LocalDaemonStore:
         else:
             updated.pop("disabledAgents", None)
         self._write_node(updated)
-        self.append_daemon_event(daemon_event("daemon.node.disabled_agents_updated", {
-            "nodeId": node_id,
-            "disabledAgents": list(disabled_agents),
-        }))
+        self.append_daemon_event(
+            daemon_event(
+                "daemon.node.disabled_agents_updated",
+                {
+                    "nodeId": node_id,
+                    "disabledAgents": list(disabled_agents),
+                },
+            )
+        )
         return updated
 
-    def update_node_agent_role_defaults(self, node_id: str, role_defaults: dict[str, str]) -> dict[str, Any]:
+    def update_node_agent_role_defaults(
+        self, node_id: str, role_defaults: dict[str, str]
+    ) -> dict[str, Any]:
         node = self.get_node(node_id)
         if not node:
             raise KeyError(node_id)
@@ -154,13 +215,20 @@ class LocalDaemonStore:
         else:
             updated.pop("agentRoleDefaults", None)
         self._write_node(updated)
-        self.append_daemon_event(daemon_event("daemon.node.agent_role_defaults_updated", {
-            "nodeId": node_id,
-            "agentRoleDefaults": dict(role_defaults),
-        }))
+        self.append_daemon_event(
+            daemon_event(
+                "daemon.node.agent_role_defaults_updated",
+                {
+                    "nodeId": node_id,
+                    "agentRoleDefaults": dict(role_defaults),
+                },
+            )
+        )
         return updated
 
-    def update_node_agent_role_overrides(self, node_id: str, role_overrides: dict[str, str]) -> dict[str, Any]:
+    def update_node_agent_role_overrides(
+        self, node_id: str, role_overrides: dict[str, str]
+    ) -> dict[str, Any]:
         node = self.get_node(node_id)
         if not node:
             raise KeyError(node_id)
@@ -170,10 +238,15 @@ class LocalDaemonStore:
         else:
             updated.pop("agentRoleOverrides", None)
         self._write_node(updated)
-        self.append_daemon_event(daemon_event("daemon.node.agent_role_overrides_updated", {
-            "nodeId": node_id,
-            "agentRoleOverrides": dict(role_overrides),
-        }))
+        self.append_daemon_event(
+            daemon_event(
+                "daemon.node.agent_role_overrides_updated",
+                {
+                    "nodeId": node_id,
+                    "agentRoleOverrides": dict(role_overrides),
+                },
+            )
+        )
         return updated
 
     def unassign_node_employee(self, node_id: str) -> dict[str, Any]:
@@ -181,10 +254,19 @@ class LocalDaemonStore:
         if not node:
             raise KeyError(node_id)
         previous = node.get("employeeId")
-        updated = {k: v for k, v in node.items() if k not in ("employeeId", "agentRoleOverrides")}
+        updated = {
+            k: v
+            for k, v in node.items()
+            if k not in ("employeeId", "agentRoleOverrides")
+        }
         updated["updatedAt"] = now_iso()
         self._write_node(updated)
-        self.append_daemon_event(daemon_event("daemon.node.unassigned", {"nodeId": node_id, "previousEmployeeId": previous}))
+        self.append_daemon_event(
+            daemon_event(
+                "daemon.node.unassigned",
+                {"nodeId": node_id, "previousEmployeeId": previous},
+            )
+        )
         return updated
 
     def delete_node(self, node_id: str) -> None:
@@ -205,7 +287,9 @@ class LocalDaemonStore:
             if request.get("nodeId") == node_id:
                 path.unlink(missing_ok=True)
         node_path.unlink()
-        self.append_daemon_event(daemon_event("daemon.node.deleted", {"nodeId": node_id}))
+        self.append_daemon_event(
+            daemon_event("daemon.node.deleted", {"nodeId": node_id})
+        )
 
     def get_node(self, node_id: str) -> dict[str, Any] | None:
         path = self.nodes_dir / f"{safe_name(node_id)}.json"
@@ -221,26 +305,56 @@ class LocalDaemonStore:
     def enqueue_command(self, node_id: str, command: dict[str, Any]) -> dict[str, Any]:
         with self._lock:
             now = now_iso()
-            record = {"id": command["id"], "nodeId": node_id, "command": command, "status": "queued", "createdAt": now, "updatedAt": now}
+            record = {
+                "id": command["id"],
+                "nodeId": node_id,
+                "command": command,
+                "status": "queued",
+                "createdAt": now,
+                "updatedAt": now,
+            }
             _write_json(self.commands_dir / f"{safe_name(record['id'])}.json", record)
             if command["type"] == "run.start":
-                self._write_run({
-                    "nodeId": node_id,
-                    "commandId": command["id"],
-                    "sessionId": command["sessionId"],
-                    "runId": command["runId"],
-                    "agent": command["agent"],
-                    "mode": command["mode"],
-                    "taskGoal": command["taskGoal"],
-                    **({"workspacePath": command["workspacePath"]} if command.get("workspacePath") else {}),
-                    "status": "running",
-                    "startedAt": now,
-                })
+                self._write_run(
+                    {
+                        "nodeId": node_id,
+                        "commandId": command["id"],
+                        "sessionId": command["sessionId"],
+                        "runId": command["runId"],
+                        "agent": command["agent"],
+                        **(
+                            {"logicalAgentId": command["logicalAgentId"]}
+                            if command.get("logicalAgentId")
+                            else {}
+                        ),
+                        **(
+                            {"placementId": command["placementId"]}
+                            if command.get("placementId")
+                            else {}
+                        ),
+                        "mode": command["mode"],
+                        "taskGoal": command["taskGoal"],
+                        **(
+                            {"workspacePath": command["workspacePath"]}
+                            if command.get("workspacePath")
+                            else {}
+                        ),
+                        "status": "running",
+                        "startedAt": now,
+                    }
+                )
             self._index_command(record)
-            self.append_daemon_event(daemon_event("daemon.command.queued", {"nodeId": node_id, "commandId": command["id"]}))
+            self.append_daemon_event(
+                daemon_event(
+                    "daemon.command.queued",
+                    {"nodeId": node_id, "commandId": command["id"]},
+                )
+            )
             return record
 
-    def take_queued_commands(self, node_id: str, limit: int = 2**53, lease_seconds: float = 60.0) -> list[dict[str, Any]]:
+    def take_queued_commands(
+        self, node_id: str, limit: int = 2**53, lease_seconds: float = 60.0
+    ) -> list[dict[str, Any]]:
         with self._lock:
             now = now_iso()
             # Safe only inside the single backend process that owns this store.
@@ -262,27 +376,51 @@ class LocalDaemonStore:
                     "leaseExpiresAt": lease_expires_at(now, lease_seconds),
                     "attempt": attempt,
                 }
-                _write_json(self.commands_dir / f"{safe_name(record['id'])}.json", updated)
+                _write_json(
+                    self.commands_dir / f"{safe_name(record['id'])}.json", updated
+                )
                 if updated["status"] in TERMINAL_DAEMON_STATUSES:
                     self._remove_command_from_index(node_id, updated["id"])
                 else:
                     self._index_command(updated)
-                self.append_daemon_event(daemon_event("daemon.command.dispatched", {"nodeId": node_id, "commandId": record["id"]}))
+                self.append_daemon_event(
+                    daemon_event(
+                        "daemon.command.dispatched",
+                        {"nodeId": node_id, "commandId": record["id"]},
+                    )
+                )
                 result.append(updated)
             return result
 
     def queued_command_count(self, node_id: str) -> int:
         now = now_iso()
-        return len([record for record in self._command_records_for_node(node_id) if command_is_available(record, now)])
+        return len(
+            [
+                record
+                for record in self._command_records_for_node(node_id)
+                if command_is_available(record, now)
+            ]
+        )
 
     def queued_command_counts(self) -> dict[str, int]:
         now = now_iso()
         return {
-            node_id: len([record for record in self._command_records_for_node(node_id) if command_is_available(record, now)])
+            node_id: len(
+                [
+                    record
+                    for record in self._command_records_for_node(node_id)
+                    if command_is_available(record, now)
+                ]
+            )
             for node_id in list(self._nonterminal_command_ids_by_node.keys())
         }
 
-    def renew_command_leases(self, node_id: str, command_leases: list[tuple[str, str | None]], lease_seconds: float = 60.0) -> None:
+    def renew_command_leases(
+        self,
+        node_id: str,
+        command_leases: list[tuple[str, str | None]],
+        lease_seconds: float = 60.0,
+    ) -> None:
         if not command_leases:
             return
         with self._lock:
@@ -294,7 +432,10 @@ class LocalDaemonStore:
                     record["nodeId"] != node_id
                     or record["id"] not in requested
                     or record.get("status") != "dispatched"
-                    or (expected_lease_id is not None and record.get("leaseId") != expected_lease_id)
+                    or (
+                        expected_lease_id is not None
+                        and record.get("leaseId") != expected_lease_id
+                    )
                 ):
                     continue
                 updated = {
@@ -302,17 +443,29 @@ class LocalDaemonStore:
                     "updatedAt": now,
                     "leaseExpiresAt": lease_expires_at(now, lease_seconds),
                 }
-                _write_json(self.commands_dir / f"{safe_name(record['id'])}.json", updated)
-                self.append_daemon_event(daemon_event("daemon.command.lease_renewed", {
-                    "nodeId": node_id,
-                    "commandId": record["id"],
-                    "leaseId": record.get("leaseId"),
-                    "leaseExpiresAt": updated["leaseExpiresAt"],
-                }))
+                _write_json(
+                    self.commands_dir / f"{safe_name(record['id'])}.json", updated
+                )
+                self.append_daemon_event(
+                    daemon_event(
+                        "daemon.command.lease_renewed",
+                        {
+                            "nodeId": node_id,
+                            "commandId": record["id"],
+                            "leaseId": record.get("leaseId"),
+                            "leaseExpiresAt": updated["leaseExpiresAt"],
+                        },
+                    )
+                )
 
     def list_active_runs(self, node_id: str | None = None) -> list[dict[str, Any]]:
         runs = [_read_json(path) for path in self.runs_dir.glob("*.json")]
-        return [run for run in runs if run.get("status") == "running" and (node_id is None or run.get("nodeId") == node_id)]
+        return [
+            run
+            for run in runs
+            if run.get("status") == "running"
+            and (node_id is None or run.get("nodeId") == node_id)
+        ]
 
     def create_run_request(self, request: dict[str, Any]) -> dict[str, Any]:
         now = now_iso()
@@ -325,31 +478,58 @@ class LocalDaemonStore:
             **request,
         }
         _write_json(self.run_requests_dir / f"{safe_name(record['id'])}.json", record)
-        self.append_daemon_event(daemon_event("daemon.run_request.created", {
-            "nodeId": record["nodeId"],
-            "runRequestId": record["id"],
-            "sessionId": record["sessionId"],
-        }))
+        self.append_daemon_event(
+            daemon_event(
+                "daemon.run_request.created",
+                {
+                    "nodeId": record["nodeId"],
+                    "runRequestId": record["id"],
+                    "sessionId": record["sessionId"],
+                },
+            )
+        )
         return record
 
     def get_run_request(self, request_id: str) -> dict[str, Any] | None:
         path = self.run_requests_dir / f"{safe_name(request_id)}.json"
         return _read_json(path) if path.exists() else None
 
-    def list_active_run_requests(self, node_id: str | None = None) -> list[dict[str, Any]]:
+    def list_active_run_requests(
+        self, node_id: str | None = None
+    ) -> list[dict[str, Any]]:
         requests = [_read_json(path) for path in self.run_requests_dir.glob("*.json")]
         return [
-            request for request in requests
-            if request.get("status") == "running" and (node_id is None or request.get("nodeId") == node_id)
+            request
+            for request in requests
+            if request.get("status") == "running"
+            and (node_id is None or request.get("nodeId") == node_id)
         ]
 
-    def active_run_request_for_session(self, node_id: str, session_id: str) -> dict[str, Any] | None:
-        return next((request for request in self.list_active_run_requests(node_id) if request["sessionId"] == session_id), None)
+    def active_run_request_for_session(
+        self, node_id: str, session_id: str
+    ) -> dict[str, Any] | None:
+        return next(
+            (
+                request
+                for request in self.list_active_run_requests(node_id)
+                if request["sessionId"] == session_id
+            ),
+            None,
+        )
 
     def run_request_for_command(self, command_id: str) -> dict[str, Any] | None:
-        return next((request for request in self.list_active_run_requests() if request.get("currentCommandId") == command_id), None)
+        return next(
+            (
+                request
+                for request in self.list_active_run_requests()
+                if request.get("currentCommandId") == command_id
+            ),
+            None,
+        )
 
-    def update_run_request(self, request_id: str, patch: dict[str, Any]) -> dict[str, Any]:
+    def update_run_request(
+        self, request_id: str, patch: dict[str, Any]
+    ) -> dict[str, Any]:
         with self._lock:
             current = self.get_run_request(request_id)
             if not current:
@@ -358,44 +538,70 @@ class LocalDaemonStore:
             updated = {**current, **patch, "updatedAt": now}
             if patch.get("status") in ("completed", "failed", "cancelled"):
                 updated["completedAt"] = now
-            _write_json(self.run_requests_dir / f"{safe_name(request_id)}.json", updated)
-            self.append_daemon_event(daemon_event("daemon.run_request.updated", {
-                "nodeId": updated["nodeId"],
-                "runRequestId": updated["id"],
-                "status": updated["status"],
-            }))
+            _write_json(
+                self.run_requests_dir / f"{safe_name(request_id)}.json", updated
+            )
+            self.append_daemon_event(
+                daemon_event(
+                    "daemon.run_request.updated",
+                    {
+                        "nodeId": updated["nodeId"],
+                        "runRequestId": updated["id"],
+                        "status": updated["status"],
+                    },
+                )
+            )
             return updated
 
     def mark_command_completed(self, node_id: str, event: dict[str, Any]) -> bool:
-        return self._mark_command_terminal(node_id, event, "completed", event.get("exitCode"), None)
+        return self._mark_command_terminal(
+            node_id, event, "completed", event.get("exitCode"), None
+        )
 
     def mark_command_failed(self, node_id: str, event: dict[str, Any]) -> bool:
-        return self._mark_command_terminal(node_id, event, "failed", event.get("exitCode"), event.get("error"))
+        return self._mark_command_terminal(
+            node_id, event, "failed", event.get("exitCode"), event.get("error")
+        )
 
     def mark_command_cancelled(self, node_id: str, event: dict[str, Any]) -> bool:
-        return self._mark_command_terminal(node_id, event, "cancelled", None, event.get("reason"))
+        return self._mark_command_terminal(
+            node_id, event, "cancelled", None, event.get("reason")
+        )
 
-    def mark_cancel_commands_completed(self, node_id: str, target_command_id: str) -> None:
+    def mark_cancel_commands_completed(
+        self, node_id: str, target_command_id: str
+    ) -> None:
         with self._lock:
             now = now_iso()
             for record in self._command_records_for_node(node_id):
                 command = record["command"]
-                if command["type"] != "run.cancel" or command.get("commandId") != target_command_id:
+                if (
+                    command["type"] != "run.cancel"
+                    or command.get("commandId") != target_command_id
+                ):
                     continue
                 updated, completion_event = completed_cancel_record(record, now)
-                _write_json(self.commands_dir / f"{safe_name(record['id'])}.json", updated)
+                _write_json(
+                    self.commands_dir / f"{safe_name(record['id'])}.json", updated
+                )
                 self._remove_command_from_index(node_id, record["id"])
                 self.append_daemon_event(completion_event)
 
-    def prune_terminal_records(self, retention_seconds: float, per_node_limit: int) -> dict[str, int]:
-        cutoff = _format_iso(_parse_iso(now_iso()) - timedelta(seconds=max(0.0, retention_seconds)))
+    def prune_terminal_records(
+        self, retention_seconds: float, per_node_limit: int
+    ) -> dict[str, int]:
+        cutoff = _format_iso(
+            _parse_iso(now_iso()) - timedelta(seconds=max(0.0, retention_seconds))
+        )
         per_node_limit = max(0, per_node_limit)
         with self._lock:
             deleted_commands = self._prune_terminal_files(
                 self.commands_dir,
                 cutoff=cutoff,
                 per_node_limit=per_node_limit,
-                on_delete=lambda record: self._remove_command_from_index(record["nodeId"], record["id"]),
+                on_delete=lambda record: self._remove_command_from_index(
+                    record["nodeId"], record["id"]
+                ),
             )
             deleted_runs = self._prune_terminal_files(
                 self.runs_dir,
@@ -407,23 +613,40 @@ class LocalDaemonStore:
     def append_daemon_event(self, event: dict[str, Any]) -> None:
         _append_jsonl(self.events_dir / "events.jsonl", event)
 
-    def _mark_command_terminal(self, node_id: str, event: dict[str, Any], status: str, exit_code: int | None, error: str | None) -> bool:
+    def _mark_command_terminal(
+        self,
+        node_id: str,
+        event: dict[str, Any],
+        status: str,
+        exit_code: int | None,
+        error: str | None,
+    ) -> bool:
         with self._lock:
             now = now_iso()
             command = self._get_command(event["commandId"])
-            if not command or command.get("status") not in ("queued", "dispatched") or (
-                event.get("leaseId") is not None
-                and (command.get("status") != "dispatched" or command.get("leaseId") != event["leaseId"])
+            if (
+                not command
+                or command.get("status") not in ("queued", "dispatched")
+                or (
+                    event.get("leaseId") is not None
+                    and (
+                        command.get("status") != "dispatched"
+                        or command.get("leaseId") != event["leaseId"]
+                    )
+                )
             ):
                 return False
-            _write_json(self.commands_dir / f"{safe_name(command['id'])}.json", {
-                **command,
-                "status": status,
-                "updatedAt": now,
-                "completedAt": now,
-                **({"exitCode": exit_code} if exit_code is not None else {}),
-                **({"error": error} if error else {}),
-            })
+            _write_json(
+                self.commands_dir / f"{safe_name(command['id'])}.json",
+                {
+                    **command,
+                    "status": status,
+                    "updatedAt": now,
+                    "completedAt": now,
+                    **({"exitCode": exit_code} if exit_code is not None else {}),
+                    **({"error": error} if error else {}),
+                },
+            )
             self._remove_command_from_index(node_id, command["id"])
             run = self._get_run(event["runId"]) or {
                 "nodeId": node_id,
@@ -435,21 +658,32 @@ class LocalDaemonStore:
                 "taskGoal": "",
                 "startedAt": now,
             }
-            self._write_run({
-                **run,
-                "status": status,
-                "completedAt": now,
-                **({"exitCode": exit_code} if exit_code is not None else {}),
-                **({"error": error} if error else {}),
-            })
-            event_type = {"completed": "daemon.command.completed", "failed": "daemon.command.failed", "cancelled": "daemon.command.cancelled"}[status]
-            self.append_daemon_event(daemon_event(event_type, {
-                "nodeId": node_id,
-                "commandId": event["commandId"],
-                "runId": event["runId"],
-                **({"exitCode": exit_code} if exit_code is not None else {}),
-                **({"error": error} if error else {}),
-            }))
+            self._write_run(
+                {
+                    **run,
+                    "status": status,
+                    "completedAt": now,
+                    **({"exitCode": exit_code} if exit_code is not None else {}),
+                    **({"error": error} if error else {}),
+                }
+            )
+            event_type = {
+                "completed": "daemon.command.completed",
+                "failed": "daemon.command.failed",
+                "cancelled": "daemon.command.cancelled",
+            }[status]
+            self.append_daemon_event(
+                daemon_event(
+                    event_type,
+                    {
+                        "nodeId": node_id,
+                        "commandId": event["commandId"],
+                        "runId": event["runId"],
+                        **({"exitCode": exit_code} if exit_code is not None else {}),
+                        **({"error": error} if error else {}),
+                    },
+                )
+            )
             return True
 
     def _write_node(self, node: dict[str, Any]) -> None:
@@ -472,7 +706,9 @@ class LocalDaemonStore:
         if record.get("status") in TERMINAL_DAEMON_STATUSES:
             self._remove_command_from_index(record["nodeId"], record["id"])
             return
-        self._nonterminal_command_ids_by_node.setdefault(record["nodeId"], set()).add(record["id"])
+        self._nonterminal_command_ids_by_node.setdefault(record["nodeId"], set()).add(
+            record["id"]
+        )
 
     def _remove_command_from_index(self, node_id: str, command_id: str) -> None:
         command_ids = self._nonterminal_command_ids_by_node.get(node_id)
@@ -484,7 +720,9 @@ class LocalDaemonStore:
 
     def _command_records_for_node(self, node_id: str) -> list[dict[str, Any]]:
         records = []
-        for command_id in list(self._nonterminal_command_ids_by_node.get(node_id, set())):
+        for command_id in list(
+            self._nonterminal_command_ids_by_node.get(node_id, set())
+        ):
             record = self._get_command(command_id)
             if not record:
                 self._remove_command_from_index(node_id, command_id)
@@ -503,7 +741,9 @@ class LocalDaemonStore:
         per_node_limit: int,
         on_delete: Any | None = None,
     ) -> int:
-        records_by_node: dict[str, list[tuple[dict[str, Any], Path]]] = defaultdict(list)
+        records_by_node: dict[str, list[tuple[dict[str, Any], Path]]] = defaultdict(
+            list
+        )
         for path in directory.glob("*.json"):
             record = _read_json(path)
             if record.get("status") in TERMINAL_DAEMON_STATUSES:
@@ -538,7 +778,12 @@ class DatabaseDaemonStore:
         Column("public_id", Text, nullable=False, unique=True),
         Column("employee_id", Text, nullable=True),
         Column("workspace_path", Text, nullable=True),
+        Column("workspace_id", Text, nullable=True),
         Column("sandbox_mode", Text, nullable=True),
+        Column("managed_node_id", Text, nullable=True),
+        Column("provisioning_attempt_id", Text, nullable=True),
+        Column("credential_version", Integer, nullable=False, default=1),
+        Column("retired_at", DateTime(timezone=True), nullable=True),
         Column("status", Text, nullable=False),
         Column("agents", JSON, nullable=False),
         Column("agent_details", JSON, nullable=False, default=dict),
@@ -561,7 +806,12 @@ class DatabaseDaemonStore:
         metadata,
         database_id_column(),
         Column("public_id", Text, nullable=False, unique=True),
-        Column("node_id", Uuid(as_uuid=False), ForeignKey("daemon_nodes.id", ondelete="CASCADE"), nullable=False),
+        Column(
+            "node_id",
+            Uuid(as_uuid=False),
+            ForeignKey("daemon_nodes.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         Column("node_public_id", Text, nullable=False),
         Column("type", Text, nullable=False),
         Column("status", Text, nullable=False),
@@ -581,9 +831,19 @@ class DatabaseDaemonStore:
         metadata,
         database_id_column(),
         Column("public_id", Text, nullable=False, unique=True),
-        Column("node_id", Uuid(as_uuid=False), ForeignKey("daemon_nodes.id", ondelete="CASCADE"), nullable=False),
+        Column(
+            "node_id",
+            Uuid(as_uuid=False),
+            ForeignKey("daemon_nodes.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         Column("node_public_id", Text, nullable=False),
-        Column("command_id", Uuid(as_uuid=False), ForeignKey("daemon_commands.id", ondelete="SET NULL"), nullable=True),
+        Column(
+            "command_id",
+            Uuid(as_uuid=False),
+            ForeignKey("daemon_commands.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
         Column("command_public_id", Text, nullable=True),
         Column("session_public_id", Text, nullable=False),
         Column("agent", Text, nullable=False),
@@ -601,7 +861,12 @@ class DatabaseDaemonStore:
         metadata,
         database_id_column(),
         Column("public_id", Text, nullable=False, unique=True),
-        Column("node_id", Uuid(as_uuid=False), ForeignKey("daemon_nodes.id", ondelete="CASCADE"), nullable=False),
+        Column(
+            "node_id",
+            Uuid(as_uuid=False),
+            ForeignKey("daemon_nodes.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         Column("node_public_id", Text, nullable=False),
         Column("session_public_id", Text, nullable=False),
         Column("task_public_id", Text, nullable=True),
@@ -645,27 +910,52 @@ class DatabaseDaemonStore:
         node = _node_for_storage(sandbox)
         values = node_to_row(node)
         with self.engine.begin() as conn:
-            existing = conn.scalar(select(self.nodes.c.id).where(self.nodes.c.public_id == node["id"]))
+            existing = conn.scalar(
+                select(self.nodes.c.id).where(self.nodes.c.public_id == node["id"])
+            )
             if existing:
-                conn.execute(update(self.nodes).where(self.nodes.c.id == existing).values(**node_to_row(node, database_id=existing)))
+                conn.execute(
+                    update(self.nodes)
+                    .where(self.nodes.c.id == existing)
+                    .values(**node_to_row(node, database_id=existing))
+                )
             else:
                 conn.execute(insert(self.nodes).values(**values))
-            self._append_daemon_event(conn, daemon_event("daemon.node.registered", {"node": node}))
+            self._append_daemon_event(
+                conn, daemon_event("daemon.node.registered", {"node": node})
+            )
         return node
 
-    def mark_node_seen(self, node_id: str, patch: dict[str, Any] | None = None) -> dict[str, Any] | None:
+    def mark_node_seen(
+        self, node_id: str, patch: dict[str, Any] | None = None
+    ) -> dict[str, Any] | None:
         node = self.get_node(node_id)
         if not node:
             return None
         now = now_iso()
         patch = patch or {}
-        updated = {**node, **{k: v for k, v in patch.items() if v is not None}, "updatedAt": now, "lastSeenAt": now}
+        updated = {
+            **node,
+            **{k: v for k, v in patch.items() if v is not None},
+            "updatedAt": now,
+            "lastSeenAt": now,
+        }
         if patch.get("lastError") is None and "lastError" in patch:
             updated.pop("lastError", None)
         with self.engine.begin() as conn:
             node_pk = self._node_pk(conn, node_id)
-            conn.execute(update(self.nodes).where(self.nodes.c.id == node_pk).values(**node_to_row(updated, database_id=node_pk)))
-            self._append_daemon_event(conn, daemon_event("daemon.node.seen", {"nodeId": node_id, "patch": {**patch, "lastSeenAt": now}}))
+            conn.execute(
+                update(self.nodes)
+                .where(self.nodes.c.id == node_pk)
+                .values(**node_to_row(updated, database_id=node_pk))
+            )
+            self._append_daemon_event(
+                conn,
+                daemon_event(
+                    "daemon.node.seen",
+                    {"nodeId": node_id, "patch": {**patch, "lastSeenAt": now}},
+                ),
+            )
         return updated
 
     def assign_node_employee(self, node_id: str, employee_id: str) -> dict[str, Any]:
@@ -677,11 +967,23 @@ class DatabaseDaemonStore:
         updated = {**node, "employeeId": employee_id, "updatedAt": now_iso()}
         with self.engine.begin() as conn:
             node_pk = self._node_pk(conn, node_id)
-            conn.execute(update(self.nodes).where(self.nodes.c.id == node_pk).values(**node_to_row(updated, database_id=node_pk)))
-            self._append_daemon_event(conn, daemon_event("daemon.node.assigned", {"nodeId": node_id, "employeeId": employee_id}))
+            conn.execute(
+                update(self.nodes)
+                .where(self.nodes.c.id == node_pk)
+                .values(**node_to_row(updated, database_id=node_pk))
+            )
+            self._append_daemon_event(
+                conn,
+                daemon_event(
+                    "daemon.node.assigned",
+                    {"nodeId": node_id, "employeeId": employee_id},
+                ),
+            )
         return updated
 
-    def update_node_disabled_agents(self, node_id: str, disabled_agents: list[str]) -> dict[str, Any]:
+    def update_node_disabled_agents(
+        self, node_id: str, disabled_agents: list[str]
+    ) -> dict[str, Any]:
         node = self.get_node(node_id)
         if not node:
             raise KeyError(node_id)
@@ -692,14 +994,26 @@ class DatabaseDaemonStore:
             updated.pop("disabledAgents", None)
         with self.engine.begin() as conn:
             node_pk = self._node_pk(conn, node_id)
-            conn.execute(update(self.nodes).where(self.nodes.c.id == node_pk).values(**node_to_row(updated, database_id=node_pk)))
-            self._append_daemon_event(conn, daemon_event("daemon.node.disabled_agents_updated", {
-                "nodeId": node_id,
-                "disabledAgents": list(disabled_agents),
-            }))
+            conn.execute(
+                update(self.nodes)
+                .where(self.nodes.c.id == node_pk)
+                .values(**node_to_row(updated, database_id=node_pk))
+            )
+            self._append_daemon_event(
+                conn,
+                daemon_event(
+                    "daemon.node.disabled_agents_updated",
+                    {
+                        "nodeId": node_id,
+                        "disabledAgents": list(disabled_agents),
+                    },
+                ),
+            )
         return updated
 
-    def update_node_agent_role_defaults(self, node_id: str, role_defaults: dict[str, str]) -> dict[str, Any]:
+    def update_node_agent_role_defaults(
+        self, node_id: str, role_defaults: dict[str, str]
+    ) -> dict[str, Any]:
         node = self.get_node(node_id)
         if not node:
             raise KeyError(node_id)
@@ -710,14 +1024,26 @@ class DatabaseDaemonStore:
             updated.pop("agentRoleDefaults", None)
         with self.engine.begin() as conn:
             node_pk = self._node_pk(conn, node_id)
-            conn.execute(update(self.nodes).where(self.nodes.c.id == node_pk).values(**node_to_row(updated, database_id=node_pk)))
-            self._append_daemon_event(conn, daemon_event("daemon.node.agent_role_defaults_updated", {
-                "nodeId": node_id,
-                "agentRoleDefaults": dict(role_defaults),
-            }))
+            conn.execute(
+                update(self.nodes)
+                .where(self.nodes.c.id == node_pk)
+                .values(**node_to_row(updated, database_id=node_pk))
+            )
+            self._append_daemon_event(
+                conn,
+                daemon_event(
+                    "daemon.node.agent_role_defaults_updated",
+                    {
+                        "nodeId": node_id,
+                        "agentRoleDefaults": dict(role_defaults),
+                    },
+                ),
+            )
         return updated
 
-    def update_node_agent_role_overrides(self, node_id: str, role_overrides: dict[str, str]) -> dict[str, Any]:
+    def update_node_agent_role_overrides(
+        self, node_id: str, role_overrides: dict[str, str]
+    ) -> dict[str, Any]:
         node = self.get_node(node_id)
         if not node:
             raise KeyError(node_id)
@@ -728,11 +1054,21 @@ class DatabaseDaemonStore:
             updated.pop("agentRoleOverrides", None)
         with self.engine.begin() as conn:
             node_pk = self._node_pk(conn, node_id)
-            conn.execute(update(self.nodes).where(self.nodes.c.id == node_pk).values(**node_to_row(updated, database_id=node_pk)))
-            self._append_daemon_event(conn, daemon_event("daemon.node.agent_role_overrides_updated", {
-                "nodeId": node_id,
-                "agentRoleOverrides": dict(role_overrides),
-            }))
+            conn.execute(
+                update(self.nodes)
+                .where(self.nodes.c.id == node_pk)
+                .values(**node_to_row(updated, database_id=node_pk))
+            )
+            self._append_daemon_event(
+                conn,
+                daemon_event(
+                    "daemon.node.agent_role_overrides_updated",
+                    {
+                        "nodeId": node_id,
+                        "agentRoleOverrides": dict(role_overrides),
+                    },
+                ),
+            )
         return updated
 
     def unassign_node_employee(self, node_id: str) -> dict[str, Any]:
@@ -740,30 +1076,56 @@ class DatabaseDaemonStore:
         if not node:
             raise KeyError(node_id)
         previous = node.get("employeeId")
-        updated = {k: v for k, v in node.items() if k not in ("employeeId", "agentRoleOverrides")}
+        updated = {
+            k: v
+            for k, v in node.items()
+            if k not in ("employeeId", "agentRoleOverrides")
+        }
         updated["updatedAt"] = now_iso()
         with self.engine.begin() as conn:
             node_pk = self._node_pk(conn, node_id)
             row = node_to_row(updated, database_id=node_pk)
             row["employee_id"] = None
-            conn.execute(update(self.nodes).where(self.nodes.c.id == node_pk).values(**row))
-            self._append_daemon_event(conn, daemon_event("daemon.node.unassigned", {"nodeId": node_id, "previousEmployeeId": previous}))
+            conn.execute(
+                update(self.nodes).where(self.nodes.c.id == node_pk).values(**row)
+            )
+            self._append_daemon_event(
+                conn,
+                daemon_event(
+                    "daemon.node.unassigned",
+                    {"nodeId": node_id, "previousEmployeeId": previous},
+                ),
+            )
         return updated
 
     def delete_node(self, node_id: str) -> None:
         with self.engine.begin() as conn:
-            node_pk = conn.scalar(select(self.nodes.c.id).where(self.nodes.c.public_id == node_id))
+            node_pk = conn.scalar(
+                select(self.nodes.c.id).where(self.nodes.c.public_id == node_id)
+            )
             if not node_pk:
                 raise KeyError(node_id)
-            conn.execute(delete(self.run_requests).where(self.run_requests.c.node_id == node_pk))
+            conn.execute(
+                delete(self.run_requests).where(self.run_requests.c.node_id == node_pk)
+            )
             conn.execute(delete(self.runs).where(self.runs.c.node_id == node_pk))
-            conn.execute(delete(self.commands).where(self.commands.c.node_id == node_pk))
+            conn.execute(
+                delete(self.commands).where(self.commands.c.node_id == node_pk)
+            )
             conn.execute(delete(self.nodes).where(self.nodes.c.id == node_pk))
-            self._append_daemon_event(conn, daemon_event("daemon.node.deleted", {"nodeId": node_id}))
+            self._append_daemon_event(
+                conn, daemon_event("daemon.node.deleted", {"nodeId": node_id})
+            )
 
     def get_node(self, node_id: str) -> dict[str, Any] | None:
         with self.engine.begin() as conn:
-            row = conn.execute(select(self.nodes).where(self.nodes.c.public_id == node_id)).mappings().first()
+            row = (
+                conn.execute(
+                    select(self.nodes).where(self.nodes.c.public_id == node_id)
+                )
+                .mappings()
+                .first()
+            )
         return row_to_node(row) if row else None
 
     def list_nodes(self) -> list[dict[str, Any]]:
@@ -773,53 +1135,93 @@ class DatabaseDaemonStore:
 
     def get_command(self, command_id: str) -> dict[str, Any] | None:
         with self.engine.begin() as conn:
-            row = conn.execute(
-                select(self.commands).where(self.commands.c.public_id == command_id)
-            ).mappings().first()
+            row = (
+                conn.execute(
+                    select(self.commands).where(self.commands.c.public_id == command_id)
+                )
+                .mappings()
+                .first()
+            )
         return row_to_command(row) if row else None
 
     def enqueue_command(self, node_id: str, command: dict[str, Any]) -> dict[str, Any]:
         now = now_iso()
-        record = {"id": command["id"], "nodeId": node_id, "command": command, "status": "queued", "createdAt": now, "updatedAt": now}
+        record = {
+            "id": command["id"],
+            "nodeId": node_id,
+            "command": command,
+            "status": "queued",
+            "createdAt": now,
+            "updatedAt": now,
+        }
         with self.engine.begin() as conn:
             node_pk = self._node_pk(conn, node_id)
             command_row = command_to_row(record, node_pk=node_pk)
             conn.execute(insert(self.commands).values(**command_row))
             if command["type"] == "run.start":
-                self._write_run(conn, {
-                    "nodeId": node_id,
-                    "nodeDatabaseId": node_pk,
-                    "commandId": command["id"],
-                    "commandDatabaseId": command_row["id"],
-                    "sessionId": command["sessionId"],
-                    "runId": command["runId"],
-                    "agent": command["agent"],
-                    "mode": command["mode"],
-                    "taskGoal": command["taskGoal"],
-                    **({"workspacePath": command["workspacePath"]} if command.get("workspacePath") else {}),
-                    "status": "running",
-                    "startedAt": now,
-                })
-            self._append_daemon_event(conn, daemon_event("daemon.command.queued", {"nodeId": node_id, "commandId": command["id"]}))
+                self._write_run(
+                    conn,
+                    {
+                        "nodeId": node_id,
+                        "nodeDatabaseId": node_pk,
+                        "commandId": command["id"],
+                        "commandDatabaseId": command_row["id"],
+                        "sessionId": command["sessionId"],
+                        "runId": command["runId"],
+                        "agent": command["agent"],
+                        **(
+                            {"logicalAgentId": command["logicalAgentId"]}
+                            if command.get("logicalAgentId")
+                            else {}
+                        ),
+                        **(
+                            {"placementId": command["placementId"]}
+                            if command.get("placementId")
+                            else {}
+                        ),
+                        "mode": command["mode"],
+                        "taskGoal": command["taskGoal"],
+                        **(
+                            {"workspacePath": command["workspacePath"]}
+                            if command.get("workspacePath")
+                            else {}
+                        ),
+                        "status": "running",
+                        "startedAt": now,
+                    },
+                )
+            self._append_daemon_event(
+                conn,
+                daemon_event(
+                    "daemon.command.queued",
+                    {"nodeId": node_id, "commandId": command["id"]},
+                ),
+            )
         return record
 
-    def take_queued_commands(self, node_id: str, limit: int = 2**53, lease_seconds: float = 60.0) -> list[dict[str, Any]]:
+    def take_queued_commands(
+        self, node_id: str, limit: int = 2**53, lease_seconds: float = 60.0
+    ) -> list[dict[str, Any]]:
         now = now_iso()
         now_dt = _parse_iso(now)
         with self.engine.begin() as conn:
             node_pk = self._node_pk(conn, node_id)
-            available_condition = (
-                (self.commands.c.status == "queued")
-                | ((self.commands.c.status == "dispatched") & (self.commands.c.lease_expires_at <= now_dt))
+            available_condition = (self.commands.c.status == "queued") | (
+                (self.commands.c.status == "dispatched")
+                & (self.commands.c.lease_expires_at <= now_dt)
             )
-            rows = conn.execute(
-                select(self.commands)
-                .where(self.commands.c.node_id == node_pk)
-                .where(available_condition)
-                .order_by(self.commands.c.created_at)
-                .limit(limit)
-                .with_for_update(skip_locked=True)
-            ).mappings().all()
+            rows = (
+                conn.execute(
+                    select(self.commands)
+                    .where(self.commands.c.node_id == node_pk)
+                    .where(available_condition)
+                    .order_by(self.commands.c.created_at)
+                    .limit(limit)
+                    .with_for_update(skip_locked=True)
+                )
+                .mappings()
+                .all()
+            )
             result = []
             for row in rows:
                 record = row_to_command(row)
@@ -837,11 +1239,21 @@ class DatabaseDaemonStore:
                     update(self.commands)
                     .where(self.commands.c.id == record["databaseId"])
                     .where(available_condition)
-                    .values(**command_to_row(updated, database_id=record["databaseId"], node_pk=node_pk))
+                    .values(
+                        **command_to_row(
+                            updated, database_id=record["databaseId"], node_pk=node_pk
+                        )
+                    )
                 )
                 if claimed.rowcount != 1:
                     continue
-                self._append_daemon_event(conn, daemon_event("daemon.command.dispatched", {"nodeId": node_id, "commandId": record["id"]}))
+                self._append_daemon_event(
+                    conn,
+                    daemon_event(
+                        "daemon.command.dispatched",
+                        {"nodeId": node_id, "commandId": record["id"]},
+                    ),
+                )
                 result.append(updated)
         return result
 
@@ -850,14 +1262,19 @@ class DatabaseDaemonStore:
         now_dt = _parse_iso(now)
         with self.engine.begin() as conn:
             node_pk = self._node_pk(conn, node_id)
-            return len(conn.execute(
-                select(self.commands.c.id)
-                .where(self.commands.c.node_id == node_pk)
-                .where(
-                    (self.commands.c.status == "queued")
-                    | ((self.commands.c.status == "dispatched") & (self.commands.c.lease_expires_at <= now_dt))
-                )
-            ).all())
+            return len(
+                conn.execute(
+                    select(self.commands.c.id)
+                    .where(self.commands.c.node_id == node_pk)
+                    .where(
+                        (self.commands.c.status == "queued")
+                        | (
+                            (self.commands.c.status == "dispatched")
+                            & (self.commands.c.lease_expires_at <= now_dt)
+                        )
+                    )
+                ).all()
+            )
 
     def queued_command_counts(self) -> dict[str, int]:
         now = now_iso()
@@ -867,29 +1284,44 @@ class DatabaseDaemonStore:
                 select(self.commands.c.node_public_id, func.count(self.commands.c.id))
                 .where(
                     (self.commands.c.status == "queued")
-                    | ((self.commands.c.status == "dispatched") & (self.commands.c.lease_expires_at <= now_dt))
+                    | (
+                        (self.commands.c.status == "dispatched")
+                        & (self.commands.c.lease_expires_at <= now_dt)
+                    )
                 )
                 .group_by(self.commands.c.node_public_id)
             ).all()
         return {row[0]: row[1] for row in rows}
 
-    def renew_command_leases(self, node_id: str, command_leases: list[tuple[str, str | None]], lease_seconds: float = 60.0) -> None:
+    def renew_command_leases(
+        self,
+        node_id: str,
+        command_leases: list[tuple[str, str | None]],
+        lease_seconds: float = 60.0,
+    ) -> None:
         if not command_leases:
             return
         now = now_iso()
         requested = dict(command_leases)
         with self.engine.begin() as conn:
             node_pk = self._node_pk(conn, node_id)
-            rows = conn.execute(
-                select(self.commands)
-                .where(self.commands.c.node_id == node_pk)
-                .where(self.commands.c.public_id.in_(requested.keys()))
-                .where(self.commands.c.status == "dispatched")
-            ).mappings().all()
+            rows = (
+                conn.execute(
+                    select(self.commands)
+                    .where(self.commands.c.node_id == node_pk)
+                    .where(self.commands.c.public_id.in_(requested.keys()))
+                    .where(self.commands.c.status == "dispatched")
+                )
+                .mappings()
+                .all()
+            )
             for row in rows:
                 record = row_to_command(row)
                 expected_lease_id = requested[record["id"]]
-                if expected_lease_id is not None and record.get("leaseId") != expected_lease_id:
+                if (
+                    expected_lease_id is not None
+                    and record.get("leaseId") != expected_lease_id
+                ):
                     continue
                 updated = {
                     **record,
@@ -899,14 +1331,24 @@ class DatabaseDaemonStore:
                 conn.execute(
                     update(self.commands)
                     .where(self.commands.c.id == record["databaseId"])
-                    .values(**command_to_row(updated, database_id=record["databaseId"], node_pk=node_pk))
+                    .values(
+                        **command_to_row(
+                            updated, database_id=record["databaseId"], node_pk=node_pk
+                        )
+                    )
                 )
-                self._append_daemon_event(conn, daemon_event("daemon.command.lease_renewed", {
-                    "nodeId": node_id,
-                    "commandId": record["id"],
-                    "leaseId": record.get("leaseId"),
-                    "leaseExpiresAt": updated["leaseExpiresAt"],
-                }))
+                self._append_daemon_event(
+                    conn,
+                    daemon_event(
+                        "daemon.command.lease_renewed",
+                        {
+                            "nodeId": node_id,
+                            "commandId": record["id"],
+                            "leaseId": record.get("leaseId"),
+                            "leaseExpiresAt": updated["leaseExpiresAt"],
+                        },
+                    ),
+                )
 
     def list_active_runs(self, node_id: str | None = None) -> list[dict[str, Any]]:
         statement = select(self.runs).where(self.runs.c.status == "running")
@@ -928,40 +1370,77 @@ class DatabaseDaemonStore:
         }
         with self.engine.begin() as conn:
             node_pk = self._node_pk(conn, record["nodeId"])
-            conn.execute(insert(self.run_requests).values(**run_request_to_row(record, node_pk=node_pk)))
-            self._append_daemon_event(conn, daemon_event("daemon.run_request.created", {
-                "nodeId": record["nodeId"],
-                "runRequestId": record["id"],
-                "sessionId": record["sessionId"],
-            }))
+            conn.execute(
+                insert(self.run_requests).values(
+                    **run_request_to_row(record, node_pk=node_pk)
+                )
+            )
+            self._append_daemon_event(
+                conn,
+                daemon_event(
+                    "daemon.run_request.created",
+                    {
+                        "nodeId": record["nodeId"],
+                        "runRequestId": record["id"],
+                        "sessionId": record["sessionId"],
+                    },
+                ),
+            )
         return record
 
     def get_run_request(self, request_id: str) -> dict[str, Any] | None:
         with self.engine.begin() as conn:
-            row = conn.execute(select(self.run_requests).where(self.run_requests.c.public_id == request_id)).mappings().first()
+            row = (
+                conn.execute(
+                    select(self.run_requests).where(
+                        self.run_requests.c.public_id == request_id
+                    )
+                )
+                .mappings()
+                .first()
+            )
         return row_to_run_request(row) if row else None
 
-    def list_active_run_requests(self, node_id: str | None = None) -> list[dict[str, Any]]:
-        statement = select(self.run_requests).where(self.run_requests.c.status == "running")
+    def list_active_run_requests(
+        self, node_id: str | None = None
+    ) -> list[dict[str, Any]]:
+        statement = select(self.run_requests).where(
+            self.run_requests.c.status == "running"
+        )
         if node_id is not None:
             statement = statement.where(self.run_requests.c.node_public_id == node_id)
         with self.engine.begin() as conn:
             rows = conn.execute(statement).mappings().all()
         return [row_to_run_request(row) for row in rows]
 
-    def active_run_request_for_session(self, node_id: str, session_id: str) -> dict[str, Any] | None:
-        return next((request for request in self.list_active_run_requests(node_id) if request["sessionId"] == session_id), None)
+    def active_run_request_for_session(
+        self, node_id: str, session_id: str
+    ) -> dict[str, Any] | None:
+        return next(
+            (
+                request
+                for request in self.list_active_run_requests(node_id)
+                if request["sessionId"] == session_id
+            ),
+            None,
+        )
 
     def run_request_for_command(self, command_id: str) -> dict[str, Any] | None:
         with self.engine.begin() as conn:
-            row = conn.execute(
-                select(self.run_requests)
-                .where(self.run_requests.c.status == "running")
-                .where(self.run_requests.c.current_command_public_id == command_id)
-            ).mappings().first()
+            row = (
+                conn.execute(
+                    select(self.run_requests)
+                    .where(self.run_requests.c.status == "running")
+                    .where(self.run_requests.c.current_command_public_id == command_id)
+                )
+                .mappings()
+                .first()
+            )
         return row_to_run_request(row) if row else None
 
-    def update_run_request(self, request_id: str, patch: dict[str, Any]) -> dict[str, Any]:
+    def update_run_request(
+        self, request_id: str, patch: dict[str, Any]
+    ) -> dict[str, Any]:
         current = self.get_run_request(request_id)
         if not current:
             raise KeyError(request_id)
@@ -974,34 +1453,56 @@ class DatabaseDaemonStore:
             conn.execute(
                 update(self.run_requests)
                 .where(self.run_requests.c.public_id == request_id)
-                .values(**run_request_to_row(updated, database_id=current.get("databaseId"), node_pk=node_pk))
+                .values(
+                    **run_request_to_row(
+                        updated, database_id=current.get("databaseId"), node_pk=node_pk
+                    )
+                )
             )
-            self._append_daemon_event(conn, daemon_event("daemon.run_request.updated", {
-                "nodeId": updated["nodeId"],
-                "runRequestId": updated["id"],
-                "status": updated["status"],
-            }))
+            self._append_daemon_event(
+                conn,
+                daemon_event(
+                    "daemon.run_request.updated",
+                    {
+                        "nodeId": updated["nodeId"],
+                        "runRequestId": updated["id"],
+                        "status": updated["status"],
+                    },
+                ),
+            )
         return updated
 
     def mark_command_completed(self, node_id: str, event: dict[str, Any]) -> bool:
-        return self._mark_command_terminal(node_id, event, "completed", event.get("exitCode"), None)
+        return self._mark_command_terminal(
+            node_id, event, "completed", event.get("exitCode"), None
+        )
 
     def mark_command_failed(self, node_id: str, event: dict[str, Any]) -> bool:
-        return self._mark_command_terminal(node_id, event, "failed", event.get("exitCode"), event.get("error"))
+        return self._mark_command_terminal(
+            node_id, event, "failed", event.get("exitCode"), event.get("error")
+        )
 
     def mark_command_cancelled(self, node_id: str, event: dict[str, Any]) -> bool:
-        return self._mark_command_terminal(node_id, event, "cancelled", None, event.get("reason"))
+        return self._mark_command_terminal(
+            node_id, event, "cancelled", None, event.get("reason")
+        )
 
-    def mark_cancel_commands_completed(self, node_id: str, target_command_id: str) -> None:
+    def mark_cancel_commands_completed(
+        self, node_id: str, target_command_id: str
+    ) -> None:
         now = now_iso()
         with self.engine.begin() as conn:
             node_pk = self._node_pk(conn, node_id)
-            rows = conn.execute(
-                select(self.commands)
-                .where(self.commands.c.node_id == node_pk)
-                .where(self.commands.c.type == "run.cancel")
-                .where(~self.commands.c.status.in_(TERMINAL_DAEMON_STATUSES))
-            ).mappings().all()
+            rows = (
+                conn.execute(
+                    select(self.commands)
+                    .where(self.commands.c.node_id == node_pk)
+                    .where(self.commands.c.type == "run.cancel")
+                    .where(~self.commands.c.status.in_(TERMINAL_DAEMON_STATUSES))
+                )
+                .mappings()
+                .all()
+            )
             for row in rows:
                 record = row_to_command(row)
                 command = record["command"]
@@ -1011,112 +1512,213 @@ class DatabaseDaemonStore:
                 conn.execute(
                     update(self.commands)
                     .where(self.commands.c.id == record["databaseId"])
-                    .values(**command_to_row(updated, database_id=record["databaseId"], node_pk=node_pk))
+                    .values(
+                        **command_to_row(
+                            updated, database_id=record["databaseId"], node_pk=node_pk
+                        )
+                    )
                 )
                 self._append_daemon_event(conn, completion_event)
 
-    def prune_terminal_records(self, retention_seconds: float, per_node_limit: int) -> dict[str, int]:
-        cutoff = _format_iso(_parse_iso(now_iso()) - timedelta(seconds=max(0.0, retention_seconds)))
+    def prune_terminal_records(
+        self, retention_seconds: float, per_node_limit: int
+    ) -> dict[str, int]:
+        cutoff = _format_iso(
+            _parse_iso(now_iso()) - timedelta(seconds=max(0.0, retention_seconds))
+        )
         per_node_limit = max(0, per_node_limit)
         deleted_commands = 0
         deleted_runs = 0
         with self.engine.begin() as conn:
-            command_rows = conn.execute(
-                select(self.commands)
-                .where(self.commands.c.status.in_(TERMINAL_DAEMON_STATUSES))
-            ).mappings().all()
-            command_ids = terminal_database_ids_to_prune(command_rows, cutoff, per_node_limit)
+            command_rows = (
+                conn.execute(
+                    select(self.commands).where(
+                        self.commands.c.status.in_(TERMINAL_DAEMON_STATUSES)
+                    )
+                )
+                .mappings()
+                .all()
+            )
+            command_ids = terminal_database_ids_to_prune(
+                command_rows, cutoff, per_node_limit
+            )
             if command_ids:
-                deleted_commands = conn.execute(delete(self.commands).where(self.commands.c.id.in_(command_ids))).rowcount or 0
+                deleted_commands = (
+                    conn.execute(
+                        delete(self.commands).where(self.commands.c.id.in_(command_ids))
+                    ).rowcount
+                    or 0
+                )
 
-            run_rows = conn.execute(
-                select(self.runs)
-                .where(self.runs.c.status.in_(TERMINAL_DAEMON_STATUSES))
-            ).mappings().all()
+            run_rows = (
+                conn.execute(
+                    select(self.runs).where(
+                        self.runs.c.status.in_(TERMINAL_DAEMON_STATUSES)
+                    )
+                )
+                .mappings()
+                .all()
+            )
             run_ids = terminal_database_ids_to_prune(run_rows, cutoff, per_node_limit)
             if run_ids:
-                deleted_runs = conn.execute(delete(self.runs).where(self.runs.c.id.in_(run_ids))).rowcount or 0
+                deleted_runs = (
+                    conn.execute(
+                        delete(self.runs).where(self.runs.c.id.in_(run_ids))
+                    ).rowcount
+                    or 0
+                )
         return {"commands": deleted_commands, "runs": deleted_runs}
 
     def append_daemon_event(self, event: dict[str, Any]) -> None:
         with self.engine.begin() as conn:
             self._append_daemon_event(conn, event)
 
-    def _mark_command_terminal(self, node_id: str, event: dict[str, Any], status: str, exit_code: int | None, error: str | None) -> bool:
+    def _mark_command_terminal(
+        self,
+        node_id: str,
+        event: dict[str, Any],
+        status: str,
+        exit_code: int | None,
+        error: str | None,
+    ) -> bool:
         now = now_iso()
         with self.engine.begin() as conn:
             node_pk = self._node_pk(conn, node_id)
-            row = conn.execute(select(self.commands).where(self.commands.c.public_id == event["commandId"])).mappings().first()
+            row = (
+                conn.execute(
+                    select(self.commands).where(
+                        self.commands.c.public_id == event["commandId"]
+                    )
+                )
+                .mappings()
+                .first()
+            )
             if not row:
                 return False
             command = row_to_command(row)
             if command.get("status") not in ("queued", "dispatched") or (
                 event.get("leaseId") is not None
-                and (command.get("status") != "dispatched" or command.get("leaseId") != event["leaseId"])
+                and (
+                    command.get("status") != "dispatched"
+                    or command.get("leaseId") != event["leaseId"]
+                )
             ):
                 return False
-            conn.execute(update(self.commands).where(self.commands.c.id == command["databaseId"]).values(**command_to_row({
-                    **command,
+            conn.execute(
+                update(self.commands)
+                .where(self.commands.c.id == command["databaseId"])
+                .values(
+                    **command_to_row(
+                        {
+                            **command,
+                            "status": status,
+                            "updatedAt": now,
+                            "completedAt": now,
+                            **(
+                                {"exitCode": exit_code} if exit_code is not None else {}
+                            ),
+                            **({"error": error} if error else {}),
+                        },
+                        database_id=command["databaseId"],
+                        node_pk=node_pk,
+                    )
+                )
+            )
+            run_row = (
+                conn.execute(
+                    select(self.runs).where(self.runs.c.public_id == event["runId"])
+                )
+                .mappings()
+                .first()
+            )
+            run = (
+                row_to_run(run_row, include_database=True)
+                if run_row
+                else {
+                    "nodeId": node_id,
+                    "nodeDatabaseId": node_pk,
+                    "commandId": event["commandId"],
+                    **({"commandDatabaseId": row["id"]} if row else {}),
+                    "sessionId": event["sessionId"],
+                    "runId": event["runId"],
+                    "agent": event["agent"],
+                    "mode": event["mode"],
+                    "taskGoal": "",
+                    "startedAt": now,
+                }
+            )
+            self._write_run(
+                conn,
+                {
+                    **run,
                     "status": status,
-                    "updatedAt": now,
                     "completedAt": now,
                     **({"exitCode": exit_code} if exit_code is not None else {}),
                     **({"error": error} if error else {}),
-            }, database_id=command["databaseId"], node_pk=node_pk)))
-            run_row = conn.execute(select(self.runs).where(self.runs.c.public_id == event["runId"])).mappings().first()
-            run = row_to_run(run_row, include_database=True) if run_row else {
-                "nodeId": node_id,
-                "nodeDatabaseId": node_pk,
-                "commandId": event["commandId"],
-                **({"commandDatabaseId": row["id"]} if row else {}),
-                "sessionId": event["sessionId"],
-                "runId": event["runId"],
-                "agent": event["agent"],
-                "mode": event["mode"],
-                "taskGoal": "",
-                "startedAt": now,
-            }
-            self._write_run(conn, {
-                **run,
-                "status": status,
-                "completedAt": now,
-                **({"exitCode": exit_code} if exit_code is not None else {}),
-                **({"error": error} if error else {}),
-            })
-            event_type = {"completed": "daemon.command.completed", "failed": "daemon.command.failed", "cancelled": "daemon.command.cancelled"}[status]
-            self._append_daemon_event(conn, daemon_event(event_type, {
-                "nodeId": node_id,
-                "commandId": event["commandId"],
-                "runId": event["runId"],
-                **({"exitCode": exit_code} if exit_code is not None else {}),
-                **({"error": error} if error else {}),
-            }))
+                },
+            )
+            event_type = {
+                "completed": "daemon.command.completed",
+                "failed": "daemon.command.failed",
+                "cancelled": "daemon.command.cancelled",
+            }[status]
+            self._append_daemon_event(
+                conn,
+                daemon_event(
+                    event_type,
+                    {
+                        "nodeId": node_id,
+                        "commandId": event["commandId"],
+                        "runId": event["runId"],
+                        **({"exitCode": exit_code} if exit_code is not None else {}),
+                        **({"error": error} if error else {}),
+                    },
+                ),
+            )
             return True
 
     def _write_run(self, conn: Any, run: dict[str, Any]) -> None:
         values = run_to_row(run)
-        existing = conn.scalar(select(self.runs.c.id).where(self.runs.c.public_id == run["runId"]))
+        existing = conn.scalar(
+            select(self.runs.c.id).where(self.runs.c.public_id == run["runId"])
+        )
         if existing:
-            conn.execute(update(self.runs).where(self.runs.c.id == existing).values(**run_to_row(run, database_id=existing)))
+            conn.execute(
+                update(self.runs)
+                .where(self.runs.c.id == existing)
+                .values(**run_to_row(run, database_id=existing))
+            )
         else:
             conn.execute(insert(self.runs).values(**values))
 
     def _append_daemon_event(self, conn: Any, event: dict[str, Any]) -> None:
-        conn.execute(insert(self.events).values(**daemon_event_to_row(conn, self, event)))
+        conn.execute(
+            insert(self.events).values(**daemon_event_to_row(conn, self, event))
+        )
 
     def _node_pk(self, conn: Any, node_id: str) -> str:
-        node_pk = conn.scalar(select(self.nodes.c.id).where(self.nodes.c.public_id == node_id))
+        node_pk = conn.scalar(
+            select(self.nodes.c.id).where(self.nodes.c.public_id == node_id)
+        )
         if not node_pk:
             raise KeyError(node_id)
         return node_pk
 
-def node_to_row(node: dict[str, Any], *, database_id: str | None = None) -> dict[str, Any]:
+
+def node_to_row(
+    node: dict[str, Any], *, database_id: str | None = None
+) -> dict[str, Any]:
     return {
         "id": database_id or new_database_id(),
         "public_id": node["id"],
         "employee_id": node.get("employeeId"),
         "workspace_path": node.get("workspacePath"),
+        "workspace_id": node.get("workspaceId"),
         "sandbox_mode": node.get("sandboxMode"),
+        "managed_node_id": node.get("managedNodeId"),
+        "provisioning_attempt_id": node.get("provisioningAttemptId"),
+        "credential_version": int(node.get("credentialVersion") or 1),
+        "retired_at": _parse_iso(node.get("retiredAt")),
         "status": node["status"],
         "agents": node.get("agents") or {},
         "agent_details": node.get("agentDetails") or {},
@@ -1142,28 +1744,74 @@ def row_to_node(row: Any) -> dict[str, Any]:
     return {
         "id": row["public_id"],
         **({"employeeId": row["employee_id"]} if row.get("employee_id") else {}),
-        **({"workspacePath": row["workspace_path"]} if row.get("workspace_path") else {}),
+        **(
+            {"workspacePath": row["workspace_path"]}
+            if row.get("workspace_path")
+            else {}
+        ),
+        **({"workspaceId": row["workspace_id"]} if row.get("workspace_id") else {}),
         **({"sandboxMode": row["sandbox_mode"]} if row.get("sandbox_mode") else {}),
+        **(
+            {"managedNodeId": row["managed_node_id"]}
+            if row.get("managed_node_id")
+            else {}
+        ),
+        **(
+            {"provisioningAttemptId": row["provisioning_attempt_id"]}
+            if row.get("provisioning_attempt_id")
+            else {}
+        ),
+        "credentialVersion": int(row.get("credential_version") or 1),
+        **(
+            {"retiredAt": _format_iso(row["retired_at"])}
+            if row.get("retired_at")
+            else {}
+        ),
         "status": row["status"],
         "agents": row["agents"] or {},
         **({"agentDetails": row["agent_details"]} if row.get("agent_details") else {}),
         "maxConcurrentRuns": int(row.get("max_concurrent_runs") or 1),
         "runCapacityByMode": row.get("run_capacity_by_mode") or {},
-        **({"disabledAgents": list(row["disabled_agents"])} if row.get("disabled_agents") else {}),
-        **({"agentRoleDefaults": dict(row["agent_role_defaults"])} if row.get("agent_role_defaults") else {}),
-        **({"agentRoleOverrides": dict(row["agent_role_overrides"])} if row.get("agent_role_overrides") else {}),
+        **(
+            {"disabledAgents": list(row["disabled_agents"])}
+            if row.get("disabled_agents")
+            else {}
+        ),
+        **(
+            {"agentRoleDefaults": dict(row["agent_role_defaults"])}
+            if row.get("agent_role_defaults")
+            else {}
+        ),
+        **(
+            {"agentRoleOverrides": dict(row["agent_role_overrides"])}
+            if row.get("agent_role_overrides")
+            else {}
+        ),
         "token": None,
         **({"tokenHash": row["token_hash"]} if row.get("token_hash") else {}),
         **({"uiTokenHash": row["ui_token_hash"]} if row.get("ui_token_hash") else {}),
-        **({"nodeTokenHash": row["node_token_hash"]} if row.get("node_token_hash") else {}),
+        **(
+            {"nodeTokenHash": row["node_token_hash"]}
+            if row.get("node_token_hash")
+            else {}
+        ),
         **({"lastError": row["last_error"]} if row.get("last_error") else {}),
         "createdAt": _format_iso(row["created_at"]),
         "updatedAt": _format_iso(row["updated_at"]),
-        **({"lastSeenAt": _format_iso(row["last_seen_at"])} if row.get("last_seen_at") else {}),
+        **(
+            {"lastSeenAt": _format_iso(row["last_seen_at"])}
+            if row.get("last_seen_at")
+            else {}
+        ),
     }
 
 
-def command_to_row(record: dict[str, Any], *, database_id: str | None = None, node_pk: str | None = None) -> dict[str, Any]:
+def command_to_row(
+    record: dict[str, Any],
+    *,
+    database_id: str | None = None,
+    node_pk: str | None = None,
+) -> dict[str, Any]:
     return {
         "id": database_id or record.get("databaseId") or new_database_id(),
         "public_id": record["id"],
@@ -1193,11 +1841,23 @@ def row_to_command(row: Any) -> dict[str, Any]:
         "status": row["status"],
         "createdAt": _format_iso(row["created_at"]),
         "updatedAt": _format_iso(row["updated_at"]),
-        **({"dispatchedAt": _format_iso(row["dispatched_at"])} if row.get("dispatched_at") else {}),
+        **(
+            {"dispatchedAt": _format_iso(row["dispatched_at"])}
+            if row.get("dispatched_at")
+            else {}
+        ),
         **({"leaseId": row["lease_id"]} if row.get("lease_id") else {}),
-        **({"leaseExpiresAt": _format_iso(row["lease_expires_at"])} if row.get("lease_expires_at") else {}),
+        **(
+            {"leaseExpiresAt": _format_iso(row["lease_expires_at"])}
+            if row.get("lease_expires_at")
+            else {}
+        ),
         "attempt": row.get("attempt") or 0,
-        **({"completedAt": _format_iso(row["completed_at"])} if row.get("completed_at") else {}),
+        **(
+            {"completedAt": _format_iso(row["completed_at"])}
+            if row.get("completed_at")
+            else {}
+        ),
         **({"exitCode": row["exit_code"]} if row.get("exit_code") is not None else {}),
         **({"error": row["error"]} if row.get("error") else {}),
     }
@@ -1215,10 +1875,14 @@ def command_is_available(record: dict[str, Any], now: str) -> bool:
     if status != "dispatched":
         return False
     lease_expires_at_value = record.get("leaseExpiresAt")
-    return bool(lease_expires_at_value and _parse_iso(lease_expires_at_value) <= _parse_iso(now))
+    return bool(
+        lease_expires_at_value and _parse_iso(lease_expires_at_value) <= _parse_iso(now)
+    )
 
 
-def run_to_row(run: dict[str, Any], *, database_id: str | None = None) -> dict[str, Any]:
+def run_to_row(
+    run: dict[str, Any], *, database_id: str | None = None
+) -> dict[str, Any]:
     return {
         "id": database_id or run.get("databaseId") or new_database_id(),
         "public_id": run["runId"],
@@ -1244,23 +1908,44 @@ def row_to_run(row: Any, *, include_database: bool = False) -> dict[str, Any]:
         **({"databaseId": row["id"]} if include_database else {}),
         "nodeId": row["node_public_id"],
         **({"nodeDatabaseId": row["node_id"]} if include_database else {}),
-        **({"commandId": row["command_public_id"]} if row.get("command_public_id") else {}),
-        **({"commandDatabaseId": row["command_id"]} if include_database and row.get("command_id") else {}),
+        **(
+            {"commandId": row["command_public_id"]}
+            if row.get("command_public_id")
+            else {}
+        ),
+        **(
+            {"commandDatabaseId": row["command_id"]}
+            if include_database and row.get("command_id")
+            else {}
+        ),
         "sessionId": row["session_public_id"],
         "runId": row["public_id"],
         "agent": row["agent"],
         "mode": row["mode"],
         "taskGoal": row["task_goal"],
-        **({"workspacePath": row["workspace_path"]} if row.get("workspace_path") else {}),
+        **(
+            {"workspacePath": row["workspace_path"]}
+            if row.get("workspace_path")
+            else {}
+        ),
         "status": row["status"],
         **({"exitCode": row["exit_code"]} if row.get("exit_code") is not None else {}),
         **({"error": row["error"]} if row.get("error") else {}),
         "startedAt": _format_iso(row["started_at"]),
-        **({"completedAt": _format_iso(row["completed_at"])} if row.get("completed_at") else {}),
+        **(
+            {"completedAt": _format_iso(row["completed_at"])}
+            if row.get("completed_at")
+            else {}
+        ),
     }
 
 
-def run_request_to_row(record: dict[str, Any], *, database_id: str | None = None, node_pk: str | None = None) -> dict[str, Any]:
+def run_request_to_row(
+    record: dict[str, Any],
+    *,
+    database_id: str | None = None,
+    node_pk: str | None = None,
+) -> dict[str, Any]:
     return {
         "id": database_id or record.get("databaseId") or new_database_id(),
         "public_id": record["id"],
@@ -1298,30 +1983,60 @@ def row_to_run_request(row: Any) -> dict[str, Any]:
         "currentIndex": row["current_index"],
         "state": row["state"] or {},
         "status": row["status"],
-        **({"currentCommandId": row["current_command_public_id"]} if row.get("current_command_public_id") else {}),
-        **({"currentRunId": row["current_run_public_id"]} if row.get("current_run_public_id") else {}),
+        **(
+            {"currentCommandId": row["current_command_public_id"]}
+            if row.get("current_command_public_id")
+            else {}
+        ),
+        **(
+            {"currentRunId": row["current_run_public_id"]}
+            if row.get("current_run_public_id")
+            else {}
+        ),
         **({"currentAgent": row["current_agent"]} if row.get("current_agent") else {}),
         **({"currentMode": row["current_mode"]} if row.get("current_mode") else {}),
-        **({"currentStartedAt": _format_iso(row["current_started_at"])} if row.get("current_started_at") else {}),
+        **(
+            {"currentStartedAt": _format_iso(row["current_started_at"])}
+            if row.get("current_started_at")
+            else {}
+        ),
         **({"error": row["error"]} if row.get("error") else {}),
         "createdAt": _format_iso(row["created_at"]),
         "updatedAt": _format_iso(row["updated_at"]),
-        **({"completedAt": _format_iso(row["completed_at"])} if row.get("completed_at") else {}),
+        **(
+            {"completedAt": _format_iso(row["completed_at"])}
+            if row.get("completed_at")
+            else {}
+        ),
     }
 
 
-def daemon_event_to_row(conn: Any, store: DatabaseDaemonStore, event: dict[str, Any]) -> dict[str, Any]:
+def daemon_event_to_row(
+    conn: Any, store: DatabaseDaemonStore, event: dict[str, Any]
+) -> dict[str, Any]:
     node_id = event.get("nodeId")
     command_id = event.get("commandId")
     run_id = event.get("runId")
     return {
         "id": new_database_id(),
         "public_id": event["id"],
-        "node_id": conn.scalar(select(store.nodes.c.id).where(store.nodes.c.public_id == node_id)) if node_id else None,
+        "node_id": conn.scalar(
+            select(store.nodes.c.id).where(store.nodes.c.public_id == node_id)
+        )
+        if node_id
+        else None,
         "node_public_id": node_id,
-        "command_id": conn.scalar(select(store.commands.c.id).where(store.commands.c.public_id == command_id)) if command_id else None,
+        "command_id": conn.scalar(
+            select(store.commands.c.id).where(store.commands.c.public_id == command_id)
+        )
+        if command_id
+        else None,
         "command_public_id": command_id,
-        "run_id": conn.scalar(select(store.runs.c.id).where(store.runs.c.public_id == run_id)) if run_id else None,
+        "run_id": conn.scalar(
+            select(store.runs.c.id).where(store.runs.c.public_id == run_id)
+        )
+        if run_id
+        else None,
         "run_public_id": run_id,
         "type": event["type"],
         "timestamp": _parse_iso(event["timestamp"]),

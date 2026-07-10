@@ -1,0 +1,526 @@
+from __future__ import annotations
+
+from pathlib import Path
+from threading import RLock
+from typing import Any
+
+from sqlalchemy import (
+    BigInteger,
+    Column,
+    DateTime,
+    ForeignKey,
+    JSON,
+    MetaData,
+    Table,
+    Text,
+    Uuid,
+    create_engine,
+    insert,
+    select,
+    update,
+)
+
+from ..core.ids import new_database_id, new_relay_id, now_iso
+from ..core.models import AGENT_NAMES
+from .store_common import (
+    DEFAULT_RELAY_DATA_DIR,
+    _append_jsonl,
+    _format_iso,
+    _parse_iso,
+    _read_json,
+    _read_jsonl,
+    _write_json,
+    database_id_column,
+    safe_name,
+)
+
+
+PLACEMENT_DESIRED_STATES = frozenset({"active", "draining", "removed"})
+
+
+class LocalAgentPlacementStore:
+    """Event-sourced bindings between logical agents and daemon nodes."""
+
+    def __init__(self, root_dir: str | Path = DEFAULT_RELAY_DATA_DIR):
+        self.root = Path(root_dir) / "agent-placements"
+        self.root.mkdir(parents=True, exist_ok=True)
+        self._lock = RLock()
+
+    def create_placement(
+        self,
+        agent: dict[str, Any],
+        daemon_node_id: str,
+        payload: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        placement = _new_placement(agent, daemon_node_id, payload or {})
+        with self._lock:
+            if _has_active_placement(
+                self.list_placements(agent_id=agent["id"]),
+                placement["daemonNodeId"],
+            ):
+                raise ValueError(
+                    "Agent already has an active placement on this daemon node."
+                )
+            self._append(placement["id"], "placement.created", placement)
+            return placement
+
+    def get_placement(self, placement_id: str) -> dict[str, Any] | None:
+        path = self._snapshot_path(placement_id)
+        return _read_json(path) if path.exists() else None
+
+    def list_placements(
+        self,
+        *,
+        agent_id: str | None = None,
+        daemon_node_id: str | None = None,
+        include_removed: bool = False,
+    ) -> list[dict[str, Any]]:
+        placements = [_read_json(path) for path in self.root.glob("*/snapshot.json")]
+        if agent_id is not None:
+            placements = [
+                placement
+                for placement in placements
+                if placement.get("agentId") == agent_id
+            ]
+        if daemon_node_id is not None:
+            placements = [
+                placement
+                for placement in placements
+                if placement.get("daemonNodeId") == daemon_node_id
+            ]
+        if not include_removed:
+            placements = [
+                placement
+                for placement in placements
+                if placement.get("desiredState") != "removed"
+            ]
+        return sorted(
+            placements, key=lambda item: (int(item.get("priority") or 100), item["id"])
+        )
+
+    def update_placement(
+        self, placement_id: str, patch: dict[str, Any]
+    ) -> dict[str, Any]:
+        allowed = {
+            "desiredState",
+            "priority",
+            "workspacePolicy",
+            "agentVersion",
+            "conditions",
+        }
+        unknown = set(patch) - allowed
+        if unknown:
+            raise ValueError(
+                f"Unsupported placement field(s): {', '.join(sorted(unknown))}."
+            )
+        with self._lock:
+            current = self.get_placement(placement_id)
+            if not current:
+                raise KeyError(placement_id)
+            normalized = dict(patch)
+            if (
+                "desiredState" in normalized
+                and normalized["desiredState"] not in PLACEMENT_DESIRED_STATES
+            ):
+                raise ValueError("desiredState must be active, draining, or removed.")
+            if "priority" in normalized and not isinstance(normalized["priority"], int):
+                raise ValueError("priority must be an integer.")
+            if "agentVersion" in normalized and not isinstance(
+                normalized["agentVersion"], int
+            ):
+                raise ValueError("agentVersion must be an integer.")
+            if "workspacePolicy" in normalized and not isinstance(
+                normalized["workspacePolicy"], dict
+            ):
+                raise ValueError("workspacePolicy must be an object.")
+            if "conditions" in normalized and not isinstance(
+                normalized["conditions"], list
+            ):
+                raise ValueError("conditions must be an array.")
+            updated = {**current, **normalized, "updatedAt": now_iso()}
+            event_type = "placement.updated"
+            if normalized.get("desiredState") == "draining":
+                event_type = "placement.draining"
+            elif normalized.get("desiredState") == "removed":
+                event_type = "placement.removed"
+            self._append(placement_id, event_type, updated)
+            return updated
+
+    def events(self, placement_id: str) -> list[dict[str, Any]]:
+        return _read_jsonl(self._events_path(placement_id))
+
+    def _append(
+        self, placement_id: str, event_type: str, placement: dict[str, Any]
+    ) -> None:
+        event = {
+            "id": new_relay_id("evt"),
+            "type": event_type,
+            "placementId": placement_id,
+            "timestamp": now_iso(),
+            "placement": placement,
+        }
+        _append_jsonl(self._events_path(placement_id), event)
+        _write_json(self._snapshot_path(placement_id), placement)
+
+    def _events_path(self, placement_id: str) -> Path:
+        return self.root / safe_name(placement_id) / "events.jsonl"
+
+    def _snapshot_path(self, placement_id: str) -> Path:
+        return self.root / safe_name(placement_id) / "snapshot.json"
+
+
+class DatabaseAgentPlacementStore:
+    metadata = MetaData()
+    placements = Table(
+        "agent_placements",
+        metadata,
+        database_id_column(),
+        Column("public_id", Text, nullable=False, unique=True),
+        Column("agent_public_id", Text, nullable=False, index=True),
+        Column("employee_public_id", Text, nullable=False, index=True),
+        Column("daemon_node_public_id", Text, nullable=False, index=True),
+        Column("executor_kind", Text, nullable=False),
+        Column("desired_state", Text, nullable=False),
+        Column("priority", BigInteger, nullable=False),
+        Column("agent_version", BigInteger, nullable=False),
+        Column("snapshot", JSON, nullable=False),
+        Column("event_version", BigInteger, nullable=False),
+        Column("created_at", DateTime(timezone=True), nullable=False),
+        Column("updated_at", DateTime(timezone=True), nullable=False),
+    )
+    events_table = Table(
+        "agent_placement_events",
+        metadata,
+        database_id_column(),
+        Column("public_id", Text, nullable=False, unique=True),
+        Column(
+            "placement_id",
+            Uuid(as_uuid=False),
+            ForeignKey("agent_placements.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        Column("sequence", BigInteger, nullable=False),
+        Column("type", Text, nullable=False),
+        Column("timestamp", DateTime(timezone=True), nullable=False),
+        Column("payload", JSON, nullable=False),
+    )
+
+    def __init__(self, database_url: str, *, create_schema: bool = False):
+        self.engine = create_engine(database_url, future=True)
+        if create_schema:
+            self.metadata.create_all(self.engine)
+
+    def create_placement(
+        self,
+        agent: dict[str, Any],
+        daemon_node_id: str,
+        payload: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        placement = _new_placement(agent, daemon_node_id, payload or {})
+        if _has_active_placement(
+            self.list_placements(agent_id=agent["id"]), placement["daemonNodeId"]
+        ):
+            raise ValueError(
+                "Agent already has an active placement on this daemon node."
+            )
+        event = _placement_event(placement["id"], "placement.created", placement)
+        with self.engine.begin() as conn:
+            row = _placement_row(placement, event_version=1)
+            conn.execute(insert(self.placements).values(**row))
+            conn.execute(
+                insert(self.events_table).values(
+                    **_placement_event_row(row["id"], 0, event)
+                )
+            )
+        return placement
+
+    def get_placement(self, placement_id: str) -> dict[str, Any] | None:
+        with self.engine.begin() as conn:
+            row = (
+                conn.execute(
+                    select(self.placements.c.snapshot).where(
+                        self.placements.c.public_id == placement_id
+                    )
+                )
+                .mappings()
+                .first()
+            )
+        return row["snapshot"] if row else None
+
+    def list_placements(
+        self,
+        *,
+        agent_id: str | None = None,
+        daemon_node_id: str | None = None,
+        include_removed: bool = False,
+    ) -> list[dict[str, Any]]:
+        statement = select(self.placements.c.snapshot)
+        if agent_id is not None:
+            statement = statement.where(self.placements.c.agent_public_id == agent_id)
+        if daemon_node_id is not None:
+            statement = statement.where(
+                self.placements.c.daemon_node_public_id == daemon_node_id
+            )
+        if not include_removed:
+            statement = statement.where(self.placements.c.desired_state != "removed")
+        with self.engine.begin() as conn:
+            rows = conn.execute(statement).mappings().all()
+        return sorted(
+            (row["snapshot"] for row in rows),
+            key=lambda item: (int(item.get("priority") or 100), item["id"]),
+        )
+
+    def update_placement(
+        self, placement_id: str, patch: dict[str, Any]
+    ) -> dict[str, Any]:
+        allowed = {
+            "desiredState",
+            "priority",
+            "workspacePolicy",
+            "agentVersion",
+            "conditions",
+        }
+        unknown = set(patch) - allowed
+        if unknown:
+            raise ValueError(
+                f"Unsupported placement field(s): {', '.join(sorted(unknown))}."
+            )
+        current = self.get_placement(placement_id)
+        if not current:
+            raise KeyError(placement_id)
+        normalized = dict(patch)
+        if (
+            "desiredState" in normalized
+            and normalized["desiredState"] not in PLACEMENT_DESIRED_STATES
+        ):
+            raise ValueError("desiredState must be active, draining, or removed.")
+        if "priority" in normalized and not isinstance(normalized["priority"], int):
+            raise ValueError("priority must be an integer.")
+        if "agentVersion" in normalized and not isinstance(
+            normalized["agentVersion"], int
+        ):
+            raise ValueError("agentVersion must be an integer.")
+        if "workspacePolicy" in normalized and not isinstance(
+            normalized["workspacePolicy"], dict
+        ):
+            raise ValueError("workspacePolicy must be an object.")
+        if "conditions" in normalized and not isinstance(
+            normalized["conditions"], list
+        ):
+            raise ValueError("conditions must be an array.")
+        updated = {**current, **normalized, "updatedAt": now_iso()}
+        event_type = (
+            "placement.draining"
+            if normalized.get("desiredState") == "draining"
+            else "placement.removed"
+            if normalized.get("desiredState") == "removed"
+            else "placement.updated"
+        )
+        event = _placement_event(placement_id, event_type, updated)
+        with self.engine.begin() as conn:
+            row = (
+                conn.execute(
+                    select(self.placements.c.id, self.placements.c.event_version)
+                    .where(self.placements.c.public_id == placement_id)
+                    .with_for_update()
+                )
+                .mappings()
+                .first()
+            )
+            if not row:
+                raise KeyError(placement_id)
+            sequence = int(row["event_version"] or 0)
+            conn.execute(
+                insert(self.events_table).values(
+                    **_placement_event_row(row["id"], sequence, event)
+                )
+            )
+            conn.execute(
+                update(self.placements)
+                .where(self.placements.c.id == row["id"])
+                .values(
+                    **_placement_row(
+                        updated, event_version=sequence + 1, database_id=row["id"]
+                    )
+                )
+            )
+        return updated
+
+    def events(self, placement_id: str) -> list[dict[str, Any]]:
+        with self.engine.begin() as conn:
+            rows = (
+                conn.execute(
+                    select(
+                        self.events_table.c.public_id,
+                        self.events_table.c.type,
+                        self.events_table.c.timestamp,
+                        self.events_table.c.payload,
+                    )
+                    .join(
+                        self.placements,
+                        self.events_table.c.placement_id == self.placements.c.id,
+                    )
+                    .where(self.placements.c.public_id == placement_id)
+                    .order_by(self.events_table.c.sequence)
+                )
+                .mappings()
+                .all()
+            )
+        if not rows and not self.get_placement(placement_id):
+            raise KeyError(placement_id)
+        return [
+            {
+                "id": row["public_id"],
+                "type": row["type"],
+                "placementId": placement_id,
+                "timestamp": _format_iso(row["timestamp"]),
+                "placement": row["payload"]["placement"],
+            }
+            for row in rows
+        ]
+
+
+def _has_active_placement(
+    placements: list[dict[str, Any]], daemon_node_id: str
+) -> bool:
+    return any(
+        placement["daemonNodeId"] == daemon_node_id
+        and placement.get("desiredState") != "removed"
+        for placement in placements
+    )
+
+
+def _new_placement(
+    agent: dict[str, Any], daemon_node_id: str, payload: dict[str, Any]
+) -> dict[str, Any]:
+    daemon_node_id = daemon_node_id.strip()
+    if not daemon_node_id:
+        raise ValueError("daemonNodeId is required.")
+    desired_state = payload.get("desiredState") or "active"
+    if desired_state not in PLACEMENT_DESIRED_STATES:
+        raise ValueError("desiredState must be active, draining, or removed.")
+    priority = payload.get("priority", 100)
+    if not isinstance(priority, int):
+        raise ValueError("priority must be an integer.")
+    workspace_policy = payload.get("workspacePolicy") or {"kind": "node-affine"}
+    if not isinstance(workspace_policy, dict):
+        raise ValueError("workspacePolicy must be an object.")
+    timestamp = now_iso()
+    return {
+        "id": new_relay_id("placement"),
+        "agentId": agent["id"],
+        "employeeId": agent["employeeId"],
+        "daemonNodeId": daemon_node_id,
+        "executorKind": agent["executorKind"],
+        "desiredState": desired_state,
+        "priority": priority,
+        "agentVersion": agent["version"],
+        "workspacePolicy": workspace_policy,
+        "conditions": [],
+        "createdAt": timestamp,
+        "updatedAt": timestamp,
+    }
+
+
+def _placement_event(
+    placement_id: str, event_type: str, placement: dict[str, Any]
+) -> dict[str, Any]:
+    return {
+        "id": new_relay_id("evt"),
+        "type": event_type,
+        "placementId": placement_id,
+        "timestamp": now_iso(),
+        "placement": placement,
+    }
+
+
+def _placement_row(
+    placement: dict[str, Any], *, event_version: int, database_id: str | None = None
+) -> dict[str, Any]:
+    return {
+        "id": database_id or new_database_id(),
+        "public_id": placement["id"],
+        "agent_public_id": placement["agentId"],
+        "employee_public_id": placement["employeeId"],
+        "daemon_node_public_id": placement["daemonNodeId"],
+        "executor_kind": placement["executorKind"],
+        "desired_state": placement["desiredState"],
+        "priority": int(placement.get("priority") or 100),
+        "agent_version": int(placement.get("agentVersion") or 1),
+        "snapshot": placement,
+        "event_version": event_version,
+        "created_at": _parse_iso(placement["createdAt"]),
+        "updated_at": _parse_iso(placement["updatedAt"]),
+    }
+
+
+def _placement_event_row(
+    placement_database_id: str, sequence: int, event: dict[str, Any]
+) -> dict[str, Any]:
+    return {
+        "public_id": event["id"],
+        "placement_id": placement_database_id,
+        "sequence": sequence,
+        "type": event["type"],
+        "timestamp": _parse_iso(event["timestamp"]),
+        "payload": {"placement": event["placement"]},
+    }
+
+
+def placement_status(
+    placement: dict[str, Any],
+    agent: dict[str, Any] | None,
+    daemon_node: dict[str, Any] | None,
+) -> dict[str, Any]:
+    conditions: list[dict[str, str]] = []
+    status = "pending"
+    if placement.get("desiredState") != "active":
+        status = "offline"
+        conditions.append(
+            {
+                "reason": "placement_not_active",
+                "message": "Placement is not accepting new work.",
+            }
+        )
+    elif not agent or agent.get("deletedAt") or not agent.get("enabled", True):
+        status = "incompatible"
+        conditions.append(
+            {
+                "reason": "agent_disabled",
+                "message": "Logical agent is disabled or deleted.",
+            }
+        )
+    elif placement.get("agentVersion") != agent.get("version"):
+        status = "incompatible"
+        conditions.append(
+            {
+                "reason": "agent_configuration_pending",
+                "message": "Placement has not realized the current agent configuration.",
+            }
+        )
+    elif not daemon_node:
+        status = "offline"
+        conditions.append(
+            {"reason": "node_not_found", "message": "Runtime node is not registered."}
+        )
+    elif not daemon_node.get("online") or daemon_node.get("stale"):
+        status = "offline"
+        conditions.append(
+            {"reason": "node_offline", "message": "Runtime node heartbeat is not live."}
+        )
+    else:
+        executor_kind = placement.get("executorKind")
+        executor_status = (daemon_node.get("agents") or {}).get(executor_kind)
+        if executor_kind not in AGENT_NAMES or executor_status != "ready":
+            status = "incompatible"
+            conditions.append(
+                {
+                    "reason": "executor_not_ready",
+                    "message": f"{executor_kind} is not ready on this runtime node.",
+                }
+            )
+        elif daemon_node.get("status") == "running":
+            status = "busy"
+        else:
+            status = "ready"
+    return {**placement, "status": status, "conditions": conditions}

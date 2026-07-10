@@ -205,14 +205,81 @@ describe("RelayChatIdentityResolver", () => {
 });
 
 describe("RelayChatGateway", () => {
-  it("resolves chat identity and sandbox before invoking Relay backend", async () => {
-    const events: RelayEvent[] = [];
+  it("dispatches chat work through the employee's logical agent", async () => {
+    let selectedAgentId = "";
     const backend: RelayChatBackend = {
-      async startSandboxRun(input) {
-        assert.equal(input.sandboxId, "sbx_alice");
+      async listEmployeeAgents(employeeId) {
+        assert.equal(employeeId, "alice");
+        return [{ id: "agent_builder", executorKind: "codex", availability: "ready" }];
+      },
+      async startAgentRun(input) {
+        selectedAgentId = input.agentId;
         assert.equal(input.employeeId, "alice");
         return makeSession("running");
       },
+      async startSandboxRun() {
+        throw new Error("sandbox routing should not be used");
+      },
+      async cancelSandboxRun() {
+        return makeSession("cancelled");
+      },
+      async getSession() {
+        return makeSession("completed");
+      },
+      async streamSessionEvents() {},
+    };
+    const identities = new StaticChatIdentityResolver([
+      { provider: "telegram", externalUserId: "42", employeeId: "alice" },
+    ]);
+    const gateway = new RelayChatGateway({ backend, identities });
+
+    await gateway.run({
+      ...telegramConversation({ userId: 42, chatId: 42 }),
+      agent: "codex",
+      mode: "action",
+      taskGoal: "ship chat support",
+    });
+
+    assert.equal(selectedAgentId, "agent_builder");
+  });
+
+  it("does not use a default agent whose executor differs from the requested agent", async () => {
+    let selectedAgentId = "";
+    const backend: RelayChatBackend = {
+      async listEmployeeAgents() {
+        return [
+          { id: "agent_writer", executorKind: "claude", availability: "ready" },
+          { id: "agent_builder", executorKind: "codex", availability: "ready" },
+        ];
+      },
+      async startAgentRun(input) { selectedAgentId = input.agentId; return makeSession("running"); },
+      async startSandboxRun() { throw new Error("sandbox routing should not be used"); },
+      async cancelSandboxRun() { return makeSession("cancelled"); },
+      async getSession() { return makeSession("completed"); },
+      async streamSessionEvents() {},
+    };
+    const identities = new StaticChatIdentityResolver([
+      { provider: "telegram", externalUserId: "42", employeeId: "alice", defaultAgentId: "agent_writer" },
+    ]);
+    await new RelayChatGateway({ backend, identities }).run({
+      ...telegramConversation({ userId: 42, chatId: 42 }),
+      agent: "codex",
+      mode: "action",
+      taskGoal: "build it",
+    });
+    assert.equal(selectedAgentId, "agent_builder");
+  });
+
+  it("resolves chat identity and agent before invoking Relay backend", async () => {
+    const events: RelayEvent[] = [];
+    const backend: RelayChatBackend = {
+      async listEmployeeAgents() { return [{ id: "agent_builder", executorKind: "codex", availability: "ready" }]; },
+      async startAgentRun(input) {
+        assert.equal(input.agentId, "agent_builder");
+        assert.equal(input.employeeId, "alice");
+        return makeSession("running");
+      },
+      async startSandboxRun() { throw new Error("sandbox routing should not be used"); },
       async cancelSandboxRun() {
         return makeSession("cancelled");
       },
@@ -228,7 +295,7 @@ describe("RelayChatGateway", () => {
       },
     };
     const identities = new StaticChatIdentityResolver([
-      { provider: "telegram", externalUserId: "42", employeeId: "alice", defaultSandboxId: "sbx_alice" },
+      { provider: "telegram", externalUserId: "42", employeeId: "alice", defaultAgentId: "agent_builder" },
     ]);
     const gateway = new RelayChatGateway({ backend, identities });
     const seen: RelayEvent[] = [];
@@ -282,10 +349,12 @@ describe("RelayChatGateway", () => {
       ranWith: [],
     };
     const backend: RelayChatBackend = {
-      async startSandboxRun(input) {
+      async listEmployeeAgents() { return [{ id: "agent_builder", executorKind: "codex", availability: "ready" }]; },
+      async startAgentRun(input) {
         calls.ranWith.push(input.sessionId);
         return makeSession("running");
       },
+      async startSandboxRun() { throw new Error("sandbox routing should not be used"); },
       async cancelSandboxRun() {
         return makeSession("cancelled");
       },
@@ -302,7 +371,7 @@ describe("RelayChatGateway", () => {
       },
     };
     const identities = new StaticChatIdentityResolver([
-      { provider: "discord", externalUserId: "u1", employeeId: "alice", defaultSandboxId: "sbx_alice" },
+      { provider: "discord", externalUserId: "u1", employeeId: "alice", defaultAgentId: "agent_builder" },
     ]);
     const gateway = new RelayChatGateway({ backend, identities });
 
@@ -324,9 +393,11 @@ describe("RelayChatGateway", () => {
     let started = 0;
     let failed = 0;
     const backend: RelayChatBackend = {
-      async startSandboxRun() {
+      async listEmployeeAgents() { return [{ id: "agent_builder", executorKind: "codex", availability: "ready" }]; },
+      async startAgentRun() {
         return makeSession("running");
       },
+      async startSandboxRun() { throw new Error("sandbox routing should not be used"); },
       async cancelSandboxRun() {
         return makeSession("cancelled");
       },
@@ -341,7 +412,7 @@ describe("RelayChatGateway", () => {
       },
     };
     const identities = new StaticChatIdentityResolver([
-      { provider: "discord", externalUserId: "u1", employeeId: "alice", defaultSandboxId: "sbx_alice" },
+      { provider: "discord", externalUserId: "u1", employeeId: "alice", defaultAgentId: "agent_builder" },
     ]);
     const gateway = new RelayChatGateway({ backend, identities });
 
@@ -373,10 +444,12 @@ describe("RelayChatGateway", () => {
     let resolved = 0;
     const ranWith: (string | undefined)[] = [];
     const backend: RelayChatBackend = {
-      async startSandboxRun(input) {
+      async listEmployeeAgents() { return [{ id: "agent_builder", executorKind: "codex", availability: "ready" }]; },
+      async startAgentRun(input) {
         ranWith.push(input.sessionId);
         return makeSession("running");
       },
+      async startSandboxRun() { throw new Error("sandbox routing should not be used"); },
       async cancelSandboxRun() {
         return makeSession("cancelled");
       },
@@ -391,7 +464,7 @@ describe("RelayChatGateway", () => {
       async bindConversationSession() {},
     };
     const identities = new StaticChatIdentityResolver([
-      { provider: "discord", externalUserId: "u1", employeeId: "alice", defaultSandboxId: "sbx_alice" },
+      { provider: "discord", externalUserId: "u1", employeeId: "alice", defaultAgentId: "agent_builder" },
     ]);
     const gateway = new RelayChatGateway({ backend, identities });
 

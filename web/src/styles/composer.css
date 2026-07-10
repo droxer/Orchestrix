@@ -300,6 +300,7 @@
 
 .send-button:focus-visible {
   outline: none;
+  box-shadow: var(--ring-focus);
 }
 
 .send-button:disabled {

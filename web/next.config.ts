@@ -23,6 +23,13 @@ const nextConfig = (phase: string): NextConfig => {
             return {
               beforeFiles: [
                 { source: "/auth/:path*", destination: `${backendUrl}/auth/:path*` },
+                { source: "/agents", destination: `${backendUrl}/agents` },
+                { source: "/agents/:path*", destination: `${backendUrl}/agents/:path*` },
+                { source: "/agent-runs", destination: `${backendUrl}/agent-runs` },
+                { source: "/agent-runs/:path*", destination: `${backendUrl}/agent-runs/:path*` },
+                { source: "/artifacts", destination: `${backendUrl}/artifacts` },
+                { source: "/artifacts/:path*", destination: `${backendUrl}/artifacts/:path*` },
+                { source: "/chat/:path*", destination: `${backendUrl}/chat/:path*` },
                 { source: "/cp", destination: `${backendUrl}/cp` },
                 { source: "/cp/:path*", destination: `${backendUrl}/cp/:path*` },
                 { source: "/sandboxes/:path*", destination: `${backendUrl}/sandboxes/:path*` },

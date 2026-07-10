@@ -1,0 +1,286 @@
+from __future__ import annotations
+
+from datetime import datetime, timedelta, timezone
+import hashlib
+import hmac
+from pathlib import Path
+import secrets
+from threading import RLock
+from typing import Any
+from uuid import uuid4
+
+from ..persistence.store_common import DEFAULT_RELAY_DATA_DIR, _read_json, _write_json, now_iso, safe_name
+
+
+MANAGED_NODE_DESIRED_STATES = frozenset({"running", "stopped", "deleted"})
+# "pooled" and "shared" are reserved for future multi-employee node sharing;
+# only "dedicated" is wired into agent placement sync today, so the other
+# modes are rejected rather than silently accepted with no agents ever synced.
+MANAGED_NODE_ASSIGNMENT_MODES = frozenset({"dedicated"})
+MANAGED_NODE_SANDBOX_MODES = frozenset({"boxlite", "none"})
+MANAGED_NODE_PHASES = frozenset({
+    "requested",
+    "allocating",
+    "bootstrapping",
+    "registering",
+    "ready",
+    "draining",
+    "stopped",
+    "deleting",
+})
+PROVISIONING_ATTEMPT_STATUSES = frozenset({
+    "pending",
+    "claimed",
+    "allocating",
+    "bootstrapping",
+    "registering",
+    "succeeded",
+    "failed",
+    "cancelled",
+})
+TERMINAL_ATTEMPT_STATUSES = frozenset({"succeeded", "failed", "cancelled"})
+
+
+def _new_id(prefix: str) -> str:
+    return f"{prefix}_{uuid4().hex}"
+
+
+def _secret_hash(secret: str) -> str:
+    return hashlib.sha256(secret.encode("utf-8")).hexdigest()
+
+
+def _parse_timestamp(value: str) -> datetime:
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+class LocalManagedNodeStore:
+    """Durable local-first store for managed-node desired state and attempts."""
+
+    def __init__(self, root_dir: str | Path = DEFAULT_RELAY_DATA_DIR):
+        root = Path(root_dir) / "managed-nodes"
+        self.nodes_dir = root / "nodes"
+        self.attempts_dir = root / "attempts"
+        self.grants_dir = root / "enrollment-grants"
+        self._lock = RLock()
+        for path in (self.nodes_dir, self.attempts_dir, self.grants_dir):
+            path.mkdir(parents=True, exist_ok=True)
+
+    def create_node(self, payload: dict[str, Any]) -> dict[str, Any]:
+        assignment_mode = payload.get("assignmentMode") or "dedicated"
+        desired_state = payload.get("desiredState") or "running"
+        sandbox_mode = payload.get("sandboxMode") or "boxlite"
+        employee_id = payload.get("employeeId")
+        if assignment_mode not in MANAGED_NODE_ASSIGNMENT_MODES:
+            raise ValueError("assignmentMode must be dedicated.")
+        if desired_state not in MANAGED_NODE_DESIRED_STATES:
+            raise ValueError("desiredState must be running, stopped, or deleted.")
+        if sandbox_mode not in MANAGED_NODE_SANDBOX_MODES:
+            raise ValueError("sandboxMode must be boxlite or none.")
+        if not employee_id:
+            raise ValueError("employeeId is required for a dedicated managed node.")
+        with self._lock:
+            now = now_iso()
+            node = {
+                "id": _new_id("mnode"),
+                "displayName": payload.get("displayName") or f"Managed node for {employee_id or 'pool'}",
+                **({"employeeId": employee_id} if employee_id else {}),
+                "assignmentMode": assignment_mode,
+                "provider": payload.get("provider") or "local-process",
+                **({"providerConfigRef": payload["providerConfigRef"]} if payload.get("providerConfigRef") else {}),
+                "profile": payload.get("profile") or "standard",
+                "sandboxMode": sandbox_mode,
+                "workspacePolicy": payload.get("workspacePolicy") or {"kind": "employee-home"},
+                "desiredState": desired_state,
+                "generation": 1,
+                "phase": "requested" if desired_state == "running" else "stopped",
+                "conditions": [],
+                "createdAt": now,
+                "updatedAt": now,
+            }
+            self._write_node(node)
+            return node
+
+    def list_nodes(self, *, include_deleted: bool = False) -> list[dict[str, Any]]:
+        nodes = [_read_json(path) for path in self.nodes_dir.glob("*.json")]
+        if not include_deleted:
+            nodes = [node for node in nodes if node.get("desiredState") != "deleted"]
+        return sorted(nodes, key=lambda item: (item.get("createdAt") or "", item["id"]))
+
+    def get_node(self, node_id: str) -> dict[str, Any] | None:
+        path = self.nodes_dir / f"{safe_name(node_id)}.json"
+        return _read_json(path) if path.exists() else None
+
+    def update_node(self, node_id: str, patch: dict[str, Any]) -> dict[str, Any]:
+        with self._lock:
+            node = self.get_node(node_id)
+            if not node:
+                raise KeyError(node_id)
+            provider_fields = {"provider", "providerConfigRef", "profile", "sandboxMode", "workspacePolicy"}
+            allowed_fields = provider_fields | {"displayName", "employeeId", "assignmentMode", "desiredState", "phase"}
+            unknown = set(patch) - allowed_fields
+            if unknown:
+                raise ValueError(f"Unsupported managed node field(s): {', '.join(sorted(unknown))}.")
+            desired_state = patch.get("desiredState", node["desiredState"])
+            if desired_state not in MANAGED_NODE_DESIRED_STATES:
+                raise ValueError("desiredState must be running, stopped, or deleted.")
+            sandbox_mode = patch.get("sandboxMode", node["sandboxMode"])
+            if sandbox_mode not in MANAGED_NODE_SANDBOX_MODES:
+                raise ValueError("sandboxMode must be boxlite or none.")
+            assignment_mode = patch.get("assignmentMode", node["assignmentMode"])
+            if assignment_mode not in MANAGED_NODE_ASSIGNMENT_MODES:
+                raise ValueError("assignmentMode must be dedicated.")
+            employee_id = patch.get("employeeId", node.get("employeeId"))
+            if assignment_mode == "dedicated" and not employee_id:
+                raise ValueError("employeeId is required for a dedicated managed node.")
+            if "phase" in patch and patch["phase"] not in MANAGED_NODE_PHASES:
+                raise ValueError("Invalid managed node phase.")
+            updated = {**node, **patch, "updatedAt": now_iso()}
+            generation_changed = any(field in patch and patch[field] != node.get(field) for field in provider_fields)
+            if generation_changed:
+                updated["generation"] = int(node.get("generation") or 1) + 1
+                updated["phase"] = "requested" if desired_state == "running" else updated["phase"]
+                updated.pop("activeAttemptId", None)
+            if desired_state != node["desiredState"]:
+                updated["phase"] = {"running": "requested", "stopped": "draining", "deleted": "deleting"}[desired_state]
+            self._write_node(updated)
+            return updated
+
+    def create_attempt(self, node_id: str, *, grant_ttl_seconds: int = 900) -> tuple[dict[str, Any], str]:
+        with self._lock:
+            node = self.get_node(node_id)
+            if not node:
+                raise KeyError(node_id)
+            if node["desiredState"] != "running":
+                raise ValueError("Managed node must desire running before provisioning.")
+            active = self.active_attempt(node_id)
+            if active:
+                raise ValueError("Managed node already has an active provisioning attempt.")
+            attempts = self.list_attempts(node_id)
+            attempt_number = 1 + max((int(item.get("attemptNumber") or 0) for item in attempts if item.get("generation") == node["generation"]), default=0)
+            now = now_iso()
+            attempt = {
+                "id": _new_id("attempt"),
+                "managedNodeId": node_id,
+                "generation": node["generation"],
+                "attemptNumber": attempt_number,
+                "status": "pending",
+                "startedAt": now,
+                "updatedAt": now,
+            }
+            secret = secrets.token_urlsafe(32)
+            grant_id = _new_id("grant")
+            expires_at = (datetime.now(timezone.utc) + timedelta(seconds=grant_ttl_seconds)).isoformat().replace("+00:00", "Z")
+            grant = {
+                "id": grant_id,
+                "attemptId": attempt["id"],
+                "secretHash": _secret_hash(secret),
+                "expiresAt": expires_at,
+                "createdAt": now,
+            }
+            _write_json(self.attempts_dir / f"{safe_name(attempt['id'])}.json", attempt)
+            _write_json(self.grants_dir / f"{safe_name(grant_id)}.json", grant)
+            self._write_node({**node, "activeAttemptId": attempt["id"], "phase": "allocating", "updatedAt": now})
+            return attempt, f"{grant_id}.{secret}"
+
+    def list_attempts(self, node_id: str) -> list[dict[str, Any]]:
+        attempts = [_read_json(path) for path in self.attempts_dir.glob("*.json")]
+        return sorted(
+            (item for item in attempts if item.get("managedNodeId") == node_id),
+            key=lambda item: (item.get("startedAt") or "", item["id"]),
+        )
+
+    def active_attempt(self, node_id: str) -> dict[str, Any] | None:
+        return next((item for item in reversed(self.list_attempts(node_id)) if item.get("status") not in TERMINAL_ATTEMPT_STATUSES), None)
+
+    def update_attempt(self, attempt_id: str, patch: dict[str, Any]) -> dict[str, Any]:
+        with self._lock:
+            attempt = self._get_attempt(attempt_id)
+            if not attempt:
+                raise KeyError(attempt_id)
+            status = patch.get("status", attempt["status"])
+            if status not in PROVISIONING_ATTEMPT_STATUSES:
+                raise ValueError("Invalid provisioning attempt status.")
+            allowed = {"status", "providerInstanceId", "providerOperationId", "errorCode", "errorMessage", "retryAt"}
+            unknown = set(patch) - allowed
+            if unknown:
+                raise ValueError(f"Unsupported provisioning attempt field(s): {', '.join(sorted(unknown))}.")
+            now = now_iso()
+            updated = {**attempt, **patch, "updatedAt": now}
+            if status in TERMINAL_ATTEMPT_STATUSES:
+                updated["finishedAt"] = now
+            _write_json(self.attempts_dir / f"{safe_name(attempt_id)}.json", updated)
+            node = self.get_node(attempt["managedNodeId"])
+            if node:
+                phase_by_status = {
+                    "pending": "allocating",
+                    "claimed": "allocating",
+                    "allocating": "allocating",
+                    "bootstrapping": "bootstrapping",
+                    "registering": "registering",
+                }
+                node_patch = {**node, "updatedAt": now}
+                if status in phase_by_status:
+                    node_patch["phase"] = phase_by_status[status]
+                if status in TERMINAL_ATTEMPT_STATUSES and node.get("activeAttemptId") == attempt_id:
+                    node_patch.pop("activeAttemptId", None)
+                self._write_node(node_patch)
+            return updated
+
+    def consume_enrollment_grant(self, credential: str) -> tuple[dict[str, Any], dict[str, Any]]:
+        grant_id, separator, secret = credential.partition(".")
+        if not separator or not grant_id or not secret:
+            raise PermissionError("Invalid enrollment credential.")
+        with self._lock:
+            path = self.grants_dir / f"{safe_name(grant_id)}.json"
+            if not path.exists():
+                raise PermissionError("Invalid enrollment credential.")
+            grant = _read_json(path)
+            if grant.get("revokedAt"):
+                raise PermissionError("Enrollment grant has been revoked.")
+            if grant.get("consumedAt"):
+                raise PermissionError("Enrollment grant has already been consumed.")
+            if _parse_timestamp(grant["expiresAt"]) <= datetime.now(timezone.utc):
+                raise PermissionError("Enrollment grant has expired.")
+            if not hmac.compare_digest(grant["secretHash"], _secret_hash(secret)):
+                raise PermissionError("Invalid enrollment credential.")
+            attempt = self._get_attempt(grant["attemptId"])
+            if not attempt or attempt.get("status") in TERMINAL_ATTEMPT_STATUSES:
+                raise PermissionError("Provisioning attempt is not active.")
+            node = self.get_node(attempt["managedNodeId"])
+            if not node or node.get("desiredState") != "running" or node.get("generation") != attempt.get("generation"):
+                raise PermissionError("Managed node no longer accepts this enrollment grant.")
+            consumed_at = now_iso()
+            _write_json(path, {**grant, "consumedAt": consumed_at})
+            return node, attempt
+
+    def complete_enrollment(self, node_id: str, attempt_id: str, daemon_node_id: str) -> tuple[dict[str, Any], dict[str, Any]]:
+        with self._lock:
+            attempt = self.update_attempt(attempt_id, {"status": "succeeded"})
+            node = self.get_node(node_id)
+            if not node:
+                raise KeyError(node_id)
+            updated = {
+                **node,
+                "activeDaemonNodeId": daemon_node_id,
+                "phase": "registering",
+                "updatedAt": now_iso(),
+            }
+            updated.pop("activeAttemptId", None)
+            self._write_node(updated)
+            return updated, attempt
+
+    def mark_ready(self, daemon_node_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            node = next((item for item in self.list_nodes() if item.get("activeDaemonNodeId") == daemon_node_id), None)
+            if not node:
+                return None
+            updated = {**node, "phase": "ready", "conditions": [], "updatedAt": now_iso()}
+            self._write_node(updated)
+            return updated
+
+    def _get_attempt(self, attempt_id: str) -> dict[str, Any] | None:
+        path = self.attempts_dir / f"{safe_name(attempt_id)}.json"
+        return _read_json(path) if path.exists() else None
+
+    def _write_node(self, node: dict[str, Any]) -> None:
+        _write_json(self.nodes_dir / f"{safe_name(node['id'])}.json", node)

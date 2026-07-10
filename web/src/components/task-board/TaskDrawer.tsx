@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { AGENT_NAMES, type AgentName, type TaskPriority, type TaskRoutineCadence, type TaskRoutineType, type TaskStatus } from "../../types";
+import type { EmployeeAgent, TaskPriority, TaskRoutineCadence, TaskRoutineType, TaskStatus } from "../../types";
 import { TASK_PRIORITIES, TASK_STATUSES } from "../../lib/backlog";
 import { TASK_ROUTINE_CADENCES, TASK_ROUTINE_TYPES } from "../../lib/routine";
 import type { TaskBoardFormState } from "../../lib/taskBoardForm";
@@ -25,6 +25,7 @@ const NO_AGENT = "__none__";
 type TaskDrawerProps = {
   form: TaskBoardFormState;
   employees: string[];
+  logicalAgents: EmployeeAgent[];
   saving: boolean;
   title: string;
   subtitle: string;
@@ -37,6 +38,7 @@ type TaskDrawerProps = {
 export function TaskDrawer({
   form,
   employees,
+  logicalAgents,
   saving,
   title,
   subtitle,
@@ -195,8 +197,17 @@ export function TaskDrawer({
           <label className="adm-field">
             <span>{t("backlog.agent")}</span>
             <Select
-              value={form.assignedAgent || NO_AGENT}
-              onValueChange={(value) => updateBase({ assignedAgent: value === NO_AGENT ? "" : (value as AgentName) })}
+              value={form.assignedAgentId || form.assignedAgent || NO_AGENT}
+              onValueChange={(value) => {
+                if (value === NO_AGENT) {
+                  updateBase({ assignedAgent: "", assignedAgentId: "" });
+                  return;
+                }
+                const logicalAgent = logicalAgents.find((agent) => agent.id === value);
+                if (logicalAgent) {
+                  updateBase({ assignedAgent: logicalAgent.executorKind, assignedAgentId: logicalAgent.id });
+                }
+              }}
             >
               <SelectTrigger className="w-full">
                 <SelectValue />
@@ -205,9 +216,11 @@ export function TaskDrawer({
                 <SelectItem value={NO_AGENT}>
                   {form.variant === "backlog" ? t("backlog.agent_team") : t("backlog.no_agent")}
                 </SelectItem>
-                {AGENT_NAMES.map((agent) => (
-                  <SelectItem key={agent} value={agent}>{agent}</SelectItem>
-                ))}
+                {logicalAgents
+                  .filter((agent) => !form.assigneeEmployeeId || agent.employeeId === form.assigneeEmployeeId)
+                  .map((agent) => (
+                    <SelectItem key={agent.id} value={agent.id}>{agent.displayName} · {agent.executorKind}</SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </label>

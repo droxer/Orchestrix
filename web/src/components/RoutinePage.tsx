@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
 import { useRelayMutations } from "../hooks/useRelayMutations";
 import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
+import { useEmployeeAgents } from "../hooks/useEmployeeAgents";
 import { AgentStateBadge } from "./AgentStateBadge";
 import { Badge } from "@/components/ui/badge";
 import { PriorityBadge } from "./PriorityBadge";
@@ -21,6 +22,7 @@ import { TaskDrawer } from "./task-board/TaskDrawer";
 import { PageHeader } from "./PageHeader";
 import { BoardEmpty } from "./BoardEmpty";
 import { TaskBoardHeaderActions } from "./TaskBoardHeaderActions";
+import { useUrlSearchState } from "../hooks/useUrlSearchState";
 
 interface RoutinePageProps {
   tasks: RelayTask[];
@@ -45,6 +47,25 @@ type RoutineView = "card" | "list";
 
 const ROUTINE_VIEW_STORAGE_KEY = "relay-web.routineView";
 const ROUTINE_VIEWS: readonly RoutineView[] = ["card", "list"];
+
+function parseRoutineFilters(value: string | null): RoutineFilters {
+  if (!value) return initialFilters;
+  try {
+    return { ...initialFilters, ...JSON.parse(value) } as RoutineFilters;
+  } catch {
+    return initialFilters;
+  }
+}
+
+function serializeRoutineFilters(value: RoutineFilters): string | null {
+  return JSON.stringify(value) === JSON.stringify(initialFilters) ? null : JSON.stringify(value);
+}
+
+function parseRoutineView(value: string | null): RoutineView {
+  return ROUTINE_VIEWS.includes(value as RoutineView)
+    ? value as RoutineView
+    : readViewPreference(ROUTINE_VIEW_STORAGE_KEY, "list", ROUTINE_VIEWS);
+}
 
 function activeFilterCount(filters: RoutineFilters): number {
   let count = 0;
@@ -348,14 +369,15 @@ function RoutineRow({
 }
 
 export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing, onRefresh, onOpenConversation }: RoutinePageProps) {
+  const { agents: logicalAgents } = useEmployeeAgents(currentUser.employeeId);
   const { t } = useTranslation();
   const {
     startTaskMutation,
     updateTaskMutation,
     createTaskMutation,
   } = useRelayMutations();
-  const [filters, setFilters] = useState<RoutineFilters>(initialFilters);
-  const [view, setView] = useState<RoutineView>(() => readViewPreference(ROUTINE_VIEW_STORAGE_KEY, "list", ROUTINE_VIEWS));
+  const [filters, setFilters] = useUrlSearchState("routineFilters", initialFilters, parseRoutineFilters, serializeRoutineFilters);
+  const [view, setView] = useUrlSearchState("routineView", parseRoutineView(null), parseRoutineView, (value) => value);
   const [form, setForm] = useState<RoutineTaskFormState | null>(null);
   const [formBaseline, setFormBaseline] = useState<RoutineTaskFormState | null>(null);
   const [saving, setSaving] = useState(false);
@@ -400,6 +422,7 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
       priority: task.priority,
       assigneeEmployeeId: task.assigneeEmployeeId ?? task.ownerEmployeeId ?? currentUser.employeeId ?? currentUser.username,
       assignedAgent: task.assignedAgent ?? "",
+      assignedAgentId: task.assignedAgentId ?? "",
       routineType: task.routineType ?? "task",
       routineCadence: task.routineCadence ?? "weekly",
       routineNextRunDate: task.routineNextRunDate ?? "",
@@ -423,6 +446,7 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
         routineNextRunDate: form.routineNextRunDate,
         routineEnabled: form.routineEnabled,
         ...(form.assignedAgent ? { assignedAgent: form.assignedAgent } : {}),
+        ...(form.assignedAgentId ? { assignedAgentId: form.assignedAgentId } : {}),
       };
       if (form.id) await updateTaskMutation.mutateAsync({ taskId: form.id, input: payload });
       else await createTaskMutation.mutateAsync(payload);
@@ -497,7 +521,7 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
                 key={task.id}
                 task={task}
                 session={session}
-                ready={agentReadyForTask(task, nodes)}
+                ready={agentReadyForTask(task, nodes, logicalAgents)}
                 {...routineHandlers(task, session)}
               />
             );
@@ -512,7 +536,7 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
                 key={task.id}
                 task={task}
                 session={session}
-                ready={agentReadyForTask(task, nodes)}
+                ready={agentReadyForTask(task, nodes, logicalAgents)}
                 {...routineHandlers(task, session)}
               />
             );
@@ -524,6 +548,7 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
         <TaskDrawer
           form={form}
           employees={employees}
+          logicalAgents={logicalAgents}
           saving={saving}
           title={form.id ? t("routine.edit") : t("routine.new")}
           subtitle={form.id ?? t("routine.new_routine_id")}

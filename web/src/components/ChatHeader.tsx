@@ -1,6 +1,6 @@
-import { useRef, type Dispatch, type SetStateAction } from "react";
+import { useRef } from "react";
 import { useTranslation } from "react-i18next";
-import type { AgentName, RelaySession } from "../types";
+import type { AgentName, EmployeeAgent, RelaySession } from "../types";
 import { NavConversations, NavRefresh, StreamAttachment } from "./icons";
 import { AgentMark } from "./AgentMark";
 import { Badge } from "@/components/ui/badge";
@@ -22,12 +22,11 @@ const ACTIVITY_BADGE: Record<
 };
 
 // Chat-panel header: session identity, status, agent tabs, and refresh.
-export function ChatHeader({ activeAgent, setActiveAgent, agentNames, disabledAgents, agentHealth, activeSession, runningAgent, isRefreshing, artifactCount, onOpenArtifacts, onRefresh, onBackToThreads }: {
+export function ChatHeader({ activeAgent, logicalAgents, activeLogicalAgentId, onLogicalAgentPicked, activeSession, runningAgent, isRefreshing, artifactCount, onOpenArtifacts, onRefresh, onBackToThreads }: {
   activeAgent: AgentName;
-  setActiveAgent: Dispatch<SetStateAction<AgentName>>;
-  agentNames: AgentName[];
-  disabledAgents?: AgentName[];
-  agentHealth?: Partial<Record<AgentName, "unknown" | "ready" | "failed">>;
+  logicalAgents: EmployeeAgent[];
+  activeLogicalAgentId: string | null;
+  onLogicalAgentPicked: (agent: EmployeeAgent) => void;
   activeSession: RelaySession | undefined;
   runningAgent?: AgentName;
   isRefreshing: boolean;
@@ -36,22 +35,8 @@ export function ChatHeader({ activeAgent, setActiveAgent, agentNames, disabledAg
   onRefresh: () => void;
   onBackToThreads: () => void;
 }) {
-  const disabledSet = new Set(disabledAgents ?? []);
   const { t } = useTranslation();
   const tabsRef = useRef<HTMLDivElement>(null);
-  const enabledAgents = agentNames.filter((agent) => {
-    if (disabledSet.has(agent)) return false;
-    return agentHealth?.[agent] === "ready";
-  });
-  const rovingAgent = !disabledSet.has(activeAgent) ? activeAgent : enabledAgents[0];
-  const moveActive = (dir: 1 | -1) => {
-    if (enabledAgents.length === 0) return;
-    const current = enabledAgents.indexOf(rovingAgent);
-    const base = current === -1 ? 0 : current;
-    const next = enabledAgents[(base + dir + enabledAgents.length) % enabledAgents.length];
-    setActiveAgent(next);
-    tabsRef.current?.querySelector<HTMLButtonElement>(`[data-agent="${next}"]`)?.focus();
-  };
   const tokenUsage = activeSession?.tokenUsage;
   const tokenUsageTitle = tokenUsage
     ? t("conversation.token_usage_title", {
@@ -64,6 +49,17 @@ export function ChatHeader({ activeAgent, setActiveAgent, agentNames, disabledAg
     ? conversationActivity(activeSession.status, runningAgent)
     : null;
   const showMeta = Boolean(activity || tokenUsage);
+  const activeLogicalAgent = logicalAgents.find((agent) => agent.id === activeLogicalAgentId);
+  const moveLogicalAgent = (direction: 1 | -1) => {
+    const readyAgents = logicalAgents.filter((agent) => agent.availability === "ready");
+    if (readyAgents.length === 0) return;
+    const current = readyAgents.findIndex((agent) => agent.id === activeLogicalAgentId);
+    const next = readyAgents[(Math.max(current, 0) + direction + readyAgents.length) % readyAgents.length];
+    onLogicalAgentPicked(next);
+    requestAnimationFrame(() => {
+      tabsRef.current?.querySelector<HTMLButtonElement>(`[data-logical-agent="${CSS.escape(next.id)}"]`)?.focus();
+    });
+  };
   return (
     <header className="chat-header">
       <div className="chat-title">
@@ -97,51 +93,40 @@ export function ChatHeader({ activeAgent, setActiveAgent, agentNames, disabledAg
       <div className="chat-tools">
         <div className="chat-active-agent" aria-label={t("thread.talk_to_agent")}>
           <AgentMark agent={activeAgent} size={14} className="chat-active-agent-mark" />
-          <span className="mono" translate="no">{activeAgent}</span>
+          <span className="mono" translate="no">{activeLogicalAgent?.displayName ?? activeAgent}</span>
         </div>
         <div className="header-agent-tabs" role="radiogroup" aria-label={t("thread.talk_to_agent")} ref={tabsRef}>
-          {agentNames.map((a) => {
-            const adminDisabled = disabledSet.has(a);
-            const health = agentHealth?.[a] ?? "unknown";
-            const isReady = health === "ready";
-            const isDisabled = adminDisabled || !isReady;
-            const isFailed = health === "failed";
-            const isActive = a === activeAgent;
-            const classes = [
-              isActive ? "active" : "",
-              isDisabled ? "agent-tab-disabled" : "",
-              isFailed && !adminDisabled ? "agent-tab-failed" : "",
-              !isReady && !adminDisabled && !isFailed ? "agent-tab-not-ready" : "",
-            ].filter(Boolean).join(" ");
-            const title = adminDisabled
-              ? t("thread.agent_disabled_title", { agent: a })
-              : isFailed
-                ? t("thread.agent_failed_title", { agent: a })
-                : !isReady
-                  ? t("thread.agent_not_ready_title", { agent: a })
-                  : undefined;
+          {logicalAgents.length > 0 ? logicalAgents.map((logicalAgent) => {
+            const isReady = logicalAgent.availability === "ready";
+            const isActive = logicalAgent.id === activeLogicalAgentId;
             return (
               <button
-                key={a}
+                key={logicalAgent.id}
                 type="button"
                 role="radio"
-                data-agent={a}
+                data-agent={logicalAgent.id}
+                data-logical-agent={logicalAgent.id}
                 aria-checked={isActive}
-                aria-disabled={isDisabled || undefined}
-                tabIndex={a === rovingAgent ? 0 : -1}
-                className={classes}
-                title={title}
-                onClick={() => { if (!isDisabled) setActiveAgent(a); }}
-                onKeyDown={(e) => {
-                  if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); moveActive(1); }
-                  else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); moveActive(-1); }
+                aria-disabled={!isReady || undefined}
+                tabIndex={isActive ? 0 : -1}
+                className={[isActive ? "active" : "", !isReady ? "agent-tab-disabled" : ""].filter(Boolean).join(" ")}
+                title={!isReady ? `${logicalAgent.displayName}: ${logicalAgent.availability}` : undefined}
+                onClick={() => { if (isReady) onLogicalAgentPicked(logicalAgent); }}
+                onKeyDown={(event) => {
+                  if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+                    event.preventDefault();
+                    moveLogicalAgent(1);
+                  } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+                    event.preventDefault();
+                    moveLogicalAgent(-1);
+                  }
                 }}
               >
-                <AgentMark agent={a} size={14} className="header-agent-tab-mark" />
-                <span translate="no">{a}</span>
+                <AgentMark agent={logicalAgent.executorKind} size={14} className="header-agent-tab-mark" />
+                <span translate="no">{logicalAgent.displayName}</span>
               </button>
             );
-          })}
+          }) : <span className="text-muted-foreground">{t("thread.no_agents")}</span>}
         </div>
         <button
           className="icon-button chat-artifacts-button"

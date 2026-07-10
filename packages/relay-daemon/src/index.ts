@@ -52,12 +52,14 @@ export interface DaemonRuntimeOptions {
   sandbox?: DaemonSandboxMode;
   employeeId?: string;
   workspacePath?: string;
+  workspaceId?: string;
   pollIntervalMs?: number;
   commandPollWaitMs?: number;
   commandLeaseSeconds?: number;
   heartbeatIntervalMs?: number;
   fetchFn?: typeof fetch;
   token?: string;
+  enrollmentToken?: string;
   logDir?: string;
   logger?: DaemonLogger;
   signal?: AbortSignal;
@@ -107,20 +109,32 @@ export interface DaemonLogger {
 
 export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promise<void> {
   const backendUrl = normalizeBaseUrl(options.backendUrl ?? process.env.RELAY_BACKEND_URL ?? process.env.RELAY_DAEMON_URL ?? "http://127.0.0.1:8790");
-  const sandboxId = options.sandboxId ?? process.env.RELAY_SANDBOX_ID;
-  if (!sandboxId) throw new Error("RELAY_SANDBOX_ID is required for the relay daemon.");
-  const configuredEmployeeId = options.employeeId ?? process.env.RELAY_EMPLOYEE_ID;
+  const fetchFn = options.fetchFn ?? fetch;
+  let sandboxId = options.sandboxId ?? process.env.RELAY_SANDBOX_ID;
+  let configuredEmployeeId = options.employeeId ?? process.env.RELAY_EMPLOYEE_ID;
   const employeeId = configuredEmployeeId ?? process.env.USER ?? "local";
   const workspacePath = firstNonBlank(options.workspacePath, process.env.RELAY_WORKSPACE, process.env.WORKSPACE) ?? process.cwd();
-  const sandboxMode = resolveSandboxMode(options.sandbox ?? process.env.RELAY_SANDBOX_MODE);
+  const workspaceId = firstNonBlank(options.workspaceId, process.env.RELAY_WORKSPACE_ID);
+  const enrollmentToken = options.enrollmentToken ?? process.env.RELAY_ENROLLMENT_TOKEN;
+  let enrolledToken: string | undefined;
+  let enrolledSandboxMode: string | undefined;
+  if (!sandboxId && enrollmentToken) {
+    const enrollment = await enrollManagedDaemon(fetchFn, backendUrl, enrollmentToken, workspacePath, options.signal);
+    sandboxId = enrollment.sandboxId;
+    enrolledToken = enrollment.token;
+    configuredEmployeeId = configuredEmployeeId ?? enrollment.employeeId;
+    enrolledSandboxMode = enrollment.sandboxMode;
+  }
+  if (!sandboxId) throw new Error("RELAY_SANDBOX_ID or RELAY_ENROLLMENT_TOKEN is required for the relay daemon.");
+  const effectiveEmployeeId = configuredEmployeeId ?? employeeId;
+  const sandboxMode = resolveSandboxMode(options.sandbox ?? process.env.RELAY_SANDBOX_MODE ?? enrolledSandboxMode);
   configureAgentProcessEnvironment(sandboxMode, workspacePath, options.agentHome);
   const tokenResolution = ensureDaemonNodeToken({
     workspacePath,
-    employeeId,
-    token: options.token ?? process.env.RELAY_DAEMON_TOKEN ?? process.env.RELAY_DAEMON_NODE_TOKEN,
+    employeeId: effectiveEmployeeId,
+    token: options.token ?? process.env.RELAY_DAEMON_TOKEN ?? process.env.RELAY_DAEMON_NODE_TOKEN ?? enrolledToken,
   });
   const token = tokenResolution.token;
-  const fetchFn = options.fetchFn ?? fetch;
   const pollIntervalMs = options.pollIntervalMs ?? 1000;
   const commandPollWaitMs = boundedNumber(
     options.commandPollWaitMs ?? positiveIntEnv("RELAY_DAEMON_COMMAND_POLL_WAIT_MS") ?? DEFAULT_COMMAND_POLL_WAIT_MS,
@@ -147,8 +161,8 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
     health = next;
     logger.info("daemon health", { sandboxId, health: next, ...fields });
   };
-  logger.info("daemon starting", { sandboxId, employeeId, workspacePath, backendUrl, sandboxMode });
-  setHealth("starting", { employeeId, workspacePath, backendUrl, sandboxMode });
+  logger.info("daemon starting", { sandboxId, employeeId: effectiveEmployeeId, workspacePath, backendUrl, sandboxMode });
+  setHealth("starting", { employeeId: effectiveEmployeeId, workspacePath, backendUrl, sandboxMode });
   const runCapacityByMode = resolveRunCapacityByMode(options.runCapacityByMode);
   const maxConcurrentRuns = options.maxConcurrentRuns ?? positiveIntEnv("RELAY_DAEMON_MAX_CONCURRENT_RUNS") ?? Math.max(...Object.values(runCapacityByMode));
   const activeRuns = new Map<string, { command: DaemonNodeRunCommand; controller: AbortController; promise: Promise<void> }>();
@@ -170,12 +184,20 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
   const agentInventory = await discoverAgentInventory(environment.execStream, options.signal);
   const buildRegistration = (includeEmployeeId = Boolean(configuredEmployeeId), status?: DaemonNodeRegistration["status"]): DaemonNodeRegistration => ({
     sandboxId,
-    ...(includeEmployeeId ? { employeeId } : {}),
+    ...(includeEmployeeId ? { employeeId: effectiveEmployeeId } : {}),
     token,
     workspacePath,
+    ...(workspaceId ? { workspaceId } : {}),
     sandboxMode,
     protocolVersion: DAEMON_NODE_PROTOCOL_VERSION,
     supportedAgents,
+    executorCapabilities: Object.entries(agentHealth).map(([executorKind, health]) => ({
+      executorKind: executorKind as AgentName,
+      status: health.status,
+      adapter: health.adapter ?? "cli",
+      maxConcurrentRuns,
+      ...(agentInventory[executorKind as AgentName] ? { inventory: agentInventory[executorKind as AgentName] } : {}),
+    })),
     capabilities: [DAEMON_CAPABILITY_GENERATED_FILES],
     agentHealth,
     ...(Object.keys(agentInventory).length > 0 ? { agentInventory } : {}),
@@ -251,13 +273,13 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
     const reconnectControl = { signal: runtimeSignal, shouldStop: () => stopping };
     await withBackendReconnect(register, logger, { sandboxId, what: "registration" }, reconnectControl);
     let lastRegisteredAt = Date.now();
-    logger.info("daemon registered", { sandboxId, employeeId, workspacePath, backendUrl, logPath: logger.logPath });
+    logger.info("daemon registered", { sandboxId, employeeId: effectiveEmployeeId, workspacePath, backendUrl, logPath: logger.logPath });
     setHealth("registered");
     console.log(`Relay daemon registered sandbox ${sandboxId} with backend at ${backendUrl} (sandbox: ${sandboxMode})`);
     if (logger.logPath) console.log(`Relay daemon log: ${logger.logPath}`);
     if (tokenResolution.source === "generated" && tokenResolution.path) {
-      logger.info("daemon generated token", { sandboxId, employeeId, path: tokenResolution.path });
-      console.log(`Relay daemon generated token for ${employeeId}: ${tokenResolution.path}`);
+      logger.info("daemon generated token", { sandboxId, employeeId: effectiveEmployeeId, path: tokenResolution.path });
+      console.log(`Relay daemon generated token for ${effectiveEmployeeId}: ${tokenResolution.path}`);
     }
 
     setHealth("polling");
@@ -1168,6 +1190,38 @@ class DaemonStoppedError extends Error {
     super("Relay daemon stopped.");
     this.name = "DaemonStoppedError";
   }
+}
+
+interface ManagedDaemonEnrollment {
+  sandboxId: string;
+  token: string;
+  employeeId?: string;
+  sandboxMode?: DaemonNodeSandboxMode;
+}
+
+async function enrollManagedDaemon(
+  fetchFn: typeof fetch,
+  backendUrl: string,
+  enrollmentToken: string,
+  workspacePath: string,
+  signal?: AbortSignal,
+): Promise<ManagedDaemonEnrollment> {
+  const url = `${backendUrl}/daemon-enroll`;
+  const response = await fetchFn(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Enrollment ${enrollmentToken}`,
+    },
+    body: JSON.stringify({ workspacePath }),
+    signal: requestSignal(signal),
+  });
+  if (!response.ok) {
+    throw new DaemonHttpError(`POST ${url} failed: ${response.status} ${await response.text()}`, response.status);
+  }
+  const body = await response.json() as Partial<ManagedDaemonEnrollment>;
+  if (!body.sandboxId || !body.token) throw new Error("Managed daemon enrollment response is incomplete.");
+  return body as ManagedDaemonEnrollment;
 }
 
 // Retries `action` while the backend is unreachable (network errors) or

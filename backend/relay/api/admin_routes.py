@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Request, Response
 
 from ..daemon_registry import public_sandbox_record
 from ..security.auth import require_admin_session
+from ..services.node_agents import sync_node_agents
 from .deps import AppContextDep
 from .helpers import daemon_start_command, daemon_start_env, employee_record, json_body, string_field
 
@@ -111,7 +112,31 @@ async def soft_delete_employee(employee_id: str, request: Request, ctx: AppConte
     except ValueError as error:
         raise HTTPException(409, str(error)) from error
     affected_nodes = ctx.registry.unassign_employee_everywhere(employee_id)
-    return {"employee": record, "unassignedNodes": affected_nodes}
+    removed_placements: list[str] = []
+    deleted_agents: list[str] = []
+    for agent in ctx.employee_agent_store.list_agents(employee_id=employee_id):
+        for placement in ctx.agent_placement_store.list_placements(agent_id=agent["id"]):
+            removed = ctx.agent_placement_store.update_placement(
+                placement["id"], {"desiredState": "removed"}
+            )
+            removed_placements.append(removed["id"])
+        deleted = ctx.employee_agent_store.delete_agent(agent["id"])
+        deleted_agents.append(deleted["id"])
+    deleted_managed_nodes: list[str] = []
+    for node in ctx.managed_node_store.list_nodes():
+        if node.get("employeeId") != employee_id:
+            continue
+        deleted = ctx.managed_node_store.update_node(
+            node["id"], {"desiredState": "deleted"}
+        )
+        deleted_managed_nodes.append(deleted["id"])
+    return {
+        "employee": record,
+        "unassignedNodes": affected_nodes,
+        "deletedAgents": deleted_agents,
+        "removedPlacements": removed_placements,
+        "deletedManagedNodes": deleted_managed_nodes,
+    }
 
 
 @router.post("/cp/employees", status_code=201)
@@ -166,6 +191,7 @@ async def create_employee(request: Request, ctx: AppContextDep) -> dict[str, Any
     if node_id:
         try:
             assigned_node = ctx.registry.assign_employee(node_id, employee_id)
+            sync_node_agents(ctx, assigned_node)
         except KeyError as error:
             raise HTTPException(404, "Daemon node not found.") from error
         except ValueError as error:
@@ -191,6 +217,7 @@ async def assign_control_panel_daemon_node(node_id: str, request: Request, ctx: 
         raise HTTPException(404, "Employee not found.")
     try:
         assigned_node = ctx.registry.assign_employee(node_id, employee_id)
+        sync_node_agents(ctx, assigned_node)
     except KeyError as error:
         raise HTTPException(404, "Daemon node not found.") from error
     except ValueError as error:
@@ -213,6 +240,9 @@ async def unassign_control_panel_daemon_node(node_id: str, request: Request, ctx
         raise HTTPException(404, "Daemon node not found.") from error
     except ValueError as error:
         raise HTTPException(409, str(error)) from error
+    for placement in ctx.agent_placement_store.list_placements(daemon_node_id=node_id):
+        if placement.get("desiredState") != "removed":
+            ctx.agent_placement_store.update_placement(placement["id"], {"desiredState": "removed"})
     public_node = _public_control_panel_node(ctx, updated)
     return {"node": public_node}
 
@@ -381,6 +411,21 @@ async def check_chat_integration(integration_id: str, request: Request, ctx: App
 async def add_chat_identity_link(integration_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     user = require_admin_session(request, ctx.auth_store)
     body = await json_body(request)
+    employee_id = string_field(body, "employeeId")
+    default_agent_id = string_field(body, "defaultAgentId")
+    if not employee_record(ctx.auth_store, employee_id):
+        raise HTTPException(404, "Employee not found.")
+    if default_agent_id:
+        agent = ctx.employee_agent_store.get_agent(default_agent_id)
+        if (
+            not agent
+            or agent.get("deletedAt")
+            or not agent.get("enabled", True)
+            or agent.get("employeeId") != employee_id
+        ):
+            raise HTTPException(
+                400, "defaultAgentId must reference an enabled agent owned by the linked employee."
+            )
     try:
         integration = ctx.chat_store.add_identity_link(integration_id, body, actor=_actor_name(user))
     except (KeyError, ValueError) as error:

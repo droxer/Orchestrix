@@ -11,18 +11,11 @@ import {
   formatRelativeTime,
   isStale,
   statusTone,
+  visibleNodeAgentNames,
   type StoredNodeTokenMap,
   visualStatus,
 } from "./helpers";
 import { NodeProfileBadges } from "./NodeProfileBadges";
-
-const CONNECT_AGENT_NAMES: AgentName[] = ["claude", "codex", "kimi"];
-
-function visibleAgentNames(node: ControlPanelDaemonNodeRecord): AgentName[] {
-  const names = [...CONNECT_AGENT_NAMES];
-  if (node.agents.pi && node.agents.pi !== "unknown") names.push("pi");
-  return names;
-}
 
 function isAgentDisabled(node: ControlPanelDaemonNodeRecord, agent: AgentName): boolean {
   return Boolean(node.disabledAgents?.includes(agent));
@@ -151,7 +144,7 @@ export function NodeCard({
 
       <div className="adm-node-card-body">
         <div className="adm-agents">
-          {visibleAgentNames(node).map((name) => {
+          {visibleNodeAgentNames(node).map((name) => {
             const agentStatus = node.agents[name] ?? "unknown";
             const agentTone = agentStatusTone(agentStatus);
             const disabled = isAgentDisabled(node, name);
@@ -175,15 +168,17 @@ export function NodeCard({
           <span className="adm-node-card-queued mono tone-info">{node.queuedCommandCount} {t("admin.queued")}</span>
         ) : null}
         <div className="adm-node-card-actions">
-          <button
-            type="button"
-            className="adm-node-card-icon-btn"
-            onClick={() => onReveal(node)}
-            aria-label={t("admin.v2.reveal_credentials_for", { id: node.id })}
-            title={t("admin.v2.reveal_credentials")}
-          >
-            <KeyRound size={14} aria-hidden="true" />
-          </button>
+          {node.managedNodeId ? null : (
+            <button
+              type="button"
+              className="adm-node-card-icon-btn"
+              onClick={() => onReveal(node)}
+              aria-label={t("admin.v2.reveal_credentials_for", { id: node.id })}
+              title={t("admin.v2.reveal_credentials")}
+            >
+              <KeyRound size={14} aria-hidden="true" />
+            </button>
+          )}
           <button
             type="button"
             className="adm-node-card-icon-btn"

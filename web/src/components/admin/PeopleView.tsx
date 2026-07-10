@@ -1,30 +1,27 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Plus, Search, Trash2, Users } from "lucide-react";
+import { Bot, Search, Trash2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useDialogs } from "@/components/ui/DialogProvider";
 import { RelayEmptyState } from "@/components/RelayEmptyState";
 import type { ControlPanelDaemonNodeRecord } from "../../types";
+import { listControlPanelAgents } from "../../api";
+import { ADMIN_AGENTS_KEY } from "./AgentsView";
 import {
   buildEmployeeSummaries,
-  isStale,
-  statusTone,
-  truncateId,
-  visualStatus,
   type EmployeeNodeSummary,
 } from "./helpers";
 
 interface PeopleViewProps {
   employees: import("../../types").EmployeeRecord[];
   nodes: ControlPanelDaemonNodeRecord[];
-  onRevealCredentials: (node: ControlPanelDaemonNodeRecord) => void;
   onAddEmployee: () => void;
-  onRequestAssign: (employeeId: string) => void;
   onDeleteEmployee?: (employee: import("../../types").EmployeeRecord) => Promise<void>;
-  unassignedNodeCount: number;
   highlightedEmployeeId: string | null;
+  onSelectAgent?: (agentId: string) => void;
 }
 
 interface DepartmentGroup {
@@ -52,18 +49,21 @@ function groupByDepartment(summaries: EmployeeNodeSummary[], unlabeled: string):
 export function PeopleView({
   employees,
   nodes,
-  onRevealCredentials,
   onAddEmployee,
-  onRequestAssign,
   onDeleteEmployee,
-  unassignedNodeCount,
   highlightedEmployeeId,
+  onSelectAgent,
 }: PeopleViewProps) {
   const { t } = useTranslation();
   const { confirm } = useDialogs();
   const [query, setQuery] = useState("");
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const agentsQuery = useQuery({
+    queryKey: ADMIN_AGENTS_KEY,
+    queryFn: ({ signal }) => listControlPanelAgents(undefined, signal),
+  });
+  const agents = agentsQuery.data?.agents ?? [];
 
   const employeesById = useMemo(() => new Map(employees.map((employee) => [employee.id, employee])), [employees]);
 
@@ -99,25 +99,23 @@ export function PeopleView({
         item.displayName,
         item.email ?? "",
         item.departmentName ?? "",
-        ...item.nodes.map((node) => node.id),
-        ...item.nodes.map((node) => node.workspacePath ?? ""),
+        ...agents.filter((agent) => agent.employeeId === item.id).map((agent) => `${agent.displayName} ${agent.executorKind}`),
       ]
         .join(" ")
         .toLowerCase();
       return haystack.includes(q);
     });
-  }, [summaries, query]);
+  }, [agents, summaries, query]);
 
   const groups = useMemo(() => groupByDepartment(filtered, t("admin.v2.dept_none")), [filtered, t]);
-  const nodeById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
 
   if (summaries.length === 0) {
     return (
       <RelayEmptyState
         className="adm-people-empty"
         fill
-        title={t("admin.v2.empty_people_title")}
-        body={t("admin.v2.empty_people_body")}
+        title={t("admin.v2.empty_employees_title")}
+        body={t("admin.v2.empty_employees_body")}
         illustration={<Users size={40} strokeWidth={1.25} aria-hidden="true" />}
         actions={(
           <Button type="button" onClick={onAddEmployee}>
@@ -134,19 +132,25 @@ export function PeopleView({
         <Search size={16} aria-hidden="true" />
         <input
           className="adm-search-input"
-          name="admin-people-search"
+          name="admin-employees-search"
           type="search"
           autoComplete="off"
           spellCheck={false}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder={t("admin.v2.search_people_placeholder")}
-          aria-label={t("admin.v2.search_people_placeholder")}
+          placeholder={t("admin.v2.search_employees_placeholder")}
+          aria-label={t("admin.v2.search_employees_placeholder")}
         />
       </div>
 
       {deleteError ? (
         <p className="adm-people-error">{t("admin.v2.action_failed", { message: deleteError })}</p>
+      ) : null}
+      {agentsQuery.error ? (
+        <p className="adm-people-error" role="alert">
+          {t("admin.v2.agents_load_error")}{" "}
+          <button type="button" onClick={() => void agentsQuery.refetch()}>{t("admin.v2.retry")}</button>
+        </p>
       ) : null}
 
       {groups.length === 0 ? (
@@ -162,7 +166,7 @@ export function PeopleView({
             </header>
             <ul className="adm-emp-list">
               {group.members.map((member) => {
-                const memberNodes = member.nodes.map((node) => nodeById.get(node.id) ?? node);
+                const memberAgents = agents.filter((agent) => agent.employeeId === member.id && !agent.deletedAt);
                 const highlight = highlightedEmployeeId === member.id;
                 return (
                   <li
@@ -178,38 +182,22 @@ export function PeopleView({
                       </p>
                     </div>
                     <div className="adm-emp-nodes">
-                      {memberNodes.length === 0 ? (
-                        <span className="adm-emp-no-nodes">{t("admin.v2.no_nodes_for_employee")}</span>
+                      {memberAgents.length === 0 ? (
+                        <span className="adm-emp-no-nodes">{t("admin.v2.no_agents_for_employee")}</span>
                       ) : (
-                        memberNodes.map((node) => {
-                          const status = visualStatus(node);
-                          const tone = statusTone(status);
-                          return (
-                            <button
-                              key={node.id}
-                              type="button"
-                              className={`adm-node-chip tone-${tone}`}
-                              onClick={() => onRevealCredentials(node)}
-                              title={t("admin.v2.reveal_credentials_for", { id: node.id })}
-                            >
-                              <span className={`adm-node-chip-dot tone-${tone}`} aria-hidden="true" />
-                              <span className="mono">{truncateId(node.id)}</span>
-                              {!isStale(node) && node.status === "running" ? (
-                                <span className="adm-node-chip-pulse" aria-hidden="true" />
-                              ) : null}
-                            </button>
-                          );
-                        })
+                        memberAgents.map((agent) => (
+                          <button
+                            key={agent.id}
+                            type="button"
+                            className={`adm-node-chip adm-node-chip--button tone-${agent.availability === "ready" ? "good" : "muted"}`}
+                            onClick={() => onSelectAgent?.(agent.id)}
+                            disabled={!onSelectAgent}
+                          >
+                            <Bot size={12} aria-hidden="true" />
+                            <span translate="no">{agent.displayName}</span>
+                          </button>
+                        ))
                       )}
-                      <button
-                        type="button"
-                        className="adm-emp-add-node"
-                        onClick={() => onRequestAssign(member.id)}
-                        title={t("admin.v2.add_node_for", { id: member.id })}
-                      >
-                        <Plus size={12} aria-hidden="true" />
-                        <span>{t("admin.v2.add_node")}</span>
-                      </button>
                     </div>
                     <div className="adm-emp-metrics">
                       <span className={`adm-emp-running mono ${member.runningCount > 0 ? "tone-neutral" : "tone-muted"}`}>

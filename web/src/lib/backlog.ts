@@ -1,4 +1,4 @@
-import type { AgentName, DaemonNodeMonitorRecord, RelayTask, TaskPriority, TaskStatus } from "../types.js";
+import type { AgentName, DaemonNodeMonitorRecord, EmployeeAgent, RelayTask, TaskPriority, TaskStatus } from "../types.js";
 
 export const TASK_STATUSES: TaskStatus[] = ["backlog", "assigned", "running", "waiting_for_human", "review", "blocked", "done"];
 export const TASK_PRIORITIES: TaskPriority[] = ["high", "normal", "low"];
@@ -44,7 +44,16 @@ export function tasksByStatus(tasks: RelayTask[]): Record<TaskStatus, RelayTask[
 // (relay/daemon_registry/registry.py); keep them in sync when capacity
 // rules change. Action dispatches are exclusive, so readiness for an
 // assigned agent requires an idle node.
-export function agentReadyForTask(task: RelayTask, nodes: DaemonNodeMonitorRecord[]): boolean {
+export function agentReadyForTask(
+  task: RelayTask,
+  nodes: DaemonNodeMonitorRecord[],
+  logicalAgents: EmployeeAgent[] = [],
+): boolean {
+  if (task.assignedAgentId) {
+    return logicalAgents.some(
+      (agent) => agent.id === task.assignedAgentId && agent.enabled && agent.availability === "ready",
+    );
+  }
   if (!task.assignedAgent) return false;
   const employeeId = task.assigneeEmployeeId ?? task.ownerEmployeeId;
   return nodes.some((node) =>
@@ -59,7 +68,17 @@ export function agentReadyForTask(task: RelayTask, nodes: DaemonNodeMonitorRecor
   );
 }
 
-export function discussionAgentsForTask(task: RelayTask, nodes: DaemonNodeMonitorRecord[]): AgentName[] {
+export function discussionAgentsForTask(
+  task: RelayTask,
+  nodes: DaemonNodeMonitorRecord[],
+  logicalAgents: EmployeeAgent[] = [],
+): AgentName[] {
+  const readyLogicalAgents = logicalAgents.filter(
+    (agent) => agent.enabled && agent.availability === "ready",
+  );
+  if (readyLogicalAgents.length > 0) {
+    return [...new Set(readyLogicalAgents.map((agent) => agent.executorKind))];
+  }
   const employeeId = task.assigneeEmployeeId ?? task.ownerEmployeeId;
   const node = nodes.find((item) =>
     (!employeeId || item.employeeId === employeeId)

@@ -137,6 +137,10 @@ def materialize_events(events: list[dict[str, Any]]) -> dict[str, Any]:
                 "status": "running",
                 "startedAt": event["timestamp"],
                 "artifactIds": [],
+                **({"logicalAgentId": event["logicalAgentId"]} if event.get("logicalAgentId") else {}),
+                **({"placementId": event["placementId"]} if event.get("placementId") else {}),
+                **({"daemonNodeId": event["daemonNodeId"]} if event.get("daemonNodeId") else {}),
+                **({"agentVersion": event["agentVersion"]} if event.get("agentVersion") else {}),
             })
         elif event_type == "agent.completed":
             for run in session["agentRuns"]:
@@ -229,6 +233,10 @@ def materialize_task_events(events: list[dict[str, Any]]) -> dict[str, Any]:
             _apply_task_routine_fields(task, event)
         elif event_type == "task.assigned":
             task["assignedAgent"] = event["agent"]
+            if event.get("agentId"):
+                task["assignedAgentId"] = event["agentId"]
+            else:
+                task.pop("assignedAgentId", None)
         elif event_type == "task.status":
             task["status"] = event["status"]
         elif event_type == "task.session_linked":

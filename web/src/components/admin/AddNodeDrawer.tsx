@@ -2,9 +2,10 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { createControlPanelDaemonNode } from "../../api";
+import { createControlPanelDaemonNode, createManagedNode } from "../../api";
 import type {
   CreateControlPanelDaemonNodeResponse,
+  CreateManagedNodeResponse,
   EmployeeRecord,
 } from "../../types";
 import { Drawer } from "./Drawer";
@@ -19,11 +20,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+export type AddNodeDrawerSuccess =
+  | { kind: "managed"; result: CreateManagedNodeResponse }
+  | { kind: "manual"; result: CreateControlPanelDaemonNodeResponse };
+
 interface AddNodeDrawerProps {
   open: boolean;
   onClose: () => void;
   employees: EmployeeRecord[];
-  onSuccess: (result: CreateControlPanelDaemonNodeResponse) => void;
+  onSuccess: (outcome: AddNodeDrawerSuccess) => void;
 }
 
 export function AddNodeDrawer({
@@ -38,6 +43,7 @@ export function AddNodeDrawer({
   const [employeeId, setEmployeeId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
+  const isManaged = sandboxMode === "boxlite";
   const hasUnsavedChanges = Boolean(employeeId);
   const confirmDiscardChanges = useUnsavedChangesGuard(open && hasUnsavedChanges && !isBusy);
 
@@ -56,11 +62,19 @@ export function AddNodeDrawer({
     setIsBusy(true);
     setError(null);
     try {
-      const result = await createControlPanelDaemonNode({
-        employeeId: employeeId || undefined,
-        sandboxMode,
-      });
-      onSuccess(result);
+      if (isManaged) {
+        const result = await createManagedNode({
+          employeeId: employeeId || undefined,
+          sandboxMode: "boxlite",
+        });
+        onSuccess({ kind: "managed", result });
+      } else {
+        const result = await createControlPanelDaemonNode({
+          employeeId: employeeId || undefined,
+          sandboxMode: "none",
+        });
+        onSuccess({ kind: "manual", result });
+      }
     } catch (err) {
       setError(t("admin.v2.create_node_error", { message: err instanceof Error ? err.message : String(err) }));
     } finally {
@@ -78,7 +92,7 @@ export function AddNodeDrawer({
       open={open}
       onClose={() => { void requestClose(); }}
       title={t("admin.v2.add_node_title")}
-      subtitle={t("admin.v2.add_node_sub")}
+      subtitle={t(isManaged ? "admin.v2.add_node_sub_managed" : "admin.v2.add_node_sub_local")}
       variant="light"
       closeLabel={t("admin.v2.close_drawer")}
       ariaLabel={t("admin.v2.add_node_title")}
@@ -90,7 +104,10 @@ export function AddNodeDrawer({
           <p className="adm-form-group-label">{t("admin.v2.section_execution_profile")}</p>
           <ExecutionProfileField
             value={sandboxMode}
-            onChange={setSandboxMode}
+            onChange={(mode) => {
+              setSandboxMode(mode);
+              setError(null);
+            }}
             name="add-node-sandbox-mode"
             disabled={isBusy}
           />
@@ -131,7 +148,7 @@ export function AddNodeDrawer({
             {t("admin.v2.cancel")}
           </Button>
           <Button type="submit" disabled={isBusy}>
-            {isBusy ? t("admin.creating") : t("admin.v2.generate_node")}
+            {isBusy ? t("admin.creating") : t(isManaged ? "admin.v2.provision_node" : "admin.v2.generate_node")}
           </Button>
         </div>
       </form>

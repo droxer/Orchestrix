@@ -23,6 +23,12 @@ def _bootstrap_admin(client: TestClient) -> None:
 
 
 def _active_integration(client: TestClient) -> str:
+    assert client.post("/cp/users", json={
+        "username": "alice",
+        "password": "AlicePass123!",
+        "employeeId": "alice",
+        "displayName": "Alice",
+    }).status_code == 201
     integration_id = client.post("/cp/chat-integrations", json={
         "provider": "discord",
         "displayName": "Eng Discord",

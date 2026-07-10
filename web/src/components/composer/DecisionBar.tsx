@@ -1,19 +1,17 @@
 import { useTranslation } from "react-i18next";
-import type { AgentName, AgentTaskMode } from "../../types";
+import type { AgentTaskMode, EmployeeAgent } from "../../types";
 import { ActionApprove, ActionHandoff } from "../icons";
 
-export function DecisionBar({ agentNames, disabledAgents, sendDecision, handoffOpen, setHandoffOpen, handoffAgent, setHandoffAgent, handoffMode, setHandoffMode, handoffNote, setHandoffNote, sendHandoff }: {
-  agentNames: AgentName[];
-  disabledAgents?: AgentName[];
+export function DecisionBar({ logicalAgents, sendDecision, handoffOpen, setHandoffOpen, handoffAgentId, setHandoffAgentId, handoffMode, setHandoffMode, handoffNote, setHandoffNote, sendHandoff }: {
+  logicalAgents: EmployeeAgent[];
   sendDecision: (kind: "approve" | "reject" | "rerun" | "mark_done") => Promise<void>;
   handoffOpen: boolean; setHandoffOpen: (v: boolean) => void;
-  handoffAgent: AgentName; setHandoffAgent: (a: AgentName) => void;
+  handoffAgentId: string; setHandoffAgentId: (id: string) => void;
   handoffMode: AgentTaskMode; setHandoffMode: (m: AgentTaskMode) => void;
   handoffNote: string; setHandoffNote: (v: string) => void;
   sendHandoff: () => Promise<void>;
 }) {
   const { t } = useTranslation();
-  const disabledSet = new Set(disabledAgents ?? []);
   return (
     <>
       <div className="decision-bar">
@@ -29,12 +27,12 @@ export function DecisionBar({ agentNames, disabledAgents, sendDecision, handoffO
         <div id="handoff-panel" className="handoff-panel">
           <div className="handoff-row">
             <label htmlFor="handoff-agent">{t("handoff.route_to")}</label>
-            <select id="handoff-agent" name="handoff-agent" value={handoffAgent} onChange={(e) => setHandoffAgent(e.target.value as AgentName)}>
-              {agentNames.map((a) => {
-                const isDisabled = disabledSet.has(a);
+            <select id="handoff-agent" name="handoff-agent" value={handoffAgentId} onChange={(e) => setHandoffAgentId(e.target.value)}>
+              {logicalAgents.map((agent) => {
+                const isDisabled = agent.availability !== "ready";
                 return (
-                  <option key={a} value={a} disabled={isDisabled}>
-                    {isDisabled ? t("thread.agent_disabled_option", { agent: a }) : a}
+                  <option key={agent.id} value={agent.id} disabled={isDisabled}>
+                    {isDisabled ? t("thread.agent_disabled_option", { agent: agent.displayName }) : agent.displayName}
                   </option>
                 );
               })}

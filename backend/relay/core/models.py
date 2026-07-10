@@ -8,9 +8,13 @@ from pydantic import BaseModel, ConfigDict
 AgentName = Literal["claude", "pi", "codex", "kimi"]
 AgentTaskMode = Literal["action", "review", "ask"]
 AgentRole = Literal["implementer", "reviewer", "planner", "tester", "fixer"]
-SessionStatus = Literal["running", "waiting_for_human", "completed", "failed", "cancelled"]
+SessionStatus = Literal[
+    "running", "waiting_for_human", "completed", "failed", "cancelled"
+]
 TaskPriority = Literal["low", "normal", "high"]
-TaskStatus = Literal["backlog", "assigned", "running", "waiting_for_human", "review", "done", "blocked"]
+TaskStatus = Literal[
+    "backlog", "assigned", "running", "waiting_for_human", "review", "done", "blocked"
+]
 TaskRoutineType = Literal["task", "job"]
 TaskRoutineCadence = Literal["daily", "weekly", "monthly", "custom"]
 SandboxStatus = Literal["provisioning", "ready", "running", "stopped", "failed"]
@@ -42,6 +46,7 @@ class RelayModel(BaseModel):
 
 
 class Assignment(RelayModel):
+    agent_id: str | None = None
     agent: AgentName
     mode: AgentTaskMode = "action"
     role: AgentRole | None = None
@@ -59,9 +64,11 @@ class DaemonNodeRegistration(RelayModel):
     employee_id: str | None = None
     token: str
     workspace_path: str | None = None
+    workspace_id: str | None = None
     sandbox_mode: Literal["none", "boxlite"] | None = None
     protocol_version: int
     supported_agents: list[AgentName] = []
+    executor_capabilities: list[dict[str, Any]] | None = None
     agent_health: dict[str, dict[str, Any]] | None = None
     max_concurrent_runs: int | None = None
     run_capacity_by_mode: dict[AgentTaskMode, int] | None = None

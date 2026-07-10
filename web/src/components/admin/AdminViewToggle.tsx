@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslation } from "react-i18next";
-import { LayoutDashboard, Server, Users } from "lucide-react";
+import { Bot, LayoutDashboard, Server, Users } from "lucide-react";
 import type { AdminConsoleView } from "../../lib/store";
 
 export type AdminView = AdminConsoleView;
@@ -17,7 +17,8 @@ export function AdminViewToggle({ view, onChange }: AdminViewToggleProps) {
   const { t } = useTranslation();
   const items: Array<{ id: AdminView; label: string; icon: typeof Users }> = [
     { id: "dashboard", label: t("admin.v2.nav_dashboard"), icon: LayoutDashboard },
-    { id: "people", label: t("admin.v2.nav_people"), icon: Users },
+    { id: "employees", label: t("admin.v2.nav_employees"), icon: Users },
+    { id: "agents", label: t("admin.v2.nav_agents"), icon: Bot },
     { id: "fleet", label: t("admin.v2.nav_fleet"), icon: Server },
   ];
 

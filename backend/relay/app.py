@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 from fastapi import FastAPI
 from loguru import logger
 
-from .api import admin_routes, auth_routes, chat_routes, daemon_node_routes, sandbox_routes, session_routes, task_routes, web_routes
+from .api import admin_routes, agent_routes, auth_routes, chat_routes, daemon_node_routes, managed_node_routes, sandbox_routes, session_routes, task_routes, web_routes
 from .core.environment import load_backend_env
 from .core.storage_config import database_url_from_env, use_postgres_storage
 from .persistence.stores import (
@@ -26,6 +26,9 @@ from .daemon_registry import DaemonNodeRegistry, ServerDaemonNodeBackend
 from .security.auth import auth_store_from_env
 from .chat import DatabaseChatIntegrationStore, LocalChatIntegrationStore
 from .tasks import TaskScheduler
+from .services.managed_nodes import LocalManagedNodeStore
+from .persistence.employee_agent_store import DatabaseEmployeeAgentStore, LocalEmployeeAgentStore
+from .persistence.agent_placement_store import DatabaseAgentPlacementStore, LocalAgentPlacementStore
 
 load_backend_env()
 
@@ -41,9 +44,16 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     task_store = task_store_from_env(root_dir)
     daemon_store = daemon_store_from_env(root_dir)
     chat_store = chat_store_from_env(root_dir)
-    registry = DaemonNodeRegistry(session_store, daemon_store, task_store=task_store)
-    backend = ServerDaemonNodeBackend(registry)
     auth_store = auth_store_from_env(root_dir)
+    managed_node_store = LocalManagedNodeStore(root_dir)
+    employee_agent_store = employee_agent_store_from_env(root_dir)
+    agent_placement_store = agent_placement_store_from_env(root_dir)
+    registry = DaemonNodeRegistry(session_store, daemon_store, task_store=task_store)
+    backend = ServerDaemonNodeBackend(
+        registry,
+        employee_agent_store=employee_agent_store,
+        agent_placement_store=agent_placement_store,
+    )
 
     scheduler = task_scheduler_from_env(task_store=task_store, registry=registry, backend=backend)
 
@@ -65,6 +75,9 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     app.state.registry = registry
     app.state.backend = backend
     app.state.auth_store = auth_store
+    app.state.managed_node_store = managed_node_store
+    app.state.employee_agent_store = employee_agent_store
+    app.state.agent_placement_store = agent_placement_store
     app.state.task_scheduler = scheduler
     app.state.control_panel_version = CONTROL_PANEL_VERSION
 
@@ -90,12 +103,14 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
         }
 
     app.include_router(auth_routes.router)
+    app.include_router(agent_routes.router)
     app.include_router(admin_routes.router)
     app.include_router(chat_routes.router)
     app.include_router(task_routes.router)
     app.include_router(session_routes.router)
     app.include_router(sandbox_routes.router)
     app.include_router(daemon_node_routes.router)
+    app.include_router(managed_node_routes.router)
     # Registered last: its root catch-all serves the exported web UI and must not
     # shadow the explicit API routes above.
     app.include_router(web_routes.router)
@@ -109,6 +124,18 @@ def daemon_store_from_env(root_dir: Path) -> Any:
     setting = "RELAY_DAEMON_STORE=database" if daemon_store == "database" else "RELAY_STORAGE=postgres"
     database_url = database_url_from_env(setting=setting)
     return DatabaseDaemonStore(database_url)
+
+
+def employee_agent_store_from_env(root_dir: Path) -> Any:
+    if not use_postgres_storage():
+        return LocalEmployeeAgentStore(root_dir)
+    return DatabaseEmployeeAgentStore(database_url_from_env(setting="RELAY_STORAGE=postgres"))
+
+
+def agent_placement_store_from_env(root_dir: Path) -> Any:
+    if not use_postgres_storage():
+        return LocalAgentPlacementStore(root_dir)
+    return DatabaseAgentPlacementStore(database_url_from_env(setting="RELAY_STORAGE=postgres"))
 
 
 def session_store_from_env(root_dir: Path) -> Any:

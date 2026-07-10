@@ -36,6 +36,7 @@ export interface RelayTask {
   routineNextRunDate?: string;
   routineEnabled: boolean;
   assignedAgent?: AgentName;
+  assignedAgentId?: string;
   linkedSessionIds: string[];
   activity: RelayTaskActivity[];
   createdAt: string;
@@ -83,6 +84,7 @@ export type RelayTaskEvent =
       taskId: string;
       timestamp: string;
       agent: AgentName;
+      agentId?: string;
     }
   | {
       id: string;
@@ -114,6 +116,7 @@ export interface TaskStore {
     priority?: TaskPriority;
     status?: TaskStatus;
     assignedAgent?: AgentName;
+    assignedAgentId?: string;
     ownerEmployeeId?: string;
     assigneeEmployeeId?: string;
     dueDate?: string;
@@ -127,7 +130,7 @@ export interface TaskStore {
   getTask(taskId: string): Promise<RelayTask>;
   listTasks(): Promise<RelayTask[]>;
   updateTask(taskId: string, input: { title?: string; description?: string; priority?: TaskPriority; status?: TaskStatus; assigneeEmployeeId?: string; dueDate?: string; isRoutine?: boolean; routineType?: TaskRoutineType; routineCadence?: TaskRoutineCadence; routineNextRunDate?: string; routineEnabled?: boolean }): Promise<RelayTask>;
-  assignTask(taskId: string, agent: AgentName): Promise<RelayTask>;
+  assignTask(taskId: string, agent: AgentName, agentId?: string): Promise<RelayTask>;
   claimNextTaskForAgent(agent: AgentName, assigneeEmployeeId?: string): Promise<RelayTask | undefined>;
   linkSession(taskId: string, sessionId: string): Promise<RelayTask>;
   recordActivity(taskId: string, message: string, input?: { agent?: AgentName; sessionId?: string }): Promise<RelayTask>;
@@ -147,6 +150,7 @@ export class LocalTaskStore implements TaskStore {
     priority?: TaskPriority;
     status?: TaskStatus;
     assignedAgent?: AgentName;
+    assignedAgentId?: string;
     ownerEmployeeId?: string;
     assigneeEmployeeId?: string;
     dueDate?: string;
@@ -175,7 +179,10 @@ export class LocalTaskStore implements TaskStore {
       }),
     ];
     if (input.assignedAgent) {
-      events.push(relayTaskEvent("task.assigned", taskId, { agent: input.assignedAgent }));
+      events.push(relayTaskEvent("task.assigned", taskId, {
+        agent: input.assignedAgent,
+        ...(input.assignedAgentId ? { agentId: input.assignedAgentId } : {}),
+      }));
     }
     if (input.status && input.status !== "backlog") {
       events.push(relayTaskEvent("task.status", taskId, { status: input.status }));
@@ -229,8 +236,11 @@ export class LocalTaskStore implements TaskStore {
     return task;
   }
 
-  async assignTask(taskId: string, agent: AgentName): Promise<RelayTask> {
-    let task = await this.appendEvent(taskId, relayTaskEvent("task.assigned", taskId, { agent }));
+  async assignTask(taskId: string, agent: AgentName, agentId?: string): Promise<RelayTask> {
+    let task = await this.appendEvent(taskId, relayTaskEvent("task.assigned", taskId, {
+      agent,
+      ...(agentId ? { agentId } : {}),
+    }));
     task = await this.appendEvent(taskId, relayTaskEvent("task.status", taskId, { status: "assigned" }));
     return this.recordActivity(taskId, `Assigned to ${agent}.`, { agent });
   }
@@ -356,6 +366,8 @@ export function materializeTaskEvents(events: RelayTaskEvent[]): RelayTask {
       applyRoutineFields(task, event);
     } else if (event.type === "task.assigned") {
       task.assignedAgent = event.agent;
+      if (event.agentId) task.assignedAgentId = event.agentId;
+      else delete task.assignedAgentId;
     } else if (event.type === "task.status") {
       task.status = event.status;
     } else if (event.type === "task.session_linked") {

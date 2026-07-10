@@ -124,6 +124,32 @@ def workspace_path_for_employee(ctx: Any, employee_id: str) -> str:
     )
 
 
+def agent_for_workspace(ctx: Any, actor: dict[str, Any], requested_agent: str | None) -> dict[str, Any] | None:
+    agent_id = requested_agent.strip() if isinstance(requested_agent, str) else ""
+    if not agent_id:
+        return None
+    agent = ctx.employee_agent_store.get_agent(agent_id)
+    if not agent or agent.get("deletedAt"):
+        raise HTTPException(404, "Agent not found.")
+    if not actor["isAdmin"] and agent.get("employeeId") != actor["employeeId"]:
+        raise HTTPException(403, "Cannot read another employee's agent workspace.")
+    return agent
+
+
+def workspace_path_for_agent(ctx: Any, agent: dict[str, Any] | None, employee_id: str) -> str:
+    if agent:
+        nodes = {node["id"]: node for node in ctx.registry.monitor_nodes()}
+        for placement in ctx.agent_placement_store.list_placements(agent_id=agent["id"]):
+            node = nodes.get(placement["daemonNodeId"])
+            if node and node.get("workspacePath"):
+                return node["workspacePath"]
+    return workspace_path_for_employee(ctx, employee_id)
+
+
+def session_uses_agent(session: dict[str, Any], agent_id: str) -> bool:
+    return any(run.get("logicalAgentId") == agent_id for run in session.get("agentRuns", []))
+
+
 def workspace_file_timestamp(value: float) -> str:
     return datetime.fromtimestamp(value, timezone.utc).isoformat().replace("+00:00", "Z")
 
@@ -208,17 +234,19 @@ async def list_artifacts(request: Request, ctx: AppContextDep) -> dict[str, Any]
 @router.get("/workspace/brief")
 async def workspace_brief(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
-    employee_id = employee_for_workspace_brief(actor, request.query_params.get("employeeId"))
+    agent = agent_for_workspace(ctx, actor, request.query_params.get("agentId"))
+    employee_id = agent["employeeId"] if agent else employee_for_workspace_brief(actor, request.query_params.get("employeeId"))
 
     nodes = [node for node in ctx.registry.monitor_nodes() if node.get("employeeId") == employee_id]
     primary_node = nodes[0] if nodes else None
-    active_runs = [run for node in nodes for run in node.get("activeRuns", [])]
+    active_runs = [run for node in nodes for run in node.get("activeRuns", []) if not agent or run.get("currentLogicalAgentId") == agent["id"]]
 
-    sessions = [session for session in ctx.session_store.list_sessions() if session.get("ownerEmployeeId") == employee_id]
+    sessions = [session for session in ctx.session_store.list_sessions() if session.get("ownerEmployeeId") == employee_id and (not agent or session_uses_agent(session, agent["id"]))]
     tasks = [
         task
         for task in ctx.task_store.list_tasks()
-        if task.get("ownerEmployeeId") == employee_id or task.get("assigneeEmployeeId") == employee_id
+        if (task.get("ownerEmployeeId") == employee_id or task.get("assigneeEmployeeId") == employee_id)
+        and (not agent or task.get("assignedAgentId") == agent["id"])
     ]
     artifacts = [
         artifact_index_item(session, artifact)
@@ -226,13 +254,14 @@ async def workspace_brief(request: Request, ctx: AppContextDep) -> dict[str, Any
         for artifact in workspace_artifacts(session)
     ]
 
-    workspace_path = workspace_path_for_employee(ctx, employee_id)
+    workspace_path = workspace_path_for_agent(ctx, agent, employee_id)
     recent_sessions = sorted(sessions, key=lambda item: item.get("updatedAt") or "", reverse=True)[:8]
     active_tasks = [task for task in tasks if task.get("status") in ACTIVE_TASK_STATUSES]
     recent_artifacts = sorted(artifacts, key=lambda item: item.get("createdAt") or "", reverse=True)[:12]
 
     return {
         "employeeId": employee_id,
+        **({"agentId": agent["id"]} if agent else {}),
         "workspacePath": workspace_path,
         "primaryNode": primary_node,
         "nodes": nodes,
@@ -256,8 +285,9 @@ async def workspace_brief(request: Request, ctx: AppContextDep) -> dict[str, Any
 @router.get("/workspace/files")
 async def workspace_files(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
-    employee_id = employee_for_workspace_brief(actor, request.query_params.get("employeeId"))
-    workspace_path = workspace_path_for_employee(ctx, employee_id)
+    agent = agent_for_workspace(ctx, actor, request.query_params.get("agentId"))
+    employee_id = agent["employeeId"] if agent else employee_for_workspace_brief(actor, request.query_params.get("employeeId"))
+    workspace_path = workspace_path_for_agent(ctx, agent, employee_id)
     root = Path(workspace_path)
     relative_path = request.query_params.get("path") or ""
 
@@ -302,12 +332,13 @@ async def workspace_files(request: Request, ctx: AppContextDep) -> dict[str, Any
 @router.get("/workspace/file")
 async def workspace_file(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
-    employee_id = employee_for_workspace_brief(actor, request.query_params.get("employeeId"))
+    agent = agent_for_workspace(ctx, actor, request.query_params.get("agentId"))
+    employee_id = agent["employeeId"] if agent else employee_for_workspace_brief(actor, request.query_params.get("employeeId"))
     relative_path = (request.query_params.get("path") or "").strip()
     if not relative_path:
         raise HTTPException(400, "Workspace file path is required.")
 
-    workspace_path = workspace_path_for_employee(ctx, employee_id)
+    workspace_path = workspace_path_for_agent(ctx, agent, employee_id)
     root = Path(workspace_path)
     if not root.exists():
         raise HTTPException(404, "Workspace file path was not found.")
@@ -388,6 +419,30 @@ async def create_session(request: Request, ctx: AppContextDep) -> dict[str, Any]
 async def get_session(session_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
     return get_session_for_actor(ctx.session_store, session_id, actor)
+
+
+@router.post("/sessions/{session_id}/cancel")
+async def cancel_session_run(session_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
+    actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
+    session = get_session_for_actor(ctx.session_store, session_id, actor)
+    body = await json_body(request)
+    reason = string_field(body, "reason") or "Cancelled by employee."
+    node = next(
+        (
+            item
+            for item in ctx.registry.monitor_nodes()
+            if any(run.get("sessionId") == session_id for run in item.get("activeRuns", []))
+        ),
+        None,
+    )
+    if not node:
+        return session
+    return ctx.backend.cancel_run(
+        node["id"],
+        session_id,
+        reason,
+        actor_employee_id=None if actor.get("isAdmin") else actor["employeeId"],
+    )
 
 
 @router.post("/sessions/{session_id}/assignments")

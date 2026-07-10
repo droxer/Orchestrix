@@ -12,16 +12,62 @@ from .registry import (
     node_accepts_run,
     sandbox_node_auth_error,
     sandbox_ui_auth_error,
+    workspace_identity,
 )
 
 
 class ServerDaemonNodeBackend:
-    def __init__(self, registry: DaemonNodeRegistry):
+    def __init__(
+        self,
+        registry: DaemonNodeRegistry,
+        *,
+        employee_agent_store: Any | None = None,
+        agent_placement_store: Any | None = None,
+    ):
         self.registry = registry
+        self.employee_agent_store = employee_agent_store
+        self.agent_placement_store = agent_placement_store
+        if employee_agent_store is not None and agent_placement_store is not None:
+            self.registry.logical_assignment_validator = (
+                self._validate_logical_assignment
+            )
+
+    def _validate_logical_assignment(self, assignment: dict[str, Any]) -> None:
+        agent = self.employee_agent_store.get_agent(assignment.get("agentId"))
+        if not agent or agent.get("deletedAt") or not agent.get("enabled", True):
+            raise ValueError("logical agent is disabled or missing")
+        if agent.get("executorKind") != assignment.get("agent"):
+            raise ValueError("logical agent executor changed")
+        if agent.get("version") != assignment.get("agentVersion"):
+            raise ValueError("logical agent version changed")
+        placement = self.agent_placement_store.get_placement(
+            assignment.get("placementId")
+        )
+        if not placement or placement.get("desiredState") != "active":
+            raise ValueError("placement is not active")
+        if (
+            placement.get("agentId") != agent.get("id")
+            or placement.get("employeeId") != agent.get("employeeId")
+            or placement.get("daemonNodeId") != assignment.get("daemonNodeId")
+            or placement.get("executorKind") != agent.get("executorKind")
+            or placement.get("agentVersion") != agent.get("version")
+            or (placement.get("workspacePolicy") or {"kind": "node-affine"})
+            != (assignment.get("workspacePolicy") or {"kind": "node-affine"})
+        ):
+            raise ValueError("placement no longer matches the selected agent and node")
+        node = self.registry.get(assignment.get("daemonNodeId"))
+        if not node or node.get("employeeId") != agent.get("employeeId"):
+            raise ValueError("daemon node is no longer assigned to the agent's employee")
 
     def provision(self, payload: dict[str, Any]) -> dict[str, Any]:
         requested_sandbox_id = payload.get("sandboxId")
-        existing = self.registry.get(requested_sandbox_id) if requested_sandbox_id else self.registry.find_by_employee(payload["employeeId"], payload.get("workspacePath"))
+        existing = (
+            self.registry.get(requested_sandbox_id)
+            if requested_sandbox_id
+            else self.registry.find_by_employee(
+                payload["employeeId"], payload.get("workspacePath")
+            )
+        )
         if existing:
             if payload.get("actorEmployeeId"):
                 return existing
@@ -31,17 +77,27 @@ class ServerDaemonNodeBackend:
             node_error = sandbox_node_auth_error(existing, payload.get("nodeToken"))
             if not node_error and payload.get("token"):
                 employee_id = existing.get("employeeId") or payload["employeeId"]
-                return self.registry.register({
-                    "sandboxId": existing["id"],
-                    "employeeId": employee_id,
-                    "token": payload.get("nodeToken", ""),
-                    "workspacePath": existing.get("workspacePath"),
-                    "protocolVersion": DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS[0],
-                    "supportedAgents": [agent for agent, status in existing.get("agents", {}).items() if status == "ready"],
-                    "maxConcurrentRuns": existing.get("maxConcurrentRuns"),
-                    "runCapacityByMode": existing.get("runCapacityByMode"),
-                    "status": "busy" if existing["status"] == "running" else existing["status"],
-                }, payload["token"])
+                return self.registry.register(
+                    {
+                        "sandboxId": existing["id"],
+                        "employeeId": employee_id,
+                        "token": payload.get("nodeToken", ""),
+                        "workspacePath": existing.get("workspacePath"),
+                        "workspaceId": existing.get("workspaceId"),
+                        "protocolVersion": DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS[0],
+                        "supportedAgents": [
+                            agent
+                            for agent, status in existing.get("agents", {}).items()
+                            if status == "ready"
+                        ],
+                        "maxConcurrentRuns": existing.get("maxConcurrentRuns"),
+                        "runCapacityByMode": existing.get("runCapacityByMode"),
+                        "status": "busy"
+                        if existing["status"] == "running"
+                        else existing["status"],
+                    },
+                    payload["token"],
+                )
             raise PermissionError(node_error or ui_error)
         if not payload.get("token"):
             raise PermissionError("Sandbox token is required.")
@@ -52,7 +108,11 @@ class ServerDaemonNodeBackend:
         sandbox = {
             "id": sandbox_id,
             "employeeId": payload["employeeId"],
-            **({"workspacePath": payload["workspacePath"]} if payload.get("workspacePath") else {}),
+            **(
+                {"workspacePath": payload["workspacePath"]}
+                if payload.get("workspacePath")
+                else {}
+            ),
             "status": "provisioning",
             "agents": {agent: "unknown" for agent in AGENT_NAMES},
             "maxConcurrentRuns": 1,
@@ -62,15 +122,18 @@ class ServerDaemonNodeBackend:
             "updatedAt": now,
             "lastError": "Waiting for daemon node registration.",
         }
-        self.registry.register({
-            "sandboxId": sandbox_id,
-            "employeeId": payload["employeeId"],
-            "token": payload["nodeToken"],
-            "workspacePath": payload.get("workspacePath"),
-            "protocolVersion": DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS[0],
-            "supportedAgents": [],
-            "status": "stopped",
-        }, payload["token"])
+        self.registry.register(
+            {
+                "sandboxId": sandbox_id,
+                "employeeId": payload["employeeId"],
+                "token": payload["nodeToken"],
+                "workspacePath": payload.get("workspacePath"),
+                "protocolVersion": DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS[0],
+                "supportedAgents": [],
+                "status": "stopped",
+            },
+            payload["token"],
+        )
         stored = self.registry.get(sandbox_id) or {}
         return {**sandbox, **stored, "token": payload["token"]}
 
@@ -98,40 +161,96 @@ class ServerDaemonNodeBackend:
             sandbox = self.registry.get(sandbox_id)
             if not sandbox:
                 raise KeyError(f"Sandbox {sandbox_id} has no registered daemon node.")
-            if not sandbox.get("employeeId"):
-                raise ValueError(f"Sandbox {sandbox_id} daemon node is not assigned to an employee.")
-            if not self.registry.is_live(sandbox_id):
-                raise ValueError(f"Sandbox {sandbox_id} daemon node heartbeat expired.")
-            disabled = set(sandbox.get("disabledAgents") or [])
-            requested_agents = [assignment["agent"] for assignment in request["assignments"]]
-            disabled_hit = [agent for agent in requested_agents if agent in disabled]
-            not_ready = [
-                agent
-                for agent in requested_agents
-                if agent not in disabled and sandbox.get("agents", {}).get(agent) != "ready"
-            ]
-            if disabled_hit:
-                detail = ", ".join(dict.fromkeys(disabled_hit))
+            agent_first = request.get("agentFirst") is True
+            if not sandbox.get("employeeId") and not agent_first:
                 raise ValueError(
-                    f"Sandbox {sandbox_id} daemon node has disabled agent(s): {detail}. "
-                    "Re-enable them from the admin console to dispatch work."
+                    f"Sandbox {sandbox_id} daemon node is not assigned to an employee."
                 )
-            if not_ready:
-                detail = ", ".join(dict.fromkeys(not_ready))
-                raise ValueError(f"Sandbox {sandbox_id} daemon node does not have ready agent(s): {detail}.")
+            assignment_nodes = {
+                assignment.get("daemonNodeId") or sandbox_id
+                for assignment in request["assignments"]
+            }
+            runtime_nodes = [self.registry.get(node_id) for node_id in assignment_nodes]
+            if any(node is None for node in runtime_nodes):
+                raise ValueError("An assigned runtime node is no longer registered.")
+            workspace_keys = {
+                workspace_identity(node) for node in runtime_nodes if node
+            }
+            if len(assignment_nodes) > 1 and (
+                None in workspace_keys or len(workspace_keys) != 1
+            ):
+                raise ValueError(
+                    "workspace_unavailable: selected agent placements do not advertise one shared workspace identity."
+                )
+            if (
+                len(assignment_nodes) > 1
+                and all(
+                    assignment.get("agentId") for assignment in request["assignments"]
+                )
+                and any(
+                    (assignment.get("workspacePolicy") or {}).get("kind")
+                    != "shared-path"
+                    for assignment in request["assignments"]
+                )
+            ):
+                raise ValueError(
+                    "workspace_unavailable: cross-node agent placements require shared-path policy."
+                )
+            for assignment in request["assignments"]:
+                node_id = assignment.get("daemonNodeId") or sandbox_id
+                node = self.registry.get(node_id)
+                assert node is not None
+                if agent_first and assignment.get("agentId"):
+                    self._validate_logical_assignment(assignment)
+                if not self.registry.is_live(node_id):
+                    raise ValueError(
+                        f"Sandbox {node_id} daemon node heartbeat expired."
+                    )
+                if assignment["agent"] in set(node.get("disabledAgents") or []):
+                    raise ValueError(
+                        f"Sandbox {node_id} daemon node has disabled agent(s): {assignment['agent']}. "
+                        "Re-enable them from the admin console to dispatch work."
+                    )
+                if node.get("agents", {}).get(assignment["agent"]) != "ready":
+                    raise ValueError(
+                        f"Sandbox {node_id} does not have ready agent {assignment['agent']}."
+                    )
+                if not node_accepts_run(
+                    node,
+                    assignments=[assignment],
+                    active_runs=self.registry.daemon_store.list_active_runs(node_id),
+                    session_id=request.get("sessionId"),
+                ):
+                    raise ValueError(
+                        f"capacity_exhausted: Sandbox {node_id} has no available execution slot."
+                    )
             actor_employee_id = request.get("actorEmployeeId")
-            owner_employee_id = actor_employee_id or sandbox["employeeId"]
+            owner_employee_id = actor_employee_id or sandbox.get("employeeId")
+            if not owner_employee_id:
+                raise PermissionError(
+                    "Agent-first dispatch requires an authenticated employee."
+                )
             session_id_for_capacity = request.get("sessionId")
             active_runs = self.registry.daemon_store.list_active_runs(sandbox_id)
             if request.get("sessionId"):
-                session_owner = session_owner_employee_id(self.registry.store, request["sessionId"])
+                session_owner = session_owner_employee_id(
+                    self.registry.store, request["sessionId"]
+                )
                 if actor_employee_id and not request.get("actorIsAdmin"):
-                    assert_session_owned_by_employee(self.registry.store, request["sessionId"], actor_employee_id)
+                    assert_session_owned_by_employee(
+                        self.registry.store, request["sessionId"], actor_employee_id
+                    )
                 if not actor_employee_id:
-                    assert_session_owned_by_employee(self.registry.store, request["sessionId"], sandbox["employeeId"])
+                    assert_session_owned_by_employee(
+                        self.registry.store, request["sessionId"], sandbox["employeeId"]
+                    )
                 owner_employee_id = session_owner
-                if self.registry.daemon_store.active_run_request_for_session(sandbox_id, request["sessionId"]):
-                    raise ValueError(f"Session {request['sessionId']} already has an active daemon run.")
+                if self.registry.daemon_store.active_run_request_for_session(
+                    sandbox_id, request["sessionId"]
+                ):
+                    raise ValueError(
+                        f"Session {request['sessionId']} already has an active daemon run."
+                    )
             if sandbox["status"] in ("stopped", "failed", "provisioning"):
                 raise ValueError(f"Sandbox {sandbox_id} daemon node is not ready.")
             if not node_accepts_run(
@@ -140,9 +259,17 @@ class ServerDaemonNodeBackend:
                 active_runs=active_runs,
                 session_id=session_id_for_capacity,
             ):
-                raise ValueError(f"Sandbox {sandbox_id} daemon node has no available execution slot.")
-            self.registry.update_status(sandbox_id, {"status": "running", "lastError": None})
-            task_id = request.get("taskId") if isinstance(request.get("taskId"), str) and request.get("taskId") else None
+                raise ValueError(
+                    f"Sandbox {sandbox_id} daemon node has no available execution slot."
+                )
+            self.registry.update_status(
+                sandbox_id, {"status": "running", "lastError": None}
+            )
+            task_id = (
+                request.get("taskId")
+                if isinstance(request.get("taskId"), str) and request.get("taskId")
+                else None
+            )
             controller = SessionController(
                 self.registry.store,
                 task_store=self.registry.task_store,
@@ -150,15 +277,35 @@ class ServerDaemonNodeBackend:
                 workspace_path=sandbox.get("workspacePath") or "/workspace",
                 owner_employee_id=owner_employee_id,
             )
-            decision = request.get("decision") if isinstance(request.get("decision"), dict) else None
-            existing_session = self.registry.store.get_session(request["sessionId"]) if request.get("sessionId") else None
-            session_id = request.get("sessionId") or controller.create_session(
-                request["taskGoal"],
-                ["human", *dict.fromkeys(assignment["agent"] for assignment in request["assignments"])],
-            )["id"]
+            decision = (
+                request.get("decision")
+                if isinstance(request.get("decision"), dict)
+                else None
+            )
+            existing_session = (
+                self.registry.store.get_session(request["sessionId"])
+                if request.get("sessionId")
+                else None
+            )
+            session_id = (
+                request.get("sessionId")
+                or controller.create_session(
+                    request["taskGoal"],
+                    [
+                        "human",
+                        *dict.fromkeys(
+                            assignment["agent"] for assignment in request["assignments"]
+                        ),
+                    ],
+                )["id"]
+            )
             dispatch_task_goal = request["taskGoal"]
             decision_kind = decision.get("kind") if decision else None
-            prior_decision_kind = _latest_decision_kind_after_latest_user(existing_session) if existing_session else None
+            prior_decision_kind = (
+                _latest_decision_kind_after_latest_user(existing_session)
+                if existing_session
+                else None
+            )
             is_decision_dispatch = decision_kind in ("rerun", "handoff") or (
                 decision is None
                 and prior_decision_kind in ("rerun", "handoff")
@@ -169,7 +316,9 @@ class ServerDaemonNodeBackend:
             # not a new user turn. Use the canonical session goal even if an
             # older client sent a note-spliced taskGoal.
             if existing_session and is_decision_dispatch:
-                dispatch_task_goal = existing_session.get("taskGoal") or request["taskGoal"]
+                dispatch_task_goal = (
+                    existing_session.get("taskGoal") or request["taskGoal"]
+                )
             # A follow-up turn on an existing session: persist the new user
             # message so it renders in the transcript and feeds the next run's
             # conversation history. A fresh session already captures the first
@@ -183,22 +332,43 @@ class ServerDaemonNodeBackend:
                 )
             if decision:
                 kind = decision.get("kind")
-                note = decision.get("note") if isinstance(decision.get("note"), str) else None
+                note = (
+                    decision.get("note")
+                    if isinstance(decision.get("note"), str)
+                    else None
+                )
                 target_agent = valid_agent(decision.get("targetAgent"))
                 if kind == "rerun":
                     controller.record_decision(session_id, "rerun", note, target_agent)
                 elif kind == "handoff" and target_agent:
-                    controller.handoff_session(session_id, target_agent, request["assignments"], note)
+                    controller.handoff_session(
+                        session_id, target_agent, request["assignments"], note
+                    )
             state = initial_agent_state(dispatch_task_goal)
-            self.registry.start_run_request(sandbox_id, session_id, dispatch_task_goal, request["assignments"], state, task_id)
+            self.registry.start_run_request(
+                sandbox_id,
+                session_id,
+                dispatch_task_goal,
+                request["assignments"],
+                state,
+                task_id,
+            )
             return self.registry.store.get_session(session_id)
 
-    def cancel_run(self, sandbox_id: str, session_id: str, reason: str, actor_employee_id: str | None = None) -> dict[str, Any]:
+    def cancel_run(
+        self,
+        sandbox_id: str,
+        session_id: str,
+        reason: str,
+        actor_employee_id: str | None = None,
+    ) -> dict[str, Any]:
         sandbox = self.registry.get(sandbox_id)
         if not sandbox:
             raise KeyError(f"Sandbox {sandbox_id} has no registered daemon node.")
         if actor_employee_id:
-            assert_session_owned_by_employee(self.registry.store, session_id, actor_employee_id)
+            assert_session_owned_by_employee(
+                self.registry.store, session_id, actor_employee_id
+            )
         active = self.registry.cancel_active_run(sandbox_id, session_id, reason)
         if not active:
             session = self.registry.store.get_session(session_id)
@@ -208,7 +378,9 @@ class ServerDaemonNodeBackend:
         return self.registry.store.get_session(session_id)
 
 
-def assert_session_owned_by_employee(store: LocalSessionStore, session_id: str, employee_id: str) -> None:
+def assert_session_owned_by_employee(
+    store: LocalSessionStore, session_id: str, employee_id: str
+) -> None:
     try:
         session = store.get_session(session_id)
     except Exception as exc:
@@ -216,16 +388,22 @@ def assert_session_owned_by_employee(store: LocalSessionStore, session_id: str, 
             f"Session {session_id} could not be verified for {employee_id}."
         ) from exc
     if not session.get("ownerEmployeeId"):
-        raise PermissionError(f"Session {session_id} has no owner; {employee_id} is not authorized to run it.")
+        raise PermissionError(
+            f"Session {session_id} has no owner; {employee_id} is not authorized to run it."
+        )
     if session["ownerEmployeeId"] != employee_id:
-        raise PermissionError(f"Session {session_id} is owned by {session['ownerEmployeeId']}; {employee_id} is not authorized to run it.")
+        raise PermissionError(
+            f"Session {session_id} is owned by {session['ownerEmployeeId']}; {employee_id} is not authorized to run it."
+        )
 
 
 def session_owner_employee_id(store: LocalSessionStore, session_id: str) -> str:
     session = store.get_session(session_id)
     owner = session.get("ownerEmployeeId")
     if not owner:
-        raise PermissionError(f"Session {session_id} has no owner; cannot start daemon run.")
+        raise PermissionError(
+            f"Session {session_id} has no owner; cannot start daemon run."
+        )
     return owner
 
 

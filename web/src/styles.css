@@ -32,6 +32,7 @@
 /* 2. Shell + chrome */
 @import "./styles/empty-state.css";
 @import "./styles/shell.css";
+@import "./styles/routes.css";
 @import "./styles/sidenav.css";
 @import "./styles/inputs.css";
 
@@ -53,6 +54,7 @@
 @import "./styles/skills.css";
 @import "./styles/workspace.css";
 @import "./styles/backlog.css";
+@import "./styles/agents.css";
 @import "./styles/overlay.css";
 @import "./styles/preferences.css";
 @import "./styles/dialog.css";

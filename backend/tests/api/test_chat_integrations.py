@@ -34,6 +34,16 @@ def test_chat_integration_setup_flow_redacts_secrets(monkeypatch) -> None:
         client = TestClient(create_app(root))
         _bootstrap_admin(client)
         _login(client, "admin", "secret123")
+        assert client.post("/cp/users", json={
+            "username": "alice",
+            "password": "AlicePass123!",
+            "employeeId": "alice",
+            "displayName": "Alice",
+        }).status_code == 201
+        agent = client.post(
+            "/cp/employees/alice/agents",
+            json={"displayName": "Chat agent", "executorKind": "codex"},
+        ).json()["agent"]
 
         create = client.post("/cp/chat-integrations", json={
             "provider": "discord",
@@ -63,7 +73,7 @@ def test_chat_integration_setup_flow_redacts_secrets(monkeypatch) -> None:
             "externalUserId": "discord_user_1",
             "employeeId": "alice",
             "displayName": "Alice",
-            "defaultSandboxId": "sbx_alice",
+            "defaultAgentId": agent["id"],
         })
         assert link.status_code == 201
         assert link.json()["integration"]["identityLinkCount"] == 1
@@ -96,6 +106,7 @@ def test_chat_integration_setup_flow_redacts_secrets(monkeypatch) -> None:
         )
         assert resolved.status_code == 200
         assert resolved.json()["identity"]["employeeId"] == "alice"
+        assert resolved.json()["identity"]["defaultAgentId"] == agent["id"]
 
         disallowed = client.post(
             "/chat/identity/resolve",

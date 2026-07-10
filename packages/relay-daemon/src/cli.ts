@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { homedir } from "node:os";
-import { pathToFileURL } from "node:url";
+import { realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { loadPackageEnv } from "relay-core";
 import { resolveSandboxMode, runRelayDaemon, runRelayDaemonDoctor } from "./index.js";
 
@@ -14,8 +15,15 @@ Options:
   --sandbox-id <id>     Sandbox identifier (required; also RELAY_SANDBOX_ID).
   --employee-id <id>    Employee identifier (also RELAY_EMPLOYEE_ID).
   --token <token>       Daemon node token (also RELAY_DAEMON_NODE_TOKEN).
+  --enrollment-token <token>
+                        One-time managed-node enrollment token (also
+                        RELAY_ENROLLMENT_TOKEN). Replaces --sandbox-id and
+                        --token for the first start.
   --workspace <path>    Host workspace to expose to local agent CLIs
                         (also RELAY_WORKSPACE or WORKSPACE).
+  --workspace-id <id>   Canonical shared-workspace identity. Nodes may use
+                        different local paths when this ID matches
+                        (also RELAY_WORKSPACE_ID).
   --sandbox <mode>      Sandbox mode: "boxlite" boots a BoxLite VM and runs
                         agents inside it; "none" runs agents as local
                         processes (default: boxlite; also RELAY_SANDBOX_MODE).
@@ -38,7 +46,9 @@ export interface DaemonCliArgs {
   sandboxId?: string;
   employeeId?: string;
   token?: string;
+  enrollmentToken?: string;
   workspace?: string;
+  workspaceId?: string;
   sandbox?: string;
   useLocalAgentHome: boolean;
   doctor: boolean;
@@ -51,7 +61,9 @@ export function parseArgs(argv: string[]): DaemonCliArgs {
   let sandboxId: string | undefined;
   let employeeId: string | undefined;
   let token: string | undefined;
+  let enrollmentToken: string | undefined;
   let workspace: string | undefined;
+  let workspaceId: string | undefined;
   let sandbox: string | undefined;
   let useLocalAgentHome = false;
   let doctor = false;
@@ -95,12 +107,26 @@ export function parseArgs(argv: string[]): DaemonCliArgs {
       }
       token = value;
       i += 1;
+    } else if (arg === "--enrollment-token") {
+      const value = argv[i + 1];
+      if (!value || value.startsWith("-")) {
+        throw new Error("--enrollment-token requires a value.");
+      }
+      enrollmentToken = value;
+      i += 1;
     } else if (arg === "--workspace") {
       const value = argv[i + 1];
       if (!value || value.startsWith("-")) {
         throw new Error("--workspace requires a value.");
       }
       workspace = value;
+      i += 1;
+    } else if (arg === "--workspace-id") {
+      const value = argv[i + 1];
+      if (!value || value.startsWith("-")) {
+        throw new Error("--workspace-id requires a value.");
+      }
+      workspaceId = value;
       i += 1;
     } else if (arg === "--sandbox") {
       const value = argv[i + 1];
@@ -113,7 +139,20 @@ export function parseArgs(argv: string[]): DaemonCliArgs {
       throw new Error(`Unknown argument: ${arg}`);
     }
   }
-  return { backendUrl, sandboxId, employeeId, token, workspace, sandbox, useLocalAgentHome, doctor, help, version };
+  return {
+    backendUrl,
+    sandboxId,
+    employeeId,
+    token,
+    ...(enrollmentToken ? { enrollmentToken } : {}),
+    workspace,
+    workspaceId,
+    sandbox,
+    useLocalAgentHome,
+    doctor,
+    help,
+    version,
+  };
 }
 
 export async function main(argv: string[] = process.argv): Promise<void> {
@@ -130,19 +169,26 @@ export async function main(argv: string[] = process.argv): Promise<void> {
   }
 
   const sandboxId = args.sandboxId ?? process.env.RELAY_SANDBOX_ID;
-  if (!sandboxId) {
-    console.error("Error: --sandbox-id or RELAY_SANDBOX_ID is required.");
+  const enrollmentToken = args.enrollmentToken ?? process.env.RELAY_ENROLLMENT_TOKEN;
+  if (!sandboxId && !enrollmentToken) {
+    console.error("Error: --sandbox-id/RELAY_SANDBOX_ID or --enrollment-token/RELAY_ENROLLMENT_TOKEN is required.");
     showHelp();
     process.exitCode = 1;
     return;
   }
   if (args.doctor) {
+    if (!sandboxId) {
+      console.error("Error: --doctor requires an enrolled --sandbox-id.");
+      process.exitCode = 1;
+      return;
+    }
     const report = await runRelayDaemonDoctor({
       backendUrl: args.backendUrl ?? process.env.RELAY_BACKEND_URL,
       sandboxId,
       employeeId: args.employeeId ?? process.env.RELAY_EMPLOYEE_ID,
       token: args.token ?? process.env.RELAY_DAEMON_NODE_TOKEN ?? process.env.RELAY_DAEMON_TOKEN,
       workspacePath: args.workspace ?? process.env.RELAY_WORKSPACE ?? process.env.WORKSPACE,
+      workspaceId: args.workspaceId ?? process.env.RELAY_WORKSPACE_ID,
       sandbox: resolveSandboxMode(args.sandbox ?? process.env.RELAY_SANDBOX_MODE),
       agentHome: args.useLocalAgentHome ? homedir() : undefined,
     });
@@ -157,13 +203,24 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     sandboxId,
     employeeId: args.employeeId ?? process.env.RELAY_EMPLOYEE_ID,
     token: args.token ?? process.env.RELAY_DAEMON_NODE_TOKEN ?? process.env.RELAY_DAEMON_TOKEN,
+    enrollmentToken,
     workspacePath: args.workspace ?? process.env.RELAY_WORKSPACE ?? process.env.WORKSPACE,
+    workspaceId: args.workspaceId ?? process.env.RELAY_WORKSPACE_ID,
     sandbox: resolveSandboxMode(args.sandbox ?? process.env.RELAY_SANDBOX_MODE),
     agentHome: args.useLocalAgentHome ? homedir() : undefined,
   });
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+export function isMainModule(moduleUrl: string, argvPath: string | undefined): boolean {
+  if (!argvPath) return false;
+  try {
+    return realpathSync(fileURLToPath(moduleUrl)) === realpathSync(argvPath);
+  } catch {
+    return false;
+  }
+}
+
+if (isMainModule(import.meta.url, process.argv[1])) {
   main().catch((error: unknown) => {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;

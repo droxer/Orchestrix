@@ -10,6 +10,7 @@ from loguru import logger
 
 from ..core.models import DaemonNodeRegistration
 from ..daemon_registry import public_sandbox_record
+from ..services.node_agents import sync_node_agents
 from .deps import AppContextDep
 from .helpers import actor_can_access_sandbox, authorized_sandbox_for_token, bearer_token, daemon_node_event, json_body, request_actor_or_none
 
@@ -122,6 +123,9 @@ async def register_daemon_node(request: Request, ctx: AppContextDep) -> dict[str
     try:
         registration = DaemonNodeRegistration.model_validate(body).relay_dump()
         sandbox = ctx.registry.register(registration, bearer_token(request))
+        sync_node_agents(ctx, sandbox)
+        if sandbox.get("managedNodeId") and sandbox.get("status") in ("ready", "running"):
+            ctx.managed_node_store.mark_ready(sandbox["id"])
         logger.info(
             "Daemon node registered",
             sandbox_id=sandbox["id"],

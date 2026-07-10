@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { getWorkspaceBrief, listWorkspaceFiles, readWorkspaceFile } from "../api";
 import type {
   ArtifactIndexItem,
   CurrentUser,
+  EmployeeAgent,
   WorkspaceFileContentResponse,
   WorkspaceFileEntry,
   WorkspaceFilesResponse,
@@ -16,9 +17,11 @@ import { PageHeader } from "./PageHeader";
 import { ArtifactBody } from "./artifact/ArtifactBody";
 import { CodeView, isHtmlFile, isMarkdownFile, isRenderableFile, languageForFile } from "./CodeView";
 import { Markdown } from "./Markdown";
+import { useUrlSearchState } from "../hooks/useUrlSearchState";
 
 interface EmployeeWorkspacePageProps {
   employeeId: string;
+  agent: EmployeeAgent | undefined;
   currentUser: CurrentUser;
   isRefreshing: boolean;
   onRefresh: () => Promise<void>;
@@ -34,6 +37,8 @@ type Selection =
 // The browse pane folds artifacts + files into one column with a tab switcher,
 // leaving the preview pane the dominant share of the width.
 type BrowseTab = "artifacts" | "files";
+const parseBrowseTab = (value: string | null): BrowseTab => value === "files" ? "files" : "artifacts";
+const parseString = (value: string | null): string => value ?? "";
 
 const WORKSPACE_BRIEF_POLL_MS = 3000;
 
@@ -69,6 +74,7 @@ function formatBytes(bytes: number | null | undefined): string {
 
 export function EmployeeWorkspacePage({
   employeeId,
+  agent,
   currentUser,
   isRefreshing,
   onRefresh,
@@ -76,25 +82,27 @@ export function EmployeeWorkspacePage({
 }: EmployeeWorkspacePageProps) {
   const { t, i18n } = useTranslation();
   const [selected, setSelected] = useState<Selection | null>(null);
-  const [filePath, setFilePath] = useState("");
-  const [browseTab, setBrowseTab] = useState<BrowseTab>("artifacts");
+  const [filePath, setFilePath] = useUrlSearchState("workspacePath", "", parseString, (value) => value || null);
+  const [browseTab, setBrowseTab] = useUrlSearchState("workspaceTab", "artifacts" as BrowseTab, parseBrowseTab, (value) => value);
+  const [selectedKey, setSelectedKey] = useUrlSearchState("workspaceItem", "", parseString, (value) => value || null);
+  const previousScopeId = useRef(`${employeeId}:${agent?.id ?? ""}`);
 
   const query = useQuery({
     queryKey: ["workspace-brief", employeeId],
     enabled: Boolean(employeeId),
     refetchInterval: WORKSPACE_BRIEF_POLL_MS,
-    queryFn: ({ signal }) => getWorkspaceBrief({ employeeId }, signal),
+    queryFn: ({ signal }) => getWorkspaceBrief({ employeeId, agentId: agent?.id }, signal),
   });
   const fileQuery = useQuery({
     queryKey: ["workspace-files", employeeId, filePath],
     enabled: Boolean(employeeId),
-    queryFn: ({ signal }) => listWorkspaceFiles({ employeeId, path: filePath }, signal),
+    queryFn: ({ signal }) => listWorkspaceFiles({ employeeId, agentId: agent?.id, path: filePath }, signal),
   });
   const selectedFilePath = selected?.type === "file" ? selected.path : "";
   const contentQuery = useQuery({
     queryKey: ["workspace-file", employeeId, selectedFilePath],
     enabled: Boolean(employeeId) && selected?.type === "file",
-    queryFn: ({ signal }) => readWorkspaceFile({ employeeId, path: selectedFilePath }, signal),
+    queryFn: ({ signal }) => readWorkspaceFile({ employeeId, agentId: agent?.id, path: selectedFilePath }, signal),
   });
 
   const brief = query.data;
@@ -102,17 +110,35 @@ export function EmployeeWorkspacePage({
   const loadError = !brief && query.error
     ? query.error instanceof Error ? query.error.message : String(query.error)
     : "";
-  const displayName = currentUser.employeeId === employeeId
-    ? currentUser.displayName || currentUser.username || employeeId
-    : employeeId;
+  const displayName = agent?.displayName ?? t("workspace.no_agent");
 
-  // Switching employees resets navigation + selection so the panes never show
-  // another employee's path or a stale preview.
+  // Each agent is a distinct product workspace, even when several agents share
+  // the same employee-owned filesystem behind the control-plane boundary.
   useEffect(() => {
+    const scopeId = `${employeeId}:${agent?.id ?? ""}`;
+    if (previousScopeId.current === scopeId) return;
+    previousScopeId.current = scopeId;
     setFilePath("");
     setSelected(null);
+    setSelectedKey("");
     setBrowseTab("artifacts");
-  }, [employeeId]);
+  }, [agent?.id, employeeId, setBrowseTab, setFilePath, setSelectedKey]);
+
+  useEffect(() => {
+    if (!selectedKey) {
+      setSelected(null);
+      return;
+    }
+    if (selectedKey.startsWith("artifact:")) {
+      const artifact = brief?.artifacts.find((item) => item.id === selectedKey.slice(9));
+      if (artifact) setSelected({ type: "artifact", artifact });
+      return;
+    }
+    if (selectedKey.startsWith("file:")) {
+      const path = selectedKey.slice(5);
+      setSelected({ type: "file", path, name: path.split("/").at(-1) || path });
+    }
+  }, [brief?.artifacts, selectedKey]);
 
   async function refreshWorkspace(): Promise<void> {
     await Promise.all([query.refetch(), fileQuery.refetch(), onRefresh()]);
@@ -120,6 +146,23 @@ export function EmployeeWorkspacePage({
 
   function openDirectory(path: string): void {
     setFilePath(path);
+  }
+
+  function selectWorkspaceItem(selection: Selection): void {
+    setSelected(selection);
+    setSelectedKey(selection.type === "artifact" ? `artifact:${selection.artifact.id}` : `file:${selection.path}`);
+  }
+
+  function moveBrowseTab(event: KeyboardEvent<HTMLButtonElement>, next: BrowseTab): void {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const target = event.key === "Home"
+      ? "artifacts"
+      : event.key === "End"
+        ? "files"
+        : next;
+    setBrowseTab(target);
+    requestAnimationFrame(() => document.getElementById(`workspace-tab-${target}`)?.focus());
   }
 
   return (
@@ -165,6 +208,7 @@ export function EmployeeWorkspacePage({
                   tabIndex={browseTab === "artifacts" ? 0 : -1}
                   className={`workspace-tab${browseTab === "artifacts" ? " is-active" : ""}`}
                   onClick={() => setBrowseTab("artifacts")}
+                  onKeyDown={(event) => moveBrowseTab(event, "files")}
                 >
                   {t("workspace.artifacts")}
                   <span className="workspace-tab-count mono">{brief?.artifacts.length ?? 0}</span>
@@ -178,6 +222,7 @@ export function EmployeeWorkspacePage({
                   tabIndex={browseTab === "files" ? 0 : -1}
                   className={`workspace-tab${browseTab === "files" ? " is-active" : ""}`}
                   onClick={() => setBrowseTab("files")}
+                  onKeyDown={(event) => moveBrowseTab(event, "artifacts")}
                 >
                   {t("workspace.files")}
                 </button>
@@ -200,7 +245,7 @@ export function EmployeeWorkspacePage({
                               type="button"
                               className={`workspace-pick${active ? " is-active" : ""}`}
                               aria-pressed={active}
-                              onClick={() => setSelected({ type: "artifact", artifact })}
+                              onClick={() => selectWorkspaceItem({ type: "artifact", artifact })}
                             >
                               <span className={`artifact-kind-tag is-${artifact.kind}`}>
                                 {t(`artifact.kind.${artifact.kind}`, { defaultValue: artifact.kind })}
@@ -230,7 +275,7 @@ export function EmployeeWorkspacePage({
                     path={filePath}
                     selectedPath={selectedFilePath}
                     onOpenDirectory={openDirectory}
-                    onSelectFile={(entry) => setSelected({ type: "file", path: entry.path, name: entry.name })}
+                    onSelectFile={(entry) => selectWorkspaceItem({ type: "file", path: entry.path, name: entry.name })}
                   />
                 </div>
               )}

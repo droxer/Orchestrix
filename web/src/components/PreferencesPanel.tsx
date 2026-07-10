@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ComponentType, type KeyboardEvent } from "react";
-import type { TFunction } from "i18next";
+import { useRef, useState, type ComponentType, type KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import {
   SUPPORTED_LANGUAGES,
@@ -9,16 +8,8 @@ import {
   type Language,
   type Theme,
 } from "../lib/appStorage";
-import {
-  AGENT_ROLE_VALUES,
-  agentRoleMapsEqual,
-  normalizeAgentRoleMapPayload,
-  type AgentRoleMap,
-} from "../lib/manageAgents";
-import { AGENT_NAMES } from "../types";
-import type { AgentName, AgentRole, DaemonNodeMonitorRecord } from "../types";
 import { moveRadioSelection } from "../lib/radioGroupKeyboard";
-import { PrefAgents, PrefAppearance, PrefLanguage } from "./icons";
+import { PrefAppearance, PrefLanguage } from "./icons";
 
 export type { Language, Theme };
 export { SUPPORTED_LANGUAGES, SUPPORTED_THEMES };
@@ -41,14 +32,13 @@ const LANGUAGE_VALUES: Language[] = LANGUAGES.map((l) => l.code);
 /* Settings categories. Adding a new settings area = one entry here plus a
    case in renderSection (and its `pref.<id>` i18n label). The left nav and
    the content panel are both driven by this list. */
-type CategoryId = "appearance" | "language" | "agents";
+type CategoryId = "appearance" | "language";
 
 type IconComponent = ComponentType<{ size?: number }>;
 
 const CATEGORIES: { id: CategoryId; labelKey: string; Icon: IconComponent }[] = [
   { id: "appearance", labelKey: "pref.appearance", Icon: PrefAppearance },
   { id: "language", labelKey: "pref.language", Icon: PrefLanguage },
-  { id: "agents", labelKey: "pref.agents", Icon: PrefAgents },
 ];
 
 const LANGUAGE_BADGES: Record<Language, string> = {
@@ -76,14 +66,6 @@ function LanguageBadge({ code }: { code: Language }) {
   return (
     <span className="pref-lang-badge" lang={code} aria-hidden="true">
       {LANGUAGE_BADGES[code]}
-    </span>
-  );
-}
-
-function AgentBadge({ agent }: { agent: AgentName }) {
-  return (
-    <span className="pref-agent-badge" data-agent={agent} translate="no" aria-hidden="true">
-      {agent.slice(0, 2)}
     </span>
   );
 }
@@ -241,133 +223,11 @@ function LanguageSection({
   );
 }
 
-function roleLabel(t: TFunction, role: AgentRole | undefined): string {
-  return role ? t(`agent_role.${role}`) : t("pref.agent_roles.builtin");
-}
-
-function AgentRolesSection({
-  node,
-  onSave,
-  headingId,
-}: {
-  node?: DaemonNodeMonitorRecord | null;
-  onSave?: (overrides: AgentRoleMap) => Promise<void>;
-  headingId: string;
-}) {
-  const { t } = useTranslation();
-  const nodeId = node?.id ?? null;
-  const previousNodeIdRef = useRef<string | null>(null);
-  const [initialOverrides, setInitialOverrides] = useState<AgentRoleMap>(() => ({}));
-  const [overrides, setOverrides] = useState<AgentRoleMap>(() => ({}));
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!nodeId) {
-      previousNodeIdRef.current = null;
-      return;
-    }
-    if (previousNodeIdRef.current === nodeId) return;
-    previousNodeIdRef.current = nodeId;
-    const snapshot = normalizeAgentRoleMapPayload(node?.agentRoleOverrides ?? {});
-    setInitialOverrides(snapshot);
-    setOverrides(snapshot);
-    setError(null);
-    setSaving(false);
-  }, [node?.agentRoleOverrides, nodeId]);
-
-  function setRole(agent: AgentName, role: AgentRole | "") {
-    setOverrides((prev) => {
-      const next = { ...prev };
-      if (role) next[agent] = role;
-      else delete next[agent];
-      return next;
-    });
-  }
-
-  async function handleSave() {
-    if (!onSave) return;
-    setSaving(true);
-    setError(null);
-    const payload = normalizeAgentRoleMapPayload(overrides);
-    try {
-      await onSave(payload);
-      setInitialOverrides(payload);
-      setOverrides(payload);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  if (!node) {
-    return (
-      <>
-        <h4 id={headingId} className="pref-section-label">
-          {t("pref.agents")}
-        </h4>
-        <p className="pref-empty">{t("pref.agent_roles.no_node")}</p>
-      </>
-    );
-  }
-
-  const defaults = node.agentRoleDefaults ?? {};
-  const dirty = !agentRoleMapsEqual(overrides, initialOverrides);
-
-  return (
-    <>
-      <h4 id={headingId} className="pref-section-label">
-        {t("pref.agents")}
-      </h4>
-      <p className="pref-section-note">{t("pref.agent_roles.help")}</p>
-      <div className="pref-option-list">
-        {AGENT_NAMES.map((agent) => (
-          <label key={agent} className="pref-agent-row">
-            <AgentBadge agent={agent} />
-            <span className="pref-option-copy">
-              <span className="pref-option-label" translate="no">{agent}</span>
-              <span className="pref-option-sub">
-                {t("pref.agent_roles.system_default", { role: roleLabel(t, defaults[agent]) })}
-              </span>
-            </span>
-            <select
-              className="pref-agent-select"
-              value={overrides[agent] ?? ""}
-              onChange={(event) => setRole(agent, event.target.value as AgentRole | "")}
-              disabled={saving || !onSave}
-              aria-label={t("pref.agent_roles.override_for", { agent })}
-            >
-              <option value="">{t("pref.agent_roles.use_system_default")}</option>
-              {AGENT_ROLE_VALUES.map((role) => (
-                <option key={role} value={role}>{t(`agent_role.${role}`)}</option>
-              ))}
-            </select>
-          </label>
-        ))}
-      </div>
-      <div className="pref-actions">
-        <button
-          type="button"
-          className="pref-save"
-          onClick={() => void handleSave()}
-          disabled={saving || !dirty || !onSave}
-        >
-          {saving ? t("pref.saving") : t("pref.save")}
-        </button>
-        {error ? <p className="pref-error">{t("pref.action_failed", { message: error })}</p> : null}
-      </div>
-    </>
-  );
-}
-
 export interface PreferencesPanelProps {
   theme: Theme;
   onThemeChange: (theme: Theme) => void;
   language: Language;
   onLanguageChange: (language: Language) => void;
-  agentNode?: DaemonNodeMonitorRecord | null;
-  onAgentRoleOverridesChange?: (overrides: AgentRoleMap) => Promise<void>;
 }
 
 const CATEGORY_IDS: CategoryId[] = CATEGORIES.map((c) => c.id);
@@ -398,8 +258,6 @@ export function PreferencesPanel({
   onThemeChange,
   language,
   onLanguageChange,
-  agentNode,
-  onAgentRoleOverridesChange,
 }: PreferencesPanelProps) {
   const { t } = useTranslation();
   const [active, setActive] = useState<CategoryId>("appearance");
@@ -463,20 +321,6 @@ export function PreferencesPanel({
               language={language}
               onLanguageChange={onLanguageChange}
               headingId="pref-section-language"
-            />
-          )}
-        </div>
-        <div
-          role="tabpanel"
-          id="pref-panel-agents"
-          aria-labelledby="pref-tab-agents"
-          hidden={active !== "agents"}
-        >
-          {active === "agents" && (
-            <AgentRolesSection
-              node={agentNode}
-              onSave={onAgentRoleOverridesChange}
-              headingId="pref-section-agents"
             />
           )}
         </div>

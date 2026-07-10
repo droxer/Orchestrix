@@ -31,6 +31,7 @@ export function actionPrompt(state: AgentState): string {
 
 function promptPreludes(state: AgentState): string[] {
   const preludes: string[] = [];
+  if (state.agent_instructions) preludes.push(`[Agent instructions]\n${state.agent_instructions}`);
   if (state.prior_conversation) preludes.push(state.prior_conversation);
   if (state.prior_agent_bridge) preludes.push(state.prior_agent_bridge);
   if (state.prior_handoff_note) preludes.push(state.prior_handoff_note);

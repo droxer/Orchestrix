@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { resolve } from "node:path";
 import type { DaemonLaunchRequest, DaemonLauncher, ManagedDaemon, SupervisorLogger } from "./types.js";
 
 export interface LocalDaemonLauncherOptions {
@@ -19,7 +19,7 @@ export interface CommandTemplateLauncherOptions {
 }
 
 export function workspaceForEmployee(workspaceRoot: string, employeeId: string): string {
-  return join(workspaceRoot, safePathSegment(employeeId));
+  return resolve(workspaceRoot, safePathSegment(employeeId));
 }
 
 export class LocalDaemonLauncher implements DaemonLauncher {

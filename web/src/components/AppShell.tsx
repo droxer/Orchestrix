@@ -7,14 +7,14 @@ import { PreferencesDialog } from "./PreferencesDialog";
 import type { Theme, Language } from "./PreferencesPanel";
 import { SideNav } from "./SideNav";
 import type { AppRoute, MobileView } from "@/lib/viewTypes";
-import type { AgentName, CurrentUser, DaemonNodeMonitorRecord } from "@/types";
-import type { AgentRoleMap } from "@/lib/manageAgents";
+import type { CurrentUser } from "@/types";
 import { useRelayStore } from "@/lib/store";
 
 const WORK_ROUTE_LABEL_KEYS: Record<Exclude<AppRoute, "main">, string> = {
   workspace: "nav.workspace",
   backlog: "nav.backlog",
   routine: "nav.routine",
+  agents: "nav.agents",
   channels: "nav.channels",
   admin: "nav.admin",
 };
@@ -38,8 +38,6 @@ type AppShellProps = {
   onThemeChange: (theme: Theme) => void;
   language: Language;
   onLanguageChange: (language: Language) => void;
-  selectedNode: DaemonNodeMonitorRecord | undefined;
-  onAgentRoleOverridesChange: (overrides: AgentRoleMap) => Promise<void>;
 };
 
 export function AppShell({
@@ -61,8 +59,6 @@ export function AppShell({
   onThemeChange,
   language,
   onLanguageChange,
-  selectedNode,
-  onAgentRoleOverridesChange,
 }: AppShellProps) {
   const { t } = useTranslation();
   const adminView = useRelayStore((state) => state.adminView);
@@ -133,8 +129,6 @@ export function AppShell({
           onThemeChange,
           language,
           onLanguageChange,
-          agentNode: selectedNode,
-          onAgentRoleOverridesChange,
         }}
       />
     </main>

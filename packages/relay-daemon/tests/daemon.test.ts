@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync, symlinkSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test, { type TestContext } from "node:test";
 
 import {
@@ -16,6 +19,7 @@ import {
   type DaemonLogger,
 } from "../src/index.js";
 import { acquireBoxliteHomeLock } from "../src/box.js";
+import { isMainModule } from "../src/cli.js";
 import type { DaemonNodeCommand, DaemonNodeEvent, DaemonNodeRegistration, DaemonNodeRunCommand, StreamExecResult } from "relay-core";
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -84,6 +88,18 @@ function runCommand(id = "cmd_1"): DaemonNodeRunCommand {
 function isInventoryProbe(args: string[] | undefined): boolean {
   return Boolean(args?.[1]?.includes("printf 'SKILL"));
 }
+
+test("relay daemon recognizes an npm-style symlink as its CLI entrypoint", () => {
+  const root = mkdtempSync(join(tmpdir(), "relay-daemon-cli-"));
+  try {
+    const cliPath = new URL("../src/cli.js", import.meta.url);
+    const binPath = join(root, "relay-daemon");
+    symlinkSync(cliPath, binPath);
+    assert.equal(isMainModule(cliPath.href, binPath), true);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
 test("relay daemon defaults to BoxLite sandbox mode unless none is explicit", () => {
   assert.equal(resolveSandboxMode(undefined), "boxlite");
@@ -472,6 +488,7 @@ test("relay daemon advertises only agents with passing capability preflight", as
     sandboxId: "sbx_test",
     employeeId: "alice",
     workspacePath: process.cwd(),
+    workspaceId: "repo:relay",
     token: "node_token",
     pollIntervalMs: 5,
     shutdownGraceMs: 50,
@@ -502,6 +519,7 @@ test("relay daemon advertises only agents with passing capability preflight", as
   assert.equal(registrations[0].supportedAgents.includes("codex"), true);
   assert.equal(registrations[0].supportedAgents.includes("kimi"), false);
   assert.equal(registrations[0].sandboxMode, "boxlite");
+  assert.equal(registrations[0].workspaceId, "repo:relay");
   assert.equal(registrations[0].agentHealth?.kimi?.status, "failed");
   assert.match(registrations[0].agentHealth?.kimi?.detail ?? "", /not logged in/);
 });

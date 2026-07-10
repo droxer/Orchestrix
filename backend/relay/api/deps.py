@@ -17,6 +17,9 @@ class AppContext:
     registry: DaemonNodeRegistry
     backend: ServerDaemonNodeBackend
     auth_store: Any
+    managed_node_store: Any
+    employee_agent_store: Any
+    agent_placement_store: Any
 
 
 def app_context(request: Request) -> AppContext:
@@ -28,6 +31,9 @@ def app_context(request: Request) -> AppContext:
         registry=request.app.state.registry,
         backend=request.app.state.backend,
         auth_store=request.app.state.auth_store,
+        managed_node_store=request.app.state.managed_node_store,
+        employee_agent_store=request.app.state.employee_agent_store,
+        agent_placement_store=request.app.state.agent_placement_store,
     )
 
 

@@ -2,7 +2,17 @@
 
 ## Status
 
-Draft for review.
+Accepted for incremental implementation. The local-first vertical slice is
+implemented: managed-node intent and attempt persistence, single-use enrollment
+grants, managed daemon linkage, control-plane APIs, daemon enrollment, and the
+`local-process` reconciler/provider. PostgreSQL persistence for managed-node
+resources, database-backed reconcile leases, remote providers, and the final
+control-panel workflow remain rollout work described below.
+
+The employee-facing ownership and dispatch model is being reconsidered by the
+proposed [Agent-First Runtime Design](agent-first-runtime-design.md). Under that
+design, managed nodes remain infrastructure desired state while employee-owned
+logical agents are connected to runtime nodes through placements.
 
 ## Summary
 

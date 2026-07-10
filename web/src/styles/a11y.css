@@ -23,6 +23,30 @@
   box-shadow: var(--ring-focus);
 }
 
+/* Large operational collections stay cheap without changing DOM semantics or
+   keyboard order. The browser skips paint/layout for off-screen records and
+   reserves a representative row/card height to prevent scroll jumps. */
+.conversation-row,
+.workspace-pick-list > li,
+.workspace-file-pick,
+.backlog-row,
+.backlog-task,
+.routine-card,
+.adm-emp-row,
+.adm-node-card,
+.content-auto-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 96px;
+}
+
+.backlog-task,
+.routine-card,
+.agents-card,
+.adm-node-card,
+.content-auto-card {
+  contain-intrinsic-size: auto 220px;
+}
+
 /* Reduced motion — system-wide safety net. Individual surfaces
    (empty-state, login) already neutralize their entrances, but several
    keyframe animations (modal/drawer rise, sidenav + tooltip reveals, the

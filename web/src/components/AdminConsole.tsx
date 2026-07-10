@@ -12,11 +12,13 @@ import { deleteControlPanelDaemonNode, deleteControlPanelEmployee, getAuthStatus
 import type {
   AssignControlPanelDaemonNodeResponse,
   ControlPanelDaemonNodeRecord,
+  CreateManagedNodeResponse,
   CreateControlPanelDaemonNodeResponse,
   CreateControlPanelEmployeeResponse,
   CurrentUser,
   EmployeeRecord,
 } from "../types";
+import { AgentProfileDrawer } from "./admin/AgentProfileDrawer";
 import { AssignNodeDrawer } from "./admin/AssignNodeDrawer";
 import { AttentionRail } from "./admin/AttentionRail";
 import { BootstrapScreen, LoginScreen } from "./admin/AuthScreens";
@@ -26,10 +28,12 @@ import { ManageAgentsDrawer } from "./admin/ManageAgentsDrawer";
 import { PageHeader } from "./PageHeader";
 import { AdminViewToggle, type AdminView } from "./admin/AdminViewToggle";
 import { AddEmployeeDrawer } from "./admin/AddEmployeeDrawer";
-import { AddNodeDrawer } from "./admin/AddNodeDrawer";
+import { AddNodeDrawer, type AddNodeDrawerSuccess } from "./admin/AddNodeDrawer";
 import { PeopleView } from "./admin/PeopleView";
+import { AgentsView } from "./admin/AgentsView";
 import { PulseStrip } from "./admin/PulseStrip";
 import { useAdminFleet } from "../hooks/useAdminFleet";
+import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { useRelayStore } from "../lib/store";
 import {
   persistStoredNodeTokenMap,
@@ -40,6 +44,11 @@ import {
 } from "./admin/helpers";
 
 type AuthScreen = "login" | "bootstrap";
+const ADMIN_VIEWS: AdminView[] = ["dashboard", "employees", "agents", "fleet"];
+
+function parseAdminView(value: string | null): AdminView {
+  return ADMIN_VIEWS.includes(value as AdminView) ? value as AdminView : "dashboard";
+}
 
 export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null }) {
   const { t } = useTranslation();
@@ -58,13 +67,14 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
 
   const { nodes, employees, lastUpdated, pollError, isFetching, mergeFleet, refetch } = useAdminFleet(Boolean(admin));
 
-  const [view, setView] = useState<AdminView>("dashboard");
+  const [view, setView] = useUrlSearchState("adminView", "dashboard" as AdminView, parseAdminView, (value) => value);
   const setAdminView = useRelayStore((state) => state.setAdminView);
   const [addEmployeeOpen, setAddEmployeeOpen] = useState(false);
   const [addNodeOpen, setAddNodeOpen] = useState(false);
   const [assignTarget, setAssignTarget] = useState<{ employeeId?: string } | null>(null);
   const [credentialsNodeId, setCredentialsNodeId] = useState<string | null>(null);
   const [manageAgentsNodeId, setManageAgentsNodeId] = useState<string | null>(null);
+  const [agentProfileId, setAgentProfileId] = useState<string | null>(null);
   const [highlightedEmployeeId, setHighlightedEmployeeId] = useState<string | null>(null);
   const [storedTokens, setStoredTokens] = useState<StoredNodeTokenMap>(() => readStoredNodeTokens());
 
@@ -214,7 +224,7 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
     window.setTimeout(() => setHighlightedEmployeeId((prev) => (prev === result.employee.id ? null : prev)), 2400);
 
     setAddEmployeeOpen(false);
-    setView("people");
+    setView("employees");
     // Only surface the credentials drawer when a sandbox was bound — it is
     // keyed by node id and has nothing to show for an unassigned employee.
     if (node) setCredentialsNodeId(node.id);
@@ -228,10 +238,22 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
     setHighlightedEmployeeId(result.employee.id);
     window.setTimeout(() => setHighlightedEmployeeId((prev) => (prev === result.employee.id ? null : prev)), 2400);
     setAssignTarget(null);
-    setView("people");
+    setView("employees");
   }
 
-  function handleCreateNodeSuccess(result: CreateControlPanelDaemonNodeResponse) {
+  function handleCreateManagedNodeSuccess(result: CreateManagedNodeResponse) {
+    const { node } = result;
+    setHighlightedEmployeeId(node.employeeId ?? null);
+    window.setTimeout(() => setHighlightedEmployeeId((prev) => (prev === node.employeeId ? null : prev)), 2400);
+    setAddNodeOpen(false);
+    setAssignTarget(null);
+    setView("fleet");
+    // Managed provisioning is asynchronous. The supervisor enrolls the daemon,
+    // and the existing fleet poll displays it once registration succeeds.
+    void refetch();
+  }
+
+  function handleCreateManualNodeSuccess(result: CreateControlPanelDaemonNodeResponse) {
     const { node } = result;
     mergeFleet((prev) => ({
       ...prev,
@@ -252,6 +274,14 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
     setAssignTarget(null);
     setView("fleet");
     setCredentialsNodeId(node.id);
+  }
+
+  function handleAddNodeSuccess(outcome: AddNodeDrawerSuccess) {
+    if (outcome.kind === "managed") {
+      handleCreateManagedNodeSuccess(outcome.result);
+    } else {
+      handleCreateManualNodeSuccess(outcome.result);
+    }
   }
 
   if (!authChecked) {
@@ -333,7 +363,7 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
                 </span>
               ) : null}
             </span>
-            {view !== "fleet" ? (
+            {view === "employees" ? (
               <Button
                 type="button"
                 className="adm-command-onboard"
@@ -344,10 +374,9 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
                 <span className="adm-command-onboard-label">{t("admin.v2.add_employee_cta")}</span>
               </Button>
             ) : null}
-            {view !== "people" ? (
+            {view === "fleet" ? (
               <Button
                 type="button"
-                variant={view === "fleet" ? "default" : "outline"}
                 className="adm-command-onboard"
                 onClick={() => setAddNodeOpen(true)}
                 aria-label={t("admin.v2.add_node_cta")}
@@ -374,17 +403,17 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
             <div key={view} className="adm-view-stage">
               {view === "dashboard" ? (
                 <DashboardView nodes={nodes} employees={employees} metrics={metrics} />
-              ) : view === "people" ? (
+              ) : view === "employees" ? (
                 <PeopleView
                   employees={employees}
                   nodes={nodes}
-                  onRevealCredentials={handleRevealCredentials}
                   onAddEmployee={() => setAddEmployeeOpen(true)}
-                  onRequestAssign={(employeeId) => setAssignTarget({ employeeId })}
                   onDeleteEmployee={handleDeleteEmployee}
-                  unassignedNodeCount={unassignedNodes.length}
                   highlightedEmployeeId={highlightedEmployeeId}
+                  onSelectAgent={setAgentProfileId}
                 />
+              ) : view === "agents" ? (
+                <AgentsView nodes={nodes} employees={employees} onSelectAgent={setAgentProfileId} />
               ) : (
                 <FleetView
                   nodes={nodes}
@@ -412,7 +441,7 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
         open={addNodeOpen}
         onClose={() => setAddNodeOpen(false)}
         employees={employees}
-        onSuccess={handleCreateNodeSuccess}
+        onSuccess={handleAddNodeSuccess}
       />
       <AssignNodeDrawer
         open={assignTarget !== null}
@@ -421,7 +450,7 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
         unassignedNodes={unassignedNodes}
         defaultEmployeeId={assignTarget?.employeeId}
         onAssignSuccess={handleAssignSuccess}
-        onCreateNodeSuccess={handleCreateNodeSuccess}
+        onCreateNodeSuccess={handleAddNodeSuccess}
       />
       <CredentialsDrawer
         open={credentialsNodeId !== null}
@@ -436,6 +465,14 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
         onClose={() => setManageAgentsNodeId(null)}
         node={manageAgentsNode}
         onUpdated={handleNodeUpdated}
+      />
+      <AgentProfileDrawer
+        open={agentProfileId !== null}
+        onClose={() => setAgentProfileId(null)}
+        agentId={agentProfileId}
+        employees={employees}
+        nodes={nodes}
+        onAgentDeleted={() => setAgentProfileId(null)}
       />
     </section>
   );

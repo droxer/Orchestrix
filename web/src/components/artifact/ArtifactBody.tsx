@@ -80,7 +80,7 @@ function WorkspaceFileBody({ artifact, sessionId }: { artifact: RelayArtifact; s
   if (mode === "image") {
     return (
       <div className="artifact-viewer-body">
-        <img className="artifact-image-preview" src={rawHref} alt={artifact.title} loading="lazy" decoding="async" />
+        <img className="artifact-image-preview" src={rawHref} alt={artifact.title} width={1600} height={900} loading="lazy" decoding="async" />
       </div>
     );
   }

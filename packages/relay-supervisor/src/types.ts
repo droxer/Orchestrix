@@ -17,6 +17,73 @@ export interface SupervisorBackend {
   provisionDaemonNode(input: { employeeId: string; workspacePath?: string }): Promise<ProvisionedDaemonNode>;
 }
 
+export type ManagedNodeDesiredState = "running" | "stopped" | "deleted";
+export type ManagedNodePhase = "requested" | "allocating" | "bootstrapping" | "registering" | "ready" | "draining" | "stopped" | "deleting";
+
+export interface ManagedNodeRecord {
+  id: string;
+  displayName: string;
+  employeeId?: string;
+  assignmentMode: "dedicated" | "pooled" | "shared";
+  provider: string;
+  profile: string;
+  sandboxMode: "boxlite" | "none";
+  workspacePolicy: Record<string, unknown>;
+  desiredState: ManagedNodeDesiredState;
+  generation: number;
+  phase: ManagedNodePhase;
+  activeAttemptId?: string;
+  activeDaemonNodeId?: string;
+  conditions: Array<Record<string, unknown>>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProvisioningAttemptRecord {
+  id: string;
+  managedNodeId: string;
+  generation: number;
+  attemptNumber: number;
+  status: string;
+  providerInstanceId?: string;
+  providerOperationId?: string;
+  errorCode?: string;
+  errorMessage?: string;
+  retryAt?: string;
+  startedAt: string;
+  updatedAt: string;
+}
+
+export interface ManagedNodeBackend {
+  listManagedNodes(): Promise<ManagedNodeRecord[]>;
+  listProvisioningAttempts(nodeId: string): Promise<ProvisioningAttemptRecord[]>;
+  createProvisioningAttempt(nodeId: string): Promise<{ attempt: ProvisioningAttemptRecord; enrollmentCredential: string }>;
+  updateProvisioningAttempt(nodeId: string, attemptId: string, patch: Record<string, unknown>): Promise<ProvisioningAttemptRecord>;
+  updateManagedNode(nodeId: string, patch: Record<string, unknown>): Promise<ManagedNodeRecord>;
+}
+
+export interface EnsureManagedNodeInput {
+  node: ManagedNodeRecord;
+  attempt: ProvisioningAttemptRecord;
+  backendUrl: string;
+  enrollmentCredential: string;
+  workspacePath: string;
+  workspaceId: string;
+}
+
+export interface ProviderInstance {
+  id: string;
+  child?: ChildProcess;
+}
+
+export interface ManagedNodeProvider {
+  readonly name: string;
+  ensure(input: EnsureManagedNodeInput): Promise<ProviderInstance>;
+  inspect(instanceId: string): Promise<"running" | "stopped" | "unknown">;
+  stop(instanceId: string): Promise<void>;
+  delete(instanceId: string): Promise<void>;
+}
+
 export interface ProvisionedDaemonNode {
   node: ControlPanelDaemonNodeRecord;
   nodeToken?: string;

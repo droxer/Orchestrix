@@ -100,6 +100,7 @@ export interface WorkspaceBriefTask {
   ownerEmployeeId?: string;
   assigneeEmployeeId?: string;
   assignedAgent?: AgentName;
+  assignedAgentId?: string;
   dueDate?: string;
   isRoutine: boolean;
   routineType?: TaskRoutineType;
@@ -234,10 +235,105 @@ export interface CreateControlPanelDaemonNodeResponse {
   daemonEnv: Record<string, string>;
 }
 
+export type ManagedNodePhase =
+  | "requested"
+  | "allocating"
+  | "bootstrapping"
+  | "registering"
+  | "ready"
+  | "draining"
+  | "stopped"
+  | "deleting";
+
+export interface ManagedNodeRecord {
+  id: string;
+  displayName: string;
+  employeeId?: string;
+  assignmentMode: "dedicated" | "pooled" | "shared";
+  provider: string;
+  profile: string;
+  sandboxMode: "boxlite" | "none";
+  workspacePolicy: Record<string, unknown>;
+  desiredState: "running" | "stopped" | "deleted";
+  generation: number;
+  phase: ManagedNodePhase;
+  activeAttemptId?: string;
+  activeDaemonNodeId?: string;
+  conditions: Array<Record<string, unknown>>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateManagedNodeInput {
+  employeeId?: string;
+  sandboxMode: "boxlite" | "none";
+}
+
+export interface CreateManagedNodeResponse {
+  node: ManagedNodeRecord;
+}
+
+export type LogicalAgentAvailability = "ready" | "busy" | "pending" | "offline";
+
+export interface AgentPlacement {
+  id: string;
+  agentId: string;
+  employeeId: string;
+  daemonNodeId: string;
+  executorKind: AgentName;
+  desiredState: "active" | "draining" | "removed";
+  status: "pending" | "ready" | "busy" | "offline" | "incompatible" | "failed";
+  priority: number;
+  agentVersion: number;
+  workspacePolicy: Record<string, unknown>;
+  conditions: Array<{ reason: string; message: string }>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EmployeeAgent {
+  id: string;
+  employeeId: string;
+  displayName: string;
+  executorKind: AgentName;
+  instructions?: string;
+  skillPolicy: Record<string, unknown>;
+  toolPolicy: Record<string, unknown>;
+  modelPolicy: Record<string, unknown>;
+  enabled: boolean;
+  version: number;
+  availability: LogicalAgentAvailability;
+  placements: AgentPlacement[];
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string;
+}
+
+export interface EmployeeAgentsResponse {
+  agents: EmployeeAgent[];
+}
+
+export interface AgentRunInput {
+  taskGoal: string;
+  assignments: Array<{
+    agentId: string;
+    mode: AgentTaskMode;
+    role?: AgentRole;
+  }>;
+  sessionId?: string;
+  userMessageId?: string;
+  decision?: {
+    kind: "rerun" | "handoff";
+    targetAgent: AgentName;
+    note?: string;
+  };
+}
+
 export interface RunInput {
   sandboxId: string;
   taskGoal: string;
   assignments: Array<{
+    agentId?: string;
     agent: AgentName;
     mode: AgentTaskMode;
     role?: AgentRole;
@@ -273,6 +369,7 @@ export interface TaskMutationInput {
   routineEnabled?: boolean;
   assigneeEmployeeId?: string;
   assignedAgent?: AgentName;
+  assignedAgentId?: string;
 }
 
 export interface CreateTaskInput extends TaskMutationInput {
@@ -307,6 +404,7 @@ export interface ChatIdentityLink {
   externalUserId: string;
   employeeId: string;
   displayName?: string | null;
+  defaultAgentId?: string | null;
   defaultSandboxId?: string | null;
   createdAt: string;
   updatedAt: string;

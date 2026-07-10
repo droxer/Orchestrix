@@ -26,24 +26,25 @@ const ACTIVITY_STYLE: Record<
   neutral: { className: "muted", dotClass: "status-dot status-dot-neutral" },
 };
 
-function relativeTime(iso?: string): string {
+function relativeTime(iso: string | undefined, locale: string): string {
   if (!iso) return "";
   const then = new Date(iso).getTime();
   if (!Number.isFinite(then)) return "";
   const diff = Math.max(0, Date.now() - then);
   const sec = Math.round(diff / 1000);
-  if (sec < 60) return `${sec}s`;
+  const formatter = new Intl.RelativeTimeFormat(locale, { numeric: "auto", style: "narrow" });
+  if (sec < 60) return formatter.format(-sec, "second");
   const min = Math.round(sec / 60);
-  if (min < 60) return `${min}m`;
+  if (min < 60) return formatter.format(-min, "minute");
   const hr = Math.round(min / 60);
-  if (hr < 24) return `${hr}h`;
+  if (hr < 24) return formatter.format(-hr, "hour");
   const day = Math.round(hr / 24);
-  if (day < 7) return `${day}d`;
+  if (day < 7) return formatter.format(-day, "day");
   const wk = Math.round(day / 7);
-  if (wk < 5) return `${wk}w`;
+  if (wk < 5) return formatter.format(-wk, "week");
   const mo = Math.round(day / 30);
-  if (mo < 12) return `${mo}mo`;
-  return `${Math.round(day / 365)}y`;
+  if (mo < 12) return formatter.format(-mo, "month");
+  return formatter.format(-Math.round(day / 365), "year");
 }
 
 type ConversationRowProps = {
@@ -55,11 +56,11 @@ type ConversationRowProps = {
 };
 
 export function ConversationRow({ item, selected, onSelect, onRename, onClose }: ConversationRowProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { confirm } = useDialogs();
   const { session, runningAgent } = item;
   const label = conversationLabel(session);
-  const stamp = relativeTime(session.updatedAt);
+  const stamp = relativeTime(session.updatedAt, i18n.language);
   const agents = sessionAgents(session);
   const activity = conversationActivity(session.status, runningAgent);
   const activityStyle = activity ? ACTIVITY_STYLE[activity.kind] : null;

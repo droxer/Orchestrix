@@ -3,6 +3,8 @@ import { pathToFileURL } from "node:url";
 import { loadPackageEnv } from "relay-core";
 import { SupervisorBackendClient } from "./backend-client.js";
 import { CommandTemplateLauncher, LocalDaemonLauncher, workspaceForEmployee } from "./launchers.js";
+import { ManagedNodeReconciler } from "./managed-reconcile.js";
+import { LocalProcessProvider } from "./providers.js";
 import { RelaySupervisor } from "./reconcile.js";
 import type { DaemonLauncher, EmployeeRecord, SupervisorLogger } from "./types.js";
 
@@ -113,13 +115,21 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     backendUrl,
     adminToken: args.adminToken ?? process.env.RELAY_ADMIN_TOKEN,
   });
-  const launcher = buildLauncher(args, backendUrl, workspaceRoot);
-  const supervisor = new RelaySupervisor({
-    backend,
-    launcher,
-    workspacePathForEmployee: (employee: EmployeeRecord) => workspaceForEmployee(workspaceRoot, employee.id),
-    logger: consoleLogger,
-  });
+  const useLegacyEmployeeScan = (args.provider ?? process.env.RELAY_SUPERVISOR_PROVIDER) === "command";
+  const supervisor = useLegacyEmployeeScan
+    ? new RelaySupervisor({
+        backend,
+        launcher: buildLauncher(args, backendUrl, workspaceRoot),
+        workspacePathForEmployee: (employee: EmployeeRecord) => workspaceForEmployee(workspaceRoot, employee.id),
+        logger: consoleLogger,
+      })
+    : new ManagedNodeReconciler({
+        backend,
+        providers: [new LocalProcessProvider({ logger: consoleLogger })],
+        backendUrl,
+        workspacePathForNode: (node) => workspaceForEmployee(workspaceRoot, node.employeeId ?? node.id),
+        logger: consoleLogger,
+      });
 
   const stop = async () => {
     await supervisor.stop();

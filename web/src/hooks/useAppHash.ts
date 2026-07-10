@@ -6,7 +6,6 @@ import type { AppRoute, MobileView } from "../lib/viewTypes";
 import {
   hrefForRoute as buildHrefForRoute,
   parseAppHash,
-  readInitialRoute,
   syncAppHashToUrl,
   type AppHashState,
 } from "../lib/appRoute";
@@ -29,10 +28,8 @@ export function useAppHash({
   onClearPendingMessage,
 }: UseAppHashOptions) {
   const skipInitialHashSyncRef = useRef(true);
-  const [route, setRoute] = useState<AppRoute>(() => readInitialRoute());
-  const [mobileView, setMobileView] = useState<MobileView>(() =>
-    typeof window !== "undefined" ? parseAppHash(window.location.hash).mobileView : "chat",
-  );
+  const [route, setRoute] = useState<AppRoute>("main");
+  const [mobileView, setMobileView] = useState<MobileView>("chat");
 
   const appHashSessionId = route === "main" && !composingNew
     ? activeSession?.id ?? selectedSessionId ?? activeSessionId

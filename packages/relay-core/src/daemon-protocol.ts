@@ -9,6 +9,10 @@ export interface SandboxRecord {
   employeeId?: string;
   workspacePath?: string;
   sandboxMode?: DaemonNodeSandboxMode;
+  managedNodeId?: string;
+  provisioningAttemptId?: string;
+  credentialVersion?: number;
+  retiredAt?: string;
   status: SandboxStatus;
   agents: Record<AgentName, "unknown" | "ready" | "failed">;
   agentDetails?: Partial<Record<AgentName, {
@@ -34,6 +38,7 @@ export interface SandboxRecord {
 }
 
 export interface SandboxRunAssignment {
+  agentId?: string;
   agent: AgentName;
   mode?: AgentTaskMode;
   role?: AgentRole;
@@ -44,6 +49,8 @@ export interface DaemonNodeActiveRun {
   sessionId: string;
   runId: string;
   agent: AgentName;
+  logicalAgentId?: string;
+  placementId?: string;
   mode: AgentTaskMode;
   taskGoal: string;
   workspacePath?: string;

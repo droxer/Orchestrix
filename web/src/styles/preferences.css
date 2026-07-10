@@ -212,8 +212,7 @@
 }
 
 /* Badge · label stack · trailing control — one rhythm across all tabs. */
-.pref-option-row,
-.pref-agent-row {
+.pref-option-row {
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -227,14 +226,10 @@
     border-color var(--duration-fast) var(--ease-standard),
     background var(--duration-fast) var(--ease-standard),
     box-shadow var(--duration-fast) var(--ease-standard);
-}
-
-.pref-option-row {
   cursor: pointer;
 }
 
-.pref-option-row:hover,
-.pref-agent-row:hover {
+.pref-option-row:hover {
   border-color: var(--color-muted-soft);
   background: var(--color-surface-soft);
 }
@@ -366,65 +361,10 @@
   color: var(--color-ink);
 }
 
-/* ── Agent rows ───────────────────────────────────────────────────────────── */
-
-.pref-agent-badge {
-  flex-shrink: 0;
-  width: 2.75rem;
-  height: 1.75rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-xs);
-  border: 1px solid var(--color-hairline);
-  background: var(--color-surface-soft);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  letter-spacing: var(--letter-caps);
-  color: var(--color-ink);
-  text-transform: lowercase;
-}
-
-.pref-agent-select {
-  flex-shrink: 0;
-  min-width: 8.5rem;
-  height: 2.25rem;
-  padding: 0 var(--space-sm);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-sm);
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font: var(--type-label-strong);
-  cursor: pointer;
-}
-
-.pref-agent-select:focus-visible {
-  outline: none;
-  border-color: var(--color-primary);
-  box-shadow: var(--ring-focus);
-}
-
-.pref-agent-select:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
 @media (max-width: 820px) {
   .pref-modal {
     max-height: 92dvh;
     border-radius: var(--radius-lg);
-  }
-
-  .pref-agent-row {
-    flex-wrap: wrap;
-  }
-
-  .pref-agent-select {
-    flex-basis: 100%;
-    width: 100%;
-    min-width: 0;
-    min-height: 44px;
   }
 
   .pref-option-row {

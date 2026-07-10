@@ -6,6 +6,17 @@ export type DaemonNodeSandboxMode = "none" | "boxlite";
 export type DaemonAgentAdapter = "cli" | "service";
 export type DaemonAgentHealthStatus = "ready" | "failed";
 
+/** Runtime capability advertised by a daemon. Logical employee agents are
+ * control-plane identities and are connected to these capabilities by placements. */
+export interface DaemonExecutorCapability {
+  executorKind: AgentName;
+  status: DaemonAgentHealthStatus;
+  adapter: DaemonAgentAdapter;
+  maxConcurrentRuns: number;
+  inventory?: DaemonAgentInventory;
+  configurationFingerprint?: string;
+}
+
 export interface DaemonAgentHealth {
   status: DaemonAgentHealthStatus;
   detail?: string;
@@ -67,9 +78,11 @@ export interface DaemonNodeRegistration {
   employeeId?: string;
   token: string;
   workspacePath?: string;
+  workspaceId?: string;
   sandboxMode?: DaemonNodeSandboxMode;
   protocolVersion: number;
   supportedAgents: AgentName[];
+  executorCapabilities?: DaemonExecutorCapability[];
   capabilities?: DaemonNodeCapability[];
   agentHealth?: Partial<Record<AgentName, DaemonAgentHealth>>;
   agentInventory?: Partial<Record<AgentName, DaemonAgentInventory>>;
@@ -88,6 +101,9 @@ export interface DaemonNodeRunCommand {
   runId: string;
   taskGoal: string;
   agent: AgentName;
+  logicalAgentId?: string;
+  placementId?: string;
+  agentVersion?: number;
   mode: AgentTaskMode;
   workspacePath?: string;
   state?: AgentState;

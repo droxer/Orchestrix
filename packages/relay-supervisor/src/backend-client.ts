@@ -1,5 +1,5 @@
 import type { ControlPanelDaemonNodeRecord } from "relay-core";
-import type { EmployeeRecord, ProvisionedDaemonNode, SupervisorBackend } from "./types.js";
+import type { EmployeeRecord, ManagedNodeBackend, ManagedNodeRecord, ProvisionedDaemonNode, ProvisioningAttemptRecord, SupervisorBackend } from "./types.js";
 
 export interface SupervisorBackendClientOptions {
   backendUrl: string;
@@ -7,7 +7,7 @@ export interface SupervisorBackendClientOptions {
   fetchFn?: typeof fetch;
 }
 
-export class SupervisorBackendClient implements SupervisorBackend {
+export class SupervisorBackendClient implements SupervisorBackend, ManagedNodeBackend {
   private readonly backendUrl: string;
   private readonly adminToken?: string;
   private readonly fetchFn: typeof fetch;
@@ -31,6 +31,34 @@ export class SupervisorBackendClient implements SupervisorBackend {
       method: "POST",
       body: JSON.stringify(input),
     });
+  }
+
+  async listManagedNodes(): Promise<ManagedNodeRecord[]> {
+    return (await this.request<{ nodes: ManagedNodeRecord[] }>("/cp/managed-nodes")).nodes;
+  }
+
+  async createProvisioningAttempt(nodeId: string): Promise<{ attempt: ProvisioningAttemptRecord; enrollmentCredential: string }> {
+    return await this.request(`/cp/managed-nodes/${encodeURIComponent(nodeId)}/attempts`, { method: "POST" });
+  }
+
+  async listProvisioningAttempts(nodeId: string): Promise<ProvisioningAttemptRecord[]> {
+    return (await this.request<{ attempts: ProvisioningAttemptRecord[] }>(
+      `/cp/managed-nodes/${encodeURIComponent(nodeId)}/attempts`,
+    )).attempts;
+  }
+
+  async updateManagedNode(nodeId: string, patch: Record<string, unknown>): Promise<ManagedNodeRecord> {
+    return (await this.request<{ node: ManagedNodeRecord }>(`/cp/managed-nodes/${encodeURIComponent(nodeId)}`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    })).node;
+  }
+
+  async updateProvisioningAttempt(nodeId: string, attemptId: string, patch: Record<string, unknown>): Promise<ProvisioningAttemptRecord> {
+    return (await this.request<{ attempt: ProvisioningAttemptRecord }>(
+      `/cp/managed-nodes/${encodeURIComponent(nodeId)}/attempts/${encodeURIComponent(attemptId)}`,
+      { method: "PATCH", body: JSON.stringify(patch) },
+    )).attempt;
   }
 
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {

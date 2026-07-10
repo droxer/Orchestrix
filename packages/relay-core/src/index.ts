@@ -84,6 +84,7 @@ export {
   type DaemonAgentAdapter,
   type DaemonAgentHealth,
   type DaemonAgentHealthStatus,
+  type DaemonExecutorCapability,
   type DaemonAgentInventory,
   type DaemonAgentMcpServer,
   type DaemonAgentSkill,

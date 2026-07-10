@@ -173,6 +173,8 @@ class UserAuthStore:
         username = username.strip().lower()
         for user in self._read_users():
             if user["username"] == username and verify_password(password, user["passwordHash"]):
+                if user.get("employeeId") in self.deleted_employee_ids():
+                    return None
                 return user
         return None
 
@@ -215,7 +217,10 @@ class UserAuthStore:
         return None
 
     def get_user_by_id(self, user_id: str) -> dict[str, Any] | None:
-        return next((user for user in self._read_users() if user["id"] == user_id), None)
+        user = next((user for user in self._read_users() if user["id"] == user_id), None)
+        if user and user.get("employeeId") in self.deleted_employee_ids():
+            return None
+        return user
 
     def delete_session(self, token: str) -> bool:
         sessions = self._read_sessions()
@@ -438,9 +443,20 @@ class DatabaseUserAuthStore:
         username = username.strip().lower()
         with self.engine.begin() as conn:
             row = conn.execute(select(self.users).where(self.users.c.username == username)).mappings().first()
-        user = row_to_database_user(row) if row else None
-        if user and verify_password(password, user["passwordHash"]):
-            return user
+            user = row_to_database_user(row) if row else None
+            if user and verify_password(password, user["passwordHash"]):
+                employee_id = user.get("employeeId")
+                employee = (
+                    conn.execute(
+                        select(self.employees).where(
+                            self.employees.c.public_id == employee_id
+                        )
+                    ).mappings().first()
+                    if employee_id
+                    else None
+                )
+                if not employee_id or (employee and not employee.get("deleted_at")):
+                    return user
         return None
 
     def bootstrap_with_token(self, token: str, username: str, password: str) -> dict[str, Any]:
@@ -485,7 +501,15 @@ class DatabaseUserAuthStore:
     def get_user_by_id(self, user_id: str) -> dict[str, Any] | None:
         with self.engine.begin() as conn:
             row = conn.execute(select(self.users).where(self.users.c.public_id == user_id)).mappings().first()
-        return row_to_database_user(row) if row else None
+            user = row_to_database_user(row) if row else None
+            if not user or not user.get("employeeId"):
+                return user
+            employee = conn.execute(
+                select(self.employees).where(
+                    self.employees.c.public_id == user["employeeId"]
+                )
+            ).mappings().first()
+            return user if employee and not employee.get("deleted_at") else None
 
     def delete_session(self, token: str) -> bool:
         with self.engine.begin() as conn:

@@ -44,6 +44,62 @@ def _create_user(client: TestClient, username: str, *, employee_id: str) -> None
     assert response.status_code == 201
 
 
+def test_managed_node_provisioning_enrolls_runtime_with_single_use_grant(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _login_admin(client)
+
+        created = client.post("/cp/managed-nodes", json={
+            "employeeId": "alice",
+            "provider": "local-process",
+            "sandboxMode": "none",
+        })
+        assert created.status_code == 202
+        managed_node = created.json()["node"]
+
+        attempt_response = client.post(f"/cp/managed-nodes/{managed_node['id']}/attempts")
+        assert attempt_response.status_code == 201
+        credential = attempt_response.json()["enrollmentCredential"]
+
+        enrollment = client.post(
+            "/daemon-enroll",
+            json={"workspacePath": "/workspace/alice"},
+            headers={"Authorization": f"Enrollment {credential}"},
+        )
+        assert enrollment.status_code == 201
+        runtime = enrollment.json()
+        assert runtime["sandboxMode"] == "none"
+
+        duplicate = client.post(
+            "/daemon-enroll",
+            json={"workspacePath": "/workspace/alice"},
+            headers={"Authorization": f"Enrollment {credential}"},
+        )
+        assert duplicate.status_code == 401
+
+        registered = client.post("/daemon-nodes/register", json={
+            "sandboxId": runtime["sandboxId"],
+            "token": runtime["token"],
+            "workspacePath": "/workspace/alice",
+            "sandboxMode": "none",
+            "protocolVersion": 1,
+            "supportedAgents": ["codex"],
+            "status": "ready",
+        })
+        assert registered.status_code == 200
+        assert registered.json()["managedNodeId"] == managed_node["id"]
+
+        managed = client.get(f"/cp/managed-nodes/{managed_node['id']}")
+        assert managed.status_code == 200
+        assert managed.json()["node"]["phase"] == "ready"
+        control_panel_node = client.get("/cp/daemon-nodes").json()["nodes"][0]
+        assert control_panel_node["managedNodeId"] == managed_node["id"]
+        assert "nodeToken" not in control_panel_node
+
+
 def test_fastapi_daemon_routes_register_and_poll(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
@@ -217,7 +273,8 @@ def test_output_event_does_not_replace_explicit_lease_heartbeat(monkeypatch) -> 
 def test_daemon_delivery_output_reaches_the_canonical_session_stream(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
-        client = TestClient(create_app(root))
+        app = create_app(root)
+        client = TestClient(app)
         _bootstrap_admin(client)
         _login_admin(client)
         registered = client.post("/daemon-nodes/register", json={
@@ -1152,7 +1209,8 @@ def test_admin_can_start_existing_employee_session_on_employee_daemon_node(monke
 def test_admin_can_soft_delete_employee_and_unassign_nodes(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
-        client = TestClient(create_app(root))
+        app = create_app(root)
+        client = TestClient(app)
         _bootstrap_admin(client)
         _login_admin(client)
 
@@ -1169,6 +1227,26 @@ def test_admin_can_soft_delete_employee_and_unassign_nodes(monkeypatch) -> None:
         })
         assert provision.status_code == 201
         node_id = provision.json()["node"]["id"]
+        agent = client.post(
+            "/cp/employees/alice/agents",
+            json={"displayName": "Builder", "executorKind": "codex"},
+        ).json()["agent"]
+        placement = client.post(
+            f"/cp/agents/{agent['id']}/placements",
+            json={"daemonNodeId": node_id},
+        ).json()["placement"]
+        managed_node = client.post(
+            "/cp/managed-nodes",
+            json={
+                "employeeId": "alice",
+                "assignmentMode": "dedicated",
+                "sandboxMode": "boxlite",
+            },
+        ).json()["node"]
+        employee_client = TestClient(app)
+        assert employee_client.post(
+            "/auth/login", json={"username": "alice", "password": "AlicePass123!"}
+        ).status_code == 200
 
         listing = client.get("/cp/employees")
         assert listing.status_code == 200
@@ -1179,6 +1257,20 @@ def test_admin_can_soft_delete_employee_and_unassign_nodes(monkeypatch) -> None:
         body = delete.json()
         assert body["employee"]["id"] == "alice"
         assert node_id in body["unassignedNodes"]
+        assert body["deletedAgents"] == [agent["id"]]
+        assert body["removedPlacements"] == [placement["id"]]
+        assert body["deletedManagedNodes"] == [managed_node["id"]]
+        assert app.state.employee_agent_store.get_agent(agent["id"])["enabled"] is False
+        assert app.state.agent_placement_store.get_placement(placement["id"])["desiredState"] == "removed"
+        assert app.state.managed_node_store.get_node(managed_node["id"])["desiredState"] == "deleted"
+        assert employee_client.get("/auth/me").status_code == 401
+        assert employee_client.post(
+            "/auth/login", json={"username": "alice", "password": "AlicePass123!"}
+        ).status_code == 401
+        assert client.post(
+            "/cp/employees/alice/agents",
+            json={"displayName": "Orphan", "executorKind": "codex"},
+        ).status_code == 404
 
         post_delete_employees = client.get("/cp/employees")
         assert post_delete_employees.status_code == 200

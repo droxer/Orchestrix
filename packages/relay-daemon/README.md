@@ -11,12 +11,19 @@ Required:
 - `RELAY_BACKEND_URL`: backend base URL, for example `http://127.0.0.1:8790`.
 - `RELAY_SANDBOX_ID`: daemon node id provisioned by the backend.
 - `RELAY_DAEMON_NODE_TOKEN`: daemon node token issued for that node.
+- `RELAY_ENROLLMENT_TOKEN`: single-use managed-node enrollment credential. On
+  first start this replaces `RELAY_SANDBOX_ID` and
+  `RELAY_DAEMON_NODE_TOKEN`; the backend creates the observed daemon identity
+  and returns its runtime credential during enrollment.
 - `RELAY_WORKSPACE` or `WORKSPACE`: host workspace path mounted into or owned by
   the agent box.
 
 Optional:
 
 - `RELAY_EMPLOYEE_ID`: employee id bound to this daemon node when preassigned.
+- `RELAY_WORKSPACE_ID`: canonical identity for shared workspace storage. Nodes
+  may use different local paths in a multi-agent workflow only when this value
+  matches. The equivalent CLI option is `--workspace-id`.
 - `RELAY_SANDBOX_MODE`: defaults to `boxlite`, where the daemon boots and owns a
   BoxLite VM. Set `none` only when the daemon already runs inside an agent box.
 - `RELAY_BOXLITE_HOME`: BoxLite runtime state directory for `boxlite` mode.

@@ -322,6 +322,7 @@ def assignment_list(value: Any) -> list[dict[str, Any]]:
         result.append({
             "agent": agent,
             "mode": agent_task_mode(item.get("mode")),
+            **({"agentId": item["agentId"]} if isinstance(item.get("agentId"), str) and item["agentId"] else {}),
             **({"role": item["role"]} if role_name(item.get("role")) else {}),
         })
     return result

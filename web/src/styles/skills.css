@@ -1,25 +1,2 @@
-/* =====================================================================
-   Authenticated route shell grid — small screens
-
-   The MCP and Skills pages are styled with Tailwind utilities in their
-   components; this module owns only the small-screen shell collapse shared
-   by authenticated work routes.
-   ===================================================================== */
-
-@media (max-width: 820px) {
-  .messenger-shell[data-route="mcp"],
-  .messenger-shell[data-route="channels"],
-  .messenger-shell[data-route="workspace"],
-  .messenger-shell[data-route="backlog"],
-  .messenger-shell[data-route="routine"],
-  .messenger-shell[data-route="skills"],
-  .messenger-shell[data-route="mcp"][data-sidenav="open"],
-  .messenger-shell[data-route="channels"][data-sidenav="open"],
-  .messenger-shell[data-route="workspace"][data-sidenav="open"],
-  .messenger-shell[data-route="backlog"][data-sidenav="open"],
-  .messenger-shell[data-route="routine"][data-sidenav="open"],
-  .messenger-shell[data-route="skills"][data-sidenav="open"] {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(0, 1fr);
-  }
-}
+/* Skills page component styles live in the React module (Tailwind utilities).
+   Shell grid rules for work routes are in routes.css. */

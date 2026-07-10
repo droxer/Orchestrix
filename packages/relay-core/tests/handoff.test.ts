@@ -204,6 +204,17 @@ describe("review mode", () => {
 });
 
 describe("prompts", () => {
+  it("includes logical-agent instructions before the user task", () => {
+    const logicalAgentState = state({
+      task_goal: "Implement the endpoint",
+      agent_instructions: "Act as the employee's security reviewer.",
+    });
+
+    const prompt = claudeTaskPrompt(logicalAgentState);
+
+    assert.match(prompt, /^\[Agent instructions\]\nAct as the employee's security reviewer\./);
+    assert.match(prompt, /\[User\]\nImplement the endpoint$/);
+  });
   it("Claude action prompt carries the task goal", () => {
     const prompt = claudeTaskPrompt(state({ task_goal: "Fix auth" }));
 

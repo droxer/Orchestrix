@@ -2,11 +2,9 @@
 
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  logout, updateDaemonNodeAgentRoleOverrides,
-} from "./api";
+import { logout } from "./api";
 import { AGENT_NAMES } from "./types";
-import type { AgentName, AgentTaskMode, CurrentUser, DaemonNodeMonitorRecord, RelayArtifact, RelaySession } from "./types";
+import type { AgentName, AgentTaskMode, CurrentUser, DaemonNodeMonitorRecord, EmployeeAgent, RelayArtifact, RelaySession } from "./types";
 import { LoginScreen } from "./components/LoginScreen";
 import { type Theme, type Language } from "./components/PreferencesPanel";
 import type { ConversationItem } from "./components/ConversationRow";
@@ -17,18 +15,18 @@ import { useAppHash } from "./hooks/useAppHash";
 import { useSessionEvents } from "./hooks/useSessionEvents";
 import { useLocalDaemonNodes } from "./hooks/useLocalDaemonNodes";
 import { mergeVisibleDaemonNodes } from "./lib/daemonNodes";
-import { routeComposerMessage } from "./lib/messageRouting";
-import { dispatchReadyAgents, formatDispatchError, isAgentDispatchReady } from "./lib/agentReadiness";
-import { effectiveAgentRoleMap, type AgentRoleMap } from "./lib/manageAgents";
+import { formatDispatchError } from "./lib/agentReadiness";
 import { applyTheme, readLanguage, readTheme, readTokens, selectedEmployeeKey, writeLanguage, writeTheme } from "./lib/appStorage";
 import { canUseLocalControlPanel } from "./lib/controlPanel";
 import { useRelayStore } from "./lib/store";
 import { useAuthSession } from "./hooks/useAuthSession";
+import { useClientMounted } from "./hooks/useClientMounted";
 import { useActiveSession } from "./hooks/useActiveSession";
 import { chooseSendAction, suppressActiveSessionDuringPendingSend } from "./lib/sendAction";
 import { myConversationSessions, matchesConversationQuery, pickActiveConversationSession } from "./lib/conversations";
 import { shouldTailSessionEvents } from "./lib/sessionEventStream";
 import { useEmployeeProvisioning } from "./hooks/useEmployeeProvisioning";
+import { useEmployeeAgents } from "./hooks/useEmployeeAgents";
 import { isAwaitingFeedbackDecision, rerunAssignmentForSession } from "./lib/workflow";
 import { useDialogs } from "./components/ui/DialogProvider";
 import { AppShell, RouteFallback } from "./components/AppShell";
@@ -50,6 +48,7 @@ const BacklogPage = lazy(() => import("./components/BacklogPage").then((m) => ({
 const ChannelsPage = lazy(() => import("./components/ChannelsPage").then((m) => ({ default: m.ChannelsPage })));
 const EmployeeWorkspacePage = lazy(() => import("./components/EmployeeWorkspacePage").then((m) => ({ default: m.EmployeeWorkspacePage })));
 const RoutinePage = lazy(() => import("./components/RoutinePage").then((m) => ({ default: m.RoutinePage })));
+const AgentsPage = lazy(() => import("./components/AgentsPage").then((m) => ({ default: m.AgentsPage })));
 
 const agents: AgentName[] = AGENT_NAMES;
 
@@ -57,6 +56,7 @@ const WORK_ROUTE_SKIP_IDS: Record<Exclude<AppRoute, "main">, string> = {
   workspace: "workspace-panel",
   backlog: "backlog-panel",
   routine: "routine-panel",
+  agents: "agents-panel",
   channels: "channels-panel",
   admin: "admin-panel",
 };
@@ -80,7 +80,7 @@ export function App() {
     archiveSessionMutation,
     cancelRunMutation,
     recordDecisionMutation,
-    runSandboxMutation,
+    runLogicalAgentsMutation,
     invalidateRelay,
   } = useRelayMutations();
   const selectedEmployee = useRelayStore((s) => s.selectedEmployee);
@@ -91,16 +91,17 @@ export function App() {
   const setTokens = useRelayStore((s) => s.setTokens);
   const [hydrated, setHydrated] = useState(false);
   const [activeAgent, setActiveAgent] = useState<AgentName>("claude");
+  const [activeLogicalAgentId, setActiveLogicalAgentId] = useState<string | null>(null);
   const [composerMode, setComposerMode] = useState<AgentTaskMode>("action");
   const [employeeQuery, setEmployeeQuery] = useState("");
   const [prefsOpen, setPrefsOpen] = useState(false);
   const [sidenavExpanded, setSidenavExpanded] = useState(true);
-  const [theme, setTheme] = useState<Theme>(readTheme);
-  const [language, setLanguage] = useState<Language>(readLanguage);
+  const [theme, setTheme] = useState<Theme>("system");
+  const [language, setLanguage] = useState<Language>("en");
   const [handoffOpen, setHandoffOpen] = useState(false);
   const [artifactsDrawerOpen, setArtifactsDrawerOpen] = useState(false);
   const [initialArtifactId, setInitialArtifactId] = useState<string | null>(null);
-  const [handoffAgent, setHandoffAgent] = useState<AgentName>("codex");
+  const [handoffAgentId, setHandoffAgentId] = useState<string>("");
   const [handoffMode, setHandoffMode] = useState<AgentTaskMode>("action");
   const [handoffNote, setHandoffNote] = useState("");
   const [isRunning, setIsRunning] = useState(false);
@@ -114,6 +115,8 @@ export function App() {
   // session, or by text for the goal of a freshly created one).
   const [pendingUserMessage, setPendingUserMessage] = useState<{ id: string; text: string } | null>(null);
   const { user, authChecked, setUser } = useAuthSession();
+  const mounted = useClientMounted();
+  const { agents: logicalAgents } = useEmployeeAgents(user?.employeeId);
   const localNodeAdoptionStartedRef = useRef(false);
   const composerRef = useRef<ComposerHandle>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
@@ -127,12 +130,26 @@ export function App() {
   const visibleNodes = useMemo(() => mergeVisibleDaemonNodes(nodes, localNodes), [nodes, localNodes]);
   const selectedSandbox = useMemo(() => sandboxes.find((s) => s.employeeId === selectedEmployee), [sandboxes, selectedEmployee]);
   const selectedNode = useMemo(() => visibleNodes.find((n) => n.employeeId === selectedEmployee || n.id === selectedSandbox?.id), [visibleNodes, selectedEmployee, selectedSandbox?.id]);
-  const agentRoleLabels = useMemo<Partial<Record<AgentName, string>>>(() => {
-    const roleMap = effectiveAgentRoleMap(selectedNode);
-    return Object.fromEntries(
-      agents.map((agent) => [agent, roleMap[agent] ? t(`agent_role.${roleMap[agent]}`) : t(`agent.${agent}.role`)]),
-    ) as Partial<Record<AgentName, string>>;
-  }, [selectedNode, t]);
+  const activeLogicalAgent = useMemo(
+    () => logicalAgents.find((agent) => agent.id === activeLogicalAgentId),
+    [activeLogicalAgentId, logicalAgents],
+  );
+  const logicalExecutorHealth = useMemo(() => Object.fromEntries(
+    agents.map((executorKind) => [
+      executorKind,
+      logicalAgents.some((agent) => agent.executorKind === executorKind && agent.availability === "ready")
+        ? "ready"
+        : "failed",
+    ]),
+  ) as Partial<Record<AgentName, "ready" | "failed">>, [logicalAgents]);
+  const unavailableLogicalExecutors = useMemo(() => agents.filter(
+    (executorKind) => logicalExecutorHealth[executorKind] !== "ready",
+  ), [logicalExecutorHealth]);
+  const agentRoleLabels = useMemo<Partial<Record<AgentName, string>>>(() => Object.fromEntries(
+    agents.map((executorKind) => {
+      return [executorKind, t(`agent.${executorKind}.role`)];
+    }),
+  ) as Partial<Record<AgentName, string>>, [logicalAgents, t]);
   const agentDescriptors = useMemo<Record<AgentName, { role: string; blurb: string }>>(() => ({
     claude: { role: agentRoleLabels.claude ?? t("agent.claude.role"), blurb: t("agent.claude.blurb") },
     pi: { role: agentRoleLabels.pi ?? t("agent.pi.role"), blurb: t("agent.pi.blurb") },
@@ -244,12 +261,18 @@ export function App() {
     await refresh(undefined, tokenOverride);
   }, [refresh]);
 
-  const { provisionEmployeeSandbox, rememberSandboxToken, adoptLocalDaemonNodes } = useEmployeeProvisioning({
+  const { adoptLocalDaemonNodes } = useEmployeeProvisioning({
     nodes,
     setSandboxes,
     refreshLocalDaemonNodes,
     refreshWithToken,
   });
+
+  useEffect(() => {
+    if (!mounted) return;
+    setTheme(readTheme());
+    setLanguage(readLanguage());
+  }, [mounted]);
 
   useEffect(() => {
     if (!authChecked) return;
@@ -276,24 +299,19 @@ export function App() {
     }
   }, [selectedEmployee, hydrated]);
   useEffect(() => {
-    const ready = dispatchReadyAgents(selectedNode, agents);
-    if (ready.length === 0) return;
-    if (!ready.includes(activeAgent)) setActiveAgent(ready[0]);
-    if (!ready.includes(handoffAgent)) setHandoffAgent(ready[0]);
-  }, [selectedNode, agents, activeAgent, handoffAgent]);
-  useEffect(() => {
-    const disabled = selectedNode?.disabledAgents ?? [];
-    if (disabled.length === 0) return;
-    const ready = dispatchReadyAgents(selectedNode, agents);
-    if (disabled.includes(activeAgent)) {
-      const fallback = ready.find((a) => !disabled.includes(a)) ?? ready[0];
-      if (fallback && fallback !== activeAgent) setActiveAgent(fallback);
+    if (logicalAgents.length === 0) {
+      setActiveLogicalAgentId(null);
+      return;
     }
-    if (disabled.includes(handoffAgent)) {
-      const fallback = ready.find((a) => !disabled.includes(a)) ?? ready[0];
-      if (fallback && fallback !== handoffAgent) setHandoffAgent(fallback);
+    const selected = logicalAgents.find((agent) => agent.id === activeLogicalAgentId && agent.availability === "ready")
+      ?? logicalAgents.find((agent) => agent.availability === "ready")
+      ?? logicalAgents[0];
+    setActiveLogicalAgentId(selected.id);
+    setActiveAgent(selected.executorKind);
+    if (!logicalAgents.some((agent) => agent.id === handoffAgentId && agent.availability === "ready")) {
+      setHandoffAgentId(logicalAgents.find((agent) => agent.availability === "ready")?.id ?? "");
     }
-  }, [selectedNode?.disabledAgents, selectedNode, agents, activeAgent, handoffAgent]);
+  }, [activeLogicalAgentId, handoffAgentId, logicalAgents]);
   useEffect(() => {
     if ((route === "admin" || route === "channels") && user && user.role !== "admin") {
       navigateToRoute("main");
@@ -369,6 +387,19 @@ export function App() {
     syncChatHash(null);
   }
 
+  function openAgentWorkspace(agent: EmployeeAgent) {
+    setActiveLogicalAgentId(agent.id);
+    setActiveAgent(agent.executorKind);
+    navigateToRoute("workspace");
+  }
+
+  function startConversationWithAgent(agent: EmployeeAgent) {
+    setActiveLogicalAgentId(agent.id);
+    setActiveAgent(agent.executorKind);
+    startNewConversation();
+    navigateToRoute("main");
+  }
+
   function openArtifactsDrawer(artifact?: RelayArtifact) {
     if (!activeSession) return;
     setInitialArtifactId(artifact?.id ?? null);
@@ -409,17 +440,16 @@ export function App() {
     if (!raw) return;
     if (!selectedEmployee) return;
     if (conversationRunning) return;
-    const { agent: routedAgent, goal } = routeComposerMessage(raw, activeAgent, agents);
+    const goal = raw;
+    const routedAgent = activeAgent;
     if (!goal) return;
-    if (!isAgentDispatchReady(selectedNode, routedAgent)) {
-      reportMutationError(
-        "Agent not ready for dispatch",
-        null,
-        t("errors.agent_not_ready", { agent: routedAgent }),
-      );
+    const routedLogicalAgent = activeLogicalAgent?.availability === "ready" ? activeLogicalAgent : undefined;
+    if (!routedLogicalAgent) {
+      reportMutationError("Agent not ready for dispatch", null, t("errors.agent_not_ready", { agent: routedAgent }));
       return;
     }
     if (routedAgent !== activeAgent) setActiveAgent(routedAgent);
+    if (routedLogicalAgent) setActiveLogicalAgentId(routedLogicalAgent.id);
     // When staging a new conversation, always create; otherwise continue the
     // open one. composingNew forces a fresh owner-scoped session here.
     const action = composingNew ? { kind: "create" as const } : chooseSendAction({ activeSessionId: activeSession?.id ?? null, session: activeSession });
@@ -428,35 +458,29 @@ export function App() {
     // Echo the turn immediately. For a continued session we mint the message id
     // here and hand it to the backend so the persisted event reconciles by id.
     const userMessageId = `evt_${crypto.randomUUID()}`;
-    setPendingUserMessage({ id: userMessageId, text: goal });
-    setIsRunning(true);
-    composerRef.current?.clear();
     // While creating a fresh conversation, keep suppressing the previous active
     // thread so the optimistic user turn does not appear in the wrong transcript.
     if (!creatingSession) setComposingNew(false);
+    // Route synchronization clears any pending message when it reapplies an
+    // existing session from the URL. Navigate before adding this optimistic
+    // turn so that cleanup cannot erase the message in the same render batch.
     navigateToRoute("main");
+    setPendingUserMessage({ id: userMessageId, text: goal });
+    setIsRunning(true);
+    composerRef.current?.clear();
     atBottomRef.current = true;
     try {
-      const { sandbox, token } = await provisionEmployeeSandbox(selectedEmployee, selectedToken);
-      rememberSandboxToken(selectedEmployee, sandbox, token);
-      const assignment = { agent: routedAgent, mode: composerMode };
-      // The active session now tails live over SSE (useSessionEvents), so no
-      // per-run polling loop is needed while the run is in flight.
-      const done = await runSandboxMutation.mutateAsync({
-        input: {
-          sandboxId: sandbox.id,
-          taskGoal: goal,
-          assignments: [assignment],
-          sessionId,
-          ...(sessionId ? { userMessageId } : {}),
-        },
-        token,
+      const done = await runLogicalAgentsMutation.mutateAsync({
+        taskGoal: goal,
+        assignments: [{ agentId: routedLogicalAgent.id, mode: composerMode }],
+        sessionId,
+        ...(sessionId ? { userMessageId } : {}),
       });
       setActiveSessionId(done.id);
       setSelectedSessionId(done.id);
       setComposingNew(false);
       syncChatHash(done.id, true);
-      await refresh(undefined, token);
+      await refresh();
     } catch (error) {
       setPendingUserMessage(null);
       reportMutationError(
@@ -490,16 +514,6 @@ export function App() {
   const handleCancelRun = useStableEvent(() => { void cancelActiveRun(); });
   const handleRetryAgent = useStableEvent((agent: AgentName, mode: AgentTaskMode) => { void retryAgentMessage(agent, mode); });
 
-  async function updateAgentRoleOverrides(overrides: AgentRoleMap) {
-    if (!selectedNode) return;
-    try {
-      await updateDaemonNodeAgentRoleOverrides(selectedNode.id, overrides, selectedToken);
-      await invalidateRelay();
-    } catch (error) {
-      reportMutationError("Failed to update agent roles", error, t("errors.task_action"));
-    }
-  }
-
   async function sendDecision(kind: "approve" | "reject" | "rerun" | "mark_done") {
     if (!activeSession) return;
     if (kind === "rerun") {
@@ -507,10 +521,11 @@ export function App() {
       if (conversationRunning) return;
       setIsRunning(true);
       try {
-        const { sandbox, token } = await provisionEmployeeSandbox(selectedEmployee, selectedToken);
-        rememberSandboxToken(selectedEmployee, sandbox, token);
         const assignment = rerunAssignmentForSession(activeSession, activeAgent, composerMode);
-        if (!isAgentDispatchReady(selectedNode, assignment.agent)) {
+        const logicalAgent = logicalAgents.find(
+          (agent) => agent.executorKind === assignment.agent && agent.availability === "ready",
+        );
+        if (!logicalAgent) {
           reportMutationError(
             "Agent not ready for rerun",
             null,
@@ -522,19 +537,15 @@ export function App() {
         setSelectedSessionId(activeSession.id);
         navigateToRoute("main");
         atBottomRef.current = true;
-        const done = await runSandboxMutation.mutateAsync({
-          input: {
-            sandboxId: sandbox.id,
+        const done = await runLogicalAgentsMutation.mutateAsync({
             taskGoal: activeSession.taskGoal,
-            assignments: [assignment],
+            assignments: [{ agentId: logicalAgent.id, mode: assignment.mode }],
             sessionId: activeSession.id,
             decision: { kind: "rerun", targetAgent: assignment.agent },
-          },
-          token,
-        });
+          });
         setSelectedSessionId(done.id);
         syncChatHash(done.id, true);
-        await refresh(undefined, token);
+        await refresh();
       } catch (error) {
         reportMutationError(
           "Failed to rerun assignment",
@@ -565,14 +576,11 @@ export function App() {
     if (conversationRunning) return;
     setIsRunning(true);
     try {
-      const { sandbox, token } = await provisionEmployeeSandbox(selectedEmployee, selectedToken);
-      rememberSandboxToken(selectedEmployee, sandbox, token);
-      if (!isAgentDispatchReady(selectedNode, agent)) {
-        reportMutationError(
-          "Agent not ready for retry",
-          null,
-          t("errors.agent_not_ready", { agent }),
-        );
+      const logicalAgent = logicalAgents.find(
+        (candidate) => candidate.executorKind === agent && candidate.availability === "ready",
+      );
+      if (!logicalAgent) {
+        reportMutationError("Agent not ready for retry", null, t("errors.agent_not_ready", { agent }));
         return;
       }
       setActiveAgent(agent);
@@ -580,19 +588,15 @@ export function App() {
       setSelectedSessionId(activeSession.id);
       navigateToRoute("main");
       atBottomRef.current = true;
-      const done = await runSandboxMutation.mutateAsync({
-        input: {
-          sandboxId: sandbox.id,
+      const done = await runLogicalAgentsMutation.mutateAsync({
           taskGoal: activeSession.taskGoal,
-          assignments: [{ agent, mode }],
+          assignments: [{ agentId: logicalAgent.id, mode }],
           sessionId: activeSession.id,
           decision: { kind: "rerun", targetAgent: agent },
-        },
-        token,
-      });
+        });
       setSelectedSessionId(done.id);
       syncChatHash(done.id, true);
-      await refresh(undefined, token);
+      await refresh();
     } catch (error) {
       reportMutationError(
         "Failed to retry agent response",
@@ -608,33 +612,25 @@ export function App() {
     if (!activeSession) return;
     if (!selectedEmployee) return;
     if (conversationRunning) return;
-    if (!isAgentDispatchReady(selectedNode, handoffAgent)) {
-      reportMutationError(
-        "Agent not ready for handoff",
-        null,
-        t("errors.agent_not_ready", { agent: handoffAgent }),
-      );
+    const logicalAgent = logicalAgents.find(
+      (agent) => agent.id === handoffAgentId && agent.availability === "ready",
+    );
+    if (!logicalAgent) {
+      reportMutationError("Agent not ready for handoff", null, t("errors.agent_not_ready", { agent: handoffAgentId }));
       return;
     }
     setIsRunning(true);
     try {
-      const { sandbox, token } = await provisionEmployeeSandbox(selectedEmployee, selectedToken);
-      rememberSandboxToken(selectedEmployee, sandbox, token);
       const note = handoffNote.trim();
-      const assignment = { agent: handoffAgent, mode: handoffMode };
-      const done = await runSandboxMutation.mutateAsync({
-        input: {
-          sandboxId: sandbox.id,
+      const done = await runLogicalAgentsMutation.mutateAsync({
           taskGoal: activeSession.taskGoal,
-          assignments: [assignment],
+          assignments: [{ agentId: logicalAgent.id, mode: handoffMode }],
           sessionId: activeSession.id,
-          decision: { kind: "handoff", targetAgent: handoffAgent, ...(note ? { note } : {}) },
-        },
-        token,
-      });
-      setSelectedSessionId(done.id); setHandoffNote(""); setHandoffMode("action"); setHandoffOpen(false); setActiveAgent(handoffAgent);
+          decision: { kind: "handoff", targetAgent: logicalAgent.executorKind, ...(note ? { note } : {}) },
+        });
+      setSelectedSessionId(done.id); setHandoffNote(""); setHandoffMode("action"); setHandoffOpen(false); setActiveAgent(logicalAgent.executorKind); setActiveLogicalAgentId(logicalAgent.id);
       syncChatHash(done.id, true);
-      await refresh(undefined, token);
+      await refresh();
     } catch (error) {
       reportMutationError(
         "Failed to send handoff",
@@ -656,10 +652,12 @@ export function App() {
     syncChatHash(null, true);
   }
 
-  if (!authChecked) {
+  if (!mounted || !authChecked) {
     return (
-      <main className="login-checking">
-        <p className="login-checking-text">{t("login.checking")}</p>
+      <main className="login-checking" aria-busy="true">
+        <p className="login-checking-text" suppressHydrationWarning>
+          {mounted ? t("login.checking") : "Checking authentication…"}
+        </p>
       </main>
     );
   }
@@ -687,13 +685,12 @@ export function App() {
       onThemeChange={setTheme}
       language={language}
       onLanguageChange={setLanguage}
-      selectedNode={selectedNode}
-      onAgentRoleOverridesChange={updateAgentRoleOverrides}
     >
       <Suspense fallback={<RouteFallback />}>
         {route === "admin" ? <AdminConsole currentUser={user} /> : route === "channels" ? <ChannelsPage /> : route === "workspace" ? (
           <EmployeeWorkspacePage
             employeeId={selectedEmployee}
+            agent={activeLogicalAgent}
             currentUser={user}
             isRefreshing={isRefreshing}
             onRefresh={() => refresh()}
@@ -719,6 +716,14 @@ export function App() {
             onRefresh={() => refresh()}
             onOpenConversation={openConversation}
           />
+        ) : route === "agents" ? (
+          <AgentsPage
+            currentUser={user}
+            isRefreshing={isRefreshing}
+            onRefresh={() => refresh()}
+            onOpenWorkspace={openAgentWorkspace}
+            onStartConversation={startConversationWithAgent}
+          />
         ) : (
           <MainChatView
             filteredConversations={filteredConversations}
@@ -736,10 +741,15 @@ export function App() {
             onRenameConversation={(session) => void renameConversation(session)}
             onCloseConversation={(id) => void closeConversation(id)}
             activeAgent={activeAgent}
-            setActiveAgent={setActiveAgent}
             agentNames={agents}
-            disabledAgents={selectedNode?.disabledAgents}
-            agentHealth={selectedNode?.agents}
+            disabledAgents={unavailableLogicalExecutors}
+            agentHealth={logicalExecutorHealth}
+            logicalAgents={logicalAgents}
+            activeLogicalAgentId={activeLogicalAgentId}
+            onLogicalAgentPicked={(agent: EmployeeAgent) => {
+              setActiveLogicalAgentId(agent.id);
+              setActiveAgent(agent.executorKind);
+            }}
             runningAgent={activeRun?.agent}
             isRefreshing={isRefreshing}
             artifactCount={visibleArtifacts.length}
@@ -757,8 +767,8 @@ export function App() {
             setComposerMode={setComposerMode}
             handoffOpen={handoffOpen}
             setHandoffOpen={setHandoffOpen}
-            handoffAgent={handoffAgent}
-            setHandoffAgent={setHandoffAgent}
+            handoffAgentId={handoffAgentId}
+            setHandoffAgentId={setHandoffAgentId}
             handoffMode={handoffMode}
             setHandoffMode={setHandoffMode}
             handoffNote={handoffNote}

@@ -4,6 +4,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { useRelayMutations } from "../hooks/useRelayMutations";
 import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
+import { useEmployeeAgents } from "../hooks/useEmployeeAgents";
 import { AgentStateBadge } from "./AgentStateBadge";
 import { PriorityBadge } from "./PriorityBadge";
 import { cn } from "@/lib/utils";
@@ -17,6 +18,7 @@ import { BoardEmpty } from "./BoardEmpty";
 import { TaskBoardHeaderActions } from "./TaskBoardHeaderActions";
 import { TaskAssignee } from "./TaskAssignee";
 import { readViewPreference, writeViewPreference } from "../lib/viewPreference";
+import { useUrlSearchState } from "../hooks/useUrlSearchState";
 
 interface BacklogPageProps {
   tasks: RelayTask[];
@@ -41,6 +43,25 @@ type BacklogView = "board" | "list";
 
 const VIEW_STORAGE_KEY = "relay-web.backlogView";
 const BACKLOG_VIEWS: readonly BacklogView[] = ["board", "list"];
+
+function parseBacklogFilters(value: string | null): BacklogFilters {
+  if (!value) return initialFilters;
+  try {
+    return { ...initialFilters, ...JSON.parse(value) } as BacklogFilters;
+  } catch {
+    return initialFilters;
+  }
+}
+
+function serializeBacklogFilters(value: BacklogFilters): string | null {
+  return JSON.stringify(value) === JSON.stringify(initialFilters) ? null : JSON.stringify(value);
+}
+
+function parseBacklogView(value: string | null): BacklogView {
+  return BACKLOG_VIEWS.includes(value as BacklogView)
+    ? value as BacklogView
+    : readViewPreference(VIEW_STORAGE_KEY, "list", BACKLOG_VIEWS);
+}
 
 const ACTIVE_STATUSES: TaskStatus[] = ["assigned", "running", "waiting_for_human", "review"];
 
@@ -424,14 +445,15 @@ function BacklogTaskRow({
 }
 
 export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing, onRefresh, onOpenConversation }: BacklogPageProps) {
+  const { agents: logicalAgents } = useEmployeeAgents(currentUser.employeeId);
   const { t } = useTranslation();
   const {
     startTaskMutation,
     updateTaskMutation,
     createTaskMutation,
   } = useRelayMutations();
-  const [filters, setFilters] = useState<BacklogFilters>(initialFilters);
-  const [view, setView] = useState<BacklogView>(() => readViewPreference(VIEW_STORAGE_KEY, "list", BACKLOG_VIEWS));
+  const [filters, setFilters] = useUrlSearchState("backlogFilters", initialFilters, parseBacklogFilters, serializeBacklogFilters);
+  const [view, setView] = useUrlSearchState("backlogView", parseBacklogView(null), parseBacklogView, (value) => value);
   const [form, setForm] = useState<BacklogTaskFormState | null>(null);
   const [formBaseline, setFormBaseline] = useState<BacklogTaskFormState | null>(null);
   const [saving, setSaving] = useState(false);
@@ -476,6 +498,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
       dueDate: task.dueDate ?? "",
       assigneeEmployeeId: task.assigneeEmployeeId ?? task.ownerEmployeeId ?? currentUser.employeeId ?? currentUser.username,
       assignedAgent: task.assignedAgent ?? "",
+      assignedAgentId: task.assignedAgentId ?? "",
     });
   }
 
@@ -492,6 +515,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
         dueDate: form.dueDate,
         assigneeEmployeeId: form.assigneeEmployeeId.trim(),
         ...(form.assignedAgent ? { assignedAgent: form.assignedAgent } : {}),
+        ...(form.assignedAgentId ? { assignedAgentId: form.assignedAgentId } : {}),
       };
       if (form.id) await updateTaskMutation.mutateAsync({ taskId: form.id, input: payload });
       else await createTaskMutation.mutateAsync(payload);
@@ -515,13 +539,17 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
   }
 
   function taskHandlers(task: RelayTask, session?: RelaySession) {
-    const discussionAgents = discussionAgentsForTask(task, nodes);
+    const discussionAgents = discussionAgentsForTask(task, nodes, logicalAgents);
+    const discussionAssignments = logicalAgents
+      .filter((agent) => agent.enabled && agent.availability === "ready")
+      .map((agent) => ({ agentId: agent.id, agent: agent.executorKind, mode: "ask" as const }));
+    const fallbackDiscussionAssignments = discussionAgents.map((agent) => ({ agent, mode: "ask" as const }));
     return {
       onEdit: () => editTask(task),
       onStart: () => void startTaskMutation.mutate(
         task.assignedAgent
           ? { taskId: task.id }
-          : { taskId: task.id, assignments: discussionAgents.map((agent) => ({ agent, mode: "ask" as const })) },
+          : { taskId: task.id, assignments: discussionAssignments.length > 0 ? discussionAssignments : fallbackDiscussionAssignments },
         {
           onSuccess: (result) => {
             if (!task.assignedAgent && result.session) onOpenConversation(result.session.id);
@@ -531,7 +559,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
       onDiscuss: () => void startTaskMutation.mutate(
         {
           taskId: task.id,
-          assignments: discussionAgents.map((agent) => ({ agent, mode: "ask" as const })),
+          assignments: discussionAssignments.length > 0 ? discussionAssignments : fallbackDiscussionAssignments,
         },
         {
           onSuccess: (result) => {
@@ -592,13 +620,13 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
           </div>
           {filteredTasks.map((task) => {
             const session = linkedSession(task);
-            const discussionAgents = discussionAgentsForTask(task, nodes);
+            const discussionAgents = discussionAgentsForTask(task, nodes, logicalAgents);
             return (
               <BacklogTaskRow
                 key={task.id}
                 task={task}
                 session={session}
-                ready={agentReadyForTask(task, nodes)}
+                ready={agentReadyForTask(task, nodes, logicalAgents)}
                 canDiscuss={discussionAgents.length > 0}
                 {...taskHandlers(task, session)}
               />
@@ -618,13 +646,13 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
                   <p className="backlog-empty">{t("backlog.empty_lane")}</p>
                 ) : grouped[status].map((task) => {
                   const session = linkedSession(task);
-                  const discussionAgents = discussionAgentsForTask(task, nodes);
+                  const discussionAgents = discussionAgentsForTask(task, nodes, logicalAgents);
                   return (
                     <BacklogTaskCard
                       key={task.id}
                       task={task}
                       session={session}
-                      ready={agentReadyForTask(task, nodes)}
+                      ready={agentReadyForTask(task, nodes, logicalAgents)}
                       canDiscuss={discussionAgents.length > 0}
                       {...taskHandlers(task, session)}
                     />
@@ -640,6 +668,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
         <TaskDrawer
           form={form}
           employees={employees}
+          logicalAgents={logicalAgents}
           saving={saving}
           title={form.id ? t("backlog.edit_task") : t("backlog.new_task")}
           subtitle={form.id ?? t("backlog.new_task_id")}

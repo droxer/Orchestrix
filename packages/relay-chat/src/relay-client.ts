@@ -28,6 +28,48 @@ export class RelayChatClient implements RelayChatBackend {
     this.fetchFn = options.fetchFn ?? fetch;
   }
 
+  async listEmployeeAgents(employeeId: string, signal?: AbortSignal): Promise<Array<{ id: string; executorKind: AgentName; availability?: string }>> {
+    const body = await this.request<{ agents?: Array<{ id: string; executorKind: AgentName; availability?: string }> }>("/agents", {
+      employeeId,
+      signal,
+    });
+    return body.agents ?? [];
+  }
+
+  async startAgentRun(input: {
+    agentId: string;
+    taskGoal: string;
+    mode?: AgentTaskMode;
+    sessionId?: string;
+    employeeId?: string;
+    signal?: AbortSignal;
+  }): Promise<RelaySession> {
+    return this.request<RelaySession>("/agent-runs", {
+      method: "POST",
+      signal: input.signal,
+      employeeId: input.employeeId,
+      body: {
+        taskGoal: input.taskGoal,
+        assignments: [{ agentId: input.agentId, mode: input.mode ?? "action" }],
+        sessionId: input.sessionId,
+      },
+    });
+  }
+
+  async cancelSessionRun(input: {
+    sessionId: string;
+    reason?: string;
+    employeeId?: string;
+    signal?: AbortSignal;
+  }): Promise<RelaySession> {
+    return this.request<RelaySession>(`/sessions/${encodeURIComponent(input.sessionId)}/cancel`, {
+      method: "POST",
+      signal: input.signal,
+      employeeId: input.employeeId,
+      body: { reason: input.reason },
+    });
+  }
+
   async startSandboxRun(input: {
     sandboxId: string;
     taskGoal: string;

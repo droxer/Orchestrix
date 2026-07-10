@@ -24,6 +24,8 @@ export interface AgentState {
   prior_conversation?: string;
   /** Latest handoff note for the current turn, if any. */
   prior_handoff_note?: string;
+  /** Control-plane instructions for the selected logical agent identity. */
+  agent_instructions?: string;
 }
 
 export interface AgentRunOptions {

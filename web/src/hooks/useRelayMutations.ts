@@ -10,10 +10,11 @@ import {
   recordDecision,
   renameSession,
   runSandbox,
+  runLogicalAgents,
   startTask,
   updateTask,
 } from "../api";
-import type { AgentName, AgentTaskMode, CreateTaskInput, RelaySession, RunInput, TaskMutationInput } from "../types";
+import type { AgentName, AgentRunInput, AgentTaskMode, CreateTaskInput, RelaySession, RunInput, TaskMutationInput } from "../types";
 import { RELAY_QUERY_KEY } from "./useRelayData";
 import { useMutationError } from "./useMutationError";
 
@@ -72,6 +73,11 @@ export function useRelayMutations() {
     onSuccess: () => void invalidateRelay(),
   });
 
+  const runLogicalAgentsMutation = useMutation({
+    mutationFn: (input: AgentRunInput) => runLogicalAgents(input),
+    onSuccess: () => void invalidateRelay(),
+  });
+
   const createTaskMutation = useMutation({
     mutationFn: (input: CreateTaskInput) => createTask(input),
     onSuccess: () => void invalidateRelay(),
@@ -110,6 +116,7 @@ export function useRelayMutations() {
     cancelRunMutation,
     recordDecisionMutation,
     runSandboxMutation,
+    runLogicalAgentsMutation,
     createTaskMutation,
     updateTaskMutation,
     assignTaskMutation,

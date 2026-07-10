@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 
-import { apiJson, getWorkspaceBrief, listArtifacts, listTaskArtifacts, listWorkspaceFiles, readWorkspaceFile, RelayApiError } from "../src/api.js";
+import { apiJson, getWorkspaceBrief, listArtifacts, listEmployeeAgents, listTaskArtifacts, listWorkspaceFiles, readWorkspaceFile, RelayApiError, runLogicalAgents } from "../src/api.js";
 
 const originalFetch = globalThis.fetch;
 
@@ -38,6 +38,44 @@ describe("apiJson", () => {
         && error.status === 502
         && error.message === "upstream gateway failed",
     );
+  });
+
+  it("lists employee-owned logical agents", async () => {
+    let requestedUrl = "";
+    globalThis.fetch = (async (input) => {
+      requestedUrl = String(input);
+      return new Response(JSON.stringify({ agents: [] }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }) as typeof fetch;
+
+    assert.deepEqual(await listEmployeeAgents(), { agents: [] });
+    assert.equal(requestedUrl, "/agents");
+  });
+
+  it("dispatches work by logical agent id without a sandbox id", async () => {
+    let requestUrl = "";
+    let requestBody: unknown;
+    globalThis.fetch = (async (input, init) => {
+      requestUrl = String(input);
+      requestBody = JSON.parse(String(init?.body));
+      return new Response(JSON.stringify({ id: "ses_1", agentRuns: [] }), { status: 202, headers: { "Content-Type": "application/json" } });
+    }) as typeof fetch;
+
+    await runLogicalAgents({
+      taskGoal: "Build it",
+      assignments: [{ agentId: "agent_builder", mode: "action" }],
+      sessionId: "ses_existing",
+      userMessageId: "evt_user",
+      decision: { kind: "handoff", targetAgent: "codex", note: "Continue here" },
+    });
+
+    assert.equal(requestUrl, "/agent-runs");
+    assert.deepEqual(requestBody, {
+      taskGoal: "Build it",
+      assignments: [{ agentId: "agent_builder", mode: "action" }],
+      sessionId: "ses_existing",
+      userMessageId: "evt_user",
+      decision: { kind: "handoff", targetAgent: "codex", note: "Continue here" },
+    });
   });
 
   it("lists artifacts with optional employee and workspace filters", async () => {

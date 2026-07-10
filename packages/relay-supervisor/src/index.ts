@@ -1,6 +1,8 @@
 export { SupervisorBackendClient } from "./backend-client.js";
 export { CommandTemplateLauncher, LocalDaemonLauncher, workspaceForEmployee } from "./launchers.js";
 export { RelaySupervisor } from "./reconcile.js";
+export { ManagedNodeReconciler } from "./managed-reconcile.js";
+export { LocalProcessProvider } from "./providers.js";
 export type {
   DaemonLauncher,
   DaemonLaunchRequest,
@@ -9,4 +11,8 @@ export type {
   ProvisionedDaemonNode,
   SupervisorBackend,
   SupervisorLogger,
+  ManagedNodeBackend,
+  ManagedNodeProvider,
+  ManagedNodeRecord,
+  ProvisioningAttemptRecord,
 } from "./types.js";

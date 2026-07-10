@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { assignControlPanelDaemonNode, createControlPanelDaemonNode, createControlPanelEmployee } from "../src/api.js";
+import { assignControlPanelDaemonNode, createControlPanelDaemonNode, createControlPanelEmployee, createManagedNode } from "../src/api.js";
 import { conversationDaemonStatus } from "../src/lib/conversationStatus.js";
 import {
   mergeVisibleDaemonNodes,
@@ -244,6 +244,56 @@ describe("Relay web conversation status", () => {
         workspacePath: "/workspace/shared",
       });
       assert.equal(result.node.employeeId, undefined);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("posts managed-node intent without requesting daemon credentials", async () => {
+    const originalFetch = globalThis.fetch;
+    let requestPath = "";
+    let requestInit: RequestInit | undefined;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      requestPath = String(input);
+      requestInit = init;
+      return new Response(JSON.stringify({
+        node: {
+          id: "mnode_alice",
+          displayName: "Managed node for alice",
+          employeeId: "alice",
+          assignmentMode: "dedicated",
+          provider: "local-process",
+          profile: "standard",
+          sandboxMode: "boxlite",
+          workspacePolicy: { kind: "employee-home" },
+          desiredState: "running",
+          generation: 1,
+          phase: "requested",
+          conditions: [],
+          createdAt: "2026-07-10T00:00:00Z",
+          updatedAt: "2026-07-10T00:00:00Z",
+        },
+      }), {
+        status: 202,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+    try {
+      const result = await createManagedNode({ employeeId: "alice", sandboxMode: "boxlite" });
+
+      assert.equal(requestPath, "/cp/managed-nodes");
+      assert.equal(requestInit?.method, "POST");
+      assert.deepEqual(JSON.parse(String(requestInit?.body)), {
+        employeeId: "alice",
+        assignmentMode: "dedicated",
+        provider: "local-process",
+        profile: "standard",
+        sandboxMode: "boxlite",
+        workspacePolicy: { kind: "employee-home" },
+        desiredState: "running",
+      });
+      assert.equal(result.node.phase, "requested");
+      assert.equal("daemonCommand" in result, false);
     } finally {
       globalThis.fetch = originalFetch;
     }

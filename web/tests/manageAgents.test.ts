@@ -2,15 +2,12 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
-  agentRoleMapsEqual,
   disabledSetsEqual,
-  effectiveAgentRoleMap,
   newlyDisabledReadyAgents,
-  normalizeAgentRoleMapPayload,
   normalizeDisabledAgentsPayload,
   shouldSnapshotDisabledAgents,
 } from "../src/lib/manageAgents.js";
-import type { AgentName, AgentRole } from "../src/types.js";
+import type { AgentName } from "../src/types.js";
 
 describe("shouldSnapshotDisabledAgents", () => {
   it("snapshots when the drawer first opens with a node", () => {
@@ -47,60 +44,6 @@ describe("normalizeDisabledAgentsPayload", () => {
 
   it("returns an empty array for an empty input", () => {
     assert.deepEqual(normalizeDisabledAgentsPayload([]), []);
-  });
-});
-
-describe("normalizeAgentRoleMapPayload", () => {
-  it("keeps known agents and roles in canonical agent order", () => {
-    const input = {
-      codex: "fixer",
-      claude: "planner",
-      bogus: "reviewer",
-      pi: "builder",
-    } as Partial<Record<AgentName | "bogus", AgentRole | "builder">>;
-
-    assert.deepEqual(normalizeAgentRoleMapPayload(input as any), {
-      claude: "planner",
-      codex: "fixer",
-    });
-  });
-
-  it("returns an empty object for empty input", () => {
-    assert.deepEqual(normalizeAgentRoleMapPayload({}), {});
-  });
-});
-
-describe("agentRoleMapsEqual", () => {
-  it("returns true for equal role maps regardless of object order", () => {
-    assert.equal(agentRoleMapsEqual({ codex: "fixer", claude: "planner" }, { claude: "planner", codex: "fixer" }), true);
-  });
-
-  it("returns false when role maps differ", () => {
-    assert.equal(agentRoleMapsEqual({ codex: "fixer" }, { codex: "planner" }), false);
-  });
-});
-
-describe("effectiveAgentRoleMap", () => {
-  it("uses employee overrides before system defaults", () => {
-    assert.deepEqual(effectiveAgentRoleMap({
-      agentRoleDefaults: { claude: "planner", codex: "reviewer" },
-      agentRoleOverrides: { codex: "implementer" },
-    }), {
-      claude: "planner",
-      codex: "implementer",
-    });
-  });
-
-  it("filters unknown agents and invalid roles", () => {
-    const source = {
-      agentRoleDefaults: { claude: "planner", bogus: "reviewer" },
-      agentRoleOverrides: { claude: "builder", kimi: "fixer" },
-    } as unknown as Parameters<typeof effectiveAgentRoleMap>[0];
-
-    assert.deepEqual(effectiveAgentRoleMap(source), {
-      claude: "planner",
-      kimi: "fixer",
-    });
   });
 });
 

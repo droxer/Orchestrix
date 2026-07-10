@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { writeTokens, type TokenMap } from "./appStorage";
 
-export type AdminConsoleView = "dashboard" | "people" | "fleet";
+export type AdminConsoleView = "dashboard" | "employees" | "agents" | "fleet";
 
 // Cross-cutting client state for the main app shell: which employee/session is
 // open and the per-employee/sandbox auth tokens. Server state stays in TanStack

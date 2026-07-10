@@ -11,6 +11,8 @@ import type {
   CreateControlPanelEmployeeResponse,
   CreateControlPanelDaemonNodeInput,
   CreateControlPanelDaemonNodeResponse,
+  CreateManagedNodeInput,
+  CreateManagedNodeResponse,
   CreateSessionInput,
   CreateTaskInput,
   ControlPanelDaemonNodesResponse,
@@ -18,6 +20,10 @@ import type {
   CurrentUser,
   UnassignControlPanelDaemonNodeResponse,
   DaemonNodesResponse,
+  EmployeeAgentsResponse,
+  EmployeeAgent,
+  AgentPlacement,
+  AgentRunInput,
   RelaySession,
   RelayTask,
   RunInput,
@@ -88,6 +94,48 @@ export function listDaemonNodes(token?: string, signal?: AbortSignal): Promise<D
   return apiJson<DaemonNodesResponse>("/daemon-nodes", { token, signal });
 }
 
+export function listEmployeeAgents(signal?: AbortSignal): Promise<EmployeeAgentsResponse> {
+  return apiJson<EmployeeAgentsResponse>("/agents", { signal });
+}
+
+export function listControlPanelAgents(employeeId?: string, signal?: AbortSignal): Promise<EmployeeAgentsResponse> {
+  const query = employeeId ? `?employeeId=${encodeURIComponent(employeeId)}` : "";
+  return apiJson<EmployeeAgentsResponse>(`/cp/agents${query}`, { signal });
+}
+
+export function getControlPanelAgent(agentId: string, signal?: AbortSignal): Promise<{ agent: EmployeeAgent }> {
+  return apiJson<{ agent: EmployeeAgent }>(`/cp/agents/${encodeURIComponent(agentId)}`, { signal });
+}
+
+export function updateEmployeeAgent(
+  agentId: string,
+  patch: {
+    enabled?: boolean;
+    displayName?: string;
+    instructions?: string;
+    skillPolicy?: Record<string, unknown>;
+    toolPolicy?: Record<string, unknown>;
+    modelPolicy?: Record<string, unknown>;
+  },
+): Promise<{ agent: EmployeeAgent }> {
+  return apiJson<{ agent: EmployeeAgent }>(`/cp/agents/${encodeURIComponent(agentId)}`, {
+    method: "PATCH",
+    body: patch,
+  });
+}
+
+export function deleteEmployeeAgent(agentId: string): Promise<{ agent: EmployeeAgent }> {
+  return apiJson<{ agent: EmployeeAgent }>(`/cp/agents/${encodeURIComponent(agentId)}`, {
+    method: "DELETE",
+  });
+}
+
+export function deleteAgentPlacement(placementId: string): Promise<{ placement: AgentPlacement }> {
+  return apiJson<{ placement: AgentPlacement }>(`/cp/agent-placements/${encodeURIComponent(placementId)}`, {
+    method: "DELETE",
+  });
+}
+
 export function listControlPanelDaemonNodes(signal?: AbortSignal): Promise<ControlPanelDaemonNodesResponse> {
   return apiJson<ControlPanelDaemonNodesResponse>("/cp/daemon-nodes", { signal });
 }
@@ -130,6 +178,21 @@ export function createControlPanelDaemonNode(
       ...(input.employeeId ? { employeeId: input.employeeId } : {}),
       ...(input.workspacePath ? { workspacePath: input.workspacePath } : {}),
       ...(input.sandboxMode ? { sandboxMode: input.sandboxMode } : {}),
+    },
+  });
+}
+
+export function createManagedNode(input: CreateManagedNodeInput): Promise<CreateManagedNodeResponse> {
+  return apiJson<CreateManagedNodeResponse>("/cp/managed-nodes", {
+    method: "POST",
+    body: {
+      ...(input.employeeId ? { employeeId: input.employeeId } : {}),
+      assignmentMode: input.employeeId ? "dedicated" : "pooled",
+      provider: "local-process",
+      profile: "standard",
+      sandboxMode: input.sandboxMode,
+      workspacePolicy: { kind: input.employeeId ? "employee-home" : "managed-pool" },
+      desiredState: "running",
     },
   });
 }
@@ -240,32 +303,35 @@ export function listArtifacts(
 }
 
 export function getWorkspaceBrief(
-  input: { employeeId?: string } = {},
+  input: { employeeId?: string; agentId?: string } = {},
   signal?: AbortSignal,
 ): Promise<WorkspaceBriefResponse> {
   const params = new URLSearchParams();
   if (input.employeeId) params.set("employeeId", input.employeeId);
+  if (input.agentId) params.set("agentId", input.agentId);
   const query = params.toString();
   return apiJson<WorkspaceBriefResponse>(`/workspace/brief${query ? `?${query}` : ""}`, { signal });
 }
 
 export function listWorkspaceFiles(
-  input: { employeeId?: string; path?: string } = {},
+  input: { employeeId?: string; agentId?: string; path?: string } = {},
   signal?: AbortSignal,
 ): Promise<WorkspaceFilesResponse> {
   const params = new URLSearchParams();
   if (input.employeeId) params.set("employeeId", input.employeeId);
+  if (input.agentId) params.set("agentId", input.agentId);
   if (input.path) params.set("path", input.path);
   const query = params.toString();
   return apiJson<WorkspaceFilesResponse>(`/workspace/files${query ? `?${query}` : ""}`, { signal });
 }
 
 export function readWorkspaceFile(
-  input: { employeeId?: string; path: string },
+  input: { employeeId?: string; agentId?: string; path: string },
   signal?: AbortSignal,
 ): Promise<WorkspaceFileContentResponse> {
   const params = new URLSearchParams();
   if (input.employeeId) params.set("employeeId", input.employeeId);
+  if (input.agentId) params.set("agentId", input.agentId);
   params.set("path", input.path);
   return apiJson<WorkspaceFileContentResponse>(`/workspace/file?${params.toString()}`, { signal });
 }
@@ -396,7 +462,7 @@ export function activateChatIntegration(integrationId: string): Promise<{ integr
 
 export function addChatIdentityLink(
   integrationId: string,
-  input: { externalUserId: string; employeeId: string; displayName?: string; defaultSandboxId?: string },
+  input: { externalUserId: string; employeeId: string; displayName?: string; defaultAgentId?: string },
 ): Promise<{ integration: ChatIntegration }> {
   return apiJson<{ integration: ChatIntegration }>(
     `/cp/chat-integrations/${encodeURIComponent(integrationId)}/identity-links`,
@@ -462,6 +528,19 @@ export function runSandbox(input: RunInput, token?: string): Promise<RelaySessio
   return apiJson<RelaySession>(`/sandboxes/${encodeURIComponent(input.sandboxId)}/runs`, {
     method: "POST",
     token,
+    body: {
+      taskGoal: input.taskGoal,
+      assignments: input.assignments,
+      sessionId: input.sessionId,
+      ...(input.userMessageId ? { userMessageId: input.userMessageId } : {}),
+      ...(input.decision ? { decision: input.decision } : {}),
+    },
+  });
+}
+
+export function runLogicalAgents(input: AgentRunInput): Promise<RelaySession> {
+  return apiJson<RelaySession>("/agent-runs", {
+    method: "POST",
     body: {
       taskGoal: input.taskGoal,
       assignments: input.assignments,

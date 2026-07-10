@@ -2,19 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { updateControlPanelDaemonNodeAgentRoleDefaults, updateControlPanelDaemonNodeDisabledAgents } from "../../api";
+import { updateControlPanelDaemonNodeDisabledAgents } from "../../api";
 import {
-  AGENT_ROLE_VALUES,
-  agentRoleMapsEqual,
   disabledSetsEqual,
   newlyDisabledReadyAgents,
-  normalizeAgentRoleMapPayload,
   normalizeDisabledAgentsPayload,
   shouldSnapshotDisabledAgents,
-  type AgentRoleMap,
 } from "../../lib/manageAgents";
 import { AGENT_NAMES } from "../../types";
-import type { AgentName, AgentRole, ControlPanelDaemonNodeRecord } from "../../types";
+import type { AgentName, ControlPanelDaemonNodeRecord } from "../../types";
 import { useDialogs } from "@/components/ui/DialogProvider";
 import { Drawer } from "./Drawer";
 import { agentStatusTone } from "./helpers";
@@ -31,8 +27,6 @@ export function ManageAgentsDrawer({ open, onClose, node, onUpdated }: ManageAge
   const { confirm } = useDialogs();
   const [initialDisabled, setInitialDisabled] = useState<Set<AgentName>>(() => new Set());
   const [disabled, setDisabled] = useState<Set<AgentName>>(() => new Set());
-  const [initialRoleDefaults, setInitialRoleDefaults] = useState<AgentRoleMap>(() => ({}));
-  const [roleDefaults, setRoleDefaults] = useState<AgentRoleMap>(() => ({}));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,9 +44,6 @@ export function ManageAgentsDrawer({ open, onClose, node, onUpdated }: ManageAge
     const snapshot = new Set((node?.disabledAgents ?? []) as AgentName[]);
     setInitialDisabled(snapshot);
     setDisabled(new Set(snapshot));
-    const roles = normalizeAgentRoleMapPayload(node?.agentRoleDefaults ?? {});
-    setInitialRoleDefaults(roles);
-    setRoleDefaults(roles);
     setError(null);
     setSaving(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -63,15 +54,6 @@ export function ManageAgentsDrawer({ open, onClose, node, onUpdated }: ManageAge
       const next = new Set(prev);
       if (next.has(agent)) next.delete(agent);
       else next.add(agent);
-      return next;
-    });
-  }
-
-  function setRole(agent: AgentName, role: AgentRole | "") {
-    setRoleDefaults((prev) => {
-      const next = { ...prev };
-      if (role) next[agent] = role;
-      else delete next[agent];
       return next;
     });
   }
@@ -103,13 +85,6 @@ export function ManageAgentsDrawer({ open, onClose, node, onUpdated }: ManageAge
         );
         updatedNode = result.node;
       }
-      if (!agentRoleMapsEqual(roleDefaults, initialRoleDefaults)) {
-        const result = await updateControlPanelDaemonNodeAgentRoleDefaults(
-          node.id,
-          normalizeAgentRoleMapPayload(roleDefaults),
-        );
-        updatedNode = result.node;
-      }
       onUpdated(updatedNode);
       onClose();
     } catch (err) {
@@ -134,7 +109,7 @@ export function ManageAgentsDrawer({ open, onClose, node, onUpdated }: ManageAge
     );
   }
 
-  const dirty = !disabledSetsEqual(disabled, initialDisabled) || !agentRoleMapsEqual(roleDefaults, initialRoleDefaults);
+  const dirty = !disabledSetsEqual(disabled, initialDisabled);
 
   return (
     <Drawer
@@ -189,20 +164,6 @@ export function ManageAgentsDrawer({ open, onClose, node, onUpdated }: ManageAge
                   </span>
                 </label>
               </div>
-              <label className="adm-agent-role-field">
-                <span className="adm-agent-role-field-label">{t("admin.v2.agent_default_role")}</span>
-                <select
-                  value={roleDefaults[agent] ?? ""}
-                  onChange={(event) => setRole(agent, event.target.value as AgentRole | "")}
-                  disabled={saving || !isEnabled}
-                  aria-label={t("admin.v2.agent_default_role_for", { agent })}
-                >
-                  <option value="">{t("admin.v2.agent_role_builtin")}</option>
-                  {AGENT_ROLE_VALUES.map((role) => (
-                    <option key={role} value={role}>{t(`agent_role.${role}`)}</option>
-                  ))}
-                </select>
-              </label>
               <div className="adm-agent-inventory">
                 {skills.length === 0 && mcpServers.length === 0 ? (
                   <span className="adm-agent-inventory-empty">{t("admin.v2.agent_no_inventory")}</span>

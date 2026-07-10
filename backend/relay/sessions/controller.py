@@ -226,6 +226,10 @@ class SessionController:
             "agent": step["agent"],
             "role": role,
             "mode": step["mode"],
+            **({"logicalAgentId": step["logicalAgentId"]} if step.get("logicalAgentId") else {}),
+            **({"placementId": step["placementId"]} if step.get("placementId") else {}),
+            **({"daemonNodeId": step["daemonNodeId"]} if step.get("daemonNodeId") else {}),
+            **({"agentVersion": step["agentVersion"]} if step.get("agentVersion") else {}),
         }))
         self._update_task_status("review" if step["mode"] == "review" else "running", f"{step['agent']} {step['mode']} started.", {
             "agent": step["agent"],

@@ -3,13 +3,13 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Check, Inbox, Plus } from "lucide-react";
-import { assignControlPanelDaemonNode, createControlPanelDaemonNode } from "../../api";
+import { assignControlPanelDaemonNode, createControlPanelDaemonNode, createManagedNode } from "../../api";
 import type {
   AssignControlPanelDaemonNodeResponse,
   ControlPanelDaemonNodeRecord,
-  CreateControlPanelDaemonNodeResponse,
   EmployeeRecord,
 } from "../../types";
+import type { AddNodeDrawerSuccess } from "./AddNodeDrawer";
 import { Drawer } from "./Drawer";
 import { ExecutionProfileField, type DaemonSandboxMode } from "./ExecutionProfileField";
 import { statusTone, visualStatus } from "./helpers";
@@ -29,7 +29,7 @@ interface AssignNodeDrawerProps {
   unassignedNodes: ControlPanelDaemonNodeRecord[];
   defaultEmployeeId?: string;
   onAssignSuccess: (result: AssignControlPanelDaemonNodeResponse) => void;
-  onCreateNodeSuccess: (result: CreateControlPanelDaemonNodeResponse) => void;
+  onCreateNodeSuccess: (outcome: AddNodeDrawerSuccess) => void;
 }
 
 function initialsOf(value: string): string {
@@ -76,6 +76,7 @@ export function AssignNodeDrawer({
   const hasNodes = unassignedNodes.length > 0;
   // With no unassigned nodes, creating one is the only path — force it.
   const creatingNode = createNew || !hasNodes;
+  const isManaged = sandboxMode === "boxlite";
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -87,11 +88,19 @@ export function AssignNodeDrawer({
     setError(null);
     try {
       if (creatingNode) {
-        const result = await createControlPanelDaemonNode({
-          employeeId: nextEmployeeId,
-          sandboxMode,
-        });
-        onCreateNodeSuccess(result);
+        if (isManaged) {
+          const result = await createManagedNode({
+            employeeId: nextEmployeeId,
+            sandboxMode: "boxlite",
+          });
+          onCreateNodeSuccess({ kind: "managed", result });
+        } else {
+          const result = await createControlPanelDaemonNode({
+            employeeId: nextEmployeeId,
+            sandboxMode: "none",
+          });
+          onCreateNodeSuccess({ kind: "manual", result });
+        }
       } else {
         const result = await assignControlPanelDaemonNode({
           employeeId: nextEmployeeId,
@@ -308,7 +317,10 @@ export function AssignNodeDrawer({
             <legend className="adm-form-legend">{t("admin.v2.section_node")}</legend>
             <ExecutionProfileField
               value={sandboxMode}
-              onChange={setSandboxMode}
+              onChange={(mode) => {
+                setSandboxMode(mode);
+                setError(null);
+              }}
               name="assign-sandbox-mode"
               disabled={isBusy}
             />
@@ -333,7 +345,7 @@ export function AssignNodeDrawer({
             {isBusy
               ? creatingNode ? t("admin.creating") : t("admin.assigning")
               : creatingNode
-                ? t("admin.v2.generate_node")
+                ? t(isManaged ? "admin.v2.provision_node" : "admin.v2.generate_node")
                 : t("admin.assign")}
           </Button>
         </div>

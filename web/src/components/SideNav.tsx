@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type Dispatch, type MouseEvent, type SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  NavAdmin, NavBacklog, NavChannels, NavConversations, NavLogout, NavPreferences,
+  NavAdmin, NavAgents, NavBacklog, NavChannels, NavConversations, NavLogout, NavPreferences,
   NavRoutine, NavSidebarCollapse, NavSidebarExpand, NavWorkspace,
 } from "./icons";
 import { RelayMark } from "./RelayMark";
@@ -190,6 +190,22 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
         >
           <NavRoutine size={18} />
           <span className="sidenav-label">{t("nav.routine")}</span>
+        </a>
+        <a
+          className={`sidenav-btn ${route === "agents" ? "active" : ""}`}
+          data-nav="agents"
+          href={hrefForRoute("agents")}
+          aria-label={t("nav.agents_label")}
+          aria-current={route === "agents" ? "page" : undefined}
+          title={t("nav.agents_label")}
+          onClick={(event) => handleRouteClick(event, "agents")}
+          onMouseEnter={(e) => showNavTooltip(t("nav.agents"), e.currentTarget)}
+          onMouseLeave={hideNavTooltip}
+          onFocus={(e) => showNavTooltip(t("nav.agents"), e.currentTarget)}
+          onBlur={hideNavTooltip}
+        >
+          <NavAgents size={18} />
+          <span className="sidenav-label">{t("nav.agents")}</span>
         </a>
         {isAdmin ? (
           <>

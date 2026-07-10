@@ -316,6 +316,7 @@
   .workspace-page,
   .backlog-page,
   .routine-page,
+  .agents-page,
   .admin-console {
     grid-row: 2;
     min-height: 0;

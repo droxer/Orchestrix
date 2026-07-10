@@ -2,7 +2,7 @@
 
 import type { Dispatch, RefObject, SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
-import type { AgentName, AgentTaskMode, DaemonNodeMonitorRecord, RelayArtifact, RelaySession } from "../types";
+import type { AgentName, AgentTaskMode, EmployeeAgent, RelayArtifact, RelaySession } from "../types";
 import type { ConversationItem } from "./ConversationRow";
 import { ThreadPanel } from "./ThreadPanel";
 import { ChatHeader } from "./ChatHeader";
@@ -29,10 +29,12 @@ export type MainChatViewProps = {
   onRenameConversation: (session: RelaySession) => void;
   onCloseConversation: (sessionId: string) => void;
   activeAgent: AgentName;
-  setActiveAgent: Dispatch<SetStateAction<AgentName>>;
   agentNames: AgentName[];
   disabledAgents: AgentName[] | undefined;
-  agentHealth: DaemonNodeMonitorRecord["agents"] | undefined;
+  agentHealth: Partial<Record<AgentName, "unknown" | "ready" | "failed">> | undefined;
+  logicalAgents: EmployeeAgent[];
+  activeLogicalAgentId: string | null;
+  onLogicalAgentPicked: (agent: EmployeeAgent) => void;
   runningAgent: AgentName | undefined;
   isRefreshing: boolean;
   artifactCount: number;
@@ -50,8 +52,8 @@ export type MainChatViewProps = {
   setComposerMode: Dispatch<SetStateAction<AgentTaskMode>>;
   handoffOpen: boolean;
   setHandoffOpen: Dispatch<SetStateAction<boolean>>;
-  handoffAgent: AgentName;
-  setHandoffAgent: Dispatch<SetStateAction<AgentName>>;
+  handoffAgentId: string;
+  setHandoffAgentId: Dispatch<SetStateAction<string>>;
   handoffMode: AgentTaskMode;
   setHandoffMode: Dispatch<SetStateAction<AgentTaskMode>>;
   handoffNote: string;
@@ -81,10 +83,12 @@ export function MainChatView({
   onRenameConversation,
   onCloseConversation,
   activeAgent,
-  setActiveAgent,
   agentNames,
   disabledAgents,
   agentHealth,
+  logicalAgents,
+  activeLogicalAgentId,
+  onLogicalAgentPicked,
   runningAgent,
   isRefreshing,
   artifactCount,
@@ -102,8 +106,8 @@ export function MainChatView({
   setComposerMode,
   handoffOpen,
   setHandoffOpen,
-  handoffAgent,
-  setHandoffAgent,
+  handoffAgentId,
+  setHandoffAgentId,
   handoffMode,
   setHandoffMode,
   handoffNote,
@@ -134,10 +138,9 @@ export function MainChatView({
       <section id="chat-panel" className="chat-panel" aria-label={t("nav.conversations")} tabIndex={-1}>
         <ChatHeader
           activeAgent={activeAgent}
-          setActiveAgent={setActiveAgent}
-          agentNames={agentNames}
-          disabledAgents={disabledAgents}
-          agentHealth={agentHealth}
+          logicalAgents={logicalAgents}
+          activeLogicalAgentId={activeLogicalAgentId}
+          onLogicalAgentPicked={onLogicalAgentPicked}
           activeSession={activeSession}
           runningAgent={runningAgent}
           isRefreshing={isRefreshing}
@@ -174,13 +177,12 @@ export function MainChatView({
                 })}
                 {awaitingDecision ? (
                   <DecisionBar
-                    agentNames={agentNames}
-                    disabledAgents={disabledAgents}
+                    logicalAgents={logicalAgents}
                     sendDecision={sendDecision}
                     handoffOpen={handoffOpen}
                     setHandoffOpen={setHandoffOpen}
-                    handoffAgent={handoffAgent}
-                    setHandoffAgent={setHandoffAgent}
+                    handoffAgentId={handoffAgentId}
+                    setHandoffAgentId={setHandoffAgentId}
                     handoffMode={handoffMode}
                     setHandoffMode={setHandoffMode}
                     handoffNote={handoffNote}

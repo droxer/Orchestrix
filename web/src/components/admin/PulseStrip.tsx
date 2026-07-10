@@ -36,7 +36,7 @@ export function PulseStrip({
           { key: "failed", value: failed, label: t("admin.metric_failed"), tone: "bad" },
           { key: "queued", value: queued, label: t("admin.metric_queued"), tone: "neutral" },
         ]
-      : view === "people"
+      : view === "employees"
       ? [
           { key: "unassigned", value: unassignedNodes, label: t("admin.metric_unassigned"), tone: "neutral" },
           { key: "running", value: running, label: t("admin.metric_running"), tone: "neutral" },
@@ -51,8 +51,8 @@ export function PulseStrip({
   const ariaLabel =
     view === "dashboard"
       ? t("admin.v2.pulse_label")
-      : view === "people"
-        ? t("admin.v2.pulse_people_label")
+      : view === "employees"
+        ? t("admin.v2.pulse_employees_label")
         : t("admin.v2.pulse_fleet_label");
 
   return (

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { agentReadyForTask, discussionAgentsForTask, dueTone, filterTasks, localDateKey, tasksByStatus, type BacklogFilters } from "../src/lib/backlog.js";
-import type { DaemonNodeMonitorRecord, RelayTask } from "../src/types.js";
+import type { DaemonNodeMonitorRecord, EmployeeAgent, RelayTask } from "../src/types.js";
 
 const baseFilters: BacklogFilters = {
   query: "",
@@ -29,6 +29,7 @@ function task(input: Partial<RelayTask> & { id: string; title: string }): RelayT
     routineNextRunDate: input.routineNextRunDate,
     routineEnabled: input.routineEnabled ?? false,
     assignedAgent: input.assignedAgent,
+    assignedAgentId: input.assignedAgentId,
     linkedSessionIds: input.linkedSessionIds ?? [],
     activity: input.activity ?? [],
     createdAt: input.createdAt ?? "2026-06-01T00:00:00.000Z",
@@ -98,9 +99,43 @@ describe("agentReadyForTask", () => {
       activeRuns: [{ commandId: "cmd_1", sessionId: "ses_1", runId: "run_1", agent: "codex", mode: "ask", taskGoal: "question", startedAt: "2026-06-28T00:00:00.000Z" }],
     })]), false);
   });
+
+  it("uses logical-agent availability instead of employee node ownership", () => {
+    const backlogTask = task({ id: "a", title: "A", assignedAgent: "codex", assignedAgentId: "agent_builder" });
+    const logicalAgent: EmployeeAgent = {
+      id: "agent_builder",
+      employeeId: "alice",
+      displayName: "Builder",
+      executorKind: "codex",
+      skillPolicy: {}, toolPolicy: {}, modelPolicy: {},
+      enabled: true,
+      version: 1,
+      availability: "ready",
+      placements: [],
+      createdAt: "2026-07-10T00:00:00.000Z",
+      updatedAt: "2026-07-10T00:00:00.000Z",
+    };
+
+    assert.equal(agentReadyForTask(backlogTask, [], [logicalAgent]), true);
+    assert.equal(agentReadyForTask(backlogTask, [node({ id: "n1", employeeId: "alice" })], [{ ...logicalAgent, availability: "offline" }]), false);
+  });
 });
 
 describe("discussionAgentsForTask", () => {
+  it("uses ready logical agents without exposing their runtime nodes", () => {
+    const backlogTask = task({ id: "a", title: "A", assigneeEmployeeId: "alice" });
+    const base: Omit<EmployeeAgent, "id" | "displayName" | "executorKind"> = {
+      employeeId: "alice", skillPolicy: {}, toolPolicy: {}, modelPolicy: {},
+      enabled: true, version: 1, availability: "ready", placements: [],
+      createdAt: "2026-07-10T00:00:00.000Z", updatedAt: "2026-07-10T00:00:00.000Z",
+    };
+    assert.deepEqual(discussionAgentsForTask(backlogTask, [], [
+      { ...base, id: "agent_research", displayName: "Researcher", executorKind: "claude" },
+      { ...base, id: "agent_review", displayName: "Reviewer", executorKind: "claude" },
+      { ...base, id: "agent_build", displayName: "Builder", executorKind: "codex" },
+    ]), ["claude", "codex"]);
+  });
+
   it("returns ready enabled agents from the matching employee node", () => {
     const backlogTask = task({ id: "a", title: "A", assigneeEmployeeId: "alice" });
 

@@ -15,6 +15,7 @@ export interface ChatConversationRef {
 export interface ChatIdentity {
   employeeId: string;
   displayName?: string;
+  defaultAgentId?: string;
   defaultSandboxId?: string;
   isAdmin?: boolean;
 }
@@ -82,6 +83,21 @@ export interface RelayChatRequestContext {
 }
 
 export interface RelayChatBackend {
+  listEmployeeAgents?(employeeId: string, signal?: AbortSignal): Promise<Array<{ id: string; executorKind: AgentName; availability?: string }>>;
+  startAgentRun?(input: {
+    agentId: string;
+    taskGoal: string;
+    mode?: AgentTaskMode;
+    sessionId?: string;
+    employeeId?: string;
+    signal?: AbortSignal;
+  }): Promise<RelaySession>;
+  cancelSessionRun?(input: {
+    sessionId: string;
+    reason?: string;
+    employeeId?: string;
+    signal?: AbortSignal;
+  }): Promise<RelaySession>;
   startSandboxRun(input: {
     sandboxId: string;
     taskGoal: string;

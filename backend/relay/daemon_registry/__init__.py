@@ -18,6 +18,7 @@ from .registry import (
     sandbox_ui_auth_error,
     sandbox_ui_token_matches,
     workspace_paths_match,
+    workspace_identity,
 )
 
 __all__ = [
@@ -40,4 +41,5 @@ __all__ = [
     "sandbox_ui_auth_error",
     "sandbox_ui_token_matches",
     "workspace_paths_match",
+    "workspace_identity",
 ]

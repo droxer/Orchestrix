@@ -171,6 +171,7 @@ class LocalChatIntegrationStore:
                 "externalUserId": external_user_id,
                 "employeeId": employee_id,
                 "displayName": _string(payload.get("displayName")),
+                "defaultAgentId": _string(payload.get("defaultAgentId")),
                 "defaultSandboxId": _string(payload.get("defaultSandboxId")),
                 "createdAt": now_iso(),
                 "updatedAt": now_iso(),
@@ -244,6 +245,7 @@ class LocalChatIntegrationStore:
                     "tenantId": integration.get("tenantId"),
                     "employeeId": link["employeeId"],
                     "displayName": link.get("displayName"),
+                    "defaultAgentId": link.get("defaultAgentId"),
                     "defaultSandboxId": link.get("defaultSandboxId"),
                 }
             return None
