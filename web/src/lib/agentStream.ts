@@ -28,19 +28,77 @@ export function parseAgentStream(agent: AgentName, raw: string): AgentSegment[] 
 }
 
 export function userVisibleAgentSegments(segments: AgentSegment[]): AgentSegment[] {
-  return segments.filter((segment) => segment.kind === "text" || segment.kind === "status" || segment.kind === "narration");
+  const visible = segments.filter(
+    (segment) => segment.kind === "text" || segment.kind === "status" || segment.kind === "narration",
+  );
+  // Raw fallback output (CLI text the parser could not classify) is elided
+  // once a run settles — unless it is the only substance, in which case
+  // dropping it would leave the turn reading as empty.
+  if (visible.some((segment) => segment.kind === "text")) return visible;
+  if (!segments.some((segment) => segment.kind === "raw")) return visible;
+  return segments.filter(
+    (segment) =>
+      segment.kind === "text" ||
+      segment.kind === "status" ||
+      segment.kind === "narration" ||
+      segment.kind === "raw",
+  );
+}
+
+/** While a run is live, surface tool/command lines so long silent stretches still read as activity. */
+export function displayAgentSegments(segments: AgentSegment[], streaming: boolean): AgentSegment[] {
+  if (!streaming) return userVisibleAgentSegments(segments);
+  return segments.filter((segment) => segment.kind !== "thinking");
+}
+
+export function hasStreamingTextCaret(segments: AgentSegment[]): boolean {
+  return segments[segments.length - 1]?.kind === "text";
 }
 
 export function emptyAgentStreamSegments(_agent: AgentName, _streaming: boolean, _t: TFunction): AgentSegment[] {
   return [];
 }
 
+export function agentMessagePlainText(
+  agent: AgentName,
+  stdout: string,
+  stderr: string,
+  t: TFunction,
+  streaming = false,
+): string {
+  const segments = displayAgentSegments(
+    [...parseAgentStream(agent, stdout), ...parseAgentStderr(stderr)],
+    streaming,
+  );
+  return segments
+    .map((segment) => {
+      if (segment.kind === "text" || segment.kind === "status" || segment.kind === "raw") return segment.text;
+      if (segment.kind === "narration") return t(segment.key, segment.params);
+      return "";
+    })
+    .filter(Boolean)
+    .join("\n\n")
+    .trim();
+}
+
+// stderr from a chatty CLI (progress bars, repeated deprecation warnings) can
+// run to dozens of lines; the transcript keeps the tail — where the actual
+// error usually lands — behind a single "omitted" line instead of a wall of
+// warn rows.
+const STDERR_TAIL_LINES = 3;
+
 export function parseAgentStderr(raw: string): AgentSegment[] {
   if (!raw) return [];
   const lines = stripAnsi(raw).split(/\r?\n/)
     .map((line) => line.trim())
-    .filter((line) => line && !isCodexStdinNotice(line));
-  return lines.map((line): AgentSegment => ({ kind: "status", tone: "warn", text: line }));
+    .filter((line) => line && !isCodexStdinNotice(line))
+    .filter((line, index, all) => line !== all[index - 1]);
+  const tail = lines.slice(-STDERR_TAIL_LINES);
+  const omitted = lines.length - tail.length;
+  const out: AgentSegment[] = [];
+  if (omitted > 0) out.push(narration("agent_stream.stderr_omitted", { count: omitted }, "warn"));
+  for (const line of tail) out.push({ kind: "status", tone: "warn", text: line });
+  return out;
 }
 
 function isCodexStdinNotice(line: string): boolean {

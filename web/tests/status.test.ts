@@ -7,6 +7,14 @@ import {
   mergeVisibleDaemonNodes,
   shouldClaimLocalDaemonNode,
 } from "../src/lib/daemonNodes.js";
+import {
+  buildDaemonStartCommand,
+  nodeExecutionProfile,
+  nodeLocalityFlags,
+  nodeLocalityKinds,
+  resolveNodeCredentials,
+  upsertStoredCredentialsFromNodes,
+} from "../src/lib/adminHelpers.js";
 import type {
   ControlPanelDaemonNodeRecord,
   DaemonNodeMonitorRecord,
@@ -277,5 +285,107 @@ describe("Relay web conversation status", () => {
     } finally {
       globalThis.fetch = originalFetch;
     }
+  });
+});
+
+describe("Relay web admin node helpers", () => {
+  it("builds a daemon start command from cached node metadata", () => {
+    const command = buildDaemonStartCommand({
+      id: "sbx_alice",
+      employeeId: "alice",
+      workspacePath: "/workspace/alice",
+      sandboxMode: "boxlite",
+    }, "tok_secret", "http://127.0.0.1:8790");
+
+    assert.match(command, /--sandbox-id sbx_alice/);
+    assert.match(command, /--token tok_secret/);
+    assert.match(command, /--sandbox boxlite/);
+    assert.doesNotMatch(command, /--use-local-agent-home/);
+    assert.match(command, /--employee-id alice/);
+    assert.match(command, /--workspace /);
+  });
+
+  it("defaults missing sandbox mode to managed command reconstruction", () => {
+    const command = buildDaemonStartCommand({
+      id: "sbx_pending",
+      employeeId: "alice",
+      workspacePath: "/workspace/alice",
+    }, "tok_secret", "http://127.0.0.1:8790");
+
+    assert.match(command, /--sandbox boxlite/);
+    assert.doesNotMatch(command, /--use-local-agent-home/);
+  });
+
+  it("adds local agent home only for local daemon commands", () => {
+    const command = buildDaemonStartCommand({
+      id: "sbx_local",
+      employeeId: "alice",
+      workspacePath: "/workspace/alice",
+      sandboxMode: "none",
+    }, "tok_secret", "http://127.0.0.1:8790");
+
+    assert.match(command, /--sandbox none/);
+    assert.match(command, /--use-local-agent-home/);
+  });
+
+  it("resolves credentials from browser cache when the server no longer reveals tokens", () => {
+    const node = {
+      ...controlPanelNode({
+        id: "sbx_alice",
+        employeeId: "alice",
+        online: true,
+        stale: false,
+      }),
+      nodeToken: undefined,
+    };
+    const resolved = resolveNodeCredentials(node, {
+      nodeToken: "tok_cached",
+      savedAt: "2026-06-12T00:00:00.000Z",
+    }, "http://127.0.0.1:8790");
+
+    assert.equal(resolved.source, "cache");
+    assert.equal(resolved.nodeToken, "tok_cached");
+    assert.match(resolved.daemonCommand ?? "", /--token tok_cached/);
+  });
+
+  it("labels colocated live nodes and browser-provisioned nodes", () => {
+    const node = controlPanelNode({
+      id: "sbx_alice",
+      employeeId: "alice",
+      online: true,
+      stale: false,
+      sandboxMode: "boxlite",
+    });
+    const flags = nodeLocalityFlags(node, {
+      colocated: true,
+      storedTokens: {
+        sbx_alice: { nodeToken: "tok_cached", savedAt: "2026-06-12T00:00:00.000Z" },
+      },
+    });
+
+    assert.equal(flags.hasCachedCredentials, true);
+    assert.equal(flags.isColocatedLive, true);
+    assert.equal(nodeExecutionProfile(node), "managed");
+    assert.deepEqual(nodeLocalityKinds(node, {
+      colocated: true,
+      storedTokens: { sbx_alice: { nodeToken: "tok_cached", savedAt: "2026-06-12T00:00:00.000Z" } },
+    }), ["saved_here", "this_host"]);
+    assert.equal(nodeExecutionProfile({ sandboxMode: "none" }), "local");
+  });
+
+  it("persists ephemeral control-panel node tokens into the stored map", () => {
+    const node = controlPanelNode({
+      id: "sbx_alice",
+      employeeId: "alice",
+      nodeToken: "tok_live",
+      workspacePath: "/workspace/alice",
+    });
+    const updated = upsertStoredCredentialsFromNodes({}, [node], "http://127.0.0.1:8790");
+
+    assert.ok(updated);
+    assert.equal(updated?.sbx_alice.nodeToken, "tok_live");
+    assert.match(updated?.sbx_alice.daemonCommand ?? "", /--token tok_live/);
+    assert.match(updated?.sbx_alice.daemonCommand ?? "", /--sandbox boxlite/);
+    assert.doesNotMatch(updated?.sbx_alice.daemonCommand ?? "", /--use-local-agent-home/);
   });
 });

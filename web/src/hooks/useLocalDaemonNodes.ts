@@ -1,35 +1,35 @@
 import { useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ControlPanelDaemonNodeRecord } from "../types";
-
-const LOCAL_NODES_KEY = ["relay", "local-nodes"] as const;
-const POLL_INTERVAL_MS = 3000;
+import {
+  CONTROL_PANEL_NODES_KEY,
+  CONTROL_PANEL_POLL_MS,
+  fetchControlPanelNodes,
+} from "../lib/controlPanelQueries";
 
 // Admin-only discovery of daemon nodes registered with a co-located control
-// panel. The 3s poll lives on the query's refetchInterval (replacing a manual
-// setInterval); provisioning/adopt flows call refreshLocalDaemonNodes() for a
-// guaranteed-fresh read, which also writes the cache so localNodes stays in
-// sync. When disabled (non-admin / not local) the poll is off but imperative
-// fetches still populate the same cache, matching the prior behavior.
-export function useLocalDaemonNodes(
-  fetcher: () => Promise<ControlPanelDaemonNodeRecord[]>,
-  enabled: boolean,
-): {
+// panel. Shares CONTROL_PANEL_NODES_KEY with useAdminFleet so chat + admin do
+// not double-poll /cp/daemon-nodes on localhost.
+export function useLocalDaemonNodes(enabled: boolean): {
   localNodes: ControlPanelDaemonNodeRecord[];
   refreshLocalDaemonNodes: () => Promise<ControlPanelDaemonNodeRecord[]>;
 } {
   const queryClient = useQueryClient();
 
   const query = useQuery({
-    queryKey: LOCAL_NODES_KEY,
-    queryFn: fetcher,
+    queryKey: CONTROL_PANEL_NODES_KEY,
+    queryFn: ({ signal }) => fetchControlPanelNodes(signal),
     enabled,
-    refetchInterval: POLL_INTERVAL_MS,
+    refetchInterval: CONTROL_PANEL_POLL_MS,
   });
 
   const refreshLocalDaemonNodes = useCallback(
-    () => queryClient.fetchQuery({ queryKey: LOCAL_NODES_KEY, queryFn: fetcher, staleTime: 0 }),
-    [queryClient, fetcher],
+    () => queryClient.fetchQuery({
+      queryKey: CONTROL_PANEL_NODES_KEY,
+      queryFn: ({ signal }) => fetchControlPanelNodes(signal),
+      staleTime: 0,
+    }),
+    [queryClient],
   );
 
   return { localNodes: query.data ?? [], refreshLocalDaemonNodes };

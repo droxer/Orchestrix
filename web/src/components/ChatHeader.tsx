@@ -39,9 +39,10 @@ export function ChatHeader({ activeAgent, setActiveAgent, agentNames, disabledAg
   const disabledSet = new Set(disabledAgents ?? []);
   const { t } = useTranslation();
   const tabsRef = useRef<HTMLDivElement>(null);
-  // Single-select radiogroup: only enabled agents participate in arrow-key
-  // navigation, and exactly one radio is in the tab order (roving tabindex).
-  const enabledAgents = agentNames.filter((a) => !disabledSet.has(a));
+  const enabledAgents = agentNames.filter((agent) => {
+    if (disabledSet.has(agent)) return false;
+    return agentHealth?.[agent] === "ready";
+  });
   const rovingAgent = !disabledSet.has(activeAgent) ? activeAgent : enabledAgents[0];
   const moveActive = (dir: 1 | -1) => {
     if (enabledAgents.length === 0) return;
@@ -100,19 +101,25 @@ export function ChatHeader({ activeAgent, setActiveAgent, agentNames, disabledAg
         </div>
         <div className="header-agent-tabs" role="radiogroup" aria-label={t("thread.talk_to_agent")} ref={tabsRef}>
           {agentNames.map((a) => {
-            const isDisabled = disabledSet.has(a);
-            const isFailed = agentHealth?.[a] === "failed";
+            const adminDisabled = disabledSet.has(a);
+            const health = agentHealth?.[a] ?? "unknown";
+            const isReady = health === "ready";
+            const isDisabled = adminDisabled || !isReady;
+            const isFailed = health === "failed";
             const isActive = a === activeAgent;
             const classes = [
               isActive ? "active" : "",
               isDisabled ? "agent-tab-disabled" : "",
-              isFailed && !isDisabled ? "agent-tab-failed" : "",
+              isFailed && !adminDisabled ? "agent-tab-failed" : "",
+              !isReady && !adminDisabled && !isFailed ? "agent-tab-not-ready" : "",
             ].filter(Boolean).join(" ");
-            const title = isDisabled
+            const title = adminDisabled
               ? t("thread.agent_disabled_title", { agent: a })
               : isFailed
                 ? t("thread.agent_failed_title", { agent: a })
-                : undefined;
+                : !isReady
+                  ? t("thread.agent_not_ready_title", { agent: a })
+                  : undefined;
             return (
               <button
                 key={a}

@@ -3,7 +3,8 @@ import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { AgentMark } from "./AgentMark";
 import { AgentStream } from "./AgentStream";
-import type { AgentName } from "../types";
+import { MessageTurnActions } from "./MessageTurnActions";
+import type { AgentName, AgentTaskMode } from "../types";
 import { AGENT_NAMES } from "../types";
 import { agentLabel, parsePlanSteps, type PlanStep } from "../lib/plan";
 import type { RelayArtifact } from "relay-core";
@@ -15,11 +16,15 @@ export { isGroupedContinuation, projectMessages } from "../lib/projectMessages";
 export type { DerivedMessage } from "../lib/projectMessages";
 
 function formatTime(value: string): string {
+  const date = new Date(value);
+  // A malformed event timestamp must not throw mid-render and take the whole
+  // transcript down with it.
+  if (Number.isNaN(date.getTime())) return "";
   return new Intl.DateTimeFormat(document.documentElement.lang || undefined, {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
-  }).format(new Date(value));
+  }).format(date);
 }
 
 function formatArtifactSize(bytes: number | undefined, t: TFunction): string {
@@ -139,6 +144,8 @@ type MessageBlockProps = {
   sessionId: string;
   grouped?: boolean;
   onOpenArtifact?: (artifact: RelayArtifact) => void;
+  onRetryAgent?: (agent: AgentName, mode: AgentTaskMode) => void;
+  retryDisabled?: boolean;
 };
 
 export function MessageBlock({
@@ -146,6 +153,8 @@ export function MessageBlock({
   sessionId,
   grouped = false,
   onOpenArtifact,
+  onRetryAgent,
+  retryDisabled = false,
 }: MessageBlockProps) {
   const { t } = useTranslation();
   if (message.kind === "user") {
@@ -155,10 +164,10 @@ export function MessageBlock({
         <div className="turn-body">
           <header>
             <span className="turn-who" translate="no">{t("message.user_label")}</span>
-            <time className="mono">{formatTime(message.timestamp)}</time>
           </header>
           <p className="user-text">{message.text}</p>
         </div>
+        <time className="msg-time mono" dateTime={message.timestamp}>{formatTime(message.timestamp)}</time>
       </article>
     );
   }
@@ -177,7 +186,9 @@ export function MessageBlock({
               {message.agent}
               <span className="agent-mode" data-mode={message.mode}>{message.mode}</span>
             </span>
-            <time className="mono">{formatTime(message.timestamp)}</time>
+            {message.streaming ? (
+              <span className="agent-live-pulse" aria-label={t("agent_stream.empty_working")} />
+            ) : null}
           </header>
           <AgentStream
             agent={message.agent}
@@ -192,7 +203,17 @@ export function MessageBlock({
               ))}
             </div>
           ) : null}
+          <MessageTurnActions
+            agent={message.agent}
+            mode={message.mode}
+            stdout={message.stdout}
+            stderr={message.stderr}
+            streaming={message.streaming}
+            retryDisabled={retryDisabled}
+            onRetry={onRetryAgent}
+          />
         </div>
+        <time className="msg-time mono" dateTime={message.timestamp}>{formatTime(message.timestamp)}</time>
       </article>
     );
   }
@@ -203,21 +224,27 @@ export function MessageBlock({
   if (message.artifact) {
     return (
       <div className={`msg msg-system msg-system-artifact tone-${message.tone}`}>
-        <ArtifactCard artifact={message.artifact} sessionId={sessionId} onOpenArtifact={onOpenArtifact} />
-        <time className="mono">{formatTime(message.timestamp)}</time>
+        <span className={`rail-node rail-node-system tone-${message.tone}`} aria-hidden="true" />
+        <div className="msg-system-body">
+          <ArtifactCard artifact={message.artifact} sessionId={sessionId} onOpenArtifact={onOpenArtifact} />
+        </div>
+        <time className="msg-time mono" dateTime={message.timestamp}>{formatTime(message.timestamp)}</time>
       </div>
     );
   }
 
   return (
     <div className={`msg msg-system tone-${message.tone}`}>
-      <span className="msg-system-label">
-        <span>{message.label}</span>
-      </span>
-      {message.detail ? (
-        <span className="msg-system-detail">{message.detail}</span>
-      ) : null}
-      <time className="mono">{formatTime(message.timestamp)}</time>
+      <span className={`rail-node rail-node-system tone-${message.tone}`} aria-hidden="true" />
+      <div className="msg-system-body">
+        <span className="msg-system-label">
+          <span>{message.label}</span>
+        </span>
+        {message.detail ? (
+          <span className="msg-system-detail">{message.detail}</span>
+        ) : null}
+      </div>
+      <time className="msg-time mono" dateTime={message.timestamp}>{formatTime(message.timestamp)}</time>
     </div>
   );
 }

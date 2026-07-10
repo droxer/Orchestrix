@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, Inbox } from "lucide-react";
+import { Check, Inbox, Plus } from "lucide-react";
 import { assignControlPanelDaemonNode, createControlPanelDaemonNode } from "../../api";
 import type {
   AssignControlPanelDaemonNodeResponse,
@@ -11,9 +11,9 @@ import type {
   EmployeeRecord,
 } from "../../types";
 import { Drawer } from "./Drawer";
+import { ExecutionProfileField, type DaemonSandboxMode } from "./ExecutionProfileField";
 import { statusTone, visualStatus } from "./helpers";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -52,7 +52,8 @@ export function AssignNodeDrawer({
   const { t } = useTranslation();
   const [employeeId, setEmployeeId] = useState("");
   const [nodeId, setNodeId] = useState("");
-  const [localWorkspacePath, setLocalWorkspacePath] = useState("");
+  const [createNew, setCreateNew] = useState(false);
+  const [sandboxMode, setSandboxMode] = useState<DaemonSandboxMode>("boxlite");
   const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
 
@@ -60,7 +61,8 @@ export function AssignNodeDrawer({
     if (open) {
       setEmployeeId(defaultEmployeeId ?? "");
       setNodeId("");
-      setLocalWorkspacePath("");
+      setCreateNew(false);
+      setSandboxMode("boxlite");
       setError(null);
       setIsBusy(false);
     }
@@ -72,33 +74,34 @@ export function AssignNodeDrawer({
     [employees, employeeId],
   );
   const hasNodes = unassignedNodes.length > 0;
+  // With no unassigned nodes, creating one is the only path — force it.
+  const creatingNode = createNew || !hasNodes;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextEmployeeId = employeeId.trim().replace(/^@/, "");
-    const nextWorkspacePath = localWorkspacePath.trim();
     if (!nextEmployeeId) return setError(t("admin.employee_required"));
-    if (hasNodes && !nodeId) return setError(t("admin.node_required"));
+    if (!creatingNode && !nodeId) return setError(t("admin.node_required"));
 
     setIsBusy(true);
     setError(null);
     try {
-      if (hasNodes) {
+      if (creatingNode) {
+        const result = await createControlPanelDaemonNode({
+          employeeId: nextEmployeeId,
+          sandboxMode,
+        });
+        onCreateNodeSuccess(result);
+      } else {
         const result = await assignControlPanelDaemonNode({
           employeeId: nextEmployeeId,
           nodeId,
         });
         onAssignSuccess(result);
-      } else {
-        const result = await createControlPanelDaemonNode({
-          employeeId: nextEmployeeId,
-          workspacePath: nextWorkspacePath,
-        });
-        onCreateNodeSuccess(result);
       }
     } catch (err) {
       setError(
-        t(hasNodes ? "admin.v2.assign_error" : "admin.v2.create_node_error", {
+        t(creatingNode ? "admin.v2.create_node_error" : "admin.v2.assign_error", {
           message: err instanceof Error ? err.message : String(err),
         }),
       );
@@ -107,9 +110,9 @@ export function AssignNodeDrawer({
     }
   }
 
-  const canSubmit = hasNodes
-    ? Boolean(employeeId && nodeId)
-    : Boolean(employeeId.trim());
+  const canSubmit = creatingNode
+    ? Boolean(employeeId.trim())
+    : Boolean(employeeId && nodeId);
   const displayHandle = selectedEmployee
     ? `@${selectedEmployee.id}`
     : employeeId
@@ -219,7 +222,10 @@ export function AssignNodeDrawer({
                         name="assign-node-id"
                         value={node.id}
                         checked={isSelected}
-                        onChange={() => setNodeId(node.id)}
+                        onChange={() => {
+                          setNodeId(node.id);
+                          setCreateNew(false);
+                        }}
                       />
                       <span className={`adm-assign-node ${isSelected ? "selected" : ""}`}>
                         <span
@@ -252,6 +258,35 @@ export function AssignNodeDrawer({
                   </li>
                 );
               })}
+              <li>
+                <label className="adm-assign-node-choice">
+                  <input
+                    className="adm-assign-node-input"
+                    type="radio"
+                    name="assign-node-id"
+                    value="__new__"
+                    checked={createNew}
+                    onChange={() => {
+                      setCreateNew(true);
+                      setNodeId("");
+                    }}
+                  />
+                  <span className={`adm-assign-node ${createNew ? "selected" : ""}`}>
+                    <span className="adm-assign-node-dot tone-muted" aria-hidden="true" />
+                    <span className="adm-assign-node-body">
+                      <span className="adm-assign-node-id">
+                        <Plus size={12} aria-hidden="true" /> {t("admin.v2.assign_new_node_option")}
+                      </span>
+                      <span className="adm-assign-node-path muted">
+                        {t("admin.v2.assign_new_node_hint")}
+                      </span>
+                    </span>
+                    <span className="adm-assign-node-check" aria-hidden="true">
+                      {createNew ? <Check size={14} /> : null}
+                    </span>
+                  </span>
+                </label>
+              </li>
             </ul>
           ) : (
             <div className="adm-assign-empty" role="status">
@@ -261,31 +296,25 @@ export function AssignNodeDrawer({
                   {t("admin.no_unassigned_nodes")}
                 </p>
                 <p className="adm-assign-empty-body">
-                  {t("admin.v2.local_node_help")}
+                  {t("admin.v2.assign_new_node_hint")}
                 </p>
               </div>
             </div>
           )}
         </section>
 
-        {!hasNodes ? (
+        {creatingNode ? (
           <fieldset className="adm-form-section">
-            <legend className="adm-form-legend">{t("admin.v2.section_local_node")}</legend>
-            <label className="adm-field">
-              <span>
-                {t("admin.workspace_path")}
-                <span className="adm-field-opt">{t("admin.v2.optional")}</span>
-              </span>
-              <Input
-                name="assign-local-node-workspace"
-                className="mono"
-                value={localWorkspacePath}
-                onChange={(event) => setLocalWorkspacePath(event.target.value)}
-                autoComplete="off"
-                spellCheck={false}
-                placeholder={t("admin.v2.placeholder_workspace_path")}
-              />
-            </label>
+            <legend className="adm-form-legend">{t("admin.v2.section_node")}</legend>
+            <ExecutionProfileField
+              value={sandboxMode}
+              onChange={setSandboxMode}
+              name="assign-sandbox-mode"
+              disabled={isBusy}
+            />
+            <p className="adm-form-hint">
+              {sandboxMode === "boxlite" ? t("admin.v2.node_help_managed") : t("admin.v2.node_help_local")}
+            </p>
           </fieldset>
         ) : null}
 
@@ -302,10 +331,10 @@ export function AssignNodeDrawer({
           </Button>
           <Button type="submit" disabled={isBusy || !canSubmit}>
             {isBusy
-              ? hasNodes ? t("admin.assigning") : t("admin.creating")
-              : hasNodes
-                ? t("admin.assign")
-                : t("admin.v2.generate_node")}
+              ? creatingNode ? t("admin.creating") : t("admin.assigning")
+              : creatingNode
+                ? t("admin.v2.generate_node")
+                : t("admin.assign")}
           </Button>
         </div>
       </form>

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { TFunction } from "i18next";
 
-import { emptyAgentStreamSegments, parseAgentStderr, parseAgentStream, userVisibleAgentSegments } from "../src/lib/agentStream.js";
+import { displayAgentSegments, emptyAgentStreamSegments, hasStreamingTextCaret, parseAgentStderr, parseAgentStream, userVisibleAgentSegments, agentMessagePlainText, type AgentSegment } from "../src/lib/agentStream.js";
 
 describe("agent stream parsing", () => {
   it("filters Codex stdin notice from stderr", () => {
@@ -15,6 +15,46 @@ describe("agent stream parsing", () => {
 
     assert.deepEqual(parseAgentStderr(raw), [
       { kind: "status", tone: "warn", text: "real warning" },
+    ]);
+  });
+
+  it("collapses long stderr to the tail behind an omitted-lines narration", () => {
+    const raw = ["line 1", "line 2", "line 3", "line 4", "line 5"].join("\n");
+
+    assert.deepEqual(parseAgentStderr(raw), [
+      { kind: "narration", key: "agent_stream.stderr_omitted", params: { count: 2, tone: "warn" } },
+      { kind: "status", tone: "warn", text: "line 3" },
+      { kind: "status", tone: "warn", text: "line 4" },
+      { kind: "status", tone: "warn", text: "line 5" },
+    ]);
+  });
+
+  it("dedupes consecutive repeated stderr lines", () => {
+    const raw = ["progress 50%", "progress 50%", "progress 50%", "done with warnings"].join("\n");
+
+    assert.deepEqual(parseAgentStderr(raw), [
+      { kind: "status", tone: "warn", text: "progress 50%" },
+      { kind: "status", tone: "warn", text: "done with warnings" },
+    ]);
+  });
+
+  it("keeps raw fallback output visible when it is the only substance of a turn", () => {
+    const segments: AgentSegment[] = [
+      { kind: "raw", text: "plain CLI output the parser could not classify" },
+      { kind: "narration", key: "agent_stream.codex_finished", params: { tone: "good" } },
+    ];
+
+    assert.deepEqual(userVisibleAgentSegments(segments), segments);
+  });
+
+  it("still elides raw fallback output once real text is present", () => {
+    const segments: AgentSegment[] = [
+      { kind: "raw", text: "protocol noise" },
+      { kind: "text", text: "Here is the answer." },
+    ];
+
+    assert.deepEqual(userVisibleAgentSegments(segments), [
+      { kind: "text", text: "Here is the answer." },
     ]);
   });
 
@@ -139,6 +179,29 @@ describe("agent stream parsing", () => {
     assert.deepEqual(userVisibleAgentSegments(parseAgentStream("codex", raw)), [
       { kind: "text", text: "Recovered completed answer." },
     ]);
+  });
+
+  it("shows tool and command lines only while a run is streaming", () => {
+    const segments: AgentSegment[] = [
+      { kind: "text", text: "Planning." },
+      { kind: "tool", name: "Read", target: "src/app.ts" },
+      { kind: "command", command: "npm test" },
+      { kind: "thinking", text: "hidden reasoning" },
+    ];
+
+    assert.deepEqual(displayAgentSegments(segments, true), [
+      { kind: "text", text: "Planning." },
+      { kind: "tool", name: "Read", target: "src/app.ts" },
+      { kind: "command", command: "npm test" },
+    ]);
+    assert.deepEqual(displayAgentSegments(segments, false), [
+      { kind: "text", text: "Planning." },
+    ]);
+  });
+
+  it("detects when the streaming caret should attach to text", () => {
+    assert.equal(hasStreamingTextCaret([{ kind: "tool", name: "Read" }]), false);
+    assert.equal(hasStreamingTextCaret([{ kind: "text", text: "Still typing" }]), true);
   });
 
   it("renders Kimi assistant text without raw JSON", () => {
@@ -297,5 +360,16 @@ describe("agent stream parsing", () => {
     assert.deepEqual(emptyAgentStreamSegments("pi", false, t as TFunction), []);
     assert.deepEqual(emptyAgentStreamSegments("pi", true, t as TFunction), []);
     assert.deepEqual(emptyAgentStreamSegments("claude", false, t as TFunction), []);
+  });
+
+  it("extracts user-visible plain text for copy", () => {
+    const t = (key: string) => key;
+    const stdout = "\n\nShip the fix.\n";
+    const stderr = "stderr warning";
+
+    assert.equal(
+      agentMessagePlainText("pi", stdout, stderr, t as TFunction),
+      "Ship the fix.\n\nstderr warning",
+    );
   });
 });

@@ -18,9 +18,10 @@ import { useSessionEvents } from "./hooks/useSessionEvents";
 import { useLocalDaemonNodes } from "./hooks/useLocalDaemonNodes";
 import { mergeVisibleDaemonNodes } from "./lib/daemonNodes";
 import { routeComposerMessage } from "./lib/messageRouting";
+import { dispatchReadyAgents, formatDispatchError, isAgentDispatchReady } from "./lib/agentReadiness";
 import { effectiveAgentRoleMap, type AgentRoleMap } from "./lib/manageAgents";
 import { applyTheme, readLanguage, readTheme, readTokens, selectedEmployeeKey, writeLanguage, writeTheme } from "./lib/appStorage";
-import { canUseLocalControlPanel, localControlPanelNodes } from "./lib/controlPanel";
+import { canUseLocalControlPanel } from "./lib/controlPanel";
 import { useRelayStore } from "./lib/store";
 import { useAuthSession } from "./hooks/useAuthSession";
 import { useActiveSession } from "./hooks/useActiveSession";
@@ -40,7 +41,7 @@ import { visibleConversationArtifacts } from "./lib/conversationArtifacts";
 import {
   canCancelConversationRun,
   conversationCancelNodeId,
-  findActiveRunForSession,
+  findActiveRunOwnerForSession,
   isConversationRunInFlight,
 } from "./lib/conversationRunning";
 
@@ -121,7 +122,6 @@ export function App() {
   const selectedEmployeeToken = tokens[selectedEmployee];
   const { sandboxes, nodes, sessions, tasks, isRefreshing, refresh, setSandboxes } = useRelayData(selectedEmployeeToken, Boolean(user));
   const { localNodes, refreshLocalDaemonNodes } = useLocalDaemonNodes(
-    localControlPanelNodes,
     hydrated && user?.role === "admin" && canUseLocalControlPanel(),
   );
   const visibleNodes = useMemo(() => mergeVisibleDaemonNodes(nodes, localNodes), [nodes, localNodes]);
@@ -189,7 +189,11 @@ export function App() {
   useSessionEvents(activeSession?.id, Boolean(user) && shouldTailSessionEvents(activeSession?.status));
 
   const selectedToken = selectedSandbox ? (tokens[selectedSandbox.id] ?? tokens[selectedEmployee]) : tokens[selectedEmployee];
-  const activeRun = findActiveRunForSession(selectedNode, activeSession?.id);
+  const activeRunOwner = useMemo(
+    () => findActiveRunOwnerForSession(visibleNodes, activeSession?.id),
+    [visibleNodes, activeSession?.id],
+  );
+  const activeRun = activeRunOwner?.run;
   const conversationRunning = isConversationRunInFlight({
     activeRun,
     session: activeSession,
@@ -228,9 +232,9 @@ export function App() {
   const awaitingDecision = useMemo(() => isAwaitingFeedbackDecision(activeSession), [activeSession]);
 
   const conversations = useMemo<ConversationItem[]>(() => {
-    const runningBy = new Map((selectedNode?.activeRuns ?? []).map((run) => [run.sessionId, run.agent]));
+    const runningBy = new Map(visibleNodes.flatMap((node) => node.activeRuns.map((run) => [run.sessionId, run.agent] as const)));
     return myConversations.map((session) => ({ session, runningAgent: runningBy.get(session.id) }));
-  }, [myConversations, selectedNode?.activeRuns]);
+  }, [myConversations, visibleNodes]);
   const filteredConversations = useMemo(
     () => conversations.filter((c) => matchesConversationQuery(c.session, employeeQuery)),
     [conversations, employeeQuery],
@@ -272,17 +276,24 @@ export function App() {
     }
   }, [selectedEmployee, hydrated]);
   useEffect(() => {
+    const ready = dispatchReadyAgents(selectedNode, agents);
+    if (ready.length === 0) return;
+    if (!ready.includes(activeAgent)) setActiveAgent(ready[0]);
+    if (!ready.includes(handoffAgent)) setHandoffAgent(ready[0]);
+  }, [selectedNode, agents, activeAgent, handoffAgent]);
+  useEffect(() => {
     const disabled = selectedNode?.disabledAgents ?? [];
     if (disabled.length === 0) return;
+    const ready = dispatchReadyAgents(selectedNode, agents);
     if (disabled.includes(activeAgent)) {
-      const fallback = agents.find((a) => !disabled.includes(a));
+      const fallback = ready.find((a) => !disabled.includes(a)) ?? ready[0];
       if (fallback && fallback !== activeAgent) setActiveAgent(fallback);
     }
     if (disabled.includes(handoffAgent)) {
-      const fallback = agents.find((a) => !disabled.includes(a));
+      const fallback = ready.find((a) => !disabled.includes(a)) ?? ready[0];
       if (fallback && fallback !== handoffAgent) setHandoffAgent(fallback);
     }
-  }, [selectedNode?.disabledAgents, activeAgent, handoffAgent]);
+  }, [selectedNode?.disabledAgents, selectedNode, agents, activeAgent, handoffAgent]);
   useEffect(() => {
     if ((route === "admin" || route === "channels") && user && user.role !== "admin") {
       navigateToRoute("main");
@@ -400,6 +411,14 @@ export function App() {
     if (conversationRunning) return;
     const { agent: routedAgent, goal } = routeComposerMessage(raw, activeAgent, agents);
     if (!goal) return;
+    if (!isAgentDispatchReady(selectedNode, routedAgent)) {
+      reportMutationError(
+        "Agent not ready for dispatch",
+        null,
+        t("errors.agent_not_ready", { agent: routedAgent }),
+      );
+      return;
+    }
     if (routedAgent !== activeAgent) setActiveAgent(routedAgent);
     // When staging a new conversation, always create; otherwise continue the
     // open one. composingNew forces a fresh owner-scoped session here.
@@ -440,20 +459,24 @@ export function App() {
       await refresh(undefined, token);
     } catch (error) {
       setPendingUserMessage(null);
-      reportMutationError("Failed to send message", error, t("errors.send_message"));
+      reportMutationError(
+        "Failed to send message",
+        error,
+        formatDispatchError(error, t) ?? t("errors.send_message"),
+      );
     } finally { setIsRunning(false); }
   }
 
   async function cancelActiveRun() {
     if (!activeSession) return;
     if (!canCancelConversationRun({ activeRun, session: activeSession })) return;
-    const cancelNodeId = conversationCancelNodeId({ node: selectedNode, sandbox: selectedSandbox });
+    const cancelNodeId = conversationCancelNodeId({ node: activeRunOwner?.node ?? selectedNode, sandbox: selectedSandbox });
     if (!cancelNodeId) return;
     try {
       const session = await cancelRunMutation.mutateAsync({
         sandboxId: cancelNodeId,
         sessionId: activeRun?.sessionId ?? activeSession.id,
-        token: selectedToken,
+        token: tokens[cancelNodeId] ?? selectedToken,
         reason: t("cancel.reason"),
       });
       setSelectedSessionId(session.id);
@@ -465,6 +488,7 @@ export function App() {
 
   const handleComposerSend = useStableEvent(() => { void sendMessage(); });
   const handleCancelRun = useStableEvent(() => { void cancelActiveRun(); });
+  const handleRetryAgent = useStableEvent((agent: AgentName, mode: AgentTaskMode) => { void retryAgentMessage(agent, mode); });
 
   async function updateAgentRoleOverrides(overrides: AgentRoleMap) {
     if (!selectedNode) return;
@@ -486,6 +510,14 @@ export function App() {
         const { sandbox, token } = await provisionEmployeeSandbox(selectedEmployee, selectedToken);
         rememberSandboxToken(selectedEmployee, sandbox, token);
         const assignment = rerunAssignmentForSession(activeSession, activeAgent, composerMode);
+        if (!isAgentDispatchReady(selectedNode, assignment.agent)) {
+          reportMutationError(
+            "Agent not ready for rerun",
+            null,
+            t("errors.agent_not_ready", { agent: assignment.agent }),
+          );
+          return;
+        }
         setActiveAgent(assignment.agent);
         setSelectedSessionId(activeSession.id);
         navigateToRoute("main");
@@ -504,7 +536,11 @@ export function App() {
         syncChatHash(done.id, true);
         await refresh(undefined, token);
       } catch (error) {
-        reportMutationError("Failed to rerun assignment", error, t("errors.rerun_assignment"));
+        reportMutationError(
+          "Failed to rerun assignment",
+          error,
+          formatDispatchError(error, t) ?? t("errors.rerun_assignment"),
+        );
       } finally {
         setIsRunning(false);
       }
@@ -523,10 +559,63 @@ export function App() {
     }
   }
 
+  async function retryAgentMessage(agent: AgentName, mode: AgentTaskMode) {
+    if (!activeSession) return;
+    if (!selectedEmployee) return;
+    if (conversationRunning) return;
+    setIsRunning(true);
+    try {
+      const { sandbox, token } = await provisionEmployeeSandbox(selectedEmployee, selectedToken);
+      rememberSandboxToken(selectedEmployee, sandbox, token);
+      if (!isAgentDispatchReady(selectedNode, agent)) {
+        reportMutationError(
+          "Agent not ready for retry",
+          null,
+          t("errors.agent_not_ready", { agent }),
+        );
+        return;
+      }
+      setActiveAgent(agent);
+      setComposerMode(mode);
+      setSelectedSessionId(activeSession.id);
+      navigateToRoute("main");
+      atBottomRef.current = true;
+      const done = await runSandboxMutation.mutateAsync({
+        input: {
+          sandboxId: sandbox.id,
+          taskGoal: activeSession.taskGoal,
+          assignments: [{ agent, mode }],
+          sessionId: activeSession.id,
+          decision: { kind: "rerun", targetAgent: agent },
+        },
+        token,
+      });
+      setSelectedSessionId(done.id);
+      syncChatHash(done.id, true);
+      await refresh(undefined, token);
+    } catch (error) {
+      reportMutationError(
+        "Failed to retry agent response",
+        error,
+        formatDispatchError(error, t) ?? t("errors.rerun_assignment"),
+      );
+    } finally {
+      setIsRunning(false);
+    }
+  }
+
   async function sendHandoff() {
     if (!activeSession) return;
     if (!selectedEmployee) return;
     if (conversationRunning) return;
+    if (!isAgentDispatchReady(selectedNode, handoffAgent)) {
+      reportMutationError(
+        "Agent not ready for handoff",
+        null,
+        t("errors.agent_not_ready", { agent: handoffAgent }),
+      );
+      return;
+    }
     setIsRunning(true);
     try {
       const { sandbox, token } = await provisionEmployeeSandbox(selectedEmployee, selectedToken);
@@ -547,7 +636,11 @@ export function App() {
       syncChatHash(done.id, true);
       await refresh(undefined, token);
     } catch (error) {
-      reportMutationError("Failed to send handoff", error, t("errors.send_handoff"));
+      reportMutationError(
+        "Failed to send handoff",
+        error,
+        formatDispatchError(error, t) ?? t("errors.send_handoff"),
+      );
     } finally { setIsRunning(false); }
   }
 
@@ -675,6 +768,7 @@ export function App() {
             onAgentPicked={setActiveAgent}
             onSend={handleComposerSend}
             onCancelRun={handleCancelRun}
+            onRetryAgent={handleRetryAgent}
             running={conversationRunning}
           />
         )}

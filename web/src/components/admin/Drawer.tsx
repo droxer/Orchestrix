@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { X } from "lucide-react";
+import { OverlayCloseButton } from "@/components/ui/OverlayCloseButton";
 
 export interface DrawerProps {
   open: boolean;
@@ -20,6 +20,11 @@ export interface DrawerProps {
   bodyClassName?: string;
   /** Stacking order — higher = on top. Used when multiple drawers open at once. */
   layer?: number;
+}
+
+function layerBackdropClass(layer: number): string {
+  if (layer <= 0) return "";
+  return ` adm-drawer-backdrop--layer-${Math.min(layer, 3)}`;
 }
 
 export function Drawer({
@@ -61,8 +66,10 @@ export function Drawer({
       // keyboard (Escape closes the dropdown, arrows/Tab navigate it), so we
       // must defer entirely. Otherwise Escape would close the whole drawer and
       // the focus trap below would yank focus out of the open listbox.
+      // Confirm/prompt dialogs and portalled Radix overlays own the keyboard
+      // while open — defer so Escape/Tab don't close the drawer or yank focus.
       const overlayOpen = document.querySelector(
-        '[data-slot="select-content"], [data-radix-popper-content-wrapper]',
+        '.dialog-backdrop, [data-slot="select-content"], [data-radix-popper-content-wrapper]',
       );
       if (overlayOpen) return;
 
@@ -109,8 +116,8 @@ export function Drawer({
 
   return createPortal(
     <div
-      className={`adm-drawer-backdrop ${variant === "dark" ? "dark" : ""}`}
-      style={{ zIndex: 1200 + layer }}
+      className={`overlay-backdrop adm-drawer-backdrop ${variant === "dark" ? "dark" : ""}${layerBackdropClass(layer)}`}
+      style={{ zIndex: `calc(var(--z-drawer) + ${layer})` }}
       role="presentation"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
@@ -131,15 +138,7 @@ export function Drawer({
             <h2 className="adm-drawer-title">{title}</h2>
             {subtitle ? <p className="adm-drawer-sub">{subtitle}</p> : null}
           </div>
-          <button
-            type="button"
-            className="adm-drawer-close"
-            onClick={onClose}
-            aria-label={closeLabel}
-            title={closeLabel}
-          >
-            <X size={18} aria-hidden="true" />
-          </button>
+          <OverlayCloseButton label={closeLabel} onClick={onClose} className="overlay-close adm-drawer-close" />
         </header>
         <div className={`adm-drawer-body${bodyClassName ? ` ${bodyClassName}` : ""}`}>{children}</div>
       </aside>

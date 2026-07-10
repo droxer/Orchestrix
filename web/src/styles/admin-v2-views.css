@@ -288,7 +288,14 @@
 .tone-muted { color: var(--color-muted); }
 .tone-neutral { color: var(--color-ink); }
 
-/* ── Fleet view — compact filter chips ────────────────────────────── */
+/* ── Fleet view — profile hint + filter chips ─────────────────────── */
+.adm-fleet-profile-hint {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--text-2xs);
+  color: var(--color-muted);
+  line-height: 1.45;
+}
+
 .adm-fleet-filters {
   display: flex;
   flex-wrap: wrap;
@@ -455,6 +462,68 @@
 @keyframes adm-node-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
+}
+
+.adm-node-profile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  padding-top: 0.1rem;
+  font-size: var(--text-2xs);
+  line-height: 1.35;
+}
+
+.adm-node-profile.is-compact {
+  padding-top: 0;
+  margin-bottom: var(--space-sm);
+}
+
+.adm-node-profile-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--color-ink);
+}
+
+.adm-node-profile-kind::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.adm-node-profile-kind[data-kind="managed"]::before {
+  background: var(--color-info);
+}
+
+.adm-node-profile-kind[data-kind="local"]::before {
+  background: var(--color-semantic-up);
+}
+
+.adm-node-profile-kind[data-kind="pending"]::before {
+  border: 1px solid var(--color-muted);
+  background: transparent;
+}
+
+.adm-node-profile-sep {
+  color: var(--color-muted);
+}
+
+.adm-node-profile-locality {
+  font-family: var(--font-mono);
+  color: var(--color-muted);
+}
+
+.adm-cred-hint {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: var(--text-2xs);
+  color: var(--color-muted);
+  line-height: 1.35;
 }
 
 .adm-node-card-head {
@@ -990,9 +1059,7 @@
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  background: var(--color-overlay);
-  backdrop-filter: blur(2px);
-  animation: adm-fade-in var(--duration-base) var(--ease-standard);
+  animation: overlay-backdrop-in var(--duration-base) var(--ease-standard);
 }
 
 .adm-rail-sheet {

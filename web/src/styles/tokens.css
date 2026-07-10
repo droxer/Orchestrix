@@ -237,20 +237,28 @@
   --space-lg: 24px;
   --space-xl: 32px;
   --space-xxl: 48px;
-  --space-section: 64px; /* section rhythm — consumed by admin-v2-drawers onboard section */
+  --space-section: 64px; /* section rhythm — consumed by admin-v2-drawers empty-state block */
   /* Row rhythm — Linear-dense default; surfaces that need air opt up locally,
      dense surfaces opt further down via [data-density="compact"]. */
   --space-row-y: var(--space-sm);
 
   /* Shell dimensions */
-  --sidenav-w: 96px;
-  --sidenav-w-open: 260px;
+  --sidenav-w: 84px;
+  --sidenav-w-open: 240px;
   --thread-w: 296px;
   --header-h: 60px;
 
-  /* Z-index scale — named layers cover all floating chrome. Pick by role,
-     not by number, so stacking context additions stay consistent.
-     Ladder: popover < drawer < modal < sheet < float < overlay < dialog. */
+  /* Z-index scale — named layers cover all floating chrome. Pick by role:
+     popover < drawer < modal < sheet < float < overlay < dialog.
+
+     Overlay grammar (surface + motion):
+       • Centered modal  — preferences, confirm/prompt (desktop centered lift;
+         ≤820px confirm + preferences become bottom sheets).
+       • Right drawer    — admin forms, task editor, artifact library (desktop
+         slide from right; mobile full-viewport slide up).
+       • Bottom sheet    — admin attention rail (mobile), composer popovers.
+       Confirm dialogs stack above everything (--z-dialog) so they can interrupt
+       an open drawer or preferences panel. */
   --z-popover: 20;  /* popovers, dropdowns, pickers (composer agent/mention pickers) */
   --z-drawer: 30;   /* side drawers, detail panels */
   --z-modal: 40;    /* in-pane modal chrome, floating action buttons */

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { TFunction } from "i18next";
 
-import { projectMessages } from "../src/lib/projectMessages.js";
+import { phaseDividerLabel, projectMessages } from "../src/lib/projectMessages.js";
 import type { RelaySession } from "../src/types.js";
 
 const timestamp = "2026-06-19T12:00:00.000Z";
@@ -10,6 +10,9 @@ const timestamp = "2026-06-19T12:00:00.000Z";
 const t = ((key: string, options?: Record<string, unknown>) => {
   if (key === "message.artifact") return `Artifact - ${String(options?.kind)}`;
   if (key.startsWith("artifact.kind.")) return String(options?.defaultValue ?? key.split(".").at(-1));
+  if (key === "transcript.phase_agent") return `${String(options?.agent)} · ${String(options?.mode)}`;
+  if (key === "transcript.phase_handoff") return `Handoff · ${String(options?.agent)} · ${String(options?.mode)}`;
+  if (key.startsWith("mode.")) return String(key.split(".").at(-1));
   return key;
 }) as unknown as TFunction;
 
@@ -334,5 +337,55 @@ describe("projectMessages artifact projection", () => {
     const agent = messages.find((message) => message.kind === "agent");
     assert.ok(agent && agent.kind === "agent");
     assert.equal(agent.stdout.match(/Already streamed/g)?.length, 1);
+  });
+});
+
+describe("phaseDividerLabel", () => {
+  it("labels the first agent chapter after a user turn", () => {
+    const messages = projectMessages(session([
+      {
+        id: "ev_run",
+        type: "agent.started",
+        sessionId: "ses_1",
+        timestamp,
+        runId: "run_1",
+        agent: "claude",
+        role: "implementer",
+        mode: "action",
+      },
+    ]), t);
+
+    const agentIndex = messages.findIndex((message) => message.kind === "agent");
+    assert.equal(phaseDividerLabel(messages, agentIndex, t), "claude · action");
+  });
+
+  it("labels agent handoffs across different agents", () => {
+    const messages = projectMessages(session([
+      {
+        id: "ev_run_a",
+        type: "agent.started",
+        sessionId: "ses_1",
+        timestamp,
+        runId: "run_a",
+        agent: "claude",
+        role: "implementer",
+        mode: "action",
+      },
+      {
+        id: "ev_run_b",
+        type: "agent.started",
+        sessionId: "ses_1",
+        timestamp,
+        runId: "run_b",
+        agent: "codex",
+        role: "reviewer",
+        mode: "review",
+      },
+    ]), t);
+
+    const codexIndex = messages.findIndex(
+      (message) => message.kind === "agent" && message.agent === "codex",
+    );
+    assert.equal(phaseDividerLabel(messages, codexIndex, t), "Handoff · codex · review");
   });
 });

@@ -11,3 +11,4 @@ sync with [`docs/implementation-plan.md`](../implementation-plan.md).
 | [ADR-007](007-governed-enterprise-authority.md) | Governed enterprise authority instead of opaque agent autonomy |
 | [ADR-008](008-boxlite-lightweight-execution.md) | BoxLite-first lightweight execution boundary |
 | [ADR-009](009-control-plane-outside-sandbox.md) | Durable control plane remains outside sandbox |
+| [ADR-010](010-leased-agent-node-delivery.md) | Explicit leased, at-least-once agent-node delivery |

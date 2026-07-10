@@ -17,6 +17,12 @@
   line-height: var(--leading-loose);
 }
 
+.agent-prose {
+  /* Long unbroken tokens (URLs, hashes, file paths) must wrap inside the
+     message column instead of forcing a horizontal overflow. */
+  overflow-wrap: anywhere;
+}
+
 .agent-prose p {
   margin: 0 0 var(--space-xs);
 }
@@ -103,6 +109,31 @@
 .agent-prose li > ul,
 .agent-prose li > ol {
   margin-top: var(--space-xxs);
+}
+
+/* GFM task lists — the checkbox is the marker; drop the disc so items don't
+   read double-bulleted. */
+.agent-prose ul.contains-task-list {
+  padding-left: var(--space-xs);
+  list-style: none;
+}
+
+.agent-prose li.task-list-item {
+  list-style: none;
+}
+
+.agent-prose li.task-list-item input[type="checkbox"] {
+  margin: 0 var(--space-xs) 0 0;
+  vertical-align: -1.5px;
+  accent-color: var(--color-primary);
+}
+
+.agent-prose img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: var(--space-xs) 0;
+  border-radius: var(--radius-sm);
 }
 
 .agent-prose blockquote {
@@ -317,7 +348,13 @@
   overflow-x: auto;
 }
 
-.agent-stream.streaming .agent-text:last-child .agent-prose p:last-child::after,
+/* The caret rides whatever block the streamed text currently ends in — plain
+   paragraph, heading, list item, blockquote, or code fence — so a turn that
+   is mid-list or mid-fence still shows liveness in the body. */
+.agent-stream.streaming .agent-text:last-child .agent-prose > :last-child:is(p, h1, h2, h3, h4, h5, h6)::after,
+.agent-stream.streaming .agent-text:last-child .agent-prose > :last-child:is(ul, ol) li:last-child::after,
+.agent-stream.streaming .agent-text:last-child .agent-prose > blockquote:last-child p:last-child::after,
+.agent-stream.streaming .agent-text:last-child .agent-prose > pre:last-child > code::after,
 .agent-stream.streaming .agent-thinking:last-child .agent-thinking-body p:last-child::after {
   content: "";
   display: inline-block;
@@ -327,6 +364,27 @@
   vertical-align: -2px;
   background: var(--color-primary);
   animation: caret 1s steps(1, end) infinite;
+}
+
+/* Live-run footer — a pulsing dot when the agent is still working but the
+   last visible segment is not streaming text (tool runs, status, silence). */
+.agent-stream-activity {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  align-self: flex-start;
+  color: var(--color-muted);
+  font: var(--type-label);
+}
+
+.agent-stream-pulse {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-info);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-info) 40%, transparent);
+  animation: conv-pulse 1.4s ease-out infinite;
 }
 
 @keyframes caret { 50% { opacity: 0; } }
@@ -401,16 +459,24 @@
   color: var(--color-muted);
 }
 
-/* System lifecycle line. Shares the micro-status visual language with
-   .agent-status: a small colored dot carries the tone, label and detail
-   stay neutral. No horizontal rule — the calm transcript flow is the
-   point, and tone is a hint, not a banner. */
+/* System lifecycle line. Tone is carried by the rail node; label and detail
+   stay neutral. No horizontal rule — the calm transcript flow is the point. */
 .msg-system {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  column-gap: var(--space-sm);
+  align-items: baseline;
+  padding: 2px 0;
+  color: var(--color-muted);
+}
+
+.msg-system-body {
   display: flex;
   align-items: baseline;
   gap: var(--space-sm);
-  padding: 2px 0;
-  color: var(--color-muted);
+  min-width: 0;
+  grid-column: 2;
+  grid-row: 1 / -1;
 }
 
 .msg-system-label {
@@ -419,16 +485,6 @@
   gap: var(--space-xs);
   color: var(--color-body);
   font: var(--type-label-md);
-}
-
-.msg-system-label::before {
-  content: "";
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-full);
-  background: var(--color-muted-soft);
-  align-self: center;
 }
 
 .msg-system-detail {
@@ -440,25 +496,22 @@
   white-space: nowrap;
 }
 
-.msg-system time {
-  margin-left: auto;
-  color: var(--color-muted);
-  font-family: var(--font-number);
-  font-size: var(--text-xs);
-  font-weight: 500;
+.msg-system .msg-time {
+  grid-column: 3;
+  grid-row: 1;
 }
 
-.msg-system.tone-good .msg-system-label::before { background: var(--color-semantic-up); }
-.msg-system.tone-bad  .msg-system-label::before { background: var(--color-semantic-down); }
-.msg-system.tone-info .msg-system-label::before { background: var(--color-info); }
+@media (min-width: 720px) {
+  .msg-system {
+    grid-template-columns: 20px minmax(0, 1fr) 5.5rem;
+  }
+}
 
-/* System rows that carry an artifact (assignment plans) render the card
-   itself; align to the top since the card is taller than one text line. */
+/* System rows that carry an artifact render the card itself. */
 .msg-system-artifact {
   align-items: flex-start;
 }
 
-.msg-system-artifact > :first-child {
-  flex: 1;
-  min-width: 0;
+.msg-system-artifact .msg-system-body {
+  align-items: flex-start;
 }

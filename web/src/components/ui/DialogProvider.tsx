@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import { TriangleAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 
@@ -62,6 +63,9 @@ interface DialogApi {
 
 const DialogContext = createContext<DialogApi | null>(null);
 
+const TOAST_VISIBLE_MS = 6000;
+const TOAST_EXIT_MS = 160;
+
 export function useDialogs(): DialogApi {
   const ctx = useContext(DialogContext);
   if (!ctx) throw new Error("useDialogs must be used within <DialogProvider>");
@@ -72,6 +76,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const [request, setRequest] = useState<Request | null>(null);
   const [announcement, setAnnouncement] = useState<Announcement | null>(null);
+  const [toastExiting, setToastExiting] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const dialogRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
@@ -94,6 +99,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
 
   const announce = useCallback((opts: AnnouncementOptions | string) => {
     const next = typeof opts === "string" ? { message: opts } : opts;
+    setToastExiting(false);
     setAnnouncement({
       id: announcementId.current + 1,
       message: next.message,
@@ -162,9 +168,18 @@ export function DialogProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!announcement) return;
-    const timeout = window.setTimeout(() => setAnnouncement(null), 6000);
-    return () => window.clearTimeout(timeout);
+    const exitTimer = window.setTimeout(() => setToastExiting(true), TOAST_VISIBLE_MS - TOAST_EXIT_MS);
+    const removeTimer = window.setTimeout(() => {
+      setAnnouncement(null);
+      setToastExiting(false);
+    }, TOAST_VISIBLE_MS);
+    return () => {
+      window.clearTimeout(exitTimer);
+      window.clearTimeout(removeTimer);
+    };
   }, [announcement]);
+
+  const isDangerConfirm = request?.kind === "confirm" && request.opts.tone === "danger";
 
   return (
     <DialogContext.Provider value={{ confirm, prompt, announce }}>
@@ -172,7 +187,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
       {announcement ? (
         <div
           key={announcement.id}
-          className="dialog-toast"
+          className={`dialog-toast${toastExiting ? " dialog-toast--exit" : ""}`}
           data-tone={announcement.tone}
           role="status"
           aria-live={announcement.tone === "error" ? "assertive" : "polite"}
@@ -184,7 +199,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
       {request && typeof document !== "undefined"
         ? createPortal(
             <div
-              className="dialog-backdrop"
+              className="overlay-backdrop dialog-backdrop"
               role="presentation"
               onMouseDown={(event) => {
                 if (event.target === event.currentTarget) settle(cancelValue(request));
@@ -198,10 +213,19 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                 aria-describedby={request.opts.message ? "dialog-desc" : undefined}
                 tabIndex={-1}
                 className="dialog-modal"
+                data-tone={isDangerConfirm ? "danger" : undefined}
               >
-                <h2 id="dialog-title" className="dialog-title">
-                  {request.opts.title}
-                </h2>
+                {isDangerConfirm ? (
+                  <p className="dialog-kicker">{t("dialog.danger_kicker")}</p>
+                ) : null}
+                <div className="dialog-title-row">
+                  {isDangerConfirm ? (
+                    <TriangleAlert size={20} className="dialog-danger-icon" aria-hidden="true" />
+                  ) : null}
+                  <h2 id="dialog-title" className="dialog-title">
+                    {request.opts.title}
+                  </h2>
+                </div>
                 {request.opts.message ? (
                   <p id="dialog-desc" className="dialog-message">
                     {request.opts.message}

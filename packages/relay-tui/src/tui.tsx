@@ -479,7 +479,7 @@ export function replayDaemonAgentOutput(
 function isBoxLiteSingleRuntimeError(text: string): boolean {
   const normalized = text.replace(/\s+/g, " ");
   return normalized.includes("Another Relay orchestrator is already running:")
-    && normalized.includes("only one BoxLite runtime can use ~/.boxlite");
+    && normalized.includes("only one BoxLite runtime can use ");
 }
 
 function formatDaemonFailureForTui(text: string): string {

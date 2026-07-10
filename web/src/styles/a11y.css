@@ -69,6 +69,7 @@
   .adm-mode-tab,
   .adm-copy-pill,
   .adm-cred-action-button,
+  .overlay-close,
   .adm-drawer-close,
   .adm-chat-rows button,
   .people-search {
@@ -116,6 +117,7 @@
   .send-button,
   .backlog-task-actions .backlog-action-icon,
   .backlog-row-actions .backlog-action-icon,
+  .overlay-close,
   .adm-drawer-close,
   .adm-chat-rows button {
     width: 44px;

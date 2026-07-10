@@ -10,6 +10,12 @@ This document translates Relay's product and architecture strategy into an imple
 
 Use this document after reading [system-architecture.md](system-architecture.md). The architecture document explains target system direction and strategic choices; this document explains how to build the system.
 
+Supporting design specifications:
+
+- [Managed Node Provisioning](managed-node-provisioning.md): desired-state
+  reconciliation, provider lifecycle, secure daemon enrollment, and migration
+  from the current supervisor workflow.
+
 ## Document Map
 
 | Section | Purpose |
@@ -34,6 +40,7 @@ This implementation blueprint follows the current accepted ADRs:
 | [ADR-007: Governed Enterprise Authority](adr/007-governed-enterprise-authority.md) | Tool calls, sensitive reads, writes, approvals, secrets, and audit must flow through governed Relay boundaries. |
 | [ADR-008: BoxLite-First Lightweight Execution](adr/008-boxlite-lightweight-execution.md) | BoxLite is the current lightweight execution implementation, but orchestration should depend on execution-plane interfaces rather than BoxLite directly. |
 | [ADR-009: Durable Control Plane Outside Sandbox](adr/009-control-plane-outside-sandbox.md) | Durable task/session state, permissions, approvals, memory, and workflow authority stay outside sandbox guest workers. |
+| [ADR-010: Explicit Leases for Agent-Node Delivery](adr/010-leased-agent-node-delivery.md) | Backend-to-daemon commands use bounded, explicit leases and at-least-once delivery; only daemon-reported active work renews ownership. |
 
 ## 0. Design Position
 

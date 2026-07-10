@@ -74,6 +74,7 @@
     flex-basis: 100%;
   }
 
+  .overlay-close,
   .adm-drawer-close {
     width: 44px;
     height: 44px;
@@ -106,18 +107,20 @@
     padding: var(--space-base);
   }
 
-  /* ── Confirm / prompt dialogs ──────────────────────────────────── */
+  /* ── Confirm / prompt dialogs (bottom sheet, matches preferences) ── */
   .dialog-backdrop {
+    align-items: flex-end;
     padding:
-      max(env(safe-area-inset-top), var(--space-base))
-      var(--space-base)
-      max(env(safe-area-inset-bottom), var(--space-base));
+      max(env(safe-area-inset-top), var(--space-sm))
+      var(--space-sm)
+      max(env(safe-area-inset-bottom), var(--space-sm));
   }
 
   .dialog-modal {
     width: 100%;
     padding: var(--space-base);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    animation: overlay-sheet-in var(--duration-base) var(--ease-emphasized) both;
   }
 
   .dialog-title {

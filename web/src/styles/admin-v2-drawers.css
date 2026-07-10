@@ -92,20 +92,8 @@
   position: fixed;
   inset: 0;
   z-index: var(--z-drawer);
-  background: var(--color-overlay);
-  backdrop-filter: blur(2px);
   display: flex;
   justify-content: flex-end;
-  animation: adm-fade-in var(--duration-base) var(--ease-standard);
-}
-
-.adm-drawer-backdrop.dark {
-  background: var(--color-overlay);
-}
-
-@keyframes adm-fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
 }
 
 .adm-drawer {
@@ -186,28 +174,6 @@ html[data-theme="light"] .adm-drawer.dark {
 }
 
 .adm-drawer.dark .adm-drawer-sub { color: var(--color-on-dark-soft); }
-
-.adm-drawer-close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border: none;
-  border-radius: var(--radius-full);
-  background: transparent;
-  color: var(--color-muted);
-  cursor: pointer;
-  transition: background var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
-}
-
-.adm-drawer-close:hover {
-  background: var(--color-surface-strong);
-  color: var(--color-ink);
-}
-
-.adm-drawer.dark .adm-drawer-close { color: var(--color-on-dark-soft); }
-.adm-drawer.dark .adm-drawer-close:hover { background: var(--color-surface-dark-elevated); color: var(--color-on-dark); }
 
 .adm-drawer-body {
   flex: 1;
@@ -586,6 +552,122 @@ html[data-theme="light"] .adm-drawer.dark {
   color: var(--color-muted);
 }
 
+/* ── Streamlined forms (add employee / add node) ─────────────────── */
+.adm-form--streamlined {
+  gap: var(--space-base);
+}
+
+.adm-form--streamlined .adm-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding-top: var(--space-sm);
+  margin-top: var(--space-xs);
+  border-top: 1px solid var(--color-hairline-soft);
+}
+
+.adm-form--streamlined .adm-form-group-label {
+  margin: 0;
+  font: var(--type-micro-strong);
+  letter-spacing: var(--letter-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.adm-form--streamlined .adm-field > span {
+  font: var(--type-label);
+  color: var(--color-body);
+}
+
+.adm-form--streamlined .adm-field-req {
+  font-weight: 500;
+}
+
+/* ── Execution profile segmented control ──────────────────────────── */
+.adm-profile-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.adm-profile-segment {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-hairline-soft);
+}
+
+.adm-profile-segment-option {
+  display: block;
+  position: relative;
+}
+
+.adm-profile-segment-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.adm-profile-segment-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  width: 100%;
+  height: 34px;
+  padding: 0 var(--space-sm);
+  border: none;
+  border-radius: calc(var(--radius-sm) - 2px);
+  background: transparent;
+  color: var(--color-muted);
+  font: var(--type-label);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
+}
+
+.adm-profile-segment-btn:hover {
+  color: var(--color-ink);
+}
+
+.adm-profile-segment-input:focus-visible + .adm-profile-segment-btn {
+  outline: none;
+  box-shadow: var(--ring-focus);
+}
+
+.adm-profile-segment-input:disabled + .adm-profile-segment-btn {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.adm-profile-segment-btn.active {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-soft);
+}
+
+.adm-profile-segment-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.adm-profile-segment-dot[data-kind="managed"] { background: var(--color-info); }
+.adm-profile-segment-dot[data-kind="local"] { background: var(--color-semantic-up); }
+
+.adm-profile-field > .adm-form-hint {
+  margin: 0;
+}
+
 /* ── Credentials drawer rows ──────────────────────────────────────── */
 .adm-cred-row {
   padding: var(--space-base) 0;
@@ -596,6 +678,40 @@ html[data-theme="light"] .adm-drawer.dark {
 }
 
 .adm-cred-row:last-of-type { border-bottom: none; }
+
+.adm-drawer.dark .adm-cred-row {
+  border-bottom-color: var(--color-hairline-on-dark);
+}
+
+.adm-drawer.dark .adm-cred-label,
+.adm-drawer.dark .adm-cred-note,
+.adm-drawer.dark .adm-cred-empty {
+  color: var(--color-on-dark-soft);
+}
+
+.adm-drawer.dark .adm-cred-value-line {
+  background: var(--color-surface-dark-elevated);
+  border-color: var(--color-hairline-on-dark);
+}
+
+.adm-drawer.dark .adm-cred-value {
+  color: var(--color-on-dark);
+}
+
+.adm-drawer.dark .adm-cred-actions {
+  border-top-color: var(--color-hairline-on-dark);
+}
+
+.adm-drawer.dark .adm-cred-action-button {
+  background: var(--color-surface-dark-elevated);
+  border-color: var(--color-hairline-on-dark);
+  color: var(--color-on-dark);
+}
+
+.adm-drawer.dark .adm-cred-action-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-on-dark) 8%, var(--color-surface-dark-elevated));
+  border-color: var(--color-on-dark-soft);
+}
 
 .adm-cred-label {
   font: var(--type-micro-strong);

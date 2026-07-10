@@ -2,11 +2,11 @@
 
 @media (max-width: 1040px) {
   .messenger-shell {
-    grid-template-columns: var(--sidenav-w) 260px minmax(0, 1fr);
+    grid-template-columns: var(--sidenav-w) var(--thread-w) minmax(0, 1fr);
   }
 
   .messenger-shell[data-sidenav="open"] {
-    grid-template-columns: var(--sidenav-w-open) 260px minmax(0, 1fr);
+    grid-template-columns: var(--sidenav-w-open) var(--thread-w) minmax(0, 1fr);
   }
 
   .header-agent-tabs button {
@@ -149,16 +149,28 @@
     border-bottom-color: var(--color-hairline-soft);
   }
 
-  .messenger-shell[data-route="admin"] .page-header-title--display {
-    position: absolute;
-    width: 1px;
-    height: 1px;
+  .messenger-shell[data-route="admin"] .page-header {
+    min-height: 0;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom-color: var(--color-hairline-soft);
+  }
+
+  .messenger-shell[data-route="admin"] .page-header-lead {
+    position: static;
+    width: auto;
+    height: auto;
     padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
     border: 0;
+  }
+
+  .messenger-shell[data-route="admin"] .page-header-title--display {
+    font: var(--type-title-lg);
+    letter-spacing: var(--letter-tight);
   }
 
   .mobile-topbar button {

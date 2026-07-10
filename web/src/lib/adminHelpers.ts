@@ -1,6 +1,42 @@
 import type { TFunction } from "i18next";
 import type { ControlPanelDaemonNodeRecord, EmployeeRecord, Tone } from "../types.js";
 
+function shellQuote(value: string): string {
+  if (/^[A-Za-z0-9_./:@=-]+$/.test(value)) return value;
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+export function defaultBackendUrl(): string {
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return window.location.origin;
+  }
+  return "http://127.0.0.1:8790";
+}
+
+/** Mirror backend daemon_start_command so cached node tokens stay usable after restart. */
+export function buildDaemonStartCommand(
+  node: Pick<ControlPanelDaemonNodeRecord, "id" | "employeeId" | "workspacePath" | "sandboxMode">,
+  nodeToken: string,
+  backendUrl = defaultBackendUrl(),
+): string {
+  const sandboxMode = node.sandboxMode === "none" ? "none" : "boxlite";
+  const parts = [
+    "relay-daemon",
+    "--backend-url",
+    backendUrl,
+    "--sandbox-id",
+    node.id,
+    "--token",
+    nodeToken,
+    "--sandbox",
+    sandboxMode,
+  ];
+  if (sandboxMode === "none") parts.push("--use-local-agent-home");
+  if (node.employeeId) parts.push("--employee-id", node.employeeId);
+  if (node.workspacePath) parts.push("--workspace", node.workspacePath);
+  return parts.map(shellQuote).join(" ");
+}
+
 export const STALE_AFTER_MS = 15_000;
 export const QUIET_AFTER_MS = 10_000;
 export const adminNodeTokenStorageKey = "relay-web.adminNodeTokens";
@@ -159,6 +195,121 @@ export function writeStoredNodeToken(nodeId: string, token: StoredNodeToken): vo
     const map = readStoredNodeTokens();
     const next = { ...map, [nodeId]: token };
     window.localStorage.setItem(adminNodeTokenStorageKey, JSON.stringify(next));
+  } catch {
+    /* ignore quota errors */
+  }
+}
+
+export interface NodeLocalityFlags {
+  hasCachedCredentials: boolean;
+  isColocatedLive: boolean;
+}
+
+export type NodeExecutionProfile = "managed" | "local" | "pending";
+
+export type NodeLocalityKind = "this_host" | "saved_here" | "remote";
+
+/** boxlite VM sandbox → managed; host processes → local node. */
+export function nodeExecutionProfile(node: Pick<ControlPanelDaemonNodeRecord, "sandboxMode">): NodeExecutionProfile {
+  if (node.sandboxMode === "boxlite") return "managed";
+  if (node.sandboxMode === "none") return "local";
+  return "pending";
+}
+
+export function nodeLocalityKind(
+  node: ControlPanelDaemonNodeRecord,
+  options: { storedTokens: StoredNodeTokenMap; colocated: boolean },
+): NodeLocalityKind {
+  if (!options.colocated) return "remote";
+  const cached = options.storedTokens[node.id];
+  if (cached?.nodeToken || cached?.sandboxToken || cached?.daemonCommand) return "saved_here";
+  if (node.online && !isStale(node)) return "this_host";
+  return "remote";
+}
+
+export function nodeLocalityKinds(
+  node: ControlPanelDaemonNodeRecord,
+  options: { storedTokens: StoredNodeTokenMap; colocated: boolean },
+): Array<Exclude<NodeLocalityKind, "remote">> {
+  if (!options.colocated) return [];
+  const kinds: Array<Exclude<NodeLocalityKind, "remote">> = [];
+  const cached = options.storedTokens[node.id];
+  if (cached?.nodeToken || cached?.sandboxToken || cached?.daemonCommand) kinds.push("saved_here");
+  if (node.online && !isStale(node)) kinds.push("this_host");
+  return kinds;
+}
+
+export function nodeLocalityFlags(
+  node: ControlPanelDaemonNodeRecord,
+  options: { storedTokens: StoredNodeTokenMap; colocated: boolean },
+): NodeLocalityFlags {
+  const cached = options.storedTokens[node.id];
+  return {
+    hasCachedCredentials: Boolean(cached?.nodeToken || cached?.sandboxToken || cached?.daemonCommand),
+    isColocatedLive: options.colocated && node.online && !isStale(node),
+  };
+}
+
+export function resolveNodeCredentials(
+  node: ControlPanelDaemonNodeRecord,
+  storedToken?: StoredNodeToken,
+  backendUrl = defaultBackendUrl(),
+): {
+  sandboxToken?: string;
+  nodeToken?: string;
+  daemonCommand?: string;
+  source: "none" | "cache" | "server" | "cache+server";
+} {
+  const nodeToken = storedToken?.nodeToken ?? node.nodeToken;
+  const sandboxToken = storedToken?.sandboxToken;
+  const daemonCommand = storedToken?.daemonCommand
+    ?? (nodeToken ? buildDaemonStartCommand(node, nodeToken, backendUrl) : undefined);
+  const fromCache = Boolean(storedToken?.nodeToken || storedToken?.sandboxToken || storedToken?.daemonCommand);
+  const fromServer = Boolean(node.nodeToken);
+  let source: "none" | "cache" | "server" | "cache+server" = "none";
+  if (fromCache && fromServer) source = "cache+server";
+  else if (fromCache) source = "cache";
+  else if (fromServer) source = "server";
+  if (!nodeToken && !sandboxToken && !daemonCommand) {
+    return { source: "none" };
+  }
+  return { sandboxToken, nodeToken, daemonCommand, source };
+}
+
+/** Persist ephemeral control-panel node tokens before the backend drops them from RAM. */
+export function upsertStoredCredentialsFromNodes(
+  map: StoredNodeTokenMap,
+  nodes: ControlPanelDaemonNodeRecord[],
+  backendUrl = defaultBackendUrl(),
+): StoredNodeTokenMap | null {
+  let next = map;
+  let changed = false;
+  for (const node of nodes) {
+    if (!node.nodeToken) continue;
+    const existing = next[node.id];
+    const merged: StoredNodeToken = {
+      employeeId: node.employeeId ?? existing?.employeeId,
+      nodeToken: node.nodeToken,
+      sandboxToken: existing?.sandboxToken,
+      daemonCommand: existing?.daemonCommand ?? buildDaemonStartCommand(node, node.nodeToken, backendUrl),
+      savedAt: existing?.savedAt ?? new Date().toISOString(),
+    };
+    if (
+      existing?.nodeToken !== merged.nodeToken
+      || existing?.daemonCommand !== merged.daemonCommand
+      || existing?.employeeId !== merged.employeeId
+    ) {
+      next = { ...next, [node.id]: merged };
+      changed = true;
+    }
+  }
+  return changed ? next : null;
+}
+
+export function persistStoredNodeTokenMap(map: StoredNodeTokenMap): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(adminNodeTokenStorageKey, JSON.stringify(map));
   } catch {
     /* ignore quota errors */
   }

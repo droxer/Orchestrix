@@ -8,6 +8,7 @@ import { ThreadPanel } from "./ThreadPanel";
 import { ChatHeader } from "./ChatHeader";
 import { TranscriptEmpty } from "./TranscriptEmpty";
 import { MessageBlock, isGroupedContinuation, type DerivedMessage } from "./MessageBlock";
+import { phaseDividerLabel } from "../lib/projectMessages";
 import { DecisionBar } from "./composer/DecisionBar";
 import { Composer, type ComposerHandle } from "./composer/Composer";
 import { ArtifactLibraryDrawer } from "./artifact/ArtifactLibraryDrawer";
@@ -60,6 +61,7 @@ export type MainChatViewProps = {
   onAgentPicked: (agent: AgentName) => void;
   onSend: () => void;
   onCancelRun: () => void;
+  onRetryAgent: (agent: AgentName, mode: AgentTaskMode) => void;
   running: boolean;
 };
 
@@ -111,6 +113,7 @@ export function MainChatView({
   onAgentPicked,
   onSend,
   onCancelRun,
+  onRetryAgent,
   running,
 }: MainChatViewProps) {
   const { t } = useTranslation();
@@ -148,15 +151,27 @@ export function MainChatView({
           <div className="transcript-inner">
             {activeSession || pendingUserMessage ? (
               <>
-                {displayMessages.map((msg, i) => (
-                  <MessageBlock
-                    key={msg.id}
-                    message={msg}
-                    sessionId={activeSession?.id ?? ""}
-                    grouped={isGroupedContinuation(displayMessages, i)}
-                    onOpenArtifact={onOpenArtifacts}
-                  />
-                ))}
+                {displayMessages.map((msg, i) => {
+                  const phaseLabel = phaseDividerLabel(displayMessages, i, t);
+                  return (
+                    <div key={msg.id} className="transcript-turn">
+                      {phaseLabel ? (
+                        <div className="transcript-phase" role="separator" aria-label={phaseLabel}>
+                          <span className="transcript-phase-node" aria-hidden="true" />
+                          <span className="transcript-phase-label">{phaseLabel}</span>
+                        </div>
+                      ) : null}
+                      <MessageBlock
+                        message={msg}
+                        sessionId={activeSession?.id ?? ""}
+                        grouped={isGroupedContinuation(displayMessages, i)}
+                        onOpenArtifact={onOpenArtifacts}
+                        onRetryAgent={onRetryAgent}
+                        retryDisabled={running}
+                      />
+                    </div>
+                  );
+                })}
                 {awaitingDecision ? (
                   <DecisionBar
                     agentNames={agentNames}
@@ -188,6 +203,7 @@ export function MainChatView({
           ref={composerRef}
           agentNames={agentNames}
           disabledAgents={disabledAgents}
+          agentHealth={agentHealth}
           composerMode={composerMode}
           setComposerMode={setComposerMode}
           activeAgent={activeAgent}

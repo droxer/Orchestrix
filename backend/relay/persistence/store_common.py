@@ -28,6 +28,11 @@ def _parse_iso(value: str | None) -> datetime | None:
 def _format_iso(value: datetime | None) -> str | None:
     if value is None:
         return None
+    if value.tzinfo is None:
+        # SQLite's DATETIME result has no timezone offset. Relay writes all
+        # timestamps as UTC, so never reinterpret a database value in the
+        # host's local timezone when formatting it back onto the wire.
+        value = value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 

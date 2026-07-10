@@ -5,9 +5,10 @@ import type { AgentName } from "../types";
 // returned handlers to the textarea and renders the popover from
 // filteredMentionAgents; picking a mention notifies onAgentPicked so the host
 // can route the active agent.
-export function useComposer({ agentNames, disabledAgents, onAgentPicked }: {
+export function useComposer({ agentNames, disabledAgents, agentHealth, onAgentPicked }: {
   agentNames: AgentName[];
   disabledAgents?: AgentName[];
+  agentHealth?: Partial<Record<AgentName, "unknown" | "ready" | "failed">>;
   onAgentPicked: (agent: AgentName) => void;
 }): {
   composerText: string;
@@ -64,7 +65,8 @@ export function useComposer({ agentNames, disabledAgents, onAgentPicked }: {
   }
 
   const disabledSet = new Set(disabledAgents ?? []);
-  const enabledAgents = agentNames.filter((a) => !disabledSet.has(a));
+  const enabledAgents = agentNames.filter((agent) =>
+    !disabledSet.has(agent) && agentHealth?.[agent] === "ready");
   const filteredMentionAgents = mentionQuery
     ? enabledAgents.filter((a) => a.startsWith(mentionQuery))
     : enabledAgents;

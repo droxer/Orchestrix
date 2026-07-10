@@ -9,6 +9,7 @@ import { SideNav } from "./SideNav";
 import type { AppRoute, MobileView } from "@/lib/viewTypes";
 import type { AgentName, CurrentUser, DaemonNodeMonitorRecord } from "@/types";
 import type { AgentRoleMap } from "@/lib/manageAgents";
+import { useRelayStore } from "@/lib/store";
 
 const WORK_ROUTE_LABEL_KEYS: Record<Exclude<AppRoute, "main">, string> = {
   workspace: "nav.workspace",
@@ -64,6 +65,12 @@ export function AppShell({
   onAgentRoleOverridesChange,
 }: AppShellProps) {
   const { t } = useTranslation();
+  const adminView = useRelayStore((state) => state.adminView);
+  const mobileRouteTitle = route === "admin"
+    ? t(`admin.v2.title_${adminView}`)
+    : route === "main"
+      ? t("nav.conversations")
+      : t(WORK_ROUTE_LABEL_KEYS[route]);
 
   return (
     <main className="messenger-shell" data-mobile-view={mobileView} data-route={route} data-sidenav={sidenavExpanded ? "open" : "closed"}>
@@ -95,8 +102,8 @@ export function AppShell({
           </>
         ) : (
           <div className="mobile-topbar-route">
-            <span className="mobile-topbar-eyebrow">{t("nav.mobile_section")}</span>
-            <span className="mobile-topbar-title">{t(WORK_ROUTE_LABEL_KEYS[route])}</span>
+            <span className="mobile-topbar-eyebrow">{route === "admin" ? t("nav.admin") : t("nav.mobile_section")}</span>
+            <span className="mobile-topbar-title">{mobileRouteTitle}</span>
           </div>
         )}
         <button type="button" className={`mobile-settings ${prefsOpen ? "active" : ""}`} aria-label={t("nav.settings")} aria-haspopup="dialog" aria-expanded={prefsOpen} onClick={() => setPrefsOpen((v) => !v)}>

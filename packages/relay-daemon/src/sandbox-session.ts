@@ -1,7 +1,12 @@
 import {
-  ensureSingleOrchestrator,
+  acquireBoxliteHomeLock,
   importBoxLite,
+  type BoxliteHomeLock,
 } from "./box.js";
+import { createHash } from "node:crypto";
+import { mkdirSync } from "node:fs";
+import { homedir } from "node:os";
+import { basename, join, resolve } from "node:path";
 import {
   DEVBOX_IMAGE,
   GUEST_WORKSPACE,
@@ -25,6 +30,7 @@ import { defaultExecutionManager, type ExecutionManager } from "./execution.js";
 export interface OrchestratorSession {
   rootfsPath: string;
   hostWorkspace: string;
+  boxliteHome: string;
   hostUid: number;
   hostGid: number;
   syncedUid: number;
@@ -34,13 +40,8 @@ export interface OrchestratorSession {
 export interface OrchestratorSessionOptions {
   boxName?: string;
   workspacePath?: string;
+  boxliteHome?: string;
   executionManager?: ExecutionManager;
-  /**
-   * pgrep pattern used to refuse starting a second BoxLite runtime. The
-   * default matches any Relay process; long-lived daemons pass a narrower
-   * pattern so the backend and TUI running alongside them do not trip it.
-   */
-  singleInstancePattern?: string;
 }
 
 export interface ActiveOrchestratorSession {
@@ -49,6 +50,15 @@ export interface ActiveOrchestratorSession {
 }
 
 const readyAgents = new Set<AgentName>();
+
+export function resolveBoxliteHome(hostWorkspace: string, override = process.env.RELAY_BOXLITE_HOME): string {
+  const explicit = override?.trim();
+  if (explicit) return resolve(explicit);
+  const workspacePath = resolve(hostWorkspace);
+  const digest = createHash("sha256").update(workspacePath).digest("hex").slice(0, 12);
+  const label = basename(workspacePath).replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 48) || "workspace";
+  return join(homedir(), ".relay", "boxlite", `${label}-${digest}`);
+}
 
 export function resetAgentReadiness(): void {
   readyAgents.clear();
@@ -80,7 +90,9 @@ export async function startOrchestratorSession(
   sink?: AgentOutputSink,
   options: OrchestratorSessionOptions = {},
 ): Promise<ActiveOrchestratorSession> {
-  ensureSingleOrchestrator(options.singleInstancePattern);
+  const executionManager = options.executionManager ?? defaultExecutionManager;
+  const hostWorkspace = options.workspacePath ?? hostWorkspacePath();
+  const boxliteHome = resolveBoxliteHome(hostWorkspace, options.boxliteHome);
   resetAgentReadiness();
   if (!sink) {
     console.log(section("Relay", ansi.cyan));
@@ -90,19 +102,27 @@ export async function startOrchestratorSession(
     sink(`${keyValue("image", DEVBOX_IMAGE)}\n`);
     sink(`${keyValue("mount", GUEST_WORKSPACE)}\n`);
   }
-  const executionManager = options.executionManager ?? defaultExecutionManager;
   const rootfsPath = executionManager.ensureImage(sink);
-  const hostWorkspace = options.workspacePath ?? hostWorkspacePath();
-
-  const { JsBoxlite } = await importBoxLite();
-  const runtime = JsBoxlite.withDefaultConfig();
+  mkdirSync(boxliteHome, { recursive: true });
+  let homeLock: BoxliteHomeLock | undefined;
+  let runtime: any | undefined;
   const boxName = options.boxName ?? "relay";
   const close = async (): Promise<void> => {
-    await executionManager.stopActiveSandbox();
-    resetAgentReadiness();
-    await executionManager.removeSandbox(runtime, boxName);
+    try {
+      resetAgentReadiness();
+      if (runtime) {
+        await executionManager.stopActiveSandbox();
+        await executionManager.removeSandbox(runtime, boxName);
+      }
+    } finally {
+      runtime?.close?.();
+      homeLock?.release();
+    }
   };
   try {
+    homeLock = acquireBoxliteHomeLock(boxliteHome);
+    const { JsBoxlite } = await importBoxLite();
+    runtime = new JsBoxlite({ homeDir: boxliteHome });
     const [hostUid, hostGid] = hostWorkspaceOwner(hostWorkspace);
     const guestEnv = guestAgentEnv(hostWorkspace);
     setSessionGuestEnv(guestEnv);
@@ -119,6 +139,7 @@ export async function startOrchestratorSession(
     emitOrPrint(sink, keyValue("box", boxName));
     emitOrPrint(sink, keyValue("rootfs", rootfsPath));
     emitOrPrint(sink, keyValue("workspace", hostWorkspace));
+    emitOrPrint(sink, keyValue("boxlite-home", boxliteHome));
 
     const [syncedUid, syncedGid] = await executionManager.prepareWorkspace(hostWorkspace);
     emitOrPrint(sink, keyValue("owner", `uid=${syncedUid} gid=${syncedGid} (host uid=${hostUid} gid=${hostGid})`));
@@ -129,6 +150,7 @@ export async function startOrchestratorSession(
       session: {
         rootfsPath,
         hostWorkspace,
+        boxliteHome,
         hostUid,
         hostGid,
         syncedUid,

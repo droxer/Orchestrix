@@ -222,6 +222,8 @@ export interface UnassignControlPanelDaemonNodeResponse {
 export interface CreateControlPanelDaemonNodeInput {
   employeeId?: string;
   workspacePath?: string;
+  /** "boxlite" = managed BoxLite VM (default); "none" = local host processes. */
+  sandboxMode?: "boxlite" | "none";
 }
 
 export interface CreateControlPanelDaemonNodeResponse {

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 from tempfile import TemporaryDirectory
+import time
 
 from fastapi.testclient import TestClient
 
@@ -88,6 +90,317 @@ def test_fastapi_daemon_routes_register_and_poll(monkeypatch) -> None:
         response = client.get("/cp/daemon-nodes")
         assert response.status_code == 200
         assert response.json()["nodes"][0].get("nodeToken") == "node_token"
+
+
+def test_explicit_command_leases_redeliver_work_missing_from_daemon_heartbeat(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _login_admin(client)
+        response = client.post("/daemon-nodes/register", json={
+            "sandboxId": "sbx_alice",
+            "employeeId": "alice",
+            "token": "node_token",
+            "workspacePath": "/workspace/alice",
+            "protocolVersion": 1,
+            "supportedAgents": ["codex"],
+            "status": "ready",
+        }, headers={"Authorization": "Bearer ui_token"})
+        assert response.status_code == 200
+
+        run = client.post("/sandboxes/sbx_alice/runs", json={
+            "taskGoal": "recover this run",
+            "assignments": [{"agent": "codex", "mode": "action"}],
+        }, headers={"Authorization": "Bearer ui_token"})
+        assert run.status_code == 202
+
+        first = client.get(
+            "/daemon-nodes/sbx_alice/commands?leaseMode=explicit&leaseSeconds=1",
+            headers={"Authorization": "Bearer node_token"},
+        )
+        assert first.status_code == 200
+        [first_command] = first.json()["commands"]
+        assert first_command["attempt"] == 1
+
+        time.sleep(1.05)
+
+        second = client.get(
+            "/daemon-nodes/sbx_alice/commands?leaseMode=explicit&leaseSeconds=1",
+            headers={"Authorization": "Bearer node_token"},
+        )
+        assert second.status_code == 200
+        [second_command] = second.json()["commands"]
+        assert second_command["id"] == first_command["id"]
+        assert second_command["attempt"] == 2
+        assert second_command["leaseId"] != first_command["leaseId"]
+
+        stale_output = client.post("/daemon-nodes/sbx_alice/events", json={
+            "type": "run.output",
+            "commandId": first_command["id"],
+            "leaseId": first_command["leaseId"],
+            "sessionId": first_command["sessionId"],
+            "runId": first_command["runId"],
+            "agent": first_command["agent"],
+            "stream": "stdout",
+            "text": "superseded delivery",
+            "sequence": 0,
+        }, headers={"Authorization": "Bearer node_token"})
+        assert stale_output.status_code == 401
+
+        current_output = client.post("/daemon-nodes/sbx_alice/events", json={
+            "type": "run.output",
+            "commandId": second_command["id"],
+            "leaseId": second_command["leaseId"],
+            "sessionId": second_command["sessionId"],
+            "runId": second_command["runId"],
+            "agent": second_command["agent"],
+            "stream": "stdout",
+            "text": "current delivery",
+            "sequence": 0,
+        }, headers={"Authorization": "Bearer node_token"})
+        assert current_output.status_code == 202
+
+
+def test_output_event_does_not_replace_explicit_lease_heartbeat(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _login_admin(client)
+        response = client.post("/daemon-nodes/register", json={
+            "sandboxId": "sbx_alice",
+            "employeeId": "alice",
+            "token": "node_token",
+            "workspacePath": "/workspace/alice",
+            "protocolVersion": 1,
+            "supportedAgents": ["codex"],
+            "status": "ready",
+        }, headers={"Authorization": "Bearer ui_token"})
+        assert response.status_code == 200
+
+        run = client.post("/sandboxes/sbx_alice/runs", json={
+            "taskGoal": "recover after output",
+            "assignments": [{"agent": "codex", "mode": "action"}],
+        }, headers={"Authorization": "Bearer ui_token"})
+        assert run.status_code == 202
+        [first] = client.get(
+            "/daemon-nodes/sbx_alice/commands?leaseMode=explicit&leaseSeconds=1",
+            headers={"Authorization": "Bearer node_token"},
+        ).json()["commands"]
+
+        output = client.post("/daemon-nodes/sbx_alice/events", json={
+            "type": "run.output",
+            "commandId": first["id"],
+            "leaseId": first["leaseId"],
+            "sessionId": first["sessionId"],
+            "runId": first["runId"],
+            "agent": first["agent"],
+            "stream": "stdout",
+            "text": "still working\n",
+            "sequence": 0,
+        }, headers={"Authorization": "Bearer node_token"})
+        assert output.status_code == 202
+
+        time.sleep(1.05)
+
+        [redelivered] = client.get(
+            "/daemon-nodes/sbx_alice/commands?leaseMode=explicit&leaseSeconds=1",
+            headers={"Authorization": "Bearer node_token"},
+        ).json()["commands"]
+        assert redelivered["id"] == first["id"]
+        assert redelivered["attempt"] == 2
+
+
+def test_daemon_delivery_output_reaches_the_canonical_session_stream(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _login_admin(client)
+        registered = client.post("/daemon-nodes/register", json={
+            "sandboxId": "sbx_alice",
+            "employeeId": "alice",
+            "token": "node_token",
+            "workspacePath": "/workspace/alice",
+            "protocolVersion": 1,
+            "supportedAgents": ["codex"],
+            "status": "ready",
+        }, headers={"Authorization": "Bearer ui_token"})
+        assert registered.status_code == 200
+        run = client.post("/sandboxes/sbx_alice/runs", json={
+            "taskGoal": "stream this answer",
+            "assignments": [{"agent": "codex", "mode": "action"}],
+        }, headers={"Authorization": "Bearer ui_token"})
+        assert run.status_code == 202
+        session_id = run.json()["id"]
+        [command] = client.get(
+            "/daemon-nodes/sbx_alice/commands?leaseMode=explicit&leaseSeconds=90",
+            headers={"Authorization": "Bearer node_token"},
+        ).json()["commands"]
+
+        output = client.post("/daemon-nodes/sbx_alice/events", json={
+            "type": "run.output",
+            "commandId": command["id"],
+            "leaseId": command["leaseId"],
+            "sessionId": command["sessionId"],
+            "runId": command["runId"],
+            "agent": command["agent"],
+            "stream": "stdout",
+            "text": "hello from the daemon",
+            "sequence": 0,
+        }, headers={"Authorization": "Bearer node_token"})
+        assert output.status_code == 202
+        completed = client.post("/daemon-nodes/sbx_alice/events", json={
+            "type": "run.completed",
+            "commandId": command["id"],
+            "leaseId": command["leaseId"],
+            "sessionId": command["sessionId"],
+            "runId": command["runId"],
+            "agent": command["agent"],
+            "mode": command["mode"],
+            "exitCode": 0,
+        }, headers={"Authorization": "Bearer node_token"})
+        assert completed.status_code == 202
+
+        stream = client.get(f"/sessions/{session_id}/events")
+        payloads = [
+            json.loads(line.removeprefix("data: "))
+            for line in stream.text.splitlines()
+            if line.startswith("data: {")
+        ]
+        assert [event["text"] for event in payloads if event.get("type") == "agent.output"] == [
+            "hello from the daemon"
+        ]
+        assert any(event.get("type") == "session.completed" for event in payloads)
+
+
+def test_cancel_command_is_redelivered_until_run_termination_confirms_it(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _login_admin(client)
+        response = client.post("/daemon-nodes/register", json={
+            "sandboxId": "sbx_alice",
+            "employeeId": "alice",
+            "token": "node_token",
+            "workspacePath": "/workspace/alice",
+            "protocolVersion": 1,
+            "supportedAgents": ["codex"],
+            "status": "ready",
+        }, headers={"Authorization": "Bearer ui_token"})
+        assert response.status_code == 200
+
+        run = client.post("/sandboxes/sbx_alice/runs", json={
+            "taskGoal": "cancel this run reliably",
+            "assignments": [{"agent": "codex", "mode": "action"}],
+        }, headers={"Authorization": "Bearer ui_token"})
+        assert run.status_code == 202
+        session_id = run.json()["id"]
+        [start] = client.get(
+            "/daemon-nodes/sbx_alice/commands?leaseMode=explicit&leaseSeconds=1",
+            headers={"Authorization": "Bearer node_token"},
+        ).json()["commands"]
+
+        cancel = client.post(
+            f"/sandboxes/sbx_alice/runs/{session_id}/cancel",
+            json={"reason": "no longer needed"},
+            headers={"Authorization": "Bearer ui_token"},
+        )
+        assert cancel.status_code == 202
+        poll_url = (
+            "/daemon-nodes/sbx_alice/commands"
+            f"?leaseMode=explicit&leaseSeconds=1&activeCommandLease={start['id']}:{start['leaseId']}"
+        )
+        [first_cancel] = client.get(
+            poll_url,
+            headers={"Authorization": "Bearer node_token"},
+        ).json()["commands"]
+        assert first_cancel["type"] == "run.cancel"
+        assert first_cancel["attempt"] == 1
+
+        time.sleep(1.05)
+
+        [second_cancel] = client.get(
+            poll_url,
+            headers={"Authorization": "Bearer node_token"},
+        ).json()["commands"]
+        assert second_cancel["id"] == first_cancel["id"]
+        assert second_cancel["attempt"] == 2
+
+        terminal = client.post("/daemon-nodes/sbx_alice/events", json={
+            "type": "run.cancelled",
+            "commandId": start["id"],
+            "leaseId": start["leaseId"],
+            "sessionId": start["sessionId"],
+            "runId": start["runId"],
+            "agent": start["agent"],
+            "mode": start["mode"],
+            "reason": "no longer needed",
+        }, headers={"Authorization": "Bearer node_token"})
+        assert terminal.status_code == 202
+
+        after_terminal = client.get(
+            "/daemon-nodes/sbx_alice/commands?leaseMode=explicit&leaseSeconds=1",
+            headers={"Authorization": "Bearer node_token"},
+        )
+        assert after_terminal.status_code == 200
+        assert after_terminal.json() == {"commands": []}
+
+
+def test_cancel_returns_terminal_session_when_run_finishes_before_request(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _login_admin(client)
+        response = client.post("/daemon-nodes/register", json={
+            "sandboxId": "sbx_alice",
+            "employeeId": "alice",
+            "token": "node_token",
+            "workspacePath": "/workspace/alice",
+            "protocolVersion": 1,
+            "supportedAgents": ["codex"],
+            "status": "ready",
+        }, headers={"Authorization": "Bearer ui_token"})
+        assert response.status_code == 200
+
+        run = client.post("/sandboxes/sbx_alice/runs", json={
+            "taskGoal": "finish before stop click",
+            "assignments": [{"agent": "codex", "mode": "action"}],
+        }, headers={"Authorization": "Bearer ui_token"})
+        assert run.status_code == 202
+        session_id = run.json()["id"]
+        [command] = client.get(
+            "/daemon-nodes/sbx_alice/commands?leaseMode=explicit&leaseSeconds=10",
+            headers={"Authorization": "Bearer node_token"},
+        ).json()["commands"]
+        completed = client.post("/daemon-nodes/sbx_alice/events", json={
+            "type": "run.completed",
+            "commandId": command["id"],
+            "leaseId": command["leaseId"],
+            "sessionId": session_id,
+            "runId": command["runId"],
+            "agent": command["agent"],
+            "mode": command["mode"],
+            "exitCode": 0,
+            "agentLog": "done",
+        }, headers={"Authorization": "Bearer node_token"})
+        assert completed.status_code == 202
+
+        cancel = client.post(
+            f"/sandboxes/sbx_alice/runs/{session_id}/cancel",
+            json={"reason": "stop clicked"},
+            headers={"Authorization": "Bearer ui_token"},
+        )
+
+        assert cancel.status_code == 202
+        assert cancel.json()["status"] == "completed"
 
 
 def test_daemon_registration_stores_agent_health_and_rejects_unready_runs(monkeypatch) -> None:
@@ -354,19 +667,26 @@ def test_control_panel_creates_pending_daemon_node_and_reuses_duplicate(monkeypa
         node = body["node"]
         assert node["employeeId"] == "alice"
         assert node["workspacePath"] == "/workspace/alice"
+        assert node["sandboxMode"] == "boxlite"
         assert node["status"] == "provisioning"
         assert body["sandboxToken"].startswith("tok_")
         assert body["nodeToken"].startswith("tok_")
         assert body["nodeToken"] in body["daemonCommand"]
-        assert "--sandbox none" in body["daemonCommand"]
-        assert "--use-local-agent-home" in body["daemonCommand"]
+        # Managed (boxlite) is the default sandbox mode for generated commands.
+        assert "--sandbox boxlite" in body["daemonCommand"]
+        assert "--use-local-agent-home" not in body["daemonCommand"]
         assert "--workspace /workspace/alice" in body["daemonCommand"]
         assert body["daemonEnv"]["RELAY_SANDBOX_ID"] == node["id"]
         assert body["daemonEnv"]["RELAY_EMPLOYEE_ID"] == "alice"
         assert body["daemonEnv"]["RELAY_DAEMON_NODE_TOKEN"] == body["nodeToken"]
-        assert body["daemonEnv"]["RELAY_SANDBOX_MODE"] == "none"
+        assert body["daemonEnv"]["RELAY_SANDBOX_MODE"] == "boxlite"
         assert body["daemonEnv"]["RELAY_WORKSPACE"] == "/workspace/alice"
-        assert body["daemonEnv"]["RELAY_USE_LOCAL_AGENT_HOME"] == "1"
+        assert "RELAY_USE_LOCAL_AGENT_HOME" not in body["daemonEnv"]
+
+        listing = client.get("/cp/daemon-nodes")
+        assert listing.status_code == 200
+        listed = next(item for item in listing.json()["nodes"] if item["id"] == node["id"])
+        assert listed["sandboxMode"] == "boxlite"
 
         sandboxes = client.get("/sandboxes", headers={"Authorization": f"Bearer {body['sandboxToken']}"})
         assert sandboxes.status_code == 200
@@ -412,6 +732,7 @@ def test_control_panel_creates_pending_daemon_node_and_reuses_duplicate(monkeypa
         assert duplicate.status_code == 201
         duplicate_body = duplicate.json()
         assert duplicate_body["node"]["id"] == node["id"]
+        assert duplicate_body["node"]["sandboxMode"] == "boxlite"
         assert "sandboxToken" not in duplicate_body
         assert duplicate_body["nodeToken"] == body["nodeToken"]
         assert "daemonCommand" in duplicate_body
@@ -426,6 +747,61 @@ def test_control_panel_creates_pending_daemon_node_and_reuses_duplicate(monkeypa
         listing = client.get("/cp/daemon-nodes")
         assert listing.status_code == 200
         assert all(item["id"] != node["id"] for item in listing.json()["nodes"])
+
+
+def test_control_panel_creates_local_mode_daemon_node(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _login_admin(client)
+
+        response = client.post("/cp/daemon-nodes", json={
+            "employeeId": "alice",
+            "workspacePath": "/workspace/alice",
+            "sandboxMode": "none",
+        })
+
+        assert response.status_code == 201
+        body = response.json()
+        assert body["node"]["sandboxMode"] == "none"
+        assert "--sandbox none" in body["daemonCommand"]
+        assert "--use-local-agent-home" in body["daemonCommand"]
+        assert body["daemonEnv"]["RELAY_SANDBOX_MODE"] == "none"
+        assert body["daemonEnv"]["RELAY_USE_LOCAL_AGENT_HOME"] == "1"
+
+        listing = client.get("/cp/daemon-nodes")
+        assert listing.status_code == 200
+        listed = next(item for item in listing.json()["nodes"] if item["id"] == body["node"]["id"])
+        assert listed["sandboxMode"] == "none"
+
+        duplicate = client.post("/cp/daemon-nodes", json={
+            "employeeId": "alice",
+            "workspacePath": "/workspace/alice",
+            "sandboxMode": "boxlite",
+        })
+        assert duplicate.status_code == 201
+        duplicate_body = duplicate.json()
+        assert duplicate_body["node"]["id"] == body["node"]["id"]
+        assert duplicate_body["node"]["sandboxMode"] == "none"
+        assert "--sandbox none" in duplicate_body["daemonCommand"]
+        assert "--use-local-agent-home" in duplicate_body["daemonCommand"]
+        assert duplicate_body["daemonEnv"]["RELAY_SANDBOX_MODE"] == "none"
+
+
+def test_control_panel_rejects_unknown_sandbox_mode(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _login_admin(client)
+
+        response = client.post("/cp/daemon-nodes", json={
+            "employeeId": "alice",
+            "sandboxMode": "firecracker",
+        })
+
+        assert response.status_code == 400
 
 
 def test_control_panel_creates_unassigned_pending_daemon_node(monkeypatch) -> None:

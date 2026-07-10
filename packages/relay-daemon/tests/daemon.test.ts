@@ -8,12 +8,14 @@ import {
   discoverAgentInventory,
   localProcessExecStream,
   parseInventoryOutput,
+  resolveBoxliteHome,
   resolveSandboxMode,
   runRelayDaemon,
   runRelayDaemonDoctor,
   type DaemonExecutionEnvironment,
   type DaemonLogger,
 } from "../src/index.js";
+import { acquireBoxliteHomeLock } from "../src/box.js";
 import type { DaemonNodeCommand, DaemonNodeEvent, DaemonNodeRegistration, DaemonNodeRunCommand, StreamExecResult } from "relay-core";
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -87,6 +89,68 @@ test("relay daemon defaults to BoxLite sandbox mode unless none is explicit", ()
   assert.equal(resolveSandboxMode(undefined), "boxlite");
   assert.equal(resolveSandboxMode(""), "boxlite");
   assert.equal(resolveSandboxMode("none"), "none");
+});
+
+test("BoxLite home is isolated from the global default and stable per workspace", () => {
+  const workspace = "/tmp/relay workspace";
+
+  const resolved = resolveBoxliteHome(workspace, undefined);
+
+  assert.match(resolved, /\/\.relay\/boxlite\/relay-workspace-[a-f0-9]{12}$/);
+  assert.notEqual(resolved, `${process.env.HOME}/.boxlite`);
+  assert.equal(resolveBoxliteHome(workspace, resolved), resolved);
+});
+
+test("BoxLite home locks allow different homes at the same time", async (t: TestContext) => {
+  const { mkdtempSync, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join: joinPath } = await import("node:path");
+  const root = mkdtempSync(joinPath(tmpdir(), "relay-boxlite-locks-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+
+  const first = acquireBoxliteHomeLock(joinPath(root, "one"));
+  const second = acquireBoxliteHomeLock(joinPath(root, "two"));
+  t.after(() => first.release());
+  t.after(() => second.release());
+
+  assert.notEqual(first.lockDir, second.lockDir);
+});
+
+test("BoxLite home lock rejects another live owner of the same home", async (t: TestContext) => {
+  const { mkdtempSync, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join: joinPath } = await import("node:path");
+  const root = mkdtempSync(joinPath(tmpdir(), "relay-boxlite-lock-busy-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+
+  const lock = acquireBoxliteHomeLock(root);
+  t.after(() => lock.release());
+
+  assert.throws(
+    () => acquireBoxliteHomeLock(root),
+    /Another Relay orchestrator is already running:[\s\S]+only one BoxLite runtime can use/,
+  );
+});
+
+test("BoxLite home lock reclaims stale owners", async (t: TestContext) => {
+  const { mkdtempSync, mkdirSync, rmSync, writeFileSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join: joinPath } = await import("node:path");
+  const root = mkdtempSync(joinPath(tmpdir(), "relay-boxlite-lock-stale-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+
+  const lockDir = joinPath(root, ".relay-boxlite.lock");
+  mkdirSync(lockDir);
+  writeFileSync(joinPath(lockDir, "owner.json"), JSON.stringify({
+    pid: -1,
+    token: "stale",
+    command: "stale relay-daemon",
+  }));
+
+  const lock = acquireBoxliteHomeLock(root);
+  t.after(() => lock.release());
+
+  assert.equal(lock.lockDir, lockDir);
 });
 
 test("BoxLite mode clears local agent process flags", async () => {
@@ -285,12 +349,13 @@ test("relay daemon ignores duplicate run.start commands already active", async (
   assert.equal(events.filter((event) => event.type === "run.completed").length, 1);
 });
 
-test("relay daemon advertises active command ids while polling", async () => {
+test("relay daemon advertises active delivery leases while polling", async () => {
   const stop = new AbortController();
   const command = { ...runCommand("cmd_active_poll"), leaseId: "lease_1", leaseExpiresAt: new Date(Date.now() + 60_000).toISOString() };
   let commandServed = false;
   let activePollSeen = false;
   let commandLeaseSeconds = 0;
+  let leaseMode = "";
   const daemon = runRelayDaemon({
     backendUrl: "http://relay.test",
     sandboxId: "sbx_test",
@@ -319,11 +384,12 @@ test("relay daemon advertises active command ids while polling", async () => {
       if (path === "/daemon-nodes/register") return jsonResponse({ ok: true });
       if (path.endsWith("/commands")) {
         commandLeaseSeconds = Number(parsed.searchParams.get("leaseSeconds") ?? "0");
+        leaseMode = parsed.searchParams.get("leaseMode") ?? "";
         if (!commandServed) {
           commandServed = true;
           return jsonResponse({ commands: [command] });
         }
-        if (parsed.searchParams.get("activeCommandIds") === command.id) activePollSeen = true;
+        if (parsed.searchParams.get("activeCommandLease") === `${command.id}:${command.leaseId}`) activePollSeen = true;
         return jsonResponse({ commands: [] });
       }
       if (path.endsWith("/events")) {
@@ -338,7 +404,8 @@ test("relay daemon advertises active command ids while polling", async () => {
   await daemon;
 
   assert.equal(activePollSeen, true);
-  assert.ok(commandLeaseSeconds >= 15 * 60);
+  assert.equal(leaseMode, "explicit");
+  assert.equal(commandLeaseSeconds, 90);
 });
 
 test("relay daemon refreshes an active command lease from a duplicate dispatch", async () => {

@@ -2,8 +2,7 @@
 
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { ActionRemove } from "./icons";
-import { Button } from "@/components/ui/button";
+import { OverlayCloseButton } from "@/components/ui/OverlayCloseButton";
 import { PreferencesPanel, type PreferencesPanelProps } from "./PreferencesPanel";
 import { useModalDrawer } from "../hooks/useModalDrawer";
 
@@ -21,7 +20,7 @@ export function PreferencesDialog({ open, onClose, preferences }: PreferencesDia
 
   return createPortal(
     <div
-      className="pref-backdrop"
+      className="overlay-backdrop pref-backdrop"
       role="presentation"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
@@ -43,15 +42,7 @@ export function PreferencesDialog({ open, onClose, preferences }: PreferencesDia
               {t("pref.sub")}
             </span>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="pref-close"
-            aria-label={t("pref.close")}
-            onClick={onClose}
-          >
-            <ActionRemove size={16} />
-          </Button>
+          <OverlayCloseButton label={t("pref.close")} onClick={onClose} className="overlay-close pref-close" />
         </header>
 
         <PreferencesPanel {...preferences} />

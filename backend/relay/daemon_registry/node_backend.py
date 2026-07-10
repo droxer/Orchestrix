@@ -81,7 +81,11 @@ class ServerDaemonNodeBackend:
         return self.registry.list_ready()
 
     def provision_daemon_node(self, payload: dict[str, Any]) -> dict[str, Any]:
-        sandbox, ui_token, node_token = self.registry.provision_pending(payload.get("employeeId"), payload.get("workspacePath"))
+        sandbox, ui_token, node_token = self.registry.provision_pending(
+            payload.get("employeeId"),
+            payload.get("workspacePath"),
+            payload.get("sandboxMode") or "boxlite",
+        )
         return {
             **sandbox,
             **({"token": ui_token, "sandboxToken": ui_token} if ui_token else {}),
@@ -197,6 +201,9 @@ class ServerDaemonNodeBackend:
             assert_session_owned_by_employee(self.registry.store, session_id, actor_employee_id)
         active = self.registry.cancel_active_run(sandbox_id, session_id, reason)
         if not active:
+            session = self.registry.store.get_session(session_id)
+            if session.get("status") in ("completed", "failed", "cancelled"):
+                return session
             raise KeyError(f"Session {session_id} has no active daemon node run.")
         return self.registry.store.get_session(session_id)
 

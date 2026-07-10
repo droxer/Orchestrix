@@ -53,7 +53,7 @@ export function PulseStrip({
       ? t("admin.v2.pulse_label")
       : view === "people"
         ? t("admin.v2.pulse_people_label")
-        : t("admin.v2.pulse_alerts_label");
+        : t("admin.v2.pulse_fleet_label");
 
   return (
     <div className="adm-pulse adm-pulse--alerts" role="group" aria-label={ariaLabel}>

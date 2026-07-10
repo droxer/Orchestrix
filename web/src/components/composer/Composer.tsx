@@ -23,15 +23,16 @@ const ComposerView = forwardRef<ComposerHandle, {
   composerMode: AgentTaskMode;
   setComposerMode: Dispatch<SetStateAction<AgentTaskMode>>;
   activeAgent: AgentName;
+  agentHealth?: Partial<Record<AgentName, "unknown" | "ready" | "failed">>;
   agentRoleLabels?: Partial<Record<AgentName, string>>;
   selectedEmployee: string;
   running: boolean;
   onAgentPicked: (agent: AgentName) => void;
   onSend: () => void;
   onCancelRun: () => void;
-}>(function Composer({ agentNames, disabledAgents, composerMode, setComposerMode, activeAgent, agentRoleLabels, selectedEmployee, running, onAgentPicked, onSend, onCancelRun }, ref) {
+}>(function Composer({ agentNames, disabledAgents, agentHealth, composerMode, setComposerMode, activeAgent, agentRoleLabels, selectedEmployee, running, onAgentPicked, onSend, onCancelRun }, ref) {
   const { t } = useTranslation();
-  const composer = useComposer({ agentNames, disabledAgents, onAgentPicked });
+  const composer = useComposer({ agentNames, disabledAgents, agentHealth, onAgentPicked });
   const {
     composerText, setComposerText, mentionOpen, setMentionOpen, mentionIndex, setMentionIndex,
     setIsComposing, textareaRef, filteredMentionAgents, syncMentionState, insertMention,

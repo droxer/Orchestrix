@@ -165,7 +165,7 @@ export function AttentionRail({ nodes }: AttentionRailProps) {
         </button>
         {sheetOpen ? (
           <div
-            className="adm-rail-sheet-backdrop"
+            className="overlay-backdrop adm-rail-sheet-backdrop"
             role="presentation"
             onClick={(event) => {
               if (event.target === event.currentTarget) setSheetOpen(false);

@@ -1,452 +1,482 @@
 /* =====================================================================
-   Login — editorial split surface
+   Login — the attach sequence
 
-   Two-pane composition: a left rail carrying the form and a right pane
-   carrying the pull-quote + system status. The split collapses
-   to a single column under 880px; the right pane is hidden rather than
-   stacked, since stacking the editorial moment under a form turns it
-   into decorative noise instead of context.
+   Signing in to Relay is attaching a terminal to a live control plane,
+   and the page is staged that way: a pinned-dark ops room (pre-auth, no
+   user theme preference is loaded yet, so the surface does not follow
+   data-theme), agent transit lanes pulsing in the backdrop, and a
+   handshake block whose backend/daemon/node rows resolve one-by-one
+   while the operator types credentials into a terminal-style form.
 
-   All colors, type, radii, and spacing come from tokens.css. No new
-   primitives are introduced.
+   Color is pinned via local --lg-* variables whose values are lifted
+   verbatim from the dark ramp in tokens.css (graphite canvas, cobalt →
+   periwinkle action, amber attention). Spacing, type scale, and radii
+   are theme-independent tokens and are used directly.
+
+   Bootstrap mode (data-mode="bootstrap") swings the accent from cobalt
+   to amber: the plane is awaiting credentials, not ready.
    ===================================================================== */
 
 .login-screen {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
-  min-height: 100vh;
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font-family: var(--font-sans);
-}
+  /* Pinned dark ramp — mirrors html[data-theme="dark"] in tokens.css. */
+  --lg-canvas: #0f1011;
+  --lg-elevated: #17181a;
+  --lg-ink: #f7f8f8;
+  --lg-body: #c2c5c9;
+  --lg-muted: #8a8f98;
+  --lg-hairline: color-mix(in srgb, #f7f8f8 14%, #0f1011);
+  --lg-hairline-soft: color-mix(in srgb, #f7f8f8 8%, #0f1011);
+  --lg-cobalt: #7089ff;
+  --lg-cobalt-active: #8fa3ff;
+  --lg-on-cobalt: #08112e;
+  --lg-up: #34d399;
+  --lg-amber: #f7b84d;
+  --lg-down: #ff6b75;
+  /* Mode accent — cobalt while attaching, amber during first-run setup. */
+  --lg-accent: var(--lg-cobalt);
 
-@media (max-width: 879px) {
-  .login-screen {
-    grid-template-columns: 1fr;
-  }
-
-  .login-pane {
-    min-height: 100svh;
-    padding-top: max(env(safe-area-inset-top), var(--space-lg));
-    padding-bottom: max(env(safe-area-inset-bottom), var(--space-lg));
-    padding-inline: max(env(safe-area-inset-left), var(--space-base)) max(env(safe-area-inset-right), var(--space-base));
-  }
-
-  .login-pane-body {
-    padding-block: var(--space-lg);
-  }
-}
-
-@media (max-width: 480px) {
-  .login-toggle {
-    flex-direction: column;
-    align-items: stretch;
-    gap: var(--space-sm);
-  }
-
-  .login-toggle-button {
-    justify-content: center;
-    min-height: 44px;
-  }
-
-  .login-foot {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-xs);
-  }
-}
-
-/* ---------- Left rail: the form ---------------------------------- */
-
-.login-pane {
   position: relative;
+  display: flex;
+  min-height: 100vh;
+  background:
+    radial-gradient(120% 90% at 12% 0%, color-mix(in srgb, var(--lg-cobalt) 7%, transparent), transparent 55%),
+    linear-gradient(to right, var(--lg-hairline-soft) 1px, transparent 1px) 0 0 / 56px 56px,
+    linear-gradient(to bottom, var(--lg-hairline-soft) 1px, transparent 1px) 0 0 / 56px 56px,
+    var(--lg-canvas);
+  color: var(--lg-ink);
+  font-family: var(--font-sans);
+  overflow: hidden;
+}
+
+.login-screen[data-mode="bootstrap"] {
+  --lg-accent: var(--lg-amber);
+}
+
+/* ---------- Backdrop: agent transit lanes -------------------------- */
+/* Four hairlines — claude / pi / codex / kimi — each carrying a pulse
+   that travels the lane on its own period. Decorative (aria-hidden);
+   hidden on narrow viewports and frozen under reduced motion. */
+
+.login-backdrop {
+  position: absolute;
+  inset: 0 0 0 clamp(480px, 46vw, 640px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(56px, 9vh, 96px);
+  padding-right: clamp(var(--space-lg), 6vw, var(--space-xxl));
+  pointer-events: none;
+  user-select: none;
+}
+
+.login-lane {
+  position: relative;
+  height: 1px;
+  background: var(--lg-hairline);
+}
+
+.login-lane-label {
+  position: absolute;
+  left: 0;
+  bottom: var(--space-xs);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--letter-caps);
+  text-transform: uppercase;
+  color: var(--lg-muted);
+  opacity: 0.7;
+}
+
+/* The traveling packet: a short luminous dash with a soft tail. */
+.login-lane::after {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 0;
+  width: 72px;
+  height: 3px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(to right, transparent, var(--lg-cobalt));
+  box-shadow: 0 0 12px color-mix(in srgb, var(--lg-cobalt) 55%, transparent);
+  opacity: 0;
+  animation: login-lane-travel calc(7s + var(--lane-index) * 1.4s) linear infinite;
+  animation-delay: calc(var(--lane-index) * -2.6s);
+}
+
+@keyframes login-lane-travel {
+  0% { transform: translateX(-80px); opacity: 0; }
+  6% { opacity: 1; }
+  88% { opacity: 1; }
+  100% { transform: translateX(calc(50vw + 80px)); opacity: 0; }
+}
+
+/* ---------- The column --------------------------------------------- */
+
+.login-column {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: var(--space-xl) clamp(var(--space-lg), 6vw, var(--space-xxl));
+  width: min(100%, 520px);
   min-height: 100vh;
+  padding: var(--space-xl) clamp(var(--space-lg), 6vw, var(--space-xxl));
+  background: color-mix(in srgb, var(--lg-canvas) 72%, transparent);
+  backdrop-filter: blur(2px);
+  border-right: 1px solid var(--lg-hairline-soft);
 }
 
-.login-pane-top,
-.login-pane-bottom {
-  flex: 0 0 auto;
+.login-masthead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-base);
+  opacity: 0;
+  animation: login-rise var(--duration-editorial) var(--ease-out-quint) forwards;
 }
 
-.login-pane-body {
+.login-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--lg-ink);
+}
+
+.login-wordmark {
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  font-weight: 600;
+  letter-spacing: var(--letter-display);
+}
+
+.login-kicker {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--letter-caps);
+  text-transform: uppercase;
+  color: var(--lg-accent);
+}
+
+.login-kicker::before {
+  content: "▸ ";
+  opacity: 0.7;
+}
+
+.login-body {
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  max-width: 420px;
-  width: 100%;
-  margin: 0 auto;
-  padding: var(--space-xxl) 0;
+  padding-block: var(--space-xl);
 }
 
-.login-pane-top,
-.login-pane-bottom {
-  max-width: 420px;
-  width: 100%;
-  margin: 0 auto;
-}
-
-.login-brand-lockup {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-sm);
-  color: var(--color-ink);
-  opacity: 0;
-  animation: relay-rise var(--duration-slow) var(--ease-out-quint) forwards;
-  animation-delay: 40ms;
-}
-
-/* Brand kicker — mark + eyebrow text. The mark carries the product identity;
-   the text switches between sign-in and first-run setup. */
-.login-kicker {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-xs);
-  margin: 0;
-  font: var(--type-eyebrow);
-  letter-spacing: var(--letter-eyebrow);
-  text-transform: uppercase;
-  color: var(--color-muted);
-}
-
-/* Headline — weighted Geist display, two lines. The second line drops to
-   a muted tone for hierarchy instead of the retired serif italic. */
 .login-headline {
-  margin: var(--space-md) 0 var(--space-base);
+  margin: 0 0 var(--space-base);
   font-family: var(--font-display);
-  font-size: clamp(34px, 4.4vw, 44px);
+  font-size: clamp(32px, 4.2vw, 42px);
   font-weight: 600;
-  line-height: 1.05;
+  line-height: 1.06;
   letter-spacing: var(--letter-display);
-  color: var(--color-ink);
+  color: var(--lg-ink);
   opacity: 0;
-  animation: relay-rise var(--duration-editorial) var(--ease-out-quint) forwards;
-  animation-delay: 120ms;
+  animation: login-rise var(--duration-editorial) var(--ease-out-quint) forwards;
+  animation-delay: 80ms;
 }
 
 .login-headline-break {
   display: block;
-  color: var(--color-muted);
+  color: var(--lg-muted);
 }
 
 .login-lede {
-  margin: 0 0 var(--space-xl);
-  max-width: 38ch;
-  font-size: var(--text-md);
+  margin: 0 0 var(--space-lg);
+  max-width: 42ch;
+  font-size: var(--text-sm);
   line-height: var(--leading-loose);
-  color: var(--color-body);
+  color: var(--lg-body);
   opacity: 0;
-  animation: relay-rise var(--duration-editorial) var(--ease-out-quint) forwards;
-  animation-delay: 200ms;
+  animation: login-rise var(--duration-editorial) var(--ease-out-quint) forwards;
+  animation-delay: 160ms;
 }
 
+/* ---------- Handshake block ---------------------------------------- */
+/* key ————————— state : each row's wire draws left-to-right, then the
+   state lights up — the plane reporting in, one subsystem at a time. */
+
+.login-handshake {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--space-xs) var(--space-sm);
+  align-items: center;
+  margin: 0 0 var(--space-xl);
+  padding: var(--space-base) 0;
+  border-top: 1px solid var(--lg-hairline-soft);
+  border-bottom: 1px solid var(--lg-hairline-soft);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.login-handshake-row {
+  display: contents;
+}
+
+.login-handshake-key {
+  color: var(--lg-muted);
+}
+
+.login-handshake-wire {
+  margin: 0;
+  height: 1px;
+  background: var(--lg-hairline);
+  transform: scaleX(0);
+  transform-origin: left;
+  animation: login-wire-draw 420ms var(--ease-out-quint) forwards;
+  animation-delay: calc(360ms + var(--row-index) * 260ms);
+}
+
+@keyframes login-wire-draw {
+  to { transform: scaleX(1); }
+}
+
+.login-handshake-state {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xxs);
+  justify-self: end;
+  color: var(--lg-ink);
+  font-feature-settings: "tnum" 1;
+  opacity: 0;
+  animation: login-state-resolve 320ms var(--ease-out-quint) forwards;
+  animation-delay: calc(700ms + var(--row-index) * 260ms);
+}
+
+@keyframes login-state-resolve {
+  from { opacity: 0; transform: translateX(-4px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.login-handshake-state::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--lg-up);
+}
+
+.login-handshake-state[data-state="pending"] {
+  color: var(--lg-amber);
+}
+
+.login-handshake-state[data-state="pending"]::before {
+  background: var(--lg-amber);
+  animation: login-pulse 1.6s ease-in-out infinite;
+}
+
+/* ---------- Terminal form ------------------------------------------ */
+/* Numbered mono labels over underline-only inputs. The number ticks up
+   per field (bootstrap mode simply gains an 01 for the token). */
+
 .login-form {
+  counter-reset: login-field;
   display: flex;
   flex-direction: column;
-  gap: var(--space-base);
+  gap: var(--space-lg);
   opacity: 0;
-  animation: relay-rise var(--duration-editorial) var(--ease-out-quint) forwards;
-  animation-delay: 280ms;
+  animation: login-rise var(--duration-editorial) var(--ease-out-quint) forwards;
+  animation-delay: 240ms;
 }
 
 .login-field {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xxs);
+  gap: var(--space-xs);
 }
 
 .login-field-label {
-  font: var(--type-eyebrow);
-  letter-spacing: var(--letter-eyebrow);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--letter-caps);
   text-transform: uppercase;
-  color: var(--color-muted);
+  color: var(--lg-muted);
 }
 
-/* Full-width primary CTA. Tight --radius-sm is inherited from the shadcn
-   Button base — only the height + button type role are local. Kept one
-   systematic notch (44px) above the 36px chrome default as the single
-   editorial auth focal point. */
-.login-form > button[data-slot="button"] {
-  margin-top: var(--space-xs);
+.login-field-label::before {
+  counter-increment: login-field;
+  content: counter(login-field, decimal-leading-zero) " / ";
+  color: var(--lg-accent);
+}
+
+.login-input {
   width: 100%;
-  height: 44px;
-  font: var(--type-button);
+  padding: var(--space-xs) 0;
+  border: none;
+  border-bottom: 1px solid var(--lg-hairline);
+  border-radius: 0;
+  background: transparent;
+  color: var(--lg-ink);
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
+  caret-color: var(--lg-accent);
+  transition: border-color var(--duration-fast) var(--ease-standard);
+}
+
+.login-input:hover {
+  border-bottom-color: color-mix(in srgb, var(--lg-ink) 30%, var(--lg-canvas));
+}
+
+.login-input:focus-visible {
+  outline: none;
+  border-bottom-color: var(--lg-accent);
+  box-shadow: 0 1px 0 0 var(--lg-accent);
+}
+
+.login-input:-webkit-autofill {
+  -webkit-text-fill-color: var(--lg-ink);
+  -webkit-box-shadow: 0 0 0 1000px var(--lg-canvas) inset;
+  transition: background-color 9999s ease-out;
 }
 
 .login-error {
   margin: 0;
   padding: var(--space-sm) var(--space-base);
-  border-left: 2px solid var(--color-semantic-down);
-  background: color-mix(in srgb, var(--color-semantic-down) 8%, var(--color-canvas));
-  /* Text-safe red — the raw dot value fails ~3.4:1 as 13px copy. */
-  color: var(--color-danger-text);
-  font-size: var(--text-sm);
+  border-left: 2px solid var(--lg-down);
+  background: color-mix(in srgb, var(--lg-down) 10%, var(--lg-canvas));
+  color: var(--lg-down);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
   line-height: var(--leading-normal);
 }
 
-/* Mode toggle — a hairline-bordered secondary affordance, not a link.
-   Switching between sign-in and first-run setup is a context switch,
-   not a navigation, and deserves the weight of a real button. */
-.login-toggle {
+.login-submit {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-base);
-  padding-top: var(--space-base);
-  border-top: 1px solid var(--color-hairline-soft);
-  font-size: var(--text-sm);
-  color: var(--color-muted);
-  opacity: 0;
-  animation: relay-rise var(--duration-editorial) var(--ease-out-quint) forwards;
-  animation-delay: 360ms;
-}
-
-.login-toggle-button {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-xxs);
-  padding: var(--space-xs) var(--space-base);
-  border: 1px solid var(--color-hairline);
+  gap: var(--space-sm);
+  width: 100%;
+  height: 48px;
+  padding-inline: var(--space-base);
+  border: none;
   border-radius: var(--radius-sm);
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font: var(--type-label-md);
+  background: var(--lg-accent);
+  color: var(--lg-on-cobalt);
+  font: var(--type-button);
   cursor: pointer;
-  transition: background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
+  transition: background var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
 }
 
-.login-toggle-button:hover {
-  background: var(--color-surface-soft);
-  border-color: color-mix(in srgb, var(--color-ink) 18%, transparent);
+.login-screen[data-mode="bootstrap"] .login-submit {
+  /* Amber fill needs dark ink, same as the cobalt's navy — keep it. */
+  color: #2b1c02;
 }
 
-.login-toggle-button:focus-visible {
-  outline: none;
-  box-shadow: var(--ring-focus);
+.login-submit:hover:not(:disabled) {
+  background: var(--lg-cobalt-active);
 }
 
-.login-toggle-button::after {
-  content: "→";
-  margin-left: var(--space-xxs);
+.login-screen[data-mode="bootstrap"] .login-submit:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--lg-amber) 85%, #ffffff);
+}
+
+.login-submit:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.login-submit:disabled {
+  background: color-mix(in srgb, var(--lg-accent) 40%, var(--lg-canvas));
+  color: color-mix(in srgb, var(--lg-on-cobalt) 55%, var(--lg-accent));
+  cursor: default;
+}
+
+.login-submit:focus-visible {
+  outline: 2px solid var(--lg-ink);
+  outline-offset: 2px;
+}
+
+.login-submit-arrow {
   font-family: var(--font-mono);
   transition: transform var(--duration-fast) var(--ease-standard);
 }
 
-.login-toggle-button:hover::after {
-  transform: translateX(2px);
+.login-submit:hover:not(:disabled) .login-submit-arrow {
+  transform: translateX(3px);
 }
 
-/* ---------- Right pane: the editorial moment --------------------- */
-
-.login-editorial {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: var(--space-xxl) clamp(var(--space-lg), 5vw, var(--space-xxl));
-  background: var(--color-surface-soft);
-  color: var(--color-ink);
-  overflow: hidden;
-  isolation: isolate;
-}
-
-@media (max-width: 879px) {
-  .login-editorial {
-    display: none;
-  }
-}
-
-/* Bled mark — a single oversized character bled to the
-   corner. Adds depth without competing with the pull-quote. */
-.login-editorial::before {
-  content: "R";
-  position: absolute;
-  right: -0.12em;
-  bottom: -0.28em;
-  font-family: var(--font-display);
-  font-size: clamp(360px, 48vw, 640px);
-  font-weight: 400;
-  line-height: 1;
-  /* On light: 5% ink reads as a watermark; on dark, a flat 5% white is
-     too hot — drop to 3% so the bled-glyph stays a whisper. */
-  color: color-mix(in srgb, var(--color-ink) 5%, transparent);
-  z-index: -1;
-  pointer-events: none;
-  user-select: none;
-}
-
-html[data-theme="dark"] .login-editorial::before {
-  color: color-mix(in srgb, var(--color-ink) 3%, transparent);
-}
-
-.login-editorial-top {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  font: var(--type-eyebrow);
-  letter-spacing: var(--letter-eyebrow);
-  text-transform: uppercase;
-  color: var(--color-muted);
-  opacity: 0;
-  animation: relay-rise var(--duration-editorial) var(--ease-out-quint) forwards;
-  animation-delay: 160ms;
-}
-
-.login-editorial-top::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: var(--color-hairline);
-}
-
-.login-pullquote {
-  margin: 0;
-  max-width: 18ch;
-  font-family: var(--font-display);
-  font-size: clamp(28px, 3.6vw, 42px);
-  font-style: italic;
-  font-weight: 400;
-  line-height: 1.18;
-  letter-spacing: var(--letter-display);
-  color: var(--color-ink);
-  opacity: 0;
-  animation: relay-rise 880ms var(--ease-out-quint) forwards;
-  animation-delay: 240ms;
-}
-
-.login-pullquote::before {
-  content: "“";
-  display: block;
-  margin-bottom: var(--space-xs);
-  font-size: 1.6em;
-  line-height: 0.4;
-  color: color-mix(in srgb, var(--color-ink) 30%, transparent);
-}
-
-.login-pullquote-attribution {
-  margin-top: var(--space-base);
-  font: var(--type-label-md);
-  font-style: normal;
-  letter-spacing: var(--letter-open);
-  color: var(--color-muted);
-}
-
-.login-pullquote-attribution::before {
-  content: "— ";
-  color: color-mix(in srgb, var(--color-muted) 60%, transparent);
-}
-
-/* Status block — mono identifiers stacked, evoking a daemon log. Reads
-   as ambient context, not interactive UI. */
-.login-system {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: var(--space-xs) var(--space-base);
-  align-items: baseline;
-  padding-top: var(--space-base);
-  border-top: 1px solid var(--color-hairline);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--color-body);
-  opacity: 0;
-  animation: relay-rise var(--duration-editorial) var(--ease-out-quint) forwards;
-  animation-delay: 380ms;
-}
-
-.login-system-row {
-  display: contents;
-}
-
-.login-system-key {
-  color: var(--color-muted);
-}
-
-.login-system-sep {
-  color: color-mix(in srgb, var(--color-muted) 50%, transparent);
-}
-
-.login-system-value {
-  color: var(--color-ink);
-  font-feature-settings: "tnum" 1;
-  text-align: right;
-}
-
-.login-system-value[data-state="ready"]::before {
-  content: "";
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin-right: var(--space-xxs);
-  border-radius: var(--radius-full);
-  background: var(--color-semantic-up);
-  vertical-align: middle;
-}
-
-.login-system-value[data-state="pending"]::before {
-  content: "";
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin-right: var(--space-xxs);
-  border-radius: var(--radius-full);
-  background: var(--color-accent-yellow);
-  vertical-align: middle;
-}
-
-/* ---------- Footer rail ----------------------------------------- */
+/* ---------- Foot rail ----------------------------------------------- */
 
 .login-foot {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-base);
-  margin-top: var(--space-xl);
+  padding-top: var(--space-base);
+  border-top: 1px solid var(--lg-hairline-soft);
+  opacity: 0;
+  animation: login-rise var(--duration-editorial) var(--ease-out-quint) forwards;
+  animation-delay: 320ms;
+}
+
+/* Mode switch — bracketed mono affordance, a command rather than a link. */
+.login-switch {
+  padding: var(--space-xxs) 0;
+  border: none;
+  background: none;
+  color: var(--lg-body);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-standard);
+}
+
+.login-switch::before { content: "[ "; color: var(--lg-muted); }
+.login-switch::after { content: " ]"; color: var(--lg-muted); }
+
+.login-switch:hover {
+  color: var(--lg-cobalt-active);
+}
+
+.login-switch:focus-visible {
+  outline: 2px solid var(--lg-cobalt);
+  outline-offset: 2px;
+}
+
+.login-foot-meta {
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
   letter-spacing: var(--letter-caps);
   text-transform: uppercase;
-  color: var(--color-muted);
+  color: var(--lg-muted);
 }
 
-.login-foot-brand {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-xs);
-  color: var(--color-ink);
-}
-
-.login-foot-mark {
-  font-family: var(--font-display);
-  font-style: italic;
-  font-size: var(--text-sm);
-  text-transform: none;
-  letter-spacing: 0;
-  color: var(--color-muted);
-}
-
-/* ---------- Pre-auth "checking" splash --------------------------- */
+/* ---------- Pre-auth "checking" splash ------------------------------ */
 
 .login-checking {
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: var(--color-canvas);
-  color: var(--color-muted);
+  background: #0f1011;
+  color: #8a8f98;
 }
 
 .login-checking-text {
   margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--text-xl);
-  font-style: italic;
-  font-weight: 400;
-  letter-spacing: var(--letter-display);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
   animation: login-pulse 1.6s ease-in-out infinite;
+}
+
+.login-checking-text::after {
+  content: "▌";
+  margin-left: var(--space-xxs);
+  color: #7089ff;
+}
+
+/* ---------- Motion --------------------------------------------------- */
+
+@keyframes login-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes login-pulse {
@@ -454,26 +484,75 @@ html[data-theme="dark"] .login-editorial::before {
   50% { opacity: 1; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .login-checking-text {
-    animation: none;
-    opacity: 1;
+/* ---------- Responsive ----------------------------------------------- */
+
+@media (max-width: 879px) {
+  .login-backdrop {
+    display: none;
+  }
+
+  .login-column {
+    width: 100%;
+    min-height: 100svh;
+    border-right: none;
+    padding-top: max(env(safe-area-inset-top), var(--space-lg));
+    padding-bottom: max(env(safe-area-inset-bottom), var(--space-lg));
+    padding-inline: max(env(safe-area-inset-left), var(--space-base)) max(env(safe-area-inset-right), var(--space-base));
+  }
+
+  .login-body {
+    max-width: 440px;
+    width: 100%;
+    margin-inline: auto;
+  }
+
+  .login-masthead,
+  .login-foot {
+    max-width: 440px;
+    width: 100%;
+    margin-inline: auto;
   }
 }
 
-/* ---------- Motion ---------------------------------------------- */
-/* relay-rise keyframe is defined in empty-state.css which loads before login.css */
+@media (max-width: 480px) {
+  .login-foot {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-xs);
+  }
+
+  .login-switch {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
+/* ---------- Reduced motion ------------------------------------------- */
 
 @media (prefers-reduced-motion: reduce) {
-  .login-kicker,
-  .login-brand-lockup,
+  .login-masthead,
   .login-headline,
   .login-lede,
   .login-form,
-  .login-toggle,
-  .login-editorial-top,
-  .login-pullquote,
-  .login-system {
+  .login-foot,
+  .login-handshake-state {
+    animation: none;
+    opacity: 1;
+  }
+
+  .login-handshake-wire {
+    animation: none;
+    transform: scaleX(1);
+  }
+
+  .login-lane::after {
+    animation: none;
+    opacity: 0;
+  }
+
+  .login-handshake-state[data-state="pending"]::before,
+  .login-checking-text {
     animation: none;
     opacity: 1;
   }

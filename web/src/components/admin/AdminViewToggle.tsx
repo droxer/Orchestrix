@@ -2,8 +2,9 @@
 
 import { useTranslation } from "react-i18next";
 import { LayoutDashboard, Server, Users } from "lucide-react";
+import type { AdminConsoleView } from "../../lib/store";
 
-export type AdminView = "dashboard" | "people" | "fleet";
+export type AdminView = AdminConsoleView;
 
 interface AdminViewToggleProps {
   view: AdminView;

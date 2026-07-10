@@ -697,6 +697,216 @@ def test_daemon_poll_renews_known_active_command_before_reclaim() -> None:
     asyncio.run(run_flow())
 
 
+def test_daemon_heartbeat_renews_command_dispatched_by_another_backend_replica() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            database_url = f"sqlite:///{root}/daemon.db"
+            session_store = LocalSessionStore(root)
+            first_store = DatabaseDaemonStore(database_url, create_schema=True)
+            first = DaemonNodeRegistry(session_store, first_store)
+            first.register({
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }, "ui_token")
+            second = DaemonNodeRegistry(
+                session_store,
+                DatabaseDaemonStore(database_url),
+            )
+
+            backend = ServerDaemonNodeBackend(first)
+            await backend.run("sbx_alice", {
+                "taskGoal": "survive backend load balancing",
+                "assignments": [{"agent": "codex", "mode": "action"}],
+            })
+            [command] = first.take_commands(
+                "sbx_alice",
+                "node_token",
+                lease_seconds=0.05,
+                renew_known_active=False,
+            )
+
+            second.renew_active_command_leases(
+                "sbx_alice",
+                "node_token",
+                [(command["id"], command["leaseId"])],
+                lease_seconds=10,
+            )
+            time.sleep(0.08)
+
+            assert second.take_commands(
+                "sbx_alice",
+                "node_token",
+                lease_seconds=0.05,
+                renew_known_active=False,
+            ) == []
+
+    asyncio.run(run_flow())
+
+
+def test_daemon_cancel_finds_run_dispatched_by_another_backend_replica() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            database_url = f"sqlite:///{root}/daemon.db"
+            session_store = LocalSessionStore(root)
+            first = DaemonNodeRegistry(
+                session_store,
+                DatabaseDaemonStore(database_url, create_schema=True),
+            )
+            first.register({
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }, "ui_token")
+            second = DaemonNodeRegistry(
+                session_store,
+                DatabaseDaemonStore(database_url),
+            )
+            second.register({
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }, "ui_token")
+
+            session = await ServerDaemonNodeBackend(first).run("sbx_alice", {
+                "taskGoal": "cancel across backend replicas",
+                "assignments": [{"agent": "codex", "mode": "action"}],
+            })
+            [start] = first.take_commands(
+                "sbx_alice",
+                "node_token",
+                lease_seconds=10,
+                renew_known_active=False,
+            )
+
+            cancelled = ServerDaemonNodeBackend(second).cancel_run(
+                "sbx_alice",
+                session["id"],
+                "stop requested",
+            )
+
+            assert cancelled["id"] == session["id"]
+            [cancel] = second.take_commands(
+                "sbx_alice",
+                "node_token",
+                lease_seconds=10,
+                renew_known_active=False,
+            )
+            assert cancel["type"] == "run.cancel"
+            assert cancel["commandId"] == start["id"]
+
+    asyncio.run(run_flow())
+
+
+def test_daemon_events_are_accepted_by_a_replica_that_did_not_dispatch_the_command() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            database_url = f"sqlite:///{root}/daemon.db"
+            session_store = LocalSessionStore(root)
+            first = DaemonNodeRegistry(
+                session_store,
+                DatabaseDaemonStore(database_url, create_schema=True),
+            )
+            first.register({
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }, "ui_token")
+            second = DaemonNodeRegistry(
+                session_store,
+                DatabaseDaemonStore(database_url),
+            )
+
+            session = await ServerDaemonNodeBackend(first).run("sbx_alice", {
+                "taskGoal": "survive event load balancing",
+                "assignments": [{"agent": "codex", "mode": "action"}],
+            })
+            [command] = first.take_commands(
+                "sbx_alice",
+                "node_token",
+                lease_seconds=0.05,
+                renew_known_active=False,
+            )
+
+            second.handle_event("sbx_alice", {
+                "type": "run.output",
+                "commandId": command["id"],
+                "leaseId": command["leaseId"],
+                "sessionId": command["sessionId"],
+                "runId": command["runId"],
+                "agent": "codex",
+                "stream": "stdout",
+                "text": "cross-replica output",
+                "sequence": 0,
+            }, "node_token")
+            time.sleep(0.08)
+            [redelivered] = first.take_commands(
+                "sbx_alice",
+                "node_token",
+                lease_seconds=10,
+                renew_known_active=False,
+            )
+            with pytest.raises(PermissionError, match="lease does not match"):
+                second.handle_event("sbx_alice", {
+                    "type": "run.output",
+                    "commandId": command["id"],
+                    "leaseId": command["leaseId"],
+                    "sessionId": command["sessionId"],
+                    "runId": command["runId"],
+                    "agent": "codex",
+                    "stream": "stdout",
+                    "text": "stale output",
+                    "sequence": 1,
+                }, "node_token")
+            second.handle_event("sbx_alice", {
+                "type": "run.output",
+                "commandId": redelivered["id"],
+                "leaseId": redelivered["leaseId"],
+                "sessionId": redelivered["sessionId"],
+                "runId": redelivered["runId"],
+                "agent": "codex",
+                "stream": "stdout",
+                "text": "current output",
+                "sequence": 1,
+            }, "node_token")
+            second.handle_event("sbx_alice", {
+                "type": "run.completed",
+                "commandId": redelivered["id"],
+                "leaseId": redelivered["leaseId"],
+                "sessionId": redelivered["sessionId"],
+                "runId": redelivered["runId"],
+                "agent": "codex",
+                "mode": "action",
+                "exitCode": 0,
+            }, "node_token")
+
+            stored = session_store.get_session(session["id"])
+            assert [
+                event["text"]
+                for event in stored["events"]
+                if event.get("type") == "agent.output"
+            ] == ["cross-replica output", "current output"]
+            assert stored["status"] == "completed"
+
+    asyncio.run(run_flow())
+
+
 def test_daemon_failed_event_preserves_agent_log_without_artifact() -> None:
     async def run_flow() -> None:
         with TemporaryDirectory() as root:
@@ -1488,6 +1698,46 @@ def test_daemon_store_reclaims_expired_command_leases(store_factory) -> None:
 
 
 @pytest.mark.parametrize("store_factory", [LocalDaemonStore, lambda root: DatabaseDaemonStore(f"sqlite:///{root}/daemon.db", create_schema=True)])
+def test_daemon_store_retries_cancel_until_target_run_is_terminal(store_factory) -> None:
+    with TemporaryDirectory() as root:
+        store = store_factory(root)
+        store.register_node({
+            "id": "sbx_alice",
+            "employeeId": "alice",
+            "workspacePath": "/workspace/alice",
+            "status": "ready",
+            "agents": {"codex": "ready"},
+            "token": None,
+            "nodeToken": "tok_secret",
+            "nodeTokenHash": "sha256:hash",
+            "createdAt": "2026-06-13T00:00:00.000Z",
+            "updatedAt": "2026-06-13T00:00:00.000Z",
+        })
+        store.enqueue_command("sbx_alice", {
+            "id": "cmd_cancel",
+            "type": "run.cancel",
+            "commandId": "cmd_run",
+            "sessionId": "ses_1",
+            "runId": "run_1",
+            "agent": "codex",
+            "mode": "action",
+            "reason": "no longer needed",
+        })
+
+        [first] = store.take_queued_commands("sbx_alice", lease_seconds=0.05)
+        assert first["command"]["type"] == "run.cancel"
+        assert first["attempt"] == 1
+
+        time.sleep(0.08)
+
+        [second] = store.take_queued_commands("sbx_alice", lease_seconds=0.05)
+        assert second["id"] == first["id"]
+        assert second["attempt"] == 2
+        store.mark_cancel_commands_completed("sbx_alice", "cmd_run")
+        assert store.take_queued_commands("sbx_alice") == []
+
+
+@pytest.mark.parametrize("store_factory", [LocalDaemonStore, lambda root: DatabaseDaemonStore(f"sqlite:///{root}/daemon.db", create_schema=True)])
 def test_daemon_store_renews_active_command_leases(store_factory) -> None:
     with TemporaryDirectory() as root:
         store = store_factory(root)
@@ -1515,9 +1765,46 @@ def test_daemon_store_renews_active_command_leases(store_factory) -> None:
 
         [first] = store.take_queued_commands("sbx_alice", lease_seconds=0.05)
         time.sleep(0.08)
-        store.renew_command_leases("sbx_alice", [first["id"]], lease_seconds=10)
+        store.renew_command_leases("sbx_alice", [(first["id"], first["leaseId"])], lease_seconds=10)
 
         assert store.take_queued_commands("sbx_alice") == []
+
+
+@pytest.mark.parametrize("store_factory", [LocalDaemonStore, lambda root: DatabaseDaemonStore(f"sqlite:///{root}/daemon.db", create_schema=True)])
+def test_daemon_store_does_not_renew_a_superseded_delivery(store_factory) -> None:
+    with TemporaryDirectory() as root:
+        store = store_factory(root)
+        store.register_node({
+            "id": "sbx_alice",
+            "employeeId": "alice",
+            "workspacePath": "/workspace/alice",
+            "status": "ready",
+            "agents": {"codex": "ready"},
+            "token": None,
+            "nodeToken": "tok_secret",
+            "nodeTokenHash": "sha256:hash",
+            "createdAt": "2026-06-13T00:00:00.000Z",
+            "updatedAt": "2026-06-13T00:00:00.000Z",
+        })
+        store.enqueue_command("sbx_alice", {
+            "id": "cmd_long",
+            "type": "run.start",
+            "sessionId": "ses_1",
+            "runId": "run_1",
+            "agent": "codex",
+            "mode": "action",
+            "taskGoal": "fix auth",
+        })
+
+        [first] = store.take_queued_commands("sbx_alice", lease_seconds=0.05)
+        time.sleep(0.08)
+        [second] = store.take_queued_commands("sbx_alice", lease_seconds=0.05)
+        store.renew_command_leases("sbx_alice", [(first["id"], first["leaseId"])], lease_seconds=10)
+        time.sleep(0.08)
+
+        [third] = store.take_queued_commands("sbx_alice", lease_seconds=0.05)
+        assert third["attempt"] == 3
+        assert third["leaseId"] != second["leaseId"]
 
 
 @pytest.mark.parametrize("store_factory", [LocalDaemonStore, lambda root: DatabaseDaemonStore(f"sqlite:///{root}/daemon.db", create_schema=True)])

@@ -45,6 +45,32 @@ export function isGroupedContinuation(messages: DerivedMessage[], index: number)
   return false;
 }
 
+function previousTranscriptTurn(messages: DerivedMessage[], index: number): DerivedMessage | undefined {
+  for (let i = index - 1; i >= 0; i -= 1) {
+    const prev = messages[i];
+    if (prev.kind !== "system") return prev;
+  }
+  return undefined;
+}
+
+/** Label for a phase divider before a new agent chapter (handoff or fresh run). */
+export function phaseDividerLabel(messages: DerivedMessage[], index: number, t: TFunction): string | null {
+  const message = messages[index];
+  if (message.kind !== "agent" || isGroupedContinuation(messages, index)) return null;
+
+  const prev = previousTranscriptTurn(messages, index);
+  if (!prev) return null;
+
+  const mode = t(`mode.${message.mode}`);
+  if (prev.kind === "agent" && prev.agent !== message.agent) {
+    return t("transcript.phase_handoff", { agent: message.agent, mode });
+  }
+  if (prev.kind === "user") {
+    return t("transcript.phase_agent", { agent: message.agent, mode });
+  }
+  return null;
+}
+
 function streamsFromAgentLog(agentLog: string): { stdout: string; stderr: string } {
   if (!agentLog.trim()) return { stdout: "", stderr: "" };
   const matches = Array.from(agentLog.matchAll(/(?:^|\n)(stdout|stderr):\n/g));

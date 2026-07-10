@@ -29,8 +29,14 @@ export function useModalDrawer<T extends HTMLElement>(onClose: () => void, enabl
     (initial ?? panelRef.current)?.focus();
 
     function handleKey(event: KeyboardEvent) {
-      // A portalled Radix Select/Popover owns the keyboard while open; defer.
-      if (document.querySelector('[data-slot="select-content"], [data-radix-popper-content-wrapper]')) return;
+      // Confirm/prompt dialogs and portalled Radix overlays own the keyboard while open; defer.
+      if (
+        document.querySelector(
+          '.dialog-backdrop, [data-slot="select-content"], [data-radix-popper-content-wrapper]',
+        )
+      ) {
+        return;
+      }
 
       if (event.key === "Escape") {
         event.preventDefault();

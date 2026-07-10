@@ -47,19 +47,27 @@ def bounded_int(value: str | None, *, default: int, minimum: int, maximum: int, 
     return parsed
 
 
-def active_command_ids(request: Request) -> list[str]:
-    raw_values = list(request.query_params.getlist("activeCommandId"))
-    comma_value = request.query_params.get("activeCommandIds")
+def active_command_leases(request: Request, lease_mode: str) -> list[tuple[str, str | None]]:
+    leases: list[tuple[str, str | None]] = []
+    if lease_mode == "explicit":
+        for raw in request.query_params.getlist("activeCommandLease"):
+            command_id, separator, lease_id = raw.strip().partition(":")
+            if separator and command_id and lease_id and (command_id, lease_id) not in leases:
+                leases.append((command_id, lease_id))
+            if len(leases) >= MAX_ACTIVE_COMMAND_IDS:
+                return leases
+    raw_values = list(request.query_params.getlist("activeCommandId")) if lease_mode == "legacy" else []
+    comma_value = request.query_params.get("activeCommandIds") if lease_mode == "legacy" else None
     if comma_value:
         raw_values.extend(comma_value.split(","))
-    ids = []
     for raw in raw_values:
         command_id = raw.strip()
-        if command_id and command_id not in ids:
-            ids.append(command_id)
-        if len(ids) >= MAX_ACTIVE_COMMAND_IDS:
+        item = (command_id, None)
+        if command_id and item not in leases:
+            leases.append(item)
+        if len(leases) >= MAX_ACTIVE_COMMAND_IDS:
             break
-    return ids
+    return leases
 
 
 @router.get("/daemon-nodes")
@@ -152,18 +160,33 @@ async def daemon_commands(sandbox_id: str, request: Request, ctx: AppContextDep)
         maximum=MAX_COMMAND_LEASE_SECONDS,
         field="leaseSeconds",
     )
+    lease_mode = request.query_params.get("leaseMode") or "legacy"
+    if lease_mode not in ("explicit", "legacy"):
+        raise HTTPException(400, 'leaseMode must be "explicit" or "legacy".')
     try:
         token = bearer_token(request)
-        active_ids = active_command_ids(request)
+        active_leases = active_command_leases(request, lease_mode)
         deadline = time.monotonic() + wait_seconds
-        ctx.registry.renew_active_command_leases(sandbox_id, token, active_ids, lease_seconds=lease_seconds)
-        commands = ctx.registry.take_commands(sandbox_id, token, limit=limit, lease_seconds=lease_seconds)
+        ctx.registry.renew_active_command_leases(sandbox_id, token, active_leases, lease_seconds=lease_seconds)
+        commands = ctx.registry.take_commands(
+            sandbox_id,
+            token,
+            limit=limit,
+            lease_seconds=lease_seconds,
+            renew_known_active=lease_mode == "legacy",
+        )
         while not commands and time.monotonic() < deadline:
             await asyncio.sleep(min(0.25, deadline - time.monotonic()))
-            ctx.registry.renew_active_command_leases(sandbox_id, token, active_ids, lease_seconds=lease_seconds)
+            ctx.registry.renew_active_command_leases(sandbox_id, token, active_leases, lease_seconds=lease_seconds)
             if ctx.registry.available_command_count(sandbox_id, token) == 0:
                 continue
-            commands = ctx.registry.take_commands(sandbox_id, token, limit=limit, lease_seconds=lease_seconds)
+            commands = ctx.registry.take_commands(
+                sandbox_id,
+                token,
+                limit=limit,
+                lease_seconds=lease_seconds,
+                renew_known_active=lease_mode == "legacy",
+            )
         logger.debug("Daemon node commands polled", sandbox_id=sandbox_id, command_count=len(commands))
         return {"commands": commands}
     except PermissionError as error:

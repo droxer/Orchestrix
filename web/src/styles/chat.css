@@ -54,16 +54,23 @@
 }
 
 .chat-title-status {
+  flex: 0 0 auto;
   padding: 1px 7px;
   font: var(--type-meta);
   font-weight: 500;
   text-transform: none;
 }
 
+/* The token chip is the first thing to give way when the header runs out of
+   room: it shrinks and ellipsizes inside its own border instead of painting
+   past the title column under the agent tabs. Not a flex container —
+   text-overflow needs a block box. */
 .chat-title-tokens {
-  display: inline-flex;
-  align-items: center;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   padding: 1px 7px;
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-sm);
@@ -212,6 +219,11 @@
   color: var(--color-danger-text);
 }
 
+.header-agent-tabs button.agent-tab-not-ready {
+  color: var(--color-muted);
+  opacity: 0.72;
+}
+
 .transcript {
   min-height: 0;
   overflow-y: auto;
@@ -229,6 +241,28 @@
   gap: var(--space-md);
 }
 
+/* Active transcript — container spine, subtle left-edge warmth. */
+.transcript-inner:not(:has(.transcript-empty)) {
+  position: relative;
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--color-brand-soft) 28%, transparent) 0%,
+      transparent 140px
+    );
+}
+
+.transcript-inner:not(:has(.transcript-empty))::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--space-lg) + 9px);
+  top: var(--space-xl);
+  bottom: var(--space-xxl);
+  width: 1px;
+  background: var(--color-hairline);
+  pointer-events: none;
+}
+
 /* Empty transcript — flat soft surface behind the shared empty state. */
 .transcript-inner:has(.transcript-empty) {
   background: var(--color-surface-soft);
@@ -240,33 +274,89 @@
   margin: auto;
 }
 
+.transcript-turn {
+  display: contents;
+}
+
+/* Session phase marker — chapters along the rail at agent handoffs. */
+.transcript-phase {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  gap: var(--space-sm);
+  align-items: center;
+  padding: var(--space-xxs) 0;
+  color: var(--color-muted);
+}
+
+.transcript-phase-node {
+  width: 8px;
+  height: 8px;
+  margin-left: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-hairline);
+  box-shadow: 0 0 0 2px var(--color-canvas);
+  justify-self: center;
+}
+
+.transcript-phase-label {
+  font: var(--type-eyebrow);
+  letter-spacing: var(--letter-eyebrow);
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.transcript-phase-label::after {
+  content: "";
+  display: inline-block;
+  width: 100%;
+  max-width: 120px;
+  height: 1px;
+  margin-left: var(--space-sm);
+  vertical-align: middle;
+  background: var(--color-hairline-soft);
+}
+
 .msg {
   position: relative;
-  padding-left: 30px;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  column-gap: var(--space-sm);
+  align-items: start;
   content-visibility: auto;
   contain-intrinsic-size: auto 160px;
-  animation: message-in var(--duration-base) ease-out both;
 }
 
-/* The continuous spine: each turn draws the gutter line through its own box
-   and into the gap below, so consecutive turns read as one unbroken rail.
-   Flat hairline — depth comes from the rail + type, never a shadow. */
-.msg::before {
-  content: "";
-  position: absolute;
-  left: 6px;
-  top: 0;
-  bottom: calc(var(--space-md) * -1);
-  width: 1.5px;
-  background: var(--color-hairline);
-}
-
-.transcript-inner > .msg:last-child::before {
-  bottom: 0;
-}
+/* Staggered reveal — first dozen turns fade-rise on mount. */
+.transcript-inner > .transcript-turn:nth-child(1) .msg,
+.transcript-inner > .transcript-turn:nth-child(1) .transcript-phase { animation: message-in var(--duration-base) var(--ease-out-quint) both; animation-delay: 30ms; }
+.transcript-inner > .transcript-turn:nth-child(2) .msg,
+.transcript-inner > .transcript-turn:nth-child(2) .transcript-phase { animation: message-in var(--duration-base) var(--ease-out-quint) both; animation-delay: 60ms; }
+.transcript-inner > .transcript-turn:nth-child(3) .msg,
+.transcript-inner > .transcript-turn:nth-child(3) .transcript-phase { animation: message-in var(--duration-base) var(--ease-out-quint) both; animation-delay: 90ms; }
+.transcript-inner > .transcript-turn:nth-child(4) .msg,
+.transcript-inner > .transcript-turn:nth-child(4) .transcript-phase { animation: message-in var(--duration-base) var(--ease-out-quint) both; animation-delay: 120ms; }
+.transcript-inner > .transcript-turn:nth-child(5) .msg,
+.transcript-inner > .transcript-turn:nth-child(5) .transcript-phase { animation: message-in var(--duration-base) var(--ease-out-quint) both; animation-delay: 150ms; }
+.transcript-inner > .transcript-turn:nth-child(6) .msg,
+.transcript-inner > .transcript-turn:nth-child(6) .transcript-phase { animation: message-in var(--duration-base) var(--ease-out-quint) both; animation-delay: 180ms; }
+.transcript-inner > .transcript-turn:nth-child(7) .msg,
+.transcript-inner > .transcript-turn:nth-child(7) .transcript-phase { animation: message-in var(--duration-base) var(--ease-out-quint) both; animation-delay: 210ms; }
+.transcript-inner > .transcript-turn:nth-child(8) .msg,
+.transcript-inner > .transcript-turn:nth-child(8) .transcript-phase { animation: message-in var(--duration-base) var(--ease-out-quint) both; animation-delay: 240ms; }
+.transcript-inner > .transcript-turn:nth-child(9) .msg,
+.transcript-inner > .transcript-turn:nth-child(9) .transcript-phase { animation: message-in var(--duration-base) var(--ease-out-quint) both; animation-delay: 270ms; }
+.transcript-inner > .transcript-turn:nth-child(10) .msg,
+.transcript-inner > .transcript-turn:nth-child(10) .transcript-phase { animation: message-in var(--duration-base) var(--ease-out-quint) both; animation-delay: 300ms; }
+.transcript-inner > .transcript-turn:nth-child(11) .msg,
+.transcript-inner > .transcript-turn:nth-child(11) .transcript-phase { animation: message-in var(--duration-base) var(--ease-out-quint) both; animation-delay: 330ms; }
+.transcript-inner > .transcript-turn:nth-child(12) .msg,
+.transcript-inner > .transcript-turn:nth-child(12) .transcript-phase { animation: message-in var(--duration-base) var(--ease-out-quint) both; animation-delay: 360ms; }
 
 @media (prefers-reduced-motion: reduce) {
-  .msg { animation: none; }
+  .transcript-inner > .transcript-turn .msg,
+  .transcript-inner > .transcript-turn .transcript-phase { animation: none; }
 }
 
 @keyframes message-in {
@@ -277,15 +367,19 @@
 }
 
 .rail-node {
-  position: absolute;
-  left: 0;
-  top: 2px;
+  position: relative;
   display: grid;
   place-items: center;
-  width: 13px;
-  height: 13px;
+  width: 20px;
+  height: 20px;
+  grid-column: 1;
+  grid-row: 1;
+  align-self: start;
   color: var(--color-ink);
   background: var(--color-canvas);
+  border: 1px solid var(--color-hairline);
+  box-shadow: 0 0 0 2px var(--color-canvas);
+  z-index: 1;
   /* Agents are squares; the human is a circle (overridden below). Monochrome
      only — agent identity is the glyph inside, never color. */
   border-radius: var(--radius-xs);
@@ -296,12 +390,26 @@
 
 .rail-node-user {
   background: var(--color-ink);
+  border-color: var(--color-ink);
   border-radius: var(--radius-full);
-  width: 11px;
-  height: 11px;
-  top: 3px;
-  left: 1px;
+  width: 14px;
+  height: 14px;
+  justify-self: center;
 }
+
+.rail-node-system {
+  width: 10px;
+  height: 10px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: var(--color-muted-soft);
+  box-shadow: 0 0 0 2px var(--color-canvas);
+  justify-self: center;
+}
+
+.rail-node-system.tone-good { background: var(--color-semantic-up); }
+.rail-node-system.tone-bad  { background: var(--color-semantic-down); }
+.rail-node-system.tone-info { background: var(--color-info); }
 
 @keyframes node-in {
   from { transform: scale(0.4); opacity: 0; }
@@ -311,18 +419,66 @@
   .rail-node { animation: none; }
 }
 
-/* A continuation from the same agent drops its header. */
+/* A continuation from the same agent drops its header and softens the node. */
 .msg-agent.grouped .turn-body > header {
   display: none;
 }
 
+.msg-agent.grouped .rail-node-agent {
+  border-color: color-mix(in srgb, var(--color-hairline) 55%, transparent);
+  background: transparent;
+  box-shadow: 0 0 0 2px var(--color-canvas);
+}
+
+.msg-agent.grouped .rail-node-agent > svg {
+  opacity: 0.4;
+}
+
 .msg-agent + .msg-agent.grouped {
-  margin-top: calc(var(--space-sm) - var(--space-md));
+  margin-top: calc(var(--space-xs) - var(--space-md));
 }
 
 .turn-body {
   display: grid;
   gap: var(--space-xs);
+  min-width: 0;
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.msg-time {
+  color: var(--color-muted);
+  font-family: var(--font-number);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+  align-self: start;
+  padding-top: 1px;
+  text-align: right;
+}
+
+@media (min-width: 720px) {
+  .msg {
+    grid-template-columns: 20px minmax(0, 1fr) 5.5rem;
+  }
+
+  .transcript-phase {
+    grid-template-columns: 20px minmax(0, 1fr) 5.5rem;
+  }
+}
+
+@media (max-width: 719px) {
+  .msg {
+    grid-template-columns: 20px minmax(0, 1fr) auto;
+  }
+
+  .msg-time {
+    font-size: var(--text-2xs);
+  }
 }
 
 /* Agent-turn eyebrow — the agent label + timestamp in --type-meta (12px sans,
@@ -378,12 +534,32 @@
   background: var(--color-info);
 }
 
-.msg time {
-  margin-left: auto;
-  color: var(--color-muted);
-  font-family: var(--font-number);
-  font-size: var(--text-xs);
-  font-weight: 500;
+/* Live-run pulse in the agent-turn eyebrow — mirrors the conversation-row
+   working signal so long runs stay legible even when scrolled mid-output. */
+.agent-live-pulse {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-info);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-info) 40%, transparent);
+  animation: conv-pulse 1.4s ease-out infinite;
+}
+
+/* A streaming turn breathes on the rail node so liveness reads even when the
+   transcript body is quiet between tool calls. */
+@media (prefers-reduced-motion: no-preference) {
+  .msg-agent.streaming .rail-node-agent {
+    border-color: var(--color-info);
+    animation:
+      node-in var(--duration-fast) var(--ease-standard) both,
+      agent-rail-pulse 1.4s ease-out infinite;
+  }
+}
+
+@keyframes agent-rail-pulse {
+  0%   { box-shadow: 0 0 0 2px var(--color-canvas), 0 0 0 2px color-mix(in srgb, var(--color-info) 45%, transparent); }
+  100% { box-shadow: 0 0 0 2px var(--color-canvas), 0 0 0 9px color-mix(in srgb, var(--color-info) 0%, transparent); }
 }
 
 /* User voice — on the rail, not a bubble. The circular node + mono "YOU"
@@ -413,13 +589,75 @@
   font: var(--type-label);
 }
 
-.msg-agent.streaming .msg-quiet::after {
-  content: "";
-  display: inline-block;
-  width: 2px;
-  height: 1em;
-  margin-left: 4px;
-  vertical-align: -2px;
-  background: var(--color-primary);
-  animation: caret 1s steps(1, end) infinite;
+/* Per-turn actions — compact ghost icon pills pinned to the bottom of each
+   agent turn so copy and retry stay one click away. */
+.msg-agent .turn-body {
+  position: relative;
+}
+
+.msg-turn-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  margin-top: var(--space-xxs);
+}
+
+.msg-turn-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 var(--space-sm);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-surface) 72%, transparent);
+  color: var(--color-muted);
+  font: var(--type-label);
+  cursor: pointer;
+  white-space: nowrap;
+  backdrop-filter: blur(6px);
+  transition:
+    color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    background var(--duration-fast) var(--ease-standard);
+}
+
+.msg-turn-action:hover:not(:disabled) {
+  color: var(--color-ink);
+  border-color: var(--color-hairline);
+  background: var(--color-surface-raised);
+}
+
+.msg-turn-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.msg-turn-action.is-copied {
+  color: var(--color-good);
+  border-color: color-mix(in srgb, var(--color-good) 28%, var(--color-hairline));
+}
+
+.msg-turn-action:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.msg-turn-action-label {
+  font: var(--type-label);
+}
+
+@media (max-width: 720px) {
+  .msg-turn-action-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
 }

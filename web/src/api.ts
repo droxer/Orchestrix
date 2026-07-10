@@ -129,6 +129,7 @@ export function createControlPanelDaemonNode(
     body: {
       ...(input.employeeId ? { employeeId: input.employeeId } : {}),
       ...(input.workspacePath ? { workspacePath: input.workspacePath } : {}),
+      ...(input.sandboxMode ? { sandboxMode: input.sandboxMode } : {}),
     },
   });
 }

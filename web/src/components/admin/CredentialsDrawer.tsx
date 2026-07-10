@@ -6,7 +6,9 @@ import { Check, Copy } from "lucide-react";
 import type { ControlPanelDaemonNodeRecord } from "../../types";
 import { useDialogs } from "@/components/ui/DialogProvider";
 import { Drawer } from "./Drawer";
-import { copyText, type StoredNodeToken } from "./helpers";
+import { NodeProfileBadges } from "./NodeProfileBadges";
+import { copyText, resolveNodeCredentials, type StoredNodeToken } from "./helpers";
+import { canUseLocalControlPanel } from "../../lib/controlPanel";
 
 interface CredentialsDrawerProps {
   open: boolean;
@@ -23,13 +25,15 @@ interface RowProps {
   copyLabel: string;
   copied: boolean;
   onCopy: () => void;
+  hint?: string;
 }
 
-function DarkCopyRow({ label, value, copyLabel, copied, onCopy }: RowProps) {
+function DarkCopyRow({ label, value, copyLabel, copied, onCopy, hint }: RowProps) {
   const { t } = useTranslation();
   return (
     <div className="adm-cred-row">
       <span className="adm-cred-label">{label}</span>
+      {hint ? <span className="adm-cred-hint">{hint}</span> : null}
       <div className="adm-cred-value-line">
         <code className="adm-cred-value mono">{value}</code>
         <button
@@ -114,10 +118,17 @@ export function CredentialsDrawer({ open, onClose, node, storedToken, onUnassign
   }
 
   const employeeLabel = node.employeeId ? `@${node.employeeId}` : t("admin.unassigned");
-  const sandboxToken = storedToken?.sandboxToken;
-  const nodeToken = storedToken?.nodeToken ?? node.nodeToken;
-  const daemonCommand = storedToken?.daemonCommand;
-  const hasCredentials = Boolean(sandboxToken || nodeToken);
+  const credentials = resolveNodeCredentials(node, storedToken);
+  const { sandboxToken, nodeToken, daemonCommand, source } = credentials;
+  const token = nodeToken ?? sandboxToken;
+  const hasCredentials = source !== "none";
+
+  const credentialsNote = (() => {
+    if (source === "cache") return t("admin.v2.credentials_from_cache");
+    if (source === "server") return t("admin.v2.credentials_from_server");
+    if (source === "cache+server") return t("admin.v2.credentials_from_cache_and_server");
+    return null;
+  })();
 
   return (
     <Drawer
@@ -129,50 +140,56 @@ export function CredentialsDrawer({ open, onClose, node, storedToken, onUnassign
           {employeeLabel} · {node.id}
         </span>
       }
-      variant="light"
+      variant="dark"
       closeLabel={t("admin.v2.close_drawer")}
       ariaLabel={t("admin.v2.credentials_title")}
       layer={1}
     >
+      {node ? (
+        <NodeProfileBadges
+          node={node}
+          storedTokens={storedToken && node ? { [node.id]: storedToken } : {}}
+          colocated={canUseLocalControlPanel()}
+          t={t}
+          compact
+        />
+      ) : null}
       <DarkCopyRow
-        label={t("admin.sandbox_id")}
+        label={t("admin.node_id")}
+        hint={t("admin.node_id_hint")}
         value={node.id}
-        copyLabel={t("admin.copy_sandbox_id")}
-        copied={copiedField === "sandbox-id"}
-        onCopy={() => void handleCopy("sandbox-id", node.id)}
+        copyLabel={t("admin.copy_node_id")}
+        copied={copiedField === "node-id"}
+        onCopy={() => void handleCopy("node-id", node.id)}
       />
       {hasCredentials ? (
         <>
-          {sandboxToken ? (
+          {token ? (
             <DarkCopyRow
-              label={t("admin.sandbox_token")}
-              value={sandboxToken}
-              copyLabel={t("admin.copy_sandbox_token")}
-              copied={copiedField === "sandbox-token"}
-              onCopy={() => void handleCopy("sandbox-token", sandboxToken)}
-            />
-          ) : null}
-          {nodeToken ? (
-            <DarkCopyRow
-              label={t("admin.daemon_node_token")}
-              value={nodeToken}
-              copyLabel={t("admin.copy_daemon_node_token")}
+              label={t("admin.node_token")}
+              value={token}
+              copyLabel={t("admin.copy_node_token")}
               copied={copiedField === "node-token"}
-              onCopy={() => void handleCopy("node-token", nodeToken)}
+              onCopy={() => void handleCopy("node-token", token)}
             />
           ) : null}
           {daemonCommand ? (
             <DarkCopyRow
               label={t("admin.daemon_command")}
+              hint={t("admin.daemon_command_hint")}
               value={daemonCommand}
               copyLabel={t("admin.copy_daemon_command")}
               copied={copiedField === "command"}
               onCopy={() => void handleCopy("command", daemonCommand)}
             />
           ) : null}
-          <p className="adm-cred-note">
-            {t("admin.token_cached_note", { employee: employeeLabel })}
-          </p>
+          {credentialsNote ? (
+            <p className="adm-cred-note">{credentialsNote}</p>
+          ) : (
+            <p className="adm-cred-note">
+              {t("admin.token_cached_note", { employee: employeeLabel })}
+            </p>
+          )}
         </>
       ) : (
         <p className="adm-cred-empty">{t("admin.v2.token_only_at_provision")}</p>

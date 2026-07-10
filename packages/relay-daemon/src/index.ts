@@ -130,7 +130,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
   const commandLeaseSeconds = boundedNumber(
     options.commandLeaseSeconds
       ?? positiveIntEnv("RELAY_DAEMON_COMMAND_LEASE_SECONDS")
-      ?? Math.ceil((positiveIntEnv("RELAY_DAEMON_RUN_TIMEOUT_MS") ?? DEFAULT_DAEMON_RUN_TIMEOUT_MS) / 1000) + 60,
+      ?? DEFAULT_COMMAND_LEASE_SECONDS,
     1,
     MAX_COMMAND_LEASE_SECONDS,
   );
@@ -278,7 +278,10 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
           daemonCommandsUrl(backendUrl, sandboxId, {
             waitSeconds: commandPollWaitMs / 1000,
             leaseSeconds: commandLeaseSeconds,
-            activeCommandIds: [...activeRuns.keys()],
+            activeCommandLeases: [...activeRuns.values()].map(({ command }) => ({
+              commandId: command.id,
+              leaseId: command.leaseId,
+            })),
           }),
           token,
           runtimeSignal,
@@ -824,9 +827,6 @@ function createBoxliteEnvironment(
     }, {
       boxName: boxNameForSandbox(sandboxId),
       workspacePath,
-      // The backend and TUI run beside this daemon; only refuse to start when
-      // another daemon or BoxLite shim already owns the runtime.
-      singleInstancePattern: "relay-daemon/dist/cli\\.js|boxlite-shim",
     }).catch((error: unknown) => {
       starting = undefined;
       throw error;
@@ -1019,14 +1019,15 @@ function boundedNumber(value: number, minimum: number, maximum: number): number 
 function daemonCommandsUrl(
   backendUrl: string,
   sandboxId: string,
-  input: { waitSeconds: number; leaseSeconds: number; activeCommandIds: string[] },
+  input: { waitSeconds: number; leaseSeconds: number; activeCommandLeases: Array<{ commandId: string; leaseId?: string }> },
 ): string {
   const url = new URL(`${backendUrl}/daemon-nodes/${encodeURIComponent(sandboxId)}/commands`);
   url.searchParams.set("waitSeconds", formatQueryNumber(input.waitSeconds));
   url.searchParams.set("leaseSeconds", formatQueryNumber(input.leaseSeconds));
+  url.searchParams.set("leaseMode", "explicit");
   url.searchParams.set("limit", "10");
-  if (input.activeCommandIds.length > 0) {
-    url.searchParams.set("activeCommandIds", input.activeCommandIds.join(","));
+  for (const { commandId, leaseId } of input.activeCommandLeases) {
+    if (leaseId) url.searchParams.append("activeCommandLease", `${commandId}:${leaseId}`);
   }
   return url.toString();
 }
@@ -1148,7 +1149,7 @@ const SIGKILL_DELAY_MS = 5_000;
 const DEFAULT_COMMAND_POLL_WAIT_MS = 25_000;
 const MAX_COMMAND_POLL_WAIT_MS = 25_000;
 const MAX_COMMAND_LEASE_SECONDS = 60 * 60;
-const DEFAULT_DAEMON_RUN_TIMEOUT_MS = 15 * 60 * 1000;
+const DEFAULT_COMMAND_LEASE_SECONDS = 90;
 
 function requestSignal(signal?: AbortSignal): AbortSignal {
   const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
@@ -1292,6 +1293,7 @@ export {
 export {
   ensureAgentReady,
   resetAgentReadiness,
+  resolveBoxliteHome,
   startOrchestratorSession,
   withOrchestratorSession,
   type ActiveOrchestratorSession,

@@ -93,13 +93,16 @@ def backend_base_url(request: Request) -> str:
     return str(request.base_url).rstrip("/")
 
 
-def daemon_start_env(request: Request, node: dict[str, Any]) -> dict[str, str]:
+def daemon_start_env(request: Request, node: dict[str, Any], sandbox_mode: str = "boxlite") -> dict[str, str]:
     env = {
         "RELAY_BACKEND_URL": backend_base_url(request),
         "RELAY_SANDBOX_ID": node["id"],
-        "RELAY_SANDBOX_MODE": "none",
-        "RELAY_USE_LOCAL_AGENT_HOME": "1",
+        "RELAY_SANDBOX_MODE": sandbox_mode,
     }
+    # Reusing the host user's agent auth only makes sense when agents run as
+    # host processes; in boxlite mode guest provisioning handles agent auth.
+    if sandbox_mode == "none":
+        env["RELAY_USE_LOCAL_AGENT_HOME"] = "1"
     if node.get("employeeId"):
         env["RELAY_EMPLOYEE_ID"] = node["employeeId"]
     if node.get("nodeToken"):
@@ -109,7 +112,7 @@ def daemon_start_env(request: Request, node: dict[str, Any]) -> dict[str, str]:
     return env
 
 
-def daemon_start_command(request: Request, node: dict[str, Any]) -> str:
+def daemon_start_command(request: Request, node: dict[str, Any], sandbox_mode: str = "boxlite") -> str:
     parts = [
         "relay-daemon",
         "--backend-url",
@@ -119,9 +122,10 @@ def daemon_start_command(request: Request, node: dict[str, Any]) -> str:
         "--token",
         node.get("nodeToken") or "",
         "--sandbox",
-        "none",
-        "--use-local-agent-home",
+        sandbox_mode,
     ]
+    if sandbox_mode == "none":
+        parts.append("--use-local-agent-home")
     if node.get("employeeId"):
         parts.extend(["--employee-id", node["employeeId"]])
     if node.get("workspacePath"):

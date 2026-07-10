@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import {
   canCancelConversationRun,
   conversationCancelNodeId,
+  findActiveRunOwnerForSession,
   findActiveRunForSession,
   isConversationRunInFlight,
 } from "../src/lib/conversationRunning.js";
@@ -40,6 +41,16 @@ describe("conversationRunning", () => {
   it("finds the active run for the open session", () => {
     assert.deepEqual(findActiveRunForSession(node, "ses_1"), activeRun);
     assert.equal(findActiveRunForSession(node, "ses_other"), undefined);
+  });
+
+  it("finds the node that owns the run when an employee has multiple nodes", () => {
+    const idleNode = { ...node, id: "sbx_idle", activeRuns: [] };
+    const runningNode = { ...node, id: "sbx_running" };
+
+    assert.deepEqual(
+      findActiveRunOwnerForSession([idleNode, runningNode], "ses_1"),
+      { node: runningNode, run: activeRun },
+    );
   });
 
   it("treats a pending or dispatching send as in flight", () => {

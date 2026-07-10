@@ -9,33 +9,63 @@ import { cn } from "@/lib/utils";
 export function PageHeader({
   title,
   count,
+  kicker,
+  subtitle,
+  toolbar,
   actions,
   titleVariant = "default",
+  layout = "inline",
 }: {
   title: ReactNode;
   count?: ReactNode;
+  kicker?: ReactNode;
+  subtitle?: ReactNode;
+  toolbar?: ReactNode;
   actions?: ReactNode;
   /** `display` — admin page title per design system (`--type-display-lg`). */
   titleVariant?: "default" | "display";
+  /** `stacked` — kicker, title, subtitle, and toolbar in a left column (admin). */
+  layout?: "inline" | "stacked";
 }) {
+  const stacked = layout === "stacked";
+
   return (
-    <header className="page-header flex min-h-[var(--header-h)] shrink-0 items-center justify-between gap-base border-b border-hairline px-xl max-[820px]:px-base max-[820px]:py-sm">
-      <div className="page-header-lead flex min-w-0 items-baseline gap-sm">
-        <h1
-          className={cn(
-            "m-0 text-balance text-ink",
-            titleVariant === "display"
-              ? "page-header-title--display"
-              : "text-lg font-semibold leading-[1.25]",
-          )}
-        >
-          {title}
-        </h1>
-        {count != null ? (
-          <span className="mono truncate text-xs font-medium text-muted-foreground">{count}</span>
-        ) : null}
+    <header
+      className={cn(
+        "page-header flex shrink-0 justify-between gap-base border-b border-hairline px-xl max-[820px]:px-base",
+        stacked ? "items-start py-lg" : "min-h-[var(--header-h)] items-center max-[820px]:py-sm",
+      )}
+    >
+      <div
+        className={cn(
+          "page-header-lead flex min-w-0",
+          stacked ? "flex-col gap-xs" : "items-baseline gap-sm",
+        )}
+      >
+        {kicker ? <span className="page-header-kicker">{kicker}</span> : null}
+        <div className={cn("flex min-w-0 items-baseline gap-sm", stacked && "flex-wrap")}>
+          <h1
+            className={cn(
+              "m-0 text-balance text-ink",
+              titleVariant === "display"
+                ? "page-header-title--display"
+                : "text-lg font-semibold leading-[1.25]",
+            )}
+          >
+            {title}
+          </h1>
+          {count != null ? (
+            <span className="mono truncate text-xs font-medium text-muted-foreground">{count}</span>
+          ) : null}
+        </div>
+        {subtitle ? <p className="page-header-subtitle">{subtitle}</p> : null}
+        {toolbar ? <div className="page-header-toolbar">{toolbar}</div> : null}
       </div>
-      {actions ? <div className="page-header-actions flex shrink-0 flex-wrap items-center justify-end gap-xs">{actions}</div> : null}
+      {actions ? (
+        <div className={cn("page-header-actions flex shrink-0 flex-wrap items-center justify-end gap-xs", stacked && "pt-0.5")}>
+          {actions}
+        </div>
+      ) : null}
     </header>
   );
 }

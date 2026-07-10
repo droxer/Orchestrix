@@ -4,6 +4,13 @@ import type { FormEvent, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { AGENT_NAMES, type AgentName, type TaskPriority, type TaskRoutineCadence, type TaskRoutineType, type TaskStatus } from "../../types";
 import { TASK_PRIORITIES, TASK_STATUSES } from "../../lib/backlog";
@@ -12,6 +19,8 @@ import type { TaskBoardFormState } from "../../lib/taskBoardForm";
 import { Drawer } from "../admin/Drawer";
 import { ActionAddPerson } from "../icons";
 import { TaskDrawerArtifacts } from "./TaskDrawerArtifacts";
+
+const NO_AGENT = "__none__";
 
 type TaskDrawerProps = {
   form: TaskBoardFormState;
@@ -49,15 +58,19 @@ export function TaskDrawer({
       <>
         <label className="adm-field">
           <span>{t("backlog.status")}</span>
-          <select
-            name={`${fieldPrefix}-status`}
+          <Select
             value={form.status}
-            onChange={(event) => onChange({ ...form, status: event.target.value as TaskStatus })}
+            onValueChange={(value) => onChange({ ...form, status: value as TaskStatus })}
           >
-            {TASK_STATUSES.map((status) => (
-              <option key={status} value={status}>{t(`backlog.statuses.${status}`)}</option>
-            ))}
-          </select>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {TASK_STATUSES.map((status) => (
+                <SelectItem key={status} value={status}>{t(`backlog.statuses.${status}`)}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </label>
         <label className="adm-field">
           <span>{t("backlog.due")}</span>
@@ -75,27 +88,35 @@ export function TaskDrawer({
       <>
         <label className="adm-field">
           <span>{t("routine.type")}</span>
-          <select
-            name={`${fieldPrefix}-type`}
+          <Select
             value={form.routineType}
-            onChange={(event) => onChange({ ...form, routineType: event.target.value as TaskRoutineType })}
+            onValueChange={(value) => onChange({ ...form, routineType: value as TaskRoutineType })}
           >
-            {TASK_ROUTINE_TYPES.map((type) => (
-              <option key={type} value={type}>{t(`routine.types.${type}`)}</option>
-            ))}
-          </select>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {TASK_ROUTINE_TYPES.map((type) => (
+                <SelectItem key={type} value={type}>{t(`routine.types.${type}`)}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </label>
         <label className="adm-field">
           <span>{t("routine.cadence")}</span>
-          <select
-            name={`${fieldPrefix}-cadence`}
+          <Select
             value={form.routineCadence}
-            onChange={(event) => onChange({ ...form, routineCadence: event.target.value as TaskRoutineCadence })}
+            onValueChange={(value) => onChange({ ...form, routineCadence: value as TaskRoutineCadence })}
           >
-            {TASK_ROUTINE_CADENCES.map((cadence) => (
-              <option key={cadence} value={cadence}>{t(`routine.cadences.${cadence}`)}</option>
-            ))}
-          </select>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {TASK_ROUTINE_CADENCES.map((cadence) => (
+                <SelectItem key={cadence} value={cadence}>{t(`routine.cadences.${cadence}`)}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </label>
         <label className="adm-field">
           <span>{t("routine.next_run")}</span>
@@ -156,29 +177,39 @@ export function TaskDrawer({
           {form.variant === "routine" ? variantFields : null}
           <label className="adm-field">
             <span>{t("backlog.priority")}</span>
-            <select
-              name={`${fieldPrefix}-priority`}
+            <Select
               value={form.priority}
-              onChange={(event) => updateBase({ priority: event.target.value as TaskPriority })}
+              onValueChange={(value) => updateBase({ priority: value as TaskPriority })}
             >
-              {TASK_PRIORITIES.map((priority) => (
-                <option key={priority} value={priority}>{t(`backlog.priorities.${priority}`)}</option>
-              ))}
-            </select>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TASK_PRIORITIES.map((priority) => (
+                  <SelectItem key={priority} value={priority}>{t(`backlog.priorities.${priority}`)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </label>
           {form.variant === "backlog" ? variantFields : null}
           <label className="adm-field">
             <span>{t("backlog.agent")}</span>
-            <select
-              name={`${fieldPrefix}-agent`}
-              value={form.assignedAgent}
-              onChange={(event) => updateBase({ assignedAgent: event.target.value as "" | AgentName })}
+            <Select
+              value={form.assignedAgent || NO_AGENT}
+              onValueChange={(value) => updateBase({ assignedAgent: value === NO_AGENT ? "" : (value as AgentName) })}
             >
-              <option value="">{form.variant === "backlog" ? t("backlog.agent_team") : t("backlog.no_agent")}</option>
-              {AGENT_NAMES.map((agent) => (
-                <option key={agent} value={agent}>{agent}</option>
-              ))}
-            </select>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_AGENT}>
+                  {form.variant === "backlog" ? t("backlog.agent_team") : t("backlog.no_agent")}
+                </SelectItem>
+                {AGENT_NAMES.map((agent) => (
+                  <SelectItem key={agent} value={agent}>{agent}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </label>
         </div>
         <label className="adm-field">

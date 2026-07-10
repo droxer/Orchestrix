@@ -29,7 +29,6 @@ load_backend_env()
 DAEMON_NODE_LIVENESS_TIMEOUT_MS = int(os.environ.get("RELAY_DAEMON_NODE_LIVENESS_TIMEOUT_MS", "15000"))
 DAEMON_RUN_TIMEOUT_MS = int(os.environ.get("RELAY_DAEMON_RUN_TIMEOUT_MS", str(15 * 60 * 1000)))
 DAEMON_COMMAND_LEASE_SECONDS = float(os.environ.get("RELAY_DAEMON_COMMAND_LEASE_SECONDS", "60"))
-DAEMON_ACTIVE_COMMAND_LEASE_SECONDS = max(DAEMON_COMMAND_LEASE_SECONDS, (DAEMON_RUN_TIMEOUT_MS / 1000) + 60)
 DAEMON_COMMAND_RETENTION_SECONDS = float(os.environ.get("RELAY_DAEMON_COMMAND_RETENTION_SECONDS", str(6 * 60 * 60)))
 DAEMON_TERMINAL_RECORD_LIMIT = int(os.environ.get("RELAY_DAEMON_TERMINAL_RECORD_LIMIT", "500"))
 DAEMON_RECORD_PRUNE_INTERVAL_SECONDS = float(os.environ.get("RELAY_DAEMON_RECORD_PRUNE_INTERVAL_SECONDS", "60"))
@@ -695,10 +694,21 @@ class DaemonNodeRegistry:
                     self.clear_run_output(command["runId"])
         logger.info("Daemon node deleted", sandbox_id=sandbox_id)
 
-    def provision_pending(self, employee_id: str | None = None, workspace_path: str | None = None) -> tuple[dict[str, Any], str | None, str | None]:
+    def provision_pending(
+        self,
+        employee_id: str | None = None,
+        workspace_path: str | None = None,
+        sandbox_mode: str = "boxlite",
+    ) -> tuple[dict[str, Any], str | None, str | None]:
+        if sandbox_mode not in DAEMON_SANDBOX_MODES:
+            sandbox_mode = "boxlite"
         if employee_id:
             existing = self.find_by_employee(employee_id, workspace_path)
             if existing:
+                if not existing.get("sandboxMode"):
+                    existing = {**existing, "sandboxMode": sandbox_mode, "updatedAt": now_iso()}
+                    self.sandboxes[existing["id"]] = existing
+                    self.daemon_store.register_node(existing)
                 return existing, None, None
         sandbox_id = new_sandbox_id(employee_id or "node")
         ui_token = new_daemon_node_token()
@@ -708,6 +718,7 @@ class DaemonNodeRegistry:
             "id": sandbox_id,
             **({"employeeId": employee_id} if employee_id else {}),
             **({"workspacePath": workspace_path} if workspace_path else {}),
+            "sandboxMode": sandbox_mode,
             "status": "provisioning",
             "agents": {agent: "unknown" for agent in AGENT_NAMES},
             "maxConcurrentRuns": 1,
@@ -778,11 +789,13 @@ class DaemonNodeRegistry:
         *,
         limit: int = 2**53,
         lease_seconds: float = DAEMON_COMMAND_LEASE_SECONDS,
+        renew_known_active: bool = True,
     ) -> list[dict[str, Any]]:
         self._assert_authorized(sandbox_id, token)
         self.reap_stale_runs()
         self._mark_seen(sandbox_id)
-        self._renew_known_active_command_leases(sandbox_id, lease_seconds=lease_seconds)
+        if renew_known_active:
+            self._renew_known_active_command_leases(sandbox_id, lease_seconds=lease_seconds)
         records = self.daemon_store.take_queued_commands(sandbox_id, limit=limit, lease_seconds=lease_seconds)
         logger.debug("Commands taken by daemon node", sandbox_id=sandbox_id, command_count=len(records))
         for record in records:
@@ -811,33 +824,31 @@ class DaemonNodeRegistry:
         self,
         sandbox_id: str,
         token: str | None,
-        command_ids: list[str],
+        command_leases: list[tuple[str, str | None]],
         *,
-        lease_seconds: float = DAEMON_ACTIVE_COMMAND_LEASE_SECONDS,
+        lease_seconds: float = DAEMON_COMMAND_LEASE_SECONDS,
     ) -> None:
         self._assert_authorized(sandbox_id, token)
         self._mark_seen(sandbox_id)
-        if not command_ids:
+        if not command_leases:
             return
-        active_ids = {
-            command["commandId"]
-            for command in self.active_commands.values()
-            if command.get("sandboxId") == sandbox_id
-        }
-        renewable = [command_id for command_id in dict.fromkeys(command_ids) if command_id in active_ids]
+        # The durable store, not this registry replica's memory, is the source
+        # of truth for command ownership. A poll may land on a different
+        # backend process from the one that dispatched the command.
+        renewable = list(dict(command_leases).items())
         if renewable and hasattr(self.daemon_store, "renew_command_leases"):
             self.daemon_store.renew_command_leases(sandbox_id, renewable, lease_seconds=lease_seconds)
 
     def _renew_known_active_command_leases(self, sandbox_id: str, *, lease_seconds: float) -> None:
         if not hasattr(self.daemon_store, "renew_command_leases"):
             return
-        active_ids = [
-            command["commandId"]
+        active_leases = [
+            (command["commandId"], None)
             for command in self.active_commands.values()
             if command.get("sandboxId") == sandbox_id
         ]
-        if active_ids:
-            self.daemon_store.renew_command_leases(sandbox_id, active_ids, lease_seconds=lease_seconds)
+        if active_leases:
+            self.daemon_store.renew_command_leases(sandbox_id, active_leases, lease_seconds=lease_seconds)
 
     def start_run_request(self, sandbox_id: str, session_id: str, task_goal: str, assignments: list[dict[str, Any]], state: dict[str, Any], task_id: str | None = None) -> dict[str, Any]:
         if self.daemon_store.active_run_request_for_session(sandbox_id, session_id):
@@ -854,6 +865,14 @@ class DaemonNodeRegistry:
 
     def cancel_active_run(self, sandbox_id: str, session_id: str, reason: str) -> dict[str, Any] | None:
         active = next((run for run in self.active_commands.values() if run["sandboxId"] == sandbox_id and run["sessionId"] == session_id), None)
+        if not active:
+            durable_run = next((
+                run for run in self.daemon_store.list_active_runs(sandbox_id)
+                if run.get("sessionId") == session_id
+            ), None)
+            if durable_run:
+                active = {**durable_run, "sandboxId": sandbox_id}
+                self.active_commands[active["commandId"]] = active
         if not active:
             logger.warning("No active run to cancel", sandbox_id=sandbox_id, session_id=session_id)
             return None
@@ -873,10 +892,24 @@ class DaemonNodeRegistry:
     def handle_event(self, sandbox_id: str, event: dict[str, Any], token: str | None) -> None:
         self._assert_authorized(sandbox_id, token)
         self._mark_seen(sandbox_id)
-        active = self.active_commands.get(event["commandId"])
-        if not active:
+        record = self.daemon_store.get_command(event["commandId"])
+        if not record or record.get("status") != "dispatched":
             logger.debug("Daemon node event ignored: no active command", sandbox_id=sandbox_id, command_id=event["commandId"])
             return
+        command = record["command"]
+        active = {
+            "sandboxId": record["nodeId"],
+            "commandId": command["id"],
+            **({"leaseId": record["leaseId"]} if record.get("leaseId") else {}),
+            "sessionId": command["sessionId"],
+            "runId": command["runId"],
+            "agent": command["agent"],
+            "mode": command["mode"],
+            "taskGoal": command.get("taskGoal", ""),
+            **({"workspacePath": command["workspacePath"]} if command.get("workspacePath") else {}),
+            "startedAt": record.get("dispatchedAt", record["createdAt"]),
+        }
+        self.active_commands[event["commandId"]] = active
         if active["sandboxId"] != sandbox_id or active["runId"] != event["runId"] or active["sessionId"] != event["sessionId"]:
             logger.warning("Daemon node event mismatch", sandbox_id=sandbox_id, command_id=event["commandId"], run_id=event["runId"])
             raise PermissionError("Unauthorized daemon node event: command belongs to a different sandbox.")
@@ -886,8 +919,6 @@ class DaemonNodeRegistry:
         if active["agent"] != event["agent"] or (event["type"] != "run.output" and active["mode"] != event.get("mode")):
             logger.warning("Daemon node event command metadata mismatch", sandbox_id=sandbox_id, command_id=event["commandId"], run_id=event["runId"])
             raise PermissionError("Unauthorized daemon node event: command metadata does not match the active command.")
-        if hasattr(self.daemon_store, "renew_command_leases"):
-            self.daemon_store.renew_command_leases(sandbox_id, [event["commandId"]], lease_seconds=DAEMON_ACTIVE_COMMAND_LEASE_SECONDS)
         if event["type"] == "run.output":
             seen = self._output_sequences_for_run(event["sessionId"], event["runId"])
             sequence_key = (event["stream"], event["sequence"])
@@ -903,16 +934,21 @@ class DaemonNodeRegistry:
                 "sequence": event["sequence"],
             }))
             return
-        self.active_commands.pop(event["commandId"], None)
+        accepted = False
         if event["type"] == "run.completed":
             logger.info("Agent run completed on daemon node", sandbox_id=sandbox_id, command_id=event["commandId"], run_id=event["runId"], agent=event["agent"], mode=event["mode"], exit_code=event.get("exitCode"))
-            self.daemon_store.mark_command_completed(sandbox_id, event)
+            accepted = self.daemon_store.mark_command_completed(sandbox_id, event)
         elif event["type"] == "run.cancelled":
             logger.info("Agent run cancelled on daemon node", sandbox_id=sandbox_id, command_id=event["commandId"], run_id=event["runId"], agent=event["agent"], mode=event["mode"])
-            self.daemon_store.mark_command_cancelled(sandbox_id, event)
+            accepted = self.daemon_store.mark_command_cancelled(sandbox_id, event)
         else:
             logger.warning("Agent run failed on daemon node", sandbox_id=sandbox_id, command_id=event["commandId"], run_id=event["runId"], agent=event["agent"], mode=event["mode"], error=event.get("error"))
-            self.daemon_store.mark_command_failed(sandbox_id, event)
+            accepted = self.daemon_store.mark_command_failed(sandbox_id, event)
+        if not accepted:
+            logger.debug("Daemon node terminal event ignored: delivery is no longer active", sandbox_id=sandbox_id, command_id=event["commandId"])
+            return
+        self.active_commands.pop(event["commandId"], None)
+        self.daemon_store.mark_cancel_commands_completed(sandbox_id, event["commandId"])
         run_request = self.daemon_store.run_request_for_command(event["commandId"])
         if run_request:
             self._advance_run_request(run_request, event)
@@ -1153,6 +1189,7 @@ class DaemonNodeRegistry:
                 "exitCode": 1,
             }
             self.daemon_store.mark_command_failed(run_request["nodeId"], event)
+            self.daemon_store.mark_cancel_commands_completed(run_request["nodeId"], command_id)
         sandbox = self.sandboxes.get(run_request["nodeId"])
         controller = self._controller_for_sandbox(sandbox, run_request.get("taskId")) if sandbox else SessionController(self.store, task_store=self.task_store, task_id=run_request.get("taskId"))
         if run_id and run_request.get("currentAgent") and run_request.get("currentMode"):

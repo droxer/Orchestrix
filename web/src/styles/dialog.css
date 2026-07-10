@@ -2,9 +2,8 @@
    Confirm / Prompt Dialog  (dialog-* namespace)
 
    In-brand replacement for native window.confirm / window.prompt. Reuses
-   the same overlay + lift language as the preferences modal but at a
-   compact size for a single question + two actions. All colors, type,
-   radii, spacing, and motion come from tokens.css.
+   the shared overlay backdrop + lift language from overlay.css at a
+   compact size for a single question + two actions.
    ===================================================================== */
 
 .dialog-backdrop {
@@ -14,12 +13,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--color-overlay);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
   padding: var(--space-base);
-  overscroll-behavior: contain;
-  animation: pref-backdrop-in var(--duration-fast) var(--ease-standard) both;
 }
 
 .dialog-modal {
@@ -35,14 +29,43 @@
   background: var(--color-surface-raised);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lift);
-  animation: pref-modal-in var(--duration-base) var(--ease-emphasized) both;
+  animation: overlay-panel-in var(--duration-base) var(--ease-emphasized) both;
   outline: none;
+}
+
+.dialog-modal[data-tone="danger"] {
+  border-left: 3px solid var(--color-semantic-down);
+  padding-left: calc(var(--space-lg) - 2px);
+}
+
+.dialog-kicker {
+  margin: 0;
+  font: var(--type-eyebrow);
+  letter-spacing: var(--letter-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-danger-text);
+}
+
+.dialog-title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+}
+
+.dialog-danger-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--color-semantic-down);
 }
 
 .dialog-title {
   margin: 0;
   font: var(--type-title-md);
   color: var(--color-ink);
+}
+
+.dialog-modal[data-tone="danger"] .dialog-title {
+  color: var(--color-danger-text);
 }
 
 .dialog-message {
@@ -95,6 +118,11 @@
   box-shadow: var(--shadow-lift);
   font: var(--type-body-sm);
   line-height: 1.45;
+  animation: overlay-toast-in var(--duration-base) var(--ease-emphasized) both;
+}
+
+.dialog-toast.dialog-toast--exit {
+  animation: overlay-toast-out var(--duration-fast) var(--ease-standard) both;
 }
 
 .dialog-toast[data-tone="error"] {

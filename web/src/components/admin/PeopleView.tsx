@@ -20,7 +20,7 @@ interface PeopleViewProps {
   employees: import("../../types").EmployeeRecord[];
   nodes: ControlPanelDaemonNodeRecord[];
   onRevealCredentials: (node: ControlPanelDaemonNodeRecord) => void;
-  onOnboard: () => void;
+  onAddEmployee: () => void;
   onRequestAssign: (employeeId: string) => void;
   onDeleteEmployee?: (employee: import("../../types").EmployeeRecord) => Promise<void>;
   unassignedNodeCount: number;
@@ -53,7 +53,7 @@ export function PeopleView({
   employees,
   nodes,
   onRevealCredentials,
-  onOnboard,
+  onAddEmployee,
   onRequestAssign,
   onDeleteEmployee,
   unassignedNodeCount,
@@ -120,8 +120,8 @@ export function PeopleView({
         body={t("admin.v2.empty_people_body")}
         illustration={<Users size={40} strokeWidth={1.25} aria-hidden="true" />}
         actions={(
-          <Button type="button" onClick={onOnboard}>
-            {t("admin.v2.onboard_cta")}
+          <Button type="button" onClick={onAddEmployee}>
+            {t("admin.v2.add_employee_cta")}
           </Button>
         )}
       />

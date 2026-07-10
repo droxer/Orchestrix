@@ -1,20 +1,23 @@
 import { useCallback } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { listControlPanelDaemonNodes, listControlPanelEmployees } from "../api";
+import { useQueries, useQueryClient } from "@tanstack/react-query";
+import { listControlPanelEmployees } from "../api";
 import type { ControlPanelDaemonNodeRecord, EmployeeRecord } from "../types";
+import {
+  CONTROL_PANEL_NODES_KEY,
+  CONTROL_PANEL_POLL_MS,
+  fetchControlPanelNodes,
+} from "../lib/controlPanelQueries";
 
-const ADMIN_FLEET_KEY = ["admin", "fleet"] as const;
-const POLL_INTERVAL_MS = 2000;
+const ADMIN_EMPLOYEES_KEY = ["admin", "employees"] as const;
 
 export interface AdminFleet {
   nodes: ControlPanelDaemonNodeRecord[];
   employees: EmployeeRecord[];
 }
 
-// Admin console fleet snapshot (daemon nodes + employees). The 2s poll lives on
-// the query's refetchInterval (replacing a hand-rolled setInterval); onboard /
-// assign flows call mergeFleet() to fold their result into the same cache, and
-// the derived lastUpdated bumps automatically via dataUpdatedAt.
+// Admin console fleet snapshot (daemon nodes + employees). Node polling shares
+// CONTROL_PANEL_NODES_KEY with useLocalDaemonNodes so localhost chat + admin
+// reuse one /cp/daemon-nodes poll instead of two timers.
 export function useAdminFleet(enabled: boolean): {
   nodes: ControlPanelDaemonNodeRecord[];
   employees: EmployeeRecord[];
@@ -26,33 +29,57 @@ export function useAdminFleet(enabled: boolean): {
 } {
   const queryClient = useQueryClient();
 
-  const query = useQuery<AdminFleet>({
-    queryKey: ADMIN_FLEET_KEY,
-    queryFn: async ({ signal }) => {
-      const [nodeResult, employeeResult] = await Promise.all([
-        listControlPanelDaemonNodes(signal),
-        listControlPanelEmployees(signal),
-      ]);
-      return { nodes: nodeResult.nodes, employees: employeeResult.employees };
-    },
-    enabled,
-    refetchInterval: POLL_INTERVAL_MS,
+  const [nodesQuery, employeesQuery] = useQueries({
+    queries: [
+      {
+        queryKey: CONTROL_PANEL_NODES_KEY,
+        queryFn: ({ signal }: { signal: AbortSignal }) => fetchControlPanelNodes(signal),
+        enabled,
+        refetchInterval: CONTROL_PANEL_POLL_MS,
+      },
+      {
+        queryKey: ADMIN_EMPLOYEES_KEY,
+        queryFn: async ({ signal }: { signal: AbortSignal }) =>
+          (await listControlPanelEmployees(signal)).employees,
+        enabled,
+        refetchInterval: CONTROL_PANEL_POLL_MS,
+      },
+    ],
   });
+
+  const nodes = nodesQuery.data ?? [];
+  const employees = employeesQuery.data ?? [];
+  const pollError = nodesQuery.error ?? employeesQuery.error;
+  const isFetching = nodesQuery.isFetching || employeesQuery.isFetching;
+  const dataUpdatedAt = Math.max(nodesQuery.dataUpdatedAt, employeesQuery.dataUpdatedAt);
 
   const mergeFleet = useCallback(
     (updater: (prev: AdminFleet) => AdminFleet) => {
-      queryClient.setQueryData<AdminFleet>(ADMIN_FLEET_KEY, (prev) => updater(prev ?? { nodes: [], employees: [] }));
+      queryClient.setQueryData<ControlPanelDaemonNodeRecord[]>(CONTROL_PANEL_NODES_KEY, (prevNodes) => {
+        const prevEmployees = queryClient.getQueryData<EmployeeRecord[]>(ADMIN_EMPLOYEES_KEY) ?? [];
+        const next = updater({ nodes: prevNodes ?? [], employees: prevEmployees });
+        queryClient.setQueryData(ADMIN_EMPLOYEES_KEY, next.employees);
+        return next.nodes;
+      });
     },
     [queryClient],
   );
 
+  const refetch = useCallback(
+    () => Promise.all([
+      queryClient.refetchQueries({ queryKey: CONTROL_PANEL_NODES_KEY }),
+      queryClient.refetchQueries({ queryKey: ADMIN_EMPLOYEES_KEY }),
+    ]),
+    [queryClient],
+  );
+
   return {
-    nodes: query.data?.nodes ?? [],
-    employees: query.data?.employees ?? [],
-    lastUpdated: query.data ? new Date(query.dataUpdatedAt) : null,
-    pollError: query.error instanceof Error ? query.error.message : query.error ? String(query.error) : null,
-    isFetching: query.isFetching,
+    nodes,
+    employees,
+    lastUpdated: nodes.length > 0 || employees.length > 0 ? new Date(dataUpdatedAt) : null,
+    pollError: pollError instanceof Error ? pollError.message : pollError ? String(pollError) : null,
+    isFetching,
     mergeFleet,
-    refetch: () => query.refetch(),
+    refetch,
   };
 }

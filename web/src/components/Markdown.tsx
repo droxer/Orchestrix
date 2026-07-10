@@ -1,24 +1,28 @@
+import { isValidElement, type ReactElement, type ReactNode } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { highlightToHtml } from "../lib/syntax";
 
-// Shared GitHub-flavored Markdown renderer. Fenced code blocks are
-// syntax-highlighted with highlight.js (real per-language grammars); inline
-// code stays as a plain <code>.
+type CodeProps = { className?: string; children?: ReactNode };
+
+function nodeText(children: ReactNode): string {
+  if (typeof children === "string") return children;
+  if (Array.isArray(children)) return children.map(nodeText).join("");
+  return "";
+}
+
+// Shared GitHub-flavored Markdown renderer. A fenced code block always arrives
+// as <pre><code>, inline code as a bare <code> — so the block chrome lives in
+// the `pre` component. Sniffing newlines in `code` instead would misrender
+// single-line fences as inline chips and multi-line code spans as blocks.
 const MARKDOWN_COMPONENTS: Components = {
-  pre: ({ children }) => <>{children}</>,
-  code: ({ className, children, ...rest }) => {
-    const text = String(children ?? "").replace(/\n$/, "");
-    const inline = !/(^|\s)language-/.test(className ?? "") && !text.includes("\n");
-    if (inline) {
-      return (
-        <code className={className} {...rest}>
-          {text}
-        </code>
-      );
-    }
-    const lang = /language-([\w+-]+)/.exec(className ?? "")?.[1] ?? null;
+  pre: ({ children }) => {
+    const code = isValidElement<CodeProps>(children)
+      ? (children as ReactElement<CodeProps>)
+      : null;
+    const text = nodeText(code?.props.children).replace(/\n$/, "");
+    const lang = /language-([\w+-]+)/.exec(code?.props.className ?? "")?.[1] ?? null;
     return (
       <pre className="agent-code">
         {lang ? <span className="agent-code-lang">{lang}</span> : null}
@@ -33,7 +37,12 @@ const MARKDOWN_COMPONENTS: Components = {
   ),
 };
 
-/** Renders trusted Markdown prose with GFM tables/strikethrough and highlighted code fences. */
+/**
+ * Renders agent-authored Markdown with GFM tables/strikethrough/task lists and
+ * highlighted code fences. Output is HTML-escaped (highlight.js escapes fence
+ * bodies); links open in a new tab with `noopener`. Note that remote images
+ * referenced by the text still load from their origin.
+ */
 export function Markdown({ text }: { text: string }) {
   return (
     <div className="agent-prose">

@@ -35,6 +35,29 @@
   overflow: hidden;
 }
 
+.admin-console .page-header-kicker {
+  font: var(--type-eyebrow);
+  letter-spacing: var(--letter-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.admin-console .page-header-subtitle {
+  margin: 0;
+  max-width: 46ch;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--color-muted);
+}
+
+.admin-console .page-header-toolbar {
+  margin-top: var(--space-sm);
+}
+
+.admin-console .page-header-title--display {
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+
 .admin-console.adm-bare {
   background: var(--color-surface-soft);
   display: flex;
@@ -90,6 +113,11 @@
   box-shadow: var(--shadow-soft);
 }
 
+html[data-theme="contrast"] .adm-view-toggle-btn[data-active="true"],
+html[data-theme="contrast-dark"] .adm-view-toggle-btn[data-active="true"] {
+  box-shadow: inset 0 0 0 2px var(--color-ink);
+}
+
 .adm-view-toggle-btn:focus-visible {
   outline: none;
   box-shadow: var(--ring-focus);
@@ -114,16 +142,8 @@
     border: 0;
   }
 
-  .admin-console .page-header-title--display {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
+  .admin-console .page-header-subtitle {
+    display: none;
   }
 
   .adm-view-toggle-btn {

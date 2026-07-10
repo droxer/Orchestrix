@@ -129,7 +129,8 @@ html[data-theme="contrast-dark"] .relay-bleed-mark {
   );
 }
 
-html[data-theme="contrast"] .relay-empty-avatar::after {
+html[data-theme="contrast"] .relay-empty-avatar::after,
+html[data-theme="contrast-dark"] .relay-empty-avatar::after {
   display: none;
 }
 

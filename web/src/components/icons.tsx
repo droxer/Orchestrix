@@ -9,6 +9,7 @@ import {
   CircleAlert,
   CircleCheck,
   CircleStop,
+  Copy,
   CalendarClock,
   CalendarDays,
   Columns3,
@@ -83,6 +84,8 @@ export const NavNewThread = withStandardStroke(Plus, "NavNewThread");
 // Compose a new conversation (pencil-in-square), the messaging-app convention.
 export const ActionCompose = withStandardStroke(SquarePen, "ActionCompose");
 
+export const ActionCopy = withStandardStroke(Copy, "ActionCopy");
+export const ActionRetry = withStandardStroke(RefreshCw, "ActionRetry");
 export const ActionSend = withStandardStroke(ArrowUp, "ActionSend");
 export const ActionApprove = withStandardStroke(Check, "ActionApprove");
 export const ActionHandoff = withStandardStroke(Forward, "ActionHandoff");

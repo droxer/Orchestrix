@@ -4,19 +4,25 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { RelayEmptyState } from "@/components/RelayEmptyState";
+import { Button } from "@/components/ui/button";
 import type { ControlPanelDaemonNodeRecord, EmployeeRecord } from "../../types";
 import { Server } from "lucide-react";
+import { canUseLocalControlPanel } from "../../lib/controlPanel";
+import type { StoredNodeTokenMap } from "./helpers";
 import { visualStatus } from "./helpers";
 import { NodeCard } from "./NodeCard";
+import { FleetProfileLegend } from "./NodeProfileBadges";
 
 type FleetFilter = "all" | "ready" | "running" | "provisioning" | "failed" | "unassigned";
 
 interface FleetViewProps {
   nodes: ControlPanelDaemonNodeRecord[];
   employees: EmployeeRecord[];
+  storedTokens: StoredNodeTokenMap;
   onRevealCredentials: (node: ControlPanelDaemonNodeRecord) => void;
   onManageAgents: (node: ControlPanelDaemonNodeRecord) => void;
   onDeleteNode?: (node: ControlPanelDaemonNodeRecord) => Promise<void>;
+  onAddNode?: () => void;
 }
 
 const FILTERS: FleetFilter[] = ["all", "ready", "running", "provisioning", "failed", "unassigned"];
@@ -39,9 +45,10 @@ function filterLabel(filter: FleetFilter, t: TFunction): string {
   return t(`status.${filter}`, { defaultValue: filter });
 }
 
-export function FleetView({ nodes, employees, onRevealCredentials, onManageAgents, onDeleteNode }: FleetViewProps) {
+export function FleetView({ nodes, employees, storedTokens, onRevealCredentials, onManageAgents, onDeleteNode, onAddNode }: FleetViewProps) {
   const { t } = useTranslation();
   const [filter, setFilter] = useState<FleetFilter>("all");
+  const colocated = canUseLocalControlPanel();
 
   const counts = useMemo(() => {
     const result: Record<FleetFilter, number> = {
@@ -67,6 +74,7 @@ export function FleetView({ nodes, employees, onRevealCredentials, onManageAgent
 
   return (
     <div className="adm-view">
+      {colocated ? <FleetProfileLegend t={t} /> : null}
       <div className="adm-fleet-filters" role="group" aria-label={t("admin.v2.filter_label")}>
         {FILTERS.map((id) => {
           const active = filter === id;
@@ -89,8 +97,13 @@ export function FleetView({ nodes, employees, onRevealCredentials, onManageAgent
         <RelayEmptyState
           className="adm-fleet-empty"
           fill
-          title={t("admin.v2.no_nodes_for_filter")}
+          title={nodes.length === 0 ? t("admin.no_nodes") : t("admin.v2.no_nodes_for_filter")}
           illustration={<Server size={40} strokeWidth={1.25} aria-hidden="true" />}
+          actions={nodes.length === 0 && onAddNode ? (
+            <Button type="button" onClick={onAddNode}>
+              {t("admin.v2.add_node_cta")}
+            </Button>
+          ) : undefined}
         />
       ) : (
         <div className="adm-fleet-grid">
@@ -99,6 +112,8 @@ export function FleetView({ nodes, employees, onRevealCredentials, onManageAgent
               key={node.id}
               node={node}
               employee={node.employeeId ? employeeById.get(node.employeeId) : undefined}
+              storedTokens={storedTokens}
+              colocated={colocated}
               onReveal={onRevealCredentials}
               onManageAgents={onManageAgents}
               onDelete={onDeleteNode}

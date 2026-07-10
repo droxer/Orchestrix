@@ -1,5 +1,5 @@
-import { listControlPanelDaemonNodes } from "../api";
 import type { ControlPanelDaemonNodeRecord, SandboxRecord } from "../types";
+import { fetchControlPanelNodes } from "./controlPanelQueries";
 
 export function canUseLocalControlPanel(): boolean {
   if (typeof window === "undefined") return false;
@@ -33,7 +33,7 @@ export function preferLocalControlPanelNode(
 export async function localControlPanelNodes(): Promise<ControlPanelDaemonNodeRecord[]> {
   if (!canUseLocalControlPanel()) return [];
   try {
-    return (await listControlPanelDaemonNodes()).nodes;
+    return await fetchControlPanelNodes();
   } catch {
     return [];
   }

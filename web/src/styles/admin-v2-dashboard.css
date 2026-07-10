@@ -606,3 +606,84 @@
   .adm-dash-tile:nth-child(2),
   .adm-dash-tile:nth-child(3) { border-bottom: 1px solid var(--color-hairline); }
 }
+
+/* ── High-contrast themes ───────────────────────────────────────────
+   Flat operational panels: drop decorative KPI grid wash, swap soft
+   shadows for ink rings, and strengthen chart / placeholder fills so
+   data-viz reads at full legibility on near-black/white canvases. */
+html[data-theme="contrast"] .adm-dash-kpis::after,
+html[data-theme="contrast-dark"] .adm-dash-kpis::after {
+  display: none;
+}
+
+html[data-theme="contrast"] .adm-dash-card,
+html[data-theme="contrast-dark"] .adm-dash-card {
+  border-radius: 0;
+}
+
+html[data-theme="contrast"] .adm-dash-card:hover,
+html[data-theme="contrast-dark"] .adm-dash-card:hover {
+  box-shadow: var(--shadow-lift);
+}
+
+html[data-theme="contrast"] .adm-dash-chart--empty,
+html[data-theme="contrast-dark"] .adm-dash-chart--empty {
+  opacity: 1;
+}
+
+html[data-theme="contrast"] .adm-dash-chart--empty rect,
+html[data-theme="contrast-dark"] .adm-dash-chart--empty rect {
+  opacity: 1;
+  fill: var(--color-hairline-soft);
+}
+
+html[data-theme="contrast"] .adm-dash-chart-line,
+html[data-theme="contrast-dark"] .adm-dash-chart-line {
+  stroke: var(--color-ink);
+  stroke-width: 2;
+}
+
+html[data-theme="contrast"] .adm-dash-chart line:not(.adm-dash-chart-line),
+html[data-theme="contrast-dark"] .adm-dash-chart line:not(.adm-dash-chart-line) {
+  stroke: var(--color-hairline-soft);
+  stroke-dasharray: none;
+}
+
+html[data-theme="contrast"] .adm-dash-chart-area,
+html[data-theme="contrast-dark"] .adm-dash-chart-area {
+  fill: color-mix(in srgb, var(--color-ink) 14%, transparent);
+  opacity: 1;
+}
+
+html[data-theme="contrast"] .adm-dash-spark,
+html[data-theme="contrast-dark"] .adm-dash-spark {
+  color: var(--color-ink);
+}
+
+html[data-theme="contrast"] .adm-dash-bar,
+html[data-theme="contrast-dark"] .adm-dash-bar {
+  background: var(--color-canvas);
+}
+
+html[data-theme="contrast"] .adm-dash-bar-seg,
+html[data-theme="contrast-dark"] .adm-dash-bar-seg {
+  border-right-color: var(--color-ink);
+}
+
+html[data-theme="contrast"] .adm-dash-top-bar,
+html[data-theme="contrast-dark"] .adm-dash-top-bar {
+  background: var(--color-canvas);
+  box-shadow: inset 0 0 0 1px var(--color-hairline-soft);
+}
+
+html[data-theme="contrast"] .adm-dash-feed-icon,
+html[data-theme="contrast-dark"] .adm-dash-feed-icon {
+  border-width: 2px;
+}
+
+html[data-theme="contrast"] .adm-dash-stat-dot,
+html[data-theme="contrast-dark"] .adm-dash-stat-dot,
+html[data-theme="contrast"] .adm-token-dot,
+html[data-theme="contrast-dark"] .adm-token-dot {
+  box-shadow: inset 0 0 0 1px var(--color-ink);
+}

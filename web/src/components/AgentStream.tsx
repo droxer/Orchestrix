@@ -3,8 +3,24 @@ import { useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { AgentName } from "../types";
-import { emptyAgentStreamSegments, parseAgentStderr, parseAgentStream, userVisibleAgentSegments, type AgentSegment } from "../lib/agentStream";
+import {
+  displayAgentSegments,
+  emptyAgentStreamSegments,
+  hasStreamingTextCaret,
+  parseAgentStderr,
+  parseAgentStream,
+  type AgentSegment,
+} from "../lib/agentStream";
 import { Markdown } from "./Markdown";
+
+function StreamActivity({ label }: { label: string }) {
+  return (
+    <div className="agent-stream-activity" aria-live="polite">
+      <span className="agent-stream-pulse" aria-hidden="true" />
+      <span>{label}</span>
+    </div>
+  );
+}
 
 type AgentStreamProps = {
   agent: AgentName;
@@ -19,22 +35,32 @@ export function AgentStream({ agent, stdout, stderr, streaming }: AgentStreamPro
   // memoization every streamed delta would re-parse the full string from
   // scratch (O(n²) over a run). Key the parse on its raw inputs only.
   const segments = useMemo(
-    () => userVisibleAgentSegments([...parseAgentStream(agent, stdout), ...parseAgentStderr(stderr)]),
-    [agent, stdout, stderr],
+    () => displayAgentSegments([...parseAgentStream(agent, stdout), ...parseAgentStderr(stderr)], streaming),
+    [agent, stdout, stderr, streaming],
   );
+  const workingLabel = t("agent_stream.empty_working");
+  const showActivity = streaming && !hasStreamingTextCaret(segments);
 
   if (segments.length === 0) {
     const emptySegments = emptyAgentStreamSegments(agent, streaming, t);
     if (emptySegments.length > 0) {
       return (
-        <div className="agent-stream">
+        <div className={`agent-stream ${streaming ? "streaming" : ""}`}>
           {emptySegments.map((segment, i) => (
             <SegmentView key={i} segment={segment} />
           ))}
+          {showActivity ? <StreamActivity label={workingLabel} /> : null}
         </div>
       );
     }
-    return <p className="msg-quiet">{streaming ? t("agent_stream.empty_working") : t("agent_stream.empty_done")}</p>;
+    if (streaming) {
+      return (
+        <div className="agent-stream streaming">
+          <StreamActivity label={workingLabel} />
+        </div>
+      );
+    }
+    return <p className="msg-quiet">{t("agent_stream.empty_done")}</p>;
   }
 
   return (
@@ -42,6 +68,7 @@ export function AgentStream({ agent, stdout, stderr, streaming }: AgentStreamPro
       {segments.map((segment, i) => (
         <SegmentView key={i} segment={segment} />
       ))}
+      {showActivity ? <StreamActivity label={workingLabel} /> : null}
     </div>
   );
 }

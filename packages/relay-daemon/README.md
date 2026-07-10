@@ -19,13 +19,17 @@ Optional:
 - `RELAY_EMPLOYEE_ID`: employee id bound to this daemon node when preassigned.
 - `RELAY_SANDBOX_MODE`: defaults to `boxlite`, where the daemon boots and owns a
   BoxLite VM. Set `none` only when the daemon already runs inside an agent box.
+- `RELAY_BOXLITE_HOME`: BoxLite runtime state directory for `boxlite` mode.
+  Defaults to a per-workspace directory under `~/.relay/boxlite`, isolated from
+  BoxLite's global `~/.boxlite` state.
 - `RELAY_USE_LOCAL_AGENT_HOME`: set to `1` in local mode to use this user's
   existing Claude/Codex/Kimi login and config directories.
 - `RELAY_DAEMON_HEARTBEAT_MS`: registration heartbeat interval.
 - `RELAY_DAEMON_COMMAND_POLL_WAIT_MS`: long-poll wait for command requests
   (capped at 25 seconds).
 - `RELAY_DAEMON_COMMAND_LEASE_SECONDS`: command lease duration requested from
-  the backend. Defaults to the run timeout plus 60 seconds, capped at one hour.
+  the backend. Defaults to 90 seconds and is renewed by command polls while the
+  daemon still owns the run; values are capped at one hour.
 - `RELAY_DAEMON_MAX_CONCURRENT_ASK_RUNS`: concurrent ask-mode capacity. Work
   modes (`action` and `review`) stay exclusive.
 - `RELAY_DAEMON_SHUTDOWN_GRACE_MS`: max time to wait for active runs to report
@@ -73,3 +77,17 @@ The daemon has two scheduling classes. `action` and `review` are exclusive work
 modes: only one can run in the workspace at a time. `ask` mode can run
 concurrently up to the configured ask capacity so lightweight conversations do
 not block each other.
+
+## Delivery Semantics
+
+The backend command queue uses at-least-once delivery. A command poll claims
+work with a lease, and the daemon includes `leaseMode=explicit` plus each active
+command id and its per-delivery lease id on later polls. Only matching deliveries are renewed. If the daemon
+disconnects or restarts, unreported leases expire and the backend can redeliver
+the command.
+
+`run.start` is idempotent by command id while the daemon process is alive.
+`run.cancel` remains retryable until the target run reports a terminal event;
+returning a cancel command in one HTTP response is not treated as proof that it
+was received. Output events are ordered and deduplicated by stream sequence,
+and terminal events are retried across transient backend failures.

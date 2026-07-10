@@ -8,6 +8,18 @@ export function findActiveRunForSession(
   return node.activeRuns.find((run) => run.sessionId === sessionId);
 }
 
+export function findActiveRunOwnerForSession(
+  nodes: DaemonNodeMonitorRecord[],
+  sessionId: string | undefined,
+): { node: DaemonNodeMonitorRecord; run: DaemonNodeMonitorRecord["activeRuns"][number] } | undefined {
+  if (!sessionId) return undefined;
+  for (const node of nodes) {
+    const run = findActiveRunForSession(node, sessionId);
+    if (run) return { node, run };
+  }
+  return undefined;
+}
+
 /** True when the UI should show the stop control and block new sends. */
 export function isConversationRunInFlight(input: {
   activeRun: DaemonNodeMonitorRecord["activeRuns"][number] | undefined;

@@ -546,7 +546,7 @@ describe("TUI daemon runner", () => {
     const failureMessage = [
       "Another Relay orchestrator is already running:",
       "  55975 node packages/relay-daemon/dist/cli.js --sandbox-id sbx_bob",
-      "Stop it first (only one BoxLite runtime can use ~/.boxlite).",
+      "Stop it first (only one BoxLite runtime can use /Users/alice/.relay/boxlite/workspace-123456789abc).",
     ].join("\n");
     const failedSession: RelaySession = {
       id: "ses_boxlite_busy",

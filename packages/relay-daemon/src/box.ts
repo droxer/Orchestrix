@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, posix, relative, resolve, sep } from "node:path";
 import { TextDecoder } from "node:util";
@@ -28,9 +29,24 @@ import type { AgentName, AgentOutputSink, StreamExecResult } from "relay-core";
 export type BoxLiteModule = typeof import("@boxlite-ai/boxlite");
 type StreamRenderer = (chunk: string) => string;
 type CommandRunner = typeof spawnSync;
+const BOXLITE_HOME_LOCK_DIR = ".relay-boxlite.lock";
+
 interface KimiCodeFile {
   relativePath: string;
   content: Buffer;
+}
+
+export interface BoxliteHomeLock {
+  readonly boxliteHome: string;
+  readonly lockDir: string;
+  release(): void;
+}
+
+interface BoxliteHomeLockMetadata {
+  pid?: number;
+  token?: string;
+  command?: string;
+  createdAt?: string;
 }
 
 const KIMI_CODE_AUTH_ENTRIES = ["config.toml", "tui.toml", "credentials", "oauth"] as const;
@@ -63,7 +79,10 @@ export async function importBoxLite(): Promise<BoxLiteModule> {
   return import("@boxlite-ai/boxlite");
 }
 
-export function ensureSingleOrchestrator(pattern = "relay|orchestrator"): void {
+export function ensureSingleOrchestrator(
+  pattern = "relay|orchestrator",
+  boxliteHomeDescription = "the BoxLite runtime state directory",
+): void {
   const ignored = new Set([process.pid, process.ppid]);
   const result = spawnSync("pgrep", ["-fl", pattern], { encoding: "utf8" });
   if (result.status !== 0) return;
@@ -78,9 +97,77 @@ export function ensureSingleOrchestrator(pattern = "relay|orchestrator"): void {
     throw new Error(
       "Another Relay orchestrator is already running:\n" +
         others.map((line) => `  ${line}`).join("\n") +
-        "\nStop it first (only one BoxLite runtime can use ~/.boxlite).",
+        `\nStop it first (only one BoxLite runtime can use ${boxliteHomeDescription}).`,
     );
   }
+}
+
+export function acquireBoxliteHomeLock(boxliteHome: string): BoxliteHomeLock {
+  mkdirSync(boxliteHome, { recursive: true });
+  const lockDir = join(boxliteHome, BOXLITE_HOME_LOCK_DIR);
+  const metadataPath = join(lockDir, "owner.json");
+  const token = randomUUID();
+  for (;;) {
+    try {
+      mkdirSync(lockDir);
+      try {
+        writeFileSync(metadataPath, JSON.stringify({
+          pid: process.pid,
+          token,
+          command: process.argv.join(" "),
+          createdAt: new Date().toISOString(),
+        }), { mode: 0o600 });
+      } catch (error) {
+        rmSync(lockDir, { recursive: true, force: true });
+        throw error;
+      }
+      return {
+        boxliteHome,
+        lockDir,
+        release: () => releaseBoxliteHomeLock(lockDir, token),
+      };
+    } catch (error) {
+      if (!isErrno(error, "EEXIST")) throw error;
+      const metadata = readBoxliteHomeLockMetadata(metadataPath);
+      if (metadata.pid && processIsLive(metadata.pid)) {
+        throw new Error(
+          "Another Relay orchestrator is already running:\n" +
+            `  ${metadata.pid} ${metadata.command ?? "(unknown command)"}` +
+            `\nStop it first (only one BoxLite runtime can use ${boxliteHome}).`,
+        );
+      }
+      rmSync(lockDir, { recursive: true, force: true });
+    }
+  }
+}
+
+function releaseBoxliteHomeLock(lockDir: string, token: string): void {
+  const metadata = readBoxliteHomeLockMetadata(join(lockDir, "owner.json"));
+  if (metadata.token !== token) return;
+  rmSync(lockDir, { recursive: true, force: true });
+}
+
+function readBoxliteHomeLockMetadata(path: string): BoxliteHomeLockMetadata {
+  try {
+    const parsed = JSON.parse(readFileSync(path, "utf8")) as BoxliteHomeLockMetadata;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function processIsLive(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return isErrno(error, "EPERM");
+  }
+}
+
+function isErrno(error: unknown, code: string): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === code;
 }
 
 export async function prepareGuestWorkspace(hostWorkspace: string): Promise<[number, number]> {

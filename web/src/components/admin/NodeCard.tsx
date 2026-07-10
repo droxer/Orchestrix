@@ -11,8 +11,10 @@ import {
   formatRelativeTime,
   isStale,
   statusTone,
+  type StoredNodeTokenMap,
   visualStatus,
 } from "./helpers";
+import { NodeProfileBadges } from "./NodeProfileBadges";
 
 const CONNECT_AGENT_NAMES: AgentName[] = ["claude", "codex", "kimi"];
 
@@ -49,13 +51,24 @@ function agentTitle(node: ControlPanelDaemonNodeRecord, agent: AgentName, t: TFu
 interface NodeCardProps {
   node: ControlPanelDaemonNodeRecord;
   employee?: EmployeeRecord;
+  storedTokens?: StoredNodeTokenMap;
+  colocated?: boolean;
   onReveal: (node: ControlPanelDaemonNodeRecord) => void;
   onManageAgents: (node: ControlPanelDaemonNodeRecord) => void;
   onDelete?: (node: ControlPanelDaemonNodeRecord) => Promise<void>;
   t: TFunction;
 }
 
-export function NodeCard({ node, employee, onReveal, onManageAgents, onDelete, t }: NodeCardProps) {
+export function NodeCard({
+  node,
+  employee,
+  storedTokens = {},
+  colocated = false,
+  onReveal,
+  onManageAgents,
+  onDelete,
+  t,
+}: NodeCardProps) {
   const { confirm } = useDialogs();
   const [copied, setCopied] = useState(false);
   const [deletePending, setDeletePending] = useState(false);
@@ -94,7 +107,7 @@ export function NodeCard({ node, employee, onReveal, onManageAgents, onDelete, t
     : t("admin.unassigned");
 
   return (
-    <article className={`adm-node-card tone-${tone} ${running ? "is-running" : ""}`}>
+    <article className={`adm-node-card tone-${tone}${running ? " is-running" : ""}`}>
       <header className="adm-node-card-head">
         <span className={`adm-node-avatar tone-${tone}`} aria-hidden="true" translate="no">
           {node.employeeId ? ownerInitials(nodeName) : <Server size={16} aria-hidden="true" />}
@@ -121,13 +134,20 @@ export function NodeCard({ node, employee, onReveal, onManageAgents, onDelete, t
             type="button"
             className="adm-node-id mono"
             onClick={() => void handleCopyId()}
-            title={t("admin.copy_sandbox_id")}
+            title={t("admin.copy_node_id")}
           >
             <span translate="no">{node.id}</span>
             {copied ? <Check size={12} aria-hidden="true" /> : <Copy size={12} aria-hidden="true" />}
           </button>
         </div>
       </header>
+
+      <NodeProfileBadges
+        node={node}
+        storedTokens={storedTokens}
+        colocated={colocated}
+        t={t}
+      />
 
       <div className="adm-node-card-body">
         <div className="adm-agents">
@@ -150,11 +170,6 @@ export function NodeCard({ node, employee, onReveal, onManageAgents, onDelete, t
       </div>
 
       <footer className="adm-node-card-foot">
-        {node.sandboxMode ? (
-          <span className="adm-node-card-meta mono tone-muted" title="sandbox mode" translate="no">
-            {node.sandboxMode}
-          </span>
-        ) : null}
         <span className="adm-node-card-meta mono tone-muted">{formatRelativeTime(node.lastSeenAt, t)}</span>
         {node.queuedCommandCount > 0 ? (
           <span className="adm-node-card-queued mono tone-info">{node.queuedCommandCount} {t("admin.queued")}</span>

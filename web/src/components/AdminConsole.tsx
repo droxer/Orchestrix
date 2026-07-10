@@ -5,7 +5,7 @@ import { DashboardView } from "./admin/dashboard/DashboardView";
 import { useFleetMetrics } from "../hooks/useFleetMetrics";
 import { useTranslation } from "react-i18next";
 import { useMutationError } from "../hooks/useMutationError";
-import { Plus } from "lucide-react";
+import { Server, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NavRefresh } from "./icons";
 import { deleteControlPanelDaemonNode, deleteControlPanelEmployee, getAuthStatus, getMe, unassignControlPanelDaemonNode } from "../api";
@@ -25,12 +25,16 @@ import { FleetView } from "./admin/FleetView";
 import { ManageAgentsDrawer } from "./admin/ManageAgentsDrawer";
 import { PageHeader } from "./PageHeader";
 import { AdminViewToggle, type AdminView } from "./admin/AdminViewToggle";
-import { OnboardDrawer } from "./admin/OnboardDrawer";
+import { AddEmployeeDrawer } from "./admin/AddEmployeeDrawer";
+import { AddNodeDrawer } from "./admin/AddNodeDrawer";
 import { PeopleView } from "./admin/PeopleView";
 import { PulseStrip } from "./admin/PulseStrip";
 import { useAdminFleet } from "../hooks/useAdminFleet";
+import { useRelayStore } from "../lib/store";
 import {
+  persistStoredNodeTokenMap,
   readStoredNodeTokens,
+  upsertStoredCredentialsFromNodes,
   writeStoredNodeToken,
   type StoredNodeTokenMap,
 } from "./admin/helpers";
@@ -55,7 +59,9 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
   const { nodes, employees, lastUpdated, pollError, isFetching, mergeFleet, refetch } = useAdminFleet(Boolean(admin));
 
   const [view, setView] = useState<AdminView>("dashboard");
-  const [onboardOpen, setOnboardOpen] = useState(false);
+  const setAdminView = useRelayStore((state) => state.setAdminView);
+  const [addEmployeeOpen, setAddEmployeeOpen] = useState(false);
+  const [addNodeOpen, setAddNodeOpen] = useState(false);
   const [assignTarget, setAssignTarget] = useState<{ employeeId?: string } | null>(null);
   const [credentialsNodeId, setCredentialsNodeId] = useState<string | null>(null);
   const [manageAgentsNodeId, setManageAgentsNodeId] = useState<string | null>(null);
@@ -105,6 +111,10 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
     }
   }, [pollError]);
 
+  useEffect(() => {
+    setAdminView(view);
+  }, [setAdminView, view]);
+
   const metrics = useFleetMetrics(nodes, employees);
 
   const unassignedNodes = useMemo(() => nodes.filter((node) => !node.employeeId), [nodes]);
@@ -116,6 +126,15 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
     () => (manageAgentsNodeId ? nodes.find((node) => node.id === manageAgentsNodeId) ?? null : null),
     [manageAgentsNodeId, nodes],
   );
+
+  useEffect(() => {
+    setStoredTokens((current) => {
+      const updated = upsertStoredCredentialsFromNodes(current, nodes);
+      if (!updated) return current;
+      persistStoredNodeTokenMap(updated);
+      return updated;
+    });
+  }, [nodes]);
 
   function handleRevealCredentials(node: ControlPanelDaemonNodeRecord) {
     setCredentialsNodeId(node.id);
@@ -175,7 +194,7 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
     }
   }
 
-  function handleOnboardSuccess(result: CreateControlPanelEmployeeResponse) {
+  function handleAddEmployeeSuccess(result: CreateControlPanelEmployeeResponse) {
     const { node } = result;
     mergeFleet((prev) => ({
       nodes: node ? [node, ...prev.nodes.filter((current) => current.id !== node.id)] : prev.nodes,
@@ -194,7 +213,7 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
     setHighlightedEmployeeId(result.employee.id);
     window.setTimeout(() => setHighlightedEmployeeId((prev) => (prev === result.employee.id ? null : prev)), 2400);
 
-    setOnboardOpen(false);
+    setAddEmployeeOpen(false);
     setView("people");
     // Only surface the credentials drawer when a sandbox was bound — it is
     // keyed by node id and has nothing to show for an unassigned employee.
@@ -208,7 +227,6 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
     }));
     setHighlightedEmployeeId(result.employee.id);
     window.setTimeout(() => setHighlightedEmployeeId((prev) => (prev === result.employee.id ? null : prev)), 2400);
-    setOnboardOpen(false);
     setAssignTarget(null);
     setView("people");
   }
@@ -230,7 +248,8 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
     setStoredTokens(readStoredNodeTokens());
     setHighlightedEmployeeId(node.employeeId ?? null);
     window.setTimeout(() => setHighlightedEmployeeId((prev) => (prev === node.employeeId ? null : prev)), 2400);
-    setOnboardOpen(false);
+    setAddNodeOpen(false);
+    setAssignTarget(null);
     setView("fleet");
     setCredentialsNodeId(node.id);
   }
@@ -263,14 +282,27 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
   const lastUpdatedStr = lastUpdated
     ? lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
     : null;
+  const viewTitle = t(`admin.v2.title_${view}`);
+  const viewSubtitle = t(`admin.v2.sub_${view}`);
+
   return (
-    <section id="admin-panel" className="admin-console adm-shell" data-density="compact" tabIndex={-1}>
+    <section
+      id="admin-panel"
+      className="admin-console adm-shell"
+      data-density="compact"
+      data-admin-view={view}
+      aria-label={viewTitle}
+      tabIndex={-1}
+    >
       <PageHeader
-        title={t("nav.admin")}
+        kicker={t("nav.admin")}
+        title={viewTitle}
+        subtitle={viewSubtitle}
         titleVariant="display"
+        layout="stacked"
+        toolbar={<AdminViewToggle view={view} onChange={setView} />}
         actions={
           <>
-            <AdminViewToggle view={view} onChange={setView} />
             <Button
               type="button"
               variant="outline"
@@ -301,15 +333,29 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
                 </span>
               ) : null}
             </span>
-            <Button
-              type="button"
-              className="adm-command-onboard"
-              onClick={() => setOnboardOpen(true)}
-              aria-label={t("admin.v2.onboard_cta")}
-            >
-              <Plus size={16} aria-hidden="true" />
-              <span className="adm-command-onboard-label">{t("admin.v2.onboard_cta")}</span>
-            </Button>
+            {view !== "fleet" ? (
+              <Button
+                type="button"
+                className="adm-command-onboard"
+                onClick={() => setAddEmployeeOpen(true)}
+                aria-label={t("admin.v2.add_employee_cta")}
+              >
+                <UserPlus size={16} aria-hidden="true" />
+                <span className="adm-command-onboard-label">{t("admin.v2.add_employee_cta")}</span>
+              </Button>
+            ) : null}
+            {view !== "people" ? (
+              <Button
+                type="button"
+                variant={view === "fleet" ? "default" : "outline"}
+                className="adm-command-onboard"
+                onClick={() => setAddNodeOpen(true)}
+                aria-label={t("admin.v2.add_node_cta")}
+              >
+                <Server size={16} aria-hidden="true" />
+                <span className="adm-command-onboard-label">{t("admin.v2.add_node_cta")}</span>
+              </Button>
+            ) : null}
           </>
         }
       />
@@ -333,7 +379,7 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
                   employees={employees}
                   nodes={nodes}
                   onRevealCredentials={handleRevealCredentials}
-                  onOnboard={() => setOnboardOpen(true)}
+                  onAddEmployee={() => setAddEmployeeOpen(true)}
                   onRequestAssign={(employeeId) => setAssignTarget({ employeeId })}
                   onDeleteEmployee={handleDeleteEmployee}
                   unassignedNodeCount={unassignedNodes.length}
@@ -343,9 +389,11 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
                 <FleetView
                   nodes={nodes}
                   employees={employees}
+                  storedTokens={storedTokens}
                   onRevealCredentials={handleRevealCredentials}
                   onManageAgents={handleManageAgents}
                   onDeleteNode={handleDeleteNode}
+                  onAddNode={() => setAddNodeOpen(true)}
                 />
               )}
             </div>
@@ -354,14 +402,17 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
         </div>
       </div>
 
-      <OnboardDrawer
-        open={onboardOpen}
-        onClose={() => setOnboardOpen(false)}
-        employees={employees}
+      <AddEmployeeDrawer
+        open={addEmployeeOpen}
+        onClose={() => setAddEmployeeOpen(false)}
         unassignedNodes={unassignedNodes}
-        onSuccess={handleOnboardSuccess}
-        onAssignSuccess={handleAssignSuccess}
-        onCreateNodeSuccess={handleCreateNodeSuccess}
+        onSuccess={handleAddEmployeeSuccess}
+      />
+      <AddNodeDrawer
+        open={addNodeOpen}
+        onClose={() => setAddNodeOpen(false)}
+        employees={employees}
+        onSuccess={handleCreateNodeSuccess}
       />
       <AssignNodeDrawer
         open={assignTarget !== null}

@@ -280,23 +280,28 @@ async def create_control_panel_daemon_node(request: Request, ctx: AppContextDep)
     require_admin_session(request, ctx.auth_store)
     body = await json_body(request)
     employee_id = string_field(body, "employeeId") or None
+    sandbox_mode = string_field(body, "sandboxMode") or "boxlite"
+    if sandbox_mode not in ("boxlite", "none"):
+        raise HTTPException(400, 'sandboxMode must be "boxlite" or "none".')
     if hasattr(ctx.auth_store, "ensure_employee"):
         if employee_id:
             ctx.auth_store.ensure_employee(employee_id)
     node = ctx.backend.provision_daemon_node({
         **({"employeeId": employee_id} if employee_id else {}),
         "workspacePath": string_field(body, "workspacePath") or None,
+        "sandboxMode": sandbox_mode,
     })
+    effective_sandbox_mode = node.get("sandboxMode") if node.get("sandboxMode") in ("boxlite", "none") else sandbox_mode
     public_node = _public_control_panel_node(ctx, node)
     response = {
         "node": public_node,
-        "daemonEnv": daemon_start_env(request, node),
+        "daemonEnv": daemon_start_env(request, node, effective_sandbox_mode),
     }
     if node.get("sandboxToken"):
         response["sandboxToken"] = node["sandboxToken"]
     if node.get("nodeToken"):
         response["nodeToken"] = node["nodeToken"]
-        response["daemonCommand"] = daemon_start_command(request, node)
+        response["daemonCommand"] = daemon_start_command(request, node, effective_sandbox_mode)
     return response
 
 
