@@ -189,10 +189,12 @@ provisioning.
   `backend/tests/api/test_agent_workspace.py` (authz — supervisor ok,
   unrelated employee 403, admin ok; live dispatch through a placement;
   snapshot fallback; timeout → 503; traversal/missing errors).
-- **Web** (`web/tests/api.test.ts`): `listAgentWorkspaceFiles` /
+- **Web**: `web/tests/api.test.ts` covers `listAgentWorkspaceFiles` /
   `readAgentWorkspaceFile` URL construction and error mapping against the
-  agent-scoped endpoints. The status line and snapshot banner are exercised
-  manually; there is no component test for `AgentWorkspacePage` yet.
+  agent-scoped endpoints; `web/tests/workspaceHome.test.ts` covers the
+  extracted home-status derivation (`web/src/lib/workspaceHome.ts`) —
+  live chip vs snapshot banner/chip, the snapshot empty-state copy, and
+  the 503-only retry affordance.
 
 ## Risks & follow-ups
 

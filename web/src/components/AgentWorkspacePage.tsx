@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { getAgentArtifacts, getWorkspaceBrief, listAgentWorkspaceFiles, readAgentWorkspaceFile, RelayApiError } from "../api";
+import { getAgentArtifacts, getWorkspaceBrief, listAgentWorkspaceFiles, readAgentWorkspaceFile } from "../api";
 import type {
   ArtifactIndexItem,
   EmployeeAgent,
@@ -15,6 +15,7 @@ import type {
   WorkspaceBriefResponse,
 } from "../types";
 import { agentLabel } from "../lib/plan";
+import { isWorkspaceRetryableError, workspaceFilesEmptyState, workspaceHomeStatus } from "../lib/workspaceHome";
 import { NavRefresh, ViewBoard, WorkspaceFile, WorkspaceFolder } from "./icons";
 import { AgentMark } from "./AgentMark";
 import { PageHeader } from "./PageHeader";
@@ -249,6 +250,7 @@ export function AgentWorkspacePage({
     queryFn: ({ signal }) => listAgentWorkspaceFiles({ agentId: agent.id, path: filePath }, signal),
     enabled: pageTab === "workspace",
   });
+  const homeStatus = workspaceHomeStatus(fileQuery.data, snapshotBannerDismissed);
   const agentArtifactsQuery = useQuery({
     queryKey: ["agent-artifacts", agent.id],
     queryFn: ({ signal }) => getAgentArtifacts(agent.id, signal),
@@ -495,13 +497,13 @@ export function AgentWorkspacePage({
                   </div>
                 ) : (
                   <div className="workspace-tabpanel-files">
-                    {fileQuery.data?.source === "snapshot" && !snapshotBannerDismissed ? (
+                    {homeStatus.kind === "snapshot-banner" ? (
                       <SnapshotBanner onDismiss={() => setSnapshotBannerDismissed(true)} />
                     ) : null}
                     <div className="workspace-files-bar">
                       <WorkspacePathBreadcrumb path={filePath} onNavigate={openDirectory} />
-                      {fileQuery.data?.source === "live" ? <span className="workspace-home-status workspace-home-status--live">● {t("workspace.source_live")}{fileQuery.data.nodeId ? <span className="workspace-home-node"> {fileQuery.data.nodeId}</span> : null}</span> : null}
-                      {fileQuery.data?.source === "snapshot" && snapshotBannerDismissed ? (
+                      {homeStatus.kind === "live" ? <span className="workspace-home-status workspace-home-status--live">● {t("workspace.source_live")}{homeStatus.nodeId ? <span className="workspace-home-node"> {homeStatus.nodeId}</span> : null}</span> : null}
+                      {homeStatus.kind === "snapshot-chip" ? (
                         <span className="workspace-home-status workspace-home-status--snapshot">○ {t("workspace.source_snapshot")}</span>
                       ) : null}
                     </div>
@@ -762,6 +764,7 @@ function FilesPane({
 }) {
   const { t, i18n } = useTranslation();
   const entries = data?.entries ?? [];
+  const emptyState = workspaceFilesEmptyState(data?.source);
   const message = error instanceof Error ? error.message : error ? String(error) : "";
 
   return (
@@ -777,7 +780,7 @@ function FilesPane({
       ) : message ? (
         <div className="workspace-file-error">
           <WorkspaceEmpty title={message} />
-          {error instanceof RelayApiError && error.status === 503 ? <Button type="button" variant="outline" size="sm" onClick={onRetry}>{t("workspace.retry")}</Button> : null}
+          {isWorkspaceRetryableError(error) ? <Button type="button" variant="outline" size="sm" onClick={onRetry}>{t("workspace.retry")}</Button> : null}
         </div>
       ) : data && !data.exists ? (
         <WorkspaceEmpty title={t("workspace.files_unavailable")} />
@@ -797,8 +800,8 @@ function FilesPane({
         </ul>
       ) : (
         <WorkspaceEmpty
-          title={data?.source === "snapshot" ? t("workspace.no_files_yet") : t("workspace.no_files")}
-          hint={data?.source === "snapshot" ? t("workspace.empty_files_snapshot_hint") : undefined}
+          title={t(emptyState.titleKey)}
+          hint={emptyState.hintKey ? t(emptyState.hintKey) : undefined}
           kind="files"
         />
       )}

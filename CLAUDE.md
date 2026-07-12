@@ -90,6 +90,6 @@ The host workspace mounts into the BoxLite guest at `/workspace` (`GUEST_WORKSPA
 - `packages/relay-daemon/tests/daemon.test.ts` — daemon registration, command polling, and agent execution.
 - `packages/relay-tui/tests/tui.test.tsx` — Ink rendering via `ink-testing-library`. Frame assertions are sensitive to header/footer text — when changing TUI chrome, update assertions deliberately, not reflexively.
 - `web/tests/status.test.ts` — web daemon-node status derivation and local-node claiming behavior.
-- `web/tests/agentStream.test.ts`, `web/tests/messageBlock.test.ts`, `web/tests/tokenUsage.test.ts`, `web/tests/manageAgents.test.ts` — web component and utility unit tests.
+- `web/tests/agentStream.test.ts`, `web/tests/messageBlock.test.ts`, `web/tests/tokenUsage.test.ts`, `web/tests/manageAgents.test.ts`, `web/tests/workspaceHome.test.ts` — web component and utility unit tests.
 
 Tests use Node's built-in `node:test` runner with `describe`/`it`; a vitest pass over the same files surfaces a spurious "No test suite found" line but real assertions are reported correctly under either runner.
