@@ -2,7 +2,7 @@
    Tier 2 — Semantic. Signal Cyan direction (see tokens/primitives.css
    for the full rationale): dark near-black canvas by default, an
    electric telemetry cyan as the single chromatic action color —
-   deliberately not DESIGN.md's literal lavender-blue.
+   deliberately not Linear's literal lavender-blue.
 
    Role-based aliases that consume primitives.css and give every value an
    intent-bearing name: --color-semantic-* for color roles, --type-* for

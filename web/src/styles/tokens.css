@@ -1,8 +1,8 @@
 /* =====================================================================
-   Relay web — Signal Cyan: a near-black canvas (#010102, per DESIGN.md's
-   Linear-design-analysis reference) with an electric telemetry cyan
+   Relay web — Signal Cyan: a near-black canvas (#010102, from the
+   Linear dark reference) with an electric telemetry cyan
    (#22d9c0) as the single chromatic accent — a deliberate departure from
-   DESIGN.md's literal lavender-blue, chosen so Relay's agent/daemon/node
+   Linear's literal lavender-blue, chosen so Relay's agent/daemon/node
    control plane doesn't converge on the lavender-on-dark accent shared
    by most dev-tool SaaS. Dark is the default, primary theme; light is a
    derived secondary theme.

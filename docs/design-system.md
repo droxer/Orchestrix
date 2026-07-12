@@ -1,32 +1,32 @@
 ---
 version: alpha
-name: Relay-Monochrome
-description: A Precision Monochrome design system (the Linear/Vercel school) for an agent-orchestration control plane. Flat near-white surfaces (white canvas by day; near-black #0a0a0a by night) carry the chrome; near-black ink (#111113) is the single ACTION color, inverting to white on the dark canvas. Hue is reserved for status alone — success, danger, and warning (green / amber / red) as dots, borders, and text, never fills or actions — and "info" is a neutral slate. One crisp grotesk (Geist) carries every text role — display, chrome, and body alike — with weight and tight display tracking doing the differentiating; Geist Mono is reserved for code. Base UI text is 13px. Geometry is tight: 5px on buttons and badges, 6px on inputs, 8–10px on cards; the pill is retired (aliases sm). Depth comes from hairline borders, not shadows. Motion is fast with no overshoot. The result reads as serious infrastructure software — a dense, calm control plane for AI agents.
+name: Relay-Signal-Cyan
+description: A Signal Cyan design system (the Linear school, dark-first) for an agent-orchestration control plane. A near-black canvas (#010102) with a charcoal surface ladder carries the chrome; an electric telemetry cyan (#22d9c0) is the single chromatic ACTION color — brand mark, primary CTA, focus ring, link emphasis — pairing with near-black on-action text because the rest state is bright. Light is a derived secondary theme that deepens the accent into a dark teal (#0c7566, white on-action text). Hue is otherwise reserved for status alone — success, danger, and warning (green / amber / red) as dots, borders, and text, never fills or actions — and "info" is a neutral slate. One crisp grotesk (Geist) carries every text role — display, chrome, and body alike — with weight and tight display tracking doing the differentiating; Geist Mono is reserved for code. Base UI text is 13px. Geometry is tight: 5px on buttons and badges, 6px on inputs, 8–10px on cards; the pill is retired (aliases sm). Depth comes from hairline borders, not shadows. Motion is fast with no overshoot. The result reads as serious infrastructure software — a dense, calm control plane for AI agents.
 
 colors:
-  action: "#111113"
-  action-active: "#2e2e33"
-  action-disabled: "#d4d4d8"
-  action-soft: "#ececee"
-  ink: "#09090b"
-  body: "#3f3f46"
-  muted: "#71717a"
-  muted-soft: "#a1a1aa"
-  hairline: "#e4e4e7"
-  hairline-soft: "#f0f0f1"
-  canvas: "#ffffff"
-  surface-soft: "#fafafa"
-  surface-strong: "#f0f0f1"
-  surface-raised: "#ffffff"
-  surface-dark: "#18181b"
-  surface-dark-elevated: "#232326"
-  on-action: "#ffffff"
-  on-dark: "#fafafa"
+  action: "#22d9c0"
+  action-active: "#5eefda"
+  action-disabled: "#5f7a75"
+  action-soft: "#0c211d"
+  ink: "#f7f8f8"
+  body: "#d0d6e0"
+  muted: "#8a8f98"
+  muted-soft: "#62666d"
+  hairline: "#23252a"
+  hairline-soft: "#17181b"
+  canvas: "#010102"
+  surface-soft: "#0f1011"
+  surface-strong: "#141516"
+  surface-raised: "#18191a"
+  surface-dark: "#191a1b"
+  surface-dark-elevated: "#202124"
+  on-action: "#04120f"
+  on-dark: "#f7f8f8"
   on-dark-soft: "#9a9aa3"
-  success: "#10b981"
-  danger: "#ef4444"
-  warning: "#f59e0b"
-  info: "#71717a"
+  success: "#27a644"
+  danger: "#f87171"
+  warning: "#fbbf24"
+  info: "#9a9aa3"
 
 typography:
   display-lg:
@@ -176,7 +176,7 @@ components:
     height: 64px
   side-nav:
     backgroundColor: "{colors.surface-strong}"
-    activeBackgroundColor: "{colors.action}"
+    activeBackgroundColor: "{colors.action-soft}"
     textColor: "{colors.body}"
     typography: "{typography.nav-link}"
     widthCollapsed: 72px
@@ -267,7 +267,7 @@ components:
     size: 8px
 ---
 
-# Relay Design — Precision Monochrome
+# Relay Design — Signal Cyan
 
 <p align="center">
   <img src="../assets/brand/relay-logo.svg" alt="Relay logo" width="360">
@@ -275,17 +275,22 @@ components:
 
 ## Overview
 
-Relay's visual language is **Precision Monochrome** — the Linear/Vercel
-school of infrastructure software. Ink-on-white, near-monochrome zinc
-neutrals, razor hairlines, tight geometry, and extreme restraint. There is
-no brand hue: **black is the action color**, and every unit of chroma in the
-interface is a unit of information.
+Relay's visual language is **Signal Cyan** — the Linear school of
+infrastructure software, dark-first. A near-black canvas, a charcoal
+surface ladder, razor hairlines, tight geometry, and extreme restraint.
+There is exactly one brand hue: an **electric telemetry cyan** that reads
+as a live signal/network lock — fitting for a daemon/node/session
+orchestration surface — and every other unit of chroma in the interface is
+a unit of information.
 
-**Ink** (`#111113`) is the single **action** color, inverting to white
-(`#fafafa`) on the near-black (`#0a0a0a`) dark canvas — monochrome in both
-directions. Hairlines carry structure instead of shadows. Color appears
-*only* as status: green / amber / red as dots, borders, and text — never as
-background fills, never as actions.
+**Signal Cyan** (`{colors.action}` — #22d9c0) is the single chromatic
+**action** color: brand mark, primary CTA, focus ring, link emphasis. The
+rest state is bright, so on-action text is near-black
+(`{colors.on-action}` — #04120f). On the derived light theme the accent
+deepens into a dark teal (#0c7566) that carries white on-action text.
+Hairlines carry structure instead of shadows. Beyond the accent, color
+appears *only* as status: green / amber / red as dots, borders, and text —
+never as background fills, never as actions.
 
 One crisp grotesk, **Geist**, carries every text role — display, chrome,
 and body — with weight and tight display tracking (`-0.02em`) doing the
@@ -300,13 +305,14 @@ cards. The 100px pill stays retired (`{rounded.pill}` aliases
 drawers, dialogs, the composer.
 
 **Key characteristics:**
-- Ink action: `{colors.action}` (#111113) carries every primary action — buttons, links, the focus ring, and text selection — and inverts to `#fafafa` on the dark canvas. `{colors.action-soft}` (#ececee) is the matching neutral wash for selected/active affordances. Action is achromatic; it never competes with status for attention.
-- Color = status, and nothing else: success/danger/warning (green / amber / red) are carried as text, dots, and borders — never fills. "Info" is a neutral slate (`{colors.info}` #71717a). Every hue on screen means something.
+- Dark-first: the near-black canvas (`{colors.canvas}` #010102) with a charcoal surface ladder is the primary, default register; light is a derived secondary theme (`html[data-theme="light"]`).
+- Signal Cyan action: `{colors.action}` (#22d9c0) carries every primary action — buttons, links, the focus ring, and text selection — and is used *scarcely*: brand mark, primary CTA, focus, link emphasis. Because the fill is bright, on-action text is near-black; the light theme deepens the accent to a dark teal with white text. `{colors.action-soft}` (#0c211d, a dark teal-tinted wash) marks selected/active affordances.
+- Color = accent + status, and nothing else: success/danger/warning (green / amber / red) are carried as text, dots, and borders — never fills. "Info" is a neutral slate (`{colors.info}` #9a9aa3), deliberately decoupled from the accent. Every other hue on screen means something.
 - One sans, every role: Geist carries headlines, chrome, and body alike — weight (never past 600) separates emphasis, not a font-family switch. Geist Mono is reserved for tool/command lines, raw logs, code, and IDs.
 - Tight geometry: `{rounded.sm}` (5px) interactive, `{rounded.xl}` (10px) cards — the precision-tool scale.
 - Hairline depth: 1px `{colors.hairline}` borders over shadows; elevation is restrained.
 - Fast motion, no overshoot: 120–160ms transitions on `--ease-standard`; the spring curve is retired (`--ease-spring` aliases the standard curve).
-- The sidenav is themed, not pinned: it reads off the same `--color-semantic-*` surface tokens as the rest of the app and re-themes with light/dark, with the active route as a solid ink plate.
+- The sidenav is themed, not pinned: it reads off the same `--color-semantic-*` surface tokens as the rest of the app and re-themes with light/dark, with the active route on the quiet `{colors.action-soft}` selection tint.
 
 ## Token architecture
 
@@ -315,7 +321,8 @@ by `web/src/styles/tokens.css` (a pure `@import` manifest — never add a
 token there):
 
 1. **`primitives.css`** — raw hex/px/rem values and nothing else. Two color
-   registers (`:root` for light, `html[data-theme="dark"]` for dark) plus
+   registers (`:root` is the dark default; `html[data-theme="light"]`
+   overrides it with the derived light theme) plus
    the theme-independent numeric scales (spacing, radii, type, tracking,
    leading, z-index, motion, shell dimensions). This is the *only* file
    allowed to contain a literal hex color or an `rgb()`/`hsl()` function —
@@ -358,43 +365,48 @@ themes simultaneously and can't resolve a single `var()`). Run
 
 **Documented, deliberate exceptions to "primitives.css is the only hex
 source":**
-- `login.css` — a local `--lg-*` token block pinning the pre-auth dark ramp, since no user theme preference is loaded yet (retuned to the monochrome dark register along with everything else).
+- `login.css` — a local `--lg-*` token block pinning the pre-auth dark ramp, since no user theme preference is loaded yet (retuned to the Signal Cyan dark register along with everything else).
 - `preferences.css` — theme-swatch previews (`.pref-theme-swatch`).
 - `artifact.css` — the frame-preview background is a literal white document page in every theme.
 - `backlog.css` — the assignee avatar uses a procedurally generated per-identity `hsl(var(--avatar-hue))`, set inline by `TaskAssignee.tsx` from the assignee's name; there is no fixed primitive since the hue itself *is* the value.
 
 ## Colors
 
-### Action, selection, and focus (ink)
-- **Action** (`{colors.action}` — #111113): the single action color — primary buttons, links, the focus ring, and text selection. On the dark canvas it inverts to white (`#fafafa`) with near-black text (`#111113`).
-- **Action Active** (`{colors.action-active}` — #2e2e33): press/hover lift.
-- **Action Disabled** (`{colors.action-disabled}` — #d4d4d8): faded neutral for disabled actions.
-- **Action Soft** (`{colors.action-soft}` — #ececee): neutral selection wash — selected rows, active nav, running-state affordances.
+Values below are the **dark register** (`:root`, the default);
+`html[data-theme="light"]` overrides them with the derived light theme —
+light counterparts are noted inline where the relationship isn't a
+straight lightening.
+
+### Action, selection, and focus (Signal Cyan)
+- **Action** (`{colors.action}` — #22d9c0): the single chromatic action color — brand mark, primary buttons, links, the focus ring, and text selection. Bright at rest, so on-action text is near-black. Light theme deepens it to a dark teal (#0c7566, ~5.6:1 with white text).
+- **Action Active** (`{colors.action-active}` — #5eefda): press/hover lift (light: #095e52).
+- **Action Disabled** (`{colors.action-disabled}` — #5f7a75): desaturated gray-teal — fades sideways, not toward black, so the dark on-action text stays paired (light: #647976 with white text).
+- **Action Soft** (`{colors.action-soft}` — #0c211d): dark teal-tinted selection wash — selected rows, active nav, running-state affordances (light: #d6ece8, a pale teal lift).
 
 ### Status hues
-- **Success** (`{colors.success}` — #10b981): verdict approved, node ready. Text/dot/border only.
-- **Danger** (`{colors.danger}` — #ef4444): failures, reject, destructive. Text/dot/border only. Text-safe counterpart `--color-semantic-danger-text` (#dc2626, ~4.5:1 on white).
-- **Warning** (`{colors.warning}` — #f59e0b): attention dot only, never an action. Text-safe counterpart `--color-semantic-warning-text` (#8a5c00, ~4.8:1 on white) for status read as a word or numeral.
-- **Info** (`{colors.info}` — #71717a): a neutral slate — status without alarm.
+- **Success** (`{colors.success}` — #27a644): verdict approved, node ready. Text/dot/border only. (Light: #10b981.)
+- **Danger** (`{colors.danger}` — #f87171): failures, reject, destructive. Text/dot/border only. On the dark canvas the dot value doubles as the text-safe value; the light theme splits them (#ef4444 dot, `--color-semantic-danger-text` #dc2626 at ~4.5:1 on white).
+- **Warning** (`{colors.warning}` — #fbbf24): attention dot only, never an action. Dark text-safe value matches (~7:1 on near-black); light splits to #f59e0b dot / #8a5c00 text (~4.8:1 on white).
+- **Info** (`{colors.info}` — #9a9aa3): a neutral slate — status without alarm, deliberately decoupled from the accent (light: #71717a).
 
-### Surface (flat near-white)
-- **Canvas** (`{colors.canvas}` — #ffffff): the default page floor.
-- **Surface Soft** (`{colors.surface-soft}` — #fafafa): subtle tint — quotes, code, hover.
-- **Surface Strong** (`{colors.surface-strong}` — #f0f0f1): fills behind secondary buttons, search, avatars.
-- **Surface Raised** (`{colors.surface-raised}` — #ffffff): modals, drawers, floating chrome — white with a hairline or lift shadow as the edge.
-- **Surface Dark** (`{colors.surface-dark}` — #18181b): the always-dark register for chrome that stays dark even on the light theme (the always-dark diff viewer, some admin dark-mode chrome).
+### Surface (charcoal ladder on near-black)
+- **Canvas** (`{colors.canvas}` — #010102): the default page floor — near-pure black with a faint blue tint (light: #ffffff).
+- **Surface Soft** (`{colors.surface-soft}` — #0f1011): one step up — default cards, quotes, code, hover (light: #fafafa).
+- **Surface Strong** (`{colors.surface-strong}` — #141516): fills behind secondary buttons, search, avatars (light: #f0f0f1).
+- **Surface Raised** (`{colors.surface-raised}` — #18191a): modals, drawers, floating chrome, with a hairline or lift shadow as the edge (light: #ffffff).
+- **Surface Dark** (`{colors.surface-dark}` — #191a1b, graphite): the always-dark register for chrome that stays dark even on the light theme (the always-dark diff viewer, ink-fill buttons). Theme-invariant.
 
 ### Hairlines
-- **Hairline** (`{colors.hairline}` — #e4e4e7): default 1px divider and card border.
-- **Hairline Soft** (`{colors.hairline-soft}` — #f0f0f1): lighter divider.
+- **Hairline** (`{colors.hairline}` — #23252a): default 1px divider and card border (light: #e4e4e7).
+- **Hairline Soft** (`{colors.hairline-soft}` — #17181b): lighter divider (light: #f0f0f1).
 
 ### Text
-- **Ink** (`{colors.ink}` — #09090b): headings, primary copy, emphasis.
-- **Body** (`{colors.body}` — #3f3f46): default running text.
-- **Muted** (`{colors.muted}` — #71717a): sub-titles, secondary labels.
-- **Muted Soft** (`{colors.muted-soft}` — #a1a1aa): timestamps, disabled.
-- **On Action** (`{colors.on-action}` — #ffffff): text on the ink fill in light mode; flips to near-black (#111113) in dark mode since the dark-mode fill is white.
-- **On Dark** (`{colors.on-dark}` — #fafafa): text on always-dark fills in either theme.
+- **Ink** (`{colors.ink}` — #f7f8f8): headings, primary copy, emphasis (light: #131316).
+- **Body** (`{colors.body}` — #d0d6e0): default running text (light: #3f3f46).
+- **Muted** (`{colors.muted}` — #8a8f98): sub-titles, secondary labels (light: #71717a).
+- **Muted Soft** (`{colors.muted-soft}` — #62666d): timestamps, disabled (light: #a1a1aa).
+- **On Action** (`{colors.on-action}` — #04120f): near-black text on the bright cyan fill; flips to white (#ffffff) on the light theme's deepened teal — the inverse of a mid-tone accent's usual pairing.
+- **On Dark** (`{colors.on-dark}` — #f7f8f8, porcelain): text on always-dark fills in either theme.
 
 ## Typography
 
@@ -476,8 +488,10 @@ rhythm.
 | Soft drop | `--shadow-soft` | Bordered cards on hover |
 | Lift | `--shadow-lift` | Borderless floating chrome — drawers, dialogs, composer, tooltips |
 
-Both shadow tokens mix a neutral zinc ink tint (`--color-shadow-ink`,
-`--color-shadow-ink-ring` in `primitives.css`) rather than pure black. Pick
+Both shadow tokens mix from the shadow inks (`--color-shadow-ink`,
+`--color-shadow-ink-ring` in `primitives.css`) at low alpha — on the
+near-black canvas these are pure-black tints; the light theme softens the
+drop. Pick
 `--shadow-soft` for a surface that already has a 1px border; pick
 `--shadow-lift` for borderless floating chrome where the inner ring stands
 in for the edge.
@@ -506,14 +520,16 @@ for true circles.
 ### Application Navigation
 **`sidenav-panel`** — a themed rail (follows light/dark like every other
 pane). 72px collapsed / 228px expanded, 46px square buttons, rounded
-`{rounded.lg}`. Active route = a solid ink plate (white in dark mode) — the
-one place the action color fills chrome.
+`{rounded.lg}`. Active route = ink text on the quiet `{colors.action-soft}`
+selection tint with a faint action-mixed border — selected navigation stays
+distinct from true CTAs; the solid accent never fills chrome.
 
 ### Buttons
-**`button-primary`** — the ink action. Background `{colors.action}`, text
-`{colors.on-action}`, type `{typography.button}` (13px/600), padding
-8×16px, height `--size-control-md` (40px), rounded `{rounded.sm}` (5px).
-Inverts to a white fill with near-black text in dark mode.
+**`button-primary`** — the Signal Cyan action. Background `{colors.action}`,
+text `{colors.on-action}` (near-black on the bright cyan), type
+`{typography.button}` (13px/600), padding 8×16px, height `--size-control-md`
+(40px), rounded `{rounded.sm}` (5px). On the light theme the fill deepens to
+a dark teal and the text flips to white.
 
 **`button-secondary`** — soft-neutral. Background `{colors.surface-strong}`,
 text `{colors.ink}`, same geometry.
@@ -559,9 +575,10 @@ hairline, `{typography.eyebrow}`.
 ## Do's and Don'ts
 
 ### Do
-- Use `{colors.action}` (ink) for actions; let it invert to white on the dark canvas.
+- Use `{colors.action}` (Signal Cyan) for actions, and use it scarcely: brand mark, primary CTA, focus ring, link emphasis.
+- Pair the action fill with `{colors.on-action}` — near-black on the bright dark-theme cyan, white on the light theme's deepened teal. Never white-on-cyan in dark mode.
 - Use `{colors.action-soft}` for selected rows, active nav, and running-state affordances.
-- Reserve hue for status — success/danger/warning as text/dots/borders; use the slate `{colors.info}` for neutral/info status.
+- Reserve all other hue for status — success/danger/warning as text/dots/borders; use the slate `{colors.info}` for neutral/info status.
 - Render every text role in Geist; reserve Geist Mono for tool/command lines, raw logs, code, and IDs.
 - Use token radii: `{rounded.sm}` (5px) interactive, `{rounded.xl}` (10px) cards.
 - Carry depth with 1px hairlines first; reach for shadows only on floating chrome.
@@ -569,8 +586,8 @@ hairline, `{typography.eyebrow}`.
 - Add new tokens to `tokens/primitives.css` (raw value) and `tokens/semantic.css` (role) — never inline a hex/`rgb()`/`hsl()` literal in a component file. `npm run lint:css -w web` enforces this.
 
 ### Don't
-- Don't use a status color (green/amber/red) or the slate info as an action — ink is the only action color.
-- Don't introduce a brand hue — the system is achromatic by design; every unit of chroma is a unit of information.
+- Don't use a status color (green/amber/red) or the slate info as an action — Signal Cyan is the only action color.
+- Don't introduce a second chromatic accent, and don't use the cyan as a section background or decorative fill — beyond the accent, every unit of chroma is a unit of information.
 - Don't use status colors as general UI background fills.
 - Don't use ad-hoc pixel radii — use `{rounded.*}` tokens.
 - Don't tint agent avatars with vendor brand colors — glyph shape carries identity.
@@ -617,7 +634,7 @@ compressed (Linear leans on weight/color for hierarchy, not size).
 - **`sidenav-panel`** — the themed rail (see above).
 - **`thread-panel`** — conversation list, flat 70px rows. Active row = `--color-semantic-action-soft` fill.
 - **`chat-panel`** — message canvas. Messages render on a continuous rail — a hairline spine with square agent nodes and a circular ink node for the human.
-- **`composer`** — bottom-pinned input. The outer wrap carries `--shadow-lift`; the send button is a 36×36px rounded-square ink plate.
+- **`composer`** — bottom-pinned input. The outer wrap carries `--shadow-lift`; the send button is a 34×34px circular `{colors.action}` plate with `{colors.on-action}` glyph.
 - **`ac-*` (Admin Console)** — metric cards. Titles use `var(--font-display)` at `--text-3xl`; values use `--font-number` at `--text-4xl`.
 - **`adm-drawer`** — right-edge sheet on `--color-semantic-surface-raised`, hairline left border, optional layered stacking (`layer` prop deepens the scrim and scales underlay panels to 0.98). Slides in from the right on desktop; full-viewport takeover below 820px. Exit animation mirrors entrance (~150ms). Sticky **`adm-form-actions`** footer pins primary/cancel buttons while body scrolls.
 
@@ -632,15 +649,15 @@ compressed (Linear leans on weight/color for hierarchy, not size).
 - **`adm-drawer-section`** — inline grouped content (placements list, danger zone) with uppercase section title; distinct from the sticky footer.
 
 ### Focus, motion, dark mode
-- **Focus ring** — every interactive surface uses `var(--ring-focus)`, a 3px action-alpha halo (a quiet gray ring in the monochrome system). Destructive controls use `--ring-focus-danger`.
+- **Focus ring** — every interactive surface uses `var(--ring-focus)`, a 3px action-alpha halo (a cyan-tinted ring at 28% alpha). Destructive controls use `--ring-focus-danger`.
 - **Status tone driver** — `tone-good` / `tone-info` / `tone-bad` / `tone-warn` / `tone-neutral` set a single `--tone` variable consumed by dots and outlined pills.
-- **Dark mode** — one definition per tier (`html[data-theme="dark"]` in `primitives.css` for raw values, in `semantic.css` for the handful of relationship changes), resolved before first paint via a pre-hydration script in `app/layout.tsx`.
+- **Theming** — dark is the default register (`:root`); one light override per tier (`html[data-theme="light"]` in `primitives.css` for raw values, in `semantic.css` for the handful of relationship changes), resolved before first paint via a pre-hydration script in `app/layout.tsx`.
 - **Motion** — canonical curves/durations on a shared shelf (`--ease-standard`, `--ease-out-quint`, `--ease-emphasized`; `--ease-spring` is retired and aliases standard). Durations are Linear-fast (`--duration-fast` 120ms, `--duration-base` 160ms). Nothing overshoots.
 
 ### Data visualization
 The admin token-usage chart uses a fixed three-segment ramp: input tokens =
-`{colors.action}` (ink), output tokens = `{colors.success}` (green), cache
-tokens = `{colors.muted-soft}` (neutral). Fleet-health stacked bars and
+`{colors.action}` (Signal Cyan), output tokens = `{colors.success}` (green),
+cache tokens = `{colors.muted-soft}` (neutral). Fleet-health stacked bars and
 activity charts use the status tone ramp inside chart segments only.
 Artifact kind accents (`--color-kind-*` in `tokens/primitives.css`) are a
 separate decorative chip palette mirrored from the TUI — not status, not
