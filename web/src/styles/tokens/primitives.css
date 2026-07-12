@@ -9,18 +9,18 @@
    property names with different values) since that's a fact about the
    color itself, not a role assignment.
 
-   Palette direction: Signal Cyan — near-black canvas (#010102, per
-   DESIGN.md's Linear-design-analysis reference) with a four-step
+   Palette direction: Signal Cyan — near-black canvas (#010102, from
+   the Linear dark reference) with a four-step
    charcoal surface ladder, light-gray ink, and an electric telemetry
    cyan (#22d9c0) as the single chromatic accent, used ONLY for the
    brand mark, primary actions, and focus. This deliberately departs
-   from DESIGN.md's literal lavender-blue accent: lavender-on-dark is
+   from Linear's literal lavender-blue accent: lavender-on-dark is
    now the default dev-tool-SaaS accent (Linear, Raycast, Warp all
    converge there), while cyan reads as a live signal/network lock —
    fitting for a daemon/node/session orchestration surface — and stays
    perceptually distinct from the existing green/red/amber status trio.
    Dark is the primary, default register; light is a derived secondary
-   theme (not covered by DESIGN.md, which is dark-only) that deepens the
+   theme (the Linear reference is dark-only) that deepens the
    same cyan into a dark teal for AA contrast on a white canvas. Status
    hues (green/red/amber) remain the only other chroma in the system —
    dots, borders, and text, never fills or actions. One crisp grotesk
@@ -48,14 +48,14 @@
 
 :root {
   /* ----- Color primitives — dark register (default) -------------- */
-  /* Linear's near-black canvas (DESIGN.md) + a Signal Cyan accent (a
-     deliberate departure from DESIGN.md's literal lavender — see the
+  /* Linear's near-black canvas + a Signal Cyan accent (a
+     deliberate departure from Linear's literal lavender — see the
      Accent block below). Dark is the primary experience;
      html[data-theme="light"] below supplies a derived secondary theme. */
 
   /* Accent — Signal Cyan is the single chromatic action color: brand
      mark, primary CTA, focus ring, link emphasis. Deliberately NOT
-     DESIGN.md's literal lavender-blue — an electric telemetry cyan
+     Linear's literal lavender-blue — an electric telemetry cyan
      reads as a live signal/network lock (fits "daemon", "node",
      "session" vocabulary) and avoids converging on the lavender-on-dark
      accent nearly every dev-tool SaaS (Linear, Raycast, Warp) now
@@ -109,10 +109,10 @@
 
   /* Status hues — the only other chroma in the system besides the
      Signal Cyan accent. Text, dots, and borders only; never background
-     fills, never actions. Success matches DESIGN.md's semantic-success
-     directly; red/amber/slate are undocumented by the (dark-only)
-     marketing spec, so they carry forward this app's dark-tuned values. */
-  --color-green: #27a644;    /* success — DESIGN.md semantic-success */
+     fills, never actions. Success matches Linear's semantic-success
+     directly; red/amber/slate have no Linear (dark-only)
+     equivalent, so they carry forward this app's dark-tuned values. */
+  --color-green: #27a644;    /* success — Linear semantic-success */
   --color-red: #f87171;      /* danger */
   --color-yellow: #fbbf24;   /* warning (dot-only contrast) */
   --color-slate: #9a9aa3;    /* info — neutral, decoupled from the accent */
@@ -125,7 +125,7 @@
   --color-black: #000000;
 
   /* Shadow tints — near-black drop-shadow bases and the modal scrim
-     base. DESIGN.md's overlay scrim is pure black. */
+     base. Linear's overlay scrim is pure black. */
   --color-shadow-ink: #000000;
   --color-shadow-ink-ring: #23252a;
   --color-scrim-base: #000000;
@@ -225,7 +225,7 @@
   --leading-normal: 1.5;
   --leading-loose: 1.65;
 
-  /* Tracking scale — one token per intent, not per pixel. DESIGN.md
+  /* Tracking scale — one token per intent, not per pixel. Linear
      pulls display tracking aggressively negative (-3.0px at 80px ≈ 4%
      of size); at this app's chat-chrome display sizes (22–34px) that
      ratio lands around -0.02em to -0.03em. Body stays neutral. */
@@ -241,8 +241,8 @@
 
   /* Font stacks — Geist (a crisp, precision-drawn grotesk) carries every
      text role: display, chrome, and body alike, standing in for
-     DESIGN.md's proprietary Linear Display/Text (Inter/Geist Sans are
-     its own documented free substitutes). Weight and tracking do the
+     the proprietary Linear Display/Text families (Inter/Geist Sans are
+     Linear's own documented free substitutes). Weight and tracking do the
      differentiating, never a family switch. Geist Mono is reserved
      for code-like content. --font-number aliases the same family so
      metric numerals read as part of the same voice, not mono. */
@@ -267,8 +267,8 @@
   --duration-editorial: 480ms;
 }
 
-/* Light register — a derived secondary theme. DESIGN.md documents only
-   a dark canvas ("don't ship a light-mode marketing page"), so this
+/* Light register — a derived secondary theme. The Linear reference is
+   dark-only ("don't ship a light-mode marketing page"), so this
    block extrapolates a lifted counterpart: the same Signal Cyan family
    (deepened into a dark teal for AA contrast on white) on Linear's
    inverse surface family, with the zinc ink ramp this app used before
@@ -280,7 +280,7 @@ html[data-theme="light"] {
   /* Cyan itself is too light to carry white text on a white canvas, so
      the light register deepens rest/hover into a dark teal (verified
      5.6:1+ white-text contrast) rather than reusing the dark theme's
-     bright cyan directly — mirrors DESIGN.md's own light/dark accent
+     bright cyan directly — mirrors Linear's own light/dark accent
      split, just applied to teal instead of lavender. Disabled fades to
      a mid gray-teal (not pale) so the white on-accent text stays legible. */
   --color-accent: #0c7566;
