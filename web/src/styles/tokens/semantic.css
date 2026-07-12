@@ -1,8 +1,8 @@
 /* =====================================================================
-   Tier 2 — Semantic. Signal Cyan direction (see tokens/primitives.css
-   for the full rationale): dark near-black canvas by default, an
-   electric telemetry cyan as the single chromatic action color —
-   deliberately not Linear's literal lavender-blue.
+   Tier 2 — Semantic. Graphite Steel direction (see tokens/primitives.css
+   for the full rationale): dark cool charcoal canvas by default, a
+   restrained steel-blue as the single chromatic action color —
+   calmer than Signal Cyan, distinct from lavender-on-dark SaaS.
 
    Role-based aliases that consume primitives.css and give every value an
    intent-bearing name: --color-semantic-* for color roles, --type-* for
@@ -19,7 +19,7 @@
    ===================================================================== */
 
 :root {
-  /* Action — Signal Cyan (#22d9c0 dark / #0c7566 light) is the single
+  /* Action — Graphite Steel (#5b87d6 dark / #2f5fad light) is the single
      chromatic action color: brand mark, primary CTA, focus ring, link
      emphasis. Status narrows to green/amber/red and remains the only
      other chroma in the system — never used as an action fill. */

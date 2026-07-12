@@ -243,3 +243,30 @@ Second pass focused on cascade bugs and hierarchy quieting.
 - **Solid sticky chrome** — backlog lane/list heads, workspace pane heads, and message turn actions drop frosted blur mixes for solid canvas/raised fills.
 
 **Verify:** backlog filters + board/list toggle, admin People/Fleet tabs, agents roster/detail split, composer send/mode, sticky lane headers while scrolling.
+
+## Graphite Steel identity pass (2026-07-12)
+
+Reskin from Signal Cyan to **Graphite Steel** — cool charcoal surfaces + restrained steel-blue action — for a calmer, more professional read. Palette-only: four-tier token architecture and component CSS stay intact; hex changes live in Tier 1 plus synced consumers.
+
+**Locked ramps:**
+
+| Role | Dark | Light |
+|------|------|-------|
+| Canvas | `#0b0d10` | `#f7f8fa` |
+| Soft / strong / raised | `#14171c` / `#1a1e25` / `#1f242c` | `#ffffff` / `#eef0f3` / `#ffffff` |
+| Hairline 300 / 200 | `#262b33` / `#1a1e25` | `#e2e5ea` / `#eef0f3` |
+| Ink 900 / 700 / 500 | `#f3f5f7` / `#c5ccd6` / `#8b93a0` | `#12141a` / `#3f4550` / `#6b7280` |
+| Action / active / disabled | `#5b87d6` / `#7aa0e0` / `#6a7a94` | `#2f5fad` / `#274f91` / `#7a8aa3` |
+| Accent tint | `#152033` | `#dce6f5` |
+| On-action | `#0a1220` | `#ffffff` |
+
+**Shipped:**
+
+- **Primitives** — `tokens/primitives.css` dark + light registers rewritten; headers renamed Signal Cyan → Graphite Steel.
+- **Synced hex** — `appStorage.ts` / `layout.tsx` theme-color, preferences swatches, login `--lg-*` (renamed `--lg-steel*`), `appStorage` tests.
+- **Docs** — `docs/design-system.md` frontmatter + narrative; this review entry.
+
+**Out of scope:** leftover clarity-pass surface cleanup (muted kickers, sidenav plates, mobile blur).
+
+**Verify:** login CTA, preferences theme picker, chat shell, backlog, admin dashboard — light/dark, 1440 / 390. `npm run lint:css -w web`, `make web-test`.
+
