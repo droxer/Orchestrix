@@ -210,15 +210,7 @@
 }
 
 .workspace-pane-preview::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  opacity: 0.5;
-  background:
-    radial-gradient(circle at 18% 22%, color-mix(in srgb, var(--workspace-accent) 10%, transparent) 0%, transparent 42%),
-    radial-gradient(circle at 82% 78%, color-mix(in srgb, var(--color-semantic-ink) 5%, transparent) 0%, transparent 38%);
+  content: none;
 }
 
 .workspace-pane-preview > * {

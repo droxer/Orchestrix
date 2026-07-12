@@ -157,7 +157,7 @@
   flex-shrink: 0;
 }
 
-.mode-chip:hover .mode-chip-icon { transform: rotate(-4deg); }
+.mode-chip:hover .mode-chip-icon { transform: none; }
 
 @keyframes mode-chip-icon-in {
   from { opacity: 0; }
@@ -218,16 +218,9 @@
   box-shadow: var(--ring-focus), var(--shadow-lift);
 }
 
-/* Running state — a slow breathing glow instead of a static border, so the
-   floating card visibly "thinks" while an agent turn is in flight. */
+/* Running state — a quiet action hairline; no breathing glow. */
 .composer-input-wrap[data-running] {
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-semantic-action) 30%, transparent), var(--shadow-lift);
-  animation: composer-running-glow 2.4s var(--ease-standard) infinite;
-}
-
-@keyframes composer-running-glow {
-  0%, 100% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-semantic-action) 22%, transparent), var(--shadow-lift); }
-  50% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-semantic-action) 46%, transparent), 0 0 20px color-mix(in srgb, var(--color-semantic-action) 16%, transparent), var(--shadow-lift); }
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-semantic-action) 36%, transparent), var(--shadow-lift);
 }
 
 @media (prefers-reduced-motion: reduce) {

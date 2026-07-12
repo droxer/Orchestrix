@@ -156,40 +156,50 @@ body {
 }
 
 /* A themed rail, not a permanently-dark island: the active route is a
-   solid ink plate, not an ambient glow. */
+   solid action plate — no ambient glow. */
 .sidenav-panel {
   align-items: center;
-  padding: 18px 10px 12px;
+  padding: var(--space-base) var(--space-xs) var(--space-sm);
   background: var(--color-semantic-surface-strong);
   border-right: 0;
   color: var(--color-semantic-body);
 }
 
-.sidenav-brand-row { margin-bottom: 18px; }
+.sidenav-brand-row { margin-bottom: var(--space-base); }
 .sidenav-brand { color: var(--color-semantic-ink); }
-.sidenav-brand svg { filter: drop-shadow(0 0 10px color-mix(in srgb, var(--color-semantic-action) 30%, transparent)); }
-.sidenav-brand-word { font: var(--type-display-sm); letter-spacing: -0.01em; }
-.sidenav-btn { width: 46px; height: 46px; border-radius: var(--radius-lg); color: var(--color-semantic-muted); }
+.sidenav-brand-word { font: var(--type-display-sm); letter-spacing: var(--letter-display); }
+.sidenav-btn { width: 44px; height: 44px; border-radius: var(--radius-lg); color: var(--color-semantic-muted); }
 .sidenav-btn:hover { background: var(--color-semantic-surface-raised); border-color: transparent; color: var(--color-semantic-ink); }
 .sidenav-btn.active,
-.sidenav-btn.active:hover { background: var(--color-semantic-action); border-color: transparent; color: var(--color-semantic-on-action); box-shadow: 0 8px 20px color-mix(in srgb, var(--color-semantic-action) 30%, transparent); }
+.sidenav-btn.active:hover {
+  background: var(--color-semantic-action);
+  border-color: transparent;
+  color: var(--color-semantic-on-action);
+  box-shadow: none;
+}
 .sidenav-separator, .sidenav-bottom { border-color: var(--color-semantic-hairline); background-color: var(--color-semantic-hairline); }
 .sidenav-toggle { color: var(--color-semantic-muted); }
-.sidenav-panel[data-expanded="true"] .sidenav-btn { justify-content: flex-start; width: 100%; padding-inline: 14px; gap: 11px; }
-.sidenav-panel[data-expanded="true"] .sidenav-brand { padding-left: 10px; }
+.sidenav-panel[data-expanded="true"] .sidenav-btn { justify-content: flex-start; width: 100%; padding-inline: var(--space-sm); gap: var(--space-sm); }
+.sidenav-panel[data-expanded="true"] .sidenav-brand { padding-left: var(--space-xs); }
 
-.thread-panel { padding-top: 20px; background: color-mix(in srgb, var(--color-semantic-canvas) 86%, var(--color-white)); border-right-color: var(--color-semantic-hairline); }
-.conversation-heading-eyebrow { color: var(--color-semantic-action); font-weight: 600; letter-spacing: 0.12em; }
-.conversation-heading h1 { font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 600; }
-.conversation-header button { border-radius: 50%; background: var(--color-ink-900); color: var(--color-canvas-raised); }
-.conversation-header button:hover { background: var(--color-semantic-action); color: var(--color-canvas-raised); border-color: transparent; transform: rotate(90deg); }
-.conversation-search { margin-inline: 14px; border-radius: var(--radius-md); background: var(--color-canvas-raised); box-shadow: inset 0 0 0 1px var(--color-semantic-hairline); }
-.conversation-list { border-top: 0; gap: 5px; padding: 6px 9px 16px; }
+.thread-panel { padding-top: var(--space-base); background: var(--color-semantic-canvas); border-right-color: var(--color-semantic-hairline); }
+.conversation-heading-eyebrow { color: var(--color-semantic-action); font-weight: 600; letter-spacing: var(--letter-eyebrow); }
+.conversation-heading h1 { font-family: var(--font-display); font-size: var(--text-xl); font-weight: 600; }
+.conversation-list { border-top: 0; gap: 2px; padding: var(--space-xxs) var(--space-xs) var(--space-base); }
 .conversation-row { border: 0; border-radius: var(--radius-md); overflow: hidden; }
-.conversation-row-inner { min-height: 70px; padding-inline: 12px; border-radius: inherit; }
+.conversation-row-inner { min-height: 64px; padding-inline: var(--space-sm); border-radius: inherit; }
 .conversation-row:hover { background: var(--color-semantic-surface-raised); }
 .conversation-row.active { background: var(--color-semantic-action-soft); }
-.conversation-row.active::after { content: ""; position: absolute; left: 0; top: 16px; bottom: 16px; width: 3px; border-radius: calc(var(--radius-xs) / 2); background: var(--color-semantic-action); }
+.conversation-row.active::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 2px;
+  border-radius: calc(var(--radius-xs) / 2);
+  background: var(--color-semantic-action);
+}
 
 .chat-panel { background: transparent; }
 
@@ -197,36 +207,27 @@ body {
 .transcript-inner { width: min(100%, 960px); padding: var(--space-xl) var(--space-lg) var(--space-xxl); gap: var(--space-md); }
 .transcript-inner:not(:has(.transcript-empty)) { background: none; }
 .transcript-inner:not(:has(.transcript-empty))::before { left: calc(var(--space-lg) + 9px); opacity: 0.35; background: var(--color-semantic-hairline); }
-.transcript-inner:has(.transcript-empty) { margin: var(--space-lg) auto; min-height: calc(100% - var(--space-xl)); border: 1px solid var(--color-semantic-hairline); border-radius: var(--radius-xl); background: var(--color-semantic-surface-raised); }
+.transcript-inner:has(.transcript-empty) {
+  margin: 0 auto;
+  min-height: 100%;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
 .transcript-phase-node { background: var(--color-semantic-action); box-shadow: 0 0 0 4px var(--color-semantic-canvas); }
 .rail-node { border-color: var(--color-ink-200); border-radius: 50%; background: var(--color-canvas-raised); box-shadow: 0 0 0 4px var(--color-semantic-canvas); }
 .rail-node-user { width: 16px; height: 16px; background: var(--color-semantic-action); border-color: var(--color-semantic-action); }
 .msg header > span:first-child { font-family: var(--font-display); font-size: var(--text-md); font-weight: 600; }
 .msg-time { color: var(--color-semantic-muted-soft); }
 
-.relay-empty { max-width: 520px; padding: 56px 34px; }
-.relay-empty-title { font-family: var(--font-display); font-size: clamp(30px, 4vw, 46px); font-weight: 500; line-height: 1.04; letter-spacing: -0.042em; }
-.relay-empty-body { max-width: 36ch; font-size: var(--text-md); }
-.relay-empty-hint { color: var(--color-semantic-action); font-weight: 600; }
-.relay-bleed-mark { color: color-mix(in srgb, var(--color-semantic-action) 7%, transparent); font-family: var(--font-display); }
-.atelier-orbit { position: relative; display: grid; place-items: center; width: 120px; height: 120px; border: 1px solid color-mix(in srgb, var(--color-semantic-action) 26%, transparent); border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--color-semantic-action) 16%, transparent), transparent 64%); animation: atelier-breathe 5s ease-in-out infinite; }
-.atelier-orbit::before, .atelier-orbit::after { content: ""; position: absolute; border: 1px solid color-mix(in srgb, var(--color-slate) 20%, transparent); border-radius: 50%; }
-.atelier-orbit::before { inset: 12px -17px; }
-.atelier-orbit::after { inset: -17px 12px; }
-.atelier-orbit-dot { position: absolute; width: 9px; height: 9px; border-radius: 50%; background: var(--color-semantic-action); box-shadow: 0 0 0 5px color-mix(in srgb, var(--color-semantic-action) 10%, transparent); }
-.atelier-orbit-dot--one { top: 9px; right: 22px; }
-.atelier-orbit-dot--two { bottom: 11px; left: 17px; width: 7px; height: 7px; background: var(--color-slate); box-shadow: 0 0 0 5px color-mix(in srgb, var(--color-slate) 10%, transparent); }
-.atelier-orbit .relay-empty-avatar { width: 62px; height: 62px; border-radius: 50%; background: var(--color-ink-900); color: var(--color-canvas-raised); box-shadow: 0 12px 20px color-mix(in srgb, var(--color-ink-900) 18%, transparent); }
-.atelier-orbit .relay-empty-avatar::after { display: none; }
-@keyframes atelier-breathe { 50% { transform: scale(1.035) rotate(4deg); } }
+/* Empty states keep the base type roles — no oversized display override. */
+.relay-empty { max-width: 440px; padding: var(--space-xxl) var(--space-xl); }
+.relay-empty-hint { color: var(--color-semantic-muted); font-weight: 500; }
 
-/* Dark theme — token-level dark values (canvas, surfaces, ink, action,
-   hairlines) live once in tokens/primitives.css; this block only adds the
-   structural rules specific to this file's components. */
+/* Dark theme — token-level dark values live in tokens/primitives.css;
+   this block only adds structural rules for this file's components. */
 html[data-theme="dark"] .thread-panel { background: var(--color-semantic-surface-soft); }
-html[data-theme="dark"] .conversation-search,
-html[data-theme="dark"] .conversation-row:hover,
-html[data-theme="dark"] .transcript-inner:has(.transcript-empty) { background: var(--color-semantic-surface-raised); }
+html[data-theme="dark"] .conversation-row:hover { background: var(--color-semantic-surface-raised); }
 html[data-theme="dark"] .conversation-row.active { background: var(--color-semantic-action-soft); }
 html[data-theme="dark"] .header-agent-tabs { background: var(--color-semantic-surface-soft); }
 html[data-theme="dark"] .chat-header,
@@ -234,17 +235,11 @@ html[data-theme="dark"] .page-header {
   --surface-header-bg: var(--color-semantic-canvas);
 }
 html[data-theme="dark"] .rail-node { background: var(--color-semantic-surface-raised); }
-html[data-theme="dark"] .atelier-orbit .relay-empty-avatar { background: var(--color-semantic-action); color: var(--color-semantic-on-action); }
 
 @media (max-width: 820px) {
-  .chat-header { padding-inline: 16px; }
-  .chat-header::after { right: 16px; left: 16px; }
-  .transcript-inner { padding: 24px 18px 34px; }
-  .transcript-inner:has(.transcript-empty) { margin: 10px auto; border-radius: calc((var(--radius-lg) + var(--radius-xl)) / 2); }
-  .atelier-orbit { transform: scale(.82); }
+  .chat-header { padding-inline: var(--space-base); }
+  .transcript-inner { padding: var(--space-lg) var(--space-base) var(--space-xl); }
 }
-
-@media (prefers-reduced-motion: reduce) { .atelier-orbit { animation: none; } }
 
 /* ── Work routes — paper cards + neutral segments ───────────── */
 
@@ -260,9 +255,10 @@ html[data-theme="dark"] .atelier-orbit .relay-empty-avatar { background: var(--c
 .backlog-stats,
 .workspace-metric-strip,
 .adm-pulse {
-  border: 1px solid var(--color-semantic-hairline);
-  border-radius: var(--radius-lg);
-  background: var(--color-semantic-surface-raised);
+  border: 0;
+  border-bottom: 1px solid var(--color-semantic-hairline);
+  border-radius: 0;
+  background: var(--color-semantic-canvas);
   box-shadow: none;
 }
 
@@ -379,11 +375,11 @@ html[data-theme="dark"] .atelier-orbit .relay-empty-avatar { background: var(--c
 .login-wordmark {
   font-family: var(--font-display);
   font-weight: 500;
-  letter-spacing: -0.045em;
+  letter-spacing: var(--letter-display);
 }
 
 .login-input { border-radius: var(--radius-md); }
-.login-submit { border-radius: var(--radius-full); background: var(--color-semantic-action); }
+.login-submit { border-radius: var(--radius-md); background: var(--color-semantic-action); }
 
 /* Mobile — same header grammar, no extra chrome */
 @media (max-width: 820px) {
@@ -415,9 +411,6 @@ html[data-theme="dark"] .atelier-orbit .relay-empty-avatar { background: var(--c
   letter-spacing: var(--letter-tight);
 }
 
-html[data-theme="dark"] .backlog-stats,
-html[data-theme="dark"] .workspace-metric-strip,
-html[data-theme="dark"] .adm-pulse,
 html[data-theme="dark"] .backlog-lane,
 html[data-theme="dark"] .backlog-task,
 html[data-theme="dark"] .agents-detail,

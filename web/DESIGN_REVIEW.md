@@ -216,3 +216,16 @@ Audit of every overlay surface at ≤820px — drawers, modals, sheets, and comp
 | **Artifact library drawer** | Inherits drawer takeover + existing vertical index stack |
 
 **Verify manually:** open task drawer, preferences, rename confirm dialog, @mention popover, admin attention sheet, artifact drawer at 390px with keyboard up.
+
+## Clarity pass (2026-07-12)
+
+Whole-frontend visual cleanup toward the design system's hairline-first restraint: less glow, less decoration, clearer hierarchy. No layout or product-flow changes.
+
+**Shipped:**
+
+- **Empty states** — removed animated `atelier-orbit` rings/dots; transcript empty uses a plain agent avatar. Dropped bled "R" watermarks from transcript, agents, and admin KPI band (login keeps its signature moment).
+- **Chrome noise** — removed sidenav brand glow, active-nav drop shadow, conversation "new" rotate/ink-plate override, empty-avatar radial halo, chat artifact-count soft shadow, composer running glow pulse, mode-chip icon tilt, login lane glow, workspace preview radial wash.
+- **Surfaces** — backlog/admin/workspace metric strips stay flush (border-bottom only, not nested cards). Backlog page drops gradient wash + lane grid wallpaper. Admin KPI band drops the decorative `::after` grid overlay (tile borders already divide). Transcript empty no longer sits in a bordered paper card.
+- **Geometry** — login submit returns to `--radius-md` (pill retired per design system). Empty-state titles keep base `--type-title-md` instead of oversized display clamp.
+
+**Verify:** chat empty + thread list, backlog list/board, agents roster, admin dashboard KPIs, login CTA, composer while an agent is running — light/dark, 1440 / 390.

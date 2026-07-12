@@ -109,21 +109,6 @@ html[data-theme="dark"] .relay-bleed-mark {
   color: var(--color-semantic-ink);
 }
 
-/* Monochrome halo — depth without agent brand hues. */
-.relay-empty-avatar::after {
-  content: "";
-  position: absolute;
-  inset: -10px;
-  z-index: -1;
-  pointer-events: none;
-  border-radius: calc(var(--radius-md) + 6px);
-  background: radial-gradient(
-    circle at 50% 45%,
-    color-mix(in srgb, var(--color-semantic-ink) 7%, transparent),
-    transparent 68%
-  );
-}
-
 .relay-empty-avatar > svg {
   display: block;
 }

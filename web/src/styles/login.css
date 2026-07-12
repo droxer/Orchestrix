@@ -98,7 +98,6 @@
   height: 3px;
   border-radius: var(--radius-full);
   background: linear-gradient(to right, transparent, var(--lg-teal));
-  box-shadow: 0 0 12px color-mix(in srgb, var(--lg-teal) 55%, transparent);
   opacity: 0;
   animation: login-lane-travel calc(7s + var(--lane-index) * 1.4s) linear infinite;
   animation-delay: calc(var(--lane-index) * -2.6s);

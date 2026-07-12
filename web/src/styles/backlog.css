@@ -14,25 +14,7 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  /* Default (list) surface: just the soft top wash. The vertical lane grid is
-     board-only — behind list rows it aligns to nothing and reads as noise. */
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--color-semantic-surface-soft) 55%, transparent), transparent 180px),
-    var(--color-semantic-canvas);
-}
-
-/* Board view repaints the lane grid so the kanban columns sit on their rails. */
-.backlog-page[data-view="board"] {
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--color-semantic-surface-soft) 55%, transparent), transparent 180px),
-    repeating-linear-gradient(
-      90deg,
-      transparent,
-      transparent calc(var(--backlog-lane-w) - 1px),
-      color-mix(in srgb, var(--color-semantic-hairline-soft) 65%, transparent) calc(var(--backlog-lane-w) - 1px),
-      color-mix(in srgb, var(--color-semantic-hairline-soft) 65%, transparent) var(--backlog-lane-w)
-    ),
-    var(--color-semantic-canvas);
+  background: var(--color-semantic-canvas);
 }
 
 /* ── KPI strip ─────────────────────────────────────────────────────── */

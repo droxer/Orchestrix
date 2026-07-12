@@ -33,14 +33,9 @@ export function TranscriptEmpty({
       title={headline}
       body={body}
       hint={selectedEmployee ? t("transcript.hint_mention") : undefined}
-      mark
       illustration={(
-        <span className="atelier-orbit" aria-hidden="true">
-          <i className="atelier-orbit-dot atelier-orbit-dot--one" />
-          <i className="atelier-orbit-dot atelier-orbit-dot--two" />
-          <span className="relay-empty-avatar agent-avatar" data-agent={activeAgent}>
-            <AgentMark agent={activeAgent} size={28} />
-          </span>
+        <span className="relay-empty-avatar agent-avatar" data-agent={activeAgent} aria-hidden="true">
+          <AgentMark agent={activeAgent} size={28} />
         </span>
       )}
     />
