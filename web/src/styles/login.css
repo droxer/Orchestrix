@@ -10,37 +10,40 @@
 
    Color is pinned via local --lg-* variables whose values are lifted
    verbatim from the dark (default) ramp in tokens/primitives.css
-   (near-black canvas, Signal Cyan action, amber attention). Spacing,
+   (cool charcoal canvas, Graphite Steel action, amber attention). Spacing,
    type scale, and radii are theme-independent tokens and are used
    directly. Documented stylelint exception — see web/.stylelintrc.json.
 
-   Bootstrap mode (data-mode="bootstrap") swings the accent from cyan
+   Bootstrap mode (data-mode="bootstrap") swings the accent from steel
    to amber: the plane is awaiting credentials, not ready.
    ===================================================================== */
 
 .login-screen {
   /* Pinned dark ramp — mirrors the default (dark) register in tokens/primitives.css. */
-  --lg-canvas: #010102;
-  --lg-elevated: #18191a;
-  --lg-ink: #f7f8f8;
-  --lg-body: #d0d6e0;
-  --lg-muted: #8a8f98;
-  --lg-hairline: color-mix(in srgb, #f7f8f8 14%, #010102);
-  --lg-hairline-soft: color-mix(in srgb, #f7f8f8 8%, #010102);
-  --lg-teal: #22d9c0;
-  --lg-teal-active: #5eefda;
-  --lg-on-teal: #04120f; /* text-on-accent (dark ink on the bright cyan fill) */
+  --lg-canvas: #0b0d10;
+  --lg-elevated: #1f242c;
+  --lg-ink: #f3f5f7;
+  --lg-body: #c5ccd6;
+  --lg-muted: #8b93a0;
+  --lg-hairline: color-mix(in srgb, #f3f5f7 14%, #0b0d10);
+  --lg-hairline-soft: color-mix(in srgb, #f3f5f7 8%, #0b0d10);
+  --lg-steel: #5b87d6;
+  --lg-steel-active: #7aa0e0;
+  --lg-on-steel: #0a1220; /* text-on-accent (dark ink on the steel fill) */
   --lg-up: #34d399;
   --lg-amber: #fbbf24;
   --lg-down: #f87171;
-  /* Mode accent — cyan while attaching, amber during first-run setup. */
-  --lg-accent: var(--lg-teal);
+  /* Mode accent — steel while attaching, amber during first-run setup. */
+  --lg-accent: var(--lg-steel);
+  /* Pin semantic action to the pre-auth dark steel so RelayMark's lead
+     chevron stays Graphite Steel even when the operator's saved theme is light. */
+  --color-semantic-action: var(--lg-steel);
 
   position: relative;
   display: flex;
   min-height: 100vh;
   background:
-    radial-gradient(120% 90% at 12% 0%, color-mix(in srgb, var(--lg-teal) 7%, transparent), transparent 55%),
+    radial-gradient(120% 90% at 12% 0%, color-mix(in srgb, var(--lg-steel) 7%, transparent), transparent 55%),
     linear-gradient(to right, var(--lg-hairline-soft) 1px, transparent 1px) 0 0 / 56px 56px,
     linear-gradient(to bottom, var(--lg-hairline-soft) 1px, transparent 1px) 0 0 / 56px 56px,
     var(--lg-canvas);
@@ -97,7 +100,7 @@
   width: 72px;
   height: 3px;
   border-radius: var(--radius-full);
-  background: linear-gradient(to right, transparent, var(--lg-teal));
+  background: linear-gradient(to right, transparent, var(--lg-steel));
   opacity: 0;
   animation: login-lane-travel calc(7s + var(--lane-index) * 1.4s) linear infinite;
   animation-delay: calc(var(--lane-index) * -2.6s);
@@ -359,19 +362,19 @@
   border: none;
   border-radius: var(--radius-sm);
   background: var(--lg-accent);
-  color: var(--lg-on-teal);
+  color: var(--lg-on-steel);
   font: var(--type-button);
   cursor: pointer;
   transition: background var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
 }
 
 .login-screen[data-mode="bootstrap"] .login-submit {
-  /* Amber fill needs dark ink, same as the teal's sea-ink — keep it. */
+  /* Amber fill needs dark ink, same as the steel on-action — keep it. */
   color: #2b1c02;
 }
 
 .login-submit:hover:not(:disabled) {
-  background: var(--lg-teal-active);
+  background: var(--lg-steel-active);
 }
 
 .login-screen[data-mode="bootstrap"] .login-submit:hover:not(:disabled) {
@@ -383,12 +386,12 @@
 }
 
 .login-submit:disabled {
-  /* Label uses --lg-muted (neutral gray, not a lg-on-teal/lg-accent blend):
-     on-teal is dark ink for the bright cyan rest state, so blending it
+  /* Label uses --lg-muted (neutral gray, not a lg-on-steel/lg-accent blend):
+     on-steel is dark ink for the steel rest state, so blending it
      toward the accent here collapsed text and background to the same
      dark hue and made the label unreadable. A neutral muted gray stays
-     legible against the dark teal fill regardless of which direction
-     on-teal points in a given accent scheme. */
+     legible against the darkened steel fill regardless of which direction
+     on-steel points in a given accent scheme. */
   background: color-mix(in srgb, var(--lg-accent) 40%, var(--lg-canvas));
   color: var(--lg-muted);
   cursor: default;
@@ -438,11 +441,11 @@
 .login-switch::after { content: " ]"; color: var(--lg-muted); }
 
 .login-switch:hover {
-  color: var(--lg-teal-active);
+  color: var(--lg-steel-active);
 }
 
 .login-switch:focus-visible {
-  outline: 2px solid var(--lg-teal);
+  outline: 2px solid var(--lg-steel);
   outline-offset: 2px;
 }
 
@@ -479,9 +482,8 @@
 .login-checking-text::after {
   content: "▌";
   margin-left: var(--space-xxs);
-  /* Same pre-mount scope constraint as .login-checking above — the
-     dark-canvas white accent, matching --color-semantic-action's dark-mode value. */
-  color: #fafafa;
+  /* Pre-mount caret on the pinned dark canvas — matches --lg-ink. */
+  color: #f3f5f7;
 }
 
 /* ---------- Motion --------------------------------------------------- */

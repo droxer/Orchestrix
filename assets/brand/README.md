@@ -1,8 +1,8 @@
 # Relay Brand Assets
 
 This folder contains the current Relay product logo assets. The source SVGs use
-the same mark: a custom monoline `R` whose ink loop reads as the stable control
-plane and whose Relay-blue diagonal reads as the execution relay.
+the same mark: dual chevrons — the lead stroke carries **Graphite Steel** (the
+action accent) and the trailing stroke reads as stable ink on the control plane.
 
 ## Files
 
@@ -13,19 +13,24 @@ plane and whose Relay-blue diagonal reads as the execution relay.
 - `relay-logo-concept.png`: early generated concept reference. Do not embed it
   in product surfaces; the SVG files are the source of truth.
 
-## Colors
+## Colors (Graphite Steel)
 
-- Ink: `#18232d`
-- Relay blue: `#0052ff`
-- Surface: `#f7f6f1`
+| Role | Light | Dark |
+|------|-------|------|
+| Ink | `#12141a` | `#f3f5f7` |
+| Action (steel) | `#2f5fad` | `#5b87d6` |
+| On-action | `#ffffff` | `#0a1220` |
+| Canvas | `#f7f8fa` | `#0b0d10` |
 
-The SVG files define these as CSS variables:
+The logo SVG defines theme-aware CSS variables:
 
 ```css
---relay-ink: #18232d;
---relay-accent: #0052ff;
---relay-surface: #f7f6f1;
+--relay-ink: #12141a;      /* dark: #f3f5f7 */
+--relay-accent: #2f5fad;   /* dark: #5b87d6 */
 ```
+
+`relay-mark.svg` uses the dark action fill (`#5b87d6`) with on-action strokes
+(`#0a1220`) so the icon reads clearly at favicon sizes.
 
 Use `relay-logo.svg` when the wordmark has enough horizontal room. Use
 `relay-mark.svg` when the logo must survive at small sizes or when nearby text
@@ -39,23 +44,20 @@ already says Relay.
 
 ### Geometry
 
-- Control-plane loop: rounded 5-unit ink stroke, `M18 50 V14 H44 C56 14 64 21
-  64 31 C64 41 56 47 44 47 H18`.
-- Execution relay: rounded 5-unit Relay-blue diagonal from `M44 47` to
-  `L70 56`.
+- Lead chevron (action): `M12 14 L32 32 L12 50` — Graphite Steel stroke.
+- Trailing chevron (ink): `M32 14 L52 32 L32 50` at ~45–55% opacity — control-plane echo.
 
 ### Colors
 
-The mark uses two colors only:
+The lockup uses two roles only:
 
-- Ink `#18232d` — control-plane loop and wordmark.
-- Relay Blue `#0052ff` — execution relay.
+- Action (steel) — lead chevron (`#5b87d6` dark / `#2f5fad` light).
+- Ink — trailing chevron and wordmark (`#f3f5f7` dark / `#12141a` light).
 
-On dark surfaces, every element currently rendered in ink swaps to `#ffffff`.
-Relay Blue is unchanged. The standalone SVGs include a
-`prefers-color-scheme: dark` rule for browser/README rendering; the React
-`RelayMark` uses `currentColor` for the ink stroke, so product surfaces can set
-the surrounding `color` token to `--color-ink` or `--color-on-dark`.
+Standalone SVGs include a `prefers-color-scheme: dark` rule for
+browser/README rendering. The React `RelayMark` paints the lead chevron with
+`var(--color-semantic-action)` and the trailing chevron with `currentColor`, so
+product chrome can keep surrounding text on the ink token.
 
 ### Clear space
 

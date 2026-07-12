@@ -1,32 +1,32 @@
 ---
 version: alpha
-name: Relay-Signal-Cyan
-description: A Signal Cyan design system (the Linear school, dark-first) for an agent-orchestration control plane. A near-black canvas (#010102) with a charcoal surface ladder carries the chrome; an electric telemetry cyan (#22d9c0) is the single chromatic ACTION color — brand mark, primary CTA, focus ring, link emphasis — pairing with near-black on-action text because the rest state is bright. Light is a derived secondary theme that deepens the accent into a dark teal (#0c7566, white on-action text). Hue is otherwise reserved for status alone — success, danger, and warning (green / amber / red) as dots, borders, and text, never fills or actions — and "info" is a neutral slate. One crisp grotesk (Geist) carries every text role — display, chrome, and body alike — with weight and tight display tracking doing the differentiating; Geist Mono is reserved for code. Base UI text is 13px. Geometry is tight: 5px on buttons and badges, 6px on inputs, 8–10px on cards; the pill is retired (aliases sm). Depth comes from hairline borders, not shadows. Motion is fast with no overshoot. The result reads as serious infrastructure software — a dense, calm control plane for AI agents.
+name: Relay-Graphite-Steel
+description: A Graphite Steel design system (the Linear school, dark-first) for an agent-orchestration control plane. A cool charcoal canvas (#0b0d10) with a cool surface ladder carries the chrome; a restrained steel-blue (#5b87d6) is the single chromatic ACTION color — brand mark, primary CTA, focus ring, link emphasis — pairing with near-black on-action text because the rest state is mid-bright. Light is a derived secondary theme that deepens the accent into #2f5fad (white on-action text) on cool gray-white (#f7f8fa). Hue is otherwise reserved for status alone — success, danger, and warning (green / amber / red) as dots, borders, and text, never fills or actions — and "info" is a neutral slate. One crisp grotesk (Geist) carries every text role — display, chrome, and body alike — with weight and tight display tracking doing the differentiating; Geist Mono is reserved for code. Base UI text is 13px. Geometry is tight: 5px on buttons and badges, 6px on inputs, 8–10px on cards; the pill is retired (aliases sm). Depth comes from hairline borders, not shadows. Motion is fast with no overshoot. The result reads as serious infrastructure software — a dense, calm control plane for AI agents.
 
 colors:
-  action: "#22d9c0"
-  action-active: "#5eefda"
-  action-disabled: "#5f7a75"
-  action-soft: "#0c211d"
-  ink: "#f7f8f8"
-  body: "#d0d6e0"
-  muted: "#8a8f98"
-  muted-soft: "#62666d"
-  hairline: "#23252a"
-  hairline-soft: "#17181b"
-  canvas: "#010102"
-  surface-soft: "#0f1011"
-  surface-strong: "#141516"
-  surface-raised: "#18191a"
-  surface-dark: "#191a1b"
-  surface-dark-elevated: "#202124"
-  on-action: "#04120f"
-  on-dark: "#f7f8f8"
-  on-dark-soft: "#9a9aa3"
+  action: "#5b87d6"
+  action-active: "#7aa0e0"
+  action-disabled: "#6a7a94"
+  action-soft: "#152033"
+  ink: "#f3f5f7"
+  body: "#c5ccd6"
+  muted: "#8b93a0"
+  muted-soft: "#636b78"
+  hairline: "#262b33"
+  hairline-soft: "#1a1e25"
+  canvas: "#0b0d10"
+  surface-soft: "#14171c"
+  surface-strong: "#1a1e25"
+  surface-raised: "#1f242c"
+  surface-dark: "#171a20"
+  surface-dark-elevated: "#22272f"
+  on-action: "#0a1220"
+  on-dark: "#f3f5f7"
+  on-dark-soft: "#9aa1ab"
   success: "#27a644"
   danger: "#f87171"
   warning: "#fbbf24"
-  info: "#9a9aa3"
+  info: "#9aa1ab"
 
 typography:
   display-lg:
@@ -267,7 +267,7 @@ components:
     size: 8px
 ---
 
-# Relay Design — Signal Cyan
+# Relay Design — Graphite Steel
 
 <p align="center">
   <img src="../assets/brand/relay-logo.svg" alt="Relay logo" width="360">
@@ -275,19 +275,18 @@ components:
 
 ## Overview
 
-Relay's visual language is **Signal Cyan** — the Linear school of
-infrastructure software, dark-first. A near-black canvas, a charcoal
+Relay's visual language is **Graphite Steel** — the Linear school of
+infrastructure software, dark-first. A cool charcoal canvas, a cool
 surface ladder, razor hairlines, tight geometry, and extreme restraint.
-There is exactly one brand hue: an **electric telemetry cyan** that reads
-as a live signal/network lock — fitting for a daemon/node/session
-orchestration surface — and every other unit of chroma in the interface is
-a unit of information.
+There is exactly one brand hue: a **restrained steel-blue** that reads
+as enterprise calm — quieter than Signal Cyan's neon telemetry flash —
+and every other unit of chroma in the interface is a unit of information.
 
-**Signal Cyan** (`{colors.action}` — #22d9c0) is the single chromatic
+**Graphite Steel** (`{colors.action}` — #5b87d6) is the single chromatic
 **action** color: brand mark, primary CTA, focus ring, link emphasis. The
-rest state is bright, so on-action text is near-black
-(`{colors.on-action}` — #04120f). On the derived light theme the accent
-deepens into a dark teal (#0c7566) that carries white on-action text.
+rest state is mid-bright, so on-action text is near-black
+(`{colors.on-action}` — #0a1220). On the derived light theme the accent
+deepens into #2f5fad that carries white on-action text.
 Hairlines carry structure instead of shadows. Beyond the accent, color
 appears *only* as status: green / amber / red as dots, borders, and text —
 never as background fills, never as actions.
@@ -305,9 +304,9 @@ cards. The 100px pill stays retired (`{rounded.pill}` aliases
 drawers, dialogs, the composer.
 
 **Key characteristics:**
-- Dark-first: the near-black canvas (`{colors.canvas}` #010102) with a charcoal surface ladder is the primary, default register; light is a derived secondary theme (`html[data-theme="light"]`).
-- Signal Cyan action: `{colors.action}` (#22d9c0) carries every primary action — buttons, links, the focus ring, and text selection — and is used *scarcely*: brand mark, primary CTA, focus, link emphasis. Because the fill is bright, on-action text is near-black; the light theme deepens the accent to a dark teal with white text. `{colors.action-soft}` (#0c211d, a dark teal-tinted wash) marks selected/active affordances.
-- Color = accent + status, and nothing else: success/danger/warning (green / amber / red) are carried as text, dots, and borders — never fills. "Info" is a neutral slate (`{colors.info}` #9a9aa3), deliberately decoupled from the accent. Every other hue on screen means something.
+- Dark-first: the cool charcoal canvas (`{colors.canvas}` #0b0d10) with a cool surface ladder is the primary, default register; light is a derived secondary theme (`html[data-theme="light"]`) on cool gray-white (#f7f8fa).
+- Graphite Steel action: `{colors.action}` (#5b87d6) carries every primary action — buttons, links, the focus ring, and text selection — and is used *scarcely*: brand mark, primary CTA, focus, link emphasis. Because the fill is mid-bright, on-action text is near-black; the light theme deepens the accent to #2f5fad with white text. `{colors.action-soft}` (#152033, a dark steel-tinted wash) marks selected/active affordances.
+- Color = accent + status, and nothing else: success/danger/warning (green / amber / red) are carried as text, dots, and borders — never fills. "Info" is a neutral slate (`{colors.info}` #9aa1ab), deliberately decoupled from the accent. Every other hue on screen means something.
 - One sans, every role: Geist carries headlines, chrome, and body alike — weight (never past 600) separates emphasis, not a font-family switch. Geist Mono is reserved for tool/command lines, raw logs, code, and IDs.
 - Tight geometry: `{rounded.sm}` (5px) interactive, `{rounded.xl}` (10px) cards — the precision-tool scale.
 - Hairline depth: 1px `{colors.hairline}` borders over shadows; elevation is restrained.
@@ -365,7 +364,7 @@ themes simultaneously and can't resolve a single `var()`). Run
 
 **Documented, deliberate exceptions to "primitives.css is the only hex
 source":**
-- `login.css` — a local `--lg-*` token block pinning the pre-auth dark ramp, since no user theme preference is loaded yet (retuned to the Signal Cyan dark register along with everything else).
+- `login.css` — a local `--lg-*` token block pinning the pre-auth dark ramp, since no user theme preference is loaded yet (retuned to the Graphite Steel dark register along with everything else).
 - `preferences.css` — theme-swatch previews (`.pref-theme-swatch`).
 - `artifact.css` — the frame-preview background is a literal white document page in every theme.
 - `backlog.css` — the assignee avatar uses a procedurally generated per-identity `hsl(var(--avatar-hue))`, set inline by `TaskAssignee.tsx` from the assignee's name; there is no fixed primitive since the hue itself *is* the value.
@@ -377,36 +376,36 @@ Values below are the **dark register** (`:root`, the default);
 light counterparts are noted inline where the relationship isn't a
 straight lightening.
 
-### Action, selection, and focus (Signal Cyan)
-- **Action** (`{colors.action}` — #22d9c0): the single chromatic action color — brand mark, primary buttons, links, the focus ring, and text selection. Bright at rest, so on-action text is near-black. Light theme deepens it to a dark teal (#0c7566, ~5.6:1 with white text).
-- **Action Active** (`{colors.action-active}` — #5eefda): press/hover lift (light: #095e52).
-- **Action Disabled** (`{colors.action-disabled}` — #5f7a75): desaturated gray-teal — fades sideways, not toward black, so the dark on-action text stays paired (light: #647976 with white text).
-- **Action Soft** (`{colors.action-soft}` — #0c211d): dark teal-tinted selection wash — selected rows, active nav, running-state affordances (light: #d6ece8, a pale teal lift).
+### Action, selection, and focus (Graphite Steel)
+- **Action** (`{colors.action}` — #5b87d6): the single chromatic action color — brand mark, primary buttons, links, the focus ring, and text selection. Mid-bright at rest, so on-action text is near-black. Light theme deepens it to #2f5fad (~4.5:1+ with white text).
+- **Action Active** (`{colors.action-active}` — #7aa0e0): press/hover lift (light: #274f91).
+- **Action Disabled** (`{colors.action-disabled}` — #6a7a94): desaturated steel-gray — fades sideways, not toward black, so the dark on-action text stays paired (light: #7a8aa3 with white text).
+- **Action Soft** (`{colors.action-soft}` — #152033): dark steel-tinted selection wash — selected rows, active nav, running-state affordances (light: #dce6f5, a pale steel lift).
 
 ### Status hues
 - **Success** (`{colors.success}` — #27a644): verdict approved, node ready. Text/dot/border only. (Light: #10b981.)
 - **Danger** (`{colors.danger}` — #f87171): failures, reject, destructive. Text/dot/border only. On the dark canvas the dot value doubles as the text-safe value; the light theme splits them (#ef4444 dot, `--color-semantic-danger-text` #dc2626 at ~4.5:1 on white).
-- **Warning** (`{colors.warning}` — #fbbf24): attention dot only, never an action. Dark text-safe value matches (~7:1 on near-black); light splits to #f59e0b dot / #8a5c00 text (~4.8:1 on white).
-- **Info** (`{colors.info}` — #9a9aa3): a neutral slate — status without alarm, deliberately decoupled from the accent (light: #71717a).
+- **Warning** (`{colors.warning}` — #fbbf24): attention dot only, never an action. Dark text-safe value matches (~7:1 on cool charcoal); light splits to #f59e0b dot / #8a5c00 text (~4.8:1 on cool gray-white).
+- **Info** (`{colors.info}` — #9aa1ab): a neutral slate — status without alarm, deliberately decoupled from the accent (light: #6b7280).
 
-### Surface (charcoal ladder on near-black)
-- **Canvas** (`{colors.canvas}` — #010102): the default page floor — near-pure black with a faint blue tint (light: #ffffff).
-- **Surface Soft** (`{colors.surface-soft}` — #0f1011): one step up — default cards, quotes, code, hover (light: #fafafa).
-- **Surface Strong** (`{colors.surface-strong}` — #141516): fills behind secondary buttons, search, avatars (light: #f0f0f1).
-- **Surface Raised** (`{colors.surface-raised}` — #18191a): modals, drawers, floating chrome, with a hairline or lift shadow as the edge (light: #ffffff).
-- **Surface Dark** (`{colors.surface-dark}` — #191a1b, graphite): the always-dark register for chrome that stays dark even on the light theme (the always-dark diff viewer, ink-fill buttons). Theme-invariant.
+### Surface (cool charcoal ladder)
+- **Canvas** (`{colors.canvas}` — #0b0d10): the default page floor — cool near-black (light: #f7f8fa).
+- **Surface Soft** (`{colors.surface-soft}` — #14171c): one step up — default cards, quotes, code, hover (light: #ffffff).
+- **Surface Strong** (`{colors.surface-strong}` — #1a1e25): fills behind secondary buttons, search, avatars (light: #eef0f3).
+- **Surface Raised** (`{colors.surface-raised}` — #1f242c): modals, drawers, floating chrome, with a hairline or lift shadow as the edge (light: #ffffff).
+- **Surface Dark** (`{colors.surface-dark}` — #171a20, graphite): the always-dark register for chrome that stays dark even on the light theme (the always-dark diff viewer, ink-fill buttons). Theme-invariant.
 
 ### Hairlines
-- **Hairline** (`{colors.hairline}` — #23252a): default 1px divider and card border (light: #e4e4e7).
-- **Hairline Soft** (`{colors.hairline-soft}` — #17181b): lighter divider (light: #f0f0f1).
+- **Hairline** (`{colors.hairline}` — #262b33): default 1px divider and card border (light: #e2e5ea).
+- **Hairline Soft** (`{colors.hairline-soft}` — #1a1e25): lighter divider (light: #eef0f3).
 
 ### Text
-- **Ink** (`{colors.ink}` — #f7f8f8): headings, primary copy, emphasis (light: #131316).
-- **Body** (`{colors.body}` — #d0d6e0): default running text (light: #3f3f46).
-- **Muted** (`{colors.muted}` — #8a8f98): sub-titles, secondary labels (light: #71717a).
-- **Muted Soft** (`{colors.muted-soft}` — #62666d): timestamps, disabled (light: #a1a1aa).
-- **On Action** (`{colors.on-action}` — #04120f): near-black text on the bright cyan fill; flips to white (#ffffff) on the light theme's deepened teal — the inverse of a mid-tone accent's usual pairing.
-- **On Dark** (`{colors.on-dark}` — #f7f8f8, porcelain): text on always-dark fills in either theme.
+- **Ink** (`{colors.ink}` — #f3f5f7): headings, primary copy, emphasis (light: #12141a).
+- **Body** (`{colors.body}` — #c5ccd6): default running text (light: #3f4550).
+- **Muted** (`{colors.muted}` — #8b93a0): sub-titles, secondary labels (light: #6b7280).
+- **Muted Soft** (`{colors.muted-soft}` — #636b78): timestamps, disabled (light: #9aa1ab).
+- **On Action** (`{colors.on-action}` — #0a1220): near-black text on the steel fill; flips to white (#ffffff) on the light theme's deepened steel — the inverse of a mid-tone accent's usual pairing.
+- **On Dark** (`{colors.on-dark}` — #f3f5f7, porcelain): text on always-dark fills in either theme.
 
 ## Typography
 
@@ -525,11 +524,11 @@ selection tint with a faint action-mixed border — selected navigation stays
 distinct from true CTAs; the solid accent never fills chrome.
 
 ### Buttons
-**`button-primary`** — the Signal Cyan action. Background `{colors.action}`,
-text `{colors.on-action}` (near-black on the bright cyan), type
+**`button-primary`** — the Graphite Steel action. Background `{colors.action}`,
+text `{colors.on-action}` (near-black on the steel fill), type
 `{typography.button}` (13px/600), padding 8×16px, height `--size-control-md`
 (40px), rounded `{rounded.sm}` (5px). On the light theme the fill deepens to
-a dark teal and the text flips to white.
+#2f5fad and the text flips to white.
 
 **`button-secondary`** — soft-neutral. Background `{colors.surface-strong}`,
 text `{colors.ink}`, same geometry.
@@ -575,8 +574,8 @@ hairline, `{typography.eyebrow}`.
 ## Do's and Don'ts
 
 ### Do
-- Use `{colors.action}` (Signal Cyan) for actions, and use it scarcely: brand mark, primary CTA, focus ring, link emphasis.
-- Pair the action fill with `{colors.on-action}` — near-black on the bright dark-theme cyan, white on the light theme's deepened teal. Never white-on-cyan in dark mode.
+- Use `{colors.action}` (Graphite Steel) for actions, and use it scarcely: brand mark, primary CTA, focus ring, link emphasis.
+- Pair the action fill with `{colors.on-action}` — near-black on the dark-theme steel, white on the light theme's deepened steel. Never white-on-steel in dark mode.
 - Use `{colors.action-soft}` for selected rows, active nav, and running-state affordances.
 - Reserve all other hue for status — success/danger/warning as text/dots/borders; use the slate `{colors.info}` for neutral/info status.
 - Render every text role in Geist; reserve Geist Mono for tool/command lines, raw logs, code, and IDs.
@@ -586,8 +585,8 @@ hairline, `{typography.eyebrow}`.
 - Add new tokens to `tokens/primitives.css` (raw value) and `tokens/semantic.css` (role) — never inline a hex/`rgb()`/`hsl()` literal in a component file. `npm run lint:css -w web` enforces this.
 
 ### Don't
-- Don't use a status color (green/amber/red) or the slate info as an action — Signal Cyan is the only action color.
-- Don't introduce a second chromatic accent, and don't use the cyan as a section background or decorative fill — beyond the accent, every unit of chroma is a unit of information.
+- Don't use a status color (green/amber/red) or the slate info as an action — Graphite Steel is the only action color.
+- Don't introduce a second chromatic accent, and don't use the steel as a section background or decorative fill — beyond the accent, every unit of chroma is a unit of information.
 - Don't use status colors as general UI background fills.
 - Don't use ad-hoc pixel radii — use `{rounded.*}` tokens.
 - Don't tint agent avatars with vendor brand colors — glyph shape carries identity.
@@ -649,14 +648,14 @@ compressed (Linear leans on weight/color for hierarchy, not size).
 - **`adm-drawer-section`** — inline grouped content (placements list, danger zone) with uppercase section title; distinct from the sticky footer.
 
 ### Focus, motion, dark mode
-- **Focus ring** — every interactive surface uses `var(--ring-focus)`, a 3px action-alpha halo (a cyan-tinted ring at 28% alpha). Destructive controls use `--ring-focus-danger`.
+- **Focus ring** — every interactive surface uses `var(--ring-focus)`, a 3px action-alpha halo (a steel-tinted ring at 28% alpha). Destructive controls use `--ring-focus-danger`.
 - **Status tone driver** — `tone-good` / `tone-info` / `tone-bad` / `tone-warn` / `tone-neutral` set a single `--tone` variable consumed by dots and outlined pills.
 - **Theming** — dark is the default register (`:root`); one light override per tier (`html[data-theme="light"]` in `primitives.css` for raw values, in `semantic.css` for the handful of relationship changes), resolved before first paint via a pre-hydration script in `app/layout.tsx`.
 - **Motion** — canonical curves/durations on a shared shelf (`--ease-standard`, `--ease-out-quint`, `--ease-emphasized`; `--ease-spring` is retired and aliases standard). Durations are Linear-fast (`--duration-fast` 120ms, `--duration-base` 160ms). Nothing overshoots.
 
 ### Data visualization
 The admin token-usage chart uses a fixed three-segment ramp: input tokens =
-`{colors.action}` (Signal Cyan), output tokens = `{colors.success}` (green),
+`{colors.action}` (Graphite Steel), output tokens = `{colors.success}` (green),
 cache tokens = `{colors.muted-soft}` (neutral). Fleet-health stacked bars and
 activity charts use the status tone ramp inside chart segments only.
 Artifact kind accents (`--color-kind-*` in `tokens/primitives.css`) are a

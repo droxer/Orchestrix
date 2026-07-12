@@ -9,20 +9,17 @@
    property names with different values) since that's a fact about the
    color itself, not a role assignment.
 
-   Palette direction: Signal Cyan — near-black canvas (#010102, from
-   the Linear dark reference) with a four-step
-   charcoal surface ladder, light-gray ink, and an electric telemetry
-   cyan (#22d9c0) as the single chromatic accent, used ONLY for the
-   brand mark, primary actions, and focus. This deliberately departs
-   from Linear's literal lavender-blue accent: lavender-on-dark is
-   now the default dev-tool-SaaS accent (Linear, Raycast, Warp all
-   converge there), while cyan reads as a live signal/network lock —
-   fitting for a daemon/node/session orchestration surface — and stays
-   perceptually distinct from the existing green/red/amber status trio.
-   Dark is the primary, default register; light is a derived secondary
-   theme (the Linear reference is dark-only) that deepens the
-   same cyan into a dark teal for AA contrast on a white canvas. Status
-   hues (green/red/amber) remain the only other chroma in the system —
+   Palette direction: Graphite Steel — cool charcoal canvas (#0b0d10)
+   with a four-step cool surface ladder, light-gray ink, and a
+   restrained steel-blue (#5b87d6) as the single chromatic accent, used
+   ONLY for the brand mark, primary actions, and focus. This replaces
+   Signal Cyan's electric telemetry accent with a calmer enterprise
+   blue that stays perceptually distinct from the green/red/amber
+   status trio and avoids both lavender-on-dark SaaS convergence and
+   neon cyan flash. Dark is the primary, default register; light is a
+   derived secondary theme that deepens the same steel family into
+   #2f5fad for AA contrast on a cool gray-white canvas. Status hues
+   (green/red/amber) remain the only other chroma in the system —
    dots, borders, and text, never fills or actions. One crisp grotesk
    (Geist) carries every text role; Geist Mono is reserved for code-like
    content. Geometry is tight (5–6px controls), hairlines draw all
@@ -48,75 +45,67 @@
 
 :root {
   /* ----- Color primitives — dark register (default) -------------- */
-  /* Linear's near-black canvas + a Signal Cyan accent (a
-     deliberate departure from Linear's literal lavender — see the
-     Accent block below). Dark is the primary experience;
-     html[data-theme="light"] below supplies a derived secondary theme. */
+  /* Cool charcoal canvas + Graphite Steel accent. Dark is the primary
+     experience; html[data-theme="light"] supplies a derived secondary. */
 
-  /* Accent — Signal Cyan is the single chromatic action color: brand
-     mark, primary CTA, focus ring, link emphasis. Deliberately NOT
-     Linear's literal lavender-blue — an electric telemetry cyan
-     reads as a live signal/network lock (fits "daemon", "node",
-     "session" vocabulary) and avoids converging on the lavender-on-dark
-     accent nearly every dev-tool SaaS (Linear, Raycast, Warp) now
-     shares. Rest state is bright, so on-accent text goes DARK here
-     (the inverse of a mid-tone accent like lavender, which pairs with
-     white text) — see --color-on-accent below. Disabled fades to a
-     desaturated gray-teal rather than toward black, since a darker
-     disabled fill would break the dark-on-accent text pairing. */
-  --color-accent: #22d9c0;
-  --color-accent-active: #5eefda;
-  --color-accent-disabled: #5f7a75;
-  --color-accent-tint: #0c211d; /* selection wash — a dark teal-tinted surface, not a pastel */
+  /* Accent — Graphite Steel is the single chromatic action color: brand
+     mark, primary CTA, focus ring, link emphasis. A restrained steel
+     blue reads as enterprise calm (Stripe/Notion school) without the
+     neon flash of Signal Cyan or the lavender-on-dark convergence of
+     most dev-tool SaaS. Rest state is mid-bright, so on-accent text
+     goes DARK here — see --color-on-accent below. Disabled fades to a
+     desaturated steel-gray so dark-on-accent text stays legible. */
+  --color-accent: #5b87d6;
+  --color-accent-active: #7aa0e0;
+  --color-accent-disabled: #6a7a94;
+  --color-accent-tint: #152033; /* selection wash — a dark steel-tinted surface, not a pastel */
 
-  /* Ink — Linear's light-gray text ramp, darkest(brightest)-first. */
-  --color-ink-900: #f7f8f8;
-  --color-ink-700: #d0d6e0;
-  --color-ink-500: #8a8f98;
-  --color-ink-300: #62666d;
-  --color-ink-200: #4a4d54; /* rail/decorative border step between hairline and ink-300 */
+  /* Ink — cool light-gray text ramp, darkest(brightest)-first. */
+  --color-ink-900: #f3f5f7;
+  --color-ink-700: #c5ccd6;
+  --color-ink-500: #8b93a0;
+  --color-ink-300: #636b78;
+  --color-ink-200: #4a5160; /* rail/decorative border step between hairline and ink-300 */
 
-  /* On-fill text — theme-varying, and now direction-flipped from the old
-     lavender scheme: the dark theme's cyan is BRIGHT, so its on-accent
-     text is near-black ink (verified ~4.5:1+ against rest/hover/disabled
-     accent fills); the light theme's accent is deepened enough that
-     on-accent stays white (see html[data-theme="light"] below). */
-  --color-on-accent: #04120f;
-  --color-porcelain: #f7f8f8;  /* text on ink/dark fills that appear in both themes */
+  /* On-fill text — theme-varying: the dark theme's steel is bright
+     enough that on-accent text is near-black ink; the light theme's
+     accent is deepened enough that on-accent stays white. */
+  --color-on-accent: #0a1220;
+  --color-porcelain: #f3f5f7;  /* text on ink/dark fills that appear in both themes */
 
   /* True white — always literal, never theme-varying. Used only as a
      color-mix input (alpha overlays mixing toward white); kept distinct
      from --color-on-accent, which flips to a dark ink in light mode. */
   --color-white: #ffffff;
 
-  /* Canvas — Linear's four-step charcoal surface ladder on a near-black
-     (#010102) canvas. Structure comes from hairlines, not shadows. */
-  --color-canvas-base: #010102;
-  --color-canvas-soft: #0f1011;    /* surface-1 — default cards, product panels */
-  --color-canvas-strong: #141516;  /* surface-2 — fills, search, hovered cards */
-  --color-canvas-raised: #18191a;  /* surface-3 — modals, drawers, floating chrome */
+  /* Canvas — cool four-step charcoal surface ladder on a near-black
+     (#0b0d10) canvas. Structure comes from hairlines, not shadows. */
+  --color-canvas-base: #0b0d10;
+  --color-canvas-soft: #14171c;    /* surface-1 — default cards, product panels */
+  --color-canvas-strong: #1a1e25;  /* surface-2 — fills, search, hovered cards */
+  --color-canvas-raised: #1f242c;  /* surface-3 — modals, drawers, floating chrome */
 
   /* Graphite — the always-dark surface register (chrome that stays dark
      even on the light theme, e.g. dark buttons/fills, the always-dark
      diff viewer). Theme-invariant; not redeclared under light. */
-  --color-graphite-900: #191a1b;
-  --color-graphite-800: #202124;
-  --color-graphite-400: #9a9aa3;
+  --color-graphite-900: #171a20;
+  --color-graphite-800: #22272f;
+  --color-graphite-400: #9aa1ab;
 
   /* Hairline ramp. */
-  --color-hairline-300: #23252a;
-  --color-hairline-200: #17181b;
+  --color-hairline-300: #262b33;
+  --color-hairline-200: #1a1e25;
 
   /* Status hues — the only other chroma in the system besides the
-     Signal Cyan accent. Text, dots, and borders only; never background
-     fills, never actions. Success matches Linear's semantic-success
-     directly; red/amber/slate have no Linear (dark-only)
-     equivalent, so they carry forward this app's dark-tuned values. */
+     Graphite Steel accent. Text, dots, and borders only; never
+     background fills, never actions. Success matches Linear's
+     semantic-success directly; red/amber/slate carry forward this
+     app's dark-tuned values. */
   --color-green: #27a644;    /* success — Linear semantic-success */
   --color-red: #f87171;      /* danger */
   --color-yellow: #fbbf24;   /* warning (dot-only contrast) */
-  --color-slate: #9a9aa3;    /* info — neutral, decoupled from the accent */
-  --color-yellow-deep: #fbbf24; /* warning as text — ~7:1 on the near-black canvas */
+  --color-slate: #9aa1ab;    /* info — neutral, decoupled from the accent */
+  --color-yellow-deep: #fbbf24; /* warning as text — ~7:1 on the cool charcoal canvas */
   --color-red-deep: #f87171;    /* danger as text */
   --color-rust: #f0a868;        /* syntax-highlight numerals — orthogonal to the reskin */
 
@@ -127,7 +116,7 @@
   /* Shadow tints — near-black drop-shadow bases and the modal scrim
      base. Linear's overlay scrim is pure black. */
   --color-shadow-ink: #000000;
-  --color-shadow-ink-ring: #23252a;
+  --color-shadow-ink-ring: #262b33;
   --color-scrim-base: #000000;
 
   /* Artifact kind accents — the one DECORATIVE color group in the system, a
@@ -135,7 +124,7 @@
      artifact palette so the transcript chip's left-border kind tag reads
      identically across the two surfaces. Tokenized (not inlined) so light
      and contrast can retune them; consumed only by artifact.css. Brightened
-     for the near-black canvas. --color-diff-hunk is the hunk header inside
+     for the cool charcoal canvas. --color-diff-hunk is the hunk header inside
      the always-dark diff viewer, so it does not flip. --color-kind-review
      is a named alias for the "review passed" green so the kind accent does
      not borrow the status-semantic-success token directly. */
@@ -269,49 +258,47 @@
 
 /* Light register — a derived secondary theme. The Linear reference is
    dark-only ("don't ship a light-mode marketing page"), so this
-   block extrapolates a lifted counterpart: the same Signal Cyan family
-   (deepened into a dark teal for AA contrast on white) on Linear's
-   inverse surface family, with the zinc ink ramp this app used before
-   the reskin. `applyTheme` (appStorage.ts) resolves "system" via matchMedia
-   to light|dark; the pre-hydration script in app/layout.tsx mirrors the
-   same logic to avoid a flash. Dark is the default/primary register
-   above; this override only applies under html[data-theme="light"]. */
+   block extrapolates a lifted counterpart: the same Graphite Steel
+   family (deepened into #2f5fad for AA contrast on cool gray-white)
+   with a cool zinc ink ramp. `applyTheme` (appStorage.ts) resolves
+   "system" via matchMedia to light|dark; the pre-hydration script in
+   app/layout.tsx mirrors the same logic to avoid a flash. Dark is the
+   default/primary register above; this override only applies under
+   html[data-theme="light"]. */
 html[data-theme="light"] {
-  /* Cyan itself is too light to carry white text on a white canvas, so
-     the light register deepens rest/hover into a dark teal (verified
-     5.6:1+ white-text contrast) rather than reusing the dark theme's
-     bright cyan directly — mirrors Linear's own light/dark accent
-     split, just applied to teal instead of lavender. Disabled fades to
-     a mid gray-teal (not pale) so the white on-accent text stays legible. */
-  --color-accent: #0c7566;
-  --color-accent-active: #095e52;
-  --color-accent-disabled: #647976;
-  --color-accent-tint: #d6ece8;   /* selection wash — a lifted pale teal tint, not a pastel */
-  --color-on-accent: #ffffff; /* white text on the deepened teal fill */
+  /* Dark steel is bright enough on charcoal but too light to carry
+     white text on a pale canvas, so the light register deepens
+     rest/hover into #2f5fad (verified ~4.5:1+ white-text contrast).
+     Disabled fades to a mid steel-gray so white on-accent stays legible. */
+  --color-accent: #2f5fad;
+  --color-accent-active: #274f91;
+  --color-accent-disabled: #7a8aa3;
+  --color-accent-tint: #dce6f5;   /* selection wash — a lifted pale steel tint, not a pastel */
+  --color-on-accent: #ffffff; /* white text on the deepened steel fill */
 
-  --color-ink-900: #131316;
-  --color-ink-700: #3f3f46;
-  --color-ink-500: #71717a;
-  --color-ink-300: #a1a1aa;
-  --color-ink-200: #d4d4d8;
+  --color-ink-900: #12141a;
+  --color-ink-700: #3f4550;
+  --color-ink-500: #6b7280;
+  --color-ink-300: #9aa1ab;
+  --color-ink-200: #d1d5db;
 
-  --color-canvas-base: #ffffff;
-  --color-canvas-soft: #fafafa;
-  --color-canvas-strong: #f0f0f1;
+  --color-canvas-base: #f7f8fa;
+  --color-canvas-soft: #ffffff;
+  --color-canvas-strong: #eef0f3;
   --color-canvas-raised: #ffffff;
 
-  --color-hairline-300: #e4e4e7;
-  --color-hairline-200: #f0f0f1;
+  --color-hairline-300: #e2e5ea;
+  --color-hairline-200: #eef0f3;
 
   --color-green: #10b981;
   --color-red: #ef4444;
-  --color-slate: #71717a;
+  --color-slate: #6b7280;
   --color-rust: #b45309;
   --color-yellow: #f59e0b;
-  --color-yellow-deep: #8a5c00; /* ~4.8:1 on white */
-  --color-red-deep: #dc2626;    /* ~4.5:1 on white */
+  --color-yellow-deep: #8a5c00; /* ~4.8:1 on cool gray-white */
+  --color-red-deep: #dc2626;    /* ~4.5:1 on cool gray-white */
 
-  /* Artifact kind accents — desaturated for the white canvas. */
+  /* Artifact kind accents — desaturated for the pale canvas. */
   --color-kind-plan: #0891b2;
   --color-kind-diff: #b45309;
   --color-kind-test: #7c3aed;

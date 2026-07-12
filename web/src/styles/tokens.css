@@ -1,11 +1,11 @@
 /* =====================================================================
-   Relay web — Signal Cyan: a near-black canvas (#010102, from the
-   Linear dark reference) with an electric telemetry cyan
-   (#22d9c0) as the single chromatic accent — a deliberate departure from
-   Linear's literal lavender-blue, chosen so Relay's agent/daemon/node
-   control plane doesn't converge on the lavender-on-dark accent shared
-   by most dev-tool SaaS. Dark is the default, primary theme; light is a
-   derived secondary theme.
+   Relay web — Graphite Steel: a cool charcoal canvas (#0b0d10) with a
+   restrained steel-blue (#5b87d6) as the single chromatic accent — a
+   calmer enterprise action color that replaces Signal Cyan's neon
+   telemetry flash while staying distinct from lavender-on-dark SaaS
+   accents. Dark is the default, primary theme; light is a derived
+   secondary theme on cool gray-white (#f7f8fa) with deepened steel
+   (#2f5fad).
 
    Token architecture, four tiers, one file per tier under ./tokens/:
      1. primitives.css     — raw hex/px/rem values, light + dark registers.
@@ -17,16 +17,15 @@
      4. base.css           — html/body reset, focus contract, and the
         shared utility classes (.mono, .eyebrow, .tone-*).
 
-   Visual language: a near-black canvas (#010102) with a four-step
-   charcoal surface ladder carries the product chrome by default; a
-   derived light theme lifts the same language onto white. Signal Cyan
-   (#22d9c0 dark / #0c7566 light) is the single chromatic ACTION color —
-   brand mark, primary CTA, focus ring, link emphasis — never used
-   decoratively. Hairlines
-   draw all structure instead of shadows. Status is the only other
-   chroma in the system — success / danger / warning (green / amber /
-   red) as dots, borders, and text, never fills or actions; "info" is a
-   neutral slate.
+   Visual language: a cool charcoal canvas (#0b0d10) with a four-step
+   surface ladder carries the product chrome by default; a derived
+   light theme lifts the same language onto cool gray-white. Graphite
+   Steel (#5b87d6 dark / #2f5fad light) is the single chromatic ACTION
+   color — brand mark, primary CTA, focus ring, link emphasis — never
+   used decoratively. Hairlines draw all structure instead of shadows.
+   Status is the only other chroma in the system — success / danger /
+   warning (green / amber / red) as dots, borders, and text, never
+   fills or actions; "info" is a neutral slate.
    One crisp grotesk (Geist) carries every text role — display, chrome,
    and body alike — with weight and tight display tracking doing the
    differentiating, never a family switch. Geist Mono is reserved for
