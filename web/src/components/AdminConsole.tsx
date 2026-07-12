@@ -29,8 +29,7 @@ import { PageHeader } from "./PageHeader";
 import { AdminViewToggle, type AdminView } from "./admin/AdminViewToggle";
 import { AddEmployeeDrawer } from "./admin/AddEmployeeDrawer";
 import { AddNodeDrawer, type AddNodeDrawerSuccess } from "./admin/AddNodeDrawer";
-import { PeopleView } from "./admin/PeopleView";
-import { AgentsView } from "./admin/AgentsView";
+import { EmployeesView } from "./admin/EmployeesView";
 import { PulseStrip } from "./admin/PulseStrip";
 import { useAdminFleet } from "../hooks/useAdminFleet";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
@@ -44,7 +43,7 @@ import {
 } from "./admin/helpers";
 
 type AuthScreen = "login" | "bootstrap";
-const ADMIN_VIEWS: AdminView[] = ["dashboard", "employees", "agents", "fleet"];
+const ADMIN_VIEWS: AdminView[] = ["dashboard", "employees", "fleet"];
 
 function parseAdminView(value: string | null): AdminView {
   return ADMIN_VIEWS.includes(value as AdminView) ? value as AdminView : "dashboard";
@@ -390,21 +389,23 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
       />
 
       <div className="adm-main">
-        <PulseStrip
-          view={view}
-          running={metrics.running}
-          failed={metrics.failed}
-          queued={metrics.queued}
-          unassignedNodes={unassignedNodes.length}
-        />
+        {view !== "dashboard" ? (
+          <PulseStrip
+            view={view}
+            running={metrics.running}
+            failed={metrics.failed}
+            queued={metrics.queued}
+            unassignedNodes={unassignedNodes.length}
+          />
+        ) : null}
 
-        <div className={`adm-content${view === "fleet" ? "" : " adm-content--solo"}`}>
+        <div className="adm-content">
           <div className="adm-content-main">
             <div key={view} className="adm-view-stage">
               {view === "dashboard" ? (
                 <DashboardView nodes={nodes} employees={employees} metrics={metrics} />
               ) : view === "employees" ? (
-                <PeopleView
+                <EmployeesView
                   employees={employees}
                   nodes={nodes}
                   onAddEmployee={() => setAddEmployeeOpen(true)}
@@ -412,8 +413,6 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
                   highlightedEmployeeId={highlightedEmployeeId}
                   onSelectAgent={setAgentProfileId}
                 />
-              ) : view === "agents" ? (
-                <AgentsView nodes={nodes} employees={employees} onSelectAgent={setAgentProfileId} />
               ) : (
                 <FleetView
                   nodes={nodes}
@@ -427,7 +426,7 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
               )}
             </div>
           </div>
-          {view === "fleet" ? <AttentionRail nodes={nodes} /> : null}
+          <AttentionRail nodes={nodes} />
         </div>
       </div>
 

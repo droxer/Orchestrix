@@ -20,6 +20,12 @@ describe("app hash routes", () => {
       mobileView: "chat",
       sessionId: null,
     });
+    assert.deepEqual(parseAppHash("#/agents/agent_123/workspace"), {
+      route: "agents",
+      mobileView: "chat",
+      sessionId: null,
+      agentWorkspaceId: "agent_123",
+    });
   });
 
   it("parses chat session and thread-list links", () => {
@@ -38,7 +44,7 @@ describe("app hash routes", () => {
   it("formats app state and route hrefs", () => {
     assert.equal(hashForAppState({ route: "main", mobileView: "chat", sessionId: "ses_123" }), "#/chat/ses_123");
     assert.equal(hashForAppState({ route: "main", mobileView: "threads", sessionId: "ses_123" }), "#/threads");
-    assert.equal(hashForAppState({ route: "workspace", mobileView: "chat", sessionId: "ses_123" }), "#/workspace");
+    assert.equal(hashForAppState({ route: "agents", mobileView: "chat", sessionId: "ses_123", agentWorkspaceId: "agent_123" }), "#/agents/agent_123/workspace");
     assert.equal(hashForAppState({ route: "agents", mobileView: "chat", sessionId: null }), "#/agents");
     assert.equal(hrefForRoute("main", "ses_123"), "#/chat/ses_123");
     assert.equal(hrefForRoute("backlog", "ses_123"), "#/backlog");

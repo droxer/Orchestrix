@@ -1,7 +1,7 @@
-export type Theme = "light" | "dark" | "system" | "contrast" | "contrast-dark";
+export type Theme = "light" | "dark" | "system";
 export type ResolvedTheme = Exclude<Theme, "system">;
 
-export const SUPPORTED_THEMES = ["light", "dark", "system", "contrast", "contrast-dark"] as const;
+export const SUPPORTED_THEMES = ["light", "dark", "system"] as const;
 
 export const SUPPORTED_LANGUAGES = ["en", "zh-CN", "zh-TW"] as const;
 
@@ -25,9 +25,13 @@ export function writeTokens(tokens: TokenMap): void {
 }
 
 export function readTheme(): Theme {
-  if (typeof window === "undefined") return "system";
+  if (typeof localStorage === "undefined") return "dark";
   const stored = localStorage.getItem(themeStorageKey);
-  return SUPPORTED_THEMES.includes(stored as Theme) ? stored as Theme : "system";
+  if (stored === "contrast" || stored === "contrast-dark") {
+    localStorage.setItem(themeStorageKey, "system");
+    return "system";
+  }
+  return SUPPORTED_THEMES.includes(stored as Theme) ? stored as Theme : "dark";
 }
 
 export function readLanguage(): Language {
@@ -55,10 +59,8 @@ export function resolveTheme(theme: Theme): ResolvedTheme {
 }
 
 const THEME_COLOR_BY_THEME: Record<ResolvedTheme, string> = {
-  light: "#fcfcfd",
-  dark: "#0f1011",
-  contrast: "#ffffff",
-  "contrast-dark": "#000000",
+  light: "#ffffff",
+  dark: "#010102",
 };
 
 export function themeColorForTheme(theme: Theme): string {
@@ -81,11 +83,11 @@ export function syncThemeColor(theme: Theme): void {
 
 /** Reflect the user's choice onto data-theme, resolving "system" to a
  *  concrete value so the CSS needs only html[data-theme] blocks (no
- *  parallel prefers-color-scheme media query). "contrast" (light) and
- *  "contrast-dark" are explicit and map straight through. */
+ *  parallel prefers-color-scheme media query). */
 export function applyTheme(theme: Theme): void {
   if (typeof document === "undefined") return;
   const resolved = resolveTheme(theme);
   document.documentElement.setAttribute("data-theme", resolved);
+  document.documentElement.classList.toggle("dark", resolved === "dark");
   syncThemeColor(theme);
 }

@@ -16,8 +16,10 @@ export function sessionTokenUsage(sessions: RelaySession[]): TokenUsage | undefi
   return mergeTokenUsage(sessions.map((session) => session.tokenUsage));
 }
 
-export function formatCompactTokens(value: number): string {
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`;
-  return String(value);
+export function formatCompactTokens(value: number, locale?: string): string {
+  return new Intl.NumberFormat(locale || undefined, {
+    notation: "compact",
+    compactDisplay: "short",
+    maximumFractionDigits: 1,
+  }).format(value);
 }

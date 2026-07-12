@@ -15,6 +15,7 @@ from .deps import AppContextDep
 from .helpers import actor_can_access_sandbox, authorized_sandbox_for_token, bearer_token, daemon_node_event, json_body, request_actor_or_none
 
 router = APIRouter()
+WORKSPACE_EVENT_TYPES = frozenset({"workspace.listing", "workspace.file", "workspace.error"})
 
 MAX_COMMAND_POLL_WAIT_SECONDS = 30.0
 MAX_COMMAND_POLL_LIMIT = 50
@@ -204,6 +205,10 @@ async def daemon_commands(sandbox_id: str, request: Request, ctx: AppContextDep)
 async def daemon_events(sandbox_id: str, request: Request, ctx: AppContextDep) -> dict[str, bool]:
     try:
         event = daemon_node_event(await json_body(request))
+        if event.get("type") in WORKSPACE_EVENT_TYPES:
+            ctx.registry.assert_node_event_authorized(sandbox_id, bearer_token(request))
+            ctx.workspace_query_broker.resolve(event["commandId"], sandbox_id, event)
+            return {"ok": True}
         ctx.registry.handle_event(sandbox_id, event, bearer_token(request))
         logger.debug(
             "Daemon node event handled",

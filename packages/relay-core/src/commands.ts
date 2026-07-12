@@ -43,7 +43,7 @@ function codexBaseArgv({ readOnly = false }: { readOnly?: boolean } = {}): strin
     // Ask mode confines Codex to a read-only sandbox with no approvals; action
     // mode keeps full write access.
     ...(readOnly
-      ? ["--sandbox", "read-only", "--ask-for-approval", "never"]
+      ? ["--sandbox", "read-only"]
       : ["--dangerously-bypass-approvals-and-sandbox"]),
   ];
   const model = openaiModel();

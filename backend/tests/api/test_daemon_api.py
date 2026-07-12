@@ -44,6 +44,27 @@ def _create_user(client: TestClient, username: str, *, employee_id: str) -> None
     assert response.status_code == 201
 
 
+def test_workspace_event_is_authorized_and_resolves_query_broker(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        app.state.registry.register({"sandboxId": "sbx_workspace", "employeeId": "alice", "token": "node_token", "protocolVersion": 1, "supportedAgents": ["codex"], "status": "ready"})
+        received: list[tuple[str, str, dict]] = []
+
+        class Broker:
+            def resolve(self, command_id, sandbox_id, payload):
+                received.append((command_id, sandbox_id, payload))
+                return True
+
+        app.state.workspace_query_broker = Broker()
+        event = {"type": "workspace.listing", "commandId": "cmd_1", "agentId": "agent_1", "path": "", "exists": True, "entries": []}
+        response = client.post("/daemon-nodes/sbx_workspace/events", json=event, headers={"Authorization": "Bearer node_token"})
+        assert response.status_code == 202
+        assert received == [("cmd_1", "sbx_workspace", event)]
+        assert client.post("/daemon-nodes/sbx_workspace/events", json=event, headers={"Authorization": "Bearer wrong"}).status_code == 401
+
+
 def test_managed_node_provisioning_enrolls_runtime_with_single_use_grant(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
@@ -52,10 +73,18 @@ def test_managed_node_provisioning_enrolls_runtime_with_single_use_grant(monkeyp
         _bootstrap_admin(client)
         _login_admin(client)
 
-        created = client.post("/cp/managed-nodes", json={
+        rejected_local = client.post("/cp/managed-nodes", json={
             "employeeId": "alice",
             "provider": "local-process",
             "sandboxMode": "none",
+        })
+        assert rejected_local.status_code == 409
+        assert "require sandboxMode boxlite" in rejected_local.json()["detail"]
+
+        created = client.post("/cp/managed-nodes", json={
+            "employeeId": "alice",
+            "provider": "local-process",
+            "sandboxMode": "boxlite",
         })
         assert created.status_code == 202
         managed_node = created.json()["node"]
@@ -71,7 +100,7 @@ def test_managed_node_provisioning_enrolls_runtime_with_single_use_grant(monkeyp
         )
         assert enrollment.status_code == 201
         runtime = enrollment.json()
-        assert runtime["sandboxMode"] == "none"
+        assert runtime["sandboxMode"] == "boxlite"
 
         duplicate = client.post(
             "/daemon-enroll",
@@ -84,7 +113,7 @@ def test_managed_node_provisioning_enrolls_runtime_with_single_use_grant(monkeyp
             "sandboxId": runtime["sandboxId"],
             "token": runtime["token"],
             "workspacePath": "/workspace/alice",
-            "sandboxMode": "none",
+            "sandboxMode": "boxlite",
             "protocolVersion": 1,
             "supportedAgents": ["codex"],
             "status": "ready",
@@ -310,6 +339,31 @@ def test_daemon_delivery_output_reaches_the_canonical_session_stream(monkeypatch
             "sequence": 0,
         }, headers={"Authorization": "Bearer node_token"})
         assert output.status_code == 202
+        collaboration_payload = {
+            "id": "collab-1",
+            "tool": "spawnAgent",
+            "status": "completed",
+            "senderThreadId": "root-thread",
+            "receiverThreadIds": ["child-thread"],
+            "prompt": "Review the change",
+            "model": None,
+            "reasoningEffort": None,
+            "agentsStates": {
+                "child-thread": {"status": "running", "message": "Reviewing"}
+            },
+        }
+        collaboration = client.post("/daemon-nodes/sbx_alice/events", json={
+            "type": "run.collaboration",
+            "commandId": command["id"],
+            "leaseId": command["leaseId"],
+            "sessionId": command["sessionId"],
+            "runId": command["runId"],
+            "agent": command["agent"],
+            "mode": command["mode"],
+            "collaboration": collaboration_payload,
+            "sequence": 1,
+        }, headers={"Authorization": "Bearer node_token"})
+        assert collaboration.status_code == 202
         completed = client.post("/daemon-nodes/sbx_alice/events", json={
             "type": "run.completed",
             "commandId": command["id"],
@@ -330,6 +384,9 @@ def test_daemon_delivery_output_reaches_the_canonical_session_stream(monkeypatch
         ]
         assert [event["text"] for event in payloads if event.get("type") == "agent.output"] == [
             "hello from the daemon"
+        ]
+        assert [event["collaboration"] for event in payloads if event.get("type") == "agent.collaboration"] == [
+            collaboration_payload
         ]
         assert any(event.get("type") == "session.completed" for event in payloads)
 

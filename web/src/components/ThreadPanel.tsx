@@ -4,6 +4,7 @@ import { ActionCompose, ActionSearch } from "./icons";
 import { ConversationRow, type ConversationItem } from "./ConversationRow";
 import { groupConversations } from "../lib/conversationGroups";
 import type { RelaySession } from "../types";
+import type { AgentName } from "../types";
 
 // The logged-in employee's own conversations. Each row is a session; the list
 // is owner-scoped by the backend, so it only ever shows the current employee's
@@ -13,6 +14,7 @@ export function ThreadPanel({
   query,
   setQuery,
   selectedSessionId,
+  agentDisplayNames,
   onSelectConversation,
   onNewConversation,
   onRenameConversation,
@@ -22,6 +24,7 @@ export function ThreadPanel({
   query: string;
   setQuery: Dispatch<SetStateAction<string>>;
   selectedSessionId: string | undefined;
+  agentDisplayNames?: Partial<Record<AgentName, string>>;
   onSelectConversation: (sessionId: string) => void;
   onNewConversation: () => void;
   onRenameConversation: (session: RelaySession) => void;
@@ -58,7 +61,7 @@ export function ThreadPanel({
           <ActionCompose size={16} />
         </button>
       </div>
-      <form className="people-search conversation-search" onSubmit={(e) => e.preventDefault()}>
+      <form className="relay-search conversation-search" onSubmit={(e) => e.preventDefault()}>
         <ActionSearch size={16} />
         <input
           aria-label={t("thread.search_label")}
@@ -83,6 +86,7 @@ export function ThreadPanel({
                   key={item.session.id}
                   item={item}
                   selected={selectedSessionId === item.session.id}
+                  agentDisplayNames={agentDisplayNames}
                   onSelect={onSelectConversation}
                   onRename={onRenameConversation}
                   onClose={onCloseConversation}

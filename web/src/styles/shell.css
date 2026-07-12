@@ -7,7 +7,7 @@
   height: 100svh;
   min-height: 100vh;
   overflow: hidden;
-  background: var(--color-canvas);
+  background: var(--color-semantic-canvas);
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   transition: grid-template-columns var(--duration-base) var(--ease-standard);
 }
@@ -18,6 +18,25 @@
 
 .mobile-topbar {
   display: none;
+}
+
+/* Stacked PageHeader — kicker color from atelier .eyebrow-brand */
+.page-header-kicker {
+  font: var(--type-eyebrow);
+  letter-spacing: var(--letter-eyebrow);
+  text-transform: uppercase;
+}
+
+.page-header-subtitle {
+  margin: 0;
+  max-width: 46ch;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--color-semantic-muted);
+}
+
+.page-header-toolbar {
+  margin-top: var(--space-sm);
 }
 
 /* Admin (and future display-scale routes) — design-system display-lg title */

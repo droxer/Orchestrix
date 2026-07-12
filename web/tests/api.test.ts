@@ -1,13 +1,27 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 
-import { apiJson, getWorkspaceBrief, listArtifacts, listEmployeeAgents, listTaskArtifacts, listWorkspaceFiles, readWorkspaceFile, RelayApiError, runLogicalAgents } from "../src/api.js";
+import { apiJson, getWorkspaceBrief, listAgentWorkspaceFiles, listArtifacts, listEmployeeAgents, listTaskArtifacts, readAgentWorkspaceFile, RelayApiError, runLogicalAgents, updateOwnEmployeeAgent } from "../src/api.js";
 
 const originalFetch = globalThis.fetch;
 
 describe("apiJson", () => {
   afterEach(() => {
     globalThis.fetch = originalFetch;
+  });
+
+  it("reports an HTML fallback response instead of attempting to parse it as JSON", async () => {
+    globalThis.fetch = (async () => new Response("<!DOCTYPE html><html><body>Relay</body></html>", {
+      status: 200,
+      headers: { "Content-Type": "text/html" },
+    })) as typeof fetch;
+
+    await assert.rejects(
+      () => apiJson("/agents/agent_1/workspace/files"),
+      (error: unknown) => error instanceof RelayApiError
+        && error.status === 200
+        && error.message.includes("HTML response"),
+    );
   });
 
   it("surfaces JSON detail errors as RelayApiError", async () => {
@@ -49,6 +63,31 @@ describe("apiJson", () => {
 
     assert.deepEqual(await listEmployeeAgents(), { agents: [] });
     assert.equal(requestedUrl, "/agents");
+  });
+
+  it("updates employee-owned logical agent metadata", async () => {
+    let requestUrl = "";
+    let requestBody: unknown;
+    globalThis.fetch = (async (input, init) => {
+      requestUrl = String(input);
+      requestBody = JSON.parse(String(init?.body));
+      return new Response(JSON.stringify({
+        agent: {
+          id: "agent_research",
+          displayName: "Analyst",
+          instructions: "Cite sources.",
+        },
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }) as typeof fetch;
+
+    const result = await updateOwnEmployeeAgent("agent_research", {
+      displayName: "Analyst",
+      instructions: "Cite sources.",
+    });
+
+    assert.equal(requestUrl, "/agents/agent_research");
+    assert.deepEqual(requestBody, { displayName: "Analyst", instructions: "Cite sources." });
+    assert.equal(result.agent.displayName, "Analyst");
   });
 
   it("dispatches work by logical agent id without a sandbox id", async () => {
@@ -130,7 +169,6 @@ describe("apiJson", () => {
       requestedUrl = String(input);
       return new Response(JSON.stringify({
         employeeId: "alice",
-        workspacePath: "/workspace/alice",
         primaryNode: null,
         nodes: [],
         activeRuns: [],
@@ -159,17 +197,16 @@ describe("apiJson", () => {
     assert.equal(requestedUrl, "/workspace/brief?employeeId=alice");
   });
 
-  it("lists workspace files with optional employee and path filters", async () => {
+  it("lists agent workspace files", async () => {
     let requestedUrl = "";
     globalThis.fetch = (async (input) => {
       requestedUrl = String(input);
       return new Response(JSON.stringify({
-        employeeId: "alice",
-        workspacePath: "/workspace/alice",
+        agentId: "agent_1",
+        source: "live",
         path: "src/ui",
         exists: true,
         entries: [],
-        limit: 200,
         generatedAt: "2026-06-27T00:00:00Z",
       }), {
         status: 200,
@@ -177,10 +214,10 @@ describe("apiJson", () => {
       });
     }) as typeof fetch;
 
-    const result = await listWorkspaceFiles({ employeeId: "alice", path: "src/ui" });
+    const result = await listAgentWorkspaceFiles({ agentId: "agent_1", path: "src/ui" });
 
-    assert.equal(result.employeeId, "alice");
-    assert.equal(requestedUrl, "/workspace/files?employeeId=alice&path=src%2Fui");
+    assert.equal(result.agentId, "agent_1");
+    assert.equal(requestedUrl, "/agents/agent_1/workspace/files?path=src%2Fui");
   });
 
   it("reads a workspace file's content for the preview pane", async () => {
@@ -188,8 +225,8 @@ describe("apiJson", () => {
     globalThis.fetch = (async (input) => {
       requestedUrl = String(input);
       return new Response(JSON.stringify({
-        employeeId: "alice",
-        workspacePath: "/workspace/alice",
+        agentId: "agent_1",
+        source: "live",
         path: "src/app.tsx",
         exists: true,
         isBinary: false,
@@ -204,10 +241,10 @@ describe("apiJson", () => {
       });
     }) as typeof fetch;
 
-    const result = await readWorkspaceFile({ employeeId: "alice", path: "src/app.tsx" });
+    const result = await readAgentWorkspaceFile({ agentId: "agent_1", path: "src/app.tsx" });
 
     assert.equal(result.content, "hello world\n");
     assert.equal(result.isBinary, false);
-    assert.equal(requestedUrl, "/workspace/file?employeeId=alice&path=src%2Fapp.tsx");
+    assert.equal(requestedUrl, "/agents/agent_1/workspace/file?path=src%2Fapp.tsx");
   });
 });

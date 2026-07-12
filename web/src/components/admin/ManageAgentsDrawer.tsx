@@ -12,6 +12,8 @@ import {
 import { AGENT_NAMES } from "../../types";
 import type { AgentName, ControlPanelDaemonNodeRecord } from "../../types";
 import { useDialogs } from "@/components/ui/DialogProvider";
+import { Button } from "@/components/ui/button";
+import { AgentMark } from "../AgentMark";
 import { Drawer } from "./Drawer";
 import { agentStatusTone } from "./helpers";
 
@@ -125,9 +127,11 @@ export function ManageAgentsDrawer({ open, onClose, node, onUpdated }: ManageAge
       ariaLabel={t("admin.v2.manage_agents_title")}
       layer={1}
       width={520}
+      bodyClassName="adm-drawer-body--column"
     >
-      <p className="adm-cred-note adm-agent-drawer-note">{t("admin.v2.manage_agents_help")}</p>
-      <ul className="adm-agent-toggle-list">
+      <div className="adm-form">
+        <p className="adm-cred-note adm-agent-drawer-note">{t("admin.v2.manage_agents_help")}</p>
+        <ul className="adm-agent-toggle-list">
         {AGENT_NAMES.map((agent) => {
           const agentStatus = node.agents[agent] ?? "unknown";
           const tone = agentStatusTone(agentStatus);
@@ -142,7 +146,10 @@ export function ManageAgentsDrawer({ open, onClose, node, onUpdated }: ManageAge
             >
               <div className="adm-agent-toggle-row">
                 <div className="adm-agent-toggle-meta">
-                  <span className="adm-agent-toggle-name" translate="no">{agent}</span>
+                  <span className="adm-agent-toggle-name" translate="no">
+                    <AgentMark agent={agent} size={14} className="adm-agent-toggle-mark" />
+                    {agent}
+                  </span>
                   <span className={`adm-agent-chip tone-${tone}`}>{t(`status.${agentStatus}`, { defaultValue: agentStatus })}</span>
                 </div>
                 <label className="adm-agent-toggle-switch">
@@ -199,27 +206,18 @@ export function ManageAgentsDrawer({ open, onClose, node, onUpdated }: ManageAge
             </li>
           );
         })}
-      </ul>
-      <div className="adm-cred-actions adm-cred-actions--row">
-        <button
-          type="button"
-          className="adm-cred-action-button primary"
-          onClick={() => void handleSave()}
-          disabled={saving || !dirty}
-        >
-          {saving ? t("admin.v2.saving") : t("admin.v2.save")}
-        </button>
-        <button
-          type="button"
-          className="adm-cred-action-button"
-          onClick={onClose}
-          disabled={saving}
-        >
-          {t("admin.v2.cancel")}
-        </button>
+        </ul>
         {error ? (
-          <p className="adm-cred-action-error">{t("admin.v2.action_failed", { message: error })}</p>
+          <p className="adm-form-error" role="alert">{t("admin.v2.action_failed", { message: error })}</p>
         ) : null}
+        <div className="adm-form-actions">
+          <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>
+            {t("admin.v2.cancel")}
+          </Button>
+          <Button type="button" onClick={() => void handleSave()} disabled={saving || !dirty}>
+            {saving ? t("admin.v2.saving") : t("admin.v2.save")}
+          </Button>
+        </div>
       </div>
     </Drawer>
   );

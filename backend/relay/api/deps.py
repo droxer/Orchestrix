@@ -18,8 +18,9 @@ class AppContext:
     backend: ServerDaemonNodeBackend
     auth_store: Any
     managed_node_store: Any
-    employee_agent_store: Any
+    agent_store: Any
     agent_placement_store: Any
+    workspace_query_broker: Any
 
 
 def app_context(request: Request) -> AppContext:
@@ -32,8 +33,9 @@ def app_context(request: Request) -> AppContext:
         backend=request.app.state.backend,
         auth_store=request.app.state.auth_store,
         managed_node_store=request.app.state.managed_node_store,
-        employee_agent_store=request.app.state.employee_agent_store,
+        agent_store=request.app.state.agent_store,
         agent_placement_store=request.app.state.agent_placement_store,
+        workspace_query_broker=request.app.state.workspace_query_broker,
     )
 
 

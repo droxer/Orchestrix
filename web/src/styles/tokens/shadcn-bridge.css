@@ -1,0 +1,124 @@
+/* =====================================================================
+   Tier 3 — shadcn/ui bridge.
+
+   Exposes semantic.css's roles to Tailwind utilities (bg-primary,
+   text-muted-foreground, rounded-xl, ...) and to shadcn/ui's own
+   component variables (--background, --primary, ...). Nothing here
+   originates a value — every declaration is a var() pointing at
+   semantic.css or primitives.css.
+   ===================================================================== */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Relay palette — brand, surfaces, tones, and hairlines exposed as
+     utilities so the full design language (not just shadcn's semantic
+     aliases) is addressable: bg-surface-soft, text-ink, text-body,
+     border-hairline, text-success. `inline` means these resolve to the
+     :root var at the use site rather than emitting a competing custom
+     property. */
+  --color-ink: var(--color-semantic-ink);
+  --color-body: var(--color-semantic-body);
+  --color-muted-soft: var(--color-semantic-muted-soft);
+  --color-on-primary: var(--color-semantic-on-action);
+  --color-primary-active: var(--color-semantic-action-active);
+  --color-primary-disabled: var(--color-semantic-action-disabled);
+  --color-surface-soft: var(--color-semantic-surface-soft);
+  --color-surface-strong: var(--color-semantic-surface-strong);
+  --color-surface-raised: var(--color-semantic-surface-raised);
+  --color-surface-dark: var(--color-semantic-surface-dark);
+  --color-hairline: var(--color-semantic-hairline);
+  --color-hairline-soft: var(--color-semantic-hairline-soft);
+  --color-success: var(--color-semantic-success);
+  --color-danger: var(--color-semantic-danger);
+  --color-warning: var(--color-semantic-warning);
+  --color-info: var(--color-semantic-info);
+  --color-brand-soft: var(--color-semantic-action-soft);
+
+  /* Radii — one scale for component CSS and Tailwind utilities
+     (rounded-sm … rounded-4xl). --radius-pill is a retired alias. */
+  --radius-xs: var(--radius-xs);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-2xl: var(--radius-2xl);
+  --radius-3xl: var(--radius-3xl);
+  --radius-4xl: var(--radius-4xl);
+  --radius-full: var(--radius-full);
+
+  /* Spacing — the 4px-base named scale → p-md, gap-sm, etc. Coexists with
+     Tailwind's numeric spacing (p-4) since the keys are named, not numeric. */
+  --spacing-xxs: var(--space-xxs);
+  --spacing-xs: var(--space-xs);
+  --spacing-sm: var(--space-sm);
+  --spacing-base: var(--space-base);
+  --spacing-md: var(--space-md);
+  --spacing-lg: var(--space-lg);
+  --spacing-xl: var(--space-xl);
+  --spacing-xxl: var(--space-xxl);
+
+  /* Type scale — the operational chat surface sizes (px). Registering these
+     makes the documented scale the source of truth for text-* utilities, so
+     text-md / text-2xs / text-micro exist and text-base means 13px. */
+  --text-micro: var(--text-micro);
+  --text-2xs: var(--text-2xs);
+  --text-xs: var(--text-xs);
+  --text-sm: var(--text-sm);
+  --text-base: var(--text-base);
+  --text-md: var(--text-md);
+  --text-lg: var(--text-lg);
+  --text-xl: var(--text-xl);
+  --text-2xl: var(--text-2xl);
+  --text-3xl: var(--text-3xl);
+  --text-4xl: var(--text-4xl);
+
+  /* Leading scale → leading-tight / leading-loose for migrated prose. */
+  --leading-tight: var(--leading-tight);
+  --leading-snug: var(--leading-snug);
+  --leading-normal: var(--leading-normal);
+  --leading-loose: var(--leading-loose);
+
+  /* Typography families exposed to Tailwind utilities */
+  --font-sans: var(--font-sans);
+  --font-display: var(--font-display);
+  --font-mono: var(--font-mono);
+}
+
+:root {
+  --background: var(--color-semantic-canvas);
+  --foreground: var(--color-semantic-ink);
+  --card: var(--color-semantic-canvas);
+  --card-foreground: var(--color-semantic-ink);
+  --popover: var(--color-semantic-canvas);
+  --popover-foreground: var(--color-semantic-ink);
+  --primary: var(--color-semantic-action);
+  --primary-foreground: var(--color-semantic-on-action);
+  --secondary: var(--color-semantic-surface-strong);
+  --secondary-foreground: var(--color-semantic-ink);
+  --muted: var(--color-semantic-surface-strong);
+  --muted-foreground: var(--color-semantic-muted);
+  --accent: var(--color-semantic-surface-soft);
+  --accent-foreground: var(--color-semantic-ink);
+  --destructive: var(--color-semantic-danger);
+  --border: var(--color-semantic-hairline);
+  --input: var(--color-semantic-hairline);
+  --ring: var(--color-semantic-action);
+}

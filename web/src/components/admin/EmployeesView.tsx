@@ -3,19 +3,21 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Bot, Search, Trash2, Users } from "lucide-react";
+import { Search, Trash2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useDialogs } from "@/components/ui/DialogProvider";
 import { RelayEmptyState } from "@/components/RelayEmptyState";
+import { AgentMark } from "../AgentMark";
 import type { ControlPanelDaemonNodeRecord } from "../../types";
 import { listControlPanelAgents } from "../../api";
-import { ADMIN_AGENTS_KEY } from "./AgentsView";
+import { ADMIN_AGENTS_KEY } from "../../lib/adminHelpers";
 import {
   buildEmployeeSummaries,
+  agentAvailabilityTone,
   type EmployeeNodeSummary,
 } from "./helpers";
 
-interface PeopleViewProps {
+interface EmployeesViewProps {
   employees: import("../../types").EmployeeRecord[];
   nodes: ControlPanelDaemonNodeRecord[];
   onAddEmployee: () => void;
@@ -46,14 +48,14 @@ function groupByDepartment(summaries: EmployeeNodeSummary[], unlabeled: string):
   });
 }
 
-export function PeopleView({
+export function EmployeesView({
   employees,
   nodes,
   onAddEmployee,
   onDeleteEmployee,
   highlightedEmployeeId,
   onSelectAgent,
-}: PeopleViewProps) {
+}: EmployeesViewProps) {
   const { t } = useTranslation();
   const { confirm } = useDialogs();
   const [query, setQuery] = useState("");
@@ -112,7 +114,7 @@ export function PeopleView({
   if (summaries.length === 0) {
     return (
       <RelayEmptyState
-        className="adm-people-empty"
+        className="adm-employees-empty"
         fill
         title={t("admin.v2.empty_employees_title")}
         body={t("admin.v2.empty_employees_body")}
@@ -128,7 +130,7 @@ export function PeopleView({
 
   return (
     <div className="adm-view">
-      <div className="adm-search">
+      <div className="relay-search adm-search">
         <Search size={16} aria-hidden="true" />
         <input
           className="adm-search-input"
@@ -144,10 +146,10 @@ export function PeopleView({
       </div>
 
       {deleteError ? (
-        <p className="adm-people-error">{t("admin.v2.action_failed", { message: deleteError })}</p>
+        <p className="adm-view-error">{t("admin.v2.action_failed", { message: deleteError })}</p>
       ) : null}
       {agentsQuery.error ? (
-        <p className="adm-people-error" role="alert">
+        <p className="adm-view-error" role="alert">
           {t("admin.v2.agents_load_error")}{" "}
           <button type="button" onClick={() => void agentsQuery.refetch()}>{t("admin.v2.retry")}</button>
         </p>
@@ -156,7 +158,13 @@ export function PeopleView({
       {groups.length === 0 ? (
         <p className="adm-empty-body">{t("admin.v2.no_match")}</p>
       ) : (
-        groups.map((group) => (
+        <>
+          <div className="adm-emp-cols" aria-hidden="true">
+            <span className="adm-emp-col-label">{t("admin.col_employee")}</span>
+            <span className="adm-emp-col-label">{t("admin.col_agents")}</span>
+            <span className="adm-emp-col-label adm-emp-col-label--metrics">{t("admin.v2.col_metrics")}</span>
+          </div>
+          {groups.map((group) => (
           <section key={group.key} className="adm-dept-group">
             <header className="adm-dept-head">
               <span className="adm-dept-label">{group.label}</span>
@@ -189,23 +197,36 @@ export function PeopleView({
                           <button
                             key={agent.id}
                             type="button"
-                            className={`adm-node-chip adm-node-chip--button tone-${agent.availability === "ready" ? "good" : "muted"}`}
+                            className={`adm-node-chip adm-node-chip--button tone-${agentAvailabilityTone(agent.availability)}`}
                             onClick={() => onSelectAgent?.(agent.id)}
                             disabled={!onSelectAgent}
                           >
-                            <Bot size={12} aria-hidden="true" />
+                            <AgentMark agent={agent.executorKind} size={12} className="adm-node-chip-mark" />
                             <span translate="no">{agent.displayName}</span>
                           </button>
                         ))
                       )}
                     </div>
-                    <div className="adm-emp-metrics">
-                      <span className={`adm-emp-running mono ${member.runningCount > 0 ? "tone-neutral" : "tone-muted"}`}>
-                        {member.runningCount}
-                      </span>
-                      <span className="adm-emp-ratio mono tone-muted">
-                        {member.readyCount}/{member.nodeCount}
-                      </span>
+                    <div
+                      className="adm-emp-metrics"
+                      aria-label={t("admin.v2.emp_metrics_aria", {
+                        running: member.runningCount,
+                        ready: member.readyCount,
+                        total: member.nodeCount,
+                      })}
+                    >
+                      <div className="adm-emp-metric">
+                        <span className="adm-emp-metric-label">{t("admin.v2.col_running")}</span>
+                        <span className={`adm-emp-running mono ${member.runningCount > 0 ? "tone-neutral" : "tone-muted"}`}>
+                          {member.runningCount}
+                        </span>
+                      </div>
+                      <div className="adm-emp-metric">
+                        <span className="adm-emp-metric-label">{t("admin.v2.col_ready")}</span>
+                        <span className="adm-emp-ratio mono tone-muted">
+                          {member.readyCount}/{member.nodeCount}
+                        </span>
+                      </div>
                       {onDeleteEmployee ? (
                         <button
                           type="button"
@@ -224,7 +245,8 @@ export function PeopleView({
               })}
             </ul>
           </section>
-        ))
+          ))}
+        </>
       )}
     </div>
   );

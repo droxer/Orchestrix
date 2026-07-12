@@ -404,7 +404,8 @@ describe("Relay web admin node helpers", () => {
       employeeId: "alice",
       online: true,
       stale: false,
-      sandboxMode: "boxlite",
+      sandboxMode: "none",
+      managedNodeId: "mnode_alice",
     });
     const flags = nodeLocalityFlags(node, {
       colocated: true,
@@ -420,7 +421,8 @@ describe("Relay web admin node helpers", () => {
       colocated: true,
       storedTokens: { sbx_alice: { nodeToken: "tok_cached", savedAt: "2026-06-12T00:00:00.000Z" } },
     }), ["saved_here", "this_host"]);
-    assert.equal(nodeExecutionProfile({ sandboxMode: "none" }), "local");
+    assert.equal(nodeExecutionProfile({ sandboxMode: "boxlite" }), "local");
+    assert.equal(nodeExecutionProfile({ sandboxMode: "none", managedNodeId: "mnode_alice" }), "managed");
   });
 
   it("persists ephemeral control-panel node tokens into the stored map", () => {

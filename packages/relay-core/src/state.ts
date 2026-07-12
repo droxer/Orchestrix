@@ -1,5 +1,6 @@
 import type { AgentOutputSink } from "./format.js";
 import type { TokenUsage } from "./token-usage.js";
+import type { CodexCollaborationEvent } from "./codex-collaboration.js";
 
 export type AgentName = "claude" | "pi" | "codex" | "kimi";
 // "action" runs the agent with write access (UI label: "Agent"); "ask" is a
@@ -37,10 +38,13 @@ export interface AgentRunOptions {
   agent?: AgentName;
   sessionController?: SessionStepRunner;
   sessionId?: string;
+  /** Relative subdirectory (under GUEST_WORKSPACE) this run's cwd should use, e.g. "agents/<agentId>". */
+  agentWorkspaceSubdir?: string;
 }
 
 export interface AgentEventSink {
   agentOutput(runId: string, agent: AgentName, stream: "stdout" | "stderr", text: string): void | Promise<void>;
+  agentCollaboration?(runId: string, agent: AgentName, event: CodexCollaborationEvent): void | Promise<void>;
 }
 
 export interface SessionStepRunner {

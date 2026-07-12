@@ -147,9 +147,9 @@ export function ChatIntegrationsView() {
 
   return (
     <div className="adm-view adm-chat">
-      {error ? <p className="adm-people-error" role="alert" aria-live="polite">{t("admin.v2.action_failed", { message: error })}</p> : null}
+      {error ? <p className="adm-view-error" role="alert" aria-live="polite">{t("admin.v2.action_failed", { message: error })}</p> : null}
       {query.error ? (
-        <div className="adm-people-error" role="alert">
+        <div className="adm-view-error" role="alert">
           <span>{t("admin.v2.chat_load_error")}</span>{" "}
           <Button type="button" size="xs" variant="outline" onClick={() => void query.refetch()}>{t("admin.v2.retry")}</Button>
         </div>

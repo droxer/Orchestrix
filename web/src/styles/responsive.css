@@ -51,8 +51,8 @@
     gap: var(--space-xs);
     min-width: 0;
     padding: max(env(safe-area-inset-top), var(--space-xs)) max(env(safe-area-inset-right), var(--space-base)) var(--space-xs) max(env(safe-area-inset-left), var(--space-base));
-    border-bottom: 1px solid var(--color-hairline);
-    background: var(--color-canvas);
+    border-bottom: 1px solid var(--color-semantic-hairline);
+    background: var(--color-semantic-canvas);
     z-index: var(--z-drawer);
   }
 
@@ -83,13 +83,13 @@
     pointer-events: none;
     cursor: default;
     background: transparent;
-    color: var(--color-ink);
+    color: var(--color-semantic-ink);
     font: var(--type-label-strong);
   }
 
   .messenger-shell[data-mobile-view="chat"] .mobile-topbar--chat > button:nth-of-type(2).active {
     background: transparent;
-    color: var(--color-ink);
+    color: var(--color-semantic-ink);
   }
 
   .mobile-topbar-route {
@@ -109,7 +109,7 @@
     font: var(--type-eyebrow);
     letter-spacing: var(--letter-eyebrow);
     text-transform: uppercase;
-    color: var(--color-muted);
+    color: var(--color-semantic-muted);
     line-height: 1;
   }
 
@@ -118,7 +118,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: var(--color-ink);
+    color: var(--color-semantic-ink);
     font: var(--type-label-strong);
     line-height: 1.2;
   }
@@ -146,14 +146,14 @@
   .messenger-shell[data-route]:not([data-route="main"]) .page-header {
     min-height: 0;
     justify-content: flex-end;
-    border-bottom-color: var(--color-hairline-soft);
+    border-bottom-color: var(--color-semantic-hairline-soft);
   }
 
   .messenger-shell[data-route="admin"] .page-header {
     min-height: 0;
     justify-content: space-between;
     align-items: flex-start;
-    border-bottom-color: var(--color-hairline-soft);
+    border-bottom-color: var(--color-semantic-hairline-soft);
   }
 
   .messenger-shell[data-route="admin"] .page-header-lead {
@@ -182,7 +182,7 @@
     min-height: 44px;
     padding: 0 var(--space-sm);
     border-radius: var(--radius-sm);
-    color: var(--color-body);
+    color: var(--color-semantic-body);
     font: var(--type-label-strong);
   }
 
@@ -194,8 +194,8 @@
   }
 
   .mobile-topbar button.active {
-    background: var(--color-surface-strong);
-    color: var(--color-ink);
+    background: var(--color-semantic-surface-strong);
+    color: var(--color-semantic-ink);
   }
 
   .sidenav-panel {
@@ -207,9 +207,9 @@
     gap: 0;
     min-height: 58px;
     padding: 4px max(env(safe-area-inset-right), var(--space-xs)) max(env(safe-area-inset-bottom), 4px) max(env(safe-area-inset-left), var(--space-xs));
-    border-top: 1px solid var(--color-hairline);
+    border-top: 1px solid var(--color-semantic-hairline);
     border-right: 0;
-    background: color-mix(in srgb, var(--color-canvas) 94%, transparent);
+    background: color-mix(in srgb, var(--color-semantic-canvas) 94%, transparent);
     backdrop-filter: blur(14px);
     overflow-x: auto;
     overflow-y: hidden;
@@ -261,18 +261,18 @@
     width: 20px;
     height: 2px;
     border-radius: 0 0 var(--radius-sm) var(--radius-sm);
-    background: var(--color-primary);
+    background: var(--color-semantic-action);
     transform: translateX(-50%);
   }
 
   .sidenav-btn.active {
-    color: var(--color-ink);
-    background: var(--color-brand-soft);
-    border-color: color-mix(in srgb, var(--color-primary) 18%, var(--color-hairline));
+    color: var(--color-semantic-ink);
+    background: var(--color-semantic-action-soft);
+    border-color: color-mix(in srgb, var(--color-semantic-action) 18%, var(--color-semantic-hairline));
   }
 
   .sidenav-btn.active:hover {
-    background: var(--color-brand-soft);
+    background: var(--color-semantic-action-soft);
   }
 
   .messenger-shell .sidenav-btn {
@@ -357,7 +357,8 @@
 
   .chat-header {
     min-width: 0;
-    padding: 0 var(--space-sm);
+    min-height: var(--header-h);
+    padding: var(--space-sm);
     grid-template-columns: auto minmax(0, 1fr);
   }
 
@@ -398,10 +399,10 @@
     gap: var(--space-xs);
     min-height: 44px;
     padding: 0 var(--space-sm);
-    border: 1px solid var(--color-hairline);
-    border-radius: var(--radius-sm);
-    background: var(--color-canvas);
-    color: var(--color-ink);
+    border: 1px solid var(--color-semantic-hairline);
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--color-semantic-surface-raised) 72%, transparent);
+    color: var(--color-semantic-ink);
     font: var(--type-label-strong);
   }
 
@@ -446,12 +447,12 @@
   }
 
   .composer {
-    padding: var(--space-sm) var(--space-base) var(--space-base);
+    --composer-inline: 18px;
+    padding: var(--space-sm) var(--space-sm) max(env(safe-area-inset-bottom), var(--space-base));
   }
 
-  .composer-input-wrap {
-    padding-inline: var(--space-base);
-    box-shadow: var(--shadow-soft);
+  .composer-send-hint {
+    display: none;
   }
 
   .mode-chip {
@@ -480,11 +481,11 @@
   .adm-dash-kpis {
     padding-inline: var(--space-base);
   }
-}
 
-@media (max-width: 820px) and (prefers-reduced-motion: reduce) {
-  .messenger-shell .sidenav-btn {
-    animation: none;
-    opacity: 1;
+  @media (prefers-reduced-motion: reduce) {
+    .messenger-shell .sidenav-btn {
+      animation: none;
+      opacity: 1;
+    }
   }
 }

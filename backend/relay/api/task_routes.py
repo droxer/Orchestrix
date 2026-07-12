@@ -47,13 +47,13 @@ def logical_agent_for_assignment(
 ) -> dict[str, Any] | None:
     if not agent_id:
         return None
-    agent = ctx.employee_agent_store.get_agent(agent_id)
+    agent = ctx.agent_store.get_agent(agent_id)
     if not agent or agent.get("deletedAt"):
         raise HTTPException(404, "Logical agent not found.")
     allowed_employee_id = expected_employee_id or actor["employeeId"]
-    if agent.get("employeeId") != allowed_employee_id:
+    if agent.get("supervisorEmployeeId") != allowed_employee_id:
         raise HTTPException(403, "Logical agent is not available to the task assignee.")
-    if not actor["isAdmin"] and agent.get("employeeId") != actor["employeeId"]:
+    if not actor["isAdmin"] and agent.get("supervisorEmployeeId") != actor["employeeId"]:
         raise HTTPException(403, "Logical agent access denied.")
     return agent
 
@@ -204,7 +204,7 @@ async def start_task_on_ready_node(
                 run_assignments,
                 employee_id=actor["employeeId"],
                 is_admin=actor["isAdmin"],
-                agent_store=ctx.employee_agent_store,
+                agent_store=ctx.agent_store,
                 placement_store=ctx.agent_placement_store,
                 daemon_nodes=ctx.registry.monitor_nodes(),
             )
@@ -437,6 +437,7 @@ async def create_task(request: Request, ctx: AppContextDep) -> dict[str, Any]:
             task_id=task["id"],
             workspace_path=workspace_path,
             owner_employee_id=owner,
+            owner_agent_id=assigned_agent_id,
         )
         session = controller.create_session(
             task_goal_text(task),
@@ -676,6 +677,7 @@ async def pickup_task(
         task_id=task["id"],
         workspace_path=workspace_path,
         owner_employee_id=current.get("ownerEmployeeId") or actor["employeeId"],
+        owner_agent_id=current.get("assignedAgentId"),
     )
     session = controller.create_session(task_goal_text(task), ["human", agent])
     mode = agent_task_mode(body.get("mode"))

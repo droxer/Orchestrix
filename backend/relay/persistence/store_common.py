@@ -112,6 +112,8 @@ def materialize_events(events: list[dict[str, Any]]) -> dict[str, Any]:
     }
     if created.get("ownerEmployeeId"):
         session["ownerEmployeeId"] = created["ownerEmployeeId"]
+    if created.get("ownerAgentId"):
+        session["ownerAgentId"] = created["ownerAgentId"]
     for event in events:
         session["events"].append(event)
         session["updatedAt"] = event["timestamp"]

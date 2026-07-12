@@ -5,6 +5,7 @@ import { getAgent } from "./agents.js";
 import { REPO_ROOT } from "./env.js";
 import type { AgentName, AgentTaskMode } from "./state.js";
 import { mergeTokenUsage, type TokenUsage } from "./token-usage.js";
+import type { CodexCollaborationEvent } from "./codex-collaboration.js";
 
 export type AgentRole = "implementer" | "reviewer" | "planner" | "tester" | "fixer";
 export type SessionStatus = "running" | "waiting_for_human" | "completed" | "failed" | "cancelled";
@@ -121,6 +122,17 @@ export type RelayEvent =
       stream: "stdout" | "stderr";
       text: string;
       sequence?: number;
+    }
+  | {
+      id: string;
+      type: "agent.collaboration";
+      sessionId: string;
+      timestamp: string;
+      runId: string;
+      agent: AgentName;
+      mode: AgentTaskMode;
+      sequence: number;
+      collaboration: CodexCollaborationEvent;
     }
   | {
       id: string;

@@ -27,7 +27,7 @@ export interface ManagedNodeRecord {
   assignmentMode: "dedicated" | "pooled" | "shared";
   provider: string;
   profile: string;
-  sandboxMode: "boxlite" | "none";
+  sandboxMode: "boxlite";
   workspacePolicy: Record<string, unknown>;
   desiredState: ManagedNodeDesiredState;
   generation: number;

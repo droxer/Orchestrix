@@ -20,7 +20,7 @@
   max-height: min(680px, 90vh);
   display: flex;
   flex-direction: column;
-  background: var(--color-surface-raised);
+  background: var(--color-semantic-surface-raised);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lift);
   overflow: hidden;
@@ -36,7 +36,7 @@
   justify-content: space-between;
   gap: var(--space-base);
   padding: var(--space-lg) var(--space-lg) var(--space-base);
-  border-bottom: 1px solid var(--color-hairline);
+  border-bottom: 1px solid var(--color-semantic-hairline);
   flex-shrink: 0;
 }
 
@@ -49,12 +49,12 @@
 .pref-header-text h3 {
   margin: 0;
   font: var(--type-title-lg);
-  color: var(--color-ink);
+  color: var(--color-semantic-ink);
   letter-spacing: var(--letter-tight);
 }
 
 .pref-header-sub {
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
   font: var(--type-caption-strong);
 }
 
@@ -77,7 +77,7 @@
   flex-direction: column;
   gap: 2px;
   padding: var(--space-sm) var(--space-xs);
-  border-right: 1px solid var(--color-hairline-soft);
+  border-right: 1px solid var(--color-semantic-hairline-soft);
   overflow-y: auto;
 }
 
@@ -89,7 +89,7 @@
   padding: var(--space-xs) var(--space-sm);
   border-radius: var(--radius-sm);
   font: var(--type-nav-link);
-  color: var(--color-body);
+  color: var(--color-semantic-body);
   text-align: left;
   transition: background var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
 }
@@ -98,7 +98,7 @@
    hovered, when it picks up the same ink as the text. */
 .pref-nav-item svg {
   flex-shrink: 0;
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
   transition: color var(--duration-fast) var(--ease-standard);
 }
 
@@ -107,8 +107,8 @@
 }
 
 .pref-nav-item:hover {
-  background: var(--color-surface-soft);
-  color: var(--color-ink);
+  background: var(--color-semantic-surface-soft);
+  color: var(--color-semantic-ink);
 }
 
 .pref-nav-item:hover svg,
@@ -117,8 +117,8 @@
 }
 
 .pref-nav-item.active {
-  background: var(--color-surface-strong);
-  color: var(--color-ink);
+  background: var(--color-semantic-surface-strong);
+  color: var(--color-semantic-ink);
   font-weight: 600;
 }
 
@@ -131,7 +131,7 @@
   width: 2px;
   height: 16px;
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-  background: var(--color-primary);
+  background: var(--color-semantic-action);
   transform: translateY(-50%);
 }
 
@@ -152,13 +152,13 @@
   font: var(--type-eyebrow);
   letter-spacing: var(--letter-eyebrow);
   text-transform: uppercase;
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
 }
 
 .pref-empty,
 .pref-section-note {
   margin: 0 0 var(--space-md);
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
   font: var(--type-caption);
   line-height: 1.5;
 }
@@ -175,8 +175,8 @@
   min-height: 2rem;
   padding: 0 var(--space-base);
   border-radius: var(--radius-sm);
-  background: var(--color-primary);
-  color: var(--color-on-primary);
+  background: var(--color-semantic-action);
+  color: var(--color-semantic-on-action);
   font: var(--type-label-strong);
 }
 
@@ -187,7 +187,7 @@
 
 .pref-error {
   margin: 0;
-  color: var(--color-danger-text);
+  color: var(--color-semantic-danger-text);
   font-size: var(--text-xs);
 }
 
@@ -198,7 +198,7 @@
   font: var(--type-eyebrow);
   letter-spacing: var(--letter-eyebrow);
   text-transform: uppercase;
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
 }
 
 .pref-group-label--spaced {
@@ -218,9 +218,9 @@
   align-items: center;
   gap: var(--space-base);
   padding: var(--space-sm) var(--space-base);
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--color-semantic-hairline);
   border-radius: var(--radius-md);
-  background: var(--color-canvas);
+  background: var(--color-semantic-canvas);
   text-align: left;
   transition:
     border-color var(--duration-fast) var(--ease-standard),
@@ -230,18 +230,18 @@
 }
 
 .pref-option-row:hover {
-  border-color: var(--color-muted-soft);
-  background: var(--color-surface-soft);
+  border-color: var(--color-semantic-muted-soft);
+  background: var(--color-semantic-surface-soft);
 }
 
 .pref-option-row.selected {
-  border-color: var(--color-primary);
-  background: color-mix(in srgb, var(--color-primary) 5%, var(--color-canvas));
+  border-color: var(--color-semantic-action);
+  background: color-mix(in srgb, var(--color-semantic-action) 5%, var(--color-semantic-canvas));
 }
 
 .pref-option-row:focus-visible {
   outline: none;
-  border-color: var(--color-primary);
+  border-color: var(--color-semantic-action);
   box-shadow: var(--ring-focus);
 }
 
@@ -255,17 +255,17 @@
 
 .pref-option-label {
   font: var(--type-label-strong);
-  color: var(--color-ink);
+  color: var(--color-semantic-ink);
 }
 
 .pref-option-sub {
   font-size: var(--text-xs);
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
   line-height: 1.35;
 }
 
 .pref-option-row.selected .pref-option-sub {
-  color: color-mix(in srgb, var(--color-primary) 65%, var(--color-muted));
+  color: color-mix(in srgb, var(--color-semantic-action) 65%, var(--color-semantic-muted));
 }
 
 .pref-option-check {
@@ -282,7 +282,7 @@
   width: 2.75rem;
   height: 1.75rem;
   border-radius: var(--radius-xs);
-  border: 1px solid color-mix(in srgb, var(--color-ink) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-semantic-ink) 10%, transparent);
   position: relative;
   overflow: hidden;
 }
@@ -296,50 +296,39 @@
   height: 3px;
 }
 
+/* Swatches preview the light/dark canvas + action color regardless of the
+   currently active theme, so — unlike the rest of this file — they must
+   use literal values rather than var() (which would only ever reflect
+   whichever theme is active right now). Keep these in sync with the
+   --color-accent / --color-canvas-base primitives in tokens/primitives.css
+   (dark/default values) and their html[data-theme="light"] overrides
+   (light values). Documented stylelint exception — see web/.stylelintrc.json. */
 .pref-theme-swatch[data-tone="light"] {
-  background: #f8f8fa;
+  background: #ffffff;
 }
 
 .pref-theme-swatch[data-tone="light"]::after {
-  background: #3b5bdb;
+  background: #0c7566; /* light theme's deepened teal (accent is theme-varying, unlike the old lavender) */
 }
 
 .pref-theme-swatch[data-tone="dark"] {
-  background: #0f1011;
-  border-color: color-mix(in srgb, #ffffff 14%, transparent);
+  background: #010102;
+  border-color: color-mix(in srgb, #f7f8f8 14%, transparent);
 }
 
 .pref-theme-swatch[data-tone="dark"]::after {
-  background: #7089ff;
+  background: #22d9c0; /* dark theme's bright signal cyan */
 }
 
 .pref-theme-swatch[data-tone="system"] {
-  background: linear-gradient(135deg, #f8f8fa 0 50%, #0f1011 50% 100%);
-  border-color: color-mix(in srgb, var(--color-ink) 10%, transparent);
+  background: linear-gradient(135deg, #ffffff 0 50%, #010102 50% 100%);
+  border-color: color-mix(in srgb, var(--color-semantic-ink) 10%, transparent);
 }
 
 .pref-theme-swatch[data-tone="system"]::after {
-  background: linear-gradient(90deg, #3b5bdb 0 50%, #7089ff 50% 100%);
-}
-
-.pref-theme-swatch[data-tone="contrast"] {
-  background: #ffffff;
-  border: 2px solid #000000;
-}
-
-.pref-theme-swatch[data-tone="contrast"]::after {
-  background: #000000;
-  height: 4px;
-}
-
-.pref-theme-swatch[data-tone="contrast-dark"] {
-  background: #000000;
-  border: 2px solid #ffffff;
-}
-
-.pref-theme-swatch[data-tone="contrast-dark"]::after {
-  background: #ffffff;
-  height: 4px;
+  /* Signal Cyan is theme-varying (deep teal on light / bright cyan on
+     dark), so the split-gradient dot shows both, half per theme. */
+  background: linear-gradient(90deg, #0c7566 0 50%, #22d9c0 50% 100%);
 }
 
 /* ── Language badges ──────────────────────────────────────────────────────── */
@@ -352,13 +341,13 @@
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-xs);
-  border: 1px solid var(--color-hairline);
-  background: var(--color-surface-soft);
+  border: 1px solid var(--color-semantic-hairline);
+  background: var(--color-semantic-surface-soft);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   font-weight: 600;
   letter-spacing: var(--letter-caps);
-  color: var(--color-ink);
+  color: var(--color-semantic-ink);
 }
 
 @media (max-width: 820px) {
@@ -384,7 +373,7 @@
     overflow-x: auto;
     padding: var(--space-sm);
     border-right: none;
-    border-bottom: 1px solid var(--color-hairline-soft);
+    border-bottom: 1px solid var(--color-semantic-hairline-soft);
   }
 
   .pref-content {

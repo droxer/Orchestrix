@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 from fastapi import FastAPI
 from loguru import logger
 
-from .api import admin_routes, agent_routes, auth_routes, chat_routes, daemon_node_routes, managed_node_routes, sandbox_routes, session_routes, task_routes, web_routes
+from .api import admin_routes, agent_routes, agent_workspace_routes, auth_routes, chat_routes, daemon_node_routes, managed_node_routes, sandbox_routes, session_routes, task_routes, web_routes
 from .core.environment import load_backend_env
 from .core.storage_config import database_url_from_env, use_postgres_storage
 from .persistence.stores import (
@@ -27,8 +27,9 @@ from .security.auth import auth_store_from_env
 from .chat import DatabaseChatIntegrationStore, LocalChatIntegrationStore
 from .tasks import TaskScheduler
 from .services.managed_nodes import LocalManagedNodeStore
-from .persistence.employee_agent_store import DatabaseEmployeeAgentStore, LocalEmployeeAgentStore
+from .persistence.agent_store import DatabaseAgentStore, LocalAgentStore
 from .persistence.agent_placement_store import DatabaseAgentPlacementStore, LocalAgentPlacementStore
+from .services.workspace_query import WorkspaceQueryBroker
 
 load_backend_env()
 
@@ -46,12 +47,12 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     chat_store = chat_store_from_env(root_dir)
     auth_store = auth_store_from_env(root_dir)
     managed_node_store = LocalManagedNodeStore(root_dir)
-    employee_agent_store = employee_agent_store_from_env(root_dir)
+    agent_store = agent_store_from_env(root_dir)
     agent_placement_store = agent_placement_store_from_env(root_dir)
     registry = DaemonNodeRegistry(session_store, daemon_store, task_store=task_store)
     backend = ServerDaemonNodeBackend(
         registry,
-        employee_agent_store=employee_agent_store,
+        agent_store=agent_store,
         agent_placement_store=agent_placement_store,
     )
 
@@ -76,8 +77,10 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     app.state.backend = backend
     app.state.auth_store = auth_store
     app.state.managed_node_store = managed_node_store
-    app.state.employee_agent_store = employee_agent_store
+    app.state.agent_store = agent_store
+    app.state.employee_agent_store = agent_store  # compatibility for migrations still reading the old name
     app.state.agent_placement_store = agent_placement_store
+    app.state.workspace_query_broker = WorkspaceQueryBroker()
     app.state.task_scheduler = scheduler
     app.state.control_panel_version = CONTROL_PANEL_VERSION
 
@@ -104,6 +107,7 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
 
     app.include_router(auth_routes.router)
     app.include_router(agent_routes.router)
+    app.include_router(agent_workspace_routes.router)
     app.include_router(admin_routes.router)
     app.include_router(chat_routes.router)
     app.include_router(task_routes.router)
@@ -126,10 +130,10 @@ def daemon_store_from_env(root_dir: Path) -> Any:
     return DatabaseDaemonStore(database_url)
 
 
-def employee_agent_store_from_env(root_dir: Path) -> Any:
+def agent_store_from_env(root_dir: Path) -> Any:
     if not use_postgres_storage():
-        return LocalEmployeeAgentStore(root_dir)
-    return DatabaseEmployeeAgentStore(database_url_from_env(setting="RELAY_STORAGE=postgres"))
+        return LocalAgentStore(root_dir)
+    return DatabaseAgentStore(database_url_from_env(setting="RELAY_STORAGE=postgres"))
 
 
 def agent_placement_store_from_env(root_dir: Path) -> Any:

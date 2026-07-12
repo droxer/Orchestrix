@@ -34,14 +34,14 @@
 .routine-card,
 .adm-emp-row,
 .adm-node-card,
-.content-auto-card {
+.content-auto-card,
+.agents-roster-row {
   content-visibility: auto;
   contain-intrinsic-size: auto 96px;
 }
 
 .backlog-task,
 .routine-card,
-.agents-card,
 .adm-node-card,
 .content-auto-card {
   contain-intrinsic-size: auto 220px;
@@ -87,16 +87,19 @@
   .backlog-task-actions button,
   .backlog-row-actions select,
   .backlog-row-actions button,
-  .workspace-preview-open,
   .code-view-toggle,
   .adm-view-toggle-btn,
   .adm-mode-tab,
   .adm-copy-pill,
-  .adm-cred-action-button,
+  .adm-form-actions [data-slot="button"],
   .overlay-close,
   .adm-drawer-close,
   .adm-chat-rows button,
-  .people-search {
+  .relay-search,
+  .adm-search,
+  .adm-fleet-chip,
+  .adm-emp-delete,
+  .adm-node-card-icon-btn {
     min-height: 44px;
   }
 
@@ -116,7 +119,7 @@
     height: 32px;
   }
 
-  /* Inline connect affordance inside the (already-boosted 44px) people-search
+  /* Inline connect affordance inside the (already-boosted 44px) relay-search
      field. A full 44px plate would overflow the field, so raise it to the 36px
      icon-button base — comfortably past the 24px WCAG 2.5.8 floor and centered
      in the taller touch field. */
@@ -151,22 +154,32 @@
   .adm-view-toggle-btn {
     min-width: 44px;
   }
+
+  .adm-fleet-chip {
+    min-width: 44px;
+    padding-inline: var(--space-sm);
+  }
+
+  .adm-emp-delete,
+  .adm-node-card-icon-btn {
+    width: 44px;
+    height: 44px;
+  }
 }
 
-/* OS “increase contrast” — boost hairlines and body copy when the user
-   has not already pinned the dedicated High contrast theme. */
+/* OS “increase contrast” — boost hairlines and body copy. */
 @media (prefers-contrast: more) {
   html[data-theme="light"] {
-    --color-body: var(--color-ink);
-    --color-hairline: color-mix(in srgb, var(--color-ink) 42%, var(--color-canvas));
-    --color-hairline-soft: color-mix(in srgb, var(--color-ink) 28%, var(--color-canvas));
-    --ring-focus: 0 0 0 3px var(--color-ink);
+    --color-semantic-body: var(--color-semantic-ink);
+    --color-semantic-hairline: color-mix(in srgb, var(--color-semantic-ink) 42%, var(--color-semantic-canvas));
+    --color-semantic-hairline-soft: color-mix(in srgb, var(--color-semantic-ink) 28%, var(--color-semantic-canvas));
+    --ring-focus: 0 0 0 3px var(--color-semantic-ink);
   }
 
   html[data-theme="dark"] {
-    --color-body: color-mix(in srgb, var(--color-on-dark) 92%, var(--color-surface-dark));
-    --color-hairline: color-mix(in srgb, var(--color-on-dark) 38%, var(--color-surface-dark));
-    --color-hairline-soft: color-mix(in srgb, var(--color-on-dark) 26%, var(--color-surface-dark));
-    --ring-focus: 0 0 0 3px var(--color-on-dark);
+    --color-semantic-body: color-mix(in srgb, var(--color-semantic-on-dark) 92%, var(--color-semantic-surface-dark));
+    --color-semantic-hairline: color-mix(in srgb, var(--color-semantic-on-dark) 38%, var(--color-semantic-surface-dark));
+    --color-semantic-hairline-soft: color-mix(in srgb, var(--color-semantic-on-dark) 26%, var(--color-semantic-surface-dark));
+    --ring-focus: 0 0 0 3px var(--color-semantic-on-dark);
   }
 }

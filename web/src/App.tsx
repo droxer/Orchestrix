@@ -16,12 +16,14 @@ import { useSessionEvents } from "./hooks/useSessionEvents";
 import { useLocalDaemonNodes } from "./hooks/useLocalDaemonNodes";
 import { mergeVisibleDaemonNodes } from "./lib/daemonNodes";
 import { formatDispatchError } from "./lib/agentReadiness";
+import { isLogicalAgentRoutable } from "./lib/agentDisplayNames";
 import { applyTheme, readLanguage, readTheme, readTokens, selectedEmployeeKey, writeLanguage, writeTheme } from "./lib/appStorage";
 import { canUseLocalControlPanel } from "./lib/controlPanel";
 import { useRelayStore } from "./lib/store";
 import { useAuthSession } from "./hooks/useAuthSession";
 import { useClientMounted } from "./hooks/useClientMounted";
 import { useActiveSession } from "./hooks/useActiveSession";
+import type { WorkspacePageTab } from "./components/AgentWorkspacePage";
 import { chooseSendAction, suppressActiveSessionDuringPendingSend } from "./lib/sendAction";
 import { myConversationSessions, matchesConversationQuery, pickActiveConversationSession } from "./lib/conversations";
 import { shouldTailSessionEvents } from "./lib/sessionEventStream";
@@ -46,14 +48,12 @@ import {
 const AdminConsole = lazy(() => import("./components/AdminConsole").then((m) => ({ default: m.AdminConsole })));
 const BacklogPage = lazy(() => import("./components/BacklogPage").then((m) => ({ default: m.BacklogPage })));
 const ChannelsPage = lazy(() => import("./components/ChannelsPage").then((m) => ({ default: m.ChannelsPage })));
-const EmployeeWorkspacePage = lazy(() => import("./components/EmployeeWorkspacePage").then((m) => ({ default: m.EmployeeWorkspacePage })));
 const RoutinePage = lazy(() => import("./components/RoutinePage").then((m) => ({ default: m.RoutinePage })));
 const AgentsPage = lazy(() => import("./components/AgentsPage").then((m) => ({ default: m.AgentsPage })));
 
 const agents: AgentName[] = AGENT_NAMES;
 
 const WORK_ROUTE_SKIP_IDS: Record<Exclude<AppRoute, "main">, string> = {
-  workspace: "workspace-panel",
   backlog: "backlog-panel",
   routine: "routine-panel",
   agents: "agents-panel",
@@ -134,17 +134,6 @@ export function App() {
     () => logicalAgents.find((agent) => agent.id === activeLogicalAgentId),
     [activeLogicalAgentId, logicalAgents],
   );
-  const logicalExecutorHealth = useMemo(() => Object.fromEntries(
-    agents.map((executorKind) => [
-      executorKind,
-      logicalAgents.some((agent) => agent.executorKind === executorKind && agent.availability === "ready")
-        ? "ready"
-        : "failed",
-    ]),
-  ) as Partial<Record<AgentName, "ready" | "failed">>, [logicalAgents]);
-  const unavailableLogicalExecutors = useMemo(() => agents.filter(
-    (executorKind) => logicalExecutorHealth[executorKind] !== "ready",
-  ), [logicalExecutorHealth]);
   const agentRoleLabels = useMemo<Partial<Record<AgentName, string>>>(() => Object.fromEntries(
     agents.map((executorKind) => {
       return [executorKind, t(`agent.${executorKind}.role`)];
@@ -188,10 +177,12 @@ export function App() {
   const {
     route,
     mobileView,
+    agentWorkspaceId,
     navigateToRoute,
     navigateToMobileView,
     hrefForSideNavRoute,
     syncChatHash,
+    navigateToAgentWorkspace,
   } = useAppHash({
     composingNew,
     activeSessionId,
@@ -200,6 +191,13 @@ export function App() {
     onApplySessionFromHash: applySessionFromHash,
     onClearPendingMessage: clearPendingMessage,
   });
+
+  useEffect(() => {
+    const workspaceAgent = logicalAgents.find((agent) => agent.id === agentWorkspaceId);
+    if (!workspaceAgent) return;
+    setActiveLogicalAgentId(workspaceAgent.id);
+    setActiveAgent(workspaceAgent.executorKind);
+  }, [agentWorkspaceId, logicalAgents]);
 
   // Live SSE tail of the open conversation; merges new events into the
   // sessions cache so the active thread updates at push latency.
@@ -243,8 +241,9 @@ export function App() {
 
   const skipLinkHref = useMemo(() => {
     if (route === "main") return mobileView === "threads" ? "#thread-panel" : "#chat-panel";
+    if (route === "agents" && agentWorkspaceId) return "#agent-workspace-panel";
     return `#${WORK_ROUTE_SKIP_IDS[route]}`;
-  }, [route, mobileView]);
+  }, [agentWorkspaceId, route, mobileView]);
 
   const awaitingDecision = useMemo(() => isAwaitingFeedbackDecision(activeSession), [activeSession]);
 
@@ -303,13 +302,13 @@ export function App() {
       setActiveLogicalAgentId(null);
       return;
     }
-    const selected = logicalAgents.find((agent) => agent.id === activeLogicalAgentId && agent.availability === "ready")
-      ?? logicalAgents.find((agent) => agent.availability === "ready")
+    const selected = logicalAgents.find((agent) => agent.id === activeLogicalAgentId && isLogicalAgentRoutable(agent.availability))
+      ?? logicalAgents.find((agent) => isLogicalAgentRoutable(agent.availability))
       ?? logicalAgents[0];
     setActiveLogicalAgentId(selected.id);
     setActiveAgent(selected.executorKind);
-    if (!logicalAgents.some((agent) => agent.id === handoffAgentId && agent.availability === "ready")) {
-      setHandoffAgentId(logicalAgents.find((agent) => agent.availability === "ready")?.id ?? "");
+    if (!logicalAgents.some((agent) => agent.id === handoffAgentId && isLogicalAgentRoutable(agent.availability))) {
+      setHandoffAgentId(logicalAgents.find((agent) => isLogicalAgentRoutable(agent.availability))?.id ?? "");
     }
   }, [activeLogicalAgentId, handoffAgentId, logicalAgents]);
   useEffect(() => {
@@ -387,10 +386,16 @@ export function App() {
     syncChatHash(null);
   }
 
-  function openAgentWorkspace(agent: EmployeeAgent) {
+  function openAgentWorkspace(agent: EmployeeAgent, tab?: WorkspacePageTab) {
     setActiveLogicalAgentId(agent.id);
     setActiveAgent(agent.executorKind);
-    navigateToRoute("workspace");
+    navigateToAgentWorkspace(agent.id);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      if (tab && tab !== "artifacts") url.searchParams.set("workspaceTab", tab);
+      else url.searchParams.delete("workspaceTab");
+      window.history.replaceState(window.history.state, "", url);
+    }
   }
 
   function startConversationWithAgent(agent: EmployeeAgent) {
@@ -443,7 +448,9 @@ export function App() {
     const goal = raw;
     const routedAgent = activeAgent;
     if (!goal) return;
-    const routedLogicalAgent = activeLogicalAgent?.availability === "ready" ? activeLogicalAgent : undefined;
+    const routedLogicalAgent = activeLogicalAgent && isLogicalAgentRoutable(activeLogicalAgent.availability)
+      ? activeLogicalAgent
+      : undefined;
     if (!routedLogicalAgent) {
       reportMutationError("Agent not ready for dispatch", null, t("errors.agent_not_ready", { agent: routedAgent }));
       return;
@@ -523,7 +530,7 @@ export function App() {
       try {
         const assignment = rerunAssignmentForSession(activeSession, activeAgent, composerMode);
         const logicalAgent = logicalAgents.find(
-          (agent) => agent.executorKind === assignment.agent && agent.availability === "ready",
+          (agent) => agent.executorKind === assignment.agent && isLogicalAgentRoutable(agent.availability),
         );
         if (!logicalAgent) {
           reportMutationError(
@@ -577,7 +584,7 @@ export function App() {
     setIsRunning(true);
     try {
       const logicalAgent = logicalAgents.find(
-        (candidate) => candidate.executorKind === agent && candidate.availability === "ready",
+        (candidate) => candidate.executorKind === agent && isLogicalAgentRoutable(candidate.availability),
       );
       if (!logicalAgent) {
         reportMutationError("Agent not ready for retry", null, t("errors.agent_not_ready", { agent }));
@@ -613,7 +620,7 @@ export function App() {
     if (!selectedEmployee) return;
     if (conversationRunning) return;
     const logicalAgent = logicalAgents.find(
-      (agent) => agent.id === handoffAgentId && agent.availability === "ready",
+      (agent) => agent.id === handoffAgentId && isLogicalAgentRoutable(agent.availability),
     );
     if (!logicalAgent) {
       reportMutationError("Agent not ready for handoff", null, t("errors.agent_not_ready", { agent: handoffAgentId }));
@@ -687,16 +694,7 @@ export function App() {
       onLanguageChange={setLanguage}
     >
       <Suspense fallback={<RouteFallback />}>
-        {route === "admin" ? <AdminConsole currentUser={user} /> : route === "channels" ? <ChannelsPage /> : route === "workspace" ? (
-          <EmployeeWorkspacePage
-            employeeId={selectedEmployee}
-            agent={activeLogicalAgent}
-            currentUser={user}
-            isRefreshing={isRefreshing}
-            onRefresh={() => refresh()}
-            onOpenConversation={openConversation}
-          />
-        ) : route === "backlog" ? (
+        {route === "admin" ? <AdminConsole currentUser={user} /> : route === "channels" ? <ChannelsPage /> : route === "backlog" ? (
           <BacklogPage
             tasks={tasks}
             sessions={sessions}
@@ -721,8 +719,10 @@ export function App() {
             currentUser={user}
             isRefreshing={isRefreshing}
             onRefresh={() => refresh()}
+            workspaceAgent={activeLogicalAgent?.id === agentWorkspaceId ? activeLogicalAgent ?? null : null}
             onOpenWorkspace={openAgentWorkspace}
             onStartConversation={startConversationWithAgent}
+            onOpenConversation={openConversation}
           />
         ) : (
           <MainChatView
@@ -741,9 +741,6 @@ export function App() {
             onRenameConversation={(session) => void renameConversation(session)}
             onCloseConversation={(id) => void closeConversation(id)}
             activeAgent={activeAgent}
-            agentNames={agents}
-            disabledAgents={unavailableLogicalExecutors}
-            agentHealth={logicalExecutorHealth}
             logicalAgents={logicalAgents}
             activeLogicalAgentId={activeLogicalAgentId}
             onLogicalAgentPicked={(agent: EmployeeAgent) => {
@@ -775,7 +772,10 @@ export function App() {
             setHandoffNote={setHandoffNote}
             sendDecision={sendDecision}
             sendHandoff={sendHandoff}
-            onAgentPicked={setActiveAgent}
+            onAgentPicked={(agent) => {
+              setActiveLogicalAgentId(agent.id);
+              setActiveAgent(agent.executorKind);
+            }}
             onSend={handleComposerSend}
             onCancelRun={handleCancelRun}
             onRetryAgent={handleRetryAgent}

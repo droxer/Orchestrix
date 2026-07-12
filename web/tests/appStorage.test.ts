@@ -22,6 +22,7 @@ describe("Relay web theme storage", () => {
       documentElement: {
         setAttribute: (_name: string, value: string) => { themeAttr = value; },
         getAttribute: () => themeAttr,
+        classList: { toggle: () => false },
       },
     } as unknown as Document;
   });
@@ -33,30 +34,23 @@ describe("Relay web theme storage", () => {
     delete (globalThis as { matchMedia?: typeof globalThis.matchMedia }).matchMedia;
   });
 
-  it("defaults readTheme to system when storage is empty", () => {
-    assert.equal(readTheme(), "system");
+  it("defaults readTheme to dark when storage is empty", () => {
+    assert.equal(readTheme(), "dark");
   });
 
   it("rejects unknown stored themes", () => {
     storage.set("relay-web.theme", "neon");
-    assert.equal(readTheme(), "system");
+    assert.equal(readTheme(), "dark");
   });
 
-  it("applyTheme maps the explicit contrast themes straight through, ignoring the OS", () => {
-    const matchMedia = (query: string) => ({
-      matches: query.includes("dark"),
-      media: query,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-    });
-    globalThis.matchMedia = matchMedia as unknown as typeof globalThis.matchMedia;
-    (globalThis as { window?: Window }).window = {
-      matchMedia: matchMedia as unknown as Window["matchMedia"],
-    } as Window;
-    applyTheme("contrast");
-    assert.equal(themeAttr, "contrast");
-    applyTheme("contrast-dark");
-    assert.equal(themeAttr, "contrast-dark");
+  it("migrates legacy high-contrast themes to system", () => {
+    storage.set("relay-web.theme", "contrast");
+    assert.equal(readTheme(), "system");
+    assert.equal(storage.get("relay-web.theme"), "system");
+
+    storage.set("relay-web.theme", "contrast-dark");
+    assert.equal(readTheme(), "system");
+    assert.equal(storage.get("relay-web.theme"), "system");
   });
 
   it("applyTheme resolves light and dark literally", () => {
@@ -67,14 +61,12 @@ describe("Relay web theme storage", () => {
   });
 
   it("exports all preference theme options", () => {
-    assert.deepEqual([...SUPPORTED_THEMES], ["light", "dark", "system", "contrast", "contrast-dark"]);
+    assert.deepEqual([...SUPPORTED_THEMES], ["light", "dark", "system"]);
   });
 
   it("maps explicit themes to browser chrome colors", () => {
-    assert.equal(themeColorForTheme("light"), "#fcfcfd");
-    assert.equal(themeColorForTheme("dark"), "#0f1011");
-    assert.equal(themeColorForTheme("contrast"), "#ffffff");
-    assert.equal(themeColorForTheme("contrast-dark"), "#000000");
+    assert.equal(themeColorForTheme("light"), "#ffffff");
+    assert.equal(themeColorForTheme("dark"), "#010102");
   });
 
   it("applyTheme resolves system via matchMedia", () => {

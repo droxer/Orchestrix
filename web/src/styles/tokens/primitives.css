@@ -1,0 +1,369 @@
+/* =====================================================================
+   Tier 1 — Primitives.
+
+   Raw values with no role or intent baked into the name: hex/rgba colors
+   and the numeric scales (spacing, radii, type, tracking, leading,
+   z-index, motion, shell dimensions). Nothing here says what a value is
+   *for* — that's semantic.css. A primitive may still be theme-aware (the
+   `html[data-theme="light"]` block below redeclares the same custom
+   property names with different values) since that's a fact about the
+   color itself, not a role assignment.
+
+   Palette direction: Signal Cyan — near-black canvas (#010102, per
+   DESIGN.md's Linear-design-analysis reference) with a four-step
+   charcoal surface ladder, light-gray ink, and an electric telemetry
+   cyan (#22d9c0) as the single chromatic accent, used ONLY for the
+   brand mark, primary actions, and focus. This deliberately departs
+   from DESIGN.md's literal lavender-blue accent: lavender-on-dark is
+   now the default dev-tool-SaaS accent (Linear, Raycast, Warp all
+   converge there), while cyan reads as a live signal/network lock —
+   fitting for a daemon/node/session orchestration surface — and stays
+   perceptually distinct from the existing green/red/amber status trio.
+   Dark is the primary, default register; light is a derived secondary
+   theme (not covered by DESIGN.md, which is dark-only) that deepens the
+   same cyan into a dark teal for AA contrast on a white canvas. Status
+   hues (green/red/amber) remain the only other chroma in the system —
+   dots, borders, and text, never fills or actions. One crisp grotesk
+   (Geist) carries every text role; Geist Mono is reserved for code-like
+   content. Geometry is tight (5–6px controls), hairlines draw all
+   structure, and motion is fast with no overshoot. Because semantic.css
+   only ever aliases these names, this whole reskin lives entirely in
+   this file; no component CSS changed.
+
+   No component CSS should ever reference a primitive directly — always
+   go through a --color-semantic-* / --type-* / --shadow-* role in
+   semantic.css. This file is the only place a hex value is allowed to
+   originate (see web/.stylelintrc.json).
+   ===================================================================== */
+
+/* Layout breakpoints — reference values for @media queries (custom
+   properties cannot be used in @media conditions without @custom-media).
+   --bp-mobile: 820px   primary shell collapse
+   --bp-tablet: 1040px  narrow thread pane
+   --bp-login-stack: 879px  login editorial pane drop
+   --bp-admin-drawer: 768px  full-width admin drawers
+   --bp-admin-compact: 640px  icon-only admin chrome
+   --bp-preferences: 600px  horizontal preferences nav
+   --bp-artifact-chip: 560px  hide artifact chip CTA text */
+
+:root {
+  /* ----- Color primitives — dark register (default) -------------- */
+  /* Linear's near-black canvas (DESIGN.md) + a Signal Cyan accent (a
+     deliberate departure from DESIGN.md's literal lavender — see the
+     Accent block below). Dark is the primary experience;
+     html[data-theme="light"] below supplies a derived secondary theme. */
+
+  /* Accent — Signal Cyan is the single chromatic action color: brand
+     mark, primary CTA, focus ring, link emphasis. Deliberately NOT
+     DESIGN.md's literal lavender-blue — an electric telemetry cyan
+     reads as a live signal/network lock (fits "daemon", "node",
+     "session" vocabulary) and avoids converging on the lavender-on-dark
+     accent nearly every dev-tool SaaS (Linear, Raycast, Warp) now
+     shares. Rest state is bright, so on-accent text goes DARK here
+     (the inverse of a mid-tone accent like lavender, which pairs with
+     white text) — see --color-on-accent below. Disabled fades to a
+     desaturated gray-teal rather than toward black, since a darker
+     disabled fill would break the dark-on-accent text pairing. */
+  --color-accent: #22d9c0;
+  --color-accent-active: #5eefda;
+  --color-accent-disabled: #5f7a75;
+  --color-accent-tint: #0c211d; /* selection wash — a dark teal-tinted surface, not a pastel */
+
+  /* Ink — Linear's light-gray text ramp, darkest(brightest)-first. */
+  --color-ink-900: #f7f8f8;
+  --color-ink-700: #d0d6e0;
+  --color-ink-500: #8a8f98;
+  --color-ink-300: #62666d;
+  --color-ink-200: #4a4d54; /* rail/decorative border step between hairline and ink-300 */
+
+  /* On-fill text — theme-varying, and now direction-flipped from the old
+     lavender scheme: the dark theme's cyan is BRIGHT, so its on-accent
+     text is near-black ink (verified ~4.5:1+ against rest/hover/disabled
+     accent fills); the light theme's accent is deepened enough that
+     on-accent stays white (see html[data-theme="light"] below). */
+  --color-on-accent: #04120f;
+  --color-porcelain: #f7f8f8;  /* text on ink/dark fills that appear in both themes */
+
+  /* True white — always literal, never theme-varying. Used only as a
+     color-mix input (alpha overlays mixing toward white); kept distinct
+     from --color-on-accent, which flips to a dark ink in light mode. */
+  --color-white: #ffffff;
+
+  /* Canvas — Linear's four-step charcoal surface ladder on a near-black
+     (#010102) canvas. Structure comes from hairlines, not shadows. */
+  --color-canvas-base: #010102;
+  --color-canvas-soft: #0f1011;    /* surface-1 — default cards, product panels */
+  --color-canvas-strong: #141516;  /* surface-2 — fills, search, hovered cards */
+  --color-canvas-raised: #18191a;  /* surface-3 — modals, drawers, floating chrome */
+
+  /* Graphite — the always-dark surface register (chrome that stays dark
+     even on the light theme, e.g. dark buttons/fills, the always-dark
+     diff viewer). Theme-invariant; not redeclared under light. */
+  --color-graphite-900: #191a1b;
+  --color-graphite-800: #202124;
+  --color-graphite-400: #9a9aa3;
+
+  /* Hairline ramp. */
+  --color-hairline-300: #23252a;
+  --color-hairline-200: #17181b;
+
+  /* Status hues — the only other chroma in the system besides the
+     Signal Cyan accent. Text, dots, and borders only; never background
+     fills, never actions. Success matches DESIGN.md's semantic-success
+     directly; red/amber/slate are undocumented by the (dark-only)
+     marketing spec, so they carry forward this app's dark-tuned values. */
+  --color-green: #27a644;    /* success — DESIGN.md semantic-success */
+  --color-red: #f87171;      /* danger */
+  --color-yellow: #fbbf24;   /* warning (dot-only contrast) */
+  --color-slate: #9a9aa3;    /* info — neutral, decoupled from the accent */
+  --color-yellow-deep: #fbbf24; /* warning as text — ~7:1 on the near-black canvas */
+  --color-red-deep: #f87171;    /* danger as text */
+  --color-rust: #f0a868;        /* syntax-highlight numerals — orthogonal to the reskin */
+
+  /* True black — used only as color-mix inputs (alpha overlays), never
+     assigned directly to a role. */
+  --color-black: #000000;
+
+  /* Shadow tints — near-black drop-shadow bases and the modal scrim
+     base. DESIGN.md's overlay scrim is pure black. */
+  --color-shadow-ink: #000000;
+  --color-shadow-ink-ring: #23252a;
+  --color-scrim-base: #000000;
+
+  /* Artifact kind accents — the one DECORATIVE color group in the system, a
+     deliberate exception to "hue is status-only". These mirror the TUI
+     artifact palette so the transcript chip's left-border kind tag reads
+     identically across the two surfaces. Tokenized (not inlined) so light
+     and contrast can retune them; consumed only by artifact.css. Brightened
+     for the near-black canvas. --color-diff-hunk is the hunk header inside
+     the always-dark diff viewer, so it does not flip. --color-kind-review
+     is a named alias for the "review passed" green so the kind accent does
+     not borrow the status-semantic-success token directly. */
+  --color-kind-plan: #22b8d4;     /* cyan */
+  --color-kind-diff: #e0913a;     /* amber */
+  --color-kind-test: #a78bfa;     /* violet */
+  --color-kind-log: #e879f9;      /* magenta */
+  --color-kind-summary: #60a5fa;  /* blue */
+  --color-kind-review: #34d399;   /* green — named separately as a decorative alias */
+  --color-diff-hunk: #5eb3f5;
+
+  /* ----- Structural primitives — theme-independent scales -------- */
+
+  /* Radii — precision geometry: 5–6px controls, 8–10px cards and
+     drawers. Nothing balloons past 16px except the true circle. */
+  --radius-none: 0;
+  --radius-xs: 3px;
+  --radius-sm: 5px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+  --radius-2xl: 12px;
+  --radius-3xl: 14px;
+  --radius-4xl: 16px;
+  --radius-full: 9999px;
+  --radius-pill: var(--radius-sm); /* retired — aliases sm */
+
+  /* Spacing — 4px base unit. */
+  --space-xxs: 4px;
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-base: 16px;
+  --space-md: 20px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-xxl: 48px;
+  --space-section: 64px;
+  --space-row-y: var(--space-sm); /* Linear-dense row rhythm default */
+
+  /* Control sizing — 40px recurred as a bare literal across 10+ files
+     (inputs, dialog buttons, admin drawer fields, backlog rows, composer,
+     handoff rows) without a shared name; promoted here since it's a real,
+     reused value rather than a one-off layout dimension. */
+  --size-control-md: 40px;
+
+  /* Shell dimensions */
+  --sidenav-w: 72px;
+  --sidenav-w-open: 228px;
+  --thread-w: 318px;
+  --header-h: 64px;
+
+  /* Z-index scale — named layers cover all floating chrome. Pick by role:
+     popover < drawer < modal < sheet < float < overlay < dialog.
+
+     Overlay grammar (surface + motion):
+       • Centered modal  — preferences, confirm/prompt (desktop centered lift;
+         ≤820px confirm + preferences become bottom sheets).
+       • Right drawer    — admin forms, task editor, artifact library (desktop
+         slide from right; mobile full-viewport slide up).
+       • Bottom sheet    — admin attention rail (mobile), composer popovers.
+       Confirm dialogs stack above everything (--z-dialog) so they can interrupt
+       an open drawer or preferences panel. */
+  --z-popover: 20;  /* popovers, dropdowns, pickers (composer agent/mention pickers) */
+  --z-drawer: 30;   /* side drawers, detail panels */
+  --z-modal: 40;    /* in-pane modal chrome, floating action buttons */
+  --z-sheet: 50;    /* mobile bottom sheets + their scrims — must beat the FAB that opens them */
+  --z-float: 120;   /* transient nav chrome above every pane: sidenav flyout menus, tooltips */
+  --z-overlay: 200; /* full-screen modal overlays (preferences) — beats --z-float */
+  --z-dialog: 300;  /* confirm dialogs — topmost interactive layer, can stack over overlays */
+
+  /* Type scale — operational chat surface scale (px). */
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 13px;
+  --text-md: 16px;
+  --text-lg: 18px;
+  --text-xl: 22px;
+  --text-2xl: 24px;
+  --text-3xl: 26px;
+  --text-4xl: 30px;
+  --text-2xs: 11px;
+  --text-micro: 10px;
+
+  /* Leading scale */
+  --leading-tight: 1.15;
+  --leading-snug: 1.33;
+  --leading-normal: 1.5;
+  --leading-loose: 1.65;
+
+  /* Tracking scale — one token per intent, not per pixel. DESIGN.md
+     pulls display tracking aggressively negative (-3.0px at 80px ≈ 4%
+     of size); at this app's chat-chrome display sizes (22–34px) that
+     ratio lands around -0.02em to -0.03em. Body stays neutral. */
+  --letter-display: -0.025em;
+  --letter-tight: -0.015em;
+  --letter-body: 0;
+  --letter-open: 0.02em;
+  --letter-caps: 0.04em;
+  --letter-caps-wide: 0.06em;
+  --letter-eyebrow: 0.05em;
+  --letter-eyebrow-wide: 0.08em;
+  --letter-number-fluid: -0.01em;
+
+  /* Font stacks — Geist (a crisp, precision-drawn grotesk) carries every
+     text role: display, chrome, and body alike, standing in for
+     DESIGN.md's proprietary Linear Display/Text (Inter/Geist Sans are
+     its own documented free substitutes). Weight and tracking do the
+     differentiating, never a family switch. Geist Mono is reserved
+     for code-like content. --font-number aliases the same family so
+     metric numerals read as part of the same voice, not mono. */
+  --font-sans: var(--font-app-sans), "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-display: var(--font-app-sans), "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-mono: var(--font-geist-mono), "Geist Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --font-number: var(--font-app-sans), "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+
+  /* Motion — canonical curves + durations. `--ease-out-quint` is the
+     confident rise (login pane, transcript empty); `--ease-standard` is
+     everything else; `--ease-emphasized` is the firmer decelerate used by
+     tab underlines and the preferences modal rise. `--ease-spring` is
+     RETIRED — the precision system never overshoots — and aliases the
+     standard curve for its remaining consumers. */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-out-quint: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-spring: cubic-bezier(0.2, 0, 0, 1); /* retired — no overshoot; aliases standard */
+  --ease-emphasized: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-fast: 120ms;
+  --duration-base: 160ms;
+  --duration-slow: 360ms;
+  --duration-editorial: 480ms;
+}
+
+/* Light register — a derived secondary theme. DESIGN.md documents only
+   a dark canvas ("don't ship a light-mode marketing page"), so this
+   block extrapolates a lifted counterpart: the same Signal Cyan family
+   (deepened into a dark teal for AA contrast on white) on Linear's
+   inverse surface family, with the zinc ink ramp this app used before
+   the reskin. `applyTheme` (appStorage.ts) resolves "system" via matchMedia
+   to light|dark; the pre-hydration script in app/layout.tsx mirrors the
+   same logic to avoid a flash. Dark is the default/primary register
+   above; this override only applies under html[data-theme="light"]. */
+html[data-theme="light"] {
+  /* Cyan itself is too light to carry white text on a white canvas, so
+     the light register deepens rest/hover into a dark teal (verified
+     5.6:1+ white-text contrast) rather than reusing the dark theme's
+     bright cyan directly — mirrors DESIGN.md's own light/dark accent
+     split, just applied to teal instead of lavender. Disabled fades to
+     a mid gray-teal (not pale) so the white on-accent text stays legible. */
+  --color-accent: #0c7566;
+  --color-accent-active: #095e52;
+  --color-accent-disabled: #647976;
+  --color-accent-tint: #d6ece8;   /* selection wash — a lifted pale teal tint, not a pastel */
+  --color-on-accent: #ffffff; /* white text on the deepened teal fill */
+
+  --color-ink-900: #131316;
+  --color-ink-700: #3f3f46;
+  --color-ink-500: #71717a;
+  --color-ink-300: #a1a1aa;
+  --color-ink-200: #d4d4d8;
+
+  --color-canvas-base: #ffffff;
+  --color-canvas-soft: #fafafa;
+  --color-canvas-strong: #f0f0f1;
+  --color-canvas-raised: #ffffff;
+
+  --color-hairline-300: #e4e4e7;
+  --color-hairline-200: #f0f0f1;
+
+  --color-green: #10b981;
+  --color-red: #ef4444;
+  --color-slate: #71717a;
+  --color-rust: #b45309;
+  --color-yellow: #f59e0b;
+  --color-yellow-deep: #8a5c00; /* ~4.8:1 on white */
+  --color-red-deep: #dc2626;    /* ~4.5:1 on white */
+
+  /* Artifact kind accents — desaturated for the white canvas. */
+  --color-kind-plan: #0891b2;
+  --color-kind-diff: #b45309;
+  --color-kind-test: #7c3aed;
+  --color-kind-log: #c026d3;
+  --color-kind-summary: #2563eb;
+  --color-kind-review: #10b981;
+}
+
+/* International type — CJK coverage. Geist and Geist Mono carry no Han
+   glyphs, so under a Chinese locale we keep the Latin face first and let
+   Han characters fall through the stack. System CJK fonts come first —
+   PingFang (macOS/iOS), HarmonyOS Sans / MiSans, Microsoft YaHei/JhengHei
+   (Windows) — because native rendering is sharper and costs no download;
+   the Noto Sans SC/TC webfonts (loaded by next/font in layout.tsx,
+   preload off) are the last-resort fallback whose unicode-range chunks
+   only download when every system font misses. --font-display aliases
+   --font-sans, so overriding --font-sans here also retargets display —
+   no separate display stack is needed. --font-number aliases --font-sans
+   and inherits these via substitution. */
+html:lang(zh-CN) {
+  --font-sans: var(--font-app-sans), "PingFang SC", "HarmonyOS Sans SC", "MiSans", "Microsoft YaHei UI", "Microsoft YaHei", var(--font-noto-sans-sc), "Noto Sans SC", sans-serif;
+  --font-mono: var(--font-geist-mono), "PingFang SC", "Microsoft YaHei", var(--font-noto-sans-sc), "Noto Sans SC", monospace;
+}
+
+html:lang(zh-TW) {
+  --font-sans: var(--font-app-sans), "PingFang TC", "Microsoft JhengHei UI", "Microsoft JhengHei", var(--font-noto-sans-tc), "Noto Sans TC", sans-serif;
+  --font-mono: var(--font-geist-mono), "PingFang TC", "Microsoft JhengHei", var(--font-noto-sans-tc), "Noto Sans TC", monospace;
+}
+
+/* CJK typographic corrections — Han glyphs are full-width squares:
+   negative Latin tracking cramps them and wide caps tracking is
+   meaningless, so neutralize per-intent; CJK reading also wants looser
+   leading. html:lang() beats :root on specificity regardless of source
+   order, so these safely override the semantic --type-* shorthands
+   defined in semantic.css even though this file loads first. */
+html:lang(zh-CN),
+html:lang(zh-TW) {
+  --letter-display: 0;
+  --letter-tight: 0;
+  --letter-body: 0;
+  --letter-caps: 0.02em;
+  --letter-caps-wide: 0.03em;
+  --letter-eyebrow: 0.05em;
+  --letter-eyebrow-wide: 0.08em;
+  --leading-normal: 1.7;
+  --leading-loose: 1.8;
+}
+
+/* Density escape hatch — data-dense surfaces (admin tables, backlog
+   board) restore the compact rhythm for their subtree. One override
+   block; never fork per component. */
+[data-density="compact"] {
+  --leading-loose: 1.5;
+  --space-row-y: var(--space-xs);
+}

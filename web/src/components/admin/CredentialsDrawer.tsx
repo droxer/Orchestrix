@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Check, Copy } from "lucide-react";
 import type { ControlPanelDaemonNodeRecord } from "../../types";
 import { useDialogs } from "@/components/ui/DialogProvider";
+import { Button } from "@/components/ui/button";
 import { Drawer } from "./Drawer";
 import { NodeProfileBadges } from "./NodeProfileBadges";
 import { copyText, resolveNodeCredentials, type StoredNodeToken } from "./helpers";
@@ -28,7 +29,7 @@ interface RowProps {
   hint?: string;
 }
 
-function DarkCopyRow({ label, value, copyLabel, copied, onCopy, hint }: RowProps) {
+function CredCopyRow({ label, value, copyLabel, copied, onCopy, hint }: RowProps) {
   const { t } = useTranslation();
   return (
     <div className="adm-cred-row">
@@ -107,10 +108,10 @@ export function CredentialsDrawer({ open, onClose, node, storedToken, onUnassign
         open={open}
         onClose={onClose}
         title={t("admin.v2.credentials_title")}
-        variant="light"
         closeLabel={t("admin.v2.close_drawer")}
         ariaLabel={t("admin.v2.credentials_title")}
         layer={1}
+        width={520}
       >
         <p className="adm-cred-empty">{t("admin.v2.no_node_selected")}</p>
       </Drawer>
@@ -130,6 +131,8 @@ export function CredentialsDrawer({ open, onClose, node, storedToken, onUnassign
     return null;
   })();
 
+  const hasDangerZone = Boolean(onUnassign || onDelete);
+
   return (
     <Drawer
       open={open}
@@ -140,88 +143,98 @@ export function CredentialsDrawer({ open, onClose, node, storedToken, onUnassign
           {employeeLabel} · {node.id}
         </span>
       }
-      variant="dark"
       closeLabel={t("admin.v2.close_drawer")}
       ariaLabel={t("admin.v2.credentials_title")}
       layer={1}
+      width={520}
+      bodyClassName={hasDangerZone ? "adm-drawer-body--column" : undefined}
     >
-      {node ? (
+      <div className={hasDangerZone ? "adm-form" : undefined}>
         <NodeProfileBadges
           node={node}
-          storedTokens={storedToken && node ? { [node.id]: storedToken } : {}}
+          storedTokens={storedToken ? { [node.id]: storedToken } : {}}
           colocated={canUseLocalControlPanel()}
           t={t}
           compact
         />
-      ) : null}
-      <DarkCopyRow
-        label={t("admin.node_id")}
-        hint={t("admin.node_id_hint")}
-        value={node.id}
-        copyLabel={t("admin.copy_node_id")}
-        copied={copiedField === "node-id"}
-        onCopy={() => void handleCopy("node-id", node.id)}
-      />
-      {hasCredentials ? (
-        <>
-          {token ? (
-            <DarkCopyRow
-              label={t("admin.node_token")}
-              value={token}
-              copyLabel={t("admin.copy_node_token")}
-              copied={copiedField === "node-token"}
-              onCopy={() => void handleCopy("node-token", token)}
-            />
-          ) : null}
-          {daemonCommand ? (
-            <DarkCopyRow
-              label={t("admin.daemon_command")}
-              hint={t("admin.daemon_command_hint")}
-              value={daemonCommand}
-              copyLabel={t("admin.copy_daemon_command")}
-              copied={copiedField === "command"}
-              onCopy={() => void handleCopy("command", daemonCommand)}
-            />
-          ) : null}
-          {credentialsNote ? (
-            <p className="adm-cred-note">{credentialsNote}</p>
-          ) : (
-            <p className="adm-cred-note">
-              {t("admin.token_cached_note", { employee: employeeLabel })}
-            </p>
-          )}
-        </>
-      ) : (
-        <p className="adm-cred-empty">{t("admin.v2.token_only_at_provision")}</p>
-      )}
-      {(onUnassign || onDelete) ? (
-        <div className="adm-cred-actions">
-          <p className="adm-cred-actions-title">{t("admin.v2.danger_zone")}</p>
-          {onUnassign && node.employeeId ? (
-            <button
-              type="button"
-              className="adm-cred-action-button"
-              onClick={handleUnassign}
-              disabled={actionPending !== null}
-            >
-              {t("admin.v2.unassign_action")}
-            </button>
-          ) : null}
-          {onDelete ? (
-            <button
-              type="button"
-              className="adm-cred-action-button danger"
-              onClick={handleDelete}
-              disabled={actionPending !== null}
-            >
-              {t("admin.v2.delete_action")}
-            </button>
-          ) : null}
-          {actionError ? (
-            <p className="adm-cred-action-error">{t("admin.v2.action_failed", { message: actionError })}</p>
-          ) : null}
-        </div>
-      ) : null}
+        <CredCopyRow
+          label={t("admin.node_id")}
+          hint={t("admin.node_id_hint")}
+          value={node.id}
+          copyLabel={t("admin.copy_node_id")}
+          copied={copiedField === "node-id"}
+          onCopy={() => void handleCopy("node-id", node.id)}
+        />
+        {hasCredentials ? (
+          <>
+            {token ? (
+              <CredCopyRow
+                label={t("admin.node_token")}
+                value={token}
+                copyLabel={t("admin.copy_node_token")}
+                copied={copiedField === "node-token"}
+                onCopy={() => void handleCopy("node-token", token)}
+              />
+            ) : null}
+            {daemonCommand ? (
+              <CredCopyRow
+                label={t("admin.daemon_command")}
+                hint={t("admin.daemon_command_hint")}
+                value={daemonCommand}
+                copyLabel={t("admin.copy_daemon_command")}
+                copied={copiedField === "command"}
+                onCopy={() => void handleCopy("command", daemonCommand)}
+              />
+            ) : null}
+            {credentialsNote ? (
+              <p className="adm-cred-note">{credentialsNote}</p>
+            ) : (
+              <p className="adm-cred-note">
+                {t("admin.token_cached_note", { employee: employeeLabel })}
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="adm-cred-empty">{t("admin.v2.token_only_at_provision")}</p>
+        )}
+        {hasDangerZone ? (
+          <>
+            <div className="adm-drawer-section">
+              <p className="adm-drawer-section-title">{t("admin.v2.danger_zone")}</p>
+              <div className="adm-drawer-section-actions">
+                {onUnassign && node.employeeId ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleUnassign}
+                    disabled={actionPending !== null}
+                  >
+                    {t("admin.v2.unassign_action")}
+                  </Button>
+                ) : null}
+                {onDelete ? (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={handleDelete}
+                    disabled={actionPending !== null}
+                  >
+                    {t("admin.v2.delete_action")}
+                  </Button>
+                ) : null}
+              </div>
+              {actionError ? (
+                <p className="adm-form-error" role="alert">{t("admin.v2.action_failed", { message: actionError })}</p>
+              ) : null}
+            </div>
+            <div className="adm-form-actions">
+              <Button type="button" variant="ghost" onClick={onClose} disabled={actionPending !== null}>
+                {t("admin.v2.close_drawer")}
+              </Button>
+            </div>
+          </>
+        ) : null}
+      </div>
     </Drawer>
   );
 }

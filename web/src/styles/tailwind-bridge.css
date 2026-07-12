@@ -1,0 +1,75 @@
+/* Tailwind v4 + shadcn bridge — must load after tokens.css, before surface CSS.
+   Kept separate so styles.css can end with plain @imports (fixes Turbopack
+   mis-parsing @theme/@custom-variant after responsive.css). */
+
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(html[data-theme="dark"], html[data-theme="dark"] *));
+
+@theme inline {
+    --font-heading: var(--font-sans);
+    --font-sans: var(--font-sans);
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-semantic-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-semantic-action: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+}
+
+/* Core shadcn aliases (--background, --foreground, …) live in
+   tokens/shadcn-bridge.css and follow html[data-theme] via semantic
+   tokens. Only the sidebar/chart extras that shadcn/ui expects are
+   declared here. */
+:root {
+    --chart-1: var(--color-semantic-action);
+    --chart-2: var(--color-semantic-info);
+    --chart-3: var(--color-semantic-success);
+    --chart-4: var(--color-semantic-warning);
+    --chart-5: var(--color-semantic-danger);
+    --sidebar: var(--color-semantic-surface-soft);
+    --sidebar-foreground: var(--color-semantic-ink);
+    --sidebar-primary: var(--color-semantic-action);
+    --sidebar-primary-foreground: var(--color-semantic-on-action);
+    --sidebar-accent: var(--color-semantic-surface-strong);
+    --sidebar-accent-foreground: var(--color-semantic-ink);
+    --sidebar-border: var(--color-semantic-hairline);
+    --sidebar-ring: var(--color-semantic-action);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}

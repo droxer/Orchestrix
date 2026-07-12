@@ -8,15 +8,25 @@ from ..security.auth import require_admin_session
 from ..persistence.agent_placement_store import placement_status
 from ..services.agent_routing import AgentRoutingError, resolve_agent_assignments
 from .deps import AppContextDep
-from .helpers import agent_task_mode, json_body, request_actor, role_name, string_field
+from .helpers import (
+    agent_task_mode,
+    json_body,
+    request_actor,
+    role_name,
+    string_field,
+    newest_agent_workspace_artifacts,
+)
 
 router = APIRouter()
 
 
+AGENT_META_FIELDS = frozenset({"displayName", "instructions"})
+
+
 @router.get("/agents")
-async def list_employee_agents(request: Request, ctx: AppContextDep) -> dict[str, Any]:
+async def list_agents(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     actor = request_actor(request, ctx.auth_store)
-    agents = ctx.employee_agent_store.list_agents(employee_id=actor["employeeId"])
+    agents = ctx.agent_store.list_agents(supervisor_employee_id=actor["employeeId"])
     return {
         "agents": [
             _agent_with_placements(ctx, agent)
@@ -26,33 +36,86 @@ async def list_employee_agents(request: Request, ctx: AppContextDep) -> dict[str
     }
 
 
+@router.patch("/agents/{agent_id}")
+async def update_agent(
+    agent_id: str, request: Request, ctx: AppContextDep
+) -> dict[str, Any]:
+    actor = request_actor(request, ctx.auth_store)
+    agent = ctx.agent_store.get_agent(agent_id)
+    if not agent or agent.get("deletedAt"):
+        raise HTTPException(404, "Agent not found.")
+    if agent.get("supervisorEmployeeId") != actor["employeeId"]:
+        raise HTTPException(403, "Cannot update another employee's agent.")
+    body = await json_body(request)
+    unknown = set(body) - AGENT_META_FIELDS
+    if unknown:
+        raise HTTPException(
+            400,
+            f"Unsupported agent field(s): {', '.join(sorted(unknown))}.",
+        )
+    try:
+        updated = ctx.agent_store.update_agent(agent_id, body)
+    except ValueError as error:
+        raise HTTPException(
+            409 if "already has" in str(error) else 400, str(error)
+        ) from error
+    return {"agent": _agent_with_placements(ctx, updated)}
+
+
+@router.get("/agents/{agent_id}/artifacts")
+async def agent_artifacts(
+    agent_id: str, request: Request, ctx: AppContextDep
+) -> dict[str, Any]:
+    actor = request_actor(request, ctx.auth_store)
+    agent = ctx.agent_store.get_agent(agent_id)
+    if not agent or agent.get("deletedAt"):
+        raise HTTPException(404, "Agent not found.")
+    if not actor["isAdmin"] and agent.get("supervisorEmployeeId") != actor["employeeId"]:
+        raise HTTPException(403, "Cannot read another employee's agent artifacts.")
+    return {"agentId": agent_id, "artifacts": newest_agent_workspace_artifacts(ctx.session_store, agent_id)}
+
+
 @router.get("/cp/agents")
 async def list_control_panel_agents(
     request: Request, ctx: AppContextDep
 ) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
-    employee_id = request.query_params.get("employeeId") or None
+    employee_id = request.query_params.get("supervisorEmployeeId") or None
     return {
         "agents": [
             _agent_with_placements(ctx, agent)
-            for agent in ctx.employee_agent_store.list_agents(
-                employee_id=employee_id, include_deleted=True
+            for agent in ctx.agent_store.list_agents(
+                supervisor_employee_id=employee_id, include_deleted=True
             )
         ]
     }
 
 
-# Compatibility-only endpoint for older control-panel clients. The current UI
-# derives agents from assigned node capabilities and never calls this route.
-@router.post("/cp/employees/{employee_id}/agents", status_code=201)
+@router.post("/cp/agents", status_code=201)
 async def create_control_panel_agent(
+    request: Request, ctx: AppContextDep
+) -> dict[str, Any]:
+    require_admin_session(request, ctx.auth_store)
+    body = await json_body(request)
+    employee_id = string_field(body, "supervisorEmployeeId")
+    if not _employee_exists(ctx.auth_store, employee_id):
+        raise HTTPException(404, "Employee not found.")
+    try:
+        return {"agent": ctx.agent_store.create_agent(employee_id, body)}
+    except ValueError as error:
+        raise HTTPException(409 if "already has" in str(error) else 400, str(error)) from error
+
+
+@router.post("/cp/employees/{employee_id}/agents", status_code=201)
+async def create_employee_agent_compat(
     employee_id: str, request: Request, ctx: AppContextDep
 ) -> dict[str, Any]:
+    """Compatibility route retained while callers move to /cp/agents."""
     require_admin_session(request, ctx.auth_store)
     if not _employee_exists(ctx.auth_store, employee_id):
         raise HTTPException(404, "Employee not found.")
     try:
-        return {"agent": ctx.employee_agent_store.create_agent(employee_id, await json_body(request))}
+        return {"agent": ctx.agent_store.create_agent(employee_id, await json_body(request))}
     except ValueError as error:
         raise HTTPException(409 if "already has" in str(error) else 400, str(error)) from error
 
@@ -62,7 +125,7 @@ async def get_control_panel_agent(
     agent_id: str, request: Request, ctx: AppContextDep
 ) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
-    agent = ctx.employee_agent_store.get_agent(agent_id)
+    agent = ctx.agent_store.get_agent(agent_id)
     if not agent:
         raise HTTPException(404, "Agent not found.")
     return {"agent": _agent_with_placements(ctx, agent)}
@@ -75,7 +138,7 @@ async def update_control_panel_agent(
     require_admin_session(request, ctx.auth_store)
     try:
         return {
-            "agent": ctx.employee_agent_store.update_agent(
+            "agent": ctx.agent_store.update_agent(
                 agent_id, await json_body(request)
             )
         }
@@ -93,7 +156,7 @@ async def delete_control_panel_agent(
 ) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     try:
-        return {"agent": ctx.employee_agent_store.delete_agent(agent_id)}
+        return {"agent": ctx.agent_store.delete_agent(agent_id)}
     except KeyError as error:
         raise HTTPException(404, "Agent not found.") from error
 
@@ -116,7 +179,7 @@ async def create_agent_placement(
     agent_id: str, request: Request, ctx: AppContextDep
 ) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
-    agent = ctx.employee_agent_store.get_agent(agent_id)
+    agent = ctx.agent_store.get_agent(agent_id)
     if not agent or agent.get("deletedAt"):
         raise HTTPException(404, "Agent not found.")
     body = await json_body(request)
@@ -186,8 +249,8 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
             {
                 "agentId": item["agentId"],
                 **(
-                    {"agent": item["agent"]}
-                    if isinstance(item.get("agent"), str) and item["agent"]
+                    {"executorKind": item["executorKind"]}
+                    if isinstance(item.get("executorKind"), str) and item["executorKind"]
                     else {}
                 ),
                 "mode": agent_task_mode(item.get("mode")),
@@ -199,7 +262,7 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
             assignments,
             employee_id=actor["employeeId"],
             is_admin=actor["isAdmin"],
-            agent_store=ctx.employee_agent_store,
+            agent_store=ctx.agent_store,
             placement_store=ctx.agent_placement_store,
             daemon_nodes=ctx.registry.monitor_nodes(),
         )
@@ -292,5 +355,5 @@ def _placement_view(ctx: AppContextDep, placement: dict[str, Any]) -> dict[str, 
         ),
         None,
     )
-    agent = ctx.employee_agent_store.get_agent(placement["agentId"])
+    agent = ctx.agent_store.get_agent(placement["agentId"])
     return placement_status(placement, agent, node)

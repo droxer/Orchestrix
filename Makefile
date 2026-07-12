@@ -128,6 +128,7 @@ run-fresh: devbox-oci
 	$(if $(filter command line environment,$(origin WORKSPACE)),RELAY_WORKSPACE="$(WORKSPACE)" )node packages/relay-tui/dist/local-run.js
 
 stop:
+	-pkill -f "uv run --project backend relay" 2>/dev/null
 	-pkill -f "backend --port" 2>/dev/null
 	-pkill -f "node packages/relay-daemon/dist/cli.js" 2>/dev/null
 	-pkill -f "node packages/relay-supervisor/dist/cli.js" 2>/dev/null

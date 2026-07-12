@@ -6,7 +6,8 @@ import { AgentStream } from "./AgentStream";
 import { MessageTurnActions } from "./MessageTurnActions";
 import type { AgentName, AgentTaskMode } from "../types";
 import { AGENT_NAMES } from "../types";
-import { agentLabel, parsePlanSteps, type PlanStep } from "../lib/plan";
+import { labelForExecutor } from "../lib/agentDisplayNames";
+import { parsePlanSteps, type PlanStep } from "../lib/plan";
 import type { RelayArtifact } from "relay-core";
 import { useArtifactBody } from "../lib/useArtifactBody";
 import { summarizeArtifact } from "../lib/artifactStats";
@@ -45,7 +46,7 @@ function formatArtifactSize(bytes: number | undefined, t: TFunction): string {
   });
 }
 
-function PlanSummary({ steps }: { steps: PlanStep[] }) {
+function PlanSummary({ steps, agentDisplayNames }: { steps: PlanStep[]; agentDisplayNames?: Partial<Record<AgentName, string>> }) {
   const { t } = useTranslation();
   return (
     <ol className="artifact-plan-summary">
@@ -54,7 +55,7 @@ function PlanSummary({ steps }: { steps: PlanStep[] }) {
           {index > 0 ? <span className="artifact-plan-arrow" aria-hidden="true">→</span> : null}
           <span className="artifact-plan-step">
             <AgentMark agent={step.agent} size={14} />
-            <span className="artifact-plan-agent">{agentLabel(step.agent)}</span>
+            <span className="artifact-plan-agent">{labelForExecutor(step.agent, agentDisplayNames)}</span>
             <span className="artifact-plan-mode">{t(`mode.${step.mode}`)}</span>
           </span>
         </li>
@@ -65,7 +66,7 @@ function PlanSummary({ steps }: { steps: PlanStep[] }) {
 
 // Plan artifacts render inline as a human-readable step summary; they carry a
 // short JSON assignment list rather than a body worth opening in the viewer.
-function PlanCard({ artifact, sessionId }: { artifact: RelayArtifact; sessionId: string }) {
+function PlanCard({ artifact, sessionId, agentDisplayNames }: { artifact: RelayArtifact; sessionId: string; agentDisplayNames?: Partial<Record<AgentName, string>> }) {
   const body = useArtifactBody(sessionId, artifact.id);
   const planSteps = body.isSuccess ? parsePlanSteps(body.data ?? "", AGENT_NAMES) : null;
 
@@ -77,14 +78,14 @@ function PlanCard({ artifact, sessionId }: { artifact: RelayArtifact; sessionId:
   return (
     <div className="artifact-plan-note">
       <span className="artifact-plan-note-label">{artifact.title}</span>
-      <PlanSummary steps={planSteps} />
+      <PlanSummary steps={planSteps} agentDisplayNames={agentDisplayNames} />
     </div>
   );
 }
 
-function ArtifactCard({ artifact, sessionId, allArtifacts, onOpenArtifact }: { artifact: RelayArtifact; sessionId: string; allArtifacts?: RelayArtifact[]; onOpenArtifact?: (artifact: RelayArtifact) => void }) {
+function ArtifactCard({ artifact, sessionId, allArtifacts, onOpenArtifact, agentDisplayNames }: { artifact: RelayArtifact; sessionId: string; allArtifacts?: RelayArtifact[]; onOpenArtifact?: (artifact: RelayArtifact) => void; agentDisplayNames?: Partial<Record<AgentName, string>> }) {
   if (artifact.kind === "plan") {
-    return <PlanCard artifact={artifact} sessionId={sessionId} />;
+    return <PlanCard artifact={artifact} sessionId={sessionId} agentDisplayNames={agentDisplayNames} />;
   }
   return <ArtifactChip artifact={artifact} sessionId={sessionId} allArtifacts={allArtifacts} onOpenArtifact={onOpenArtifact} />;
 }
@@ -143,6 +144,7 @@ type MessageBlockProps = {
   message: DerivedMessage;
   sessionId: string;
   grouped?: boolean;
+  agentDisplayNames?: Partial<Record<AgentName, string>>;
   onOpenArtifact?: (artifact: RelayArtifact) => void;
   onRetryAgent?: (agent: AgentName, mode: AgentTaskMode) => void;
   retryDisabled?: boolean;
@@ -152,6 +154,7 @@ export function MessageBlock({
   message,
   sessionId,
   grouped = false,
+  agentDisplayNames,
   onOpenArtifact,
   onRetryAgent,
   retryDisabled = false,
@@ -173,6 +176,7 @@ export function MessageBlock({
   }
 
   if (message.kind === "agent") {
+    const agentName = labelForExecutor(message.agent, agentDisplayNames);
     return (
       <article
         className={`msg msg-agent ${message.streaming ? "streaming" : ""} ${grouped ? "grouped" : ""}`}
@@ -183,7 +187,7 @@ export function MessageBlock({
         <div className="turn-body">
           <header>
             <span className="agent-title" translate="no">
-              {message.agent}
+              {agentName}
               <span className="agent-mode" data-mode={message.mode}>{message.mode}</span>
             </span>
             {message.streaming ? (
@@ -195,11 +199,12 @@ export function MessageBlock({
             stdout={message.stdout}
             stderr={message.stderr}
             streaming={message.streaming}
+            collaborations={message.collaborations}
           />
           {message.attachments.length > 0 ? (
             <div className="attachment-list">
               {message.attachments.map((artifact) => (
-                <ArtifactCard key={artifact.id} artifact={artifact} sessionId={sessionId} allArtifacts={message.attachments} onOpenArtifact={onOpenArtifact} />
+                <ArtifactCard key={artifact.id} artifact={artifact} sessionId={sessionId} allArtifacts={message.attachments} onOpenArtifact={onOpenArtifact} agentDisplayNames={agentDisplayNames} />
               ))}
             </div>
           ) : null}

@@ -21,22 +21,26 @@ class ServerDaemonNodeBackend:
         self,
         registry: DaemonNodeRegistry,
         *,
+        agent_store: Any | None = None,
         employee_agent_store: Any | None = None,
         agent_placement_store: Any | None = None,
     ):
+        if agent_store is not None and employee_agent_store is not None and agent_store is not employee_agent_store:
+            raise ValueError("Pass either agent_store or employee_agent_store, not both.")
+        agent_store = agent_store or employee_agent_store
         self.registry = registry
-        self.employee_agent_store = employee_agent_store
+        self.agent_store = agent_store
         self.agent_placement_store = agent_placement_store
-        if employee_agent_store is not None and agent_placement_store is not None:
+        if agent_store is not None and agent_placement_store is not None:
             self.registry.logical_assignment_validator = (
                 self._validate_logical_assignment
             )
 
     def _validate_logical_assignment(self, assignment: dict[str, Any]) -> None:
-        agent = self.employee_agent_store.get_agent(assignment.get("agentId"))
+        agent = self.agent_store.get_agent(assignment.get("agentId"))
         if not agent or agent.get("deletedAt") or not agent.get("enabled", True):
             raise ValueError("logical agent is disabled or missing")
-        if agent.get("executorKind") != assignment.get("agent"):
+        if agent.get("executorKind") != assignment.get("executorKind"):
             raise ValueError("logical agent executor changed")
         if agent.get("version") != assignment.get("agentVersion"):
             raise ValueError("logical agent version changed")
@@ -47,7 +51,7 @@ class ServerDaemonNodeBackend:
             raise ValueError("placement is not active")
         if (
             placement.get("agentId") != agent.get("id")
-            or placement.get("employeeId") != agent.get("employeeId")
+            or placement.get("supervisorEmployeeId") != agent.get("supervisorEmployeeId")
             or placement.get("daemonNodeId") != assignment.get("daemonNodeId")
             or placement.get("executorKind") != agent.get("executorKind")
             or placement.get("agentVersion") != agent.get("version")
@@ -56,8 +60,8 @@ class ServerDaemonNodeBackend:
         ):
             raise ValueError("placement no longer matches the selected agent and node")
         node = self.registry.get(assignment.get("daemonNodeId"))
-        if not node or node.get("employeeId") != agent.get("employeeId"):
-            raise ValueError("daemon node is no longer assigned to the agent's employee")
+        if not node:
+            raise ValueError("daemon node is no longer available")
 
     def provision(self, payload: dict[str, Any]) -> dict[str, Any]:
         requested_sandbox_id = payload.get("sandboxId")
@@ -157,6 +161,17 @@ class ServerDaemonNodeBackend:
 
     async def run(self, sandbox_id: str, request: dict[str, Any]) -> dict[str, Any]:
         with self.registry.dispatch_lock:
+            request = {
+                **request,
+                "assignments": [
+                    {
+                        **assignment,
+                        "executorKind": assignment.get("executorKind")
+                        or assignment.get("agent"),
+                    }
+                    for assignment in request["assignments"]
+                ],
+            }
             self.registry.reap_stale_runs()
             sandbox = self.registry.get(sandbox_id)
             if not sandbox:
@@ -206,14 +221,14 @@ class ServerDaemonNodeBackend:
                     raise ValueError(
                         f"Sandbox {node_id} daemon node heartbeat expired."
                     )
-                if assignment["agent"] in set(node.get("disabledAgents") or []):
+                if assignment["executorKind"] in set(node.get("disabledAgents") or []):
                     raise ValueError(
-                        f"Sandbox {node_id} daemon node has disabled agent(s): {assignment['agent']}. "
+                        f"Sandbox {node_id} daemon node has disabled agent(s): {assignment['executorKind']}. "
                         "Re-enable them from the admin console to dispatch work."
                     )
-                if node.get("agents", {}).get(assignment["agent"]) != "ready":
+                if node.get("agents", {}).get(assignment["executorKind"]) != "ready":
                     raise ValueError(
-                        f"Sandbox {node_id} does not have ready agent {assignment['agent']}."
+                        f"Sandbox {node_id} does not have ready agent {assignment['executorKind']}."
                     )
                 if not node_accepts_run(
                     node,
@@ -225,26 +240,23 @@ class ServerDaemonNodeBackend:
                         f"capacity_exhausted: Sandbox {node_id} has no available execution slot."
                     )
             actor_employee_id = request.get("actorEmployeeId")
-            owner_employee_id = actor_employee_id or sandbox.get("employeeId")
-            if not owner_employee_id:
-                raise PermissionError(
-                    "Agent-first dispatch requires an authenticated employee."
-                )
+            owner_agent_id = next(
+                (item.get("agentId") for item in request["assignments"] if item.get("agentId")),
+                None,
+            )
             session_id_for_capacity = request.get("sessionId")
             active_runs = self.registry.daemon_store.list_active_runs(sandbox_id)
             if request.get("sessionId"):
-                session_owner = session_owner_employee_id(
-                    self.registry.store, request["sessionId"]
+                owner_employee_id = (
+                    (self.agent_store.get_agent(owner_agent_id) or {}).get("supervisorEmployeeId")
+                    if owner_agent_id
+                    else actor_employee_id or sandbox.get("employeeId")
                 )
-                if actor_employee_id and not request.get("actorIsAdmin"):
-                    assert_session_owned_by_employee(
-                        self.registry.store, request["sessionId"], actor_employee_id
-                    )
-                if not actor_employee_id:
-                    assert_session_owned_by_employee(
-                        self.registry.store, request["sessionId"], sandbox["employeeId"]
-                    )
-                owner_employee_id = session_owner
+                if not owner_employee_id:
+                    raise PermissionError("Logical agent has no supervisor.")
+                assert_session_owned_by_employee(
+                    self.registry.store, request["sessionId"], owner_employee_id
+                )
                 if self.registry.daemon_store.active_run_request_for_session(
                     sandbox_id, request["sessionId"]
                 ):
@@ -275,7 +287,12 @@ class ServerDaemonNodeBackend:
                 task_store=self.registry.task_store,
                 task_id=task_id,
                 workspace_path=sandbox.get("workspacePath") or "/workspace",
-                owner_employee_id=owner_employee_id,
+                owner_employee_id=(
+                    (self.agent_store.get_agent(owner_agent_id) or {}).get("supervisorEmployeeId")
+                    if owner_agent_id
+                    else actor_employee_id or sandbox.get("employeeId")
+                ),
+                owner_agent_id=owner_agent_id,
             )
             decision = (
                 request.get("decision")
@@ -294,7 +311,7 @@ class ServerDaemonNodeBackend:
                     [
                         "human",
                         *dict.fromkeys(
-                            assignment["agent"] for assignment in request["assignments"]
+                            assignment["executorKind"] for assignment in request["assignments"]
                         ),
                     ],
                 )["id"]

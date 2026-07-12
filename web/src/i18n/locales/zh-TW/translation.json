@@ -104,7 +104,8 @@
     "cancel_run": "取消執行",
     "choose_agent": "選擇 Agent",
     "choose_mode": "選擇模式",
-    "address_agent": "選擇 Agent"
+    "address_agent": "選擇 Agent",
+    "send_shortcut": "{{shortcut}} 傳送"
   },
   "decision": {
     "approve": "核准",
@@ -205,7 +206,23 @@
   },
   "workspace": {
     "title": "工作區",
-    "sub": "@{{employee}} 駕駛艙",
+    "sub": "{{agent}} 的檔案與產物",
+    "profile_sub": "{{agent}} 的設定與執行環境",
+    "profile_details": "詳細資訊",
+    "sections": "工作區分區",
+    "tab_profile": "設定",
+    "tab_workspace": "工作區",
+    "tab_files": "檔案",
+    "tab_activities": "活動",
+    "header_sub": "{{role}} · {{executor}}",
+    "snapshot_banner": "正在瀏覽已儲存的副本 — 智能體上線後將顯示即時檔案。",
+    "dismiss": "關閉",
+    "path_root": "根目錄",
+    "path_label": "檔案路徑",
+    "empty_preview_hint": "從清單中選擇一個產物或檔案。",
+    "empty_artifacts_hint": "執行任務以產生計畫、差異和審查。",
+    "empty_activity_hint": "執行和對話的活動將顯示在這裡。",
+    "empty_files_snapshot_hint": "已完成執行中的檔案會索引為產物。",
     "loading": "載入工作區中…",
     "metrics": "工作區指標",
     "metric_runs": "活躍執行",
@@ -229,9 +246,19 @@
     "no_files": "此目錄中沒有檔案。",
     "loading_files": "載入檔案中…",
     "files_unavailable": "此主機上無可用的工作區路徑。",
+    "source_live": "即時",
+    "source_snapshot": "快照 · 智慧代理離線",
+    "no_files_yet": "該智慧代理尚未產生檔案。",
     "parent_directory": "上層目錄",
     "load_failed": "工作區不可用",
-    "retry": "重試"
+    "retry": "重試",
+    "activity_runs": "活躍執行",
+    "activity_threads": "最近對話",
+    "activity_tasks": "活躍任務",
+    "no_activity": "此代理尚無近期活動。",
+    "session_runs": "{{count}} 次執行",
+    "session_artifacts": "{{count}} 個產物",
+    "task_due": "截止 {{date}}"
   },
   "routine": {
     "title": "例行",
@@ -385,17 +412,14 @@
       "nav_label": "管理視圖",
       "nav_dashboard": "儀表板",
       "nav_employees": "員工",
-      "nav_agents": "代理",
       "nav_fleet": "節點",
       "nav_integrations": "頻道",
       "title_dashboard": "儀表板",
       "title_employees": "員工",
-      "title_agents": "代理",
       "title_fleet": "節點",
       "title_integrations": "頻道",
       "sub_dashboard": "一覽節點、員工、對話與 Token 用量。",
       "sub_employees": "員工與其所屬節點。",
-      "sub_agents": "員工擁有的代理及其執行階段配置。",
       "sub_fleet": "工作區內的全部節點。",
       "sub_integrations": "面向 Relay 代理的企業聊天入口。",
       "dash_kpis_label": "核心指標",
@@ -547,6 +571,10 @@
       "empty_employees_title": "尚無員工。",
       "empty_employees_body": "先新增第一位員工；需要時再為其分配節點。",
       "no_match": "沒有相符的員工。",
+      "col_metrics": "活動",
+      "col_running": "執行中",
+      "col_ready": "就緒",
+      "emp_metrics_aria": "{{running}} 個執行中，{{ready}}/{{total}} 個節點就緒",
       "no_nodes_for_employee": "未分配節點。",
       "no_nodes_for_filter": "此篩選下沒有節點。",
       "search_employees_placeholder": "搜尋員工、部門或節點…",
@@ -645,17 +673,12 @@
     "action_failed": "操作失敗：{{message}}",
     "theme": {
       "group": "主題",
-      "contrast_group": "高對比",
       "light": "淺色",
       "light_sub": "始終淺色",
       "dark": "深色",
       "dark_sub": "始終深色",
       "system": "系統",
-      "system_sub": "跟隨系統設定",
-      "contrast": "高對比",
-      "contrast_sub": "淺色 · 強邊框與文字",
-      "contrast-dark": "高對比深色",
-      "contrast-dark_sub": "深色 · 強邊框與文字"
+      "system_sub": "跟隨系統設定"
     }
   },
   "agent_role": {
@@ -790,7 +813,17 @@
     "codex_failed": "Codex 失敗：{{message}}",
     "codex_error": "Codex 錯誤：{{message}}",
     "codex_changed_files": "Codex 已變更檔案。",
-    "stderr_omitted_other": "\u2026 已省略前面 {{count}} 行 stderr"
+    "subagents_title": "子代理",
+    "subagent_status": {
+      "pendingInit": "正在啟動",
+      "running": "執行中",
+      "interrupted": "已中斷",
+      "completed": "已完成",
+      "errored": "失敗",
+      "shutdown": "已關閉",
+      "notFound": "找不到"
+    },
+    "stderr_omitted_other": "… 已省略前面 {{count}} 行 stderr"
   },
   "message": {
     "user_label": "你",
@@ -895,6 +928,13 @@
     "empty_body": "管理員尚未為您的員工檔案分配邏輯智能體。",
     "empty_filtered_title": "沒有符合的智能體",
     "empty_filtered_body": "請嘗試其他搜尋詞或可用性篩選條件。",
-    "empty_hint": "管理員設定後，智能體將顯示在此處。"
+    "empty_hint": "管理員設定後，智能體將顯示在此處。",
+    "instructions_label": "指令",
+    "instructions_placeholder": "可選：為此代理新增指導說明…",
+    "instructions_empty": "尚無指令",
+    "edit_instructions": "編輯指令",
+    "select_title": "選擇一個智能體",
+    "select_body": "從左側名單中選擇一個智能體，檢視其設定、工作區與產生的檔案。",
+    "select_hint": "每一列都顯示可用性、角色與最近更新時間——選擇任一智能體即可載入其控制台。"
   }
 }

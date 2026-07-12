@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import { moveRadioSelection } from "../src/lib/radioGroupKeyboard.js";
 import type { Theme } from "../src/lib/appStorage.js";
 
-const THEME_VALUES: Theme[] = ["light", "dark", "system", "contrast", "contrast-dark"];
+const THEME_VALUES: Theme[] = ["light", "dark", "system"];
 
 function fakeKeyboardEvent(key: string): Parameters<typeof moveRadioSelection>[0] {
   let defaultPrevented = false;
@@ -44,20 +44,20 @@ describe("moveRadioSelection", () => {
       assert.equal(changes.at(-1), THEME_VALUES[(step + 1) % THEME_VALUES.length]);
     }
 
-    assert.deepEqual(changes, ["dark", "system", "contrast", "contrast-dark", "light"]);
+    assert.deepEqual(changes, ["dark", "system", "light"]);
   });
 
-  it("walks theme options backward with ArrowLeft from high-contrast dark", () => {
+  it("walks theme options backward with ArrowLeft from system", () => {
     const refs = fakeRefs<Theme>();
     for (const value of THEME_VALUES) refs.register(value);
     const changes: Theme[] = [];
     const event = fakeKeyboardEvent("ArrowLeft");
 
-    moveRadioSelection(event, THEME_VALUES, "contrast-dark", refs, (value) => { changes.push(value); });
+    moveRadioSelection(event, THEME_VALUES, "system", refs, (value) => { changes.push(value); });
 
     assert.equal(event.defaultPrevented, true);
-    assert.deepEqual(changes, ["contrast"]);
-    assert.deepEqual(refs.focused, ["contrast"]);
+    assert.deepEqual(changes, ["dark"]);
+    assert.deepEqual(refs.focused, ["dark"]);
   });
 
   it("jumps to first and last options with Home and End", () => {
@@ -65,10 +65,10 @@ describe("moveRadioSelection", () => {
     for (const value of THEME_VALUES) refs.register(value);
     const changes: Theme[] = [];
 
-    moveRadioSelection(fakeKeyboardEvent("Home"), THEME_VALUES, "contrast", refs, (value) => { changes.push(value); });
+    moveRadioSelection(fakeKeyboardEvent("Home"), THEME_VALUES, "dark", refs, (value) => { changes.push(value); });
     moveRadioSelection(fakeKeyboardEvent("End"), THEME_VALUES, "light", refs, (value) => { changes.push(value); });
 
-    assert.deepEqual(changes, ["light", "contrast-dark"]);
+    assert.deepEqual(changes, ["light", "system"]);
   });
 
   it("ignores unrelated keys", () => {

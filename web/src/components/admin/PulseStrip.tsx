@@ -30,30 +30,22 @@ export function PulseStrip({
   const { t } = useTranslation();
 
   const cells: PulseCell[] =
-    view === "dashboard"
-      ? [
-          { key: "running", value: running, label: t("admin.metric_running"), tone: "neutral" },
-          { key: "failed", value: failed, label: t("admin.metric_failed"), tone: "bad" },
-          { key: "queued", value: queued, label: t("admin.metric_queued"), tone: "neutral" },
-        ]
-      : view === "employees"
+    view === "employees"
       ? [
           { key: "unassigned", value: unassignedNodes, label: t("admin.metric_unassigned"), tone: "neutral" },
           { key: "running", value: running, label: t("admin.metric_running"), tone: "neutral" },
-          { key: "failed", value: failed, label: t("admin.metric_failed"), tone: "bad" },
+          { key: "failed", value: failed, label: t("admin.metric_failed"), tone: failed > 0 ? "bad" : "neutral" },
         ]
       : [
           { key: "running", value: running, label: t("admin.metric_running"), tone: "neutral" },
-          { key: "failed", value: failed, label: t("admin.metric_failed"), tone: "bad" },
+          { key: "failed", value: failed, label: t("admin.metric_failed"), tone: failed > 0 ? "bad" : "neutral" },
           { key: "queued", value: queued, label: t("admin.metric_queued"), tone: "neutral" },
         ];
 
   const ariaLabel =
-    view === "dashboard"
-      ? t("admin.v2.pulse_label")
-      : view === "employees"
-        ? t("admin.v2.pulse_employees_label")
-        : t("admin.v2.pulse_fleet_label");
+    view === "employees"
+      ? t("admin.v2.pulse_employees_label")
+      : t("admin.v2.pulse_fleet_label");
 
   return (
     <div className="adm-pulse adm-pulse--alerts" role="group" aria-label={ariaLabel}>

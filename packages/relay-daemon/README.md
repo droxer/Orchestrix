@@ -25,12 +25,17 @@ Optional:
   may use different local paths in a multi-agent workflow only when this value
   matches. The equivalent CLI option is `--workspace-id`.
 - `RELAY_SANDBOX_MODE`: defaults to `boxlite`, where the daemon boots and owns a
-  BoxLite VM. Set `none` only when the daemon already runs inside an agent box.
+  BoxLite VM. Set `none` for a manual/local node that runs agents in the
+  daemon's current host environment, such as an employee workstation or an
+  already-isolated agent box.
 - `RELAY_BOXLITE_HOME`: BoxLite runtime state directory for `boxlite` mode.
   Defaults to a per-workspace directory under `~/.relay/boxlite`, isolated from
   BoxLite's global `~/.boxlite` state.
-- `RELAY_USE_LOCAL_AGENT_HOME`: set to `1` in local mode to use this user's
-  existing Claude/Codex/Kimi login and config directories.
+- `RELAY_AGENT_HOME`: override the home inspected by local mode. By default,
+  local mode detects this user's existing Claude/Codex/Pi/Kimi installations,
+  logins, skills, and MCP configuration under `HOME`.
+- `RELAY_USE_LOCAL_AGENT_HOME`: deprecated compatibility flag; local mode now
+  uses this user's home by default.
 - `RELAY_DAEMON_HEARTBEAT_MS`: registration heartbeat interval.
 - `RELAY_DAEMON_COMMAND_POLL_WAIT_MS`: long-poll wait for command requests
   (capped at 25 seconds).

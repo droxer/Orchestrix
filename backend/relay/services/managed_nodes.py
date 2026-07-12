@@ -17,7 +17,7 @@ MANAGED_NODE_DESIRED_STATES = frozenset({"running", "stopped", "deleted"})
 # only "dedicated" is wired into agent placement sync today, so the other
 # modes are rejected rather than silently accepted with no agents ever synced.
 MANAGED_NODE_ASSIGNMENT_MODES = frozenset({"dedicated"})
-MANAGED_NODE_SANDBOX_MODES = frozenset({"boxlite", "none"})
+MANAGED_NODE_SANDBOX_MODES = frozenset({"boxlite"})
 MANAGED_NODE_PHASES = frozenset({
     "requested",
     "allocating",
@@ -53,6 +53,11 @@ def _parse_timestamp(value: str) -> datetime:
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
+def _validate_managed_sandbox_mode(value: Any) -> None:
+    if value not in MANAGED_NODE_SANDBOX_MODES:
+        raise ValueError("Managed nodes require sandboxMode boxlite.")
+
+
 class LocalManagedNodeStore:
     """Durable local-first store for managed-node desired state and attempts."""
 
@@ -74,8 +79,7 @@ class LocalManagedNodeStore:
             raise ValueError("assignmentMode must be dedicated.")
         if desired_state not in MANAGED_NODE_DESIRED_STATES:
             raise ValueError("desiredState must be running, stopped, or deleted.")
-        if sandbox_mode not in MANAGED_NODE_SANDBOX_MODES:
-            raise ValueError("sandboxMode must be boxlite or none.")
+        _validate_managed_sandbox_mode(sandbox_mode)
         if not employee_id:
             raise ValueError("employeeId is required for a dedicated managed node.")
         with self._lock:
@@ -124,8 +128,7 @@ class LocalManagedNodeStore:
             if desired_state not in MANAGED_NODE_DESIRED_STATES:
                 raise ValueError("desiredState must be running, stopped, or deleted.")
             sandbox_mode = patch.get("sandboxMode", node["sandboxMode"])
-            if sandbox_mode not in MANAGED_NODE_SANDBOX_MODES:
-                raise ValueError("sandboxMode must be boxlite or none.")
+            _validate_managed_sandbox_mode(sandbox_mode)
             assignment_mode = patch.get("assignmentMode", node["assignmentMode"])
             if assignment_mode not in MANAGED_NODE_ASSIGNMENT_MODES:
                 raise ValueError("assignmentMode must be dedicated.")

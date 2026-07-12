@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { RelayEmptyState } from "@/components/RelayEmptyState";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import type { ControlPanelDaemonNodeRecord, EmployeeRecord } from "../../types";
 import { Server } from "lucide-react";
 import { canUseLocalControlPanel } from "../../lib/controlPanel";
+import { useUrlSearchState } from "../../hooks/useUrlSearchState";
 import type { StoredNodeTokenMap } from "./helpers";
 import { visualStatus } from "./helpers";
 import { NodeCard } from "./NodeCard";
@@ -26,6 +27,14 @@ interface FleetViewProps {
 }
 
 const FILTERS: FleetFilter[] = ["all", "ready", "running", "provisioning", "failed", "unassigned"];
+
+function parseFleetFilter(value: string | null): FleetFilter {
+  return FILTERS.includes(value as FleetFilter) ? value as FleetFilter : "all";
+}
+
+function serializeFleetFilter(value: FleetFilter): string | null {
+  return value === "all" ? null : value;
+}
 
 function matchesFilter(node: ControlPanelDaemonNodeRecord, filter: FleetFilter): boolean {
   if (filter === "all") return true;
@@ -47,7 +56,7 @@ function filterLabel(filter: FleetFilter, t: TFunction): string {
 
 export function FleetView({ nodes, employees, storedTokens, onRevealCredentials, onManageAgents, onDeleteNode, onAddNode }: FleetViewProps) {
   const { t } = useTranslation();
-  const [filter, setFilter] = useState<FleetFilter>("all");
+  const [filter, setFilter] = useUrlSearchState("fleetFilter", "all" as FleetFilter, parseFleetFilter, serializeFleetFilter);
   const colocated = canUseLocalControlPanel();
 
   const counts = useMemo(() => {
@@ -82,7 +91,8 @@ export function FleetView({ nodes, employees, storedTokens, onRevealCredentials,
             <button
               key={id}
               type="button"
-              className={`adm-fleet-chip ${active ? "active" : ""}`}
+              className="adm-fleet-chip"
+              data-active={active ? "true" : "false"}
               aria-pressed={active}
               onClick={() => setFilter(id)}
             >

@@ -46,3 +46,11 @@ repos:
         types_or: [ts, tsx]
         files: ^web/
         pass_filenames: false
+
+      - id: lint-css-web
+        name: stylelint (web design tokens)
+        entry: npm run lint:css --workspace web
+        language: system
+        types_or: [css]
+        files: ^web/src/styles/
+        pass_filenames: false

@@ -104,7 +104,9 @@
     "send": "Send",
     "cancel_run": "Cancel run",
     "choose_agent": "Choose agent",
-    "address_agent": "Address an agent"
+    "choose_mode": "Choose mode",
+    "address_agent": "Address an agent",
+    "send_shortcut": "{{shortcut}} to send"
   },
   "decision": {
     "approve": "Approve",
@@ -204,7 +206,23 @@
   },
   "workspace": {
     "title": "Workspace",
-    "sub": "{{employee}} cockpit",
+    "sub": "{{agent}}’s files and artifacts",
+    "profile_sub": "{{agent}}’s profile and runtime",
+    "profile_details": "Details",
+    "sections": "Workspace sections",
+    "tab_profile": "Profile",
+    "tab_workspace": "Workspace",
+    "tab_files": "Files",
+    "tab_activities": "Activities",
+    "header_sub": "{{role}} · {{executor}}",
+    "snapshot_banner": "Browsing saved copies — live files appear when this agent is online.",
+    "dismiss": "Dismiss",
+    "path_root": "home",
+    "path_label": "File path",
+    "empty_preview_hint": "Pick an artifact or file from the list.",
+    "empty_artifacts_hint": "Run a task to generate plans, diffs, and reviews.",
+    "empty_activity_hint": "Activity from runs and threads will show up here.",
+    "empty_files_snapshot_hint": "Files from completed runs are indexed as artifacts.",
     "no_agent": "No agent selected",
     "loading": "Loading workspace…",
     "metrics": "Workspace metrics",
@@ -229,9 +247,19 @@
     "no_files": "No files in this directory.",
     "loading_files": "Loading files…",
     "files_unavailable": "Workspace path is not available on this host.",
+    "source_live": "Live",
+    "source_snapshot": "Snapshot · agent offline",
+    "no_files_yet": "This agent hasn't produced files yet.",
     "parent_directory": "Parent",
     "load_failed": "Workspace unavailable",
-    "retry": "Retry"
+    "retry": "Retry",
+    "activity_runs": "Active runs",
+    "activity_threads": "Recent threads",
+    "activity_tasks": "Active tasks",
+    "no_activity": "No recent activity for this agent.",
+    "session_runs": "{{count}} runs",
+    "session_artifacts": "{{count}} artifacts",
+    "task_due": "Due {{date}}"
   },
   "routine": {
     "title": "Routine",
@@ -385,17 +413,14 @@
       "nav_label": "Admin views",
       "nav_dashboard": "Dashboard",
       "nav_employees": "Employees",
-      "nav_agents": "Agents",
       "nav_fleet": "Nodes",
       "nav_integrations": "Channels",
       "title_dashboard": "Dashboard",
       "title_employees": "Employees",
-      "title_agents": "Agents",
       "title_fleet": "Nodes",
       "title_integrations": "Channels",
       "sub_dashboard": "Nodes, employees, threads, and token usage at a glance.",
       "sub_employees": "Employees and the nodes they own.",
-      "sub_agents": "Employee-owned agents and their runtime placements.",
       "sub_fleet": "Every node in the workforce.",
       "sub_integrations": "Enterprise chat entry points for Relay agents.",
       "dash_kpis_label": "Headline numbers",
@@ -547,6 +572,10 @@
       "empty_employees_title": "No employees yet.",
       "empty_employees_body": "Create the first employee, then assign a node when they need one.",
       "no_match": "No employees match this search.",
+      "col_metrics": "Activity",
+      "col_running": "Running",
+      "col_ready": "Ready",
+      "emp_metrics_aria": "{{running}} running, {{ready}} of {{total}} nodes ready",
       "no_nodes_for_employee": "No node assigned.",
       "no_nodes_for_filter": "No nodes in this slice.",
       "search_employees_placeholder": "Search employees, departments, nodes…",
@@ -645,17 +674,12 @@
     "action_failed": "Action failed: {{message}}",
     "theme": {
       "group": "Theme",
-      "contrast_group": "High contrast",
       "light": "Light",
       "light_sub": "Always light",
       "dark": "Dark",
       "dark_sub": "Always dark",
       "system": "System",
-      "system_sub": "Follows OS setting",
-      "contrast": "High contrast",
-      "contrast_sub": "Light · strong borders & text",
-      "contrast-dark": "High contrast dark",
-      "contrast-dark_sub": "Dark · strong borders & text"
+      "system_sub": "Follows OS setting"
     }
   },
   "agent_role": {
@@ -785,6 +809,16 @@
     "codex_failed": "Codex failed: {{message}}",
     "codex_error": "Codex error: {{message}}",
     "codex_changed_files": "Codex changed files.",
+    "subagents_title": "Sub-agents",
+    "subagent_status": {
+      "pendingInit": "starting",
+      "running": "running",
+      "interrupted": "interrupted",
+      "completed": "completed",
+      "errored": "failed",
+      "shutdown": "closed",
+      "notFound": "not found"
+    },
     "stderr_omitted_one": "… {{count}} earlier stderr line",
     "stderr_omitted_other": "… {{count}} earlier stderr lines"
   },
@@ -891,6 +925,13 @@
     "empty_body": "Your admin has not assigned any logical agents to your employee profile.",
     "empty_filtered_title": "No agents match",
     "empty_filtered_body": "Try a different search or availability filter.",
-    "empty_hint": "Agents appear here once provisioned by an administrator."
+    "empty_hint": "Agents appear here once provisioned by an administrator.",
+    "instructions_label": "Instructions",
+    "instructions_placeholder": "Optional guidance for this agent…",
+    "instructions_empty": "No instructions yet",
+    "edit_instructions": "Edit instructions",
+    "select_title": "Select an agent",
+    "select_body": "Choose an agent from the roster to inspect its profile, workspace, and generated files.",
+    "select_hint": "Availability, role, and last-updated status live in the row — pick any agent to load its console."
   }
 }

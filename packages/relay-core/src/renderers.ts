@@ -150,6 +150,7 @@ export class StderrLineRenderer {
     if (!line) return "";
     if (line.includes("seccomp not available")) return "";
     if (isCodexStdinNotice(line)) return "";
+    if (isCodexLegacyMultiAgentFallback(line)) return "";
     if (isKimiResumeNotice(line)) return "";
     return `${status("warn", line)}\n`;
   }
@@ -157,6 +158,13 @@ export class StderrLineRenderer {
 
 function isCodexStdinNotice(line: string): boolean {
   return /^Reading additional input from stdin(?:\.{1,3}|…)?$/.test(line);
+}
+
+// Codex 0.138 can log a failed v1 lookup before its enabled v2 collaboration
+// handler executes the same call successfully. Keep the raw stderr in the run
+// log, but do not present this internal fallback as a user-facing warning.
+function isCodexLegacyMultiAgentFallback(line: string): boolean {
+  return /unsupported call:\s*multi_agent_v1__/.test(line);
 }
 
 // Kimi prints a "To resume this session: kimi -r <id>" footer to stderr after a

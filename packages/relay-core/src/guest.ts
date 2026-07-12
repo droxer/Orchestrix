@@ -149,6 +149,13 @@ export function guestCodexConfigToml(): string {
       "requires_openai_auth = false",
     );
   }
+  const multiAgent = codexMultiAgentEnabled();
+  lines.push(
+    "",
+    "[features]",
+    `multi_agent = ${multiAgent}`,
+    `multi_agent_v2 = ${multiAgent}`,
+  );
   return `${lines.join("\n")}\n`;
 }
 
@@ -202,7 +209,15 @@ export function guestPiModelsJson(): string {
 }
 
 export function codexCliConfigOverrides(): string[] {
-  const argv = ["-c", 'model_provider="dashscope"'];
+  const multiAgent = codexMultiAgentEnabled();
+  const argv = [
+    "-c",
+    'model_provider="dashscope"',
+    "-c",
+    `features.multi_agent=${multiAgent}`,
+    "-c",
+    `features.multi_agent_v2=${multiAgent}`,
+  ];
   const model = openaiModel();
   const baseUrl = openaiBaseUrl();
   if (model) argv.push("-c", `model=${JSON.stringify(model)}`);
@@ -215,6 +230,11 @@ export function codexCliConfigOverrides(): string[] {
     );
   }
   return argv;
+}
+
+function codexMultiAgentEnabled(): boolean {
+  const value = process.env.RELAY_CODEX_MULTI_AGENT?.trim().toLowerCase();
+  return value !== "0" && value !== "false" && value !== "off";
 }
 
 function pushEnv(env: Array<[string, string]>, key: string, value: string | undefined): void {

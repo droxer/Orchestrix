@@ -1,7 +1,7 @@
 /* =====================================================================
    Admin Console v2  (adm-* namespace)
    Operational control plane: white canvas, hairline grids, sans-tabular
-   numerals, cobalt action color. Shares PageHeader + view-toggle chrome
+   numerals, ink action color. Shares PageHeader + view-toggle chrome
    with Backlog and Routine; pulse strip and attention rail are admin-only.
    ===================================================================== */
 
@@ -29,29 +29,10 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr);
-  background: var(--color-canvas);
+  background: var(--color-semantic-canvas);
   min-height: 0;
   height: 100%;
   overflow: hidden;
-}
-
-.admin-console .page-header-kicker {
-  font: var(--type-eyebrow);
-  letter-spacing: var(--letter-eyebrow);
-  text-transform: uppercase;
-  color: var(--color-muted);
-}
-
-.admin-console .page-header-subtitle {
-  margin: 0;
-  max-width: 46ch;
-  font-size: var(--text-sm);
-  line-height: 1.45;
-  color: var(--color-muted);
-}
-
-.admin-console .page-header-toolbar {
-  margin-top: var(--space-sm);
 }
 
 .admin-console .page-header-title--display {
@@ -59,7 +40,7 @@
 }
 
 .admin-console.adm-bare {
-  background: var(--color-surface-soft);
+  background: var(--color-semantic-surface-soft);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -68,7 +49,7 @@
 }
 
 .adm-loading {
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
   font-family: var(--font-number);
   font-size: var(--text-sm);
   letter-spacing: var(--letter-caps);
@@ -80,9 +61,9 @@
   align-items: center;
   gap: 0;
   padding: 2px;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--color-semantic-hairline);
   border-radius: var(--radius-sm);
-  background: var(--color-surface-soft);
+  background: var(--color-semantic-surface-soft);
   flex-shrink: 0;
 }
 
@@ -96,26 +77,21 @@
   border: 0;
   border-radius: calc(var(--radius-sm) - 2px);
   background: transparent;
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
   cursor: pointer;
   font: var(--type-nav-link);
   transition: background var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
 }
 
 .adm-view-toggle-btn:not([data-active="true"]):hover {
-  background: color-mix(in srgb, var(--color-ink) 6%, transparent);
-  color: var(--color-ink);
+  background: color-mix(in srgb, var(--color-semantic-ink) 6%, transparent);
+  color: var(--color-semantic-ink);
 }
 
 .adm-view-toggle-btn[data-active="true"] {
-  background: var(--color-canvas);
-  color: var(--color-ink);
+  background: var(--color-semantic-canvas);
+  color: var(--color-semantic-ink);
   box-shadow: var(--shadow-soft);
-}
-
-html[data-theme="contrast"] .adm-view-toggle-btn[data-active="true"],
-html[data-theme="contrast-dark"] .adm-view-toggle-btn[data-active="true"] {
-  box-shadow: inset 0 0 0 2px var(--color-ink);
 }
 
 .adm-view-toggle-btn:focus-visible {
@@ -129,8 +105,7 @@ html[data-theme="contrast-dark"] .adm-view-toggle-btn[data-active="true"] {
 
 @media (max-width: 640px) {
   .adm-view-toggle-label,
-  .adm-command-onboard-label,
-  .adm-command-status-text {
+  .adm-command-onboard-label {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -142,8 +117,19 @@ html[data-theme="contrast-dark"] .adm-view-toggle-btn[data-active="true"] {
     border: 0;
   }
 
-  .admin-console .page-header-subtitle {
-    display: none;
+  .adm-command-status-text {
+    max-width: 9rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .page-header-subtitle {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 
   .adm-view-toggle-btn {
@@ -169,18 +155,18 @@ html[data-theme="contrast-dark"] .adm-view-toggle-btn[data-active="true"] {
   width: 8px;
   height: 8px;
   border-radius: var(--radius-full);
-  background: var(--color-muted-soft);
+  background: var(--color-semantic-muted-soft);
   transition: background var(--duration-base) var(--ease-standard);
 }
 
-.adm-live-dot.fetching { background: var(--color-info); }
-.adm-live-dot.offline { background: var(--color-semantic-down); }
+.adm-live-dot.fetching { background: var(--color-semantic-info); }
+.adm-live-dot.offline { background: var(--color-semantic-danger); }
 
 /* ── Pulse strip ──────────────────────────────────────────────────── */
 .adm-pulse {
   display: grid;
   padding: var(--space-lg) var(--space-xl);
-  border-bottom: 1px solid var(--color-hairline);
+  border-bottom: 1px solid var(--color-semantic-hairline);
   flex-shrink: 0;
   gap: 0;
 }
@@ -194,7 +180,7 @@ html[data-theme="contrast-dark"] .adm-view-toggle-btn[data-active="true"] {
   flex-direction: column;
   gap: var(--space-xxs);
   padding: 0 var(--space-base);
-  border-right: 1px solid var(--color-hairline);
+  border-right: 1px solid var(--color-semantic-hairline);
 }
 
 .adm-pulse-cell:first-child { padding-left: 0; }
@@ -202,18 +188,18 @@ html[data-theme="contrast-dark"] .adm-view-toggle-btn[data-active="true"] {
 
 .adm-pulse-value {
   font: var(--type-number);
-  color: var(--color-ink);
+  color: var(--color-semantic-ink);
   font-feature-settings: "tnum" 1;
 }
 
-.adm-pulse-value.tone-good { color: var(--color-semantic-up); }
-.adm-pulse-value.tone-info { color: var(--color-info); }
-.adm-pulse-value.tone-bad { color: var(--color-danger-text); }
-.adm-pulse-value.tone-neutral { color: var(--color-ink); }
+.adm-pulse-value.tone-good { color: var(--color-semantic-success); }
+.adm-pulse-value.tone-info { color: var(--color-semantic-info); }
+.adm-pulse-value.tone-bad { color: var(--color-semantic-danger-text); }
+.adm-pulse-value.tone-neutral { color: var(--color-semantic-ink); }
 
 .adm-pulse-label {
   font: var(--type-eyebrow);
   letter-spacing: var(--letter-eyebrow);
   text-transform: uppercase;
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
 }

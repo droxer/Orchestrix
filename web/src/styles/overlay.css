@@ -3,7 +3,7 @@
 
    Backdrop scrim, panel entrance curves, close affordance, and toast
    motion shared by confirm dialogs, preferences, and admin drawers.
-   Pick surface grammar by role — see tokens.css overlay ladder.
+   Pick surface grammar by role — see tokens/semantic.css overlay ladder.
    ===================================================================== */
 
 @keyframes overlay-backdrop-in {
@@ -35,7 +35,7 @@
   position: fixed;
   inset: 0;
   display: flex;
-  background: var(--color-overlay);
+  background: var(--color-semantic-overlay);
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(2px);
   overscroll-behavior: contain;
@@ -43,9 +43,9 @@
 }
 
 /* Stacked drawers — deepen the scrim per layer so nested panels read clearly. */
-.adm-drawer-backdrop--layer-1 { background: color-mix(in srgb, #000 12%, var(--color-overlay)); }
-.adm-drawer-backdrop--layer-2 { background: color-mix(in srgb, #000 24%, var(--color-overlay)); }
-.adm-drawer-backdrop--layer-3 { background: color-mix(in srgb, #000 36%, var(--color-overlay)); }
+.adm-drawer-backdrop--layer-1 { background: var(--color-semantic-overlay-layer-1); }
+.adm-drawer-backdrop--layer-2 { background: var(--color-semantic-overlay-layer-2); }
+.adm-drawer-backdrop--layer-3 { background: var(--color-semantic-overlay-layer-3); }
 
 .overlay-close {
   display: inline-flex;
@@ -58,7 +58,7 @@
   border: none;
   border-radius: var(--radius-full);
   background: transparent;
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
   cursor: pointer;
   transition:
     background var(--duration-fast) var(--ease-standard),
@@ -66,15 +66,6 @@
 }
 
 .overlay-close:hover {
-  background: var(--color-surface-strong);
-  color: var(--color-ink);
-}
-
-.adm-drawer.dark .overlay-close {
-  color: var(--color-on-dark-soft);
-}
-
-.adm-drawer.dark .overlay-close:hover {
-  background: var(--color-surface-dark-elevated);
-  color: var(--color-on-dark);
+  background: var(--color-semantic-surface-strong);
+  color: var(--color-semantic-ink);
 }

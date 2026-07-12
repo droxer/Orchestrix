@@ -9,37 +9,38 @@
    while the operator types credentials into a terminal-style form.
 
    Color is pinned via local --lg-* variables whose values are lifted
-   verbatim from the dark ramp in tokens.css (graphite canvas, cobalt →
-   periwinkle action, amber attention). Spacing, type scale, and radii
-   are theme-independent tokens and are used directly.
+   verbatim from the dark (default) ramp in tokens/primitives.css
+   (near-black canvas, Signal Cyan action, amber attention). Spacing,
+   type scale, and radii are theme-independent tokens and are used
+   directly. Documented stylelint exception — see web/.stylelintrc.json.
 
-   Bootstrap mode (data-mode="bootstrap") swings the accent from cobalt
+   Bootstrap mode (data-mode="bootstrap") swings the accent from cyan
    to amber: the plane is awaiting credentials, not ready.
    ===================================================================== */
 
 .login-screen {
-  /* Pinned dark ramp — mirrors html[data-theme="dark"] in tokens.css. */
-  --lg-canvas: #0f1011;
-  --lg-elevated: #17181a;
+  /* Pinned dark ramp — mirrors the default (dark) register in tokens/primitives.css. */
+  --lg-canvas: #010102;
+  --lg-elevated: #18191a;
   --lg-ink: #f7f8f8;
-  --lg-body: #c2c5c9;
+  --lg-body: #d0d6e0;
   --lg-muted: #8a8f98;
-  --lg-hairline: color-mix(in srgb, #f7f8f8 14%, #0f1011);
-  --lg-hairline-soft: color-mix(in srgb, #f7f8f8 8%, #0f1011);
-  --lg-cobalt: #7089ff;
-  --lg-cobalt-active: #8fa3ff;
-  --lg-on-cobalt: #08112e;
+  --lg-hairline: color-mix(in srgb, #f7f8f8 14%, #010102);
+  --lg-hairline-soft: color-mix(in srgb, #f7f8f8 8%, #010102);
+  --lg-teal: #22d9c0;
+  --lg-teal-active: #5eefda;
+  --lg-on-teal: #04120f; /* text-on-accent (dark ink on the bright cyan fill) */
   --lg-up: #34d399;
-  --lg-amber: #f7b84d;
-  --lg-down: #ff6b75;
-  /* Mode accent — cobalt while attaching, amber during first-run setup. */
-  --lg-accent: var(--lg-cobalt);
+  --lg-amber: #fbbf24;
+  --lg-down: #f87171;
+  /* Mode accent — cyan while attaching, amber during first-run setup. */
+  --lg-accent: var(--lg-teal);
 
   position: relative;
   display: flex;
   min-height: 100vh;
   background:
-    radial-gradient(120% 90% at 12% 0%, color-mix(in srgb, var(--lg-cobalt) 7%, transparent), transparent 55%),
+    radial-gradient(120% 90% at 12% 0%, color-mix(in srgb, var(--lg-teal) 7%, transparent), transparent 55%),
     linear-gradient(to right, var(--lg-hairline-soft) 1px, transparent 1px) 0 0 / 56px 56px,
     linear-gradient(to bottom, var(--lg-hairline-soft) 1px, transparent 1px) 0 0 / 56px 56px,
     var(--lg-canvas);
@@ -96,8 +97,8 @@
   width: 72px;
   height: 3px;
   border-radius: var(--radius-full);
-  background: linear-gradient(to right, transparent, var(--lg-cobalt));
-  box-shadow: 0 0 12px color-mix(in srgb, var(--lg-cobalt) 55%, transparent);
+  background: linear-gradient(to right, transparent, var(--lg-teal));
+  box-shadow: 0 0 12px color-mix(in srgb, var(--lg-teal) 55%, transparent);
   opacity: 0;
   animation: login-lane-travel calc(7s + var(--lane-index) * 1.4s) linear infinite;
   animation-delay: calc(var(--lane-index) * -2.6s);
@@ -359,19 +360,19 @@
   border: none;
   border-radius: var(--radius-sm);
   background: var(--lg-accent);
-  color: var(--lg-on-cobalt);
+  color: var(--lg-on-teal);
   font: var(--type-button);
   cursor: pointer;
   transition: background var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
 }
 
 .login-screen[data-mode="bootstrap"] .login-submit {
-  /* Amber fill needs dark ink, same as the cobalt's navy — keep it. */
+  /* Amber fill needs dark ink, same as the teal's sea-ink — keep it. */
   color: #2b1c02;
 }
 
 .login-submit:hover:not(:disabled) {
-  background: var(--lg-cobalt-active);
+  background: var(--lg-teal-active);
 }
 
 .login-screen[data-mode="bootstrap"] .login-submit:hover:not(:disabled) {
@@ -383,8 +384,14 @@
 }
 
 .login-submit:disabled {
+  /* Label uses --lg-muted (neutral gray, not a lg-on-teal/lg-accent blend):
+     on-teal is dark ink for the bright cyan rest state, so blending it
+     toward the accent here collapsed text and background to the same
+     dark hue and made the label unreadable. A neutral muted gray stays
+     legible against the dark teal fill regardless of which direction
+     on-teal points in a given accent scheme. */
   background: color-mix(in srgb, var(--lg-accent) 40%, var(--lg-canvas));
-  color: color-mix(in srgb, var(--lg-on-cobalt) 55%, var(--lg-accent));
+  color: var(--lg-muted);
   cursor: default;
 }
 
@@ -432,11 +439,11 @@
 .login-switch::after { content: " ]"; color: var(--lg-muted); }
 
 .login-switch:hover {
-  color: var(--lg-cobalt-active);
+  color: var(--lg-teal-active);
 }
 
 .login-switch:focus-visible {
-  outline: 2px solid var(--lg-cobalt);
+  outline: 2px solid var(--lg-teal);
   outline-offset: 2px;
 }
 
@@ -455,8 +462,12 @@
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: #0f1011;
-  color: #8a8f98;
+  /* Renders before .login-screen mounts, so --lg-* isn't in scope yet —
+     fall back to the theme-independent "always dark" surface primitives
+     (also used by the diff viewer / artifact chrome) rather than a
+     one-off literal. */
+  background: var(--color-semantic-surface-dark);
+  color: var(--color-semantic-on-dark-soft);
 }
 
 .login-checking-text {
@@ -469,7 +480,9 @@
 .login-checking-text::after {
   content: "▌";
   margin-left: var(--space-xxs);
-  color: #7089ff;
+  /* Same pre-mount scope constraint as .login-checking above — the
+     dark-canvas white accent, matching --color-semantic-action's dark-mode value. */
+  color: #fafafa;
 }
 
 /* ---------- Motion --------------------------------------------------- */

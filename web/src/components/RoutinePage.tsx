@@ -480,8 +480,10 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
   return (
     <section id="routine-panel" className="routine-page backlog-page" aria-label={t("routine.title")} tabIndex={-1}>
       <PageHeader
+        kicker={t("nav.routine")}
         title={t("routine.title")}
         count={t("routine.sub", { count: routineTasks.length })}
+        titleVariant="display"
         actions={
           <TaskBoardHeaderActions
             leading={<RoutineViewToggle view={view} onChange={changeView} />}

@@ -12,6 +12,19 @@ class AgentRoutingError(ValueError):
         self.code = code
 
 
+def select_workspace_node(agent: dict[str, Any], placement_store: Any, daemon_nodes: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Return the highest-priority live placement that can read an agent home."""
+    nodes = {node["id"]: node for node in daemon_nodes}
+    candidates: list[tuple[int, str, dict[str, Any]]] = []
+    for placement in placement_store.list_placements(agent_id=agent["id"]):
+        node = nodes.get(placement["daemonNodeId"])
+        if not node or "workspace-read" not in (node.get("capabilities") or []):
+            continue
+        if placement_status(placement, agent, node)["status"] in ("ready", "busy"):
+            candidates.append((int(placement.get("priority") or 100), placement["id"], node))
+    return sorted(candidates, key=lambda item: (item[0], item[1]))[0][2] if candidates else None
+
+
 def resolve_agent_assignments(
     assignments: list[dict[str, Any]],
     *,
@@ -37,7 +50,7 @@ def resolve_agent_assignments(
             raise AgentRoutingError(
                 "agent_not_found", f"Agent {agent_id} was not found."
             )
-        if not is_admin and agent.get("employeeId") != employee_id:
+        if not is_admin and agent.get("supervisorEmployeeId") != employee_id:
             raise AgentRoutingError(
                 "agent_forbidden",
                 f"Agent {agent_id} is not available to this employee.",
@@ -46,7 +59,7 @@ def resolve_agent_assignments(
             raise AgentRoutingError(
                 "agent_disabled", f"Agent {agent['displayName']} is disabled."
             )
-        requested_kind = assignment.get("agent")
+        requested_kind = assignment.get("executorKind")
         if requested_kind and requested_kind != agent["executorKind"]:
             raise AgentRoutingError(
                 "executor_mismatch",
@@ -111,7 +124,7 @@ def resolve_agent_assignments(
             {
                 **assignment,
                 "agentId": agent_id,
-                "agent": agent["executorKind"],
+                "executorKind": agent["executorKind"],
                 "agentVersion": agent["version"],
                 **(
                     {"agentInstructions": agent["instructions"]}

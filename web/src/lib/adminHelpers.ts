@@ -1,5 +1,7 @@
 import type { TFunction } from "i18next";
-import type { AgentName, ControlPanelDaemonNodeRecord, EmployeeRecord, Tone } from "../types.js";
+import type { AgentName, ControlPanelDaemonNodeRecord, EmployeeRecord, LogicalAgentAvailability, Tone } from "../types.js";
+
+export const ADMIN_AGENTS_KEY = ["admin", "agents"] as const;
 
 const DEFAULT_NODE_AGENT_NAMES: AgentName[] = ["claude", "codex", "kimi"];
 
@@ -76,6 +78,13 @@ export function statusTone(status: string): Tone {
   if (status === "running" || status === "provisioning") return "info";
   if (status === "failed" || status === "stale") return "bad";
   if (status === "stopped") return "warn";
+  return "neutral";
+}
+
+export function agentAvailabilityTone(availability: LogicalAgentAvailability): Tone {
+  if (availability === "ready") return "good";
+  if (availability === "busy") return "info";
+  if (availability === "pending") return "warn";
   return "neutral";
 }
 
@@ -218,10 +227,10 @@ export type NodeExecutionProfile = "managed" | "local" | "pending";
 
 export type NodeLocalityKind = "this_host" | "saved_here" | "remote";
 
-/** boxlite VM sandbox → managed; host processes → local node. */
-export function nodeExecutionProfile(node: Pick<ControlPanelDaemonNodeRecord, "sandboxMode">): NodeExecutionProfile {
-  if (node.sandboxMode === "boxlite") return "managed";
-  if (node.sandboxMode === "none") return "local";
+/** Management ownership is independent of the daemon's sandbox implementation. */
+export function nodeExecutionProfile(node: Pick<ControlPanelDaemonNodeRecord, "managedNodeId" | "sandboxMode">): NodeExecutionProfile {
+  if (node.managedNodeId) return "managed";
+  if (node.sandboxMode) return "local";
   return "pending";
 }
 

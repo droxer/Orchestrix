@@ -1,10 +1,37 @@
 /* ============================ composer ============================ */
+/* Modernized toward the floating-card composer pattern shared by Cursor,
+   Codex CLI, and Claude Code: a borderless elevated card (--shadow-lift,
+   not a hairline + soft drop), generous rounding, a circular send button,
+   and a pill-shaped mode toggle — rather than the boxier bordered-rectangle
+   input this replaces. All colors still route through semantic.css; no new
+   hardcoded values. */
 
 .composer {
+  --composer-inline: var(--space-lg);
+  position: relative;
   display: grid;
-  padding: var(--space-xs) 0 var(--space-base);
-  border-top: 1px solid var(--color-hairline-soft);
-  background: var(--color-canvas);
+  /* Side padding matters now that the card floats on shadow alone (no
+     border): without it, the card touches the panel edges any time the
+     chat panel is narrower than the 960px cap on .composer-input-wrap —
+     the common case — and the shadow gets clipped instead of reading as
+     floating. */
+  padding: var(--space-sm) var(--space-lg) max(var(--space-base), env(safe-area-inset-bottom, 0px));
+  border-top: 0;
+  background: transparent;
+}
+
+/* Scrim fade — the transcript appears to dissolve into the composer's
+   floating card rather than terminating at a hard edge. Purely decorative;
+   sits above the transcript's last pixels, below the card's own shadow. */
+.composer::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: var(--space-xl);
+  background: linear-gradient(to bottom, transparent, var(--color-semantic-canvas));
+  pointer-events: none;
 }
 
 .agent-picker-wrap { position: relative; }
@@ -15,31 +42,31 @@
   gap: var(--space-xs);
   height: 32px;
   padding: 0 12px;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--color-semantic-hairline);
   border-radius: var(--radius-sm);
-  background: var(--color-canvas);
-  color: var(--color-ink);
+  background: var(--color-semantic-canvas);
+  color: var(--color-semantic-ink);
   font: var(--type-label-strong);
   transition: border-color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
 }
 
 .agent-picker-trigger:hover {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
+  border-color: var(--color-semantic-action);
+  color: var(--color-semantic-action);
 }
 
 .agent-picker {
   position: absolute;
-  bottom: calc(100% + 6px);
+  bottom: calc(100% + 8px);
   left: 0;
   z-index: var(--z-popover);
   width: 200px;
   display: grid;
   gap: 2px;
   padding: var(--space-xxs);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-md);
-  background: var(--color-canvas);
+  border: 0;
+  border-radius: var(--radius-xl);
+  background: var(--color-semantic-surface-raised);
   box-shadow: var(--shadow-lift);
 }
 
@@ -49,11 +76,11 @@
   grid-template-columns: 28px minmax(0, 1fr);
   align-items: center;
   gap: var(--space-xs);
-  min-height: 40px;
+  min-height: var(--size-control-md);
   padding: var(--space-xs);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   text-align: left;
-  color: var(--color-ink);
+  color: var(--color-semantic-ink);
   font: var(--type-label-strong);
 }
 
@@ -61,46 +88,43 @@
 .agent-picker button.active,
 .agent-picker [role="option"]:hover,
 .agent-picker [role="option"].active {
-  background: var(--color-surface-strong);
+  background: var(--color-semantic-surface-strong);
 }
 
-/* Mode chip — single-state status indicator styled after Codex/Claude Code
-   CLI mode pickers. Click cycles to the next mode. */
 .mode-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   height: 28px;
-  min-width: 132px;            /* fits "Agent" / "智能体" + icon + hint without reflow */
-  padding: 0 10px 0 9px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--color-ink);
+  min-width: 132px;
+  padding: 0 12px 0 10px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--color-semantic-surface-strong);
+  color: var(--color-semantic-ink);
   font: var(--type-caption-strong);
   letter-spacing: var(--letter-open);
   cursor: pointer;
   white-space: nowrap;
   transition:
     background var(--duration-base) var(--ease-standard),
-    border-color var(--duration-base) var(--ease-standard),
+    box-shadow var(--duration-base) var(--ease-standard),
     transform var(--duration-fast) var(--ease-standard);
 }
 
-/* Mode distinction: the Agent chip uses a cobalt action cue because it changes
-   execution mode; Ask stays neutral. Chips never become colored fills. */
 .mode-chip[data-mode="action"] {
-  --mode-dot: var(--color-primary);
-  --mode-icon: var(--color-primary);
+  --mode-dot: var(--color-semantic-action);
+  --mode-icon: var(--color-semantic-action);
+  background: var(--color-semantic-action-soft);
 }
+
 .mode-chip[data-mode="ask"] {
-  --mode-dot: var(--color-muted);
-  --mode-icon: var(--color-ink);
+  --mode-dot: var(--color-semantic-muted);
+  --mode-icon: var(--color-semantic-ink);
 }
 
 .mode-chip:hover {
-  background: var(--color-surface-strong);
-  border-color: var(--color-ink);
+  background: color-mix(in srgb, var(--mode-dot) 16%, var(--color-semantic-surface-strong));
 }
 
 .mode-chip:active { transform: scale(0.97); }
@@ -143,13 +167,13 @@
 .mode-chip-label {
   flex: 1 1 auto;
   text-align: left;
-  color: var(--color-ink);
+  color: var(--color-semantic-ink);
 }
 
 .mode-chip-hint {
   font-size: var(--text-2xs);
   line-height: 1;
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
   opacity: 0;
   transform: rotate(-20deg);
   transition:
@@ -164,7 +188,14 @@
 }
 
 .mode-chip:active .mode-chip-hint {
-  transform: rotate(340deg);   /* satisfying spin on cycle */
+  transform: rotate(340deg);
+}
+
+@media (pointer: coarse) {
+  .mode-chip-hint {
+    opacity: 0.65;
+    transform: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -176,14 +207,31 @@
   position: relative;
   width: min(100%, 960px);
   margin: 0 auto;
-  padding-inline: var(--space-lg);
-  border-radius: var(--radius-md);
+  border: 0;
+  border-radius: var(--radius-3xl);
+  background: var(--color-semantic-surface-raised);
   box-shadow: var(--shadow-lift);
-  transition: box-shadow var(--duration-fast) var(--ease-standard);
+  transition: box-shadow var(--duration-base) var(--ease-standard);
 }
 
 .composer-input-wrap:has(.composer-input:focus-within) {
   box-shadow: var(--ring-focus), var(--shadow-lift);
+}
+
+/* Running state — a slow breathing glow instead of a static border, so the
+   floating card visibly "thinks" while an agent turn is in flight. */
+.composer-input-wrap[data-running] {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-semantic-action) 30%, transparent), var(--shadow-lift);
+  animation: composer-running-glow 2.4s var(--ease-standard) infinite;
+}
+
+@keyframes composer-running-glow {
+  0%, 100% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-semantic-action) 22%, transparent), var(--shadow-lift); }
+  50% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-semantic-action) 46%, transparent), 0 0 20px color-mix(in srgb, var(--color-semantic-action) 16%, transparent), var(--shadow-lift); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composer-input-wrap[data-running] { animation: none; }
 }
 
 .composer-input {
@@ -191,14 +239,13 @@
   flex-direction: column;
   border: 0;
   border-radius: inherit;
-  background: var(--color-canvas);
+  background: transparent;
   box-shadow: none;
-  transition: border-color var(--duration-fast) var(--ease-standard);
 }
 
 .mention-popover {
   position: absolute;
-  bottom: calc(100% + 8px);
+  bottom: calc(100% + 10px);
   left: 0;
   right: auto;
   z-index: var(--z-popover);
@@ -218,16 +265,12 @@
 }
 
 .mention-role {
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
   font: var(--type-label);
 }
 
 .mention-popover [role="option"].active .mention-role {
-  color: var(--color-ink);
-}
-
-.composer-input:focus-within {
-  border-color: transparent;
+  color: var(--color-semantic-ink);
 }
 
 .composer-input textarea {
@@ -235,11 +278,12 @@
   min-height: 56px;
   max-height: 200px;
   resize: none;
+  overflow-y: hidden;
   border: 0;
   outline: 0;
   background: transparent;
-  padding: 12px 16px 4px;
-  color: var(--color-ink);
+  padding: 16px var(--composer-inline) 6px;
+  color: var(--color-semantic-ink);
   font-size: var(--text-md);
   line-height: 1.5;
 }
@@ -249,15 +293,14 @@
 }
 
 .composer-input textarea::placeholder {
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
 }
 
 .composer-footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-sm);
-  padding: 6px 8px 8px 8px;
+  padding: 4px var(--space-sm) 10px var(--composer-inline);
 }
 
 .composer-footer-left,
@@ -266,23 +309,33 @@
   align-items: center;
   gap: var(--space-xs);
   min-height: 36px;
+  flex: 0 0 auto;
 }
 
 .composer-footer-left {
   flex-wrap: wrap;
 }
 
-/* Send control — the one filled action in the composer. 36×36px cobalt plate
-   matching the thread new-btn and design-system.md button-primary geometry. */
+.composer-send-hint {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+  color: var(--color-semantic-muted);
+  font: var(--type-caption);
+}
+
 .send-button {
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  background: var(--color-primary);
-  color: var(--color-on-primary);
+  border-radius: var(--radius-full);
+  background: var(--color-semantic-action);
+  color: var(--color-semantic-on-action);
   cursor: pointer;
   transition:
     background var(--duration-base) var(--ease-standard),
@@ -291,11 +344,12 @@
 }
 
 .send-button:hover:not(:disabled) {
-  background: var(--color-primary-active);
+  background: var(--color-semantic-action-active);
+  transform: scale(1.06);
 }
 
 .send-button:active:not(:disabled) {
-  transform: scale(0.97);
+  transform: scale(0.94);
 }
 
 .send-button:focus-visible {
@@ -304,23 +358,24 @@
 }
 
 .send-button:disabled {
-  background: var(--color-surface-strong);
-  border-color: var(--color-hairline);
-  color: color-mix(in srgb, var(--color-ink) 32%, transparent);
+  background: var(--color-semantic-surface-strong);
+  border-color: var(--color-semantic-hairline);
+  color: color-mix(in srgb, var(--color-semantic-ink) 48%, transparent);
   cursor: not-allowed;
+  opacity: 1;
+  transform: none;
 }
 
-/* Cancel variant — outlined danger stop while a run is active. Status hue as
-   border/text only; cobalt remains the sole filled action in the composer. */
 .send-button.send-button-cancel {
-  background: var(--color-canvas);
+  background: var(--color-semantic-canvas);
   border-color: var(--border-danger);
-  color: var(--color-danger-text);
+  color: var(--color-semantic-danger-text);
 }
 
 .send-button.send-button-cancel:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--color-semantic-down) 6%, var(--color-canvas));
-  border-color: var(--color-semantic-down);
+  background: color-mix(in srgb, var(--color-semantic-danger) 6%, var(--color-semantic-canvas));
+  border-color: var(--color-semantic-danger);
+  transform: scale(1.06);
 }
 
 .send-button.send-button-cancel:focus-visible {

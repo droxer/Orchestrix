@@ -30,6 +30,7 @@ export function useAppHash({
   const skipInitialHashSyncRef = useRef(true);
   const [route, setRoute] = useState<AppRoute>("main");
   const [mobileView, setMobileView] = useState<MobileView>("chat");
+  const [agentWorkspaceId, setAgentWorkspaceId] = useState<string | null>(null);
 
   const appHashSessionId = route === "main" && !composingNew
     ? activeSession?.id ?? selectedSessionId ?? activeSessionId
@@ -39,11 +40,13 @@ export function useAppHash({
     route,
     mobileView,
     sessionId: appHashSessionId ?? null,
-  }), [appHashSessionId, mobileView, route]);
+    agentWorkspaceId,
+  }), [agentWorkspaceId, appHashSessionId, mobileView, route]);
 
   const applyHashState = useCallback((state: AppHashState) => {
     setRoute(state.route);
     setMobileView(state.mobileView);
+    setAgentWorkspaceId(state.agentWorkspaceId ?? null);
     if (state.route === "main" && state.sessionId) {
       onClearPendingMessage();
       onApplySessionFromHash(state.sessionId);
@@ -85,6 +88,7 @@ export function useAppHash({
       sessionId: nextRoute === "main" && !composingNew
         ? activeSession?.id ?? selectedSessionId ?? activeSessionId
         : null,
+      agentWorkspaceId: null,
     });
   }, [activeSession?.id, activeSessionId, composingNew, navigateToAppState, selectedSessionId]);
 
@@ -95,6 +99,7 @@ export function useAppHash({
       sessionId: nextMobileView === "chat" && !composingNew
         ? activeSession?.id ?? selectedSessionId ?? activeSessionId
         : null,
+      agentWorkspaceId: null,
     });
   }, [activeSession?.id, activeSessionId, composingNew, navigateToAppState, selectedSessionId]);
 
@@ -106,16 +111,23 @@ export function useAppHash({
   const syncChatHash = useCallback((sessionId: string | null, replace = false) => {
     setRoute("main");
     setMobileView("chat");
-    syncAppHashToUrl({ route: "main", mobileView: "chat", sessionId }, replace);
+    setAgentWorkspaceId(null);
+    syncAppHashToUrl({ route: "main", mobileView: "chat", sessionId, agentWorkspaceId: null }, replace);
   }, []);
+
+  const navigateToAgentWorkspace = useCallback((agentId: string) => {
+    navigateToAppState({ route: "agents", mobileView: "chat", sessionId: null, agentWorkspaceId: agentId });
+  }, [navigateToAppState]);
 
   return {
     route,
     mobileView,
+    agentWorkspaceId,
     navigateToAppState,
     navigateToRoute,
     navigateToMobileView,
     hrefForSideNavRoute,
     syncChatHash,
+    navigateToAgentWorkspace,
   };
 }

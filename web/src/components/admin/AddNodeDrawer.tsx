@@ -93,7 +93,6 @@ export function AddNodeDrawer({
       onClose={() => { void requestClose(); }}
       title={t("admin.v2.add_node_title")}
       subtitle={t(isManaged ? "admin.v2.add_node_sub_managed" : "admin.v2.add_node_sub_local")}
-      variant="light"
       closeLabel={t("admin.v2.close_drawer")}
       ariaLabel={t("admin.v2.add_node_title")}
       bodyClassName="adm-drawer-body--column"
@@ -119,7 +118,7 @@ export function AddNodeDrawer({
             <span>{t("admin.employee")}</span>
             <Select
               value={employeeId || undefined}
-              onValueChange={setEmployeeId}
+              onValueChange={(value) => setEmployeeId(value ?? "")}
               disabled={employees.length === 0}
             >
               <SelectTrigger className="w-full mono">
@@ -141,7 +140,7 @@ export function AddNodeDrawer({
           </label>
         </div>
 
-        {error ? <div className="adm-form-error">{error}</div> : null}
+        {error ? <div className="adm-form-error" role="alert">{error}</div> : null}
 
         <div className="adm-form-actions">
           <Button type="button" variant="ghost" onClick={() => void requestClose()} disabled={isBusy}>

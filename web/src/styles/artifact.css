@@ -4,11 +4,11 @@
    so large bodies (diffs, logs) never disrupt the conversation flow. */
 
 /* Per-kind accent. Mirrors the TUI artifact palette so the two surfaces read
-   the same. Falls back to neutral slate for unrecognized kinds so cobalt stays
-   reserved for action, selection, and focus. */
+   the same. Falls back to neutral slate for unrecognized kinds so the accent
+   stays reserved for action, selection, and focus. */
 .artifact-chip,
 .artifact-kind-tag {
-  --artifact-accent: var(--color-info);
+  --artifact-accent: var(--color-semantic-info);
 }
 [data-kind="plan"],
 .artifact-kind-tag.is-plan {
@@ -37,16 +37,16 @@
 
 .artifact-chip {
   min-width: 0;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--color-semantic-hairline);
   border-left: 3px solid var(--artifact-accent);
   border-radius: var(--radius-md);
-  background: var(--color-canvas);
+  background: var(--color-semantic-canvas);
   overflow: hidden;
   transition: border-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
 }
 
 .artifact-chip:hover {
-  border-color: color-mix(in srgb, var(--artifact-accent) 45%, var(--color-hairline));
+  border-color: color-mix(in srgb, var(--artifact-accent) 45%, var(--color-semantic-hairline));
   box-shadow: var(--shadow-soft);
 }
 
@@ -92,7 +92,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
   font: var(--type-caption-strong);
   overflow: hidden;
   white-space: nowrap;
@@ -100,7 +100,7 @@
 
 .artifact-chip-copy strong {
   min-width: 0;
-  color: var(--color-ink);
+  color: var(--color-semantic-ink);
   font: var(--type-label-strong);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -123,17 +123,17 @@
   font-variant-numeric: tabular-nums;
 }
 .artifact-stat.tone-up {
-  color: var(--color-semantic-up);
+  color: var(--color-semantic-success);
 }
 .artifact-stat.tone-down {
-  color: var(--color-danger-text);
+  color: var(--color-semantic-danger-text);
 }
 
 .artifact-chip-cta {
   display: inline-flex;
   align-items: center;
   padding: 0 var(--space-xs);
-  color: var(--color-body);
+  color: var(--color-semantic-body);
   font: var(--type-label-strong);
   white-space: nowrap;
   opacity: 0.6;
@@ -156,9 +156,9 @@
   font-size: var(--text-sm);
   line-height: 1.55;
   overflow-x: auto;
-  color: var(--color-ink);
-  background: var(--color-surface-soft);
-  border: 1px solid var(--color-hairline);
+  color: var(--color-semantic-ink);
+  background: var(--color-semantic-surface-soft);
+  border: 1px solid var(--color-semantic-hairline);
   border-radius: var(--radius-sm);
 }
 .artifact-diff-line {
@@ -168,7 +168,7 @@
 }
 .artifact-diff-ln {
   padding-right: var(--space-xs);
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
   font-variant-numeric: tabular-nums;
   text-align: right;
   user-select: none;
@@ -185,23 +185,23 @@
   white-space: pre-wrap;
 }
 .artifact-diff-line.is-add {
-  background: color-mix(in srgb, var(--color-semantic-up) 16%, transparent);
-  color: color-mix(in srgb, var(--color-semantic-up) 65%, var(--color-ink));
+  background: color-mix(in srgb, var(--color-semantic-success) 16%, transparent);
+  color: color-mix(in srgb, var(--color-semantic-success) 65%, var(--color-semantic-ink));
 }
 .artifact-diff-line.is-del {
-  background: color-mix(in srgb, var(--color-semantic-down) 16%, transparent);
-  color: color-mix(in srgb, var(--color-semantic-down) 65%, var(--color-ink));
+  background: color-mix(in srgb, var(--color-semantic-danger) 16%, transparent);
+  color: color-mix(in srgb, var(--color-semantic-danger) 65%, var(--color-semantic-ink));
 }
 .artifact-diff-line.is-hunk {
   color: var(--color-diff-hunk);
   opacity: 0.9;
 }
 .artifact-diff-line.is-meta {
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
   opacity: 0.55;
 }
 .artifact-diff-line.is-context {
-  color: var(--color-ink);
+  color: var(--color-semantic-ink);
   opacity: 0.85;
 }
 
@@ -210,9 +210,9 @@
 .artifact-plain {
   margin: 0;
   padding: var(--space-base);
-  color: var(--color-ink);
-  background: var(--color-surface-soft);
-  border: 1px solid var(--color-hairline);
+  color: var(--color-semantic-ink);
+  background: var(--color-semantic-surface-soft);
+  border: 1px solid var(--color-semantic-hairline);
   border-radius: var(--radius-sm);
   font-family: var(--font-mono);
   font-size: var(--text-sm);
@@ -234,7 +234,7 @@
   aspect-ratio: 16 / 9;
   object-fit: contain;
   border-radius: var(--radius-sm);
-  background: var(--color-surface-strong);
+  background: var(--color-semantic-surface-strong);
 }
 
 .artifact-frame-preview {
@@ -254,8 +254,8 @@
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  background: var(--color-canvas);
-  color: var(--color-ink);
+  background: var(--color-semantic-canvas);
+  color: var(--color-semantic-ink);
   transition: grid-template-columns var(--duration-fast) var(--ease-standard);
 }
 
@@ -269,8 +269,8 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--color-hairline);
-  background: var(--color-surface-soft);
+  border-right: 1px solid var(--color-semantic-hairline);
+  background: var(--color-semantic-surface-soft);
   overflow: hidden;
 }
 
@@ -287,28 +287,28 @@
 .artifact-index-btn {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: var(--size-control-md);
+  height: var(--size-control-md);
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--artifact-accent, var(--color-info));
+  color: var(--artifact-accent, var(--color-semantic-info));
   cursor: pointer;
   transition: background var(--duration-fast) var(--ease-standard);
   flex: 0 0 auto;
 }
 
 .artifact-index-btn:hover {
-  background: color-mix(in srgb, var(--artifact-accent, var(--color-info)) 12%, transparent);
+  background: color-mix(in srgb, var(--artifact-accent, var(--color-semantic-info)) 12%, transparent);
 }
 
 .artifact-index-btn.is-active {
-  background: color-mix(in srgb, var(--artifact-accent, var(--color-info)) 85%, transparent);
-  color: var(--color-canvas);
+  background: color-mix(in srgb, var(--artifact-accent, var(--color-semantic-info)) 85%, transparent);
+  color: var(--color-semantic-canvas);
 }
 
 .artifact-index-btn:focus-visible {
-  outline: 2px solid var(--color-primary);
+  outline: 2px solid var(--color-semantic-action);
   outline-offset: 2px;
 }
 
@@ -348,7 +348,7 @@
   align-items: center;
   gap: var(--space-xs);
   padding: var(--space-sm) var(--space-base);
-  border-bottom: 1px solid var(--color-hairline);
+  border-bottom: 1px solid var(--color-semantic-hairline);
   flex: 0 0 auto;
 }
 
@@ -357,12 +357,12 @@
   border: 0;
   outline: 0;
   background: transparent;
-  color: var(--color-ink);
+  color: var(--color-semantic-ink);
   font: var(--type-label);
 }
 
 .artifact-index-search input::placeholder {
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
 }
 
 .artifact-index-filters {
@@ -370,16 +370,16 @@
   flex-wrap: wrap;
   gap: var(--space-xxs);
   padding: var(--space-xs) var(--space-base);
-  border-bottom: 1px solid var(--color-hairline);
+  border-bottom: 1px solid var(--color-semantic-hairline);
   flex: 0 0 auto;
 }
 
 .artifact-index-filter-btn {
   padding: 2px var(--space-sm);
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--color-semantic-hairline);
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
   font: var(--type-label-strong);
   cursor: pointer;
   transition: background var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
@@ -387,9 +387,9 @@
 
 .artifact-index-filter-btn.is-active,
 .artifact-index-filter-btn:hover {
-  background: var(--color-surface-strong);
-  color: var(--color-ink);
-  border-color: color-mix(in srgb, var(--color-ink) 24%, var(--color-hairline));
+  background: var(--color-semantic-surface-strong);
+  color: var(--color-semantic-ink);
+  border-color: color-mix(in srgb, var(--color-semantic-ink) 24%, var(--color-semantic-hairline));
 }
 
 .artifact-index-list {
@@ -411,7 +411,7 @@
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--color-ink);
+  color: var(--color-semantic-ink);
   text-align: left;
   cursor: pointer;
   font: inherit;
@@ -419,15 +419,15 @@
 }
 
 .artifact-index-row:hover {
-  background: var(--color-surface-raised);
+  background: var(--color-semantic-surface-raised);
 }
 
 .artifact-index-row.is-active {
-  background: var(--color-surface-strong);
+  background: var(--color-semantic-surface-strong);
 }
 
 .artifact-index-row:focus-visible {
-  outline: 2px solid var(--color-primary);
+  outline: 2px solid var(--color-semantic-action);
   outline-offset: 2px;
 }
 
@@ -437,8 +437,8 @@
   width: 28px;
   height: 28px;
   border-radius: var(--radius-sm);
-  color: var(--artifact-accent, var(--color-info));
-  background: color-mix(in srgb, var(--artifact-accent, var(--color-info)) 14%, transparent);
+  color: var(--artifact-accent, var(--color-semantic-info));
+  background: color-mix(in srgb, var(--artifact-accent, var(--color-semantic-info)) 14%, transparent);
 }
 
 .artifact-index-row-copy {
@@ -453,12 +453,12 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font: var(--type-label);
-  color: var(--color-ink);
+  color: var(--color-semantic-ink);
 }
 
 .artifact-index-empty {
   padding: var(--space-base);
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
   font: var(--type-label);
 }
 
@@ -477,8 +477,8 @@
   gap: var(--space-sm);
   padding: 0 var(--space-base);
   height: 44px;
-  border-bottom: 1px solid var(--color-hairline);
-  background: var(--color-surface-soft);
+  border-bottom: 1px solid var(--color-semantic-hairline);
+  background: var(--color-semantic-surface-soft);
   flex: 0 0 auto;
   min-width: 0;
   overflow: hidden;
@@ -491,7 +491,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font: var(--type-label-strong);
-  color: var(--color-ink);
+  color: var(--color-semantic-ink);
 }
 
 .artifact-preview-actions {
@@ -507,10 +507,10 @@
   gap: 4px;
   height: 28px;
   padding: 0 var(--space-sm);
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--color-semantic-hairline);
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--color-body);
+  color: var(--color-semantic-body);
   font: var(--type-label-strong);
   text-decoration: none;
   cursor: pointer;
@@ -519,12 +519,12 @@
 }
 
 .artifact-preview-action-btn:hover {
-  background: var(--color-surface-raised);
-  border-color: color-mix(in srgb, var(--color-ink) 24%, var(--color-hairline));
+  background: var(--color-semantic-surface-raised);
+  border-color: color-mix(in srgb, var(--color-semantic-ink) 24%, var(--color-semantic-hairline));
 }
 
 .artifact-preview-action-btn:focus-visible {
-  outline: 2px solid var(--color-primary);
+  outline: 2px solid var(--color-semantic-action);
   outline-offset: 2px;
 }
 
@@ -532,7 +532,7 @@
   min-width: 0;
   min-height: 0;
   overflow: auto;
-  background: var(--color-canvas);
+  background: var(--color-semantic-canvas);
 }
 
 .artifact-preview-status {
@@ -540,22 +540,22 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
   font: var(--type-label);
 }
 
 .artifact-preview-error {
-  color: var(--color-danger-text);
+  color: var(--color-semantic-danger-text);
 }
 
 /* Viewer status (reused by ArtifactBody loading/error states) */
 .artifact-viewer-status {
   padding: var(--space-lg);
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
   font-size: var(--text-sm);
 }
 .artifact-viewer-error {
-  color: var(--color-danger-text);
+  color: var(--color-semantic-danger-text);
 }
 .artifact-viewer-body {
   min-width: 0;
@@ -583,7 +583,7 @@
     width: 100%;
     max-height: min(38vh, 280px);
     border-right: 0;
-    border-bottom: 1px solid var(--color-hairline);
+    border-bottom: 1px solid var(--color-semantic-hairline);
   }
 
   .artifact-preview-pane {

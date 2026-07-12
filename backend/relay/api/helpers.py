@@ -191,6 +191,22 @@ def artifact_index_item(session: dict[str, Any], artifact: dict[str, Any]) -> di
     }
 
 
+def newest_agent_workspace_artifacts(session_store: Any, agent_id: str) -> list[dict[str, Any]]:
+    """Newest workspace-file artifact for every path owned by an agent."""
+    newest: dict[str, dict[str, Any]] = {}
+    for session in session_store.list_sessions():
+        if session.get("ownerAgentId") != agent_id:
+            continue
+        for artifact in workspace_artifacts(session):
+            if artifact.get("agentId") != agent_id:
+                continue
+            key = workspace_artifact_key(session, artifact)
+            current = newest.get(key)
+            if current is None or (artifact.get("createdAt") or "") >= (current.get("createdAt") or ""):
+                newest[key] = artifact_index_item(session, artifact)
+    return sorted(newest.values(), key=lambda item: item.get("createdAt") or "", reverse=True)
+
+
 def request_actor(request: Request, auth_store: Any) -> dict[str, Any]:
     chat_actor = request_chat_service_actor(request)
     if chat_actor:
@@ -359,6 +375,26 @@ def session_belongs_to_sandbox(session: dict[str, Any], sandbox: dict[str, Any])
 def daemon_node_event(value: dict[str, Any]) -> dict[str, Any]:
     event_type = string_field(value, "type")
     command_id = string_field(value, "commandId")
+    if event_type in {"workspace.listing", "workspace.file", "workspace.error"}:
+        agent_id = string_field(value, "agentId")
+        path = string_field(value, "path")
+        if not command_id or not agent_id:
+            raise ValueError("workspace event requires commandId and agentId.")
+        lease_id = string_field(value, "leaseId")
+        common = {"type": event_type, "commandId": command_id, **({"leaseId": lease_id} if lease_id else {}), "agentId": agent_id, "path": path}
+        if event_type == "workspace.listing":
+            entries = value.get("entries")
+            if not isinstance(value.get("exists"), bool) or not isinstance(entries, list):
+                raise ValueError("invalid daemon workspace.listing event.")
+            return {**common, "exists": value["exists"], "entries": entries}
+        if event_type == "workspace.file":
+            if not isinstance(value.get("bytes"), (int, float)) or not isinstance(value.get("isBinary"), bool) or not isinstance(value.get("truncated"), bool):
+                raise ValueError("invalid daemon workspace.file event.")
+            return {**common, "bytes": int(value["bytes"]), "isBinary": value["isBinary"], "truncated": value["truncated"], **({"contentBase64": value["contentBase64"]} if isinstance(value.get("contentBase64"), str) else {})}
+        code = string_field(value, "code")
+        if code not in {"invalid-path", "not-found", "is-directory", "io-error"}:
+            raise ValueError("invalid daemon workspace.error event.")
+        return {**common, "code": code, "message": string_field(value, "message")}
     session_id = string_field(value, "sessionId")
     run_id = string_field(value, "runId")
     agent = valid_agent(value.get("agent"))
@@ -379,6 +415,58 @@ def daemon_node_event(value: dict[str, Any]) -> dict[str, Any]:
             "stream": value["stream"],
             "text": value["text"],
             "sequence": int(value["sequence"]),
+        }
+    if event_type == "run.collaboration":
+        collaboration = value.get("collaboration")
+        if not isinstance(collaboration, dict) or not isinstance(value.get("sequence"), (int, float)):
+            raise ValueError("invalid daemon node run.collaboration event.")
+        tool = collaboration.get("tool")
+        status = collaboration.get("status")
+        receiver_ids = collaboration.get("receiverThreadIds")
+        agent_states = collaboration.get("agentsStates")
+        if (
+            tool not in {"spawnAgent", "sendInput", "resumeAgent", "wait", "closeAgent"}
+            or status not in {"inProgress", "completed", "failed"}
+            or not string_field(collaboration, "id")
+            or not string_field(collaboration, "senderThreadId")
+            or not isinstance(receiver_ids, list)
+            or len(receiver_ids) > 64
+            or any(not isinstance(item, str) or not item for item in receiver_ids)
+            or not isinstance(agent_states, dict)
+            or len(agent_states) > 64
+        ):
+            raise ValueError("invalid daemon node collaboration payload.")
+        normalized_states: dict[str, dict[str, str | None]] = {}
+        for thread_id, state in agent_states.items():
+            if not isinstance(thread_id, str) or not thread_id or not isinstance(state, dict):
+                raise ValueError("invalid daemon node collaboration agent state.")
+            agent_status = state.get("status")
+            if agent_status not in {"pendingInit", "running", "interrupted", "completed", "errored", "shutdown", "notFound"}:
+                raise ValueError("invalid daemon node collaboration agent status.")
+            message = state.get("message")
+            if message is not None and not isinstance(message, str):
+                raise ValueError("invalid daemon node collaboration agent message.")
+            normalized_states[thread_id] = {"status": agent_status, "message": message}
+        return {
+            "type": event_type,
+            "commandId": command_id,
+            **lease_field,
+            "sessionId": session_id,
+            "runId": run_id,
+            "agent": agent,
+            "mode": agent_task_mode(value.get("mode")),
+            "sequence": int(value["sequence"]),
+            "collaboration": {
+                "id": string_field(collaboration, "id"),
+                "tool": tool,
+                "status": status,
+                "senderThreadId": string_field(collaboration, "senderThreadId"),
+                "receiverThreadIds": receiver_ids,
+                "prompt": collaboration.get("prompt") if isinstance(collaboration.get("prompt"), str) else None,
+                "model": collaboration.get("model") if isinstance(collaboration.get("model"), str) else None,
+                "reasoningEffort": collaboration.get("reasoningEffort") if isinstance(collaboration.get("reasoningEffort"), str) else None,
+                "agentsStates": normalized_states,
+            },
         }
     mode = agent_task_mode(value.get("mode"))
     if event_type == "run.completed":

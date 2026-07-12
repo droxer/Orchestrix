@@ -28,8 +28,8 @@ Options:
                         agents inside it; "none" runs agents as local
                         processes (default: boxlite; also RELAY_SANDBOX_MODE).
   --use-local-agent-home
-                        In local mode, use this user's HOME for Claude/Codex/
-                        Kimi auth and config instead of Relay's isolated home.
+                        Deprecated compatibility flag. Local mode uses this
+                        user's HOME for existing agent auth and config by default.
   --doctor              Check backend, token, workspace, auth, and agent CLIs,
                         then exit without running the daemon loop.
   --help                Show this help message.

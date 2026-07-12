@@ -119,7 +119,13 @@ WORKSPACE_ARTIFACT_CONTENT_MAX_BYTES = int(
 )
 ARTIFACT_SNAPSHOT_STATE_KEY = "_relay_artifact_snapshot"
 DAEMON_CAPABILITY_GENERATED_FILES = "generated-files"
-DAEMON_NODE_CAPABILITIES = frozenset({DAEMON_CAPABILITY_GENERATED_FILES})
+DAEMON_CAPABILITY_WORKSPACE_READ = "workspace-read"
+DAEMON_CAPABILITY_STRUCTURED_AGENT_EVENTS = "structured-agent-events"
+DAEMON_NODE_CAPABILITIES = frozenset({
+    DAEMON_CAPABILITY_GENERATED_FILES,
+    DAEMON_CAPABILITY_WORKSPACE_READ,
+    DAEMON_CAPABILITY_STRUCTURED_AGENT_EVENTS,
+})
 DAEMON_SANDBOX_MODES = frozenset({"none", "boxlite"})
 
 
@@ -128,9 +134,15 @@ def _is_generated_artifact_path(relative_path: str) -> bool:
     suffix = path.suffix.lower()
     if suffix in GENERATED_ARTIFACT_EXTENSIONS:
         return True
+    output_root = path.parts[0] if path.parts else ""
+    if (
+        len(path.parts) >= 3
+        and path.parts[0] == "agents"
+        and path.parts[1].startswith("agent-")
+    ):
+        output_root = path.parts[2]
     return bool(
-        path.parts
-        and path.parts[0] == "output"
+        output_root == "output"
         and suffix in OUTPUT_ARTIFACT_TEXT_EXTENSIONS
     )
 
@@ -415,7 +427,7 @@ def effective_role_for_assignment(
     explicit_role = assignment.get("role")
     if explicit_role in AGENT_ROLES:
         return explicit_role
-    agent = assignment["agent"]
+    agent = assignment.get("executorKind") or assignment["agent"]
     if mode == "review":
         return role_for_agent(agent, mode)
     overrides = (
@@ -1397,6 +1409,7 @@ class DaemonNodeRegistry:
             raise PermissionError(
                 "Unauthorized daemon node event: command belongs to a different sandbox."
             )
+
         if (
             active.get("leaseId")
             and event.get("leaseId")
@@ -1441,6 +1454,27 @@ class DaemonNodeRegistry:
                         "stream": event["stream"],
                         "text": event["text"],
                         "sequence": event["sequence"],
+                    },
+                ),
+            )
+            return
+        if event["type"] == "run.collaboration":
+            seen = self._output_sequences_for_run(event["sessionId"], event["runId"])
+            sequence_key = ("collaboration", event["sequence"])
+            if sequence_key in seen:
+                return
+            seen.add(sequence_key)
+            self.store.append_event(
+                event["sessionId"],
+                relay_event(
+                    "agent.collaboration",
+                    event["sessionId"],
+                    {
+                        "runId": event["runId"],
+                        "agent": event["agent"],
+                        "mode": event["mode"],
+                        "sequence": event["sequence"],
+                        "collaboration": event["collaboration"],
                     },
                 ),
             )
@@ -1493,6 +1527,11 @@ class DaemonNodeRegistry:
                 self._advance_run_request(run_request, event)
         else:
             self.clear_run_output(event["runId"])
+
+    def assert_node_event_authorized(self, sandbox_id: str, token: str | None) -> None:
+        """Authorize non-run events without attempting run-event bookkeeping."""
+        self._assert_authorized(sandbox_id, token)
+        self._mark_seen(sandbox_id)
 
     def reap_stale_runs(self, *, force: bool = True) -> None:
         monotonic_now = time.monotonic()
@@ -1564,13 +1603,13 @@ class DaemonNodeRegistry:
                 self.logical_assignment_validator(assignment)
             if not self._liveness(sandbox)["online"]:
                 raise ValueError("Runtime node heartbeat is not live.")
-            if assignment["agent"] in set(sandbox.get("disabledAgents") or []):
+            if assignment["executorKind"] in set(sandbox.get("disabledAgents") or []):
                 raise ValueError(
-                    f"Executor {assignment['agent']} is disabled on this runtime node."
+                    f"Executor {assignment['executorKind']} is disabled on this runtime node."
                 )
-            if (sandbox.get("agents") or {}).get(assignment["agent"]) != "ready":
+            if (sandbox.get("agents") or {}).get(assignment["executorKind"]) != "ready":
                 raise ValueError(
-                    f"Executor {assignment['agent']} is not ready on this runtime node."
+                    f"Executor {assignment['executorKind']} is not ready on this runtime node."
                 )
             if not node_accepts_run(
                 sandbox,
@@ -1593,14 +1632,14 @@ class DaemonNodeRegistry:
         state.pop(ARTIFACT_SNAPSHOT_STATE_KEY, None)
         session_snapshot = self.store.get_session(run_request["sessionId"])
         bridge = compute_prior_agent_bridge(
-            session_snapshot, assignment["agent"], self.store
+            session_snapshot, assignment["executorKind"], self.store
         )
         if bridge:
             state["prior_agent_bridge"] = bridge
         conversation = compute_conversation_history(session_snapshot, self.store)
         if conversation:
             state["prior_conversation"] = conversation
-        handoff_note = compute_prior_handoff_note(session_snapshot, assignment["agent"])
+        handoff_note = compute_prior_handoff_note(session_snapshot, assignment["executorKind"])
         if handoff_note:
             state["prior_handoff_note"] = handoff_note
         if assignment.get("agentInstructions"):
@@ -1609,7 +1648,7 @@ class DaemonNodeRegistry:
             run_request["sessionId"],
             {
                 "runId": run_id,
-                "agent": assignment["agent"],
+                "agent": assignment["executorKind"],
                 "role": effective_role_for_assignment(sandbox, assignment, mode),
                 "mode": mode,
                 **(
@@ -1636,7 +1675,7 @@ class DaemonNodeRegistry:
             "sessionId": run_request["sessionId"],
             "runId": run_id,
             "taskGoal": run_request["taskGoal"],
-            "agent": assignment["agent"],
+            "agent": assignment["executorKind"],
             "mode": mode,
             **(
                 {"logicalAgentId": assignment["agentId"]}
@@ -1674,7 +1713,7 @@ class DaemonNodeRegistry:
                 "nodeId": node_id,
                 "currentCommandId": command["id"],
                 "currentRunId": run_id,
-                "currentAgent": assignment["agent"],
+                "currentAgent": assignment["executorKind"],
                 "currentMode": mode,
                 **(
                     {"currentLogicalAgentId": assignment["agentId"]}
@@ -1777,7 +1816,7 @@ class DaemonNodeRegistry:
         )
         if event["exitCode"] == 0:
             self._record_generated_workspace_artifacts(
-                sandbox, run_request, event, artifact_snapshot
+                sandbox, run_request, event, artifact_snapshot, assignment
             )
         if event["exitCode"] != 0:
             outcome = f"{assignment['agent']} {mode} failed with exit code {event['exitCode']}."
@@ -1817,6 +1856,7 @@ class DaemonNodeRegistry:
         run_request: dict[str, Any],
         event: dict[str, Any],
         artifact_snapshot: dict[str, Any] | None,
+        assignment: dict[str, Any] | None = None,
     ) -> None:
         session_id = run_request["sessionId"]
         workspace_path = sandbox.get("workspacePath")
@@ -1853,6 +1893,11 @@ class DaemonNodeRegistry:
                 "bytes": item["bytes"],
                 "contentType": item["contentType"],
                 "workspaceRelativePath": item["relativePath"],
+                **(
+                    {"agentId": assignment["agentId"]}
+                    if assignment and assignment.get("agentId")
+                    else {}
+                ),
             }
             if hasattr(self.store, "index_workspace_artifact"):
                 artifact, _session = self.store.index_workspace_artifact(
@@ -2116,6 +2161,7 @@ def daemon_active_run(run: dict[str, Any]) -> dict[str, Any]:
             "taskGoal",
             "workspacePath",
             "startedAt",
+            "currentLogicalAgentId",
         )
         if key in run
     }

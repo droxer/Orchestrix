@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
-import stat
 import time
 from collections.abc import AsyncIterator
 from datetime import datetime, timezone
@@ -37,8 +37,6 @@ router = APIRouter()
 
 ACTIVE_TASK_STATUSES = frozenset({"assigned", "running", "waiting_for_human", "review", "blocked"})
 ACTIVE_SESSION_STATUSES = frozenset({"running", "waiting_for_human"})
-WORKSPACE_FILE_LIMIT = 200
-WORKSPACE_FILE_PREVIEW_LIMIT = 256 * 1024  # 256 KB cap for inline file previews
 
 
 def session_artifact(session: dict[str, Any], artifact_id: str) -> dict[str, Any] | None:
@@ -113,77 +111,31 @@ def employee_for_workspace_brief(actor: dict[str, Any], requested_employee: str 
     return actor["employeeId"]
 
 
-def workspace_path_for_employee(ctx: Any, employee_id: str) -> str:
-    nodes = [node for node in ctx.registry.monitor_nodes() if node.get("employeeId") == employee_id]
-    primary_node = nodes[0] if nodes else None
-    sessions = [session for session in ctx.session_store.list_sessions() if session.get("ownerEmployeeId") == employee_id]
-    return (
-        (primary_node or {}).get("workspacePath")
-        or next((session.get("workspacePath") for session in sessions if session.get("workspacePath")), None)
-        or "/workspace"
-    )
+def managed_agent_workspace_subpath(agent_id: str) -> Path:
+    encoded = base64.urlsafe_b64encode(agent_id.encode("utf-8")).decode("ascii").rstrip("=")
+    return Path("agents") / f"agent-{encoded}"
+
+
+def agent_supervisor_employee_id(agent: dict[str, Any]) -> str | None:
+    """Return an agent's owner across current and legacy agent snapshots."""
+    owner = agent.get("supervisorEmployeeId") or agent.get("employeeId")
+    return owner if isinstance(owner, str) and owner else None
 
 
 def agent_for_workspace(ctx: Any, actor: dict[str, Any], requested_agent: str | None) -> dict[str, Any] | None:
     agent_id = requested_agent.strip() if isinstance(requested_agent, str) else ""
     if not agent_id:
         return None
-    agent = ctx.employee_agent_store.get_agent(agent_id)
+    agent = ctx.agent_store.get_agent(agent_id)
     if not agent or agent.get("deletedAt"):
         raise HTTPException(404, "Agent not found.")
-    if not actor["isAdmin"] and agent.get("employeeId") != actor["employeeId"]:
+    if not actor["isAdmin"] and agent_supervisor_employee_id(agent) != actor["employeeId"]:
         raise HTTPException(403, "Cannot read another employee's agent workspace.")
     return agent
 
 
-def workspace_path_for_agent(ctx: Any, agent: dict[str, Any] | None, employee_id: str) -> str:
-    if agent:
-        nodes = {node["id"]: node for node in ctx.registry.monitor_nodes()}
-        for placement in ctx.agent_placement_store.list_placements(agent_id=agent["id"]):
-            node = nodes.get(placement["daemonNodeId"])
-            if node and node.get("workspacePath"):
-                return node["workspacePath"]
-    return workspace_path_for_employee(ctx, employee_id)
-
-
 def session_uses_agent(session: dict[str, Any], agent_id: str) -> bool:
     return any(run.get("logicalAgentId") == agent_id for run in session.get("agentRuns", []))
-
-
-def workspace_file_timestamp(value: float) -> str:
-    return datetime.fromtimestamp(value, timezone.utc).isoformat().replace("+00:00", "Z")
-
-
-def workspace_file_item(root: Path, entry: Path) -> dict[str, Any] | None:
-    try:
-        info = entry.lstat()
-    except OSError:
-        return None
-    mode = info.st_mode
-    kind = (
-        "directory" if stat.S_ISDIR(mode)
-        else "file" if stat.S_ISREG(mode)
-        else "symlink" if stat.S_ISLNK(mode)
-        else "other"
-    )
-    return {
-        "name": entry.name,
-        "path": entry.relative_to(root).as_posix(),
-        "kind": kind,
-        "bytes": None if kind == "directory" else info.st_size,
-        "updatedAt": workspace_file_timestamp(info.st_mtime),
-    }
-
-
-def workspace_target_path(root: Path, relative_path: str) -> tuple[Path, Path]:
-    requested = relative_path.strip().strip("/")
-    if Path(requested).is_absolute():
-        raise HTTPException(400, "Workspace file path must be relative.")
-    root_resolved = root.resolve()
-    target = (root_resolved / requested).resolve()
-    if target != root_resolved and root_resolved not in target.parents:
-        raise HTTPException(403, "Workspace file path escapes the workspace.")
-    return root_resolved, target
 
 
 @router.get("/sessions")
@@ -235,7 +187,9 @@ async def list_artifacts(request: Request, ctx: AppContextDep) -> dict[str, Any]
 async def workspace_brief(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
     agent = agent_for_workspace(ctx, actor, request.query_params.get("agentId"))
-    employee_id = agent["employeeId"] if agent else employee_for_workspace_brief(actor, request.query_params.get("employeeId"))
+    employee_id = agent_supervisor_employee_id(agent) if agent else employee_for_workspace_brief(actor, request.query_params.get("employeeId"))
+    if not employee_id:
+        raise HTTPException(404, "Agent owner not found.")
 
     nodes = [node for node in ctx.registry.monitor_nodes() if node.get("employeeId") == employee_id]
     primary_node = nodes[0] if nodes else None
@@ -254,7 +208,6 @@ async def workspace_brief(request: Request, ctx: AppContextDep) -> dict[str, Any
         for artifact in workspace_artifacts(session)
     ]
 
-    workspace_path = workspace_path_for_agent(ctx, agent, employee_id)
     recent_sessions = sorted(sessions, key=lambda item: item.get("updatedAt") or "", reverse=True)[:8]
     active_tasks = [task for task in tasks if task.get("status") in ACTIVE_TASK_STATUSES]
     recent_artifacts = sorted(artifacts, key=lambda item: item.get("createdAt") or "", reverse=True)[:12]
@@ -262,7 +215,6 @@ async def workspace_brief(request: Request, ctx: AppContextDep) -> dict[str, Any
     return {
         "employeeId": employee_id,
         **({"agentId": agent["id"]} if agent else {}),
-        "workspacePath": workspace_path,
         "primaryNode": primary_node,
         "nodes": nodes,
         "activeRuns": sorted(active_runs, key=lambda item: item.get("startedAt") or "", reverse=True),
@@ -282,104 +234,6 @@ async def workspace_brief(request: Request, ctx: AppContextDep) -> dict[str, Any
     }
 
 
-@router.get("/workspace/files")
-async def workspace_files(request: Request, ctx: AppContextDep) -> dict[str, Any]:
-    actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
-    agent = agent_for_workspace(ctx, actor, request.query_params.get("agentId"))
-    employee_id = agent["employeeId"] if agent else employee_for_workspace_brief(actor, request.query_params.get("employeeId"))
-    workspace_path = workspace_path_for_agent(ctx, agent, employee_id)
-    root = Path(workspace_path)
-    relative_path = request.query_params.get("path") or ""
-
-    if not root.exists():
-        return {
-            "employeeId": employee_id,
-            "workspacePath": workspace_path,
-            "path": "",
-            "exists": False,
-            "entries": [],
-            "limit": WORKSPACE_FILE_LIMIT,
-            "generatedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-        }
-
-    root_resolved, target = workspace_target_path(root, relative_path)
-    if not target.exists():
-        raise HTTPException(404, "Workspace file path was not found.")
-    if not target.is_dir():
-        raise HTTPException(400, "Workspace file path must be a directory.")
-
-    entries: list[dict[str, Any]] = []
-    try:
-        for entry in target.iterdir():
-            item = workspace_file_item(root_resolved, entry)
-            if item:
-                entries.append(item)
-    except OSError as exc:
-        raise HTTPException(400, f"Cannot list workspace files: {exc}") from exc
-
-    entries.sort(key=lambda item: (item["kind"] != "directory", item["name"].lower()))
-    return {
-        "employeeId": employee_id,
-        "workspacePath": workspace_path,
-        "path": "" if target == root_resolved else target.relative_to(root_resolved).as_posix(),
-        "exists": True,
-        "entries": entries[:WORKSPACE_FILE_LIMIT],
-        "limit": WORKSPACE_FILE_LIMIT,
-        "generatedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-    }
-
-
-@router.get("/workspace/file")
-async def workspace_file(request: Request, ctx: AppContextDep) -> dict[str, Any]:
-    actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
-    agent = agent_for_workspace(ctx, actor, request.query_params.get("agentId"))
-    employee_id = agent["employeeId"] if agent else employee_for_workspace_brief(actor, request.query_params.get("employeeId"))
-    relative_path = (request.query_params.get("path") or "").strip()
-    if not relative_path:
-        raise HTTPException(400, "Workspace file path is required.")
-
-    workspace_path = workspace_path_for_agent(ctx, agent, employee_id)
-    root = Path(workspace_path)
-    if not root.exists():
-        raise HTTPException(404, "Workspace file path was not found.")
-
-    root_resolved, target = workspace_target_path(root, relative_path)
-    if not target.exists():
-        raise HTTPException(404, "Workspace file path was not found.")
-    if target.is_dir():
-        raise HTTPException(400, "Workspace file path is a directory.")
-    if not target.is_file():
-        raise HTTPException(400, "Workspace file path is not a regular file.")
-
-    try:
-        size = target.stat().st_size
-        with target.open("rb") as handle:
-            raw = handle.read(WORKSPACE_FILE_PREVIEW_LIMIT)
-    except OSError as exc:
-        raise HTTPException(400, f"Cannot read workspace file: {exc}") from exc
-
-    is_binary = b"\x00" in raw
-    content: str | None = None
-    if not is_binary:
-        try:
-            content = raw.decode("utf-8")
-        except UnicodeDecodeError:
-            is_binary = True
-
-    return {
-        "employeeId": employee_id,
-        "workspacePath": workspace_path,
-        "path": target.relative_to(root_resolved).as_posix(),
-        "exists": True,
-        "isBinary": is_binary,
-        "bytes": size,
-        "content": content,
-        "truncated": size > WORKSPACE_FILE_PREVIEW_LIMIT,
-        "limitBytes": WORKSPACE_FILE_PREVIEW_LIMIT,
-        "generatedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-    }
-
-
 @router.post("/sessions", status_code=201)
 async def create_session(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
@@ -388,6 +242,7 @@ async def create_session(request: Request, ctx: AppContextDep) -> dict[str, Any]
     if not task_goal:
         raise HTTPException(400, "taskGoal is required.")
     assignments = assignment_list(body.get("assignments"))
+    owner_agent_id = next((assignment.get("agentId") for assignment in assignments if assignment.get("agentId")), None)
     workspace_path = string_field(body, "workspacePath") or "/workspace"
     task_id = body.get("taskId") if isinstance(body.get("taskId"), str) else None
     task = get_task_for_actor(ctx.task_store, task_id, actor) if task_id else None
@@ -404,6 +259,7 @@ async def create_session(request: Request, ctx: AppContextDep) -> dict[str, Any]
         task_id=task_id,
         workspace_path=workspace_path,
         owner_employee_id=owner,
+        owner_agent_id=owner_agent_id,
     )
     session = controller.create_session(
         task_goal,

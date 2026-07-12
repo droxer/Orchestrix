@@ -32,7 +32,7 @@ export function PageHeader({
   return (
     <header
       className={cn(
-        "page-header flex shrink-0 justify-between gap-base border-b border-hairline px-xl max-[820px]:px-base",
+        "page-header surface-header flex shrink-0 justify-between gap-base px-xl max-[820px]:px-base",
         stacked ? "items-start py-lg" : "min-h-[var(--header-h)] items-center max-[820px]:py-sm",
       )}
     >

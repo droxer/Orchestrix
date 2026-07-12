@@ -1,0 +1,166 @@
+/* =====================================================================
+   Tier 2 — Semantic. Signal Cyan direction (see tokens/primitives.css
+   for the full rationale): dark near-black canvas by default, an
+   electric telemetry cyan as the single chromatic action color —
+   deliberately not DESIGN.md's literal lavender-blue.
+
+   Role-based aliases that consume primitives.css and give every value an
+   intent-bearing name: --color-semantic-* for color roles, --type-* for
+   composite typography shorthands, plus derived elevation/focus/motion
+   tokens. Component CSS should only ever reference tokens from this file
+   (or the --font, --space, --radius, --text structural primitive
+   scales) — never a primitive color directly.
+
+   Naming: --color-semantic-{role}, e.g. --color-semantic-action,
+   --color-semantic-danger, --color-semantic-surface-raised. This
+   replaces the prior mixed naming (--color-info vs --color-semantic-up
+   vs --color-accent-yellow all describing the same "status hue" concept
+   with different patterns).
+   ===================================================================== */
+
+:root {
+  /* Action — Signal Cyan (#22d9c0 dark / #0c7566 light) is the single
+     chromatic action color: brand mark, primary CTA, focus ring, link
+     emphasis. Status narrows to green/amber/red and remains the only
+     other chroma in the system — never used as an action fill. */
+  --color-semantic-action: var(--color-accent);
+  --color-semantic-action-active: var(--color-accent-active);
+  --color-semantic-action-disabled: var(--color-accent-disabled);
+  --color-semantic-action-soft: var(--color-accent-tint); /* selected rows, active nav, running pills */
+
+  /* Text */
+  --color-semantic-ink: var(--color-ink-900);        /* headings, primary copy, emphasized body */
+  --color-semantic-body: var(--color-ink-700);       /* running text */
+  --color-semantic-muted: var(--color-ink-500);      /* secondary labels */
+  --color-semantic-muted-soft: var(--color-ink-300); /* timestamps, disabled */
+  --color-semantic-on-action: var(--color-on-accent); /* text on the action fill */
+  --color-semantic-on-dark: var(--color-porcelain);    /* text on always-dark fills, both themes */
+
+  /* Surfaces — layered cool-neutral canvas */
+  --color-semantic-canvas: var(--color-canvas-base);
+  --color-semantic-surface-soft: var(--color-canvas-soft);       /* subtle tint — quotes, code, hover */
+  --color-semantic-surface-strong: var(--color-canvas-strong);   /* fills, search, avatars */
+  --color-semantic-surface-raised: var(--color-canvas-raised);   /* modals, drawers, floating chrome */
+  --color-semantic-surface-dark: var(--color-graphite-900);
+  --color-semantic-surface-dark-elevated: var(--color-graphite-800);
+  --color-semantic-on-dark-soft: var(--color-graphite-400);
+
+  /* Hairlines */
+  --color-semantic-hairline: var(--color-hairline-300);
+  --color-semantic-hairline-soft: var(--color-hairline-200);
+  /* --color-semantic-hairline-on-dark: always-dark surface hairline (diff viewer,
+     ink-fill buttons). NOT a dark-mode hairline — used on dark fills that appear
+     in BOTH themes. Consumed by artifact.css and admin-v2-drawers.css. Value
+     auto-lifts in dark mode because --color-semantic-on-dark is white. */
+  --color-semantic-hairline-on-dark: color-mix(in srgb, var(--color-semantic-on-dark) 14%, transparent);
+
+  /* Syntax-highlight numerals — Geist Mono numeric literal in code blocks */
+  --color-semantic-code-number: var(--color-rust);
+
+  /* Status — the only OTHER chroma in the system besides the Signal
+     Cyan action color (see --color-semantic-action above). Text, dots,
+     and borders only; never background fills, never actions. */
+  --color-semantic-success: var(--color-green);
+  --color-semantic-danger: var(--color-red);
+  --color-semantic-warning: var(--color-yellow); /* attention dot only, not an action color */
+  --color-semantic-info: var(--color-slate);     /* neutral slate — decoupled from the action hue */
+
+  /* Status-as-TEXT — the dot/border values above are tuned for fills on a
+     white canvas and fail WCAG contrast as small foreground text. These
+     darker ramps are the text-safe counterparts: use them wherever a
+     status reads as a word or a numeral, not a dot. */
+  --color-semantic-warning-text: var(--color-yellow-deep);
+  --color-semantic-danger-text: var(--color-red-deep);
+
+  /* Overlay scrim — behind modal drawers/dialogs. One token so every
+     floating surface dims the canvas identically. Deepened by default so
+     drawers/dialogs still read as modal against the near-black canvas
+     without washing out to grey; html[data-theme="light"] lightens it
+     further down this file. */
+  --color-semantic-overlay: color-mix(in srgb, var(--color-scrim-base) 72%, transparent);
+  /* Stacked drawer scrim layers — deepen per nesting level so nested
+     panels read clearly. Promoted from a trio of ad-hoc color-mix calls
+     in overlay.css. */
+  --color-semantic-overlay-layer-1: color-mix(in srgb, var(--color-black) 12%, var(--color-semantic-overlay));
+  --color-semantic-overlay-layer-2: color-mix(in srgb, var(--color-black) 24%, var(--color-semantic-overlay));
+  --color-semantic-overlay-layer-3: color-mix(in srgb, var(--color-black) 36%, var(--color-semantic-overlay));
+
+  /* Status borders for outlined pills and danger buttons. Info is a
+     standalone slate tone, not a brand/action alias. */
+  --border-success: color-mix(in srgb, var(--color-semantic-success) 28%, transparent);
+  --border-danger: color-mix(in srgb, var(--color-semantic-danger) 32%, transparent);
+
+  /* Elevation — two surface contracts.
+     --shadow-soft: just the drop. For surfaces that ALREADY have a 1px
+     hairline border; the soft drop adds depth without doubling the line.
+     --shadow-lift: welded ring + drop. For BORDERLESS floating surfaces
+     (drawers, dialogs, composer chrome, tooltips) — the inner ring acts
+     as the edge in place of a hairline border.
+     Pick by the surface, not by intuition: bordered card hover → soft;
+     unbordered floating chrome → lift. Values below are tuned for the
+     near-black default canvas; html[data-theme="light"] softens the
+     drop further down this file. */
+  --shadow-soft: 0 1px 2px color-mix(in srgb, var(--color-black) 50%, transparent);
+  --shadow-lift:
+    0 4px 14px color-mix(in srgb, var(--color-shadow-ink) 8%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--color-shadow-ink-ring) 6%, transparent);
+
+  /* Focus ring — single token, used by every interactive surface so the
+     focus treatment never drifts between buttons, inputs, and rows.
+     3px action-alpha halo with no inner solid keeps WCAG contrast
+     without overpowering the brand color. */
+  --ring-focus: 0 0 0 3px color-mix(in srgb, var(--color-semantic-action) 28%, transparent);
+  /* Danger counterpart — destructive controls (cancel-send, delete rows)
+     swap the brand halo for the status red at the same 3px/28% recipe. */
+  --ring-focus-danger: 0 0 0 3px color-mix(in srgb, var(--color-semantic-danger) 28%, transparent);
+
+  /* Semantic typography. One crisp grotesk (Geist) carries every role —
+     display, chrome, and body alike — so weight is what separates
+     emphasis, not a font-family switch. Dense sans chrome (titles,
+     labels) steps to 600, never 700+. */
+  --type-display-lg: 600 34px/1.05 var(--font-display);  /* hero headline (login, empty states) */
+  --type-display-sm: 600 25px/1.1  var(--font-display);
+  --type-title-lg:   600 22px/1.16 var(--font-display);  /* admin page title, chat title */
+  --type-title-md:   600 19px/1.24 var(--font-display);
+  --type-title-sm:   600 15px/1.3  var(--font-sans);
+  --type-body-md:    400 16px/1.5  var(--font-sans);
+  --type-body-sm:    400 13px/1.5  var(--font-sans);
+  --type-caption:    400 13px/1.5  var(--font-sans);
+  --type-caption-strong: 600 12px/1.5 var(--font-sans);
+  --type-button:     600 13px/1.15 var(--font-sans);
+  --type-nav-link:   500 13px/1.4  var(--font-sans);
+  /* Chrome labels — the dense small-text roles that fill operational UI
+     (table heads, field labels, pills, metric captions). Tight 1.4 leading. */
+  --type-label-strong:      600 13px/1.4 var(--font-sans);  /* 13px bold chrome */
+  --type-label-md:          500 13px/1.4 var(--font-sans);  /* 13px medium */
+  --type-label:             500 12px/1.4 var(--font-sans);  /* 12px medium */
+  --type-micro-strong:      600 11px/1.4 var(--font-sans);  /* 11px bold */
+  --type-number:     600 18px/1.4  var(--font-number);
+  --type-number-display: 600 30px/1.14 var(--font-number);  /* admin metric values */
+  --type-meta:  500 12px/1.4 var(--font-sans);  /* agent labels, metadata, timestamps */
+  --type-eyebrow:    500 11px/1.5 var(--font-sans);  /* pair with letter-spacing: var(--letter-eyebrow) + uppercase */
+}
+
+/* CJK reading-heavy type roles hardcode their leading in the shorthand,
+   so restate them here (see primitives.css for the --letter and --leading
+   scalar overrides this block pairs with). */
+html:lang(zh-CN),
+html:lang(zh-TW) {
+  --type-body-md:     400 16px/1.7 var(--font-sans);
+  --type-body-sm:     400 14px/1.7 var(--font-sans);
+  --type-caption:     400 13px/1.65 var(--font-sans);
+}
+
+/* Light theme — ONE selector, mirroring primitives.css's light register.
+   Dark is the default/primary register above; only tokens whose
+   *relationship* to their primitive changes for the lifted white canvas
+   need a redeclaration here — everything else inherits the new
+   primitive value automatically through the var() chain above. */
+html[data-theme="light"] {
+  /* Elevation — the deep dark-mode drop is too heavy on white; soften it. */
+  --shadow-soft: 0 1px 2px color-mix(in srgb, var(--color-shadow-ink) 4%, transparent);
+
+  /* Scrim — lighten on a white canvas so drawers/dialogs don't read as
+     near-opaque black. */
+  --color-semantic-overlay: color-mix(in srgb, var(--color-scrim-base) 68%, transparent);
+}

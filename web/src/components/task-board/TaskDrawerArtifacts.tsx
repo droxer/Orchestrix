@@ -46,9 +46,9 @@ export function TaskDrawerArtifacts({ taskId }: { taskId: string }) {
         ) : null}
       </h3>
       {failed ? (
-        <p className="task-drawer-artifacts-empty">{t("backlog.artifacts_error")}</p>
+        <p className="task-drawer-artifacts-empty" role="alert">{t("backlog.artifacts_error")}</p>
       ) : artifacts === null ? (
-        <p className="task-drawer-artifacts-empty">{t("backlog.artifacts_loading")}</p>
+        <p className="task-drawer-artifacts-empty" role="status" aria-live="polite">{t("backlog.artifacts_loading")}</p>
       ) : artifacts.length === 0 ? (
         <p className="task-drawer-artifacts-empty">{t("backlog.artifacts_empty")}</p>
       ) : (

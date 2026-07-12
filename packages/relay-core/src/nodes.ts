@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { getAgent } from "./agents.js";
 import { StderrLineRenderer } from "./renderers.js";
 import {
@@ -11,6 +12,7 @@ import {
   type AgentTaskMode,
 } from "./state.js";
 import { extractTokenUsageFromJsonl } from "./token-usage.js";
+import { CodexCollaborationStream } from "./codex-collaboration.js";
 
 const AGENT_RESULT_LOG_LIMIT = 12_000;
 
@@ -31,6 +33,7 @@ export async function runAgentNode(
   const execute = requiredExecStream(options);
   const renderer = def.createRenderer(mode);
   const stderrRenderer = new StderrLineRenderer();
+  const collaborationStream = agent === "codex" ? new CodexCollaborationStream() : undefined;
   const runId = options.runId;
   const reviewMode = mode === "review";
   const command =
@@ -40,10 +43,18 @@ export async function runAgentNode(
         ? def.buildAskCommand(state)
         : def.buildActionCommand(state);
   const actionLabel = mode === "ask" ? def.askLabel : def.actionLabel;
+  const cwd = options.agentWorkspaceSubdir
+    ? join(agentWorkspacePath(), options.agentWorkspaceSubdir)
+    : agentWorkspacePath();
   const result = await execute("bash", ["-c", command], {
-    cwd: agentWorkspacePath(),
+    cwd,
     stdoutRenderer: (chunk) => {
       if (runId) options.eventSink?.agentOutput(runId, agent, "stdout", chunk);
+      if (runId && collaborationStream && options.eventSink?.agentCollaboration) {
+        for (const event of collaborationStream.feed(chunk)) {
+          options.eventSink.agentCollaboration(runId, agent, event);
+        }
+      }
       return renderer.feed(chunk);
     },
     stderrRenderer: (chunk) => {

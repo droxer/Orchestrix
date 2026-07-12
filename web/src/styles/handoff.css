@@ -5,9 +5,9 @@
   flex-wrap: wrap;
   gap: var(--space-xs);
   padding: var(--space-sm);
-  border: 1px solid var(--color-hairline-soft);
+  border: 1px solid var(--color-semantic-hairline-soft);
   border-radius: var(--radius-md);
-  background: var(--color-surface-soft);
+  background: var(--color-semantic-surface-soft);
 }
 
 .decision-bar button,
@@ -16,47 +16,47 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-xxs);
-  min-height: 40px;
+  min-height: var(--size-control-md);
   padding: 0 var(--space-base);
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--color-semantic-hairline);
   border-radius: var(--radius-sm);
-  background: var(--color-surface-strong);
-  color: var(--color-ink);
+  background: var(--color-semantic-surface-strong);
+  color: var(--color-semantic-ink);
   font: var(--type-label-strong);
   transition: background var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
 }
 
 .decision-bar button:hover,
 .handoff-actions button:hover {
-  border-color: var(--color-primary);
-  background: var(--color-canvas);
-  color: var(--color-primary);
+  border-color: var(--color-semantic-action);
+  background: var(--color-semantic-canvas);
+  color: var(--color-semantic-action);
 }
 
 .decision-bar .primary,
 .handoff-actions .primary {
-  border-color: var(--color-primary);
-  background: var(--color-primary);
-  color: var(--color-on-primary);
+  border-color: var(--color-semantic-action);
+  background: var(--color-semantic-action);
+  color: var(--color-semantic-on-action);
 }
 
 .decision-bar .primary:hover,
 .handoff-actions .primary:hover {
-  border-color: var(--color-primary-active);
-  background: var(--color-primary-active);
-  color: var(--color-on-primary);
+  border-color: var(--color-semantic-action-active);
+  background: var(--color-semantic-action-active);
+  color: var(--color-semantic-on-action);
 }
 
 .decision-bar .danger-soft {
-  color: var(--color-danger-text);
+  color: var(--color-semantic-danger-text);
   border-color: var(--border-danger);
-  background: var(--color-canvas);
+  background: var(--color-semantic-canvas);
 }
 
 .decision-bar .danger-soft:hover {
-  color: var(--color-danger-text);
-  border-color: var(--color-semantic-down);
-  background: var(--color-canvas);
+  color: var(--color-semantic-danger-text);
+  border-color: var(--color-semantic-danger);
+  background: var(--color-semantic-canvas);
 }
 
 .handoff-panel {
@@ -65,9 +65,9 @@
   display: grid;
   gap: var(--space-sm);
   padding: var(--space-base);
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--color-semantic-hairline);
   border-radius: var(--radius-md);
-  background: var(--color-canvas);
+  background: var(--color-semantic-canvas);
 }
 
 .handoff-row {
@@ -78,7 +78,7 @@
 }
 
 .handoff-row label {
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
   font: var(--type-label-strong);
 }
 
@@ -86,18 +86,18 @@
 .handoff-panel input {
   min-width: 0;
   height: 48px;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--color-semantic-hairline);
   border-radius: var(--radius-md);
   outline: 0;
-  background: var(--color-canvas);
+  background: var(--color-semantic-canvas);
   padding: 0 var(--space-base);
-  color: var(--color-ink);
+  color: var(--color-semantic-ink);
   font-size: var(--text-md);
 }
 
 .handoff-row select:focus,
 .handoff-panel input:focus {
-  border-color: var(--color-primary);
+  border-color: var(--color-semantic-action);
   box-shadow: var(--ring-focus);
 }
 

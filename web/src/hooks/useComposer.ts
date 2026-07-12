@@ -1,15 +1,14 @@
-import { useRef, useState, type Dispatch, type SetStateAction } from "react";
-import type { AgentName } from "../types";
+import { useCallback, useLayoutEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import type { MentionableAgent } from "../lib/agentDisplayNames";
+import { resizeComposerTextarea } from "../lib/composerResize";
 
 // Composer text + @mention autocomplete state and behavior. The host wires the
 // returned handlers to the textarea and renders the popover from
 // filteredMentionAgents; picking a mention notifies onAgentPicked so the host
 // can route the active agent.
-export function useComposer({ agentNames, disabledAgents, agentHealth, onAgentPicked }: {
-  agentNames: AgentName[];
-  disabledAgents?: AgentName[];
-  agentHealth?: Partial<Record<AgentName, "unknown" | "ready" | "failed">>;
-  onAgentPicked: (agent: AgentName) => void;
+export function useComposer({ mentionAgents, onAgentPicked }: {
+  mentionAgents: MentionableAgent[];
+  onAgentPicked: (agent: MentionableAgent) => void;
 }): {
   composerText: string;
   setComposerText: Dispatch<SetStateAction<string>>;
@@ -19,9 +18,10 @@ export function useComposer({ agentNames, disabledAgents, agentHealth, onAgentPi
   setMentionIndex: Dispatch<SetStateAction<number>>;
   setIsComposing: Dispatch<SetStateAction<boolean>>;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
-  filteredMentionAgents: AgentName[];
+  filteredMentionAgents: MentionableAgent[];
   syncMentionState: (text: string, caret: number) => void;
-  insertMention: (agent: AgentName) => void;
+  insertMention: (agent: MentionableAgent) => void;
+  resizeTextarea: () => void;
 } {
   const [composerText, setComposerText] = useState("");
   const [mentionOpen, setMentionOpen] = useState(false);
@@ -30,8 +30,16 @@ export function useComposer({ agentNames, disabledAgents, agentHealth, onAgentPi
   const [isComposing, setIsComposing] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
+  const resizeTextarea = useCallback(() => {
+    resizeComposerTextarea(textareaRef.current);
+  }, []);
+
+  useLayoutEffect(() => {
+    resizeTextarea();
+  }, [composerText, resizeTextarea]);
+
   function detectMentionToken(text: string, caret: number): { start: number; query: string } | null {
-    const m = /(?:^|\s)@([a-z0-9-]*)$/i.exec(text.slice(0, caret));
+    const m = /(?:^|\s)@([^\s@]*)$/i.exec(text.slice(0, caret));
     if (!m) return null;
     return { start: m.index === 0 ? 0 : m.index + 1, query: m[1].toLowerCase() };
   }
@@ -49,12 +57,12 @@ export function useComposer({ agentNames, disabledAgents, agentHealth, onAgentPi
     else if (mentionOpen) setMentionOpen(false);
   }
 
-  function insertMention(agent: AgentName) {
+  function insertMention(agent: MentionableAgent) {
     const el = textareaRef.current;
     const caret = el?.selectionStart ?? composerText.length;
     const token = detectMentionToken(composerText, caret);
     const start = token?.start ?? caret;
-    const inserted = `@${agent} `;
+    const inserted = `@${agent.displayName} `;
     setComposerText(`${composerText.slice(0, start)}${inserted}${composerText.slice(caret)}`);
     setMentionOpen(false); setMentionQuery(""); setMentionIndex(0); onAgentPicked(agent);
     requestAnimationFrame(() => {
@@ -64,11 +72,11 @@ export function useComposer({ agentNames, disabledAgents, agentHealth, onAgentPi
     });
   }
 
-  const disabledSet = new Set(disabledAgents ?? []);
-  const enabledAgents = agentNames.filter((agent) =>
-    !disabledSet.has(agent) && agentHealth?.[agent] === "ready");
+  const enabledAgents = mentionAgents.filter((agent) => agent.ready);
   const filteredMentionAgents = mentionQuery
-    ? enabledAgents.filter((a) => a.startsWith(mentionQuery))
+    ? enabledAgents.filter((agent) =>
+        agent.displayName.toLowerCase().startsWith(mentionQuery)
+        || agent.executorKind.startsWith(mentionQuery))
     : enabledAgents;
 
   return {
@@ -80,5 +88,6 @@ export function useComposer({ agentNames, disabledAgents, agentHealth, onAgentPi
     filteredMentionAgents,
     syncMentionState,
     insertMention,
+    resizeTextarea,
   };
 }

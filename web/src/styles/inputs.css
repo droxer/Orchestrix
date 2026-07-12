@@ -1,40 +1,53 @@
 /* ============================ search / inputs ============================ */
 
-.people-search {
+/* Shared search field — thread connect, admin roster filters, etc. */
+.relay-search,
+.adm-search {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: var(--space-xs);
-  min-height: 40px;
+  min-height: var(--size-control-md);
   padding: 0 var(--space-xs) 0 var(--space-base);
-  border: 1px solid var(--color-hairline-soft);
+  border: 1px solid var(--color-semantic-hairline-soft);
   border-radius: var(--radius-sm);
-  background: var(--color-surface-strong);
-  color: var(--color-ink);
+  background: var(--color-semantic-surface-strong);
+  color: var(--color-semantic-ink);
+  max-width: 480px;
   transition: border-color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
 }
 
-.people-search svg {
-  color: var(--color-muted);
+.conversation-search {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.relay-search svg,
+.adm-search svg {
+  color: var(--color-semantic-muted);
   flex-shrink: 0;
 }
 
-.people-search input {
+.relay-search input,
+.adm-search-input {
   min-width: 0;
+  flex: 1;
   border: 0;
   outline: 0;
   background: transparent;
-  color: var(--color-ink);
+  color: var(--color-semantic-ink);
+  font-family: var(--font-sans);
   font-size: var(--text-base);
 }
 
-.people-search input::placeholder {
-  color: var(--color-muted);
+.relay-search input::placeholder,
+.adm-search-input::placeholder {
+  color: var(--color-semantic-muted);
 }
 
-.people-search:focus-within {
-  border-color: var(--color-primary);
-  background: var(--color-canvas);
+.relay-search:focus-within,
+.adm-search:focus-within {
+  border-color: var(--color-semantic-action);
+  background: var(--color-semantic-canvas);
   box-shadow: var(--ring-focus);
 }
 
@@ -44,13 +57,13 @@
   width: 26px;
   height: 26px;
   border-radius: var(--radius-full);
-  background: var(--color-primary);
-  color: var(--color-on-primary);
+  background: var(--color-semantic-action);
+  color: var(--color-semantic-on-action);
   flex-shrink: 0;
   transition: background var(--duration-fast) var(--ease-standard);
 }
 
-.search-connect-btn:hover { background: var(--color-primary-active); }
+.search-connect-btn:hover { background: var(--color-semantic-action-active); }
 
 .employee-avatar,
 .agent-avatar {
@@ -58,8 +71,8 @@
   place-items: center;
   flex-shrink: 0;
   border-radius: var(--radius-md);
-  background: var(--color-surface-strong);
-  color: var(--color-ink);
+  background: var(--color-semantic-surface-strong);
+  color: var(--color-semantic-ink);
   font-family: var(--font-sans);
   font-weight: 600;
   position: relative;
@@ -69,8 +82,8 @@
   width: var(--avatar-size, 36px);
   height: var(--avatar-size, 36px);
   font-size: var(--text-sm);
-  background: var(--color-surface-strong);
-  box-shadow: inset 0 0 0 1px var(--color-hairline-soft);
+  background: var(--color-semantic-surface-strong);
+  box-shadow: inset 0 0 0 1px var(--color-semantic-hairline-soft);
 }
 
 /* Status pip — single source of truth on the avatar. Drives all
@@ -82,18 +95,18 @@
   bottom: -1px;
   width: 10px;
   height: 10px;
-  border: 2px solid var(--color-canvas);
+  border: 2px solid var(--color-semantic-canvas);
   border-radius: var(--radius-full);
-  background: var(--color-muted-soft);
+  background: var(--color-semantic-muted-soft);
   z-index: 2;
   transition: background var(--duration-fast) var(--ease-standard);
 }
 
-.employee-avatar.tone-good::after    { background: var(--color-semantic-up); }
-.employee-avatar.tone-info::after    { background: var(--color-info); }
-.employee-avatar.tone-bad::after     { background: var(--color-semantic-down); }
-.employee-avatar.tone-warn::after    { background: var(--color-accent-yellow); }
-.employee-avatar.tone-neutral::after { background: var(--color-muted-soft); }
+.employee-avatar.tone-good::after    { background: var(--color-semantic-success); }
+.employee-avatar.tone-info::after    { background: var(--color-semantic-info); }
+.employee-avatar.tone-bad::after     { background: var(--color-semantic-danger); }
+.employee-avatar.tone-warn::after    { background: var(--color-semantic-warning); }
+.employee-avatar.tone-neutral::after { background: var(--color-semantic-muted-soft); }
 
 /* Running state — concentric pulse ring around the pip. */
 .employee-avatar.running::before {
@@ -104,14 +117,14 @@
   width: 18px;
   height: 18px;
   border-radius: var(--radius-full);
-  background: var(--color-accent-yellow);
+  background: var(--color-semantic-warning);
   opacity: 0.35;
   z-index: 1;
   animation: avatar-pulse 1.8s ease-out infinite;
 }
 
 .employee-avatar.running::after {
-  background: var(--color-accent-yellow);
+  background: var(--color-semantic-warning);
 }
 
 @keyframes avatar-pulse {
@@ -127,7 +140,7 @@
 .agent-avatar {
   width: 32px;
   height: 32px;
-  color: var(--color-ink);
+  color: var(--color-semantic-ink);
   font-size: var(--text-sm);
 }
 
@@ -139,8 +152,8 @@
 .agent-avatar[data-agent="pi"],
 .agent-avatar[data-agent="codex"],
 .agent-avatar[data-agent="kimi"] {
-  background: var(--color-surface-strong);
-  color: var(--color-ink);
+  background: var(--color-semantic-surface-strong);
+  color: var(--color-semantic-ink);
 }
 
 .agent-avatar > svg {

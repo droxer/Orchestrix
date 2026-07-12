@@ -1,0 +1,188 @@
+/* =====================================================================
+   Tier 4 — Base.
+
+   Global element resets, focus contract, and the small set of utility
+   classes shared across the app (.mono, .eyebrow, .tone-*, .kbd-hint).
+   Everything here consumes semantic.css roles; it never declares a new
+   token itself.
+   ===================================================================== */
+
+:root {
+  color-scheme: dark;
+  background: var(--color-semantic-canvas);
+  color: var(--color-semantic-ink);
+  font-family: var(--font-sans);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+html[data-theme="light"] {
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+
+html,
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  overflow-x: hidden;
+  background: var(--color-semantic-canvas);
+  color: var(--color-semantic-body);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: 1.5;
+}
+
+::selection {
+  background: var(--color-semantic-action);
+  color: var(--color-semantic-on-action);
+}
+
+.skip-link {
+  position: fixed;
+  left: var(--space-base);
+  top: var(--space-base);
+  /* Topmost when focused so it clears the float layer (sidenav flyouts,
+     tooltips at --z-float) that a literal 100 sat beneath. */
+  z-index: var(--z-dialog);
+  transform: translateY(calc(-100% - var(--space-base)));
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  background: var(--color-semantic-action);
+  color: var(--color-semantic-on-action);
+  font-size: var(--text-base);
+  font-weight: 600;
+  text-decoration: none;
+  transition: transform var(--duration-fast) var(--ease-standard);
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button,
+a,
+input,
+textarea,
+select {
+  -webkit-tap-highlight-color: color-mix(in srgb, var(--color-semantic-action) 14%, transparent);
+  touch-action: manipulation;
+}
+
+button {
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* Focus — single ring contract. Components that need a stacked shadow
+   (composer wrap, cards on hover) override locally; everything else picks
+   up the brand-alpha halo here. */
+:where(button, a, input, textarea, select):focus-visible {
+  outline: none;
+  box-shadow: var(--ring-focus);
+}
+
+.chat-panel:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-focus);
+  outline-offset: 0;
+}
+
+/* Primary CTA enabled — the unlayered `button { background: none }` reset above
+   outranks Tailwind's layered `bg-primary`/`text-primary-foreground` utilities
+   (an unlayered rule beats any @layer regardless of specificity), so the
+   default-variant <Button> would otherwise render with no fill once enabled.
+   Restore the brand fill here to match the disabled rule below. */
+button[data-slot="button"][data-variant="default"] {
+  background: var(--color-semantic-action);
+  color: var(--color-semantic-on-action);
+}
+
+button[data-slot="button"][data-variant="default"]:hover:not(:disabled) {
+  background: var(--color-semantic-action-active);
+}
+
+/* Primary CTA disabled — the shadcn <Button> default variant is the primary
+   CTA (it renders data-variant="default"), so its disabled state uses the
+   dedicated faded-ink token instead of generic opacity. */
+button[data-slot="button"][data-variant="default"]:disabled {
+  background: var(--color-semantic-action-disabled);
+  color: var(--color-semantic-on-action);
+  opacity: 1;
+}
+
+/* Inline keyboard hint — small rotated badge used inside chips and tooltips
+   to expose a shortcut without stealing focus. */
+.kbd-hint {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  line-height: 1;
+  color: var(--color-semantic-muted);
+  letter-spacing: 0.02em;
+}
+
+/* Tabular numerals — renders in the sans (--font-number aliases --font-sans
+   per the Linear model); the name is retained for its many consumers. Elements
+   that must stay monospace (session IDs, hashes) re-specify --font-mono locally. */
+.mono {
+  font-family: var(--font-number);
+  font-feature-settings: "tnum" 1;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--color-semantic-muted);
+  font: var(--type-eyebrow);
+  letter-spacing: var(--letter-eyebrow);
+  text-transform: uppercase;
+}
+
+.panel-kicker {
+  margin: 0;
+  color: var(--color-semantic-muted);
+  font: var(--type-caption-strong);
+  text-transform: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.panel-kicker::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--color-semantic-hairline-soft);
+}
+
+/* Status tone driver — the single source for dot + pill color. A component
+   sets a `tone-*` modifier on the element; dots fill with var(--tone) and
+   outlined pills take it as currentColor. Tone classes only set the
+   variable so they never fight an element's own text color — consumers
+   opt in by reading var(--tone). */
+.tone-good    { --tone: var(--color-semantic-success); }
+.tone-info    { --tone: var(--color-semantic-info); }
+.tone-bad     { --tone: var(--color-semantic-danger); }
+.tone-warn    { --tone: var(--color-semantic-warning); }
+.tone-neutral { --tone: var(--color-semantic-muted-soft); }

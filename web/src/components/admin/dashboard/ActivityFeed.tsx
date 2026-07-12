@@ -19,7 +19,7 @@ const ICONS: Record<string, { Icon: LucideIcon; tone: "info" | "good" | "bad" | 
 };
 
 export function ActivityFeed({ items, employees, className }: ActivityFeedProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const employeeMap = new Map(employees.map((e) => [e.id, e.displayName] as const));
 
   return (
@@ -36,7 +36,7 @@ export function ActivityFeed({ items, employees, className }: ActivityFeedProps)
             const meta = ICONS[item.kind] ?? { Icon: CircleDot, tone: "muted" as const };
             const Icon = meta.Icon;
             const ownerName = item.employeeId ? employeeMap.get(item.employeeId) ?? item.employeeId : null;
-            const relativeTime = formatRelative(item.timestamp);
+            const relativeTime = formatRelative(item.timestamp, i18n.language);
             return (
               <li key={`${item.kind}-${index}-${item.timestamp}`} className="adm-dash-feed-row">
                 <span className={`adm-dash-feed-icon tone-${meta.tone}`} aria-hidden="true">
@@ -60,15 +60,16 @@ export function ActivityFeed({ items, employees, className }: ActivityFeedProps)
   );
 }
 
-function formatRelative(iso: string): string {
+function formatRelative(iso: string, locale: string): string {
   const parsed = Date.parse(iso);
   if (Number.isNaN(parsed)) return iso;
   const delta = Math.max(0, Date.now() - parsed);
   const minutes = Math.floor(delta / 60_000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
+  const formatter = new Intl.RelativeTimeFormat(locale || undefined, { numeric: "auto", style: "short" });
+  if (minutes < 1) return formatter.format(0, "minute");
+  if (minutes < 60) return formatter.format(-minutes, "minute");
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return formatter.format(-hours, "hour");
   const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+  return formatter.format(-days, "day");
 }

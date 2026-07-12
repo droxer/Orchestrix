@@ -114,13 +114,13 @@ async def soft_delete_employee(employee_id: str, request: Request, ctx: AppConte
     affected_nodes = ctx.registry.unassign_employee_everywhere(employee_id)
     removed_placements: list[str] = []
     deleted_agents: list[str] = []
-    for agent in ctx.employee_agent_store.list_agents(employee_id=employee_id):
+    for agent in ctx.agent_store.list_agents(supervisor_employee_id=employee_id):
         for placement in ctx.agent_placement_store.list_placements(agent_id=agent["id"]):
             removed = ctx.agent_placement_store.update_placement(
                 placement["id"], {"desiredState": "removed"}
             )
             removed_placements.append(removed["id"])
-        deleted = ctx.employee_agent_store.delete_agent(agent["id"])
+        deleted = ctx.agent_store.delete_agent(agent["id"])
         deleted_agents.append(deleted["id"])
     deleted_managed_nodes: list[str] = []
     for node in ctx.managed_node_store.list_nodes():
@@ -416,12 +416,12 @@ async def add_chat_identity_link(integration_id: str, request: Request, ctx: App
     if not employee_record(ctx.auth_store, employee_id):
         raise HTTPException(404, "Employee not found.")
     if default_agent_id:
-        agent = ctx.employee_agent_store.get_agent(default_agent_id)
+        agent = ctx.agent_store.get_agent(default_agent_id)
         if (
             not agent
             or agent.get("deletedAt")
             or not agent.get("enabled", True)
-            or agent.get("employeeId") != employee_id
+            or agent.get("supervisorEmployeeId") != employee_id
         ):
             raise HTTPException(
                 400, "defaultAgentId must reference an enabled agent owned by the linked employee."

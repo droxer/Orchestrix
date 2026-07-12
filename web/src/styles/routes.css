@@ -50,6 +50,6 @@
   place-items: center;
   min-height: 12rem;
   padding: var(--space-xl);
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
   font: var(--type-body-sm);
 }

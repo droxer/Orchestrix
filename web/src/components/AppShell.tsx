@@ -11,7 +11,6 @@ import type { CurrentUser } from "@/types";
 import { useRelayStore } from "@/lib/store";
 
 const WORK_ROUTE_LABEL_KEYS: Record<Exclude<AppRoute, "main">, string> = {
-  workspace: "nav.workspace",
   backlog: "nav.backlog",
   routine: "nav.routine",
   agents: "nav.agents",

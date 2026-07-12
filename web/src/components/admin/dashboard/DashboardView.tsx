@@ -20,7 +20,7 @@ interface DashboardViewProps {
 }
 
 export function DashboardView({ nodes, employees, metrics }: DashboardViewProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const sessionsQuery = useDashboardSessions(true);
   const activity = useDashboardActivity(true);
   const tokens = useTokenUsage();
@@ -39,49 +39,55 @@ export function DashboardView({ nodes, employees, metrics }: DashboardViewProps)
 
   return (
     <div className="adm-dash">
-      <section className="adm-dash-kpis" aria-label={t("admin.v2.dash_kpis_label")}>
+      <div className="adm-dash-kpis-wrap">
         <span className="relay-bleed-mark" aria-hidden="true">R</span>
-        <KpiTile
-          hero
-          enterIndex={0}
-          eyebrow={t("admin.v2.dash_kpi_sessions")}
-          value={sessionsReady ? sessions.total : dash}
-          delta={
-            sessionsReady
-              ? {
-                  direction: trend.direction,
-                  label: t("admin.v2.dash_kpi_sessions_delta", {
-                    count: last24h,
-                    diff: trend.label,
-                  }),
-                }
-              : undefined
-          }
-        />
-        <KpiTile
-          enterIndex={1}
-          eyebrow={t("admin.v2.dash_kpi_nodes")}
-          value={fleetReady ? metrics.total : dash}
-          hint={
-            fleetReady
-              ? t("admin.v2.dash_kpi_nodes_hint", { ready: metrics.ready, failed: metrics.failed })
-              : undefined
-          }
-          spark={fleetReady && fleetSpark.length > 1 ? fleetSpark : undefined}
-        />
-        <KpiTile
-          enterIndex={2}
-          eyebrow={t("admin.v2.dash_kpi_employees")}
-          value={fleetReady ? metrics.employeeTotal : dash}
-          hint={fleetReady ? t("admin.v2.dash_kpi_employees_hint", { count: employees.length }) : undefined}
-        />
-        <KpiTile
-          enterIndex={3}
-          eyebrow={t("admin.v2.dash_kpi_tokens")}
-          value={tokens.available ? formatCompact(tokens.total) : dash}
-          hint={tokens.available ? t("admin.v2.dash_kpi_tokens_hint") : t("admin.v2.dash_coming_soon_tag")}
-        />
-      </section>
+        <section className="adm-dash-kpis" aria-label={t("admin.v2.dash_kpis_label")}>
+          <KpiTile
+            slot="sessions"
+            hero
+            enterIndex={0}
+            eyebrow={t("admin.v2.dash_kpi_sessions")}
+            value={sessionsReady ? sessions.total : dash}
+            delta={
+              sessionsReady
+                ? {
+                    direction: trend.direction,
+                    label: t("admin.v2.dash_kpi_sessions_delta", {
+                      count: last24h,
+                      diff: trend.label,
+                    }),
+                  }
+                : undefined
+            }
+          />
+          <KpiTile
+            slot="nodes"
+            enterIndex={1}
+            eyebrow={t("admin.v2.dash_kpi_nodes")}
+            value={fleetReady ? metrics.total : dash}
+            hint={
+              fleetReady
+                ? t("admin.v2.dash_kpi_nodes_hint", { ready: metrics.ready, failed: metrics.failed })
+                : undefined
+            }
+            spark={fleetReady && fleetSpark.length > 1 ? fleetSpark : undefined}
+          />
+          <KpiTile
+            slot="employees"
+            enterIndex={2}
+            eyebrow={t("admin.v2.dash_kpi_employees")}
+            value={fleetReady ? metrics.employeeTotal : dash}
+            hint={fleetReady ? t("admin.v2.dash_kpi_employees_hint", { count: employees.length }) : undefined}
+          />
+          <KpiTile
+            slot="tokens"
+            enterIndex={3}
+            eyebrow={t("admin.v2.dash_kpi_tokens")}
+            value={tokens.available ? formatCompact(tokens.total, i18n.language) : dash}
+            hint={tokens.available ? t("admin.v2.dash_kpi_tokens_hint") : t("admin.v2.dash_coming_soon_tag")}
+          />
+        </section>
+      </div>
 
       <div className="adm-dash-belt">
         <ActivityChart
@@ -130,8 +136,6 @@ function sparkFromCounts(values: number[]): number[] {
   return values;
 }
 
-function formatCompact(value: number): string {
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`;
-  return String(value);
+function formatCompact(value: number, locale: string): string {
+  return new Intl.NumberFormat(locale, { notation: "compact", maximumFractionDigits: 1 }).format(value);
 }

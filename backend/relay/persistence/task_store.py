@@ -232,7 +232,6 @@ class LocalTaskStore:
                 and (
                     not assignee_employee_id
                     or task.get("assigneeEmployeeId") == assignee_employee_id
-                    or task.get("ownerEmployeeId") == assignee_employee_id
                 )
             ]
             if not candidates:
@@ -699,7 +698,6 @@ class DatabaseTaskStore:
                 and (
                     not assignee_employee_id
                     or row["snapshot"].get("assigneeEmployeeId") == assignee_employee_id
-                    or row["snapshot"].get("ownerEmployeeId") == assignee_employee_id
                 )
             ]
             if not candidates:

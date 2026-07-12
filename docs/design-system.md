@@ -1,59 +1,58 @@
 ---
 version: alpha
-name: Relay-design
-description: A precision/technical design system for an agent-orchestration control plane, in the Linear / Vercel / Resend lineage. The canvas is warm ecru (#fdfcfa; near-black in dark mode); cobalt (#3b5bdb) is the single brand ACTION color and lifts to periwinkle (#7089ff) on the dark canvas. The action carries the hue; status is reserved for success, danger, and warning (green / amber / red), and "info" is a neutral cool slate (#5b6779) decoupled from the action — so the brand hue marks action, selection, and focus only. Type is Geist for all interface, display, and chrome text (display is weighted Geist at 600 with tight size-scaling tracking, not an editorial serif); Geist Mono is reserved for code-like content only — tool/command lines, raw logs, code blocks, and IDs (the Linear model, sans carries eyebrows/metadata/agent-labels/numbers). Base UI text is 13px. Geometry is tight: 5px on buttons and badges, 6px on inputs, 8–10px on cards; the pill is retired. Depth comes from warm hairline borders, not shadows. Motion is fast and un-bouncy. The result reads as serious engineering tooling — calm, dense, action-focused, terminal-native, in Linear's structural discipline.
+name: Relay-Monochrome
+description: A Precision Monochrome design system (the Linear/Vercel school) for an agent-orchestration control plane. Flat near-white surfaces (white canvas by day; near-black #0a0a0a by night) carry the chrome; near-black ink (#111113) is the single ACTION color, inverting to white on the dark canvas. Hue is reserved for status alone — success, danger, and warning (green / amber / red) as dots, borders, and text, never fills or actions — and "info" is a neutral slate. One crisp grotesk (Geist) carries every text role — display, chrome, and body alike — with weight and tight display tracking doing the differentiating; Geist Mono is reserved for code. Base UI text is 13px. Geometry is tight: 5px on buttons and badges, 6px on inputs, 8–10px on cards; the pill is retired (aliases sm). Depth comes from hairline borders, not shadows. Motion is fast with no overshoot. The result reads as serious infrastructure software — a dense, calm control plane for AI agents.
 
 colors:
-  primary: "#3b5bdb"
-  primary-active: "#2f4bc4"
-  primary-disabled: "#c1cbf0"
-  brand-soft: "#edeff8"
-  ink: "#171412"
-  body: "#57534e"
-  body-strong: "#171412"
-  muted: "#79716b"
-  muted-soft: "#a8a29e"
-  hairline: "#eae5dd"
-  hairline-soft: "#f1ede6"
-  canvas: "#fdfcfa"
-  surface-soft: "#faf8f4"
-  surface-card: "#fdfcfa"
-  surface-strong: "#f5f2ec"
-  surface-dark: "#0d0c0a"
-  surface-dark-elevated: "#1a1815"
-  on-primary: "#ffffff"
-  on-dark: "#ffffff"
-  on-dark-soft: "#a1a1aa"
-  semantic-up: "#15803d"
-  semantic-down: "#e5484d"
-  accent-yellow: "#f5a623"
-  info: "#5b6779"
+  action: "#111113"
+  action-active: "#2e2e33"
+  action-disabled: "#d4d4d8"
+  action-soft: "#ececee"
+  ink: "#09090b"
+  body: "#3f3f46"
+  muted: "#71717a"
+  muted-soft: "#a1a1aa"
+  hairline: "#e4e4e7"
+  hairline-soft: "#f0f0f1"
+  canvas: "#ffffff"
+  surface-soft: "#fafafa"
+  surface-strong: "#f0f0f1"
+  surface-raised: "#ffffff"
+  surface-dark: "#18181b"
+  surface-dark-elevated: "#232326"
+  on-action: "#ffffff"
+  on-dark: "#fafafa"
+  on-dark-soft: "#9a9aa3"
+  success: "#10b981"
+  danger: "#ef4444"
+  warning: "#f59e0b"
+  info: "#71717a"
 
 typography:
   display-lg:
-    fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
-    fontSize: 26px
+    fontFamily: "var(--font-app-sans), 'Geist', sans-serif"
+    fontSize: 34px
     fontWeight: 600
-    lineHeight: 1.15
-    letterSpacing: -0.022em
+    lineHeight: 1.05
+    letterSpacing: -0.02em
   display-sm:
-    fontFamily: "'Geist', sans-serif"
-    fontSize: 20px
+    fontFamily: "var(--font-app-sans), 'Geist', sans-serif"
+    fontSize: 25px
     fontWeight: 600
-    lineHeight: 1.2
-    letterSpacing: -0.022em
+    lineHeight: 1.1
+    letterSpacing: -0.02em
   title-lg:
-    fontFamily: "'Geist', sans-serif"
-    fontSize: 20px
+    fontFamily: "var(--font-app-sans), 'Geist', sans-serif"
+    fontSize: 22px
     fontWeight: 600
-    lineHeight: 1.2
-    letterSpacing: -0.014em
+    lineHeight: 1.16
+    letterSpacing: -0.02em
   title-md:
-    fontFamily: "'Geist', sans-serif"
-    fontSize: 17px
+    fontFamily: "var(--font-app-sans), 'Geist', sans-serif"
+    fontSize: 19px
     fontWeight: 600
-    lineHeight: 1.35
-    letterSpacing: 0
+    lineHeight: 1.24
+    letterSpacing: -0.02em
   title-sm:
     fontFamily: "'Geist', sans-serif"
     fontSize: 15px
@@ -64,12 +63,6 @@ typography:
     fontFamily: "'Geist', sans-serif"
     fontSize: 16px
     fontWeight: 400
-    lineHeight: 1.5
-    letterSpacing: 0
-  body-strong:
-    fontFamily: "'Geist', sans-serif"
-    fontSize: 16px
-    fontWeight: 600
     lineHeight: 1.5
     letterSpacing: 0
   body-sm:
@@ -96,12 +89,6 @@ typography:
     fontWeight: 600
     lineHeight: 1.4
     letterSpacing: 0
-  caption-strong-sm:
-    fontFamily: "'Geist', sans-serif"
-    fontSize: 13px
-    fontWeight: 600
-    lineHeight: 1.4
-    letterSpacing: 0
   label-md:
     fontFamily: "'Geist', sans-serif"
     fontSize: 13px
@@ -121,13 +108,13 @@ typography:
     lineHeight: 1.4
     letterSpacing: 0
   meta:
-    fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
+    fontFamily: "'Geist', sans-serif"
     fontSize: 12px
     fontWeight: 500
     lineHeight: 1.4
     letterSpacing: 0
   eyebrow:
-    fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
+    fontFamily: "'Geist', sans-serif"
     fontSize: 11px
     fontWeight: 500
     lineHeight: 1.5
@@ -135,15 +122,15 @@ typography:
   number:
     fontFamily: "'Geist', sans-serif"
     fontSize: 18px
-    fontWeight: 500
+    fontWeight: 600
     lineHeight: 1.4
     letterSpacing: 0
   number-display:
     fontFamily: "'Geist', sans-serif"
     fontSize: 30px
-    fontWeight: 500
-    lineHeight: 1.12
-    letterSpacing: -0.028em
+    fontWeight: 600
+    lineHeight: 1.14
+    letterSpacing: -0.02em
   button:
     fontFamily: "'Geist', sans-serif"
     fontSize: 13px
@@ -164,6 +151,9 @@ rounded:
   md: 6px
   lg: 8px
   xl: 10px
+  2xl: 12px
+  3xl: 14px
+  4xl: 16px
   pill: 5px
   full: 9999px
 
@@ -183,34 +173,34 @@ components:
     backgroundColor: "{colors.canvas}"
     textColor: "{colors.ink}"
     typography: "{typography.nav-link}"
-    height: 60px
+    height: 64px
   side-nav:
-    backgroundColor: "{colors.canvas}"
-    activeBackgroundColor: "{colors.surface-strong}"
-    textColor: "{colors.ink}"
+    backgroundColor: "{colors.surface-strong}"
+    activeBackgroundColor: "{colors.action}"
+    textColor: "{colors.body}"
     typography: "{typography.nav-link}"
-    widthCollapsed: 96px
-    widthExpanded: 260px
-    itemHeight: 38px
-    rounded: "{rounded.sm}"
+    widthCollapsed: 72px
+    widthExpanded: 228px
+    itemSize: 46px
+    rounded: "{rounded.lg}"
   authenticated-route-shell:
     backgroundColor: "{colors.canvas}"
-    columns: "sidenav | route"
+    columns: "sidenav | thread | route"
     routes: "workspace, backlog, routine, channels, admin"
   button-primary:
-    backgroundColor: "{colors.primary}"
-    textColor: "{colors.on-primary}"
+    backgroundColor: "{colors.action}"
+    textColor: "{colors.on-action}"
     typography: "{typography.button}"
     rounded: "{rounded.sm}"
     padding: 8px 16px
-    height: 36px
+    height: "{size.control-md}"
   button-primary-active:
-    backgroundColor: "{colors.primary-active}"
-    textColor: "{colors.on-primary}"
+    backgroundColor: "{colors.action-active}"
+    textColor: "{colors.on-action}"
     rounded: "{rounded.sm}"
   button-primary-disabled:
-    backgroundColor: "{colors.primary-disabled}"
-    textColor: "{colors.on-primary}"
+    backgroundColor: "{colors.action-disabled}"
+    textColor: "{colors.on-action}"
     rounded: "{rounded.sm}"
   button-secondary:
     backgroundColor: "{colors.surface-strong}"
@@ -218,7 +208,7 @@ components:
     typography: "{typography.button}"
     rounded: "{rounded.sm}"
     padding: 8px 16px
-    height: 36px
+    height: "{size.control-md}"
   button-ghost:
     backgroundColor: transparent
     textColor: "{colors.ink}"
@@ -226,10 +216,10 @@ components:
     rounded: "{rounded.sm}"
   link-inline:
     backgroundColor: transparent
-    textColor: "{colors.primary}"
+    textColor: "{colors.action}"
     decoration: underline
   card:
-    backgroundColor: "{colors.surface-card}"
+    backgroundColor: "{colors.surface-raised}"
     textColor: "{colors.ink}"
     rounded: "{rounded.xl}"
     border: "1px solid {colors.hairline}"
@@ -245,7 +235,7 @@ components:
     typography: "{typography.body-md}"
     rounded: "{rounded.md}"
     padding: 9px 12px
-    height: 40px
+    height: "{size.control-md}"
   search-input:
     backgroundColor: "{colors.surface-strong}"
     textColor: "{colors.ink}"
@@ -275,39 +265,9 @@ components:
   status-dot:
     rounded: "{rounded.full}"
     size: 8px
-  status-up-cell:
-    backgroundColor: transparent
-    textColor: "{colors.semantic-up}"
-    typography: "{typography.number}"
-  status-down-cell:
-    backgroundColor: transparent
-    textColor: "{colors.semantic-down}"
-    typography: "{typography.number}"
-  pricing-tier-card:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    typography: "{typography.body-md}"
-    rounded: "{rounded.xl}"
-    border: "1px solid {colors.hairline}"
-    padding: 24px
-  pricing-tier-featured:
-    backgroundColor: "{colors.surface-dark}"
-    textColor: "{colors.on-dark}"
-    typography: "{typography.body-md}"
-    rounded: "{rounded.xl}"
-    padding: 24px
-  footer-light:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.body}"
-    typography: "{typography.body-sm}"
-    padding: 64px 48px
-  legal-band:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.muted}"
-    typography: "{typography.caption}"
 ---
 
-# Relay Design
+# Relay Design — Precision Monochrome
 
 <p align="center">
   <img src="../assets/brand/relay-logo.svg" alt="Relay logo" width="360">
@@ -315,141 +275,197 @@ components:
 
 ## Overview
 
-Relay reads like serious engineering tooling — precise, dense, and restrained.
-The system is in the **Linear / Vercel / Resend** lineage: a warm ecru canvas
-(`#fdfcfa`, near-black in dark mode), **cobalt** (`#3b5bdb`) as the single brand
-**action** color, warm neutral hairlines, and the remaining color reserved for
-status. It follows Linear's structural discipline — tight radii, fast and
-un-bouncy motion, modest display sizes, dense rows, and near-flat surfaces where
-hairlines (not shadows or grain) carry the chrome.
+Relay's visual language is **Precision Monochrome** — the Linear/Vercel
+school of infrastructure software. Ink-on-white, near-monochrome zinc
+neutrals, razor hairlines, tight geometry, and extreme restraint. There is
+no brand hue: **black is the action color**, and every unit of chroma in the
+interface is a unit of information.
 
-Type is **Geist** for every line of interface, display, AND chrome text — eyebrows,
-metadata, agent labels, and numbers all ride the sans (the Linear model, where the
-sans does the work). **Geist Mono** is reserved for code-like content: tool /
-command lines, raw logs, code blocks, and IDs. There is no editorial serif: display
-moments use weighted Geist (600) with tight, size-scaling negative tracking. Base UI
-text is **13px**.
+**Ink** (`#111113`) is the single **action** color, inverting to white
+(`#fafafa`) on the near-black (`#0a0a0a`) dark canvas — monochrome in both
+directions. Hairlines carry structure instead of shadows. Color appears
+*only* as status: green / amber / red as dots, borders, and text — never as
+background fills, never as actions.
 
-Geometry is tight — 5px on buttons and badges, 6px on inputs, 8–10px on cards.
-The 100px pill is retired. Depth comes from 1px hairline borders, not decorative
-shadows.
+One crisp grotesk, **Geist**, carries every text role — display, chrome,
+and body — with weight and tight display tracking (`-0.02em`) doing the
+differentiating, never a family switch. **Geist Mono** stays reserved for
+code-like content: tool/command lines, raw logs, code blocks, and IDs. Base
+UI text is **13px**.
 
-**Key Characteristics:**
-- Cobalt action: `{colors.primary}` (#3b5bdb) carries every primary action — buttons, links, the focus ring, and text selection — and lifts to periwinkle (`#7089ff`) on the dark canvas. `{colors.brand-soft}` (#edeff8) is the matching tint for selected/active affordances. The brand hue is the action; it never bleeds into running text, status, decoration, or neutral surfaces.
-- Color = status: `{colors.semantic-up}`, `{colors.semantic-down}`, and `{colors.accent-yellow}` (green / amber / red) carry status as text, dots, and borders — never fills. "Info" is a neutral cool slate (`{colors.info}` #5b6779), decoupled from the action hue.
-- Sans-carried chrome: eyebrows, metadata, agent labels (`claude · action`), timestamps, and numbers render in Geist Sans (Linear model). Mono is reserved for tool/command lines, raw logs, code, and IDs.
-- Tight geometry: `{rounded.sm}` (5px) interactive, `{rounded.xl}` (10px) cards. Pills and large radii absent.
+Geometry is tight: 5px on buttons and badges, 6px on inputs, 8–10px on
+cards. The 100px pill stays retired (`{rounded.pill}` aliases
+`{rounded.sm}`). Depth comes from 1px hairline borders first; shadows
+(`--shadow-soft` / `--shadow-lift`) are reserved for floating chrome —
+drawers, dialogs, the composer.
+
+**Key characteristics:**
+- Ink action: `{colors.action}` (#111113) carries every primary action — buttons, links, the focus ring, and text selection — and inverts to `#fafafa` on the dark canvas. `{colors.action-soft}` (#ececee) is the matching neutral wash for selected/active affordances. Action is achromatic; it never competes with status for attention.
+- Color = status, and nothing else: success/danger/warning (green / amber / red) are carried as text, dots, and borders — never fills. "Info" is a neutral slate (`{colors.info}` #71717a). Every hue on screen means something.
+- One sans, every role: Geist carries headlines, chrome, and body alike — weight (never past 600) separates emphasis, not a font-family switch. Geist Mono is reserved for tool/command lines, raw logs, code, and IDs.
+- Tight geometry: `{rounded.sm}` (5px) interactive, `{rounded.xl}` (10px) cards — the precision-tool scale.
 - Hairline depth: 1px `{colors.hairline}` borders over shadows; elevation is restrained.
-- Weighted-sans display: Geist 600 with size-scaling negative tracking (`-0.022em` display, `-0.028em` mega) replaces the retired serif.
-- Linear-fast motion: 120–160ms transitions, un-bouncy easing; no editorial overshoot as default.
+- Fast motion, no overshoot: 120–160ms transitions on `--ease-standard`; the spring curve is retired (`--ease-spring` aliases the standard curve).
+- The sidenav is themed, not pinned: it reads off the same `--color-semantic-*` surface tokens as the rest of the app and re-themes with light/dark, with the active route as a solid ink plate.
+
+## Token architecture
+
+Tokens live under `web/src/styles/tokens/` in four tiers, imported in order
+by `web/src/styles/tokens.css` (a pure `@import` manifest — never add a
+token there):
+
+1. **`primitives.css`** — raw hex/px/rem values and nothing else. Two color
+   registers (`:root` for light, `html[data-theme="dark"]` for dark) plus
+   the theme-independent numeric scales (spacing, radii, type, tracking,
+   leading, z-index, motion, shell dimensions). This is the *only* file
+   allowed to contain a literal hex color or an `rgb()`/`hsl()` function —
+   enforced by `web/.stylelintrc.json`. Named by what a color visually *is*
+   (`--color-accent`, `--color-ink-900`, `--color-canvas-base`), not by
+   what it's *for*.
+2. **`semantic.css`** — role-based aliases consuming primitives, named by
+   what they're *for*: `--color-semantic-action`, `--color-semantic-danger`,
+   `--color-semantic-surface-raised`, plus composite `--type-*` typography
+   shorthands, `--shadow-soft`/`--shadow-lift`, `--ring-focus`. Every
+   `--color-semantic-*` token is a `var()` pointing at a primitive — never a
+   raw value.
+3. **`shadcn-bridge.css`** — the `@theme inline` block and the
+   `--background`/`--foreground`/`--primary`/etc. variables shadcn/ui and
+   Tailwind utilities (`bg-primary`, `text-muted-foreground`) consume. Every
+   declaration here is a `var()` into `semantic.css` or `primitives.css`.
+4. **`base.css`** — html/body reset, the `:focus-visible` contract, and the
+   small set of shared utility classes (`.mono`, `.eyebrow`, `.tone-*`,
+   `.kbd-hint`).
+
+Because this whole reskin is a change of *values*, not *roles*, it lived
+almost entirely in `primitives.css` (plus font loading in `app/layout.tsx`
+and the pinned local palettes in `login.css` / `preferences.css`) —
+`semantic.css` only renamed its accent aliases, and the ~28 component CSS
+files outside `tokens/` were untouched.
+
+**Naming rule:** component CSS only ever references a `--color-semantic-*`,
+`--type-*`, `--shadow-*`, `--ring-*`, or a structural primitive (`--space-*`,
+`--radius-*`, `--text-*`, `--font-*`) — never a raw hex value and never a
+tier-1 primitive directly. If a value doesn't exist yet, add it to
+`primitives.css` (if it's a new raw value) and/or `semantic.css` (if it's a
+new role), not inline in a component file.
+
+**Enforcement:** `web/.stylelintrc.json` bans hex/`rgb()`/`hsl()` literals
+everywhere except `primitives.css`, with narrow documented overrides for
+`login.css` (a pinned pre-auth dark ramp, independent of the authenticated
+theme) and `preferences.css` (theme-swatch previews that must show both
+themes simultaneously and can't resolve a single `var()`). Run
+`npm run lint:css -w web`; it's also wired into `.pre-commit-config.yaml`.
+
+**Documented, deliberate exceptions to "primitives.css is the only hex
+source":**
+- `login.css` — a local `--lg-*` token block pinning the pre-auth dark ramp, since no user theme preference is loaded yet (retuned to the monochrome dark register along with everything else).
+- `preferences.css` — theme-swatch previews (`.pref-theme-swatch`).
+- `artifact.css` — the frame-preview background is a literal white document page in every theme.
+- `backlog.css` — the assignee avatar uses a procedurally generated per-identity `hsl(var(--avatar-hue))`, set inline by `TaskAssignee.tsx` from the assignee's name; there is no fixed primitive since the hue itself *is* the value.
 
 ## Colors
 
-### Action, selection, and focus (cobalt brand)
-- **Cobalt** (`{colors.primary}` — #3b5bdb): The single brand action color — primary buttons, links, the focus ring, and text selection. On the dark canvas it lifts to periwinkle (`#7089ff`) with deep-navy text (`#08112e`). The wordmark and agent marks stay neutral; cobalt is not a decorative brand fill.
-- **Cobalt Active** (`{colors.primary-active}` — #2f4bc4): Press/hover darken on the action fill.
-- **Cobalt Disabled** (`{colors.primary-disabled}` — #c1cbf0): Faded cobalt tint for disabled actions.
-- **Brand Soft** (`{colors.brand-soft}` — #edeff8): The cobalt tint token (8% cobalt on canvas) for selection — selected rows, active nav, and running-state affordances. It is a selection tint, not a generic decorative wash.
+### Action, selection, and focus (ink)
+- **Action** (`{colors.action}` — #111113): the single action color — primary buttons, links, the focus ring, and text selection. On the dark canvas it inverts to white (`#fafafa`) with near-black text (`#111113`).
+- **Action Active** (`{colors.action-active}` — #2e2e33): press/hover lift.
+- **Action Disabled** (`{colors.action-disabled}` — #d4d4d8): faded neutral for disabled actions.
+- **Action Soft** (`{colors.action-soft}` — #ececee): neutral selection wash — selected rows, active nav, running-state affordances.
 
 ### Status hues
-- **Success** (`{colors.semantic-up}` — #15803d): positive status green — verdict approved, node ready. Text/dot/border only.
-- **Danger** (`{colors.semantic-down}` — #e5484d): failures, reject, destructive. Text/dot/border only.
-- **Warning** (`{colors.accent-yellow}` — #f5a623): attention dot only, never an action.
-- **Info** (`{colors.info}` — #5b6779): a neutral cool slate, **decoupled** from the action hue. "Info" dots, `assigned`/`review` workflow accents, and info borders read in slate — not the cobalt brand and not a second blue. Text/dot/border only, never a fill.
+- **Success** (`{colors.success}` — #10b981): verdict approved, node ready. Text/dot/border only.
+- **Danger** (`{colors.danger}` — #ef4444): failures, reject, destructive. Text/dot/border only. Text-safe counterpart `--color-semantic-danger-text` (#dc2626, ~4.5:1 on white).
+- **Warning** (`{colors.warning}` — #f59e0b): attention dot only, never an action. Text-safe counterpart `--color-semantic-warning-text` (#8a5c00, ~4.8:1 on white) for status read as a word or numeral.
+- **Info** (`{colors.info}` — #71717a): a neutral slate — status without alarm.
 
-### Surface (warm ecru / stone)
-- **Canvas** (`{colors.canvas}` — #fdfcfa): The default page floor — warm ecru, not pure white.
-- **Surface Soft** (`{colors.surface-soft}` — #faf8f4): Subtle warm tint — quotes, code, hover.
-- **Surface Strong** (`{colors.surface-strong}` — #f5f2ec): Fills behind secondary buttons, search, avatars.
-- **Surface Dark** (`{colors.surface-dark}` — #0d0c0a): The dark-mode canvas — warm near-black with a trace of amber lift off cold zinc. The featured-tier inversion fill uses the same token.
-- **Surface Dark Elevated** (`{colors.surface-dark-elevated}` — #1a1815): One step above the dark canvas for cards and floating chrome.
+### Surface (flat near-white)
+- **Canvas** (`{colors.canvas}` — #ffffff): the default page floor.
+- **Surface Soft** (`{colors.surface-soft}` — #fafafa): subtle tint — quotes, code, hover.
+- **Surface Strong** (`{colors.surface-strong}` — #f0f0f1): fills behind secondary buttons, search, avatars.
+- **Surface Raised** (`{colors.surface-raised}` — #ffffff): modals, drawers, floating chrome — white with a hairline or lift shadow as the edge.
+- **Surface Dark** (`{colors.surface-dark}` — #18181b): the always-dark register for chrome that stays dark even on the light theme (the always-dark diff viewer, some admin dark-mode chrome).
 
-### Hairlines (warm)
-- **Hairline** (`{colors.hairline}` — #eae5dd): Default 1px divider and card border on ecru.
-- **Hairline Soft** (`{colors.hairline-soft}` — #f1ede6): Lighter divider.
+### Hairlines
+- **Hairline** (`{colors.hairline}` — #e4e4e7): default 1px divider and card border.
+- **Hairline Soft** (`{colors.hairline-soft}` — #f0f0f1): lighter divider.
 
-### Text (warm stone)
-- **Ink** (`{colors.ink}` — #171412): Display headings, primary copy, emphasis.
-- **Body** (`{colors.body}` — #57534e): Default running text — warm stone.
-- **Muted** (`{colors.muted}` — #79716b): Sub-titles, secondary labels.
-- **Muted Soft** (`{colors.muted-soft}` — #a8a29e): Timestamps, disabled.
-- **On Primary** (`{colors.on-primary}` — #ffffff): Text on the cobalt action fill — stays white in light mode; on the bright dark-mode fill it flips to deep navy (`#08112e`).
-- **On Dark** (`{colors.on-dark}` — #ffffff): Text on dark surfaces.
+### Text
+- **Ink** (`{colors.ink}` — #09090b): headings, primary copy, emphasis.
+- **Body** (`{colors.body}` — #3f3f46): default running text.
+- **Muted** (`{colors.muted}` — #71717a): sub-titles, secondary labels.
+- **Muted Soft** (`{colors.muted-soft}` — #a1a1aa): timestamps, disabled.
+- **On Action** (`{colors.on-action}` — #ffffff): text on the ink fill in light mode; flips to near-black (#111113) in dark mode since the dark-mode fill is white.
+- **On Dark** (`{colors.on-dark}` — #fafafa): text on always-dark fills in either theme.
 
 ## Typography
 
 ### Font Family
-The system uses **Geist** for all interface, display, and chrome text; **Geist Mono**
-is reserved for code-like content only. **Lucide icons** handle product iconography.
-The editorial serif is retired. Fallback stack: `-apple-system, BlinkMacSystemFont,
-"Segoe UI", Helvetica, Arial, sans-serif` for sans; `"SFMono-Regular", Consolas,
-Menlo, monospace` for mono.
-
-Display is weighted Geist (600) with tight, **size-scaling** negative tracking
-(em-based, growing with size per Linear: `-0.022em` on the 20–26px display band,
-`-0.028em` on 30px+ metrics) — crisp and confident rather than editorial, and modest
-in size (Linear-restrained: the page title is 26px, not 34px). Chrome — eyebrows,
-agent labels, timestamps, numbers — rides the sans; mono is scoped to tool/command
-lines, raw logs, code blocks, and IDs.
+**Geist** (`--font-sans`, `--font-display` — both alias the same
+`--font-app-sans` variable) carries every text role: display, chrome, and
+body alike. It is a precision-drawn grotesk that stays legible from 12px
+dense chrome through display headlines, so one variable font instance
+covers the whole system — there is no separate editorial/chrome font
+pairing. **Geist Mono** (`--font-mono`) is reserved for code-like content
+only. **Lucide** icons handle product iconography. `--font-number` aliases
+the same family so metric numerals read as part of the same voice, not
+mono.
 
 ### Hierarchy
 
 | Token | Size | Weight | Line Height | Letter Spacing | Use |
 |---|---|---|---|---|---|
-| `{typography.display-lg}` | 26px | 600 | 1.15 | -0.022em | Admin page title, hero headline — Geist |
-| `{typography.display-sm}` | 20px | 600 | 1.2 | -0.022em | Sub-section heads, empty-state display |
-| `{typography.title-lg}` | 20px | 600 | 1.2 | -0.014em | Panel headings |
-| `{typography.title-md}` | 17px | 600 | 1.35 | 0 | Component titles, chat header |
+| `{typography.display-lg}` | 34px | 600 | 1.05 | -0.02em | Hero headline (login, empty states) |
+| `{typography.display-sm}` | 25px | 600 | 1.1 | -0.02em | Sub-section heads |
+| `{typography.title-lg}` | 22px | 600 | 1.16 | -0.02em | Admin page title, chat title |
+| `{typography.title-md}` | 19px | 600 | 1.24 | -0.02em | Component titles |
 | `{typography.title-sm}` | 15px | 600 | 1.3 | 0 | List labels |
 | `{typography.body-md}` | 16px | 400 | 1.5 | 0 | Message bodies, inputs |
-| `{typography.body-strong}` | 16px | 600 | 1.5 | 0 | Emphasized body |
 | `{typography.body-sm}` | 13px | 400 | 1.5 | 0 | Default UI chrome |
 | `{typography.caption}` | 13px | 400 | 1.5 | 0 | Captions, previews |
 | `{typography.caption-strong}` | 12px | 600 | 1.5 | 0 | Badge labels |
-| `{typography.label-strong}` | 13px | 600 | 1.4 | 0 | Bold chrome — row names, CTA labels, tab titles |
-| `{typography.caption-strong-sm}` | 13px | 600 | 1.4 | 0 | Small bold labels, copy buttons |
-| `{typography.label-md}` | 13px | 500 | 1.4 | 0 | Medium chrome — meta rows, timestamps (sans) |
-| `{typography.label}` | 12px | 500 | 1.4 | 0 | Small medium chrome — counts, sub-meta |
+| `{typography.label-strong}` | 13px | 600 | 1.4 | 0 | Bold chrome — row names, CTA labels |
+| `{typography.label-md}` | 13px | 500 | 1.4 | 0 | Medium chrome — meta rows, timestamps |
+| `{typography.label}` | 12px | 500 | 1.4 | 0 | Small medium chrome |
 | `{typography.micro-strong}` | 11px | 600 | 1.4 | 0 | Tiny bold — tabs, pills, agent chips |
-| `{typography.meta}` | 12px | 500 | 1.4 | 0 | Agent labels, metadata, timestamps — Geist Sans |
-| `{typography.eyebrow}` | 11px | 500 | 1.5 | 0.05em | Section kickers (uppercase) — Geist Sans |
-| `{typography.number}` | 18px | 500 | 1.4 | 0 | Inline metrics, deltas — Geist Sans (tabular) |
-| `{typography.number-display}` | 30px | 500 | 1.12 | -0.028em | Admin metric values — Geist Sans (tabular) |
+| `{typography.meta}` | 12px | 500 | 1.4 | 0 | Agent labels, metadata, timestamps |
+| `{typography.eyebrow}` | 11px | 500 | 1.5 | 0.05em | Section kickers (uppercase) |
+| `{typography.number}` | 18px | 600 | 1.4 | 0 | Inline metrics, deltas (tabular) |
+| `{typography.number-display}` | 30px | 600 | 1.14 | -0.02em | Admin metric values (tabular) |
 | _(mono)_ | 12–13px | 400–500 | 1.5 | 0 | Tool/command lines, raw logs, code, IDs — Geist Mono |
 | `{typography.button}` | 13px | 600 | 1.15 | 0 | Action labels |
 | `{typography.nav-link}` | 13px | 500 | 1.4 | 0 | Nav items |
 
 ### Principles
-- **Display is weighted sans.** Geist 600 with size-scaling negative tracking carries display moments; there is no serif. Sizes stay modest (Linear-restrained).
-- **Sans carries the chrome (Linear model).** Eyebrows, agent labels, timestamps, and numbers render in Geist Sans. Geist Mono is reserved for code-like content: tool/command lines, raw logs, code blocks, and IDs.
+- **One sans, every role.** Geist carries display, chrome, and body — weight is what separates emphasis, not a font-family switch.
 - **Emphasis tops out at 600.** No 700+ weights anywhere.
-- **Negative tracking on display only, and it scales.** Display bands use `-0.022em` (20–26px) and `-0.028em` (30px+); body stays at 0.
 - **13px is the base.** Chrome (buttons, nav, rows, labels) runs at 13px; prose and inputs stay 16px.
-
-### Note on Fonts
-Geist and Geist Mono are open Google Fonts, loaded as variable fonts by `next/font`
-in `web/src/app/layout.tsx`. `latin-ext` is loaded alongside `latin` so accented
-European/Vietnamese names in employee and sandbox labels render in-brand.
+- **Display tracking is firm.** Headlines tighten to `-0.02em` — the precision look leans on tight display type; body stays neutral at 0.
 
 ### International Type (CJK)
-The web app ships English plus Simplified (`zh-CN`) and Traditional (`zh-TW`) Chinese.
-Geist and Geist Mono carry no Han glyphs, so the Chinese locales fall through to **Noto
-Sans SC / Noto Sans TC**, loaded by `next/font` with `preload: false` and downloaded
-only on a Chinese locale.
-- **`:lang()` switching, not duplication.** `html:lang(zh-CN)` / `html:lang(zh-TW)` in `tokens.css` reorder the `--font-sans` / `--font-mono` stacks so Geist stays first for Latin and Han characters resolve to Noto. `--font-display` aliases `--font-sans`, so retargeting sans also retargets display — no separate display stack is needed.
-- **System fallbacks** cover machines without the webfont: PingFang (macOS), Microsoft YaHei / JhengHei (Windows), Source Han Sans.
+The web app ships English plus Simplified (`zh-CN`) and Traditional (`zh-TW`)
+Chinese. Geist and Geist Mono carry no Han glyphs, so the Chinese locales
+fall through to system CJK fonts first (PingFang, HarmonyOS Sans/MiSans,
+Microsoft YaHei/JhengHei), then **Noto Sans SC / Noto Sans TC**, loaded by
+`next/font` with `preload: false`.
+- **`:lang()` switching, not duplication.** `html:lang(zh-CN)` /
+  `html:lang(zh-TW)` in `tokens/primitives.css` reorder the `--font-sans` /
+  `--font-mono` stacks. `--font-display` aliases `--font-sans`, so
+  retargeting sans also retargets display.
+- CJK typographic corrections (zero tracking, looser leading) live in the
+  same file; the reading-heavy `--type-body-*`/`--type-caption` overrides
+  live in `tokens/semantic.css` since `html:lang()` beats `:root` on
+  specificity regardless of import order.
 
 ## Layout
 
 ### Spacing System
 - **Base unit:** 4px.
 - **Tokens:** `{spacing.xxs}` 4px · `{spacing.xs}` 8px · `{spacing.sm}` 12px · `{spacing.base}` 16px · `{spacing.md}` 20px · `{spacing.lg}` 24px · `{spacing.xl}` 32px · `{spacing.xxl}` 48px · `{spacing.section}` 64px.
-- **Card internal padding:** `{spacing.base}` (16px) for product cards; `{spacing.lg}` (24px) for marketing/pricing cards.
+- **Control height:** `--size-control-md` (40px) — the standard height for inputs, dialog buttons, admin drawer fields, and dense rows.
 - **Row rhythm:** the default `--space-row-y` is `{spacing.sm}` (12px) — Linear-dense; compact surfaces drop to `{spacing.xs}` (8px) via `[data-density="compact"]`.
 
 ### Whitespace Philosophy
-Calm but dense. Authenticated work surfaces are information-rich with tight rhythm;
-marketing bands use the 64px section spacing. Density lives inside the product.
+Calm but dense. Authenticated work surfaces are information-rich with tight
+rhythm.
 
 ## Elevation & Depth
 
@@ -457,12 +473,14 @@ marketing bands use the 64px section spacing. Density lives inside the product.
 |---|---|---|
 | Flat | No shadow, no border | Most surfaces |
 | Hairline border | 1px `{colors.hairline}` | Cards, rows, inputs — the default depth cue |
-| Soft drop | `--shadow-soft` (`0 1px 1px rgba(0,0,0,0.03)`) | Bordered cards on hover |
-| Lift | `--shadow-lift` (crisp 1px ink ring + `0 1px 3px rgba(0,0,0,0.04)` drop) | Borderless floating chrome — drawers, dialogs, composer, tooltips |
+| Soft drop | `--shadow-soft` | Bordered cards on hover |
+| Lift | `--shadow-lift` | Borderless floating chrome — drawers, dialogs, composer, tooltips |
 
-Depth is carried by hairlines first — near-flat surfaces in Linear's manner. Pick
-`--shadow-soft` for a surface that already has a 1px border; pick `--shadow-lift` for
-borderless floating chrome where the inner ring stands in for the edge.
+Both shadow tokens mix a neutral zinc ink tint (`--color-shadow-ink`,
+`--color-shadow-ink-ring` in `primitives.css`) rather than pure black. Pick
+`--shadow-soft` for a surface that already has a 1px border; pick
+`--shadow-lift` for borderless floating chrome where the inner ring stands
+in for the edge.
 
 ## Shapes
 
@@ -470,118 +488,109 @@ borderless floating chrome where the inner ring stands in for the edge.
 
 | Token | Value | Use |
 |---|---|---|
-| `{rounded.none}` | 0px | Reserved |
-| `{rounded.xs}` | 3px | Inline tags, tiny chips |
+| `{rounded.none}` | 0px | Flush joins (split panes, tree rows) |
+| `{rounded.xs}` | 3px | Inline tags, tiny chips, micro accents |
 | `{rounded.sm}` | 5px | Buttons, badges, send button |
-| `{rounded.md}` | 6px | Inputs, popovers, avatars (rounded-square) |
-| `{rounded.lg}` | 8px | Mid-size cards |
-| `{rounded.xl}` | 10px | Cards, drawers, pricing tiers |
-| `{rounded.pill}` | 5px | **Retired** — aliases `{rounded.sm}` so legacy consumers render tight |
-| `{rounded.full}` | 9999px | Status dots and pips only |
+| `{rounded.md}` | 6px | Inputs, popovers, search, conversation rows, avatars |
+| `{rounded.lg}` | 8px | Mid-size cards, composer wrap, mobile sheets, sidenav buttons |
+| `{rounded.xl}` | 10px | Cards, drawers, dialogs, empty states |
+| `{rounded.2xl}`–`{rounded.4xl}` | 12–16px | Extended shadcn scale |
+| `{rounded.pill}` | 5px | **Retired** — aliases `{rounded.sm}` |
+| `{rounded.full}` | 9999px | Status dots, pips, circular icon buttons |
 
-Tight corners on interactive elements, 10px on containers, full circle reserved for
-status dots. The pill is gone.
+`sm`–`md` on interactive elements, `lg`–`xl` on containers. Use `50%` only
+for true circles.
 
 ## Components
 
-### Top Navigation
-**`top-nav-light`** — Default top nav on ecru. Background `{colors.canvas}`, text `{colors.ink}`, height 60px. Wordmark left, menu center, search + actions right.
-
 ### Application Navigation
-**`sidenav-panel`** — Authenticated app rail. Ecru canvas, 1px hairline border, 48px square collapsed buttons, 38px labeled rows when expanded, rounded `{rounded.sm}`. Active route = quiet `{colors.brand-soft}` selection tint with ink text, no left bar or saturated plate. Route order is **Threads → Workspace → Backlog → Routine**; admins additionally see **Channels** and **Admin** after a separator.
-
-**Retired routes** — The standalone **MCP** and **Skills** pages are removed because they are not usable workflows. Do not reserve side-nav buttons, route-shell selectors, locale keys, or preview panels for them until they are rebuilt as real product surfaces.
+**`sidenav-panel`** — a themed rail (follows light/dark like every other
+pane). 72px collapsed / 228px expanded, 46px square buttons, rounded
+`{rounded.lg}`. Active route = a solid ink plate (white in dark mode) — the
+one place the action color fills chrome.
 
 ### Buttons
-**`button-primary`** — The cobalt action. Background `{colors.primary}`, text `{colors.on-primary}`, type `{typography.button}` (13px/600), padding 8px × 16px, height 36px, rounded `{rounded.sm}` (5px). Lifts to periwinkle (`#7089ff`) in dark mode with deep-navy text.
+**`button-primary`** — the ink action. Background `{colors.action}`, text
+`{colors.on-action}`, type `{typography.button}` (13px/600), padding
+8×16px, height `--size-control-md` (40px), rounded `{rounded.sm}` (5px).
+Inverts to a white fill with near-black text in dark mode.
 
-**`button-primary-active`** — Press/hover. Background `{colors.primary-active}`.
+**`button-secondary`** — soft-neutral. Background `{colors.surface-strong}`,
+text `{colors.ink}`, same geometry.
 
-**`button-primary-disabled`** — Faded cobalt. Background `{colors.primary-disabled}`.
+**`button-ghost`** — transparent, `{colors.surface-strong}` wash on hover.
 
-**`button-secondary`** — Soft-neutral secondary. Background `{colors.surface-strong}`, text `{colors.ink}`, same geometry.
-
-**`button-ghost`** — Transparent. Text `{colors.ink}`; surfaces a `{colors.surface-strong}` wash on hover.
-
-**`link-inline`** — Inline link. Text `{colors.primary}` (cobalt) with an underline — links read in the brand hue and stay underlined.
+**`link-inline`** — text `{colors.action}` with an underline.
 
 ### Cards
-**`card`** — The default container. Background `{colors.surface-card}`, 1px `{colors.hairline}` border, rounded `{rounded.xl}` (10px), padding 16px. Depth from the hairline, not a shadow.
+**`card`** — background `{colors.surface-raised}`, 1px `{colors.hairline}`
+border, rounded `{rounded.xl}` (10px), padding 16px. Depth from the
+hairline, not a shadow.
 
-**`card-soft`** — Quiet variant on `{colors.surface-soft}` for quotes, code blocks, and grouped content.
+**`card-soft`** — quiet variant on `{colors.surface-soft}` for quotes, code
+blocks, and grouped content.
 
 ### Operational Surfaces
-**`agent-turn`** — A message turn on the transcript rail. A square monochrome rail node (glyph shape, not vendor hue) marks the gutter; a sans `{typography.meta}` eyebrow (`claude · action`) identifies the agent and mode; body in `{typography.body-md}`; tool lines in mono. One `●` marker per turn, `○` for thinking, `⏺` for tool/command lines. No surrounding card. Consecutive same-agent turns group and drop the repeated eyebrow.
+**`agent-turn`** — a message turn on the transcript rail. A square
+monochrome rail node marks the gutter; a sans `{typography.meta}` eyebrow
+(`claude · action`) identifies the agent and mode; body in
+`{typography.body-md}`; tool lines in mono. One `●` marker per turn, `○` for
+thinking, `⏺` for tool/command lines.
 
-**`review-card`** — Codex review result. `{colors.surface-soft}` fill, 1px hairline, mono title, verdict word colored by status (`{colors.semantic-up}` approved / `{colors.semantic-down}` rejected).
-
-**`status-up-cell`** + **`status-down-cell`** — Inline status cells. Color-only text in `{typography.number}`, no background fill.
-
-**`avatar`** — Employee and agent avatars. Rounded-square (`{rounded.md}`), 36px, `{colors.surface-strong}` fill, ink glyph. Agents are differentiated by their vendor glyph shape (via `AgentMark`), **not** by vendor brand color — agent identity is shape, not hue, and the cobalt brand is reserved for actions. A corner status pip (`{rounded.full}`) carries tone.
+**`avatar`** — rounded-square (`{rounded.md}`), 36px, `{colors.surface-strong}`
+fill, ink glyph. Agents are differentiated by vendor glyph shape (via
+`AgentMark`), never by vendor brand color.
 
 ### Forms
-**`text-input`** — Background `{colors.canvas}`, rounded `{rounded.md}` (6px), padding 9px × 12px, height 40px, 1px hairline. Focus adds `--ring-focus` (3px cobalt-alpha halo).
+**`text-input`** — background `{colors.canvas}`, rounded `{rounded.md}`
+(6px), padding 9×12px, height `--size-control-md` (40px), 1px hairline.
+Focus adds `--ring-focus` (3px action-alpha halo).
 
-**`search-input`** — Background `{colors.surface-strong}`, rounded `{rounded.md}`, height 38px. No pill.
+**`search-input`** — background `{colors.surface-strong}`, rounded
+`{rounded.md}`, height 38px.
 
 ### Tags & Badges
-**`badge`** — Outlined chip. Transparent fill, 1px `{colors.hairline}`, text `{colors.body}`, type `{typography.caption-strong}`, rounded `{rounded.sm}`.
+**`badge`** — outlined chip. Transparent fill, 1px `{colors.hairline}`, text
+`{colors.body}`, type `{typography.caption-strong}`, rounded `{rounded.sm}`.
 
-**`badge-mono`** — Mono metadata chip (`3 agents`, counts). Transparent, hairline, `{typography.eyebrow}` mono.
-
-### Pricing
-**`pricing-tier-card`** — Background `{colors.canvas}`, rounded `{rounded.xl}`, 1px hairline, padding 24px.
-
-**`pricing-tier-featured`** — Dark inversion. Background `{colors.surface-dark}`, text `{colors.on-dark}` — highlights via inversion, not a colored ribbon.
-
-### Footer
-**`footer-light`** — Background `{colors.canvas}`, text `{colors.body}`. **`legal-band`** — `{colors.muted}` at `{typography.caption}`.
+**`badge-mono`** — mono metadata chip (`3 agents`, counts). Transparent,
+hairline, `{typography.eyebrow}`.
 
 ## Do's and Don'ts
 
 ### Do
-- Use `{colors.primary}` (cobalt) for actions; let it lift to periwinkle in dark mode.
-- Use `{colors.brand-soft}` for selected rows, active nav, and running-state affordances.
-- Reserve the other hues for status — `{colors.semantic-up}` / `{colors.semantic-down}` / `{colors.accent-yellow}`, as text/dots/borders; use the slate `{colors.info}` for neutral/info status.
-- Render eyebrows, agent labels, timestamps, and numbers in Geist Sans; reserve Geist Mono for tool/command lines, raw logs, code, and IDs.
-- Use tight radii: `{rounded.sm}` (5px) interactive, `{rounded.xl}` cards.
+- Use `{colors.action}` (ink) for actions; let it invert to white on the dark canvas.
+- Use `{colors.action-soft}` for selected rows, active nav, and running-state affordances.
+- Reserve hue for status — success/danger/warning as text/dots/borders; use the slate `{colors.info}` for neutral/info status.
+- Render every text role in Geist; reserve Geist Mono for tool/command lines, raw logs, code, and IDs.
+- Use token radii: `{rounded.sm}` (5px) interactive, `{rounded.xl}` (10px) cards.
 - Carry depth with 1px hairlines first; reach for shadows only on floating chrome.
-- Render links in cobalt (`{colors.primary}`) with an underline.
-- Keep motion fast and un-bouncy (120–160ms, `--ease-standard`); reserve overshoot for rare, deliberate moments.
-- Use `--atmosphere-*` tokens sparingly on login, empty states, and admin hero tiles — controlled grain/wash (now dialed back near-flat), disabled in high-contrast mode.
+- Let the sidenav follow the active theme like every other pane — no permanently-dark island.
+- Add new tokens to `tokens/primitives.css` (raw value) and `tokens/semantic.css` (role) — never inline a hex/`rgb()`/`hsl()` literal in a component file. `npm run lint:css -w web` enforces this.
 
 ### Don't
-- Don't use a status color (green/amber/red) or the slate info as an action — cobalt is the only action hue.
-- Don't route the cobalt brand into status or decoration — it marks action, selection, and focus only.
-- Don't introduce a second brand hue or use status green/amber/red as general UI background fills.
-- Don't use the pill (100px) or large radii on actions, inputs, or cards.
+- Don't use a status color (green/amber/red) or the slate info as an action — ink is the only action color.
+- Don't introduce a brand hue — the system is achromatic by design; every unit of chroma is a unit of information.
+- Don't use status colors as general UI background fills.
+- Don't use ad-hoc pixel radii — use `{rounded.*}` tokens.
 - Don't tint agent avatars with vendor brand colors — glyph shape carries identity.
-- Don't bring back an editorial serif, 700+ display weights, or oversized (34px+) display type.
-- Don't add ad-hoc decorative gradients or gloss outside the `--atmosphere-*` exception.
-
-### Status fill exceptions
-Status hues stay text/dot/border in most UI. These narrow fills are allowed:
-- **Status dots and pips** — `{rounded.full}` fills on 6–10px indicators (avatar pips, mode-chip dots, row status dots).
-- **Destructive stop** — the composer's cancel/send-stop control may use an outlined danger treatment (hairline + danger text) while a run is active; never a second action hue beside cobalt.
-- **Success confirmation** — transient copy/feedback controls may flip to an outlined success treatment (hairline + success text), not a solid green plate.
-- **Data visualization** — chart segments and stacked bars (token usage: input = cobalt, output = success green, cache = muted gray; fleet health uses the status ramp for segment fills only inside charts).
+- Don't add overshoot/bounce to motion — `--ease-spring` is retired and aliases the standard curve.
+- Don't reference a `tokens/primitives.css` value directly from component CSS — always go through a `--color-semantic-*` role in `tokens/semantic.css`.
 
 ## Operational Surfaces (in-product)
 
-The in-product chat shell is operational and dense. It inherits the primitives above
-and adds a tighter scale tuned for an authenticated three-pane Slack-style canvas. The
-tokens below live in `web/src/styles/` and supersede marketing typography inside
+The in-product chat shell is operational and dense. Tokens live in
+`web/src/styles/` and supersede marketing typography inside
 `.messenger-shell`.
 
 ### Shell dimensions
 
 | Token | Value | Use |
 |---|---|---|
-| `--sidenav-w` | 96px | Collapsed left rail |
-| `--sidenav-w-open` | 260px | Expanded left rail (default) |
-| `--thread-w` | 296px | Conversation list (second pane) |
-| `--drawer-w` | 360px | Settings/preferences drawer (right) |
-| `--header-h` | 60px | Chat panel top bar |
+| `--sidenav-w` | 72px | Collapsed left rail |
+| `--sidenav-w-open` | 228px | Expanded left rail |
+| `--thread-w` | 318px | Conversation list (second pane) |
+| `--header-h` | 64px | Chat panel top bar |
 
 ### Operational type scale
 
@@ -591,50 +600,56 @@ tokens below live in `web/src/styles/` and supersede marketing typography inside
 | `--text-2xs` | 11px | Compact metadata, sans eyebrows |
 | `--text-xs` | 12px | Badges, timestamps, panel kickers |
 | `--text-sm` | 13px | Captions, secondary UI |
-| `--text-base` | 13px | Default UI chrome (buttons, nav, rows) — Linear's base size |
+| `--text-base` | 13px | Default UI chrome (buttons, nav, rows) |
 | `--text-md` | 16px | Message bodies, inputs (≥16px avoids iOS zoom) |
 | `--text-lg` | 18px | Chat header title, wordmark |
 | `--text-xl` | 22px | Panel headings |
 | `--text-2xl` | 24px | Empty-state display, mobile metric values |
-| `--text-3xl` | 26px | Admin page title — **Geist 600** |
-| `--text-4xl` | 30px | Admin metric values — **Geist Sans 500 (tabular)** |
+| `--text-3xl` | 26px | Admin page title |
+| `--text-4xl` | 30px | Admin metric values |
 
-`--text-base` (13px chrome) and `--text-md` (16px prose) are distinct roles. Use
-`--text-base` for buttons, row labels, nav, and metadata; use `--text-md` for message
-bodies, composer text, and inputs. Note `--text-sm` and `--text-base` are both 13px —
-the scale is intentionally compressed (Linear leans on weight/color for hierarchy, not
-size). Display moments (≥24px) reach for `var(--font-display)` — weighted Geist, not a
-serif.
+`--text-sm` and `--text-base` are both 13px — the scale is intentionally
+compressed (Linear leans on weight/color for hierarchy, not size).
 
 ### Operational components
 
-- **`messenger-shell`** — three-pane CSS grid (`sidenav | thread | chat`), with an optional fourth `drawer` column. Below 768px it collapses to one pane at a time.
-- **Route shell** — top-level work pages collapse the thread pane to `sidenav | route`. Current full-page routes are `workspace`, `backlog`, `routine`, `channels`, and `admin`; route CSS should not include retired `mcp` or `skills` selectors.
-- **`sidenav-panel`** — vertical rail, labeled by default. 48px square buttons (collapsed) / 38px labeled rows at `--radius-sm`; expands to 260px revealing `--type-nav-link` labels. Active route = quiet `{colors.brand-soft}` selection tint (no left bar). The visible route set is Threads, Workspace, Backlog, Routine, with Channels and Admin added for admins.
-- **`thread-panel`** — conversation list grouped by state (Needs you → Running → Idle). Flat **68px** rows with name (`--text-base` / 600) and a 13px preview line. Active row = `{colors.brand-soft}` fill, **no left bar** (mirrors sidenav active). Separated by hairlines, not cards. The Needs-you section label stays muted; a leading warning dot carries the hue.
-- **`chat-panel`** — message canvas. 18px ink header title; messages render on a continuous **rail** — a 1.5px hairline spine with square agent nodes and a circular ink node for the human. Block-grouped `.msg` units carry sans eyebrows. Depth from typography and the rail, not boxes.
-- **`msg-user`** — the operator's voice **on the rail**. A filled circular ink node (agents stay square) plus a mono `YOU` eyebrow and timestamp; message body in 13px Geist medium, ink, no bubble and no cobalt fill. The human reads as a peer turn in the same spine as agents — attribution is node shape + eyebrow, not alignment or a messenger bubble.
-- **`composer`** — bottom-pinned input. The **outer wrap** (`.composer-input-wrap`) carries `--shadow-lift`; the inner field is a flat textarea with no extra drop shadow. The send button is a **36×36px** rounded-square (`--radius-sm`) cobalt plate — flat, no gloss. The mode chip (Implement / Review) sits bottom-left with a leading status dot — `accent-yellow` for implement, slate `{colors.info}` for review — never a colored chip fill.
-- **`ac-*` (Admin Console)** — metric cards. Titles use `var(--font-display)` at `--text-3xl` (26px); values use `--font-number` at `--text-4xl` (30px). Cards are `--radius-xl`, hairline-bordered, lift on hover.
-- **`adm-drawer`** — right-edge sheet. Light variant is ecru canvas; dark variant fills with `--color-surface-dark` and uses `--color-hairline-on-dark` for dividers.
+- **`messenger-shell`** — three-pane CSS grid (`sidenav | thread | chat`), with an optional fourth `drawer` column. Below 820px it collapses to one pane at a time.
+- **`sidenav-panel`** — the themed rail (see above).
+- **`thread-panel`** — conversation list, flat 70px rows. Active row = `--color-semantic-action-soft` fill.
+- **`chat-panel`** — message canvas. Messages render on a continuous rail — a hairline spine with square agent nodes and a circular ink node for the human.
+- **`composer`** — bottom-pinned input. The outer wrap carries `--shadow-lift`; the send button is a 36×36px rounded-square ink plate.
+- **`ac-*` (Admin Console)** — metric cards. Titles use `var(--font-display)` at `--text-3xl`; values use `--font-number` at `--text-4xl`.
+- **`adm-drawer`** — right-edge sheet on `--color-semantic-surface-raised`, hairline left border, optional layered stacking (`layer` prop deepens the scrim and scales underlay panels to 0.98). Slides in from the right on desktop; full-viewport takeover below 820px. Exit animation mirrors entrance (~150ms). Sticky **`adm-form-actions`** footer pins primary/cancel buttons while body scrolls.
+
+  **Width tiers** (via `--adm-drawer-w`):
+
+  | Width | Use |
+  |---|---|
+  | 420px | Simple CRUD — add employee/node, task/routine edit |
+  | 520px | Complex admin — assign node, agent profile, manage agents, credentials |
+  | 900px | Dual-pane viewers — artifact library |
+
+- **`adm-drawer-section`** — inline grouped content (placements list, danger zone) with uppercase section title; distinct from the sticky footer.
 
 ### Focus, motion, dark mode
-- **Focus ring** — every interactive surface uses `var(--ring-focus)`, a 3px cobalt-alpha halo. No ad-hoc 1px/2px outline variants. Destructive controls on focus may use a danger-alpha halo of the same geometry.
-- **Status tone driver** — `tone-good` / `tone-info` / `tone-bad` / `tone-warn` / `tone-neutral` set a single `--tone` variable consumed by dots and outlined pills. `tone-info` maps to `--color-info`, a neutral cool slate decoupled from the action hue (no longer the brand).
-- **Dark mode** — one definition, `html[data-theme="dark"]`, resolved before first paint. Canvas uses warm charcoal (`#0d0c0a` / `#1a1815` elevated). The action color lifts to periwinkle (`#7089ff`) with deep-navy text (`#08112e`); info reads as a lifted slate (`#8c98ac`); status hues are lifted for legibility on the dark canvas.
-- **Motion** — canonical curves/durations on a shared shelf (`--ease-standard`, `--ease-out-quint`, `--ease-spring`). Durations are Linear-fast (`--duration-fast` 120ms, `--duration-base` 160ms). Precision favors `--ease-standard`; the spring's overshoot is gentle and used sparingly.
-
-### Atmosphere (controlled exception)
-Login, transcript empty, admin KPI hero, and `.relay-atmosphere` panels may read `--atmosphere-background` — a corner radial wash plus subtle grain from `--atmosphere-grain-*` (now dialed back to a near-flat whisper, Linear-style). High-contrast themes disable grain and wash. This is the only approved decorative texture; do not invent new gradients elsewhere.
+- **Focus ring** — every interactive surface uses `var(--ring-focus)`, a 3px action-alpha halo (a quiet gray ring in the monochrome system). Destructive controls use `--ring-focus-danger`.
+- **Status tone driver** — `tone-good` / `tone-info` / `tone-bad` / `tone-warn` / `tone-neutral` set a single `--tone` variable consumed by dots and outlined pills.
+- **Dark mode** — one definition per tier (`html[data-theme="dark"]` in `primitives.css` for raw values, in `semantic.css` for the handful of relationship changes), resolved before first paint via a pre-hydration script in `app/layout.tsx`.
+- **Motion** — canonical curves/durations on a shared shelf (`--ease-standard`, `--ease-out-quint`, `--ease-emphasized`; `--ease-spring` is retired and aliases standard). Durations are Linear-fast (`--duration-fast` 120ms, `--duration-base` 160ms). Nothing overshoots.
 
 ### Data visualization
-The admin token-usage chart uses a fixed three-segment ramp that reuses existing tokens:
-- **Input tokens** — `{colors.primary}` (cobalt)
-- **Output tokens** — `{colors.semantic-up}` (green)
-- **Cache tokens** — `{colors.muted-soft}` (neutral gray)
-
-Fleet-health stacked bars and activity charts use the status tone ramp (`semantic-up` / `semantic-down` / `accent-yellow` / muted) **inside chart segments only**. Artifact kind accents (`--color-kind-*` in `tokens.css`) are a separate decorative chip palette mirrored from the TUI — not status, not action.
+The admin token-usage chart uses a fixed three-segment ramp: input tokens =
+`{colors.action}` (ink), output tokens = `{colors.success}` (green), cache
+tokens = `{colors.muted-soft}` (neutral). Fleet-health stacked bars and
+activity charts use the status tone ramp inside chart segments only.
+Artifact kind accents (`--color-kind-*` in `tokens/primitives.css`) are a
+separate decorative chip palette mirrored from the TUI — not status, not
+action; unchanged by this reskin.
 
 ## Known Gaps
-- Geist and Geist Mono are the default open-source font choices.
+- Geist and Geist Mono are the current font choices; no alternates are
+  configured.
 - Form validation states beyond focus are not fully specified.
+- `docs/design-system-preview.html` is a static preview file that predates
+  this rewrite and has not been regenerated against the current token
+  values — treat it as stale until refreshed in a follow-up pass.

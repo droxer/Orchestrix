@@ -79,6 +79,8 @@ export {
 
 export {
   DAEMON_CAPABILITY_GENERATED_FILES,
+  DAEMON_CAPABILITY_STRUCTURED_AGENT_EVENTS,
+  DAEMON_CAPABILITY_WORKSPACE_READ,
   DAEMON_NODE_PROTOCOL_VERSION,
   DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS,
   type DaemonAgentAdapter,
@@ -89,6 +91,10 @@ export {
   type DaemonAgentMcpServer,
   type DaemonAgentSkill,
   type DaemonGeneratedFile,
+  type DaemonWorkspaceEntry,
+  type DaemonWorkspaceErrorCode,
+  type DaemonWorkspaceListCommand,
+  type DaemonWorkspaceReadCommand,
   type DaemonMcpTransport,
   type DaemonNodeCapability,
   type DaemonNodeCommand,
@@ -172,6 +178,16 @@ export {
   formatKimiJsonLine,
   formatPiJsonLine,
 } from "./renderers.js";
+
+export {
+  CodexCollaborationStream,
+  parseCodexCollaborationLine,
+  type CodexCollaborationCallStatus,
+  type CodexCollaborationEvent,
+  type CodexCollaborationTool,
+  type CodexSubagentState,
+  type CodexSubagentStatus,
+} from "./codex-collaboration.js";
 
 export {
   claudeActionNode,

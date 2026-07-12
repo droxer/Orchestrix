@@ -6,7 +6,7 @@
   min-height: 0;
   display: grid;
   grid-template-rows: var(--header-h) minmax(0, 1fr) auto;
-  background: var(--color-canvas);
+  background: var(--color-semantic-canvas);
 }
 
 .chat-header {
@@ -15,8 +15,8 @@
   align-items: center;
   gap: var(--space-sm);
   padding: 0 var(--space-base);
-  border-bottom: 1px solid var(--color-hairline);
-  background: var(--color-canvas);
+  border-bottom: 1px solid var(--color-semantic-hairline);
+  background: var(--color-semantic-canvas);
 }
 
 .chat-title {
@@ -50,7 +50,7 @@
   margin: 0;
   flex: 0 1 auto;
   min-width: 0;
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
 }
 
 .chat-title-status {
@@ -72,10 +72,10 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   padding: 1px 7px;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--color-semantic-hairline);
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
   font: var(--type-eyebrow);
   letter-spacing: var(--letter-eyebrow);
   text-transform: uppercase;
@@ -85,7 +85,7 @@
   min-width: 0;
   margin: 0;
   flex: 1 1 auto;
-  color: var(--color-ink);
+  color: var(--color-semantic-ink);
   font: var(--type-title-md);
   font-size: var(--text-lg);
   line-height: var(--leading-snug);
@@ -108,9 +108,9 @@
   gap: 5px;
   min-height: 30px;
   padding: 0 var(--space-sm);
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--color-semantic-hairline);
   border-radius: var(--radius-sm);
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
   font: var(--type-meta);
   white-space: nowrap;
 }
@@ -132,7 +132,7 @@
 }
 
 .chat-header .icon-button:disabled:hover {
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
   background: transparent;
   border-color: transparent;
 }
@@ -150,14 +150,14 @@
   display: grid;
   place-items: center;
   padding: 0 4px;
-  border: 1px solid var(--color-canvas);
+  border: 1px solid var(--color-semantic-canvas);
   border-radius: var(--radius-full);
-  background: var(--color-ink);
-  color: var(--color-canvas);
+  background: var(--color-semantic-ink);
+  color: var(--color-semantic-canvas);
   font-size: var(--text-micro);
   font-weight: 600;
   line-height: 1;
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-ink) 18%, transparent);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-semantic-ink) 18%, transparent);
 }
 
 .header-agent-tabs {
@@ -166,7 +166,7 @@
   gap: 2px;
   padding: var(--space-xxs);
   border-radius: var(--radius-sm);
-  background: var(--color-surface-strong);
+  background: var(--color-semantic-surface-strong);
 }
 
 .header-agent-tabs button {
@@ -177,7 +177,7 @@
   padding: 0 var(--space-sm);
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  color: var(--color-body);
+  color: var(--color-semantic-body);
   font: var(--type-meta);
   background: transparent;
   white-space: nowrap;
@@ -190,7 +190,7 @@
 }
 
 .header-agent-tabs button:hover {
-  color: var(--color-ink);
+  color: var(--color-semantic-ink);
 }
 
 .header-agent-tabs button:hover .header-agent-tab-mark,
@@ -199,14 +199,14 @@
 }
 
 .header-agent-tabs button.active {
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  border-color: var(--color-hairline);
+  background: var(--color-semantic-canvas);
+  color: var(--color-semantic-ink);
+  border-color: var(--color-semantic-hairline);
 }
 
 .header-agent-tabs button.agent-tab-disabled,
 .header-agent-tabs button.agent-tab-disabled:hover {
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
   opacity: 0.55;
   text-decoration: line-through;
   text-decoration-thickness: 1px;
@@ -215,12 +215,48 @@
   border-color: transparent;
 }
 
+.header-agent-tabs button.agent-tab-busy {
+  color: var(--color-semantic-ink);
+}
+
+.header-agent-tabs button.agent-tab-busy .header-agent-tab-mark {
+  opacity: 1;
+}
+
+.header-agent-busy-pip {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-semantic-info);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-semantic-info) 55%, transparent);
+  animation: header-agent-busy-pulse 1.6s var(--ease-standard) infinite;
+}
+
+@keyframes header-agent-busy-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-semantic-info) 45%, transparent);
+    opacity: 1;
+  }
+  55% {
+    box-shadow: 0 0 0 5px transparent;
+    opacity: 0.72;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .header-agent-busy-pip {
+    animation: none;
+  }
+}
+
 .header-agent-tabs button.agent-tab-failed {
-  color: var(--color-danger-text);
+  color: var(--color-semantic-danger-text);
 }
 
 .header-agent-tabs button.agent-tab-not-ready {
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
   opacity: 0.72;
 }
 
@@ -228,7 +264,7 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  background: var(--color-canvas);
+  background: var(--color-semantic-canvas);
 }
 
 .transcript-inner {
@@ -247,7 +283,7 @@
   background:
     linear-gradient(
       90deg,
-      color-mix(in srgb, var(--color-brand-soft) 28%, transparent) 0%,
+      color-mix(in srgb, var(--color-semantic-action-soft) 28%, transparent) 0%,
       transparent 140px
     );
 }
@@ -259,13 +295,13 @@
   top: var(--space-xl);
   bottom: var(--space-xxl);
   width: 1px;
-  background: var(--color-hairline);
+  background: var(--color-semantic-hairline);
   pointer-events: none;
 }
 
 /* Empty transcript — flat soft surface behind the shared empty state. */
 .transcript-inner:has(.transcript-empty) {
-  background: var(--color-surface-soft);
+  background: var(--color-semantic-surface-soft);
   border-radius: var(--radius-xl);
 }
 
@@ -285,7 +321,7 @@
   gap: var(--space-sm);
   align-items: center;
   padding: var(--space-xxs) 0;
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
 }
 
 .transcript-phase-node {
@@ -293,8 +329,8 @@
   height: 8px;
   margin-left: 6px;
   border-radius: var(--radius-full);
-  background: var(--color-hairline);
-  box-shadow: 0 0 0 2px var(--color-canvas);
+  background: var(--color-semantic-hairline);
+  box-shadow: 0 0 0 2px var(--color-semantic-canvas);
   justify-self: center;
 }
 
@@ -315,7 +351,7 @@
   height: 1px;
   margin-left: var(--space-sm);
   vertical-align: middle;
-  background: var(--color-hairline-soft);
+  background: var(--color-semantic-hairline-soft);
 }
 
 .msg {
@@ -375,10 +411,10 @@
   grid-column: 1;
   grid-row: 1;
   align-self: start;
-  color: var(--color-ink);
-  background: var(--color-canvas);
-  border: 1px solid var(--color-hairline);
-  box-shadow: 0 0 0 2px var(--color-canvas);
+  color: var(--color-semantic-ink);
+  background: var(--color-semantic-canvas);
+  border: 1px solid var(--color-semantic-hairline);
+  box-shadow: 0 0 0 2px var(--color-semantic-canvas);
   z-index: 1;
   /* Agents are squares; the human is a circle (overridden below). Monochrome
      only — agent identity is the glyph inside, never color. */
@@ -389,8 +425,8 @@
 .rail-node-agent > svg { display: block; }
 
 .rail-node-user {
-  background: var(--color-ink);
-  border-color: var(--color-ink);
+  background: var(--color-semantic-ink);
+  border-color: var(--color-semantic-ink);
   border-radius: var(--radius-full);
   width: 14px;
   height: 14px;
@@ -402,14 +438,14 @@
   height: 10px;
   border: none;
   border-radius: var(--radius-full);
-  background: var(--color-muted-soft);
-  box-shadow: 0 0 0 2px var(--color-canvas);
+  background: var(--color-semantic-muted-soft);
+  box-shadow: 0 0 0 2px var(--color-semantic-canvas);
   justify-self: center;
 }
 
-.rail-node-system.tone-good { background: var(--color-semantic-up); }
-.rail-node-system.tone-bad  { background: var(--color-semantic-down); }
-.rail-node-system.tone-info { background: var(--color-info); }
+.rail-node-system.tone-good { background: var(--color-semantic-success); }
+.rail-node-system.tone-bad  { background: var(--color-semantic-danger); }
+.rail-node-system.tone-info { background: var(--color-semantic-info); }
 
 @keyframes node-in {
   from { transform: scale(0.4); opacity: 0; }
@@ -425,9 +461,9 @@
 }
 
 .msg-agent.grouped .rail-node-agent {
-  border-color: color-mix(in srgb, var(--color-hairline) 55%, transparent);
+  border-color: color-mix(in srgb, var(--color-semantic-hairline) 55%, transparent);
   background: transparent;
-  box-shadow: 0 0 0 2px var(--color-canvas);
+  box-shadow: 0 0 0 2px var(--color-semantic-canvas);
 }
 
 .msg-agent.grouped .rail-node-agent > svg {
@@ -447,7 +483,7 @@
 }
 
 .msg-time {
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
   font-family: var(--font-number);
   font-size: var(--text-xs);
   font-weight: 500;
@@ -489,12 +525,12 @@
   align-items: baseline;
   gap: var(--space-sm);
   padding: 0;
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
   font: var(--type-meta);
 }
 
 .msg header > span:first-child {
-  color: var(--color-ink);
+  color: var(--color-semantic-ink);
   font: var(--type-meta);
 }
 
@@ -509,7 +545,7 @@
    without competing for weight (design-system.md agent-turn). A leading `·`
    binds it to the name. */
 .msg header .agent-mode {
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
 }
 
 .msg header .agent-mode::before {
@@ -517,13 +553,13 @@
 }
 
 /* A review turn earns a slate info dot and label so reviews read distinctly
-   from action turns without borrowing the cobalt action hue. Status color only;
-   never an action fill. */
+   from action turns without borrowing the ink action color. Status color
+   only; never an action fill. */
 .msg header .agent-mode[data-mode="review"] {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  color: var(--color-info);
+  color: var(--color-semantic-info);
 }
 
 .msg header .agent-mode[data-mode="review"]::before {
@@ -531,7 +567,7 @@
   width: 6px;
   height: 6px;
   border-radius: var(--radius-full);
-  background: var(--color-info);
+  background: var(--color-semantic-info);
 }
 
 /* Live-run pulse in the agent-turn eyebrow — mirrors the conversation-row
@@ -541,8 +577,8 @@
   width: 6px;
   height: 6px;
   border-radius: var(--radius-full);
-  background: var(--color-info);
-  box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-info) 40%, transparent);
+  background: var(--color-semantic-info);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-semantic-info) 40%, transparent);
   animation: conv-pulse 1.4s ease-out infinite;
 }
 
@@ -550,7 +586,7 @@
    transcript body is quiet between tool calls. */
 @media (prefers-reduced-motion: no-preference) {
   .msg-agent.streaming .rail-node-agent {
-    border-color: var(--color-info);
+    border-color: var(--color-semantic-info);
     animation:
       node-in var(--duration-fast) var(--ease-standard) both,
       agent-rail-pulse 1.4s ease-out infinite;
@@ -558,8 +594,8 @@
 }
 
 @keyframes agent-rail-pulse {
-  0%   { box-shadow: 0 0 0 2px var(--color-canvas), 0 0 0 2px color-mix(in srgb, var(--color-info) 45%, transparent); }
-  100% { box-shadow: 0 0 0 2px var(--color-canvas), 0 0 0 9px color-mix(in srgb, var(--color-info) 0%, transparent); }
+  0%   { box-shadow: 0 0 0 2px var(--color-semantic-canvas), 0 0 0 2px color-mix(in srgb, var(--color-semantic-info) 45%, transparent); }
+  100% { box-shadow: 0 0 0 2px var(--color-semantic-canvas), 0 0 0 9px color-mix(in srgb, var(--color-semantic-info) 0%, transparent); }
 }
 
 /* User voice — on the rail, not a bubble. The circular node + mono "YOU"
@@ -569,12 +605,12 @@
   font: var(--type-meta);
   letter-spacing: var(--letter-caps-wide);
   text-transform: uppercase;
-  color: var(--color-ink);
+  color: var(--color-semantic-ink);
 }
 
 .msg-user .user-text {
   margin: 0;
-  color: var(--color-ink);
+  color: var(--color-semantic-ink);
   font-size: var(--text-base);
   font-weight: 500;
   line-height: var(--leading-loose);
@@ -585,7 +621,7 @@
 .msg-quiet {
   margin: 0;
   max-width: 100%;
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
   font: var(--type-label);
 }
 
@@ -611,8 +647,8 @@
   padding: 0 var(--space-sm);
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--color-surface) 72%, transparent);
-  color: var(--color-muted);
+  background: color-mix(in srgb, var(--color-semantic-surface-raised) 72%, transparent);
+  color: var(--color-semantic-muted);
   font: var(--type-label);
   cursor: pointer;
   white-space: nowrap;
@@ -624,9 +660,9 @@
 }
 
 .msg-turn-action:hover:not(:disabled) {
-  color: var(--color-ink);
-  border-color: var(--color-hairline);
-  background: var(--color-surface-raised);
+  color: var(--color-semantic-ink);
+  border-color: var(--color-semantic-hairline);
+  background: var(--color-semantic-surface-raised);
 }
 
 .msg-turn-action:disabled {
@@ -635,12 +671,12 @@
 }
 
 .msg-turn-action.is-copied {
-  color: var(--color-good);
-  border-color: color-mix(in srgb, var(--color-good) 28%, var(--color-hairline));
+  color: var(--color-semantic-success);
+  border-color: color-mix(in srgb, var(--color-semantic-success) 28%, var(--color-semantic-hairline));
 }
 
 .msg-turn-action:focus-visible {
-  outline: 2px solid var(--color-primary);
+  outline: 2px solid var(--color-semantic-action);
   outline-offset: 2px;
 }
 

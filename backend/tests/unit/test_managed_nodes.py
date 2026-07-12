@@ -40,6 +40,13 @@ def test_employee_can_have_multiple_dedicated_managed_nodes(tmp_path: Path) -> N
     assert first["id"] != second["id"]
 
 
+def test_managed_nodes_require_boxlite(tmp_path: Path) -> None:
+    store = LocalManagedNodeStore(tmp_path)
+
+    with pytest.raises(ValueError, match="require sandboxMode boxlite"):
+        store.create_node({"employeeId": "alice", "sandboxMode": "none"})
+
+
 def test_successful_enrollment_links_observed_daemon(tmp_path: Path) -> None:
     store = LocalManagedNodeStore(tmp_path)
     node = store.create_node({"employeeId": "alice"})

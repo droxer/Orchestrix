@@ -1,4 +1,5 @@
 import type {
+  AgentArtifactsResponse,
   AgentName,
   AgentRole,
   AgentTaskMode,
@@ -36,8 +37,8 @@ import type {
   TaskMutationInput,
   TasksResponse,
   WorkspaceBriefResponse,
-  WorkspaceFilesResponse,
-  WorkspaceFileContentResponse,
+  AgentWorkspaceFilesResponse,
+  AgentWorkspaceFileResponse,
 } from "./types.js";
 
 export class RelayApiError extends Error {
@@ -70,6 +71,12 @@ export async function apiJson<T>(
   } catch (error) {
     if (!response.ok) {
       throw new RelayApiError(text.trim() || response.statusText, response.status);
+    }
+    if (response.headers.get("content-type")?.includes("text/html") || text.trimStart().startsWith("<")) {
+      throw new RelayApiError(
+        "Relay returned an HTML response where this API expected JSON. Restart the Relay backend and web server, then try again.",
+        response.status,
+      );
     }
     throw error;
   }
@@ -107,16 +114,31 @@ export function getControlPanelAgent(agentId: string, signal?: AbortSignal): Pro
   return apiJson<{ agent: EmployeeAgent }>(`/cp/agents/${encodeURIComponent(agentId)}`, { signal });
 }
 
+export type EmployeeAgentMetaPatch = {
+  displayName?: string;
+  instructions?: string;
+};
+
+export type EmployeeAgentAdminPatch = EmployeeAgentMetaPatch & {
+  enabled?: boolean;
+  skillPolicy?: Record<string, unknown>;
+  toolPolicy?: Record<string, unknown>;
+  modelPolicy?: Record<string, unknown>;
+};
+
+export function updateOwnEmployeeAgent(
+  agentId: string,
+  patch: EmployeeAgentMetaPatch,
+): Promise<{ agent: EmployeeAgent }> {
+  return apiJson<{ agent: EmployeeAgent }>(`/agents/${encodeURIComponent(agentId)}`, {
+    method: "PATCH",
+    body: patch,
+  });
+}
+
 export function updateEmployeeAgent(
   agentId: string,
-  patch: {
-    enabled?: boolean;
-    displayName?: string;
-    instructions?: string;
-    skillPolicy?: Record<string, unknown>;
-    toolPolicy?: Record<string, unknown>;
-    modelPolicy?: Record<string, unknown>;
-  },
+  patch: EmployeeAgentAdminPatch,
 ): Promise<{ agent: EmployeeAgent }> {
   return apiJson<{ agent: EmployeeAgent }>(`/cp/agents/${encodeURIComponent(agentId)}`, {
     method: "PATCH",
@@ -313,27 +335,22 @@ export function getWorkspaceBrief(
   return apiJson<WorkspaceBriefResponse>(`/workspace/brief${query ? `?${query}` : ""}`, { signal });
 }
 
-export function listWorkspaceFiles(
-  input: { employeeId?: string; agentId?: string; path?: string } = {},
+export function listAgentWorkspaceFiles(
+  input: { agentId: string; path?: string },
   signal?: AbortSignal,
-): Promise<WorkspaceFilesResponse> {
+): Promise<AgentWorkspaceFilesResponse> {
   const params = new URLSearchParams();
-  if (input.employeeId) params.set("employeeId", input.employeeId);
-  if (input.agentId) params.set("agentId", input.agentId);
   if (input.path) params.set("path", input.path);
   const query = params.toString();
-  return apiJson<WorkspaceFilesResponse>(`/workspace/files${query ? `?${query}` : ""}`, { signal });
+  return apiJson<AgentWorkspaceFilesResponse>(`/agents/${encodeURIComponent(input.agentId)}/workspace/files${query ? `?${query}` : ""}`, { signal });
 }
 
-export function readWorkspaceFile(
-  input: { employeeId?: string; agentId?: string; path: string },
+export function readAgentWorkspaceFile(
+  input: { agentId: string; path: string },
   signal?: AbortSignal,
-): Promise<WorkspaceFileContentResponse> {
-  const params = new URLSearchParams();
-  if (input.employeeId) params.set("employeeId", input.employeeId);
-  if (input.agentId) params.set("agentId", input.agentId);
-  params.set("path", input.path);
-  return apiJson<WorkspaceFileContentResponse>(`/workspace/file?${params.toString()}`, { signal });
+): Promise<AgentWorkspaceFileResponse> {
+  const params = new URLSearchParams({ path: input.path });
+  return apiJson<AgentWorkspaceFileResponse>(`/agents/${encodeURIComponent(input.agentId)}/workspace/file?${params.toString()}`, { signal });
 }
 
 export function listTasks(signal?: AbortSignal): Promise<TasksResponse> {
@@ -366,6 +383,10 @@ export function startTask(taskId: string, input: { agent?: AgentName; mode?: Age
     method: "POST",
     body: input,
   });
+}
+
+export function getAgentArtifacts(agentId: string, signal?: AbortSignal): Promise<AgentArtifactsResponse> {
+  return apiJson<AgentArtifactsResponse>(`/agents/${encodeURIComponent(agentId)}/artifacts`, { signal });
 }
 
 export function listTaskArtifacts(taskId: string, signal?: AbortSignal): Promise<TaskArtifactsResponse> {

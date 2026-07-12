@@ -26,6 +26,20 @@
     to { transform: translateY(0); opacity: 1; }
   }
 
+  @keyframes adm-drawer-mobile-out {
+    from { transform: translateY(0); opacity: 1; }
+    to { transform: translateY(12px); opacity: 0.72; }
+  }
+
+  .adm-drawer.is-closing {
+    animation: adm-drawer-mobile-out var(--duration-fast) var(--ease-emphasized) forwards;
+  }
+
+  .adm-drawer-backdrop.is-underlay .adm-drawer {
+    transform: none;
+    opacity: 1;
+  }
+
   .adm-drawer-head {
     gap: var(--space-sm);
     padding:
@@ -204,7 +218,8 @@
 }
 
 @media (max-width: 820px) and (prefers-reduced-motion: reduce) {
-  .adm-drawer {
+  .adm-drawer,
+  .adm-drawer.is-closing {
     animation: none;
   }
 }

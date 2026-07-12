@@ -5,6 +5,7 @@ from tempfile import TemporaryDirectory
 from fastapi.testclient import TestClient
 
 from relay.app import create_app
+from relay.persistence.store_common import _write_json
 
 
 def _bootstrap_admin(client: TestClient) -> None:
@@ -15,7 +16,7 @@ def _bootstrap_admin(client: TestClient) -> None:
     assert response.status_code == 200
 
 
-def test_admin_manages_employee_agents_and_employee_lists_own_agents(
+def test_admin_manages_agents_and_employee_lists_own_agents(
     monkeypatch,
 ) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
@@ -82,7 +83,87 @@ def test_employee_agent_admin_routes_require_admin(monkeypatch) -> None:
         )
 
 
-def test_admin_places_employee_agents_on_different_runtime_nodes(monkeypatch) -> None:
+def test_employee_updates_own_agent_meta(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        employee = client.post(
+            "/cp/employees",
+            json={
+                "employeeId": "alice",
+                "username": "alice",
+                "password": "userpass",
+                "displayName": "Alice",
+            },
+        )
+        assert employee.status_code == 201
+        researcher = client.post(
+            "/cp/employees/alice/agents",
+            json={
+                "displayName": "Researcher",
+                "executorKind": "claude",
+                "defaultRole": "planner",
+            },
+        ).json()["agent"]
+
+        assert client.post("/auth/logout").status_code == 200
+        assert (
+            client.post(
+                "/auth/login", json={"username": "alice", "password": "userpass"}
+            ).status_code
+            == 200
+        )
+
+        updated = client.patch(
+            f"/agents/{researcher['id']}",
+            json={
+                "displayName": "Analyst",
+                "instructions": "Cite primary sources.",
+            },
+        )
+        assert updated.status_code == 200
+        payload = updated.json()["agent"]
+        assert payload["displayName"] == "Analyst"
+        assert payload["instructions"] == "Cite primary sources."
+
+        forbidden_field = client.patch(
+            f"/agents/{researcher['id']}",
+            json={"enabled": False},
+        )
+        assert forbidden_field.status_code == 400
+
+        assert client.post("/auth/logout").status_code == 200
+        assert (
+            client.post(
+                "/auth/login", json={"username": "admin", "password": "secret123"}
+            ).status_code
+            == 200
+        )
+        bob = client.post(
+            "/cp/employees",
+            json={
+                "employeeId": "bob",
+                "username": "bob",
+                "password": "userpass",
+            },
+        )
+        assert bob.status_code == 201
+        assert client.post("/auth/logout").status_code == 200
+        assert (
+            client.post(
+                "/auth/login", json={"username": "bob", "password": "userpass"}
+            ).status_code
+            == 200
+        )
+        forbidden_owner = client.patch(
+            f"/agents/{researcher['id']}",
+            json={"displayName": "Hijacked"},
+        )
+        assert forbidden_owner.status_code == 403
+
+
+def test_admin_places_agents_on_different_runtime_nodes(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
         app = create_app(root)
@@ -198,6 +279,65 @@ def test_employee_dispatches_work_by_logical_agent_id(monkeypatch) -> None:
         assert run["daemonNodeId"] == "node_a"
         command = app.state.daemon_store.take_queued_commands("node_a")[0]["command"]
         assert command["logicalAgentId"] == agent["id"]
+
+
+def test_existing_session_dispatch_normalizes_legacy_agent_supervisor(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        assert client.post(
+            "/cp/employees",
+            json={
+                "employeeId": "alice",
+                "username": "alice",
+                "password": "userpass",
+            },
+        ).status_code == 201
+        app.state.registry.register(
+            {
+                "sandboxId": "node_a",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }
+        )
+        agent = app.state.agent_store.create_agent(
+            "alice", {"displayName": "Builder", "executorKind": "codex"}
+        )
+        placement = app.state.agent_placement_store.create_placement(agent, "node_a")
+        legacy_agent = {**agent, "employeeId": "alice"}
+        legacy_agent.pop("supervisorEmployeeId")
+        legacy_placement = {**placement, "employeeId": "alice"}
+        legacy_placement.pop("supervisorEmployeeId")
+        _write_json(app.state.agent_store._snapshot_path(agent["id"]), legacy_agent)
+        _write_json(
+            app.state.agent_placement_store._snapshot_path(placement["id"]),
+            legacy_placement,
+        )
+        session = app.state.session_store.create_session(
+            {
+                "workspacePath": "/workspace/alice",
+                "ownerEmployeeId": "alice",
+                "ownerAgentId": agent["id"],
+                "taskGoal": "Build the feature",
+            }
+        )
+
+        response = client.post(
+            "/agent-runs",
+            json={
+                "taskGoal": "Continue the feature",
+                "sessionId": session["id"],
+                "assignments": [{"agentId": agent["id"], "mode": "action"}],
+            },
+        )
+
+        assert response.status_code == 202, response.text
 
 
 def test_employee_cannot_list_or_dispatch_another_employees_agent(monkeypatch) -> None:

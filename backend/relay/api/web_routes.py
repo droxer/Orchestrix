@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, HTTPException, Response
 from fastapi.responses import HTMLResponse
 
 from .helpers import web_ui_asset_response
@@ -18,6 +18,8 @@ async def control_panel() -> str:
 # unmatched paths fall back to the SPA's index.html for client-side routing.
 @router.get("/{asset_path:path}")
 async def web_asset(asset_path: str = "") -> Response:
+    if asset_path.startswith("workspace/") and asset_path.rsplit("/", 1)[-1] in {"files", "file"}:
+        raise HTTPException(404, "Not found.")
     return web_ui_asset_response(asset_path)
 
 

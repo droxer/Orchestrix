@@ -43,6 +43,7 @@ class LocalSessionStore:
             event = relay_event("session.created", session_id, {
                 "workspacePath": payload["workspacePath"],
                 **({"ownerEmployeeId": payload["ownerEmployeeId"]} if payload.get("ownerEmployeeId") else {}),
+                **({"ownerAgentId": payload["ownerAgentId"]} if payload.get("ownerAgentId") else {}),
                 "taskGoal": payload["taskGoal"],
                 "participants": payload.get("participants", ["human"]),
             })
@@ -250,6 +251,7 @@ class DatabaseSessionStore:
         events = [relay_event("session.created", session_id, {
             "workspacePath": payload["workspacePath"],
             **({"ownerEmployeeId": payload["ownerEmployeeId"]} if payload.get("ownerEmployeeId") else {}),
+            **({"ownerAgentId": payload["ownerAgentId"]} if payload.get("ownerAgentId") else {}),
             "taskGoal": payload["taskGoal"],
             "participants": payload.get("participants", ["human"]),
         })]

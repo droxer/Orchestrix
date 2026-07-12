@@ -36,6 +36,49 @@ function session(events: RelaySession["events"]): RelaySession {
 }
 
 describe("projectMessages artifact projection", () => {
+  it("attaches structured collaboration events to the matching run", () => {
+    const collaboration = {
+      id: "collab-1",
+      tool: "spawnAgent" as const,
+      status: "completed" as const,
+      senderThreadId: "root-thread",
+      receiverThreadIds: ["child-thread"],
+      prompt: "Review the protocol",
+      model: null,
+      reasoningEffort: null,
+      agentsStates: {
+        "child-thread": { status: "running" as const, message: "Reading tests" },
+      },
+    };
+    const messages = projectMessages(session([
+      {
+        id: "ev_run",
+        type: "agent.started",
+        sessionId: "ses_1",
+        timestamp,
+        runId: "run_1",
+        agent: "codex",
+        role: "implementer",
+        mode: "action",
+      },
+      {
+        id: "ev_collab",
+        type: "agent.collaboration",
+        sessionId: "ses_1",
+        timestamp,
+        runId: "run_1",
+        agent: "codex",
+        mode: "action",
+        sequence: 1,
+        collaboration,
+      },
+    ]), t);
+
+    const agent = messages.find((message) => message.kind === "agent");
+    assert.ok(agent && agent.kind === "agent");
+    assert.deepEqual(agent.collaborations, [collaboration]);
+  });
+
   it("attaches visible artifacts to the matching agent run and hides command logs", () => {
     const messages = projectMessages(session([
       {

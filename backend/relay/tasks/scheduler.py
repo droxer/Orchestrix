@@ -176,7 +176,7 @@ class TaskScheduler:
                         or task.get("ownerEmployeeId")
                         or "",
                         is_admin=True,
-                        agent_store=self.backend.employee_agent_store,
+                        agent_store=self.backend.agent_store,
                         placement_store=self.backend.agent_placement_store,
                         daemon_nodes=self.registry.monitor_nodes(),
                     )

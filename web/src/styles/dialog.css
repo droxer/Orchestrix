@@ -26,7 +26,7 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: var(--space-lg);
-  background: var(--color-surface-raised);
+  background: var(--color-semantic-surface-raised);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lift);
   animation: overlay-panel-in var(--duration-base) var(--ease-emphasized) both;
@@ -34,7 +34,7 @@
 }
 
 .dialog-modal[data-tone="danger"] {
-  border-left: 3px solid var(--color-semantic-down);
+  border-left: 3px solid var(--color-semantic-danger);
   padding-left: calc(var(--space-lg) - 2px);
 }
 
@@ -43,7 +43,7 @@
   font: var(--type-eyebrow);
   letter-spacing: var(--letter-eyebrow);
   text-transform: uppercase;
-  color: var(--color-danger-text);
+  color: var(--color-semantic-danger-text);
 }
 
 .dialog-title-row {
@@ -55,23 +55,23 @@
 .dialog-danger-icon {
   flex-shrink: 0;
   margin-top: 2px;
-  color: var(--color-semantic-down);
+  color: var(--color-semantic-danger);
 }
 
 .dialog-title {
   margin: 0;
   font: var(--type-title-md);
-  color: var(--color-ink);
+  color: var(--color-semantic-ink);
 }
 
 .dialog-modal[data-tone="danger"] .dialog-title {
-  color: var(--color-danger-text);
+  color: var(--color-semantic-danger-text);
 }
 
 .dialog-message {
   margin: 0;
   font: var(--type-body-sm);
-  color: var(--color-body);
+  color: var(--color-semantic-body);
 }
 
 .dialog-form {
@@ -80,19 +80,19 @@
 
 .dialog-input {
   width: 100%;
-  height: 40px;
+  height: var(--size-control-md);
   padding: 0 var(--space-sm);
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--color-semantic-hairline);
   border-radius: var(--radius-md);
-  background: var(--color-canvas);
-  color: var(--color-ink);
+  background: var(--color-semantic-canvas);
+  color: var(--color-semantic-ink);
   font-size: var(--text-md);
   transition: border-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
 }
 
 .dialog-input:focus-visible {
   outline: none;
-  border-color: var(--color-primary);
+  border-color: var(--color-semantic-action);
   box-shadow: var(--ring-focus);
 }
 
@@ -110,11 +110,11 @@
   z-index: calc(var(--z-dialog) + 1);
   width: min(420px, calc(100vw - var(--space-lg) * 2));
   padding: var(--space-sm) var(--space-base);
-  border: 1px solid var(--color-hairline);
-  border-left: 3px solid var(--color-info);
+  border: 1px solid var(--color-semantic-hairline);
+  border-left: 3px solid var(--color-semantic-info);
   border-radius: var(--radius-md);
-  background: var(--color-surface-raised);
-  color: var(--color-ink);
+  background: var(--color-semantic-surface-raised);
+  color: var(--color-semantic-ink);
   box-shadow: var(--shadow-lift);
   font: var(--type-body-sm);
   line-height: 1.45;
@@ -126,12 +126,12 @@
 }
 
 .dialog-toast[data-tone="error"] {
-  border-left-color: var(--color-semantic-down);
-  color: var(--color-danger-text);
+  border-left-color: var(--color-semantic-danger);
+  color: var(--color-semantic-danger-text);
 }
 
 .dialog-toast[data-tone="success"] {
-  border-left-color: var(--color-semantic-up);
+  border-left-color: var(--color-semantic-success);
 }
 
 @media (max-width: 600px) {

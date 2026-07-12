@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from relay.persistence.agent_placement_store import LocalAgentPlacementStore
-from relay.persistence.employee_agent_store import LocalEmployeeAgentStore
+from relay.persistence.agent_store import LocalAgentStore
 from relay.services.agent_routing import AgentRoutingError, resolve_agent_assignments
 
 
@@ -30,7 +30,7 @@ def node(
 
 
 def test_resolves_each_logical_agent_to_its_own_runtime_node(tmp_path: Path) -> None:
-    agents = LocalEmployeeAgentStore(tmp_path)
+    agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     researcher = agents.create_agent(
         "alice",
@@ -66,12 +66,12 @@ def test_resolves_each_logical_agent_to_its_own_runtime_node(tmp_path: Path) -> 
     )
 
     assert [item["daemonNodeId"] for item in resolved] == ["node_a", "node_b"]
-    assert [item["agent"] for item in resolved] == ["claude", "codex"]
+    assert [item["executorKind"] for item in resolved] == ["claude", "codex"]
     assert resolved[0]["agentInstructions"] == "Compare sources before answering."
 
 
 def test_employee_cannot_route_another_employees_agent(tmp_path: Path) -> None:
-    agents = LocalEmployeeAgentStore(tmp_path)
+    agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     agent = agents.create_agent(
         "alice", {"displayName": "Researcher", "executorKind": "claude"}
@@ -92,7 +92,7 @@ def test_employee_cannot_route_another_employees_agent(tmp_path: Path) -> None:
 
 
 def test_canonical_workspace_id_allows_different_node_paths(tmp_path: Path) -> None:
-    agents = LocalEmployeeAgentStore(tmp_path)
+    agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     researcher = agents.create_agent(
         "alice", {"displayName": "Researcher", "executorKind": "claude"}
@@ -127,7 +127,7 @@ def test_canonical_workspace_id_allows_different_node_paths(tmp_path: Path) -> N
 
 
 def test_node_affine_placements_reject_cross_node_workflow(tmp_path: Path) -> None:
-    agents = LocalEmployeeAgentStore(tmp_path)
+    agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     researcher = agents.create_agent(
         "alice", {"displayName": "Researcher", "executorKind": "claude"}
@@ -155,7 +155,7 @@ def test_node_affine_placements_reject_cross_node_workflow(tmp_path: Path) -> No
 
 
 def test_different_workspace_ids_reject_cross_node_workflow(tmp_path: Path) -> None:
-    agents = LocalEmployeeAgentStore(tmp_path)
+    agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     first = agents.create_agent(
         "alice", {"displayName": "First", "executorKind": "claude"}
@@ -183,7 +183,7 @@ def test_different_workspace_ids_reject_cross_node_workflow(tmp_path: Path) -> N
 
 
 def test_offline_agent_returns_stable_reason(tmp_path: Path) -> None:
-    agents = LocalEmployeeAgentStore(tmp_path)
+    agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     agent = agents.create_agent(
         "alice", {"displayName": "Builder", "executorKind": "codex"}
@@ -204,7 +204,7 @@ def test_offline_agent_returns_stable_reason(tmp_path: Path) -> None:
 
 
 def test_saturated_placement_returns_capacity_exhausted(tmp_path: Path) -> None:
-    agents = LocalEmployeeAgentStore(tmp_path)
+    agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     agent = agents.create_agent(
         "alice", {"displayName": "Builder", "executorKind": "codex"}

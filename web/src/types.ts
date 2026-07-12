@@ -76,6 +76,11 @@ export interface TaskArtifactsResponse {
   artifacts: ArtifactIndexItem[];
 }
 
+export interface AgentArtifactsResponse {
+  agentId: string;
+  artifacts: ArtifactIndexItem[];
+}
+
 export interface WorkspaceBriefSession {
   id: string;
   title?: string;
@@ -114,7 +119,7 @@ export interface WorkspaceBriefTask {
 
 export interface WorkspaceBriefResponse {
   employeeId: string;
-  workspacePath: string;
+  workspacePath?: string;
   primaryNode?: DaemonNodeMonitorRecord | null;
   nodes: DaemonNodeMonitorRecord[];
   activeRuns: DaemonNodeMonitorRecord["activeRuns"];
@@ -133,7 +138,7 @@ export interface WorkspaceBriefResponse {
   generatedAt: string;
 }
 
-export type WorkspaceFileKind = "directory" | "file" | "symlink" | "other";
+export type WorkspaceFileKind = "directory" | "file";
 
 export interface WorkspaceFileEntry {
   name: string;
@@ -143,19 +148,22 @@ export interface WorkspaceFileEntry {
   updatedAt: string;
 }
 
-export interface WorkspaceFilesResponse {
-  employeeId: string;
-  workspacePath: string;
+export type AgentWorkspaceSource = "live" | "snapshot";
+
+export interface AgentWorkspaceFilesResponse {
+  agentId: string;
+  source: AgentWorkspaceSource;
+  nodeId?: string;
   path: string;
   exists: boolean;
   entries: WorkspaceFileEntry[];
-  limit: number;
   generatedAt: string;
 }
 
-export interface WorkspaceFileContentResponse {
-  employeeId: string;
-  workspacePath: string;
+export interface AgentWorkspaceFileResponse {
+  agentId: string;
+  source: AgentWorkspaceSource;
+  nodeId?: string;
   path: string;
   exists: boolean;
   isBinary: boolean;
@@ -252,7 +260,7 @@ export interface ManagedNodeRecord {
   assignmentMode: "dedicated" | "pooled" | "shared";
   provider: string;
   profile: string;
-  sandboxMode: "boxlite" | "none";
+  sandboxMode: "boxlite";
   workspacePolicy: Record<string, unknown>;
   desiredState: "running" | "stopped" | "deleted";
   generation: number;
@@ -266,7 +274,7 @@ export interface ManagedNodeRecord {
 
 export interface CreateManagedNodeInput {
   employeeId?: string;
-  sandboxMode: "boxlite" | "none";
+  sandboxMode: "boxlite";
 }
 
 export interface CreateManagedNodeResponse {

@@ -7,14 +7,14 @@ from relay.persistence.agent_placement_store import (
     LocalAgentPlacementStore,
     placement_status,
 )
-from relay.persistence.employee_agent_store import (
-    DatabaseEmployeeAgentStore,
-    LocalEmployeeAgentStore,
+from relay.persistence.agent_store import (
+    DatabaseAgentStore,
+    LocalAgentStore,
 )
 
 
 def test_agents_can_be_placed_on_different_nodes(tmp_path: Path) -> None:
-    agents = LocalEmployeeAgentStore(tmp_path)
+    agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     researcher = agents.create_agent(
         "alice", {"displayName": "Researcher", "executorKind": "claude"}
@@ -33,7 +33,7 @@ def test_agents_can_be_placed_on_different_nodes(tmp_path: Path) -> None:
 def test_placement_availability_is_derived_from_agent_and_node_health(
     tmp_path: Path,
 ) -> None:
-    agents = LocalEmployeeAgentStore(tmp_path)
+    agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     agent = agents.create_agent(
         "alice", {"displayName": "Builder", "executorKind": "codex"}
@@ -61,7 +61,7 @@ def test_placement_availability_is_derived_from_agent_and_node_health(
 
 def test_database_agent_placement_store_matches_local_contract(tmp_path: Path) -> None:
     database_url = f"sqlite:///{tmp_path}/placements.db"
-    agents = DatabaseEmployeeAgentStore(database_url, create_schema=True)
+    agents = DatabaseAgentStore(database_url, create_schema=True)
     placements = DatabaseAgentPlacementStore(database_url, create_schema=True)
     agent = agents.create_agent(
         "alice", {"displayName": "Builder", "executorKind": "codex"}
@@ -81,3 +81,26 @@ def test_database_agent_placement_store_matches_local_contract(tmp_path: Path) -
         "placement.created",
         "placement.draining",
     ]
+
+
+def test_database_placement_store_normalizes_legacy_owner_snapshot(tmp_path: Path) -> None:
+    database_url = f"sqlite:///{tmp_path}/legacy-placements.db"
+    agents = DatabaseAgentStore(database_url, create_schema=True)
+    placements = DatabaseAgentPlacementStore(database_url, create_schema=True)
+    agent = agents.create_agent(
+        "alice", {"displayName": "Builder", "executorKind": "codex"}
+    )
+    placement = placements.create_placement(agent, "node_a")
+    legacy = {**placement, "employeeId": "alice"}
+    legacy.pop("supervisorEmployeeId")
+    with placements.engine.begin() as conn:
+        conn.execute(
+            placements.placements.update()
+            .where(placements.placements.c.public_id == placement["id"])
+            .values(snapshot=legacy)
+        )
+
+    assert (
+        placements.get_placement(placement["id"])["supervisorEmployeeId"]
+        == "alice"
+    )

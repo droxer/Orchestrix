@@ -62,7 +62,10 @@ export function TaskDrawer({
           <span>{t("backlog.status")}</span>
           <Select
             value={form.status}
-            onValueChange={(value) => onChange({ ...form, status: value as TaskStatus })}
+            onValueChange={(value) => {
+              if (value == null) return
+              onChange({ ...form, status: value as TaskStatus })
+            }}
           >
             <SelectTrigger className="w-full">
               <SelectValue />
@@ -92,7 +95,10 @@ export function TaskDrawer({
           <span>{t("routine.type")}</span>
           <Select
             value={form.routineType}
-            onValueChange={(value) => onChange({ ...form, routineType: value as TaskRoutineType })}
+            onValueChange={(value) => {
+              if (value == null) return
+              onChange({ ...form, routineType: value as TaskRoutineType })
+            }}
           >
             <SelectTrigger className="w-full">
               <SelectValue />
@@ -108,7 +114,10 @@ export function TaskDrawer({
           <span>{t("routine.cadence")}</span>
           <Select
             value={form.routineCadence}
-            onValueChange={(value) => onChange({ ...form, routineCadence: value as TaskRoutineCadence })}
+            onValueChange={(value) => {
+              if (value == null) return
+              onChange({ ...form, routineCadence: value as TaskRoutineCadence })
+            }}
           >
             <SelectTrigger className="w-full">
               <SelectValue />
@@ -150,7 +159,6 @@ export function TaskDrawer({
       }}
       title={title}
       subtitle={subtitle}
-      variant="light"
       width={420}
       closeLabel={t("dialog.cancel")}
       ariaLabel={title}
@@ -181,7 +189,10 @@ export function TaskDrawer({
             <span>{t("backlog.priority")}</span>
             <Select
               value={form.priority}
-              onValueChange={(value) => updateBase({ priority: value as TaskPriority })}
+              onValueChange={(value) => {
+                if (value == null) return
+                updateBase({ priority: value as TaskPriority })
+              }}
             >
               <SelectTrigger className="w-full">
                 <SelectValue />
@@ -199,6 +210,7 @@ export function TaskDrawer({
             <Select
               value={form.assignedAgentId || form.assignedAgent || NO_AGENT}
               onValueChange={(value) => {
+                if (value == null) return
                 if (value === NO_AGENT) {
                   updateBase({ assignedAgent: "", assignedAgentId: "" });
                   return;
@@ -241,16 +253,16 @@ export function TaskDrawer({
             </datalist>
           </div>
         </label>
+        {form.variant === "backlog" && form.id ? <TaskDrawerArtifacts taskId={form.id} /> : null}
         <div className="adm-form-actions">
-          <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
+          <Button type="button" variant="outline" size="default" onClick={onClose} disabled={saving}>
             {t("dialog.cancel")}
           </Button>
-          <Button type="submit" disabled={saving || !form.title.trim()}>
+          <Button type="submit" variant="default" size="default" disabled={saving || !form.title.trim()}>
             {saving ? t("admin.saving") : t("dialog.confirm")}
           </Button>
         </div>
       </form>
-      {form.variant === "backlog" && form.id ? <TaskDrawerArtifacts taskId={form.id} /> : null}
     </Drawer>
   );
 }

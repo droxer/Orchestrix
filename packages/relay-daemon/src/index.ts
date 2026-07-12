@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
-import { accessSync, appendFileSync, chmodSync, constants, mkdirSync, statSync, writeFileSync } from "node:fs";
+import { accessSync, appendFileSync, constants, mkdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, resolve, sep } from "node:path";
 
 import type {
   DaemonNodeCommand,
@@ -13,9 +13,11 @@ import type {
   AgentName,
   AgentTaskMode,
   StreamExecResult,
+  CodexCollaborationEvent,
 } from "relay-core";
 import { startOrchestratorSession, ensureAgentReady as ensureSandboxAgentReady, type ActiveOrchestratorSession } from "./sandbox-session.js";
 import { diffGeneratedFiles, snapshotGeneratedFiles } from "./generated-files.js";
+import { agentWorkspaceSubpath, ensureAgentWorkspaceDir } from "./agent-workspace.js";
 import { discoverAgentInventory } from "./agent-inventory.js";
 import { defaultExecutionManager } from "./execution.js";
 import { hasHostKimiCodeAuth, prepareHostAgentSkills, prepareHostKimiCodeHome } from "./box.js";
@@ -25,18 +27,15 @@ import {
   runAgentNode,
   initialAgentState,
   mergeAgentState,
-  guestCodexAuthJson,
-  guestCodexConfigToml,
-  guestPiAuthJson,
-  guestPiModelsJson,
   ensureDaemonNodeToken,
   GUEST_WORKSPACE,
   agentHomePath,
-  kimiApiKey,
-  openaiApiKey,
   DAEMON_CAPABILITY_GENERATED_FILES,
+  DAEMON_CAPABILITY_STRUCTURED_AGENT_EVENTS,
+  DAEMON_CAPABILITY_WORKSPACE_READ,
   DAEMON_NODE_PROTOCOL_VERSION,
 } from "relay-core";
+import { workspaceCommandEvent } from "./workspace-read.js";
 
 export type DaemonSandboxMode = DaemonNodeSandboxMode;
 const DEFAULT_DAEMON_SANDBOX_MODE: DaemonSandboxMode = "boxlite";
@@ -179,9 +178,8 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
     setHealth("stopped");
     return;
   }
-  const agentHealth = await discoverDaemonAgentHealth(environment, logger, sandboxId, options.signal);
-  const supportedAgents = readyAgents(agentHealth);
-  const agentInventory = await discoverAgentInventory(environment.execStream, options.signal);
+  let agentHealth = await discoverDaemonAgentHealth(environment, logger, sandboxId, options.signal);
+  let agentInventory = await discoverAgentInventory(environment.execStream, options.signal);
   const buildRegistration = (includeEmployeeId = Boolean(configuredEmployeeId), status?: DaemonNodeRegistration["status"]): DaemonNodeRegistration => ({
     sandboxId,
     ...(includeEmployeeId ? { employeeId: effectiveEmployeeId } : {}),
@@ -190,7 +188,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
     ...(workspaceId ? { workspaceId } : {}),
     sandboxMode,
     protocolVersion: DAEMON_NODE_PROTOCOL_VERSION,
-    supportedAgents,
+    supportedAgents: readyAgents(agentHealth),
     executorCapabilities: Object.entries(agentHealth).map(([executorKind, health]) => ({
       executorKind: executorKind as AgentName,
       status: health.status,
@@ -198,7 +196,11 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
       maxConcurrentRuns,
       ...(agentInventory[executorKind as AgentName] ? { inventory: agentInventory[executorKind as AgentName] } : {}),
     })),
-    capabilities: [DAEMON_CAPABILITY_GENERATED_FILES],
+    capabilities: [
+      DAEMON_CAPABILITY_GENERATED_FILES,
+      DAEMON_CAPABILITY_WORKSPACE_READ,
+      DAEMON_CAPABILITY_STRUCTURED_AGENT_EVENTS,
+    ],
     agentHealth,
     ...(Object.keys(agentInventory).length > 0 ? { agentInventory } : {}),
     maxConcurrentRuns,
@@ -292,6 +294,10 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
         // node's agent roster and busy/ready status without waiting for a poll
         // rejection.
         if (Date.now() - lastRegisteredAt >= heartbeatIntervalMs) {
+          if (sandboxMode === "none") {
+            agentHealth = await discoverDaemonAgentHealth(environment, logger, sandboxId, runtimeSignal);
+            agentInventory = await discoverAgentInventory(environment.execStream, runtimeSignal);
+          }
           await register();
           lastRegisteredAt = Date.now();
         }
@@ -417,6 +423,11 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
             mode: command.mode,
           });
           activeRuns.get(command.commandId)?.controller.abort(command.reason);
+        } else if (command.type === "workspace.list" || command.type === "workspace.read") {
+          const event = workspaceCommandEvent(workspacePath, command);
+          await postJsonWithRetry(fetchFn, `${backendUrl}/daemon-nodes/${encodeURIComponent(sandboxId)}/events`, event, token, runtimeSignal).catch((error: unknown) => {
+            logger.error("workspace event post failed", { sandboxId, commandId: command.id, error: error instanceof Error ? error.message : String(error) });
+          });
         }
       }
       await delay(pollIntervalMs, runtimeSignal);
@@ -513,19 +524,10 @@ function configureAgentProcessEnvironment(
   } else {
     process.env.RELAY_AGENT_WORKSPACE = workspacePath;
     process.env.RELAY_RUN_AS_CURRENT_USER = "1";
-    const resolvedAgentHome = agentHome ?? localAgentHomeFromEnv();
-    if (resolvedAgentHome) {
-      process.env.RELAY_AGENT_HOME = resolvedAgentHome;
-    } else {
-      process.env.RELAY_AGENT_HOME ??= join(workspacePath, ".relay", "daemon-node-home");
-    }
+    // Local nodes discover and run the employee's existing host agents. An
+    // explicit home remains available for service accounts and tests.
+    process.env.RELAY_AGENT_HOME = agentHome ?? process.env.RELAY_AGENT_HOME ?? homedir();
   }
-}
-
-function localAgentHomeFromEnv(): string | undefined {
-  const value = process.env.RELAY_USE_LOCAL_AGENT_HOME;
-  if (!value || value === "0" || value.toLowerCase() === "false") return undefined;
-  return process.env.HOME || homedir();
 }
 
 function firstNonBlank(...values: Array<string | undefined>): string | undefined {
@@ -672,17 +674,58 @@ async function executeCommand(
         }
       });
     },
+    agentCollaboration: (_runId: string, agent: AgentName, collaboration: CodexCollaborationEvent): void => {
+      const sequence = outputSequence++;
+      outputPostChain = outputPostChain.then(async () => {
+        if (outputPostFailure) return;
+        try {
+          await postJsonWithRetry(fetchFn, eventUrl, {
+            type: "run.collaboration",
+            commandId: command.id,
+            ...commandLeaseEventFields(command),
+            sessionId: command.sessionId,
+            runId: command.runId,
+            agent,
+            mode: command.mode,
+            collaboration,
+            sequence,
+          } satisfies DaemonNodeEvent, token, signal);
+        } catch (error) {
+          outputPostFailure = error instanceof Error ? error : new Error(String(error));
+          logger.error("collaboration event post exhausted retries", {
+            ...commandLogFields(sandboxId, command),
+            agent,
+            sequence,
+            error: outputPostFailure.message,
+          });
+        }
+      });
+    },
   };
+  // Each logical agent gets its own subdirectory under the node's shared
+  // workspace mount so concurrent agents don't collide; the host directory
+  // is created before the run since BoxLite bind-mounts make it immediately
+  // visible in the guest.
+  const agentWorkspaceSubdir = command.logicalAgentId
+    ? agentWorkspaceSubpath(command.logicalAgentId)
+    : undefined;
+  if (command.logicalAgentId) {
+    ensureAgentWorkspaceDir(nodeWorkspacePath, command.logicalAgentId);
+  }
+  const generatedFilesScanPath = agentWorkspaceSubdir
+    ? join(nodeWorkspacePath, agentWorkspaceSubdir)
+    : nodeWorkspacePath;
   const options = {
     execStream: environment.execStream,
     eventSink,
     runId: command.runId,
     agent: command.agent,
     signal,
+    agentWorkspaceSubdir,
   };
   // Snapshot document-type workspace files so a successful run can report
   // exactly what it created or changed (see generated-files.ts).
-  const workspaceSnapshot = snapshotGeneratedFiles(nodeWorkspacePath);
+  const workspaceSnapshot = snapshotGeneratedFiles(generatedFilesScanPath);
   const patch = await runAgentNode(command.agent, command.mode, state, options);
   const next = mergeAgentState(state, patch);
   await outputPostChain;
@@ -715,7 +758,14 @@ async function executeCommand(
     } satisfies DaemonNodeEvent, token, signal);
     return;
   }
-  const generatedFiles = next.last_exit_code === 0 ? diffGeneratedFiles(nodeWorkspacePath, workspaceSnapshot) : [];
+  const generatedFiles = next.last_exit_code === 0
+    ? diffGeneratedFiles(generatedFilesScanPath, workspaceSnapshot).map((file) => ({
+      ...file,
+      relativePath: agentWorkspaceSubdir
+        ? `${agentWorkspaceSubdir.split(sep).join("/")}/${file.relativePath}`
+        : file.relativePath,
+    }))
+    : [];
   logger.info("run completed", {
     ...commandLogFields(sandboxId, command),
     exitCode: next.last_exit_code,
@@ -761,40 +811,6 @@ function commandLeaseEventFields(command: DaemonNodeRunCommand): { leaseId?: str
   return command.leaseId ? { leaseId: command.leaseId } : {};
 }
 
-function ensureHostAgentReady(agent: AgentName): void {
-  // Auth material is written directly from this process; never pass it
-  // through a shell where it would be visible in the process table.
-  const home = agentHomePath();
-  // Skills are shared across every agent under ~/.claude/skills.
-  prepareHostAgentSkills(join(home, ".claude", "skills"));
-  if (agent === "codex") {
-    const apiKey = openaiApiKey();
-    if (!apiKey) throw new Error("OPENAI_API_KEY or CODEX_API_KEY is required for Codex daemon runs.");
-    const codexHome = join(home, ".codex");
-    mkdirSync(codexHome, { recursive: true });
-    writeSecretFile(join(codexHome, "auth.json"), guestCodexAuthJson(apiKey));
-    writeFileSync(join(codexHome, "config.toml"), guestCodexConfigToml());
-  }
-  if (agent === "pi") {
-    const piHome = join(home, ".pi", "agent");
-    mkdirSync(piHome, { recursive: true });
-    writeSecretFile(join(piHome, "auth.json"), guestPiAuthJson());
-    writeFileSync(join(piHome, "models.json"), guestPiModelsJson());
-  }
-  if (agent === "kimi") {
-    if (hasHostKimiCodeAuth()) {
-      prepareHostKimiCodeHome(join(home, ".kimi-code"));
-    } else if (!kimiApiKey()) {
-      throw new Error("Kimi requires a host Kimi Code login, KIMI_API_KEY, or MOONSHOT_API_KEY.");
-    }
-  }
-}
-
-function writeSecretFile(path: string, content: string): void {
-  writeFileSync(path, content, { mode: 0o600 });
-  chmodSync(path, 0o600);
-}
-
 export interface DaemonExecutionEnvironment {
   readonly sandboxMode: DaemonSandboxMode;
   ensureAgentReady(agent: AgentName, signal?: AbortSignal): Promise<void>;
@@ -826,7 +842,6 @@ function createExecutionEnvironment(
 }
 
 async function ensureLocalAgentReady(agent: AgentName, signal?: AbortSignal): Promise<void> {
-  ensureHostAgentReady(agent);
   const def = getAgent(agent);
   const result = await localProcessExecStream("bash", ["-c", def.preflight.command()], { signal });
   if (result.exit_code !== 0) {

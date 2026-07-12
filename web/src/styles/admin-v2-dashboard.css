@@ -22,13 +22,13 @@
 .adm-dash-kpis {
   display: grid;
   grid-template-columns: 2fr 1fr 1fr 1fr;
-  border: 1px solid var(--color-hairline);
-  background: var(--color-canvas);
+  border: 1px solid var(--color-semantic-hairline);
+  background: var(--color-semantic-canvas);
   position: relative;
   isolation: isolate;
 }
 
-/* Hairline grid overlay — control-room depth on the full KPI band. */
+/* Hairline grid overlay — vertical dividers aligned to 2fr 1fr 1fr 1fr tracks. */
 .adm-dash-kpis::after {
   content: "";
   position: absolute;
@@ -36,21 +36,27 @@
   z-index: 0;
   pointer-events: none;
   background-image:
-    repeating-linear-gradient(
+    linear-gradient(
       90deg,
-      transparent,
-      transparent calc(25% - 1px),
-      var(--color-hairline-soft) calc(25% - 1px),
-      var(--color-hairline-soft) 25%
-    ),
-    repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 31px,
-      var(--color-hairline-soft) 31px,
-      var(--color-hairline-soft) 32px
+      transparent calc(40% - 0.5px),
+      var(--color-semantic-hairline-soft) calc(40% - 0.5px),
+      var(--color-semantic-hairline-soft) calc(40% + 0.5px),
+      transparent calc(40% + 0.5px),
+      transparent calc(60% - 0.5px),
+      var(--color-semantic-hairline-soft) calc(60% - 0.5px),
+      var(--color-semantic-hairline-soft) calc(60% + 0.5px),
+      transparent calc(60% + 0.5px),
+      transparent calc(80% - 0.5px),
+      var(--color-semantic-hairline-soft) calc(80% - 0.5px),
+      var(--color-semantic-hairline-soft) calc(80% + 0.5px),
+      transparent calc(80% + 0.5px)
     );
   opacity: 0.55;
+}
+
+.adm-dash-kpis-wrap {
+  position: relative;
+  isolation: isolate;
 }
 
 .adm-dash-kpis > .adm-dash-tile {
@@ -70,7 +76,7 @@
   flex-direction: column;
   gap: var(--space-sm);
   padding: var(--space-base) var(--space-base);
-  border-right: 1px solid var(--color-hairline);
+  border-right: 1px solid var(--color-semantic-hairline);
   min-width: 0;
 }
 
@@ -85,12 +91,12 @@
   font: var(--type-eyebrow);
   letter-spacing: var(--letter-eyebrow);
   text-transform: uppercase;
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
 }
 
 .adm-dash-tile-value {
   font: var(--type-number-display);
-  color: var(--color-ink);
+  color: var(--color-semantic-ink);
   font-variant-numeric: tabular-nums;
 }
 
@@ -107,12 +113,12 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-sm);
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
 }
 
 .adm-dash-tile-hint {
   font-size: var(--text-xs);
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
 }
 
 .adm-dash-delta {
@@ -124,12 +130,12 @@
   letter-spacing: var(--letter-open);
 }
 
-.adm-dash-delta.tone-up { color: var(--color-semantic-up); }
-.adm-dash-delta.tone-down { color: var(--color-danger-text); }
-.adm-dash-delta.tone-flat { color: var(--color-muted); }
+.adm-dash-delta.tone-up { color: var(--color-semantic-success); }
+.adm-dash-delta.tone-down { color: var(--color-semantic-danger-text); }
+.adm-dash-delta.tone-flat { color: var(--color-semantic-muted); }
 
 .adm-dash-spark {
-  color: var(--color-info);
+  color: var(--color-semantic-info);
   display: block;
 }
 
@@ -151,16 +157,16 @@
   flex-direction: column;
   gap: var(--space-base);
   padding: var(--space-base);
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--color-semantic-hairline);
   border-radius: var(--radius-xl);
-  background: var(--color-canvas);
+  background: var(--color-semantic-canvas);
   min-width: 0;
   height: 100%;
-  transition: box-shadow var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+  transition: border-color var(--duration-fast) var(--ease-standard);
 }
 
 .adm-dash-card:hover {
-  box-shadow: var(--shadow-soft);
+  border-color: color-mix(in srgb, var(--color-semantic-ink) 24%, var(--color-semantic-hairline));
 }
 
 .adm-dash-belt > .adm-dash-card {
@@ -177,19 +183,19 @@
   font: var(--type-eyebrow);
   letter-spacing: var(--letter-eyebrow);
   text-transform: uppercase;
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
 }
 
 .adm-dash-card-title {
   margin: 0;
   font: var(--type-title-md);
-  color: var(--color-ink);
+  color: var(--color-semantic-ink);
 }
 
 .adm-dash-card-hint {
   margin: 0;
   font-size: var(--text-xs);
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
 }
 
 .adm-dash-card--chart .adm-dash-chart {
@@ -202,7 +208,7 @@
 
 .adm-dash-card-foot {
   margin-top: auto;
-  border-top: 1px solid var(--color-hairline-soft);
+  border-top: 1px solid var(--color-semantic-hairline-soft);
   padding-top: var(--space-sm);
 }
 
@@ -259,15 +265,15 @@
   max-height: 140px;
 }
 
-.adm-token-seg--input { fill: var(--color-primary); }
-.adm-token-seg--output { fill: var(--color-semantic-up); }
-.adm-token-seg--cache { fill: var(--color-muted-soft); }
+.adm-token-seg--input { fill: var(--color-semantic-action); }
+.adm-token-seg--output { fill: var(--color-semantic-success); }
+.adm-token-seg--cache { fill: var(--color-semantic-muted-soft); }
 
 .adm-token-legend {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-xs) var(--space-base);
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
   font-size: var(--text-xs);
 }
 
@@ -284,9 +290,9 @@
   display: inline-block;
 }
 
-.adm-token-dot--input { background: var(--color-primary); }
-.adm-token-dot--output { background: var(--color-semantic-up); }
-.adm-token-dot--cache { background: var(--color-muted-soft); }
+.adm-token-dot--input { background: var(--color-semantic-action); }
+.adm-token-dot--output { background: var(--color-semantic-success); }
+.adm-token-dot--cache { background: var(--color-semantic-muted-soft); }
 
 .adm-dash-empty {
   position: relative;
@@ -315,19 +321,19 @@
   font: var(--type-micro-strong);
   letter-spacing: var(--letter-eyebrow);
   text-transform: uppercase;
-  color: var(--color-primary);
+  color: var(--color-semantic-action);
   padding: 2px 8px;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid var(--color-semantic-hairline);
   border-radius: var(--radius-sm);
-  background: var(--color-canvas);
+  background: var(--color-semantic-canvas);
 }
 
 .adm-dash-empty-copy {
   margin: 0;
   font-size: var(--text-xs);
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
   max-width: 28ch;
-  background: var(--color-canvas);
+  background: var(--color-semantic-canvas);
   padding: 0 var(--space-xs);
 }
 
@@ -336,25 +342,25 @@
   display: flex;
   width: 100%;
   height: 10px;
-  border: 1px solid var(--color-hairline);
-  background: var(--color-hairline-soft);
+  border: 1px solid var(--color-semantic-hairline);
+  background: var(--color-semantic-hairline-soft);
   overflow: hidden;
 }
 
 .adm-dash-bar-seg {
   display: block;
   height: 100%;
-  border-right: 1px solid var(--color-canvas);
+  border-right: 1px solid var(--color-semantic-canvas);
 }
 
 .adm-dash-bar-seg:last-child { border-right: none; }
 /* Data-viz exception to "hue is status text/dot only, never fills": a stacked
    bar segment IS the datum, so it takes the status hue as its fill. Scoped to
    the chart; canvas chrome elsewhere keeps status to text and dots. */
-.adm-dash-bar-seg.tone-good { background: var(--color-semantic-up); }
-.adm-dash-bar-seg.tone-info { background: var(--color-info); }
-.adm-dash-bar-seg.tone-bad  { background: var(--color-semantic-down); }
-.adm-dash-bar-seg.tone-muted { background: var(--color-muted-soft); }
+.adm-dash-bar-seg.tone-good { background: var(--color-semantic-success); }
+.adm-dash-bar-seg.tone-info { background: var(--color-semantic-info); }
+.adm-dash-bar-seg.tone-bad  { background: var(--color-semantic-danger); }
+.adm-dash-bar-seg.tone-muted { background: var(--color-semantic-muted-soft); }
 
 .adm-dash-bar-empty {
   flex: 1;
@@ -362,8 +368,8 @@
     45deg,
     transparent,
     transparent 6px,
-    var(--color-hairline) 6px,
-    var(--color-hairline) 7px
+    var(--color-semantic-hairline) 6px,
+    var(--color-semantic-hairline) 7px
   );
   animation: adm-bar-hatch 1.2s var(--ease-standard) forwards;
 }
@@ -400,7 +406,7 @@
   font-size: var(--text-2xs);
   text-transform: uppercase;
   letter-spacing: var(--letter-eyebrow);
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
   margin: 0;
 }
 
@@ -411,10 +417,10 @@
   background: currentColor;
 }
 
-.adm-dash-stat.tone-good { color: var(--color-semantic-up); }
-.adm-dash-stat.tone-info { color: var(--color-info); }
-.adm-dash-stat.tone-bad  { color: var(--color-danger-text); }
-.adm-dash-stat.tone-muted { color: var(--color-muted); }
+.adm-dash-stat.tone-good { color: var(--color-semantic-success); }
+.adm-dash-stat.tone-info { color: var(--color-semantic-info); }
+.adm-dash-stat.tone-bad  { color: var(--color-semantic-danger-text); }
+.adm-dash-stat.tone-muted { color: var(--color-semantic-muted); }
 
 .adm-dash-stat-value {
   margin: 0;
@@ -423,7 +429,7 @@
   font-weight: 500;
   line-height: 1.0;
   letter-spacing: var(--letter-display);
-  color: var(--color-ink);
+  color: var(--color-semantic-ink);
   font-variant-numeric: tabular-nums;
 }
 
@@ -446,7 +452,7 @@
 
 .adm-dash-top-rank {
   font-size: var(--text-2xs);
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
   letter-spacing: var(--letter-caps-wide);
 }
 
@@ -459,7 +465,7 @@
 
 .adm-dash-top-name {
   font-size: var(--text-sm);
-  color: var(--color-ink);
+  color: var(--color-semantic-ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -467,26 +473,26 @@
 
 .adm-dash-top-sub {
   font-size: var(--text-2xs);
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
   letter-spacing: var(--letter-caps);
 }
 
 .adm-dash-top-bar {
   position: relative;
   height: 4px;
-  background: var(--color-hairline-soft);
+  background: var(--color-semantic-hairline-soft);
 }
 
 .adm-dash-top-bar > span {
   display: block;
   height: 100%;
-  background: var(--color-primary);
+  background: var(--color-semantic-action);
   min-width: 4px;
 }
 
 .adm-dash-top-count {
   font-size: var(--text-sm);
-  color: var(--color-ink);
+  color: var(--color-semantic-ink);
   font-variant-numeric: tabular-nums;
 }
 
@@ -507,7 +513,7 @@
   top: var(--space-sm);
   bottom: var(--space-sm);
   width: 1px;
-  background: var(--color-hairline);
+  background: var(--color-semantic-hairline);
 }
 
 .adm-dash-feed-row {
@@ -522,7 +528,7 @@
 }
 
 .adm-dash-feed-row:not(:last-child) {
-  border-bottom: 1px solid var(--color-hairline-soft);
+  border-bottom: 1px solid var(--color-semantic-hairline-soft);
 }
 
 .adm-dash-feed-icon {
@@ -533,15 +539,15 @@
   height: 24px;
   border-radius: var(--radius-full);
   border: 1px solid currentColor;
-  background: var(--color-canvas);
+  background: var(--color-semantic-canvas);
   position: relative;
   z-index: 1;
 }
 
-.adm-dash-feed-icon.tone-good { color: var(--color-semantic-up); }
-.adm-dash-feed-icon.tone-bad  { color: var(--color-semantic-down); }
-.adm-dash-feed-icon.tone-info { color: var(--color-info); }
-.adm-dash-feed-icon.tone-muted { color: var(--color-muted); }
+.adm-dash-feed-icon.tone-good { color: var(--color-semantic-success); }
+.adm-dash-feed-icon.tone-bad  { color: var(--color-semantic-danger); }
+.adm-dash-feed-icon.tone-info { color: var(--color-semantic-info); }
+.adm-dash-feed-icon.tone-muted { color: var(--color-semantic-muted); }
 
 .adm-dash-feed-body {
   display: flex;
@@ -552,7 +558,7 @@
 
 .adm-dash-feed-message {
   font-size: var(--text-sm);
-  color: var(--color-ink);
+  color: var(--color-semantic-ink);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   line-clamp: 2;
@@ -564,13 +570,13 @@
 
 .adm-dash-feed-owner {
   font-size: var(--text-2xs);
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
   letter-spacing: var(--letter-caps);
 }
 
 .adm-dash-feed-time {
   font-size: var(--text-2xs);
-  color: var(--color-muted);
+  color: var(--color-semantic-muted);
   letter-spacing: var(--letter-caps-wide);
   white-space: nowrap;
   padding-top: 2px;
@@ -600,90 +606,12 @@
   .adm-dash-belt > :last-child { grid-column: auto; }
   .adm-dash-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .adm-dash-tile { grid-column: span 1; }
-  .adm-dash-tile--hero { grid-column: 1 / -1; border-right: none; border-bottom: 1px solid var(--color-hairline); }
-  .adm-dash-tile:nth-child(2) { border-right: 1px solid var(--color-hairline); }
-  .adm-dash-tile:nth-child(3) { border-right: none; }
-  .adm-dash-tile:nth-child(2),
-  .adm-dash-tile:nth-child(3) { border-bottom: 1px solid var(--color-hairline); }
-}
+  .adm-dash-tile--hero { grid-column: 1 / -1; border-right: none; border-bottom: 1px solid var(--color-semantic-hairline); }
+  .adm-dash-tile--nodes { border-right: 1px solid var(--color-semantic-hairline); border-bottom: 1px solid var(--color-semantic-hairline); }
+  .adm-dash-tile--employees { border-right: none; border-bottom: 1px solid var(--color-semantic-hairline); }
+  .adm-dash-tile--tokens { grid-column: 1 / -1; border-right: none; }
 
-/* ── High-contrast themes ───────────────────────────────────────────
-   Flat operational panels: drop decorative KPI grid wash, swap soft
-   shadows for ink rings, and strengthen chart / placeholder fills so
-   data-viz reads at full legibility on near-black/white canvases. */
-html[data-theme="contrast"] .adm-dash-kpis::after,
-html[data-theme="contrast-dark"] .adm-dash-kpis::after {
-  display: none;
-}
-
-html[data-theme="contrast"] .adm-dash-card,
-html[data-theme="contrast-dark"] .adm-dash-card {
-  border-radius: 0;
-}
-
-html[data-theme="contrast"] .adm-dash-card:hover,
-html[data-theme="contrast-dark"] .adm-dash-card:hover {
-  box-shadow: var(--shadow-lift);
-}
-
-html[data-theme="contrast"] .adm-dash-chart--empty,
-html[data-theme="contrast-dark"] .adm-dash-chart--empty {
-  opacity: 1;
-}
-
-html[data-theme="contrast"] .adm-dash-chart--empty rect,
-html[data-theme="contrast-dark"] .adm-dash-chart--empty rect {
-  opacity: 1;
-  fill: var(--color-hairline-soft);
-}
-
-html[data-theme="contrast"] .adm-dash-chart-line,
-html[data-theme="contrast-dark"] .adm-dash-chart-line {
-  stroke: var(--color-ink);
-  stroke-width: 2;
-}
-
-html[data-theme="contrast"] .adm-dash-chart line:not(.adm-dash-chart-line),
-html[data-theme="contrast-dark"] .adm-dash-chart line:not(.adm-dash-chart-line) {
-  stroke: var(--color-hairline-soft);
-  stroke-dasharray: none;
-}
-
-html[data-theme="contrast"] .adm-dash-chart-area,
-html[data-theme="contrast-dark"] .adm-dash-chart-area {
-  fill: color-mix(in srgb, var(--color-ink) 14%, transparent);
-  opacity: 1;
-}
-
-html[data-theme="contrast"] .adm-dash-spark,
-html[data-theme="contrast-dark"] .adm-dash-spark {
-  color: var(--color-ink);
-}
-
-html[data-theme="contrast"] .adm-dash-bar,
-html[data-theme="contrast-dark"] .adm-dash-bar {
-  background: var(--color-canvas);
-}
-
-html[data-theme="contrast"] .adm-dash-bar-seg,
-html[data-theme="contrast-dark"] .adm-dash-bar-seg {
-  border-right-color: var(--color-ink);
-}
-
-html[data-theme="contrast"] .adm-dash-top-bar,
-html[data-theme="contrast-dark"] .adm-dash-top-bar {
-  background: var(--color-canvas);
-  box-shadow: inset 0 0 0 1px var(--color-hairline-soft);
-}
-
-html[data-theme="contrast"] .adm-dash-feed-icon,
-html[data-theme="contrast-dark"] .adm-dash-feed-icon {
-  border-width: 2px;
-}
-
-html[data-theme="contrast"] .adm-dash-stat-dot,
-html[data-theme="contrast-dark"] .adm-dash-stat-dot,
-html[data-theme="contrast"] .adm-token-dot,
-html[data-theme="contrast-dark"] .adm-token-dot {
-  box-shadow: inset 0 0 0 1px var(--color-ink);
+  .adm-dash-kpis::after {
+    background-image: none;
+  }
 }

@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import test, { type TestContext } from "node:test";
 
@@ -19,6 +19,8 @@ import {
   type DaemonLogger,
 } from "../src/index.js";
 import { acquireBoxliteHomeLock } from "../src/box.js";
+import { agentWorkspaceSubpath } from "../src/agent-workspace.js";
+import { listAgentWorkspace, readAgentWorkspaceFile, WorkspaceReadError } from "../src/workspace-read.js";
 import { isMainModule } from "../src/cli.js";
 import type { DaemonNodeCommand, DaemonNodeEvent, DaemonNodeRegistration, DaemonNodeRunCommand, StreamExecResult } from "relay-core";
 
@@ -196,6 +198,31 @@ test("BoxLite mode clears local agent process flags", async () => {
   }
 });
 
+test("local node mode detects agents from the employee host home by default", async () => {
+  const previous = captureEnv(["RELAY_AGENT_HOME", "RELAY_RUN_AS_CURRENT_USER"]);
+  const stop = new AbortController();
+  stop.abort();
+  delete process.env.RELAY_AGENT_HOME;
+  try {
+    await runRelayDaemon({
+      backendUrl: "http://relay.test",
+      sandboxId: "sbx_local_env",
+      employeeId: "alice",
+      workspacePath: process.cwd(),
+      sandbox: "none",
+      token: "node_token",
+      logger: testLogger(),
+      signal: stop.signal,
+      environment: fakeEnvironment(),
+    });
+
+    assert.equal(process.env.RELAY_RUN_AS_CURRENT_USER, "1");
+    assert.equal(process.env.RELAY_AGENT_HOME, homedir());
+  } finally {
+    restoreCapturedEnv(previous);
+  }
+});
+
 test("local process execution strips daemon tokens from agent subprocess env", async () => {
   const previous = captureEnv([
     "DATABASE_URL",
@@ -365,6 +392,67 @@ test("relay daemon ignores duplicate run.start commands already active", async (
   assert.equal(events.filter((event) => event.type === "run.completed").length, 1);
 });
 
+test("relay daemon reports structured Codex collaboration events", async () => {
+  const stop = new AbortController();
+  const events: DaemonNodeEvent[] = [];
+  let commandServed = false;
+  const command = runCommand("cmd_collaboration");
+  const item = JSON.stringify({
+    type: "item.completed",
+    item: {
+      type: "collab_agent_tool_call",
+      id: "collab-1",
+      tool: "spawn_agent",
+      status: "completed",
+      sender_thread_id: "root-thread",
+      receiver_thread_ids: ["child-thread"],
+      prompt: "Review the changes",
+      agents_states: { "child-thread": { status: "running", message: null } },
+    },
+  });
+  await runRelayDaemon({
+    backendUrl: "http://relay.test",
+    sandboxId: "sbx_test",
+    employeeId: "alice",
+    workspacePath: process.cwd(),
+    token: "node_token",
+    pollIntervalMs: 5,
+    shutdownGraceMs: 50,
+    logger: testLogger(),
+    signal: stop.signal,
+    environment: fakeEnvironment({
+      exec: async (_cmd, args, options) => {
+        if (!isInventoryProbe(args)) options?.stdoutRenderer?.(`${item}\n`);
+        return { exit_code: 0, stdout: `${item}\n`, stderr: "" };
+      },
+    }),
+    fetchFn: async (url, init) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/daemon-nodes/register") return jsonResponse({ ok: true });
+      if (path.endsWith("/commands")) {
+        if (!commandServed) {
+          commandServed = true;
+          return jsonResponse({ commands: [command] });
+        }
+        return jsonResponse({ commands: [] });
+      }
+      if (path.endsWith("/events")) {
+        const event = await jsonBody<DaemonNodeEvent>(init);
+        events.push(event);
+        if (event.type === "run.completed") stop.abort();
+        return jsonResponse({ ok: true }, 202);
+      }
+      throw new Error(`unexpected URL ${url}`);
+    },
+  });
+
+  const collaboration = events.find((event) => event.type === "run.collaboration");
+  assert.ok(collaboration && collaboration.type === "run.collaboration");
+  assert.equal(collaboration.collaboration.tool, "spawnAgent");
+  assert.deepEqual(collaboration.collaboration.receiverThreadIds, ["child-thread"]);
+});
+
 test("relay daemon advertises active delivery leases while polling", async () => {
   const stop = new AbortController();
   const command = { ...runCommand("cmd_active_poll"), leaseId: "lease_1", leaseExpiresAt: new Date(Date.now() + 60_000).toISOString() };
@@ -522,6 +610,46 @@ test("relay daemon advertises only agents with passing capability preflight", as
   assert.equal(registrations[0].workspaceId, "repo:relay");
   assert.equal(registrations[0].agentHealth?.kimi?.status, "failed");
   assert.match(registrations[0].agentHealth?.kimi?.detail ?? "", /not logged in/);
+});
+
+test("local node refreshes agent availability before heartbeat registration", async () => {
+  const stop = new AbortController();
+  const registrations: DaemonNodeRegistration[] = [];
+  let codexChecks = 0;
+  await runRelayDaemon({
+    backendUrl: "http://relay.test",
+    sandboxId: "sbx_local_refresh",
+    employeeId: "alice",
+    workspacePath: process.cwd(),
+    sandbox: "none",
+    token: "node_token",
+    pollIntervalMs: 1,
+    heartbeatIntervalMs: 1,
+    shutdownGraceMs: 50,
+    logger: testLogger(),
+    signal: stop.signal,
+    environment: fakeEnvironment({
+      ensure: async (agent) => {
+        if (agent === "codex" && codexChecks++ === 0) {
+          throw new Error("Codex is not logged in.");
+        }
+      },
+    }),
+    fetchFn: async (url, init) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/daemon-nodes/register") {
+        registrations.push(await jsonBody<DaemonNodeRegistration>(init));
+        if (registrations.length === 2) stop.abort();
+        return jsonResponse({ ok: true });
+      }
+      if (path.endsWith("/commands")) return jsonResponse({ commands: [] });
+      throw new Error(`unexpected URL ${url}`);
+    },
+  });
+
+  assert.equal(registrations[0].supportedAgents.includes("codex"), false);
+  assert.equal(registrations[1].supportedAgents.includes("codex"), true);
 });
 
 test("relay daemon doctor reports per-agent preflight failures", async () => {
@@ -1420,7 +1548,11 @@ test("relay daemon reports generated workspace documents in run.completed", asyn
   let commandServed = false;
   const base = runCommand();
   assert.ok(base.type === "run.start");
-  const command: DaemonNodeCommand = { ...base, workspacePath: workspace };
+  const command: DaemonNodeCommand = {
+    ...base,
+    workspacePath: workspace,
+    logicalAgentId: "agent_research",
+  };
   await runRelayDaemon({
     backendUrl: "http://relay.test",
     sandboxId: "sbx_test",
@@ -1434,8 +1566,8 @@ test("relay daemon reports generated workspace documents in run.completed", asyn
     environment: fakeEnvironment({
       exec: async (_cmd, args, options) => {
         if (!isInventoryProbe(args)) {
-          writeFile(joinPath(workspace, "quarterly-report.pdf"), "pdf bytes");
-          writeFile(joinPath(workspace, "server.key"), "not a document");
+          writeFile(joinPath(workspace, agentWorkspaceSubpath("agent_research"), "quarterly-report.pdf"), "pdf bytes");
+          writeFile(joinPath(workspace, agentWorkspaceSubpath("agent_research"), "server.key"), "not a document");
         }
         const rendered = options?.stdoutRenderer?.("done\n") ?? "done\n";
         options?.sink?.(rendered);
@@ -1470,7 +1602,7 @@ test("relay daemon reports generated workspace documents in run.completed", asyn
   assert.ok(completed && completed.type === "run.completed");
   assert.equal(completed.generatedFiles?.length, 1);
   const [file] = completed.generatedFiles ?? [];
-  assert.equal(file.relativePath, "quarterly-report.pdf");
+  assert.equal(file.relativePath, "agents/agent-YWdlbnRfcmVzZWFyY2g/quarterly-report.pdf");
   assert.equal(file.contentType, "application/pdf");
   assert.equal(Buffer.from(file.contentBase64 ?? "", "base64").toString("utf-8"), "pdf bytes");
 });
@@ -1497,4 +1629,96 @@ test("generated-file diff detects changed files and skips excluded directories",
   const changed = diffGeneratedFiles(workspace, before);
   assert.deepEqual(changed.map((file) => file.relativePath).sort(), ["data.csv", "output/summary.md", "report.html"]);
   assert.deepEqual(diffGeneratedFiles(workspace, snapshotGeneratedFiles(workspace)), []);
+});
+
+test("listAgentWorkspace confines files to an agent home and sorts directories first", () => {
+  const root = mkdtempSync(join(tmpdir(), "relay-ws-"));
+  try {
+    const home = join(root, agentWorkspaceSubpath("agent_1"));
+    mkdirSync(join(home, "sub"), { recursive: true });
+    writeFileSync(join(home, "report.md"), "hello");
+    writeFileSync(join(root, "outside.txt"), "secret");
+
+    const listing = listAgentWorkspace(root, "agent_1", "");
+    assert.equal(listing.exists, true);
+    assert.deepEqual(listing.entries.map((entry) => [entry.name, entry.kind]), [["sub", "directory"], ["report.md", "file"]]);
+    assert.equal(listing.entries.every((entry) => !entry.path.includes("outside")), true);
+    assert.deepEqual(listAgentWorkspace(root, "agent_none", ""), { path: "", exists: false, entries: [] });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("readAgentWorkspaceFile rejects escapes and caps text while identifying binary data", () => {
+  const root = mkdtempSync(join(tmpdir(), "relay-ws-"));
+  try {
+    const home = join(root, agentWorkspaceSubpath("agent_1"));
+    mkdirSync(join(home, "sub"), { recursive: true });
+    writeFileSync(join(home, "small.txt"), "hello");
+    writeFileSync(join(home, "bin.dat"), Buffer.from([0, 1, 2]));
+    writeFileSync(join(home, "big.txt"), "x".repeat(64));
+    writeFileSync(join(root, "outside.txt"), "secret");
+    symlinkSync(root, join(home, "escape"));
+
+    assert.throws(() => readAgentWorkspaceFile(root, "agent_1", "../outside.txt"), (error: unknown) => error instanceof WorkspaceReadError && error.code === "invalid-path");
+    assert.throws(() => readAgentWorkspaceFile(root, "agent_1", "/outside.txt"), (error: unknown) => error instanceof WorkspaceReadError && error.code === "invalid-path");
+    assert.throws(() => readAgentWorkspaceFile(root, "agent_1", "escape/outside.txt"), (error: unknown) => error instanceof WorkspaceReadError && error.code === "invalid-path");
+    assert.throws(() => readAgentWorkspaceFile(root, "agent_1", "sub"), (error: unknown) => error instanceof WorkspaceReadError && error.code === "is-directory");
+    assert.throws(() => readAgentWorkspaceFile(root, "agent_1", "missing.txt"), (error: unknown) => error instanceof WorkspaceReadError && error.code === "not-found");
+    assert.equal(Buffer.from(readAgentWorkspaceFile(root, "agent_1", "small.txt").contentBase64 ?? "", "base64").toString(), "hello");
+    assert.equal(readAgentWorkspaceFile(root, "agent_1", "bin.dat").isBinary, true);
+    const capped = readAgentWorkspaceFile(root, "agent_1", "big.txt", 16);
+    assert.equal(capped.truncated, true);
+    assert.equal(Buffer.from(capped.contentBase64 ?? "", "base64").byteLength, 16);
+    assert.equal(capped.bytes, 64);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("relay daemon serves agent-home workspace commands", async () => {
+  const root = mkdtempSync(join(tmpdir(), "relay-ws-"));
+  const home = join(root, agentWorkspaceSubpath("agent_1"));
+  mkdirSync(home, { recursive: true });
+  writeFileSync(join(home, "report.md"), "hello");
+  const stop = new AbortController();
+  const events: DaemonNodeEvent[] = [];
+  let registration: DaemonNodeRegistration | undefined;
+  let served = false;
+  await runRelayDaemon({
+    backendUrl: "http://relay.test", sandboxId: "sbx_test", employeeId: "alice", workspacePath: root, token: "node_token",
+    pollIntervalMs: 5, shutdownGraceMs: 50, logger: testLogger(), signal: stop.signal,
+    environment: fakeEnvironment({ exec: async () => ({ exit_code: 0, stdout: "", stderr: "" }) }),
+    fetchFn: async (url, init) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/daemon-nodes/register") { registration = await jsonBody<DaemonNodeRegistration>(init); return jsonResponse({ ok: true }); }
+      if (path.endsWith("/commands")) {
+        if (!served) { served = true; return jsonResponse({ commands: [
+          { id: "cmd_ls", type: "workspace.list", agentId: "agent_1", path: "" },
+          { id: "cmd_read", type: "workspace.read", agentId: "agent_1", path: "report.md" },
+          { id: "cmd_bad", type: "workspace.read", agentId: "agent_1", path: "../escape" },
+        ] }); }
+        return jsonResponse({ commands: [] });
+      }
+      if (path.endsWith("/events")) {
+        events.push(await jsonBody<DaemonNodeEvent>(init));
+        if (events.length === 3) stop.abort();
+        return jsonResponse({ ok: true }, 202);
+      }
+      throw new Error(`Unexpected URL ${url}`);
+    },
+  });
+  rmSync(root, { recursive: true, force: true });
+
+  assert.equal(registration?.capabilities?.includes("workspace-read"), true);
+  const listing = events.find((event) => event.type === "workspace.listing");
+  assert.ok(listing && listing.type === "workspace.listing");
+  assert.deepEqual(listing.entries.map((entry) => entry.name), ["report.md"]);
+  const file = events.find((event) => event.type === "workspace.file");
+  assert.ok(file && file.type === "workspace.file");
+  assert.equal(Buffer.from(file.contentBase64 ?? "", "base64").toString(), "hello");
+  const error = events.find((event) => event.type === "workspace.error");
+  assert.ok(error && error.type === "workspace.error");
+  assert.equal(error.code, "invalid-path");
 });

@@ -199,6 +199,7 @@ describe("review mode", () => {
     assert.match(buildClaudeAskCommand(taskState), /--permission-mode\s+plan/);
     assert.doesNotMatch(buildClaudeAskCommand(taskState), /bypassPermissions/);
     assert.match(buildCodexAskCommand(taskState), /--sandbox\s+read-only/);
+    assert.doesNotMatch(buildCodexAskCommand(taskState), /--ask-for-approval/);
     assert.doesNotMatch(buildCodexAskCommand(taskState), /dangerously-bypass/);
   });
 });
@@ -377,6 +378,8 @@ describe("agent command invocation", () => {
       assert.ok(args.includes("--json"));
       assert.ok(args.includes("--skip-git-repo-check"));
       assert.ok(args.includes("--dangerously-bypass-approvals-and-sandbox"));
+      assert.ok(args.includes("features.multi_agent=true"));
+      assert.ok(args.includes("features.multi_agent_v2=true"));
       assert.equal(args[args.indexOf("-C") + 1], workspace);
       assert.ok(args.indexOf("exec") > args.indexOf(workspace));
       assert.ok(args.indexOf("--json") > args.indexOf("exec"));
@@ -651,6 +654,14 @@ describe("agent stream rendering", () => {
     ].map((line) => renderer.feed(line)).join("");
 
     assert.equal(output, "");
+  });
+
+  it("filters the harmless Codex v1 router fallback when v2 handles collaboration", () => {
+    const renderer = new StderrLineRenderer();
+    assert.equal(
+      renderer.feed("2026-07-12T05:08:48Z ERROR codex_core::tools::router: error=unsupported call: multi_agent_v1__spawn_agent\n"),
+      "",
+    );
   });
 });
 
@@ -1153,6 +1164,8 @@ describe("Pi provider config", () => {
         assert.ok(claudeEnv.some(([key, value]) => key === "ANTHROPIC_API_KEY" && value === "claude-key"));
         assert.match(codexConfig, /https:\/\/llm\.example\.com\/v1/);
         assert.match(codexConfig, /llm-model/);
+        assert.match(codexConfig, /\[features\][\s\S]*multi_agent = true/);
+        assert.match(codexConfig, /\[features\][\s\S]*multi_agent_v2 = true/);
         assert.match(codexCommand, /-m llm-model/);
         assert.match(claudeCommand, /--model claude-model/);
       },

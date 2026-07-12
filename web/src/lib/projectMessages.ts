@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import type { RelayArtifact } from "relay-core";
+import type { CodexCollaborationEvent, RelayArtifact } from "relay-core";
 import type { AgentName, AgentTaskMode, RelaySession, Tone } from "../types.js";
 
 export type DerivedMessage =
@@ -19,6 +19,7 @@ export type DerivedMessage =
       streaming: boolean;
       stdout: string;
       stderr: string;
+      collaborations: CodexCollaborationEvent[];
       attachments: RelayArtifact[];
     }
   | {
@@ -54,7 +55,12 @@ function previousTranscriptTurn(messages: DerivedMessage[], index: number): Deri
 }
 
 /** Label for a phase divider before a new agent chapter (handoff or fresh run). */
-export function phaseDividerLabel(messages: DerivedMessage[], index: number, t: TFunction): string | null {
+export function phaseDividerLabel(
+  messages: DerivedMessage[],
+  index: number,
+  t: TFunction,
+  agentDisplayNames?: Partial<Record<AgentName, string>>,
+): string | null {
   const message = messages[index];
   if (message.kind !== "agent" || isGroupedContinuation(messages, index)) return null;
 
@@ -62,11 +68,12 @@ export function phaseDividerLabel(messages: DerivedMessage[], index: number, t: 
   if (!prev) return null;
 
   const mode = t(`mode.${message.mode}`);
+  const agentName = agentDisplayNames?.[message.agent] ?? message.agent;
   if (prev.kind === "agent" && prev.agent !== message.agent) {
-    return t("transcript.phase_handoff", { agent: message.agent, mode });
+    return t("transcript.phase_handoff", { agent: agentName, mode });
   }
   if (prev.kind === "user") {
-    return t("transcript.phase_agent", { agent: message.agent, mode });
+    return t("transcript.phase_agent", { agent: agentName, mode });
   }
   return null;
 }
@@ -182,6 +189,7 @@ export function projectMessages(session: RelaySession | undefined, t: TFunction)
       attachmentIds: Set<string>;
       stdout: string;
       stderr: string;
+      collaborations: CodexCollaborationEvent[];
     }
   >();
 
@@ -203,6 +211,7 @@ export function projectMessages(session: RelaySession | undefined, t: TFunction)
       streaming: true,
       stdout: "",
       stderr: "",
+      collaborations: [],
       attachments: [],
     };
     out.push(block);
@@ -212,6 +221,7 @@ export function projectMessages(session: RelaySession | undefined, t: TFunction)
       attachmentIds: new Set(),
       stdout: "",
       stderr: "",
+      collaborations: [],
     });
     return index;
   };
@@ -248,6 +258,17 @@ export function projectMessages(session: RelaySession | undefined, t: TFunction)
         const block = out[index];
         if (block.kind === "agent") {
           out[index] = { ...block, stdout: state.stdout, stderr: state.stderr };
+        }
+        break;
+      }
+      case "agent.collaboration": {
+        const index = ensureRun(event.runId, event.agent, event.timestamp, event.mode);
+        const state = runState.get(event.runId);
+        if (!state) break;
+        state.collaborations.push(event.collaboration);
+        const block = out[index];
+        if (block.kind === "agent") {
+          out[index] = { ...block, collaborations: [...state.collaborations] };
         }
         break;
       }

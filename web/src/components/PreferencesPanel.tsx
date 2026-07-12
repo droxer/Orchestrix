@@ -20,13 +20,7 @@ const LANGUAGES: { code: Language; label: string; native: string }[] = [
   { code: "zh-TW", label: "Traditional Chinese",native: "繁體中文"   },
 ];
 
-/* Single source of keyboard order for the appearance radiogroup. The cards
-   render in two visual groups (base themes / high-contrast variants) but
-   stay ONE radiogroup, so roving-tabindex must walk the whole list in
-   reading order. */
-const THEME_VALUES: Theme[] = ["light", "dark", "system", "contrast", "contrast-dark"];
-const BASE_THEMES: Theme[] = ["light", "dark", "system"];
-const CONTRAST_THEMES: Theme[] = ["contrast", "contrast-dark"];
+const THEME_VALUES: Theme[] = ["light", "dark", "system"];
 const LANGUAGE_VALUES: Language[] = LANGUAGES.map((l) => l.code);
 
 /* Settings categories. Adding a new settings area = one entry here plus a
@@ -128,8 +122,6 @@ function AppearanceSection({
       <h4 id={headingId} className="pref-section-label">
         {t("pref.appearance")}
       </h4>
-      {/* One radiogroup spans both visual groups; roving-tabindex walks the
-          full THEME_VALUES order so keyboard flow matches reading order. */}
       <div
         role="radiogroup"
         aria-labelledby={headingId}
@@ -137,11 +129,7 @@ function AppearanceSection({
       >
         <p className="pref-group-label">{t("pref.theme.group")}</p>
         <div className="pref-option-list">
-          {BASE_THEMES.map(renderOption)}
-        </div>
-        <p className="pref-group-label pref-group-label--spaced">{t("pref.theme.contrast_group")}</p>
-        <div className="pref-option-list">
-          {CONTRAST_THEMES.map(renderOption)}
+          {THEME_VALUES.map(renderOption)}
         </div>
       </div>
     </>

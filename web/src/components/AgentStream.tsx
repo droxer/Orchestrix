@@ -1,6 +1,7 @@
 import { StreamCheck, StreamError, StreamInfo, StreamWarn } from "./icons";
 import { useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import type { CodexCollaborationEvent } from "relay-core";
 
 import type { AgentName } from "../types";
 import {
@@ -12,6 +13,8 @@ import {
   type AgentSegment,
 } from "../lib/agentStream";
 import { Markdown } from "./Markdown";
+import { buildCollaborationTree } from "../lib/collaborationTree";
+import { CollaborationTree } from "./CollaborationTree";
 
 function StreamActivity({ label }: { label: string }) {
   return (
@@ -27,9 +30,10 @@ type AgentStreamProps = {
   stdout: string;
   stderr: string;
   streaming: boolean;
+  collaborations: CodexCollaborationEvent[];
 };
 
-export function AgentStream({ agent, stdout, stderr, streaming }: AgentStreamProps) {
+export function AgentStream({ agent, stdout, stderr, streaming, collaborations }: AgentStreamProps) {
   const { t } = useTranslation();
   // The parser scans the whole accumulated stdout char-by-char; without
   // memoization every streamed delta would re-parse the full string from
@@ -40,12 +44,17 @@ export function AgentStream({ agent, stdout, stderr, streaming }: AgentStreamPro
   );
   const workingLabel = t("agent_stream.empty_working");
   const showActivity = streaming && !hasStreamingTextCaret(segments);
+  const collaborationNodes = useMemo(
+    () => buildCollaborationTree(collaborations, { settled: !streaming }),
+    [collaborations, streaming],
+  );
 
   if (segments.length === 0) {
     const emptySegments = emptyAgentStreamSegments(agent, streaming, t);
     if (emptySegments.length > 0) {
       return (
         <div className={`agent-stream ${streaming ? "streaming" : ""}`}>
+          <CollaborationTree nodes={collaborationNodes} />
           {emptySegments.map((segment, i) => (
             <SegmentView key={i} segment={segment} />
           ))}
@@ -56,7 +65,15 @@ export function AgentStream({ agent, stdout, stderr, streaming }: AgentStreamPro
     if (streaming) {
       return (
         <div className="agent-stream streaming">
+          <CollaborationTree nodes={collaborationNodes} />
           <StreamActivity label={workingLabel} />
+        </div>
+      );
+    }
+    if (collaborationNodes.length > 0) {
+      return (
+        <div className="agent-stream">
+          <CollaborationTree nodes={collaborationNodes} />
         </div>
       );
     }
@@ -65,6 +82,7 @@ export function AgentStream({ agent, stdout, stderr, streaming }: AgentStreamPro
 
   return (
     <div className={`agent-stream ${streaming ? "streaming" : ""}`}>
+      <CollaborationTree nodes={collaborationNodes} />
       {segments.map((segment, i) => (
         <SegmentView key={i} segment={segment} />
       ))}

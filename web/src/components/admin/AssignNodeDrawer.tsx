@@ -136,7 +136,6 @@ export function AssignNodeDrawer({
       }}
       title={t("admin.v2.assign_title")}
       subtitle={t("admin.v2.assign_sub")}
-      variant="light"
       width={520}
       closeLabel={t("admin.v2.close_drawer")}
       ariaLabel={t("admin.v2.assign_title")}
@@ -175,7 +174,7 @@ export function AssignNodeDrawer({
               <span>{t("admin.employee")}</span>
               <Select
                 value={employeeId || undefined}
-                onValueChange={setEmployeeId}
+                onValueChange={(value) => setEmployeeId(value ?? "")}
                 disabled={employees.length === 0}
               >
                 <SelectTrigger className="w-full mono">
@@ -330,7 +329,7 @@ export function AssignNodeDrawer({
           </fieldset>
         ) : null}
 
-        {error ? <div className="adm-form-error">{error}</div> : null}
+        {error ? <div className="adm-form-error" role="alert">{error}</div> : null}
 
         <div className="adm-form-actions">
           <Button

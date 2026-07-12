@@ -18,7 +18,7 @@ describe("web token usage helpers", () => {
 
   it("formats compact token counts for conversation rows", () => {
     assert.equal(formatCompactTokens(999), "999");
-    assert.equal(formatCompactTokens(1_250), "1.3k");
+    assert.equal(formatCompactTokens(1_250), "1.3K");
     assert.equal(formatCompactTokens(1_250_000), "1.3M");
   });
 });

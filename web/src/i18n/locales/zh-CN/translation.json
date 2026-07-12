@@ -104,7 +104,8 @@
     "cancel_run": "取消运行",
     "choose_agent": "选择 Agent",
     "choose_mode": "选择模式",
-    "address_agent": "选择 Agent"
+    "address_agent": "选择 Agent",
+    "send_shortcut": "{{shortcut}} 发送"
   },
   "decision": {
     "approve": "批准",
@@ -205,7 +206,23 @@
   },
   "workspace": {
     "title": "工作区",
-    "sub": "@{{employee}} 驾驶舱",
+    "sub": "{{agent}} 的文件与产物",
+    "profile_sub": "{{agent}} 的配置与运行时",
+    "profile_details": "详细信息",
+    "sections": "工作区分区",
+    "tab_profile": "配置",
+    "tab_workspace": "工作区",
+    "tab_files": "文件",
+    "tab_activities": "活动",
+    "header_sub": "{{role}} · {{executor}}",
+    "snapshot_banner": "正在浏览已保存的副本 — 智能体上线后将显示实时文件。",
+    "dismiss": "关闭",
+    "path_root": "home",
+    "path_label": "文件路径",
+    "empty_preview_hint": "从列表中选择一个产物或文件。",
+    "empty_artifacts_hint": "运行任务以生成计划、差异和审查。",
+    "empty_activity_hint": "运行和对话的活动将显示在这里。",
+    "empty_files_snapshot_hint": "已完成运行中的文件会索引为产物。",
     "loading": "加载工作区中…",
     "metrics": "工作区指标",
     "metric_runs": "活跃运行",
@@ -229,9 +246,19 @@
     "no_files": "此目录中没有文件。",
     "loading_files": "加载文件中…",
     "files_unavailable": "此主机上无可用的工作区路径。",
+    "source_live": "实时",
+    "source_snapshot": "快照 · 智能体离线",
+    "no_files_yet": "该智能体还没有生成文件。",
     "parent_directory": "上级目录",
     "load_failed": "工作区不可用",
-    "retry": "重试"
+    "retry": "重试",
+    "activity_runs": "活跃运行",
+    "activity_threads": "最近对话",
+    "activity_tasks": "活跃任务",
+    "no_activity": "此代理暂无近期活动。",
+    "session_runs": "{{count}} 次运行",
+    "session_artifacts": "{{count}} 个产物",
+    "task_due": "截止 {{date}}"
   },
   "routine": {
     "title": "例行",
@@ -385,17 +412,14 @@
       "nav_label": "管理视图",
       "nav_dashboard": "仪表板",
       "nav_employees": "员工",
-      "nav_agents": "智能体",
       "nav_fleet": "节点",
       "nav_integrations": "频道",
       "title_dashboard": "仪表板",
       "title_employees": "员工",
-      "title_agents": "智能体",
       "title_fleet": "节点",
       "title_integrations": "频道",
       "sub_dashboard": "一览节点、员工、对话与 Token 用量。",
       "sub_employees": "员工与所属节点。",
-      "sub_agents": "员工拥有的智能体及其运行时部署。",
       "sub_fleet": "工作区内的全部节点。",
       "sub_integrations": "面向 Relay 智能体的企业聊天入口。",
       "dash_kpis_label": "核心指标",
@@ -547,6 +571,10 @@
       "empty_employees_title": "尚无员工。",
       "empty_employees_body": "先添加第一位员工；需要时再为其分配节点。",
       "no_match": "没有匹配的员工。",
+      "col_metrics": "活动",
+      "col_running": "运行中",
+      "col_ready": "就绪",
+      "emp_metrics_aria": "{{running}} 个运行中，{{ready}}/{{total}} 个节点就绪",
       "no_nodes_for_employee": "未分配节点。",
       "no_nodes_for_filter": "此筛选下没有节点。",
       "search_employees_placeholder": "搜索员工、部门或节点…",
@@ -645,17 +673,12 @@
     "action_failed": "操作失败：{{message}}",
     "theme": {
       "group": "主题",
-      "contrast_group": "高对比度",
       "light": "浅色",
       "light_sub": "始终浅色",
       "dark": "深色",
       "dark_sub": "始终深色",
       "system": "系统",
-      "system_sub": "跟随系统设置",
-      "contrast": "高对比度",
-      "contrast_sub": "浅色 · 强边框与文字",
-      "contrast-dark": "高对比度深色",
-      "contrast-dark_sub": "深色 · 强边框与文字"
+      "system_sub": "跟随系统设置"
     }
   },
   "agent_role": {
@@ -785,6 +808,16 @@
     "codex_failed": "Codex 失败：{{message}}",
     "codex_error": "Codex 错误：{{message}}",
     "codex_changed_files": "Codex 已修改文件。",
+    "subagents_title": "子智能体",
+    "subagent_status": {
+      "pendingInit": "正在启动",
+      "running": "运行中",
+      "interrupted": "已中断",
+      "completed": "已完成",
+      "errored": "失败",
+      "shutdown": "已关闭",
+      "notFound": "未找到"
+    },
     "stderr_omitted_other": "… 已省略前面 {{count}} 行 stderr"
   },
   "message": {
@@ -890,6 +923,13 @@
     "empty_body": "管理员尚未为您的员工档案分配逻辑智能体。",
     "empty_filtered_title": "没有匹配的智能体",
     "empty_filtered_body": "请尝试其他搜索词或可用性筛选条件。",
-    "empty_hint": "管理员配置后，智能体将显示在此处。"
+    "empty_hint": "管理员配置后，智能体将显示在此处。",
+    "instructions_label": "指令",
+    "instructions_placeholder": "可选：为此智能体添加指导说明…",
+    "instructions_empty": "暂无指令",
+    "edit_instructions": "编辑指令",
+    "select_title": "选择一个智能体",
+    "select_body": "从左侧名单中选择一个智能体，查看其配置、工作区和生成的文件。",
+    "select_hint": "每一行都显示可用性、角色和最近更新时间——选择任意智能体即可加载其控制台。"
   }
 }

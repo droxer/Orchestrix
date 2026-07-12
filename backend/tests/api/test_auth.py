@@ -532,7 +532,7 @@ def test_workspace_brief_summarizes_employee_workspace(monkeypatch) -> None:
         assert brief_response.status_code == 200
         brief = brief_response.json()
         assert brief["employeeId"] == "alice"
-        assert brief["workspacePath"] == "/workspace/alice"
+        assert "workspacePath" not in brief
         assert brief["primaryNode"]["id"] == "sbx_alice"
         assert "nodeToken" not in brief["primaryNode"]
         assert brief["metrics"]["nodeCount"] == 1
@@ -597,7 +597,7 @@ def test_workspace_brief_only_lists_generated_artifacts(monkeypatch) -> None:
         assert {artifact["kind"] for artifact in listed} == {"workspace_file"}
 
 
-def test_workspace_files_lists_employee_workspace(monkeypatch) -> None:
+def test_employee_workspace_file_routes_are_removed(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
         workspace = Path(root) / "workspaces" / "alice"
@@ -628,26 +628,10 @@ def test_workspace_files_lists_employee_workspace(monkeypatch) -> None:
         _login(alice_client, "alice", "userpass")
         _login(bob_client, "bob", "userpass")
 
-        response = alice_client.get("/workspace/files")
-        assert response.status_code == 200
-        body = response.json()
-        assert body["employeeId"] == "alice"
-        assert body["workspacePath"] == str(workspace)
-        assert body["path"] == ""
-        assert body["exists"] is True
-        assert [(entry["kind"], entry["path"]) for entry in body["entries"]] == [
-            ("directory", "src"),
-            ("file", "README.md"),
-        ]
-        assert body["entries"][1]["bytes"] == 5
-
-        nested = alice_client.get("/workspace/files?path=src")
-        assert nested.status_code == 200
-        assert nested.json()["path"] == "src"
-        assert nested.json()["entries"][0]["path"] == "src/app.ts"
-
-        assert alice_client.get("/workspace/files?path=..").status_code == 403
-        assert bob_client.get("/workspace/files?employeeId=alice").status_code == 403
+        assert "workspacePath" not in alice_client.get("/workspace/brief").json()
+        assert alice_client.get("/workspace/files").status_code == 404
+        assert alice_client.get("/workspace/file", params={"path": "README.md"}).status_code == 404
+        assert bob_client.get("/workspace/files?employeeId=alice").status_code == 404
 
 
 def test_admin_can_create_resources_for_specific_employee(monkeypatch) -> None:

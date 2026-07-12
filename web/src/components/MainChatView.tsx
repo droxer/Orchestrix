@@ -1,8 +1,9 @@
 "use client";
 
-import type { Dispatch, RefObject, SetStateAction } from "react";
+import { useMemo, type Dispatch, RefObject, SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 import type { AgentName, AgentTaskMode, EmployeeAgent, RelayArtifact, RelaySession } from "../types";
+import { buildExecutorDisplayNameMap, displayNameForExecutor, mentionableAgents, type MentionableAgent } from "../lib/agentDisplayNames";
 import type { ConversationItem } from "./ConversationRow";
 import { ThreadPanel } from "./ThreadPanel";
 import { ChatHeader } from "./ChatHeader";
@@ -29,9 +30,6 @@ export type MainChatViewProps = {
   onRenameConversation: (session: RelaySession) => void;
   onCloseConversation: (sessionId: string) => void;
   activeAgent: AgentName;
-  agentNames: AgentName[];
-  disabledAgents: AgentName[] | undefined;
-  agentHealth: Partial<Record<AgentName, "unknown" | "ready" | "failed">> | undefined;
   logicalAgents: EmployeeAgent[];
   activeLogicalAgentId: string | null;
   onLogicalAgentPicked: (agent: EmployeeAgent) => void;
@@ -60,7 +58,7 @@ export type MainChatViewProps = {
   setHandoffNote: Dispatch<SetStateAction<string>>;
   sendDecision: (kind: "approve" | "reject" | "rerun" | "mark_done") => Promise<void>;
   sendHandoff: () => Promise<void>;
-  onAgentPicked: (agent: AgentName) => void;
+  onAgentPicked: (agent: MentionableAgent) => void;
   onSend: () => void;
   onCancelRun: () => void;
   onRetryAgent: (agent: AgentName, mode: AgentTaskMode) => void;
@@ -83,9 +81,6 @@ export function MainChatView({
   onRenameConversation,
   onCloseConversation,
   activeAgent,
-  agentNames,
-  disabledAgents,
-  agentHealth,
   logicalAgents,
   activeLogicalAgentId,
   onLogicalAgentPicked,
@@ -121,6 +116,16 @@ export function MainChatView({
   running,
 }: MainChatViewProps) {
   const { t } = useTranslation();
+  const mentionAgents = useMemo(() => mentionableAgents(logicalAgents), [logicalAgents]);
+  const agentDisplayNames = useMemo(() => buildExecutorDisplayNameMap(logicalAgents), [logicalAgents]);
+  const activeAgentDisplayName = useMemo(() => {
+    const logical = logicalAgents.find((agent) => agent.id === activeLogicalAgentId && !agent.deletedAt);
+    return logical?.displayName ?? displayNameForExecutor(activeAgent, logicalAgents);
+  }, [activeAgent, activeLogicalAgentId, logicalAgents]);
+  const runningAgentDisplayName = useMemo(
+    () => (runningAgent ? displayNameForExecutor(runningAgent, logicalAgents) : undefined),
+    [logicalAgents, runningAgent],
+  );
 
   return (
     <>
@@ -129,6 +134,7 @@ export function MainChatView({
         query={employeeQuery}
         setQuery={setEmployeeQuery}
         selectedSessionId={activeSession?.id}
+        agentDisplayNames={agentDisplayNames}
         onSelectConversation={onSelectConversation}
         onNewConversation={onNewConversation}
         onRenameConversation={onRenameConversation}
@@ -143,6 +149,7 @@ export function MainChatView({
           onLogicalAgentPicked={onLogicalAgentPicked}
           activeSession={activeSession}
           runningAgent={runningAgent}
+          runningAgentDisplayName={runningAgentDisplayName}
           isRefreshing={isRefreshing}
           artifactCount={artifactCount}
           onOpenArtifacts={onOpenArtifacts}
@@ -155,7 +162,7 @@ export function MainChatView({
             {activeSession || pendingUserMessage ? (
               <>
                 {displayMessages.map((msg, i) => {
-                  const phaseLabel = phaseDividerLabel(displayMessages, i, t);
+                  const phaseLabel = phaseDividerLabel(displayMessages, i, t, agentDisplayNames);
                   return (
                     <div key={msg.id} className="transcript-turn">
                       {phaseLabel ? (
@@ -168,6 +175,7 @@ export function MainChatView({
                         message={msg}
                         sessionId={activeSession?.id ?? ""}
                         grouped={isGroupedContinuation(displayMessages, i)}
+                        agentDisplayNames={agentDisplayNames}
                         onOpenArtifact={onOpenArtifacts}
                         onRetryAgent={onRetryAgent}
                         retryDisabled={running}
@@ -195,6 +203,7 @@ export function MainChatView({
               <TranscriptEmpty
                 selectedEmployee={selectedEmployee}
                 activeAgent={activeAgent}
+                activeAgentDisplayName={activeAgentDisplayName}
                 agentDescriptors={agentDescriptors}
               />
             )}
@@ -203,12 +212,10 @@ export function MainChatView({
 
         <Composer
           ref={composerRef}
-          agentNames={agentNames}
-          disabledAgents={disabledAgents}
-          agentHealth={agentHealth}
+          mentionAgents={mentionAgents}
           composerMode={composerMode}
           setComposerMode={setComposerMode}
-          activeAgent={activeAgent}
+          activeAgentDisplayName={activeAgentDisplayName}
           agentRoleLabels={agentRoleLabels}
           selectedEmployee={selectedEmployee}
           running={running}

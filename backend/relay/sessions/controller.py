@@ -52,18 +52,21 @@ class SessionController:
         task_id: str | None = None,
         workspace_path: str = "/workspace",
         owner_employee_id: str | None = None,
+        owner_agent_id: str | None = None,
     ):
         self.store = store or LocalSessionStore()
         self.task_store = task_store
         self.task_id = task_id
         self.workspace_path = workspace_path
         self.owner_employee_id = owner_employee_id
+        self.owner_agent_id = owner_agent_id
         self.active_session_id = ""
 
     def create_session(self, task_goal: str, participants: list[str] | None = None, pending_start: bool = False) -> dict[str, Any]:
         session = self.store.create_session({
             "workspacePath": self.workspace_path,
             **({"ownerEmployeeId": self.owner_employee_id} if self.owner_employee_id else {}),
+            **({"ownerAgentId": self.owner_agent_id} if self.owner_agent_id else {}),
             "taskGoal": task_goal,
             "participants": participants or ["human"],
             "status": "running",
@@ -112,7 +115,6 @@ class SessionController:
                 "kind": "cancel",
                 "createdAt": now_iso(),
                 "note": note,
-                **({"actorEmployeeId": self.owner_employee_id} if self.owner_employee_id else {}),
             }
         }))
         self._update_task_status("blocked", note, {"sessionId": session_id})
@@ -128,7 +130,6 @@ class SessionController:
             "createdAt": now_iso(),
             **({"note": note} if note else {}),
             **({"targetAgent": target_agent} if target_agent else {}),
-            **({"actorEmployeeId": self.owner_employee_id} if self.owner_employee_id else {}),
         }
         logger.info("Human decision recorded", session_id=session_id, kind=kind, target_agent=target_agent)
         self._append(session_id, relay_event("human.decision", session_id, {"decision": decision}))
@@ -162,7 +163,6 @@ class SessionController:
                 "createdAt": now_iso(),
                 **({"note": note} if note else {}),
                 "targetAgent": target_agent,
-                **({"actorEmployeeId": self.owner_employee_id} if self.owner_employee_id else {}),
             }
         }))
         self.assign_session(session_id, assignments)
@@ -200,7 +200,7 @@ class SessionController:
             "body": json.dumps({"assignments": assignments}, indent=2),
             "extension": "json",
         })
-        logger.info("Session assignments updated", session_id=session_id, assignments=[{"agent": a["agent"], "mode": a["mode"]} for a in assignments])
+        logger.info("Session assignments updated", session_id=session_id, assignments=[{"executorKind": a.get("executorKind") or a["agent"], "mode": a["mode"]} for a in assignments])
         return self._append(session_id, relay_event("session.status", session_id, {
             "status": "running",
             "phase": "assigned",

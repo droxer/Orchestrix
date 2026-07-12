@@ -1,2 +1,2 @@
 export type MobileView = "threads" | "chat";
-export type AppRoute = "main" | "workspace" | "backlog" | "routine" | "agents" | "channels" | "admin";
+export type AppRoute = "main" | "backlog" | "routine" | "agents" | "channels" | "admin";

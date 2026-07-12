@@ -5,12 +5,14 @@ import { Check, Copy, KeyRound, Server, Settings2, Trash2 } from "lucide-react";
 import type { TFunction } from "i18next";
 import type { AgentName, ControlPanelDaemonNodeRecord, EmployeeRecord } from "../../types";
 import { useDialogs } from "@/components/ui/DialogProvider";
+import { AgentMark } from "../AgentMark";
 import {
   agentStatusTone,
   copyText,
   formatRelativeTime,
   isStale,
   statusTone,
+  truncateId,
   visibleNodeAgentNames,
   type StoredNodeTokenMap,
   visualStatus,
@@ -127,9 +129,10 @@ export function NodeCard({
             type="button"
             className="adm-node-id mono"
             onClick={() => void handleCopyId()}
-            title={t("admin.copy_node_id")}
+            aria-label={copied ? t("admin.copied") : t("admin.copy_node_id")}
+            title={node.id}
           >
-            <span translate="no">{node.id}</span>
+            <span translate="no">{truncateId(node.id)}</span>
             {copied ? <Check size={12} aria-hidden="true" /> : <Copy size={12} aria-hidden="true" />}
           </button>
         </div>
@@ -152,9 +155,11 @@ export function NodeCard({
               <span
                 key={name}
                 className={`adm-agent-chip tone-${agentTone}${disabled ? " is-disabled" : ""}`}
+                data-agent={name}
                 title={agentTitle(node, name, t)}
               >
                 <i className="adm-agent-dot" aria-hidden="true" />
+                <AgentMark agent={name} size={12} className="adm-agent-chip-mark" />
                 {name}
               </span>
             );

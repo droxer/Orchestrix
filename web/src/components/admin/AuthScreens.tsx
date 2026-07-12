@@ -22,8 +22,9 @@ function AuthShell({ children }: { children: React.ReactNode }) {
   return (
     <section className="adm-auth-shell">
       <div className="adm-auth-card">
-        <div className="adm-auth-brand" aria-hidden="true">
-          <RelayMark width={32} height={32} />
+        <div className="adm-auth-brand">
+          <RelayMark width={32} height={32} aria-hidden="true" />
+          <span className="sr-only">Relay Admin</span>
         </div>
         {children}
       </div>
@@ -83,7 +84,7 @@ export function LoginScreen({ onLogin, needsBootstrap, onSwitchToBootstrap }: Lo
             autoComplete="current-password"
           />
         </label>
-        {error ? <div className="adm-form-error">{error}</div> : null}
+        {error ? <div className="adm-form-error" role="alert">{error}</div> : null}
         <Button
           type="submit"
           className="w-full"
@@ -164,7 +165,7 @@ export function BootstrapScreen({ onBootstrapped, onSwitchToLogin }: BootstrapSc
             autoComplete="new-password"
           />
         </label>
-        {error ? <div className="adm-form-error">{error}</div> : null}
+        {error ? <div className="adm-form-error" role="alert">{error}</div> : null}
         <Button
           type="submit"
           className="w-full"

@@ -122,7 +122,11 @@ async def run_sandbox(
     assignments = assignment_list(body.get("assignments"))
     if not task_goal or not assignments:
         raise HTTPException(400, "taskGoal and at least one assignment are required.")
+    session_id = string_field(body, "sessionId") or string_field(body, "session_id")
     employee_id = sandbox.get("employeeId")
+    if employee_id and session_id and actor and actor.get("isAdmin"):
+        session = ctx.session_store.get_session(session_id)
+        employee_id = session.get("ownerEmployeeId") or employee_id
     if employee_id:
         assignments = [
             _resolve_legacy_assignment(ctx, employee_id, sandbox_id, assignment)
@@ -133,7 +137,6 @@ async def run_sandbox(
         "assignments": assignments,
         **({"agentFirst": True} if employee_id else {}),
     }
-    session_id = string_field(body, "sessionId") or string_field(body, "session_id")
     if session_id:
         parsed["sessionId"] = session_id
     user_message_id = string_field(body, "userMessageId") or string_field(
@@ -175,26 +178,11 @@ def _resolve_legacy_assignment(
     sandbox_id: str,
     assignment: dict[str, Any],
 ) -> dict[str, Any]:
-    agent = ctx.employee_agent_store.ensure_compatibility_agent(
-        employee_id, assignment["agent"]
-    )
-    placement = next(
-        (
-            item
-            for item in ctx.agent_placement_store.list_placements(agent_id=agent["id"])
-            if item["daemonNodeId"] == sandbox_id
-        ),
-        None,
-    )
+    agent = ctx.agent_store.ensure_compatibility_agent(employee_id, assignment["agent"])
+    placement = next((item for item in ctx.agent_placement_store.list_placements(agent_id=agent["id"]) if item["daemonNodeId"] == sandbox_id), None)
     if placement is None:
         placement = ctx.agent_placement_store.create_placement(agent, sandbox_id)
-    return {
-        **assignment,
-        "agentId": agent["id"],
-        "agentVersion": agent["version"],
-        "placementId": placement["id"],
-        "daemonNodeId": sandbox_id,
-    }
+    return {**assignment, "agentId": agent["id"], "agentVersion": agent["version"], "placementId": placement["id"], "daemonNodeId": sandbox_id, "workspacePolicy": placement.get("workspacePolicy")}
 
 
 @router.post("/sandboxes/{sandbox_id}/runs/{session_id}/cancel", status_code=202)

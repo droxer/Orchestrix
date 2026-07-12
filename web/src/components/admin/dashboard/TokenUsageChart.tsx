@@ -60,7 +60,8 @@ interface TokenUsageChartProps {
 }
 
 export function TokenUsageChart({ snapshot, compact, className }: TokenUsageChartProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const numberFormat = new Intl.NumberFormat(i18n.language || undefined);
 
   if (!snapshot.available || snapshot.daily.length === 0) {
     return (
@@ -103,9 +104,9 @@ export function TokenUsageChart({ snapshot, compact, className }: TokenUsageChar
       </header>
       <p className="adm-dash-card-hint">
         {t("admin.v2.dash_tokens_summary", {
-          input: visibleTotals.input.toLocaleString(),
-          output: visibleTotals.output.toLocaleString(),
-          cache: visibleTotals.cache.toLocaleString(),
+          input: numberFormat.format(visibleTotals.input),
+          output: numberFormat.format(visibleTotals.output),
+          cache: numberFormat.format(visibleTotals.cache),
         })}
       </p>
       <svg

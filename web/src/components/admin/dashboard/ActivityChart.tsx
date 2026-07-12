@@ -21,7 +21,7 @@ const HEIGHT = 160;
 const PADDING = { top: 12, right: 12, bottom: 24, left: 32 };
 
 export function ActivityChart({ daily, ready, className }: ActivityChartProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const lineRef = useRef<SVGPathElement>(null);
   const [lineLength, setLineLength] = useState(0);
 
@@ -64,12 +64,12 @@ export function ActivityChart({ daily, ready, className }: ActivityChartProps) {
     const tickIndices = points.length > 7 ? [0, Math.floor(points.length / 2), points.length - 1] : points.map((_, i) => i);
     const xTicks = tickIndices.map((i) => {
       const c = coords[i];
-      const label = formatDate(points[i].date);
+      const label = formatDate(points[i].date, i18n.language);
       return { x: c.x, label };
     });
 
     return { areaPath, linePath, gridLines, xTicks, yTicks, max };
-  }, [daily]);
+  }, [daily, i18n.language]);
 
   useEffect(() => {
     const path = lineRef.current;
@@ -154,8 +154,8 @@ export function ActivityChart({ daily, ready, className }: ActivityChartProps) {
   );
 }
 
-function formatDate(iso: string): string {
+function formatDate(iso: string, locale: string): string {
   const parsed = new Date(iso);
   if (Number.isNaN(parsed.getTime())) return iso;
-  return parsed.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return new Intl.DateTimeFormat(locale || undefined, { month: "short", day: "numeric" }).format(parsed);
 }

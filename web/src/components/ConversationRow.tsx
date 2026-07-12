@@ -4,6 +4,7 @@ import { useDialogs } from "./ui/DialogProvider";
 import { AgentMark } from "./AgentMark";
 import type { AgentName, RelaySession } from "../types";
 import { conversationLabel, sessionAgents, type ConversationItem } from "../lib/conversations";
+import { labelForExecutor } from "../lib/agentDisplayNames";
 import {
   conversationActivity,
   type ConversationActivityKind,
@@ -50,12 +51,13 @@ function relativeTime(iso: string | undefined, locale: string): string {
 type ConversationRowProps = {
   item: ConversationItem;
   selected: boolean;
+  agentDisplayNames?: Partial<Record<AgentName, string>>;
   onSelect: (sessionId: string) => void;
   onRename?: (session: RelaySession) => void;
   onClose?: (sessionId: string) => void;
 };
 
-export function ConversationRow({ item, selected, onSelect, onRename, onClose }: ConversationRowProps) {
+export function ConversationRow({ item, selected, agentDisplayNames, onSelect, onRename, onClose }: ConversationRowProps) {
   const { t, i18n } = useTranslation();
   const { confirm } = useDialogs();
   const { session, runningAgent } = item;
@@ -66,7 +68,7 @@ export function ConversationRow({ item, selected, onSelect, onRename, onClose }:
   const activityStyle = activity ? ACTIVITY_STYLE[activity.kind] : null;
   const activityText = activity
     ? activity.kind === "working"
-      ? t(activity.labelKey, { agent: runningAgent })
+      ? t(activity.labelKey, { agent: labelForExecutor(runningAgent!, agentDisplayNames) })
       : t(activity.labelKey)
     : undefined;
   const rowLabel = [label, stamp, activityText].filter(Boolean).join(" · ");

@@ -1,6 +1,8 @@
-import { forwardRef, memo, useImperativeHandle, type Dispatch, type SetStateAction } from "react";
+import { forwardRef, memo, useImperativeHandle, useMemo, type Dispatch, type SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 import type { AgentName, AgentTaskMode } from "../../types";
+import type { MentionableAgent } from "../../lib/agentDisplayNames";
+import { sendShortcutLabel } from "../../lib/sendShortcut";
 import { ActionSend, ActionStop } from "../icons";
 import { ModeToggle } from "./ModeToggle";
 import { MentionPopover } from "./MentionPopover";
@@ -18,27 +20,27 @@ export type ComposerHandle = {
 // send/cancel control. Draft state stays inside this component so every
 // keystroke does not re-render the full application shell and transcript.
 const ComposerView = forwardRef<ComposerHandle, {
-  agentNames: AgentName[];
-  disabledAgents?: AgentName[];
+  mentionAgents: MentionableAgent[];
   composerMode: AgentTaskMode;
   setComposerMode: Dispatch<SetStateAction<AgentTaskMode>>;
-  activeAgent: AgentName;
-  agentHealth?: Partial<Record<AgentName, "unknown" | "ready" | "failed">>;
+  activeAgentDisplayName: string;
   agentRoleLabels?: Partial<Record<AgentName, string>>;
   selectedEmployee: string;
   running: boolean;
-  onAgentPicked: (agent: AgentName) => void;
+  onAgentPicked: (agent: MentionableAgent) => void;
   onSend: () => void;
   onCancelRun: () => void;
-}>(function Composer({ agentNames, disabledAgents, agentHealth, composerMode, setComposerMode, activeAgent, agentRoleLabels, selectedEmployee, running, onAgentPicked, onSend, onCancelRun }, ref) {
+}>(function Composer({ mentionAgents, composerMode, setComposerMode, activeAgentDisplayName, agentRoleLabels, selectedEmployee, running, onAgentPicked, onSend, onCancelRun }, ref) {
   const { t } = useTranslation();
-  const composer = useComposer({ agentNames, disabledAgents, agentHealth, onAgentPicked });
+  const composer = useComposer({ mentionAgents, onAgentPicked });
   const {
     composerText, setComposerText, mentionOpen, setMentionOpen, mentionIndex, setMentionIndex,
     setIsComposing, textareaRef, filteredMentionAgents, syncMentionState, insertMention,
   } = composer;
   const hasMentionOptions = mentionOpen && filteredMentionAgents.length > 0;
   const activeMentionIndex = boundedMentionIndex(mentionIndex, filteredMentionAgents.length);
+  const sendShortcut = useMemo(() => sendShortcutLabel(), []);
+  const sendShortcutHint = t("composer.send_shortcut", { shortcut: sendShortcut });
 
   useImperativeHandle(ref, () => ({
     clear: () => {
@@ -52,7 +54,7 @@ const ComposerView = forwardRef<ComposerHandle, {
 
   return (
     <form className="composer" onSubmit={(e) => { e.preventDefault(); onSend(); }}>
-      <div className="composer-input-wrap">
+      <div className="composer-input-wrap" data-running={running || undefined}>
         {hasMentionOptions ? (
           <MentionPopover
             filteredAgents={filteredMentionAgents}
@@ -67,17 +69,21 @@ const ComposerView = forwardRef<ComposerHandle, {
             role="combobox"
             aria-autocomplete="list"
             aria-label={selectedEmployee
-              ? t("composer.aria_label", { employee: selectedEmployee, agent: activeAgent })
-              : t("composer.aria_label_no_employee", { agent: activeAgent })}
+              ? t("composer.aria_label", { employee: selectedEmployee, agent: activeAgentDisplayName })
+              : t("composer.aria_label_no_employee", { agent: activeAgentDisplayName })}
             aria-controls={hasMentionOptions ? "mention-popover" : undefined}
             aria-expanded={hasMentionOptions}
             aria-activedescendant={hasMentionOptions ? mentionOptionId(activeMentionIndex) : undefined}
+            autoComplete="off"
             name="message"
             placeholder={selectedEmployee
               ? t("composer.placeholder")
               : t("composer.placeholder_no_employee")}
             value={composerText}
-            onChange={(e) => { setComposerText(e.target.value); syncMentionState(e.target.value, e.target.selectionStart ?? e.target.value.length); }}
+            onChange={(e) => {
+              setComposerText(e.target.value);
+              syncMentionState(e.target.value, e.target.selectionStart ?? e.target.value.length);
+            }}
             onKeyUp={(e) => { if (e.key.startsWith("Arrow") || e.key === "Home" || e.key === "End") syncMentionState(e.currentTarget.value, e.currentTarget.selectionStart ?? e.currentTarget.value.length); }}
             onSelect={(e) => syncMentionState(e.currentTarget.value, e.currentTarget.selectionStart ?? e.currentTarget.value.length)}
             onCompositionStart={() => setIsComposing(true)}
@@ -97,12 +103,13 @@ const ComposerView = forwardRef<ComposerHandle, {
               }
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); onSend(); }
             }}
-            rows={2}
+            rows={1}
           />
           <div className="composer-footer">
             <div className="composer-footer-left">
               <ModeToggle mode={composerMode} setMode={setComposerMode} />
             </div>
+            <span className="composer-send-hint" aria-hidden="true">{sendShortcutHint}</span>
             <div className="composer-footer-right">
               {running ? (
                 <button
@@ -120,7 +127,7 @@ const ComposerView = forwardRef<ComposerHandle, {
                   className="send-button"
                   disabled={!composerText.trim()}
                   aria-label={t("composer.send")}
-                  title={`${t("composer.send")} (⌘↵)`}
+                  title={sendShortcutHint}
                 >
                   <ActionSend size={16} />
                 </button>

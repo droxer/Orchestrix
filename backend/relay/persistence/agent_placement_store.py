@@ -66,7 +66,11 @@ class LocalAgentPlacementStore:
 
     def get_placement(self, placement_id: str) -> dict[str, Any] | None:
         path = self._snapshot_path(placement_id)
-        return _read_json(path) if path.exists() else None
+        return (
+            _normalized_placement_snapshot(_read_json(path))
+            if path.exists()
+            else None
+        )
 
     def list_placements(
         self,
@@ -75,7 +79,10 @@ class LocalAgentPlacementStore:
         daemon_node_id: str | None = None,
         include_removed: bool = False,
     ) -> list[dict[str, Any]]:
-        placements = [_read_json(path) for path in self.root.glob("*/snapshot.json")]
+        placements = [
+            _normalized_placement_snapshot(_read_json(path))
+            for path in self.root.glob("*/snapshot.json")
+        ]
         if agent_id is not None:
             placements = [
                 placement
@@ -177,7 +184,7 @@ class DatabaseAgentPlacementStore:
         database_id_column(),
         Column("public_id", Text, nullable=False, unique=True),
         Column("agent_public_id", Text, nullable=False, index=True),
-        Column("employee_public_id", Text, nullable=False, index=True),
+        Column("supervisor_employee_public_id", Text, nullable=False, index=True),
         Column("daemon_node_public_id", Text, nullable=False, index=True),
         Column("executor_kind", Text, nullable=False),
         Column("desired_state", Text, nullable=False),
@@ -238,14 +245,23 @@ class DatabaseAgentPlacementStore:
         with self.engine.begin() as conn:
             row = (
                 conn.execute(
-                    select(self.placements.c.snapshot).where(
+                    select(
+                        self.placements.c.snapshot,
+                        self.placements.c.supervisor_employee_public_id,
+                    ).where(
                         self.placements.c.public_id == placement_id
                     )
                 )
                 .mappings()
                 .first()
             )
-        return row["snapshot"] if row else None
+        return (
+            _normalized_placement_snapshot(
+                row["snapshot"], row["supervisor_employee_public_id"]
+            )
+            if row
+            else None
+        )
 
     def list_placements(
         self,
@@ -254,7 +270,10 @@ class DatabaseAgentPlacementStore:
         daemon_node_id: str | None = None,
         include_removed: bool = False,
     ) -> list[dict[str, Any]]:
-        statement = select(self.placements.c.snapshot)
+        statement = select(
+            self.placements.c.snapshot,
+            self.placements.c.supervisor_employee_public_id,
+        )
         if agent_id is not None:
             statement = statement.where(self.placements.c.agent_public_id == agent_id)
         if daemon_node_id is not None:
@@ -266,7 +285,12 @@ class DatabaseAgentPlacementStore:
         with self.engine.begin() as conn:
             rows = conn.execute(statement).mappings().all()
         return sorted(
-            (row["snapshot"] for row in rows),
+            (
+                _normalized_placement_snapshot(
+                    row["snapshot"], row["supervisor_employee_public_id"]
+                )
+                for row in rows
+            ),
             key=lambda item: (int(item.get("priority") or 100), item["id"]),
         )
 
@@ -409,7 +433,7 @@ def _new_placement(
     return {
         "id": new_relay_id("placement"),
         "agentId": agent["id"],
-        "employeeId": agent["employeeId"],
+        "supervisorEmployeeId": agent["supervisorEmployeeId"],
         "daemonNodeId": daemon_node_id,
         "executorKind": agent["executorKind"],
         "desiredState": desired_state,
@@ -420,6 +444,17 @@ def _new_placement(
         "createdAt": timestamp,
         "updatedAt": timestamp,
     }
+
+
+def _normalized_placement_snapshot(
+    placement: dict[str, Any], supervisor_employee_id: str | None = None
+) -> dict[str, Any]:
+    owner = (
+        placement.get("supervisorEmployeeId")
+        or placement.get("employeeId")
+        or supervisor_employee_id
+    )
+    return {**placement, "supervisorEmployeeId": owner} if owner else placement
 
 
 def _placement_event(
@@ -441,7 +476,7 @@ def _placement_row(
         "id": database_id or new_database_id(),
         "public_id": placement["id"],
         "agent_public_id": placement["agentId"],
-        "employee_public_id": placement["employeeId"],
+        "supervisor_employee_public_id": placement["supervisorEmployeeId"],
         "daemon_node_public_id": placement["daemonNodeId"],
         "executor_kind": placement["executorKind"],
         "desired_state": placement["desiredState"],

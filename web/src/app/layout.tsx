@@ -11,12 +11,13 @@ import "../styles.css";
 
 import { Providers } from "./providers";
 
-// Unified Geist superfamily — Geist Sans carries UI, display, and chrome
-// text (eyebrows, metadata, agent labels, numbers) per the Linear model.
+// One crisp precision grotesk carries display, chrome, AND body text —
+// the monochrome system differentiates with weight and tracking, never a
+// family switch. This one variable Geist instance backs both --font-sans
+// and --font-display in tokens/primitives.css (both alias --font-app-sans).
 // Geist Mono is reserved for code-like content: tool/command lines, raw
-// logs, code blocks, and IDs. One harmonized family keeps the two cuts in
-// register. latin-ext widens coverage to accented European/Vietnamese
-// names in employee and sandbox labels.
+// logs, code blocks, and IDs. latin-ext widens coverage to accented
+// European/Vietnamese names in employee and sandbox labels.
 const appSans = Geist({
   subsets: ["latin", "latin-ext"],
   variable: "--font-app-sans",
@@ -65,8 +66,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#fcfcfd" },
-    { media: "(prefers-color-scheme: dark)", color: "#0f1011" },
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#010102" },
   ],
 };
 
@@ -81,13 +82,14 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       suppressHydrationWarning
     >
       <head>
-        {/* Set data-theme before first paint so system/dark users never
+        {/* Set data-theme before first paint so dark/system users never
             flash the light canvas. Mirrors applyTheme() in appStorage.ts:
-            resolve "system" via matchMedia, otherwise honor the pin. */}
+            dark is the default/primary theme; "system" resolves via
+            matchMedia, otherwise honor the pin. */}
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "(function(){try{var t=localStorage.getItem('relay-web.theme')||'system';var d=matchMedia('(prefers-color-scheme: dark)').matches;var r;if(t==='contrast'||t==='contrast-dark'){r=t;}else{var dk=t==='dark'||(t!=='light'&&d);r=dk?'dark':'light';}document.documentElement.setAttribute('data-theme',r);var c={light:'#fcfcfd',dark:'#0f1011',contrast:'#ffffff','contrast-dark':'#000000'}[r]||'#fcfcfd';var m=document.querySelector('meta[name=\"theme-color\"][data-relay-theme-color]');if(!m){m=document.createElement('meta');m.setAttribute('name','theme-color');m.setAttribute('data-relay-theme-color','');document.head.appendChild(m);}m.removeAttribute('media');m.setAttribute('content',c);}catch(e){}})();",
+              "(function(){try{var t=localStorage.getItem('relay-web.theme')||'dark';if(t==='contrast'||t==='contrast-dark'){t='system';localStorage.setItem('relay-web.theme','system');}var d=matchMedia('(prefers-color-scheme: dark)').matches;var dk=t==='dark'||(t!=='light'&&d);var r=dk?'dark':'light';document.documentElement.setAttribute('data-theme',r);document.documentElement.classList.toggle('dark',dk);var c={light:'#ffffff',dark:'#010102'}[r]||'#010102';var m=document.querySelector('meta[name=\"theme-color\"][data-relay-theme-color]');if(!m){m=document.createElement('meta');m.setAttribute('name','theme-color');m.setAttribute('data-relay-theme-color','');document.head.appendChild(m);}m.removeAttribute('media');m.setAttribute('content',c);}catch(e){}})();",
           }}
         />
       </head>

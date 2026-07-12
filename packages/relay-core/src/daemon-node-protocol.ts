@@ -1,5 +1,6 @@
 import type { AgentName, AgentState, AgentTaskMode } from "./state.js";
 import type { TokenUsage } from "./token-usage.js";
+import type { CodexCollaborationEvent } from "./codex-collaboration.js";
 
 export type DaemonNodeStatus = "ready" | "busy" | "stopped";
 export type DaemonNodeSandboxMode = "none" | "boxlite";
@@ -55,8 +56,12 @@ export const DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS: readonly number[] = [1];
  * in its run.completed event, so the backend never has to walk the workspace
  * itself (which only works when they share a filesystem).
  */
-export type DaemonNodeCapability = "generated-files";
+export type DaemonNodeCapability = "generated-files" | "workspace-read" | "structured-agent-events";
 export const DAEMON_CAPABILITY_GENERATED_FILES: DaemonNodeCapability = "generated-files";
+/** The daemon can serve agent-home file listings and reads via workspace commands. */
+export const DAEMON_CAPABILITY_WORKSPACE_READ: DaemonNodeCapability = "workspace-read";
+/** The daemon emits normalized nested-agent lifecycle events in addition to raw output. */
+export const DAEMON_CAPABILITY_STRUCTURED_AGENT_EVENTS: DaemonNodeCapability = "structured-agent-events";
 
 /** A workspace file a run created or changed, reported by the daemon. */
 export interface DaemonGeneratedFile {
@@ -123,7 +128,37 @@ export interface DaemonNodeCancelCommand {
   reason: string;
 }
 
-export type DaemonNodeCommand = DaemonNodeRunCommand | DaemonNodeCancelCommand;
+export interface DaemonWorkspaceEntry {
+  name: string;
+  path: string;
+  kind: "directory" | "file";
+  bytes: number | null;
+  updatedAt: string;
+}
+
+export interface DaemonWorkspaceListCommand {
+  id: string;
+  type: "workspace.list";
+  leaseId?: string;
+  leaseExpiresAt?: string;
+  attempt?: number;
+  agentId: string;
+  path: string;
+}
+
+export interface DaemonWorkspaceReadCommand {
+  id: string;
+  type: "workspace.read";
+  leaseId?: string;
+  leaseExpiresAt?: string;
+  attempt?: number;
+  agentId: string;
+  path: string;
+}
+
+export type DaemonWorkspaceErrorCode = "invalid-path" | "not-found" | "is-directory" | "io-error";
+
+export type DaemonNodeCommand = DaemonNodeRunCommand | DaemonNodeCancelCommand | DaemonWorkspaceListCommand | DaemonWorkspaceReadCommand;
 
 export type DaemonNodeEvent =
   | {
@@ -135,6 +170,17 @@ export type DaemonNodeEvent =
       agent: AgentName;
       stream: "stdout" | "stderr";
       text: string;
+      sequence: number;
+    }
+  | {
+      type: "run.collaboration";
+      commandId: string;
+      leaseId?: string;
+      sessionId: string;
+      runId: string;
+      agent: AgentName;
+      mode: AgentTaskMode;
+      collaboration: CodexCollaborationEvent;
       sequence: number;
     }
   | {
@@ -171,4 +217,33 @@ export type DaemonNodeEvent =
       agent: AgentName;
       mode: AgentTaskMode;
       reason: string;
+    }
+  | {
+      type: "workspace.listing";
+      commandId: string;
+      leaseId?: string;
+      agentId: string;
+      path: string;
+      exists: boolean;
+      entries: DaemonWorkspaceEntry[];
+    }
+  | {
+      type: "workspace.file";
+      commandId: string;
+      leaseId?: string;
+      agentId: string;
+      path: string;
+      bytes: number;
+      isBinary: boolean;
+      truncated: boolean;
+      contentBase64?: string;
+    }
+  | {
+      type: "workspace.error";
+      commandId: string;
+      leaseId?: string;
+      agentId: string;
+      path: string;
+      code: DaemonWorkspaceErrorCode;
+      message: string;
     };

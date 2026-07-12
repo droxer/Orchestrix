@@ -144,7 +144,7 @@ controller instance can resume reconciliation.
 | `provider` | string | Provider adapter name, initially `local-process`. |
 | `providerConfigRef` | string, nullable | Reference to server-side provider configuration; never embedded credentials. |
 | `profile` | string | Named capacity/runtime profile such as `standard`. |
-| `sandboxMode` | enum | `boxlite` or `none`. |
+| `sandboxMode` | enum | `boxlite`; managed nodes always use a server-provisioned BoxLite VM. |
 | `workspacePolicy` | JSON | Provider-neutral workspace intent, not a guessed guest path. |
 | `desiredState` | enum | `running`, `stopped`, or `deleted`. |
 | `generation` | integer | Incremented whenever provider-relevant desired state changes. |
@@ -315,7 +315,7 @@ interface EnsureManagedNodeInput {
   managedNodeId: string;
   generation: number;
   profile: string;
-  sandboxMode: "boxlite" | "none";
+  sandboxMode: "boxlite";
   workspacePolicy: WorkspacePolicy;
   enrollment: {
     backendUrl: string;

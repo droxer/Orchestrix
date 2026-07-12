@@ -18,7 +18,7 @@ from relay.daemon_registry import (
     sandbox_ui_token_matches,
 )
 from relay.persistence.agent_placement_store import LocalAgentPlacementStore
-from relay.persistence.employee_agent_store import LocalEmployeeAgentStore
+from relay.persistence.agent_store import LocalAgentStore
 from relay.persistence.stores import (
     DatabaseDaemonStore,
     LocalDaemonStore,
@@ -492,7 +492,7 @@ def test_daemon_reported_generated_files_index_without_shared_filesystem() -> No
                     "agentLog": "created report.pdf",
                     "generatedFiles": [
                         {
-                            "relativePath": "reports/q2.pdf",
+                            "relativePath": "agents/agent-YWdlbnRfcmVzZWFyY2g/reports/q2.pdf",
                             "title": "q2.pdf",
                             "bytes": 9,
                             "contentType": "application/pdf",
@@ -501,7 +501,7 @@ def test_daemon_reported_generated_files_index_without_shared_filesystem() -> No
                             ),
                         },
                         {
-                            "relativePath": "output/summary.md",
+                            "relativePath": "agents/agent-YWdlbnRfcmVzZWFyY2g/output/summary.md",
                             "title": "summary.md",
                             "bytes": 10,
                             "contentType": "text/markdown",
@@ -532,9 +532,10 @@ def test_daemon_reported_generated_files_index_without_shared_filesystem() -> No
                 if item["kind"] == "workspace_file"
             ]
             assert [artifact["workspaceRelativePath"] for artifact in files] == [
-                "reports/q2.pdf",
-                "output/summary.md",
+                "agents/agent-YWdlbnRfcmVzZWFyY2g/reports/q2.pdf",
+                "agents/agent-YWdlbnRfcmVzZWFyY2g/output/summary.md",
             ]
+            assert files[0]["path"].startswith("/remote/daemon/workspace/agents/agent-YWdlbnRfcmVzZWFyY2g/")
             assert all(artifact["agentRunId"] == command["runId"] for artifact in files)
             assert files[0]["bytes"] == 9
             assert (
@@ -1993,11 +1994,11 @@ def test_multi_node_workflow_revalidates_placement_before_next_enqueue() -> None
         with TemporaryDirectory() as root:
             session_store = LocalSessionStore(root)
             registry = DaemonNodeRegistry(session_store, LocalDaemonStore(root))
-            agents = LocalEmployeeAgentStore(root)
+            agents = LocalAgentStore(root)
             placements = LocalAgentPlacementStore(root)
             backend = ServerDaemonNodeBackend(
                 registry,
-                employee_agent_store=agents,
+                agent_store=agents,
                 agent_placement_store=placements,
             )
             researcher = agents.create_agent(

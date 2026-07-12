@@ -2,41 +2,23 @@
 @import "tw-animate-css";
 
 /* =====================================================================
-   Relay web — operational chat surface (Slack-style three-pane shell)
+   Relay web — CSS orchestrator
 
-   Token architecture, three tiers:
-     1. Primitives — the raw palette, type scale, radii, spacing.
-        Hex values live here and nowhere else.
-     2. Semantic   — role-based aliases (tones, borders, elevation)
-        consumed by component CSS below.
-     3. shadcn/ui  — the @theme bridge exposing tokens to Tailwind
-        utilities used by src/components/ui.
-
-   Visual language: cool precision. Near-achromatic cool neutrals carry
-   the surfaces, cobalt blue is the single brand ACTION color (lifting to
-   luminous periwinkle on the dark canvas), cool hairlines draw the chrome,
-   and status narrows to green/amber/red. Geist Sans carries interface,
-   display, and chrome text; Geist Mono is reserved for code-like content.
-
-   File layout: this orchestrator imports per-surface modules below.
-   Tailwind + tw-animate must stay at the very top — every other module
-   is a normal local CSS file. Order matters: tokens.css defines the
-   variable scope every other module depends on, so it always loads
-   first. Responsive.css and a11y.css come last so their media queries
-   and overrides win source-order against per-surface rules.
+   Tailwind + tw-animate stay first. tokens.css defines primitives;
+   tailwind-bridge.css holds @theme / shadcn / @layer base so this file
+   can end with plain @imports only (Turbopack-safe). responsive.css and
+   a11y.css stay last to win source order.
    ===================================================================== */
 
-/* 1. Tokens — primitives, semantic aliases, shadcn bridge, dark theme */
 @import "./styles/tokens.css";
+@import "./styles/tailwind-bridge.css";
 
-/* 2. Shell + chrome */
 @import "./styles/empty-state.css";
 @import "./styles/shell.css";
 @import "./styles/routes.css";
 @import "./styles/sidenav.css";
 @import "./styles/inputs.css";
 
-/* 3. Conversation surfaces */
 @import "./styles/thread.css";
 @import "./styles/chat.css";
 @import "./styles/agent-stream.css";
@@ -45,10 +27,8 @@
 @import "./styles/handoff.css";
 @import "./styles/composer.css";
 
-/* 4. Utility */
 @import "./styles/pills.css";
 
-/* 5. Authenticated pages */
 @import "./styles/login.css";
 @import "./styles/mcp.css";
 @import "./styles/skills.css";
@@ -64,6 +44,7 @@
 @import "./styles/admin-v2-dashboard.css";
 @import "./styles/mobile-overlays.css";
 
-/* 6. Responsive + a11y — must come last to win source order */
+@import "./styles/atelier.css";
+
 @import "./styles/responsive.css";
 @import "./styles/a11y.css";

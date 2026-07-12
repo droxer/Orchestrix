@@ -8,6 +8,7 @@ import {
   conversationActivity,
   type ConversationActivityKind,
 } from "../lib/conversationActivity";
+import { isLogicalAgentRoutable } from "../lib/agentDisplayNames";
 import { formatCompactTokens } from "../lib/tokenUsage";
 
 const ACTIVITY_BADGE: Record<
@@ -22,27 +23,29 @@ const ACTIVITY_BADGE: Record<
 };
 
 // Chat-panel header: session identity, status, agent tabs, and refresh.
-export function ChatHeader({ activeAgent, logicalAgents, activeLogicalAgentId, onLogicalAgentPicked, activeSession, runningAgent, isRefreshing, artifactCount, onOpenArtifacts, onRefresh, onBackToThreads }: {
+export function ChatHeader({ activeAgent, logicalAgents, activeLogicalAgentId, onLogicalAgentPicked, activeSession, runningAgent, runningAgentDisplayName, isRefreshing, artifactCount, onOpenArtifacts, onRefresh, onBackToThreads }: {
   activeAgent: AgentName;
   logicalAgents: EmployeeAgent[];
   activeLogicalAgentId: string | null;
   onLogicalAgentPicked: (agent: EmployeeAgent) => void;
   activeSession: RelaySession | undefined;
   runningAgent?: AgentName;
+  runningAgentDisplayName?: string;
   isRefreshing: boolean;
   artifactCount: number;
   onOpenArtifacts: () => void;
   onRefresh: () => void;
   onBackToThreads: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const numberFormat = new Intl.NumberFormat(i18n.language || undefined);
   const tabsRef = useRef<HTMLDivElement>(null);
   const tokenUsage = activeSession?.tokenUsage;
   const tokenUsageTitle = tokenUsage
     ? t("conversation.token_usage_title", {
-        input: tokenUsage.input.toLocaleString(),
-        output: tokenUsage.output.toLocaleString(),
-        cache: tokenUsage.cache.toLocaleString(),
+        input: numberFormat.format(tokenUsage.input),
+        output: numberFormat.format(tokenUsage.output),
+        cache: numberFormat.format(tokenUsage.cache),
       })
     : "";
   const activity = activeSession
@@ -51,10 +54,10 @@ export function ChatHeader({ activeAgent, logicalAgents, activeLogicalAgentId, o
   const showMeta = Boolean(activity || tokenUsage);
   const activeLogicalAgent = logicalAgents.find((agent) => agent.id === activeLogicalAgentId);
   const moveLogicalAgent = (direction: 1 | -1) => {
-    const readyAgents = logicalAgents.filter((agent) => agent.availability === "ready");
-    if (readyAgents.length === 0) return;
-    const current = readyAgents.findIndex((agent) => agent.id === activeLogicalAgentId);
-    const next = readyAgents[(Math.max(current, 0) + direction + readyAgents.length) % readyAgents.length];
+    const selectableAgents = logicalAgents.filter((agent) => isLogicalAgentRoutable(agent.availability));
+    if (selectableAgents.length === 0) return;
+    const current = selectableAgents.findIndex((agent) => agent.id === activeLogicalAgentId);
+    const next = selectableAgents[(Math.max(current, 0) + direction + selectableAgents.length) % selectableAgents.length];
     onLogicalAgentPicked(next);
     requestAnimationFrame(() => {
       tabsRef.current?.querySelector<HTMLButtonElement>(`[data-logical-agent="${CSS.escape(next.id)}"]`)?.focus();
@@ -73,7 +76,7 @@ export function ChatHeader({ activeAgent, logicalAgents, activeLogicalAgentId, o
               {activity ? (
                 <Badge variant={ACTIVITY_BADGE[activity.kind]} className="chat-title-status">
                   {activity.kind === "working"
-                    ? t(activity.labelKey, { agent: runningAgent })
+                    ? t(activity.labelKey, { agent: runningAgentDisplayName ?? runningAgent })
                     : t(activity.labelKey)}
                 </Badge>
               ) : null}
@@ -83,7 +86,7 @@ export function ChatHeader({ activeAgent, logicalAgents, activeLogicalAgentId, o
                   title={tokenUsageTitle}
                   aria-label={tokenUsageTitle}
                 >
-                  {formatCompactTokens(tokenUsage.total)} {t("conversation.tokens_short")}
+                  {formatCompactTokens(tokenUsage.total, i18n.language)} {t("conversation.tokens_short")}
                 </span>
               ) : null}
             </div>
@@ -95,9 +98,10 @@ export function ChatHeader({ activeAgent, logicalAgents, activeLogicalAgentId, o
           <AgentMark agent={activeAgent} size={14} className="chat-active-agent-mark" />
           <span className="mono" translate="no">{activeLogicalAgent?.displayName ?? activeAgent}</span>
         </div>
-        <div className="header-agent-tabs" role="radiogroup" aria-label={t("thread.talk_to_agent")} ref={tabsRef}>
+        <div className="header-agent-tabs segmented segmented--brand" role="radiogroup" aria-label={t("thread.talk_to_agent")} ref={tabsRef}>
           {logicalAgents.length > 0 ? logicalAgents.map((logicalAgent) => {
-            const isReady = logicalAgent.availability === "ready";
+            const isRoutable = isLogicalAgentRoutable(logicalAgent.availability);
+            const isBusy = logicalAgent.availability === "busy";
             const isActive = logicalAgent.id === activeLogicalAgentId;
             return (
               <button
@@ -106,12 +110,17 @@ export function ChatHeader({ activeAgent, logicalAgents, activeLogicalAgentId, o
                 role="radio"
                 data-agent={logicalAgent.id}
                 data-logical-agent={logicalAgent.id}
+                data-availability={logicalAgent.availability}
                 aria-checked={isActive}
-                aria-disabled={!isReady || undefined}
+                aria-disabled={!isRoutable || undefined}
                 tabIndex={isActive ? 0 : -1}
-                className={[isActive ? "active" : "", !isReady ? "agent-tab-disabled" : ""].filter(Boolean).join(" ")}
-                title={!isReady ? `${logicalAgent.displayName}: ${logicalAgent.availability}` : undefined}
-                onClick={() => { if (isReady) onLogicalAgentPicked(logicalAgent); }}
+                className={[
+                  isActive ? "active" : "",
+                  !isRoutable ? "agent-tab-disabled" : "",
+                  isBusy && isRoutable ? "agent-tab-busy" : "",
+                ].filter(Boolean).join(" ")}
+                title={!isRoutable ? `${logicalAgent.displayName}: ${logicalAgent.availability}` : undefined}
+                onClick={() => { if (isRoutable) onLogicalAgentPicked(logicalAgent); }}
                 onKeyDown={(event) => {
                   if (event.key === "ArrowRight" || event.key === "ArrowDown") {
                     event.preventDefault();
@@ -124,6 +133,7 @@ export function ChatHeader({ activeAgent, logicalAgents, activeLogicalAgentId, o
               >
                 <AgentMark agent={logicalAgent.executorKind} size={14} className="header-agent-tab-mark" />
                 <span translate="no">{logicalAgent.displayName}</span>
+                {isBusy && isRoutable ? <span className="header-agent-busy-pip" aria-hidden="true" /> : null}
               </button>
             );
           }) : <span className="text-muted-foreground">{t("thread.no_agents")}</span>}
