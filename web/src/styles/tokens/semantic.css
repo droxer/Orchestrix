@@ -57,8 +57,8 @@
   /* Syntax-highlight numerals — Geist Mono numeric literal in code blocks */
   --color-semantic-code-number: var(--color-rust);
 
-  /* Status — the only OTHER chroma in the system besides the Signal
-     Cyan action color (see --color-semantic-action above). Text, dots,
+  /* Status — the only OTHER chroma in the system besides the Graphite
+     Steel action color (see --color-semantic-action above). Text, dots,
      and borders only; never background fills, never actions. */
   --color-semantic-success: var(--color-green);
   --color-semantic-danger: var(--color-red);

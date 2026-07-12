@@ -264,6 +264,7 @@ Reskin from Signal Cyan to **Graphite Steel** — cool charcoal surfaces + restr
 
 - **Primitives** — `tokens/primitives.css` dark + light registers rewritten; headers renamed Signal Cyan → Graphite Steel.
 - **Synced hex** — `appStorage.ts` / `layout.tsx` theme-color, preferences swatches, login `--lg-*` (renamed `--lg-steel*`), `appStorage` tests.
+- **Brand assets** — `assets/brand/*`, `web/public/favicon.svg` + `web/public/brand/*` retargeted to Graphite Steel; `RelayMark` lead chevron uses `--color-semantic-action`.
 - **Docs** — `docs/design-system.md` frontmatter + narrative; this review entry.
 
 **Out of scope:** leftover clarity-pass surface cleanup (muted kickers, sidenav plates, mobile blur).

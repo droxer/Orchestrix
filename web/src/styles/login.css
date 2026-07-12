@@ -35,6 +35,9 @@
   --lg-down: #f87171;
   /* Mode accent — steel while attaching, amber during first-run setup. */
   --lg-accent: var(--lg-steel);
+  /* Pin semantic action to the pre-auth dark steel so RelayMark's lead
+     chevron stays Graphite Steel even when the operator's saved theme is light. */
+  --color-semantic-action: var(--lg-steel);
 
   position: relative;
   display: flex;
@@ -479,9 +482,8 @@
 .login-checking-text::after {
   content: "▌";
   margin-left: var(--space-xxs);
-  /* Same pre-mount scope constraint as .login-checking above — the
-     dark-canvas white accent, matching --color-semantic-action's dark-mode value. */
-  color: #fafafa;
+  /* Pre-mount caret on the pinned dark canvas — matches --lg-ink. */
+  color: #f3f5f7;
 }
 
 /* ---------- Motion --------------------------------------------------- */
