@@ -157,7 +157,6 @@
   font-size: var(--text-micro);
   font-weight: 600;
   line-height: 1;
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-semantic-ink) 18%, transparent);
 }
 
 .header-agent-tabs {
@@ -647,12 +646,11 @@
   padding: 0 var(--space-sm);
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--color-semantic-surface-raised) 72%, transparent);
+  background: var(--color-semantic-surface-raised);
   color: var(--color-semantic-muted);
   font: var(--type-label);
   cursor: pointer;
   white-space: nowrap;
-  backdrop-filter: blur(6px);
   transition:
     color var(--duration-fast) var(--ease-standard),
     border-color var(--duration-fast) var(--ease-standard),

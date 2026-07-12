@@ -210,15 +210,7 @@
 }
 
 .workspace-pane-preview::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  opacity: 0.5;
-  background:
-    radial-gradient(circle at 18% 22%, color-mix(in srgb, var(--workspace-accent) 10%, transparent) 0%, transparent 42%),
-    radial-gradient(circle at 82% 78%, color-mix(in srgb, var(--color-semantic-ink) 5%, transparent) 0%, transparent 38%);
+  content: none;
 }
 
 .workspace-pane-preview > * {
@@ -233,8 +225,7 @@
   min-height: 44px;
   border-bottom: 1px solid var(--color-semantic-hairline-soft);
   padding: 0 var(--space-base);
-  background: color-mix(in srgb, var(--color-semantic-canvas) 88%, transparent);
-  backdrop-filter: blur(6px);
+  background: var(--color-semantic-canvas);
 }
 
 .workspace-pane-head h3 {
@@ -702,9 +693,9 @@
   right: var(--space-sm);
   z-index: 2;
   margin: 0;
-  box-shadow: var(--shadow-soft);
-  backdrop-filter: blur(8px);
-  background: color-mix(in srgb, var(--color-semantic-canvas) 92%, transparent);
+  border: 1px solid var(--color-semantic-hairline);
+  box-shadow: var(--shadow-lift);
+  background: var(--color-semantic-surface-raised);
 }
 
 .code-view-toggle {

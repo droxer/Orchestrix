@@ -40,7 +40,6 @@ export function DashboardView({ nodes, employees, metrics }: DashboardViewProps)
   return (
     <div className="adm-dash">
       <div className="adm-dash-kpis-wrap">
-        <span className="relay-bleed-mark" aria-hidden="true">R</span>
         <section className="adm-dash-kpis" aria-label={t("admin.v2.dash_kpis_label")}>
           <KpiTile
             slot="sessions"

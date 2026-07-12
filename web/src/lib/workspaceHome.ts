@@ -1,5 +1,4 @@
-import { RelayApiError } from "../api";
-import type { AgentWorkspaceFilesResponse, AgentWorkspaceSource } from "../types";
+import type { AgentWorkspaceFilesResponse, AgentWorkspaceSource } from "../types.js";
 
 /** What the Files pane header shows about the agent home's data source. */
 export type WorkspaceHomeStatus =
@@ -9,7 +8,7 @@ export type WorkspaceHomeStatus =
   | { kind: "none" };
 
 export function workspaceHomeStatus(
-  files: Pick<AgentWorkspaceFilesResponse, "source" | "nodeId"> | undefined,
+  files: (Pick<AgentWorkspaceFilesResponse, "source"> & { nodeId?: string | null }) | undefined,
   bannerDismissed: boolean,
 ): WorkspaceHomeStatus {
   if (files?.source === "live") return { kind: "live", nodeId: files.nodeId ?? null };
@@ -30,5 +29,9 @@ export function workspaceFilesEmptyState(source: AgentWorkspaceSource | undefine
 
 /** Only a placement-unavailable (503) listing failure gets a retry button. */
 export function isWorkspaceRetryableError(error: unknown): boolean {
-  return error instanceof RelayApiError && error.status === 503;
+  // Structural check avoids a value import of RelayApiError (Next webpack
+  // cannot resolve the NodeNext `.js` specifier that packages/tsconfig needs).
+  return error instanceof Error
+    && "status" in error
+    && (error as Error & { status: unknown }).status === 503;
 }

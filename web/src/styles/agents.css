@@ -22,7 +22,7 @@
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--color-semantic-hairline);
-  background: color-mix(in srgb, var(--color-semantic-surface-soft) 45%, var(--color-semantic-canvas));
+  background: var(--color-semantic-canvas);
 }
 
 .agents-roster-filter {

@@ -216,3 +216,30 @@ Audit of every overlay surface at ≤820px — drawers, modals, sheets, and comp
 | **Artifact library drawer** | Inherits drawer takeover + existing vertical index stack |
 
 **Verify manually:** open task drawer, preferences, rename confirm dialog, @mention popover, admin attention sheet, artifact drawer at 390px with keyboard up.
+
+## Clarity pass (2026-07-12)
+
+Whole-frontend visual cleanup toward the design system's hairline-first restraint: less glow, less decoration, clearer hierarchy. No layout or product-flow changes.
+
+**Shipped:**
+
+- **Empty states** — removed animated `atelier-orbit` rings/dots; transcript empty uses a plain agent avatar. Dropped bled "R" watermarks from transcript, agents, and admin KPI band (login keeps its signature moment).
+- **Chrome noise** — removed sidenav brand glow, active-nav drop shadow, conversation "new" rotate/ink-plate override, empty-avatar radial halo, chat artifact-count soft shadow, composer running glow pulse, mode-chip icon tilt, login lane glow, workspace preview radial wash.
+- **Surfaces** — backlog/admin/workspace metric strips stay flush (border-bottom only, not nested cards). Backlog page drops gradient wash + lane grid wallpaper. Admin KPI band drops the decorative `::after` grid overlay (tile borders already divide). Transcript empty no longer sits in a bordered paper card.
+- **Geometry** — login submit returns to `--radius-md` (pill retired per design system). Empty-state titles keep base `--type-title-md` instead of oversized display clamp.
+
+**Verify:** chat empty + thread list, backlog list/board, agents roster, admin dashboard KPIs, login CTA, composer while an agent is running — light/dark, 1440 / 390.
+
+## Clarity pass 2 (2026-07-12)
+
+Second pass focused on cascade bugs and hierarchy quieting.
+
+**Shipped:**
+
+- **Segmented cascade fix** — atelier no longer forces chip-group chrome onto full-width filter bars, underline admin tabs, fleet chip rows, or workspace tab strips. Segmented grammar stays on `.segmented` / view toggles / header agent tabs only.
+- **Eyebrows muted** — page/chat/mobile/conversation kickers use muted ink (design-system default) instead of action teal, so cyan stays reserved for true actions.
+- **Pane vs card** — agents detail is a split pane again (no raised card border). Login backdrop owned solely by `login.css`.
+- **Composer geometry** — mode chip and send button leave the pill/circle + scale bounce; both use `--radius-md`.
+- **Solid sticky chrome** — backlog lane/list heads, workspace pane heads, and message turn actions drop frosted blur mixes for solid canvas/raised fills.
+
+**Verify:** backlog filters + board/list toggle, admin People/Fleet tabs, agents roster/detail split, composer send/mode, sticky lane headers while scrolling.

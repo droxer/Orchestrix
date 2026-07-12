@@ -24,44 +24,10 @@
   grid-template-columns: 2fr 1fr 1fr 1fr;
   border: 1px solid var(--color-semantic-hairline);
   background: var(--color-semantic-canvas);
-  position: relative;
-  isolation: isolate;
-}
-
-/* Hairline grid overlay — vertical dividers aligned to 2fr 1fr 1fr 1fr tracks. */
-.adm-dash-kpis::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background-image:
-    linear-gradient(
-      90deg,
-      transparent calc(40% - 0.5px),
-      var(--color-semantic-hairline-soft) calc(40% - 0.5px),
-      var(--color-semantic-hairline-soft) calc(40% + 0.5px),
-      transparent calc(40% + 0.5px),
-      transparent calc(60% - 0.5px),
-      var(--color-semantic-hairline-soft) calc(60% - 0.5px),
-      var(--color-semantic-hairline-soft) calc(60% + 0.5px),
-      transparent calc(60% + 0.5px),
-      transparent calc(80% - 0.5px),
-      var(--color-semantic-hairline-soft) calc(80% - 0.5px),
-      var(--color-semantic-hairline-soft) calc(80% + 0.5px),
-      transparent calc(80% + 0.5px)
-    );
-  opacity: 0.55;
 }
 
 .adm-dash-kpis-wrap {
   position: relative;
-  isolation: isolate;
-}
-
-.adm-dash-kpis > .adm-dash-tile {
-  position: relative;
-  z-index: 1;
 }
 
 @media (min-width: 1200px) {
@@ -610,8 +576,4 @@
   .adm-dash-tile--nodes { border-right: 1px solid var(--color-semantic-hairline); border-bottom: 1px solid var(--color-semantic-hairline); }
   .adm-dash-tile--employees { border-right: none; border-bottom: 1px solid var(--color-semantic-hairline); }
   .adm-dash-tile--tokens { grid-column: 1 / -1; border-right: none; }
-
-  .adm-dash-kpis::after {
-    background-image: none;
-  }
 }
