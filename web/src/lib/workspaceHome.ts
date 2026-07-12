@@ -1,5 +1,5 @@
-import { RelayApiError } from "../api";
-import type { AgentWorkspaceFilesResponse, AgentWorkspaceSource } from "../types";
+import { RelayApiError } from "../api.js";
+import type { AgentWorkspaceFilesResponse, AgentWorkspaceSource } from "../types.js";
 
 /** What the Files pane header shows about the agent home's data source. */
 export type WorkspaceHomeStatus =
@@ -9,7 +9,7 @@ export type WorkspaceHomeStatus =
   | { kind: "none" };
 
 export function workspaceHomeStatus(
-  files: Pick<AgentWorkspaceFilesResponse, "source" | "nodeId"> | undefined,
+  files: Pick<AgentWorkspaceFilesResponse, "source"> & { nodeId?: string | null } | undefined,
   bannerDismissed: boolean,
 ): WorkspaceHomeStatus {
   if (files?.source === "live") return { kind: "live", nodeId: files.nodeId ?? null };
