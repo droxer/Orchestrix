@@ -229,3 +229,17 @@ Whole-frontend visual cleanup toward the design system's hairline-first restrain
 - **Geometry** — login submit returns to `--radius-md` (pill retired per design system). Empty-state titles keep base `--type-title-md` instead of oversized display clamp.
 
 **Verify:** chat empty + thread list, backlog list/board, agents roster, admin dashboard KPIs, login CTA, composer while an agent is running — light/dark, 1440 / 390.
+
+## Clarity pass 2 (2026-07-12)
+
+Second pass focused on cascade bugs and hierarchy quieting.
+
+**Shipped:**
+
+- **Segmented cascade fix** — atelier no longer forces chip-group chrome onto full-width filter bars, underline admin tabs, fleet chip rows, or workspace tab strips. Segmented grammar stays on `.segmented` / view toggles / header agent tabs only.
+- **Eyebrows muted** — page/chat/mobile/conversation kickers use muted ink (design-system default) instead of action teal, so cyan stays reserved for true actions.
+- **Pane vs card** — agents detail is a split pane again (no raised card border). Login backdrop owned solely by `login.css`.
+- **Composer geometry** — mode chip and send button leave the pill/circle + scale bounce; both use `--radius-md`.
+- **Solid sticky chrome** — backlog lane/list heads, workspace pane heads, and message turn actions drop frosted blur mixes for solid canvas/raised fills.
+
+**Verify:** backlog filters + board/list toggle, admin People/Fleet tabs, agents roster/detail split, composer send/mode, sticky lane headers while scrolling.

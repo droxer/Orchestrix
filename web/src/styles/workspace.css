@@ -225,8 +225,7 @@
   min-height: 44px;
   border-bottom: 1px solid var(--color-semantic-hairline-soft);
   padding: 0 var(--space-base);
-  background: color-mix(in srgb, var(--color-semantic-canvas) 88%, transparent);
-  backdrop-filter: blur(6px);
+  background: var(--color-semantic-canvas);
 }
 
 .workspace-pane-head h3 {
@@ -694,9 +693,9 @@
   right: var(--space-sm);
   z-index: 2;
   margin: 0;
-  box-shadow: var(--shadow-soft);
-  backdrop-filter: blur(8px);
-  background: color-mix(in srgb, var(--color-semantic-canvas) 92%, transparent);
+  border: 1px solid var(--color-semantic-hairline);
+  box-shadow: var(--shadow-lift);
+  background: var(--color-semantic-surface-raised);
 }
 
 .code-view-toggle {

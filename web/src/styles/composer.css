@@ -99,7 +99,7 @@
   min-width: 132px;
   padding: 0 12px 0 10px;
   border: 0;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-md);
   background: var(--color-semantic-surface-strong);
   color: var(--color-semantic-ink);
   font: var(--type-caption-strong);
@@ -108,8 +108,7 @@
   white-space: nowrap;
   transition:
     background var(--duration-base) var(--ease-standard),
-    box-shadow var(--duration-base) var(--ease-standard),
-    transform var(--duration-fast) var(--ease-standard);
+    box-shadow var(--duration-base) var(--ease-standard);
 }
 
 .mode-chip[data-mode="action"] {
@@ -326,23 +325,21 @@
   width: 34px;
   height: 34px;
   border: 1px solid transparent;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-md);
   background: var(--color-semantic-action);
   color: var(--color-semantic-on-action);
   cursor: pointer;
   transition:
     background var(--duration-base) var(--ease-standard),
-    border-color var(--duration-base) var(--ease-standard),
-    transform var(--duration-fast) var(--ease-standard);
+    border-color var(--duration-base) var(--ease-standard);
 }
 
 .send-button:hover:not(:disabled) {
   background: var(--color-semantic-action-active);
-  transform: scale(1.06);
 }
 
 .send-button:active:not(:disabled) {
-  transform: scale(0.94);
+  background: var(--color-semantic-action-active);
 }
 
 .send-button:focus-visible {
@@ -368,7 +365,6 @@
 .send-button.send-button-cancel:hover:not(:disabled) {
   background: color-mix(in srgb, var(--color-semantic-danger) 6%, var(--color-semantic-canvas));
   border-color: var(--color-semantic-danger);
-  transform: scale(1.06);
 }
 
 .send-button.send-button-cancel:focus-visible {

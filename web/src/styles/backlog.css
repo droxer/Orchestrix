@@ -248,8 +248,7 @@
   gap: var(--space-xs);
   padding: var(--space-sm) var(--space-base);
   border-bottom: 1px solid var(--color-semantic-hairline-soft);
-  background: color-mix(in srgb, var(--color-semantic-canvas) 94%, transparent);
-  backdrop-filter: blur(6px);
+  background: var(--color-semantic-canvas);
 }
 
 .backlog-lane-head::before {
@@ -936,8 +935,7 @@
   gap: var(--space-base);
   padding: var(--space-xs) var(--space-sm);
   border-bottom: 1px solid var(--color-semantic-hairline);
-  background: color-mix(in srgb, var(--color-semantic-canvas) 92%, transparent);
-  backdrop-filter: blur(6px);
+  background: var(--color-semantic-canvas);
 }
 
 .backlog-rows-head-cell {

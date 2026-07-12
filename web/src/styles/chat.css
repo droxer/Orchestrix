@@ -646,12 +646,11 @@
   padding: 0 var(--space-sm);
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--color-semantic-surface-raised) 72%, transparent);
+  background: var(--color-semantic-surface-raised);
   color: var(--color-semantic-muted);
   font: var(--type-label);
   cursor: pointer;
   white-space: nowrap;
-  backdrop-filter: blur(6px);
   transition:
     color var(--duration-fast) var(--ease-standard),
     border-color var(--duration-fast) var(--ease-standard),
