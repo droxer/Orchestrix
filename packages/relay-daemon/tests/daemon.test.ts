@@ -7,6 +7,7 @@ import { join } from "node:path";
 import test, { type TestContext } from "node:test";
 
 import {
+  backendReconnectDelayMs,
   collectExecution,
   discoverAgentInventory,
   localProcessExecStream,
@@ -772,6 +773,57 @@ test("relay daemon preserves final agent log when output event post fails", asyn
   assert.match(failed.error, /Daemon lost agent output/);
 });
 
+test("relay daemon opens a circuit when the output post backlog is unbounded", async () => {
+  const stop = new AbortController();
+  const command = runCommand("cmd_output_backlog");
+  let commandServed = false;
+  let terminalError = "";
+  await runRelayDaemon({
+    backendUrl: "http://relay.test",
+    sandboxId: "sbx_test",
+    employeeId: "alice",
+    workspacePath: process.cwd(),
+    token: "node_token",
+    pollIntervalMs: 1,
+    shutdownGraceMs: 50,
+    logger: testLogger(),
+    signal: stop.signal,
+    environment: fakeEnvironment({
+      exec: async (_cmd, args, options) => {
+        if (!isInventoryProbe(args)) {
+          for (let index = 0; index < 300; index += 1) {
+            options?.stdoutRenderer?.(`chunk-${index}\n`);
+          }
+        }
+        return { exit_code: 0, stdout: "done", stderr: "" };
+      },
+    }),
+    fetchFn: async (url, init) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/daemon-nodes/register") return jsonResponse({ ok: true });
+      if (path.endsWith("/commands")) {
+        if (!commandServed) {
+          commandServed = true;
+          return jsonResponse({ commands: [command] });
+        }
+        return jsonResponse({ commands: [] });
+      }
+      if (path.endsWith("/events")) {
+        const event = await jsonBody<DaemonNodeEvent>(init);
+        if (event.type === "run.failed") {
+          terminalError = event.error;
+          setTimeout(() => stop.abort(), 0);
+        }
+        return jsonResponse({ ok: true }, 202);
+      }
+      throw new Error(`unexpected URL ${url}`);
+    },
+  });
+
+  assert.match(terminalError, /backlog exceeded 256 events/);
+});
+
 test("relay daemon exits startup preflight after external stop", async () => {
   const stop = new AbortController();
   let closeCount = 0;
@@ -1533,6 +1585,27 @@ test("discoverAgentInventory returns empty on non-zero exit and never throws", a
     throw new Error("exec exploded");
   };
   assert.deepEqual(await discoverAgentInventory(throwing), {});
+});
+
+test("discoverAgentInventory aborts a hung inventory probe at its deadline", async () => {
+  let aborted = false;
+  const hanging: DaemonExecutionEnvironment["execStream"] = async (_cmd, _args, options) =>
+    await new Promise<StreamExecResult>((_resolve, reject) => {
+      options?.signal?.addEventListener("abort", () => {
+        aborted = true;
+        reject(new Error("aborted"));
+      }, { once: true });
+    });
+
+  assert.deepEqual(await discoverAgentInventory(hanging, undefined, 5), {});
+  assert.equal(aborted, true);
+});
+
+test("backend reconnect delay uses capped equal jitter", () => {
+  assert.equal(backendReconnectDelayMs(1, () => 0), 1000);
+  assert.equal(backendReconnectDelayMs(1, () => 1), 2000);
+  assert.equal(backendReconnectDelayMs(4, () => 0), 5000);
+  assert.equal(backendReconnectDelayMs(20, () => 1), 10000);
 });
 
 test("relay daemon reports generated workspace documents in run.completed", async (t: TestContext) => {

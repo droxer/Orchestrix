@@ -9,7 +9,14 @@ from typing import Any
 from sqlalchemy import Column, Uuid
 
 from ..core.ids import new_database_id, new_relay_id, now_iso
-from ..core.models import AGENT_NAMES, AgentName, TaskPriority, TaskRoutineCadence, TaskRoutineType, TaskStatus
+from ..core.models import (
+    AGENT_NAMES,
+    AgentName,
+    TaskPriority,
+    TaskRoutineCadence,
+    TaskRoutineType,
+    TaskStatus,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_RELAY_DATA_DIR = REPO_ROOT / ".relay"
@@ -33,7 +40,11 @@ def _format_iso(value: datetime | None) -> str | None:
         # timestamps as UTC, so never reinterpret a database value in the
         # host's local timezone when formatting it back onto the wire.
         value = value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    return (
+        value.astimezone(timezone.utc)
+        .isoformat(timespec="milliseconds")
+        .replace("+00:00", "Z")
+    )
 
 
 def _read_json(path: Path) -> Any:
@@ -67,15 +78,35 @@ def _append_jsonl(path: Path, value: Any) -> None:
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         raise KeyError(path)
-    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
+    return [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line
+    ]
 
 
-def relay_event(event_type: str, session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-    return {"id": new_relay_id("evt"), "type": event_type, "sessionId": session_id, "timestamp": now_iso(), **payload}
+def relay_event(
+    event_type: str, session_id: str, payload: dict[str, Any]
+) -> dict[str, Any]:
+    return {
+        "id": new_relay_id("evt"),
+        "type": event_type,
+        "sessionId": session_id,
+        "timestamp": now_iso(),
+        **payload,
+    }
 
 
-def relay_task_event(event_type: str, task_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-    return {"id": new_relay_id("evt"), "type": event_type, "taskId": task_id, "timestamp": now_iso(), **payload}
+def relay_task_event(
+    event_type: str, task_id: str, payload: dict[str, Any]
+) -> dict[str, Any]:
+    return {
+        "id": new_relay_id("evt"),
+        "type": event_type,
+        "taskId": task_id,
+        "timestamp": now_iso(),
+        **payload,
+    }
 
 
 def merge_token_usage(values: list[dict[str, Any] | None]) -> dict[str, int] | None:
@@ -92,7 +123,9 @@ def merge_token_usage(values: list[dict[str, Any] | None]) -> dict[str, int] | N
 
 
 def materialize_events(events: list[dict[str, Any]]) -> dict[str, Any]:
-    created = next((event for event in events if event.get("type") == "session.created"), None)
+    created = next(
+        (event for event in events if event.get("type") == "session.created"), None
+    )
     if not created:
         raise ValueError("Relay session event log is missing session.created.")
     session: dict[str, Any] = {
@@ -128,22 +161,44 @@ def materialize_events(events: list[dict[str, Any]]) -> dict[str, Any]:
             if event["status"] not in ("completed", "failed"):
                 session.pop("finalOutcome", None)
         elif event_type == "agent.started":
-            session["status"] = "running"
-            session["phase"] = f"{event['agent']}:{event['mode']}"
-            session["currentAgent"] = event["agent"]
-            session["agentRuns"].append({
-                "id": event["runId"],
-                "agent": event["agent"],
-                "role": event["role"],
-                "mode": event["mode"],
-                "status": "running",
-                "startedAt": event["timestamp"],
-                "artifactIds": [],
-                **({"logicalAgentId": event["logicalAgentId"]} if event.get("logicalAgentId") else {}),
-                **({"placementId": event["placementId"]} if event.get("placementId") else {}),
-                **({"daemonNodeId": event["daemonNodeId"]} if event.get("daemonNodeId") else {}),
-                **({"agentVersion": event["agentVersion"]} if event.get("agentVersion") else {}),
-            })
+            # A staged daemon command can be recovered by another backend
+            # replica. Replaying its start must not duplicate the run or move a
+            # terminal session back to running.
+            if not any(run["id"] == event["runId"] for run in session["agentRuns"]):
+                session["status"] = "running"
+                session["phase"] = f"{event['agent']}:{event['mode']}"
+                session["currentAgent"] = event["agent"]
+                session["agentRuns"].append(
+                    {
+                        "id": event["runId"],
+                        "agent": event["agent"],
+                        "role": event["role"],
+                        "mode": event["mode"],
+                        "status": "running",
+                        "startedAt": event["timestamp"],
+                        "artifactIds": [],
+                        **(
+                            {"logicalAgentId": event["logicalAgentId"]}
+                            if event.get("logicalAgentId")
+                            else {}
+                        ),
+                        **(
+                            {"placementId": event["placementId"]}
+                            if event.get("placementId")
+                            else {}
+                        ),
+                        **(
+                            {"daemonNodeId": event["daemonNodeId"]}
+                            if event.get("daemonNodeId")
+                            else {}
+                        ),
+                        **(
+                            {"agentVersion": event["agentVersion"]}
+                            if event.get("agentVersion")
+                            else {}
+                        ),
+                    }
+                )
         elif event_type == "agent.completed":
             for run in session["agentRuns"]:
                 if run["id"] == event["runId"]:
@@ -154,13 +209,21 @@ def materialize_events(events: list[dict[str, Any]]) -> dict[str, Any]:
                         run["agentLog"] = event["agentLog"]
                     if event.get("tokenUsage"):
                         run["tokenUsage"] = event["tokenUsage"]
-            token_usage = merge_token_usage([run.get("tokenUsage") for run in session["agentRuns"]])
+            token_usage = merge_token_usage(
+                [run.get("tokenUsage") for run in session["agentRuns"]]
+            )
             if token_usage:
                 session["tokenUsage"] = token_usage
             else:
                 session.pop("tokenUsage", None)
             session.pop("currentAgent", None)
-            session["phase"] = "agent_completed" if event["status"] == "completed" else "cancelled" if event["status"] == "cancelled" else "agent_failed"
+            session["phase"] = (
+                "agent_completed"
+                if event["status"] == "completed"
+                else "cancelled"
+                if event["status"] == "cancelled"
+                else "agent_failed"
+            )
         elif event_type == "artifact.created":
             artifact = event["artifact"]
             session["artifacts"].append(artifact)
@@ -197,7 +260,9 @@ def materialize_events(events: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def materialize_task_events(events: list[dict[str, Any]]) -> dict[str, Any]:
-    created = next((event for event in events if event.get("type") == "task.created"), None)
+    created = next(
+        (event for event in events if event.get("type") == "task.created"), None
+    )
     if not created:
         raise ValueError("Relay task event log is missing task.created.")
     task: dict[str, Any] = {
@@ -226,7 +291,13 @@ def materialize_task_events(events: list[dict[str, Any]]) -> dict[str, Any]:
         task["updatedAt"] = event["timestamp"]
         event_type = event.get("type")
         if event_type == "task.updated":
-            for key in ("title", "description", "priority", "assigneeEmployeeId", "dueDate"):
+            for key in (
+                "title",
+                "description",
+                "priority",
+                "assigneeEmployeeId",
+                "dueDate",
+            ):
                 if key in event and event[key] is not None:
                     if key in ("assigneeEmployeeId", "dueDate") and event[key] == "":
                         task.pop(key, None)
@@ -274,7 +345,12 @@ def _apply_task_routine_fields(task: dict[str, Any], event: dict[str, Any]) -> N
 
 
 def daemon_event(event_type: str, payload: dict[str, Any]) -> dict[str, Any]:
-    return {"id": new_relay_id("devt"), "type": event_type, "timestamp": now_iso(), **payload}
+    return {
+        "id": new_relay_id("devt"),
+        "type": event_type,
+        "timestamp": now_iso(),
+        **payload,
+    }
 
 
 def safe_name(value: str) -> str:
@@ -285,7 +361,12 @@ def safe_name(value: str) -> str:
 def role_for_agent(agent: str, mode: str = "action") -> str:
     if mode == "review":
         return "reviewer"
-    return {"claude": "implementer", "pi": "tester", "codex": "fixer", "kimi": "implementer"}.get(agent, "implementer")
+    return {
+        "claude": "implementer",
+        "pi": "tester",
+        "codex": "fixer",
+        "kimi": "implementer",
+    }.get(agent, "implementer")
 
 
 def valid_agent(value: Any) -> AgentName | None:
@@ -297,7 +378,20 @@ def task_priority(value: Any) -> TaskPriority | None:
 
 
 def task_status(value: Any) -> TaskStatus | None:
-    return value if value in ("backlog", "assigned", "running", "waiting_for_human", "review", "done", "blocked") else None
+    return (
+        value
+        if value
+        in (
+            "backlog",
+            "assigned",
+            "running",
+            "waiting_for_human",
+            "review",
+            "done",
+            "blocked",
+        )
+        else None
+    )
 
 
 def task_routine_type(value: Any) -> TaskRoutineType | None:

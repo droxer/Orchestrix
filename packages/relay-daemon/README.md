@@ -36,7 +36,10 @@ Optional:
   logins, skills, and MCP configuration under `HOME`.
 - `RELAY_USE_LOCAL_AGENT_HOME`: deprecated compatibility flag; local mode now
   uses this user's home by default.
-- `RELAY_DAEMON_HEARTBEAT_MS`: registration heartbeat interval.
+- `RELAY_DAEMON_HEARTBEAT_MS`: fallback registration heartbeat interval.
+  Defaults to five minutes; command polls update node liveness continuously.
+- `RELAY_DAEMON_INVENTORY_TIMEOUT_MS`: maximum time for the best-effort agent
+  skill/MCP inventory scan. Defaults to 10 seconds.
 - `RELAY_DAEMON_COMMAND_POLL_WAIT_MS`: long-poll wait for command requests
   (capped at 25 seconds).
 - `RELAY_DAEMON_COMMAND_LEASE_SECONDS`: command lease duration requested from

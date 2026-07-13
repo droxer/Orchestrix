@@ -42,6 +42,7 @@ const AGENT_INVENTORY_SOURCES: Record<AgentName, AgentInventorySource> = {
 };
 
 const RECORD_SEPARATOR = "\t";
+const DEFAULT_INVENTORY_TIMEOUT_MS = 10_000;
 
 /**
  * Inspect the node and report each agent's installed skills and MCP servers.
@@ -50,11 +51,16 @@ const RECORD_SEPARATOR = "\t";
 export async function discoverAgentInventory(
   execStream: ExecLike,
   signal?: AbortSignal,
+  timeoutMs = DEFAULT_INVENTORY_TIMEOUT_MS,
 ): Promise<Partial<Record<AgentName, DaemonAgentInventory>>> {
   if (signal?.aborted) return {};
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  const discoverySignal = signal
+    ? AbortSignal.any([signal, timeoutSignal])
+    : timeoutSignal;
   let result: Awaited<ReturnType<ExecLike>>;
   try {
-    result = await execStream("bash", ["-c", buildInventoryScript()], { signal });
+    result = await execStream("bash", ["-c", buildInventoryScript()], { signal: discoverySignal });
   } catch {
     return {};
   }

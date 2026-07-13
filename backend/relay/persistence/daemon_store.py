@@ -41,6 +41,12 @@ from .store_common import (
 
 
 TERMINAL_DAEMON_STATUSES = frozenset({"completed", "failed", "cancelled"})
+ACTIVE_RUN_REQUEST_STATUSES = frozenset({"running", "dispatching", "finalizing"})
+DISPATCH_CLAIM_ID_STATE_KEY = "_relay_dispatch_claim_id"
+DISPATCH_CLAIM_EXPIRES_STATE_KEY = "_relay_dispatch_claim_expires_at"
+TERMINAL_EVENT_STATE_KEY = "_relay_terminal_event"
+TERMINAL_CLAIM_ID_STATE_KEY = "_relay_terminal_claim_id"
+TERMINAL_CLAIM_EXPIRES_STATE_KEY = "_relay_terminal_claim_expires_at"
 
 
 def _node_for_storage(node: dict[str, Any]) -> dict[str, Any]:
@@ -303,13 +309,32 @@ class LocalDaemonStore:
             return self._get_command(command_id)
 
     def enqueue_command(self, node_id: str, command: dict[str, Any]) -> dict[str, Any]:
+        self.stage_command(node_id, command)
+        return self.publish_command(command["id"])
+
+    def stage_command(
+        self,
+        node_id: str,
+        command: dict[str, Any],
+        *,
+        request_id: str | None = None,
+        claim_id: str | None = None,
+    ) -> dict[str, Any] | None:
         with self._lock:
+            if request_id is not None:
+                request = self.get_run_request(request_id)
+                if (
+                    not request
+                    or (request.get("state") or {}).get(DISPATCH_CLAIM_ID_STATE_KEY)
+                    != claim_id
+                ):
+                    return None
             now = now_iso()
             record = {
                 "id": command["id"],
                 "nodeId": node_id,
                 "command": command,
-                "status": "queued",
+                "status": "pending",
                 "createdAt": now,
                 "updatedAt": now,
             }
@@ -339,18 +364,62 @@ class LocalDaemonStore:
                             if command.get("workspacePath")
                             else {}
                         ),
-                        "status": "running",
+                        "status": "pending",
                         "startedAt": now,
                     }
                 )
-            self._index_command(record)
             self.append_daemon_event(
                 daemon_event(
-                    "daemon.command.queued",
+                    "daemon.command.staged",
                     {"nodeId": node_id, "commandId": command["id"]},
                 )
             )
             return record
+
+    def publish_command(self, command_id: str) -> dict[str, Any]:
+        with self._lock:
+            record = self._get_command(command_id)
+            if not record:
+                raise KeyError(command_id)
+            if record["status"] != "pending":
+                return record
+            now = now_iso()
+            updated = {**record, "status": "queued", "updatedAt": now}
+            _write_json(self.commands_dir / f"{safe_name(command_id)}.json", updated)
+            run = self._get_run(record["command"].get("runId", ""))
+            if run and run.get("status") == "pending":
+                self._write_run({**run, "status": "running"})
+            self._index_command(updated)
+            self.append_daemon_event(
+                daemon_event(
+                    "daemon.command.queued",
+                    {"nodeId": record["nodeId"], "commandId": command_id},
+                )
+            )
+            return updated
+
+    def discard_staged_command(self, command_id: str) -> None:
+        with self._lock:
+            record = self._get_command(command_id)
+            if not record or record.get("status") != "pending":
+                return
+            (self.commands_dir / f"{safe_name(command_id)}.json").unlink(
+                missing_ok=True
+            )
+            run_id = record.get("command", {}).get("runId")
+            if run_id:
+                (self.runs_dir / f"{safe_name(run_id)}.json").unlink(missing_ok=True)
+
+    def update_staged_command(
+        self, command_id: str, command: dict[str, Any]
+    ) -> dict[str, Any] | None:
+        with self._lock:
+            record = self._get_command(command_id)
+            if not record or record.get("status") != "pending":
+                return None
+            updated = {**record, "command": command, "updatedAt": now_iso()}
+            _write_json(self.commands_dir / f"{safe_name(command_id)}.json", updated)
+            return updated
 
     def take_queued_commands(
         self, node_id: str, limit: int = 2**53, lease_seconds: float = 60.0
@@ -501,7 +570,7 @@ class LocalDaemonStore:
         return [
             request
             for request in requests
-            if request.get("status") == "running"
+            if request.get("status") in ACTIVE_RUN_REQUEST_STATUSES
             and (node_id is None or request.get("nodeId") == node_id)
         ]
 
@@ -526,6 +595,77 @@ class LocalDaemonStore:
             ),
             None,
         )
+
+    def pending_command_for_run_request(self, request_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            return next(
+                (
+                    record
+                    for record in self._list_commands()
+                    if record.get("status") == "pending"
+                    and record.get("command", {}).get("_runRequestId") == request_id
+                ),
+                None,
+            )
+
+    def claim_terminal_run_request(
+        self,
+        command_id: str,
+        event: dict[str, Any],
+        claim_id: str,
+        lease_seconds: float,
+    ) -> dict[str, Any] | None:
+        with self._lock:
+            request = self.run_request_for_command(command_id)
+            if not request:
+                return None
+            state = dict(request.get("state") or {})
+            now = now_iso()
+            if request.get("status") == "finalizing":
+                expires_at = state.get(TERMINAL_CLAIM_EXPIRES_STATE_KEY)
+                if expires_at and _parse_iso(expires_at) > _parse_iso(now):
+                    return None
+            state.update(
+                {
+                    TERMINAL_EVENT_STATE_KEY: event,
+                    TERMINAL_CLAIM_ID_STATE_KEY: claim_id,
+                    TERMINAL_CLAIM_EXPIRES_STATE_KEY: lease_expires_at(
+                        now, lease_seconds
+                    ),
+                }
+            )
+            return self.update_run_request(
+                request["id"], {"status": "finalizing", "state": state}
+            )
+
+    def claim_run_request_dispatch(
+        self, request_id: str, claim_id: str, lease_seconds: float
+    ) -> dict[str, Any] | None:
+        with self._lock:
+            request = self.get_run_request(request_id)
+            if (
+                not request
+                or request.get("status") not in ("running", "dispatching")
+                or request.get("currentCommandId")
+            ):
+                return None
+            state = dict(request.get("state") or {})
+            now = now_iso()
+            if request.get("status") == "dispatching":
+                expires_at = state.get(DISPATCH_CLAIM_EXPIRES_STATE_KEY)
+                if expires_at and _parse_iso(expires_at) > _parse_iso(now):
+                    return None
+            state.update(
+                {
+                    DISPATCH_CLAIM_ID_STATE_KEY: claim_id,
+                    DISPATCH_CLAIM_EXPIRES_STATE_KEY: lease_expires_at(
+                        now, lease_seconds
+                    ),
+                }
+            )
+            return self.update_run_request(
+                request_id, {"status": "dispatching", "state": state}
+            )
 
     def update_run_request(
         self, request_id: str, patch: dict[str, Any]
@@ -552,6 +692,19 @@ class LocalDaemonStore:
                 )
             )
             return updated
+
+    def update_run_request_if_claimed(
+        self,
+        request_id: str,
+        claim_key: str,
+        claim_id: str,
+        patch: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        with self._lock:
+            current = self.get_run_request(request_id)
+            if not current or (current.get("state") or {}).get(claim_key) != claim_id:
+                return None
+            return self.update_run_request(request_id, patch)
 
     def mark_command_completed(self, node_id: str, event: dict[str, Any]) -> bool:
         return self._mark_command_terminal(
@@ -640,6 +793,10 @@ class LocalDaemonStore:
                 self.commands_dir / f"{safe_name(command['id'])}.json",
                 {
                     **command,
+                    "command": {
+                        **command["command"],
+                        "_terminalEvent": event,
+                    },
                     "status": status,
                     "updatedAt": now,
                     "completedAt": now,
@@ -1145,16 +1302,43 @@ class DatabaseDaemonStore:
         return row_to_command(row) if row else None
 
     def enqueue_command(self, node_id: str, command: dict[str, Any]) -> dict[str, Any]:
+        self.stage_command(node_id, command)
+        return self.publish_command(command["id"])
+
+    def stage_command(
+        self,
+        node_id: str,
+        command: dict[str, Any],
+        *,
+        request_id: str | None = None,
+        claim_id: str | None = None,
+    ) -> dict[str, Any] | None:
         now = now_iso()
         record = {
             "id": command["id"],
             "nodeId": node_id,
             "command": command,
-            "status": "queued",
+            "status": "pending",
             "createdAt": now,
             "updatedAt": now,
         }
         with self.engine.begin() as conn:
+            if request_id is not None:
+                request_row = (
+                    conn.execute(
+                        select(self.run_requests)
+                        .where(self.run_requests.c.public_id == request_id)
+                        .with_for_update()
+                    )
+                    .mappings()
+                    .first()
+                )
+                if (
+                    not request_row
+                    or (request_row.get("state") or {}).get(DISPATCH_CLAIM_ID_STATE_KEY)
+                    != claim_id
+                ):
+                    return None
             node_pk = self._node_pk(conn, node_id)
             command_row = command_to_row(record, node_pk=node_pk)
             conn.execute(insert(self.commands).values(**command_row))
@@ -1186,18 +1370,110 @@ class DatabaseDaemonStore:
                             if command.get("workspacePath")
                             else {}
                         ),
-                        "status": "running",
+                        "status": "pending",
                         "startedAt": now,
                     },
                 )
             self._append_daemon_event(
                 conn,
                 daemon_event(
-                    "daemon.command.queued",
+                    "daemon.command.staged",
                     {"nodeId": node_id, "commandId": command["id"]},
                 ),
             )
         return record
+
+    def publish_command(self, command_id: str) -> dict[str, Any]:
+        now = now_iso()
+        with self.engine.begin() as conn:
+            row = (
+                conn.execute(
+                    select(self.commands)
+                    .where(self.commands.c.public_id == command_id)
+                    .with_for_update()
+                )
+                .mappings()
+                .first()
+            )
+            if not row:
+                raise KeyError(command_id)
+            record = row_to_command(row)
+            if record["status"] != "pending":
+                return record
+            updated = {**record, "status": "queued", "updatedAt": now}
+            conn.execute(
+                update(self.commands)
+                .where(self.commands.c.id == record["databaseId"])
+                .values(
+                    **command_to_row(
+                        updated,
+                        database_id=record["databaseId"],
+                        node_pk=row["node_id"],
+                    )
+                )
+            )
+            conn.execute(
+                update(self.runs)
+                .where(self.runs.c.command_public_id == command_id)
+                .where(self.runs.c.status == "pending")
+                .values(status="running")
+            )
+            self._append_daemon_event(
+                conn,
+                daemon_event(
+                    "daemon.command.queued",
+                    {"nodeId": record["nodeId"], "commandId": command_id},
+                ),
+            )
+        return updated
+
+    def discard_staged_command(self, command_id: str) -> None:
+        with self.engine.begin() as conn:
+            row = (
+                conn.execute(
+                    select(self.commands)
+                    .where(self.commands.c.public_id == command_id)
+                    .where(self.commands.c.status == "pending")
+                )
+                .mappings()
+                .first()
+            )
+            if not row:
+                return
+            conn.execute(
+                delete(self.runs).where(self.runs.c.command_public_id == command_id)
+            )
+            conn.execute(delete(self.commands).where(self.commands.c.id == row["id"]))
+
+    def update_staged_command(
+        self, command_id: str, command: dict[str, Any]
+    ) -> dict[str, Any] | None:
+        now = now_iso()
+        with self.engine.begin() as conn:
+            row = (
+                conn.execute(
+                    select(self.commands)
+                    .where(self.commands.c.public_id == command_id)
+                    .where(self.commands.c.status == "pending")
+                    .with_for_update()
+                )
+                .mappings()
+                .first()
+            )
+            if not row:
+                return None
+            record = row_to_command(row)
+            updated = {**record, "command": command, "updatedAt": now}
+            conn.execute(
+                update(self.commands)
+                .where(self.commands.c.id == row["id"])
+                .values(
+                    **command_to_row(
+                        updated, database_id=row["id"], node_pk=row["node_id"]
+                    )
+                )
+            )
+        return updated
 
     def take_queued_commands(
         self, node_id: str, limit: int = 2**53, lease_seconds: float = 60.0
@@ -1405,7 +1681,7 @@ class DatabaseDaemonStore:
         self, node_id: str | None = None
     ) -> list[dict[str, Any]]:
         statement = select(self.run_requests).where(
-            self.run_requests.c.status == "running"
+            self.run_requests.c.status.in_(ACTIVE_RUN_REQUEST_STATUSES)
         )
         if node_id is not None:
             statement = statement.where(self.run_requests.c.node_public_id == node_id)
@@ -1430,13 +1706,162 @@ class DatabaseDaemonStore:
             row = (
                 conn.execute(
                     select(self.run_requests)
-                    .where(self.run_requests.c.status == "running")
+                    .where(self.run_requests.c.status.in_(ACTIVE_RUN_REQUEST_STATUSES))
                     .where(self.run_requests.c.current_command_public_id == command_id)
                 )
                 .mappings()
                 .first()
             )
         return row_to_run_request(row) if row else None
+
+    def pending_command_for_run_request(self, request_id: str) -> dict[str, Any] | None:
+        with self.engine.begin() as conn:
+            rows = (
+                conn.execute(
+                    select(self.commands).where(self.commands.c.status == "pending")
+                )
+                .mappings()
+                .all()
+            )
+        return next(
+            (
+                record
+                for row in rows
+                if (record := row_to_command(row))["command"].get("_runRequestId")
+                == request_id
+            ),
+            None,
+        )
+
+    def claim_terminal_run_request(
+        self,
+        command_id: str,
+        event: dict[str, Any],
+        claim_id: str,
+        lease_seconds: float,
+    ) -> dict[str, Any] | None:
+        now = now_iso()
+        with self.engine.begin() as conn:
+            row = (
+                conn.execute(
+                    select(self.run_requests)
+                    .where(self.run_requests.c.current_command_public_id == command_id)
+                    .where(self.run_requests.c.status.in_(ACTIVE_RUN_REQUEST_STATUSES))
+                    .with_for_update()
+                )
+                .mappings()
+                .first()
+            )
+            if not row:
+                return None
+            request = row_to_run_request(row)
+            state = dict(request.get("state") or {})
+            if request.get("status") == "finalizing":
+                expires_at = state.get(TERMINAL_CLAIM_EXPIRES_STATE_KEY)
+                if expires_at and _parse_iso(expires_at) > _parse_iso(now):
+                    return None
+            state.update(
+                {
+                    TERMINAL_EVENT_STATE_KEY: event,
+                    TERMINAL_CLAIM_ID_STATE_KEY: claim_id,
+                    TERMINAL_CLAIM_EXPIRES_STATE_KEY: lease_expires_at(
+                        now, lease_seconds
+                    ),
+                }
+            )
+            updated = {
+                **request,
+                "status": "finalizing",
+                "state": state,
+                "updatedAt": now,
+            }
+            claimed = conn.execute(
+                update(self.run_requests)
+                .where(self.run_requests.c.id == row["id"])
+                .where(self.run_requests.c.updated_at == row["updated_at"])
+                .values(
+                    **run_request_to_row(
+                        updated, database_id=row["id"], node_pk=row["node_id"]
+                    )
+                )
+            )
+            if claimed.rowcount != 1:
+                return None
+            self._append_daemon_event(
+                conn,
+                daemon_event(
+                    "daemon.run_request.finalizing",
+                    {
+                        "nodeId": updated["nodeId"],
+                        "runRequestId": updated["id"],
+                        "commandId": command_id,
+                    },
+                ),
+            )
+        return updated
+
+    def claim_run_request_dispatch(
+        self, request_id: str, claim_id: str, lease_seconds: float
+    ) -> dict[str, Any] | None:
+        now = now_iso()
+        with self.engine.begin() as conn:
+            row = (
+                conn.execute(
+                    select(self.run_requests)
+                    .where(self.run_requests.c.public_id == request_id)
+                    .where(self.run_requests.c.status.in_(("running", "dispatching")))
+                    .where(self.run_requests.c.current_command_public_id.is_(None))
+                    .with_for_update()
+                )
+                .mappings()
+                .first()
+            )
+            if not row:
+                return None
+            request = row_to_run_request(row)
+            state = dict(request.get("state") or {})
+            if request.get("status") == "dispatching":
+                expires_at = state.get(DISPATCH_CLAIM_EXPIRES_STATE_KEY)
+                if expires_at and _parse_iso(expires_at) > _parse_iso(now):
+                    return None
+            state.update(
+                {
+                    DISPATCH_CLAIM_ID_STATE_KEY: claim_id,
+                    DISPATCH_CLAIM_EXPIRES_STATE_KEY: lease_expires_at(
+                        now, lease_seconds
+                    ),
+                }
+            )
+            updated = {
+                **request,
+                "status": "dispatching",
+                "state": state,
+                "updatedAt": now,
+            }
+            claimed = conn.execute(
+                update(self.run_requests)
+                .where(self.run_requests.c.id == row["id"])
+                .where(self.run_requests.c.updated_at == row["updated_at"])
+                .where(self.run_requests.c.current_command_public_id.is_(None))
+                .values(
+                    **run_request_to_row(
+                        updated, database_id=row["id"], node_pk=row["node_id"]
+                    )
+                )
+            )
+            if claimed.rowcount != 1:
+                return None
+            self._append_daemon_event(
+                conn,
+                daemon_event(
+                    "daemon.run_request.dispatching",
+                    {
+                        "nodeId": updated["nodeId"],
+                        "runRequestId": updated["id"],
+                    },
+                ),
+            )
+        return updated
 
     def update_run_request(
         self, request_id: str, patch: dict[str, Any]
@@ -1459,6 +1884,57 @@ class DatabaseDaemonStore:
                     )
                 )
             )
+            self._append_daemon_event(
+                conn,
+                daemon_event(
+                    "daemon.run_request.updated",
+                    {
+                        "nodeId": updated["nodeId"],
+                        "runRequestId": updated["id"],
+                        "status": updated["status"],
+                    },
+                ),
+            )
+        return updated
+
+    def update_run_request_if_claimed(
+        self,
+        request_id: str,
+        claim_key: str,
+        claim_id: str,
+        patch: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        now = now_iso()
+        with self.engine.begin() as conn:
+            row = (
+                conn.execute(
+                    select(self.run_requests)
+                    .where(self.run_requests.c.public_id == request_id)
+                    .with_for_update()
+                )
+                .mappings()
+                .first()
+            )
+            if not row:
+                return None
+            current = row_to_run_request(row)
+            if (current.get("state") or {}).get(claim_key) != claim_id:
+                return None
+            updated = {**current, **patch, "updatedAt": now}
+            if patch.get("status") in TERMINAL_DAEMON_STATUSES:
+                updated["completedAt"] = now
+            applied = conn.execute(
+                update(self.run_requests)
+                .where(self.run_requests.c.id == row["id"])
+                .where(self.run_requests.c.updated_at == row["updated_at"])
+                .values(
+                    **run_request_to_row(
+                        updated, database_id=row["id"], node_pk=row["node_id"]
+                    )
+                )
+            )
+            if applied.rowcount != 1:
+                return None
             self._append_daemon_event(
                 conn,
                 daemon_event(
@@ -1611,6 +2087,10 @@ class DatabaseDaemonStore:
                     **command_to_row(
                         {
                             **command,
+                            "command": {
+                                **command["command"],
+                                "_terminalEvent": event,
+                            },
                             "status": status,
                             "updatedAt": now,
                             "completedAt": now,

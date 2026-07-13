@@ -56,6 +56,7 @@ export interface DaemonRuntimeOptions {
   commandPollWaitMs?: number;
   commandLeaseSeconds?: number;
   heartbeatIntervalMs?: number;
+  inventoryDiscoveryTimeoutMs?: number;
   fetchFn?: typeof fetch;
   token?: string;
   enrollmentToken?: string;
@@ -152,7 +153,8 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
     sandboxId,
     logDir: options.logDir,
   });
-  const heartbeatIntervalMs = options.heartbeatIntervalMs ?? positiveIntEnv("RELAY_DAEMON_HEARTBEAT_MS") ?? positiveIntEnv("RELAY_DAEMON_NODE_HEARTBEAT_MS") ?? 30_000;
+  const heartbeatIntervalMs = options.heartbeatIntervalMs ?? positiveIntEnv("RELAY_DAEMON_HEARTBEAT_MS") ?? positiveIntEnv("RELAY_DAEMON_NODE_HEARTBEAT_MS") ?? 5 * 60_000;
+  const inventoryDiscoveryTimeoutMs = options.inventoryDiscoveryTimeoutMs ?? positiveIntEnv("RELAY_DAEMON_INVENTORY_TIMEOUT_MS") ?? 10_000;
   const environment = options.environment ?? createExecutionEnvironment(sandboxMode, sandboxId, workspacePath, logger);
   let health: DaemonHealthState | undefined;
   const setHealth = (next: DaemonHealthState, fields: DaemonLogFields = {}): void => {
@@ -179,7 +181,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
     return;
   }
   let agentHealth = await discoverDaemonAgentHealth(environment, logger, sandboxId, options.signal);
-  let agentInventory = await discoverAgentInventory(environment.execStream, options.signal);
+  let agentInventory = await discoverAgentInventory(environment.execStream, options.signal, inventoryDiscoveryTimeoutMs);
   const buildRegistration = (includeEmployeeId = Boolean(configuredEmployeeId), status?: DaemonNodeRegistration["status"]): DaemonNodeRegistration => ({
     sandboxId,
     ...(includeEmployeeId ? { employeeId: effectiveEmployeeId } : {}),
@@ -296,7 +298,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
         if (Date.now() - lastRegisteredAt >= heartbeatIntervalMs) {
           if (sandboxMode === "none") {
             agentHealth = await discoverDaemonAgentHealth(environment, logger, sandboxId, runtimeSignal);
-            agentInventory = await discoverAgentInventory(environment.execStream, runtimeSignal);
+            agentInventory = await discoverAgentInventory(environment.execStream, runtimeSignal, inventoryDiscoveryTimeoutMs);
           }
           await register();
           lastRegisteredAt = Date.now();
@@ -638,6 +640,43 @@ async function executeCommand(
   let outputSequence = 0;
   let outputPostChain: Promise<void> = Promise.resolve();
   let outputPostFailure: Error | undefined;
+  let pendingOutputPosts = 0;
+  const maxPendingOutputPosts = 256;
+  const enqueueOutputPost = (
+    post: () => Promise<void>,
+    fields: DaemonLogFields,
+  ): void => {
+    if (outputPostFailure) return;
+    if (pendingOutputPosts >= maxPendingOutputPosts) {
+      outputPostFailure = new Error(
+        `Daemon output post backlog exceeded ${maxPendingOutputPosts} events.`,
+      );
+      logger.error("event post backlog circuit opened", {
+        ...commandLogFields(sandboxId, command),
+        ...fields,
+        error: outputPostFailure.message,
+      });
+      return;
+    }
+    pendingOutputPosts += 1;
+    outputPostChain = outputPostChain
+      .then(async () => {
+        if (outputPostFailure) return;
+        try {
+          await post();
+        } catch (error) {
+          outputPostFailure = error instanceof Error ? error : new Error(String(error));
+          logger.error("event post exhausted retries", {
+            ...commandLogFields(sandboxId, command),
+            ...fields,
+            error: outputPostFailure.message,
+          });
+        }
+      })
+      .finally(() => {
+        pendingOutputPosts -= 1;
+      });
+  };
   const eventSink = {
     agentOutput: (_runId: string, agent: AgentName, stream: "stdout" | "stderr", text: string): void => {
       const sequence = outputSequence++;
@@ -648,10 +687,8 @@ async function executeCommand(
         text,
         sequence,
       });
-      outputPostChain = outputPostChain.then(async () => {
-        if (outputPostFailure) return;
-        try {
-          await postJsonWithRetry(fetchFn, eventUrl, {
+      enqueueOutputPost(
+        () => postJsonWithRetry(fetchFn, eventUrl, {
             type: "run.output",
             commandId: command.id,
             ...commandLeaseEventFields(command),
@@ -661,25 +698,14 @@ async function executeCommand(
             stream,
             text,
             sequence,
-          } satisfies DaemonNodeEvent, token, signal);
-        } catch (error) {
-          outputPostFailure = error instanceof Error ? error : new Error(String(error));
-          logger.error("event post exhausted retries", {
-            ...commandLogFields(sandboxId, command),
-            agent,
-            stream,
-            sequence,
-            error: outputPostFailure.message,
-          });
-        }
-      });
+          } satisfies DaemonNodeEvent, token, signal),
+        { agent, stream, sequence },
+      );
     },
     agentCollaboration: (_runId: string, agent: AgentName, collaboration: CodexCollaborationEvent): void => {
       const sequence = outputSequence++;
-      outputPostChain = outputPostChain.then(async () => {
-        if (outputPostFailure) return;
-        try {
-          await postJsonWithRetry(fetchFn, eventUrl, {
+      enqueueOutputPost(
+        () => postJsonWithRetry(fetchFn, eventUrl, {
             type: "run.collaboration",
             commandId: command.id,
             ...commandLeaseEventFields(command),
@@ -689,17 +715,9 @@ async function executeCommand(
             mode: command.mode,
             collaboration,
             sequence,
-          } satisfies DaemonNodeEvent, token, signal);
-        } catch (error) {
-          outputPostFailure = error instanceof Error ? error : new Error(String(error));
-          logger.error("collaboration event post exhausted retries", {
-            ...commandLogFields(sandboxId, command),
-            agent,
-            sequence,
-            error: outputPostFailure.message,
-          });
-        }
-      });
+          } satisfies DaemonNodeEvent, token, signal),
+        { agent, sequence },
+      );
     },
   };
   // Each logical agent gets its own subdirectory under the node's shared
@@ -1243,6 +1261,16 @@ async function enrollManagedDaemon(
 // answering with 5xx, with capped exponential backoff. Client errors (4xx,
 // e.g. a rejected token) are fatal and propagate immediately.
 const BACKEND_RECONNECT_MAX_DELAY_MS = 10_000;
+const BACKEND_RECONNECT_BASE_DELAY_MS = 2_000;
+
+export function backendReconnectDelayMs(attempt: number, random = Math.random): number {
+  const ceiling = Math.min(
+    BACKEND_RECONNECT_BASE_DELAY_MS * 2 ** Math.min(Math.max(attempt - 1, 0), 3),
+    BACKEND_RECONNECT_MAX_DELAY_MS,
+  );
+  // Equal jitter keeps a meaningful lower bound while spreading reconnecting daemons.
+  return Math.round(ceiling * (0.5 + random() * 0.5));
+}
 
 async function withBackendReconnect<T>(
   action: () => Promise<T>,
@@ -1260,7 +1288,7 @@ async function withBackendReconnect<T>(
       if (error instanceof DaemonHttpError && error.status < 500) throw error;
       attempt += 1;
       const message = error instanceof Error ? error.message : String(error);
-      const backoff = Math.min(1000 * 2 ** Math.min(attempt - 1, 4), BACKEND_RECONNECT_MAX_DELAY_MS);
+      const backoff = backendReconnectDelayMs(attempt);
       logger.warn(`${context.what} failed; retrying`, {
         sandboxId: context.sandboxId,
         error: message,

@@ -32,7 +32,7 @@ from ..persistence.stores import (
 from ..sessions import compute_prior_agent_bridge
 from ..sessions import compute_conversation_history
 from ..sessions import compute_prior_handoff_note
-from ..sessions import SessionController, initial_agent_state
+from ..sessions import SessionController, initial_agent_state, merge_agent_state
 
 load_backend_env()
 
@@ -118,14 +118,31 @@ WORKSPACE_ARTIFACT_CONTENT_MAX_BYTES = int(
     os.environ.get("RELAY_WORKSPACE_ARTIFACT_SNAPSHOT_MAX_BYTES", str(2 * 1024 * 1024))
 )
 ARTIFACT_SNAPSHOT_STATE_KEY = "_relay_artifact_snapshot"
+TERMINAL_EVENT_STATE_KEY = "_relay_terminal_event"
+TERMINAL_CLAIM_ID_STATE_KEY = "_relay_terminal_claim_id"
+TERMINAL_CLAIM_EXPIRES_STATE_KEY = "_relay_terminal_claim_expires_at"
+TERMINAL_CLAIM_LEASE_SECONDS = float(
+    os.environ.get("RELAY_TERMINAL_CLAIM_LEASE_SECONDS", str(15 * 60))
+)
+DISPATCH_CLAIM_LEASE_SECONDS = float(
+    os.environ.get("RELAY_DISPATCH_CLAIM_LEASE_SECONDS", "60")
+)
+RUN_OUTPUT_BUFFER_MAX_CHARS = int(
+    os.environ.get("RELAY_RUN_OUTPUT_BUFFER_MAX_CHARS", str(2 * 1024 * 1024))
+)
+PERSISTED_AGENT_STATE_KEYS = frozenset(
+    {"task_goal", "agent_logs", "last_exit_code", "agent_failures", "token_usage"}
+)
 DAEMON_CAPABILITY_GENERATED_FILES = "generated-files"
 DAEMON_CAPABILITY_WORKSPACE_READ = "workspace-read"
 DAEMON_CAPABILITY_STRUCTURED_AGENT_EVENTS = "structured-agent-events"
-DAEMON_NODE_CAPABILITIES = frozenset({
-    DAEMON_CAPABILITY_GENERATED_FILES,
-    DAEMON_CAPABILITY_WORKSPACE_READ,
-    DAEMON_CAPABILITY_STRUCTURED_AGENT_EVENTS,
-})
+DAEMON_NODE_CAPABILITIES = frozenset(
+    {
+        DAEMON_CAPABILITY_GENERATED_FILES,
+        DAEMON_CAPABILITY_WORKSPACE_READ,
+        DAEMON_CAPABILITY_STRUCTURED_AGENT_EVENTS,
+    }
+)
 DAEMON_SANDBOX_MODES = frozenset({"none", "boxlite"})
 
 
@@ -141,10 +158,7 @@ def _is_generated_artifact_path(relative_path: str) -> bool:
         and path.parts[1].startswith("agent-")
     ):
         output_root = path.parts[2]
-    return bool(
-        output_root == "output"
-        and suffix in OUTPUT_ARTIFACT_TEXT_EXTENSIONS
-    )
+    return bool(output_root == "output" and suffix in OUTPUT_ARTIFACT_TEXT_EXTENSIONS)
 
 
 def hash_daemon_node_token(token: str | None) -> str | None:
@@ -168,21 +182,24 @@ def _hash_matches(expected: str | None, token: str | None) -> bool:
 
 
 def sandbox_ui_token_matches(sandbox: dict[str, Any], token: str | None) -> bool:
-    expected = (
-        sandbox.get("uiTokenHash")
-        or sandbox.get("tokenHash")
-        or hash_daemon_node_token(sandbox.get("token"))
-    )
+    expected = _credential_hash(sandbox, "uiTokenHash")
     return _hash_matches(expected, token)
 
 
 def daemon_node_token_matches(sandbox: dict[str, Any], token: str | None) -> bool:
-    expected = (
-        sandbox.get("nodeTokenHash")
-        or sandbox.get("tokenHash")
-        or hash_daemon_node_token(sandbox.get("token"))
-    )
+    expected = _credential_hash(sandbox, "nodeTokenHash")
     return _hash_matches(expected, token)
+
+
+def _credential_hash(sandbox: dict[str, Any], field: str) -> str | None:
+    """Read a split credential hash, with one isolated legacy migration path."""
+    explicit = sandbox.get(field)
+    if isinstance(explicit, str) and explicit:
+        return explicit
+    legacy = sandbox.get("tokenHash")
+    if isinstance(legacy, str) and legacy:
+        return legacy
+    return hash_daemon_node_token(sandbox.get("token"))
 
 
 def sandbox_ui_auth_error(sandbox: dict[str, Any], token: str | None) -> str | None:
@@ -490,7 +507,12 @@ def node_status_for_active_runs(
 
 
 def workspace_paths_match(left: str | None, right: str | None) -> bool:
-    return bool(left and right and Path(left).resolve() == Path(right).resolve())
+    return bool(
+        left
+        and right
+        and os.path.normcase(os.path.abspath(left))
+        == os.path.normcase(os.path.abspath(right))
+    )
 
 
 def workspace_identity(node: dict[str, Any]) -> tuple[str, str] | None:
@@ -499,7 +521,7 @@ def workspace_identity(node: dict[str, Any]) -> tuple[str, str] | None:
         return ("id", workspace_id.strip())
     workspace_path = node.get("workspacePath")
     if isinstance(workspace_path, str) and workspace_path.strip():
-        return ("path", str(Path(workspace_path).resolve()))
+        return ("path", os.path.normcase(os.path.abspath(workspace_path)))
     return None
 
 
@@ -582,7 +604,11 @@ def agent_inventory_state(
 
 def daemon_command_payload(record: dict[str, Any]) -> dict[str, Any]:
     return {
-        **record["command"],
+        **{
+            key: value
+            for key, value in record["command"].items()
+            if not key.startswith("_")
+        },
         **({"leaseId": record["leaseId"]} if record.get("leaseId") else {}),
         **(
             {"leaseExpiresAt": record["leaseExpiresAt"]}
@@ -652,8 +678,13 @@ class DaemonNodeRegistry:
         self.sandboxes: dict[str, dict[str, Any]] = {}
         self.active_commands: dict[str, dict[str, Any]] = {}
         self.outputs: dict[str, list[str]] = {}
-        self.output_sequences: dict[str, set[tuple[str, int]]] = {}
+        self.output_sizes: dict[str, int] = {}
+        self.output_sequences: dict[str, dict[str, int]] = {}
         self.output_sequences_hydrated: set[str] = set()
+        # Control-panel provisioning needs to render the launch command again
+        # during the current backend process. This cache is deliberately
+        # ephemeral and is never used for managed enrollment credentials,
+        # which are delivered exactly once by the enrollment response.
         self.plain_node_tokens: dict[str, str] = {}
         self.dispatch_lock = RLock()
         self.logical_assignment_validator: Callable[[dict[str, Any]], None] | None = (
@@ -665,6 +696,12 @@ class DaemonNodeRegistry:
 
     def register(
         self, payload: dict[str, Any], ui_token: str | None = None
+    ) -> dict[str, Any]:
+        with self.dispatch_lock:
+            return self._register_unlocked(payload, ui_token)
+
+    def _register_unlocked(
+        self, payload: dict[str, Any], ui_token: str | None
     ) -> dict[str, Any]:
         if payload["protocolVersion"] not in DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS:
             raise ValueError(
@@ -789,28 +826,16 @@ class DaemonNodeRegistry:
             ),
             "maxConcurrentRuns": max_concurrent_runs,
             "runCapacityByMode": run_capacity_by_mode,
-            "token": None,
-            "tokenHash": next_ui_hash,
             "uiTokenHash": next_ui_hash,
             "nodeTokenHash": hash_daemon_node_token(payload.get("token"))
             or (existing or {}).get("nodeTokenHash")
             or (existing or {}).get("tokenHash"),
-            **(
-                {
-                    "nodeToken": payload.get("token")
-                    or (existing or {}).get("nodeToken")
-                    or self.plain_node_tokens.get(payload["sandboxId"])
-                }
-                if not (existing or {}).get("managedNodeId")
-                else {}
-            ),
             "createdAt": (existing or {}).get("createdAt", now),
             "updatedAt": now,
             "lastSeenAt": now,
         }
         self.sandboxes[sandbox["id"]] = sandbox
-        if payload.get("token") and not sandbox.get("managedNodeId"):
-            self.plain_node_tokens[sandbox["id"]] = payload["token"]
+        self._remember_control_panel_node_token(sandbox, payload.get("token"))
         self.daemon_store.register_node(sandbox)
         logger.info(
             "Daemon node registered",
@@ -1043,7 +1068,11 @@ class DaemonNodeRegistry:
                     }
                     self.sandboxes[existing["id"]] = existing
                     self.daemon_store.register_node(existing)
-                return existing, None, None
+                return (
+                    existing,
+                    None,
+                    self.plain_node_tokens.get(existing["id"]),
+                )
         sandbox_id = new_sandbox_id(employee_id or "node")
         ui_token = new_daemon_node_token()
         node_token = new_daemon_node_token()
@@ -1057,17 +1086,14 @@ class DaemonNodeRegistry:
             "agents": {agent: "unknown" for agent in AGENT_NAMES},
             "maxConcurrentRuns": 1,
             "runCapacityByMode": {mode: 1 for mode in AGENT_TASK_MODES},
-            "token": None,
-            "tokenHash": hash_daemon_node_token(ui_token),
             "uiTokenHash": hash_daemon_node_token(ui_token),
             "nodeTokenHash": hash_daemon_node_token(node_token),
-            "nodeToken": node_token,
             "createdAt": now,
             "updatedAt": now,
             "lastError": "Waiting for daemon node registration.",
         }
         self.sandboxes[sandbox_id] = sandbox
-        self.plain_node_tokens[sandbox_id] = node_token
+        self._remember_control_panel_node_token(sandbox, node_token)
         self.daemon_store.register_node(sandbox)
         logger.info(
             "Daemon node provisioned",
@@ -1076,6 +1102,13 @@ class DaemonNodeRegistry:
             workspace_path=workspace_path,
         )
         return sandbox, ui_token, node_token
+
+    def _remember_control_panel_node_token(
+        self, sandbox: dict[str, Any], token: str | None
+    ) -> None:
+        """Cache only control-panel launch credentials, until process restart."""
+        if token and not sandbox.get("managedNodeId"):
+            self.plain_node_tokens[sandbox["id"]] = token
 
     def enroll_managed_node(
         self,
@@ -1107,7 +1140,6 @@ class DaemonNodeRegistry:
             "agents": {agent: "unknown" for agent in AGENT_NAMES},
             "maxConcurrentRuns": 1,
             "runCapacityByMode": {mode: 1 for mode in AGENT_TASK_MODES},
-            "token": None,
             "nodeTokenHash": hash_daemon_node_token(node_token),
             "createdAt": now,
             "updatedAt": now,
@@ -1181,6 +1213,10 @@ class DaemonNodeRegistry:
         return bool(sandbox and self._liveness(sandbox)["online"])
 
     def enqueue(self, sandbox_id: str, command: dict[str, Any]) -> None:
+        with self.dispatch_lock:
+            self._enqueue_unlocked(sandbox_id, command)
+
+    def _enqueue_unlocked(self, sandbox_id: str, command: dict[str, Any]) -> None:
         self.daemon_store.enqueue_command(sandbox_id, command)
         logger.debug(
             "Command enqueued",
@@ -1188,6 +1224,9 @@ class DaemonNodeRegistry:
             command_id=command["id"],
             command_type=command["type"],
         )
+        self._track_active_command(sandbox_id, command)
+
+    def _track_active_command(self, sandbox_id: str, command: dict[str, Any]) -> None:
         if command["type"] == "run.start":
             self.active_commands[command["id"]] = {
                 "sandboxId": sandbox_id,
@@ -1214,9 +1253,27 @@ class DaemonNodeRegistry:
         lease_seconds: float = DAEMON_COMMAND_LEASE_SECONDS,
         renew_known_active: bool = True,
     ) -> list[dict[str, Any]]:
+        with self.dispatch_lock:
+            return self._take_commands_unlocked(
+                sandbox_id,
+                token,
+                limit=limit,
+                lease_seconds=lease_seconds,
+                renew_known_active=renew_known_active,
+            )
+
+    def _take_commands_unlocked(
+        self,
+        sandbox_id: str,
+        token: str | None,
+        *,
+        limit: int,
+        lease_seconds: float,
+        renew_known_active: bool,
+    ) -> list[dict[str, Any]]:
         self._assert_authorized(sandbox_id, token)
-        self.reap_stale_runs()
         self._mark_seen(sandbox_id)
+        self.reap_stale_runs()
         if renew_known_active:
             self._renew_known_active_command_leases(
                 sandbox_id, lease_seconds=lease_seconds
@@ -1299,6 +1356,29 @@ class DaemonNodeRegistry:
         assignments: list[dict[str, Any]],
         state: dict[str, Any],
         task_id: str | None = None,
+        *,
+        active_runs: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        with self.dispatch_lock:
+            return self._start_run_request_unlocked(
+                sandbox_id,
+                session_id,
+                task_goal,
+                assignments,
+                state,
+                task_id,
+                active_runs,
+            )
+
+    def _start_run_request_unlocked(
+        self,
+        sandbox_id: str,
+        session_id: str,
+        task_goal: str,
+        assignments: list[dict[str, Any]],
+        state: dict[str, Any],
+        task_id: str | None,
+        active_runs: list[dict[str, Any]] | None,
     ) -> dict[str, Any]:
         if self.daemon_store.active_run_request_for_session(sandbox_id, session_id):
             raise ValueError(f"Session {session_id} already has an active daemon run.")
@@ -1312,9 +1392,15 @@ class DaemonNodeRegistry:
                 **({"taskId": task_id} if task_id else {}),
             }
         )
-        return self._enqueue_current_assignment(request)
+        return self._enqueue_current_assignment(request, active_runs=active_runs)
 
     def cancel_active_run(
+        self, sandbox_id: str, session_id: str, reason: str
+    ) -> dict[str, Any] | None:
+        with self.dispatch_lock:
+            return self._cancel_active_run_unlocked(sandbox_id, session_id, reason)
+
+    def _cancel_active_run_unlocked(
         self, sandbox_id: str, session_id: str, reason: str
     ) -> dict[str, Any] | None:
         active = next(
@@ -1367,15 +1453,57 @@ class DaemonNodeRegistry:
     def handle_event(
         self, sandbox_id: str, event: dict[str, Any], token: str | None
     ) -> None:
+        with self.dispatch_lock:
+            self._handle_event_unlocked(sandbox_id, event, token)
+
+    def _handle_event_unlocked(
+        self, sandbox_id: str, event: dict[str, Any], token: str | None
+    ) -> None:
         self._assert_authorized(sandbox_id, token)
         self._mark_seen(sandbox_id)
         record = self.daemon_store.get_command(event["commandId"])
-        if not record or record.get("status") != "dispatched":
+        if not record:
             logger.debug(
                 "Daemon node event ignored: no active command",
                 sandbox_id=sandbox_id,
                 command_id=event["commandId"],
             )
+            return
+        terminal_status = {
+            "run.completed": "completed",
+            "run.failed": "failed",
+            "run.cancelled": "cancelled",
+        }.get(event["type"])
+        if record.get("status") != "dispatched":
+            command = record["command"]
+            replay_matches = (
+                record.get("nodeId") == sandbox_id
+                and command.get("sessionId") == event.get("sessionId")
+                and command.get("runId") == event.get("runId")
+                and command.get("agent") == event.get("agent")
+                and command.get("mode") == event.get("mode")
+                and (
+                    not record.get("leaseId")
+                    or not event.get("leaseId")
+                    or record["leaseId"] == event["leaseId"]
+                )
+            )
+            if (
+                terminal_status
+                and record.get("status") == terminal_status
+                and replay_matches
+            ):
+                self.active_commands.pop(event["commandId"], None)
+                self.daemon_store.mark_cancel_commands_completed(
+                    sandbox_id, event["commandId"]
+                )
+                self._claim_and_advance_run_request(event)
+            else:
+                logger.debug(
+                    "Daemon node event ignored: no active command",
+                    sandbox_id=sandbox_id,
+                    command_id=event["commandId"],
+                )
             return
         command = record["command"]
         active = {
@@ -1438,11 +1566,8 @@ class DaemonNodeRegistry:
             )
         if event["type"] == "run.output":
             seen = self._output_sequences_for_run(event["sessionId"], event["runId"])
-            sequence_key = (event["stream"], event["sequence"])
-            if sequence_key in seen:
+            if event["sequence"] <= seen.get(event["stream"], -1):
                 return
-            seen.add(sequence_key)
-            self.outputs.setdefault(event["runId"], []).append(event["text"])
             self.store.append_event(
                 event["sessionId"],
                 relay_event(
@@ -1457,13 +1582,13 @@ class DaemonNodeRegistry:
                     },
                 ),
             )
+            seen[event["stream"]] = event["sequence"]
+            self._append_run_output(event["runId"], event["text"])
             return
         if event["type"] == "run.collaboration":
             seen = self._output_sequences_for_run(event["sessionId"], event["runId"])
-            sequence_key = ("collaboration", event["sequence"])
-            if sequence_key in seen:
+            if event["sequence"] <= seen.get("collaboration", -1):
                 return
-            seen.add(sequence_key)
             self.store.append_event(
                 event["sessionId"],
                 relay_event(
@@ -1478,6 +1603,7 @@ class DaemonNodeRegistry:
                     },
                 ),
             )
+            seen["collaboration"] = event["sequence"]
             return
         accepted = False
         if event["type"] == "run.completed":
@@ -1521,11 +1647,7 @@ class DaemonNodeRegistry:
             return
         self.active_commands.pop(event["commandId"], None)
         self.daemon_store.mark_cancel_commands_completed(sandbox_id, event["commandId"])
-        run_request = self.daemon_store.run_request_for_command(event["commandId"])
-        if run_request:
-            with self.dispatch_lock:
-                self._advance_run_request(run_request, event)
-        else:
+        if not self._claim_and_advance_run_request(event):
             self.clear_run_output(event["runId"])
 
     def assert_node_event_authorized(self, sandbox_id: str, token: str | None) -> None:
@@ -1534,6 +1656,10 @@ class DaemonNodeRegistry:
         self._mark_seen(sandbox_id)
 
     def reap_stale_runs(self, *, force: bool = True) -> None:
+        with self.dispatch_lock:
+            self._reap_stale_runs_unlocked(force=force)
+
+    def _reap_stale_runs_unlocked(self, *, force: bool) -> None:
         monotonic_now = time.monotonic()
         if not force and monotonic_now - self._last_reap_at < max(
             0.001, self.liveness_timeout_ms / 1000
@@ -1543,6 +1669,85 @@ class DaemonNodeRegistry:
         self._last_reap_at = monotonic_now
         self._maybe_prune_terminal_records(monotonic_now)
         for request in self.daemon_store.list_active_run_requests():
+            if request.get("status") == "finalizing":
+                terminal_event = (request.get("state") or {}).get(
+                    TERMINAL_EVENT_STATE_KEY
+                )
+                if isinstance(terminal_event, dict):
+                    self._claim_and_advance_run_request(terminal_event)
+                continue
+            command_id = request.get("currentCommandId")
+            if not command_id:
+                staged = self.daemon_store.pending_command_for_run_request(
+                    request["id"]
+                )
+                if staged:
+                    command = staged["command"]
+                    session = self.store.get_session(request["sessionId"])
+                    has_started = any(
+                        agent_run.get("id") == command["runId"]
+                        for agent_run in session.get("agentRuns", [])
+                    )
+                    if not has_started:
+                        claimed = self.daemon_store.claim_run_request_dispatch(
+                            request["id"],
+                            new_relay_id("claim"),
+                            DISPATCH_CLAIM_LEASE_SECONDS,
+                        )
+                        if not claimed:
+                            continue
+                        request = claimed
+                        command["_dispatchClaimId"] = request["state"][
+                            "_relay_dispatch_claim_id"
+                        ]
+                        self.daemon_store.update_staged_command(command["id"], command)
+                        self._ensure_agent_started_for_command(request, command)
+                    request = self.daemon_store.update_run_request_if_claimed(
+                        request["id"],
+                        "_relay_dispatch_claim_id",
+                        command.get("_dispatchClaimId", ""),
+                        self._run_request_command_link(command),
+                    )
+                    if not request:
+                        claimed = self.daemon_store.claim_run_request_dispatch(
+                            command["_runRequestId"],
+                            new_relay_id("claim"),
+                            DISPATCH_CLAIM_LEASE_SECONDS,
+                        )
+                        if not claimed:
+                            continue
+                        command["_dispatchClaimId"] = claimed["state"][
+                            "_relay_dispatch_claim_id"
+                        ]
+                        self.daemon_store.update_staged_command(command["id"], command)
+                        request = self.daemon_store.update_run_request_if_claimed(
+                            claimed["id"],
+                            "_relay_dispatch_claim_id",
+                            command["_dispatchClaimId"],
+                            self._run_request_command_link(command),
+                        )
+                        if not request:
+                            continue
+                    self.daemon_store.publish_command(command["id"])
+                    self._track_active_command(staged["nodeId"], command)
+                else:
+                    self._enqueue_current_assignment(request)
+                continue
+            command_record = self.daemon_store.get_command(command_id)
+            if command_record and command_record.get("status") == "pending":
+                self.daemon_store.publish_command(command_id)
+                self._track_active_command(
+                    command_record["nodeId"], command_record["command"]
+                )
+            if command_record and command_record.get("status") in (
+                "completed",
+                "failed",
+                "cancelled",
+            ):
+                terminal_event = command_record["command"].get("_terminalEvent")
+                if isinstance(terminal_event, dict):
+                    self._claim_and_advance_run_request(terminal_event)
+                    continue
             sandbox = self.sandboxes.get(request["nodeId"])
             if not sandbox:
                 self._fail_run_request(
@@ -1576,7 +1781,10 @@ class DaemonNodeRegistry:
         )
 
     def _enqueue_current_assignment(
-        self, run_request: dict[str, Any]
+        self,
+        run_request: dict[str, Any],
+        *,
+        active_runs: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         assignments = run_request["assignments"]
         index = run_request.get("currentIndex", 0)
@@ -1614,7 +1822,11 @@ class DaemonNodeRegistry:
             if not node_accepts_run(
                 sandbox,
                 assignments=[assignment],
-                active_runs=self.daemon_store.list_active_runs(node_id),
+                active_runs=(
+                    active_runs
+                    if active_runs is not None
+                    else self.daemon_store.list_active_runs(node_id)
+                ),
                 session_id=run_request["sessionId"],
             ):
                 raise ValueError("Runtime node capacity is exhausted.")
@@ -1623,13 +1835,11 @@ class DaemonNodeRegistry:
                 run_request, f"Agent placement is no longer eligible: {error}"
             )
             return run_request
-        controller = self._controller_for_sandbox(sandbox, run_request.get("taskId"))
-        state = dict(run_request["state"] or {})
-        state.pop("prior_agent_bridge", None)
-        state.pop("prior_conversation", None)
-        state.pop("prior_handoff_note", None)
-        state.pop("agent_instructions", None)
-        state.pop(ARTIFACT_SNAPSHOT_STATE_KEY, None)
+        state = {
+            key: value
+            for key, value in (run_request["state"] or {}).items()
+            if key in PERSISTED_AGENT_STATE_KEYS
+        }
         session_snapshot = self.store.get_session(run_request["sessionId"])
         bridge = compute_prior_agent_bridge(
             session_snapshot, assignment["executorKind"], self.store
@@ -1639,36 +1849,13 @@ class DaemonNodeRegistry:
         conversation = compute_conversation_history(session_snapshot, self.store)
         if conversation:
             state["prior_conversation"] = conversation
-        handoff_note = compute_prior_handoff_note(session_snapshot, assignment["executorKind"])
+        handoff_note = compute_prior_handoff_note(
+            session_snapshot, assignment["executorKind"]
+        )
         if handoff_note:
             state["prior_handoff_note"] = handoff_note
         if assignment.get("agentInstructions"):
             state["agent_instructions"] = assignment["agentInstructions"]
-        controller.record_agent_started(
-            run_request["sessionId"],
-            {
-                "runId": run_id,
-                "agent": assignment["executorKind"],
-                "role": effective_role_for_assignment(sandbox, assignment, mode),
-                "mode": mode,
-                **(
-                    {"logicalAgentId": assignment["agentId"]}
-                    if assignment.get("agentId")
-                    else {}
-                ),
-                **(
-                    {"placementId": assignment["placementId"]}
-                    if assignment.get("placementId")
-                    else {}
-                ),
-                "daemonNodeId": node_id,
-                **(
-                    {"agentVersion": assignment["agentVersion"]}
-                    if assignment.get("agentVersion")
-                    else {}
-                ),
-            },
-        )
         command = {
             "id": new_relay_id("cmd"),
             "type": "run.start",
@@ -1698,6 +1885,8 @@ class DaemonNodeRegistry:
                 else {}
             ),
             "state": state,
+            "_runRequestId": run_request["id"],
+            "_nodeId": node_id,
         }
         # Daemons that report generated files themselves make the backend-side
         # workspace walk unnecessary (and it only works on a shared filesystem).
@@ -1706,68 +1895,173 @@ class DaemonNodeRegistry:
             if self._node_reports_generated_files(sandbox)
             else _workspace_generated_file_snapshot(sandbox.get("workspacePath"))
         )
-        self.enqueue(node_id, command)
-        return self.daemon_store.update_run_request(
+        command["_artifactSnapshot"] = artifact_snapshot
+        dispatch_claim_id = new_relay_id("claim")
+        claimed_request = self.daemon_store.claim_run_request_dispatch(
             run_request["id"],
+            dispatch_claim_id,
+            DISPATCH_CLAIM_LEASE_SECONDS,
+        )
+        if not claimed_request:
+            return self.daemon_store.get_run_request(run_request["id"]) or run_request
+        run_request = claimed_request
+        command["_dispatchClaimId"] = dispatch_claim_id
+        staged = self.daemon_store.stage_command(
+            node_id,
+            command,
+            request_id=run_request["id"],
+            claim_id=dispatch_claim_id,
+        )
+        if not staged:
+            return self.daemon_store.get_run_request(run_request["id"]) or run_request
+        self._ensure_agent_started_for_command(run_request, command)
+        updated = self.daemon_store.update_run_request_if_claimed(
+            run_request["id"],
+            "_relay_dispatch_claim_id",
+            dispatch_claim_id,
+            self._run_request_command_link(command),
+        )
+        if not updated:
+            return self.daemon_store.get_run_request(run_request["id"]) or run_request
+        # A staged command is not claimable. Publish it only after its durable
+        # run-request link exists; reaping can safely publish after a crash.
+        self.daemon_store.publish_command(command["id"])
+        self._track_active_command(node_id, command)
+        return updated
+
+    def _ensure_agent_started_for_command(
+        self, run_request: dict[str, Any], command: dict[str, Any]
+    ) -> None:
+        session = self.store.get_session(run_request["sessionId"])
+        if any(
+            agent_run.get("id") == command["runId"]
+            for agent_run in session.get("agentRuns", [])
+        ):
+            return
+        assignment = run_request["assignments"][run_request.get("currentIndex", 0)]
+        sandbox = self.sandboxes[command["_nodeId"]]
+        controller = self._controller_for_sandbox(sandbox, run_request.get("taskId"))
+        controller.record_agent_started(
+            run_request["sessionId"],
             {
-                "nodeId": node_id,
-                "currentCommandId": command["id"],
-                "currentRunId": run_id,
-                "currentAgent": assignment["executorKind"],
-                "currentMode": mode,
+                "runId": command["runId"],
+                "agent": command["agent"],
+                "role": effective_role_for_assignment(
+                    sandbox, assignment, command["mode"]
+                ),
+                "mode": command["mode"],
                 **(
-                    {"currentLogicalAgentId": assignment["agentId"]}
-                    if assignment.get("agentId")
+                    {"logicalAgentId": command["logicalAgentId"]}
+                    if command.get("logicalAgentId")
                     else {}
                 ),
                 **(
-                    {"currentPlacementId": assignment["placementId"]}
-                    if assignment.get("placementId")
+                    {"placementId": command["placementId"]}
+                    if command.get("placementId")
                     else {}
                 ),
-                "currentStartedAt": now_iso(),
-                "state": {
-                    **state,
-                    **(
-                        {ARTIFACT_SNAPSHOT_STATE_KEY: artifact_snapshot}
-                        if artifact_snapshot is not None
-                        else {}
-                    ),
-                },
+                "daemonNodeId": command["_nodeId"],
+                **(
+                    {"agentVersion": command["agentVersion"]}
+                    if command.get("agentVersion")
+                    else {}
+                ),
             },
         )
+
+    def _run_request_command_link(self, command: dict[str, Any]) -> dict[str, Any]:
+        state = dict(command.get("state") or {})
+        artifact_snapshot = command.get("_artifactSnapshot")
+        if artifact_snapshot is not None:
+            state[ARTIFACT_SNAPSHOT_STATE_KEY] = artifact_snapshot
+        return {
+            "status": "running",
+            "nodeId": command["_nodeId"],
+            "currentCommandId": command["id"],
+            "currentRunId": command["runId"],
+            "currentAgent": command["agent"],
+            "currentMode": command["mode"],
+            "currentLogicalAgentId": command.get("logicalAgentId"),
+            "currentPlacementId": command.get("placementId"),
+            "currentStartedAt": now_iso(),
+            "state": state,
+        }
+
+    def _claim_and_advance_run_request(self, event: dict[str, Any]) -> bool:
+        run_request = self.daemon_store.claim_terminal_run_request(
+            event["commandId"],
+            event,
+            new_relay_id("claim"),
+            TERMINAL_CLAIM_LEASE_SECONDS,
+        )
+        if not run_request:
+            return False
+        self._advance_run_request(run_request, event)
+        return True
 
     def _advance_run_request(
         self, run_request: dict[str, Any], event: dict[str, Any]
     ) -> None:
+        terminal_claim_id = (run_request.get("state") or {}).get(
+            TERMINAL_CLAIM_ID_STATE_KEY
+        )
+        if not terminal_claim_id:
+            return
+        fenced_request = self.daemon_store.update_run_request_if_claimed(
+            run_request["id"],
+            TERMINAL_CLAIM_ID_STATE_KEY,
+            terminal_claim_id,
+            {},
+        )
+        if not fenced_request:
+            return
+        run_request = fenced_request
         sandbox = self.sandboxes.get(run_request["nodeId"])
         if not sandbox:
             self.clear_run_output(event["runId"])
             return
         controller = self._controller_for_sandbox(sandbox, run_request.get("taskId"))
+        session_before = self.store.get_session(run_request["sessionId"])
+        existing_completion = next(
+            (
+                item
+                for item in session_before.get("events", [])
+                if item.get("type") == "agent.completed"
+                and item.get("runId") == event["runId"]
+            ),
+            None,
+        )
         assignments = run_request["assignments"]
         assignment = assignments[run_request.get("currentIndex", 0)]
         mode = assignment.get("mode") or "action"
         state = dict(run_request["state"])
         artifact_snapshot = state.pop(ARTIFACT_SNAPSHOT_STATE_KEY, None)
+        state.pop(TERMINAL_EVENT_STATE_KEY, None)
+        state.pop(TERMINAL_CLAIM_ID_STATE_KEY, None)
+        state.pop(TERMINAL_CLAIM_EXPIRES_STATE_KEY, None)
         if event["type"] == "run.failed":
             agent_log = event.get("agentLog") or event["error"]
             self.clear_run_output(event["runId"])
-            controller.record_agent_completed(
-                run_request["sessionId"],
-                state,
-                {
-                    "runId": event["runId"],
-                    "agent": event["agent"],
-                    "mode": mode,
-                    "status": "failed",
-                    "exitCode": event.get("exitCode", 1),
-                    "agentLog": agent_log,
-                },
-            )
-            controller.fail_session(run_request["sessionId"], event["error"])
-            self.daemon_store.update_run_request(
-                run_request["id"], {"status": "failed", "error": event["error"]}
+            if not existing_completion:
+                controller.record_agent_completed(
+                    run_request["sessionId"],
+                    state,
+                    {
+                        "runId": event["runId"],
+                        "agent": event["agent"],
+                        "mode": mode,
+                        "status": "failed",
+                        "exitCode": event.get("exitCode", 1),
+                        "agentLog": agent_log,
+                    },
+                )
+            if session_before.get("status") != "failed":
+                controller.fail_session(run_request["sessionId"], event["error"])
+            self.daemon_store.update_run_request_if_claimed(
+                run_request["id"],
+                TERMINAL_CLAIM_ID_STATE_KEY,
+                terminal_claim_id,
+                {"status": "failed", "error": event["error"]},
             )
             self.update_status(
                 run_request["nodeId"], {"status": "ready", "lastError": event["error"]}
@@ -1775,21 +2069,26 @@ class DaemonNodeRegistry:
             return
         if event["type"] == "run.cancelled":
             self.clear_run_output(event["runId"])
-            controller.record_agent_completed(
-                run_request["sessionId"],
-                state,
-                {
-                    "runId": event["runId"],
-                    "agent": event["agent"],
-                    "mode": mode,
-                    "status": "cancelled",
-                    "exitCode": 130,
-                    "agentLog": "",
-                },
-            )
-            controller.cancel_session(run_request["sessionId"], event["reason"])
-            self.daemon_store.update_run_request(
-                run_request["id"], {"status": "cancelled", "error": event["reason"]}
+            if not existing_completion:
+                controller.record_agent_completed(
+                    run_request["sessionId"],
+                    state,
+                    {
+                        "runId": event["runId"],
+                        "agent": event["agent"],
+                        "mode": mode,
+                        "status": "cancelled",
+                        "exitCode": 130,
+                        "agentLog": "",
+                    },
+                )
+            if session_before.get("status") != "cancelled":
+                controller.cancel_session(run_request["sessionId"], event["reason"])
+            self.daemon_store.update_run_request_if_claimed(
+                run_request["id"],
+                TERMINAL_CLAIM_ID_STATE_KEY,
+                terminal_claim_id,
+                {"status": "cancelled", "error": event["reason"]},
             )
             self.update_status(
                 run_request["nodeId"], {"status": "ready", "lastError": event["reason"]}
@@ -1800,19 +2099,28 @@ class DaemonNodeRegistry:
         has_next = event["exitCode"] == 0 and run_request.get(
             "currentIndex", 0
         ) + 1 < len(assignments)
-        next_state = controller.record_agent_completed(
-            run_request["sessionId"],
-            state,
-            {
-                "runId": event["runId"],
-                "agent": event["agent"],
-                "mode": mode,
-                "status": "completed" if event["exitCode"] == 0 else "failed",
-                "exitCode": event["exitCode"],
-                "agentLog": agent_log,
-                "tokenUsage": event.get("tokenUsage"),
-                **({"pipelineHasNext": True} if has_next else {}),
-            },
+        state_patch = {
+            "agent_logs": [agent_log],
+            "last_exit_code": event["exitCode"],
+            "token_usage": event.get("tokenUsage"),
+        }
+        next_state = (
+            merge_agent_state(state, state_patch)
+            if existing_completion
+            else controller.record_agent_completed(
+                run_request["sessionId"],
+                state,
+                {
+                    "runId": event["runId"],
+                    "agent": event["agent"],
+                    "mode": mode,
+                    "status": "completed" if event["exitCode"] == 0 else "failed",
+                    "exitCode": event["exitCode"],
+                    "agentLog": agent_log,
+                    "tokenUsage": event.get("tokenUsage"),
+                    **({"pipelineHasNext": True} if has_next else {}),
+                },
+            )
         )
         if event["exitCode"] == 0:
             self._record_generated_workspace_artifacts(
@@ -1820,9 +2128,12 @@ class DaemonNodeRegistry:
             )
         if event["exitCode"] != 0:
             outcome = f"{assignment['agent']} {mode} failed with exit code {event['exitCode']}."
-            controller.fail_session(run_request["sessionId"], outcome)
-            self.daemon_store.update_run_request(
+            if session_before.get("status") != "failed":
+                controller.fail_session(run_request["sessionId"], outcome)
+            self.daemon_store.update_run_request_if_claimed(
                 run_request["id"],
+                TERMINAL_CLAIM_ID_STATE_KEY,
+                terminal_claim_id,
                 {"status": "failed", "state": next_state, "error": outcome},
             )
             self.update_status(
@@ -1830,9 +2141,12 @@ class DaemonNodeRegistry:
             )
             return
         next_index = run_request.get("currentIndex", 0) + 1
-        updated = self.daemon_store.update_run_request(
+        updated = self.daemon_store.update_run_request_if_claimed(
             run_request["id"],
+            TERMINAL_CLAIM_ID_STATE_KEY,
+            terminal_claim_id,
             {
+                "status": "running",
                 "currentIndex": next_index,
                 "state": next_state,
                 "currentCommandId": None,
@@ -1842,6 +2156,8 @@ class DaemonNodeRegistry:
                 "currentStartedAt": None,
             },
         )
+        if not updated:
+            return
         if next_index >= len(assignments):
             self._complete_run_request(updated, "Assignments completed.")
         else:
@@ -1877,12 +2193,18 @@ class DaemonNodeRegistry:
         # A file may legitimately be re-generated by a later run; each change
         # gets its own artifact attributed to the run that produced it. Only
         # duplicates within one report are dropped.
-        seen_paths: set[str] = set()
+        session = self.store.get_session(session_id)
+        seen_relative_paths = {
+            artifact.get("workspaceRelativePath")
+            for artifact in session.get("artifacts", [])
+            if artifact.get("agentRunId") == event["runId"]
+        }
         for item in items:
             path = item["path"]
-            if path in seen_paths:
+            relative_path = item["relativePath"]
+            if relative_path in seen_relative_paths:
                 continue
-            seen_paths.add(path)
+            seen_relative_paths.add(relative_path)
             artifact = {
                 "id": new_relay_id("art"),
                 "kind": "workspace_file",
@@ -1940,9 +2262,13 @@ class DaemonNodeRegistry:
             task_status = "review"
         else:
             task_status = "done"
-        controller.complete_session(
-            run_request["sessionId"], outcome, task_status=task_status
-        )
+        if (
+            self.store.get_session(run_request["sessionId"]).get("status")
+            != "completed"
+        ):
+            controller.complete_session(
+                run_request["sessionId"], outcome, task_status=task_status
+            )
         self.daemon_store.update_run_request(
             run_request["id"], {"status": "completed", "error": None}
         )
@@ -1965,10 +2291,22 @@ class DaemonNodeRegistry:
                 "error": outcome,
                 "exitCode": 1,
             }
-            self.daemon_store.mark_command_failed(run_request["nodeId"], event)
+            accepted = self.daemon_store.mark_command_failed(
+                run_request["nodeId"], event
+            )
+            if not accepted:
+                command_record = self.daemon_store.get_command(command_id)
+                if command_record:
+                    # A terminal daemon event won the durable transition on
+                    # another replica. Its handler owns the session update.
+                    if run_id:
+                        self.clear_run_output(run_id)
+                    return
             self.daemon_store.mark_cancel_commands_completed(
                 run_request["nodeId"], command_id
             )
+        if run_id:
+            self.clear_run_output(run_id)
         sandbox = self.sandboxes.get(run_request["nodeId"])
         controller = (
             self._controller_for_sandbox(sandbox, run_request.get("taskId"))
@@ -2030,23 +2368,38 @@ class DaemonNodeRegistry:
     def output_for_run(self, run_id: str) -> str:
         return "".join(self.outputs.get(run_id, []))
 
+    def _append_run_output(self, run_id: str, text: str) -> None:
+        if RUN_OUTPUT_BUFFER_MAX_CHARS <= 0:
+            return
+        chunks = self.outputs.setdefault(run_id, [])
+        chunks.append(text[-RUN_OUTPUT_BUFFER_MAX_CHARS:])
+        size = self.output_sizes.get(run_id, 0) + len(chunks[-1])
+        while size > RUN_OUTPUT_BUFFER_MAX_CHARS and chunks:
+            overflow = size - RUN_OUTPUT_BUFFER_MAX_CHARS
+            if len(chunks[0]) <= overflow:
+                size -= len(chunks.pop(0))
+            else:
+                chunks[0] = chunks[0][overflow:]
+                size -= overflow
+        self.output_sizes[run_id] = size
+
     def clear_run_output(self, run_id: str) -> None:
         self.outputs.pop(run_id, None)
+        self.output_sizes.pop(run_id, None)
         self.output_sequences.pop(run_id, None)
         self.output_sequences_hydrated.discard(run_id)
 
-    def _output_sequences_for_run(
-        self, session_id: str, run_id: str
-    ) -> set[tuple[str, int]]:
-        seen = self.output_sequences.setdefault(run_id, set())
+    def _output_sequences_for_run(self, session_id: str, run_id: str) -> dict[str, int]:
+        seen = self.output_sequences.setdefault(run_id, {})
         if run_id not in self.output_sequences_hydrated:
-            seen.update(self._session_output_sequences(session_id, run_id))
+            for stream, sequence in self._session_output_sequences(
+                session_id, run_id
+            ).items():
+                seen[stream] = max(seen.get(stream, -1), sequence)
             self.output_sequences_hydrated.add(run_id)
         return seen
 
-    def _session_output_sequences(
-        self, session_id: str, run_id: str
-    ) -> set[tuple[str, int]]:
+    def _session_output_sequences(self, session_id: str, run_id: str) -> dict[str, int]:
         try:
             session = self.store.get_session(session_id)
         except Exception:
@@ -2055,15 +2408,24 @@ class DaemonNodeRegistry:
                 session_id=session_id,
                 run_id=run_id,
             )
-            return set()
-        return {
-            (event["stream"], event["sequence"])
-            for event in session.get("events", [])
-            if event.get("type") == "agent.output"
-            and event.get("runId") == run_id
-            and isinstance(event.get("stream"), str)
-            and isinstance(event.get("sequence"), int)
-        }
+            return {}
+        seen: dict[str, int] = {}
+        for event in session.get("events", []):
+            if (
+                event.get("type") not in ("agent.output", "agent.collaboration")
+                or event.get("runId") != run_id
+                or not isinstance(event.get("sequence"), int)
+            ):
+                continue
+            stream = (
+                event.get("stream")
+                if event.get("type") == "agent.output"
+                else "collaboration"
+            )
+            if not isinstance(stream, str):
+                continue
+            seen[stream] = max(seen.get(stream, -1), event["sequence"])
+        return seen
 
     def _assert_authorized(self, sandbox_id: str, token: str | None) -> None:
         sandbox = self.sandboxes.get(sandbox_id)
@@ -2077,28 +2439,29 @@ class DaemonNodeRegistry:
             raise PermissionError("Unauthorized daemon node request.")
 
     def _mark_seen(self, sandbox_id: str) -> None:
-        sandbox = self.sandboxes.get(sandbox_id)
-        if not sandbox:
-            return
-        revived = sandbox["status"] in ("stopped", "provisioning", "failed")
-        patch = {"status": "ready", "lastError": None} if revived else {}
-        now = now_iso()
-        updated = {
-            **sandbox,
-            **{k: v for k, v in patch.items() if v is not None},
-            "updatedAt": now,
-            "lastSeenAt": now,
-        }
-        if "lastError" in patch and patch["lastError"] is None:
-            updated.pop("lastError", None)
-        self.sandboxes[sandbox_id] = updated
-        self.daemon_store.mark_node_seen(sandbox_id, patch)
-        if revived:
-            logger.info(
-                "Daemon node came online",
-                sandbox_id=sandbox_id,
-                previous_status=sandbox["status"],
-            )
+        with self.dispatch_lock:
+            sandbox = self.sandboxes.get(sandbox_id)
+            if not sandbox:
+                return
+            revived = sandbox["status"] in ("stopped", "provisioning", "failed")
+            patch = {"status": "ready", "lastError": None} if revived else {}
+            now = now_iso()
+            updated = {
+                **sandbox,
+                **{k: v for k, v in patch.items() if v is not None},
+                "updatedAt": now,
+                "lastSeenAt": now,
+            }
+            if "lastError" in patch and patch["lastError"] is None:
+                updated.pop("lastError", None)
+            self.sandboxes[sandbox_id] = updated
+            self.daemon_store.mark_node_seen(sandbox_id, patch)
+            if revived:
+                logger.info(
+                    "Daemon node came online",
+                    sandbox_id=sandbox_id,
+                    previous_status=sandbox["status"],
+                )
 
     def _load_persisted_state(self) -> None:
         nodes = self.daemon_store.list_nodes()
@@ -2117,7 +2480,6 @@ class DaemonNodeRegistry:
             )
             self.sandboxes[sandbox["id"]] = {
                 **sandbox,
-                "token": None,
                 "status": waiting_status,
                 "agents": {agent: "unknown" for agent in AGENT_NAMES},
                 "updatedAt": now_iso(),
