@@ -67,7 +67,7 @@ export function ChatHeader({ activeAgent, logicalAgents, activeLogicalAgentId, o
   return (
     <header className="chat-header">
       <div className="chat-title">
-        <Button variant="ghost" className="mobile-back-button" type="button" onClick={onBackToThreads}>
+        <Button variant="ghost" className="mobile-back-button" type="button" aria-label={t("nav.conversations")} onClick={onBackToThreads}>
           <NavConversations size={16} /><span>{t("nav.conversations")}</span>
         </Button>
         <div className="chat-title-text">
@@ -96,7 +96,7 @@ export function ChatHeader({ activeAgent, logicalAgents, activeLogicalAgentId, o
       </div>
       <div className="chat-tools">
         <div className="chat-active-agent" aria-label={t("thread.talk_to_agent")}>
-          <AgentMark agent={activeAgent} size={14} className="chat-active-agent-mark" />
+          <AgentMark agent={activeAgent} size={16} className="chat-active-agent-mark" />
           <span className="mono" translate="no">{activeLogicalAgent?.displayName ?? activeAgent}</span>
         </div>
         <div className="header-agent-tabs segmented segmented--brand" role="radiogroup" aria-label={t("thread.talk_to_agent")} ref={tabsRef}>
@@ -132,7 +132,7 @@ export function ChatHeader({ activeAgent, logicalAgents, activeLogicalAgentId, o
                   }
                 }}
               >
-                <AgentMark agent={logicalAgent.executorKind} size={14} className="header-agent-tab-mark" />
+                <AgentMark agent={logicalAgent.executorKind} size={16} className="header-agent-tab-mark" />
                 <span translate="no">{logicalAgent.displayName}</span>
                 {isBusy && isRoutable ? <span className="header-agent-busy-pip" aria-hidden="true" /> : null}
               </Button>

@@ -184,12 +184,18 @@
 
 .header-agent-tab-mark {
   flex: 0 0 auto;
-  opacity: 0.75;
+  opacity: 0.85;
   transition: opacity var(--duration-fast) var(--ease-standard);
 }
 
+/* Ghost-button's default hover fill (--muted) resolves to the same token as
+   this track's own background, so it paints invisibly here — use
+   surface-raised + a hairline instead so hover reads on a track that's
+   already elevated. */
 .header-agent-tabs button:hover {
   color: var(--color-semantic-ink);
+  background: var(--color-semantic-surface-raised);
+  border-color: var(--color-semantic-hairline);
 }
 
 .header-agent-tabs button:hover .header-agent-tab-mark,
