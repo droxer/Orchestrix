@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Search, Trash2, Users } from "lucide-react";
+import { ActionSearch, AdminDelete, AdminEmployees, ICON_STROKE_LARGE } from "../icons";
 import { Button } from "@/components/ui/button";
 import { useDialogs } from "@/components/ui/DialogProvider";
 import { RelayEmptyState } from "@/components/RelayEmptyState";
@@ -118,7 +118,7 @@ export function EmployeesView({
         fill
         title={t("admin.v2.empty_employees_title")}
         body={t("admin.v2.empty_employees_body")}
-        illustration={<Users size={40} strokeWidth={1.25} aria-hidden="true" />}
+        illustration={<AdminEmployees size={40} strokeWidth={ICON_STROKE_LARGE} aria-hidden="true" />}
         actions={(
           <Button type="button" onClick={onAddEmployee}>
             {t("admin.v2.add_employee_cta")}
@@ -131,7 +131,7 @@ export function EmployeesView({
   return (
     <div className="adm-view">
       <div className="relay-search adm-search">
-        <Search size={16} aria-hidden="true" />
+        <ActionSearch size={16} aria-hidden="true" />
         <input
           className="adm-search-input"
           name="admin-employees-search"
@@ -151,7 +151,7 @@ export function EmployeesView({
       {agentsQuery.error ? (
         <p className="adm-view-error" role="alert">
           {t("admin.v2.agents_load_error")}{" "}
-          <button type="button" onClick={() => void agentsQuery.refetch()}>{t("admin.v2.retry")}</button>
+          <Button variant="ghost" type="button" onClick={() => void agentsQuery.refetch()}>{t("admin.v2.retry")}</Button>
         </p>
       ) : null}
 
@@ -194,7 +194,7 @@ export function EmployeesView({
                         <span className="adm-emp-no-nodes">{t("admin.v2.no_agents_for_employee")}</span>
                       ) : (
                         memberAgents.map((agent) => (
-                          <button
+                          <Button variant="ghost"
                             key={agent.id}
                             type="button"
                             className={`adm-node-chip adm-node-chip--button tone-${agentAvailabilityTone(agent.availability)}`}
@@ -203,7 +203,7 @@ export function EmployeesView({
                           >
                             <AgentMark agent={agent.executorKind} size={12} className="adm-node-chip-mark" />
                             <span translate="no">{agent.displayName}</span>
-                          </button>
+                          </Button>
                         ))
                       )}
                     </div>
@@ -228,7 +228,7 @@ export function EmployeesView({
                         </span>
                       </div>
                       {onDeleteEmployee ? (
-                        <button
+                        <Button variant="ghost"
                           type="button"
                           className="adm-emp-delete"
                           onClick={() => void handleDeleteEmployee(member.id)}
@@ -236,8 +236,8 @@ export function EmployeesView({
                           aria-label={t("admin.v2.delete_employee_action")}
                           title={t("admin.v2.delete_employee_action")}
                         >
-                          <Trash2 size={13} aria-hidden="true" />
-                        </button>
+                          <AdminDelete size={13} aria-hidden="true" />
+                        </Button>
                       ) : null}
                     </div>
                   </li>

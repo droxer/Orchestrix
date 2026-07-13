@@ -5,6 +5,7 @@ import {
   NavRoutine, NavSidebarCollapse, NavSidebarExpand,
 } from "./icons";
 import { RelayMark } from "./RelayMark";
+import { Button } from "./ui/button";
 import type { AppRoute } from "../lib/viewTypes";
 
 // Left rail: brand, collapse toggle, route nav, settings/logout. Owns its own
@@ -111,8 +112,9 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
           <RelayMark width={28} height={28} />
           <span className="sidenav-brand-word">Relay</span>
         </div>
-        <button
+        <Button
           type="button"
+          variant="ghost"
           aria-label={sidenavExpanded ? t("nav.collapse_sidebar") : t("nav.expand_sidebar")}
           className="sidenav-btn sidenav-toggle"
           onClick={() => setSidenavExpanded((v) => !v)}
@@ -124,7 +126,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
         >
           {sidenavExpanded ? <NavSidebarCollapse size={16} /> : <NavSidebarExpand size={16} />}
           <span className="sidenav-toggle-label">{sidenavExpanded ? t("nav.collapse") : t("nav.expand")}</span>
-        </button>
+        </Button>
       </div>
       <nav className="sidenav-nav" aria-label={t("nav.conversations")}>
         <a
@@ -230,8 +232,9 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
         ) : null}
       </nav>
       <div className="sidenav-bottom">
-        <button
+        <Button
           ref={settingsButtonRef}
+          variant="ghost"
           className={`sidenav-btn ${prefsOpen || settingsMenu ? "active" : ""}`}
           data-nav="settings"
           type="button"
@@ -247,7 +250,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
         >
           <NavPreferences size={18} />
           <span className="sidenav-label">{t("nav.settings")}</span>
-        </button>
+        </Button>
       </div>
       {settingsMenu ? (
         <div
@@ -257,14 +260,14 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
           aria-label={t("nav.settings")}
           style={{ top: settingsMenu.y, left: settingsMenu.x }}
         >
-          <button type="button" role="menuitem" onClick={openPreferences}>
+          <Button type="button" variant="ghost" role="menuitem" onClick={openPreferences}>
             <NavPreferences size={16} />
             <span>{t("nav.preferences")}</span>
-          </button>
-          <button type="button" role="menuitem" className="danger" onClick={handleLogout}>
+          </Button>
+          <Button type="button" variant="ghost" role="menuitem" className="danger" onClick={handleLogout}>
             <NavLogout size={16} />
             <span>{t("nav.logout")}</span>
-          </button>
+          </Button>
         </div>
       ) : null}
       {navTooltip ? (

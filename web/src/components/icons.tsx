@@ -6,8 +6,10 @@ import {
   ArrowUp,
   Bot,
   Check,
+  CheckCircle2,
   CircleAlert,
   CircleCheck,
+  CircleDot,
   CircleStop,
   Copy,
   CalendarClock,
@@ -18,33 +20,48 @@ import {
   Rows3,
   Forward,
   Hash,
+  Inbox,
   Play,
   Info,
   KeyRound,
   Languages,
+  LayoutDashboard,
   LayoutGrid,
+  Link2,
   ListTodo,
+  LockKeyhole,
   Palette,
   LogOut,
   MessageCircleQuestion,
+  MessageSquare,
+  MessageSquarePlus,
   MessagesSquare,
   PanelLeftClose,
   PanelLeftOpen,
   Paperclip,
+  Pencil,
   Plus,
+  Power,
+  Radio,
   RefreshCw,
   ScanEye,
   Search,
+  Server,
   Settings,
+  Settings2,
+  ShieldCheck,
   Sparkles,
   SquarePen,
   Terminal,
+  Trash2,
+  Users,
   Zap,
   TriangleAlert,
   UserCog,
   UserPlus,
   Wrench,
   X,
+  XCircle,
   Check as LucideCheck,
   ChevronDown as LucideChevronDown,
   ChevronUp as LucideChevronUp,
@@ -58,6 +75,12 @@ import { forwardRef } from "react";
 // 2 which feels chunky next to the rest of the type; 1.75 reads as
 // engineering-precise without losing legibility at 13–18 px.
 export const ICON_STROKE = 1.75;
+
+// Large decorative strokes thin out as size grows so big glyphs (empty-state
+// illustrations, ~40px+) read at the same optical weight as the 1.75 chrome
+// icons instead of looking bloated. One shared value so future large icons
+// don't each pick their own number.
+export const ICON_STROKE_LARGE = 1.25;
 
 function withStandardStroke(Icon: LucideIcon, displayName: string) {
   const Wrapped = forwardRef<SVGSVGElement, LucideProps>((props, ref) => (
@@ -142,3 +165,27 @@ export const CheckIcon = withStandardStroke(LucideCheck, "CheckIcon");
 export const ChevronDownIcon = withStandardStroke(LucideChevronDown, "ChevronDownIcon");
 export const ChevronUpIcon = withStandardStroke(LucideChevronUp, "ChevronUpIcon");
 export const XIcon = withStandardStroke(LucideX, "XIcon");
+
+// Generic actions not covered above.
+export const ActionAdd = withStandardStroke(Plus, "ActionAdd");
+export const ActionEdit = withStandardStroke(Pencil, "ActionEdit");
+export const ActionToggle = withStandardStroke(Power, "ActionToggle");
+
+// Admin console glyphs — fleet/employee management, channel setup.
+export const AdminNode = withStandardStroke(Server, "AdminNode");
+export const AdminManageAgents = withStandardStroke(Settings2, "AdminManageAgents");
+export const AdminDelete = withStandardStroke(Trash2, "AdminDelete");
+export const AdminLive = withStandardStroke(Radio, "AdminLive");
+export const AdminDashboard = withStandardStroke(LayoutDashboard, "AdminDashboard");
+export const AdminEmployees = withStandardStroke(Users, "AdminEmployees");
+export const AdminConnect = withStandardStroke(Link2, "AdminConnect");
+export const AdminLocked = withStandardStroke(LockKeyhole, "AdminLocked");
+export const AdminChannel = withStandardStroke(MessageSquare, "AdminChannel");
+export const AdminVerified = withStandardStroke(ShieldCheck, "AdminVerified");
+export const AdminInbox = withStandardStroke(Inbox, "AdminInbox");
+
+// Dashboard activity feed markers.
+export const ActivitySuccess = withStandardStroke(CheckCircle2, "ActivitySuccess");
+export const ActivityPending = withStandardStroke(CircleDot, "ActivityPending");
+export const ActivityNewMessage = withStandardStroke(MessageSquarePlus, "ActivityNewMessage");
+export const ActivityFailed = withStandardStroke(XCircle, "ActivityFailed");

@@ -9,6 +9,7 @@ import { SideNav } from "./SideNav";
 import type { AppRoute, MobileView } from "@/lib/viewTypes";
 import type { CurrentUser } from "@/types";
 import { useRelayStore } from "@/lib/store";
+import { Button } from "./ui/button";
 
 const WORK_ROUTE_LABEL_KEYS: Record<Exclude<AppRoute, "main">, string> = {
   backlog: "nav.backlog",
@@ -77,7 +78,7 @@ export function AppShell({
       >
         {route === "main" ? (
           <>
-            <button
+            <Button variant="ghost"
               type="button"
               className={mobileView === "threads" ? "active" : ""}
               aria-label={t("nav.conversations")}
@@ -85,15 +86,15 @@ export function AppShell({
               onClick={() => onMobileViewChange("threads")}
             >
               <NavConversations size={16} /><span>{t("nav.chats")}</span>
-            </button>
-            <button
+            </Button>
+            <Button variant="ghost"
               type="button"
               className={mobileView === "chat" ? "active" : ""}
               aria-pressed={mobileView === "chat"}
               onClick={() => onMobileViewChange("chat")}
             >
               <span>{activeConversationLabel}</span>
-            </button>
+            </Button>
           </>
         ) : (
           <div className="mobile-topbar-route">
@@ -101,9 +102,9 @@ export function AppShell({
             <span className="mobile-topbar-title">{mobileRouteTitle}</span>
           </div>
         )}
-        <button type="button" className={`mobile-settings ${prefsOpen ? "active" : ""}`} aria-label={t("nav.settings")} aria-haspopup="dialog" aria-expanded={prefsOpen} onClick={() => setPrefsOpen((v) => !v)}>
+        <Button variant="ghost" type="button" className={`mobile-settings ${prefsOpen ? "active" : ""}`} aria-label={t("nav.settings")} aria-haspopup="dialog" aria-expanded={prefsOpen} onClick={() => setPrefsOpen((v) => !v)}>
           <NavPreferences size={16} />
-        </button>
+        </Button>
       </div>
 
       <SideNav

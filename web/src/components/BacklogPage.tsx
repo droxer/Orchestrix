@@ -19,6 +19,7 @@ import { TaskBoardHeaderActions } from "./TaskBoardHeaderActions";
 import { TaskAssignee } from "./TaskAssignee";
 import { readViewPreference, writeViewPreference } from "../lib/viewPreference";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
+import { Button } from "./ui/button";
 
 interface BacklogPageProps {
   tasks: RelayTask[];
@@ -135,7 +136,7 @@ function BacklogFiltersBar({
           />
         </div>
         <div className="backlog-filter-actions">
-          <button
+          <Button variant="ghost"
             type="button"
             className="backlog-filter-chip"
             data-active={expanded ? "true" : "false"}
@@ -147,15 +148,15 @@ function BacklogFiltersBar({
             {activeCount > 0 ? (
               <span className="backlog-filter-count" aria-hidden="true">{activeCount}</span>
             ) : null}
-          </button>
+          </Button>
           {activeCount > 0 ? (
-            <button
+            <Button variant="ghost"
               type="button"
               className="backlog-filter-clear"
               onClick={() => onChange(initialFilters)}
             >
               {t("backlog.clear_filters")}
-            </button>
+            </Button>
           ) : null}
         </div>
       </div>
@@ -251,7 +252,7 @@ function BacklogTaskCard({
         <PriorityBadge priority={task.priority} />
         <AgentStateBadge agent={task.assignedAgent} ready={ready} />
       </div>
-      <button type="button" className="backlog-task-title" onClick={onEdit}>{task.title}</button>
+      <Button variant="ghost" type="button" className="backlog-task-title" onClick={onEdit}>{task.title}</Button>
       {task.description ? <p className="backlog-description">{task.description}</p> : null}
       <div className="backlog-meta">
         <TaskAssignee task={task} ready={ready} unassignedLabel={t("backlog.unassigned")} showAgent={false} />
@@ -269,7 +270,7 @@ function BacklogTaskCard({
       </div>
       <div className="backlog-task-actions" role="group" aria-label={t("backlog.actions")}>
         <div className="backlog-action-group" aria-label={t("backlog.actions_dispatch")}>
-          <button
+          <Button variant="ghost"
             type="button"
             className="backlog-action-primary backlog-action-icon"
             onClick={onStart}
@@ -278,8 +279,8 @@ function BacklogTaskCard({
             title={task.assignedAgent ? t("backlog.start") : t("backlog.start_team")}
           >
             <ActionStart size={14} />
-          </button>
-          <button
+          </Button>
+          <Button variant="ghost"
             type="button"
             className="backlog-action-icon"
             onClick={onDiscuss}
@@ -288,22 +289,22 @@ function BacklogTaskCard({
             title={t("backlog.discuss")}
           >
             <ModeAsk size={14} />
-          </button>
+          </Button>
         </div>
         {session ? (
           <div className="backlog-action-group">
-            <button type="button" onClick={onOpenThread}>{t("backlog.open_thread")}</button>
+            <Button variant="ghost" type="button" onClick={onOpenThread}>{t("backlog.open_thread")}</Button>
           </div>
         ) : null}
         <div className="backlog-action-group" aria-label={t("backlog.actions_state")}>
-          <button
+          <Button variant="ghost"
             type="button"
             className={task.status === "blocked" ? undefined : "backlog-action-block"}
             onClick={onToggleBlock}
           >
             {task.status === "blocked" ? t("backlog.reopen") : t("backlog.block")}
-          </button>
-          <button type="button" className="backlog-action-done" onClick={onDone}>{t("backlog.done")}</button>
+          </Button>
+          <Button variant="ghost" type="button" className="backlog-action-done" onClick={onDone}>{t("backlog.done")}</Button>
         </div>
       </div>
     </article>
@@ -314,7 +315,7 @@ function BacklogViewToggle({ view, onChange }: { view: BacklogView; onChange: (v
   const { t } = useTranslation();
   return (
     <div className="backlog-view-toggle" role="group" aria-label={t("backlog.view")}>
-      <button
+      <Button variant="ghost"
         type="button"
         className="backlog-view-btn"
         data-active={view === "board" ? "true" : "false"}
@@ -324,8 +325,8 @@ function BacklogViewToggle({ view, onChange }: { view: BacklogView; onChange: (v
         onClick={() => onChange("board")}
       >
         <ViewBoard size={15} />
-      </button>
-      <button
+      </Button>
+      <Button variant="ghost"
         type="button"
         className="backlog-view-btn"
         data-active={view === "list" ? "true" : "false"}
@@ -335,7 +336,7 @@ function BacklogViewToggle({ view, onChange }: { view: BacklogView; onChange: (v
         onClick={() => onChange("list")}
       >
         <ViewList size={15} />
-      </button>
+      </Button>
     </div>
   );
 }
@@ -370,7 +371,7 @@ function BacklogTaskRow({
     <article className="backlog-row group" role="listitem" data-status={task.status} data-priority={task.priority}>
       <div className="backlog-row-lead">
         <span className="backlog-row-dot" aria-hidden="true" />
-        <button type="button" className="backlog-row-title" onClick={onEdit}>{task.title}</button>
+        <Button variant="ghost" type="button" className="backlog-row-title" onClick={onEdit}>{task.title}</Button>
       </div>
       <span className="backlog-row-status">{t(`backlog.statuses.${task.status}`)}</span>
       <div className="backlog-row-tags">
@@ -385,7 +386,7 @@ function BacklogTaskRow({
       </span>
       <div className="backlog-row-actions" role="group" aria-label={t("backlog.actions")}>
         <div className="backlog-action-group" aria-label={t("backlog.actions_dispatch")}>
-          <button
+          <Button variant="ghost"
             type="button"
             className="backlog-action-primary backlog-action-icon"
             onClick={onStart}
@@ -394,8 +395,8 @@ function BacklogTaskRow({
             title={task.assignedAgent ? t("backlog.start") : t("backlog.start_team")}
           >
             <ActionStart size={14} />
-          </button>
-          <button
+          </Button>
+          <Button variant="ghost"
             type="button"
             className="backlog-action-icon"
             onClick={onDiscuss}
@@ -404,11 +405,11 @@ function BacklogTaskRow({
             title={t("backlog.discuss")}
           >
             <ModeAsk size={14} />
-          </button>
+          </Button>
         </div>
         {session ? (
           <div className="backlog-action-group">
-            <button
+            <Button variant="ghost"
               type="button"
               className="backlog-action-icon"
               onClick={onOpenThread}
@@ -416,11 +417,11 @@ function BacklogTaskRow({
               title={t("backlog.open_thread")}
             >
               <NavConversations size={14} />
-            </button>
+            </Button>
           </div>
         ) : null}
         <div className="backlog-action-group" aria-label={t("backlog.actions_state")}>
-          <button
+          <Button variant="ghost"
             type="button"
             className={cn("backlog-action-icon", task.status !== "blocked" && "backlog-action-block")}
             onClick={onToggleBlock}
@@ -428,8 +429,8 @@ function BacklogTaskRow({
             title={task.status === "blocked" ? t("backlog.reopen") : t("backlog.block")}
           >
             {task.status === "blocked" ? <NavRefresh size={14} /> : <ActionStop size={14} />}
-          </button>
-          <button
+          </Button>
+          <Button variant="ghost"
             type="button"
             className="backlog-action-icon backlog-action-done"
             onClick={onDone}
@@ -437,7 +438,7 @@ function BacklogTaskRow({
             title={t("backlog.done")}
           >
             <ActionApprove size={14} />
-          </button>
+          </Button>
         </div>
       </div>
     </article>

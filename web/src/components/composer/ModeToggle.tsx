@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import type { AgentTaskMode } from "../../types";
 import { ModeAction, ModeAsk } from "../icons";
+import { Button } from "../ui/button";
 
 // The composer toggles between "Ask" (read-only Q&A) and "Agent" (does work,
 // stored as the "action" mode). "review" is a workflow-internal mode and is
@@ -13,7 +14,7 @@ export function ModeToggle({ mode, setMode }: {
   const next: AgentTaskMode = mode === "action" ? "ask" : "action";
   const Icon = mode === "ask" ? ModeAsk : ModeAction;
   return (
-    <button
+    <Button variant="ghost"
       type="button"
       className="mode-chip"
       data-mode={mode}
@@ -26,6 +27,6 @@ export function ModeToggle({ mode, setMode }: {
       </span>
       <span className="mode-chip-label">{t(`mode.${mode}`)}</span>
       <span className="mode-chip-hint" aria-hidden="true">⇧⇥</span>
-    </button>
+    </Button>
   );
 }

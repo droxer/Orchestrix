@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import {
   Geist,
   Geist_Mono,
+  Instrument_Serif,
   Noto_Sans_SC,
   Noto_Sans_TC,
 } from "next/font/google";
@@ -30,6 +31,22 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   display: "swap",
   weight: "variable",
+});
+
+// Editorial display serif — reserved for the rare, large hero-headline
+// moments (login attach screen, empty states) via --type-display-lg/sm in
+// tokens/semantic.css. Everywhere else (page titles, drawer headers, chat
+// title) stays on Geist Sans: a small serif would clash with the app's
+// dense operational chrome. Instrument Serif ships weight 400 only —
+// font-synthesis:none (base.css) means no faked bold, so display roles
+// carry emphasis through size/tracking instead of weight, matching the
+// face's intended elegant-regular treatment.
+const displaySerif = Instrument_Serif({
+  subsets: ["latin", "latin-ext"],
+  variable: "--font-instrument-serif",
+  display: "swap",
+  weight: "400",
+  style: ["normal", "italic"],
 });
 
 // CJK fallback for the zh-CN / zh-TW locales. The :lang() stacks in
@@ -78,7 +95,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
       lang="en"
-      className={`${appSans.variable} ${geistMono.variable} ${notoSansSC.variable} ${notoSansTC.variable}`}
+      className={`${appSans.variable} ${geistMono.variable} ${displaySerif.variable} ${notoSansSC.variable} ${notoSansTC.variable}`}
       suppressHydrationWarning
     >
       <head>

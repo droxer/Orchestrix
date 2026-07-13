@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import type { RelayArtifact } from "relay-core";
 import { artifactRawHref } from "../../lib/artifactPreview";
+import { Button } from "../ui/button";
 
 const TEXT_KINDS: ReadonlySet<RelayArtifact["kind"]> = new Set([
   "diff",
@@ -48,14 +49,14 @@ export function ArtifactPreviewHeader({
       <span className="artifact-preview-header-title">{artifact.title}</span>
       <div className="artifact-preview-actions">
         {canCopy ? (
-          <button
+          <Button variant="ghost"
             type="button"
             className="artifact-preview-action-btn"
             onClick={handleCopy}
             aria-label={copied ? t("artifact.copied") : t("artifact.action_copy")}
           >
             {copied ? t("artifact.copied") : t("artifact.action_copy")}
-          </button>
+          </Button>
         ) : null}
         <a
           className="artifact-preview-action-btn"

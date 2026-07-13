@@ -8,6 +8,7 @@ import { ModeToggle } from "./ModeToggle";
 import { MentionPopover } from "./MentionPopover";
 import { useComposer } from "../../hooks/useComposer";
 import { boundedMentionIndex, mentionOptionId, nextMentionIndex } from "../../lib/mentions";
+import { Button } from "../ui/button";
 
 export type ComposerHandle = {
   clear: () => void;
@@ -112,7 +113,7 @@ const ComposerView = forwardRef<ComposerHandle, {
             <span className="composer-send-hint" aria-hidden="true">{sendShortcutHint}</span>
             <div className="composer-footer-right">
               {running ? (
-                <button
+                <Button variant="ghost"
                   type="button"
                   className="send-button send-button-cancel"
                   onClick={onCancelRun}
@@ -120,9 +121,9 @@ const ComposerView = forwardRef<ComposerHandle, {
                   title={t("composer.cancel_run")}
                 >
                   <ActionStop size={16} />
-                </button>
+                </Button>
               ) : (
-                <button
+                <Button variant="ghost"
                   type="submit"
                   className="send-button"
                   disabled={!composerText.trim()}
@@ -130,7 +131,7 @@ const ComposerView = forwardRef<ComposerHandle, {
                   title={sendShortcutHint}
                 >
                   <ActionSend size={16} />
-                </button>
+                </Button>
               )}
             </div>
           </div>

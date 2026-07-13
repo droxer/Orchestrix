@@ -5,6 +5,7 @@ import { ConversationRow, type ConversationItem } from "./ConversationRow";
 import { groupConversations } from "../lib/conversationGroups";
 import type { RelaySession } from "../types";
 import type { AgentName } from "../types";
+import { Button } from "./ui/button";
 
 // The logged-in employee's own conversations. Each row is a session; the list
 // is owner-scoped by the backend, so it only ever shows the current employee's
@@ -51,7 +52,7 @@ export function ThreadPanel({
             </small>
           </h1>
         </div>
-        <button
+        <Button variant="ghost"
           type="button"
           className="conversation-new-btn"
           aria-label={t("conversation.new")}
@@ -59,7 +60,7 @@ export function ThreadPanel({
           onClick={onNewConversation}
         >
           <ActionCompose size={16} />
-        </button>
+        </Button>
       </div>
       <form className="relay-search conversation-search" onSubmit={(e) => e.preventDefault()}>
         <ActionSearch size={16} />

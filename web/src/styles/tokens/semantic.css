@@ -114,31 +114,37 @@
      swap the brand halo for the status red at the same 3px/28% recipe. */
   --ring-focus-danger: 0 0 0 3px color-mix(in srgb, var(--color-semantic-danger) 28%, transparent);
 
-  /* Semantic typography. One crisp grotesk (Geist) carries every role —
-     display, chrome, and body alike — so weight is what separates
-     emphasis, not a font-family switch. Dense sans chrome (titles,
-     labels) steps to 600, never 700+. */
-  --type-display-lg: 600 34px/1.05 var(--font-display);  /* hero headline (login, empty states) */
-  --type-display-sm: 600 25px/1.1  var(--font-display);
-  --type-title-lg:   600 22px/1.16 var(--font-display);  /* admin page title, chat title */
-  --type-title-md:   600 19px/1.24 var(--font-display);
-  --type-title-sm:   600 15px/1.3  var(--font-sans);
-  --type-body-md:    400 16px/1.5  var(--font-sans);
-  --type-body-sm:    400 13px/1.5  var(--font-sans);
-  --type-caption:    400 13px/1.5  var(--font-sans);
-  --type-caption-strong: 600 12px/1.5 var(--font-sans);
-  --type-button:     600 13px/1.15 var(--font-sans);
-  --type-nav-link:   500 13px/1.4  var(--font-sans);
+  /* Semantic typography. Geist (grotesk) carries every dense chrome role —
+     titles, labels, body alike — so weight is what separates emphasis
+     there, not a family switch (dense sans chrome steps to 600, never
+     700+). The two true hero-headline roles (display-lg/sm — login attach
+     screen, empty states) are the one deliberate family switch: an
+     editorial serif at regular weight only (Instrument Serif ships no
+     bold, and font-synthesis:none means CSS can't fake one), carrying
+     emphasis through size and generous leading instead. One step larger
+     across the board than the original 13px-base scale for a less
+     cramped, more premium reading density. */
+  --type-display-lg: 400 38px/1.1  var(--font-display-serif);  /* hero headline (login, empty states) */
+  --type-display-sm: 400 28px/1.15 var(--font-display-serif);
+  --type-title-lg:   600 24px/1.16 var(--font-display);  /* admin page title, chat title */
+  --type-title-md:   600 20px/1.24 var(--font-display);
+  --type-title-sm:   600 16px/1.3  var(--font-sans);
+  --type-body-md:    400 17px/1.5  var(--font-sans);
+  --type-body-sm:    400 14px/1.5  var(--font-sans);
+  --type-caption:    400 14px/1.5  var(--font-sans);
+  --type-caption-strong: 600 13px/1.5 var(--font-sans);
+  --type-button:     600 14px/1.15 var(--font-sans);
+  --type-nav-link:   500 14px/1.4  var(--font-sans);
   /* Chrome labels — the dense small-text roles that fill operational UI
      (table heads, field labels, pills, metric captions). Tight 1.4 leading. */
-  --type-label-strong:      600 13px/1.4 var(--font-sans);  /* 13px bold chrome */
-  --type-label-md:          500 13px/1.4 var(--font-sans);  /* 13px medium */
-  --type-label:             500 12px/1.4 var(--font-sans);  /* 12px medium */
-  --type-micro-strong:      600 11px/1.4 var(--font-sans);  /* 11px bold */
-  --type-number:     600 18px/1.4  var(--font-number);
-  --type-number-display: 600 30px/1.14 var(--font-number);  /* admin metric values */
-  --type-meta:  500 12px/1.4 var(--font-sans);  /* agent labels, metadata, timestamps */
-  --type-eyebrow:    500 11px/1.5 var(--font-sans);  /* pair with letter-spacing: var(--letter-eyebrow) + uppercase */
+  --type-label-strong:      600 14px/1.4 var(--font-sans);  /* 14px bold chrome */
+  --type-label-md:          500 14px/1.4 var(--font-sans);  /* 14px medium */
+  --type-label:             500 13px/1.4 var(--font-sans);  /* 13px medium */
+  --type-micro-strong:      600 12px/1.4 var(--font-sans);  /* 12px bold */
+  --type-number:     600 19px/1.4  var(--font-number);
+  --type-number-display: 600 32px/1.14 var(--font-number);  /* admin metric values */
+  --type-meta:  500 13px/1.4 var(--font-sans);  /* agent labels, metadata, timestamps */
+  --type-eyebrow:    500 12px/1.5 var(--font-sans);  /* pair with letter-spacing: var(--letter-eyebrow) + uppercase */
 }
 
 /* CJK reading-heavy type roles hardcode their leading in the shorthand,
@@ -146,9 +152,9 @@
    scalar overrides this block pairs with). */
 html:lang(zh-CN),
 html:lang(zh-TW) {
-  --type-body-md:     400 16px/1.7 var(--font-sans);
+  --type-body-md:     400 17px/1.7 var(--font-sans);
   --type-body-sm:     400 14px/1.7 var(--font-sans);
-  --type-caption:     400 13px/1.65 var(--font-sans);
+  --type-caption:     400 14px/1.65 var(--font-sans);
 }
 
 /* Light theme — ONE selector, mirroring primitives.css's light register.

@@ -13,6 +13,7 @@ import {
   ArtifactTest,
 } from "../icons";
 import { filterArtifacts } from "../../lib/artifactFilters";
+import { Button } from "../ui/button";
 export { filterArtifacts } from "../../lib/artifactFilters";
 
 function ArtifactKindIcon({ kind, size }: { kind: RelayArtifact["kind"]; size: number }) {
@@ -69,7 +70,7 @@ export function ArtifactIndexStrip({
       {/* Collapsed: icon buttons only */}
       <div className="artifact-index-strip-icons">
         {artifacts.map((a) => (
-          <button
+          <Button variant="ghost"
             key={a.id}
             type="button"
             className={`artifact-index-btn${a.id === selectedId ? " is-active" : ""}`}
@@ -80,7 +81,7 @@ export function ArtifactIndexStrip({
             onClick={() => onSelect(a.id)}
           >
             <ArtifactKindIcon kind={a.kind} size={16} />
-          </button>
+          </Button>
         ))}
       </div>
 
@@ -100,22 +101,22 @@ export function ArtifactIndexStrip({
         </div>
         {kinds.length > 1 ? (
           <div className="artifact-index-filters">
-            <button
+            <Button variant="ghost"
               type="button"
               className={`artifact-index-filter-btn${kindFilter === "all" ? " is-active" : ""}`}
               onClick={() => setKindFilter("all")}
             >
               {t("artifact.filter_all")}
-            </button>
+            </Button>
             {kinds.map((k) => (
-              <button
+              <Button variant="ghost"
                 key={k}
                 type="button"
                 className={`artifact-index-filter-btn${kindFilter === k ? " is-active" : ""}`}
                 onClick={() => setKindFilter(k)}
               >
                 {t(`artifact.kind.${k}`, { defaultValue: k })}
-              </button>
+              </Button>
             ))}
           </div>
         ) : null}
@@ -124,7 +125,7 @@ export function ArtifactIndexStrip({
             <p className="artifact-index-empty">{t("artifact.no_matches")}</p>
           ) : (
             filtered.map((a) => (
-              <button
+              <Button variant="ghost"
                 key={a.id}
                 type="button"
                 className={`artifact-index-row${a.id === selectedId ? " is-active" : ""}`}
@@ -141,7 +142,7 @@ export function ArtifactIndexStrip({
                     {t(`artifact.kind.${a.kind}`, { defaultValue: a.kind })}
                   </span>
                 </span>
-              </button>
+              </Button>
             ))
           )}
         </div>

@@ -6,7 +6,7 @@ import type { TFunction } from "i18next";
 import { RelayEmptyState } from "@/components/RelayEmptyState";
 import { Button } from "@/components/ui/button";
 import type { ControlPanelDaemonNodeRecord, EmployeeRecord } from "../../types";
-import { Server } from "lucide-react";
+import { AdminNode, ICON_STROKE_LARGE } from "../icons";
 import { canUseLocalControlPanel } from "../../lib/controlPanel";
 import { useUrlSearchState } from "../../hooks/useUrlSearchState";
 import type { StoredNodeTokenMap } from "./helpers";
@@ -88,7 +88,7 @@ export function FleetView({ nodes, employees, storedTokens, onRevealCredentials,
         {FILTERS.map((id) => {
           const active = filter === id;
           return (
-            <button
+            <Button variant="ghost"
               key={id}
               type="button"
               className="adm-fleet-chip"
@@ -98,7 +98,7 @@ export function FleetView({ nodes, employees, storedTokens, onRevealCredentials,
             >
               <span>{filterLabel(id, t)}</span>
               <span className="adm-fleet-chip-count mono">{counts[id]}</span>
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -108,7 +108,7 @@ export function FleetView({ nodes, employees, storedTokens, onRevealCredentials,
           className="adm-fleet-empty"
           fill
           title={nodes.length === 0 ? t("admin.no_nodes") : t("admin.v2.no_nodes_for_filter")}
-          illustration={<Server size={40} strokeWidth={1.25} aria-hidden="true" />}
+          illustration={<AdminNode size={40} strokeWidth={ICON_STROKE_LARGE} aria-hidden="true" />}
           actions={nodes.length === 0 && onAddNode ? (
             <Button type="button" onClick={onAddNode}>
               {t("admin.v2.add_node_cta")}

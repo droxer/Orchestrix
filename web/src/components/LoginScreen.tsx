@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { bootstrapUser, getAuthStatus, login, RelayApiError } from "../api";
 import type { CurrentUser } from "../types";
 import { RelayMark } from "./RelayMark";
+import { Button } from "./ui/button";
 
 interface LoginScreenProps {
   onAuthenticated: (user: CurrentUser) => void;
@@ -192,23 +193,23 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
               </p>
             )}
 
-            <button type="submit" className="login-submit" disabled={isLoading || !canSubmit}>
+            <Button variant="ghost" type="submit" className="login-submit" disabled={isLoading || !canSubmit}>
               <span>{isLoading ? t("login.loading") : submitLabel}</span>
               <span className="login-submit-arrow" aria-hidden="true">
                 →
               </span>
-            </button>
+            </Button>
           </form>
         </div>
 
         <footer className="login-foot">
-          <button
+          <Button variant="ghost"
             type="button"
             className="login-switch"
             onClick={() => switchMode(isBootstrap ? "login" : "bootstrap")}
           >
             {isBootstrap ? t("login.go_login") : t("login.go_bootstrap")}
-          </button>
+          </Button>
           <span className="login-foot-meta">Relay · {new Date().getFullYear()}</span>
         </footer>
       </section>

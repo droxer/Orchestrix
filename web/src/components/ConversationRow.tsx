@@ -9,6 +9,7 @@ import {
   conversationActivity,
   type ConversationActivityKind,
 } from "../lib/conversationActivity";
+import { Button } from "./ui/button";
 
 export type { ConversationItem };
 
@@ -85,7 +86,7 @@ export function ConversationRow({ item, selected, agentDisplayNames, onSelect, o
 
   return (
     <div className={`conversation-row ${selected ? "active" : ""}`.trimEnd()}>
-      <button
+      <Button variant="ghost"
         className="conversation-row-inner"
         type="button"
         aria-label={rowLabel}
@@ -125,10 +126,10 @@ export function ConversationRow({ item, selected, agentDisplayNames, onSelect, o
             </span>
           ) : null}
         </span>
-      </button>
+      </Button>
       <span className="conversation-row-actions">
         {onRename ? (
-          <button
+          <Button variant="ghost"
             className="conversation-rename-btn"
             type="button"
             aria-label={t("conversation.rename")}
@@ -136,10 +137,10 @@ export function ConversationRow({ item, selected, agentDisplayNames, onSelect, o
             onClick={() => onRename(session)}
           >
             <span aria-hidden="true">✎</span>
-          </button>
+          </Button>
         ) : null}
         {onClose ? (
-          <button
+          <Button variant="ghost"
             className="conversation-remove-btn"
             type="button"
             aria-label={t("conversation.close")}
@@ -147,7 +148,7 @@ export function ConversationRow({ item, selected, agentDisplayNames, onSelect, o
             onClick={handleClose}
           >
             <ActionRemove size={11} />
-          </button>
+          </Button>
         ) : null}
       </span>
     </div>

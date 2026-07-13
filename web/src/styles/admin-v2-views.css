@@ -1114,38 +1114,10 @@
   flex: none;
 }
 
-.adm-node-card-icon-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-xs);
-  color: var(--color-semantic-muted);
-  cursor: pointer;
-  transition: color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
-}
-
-.adm-node-card-icon-btn:hover {
-  color: var(--color-semantic-action);
-  background: color-mix(in srgb, var(--color-semantic-action) 10%, transparent);
-}
-
-.adm-node-card-icon-btn.danger:hover {
-  color: var(--color-semantic-danger);
-  background: color-mix(in srgb, var(--color-semantic-danger) 10%, transparent);
-}
-
-.adm-node-card-icon-btn:focus-visible {
-  outline: none;
-  box-shadow: var(--ring-focus);
-}
-
-.adm-node-card-icon-btn:disabled { opacity: 0.5; cursor: progress; }
+/* Node card icon actions (reveal/manage/delete) share the .icon-button
+   base (thread.css) at the --sm/--tinted modifiers instead of a bespoke
+   implementation — see .icon-button--sm / .icon-button--tinted. */
+.adm-node-card-icon-btn:disabled { cursor: progress; }
 
 .adm-node-card-error {
   margin: var(--space-xs) 0 0;

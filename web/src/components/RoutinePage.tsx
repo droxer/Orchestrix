@@ -23,6 +23,7 @@ import { PageHeader } from "./PageHeader";
 import { BoardEmpty } from "./BoardEmpty";
 import { TaskBoardHeaderActions } from "./TaskBoardHeaderActions";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
+import { Button } from "./ui/button";
 
 interface RoutinePageProps {
   tasks: RelayTask[];
@@ -131,7 +132,7 @@ function RoutineFiltersBar({ filters, onChange }: { filters: RoutineFilters; onC
           />
         </div>
         <div className="backlog-filter-actions">
-          <button
+          <Button variant="ghost"
             type="button"
             className="backlog-filter-chip"
             data-active={expanded ? "true" : "false"}
@@ -143,11 +144,11 @@ function RoutineFiltersBar({ filters, onChange }: { filters: RoutineFilters; onC
             {activeCount > 0 ? (
               <span className="backlog-filter-count" aria-hidden="true">{activeCount}</span>
             ) : null}
-          </button>
+          </Button>
           {activeCount > 0 ? (
-            <button type="button" className="backlog-filter-clear" onClick={() => onChange(initialFilters)}>
+            <Button variant="ghost" type="button" className="backlog-filter-clear" onClick={() => onChange(initialFilters)}>
               {t("backlog.clear_filters")}
-            </button>
+            </Button>
           ) : null}
         </div>
       </div>
@@ -208,7 +209,7 @@ function RoutineCard({
         <PriorityBadge priority={task.priority} />
         <AgentStateBadge agent={task.assignedAgent} ready={ready} />
       </div>
-      <button type="button" className="backlog-task-title" onClick={onEdit}>{task.title}</button>
+      <Button variant="ghost" type="button" className="backlog-task-title" onClick={onEdit}>{task.title}</Button>
       {task.description ? <p className="backlog-description">{task.description}</p> : null}
       <div className="backlog-meta">
         <span>{t(`routine.types.${task.routineType ?? "task"}`)} · {t(`routine.cadences.${task.routineCadence ?? "weekly"}`)}</span>
@@ -230,18 +231,18 @@ function RoutineCard({
       </div>
       <div className="backlog-task-actions" role="group" aria-label={t("backlog.actions")}>
         <div className="backlog-action-group" aria-label={t("backlog.actions_dispatch")}>
-          <button type="button" className="backlog-action-primary backlog-action-icon" onClick={onStart} disabled={!task.assignedAgent || !task.routineEnabled || task.status === "running" || task.status === "done"} aria-label={t("backlog.start")} title={t("backlog.start")}>
+          <Button variant="ghost" type="button" className="backlog-action-primary backlog-action-icon" onClick={onStart} disabled={!task.assignedAgent || !task.routineEnabled || task.status === "running" || task.status === "done"} aria-label={t("backlog.start")} title={t("backlog.start")}>
             <ActionStart size={14} />
-          </button>
+          </Button>
         </div>
         {session ? (
           <div className="backlog-action-group">
-            <button type="button" onClick={onOpenThread}>{t("backlog.open_thread")}</button>
+            <Button variant="ghost" type="button" onClick={onOpenThread}>{t("backlog.open_thread")}</Button>
           </div>
         ) : null}
         <div className="backlog-action-group" aria-label={t("backlog.actions_state")}>
-          <button type="button" className={task.status === "blocked" ? undefined : "backlog-action-block"} onClick={onToggleBlock}>{task.status === "blocked" ? t("backlog.reopen") : t("backlog.block")}</button>
-          <button type="button" className="backlog-action-done" onClick={onDone}>{t("backlog.done")}</button>
+          <Button variant="ghost" type="button" className={task.status === "blocked" ? undefined : "backlog-action-block"} onClick={onToggleBlock}>{task.status === "blocked" ? t("backlog.reopen") : t("backlog.block")}</Button>
+          <Button variant="ghost" type="button" className="backlog-action-done" onClick={onDone}>{t("backlog.done")}</Button>
         </div>
       </div>
     </article>
@@ -252,7 +253,7 @@ function RoutineViewToggle({ view, onChange }: { view: RoutineView; onChange: (v
   const { t } = useTranslation();
   return (
     <div className="backlog-view-toggle" role="group" aria-label={t("routine.view")}>
-      <button
+      <Button variant="ghost"
         type="button"
         className="backlog-view-btn"
         data-active={view === "card" ? "true" : "false"}
@@ -262,8 +263,8 @@ function RoutineViewToggle({ view, onChange }: { view: RoutineView; onChange: (v
         onClick={() => onChange("card")}
       >
         <ViewGrid size={15} />
-      </button>
-      <button
+      </Button>
+      <Button variant="ghost"
         type="button"
         className="backlog-view-btn"
         data-active={view === "list" ? "true" : "false"}
@@ -273,7 +274,7 @@ function RoutineViewToggle({ view, onChange }: { view: RoutineView; onChange: (v
         onClick={() => onChange("list")}
       >
         <ViewList size={15} />
-      </button>
+      </Button>
     </div>
   );
 }
@@ -304,7 +305,7 @@ function RoutineRow({
     <article className="backlog-row group" role="listitem" data-status={task.status} data-priority={task.priority}>
       <div className="backlog-row-lead">
         <span className="backlog-row-dot" aria-hidden="true" />
-        <button type="button" className="backlog-row-title" onClick={onEdit}>{task.title}</button>
+        <Button variant="ghost" type="button" className="backlog-row-title" onClick={onEdit}>{task.title}</Button>
       </div>
       <span className="backlog-row-status">{task.routineEnabled ? t("routine.enabled") : t("routine.disabled")}</span>
       <div className="backlog-row-tags">
@@ -319,7 +320,7 @@ function RoutineRow({
       </span>
       <div className="backlog-row-actions" role="group" aria-label={t("backlog.actions")}>
         <div className="backlog-action-group" aria-label={t("backlog.actions_dispatch")}>
-          <button
+          <Button variant="ghost"
             type="button"
             className="backlog-action-primary backlog-action-icon"
             onClick={onStart}
@@ -328,11 +329,11 @@ function RoutineRow({
             title={t("backlog.start")}
           >
             <ActionStart size={14} />
-          </button>
+          </Button>
         </div>
         {session ? (
           <div className="backlog-action-group">
-            <button
+            <Button variant="ghost"
               type="button"
               className="backlog-action-icon"
               onClick={onOpenThread}
@@ -340,11 +341,11 @@ function RoutineRow({
               title={t("backlog.open_thread")}
             >
               <NavConversations size={14} />
-            </button>
+            </Button>
           </div>
         ) : null}
         <div className="backlog-action-group" aria-label={t("backlog.actions_state")}>
-          <button
+          <Button variant="ghost"
             type="button"
             className={cn("backlog-action-icon", task.status !== "blocked" && "backlog-action-block")}
             onClick={onToggleBlock}
@@ -352,8 +353,8 @@ function RoutineRow({
             title={task.status === "blocked" ? t("backlog.reopen") : t("backlog.block")}
           >
             {task.status === "blocked" ? <NavRefresh size={14} /> : <ActionStop size={14} />}
-          </button>
-          <button
+          </Button>
+          <Button variant="ghost"
             type="button"
             className="backlog-action-icon backlog-action-done"
             onClick={onDone}
@@ -361,7 +362,7 @@ function RoutineRow({
             title={t("backlog.done")}
           >
             <ActionApprove size={14} />
-          </button>
+          </Button>
         </div>
       </div>
     </article>

@@ -49,8 +49,6 @@
 }
 
 .display-title,
-.page-header h1,
-.page-header-title--display,
 .chat-title h2,
 .adm-drawer-title,
 .adm-empty-title {
@@ -144,7 +142,6 @@ body {
 
 .sidenav-brand-row { margin-bottom: var(--space-base); }
 .sidenav-brand { color: var(--color-semantic-ink); }
-.sidenav-brand-word { font: var(--type-display-sm); letter-spacing: var(--letter-display); }
 .sidenav-btn { width: 44px; height: 44px; border-radius: var(--radius-lg); color: var(--color-semantic-muted); }
 .sidenav-btn:hover { background: var(--color-semantic-surface-raised); border-color: transparent; color: var(--color-semantic-ink); }
 .sidenav-btn.active,

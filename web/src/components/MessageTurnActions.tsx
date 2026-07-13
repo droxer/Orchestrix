@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { ActionCopy, ActionRetry, CheckIcon } from "./icons";
 import type { AgentName, AgentTaskMode } from "../types";
 import { agentMessagePlainText } from "../lib/agentStream";
+import { Button } from "./ui/button";
 
 type MessageTurnActionsProps = {
   agent: AgentName;
@@ -57,7 +58,7 @@ export function MessageTurnActions({
   return (
     <div className="msg-turn-actions" role="group" aria-label={t("message.actions_label")}>
       {canCopy ? (
-        <button
+        <Button variant="ghost"
           type="button"
           className={`msg-turn-action ${copied ? "is-copied" : ""}`}
           onClick={() => void handleCopy()}
@@ -66,10 +67,10 @@ export function MessageTurnActions({
         >
           {copied ? <CheckIcon size={14} /> : <ActionCopy size={14} />}
           <span className="msg-turn-action-label">{copied ? t("message.copied") : t("message.copy")}</span>
-        </button>
+        </Button>
       ) : null}
       {showRetry ? (
-        <button
+        <Button variant="ghost"
           type="button"
           className="msg-turn-action"
           onClick={handleRetry}
@@ -79,7 +80,7 @@ export function MessageTurnActions({
         >
           <ActionRetry size={14} />
           <span className="msg-turn-action-label">{t("message.retry")}</span>
-        </button>
+        </Button>
       ) : null}
     </div>
   );

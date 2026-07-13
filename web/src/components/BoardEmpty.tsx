@@ -2,15 +2,15 @@
 
 import { Button } from "@/components/ui/button";
 import { RelayEmptyState } from "./RelayEmptyState";
-import { ActionCompose } from "./icons";
+import { ActionCompose, ICON_STROKE_LARGE } from "./icons";
 
 function BoardEmptyIllustration() {
   return (
     <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
-      <rect x="8" y="14" width="14" height="18" rx="2" stroke="currentColor" strokeWidth="1.5" />
-      <rect x="22" y="10" width="14" height="22" rx="2" stroke="currentColor" strokeWidth="1.5" />
-      <rect x="36" y="18" width="14" height="14" rx="2" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M14 36h28" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 2" opacity="0.55" />
+      <rect x="8" y="14" width="14" height="18" rx="2" stroke="currentColor" strokeWidth={ICON_STROKE_LARGE} />
+      <rect x="22" y="10" width="14" height="22" rx="2" stroke="currentColor" strokeWidth={ICON_STROKE_LARGE} />
+      <rect x="36" y="18" width="14" height="14" rx="2" stroke="currentColor" strokeWidth={ICON_STROKE_LARGE} />
+      <path d="M14 36h28" stroke="currentColor" strokeWidth={ICON_STROKE_LARGE} strokeDasharray="3 2" opacity="0.55" />
     </svg>
   );
 }

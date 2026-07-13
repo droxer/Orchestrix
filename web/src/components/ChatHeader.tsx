@@ -10,6 +10,7 @@ import {
 } from "../lib/conversationActivity";
 import { isLogicalAgentRoutable } from "../lib/agentDisplayNames";
 import { formatCompactTokens } from "../lib/tokenUsage";
+import { Button } from "./ui/button";
 
 const ACTIVITY_BADGE: Record<
   ConversationActivityKind,
@@ -66,9 +67,9 @@ export function ChatHeader({ activeAgent, logicalAgents, activeLogicalAgentId, o
   return (
     <header className="chat-header">
       <div className="chat-title">
-        <button className="mobile-back-button" type="button" onClick={onBackToThreads}>
+        <Button variant="ghost" className="mobile-back-button" type="button" onClick={onBackToThreads}>
           <NavConversations size={16} /><span>{t("nav.conversations")}</span>
-        </button>
+        </Button>
         <div className="chat-title-text">
           <h2 title={activeSession ? (activeSession.title?.trim() || activeSession.taskGoal) : undefined}>{activeSession ? (activeSession.title?.trim() || activeSession.taskGoal) : t("thread.new_conversation")}</h2>
           {showMeta ? (
@@ -104,7 +105,7 @@ export function ChatHeader({ activeAgent, logicalAgents, activeLogicalAgentId, o
             const isBusy = logicalAgent.availability === "busy";
             const isActive = logicalAgent.id === activeLogicalAgentId;
             return (
-              <button
+              <Button variant="ghost"
                 key={logicalAgent.id}
                 type="button"
                 role="radio"
@@ -134,11 +135,11 @@ export function ChatHeader({ activeAgent, logicalAgents, activeLogicalAgentId, o
                 <AgentMark agent={logicalAgent.executorKind} size={14} className="header-agent-tab-mark" />
                 <span translate="no">{logicalAgent.displayName}</span>
                 {isBusy && isRoutable ? <span className="header-agent-busy-pip" aria-hidden="true" /> : null}
-              </button>
+              </Button>
             );
           }) : <span className="text-muted-foreground">{t("thread.no_agents")}</span>}
         </div>
-        <button
+        <Button variant="ghost"
           className="icon-button chat-artifacts-button"
           type="button"
           aria-label={t("artifact.open_drawer")}
@@ -152,10 +153,10 @@ export function ChatHeader({ activeAgent, logicalAgents, activeLogicalAgentId, o
               {artifactCount}
             </span>
           ) : null}
-        </button>
-        <button className="icon-button" type="button" aria-label={t("nav.refresh")} title={t("nav.refresh")} onClick={onRefresh}>
+        </Button>
+        <Button variant="ghost" className="icon-button" type="button" aria-label={t("nav.refresh")} title={t("nav.refresh")} onClick={onRefresh}>
           <NavRefresh size={16} className={isRefreshing ? "spin" : ""} />
-        </button>
+        </Button>
       </div>
     </header>
   );

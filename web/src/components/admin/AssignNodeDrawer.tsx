@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, Inbox, Plus } from "lucide-react";
+import { ActionAdd, ActionApprove, AdminInbox } from "../icons";
 import { assignControlPanelDaemonNode, createControlPanelDaemonNode, createManagedNode } from "../../api";
 import type {
   AssignControlPanelDaemonNodeResponse,
@@ -259,7 +259,7 @@ export function AssignNodeDrawer({
                           className="adm-assign-node-check"
                           aria-hidden="true"
                         >
-                          {isSelected ? <Check size={14} /> : null}
+                          {isSelected ? <ActionApprove size={14} /> : null}
                         </span>
                       </span>
                     </label>
@@ -283,14 +283,14 @@ export function AssignNodeDrawer({
                     <span className="adm-assign-node-dot tone-muted" aria-hidden="true" />
                     <span className="adm-assign-node-body">
                       <span className="adm-assign-node-id">
-                        <Plus size={12} aria-hidden="true" /> {t("admin.v2.assign_new_node_option")}
+                        <ActionAdd size={12} aria-hidden="true" /> {t("admin.v2.assign_new_node_option")}
                       </span>
                       <span className="adm-assign-node-path muted">
                         {t("admin.v2.assign_new_node_hint")}
                       </span>
                     </span>
                     <span className="adm-assign-node-check" aria-hidden="true">
-                      {createNew ? <Check size={14} /> : null}
+                      {createNew ? <ActionApprove size={14} /> : null}
                     </span>
                   </span>
                 </label>
@@ -298,7 +298,7 @@ export function AssignNodeDrawer({
             </ul>
           ) : (
             <div className="adm-assign-empty" role="status">
-              <Inbox size={20} aria-hidden="true" />
+              <AdminInbox size={20} aria-hidden="true" />
               <div>
                 <p className="adm-assign-empty-title">
                   {t("admin.no_unassigned_nodes")}

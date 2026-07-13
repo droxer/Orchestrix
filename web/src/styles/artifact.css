@@ -524,8 +524,8 @@
 }
 
 .artifact-preview-action-btn:focus-visible {
-  outline: 2px solid var(--color-semantic-action);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: var(--ring-focus);
 }
 
 .artifact-preview-body {

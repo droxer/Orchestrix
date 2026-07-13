@@ -441,14 +441,19 @@
   background: var(--prio-accent);
 }
 
-/* ── Task status — dot + label, accent map shared with lanes/rows ───────
+/* ── Task status — bordered pill + dot, accent map shared with lanes/rows ──
    Used where status would otherwise be plain meta text (routine cards); the
-   board uses lanes and the list its own column, so they don't need it. */
+   board uses lanes and the list its own column, so they don't need it.
+   Border + inset match the Badge status-tone pill (ui/badge.tsx) so a
+   status reads as the same "pill" grammar wherever it appears. */
 .task-status {
   --status-accent: var(--color-semantic-muted-soft);
   display: inline-flex;
   align-items: center;
   gap: var(--space-xs);
+  padding: 1px var(--space-xs);
+  border: 1px solid color-mix(in srgb, var(--status-accent) 35%, transparent);
+  border-radius: var(--radius-sm);
   color: var(--color-semantic-body);
   font: var(--type-meta);
 }

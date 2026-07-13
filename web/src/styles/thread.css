@@ -199,7 +199,7 @@
 }
 
 .conversation-name strong.mono {
-  font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace);
+  font-family: var(--font-mono);
   font-weight: 500;
   font-size: var(--text-sm);
 }
@@ -370,6 +370,38 @@
   color: var(--color-semantic-ink);
   background: var(--color-semantic-surface-strong);
   border-color: var(--color-semantic-hairline-soft);
+}
+
+.icon-button:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-focus);
+}
+
+.icon-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Compact density — dense toolbars/card footers (admin node cards) packing
+   several icon buttons into a tight row. Same circular shape and hover
+   grammar as the default 40px icon-button, at a smaller footprint. */
+.icon-button--sm {
+  width: 28px;
+  height: 28px;
+}
+
+/* Tinted hover — the icon communicates a colored action (e.g. a scoped
+   settings/reveal affordance or a destructive delete) instead of the
+   neutral ink hover above. `.danger` swaps the tint to the status red. */
+.icon-button--tinted:hover {
+  color: var(--color-semantic-action);
+  background: color-mix(in srgb, var(--color-semantic-action) 10%, transparent);
+  border-color: transparent;
+}
+
+.icon-button--tinted.danger:hover {
+  color: var(--color-semantic-danger);
+  background: color-mix(in srgb, var(--color-semantic-danger) 10%, transparent);
 }
 
 /* ===================== state-grouped sections ===================== */

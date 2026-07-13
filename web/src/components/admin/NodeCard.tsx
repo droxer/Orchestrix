@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy, KeyRound, Server, Settings2, Trash2 } from "lucide-react";
 import type { TFunction } from "i18next";
 import type { AgentName, ControlPanelDaemonNodeRecord, EmployeeRecord } from "../../types";
 import { useDialogs } from "@/components/ui/DialogProvider";
@@ -18,6 +17,8 @@ import {
   visualStatus,
 } from "./helpers";
 import { NodeProfileBadges } from "./NodeProfileBadges";
+import { Button } from "../ui/button";
+import { ActionApprove, ActionCopy, ActionKey, AdminDelete, AdminManageAgents, AdminNode } from "../icons";
 
 function isAgentDisabled(node: ControlPanelDaemonNodeRecord, agent: AgentName): boolean {
   return Boolean(node.disabledAgents?.includes(agent));
@@ -105,7 +106,7 @@ export function NodeCard({
     <article className={`adm-node-card tone-${tone}${running ? " is-running" : ""}`}>
       <header className="adm-node-card-head">
         <span className={`adm-node-avatar tone-${tone}`} aria-hidden="true" translate="no">
-          {node.employeeId ? ownerInitials(nodeName) : <Server size={16} aria-hidden="true" />}
+          {node.employeeId ? ownerInitials(nodeName) : <AdminNode size={16} aria-hidden="true" />}
         </span>
         <div className="adm-node-card-identity">
           <span
@@ -125,7 +126,7 @@ export function NodeCard({
             <i className="adm-status-dot" aria-hidden="true" />
             {t(`status.${status}`, { defaultValue: status })}
           </span>
-          <button
+          <Button variant="ghost"
             type="button"
             className="adm-node-id mono"
             onClick={() => void handleCopyId()}
@@ -133,8 +134,8 @@ export function NodeCard({
             title={node.id}
           >
             <span translate="no">{truncateId(node.id)}</span>
-            {copied ? <Check size={12} aria-hidden="true" /> : <Copy size={12} aria-hidden="true" />}
-          </button>
+            {copied ? <ActionApprove size={12} aria-hidden="true" /> : <ActionCopy size={12} aria-hidden="true" />}
+          </Button>
         </div>
       </header>
 
@@ -174,36 +175,36 @@ export function NodeCard({
         ) : null}
         <div className="adm-node-card-actions">
           {node.managedNodeId ? null : (
-            <button
+            <Button variant="ghost"
               type="button"
-              className="adm-node-card-icon-btn"
+              className="icon-button icon-button--sm icon-button--tinted adm-node-card-icon-btn"
               onClick={() => onReveal(node)}
               aria-label={t("admin.v2.reveal_credentials_for", { id: node.id })}
               title={t("admin.v2.reveal_credentials")}
             >
-              <KeyRound size={14} aria-hidden="true" />
-            </button>
+              <ActionKey size={14} aria-hidden="true" />
+            </Button>
           )}
-          <button
+          <Button variant="ghost"
             type="button"
-            className="adm-node-card-icon-btn"
+            className="icon-button icon-button--sm icon-button--tinted adm-node-card-icon-btn"
             onClick={() => onManageAgents(node)}
             aria-label={t("admin.v2.manage_agents_for", { id: node.id })}
             title={t("admin.v2.manage_agents")}
           >
-            <Settings2 size={14} aria-hidden="true" />
-          </button>
+            <AdminManageAgents size={14} aria-hidden="true" />
+          </Button>
           {onDelete ? (
-            <button
+            <Button variant="ghost"
               type="button"
-              className="adm-node-card-icon-btn danger"
+              className="icon-button icon-button--sm icon-button--tinted adm-node-card-icon-btn danger"
               onClick={() => void handleDelete()}
               disabled={deletePending}
               aria-label={t("admin.v2.delete_action")}
               title={t("admin.v2.delete_action")}
             >
-              <Trash2 size={14} aria-hidden="true" />
-            </button>
+              <AdminDelete size={14} aria-hidden="true" />
+            </Button>
           ) : null}
         </div>
       </footer>

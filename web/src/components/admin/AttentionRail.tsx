@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
-import { Radio, X } from "lucide-react";
 import type { ControlPanelDaemonNodeRecord } from "../../types";
 import type { DaemonNodeActiveRun } from "relay-core";
 import { buildAttentionItems, isStale, type AttentionItem } from "./helpers";
+import { Button } from "../ui/button";
+import { ActionRemove, AdminLive } from "../icons";
 
 interface AttentionRailProps {
   nodes: ControlPanelDaemonNodeRecord[];
@@ -90,9 +91,9 @@ function RailBody({
           <span className={attentionCount > 0 ? "tone-bad" : "tone-muted"}>{attentionCount}</span>
         </span>
         {showClose ? (
-          <button type="button" className="adm-rail-close" onClick={onClose} aria-label={t("admin.v2.rail_close")}>
-            <X size={16} aria-hidden="true" />
-          </button>
+          <Button variant="ghost" type="button" className="adm-rail-close" onClick={onClose} aria-label={t("admin.v2.rail_close")}>
+            <ActionRemove size={16} aria-hidden="true" />
+          </Button>
         ) : null}
       </header>
       {entries.length === 0 ? (
@@ -148,7 +149,7 @@ export function AttentionRail({ nodes }: AttentionRailProps) {
   if (compact) {
     return (
       <div className="adm-rail-portal">
-        <button
+        <Button variant="ghost"
           type="button"
           className="adm-rail-fab"
           onClick={() => setSheetOpen(true)}
@@ -156,13 +157,13 @@ export function AttentionRail({ nodes }: AttentionRailProps) {
           aria-controls="adm-rail-sheet"
           aria-label={t("admin.v2.rail_fab_label", { runs: runCount, alerts: attentionCount })}
         >
-          <Radio size={16} aria-hidden="true" />
+          <AdminLive size={16} aria-hidden="true" />
           <span className="adm-rail-fab-counts mono">
             <span className="tone-info">{runCount}</span>
             <span aria-hidden="true">·</span>
             <span className={attentionCount > 0 ? "tone-bad" : "tone-muted"}>{attentionCount}</span>
           </span>
-        </button>
+        </Button>
         {sheetOpen ? (
           <div
             className="overlay-backdrop adm-rail-sheet-backdrop"

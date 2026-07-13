@@ -13,6 +13,7 @@ import { useArtifactBody } from "../lib/useArtifactBody";
 import { summarizeArtifact } from "../lib/artifactStats";
 import { useArtifactViewer } from "./ArtifactViewerProvider";
 import type { DerivedMessage } from "../lib/projectMessages";
+import { Button } from "./ui/button";
 export { isGroupedContinuation, projectMessages } from "../lib/projectMessages";
 export type { DerivedMessage } from "../lib/projectMessages";
 
@@ -109,7 +110,7 @@ function ArtifactChip({ artifact, sessionId, allArtifacts, onOpenArtifact }: { a
 
   return (
     <article className="artifact-chip" data-kind={artifact.kind}>
-      <button
+      <Button variant="ghost"
         type="button"
         className="artifact-chip-main"
         onClick={() => {
@@ -135,7 +136,7 @@ function ArtifactChip({ artifact, sessionId, allArtifacts, onOpenArtifact }: { a
           <strong>{artifact.title}</strong>
         </span>
         <span className="artifact-chip-cta" aria-hidden="true">{t("artifact.view")}</span>
-      </button>
+      </Button>
     </article>
   );
 }

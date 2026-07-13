@@ -73,9 +73,7 @@
   background: transparent;
   color: var(--color-semantic-muted);
   cursor: pointer;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  line-height: 1.2;
+  font: var(--type-label-strong);
   white-space: nowrap;
   transition:
     background var(--duration-fast) var(--ease-standard),
@@ -233,8 +231,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--color-semantic-ink);
-  font-size: var(--text-sm);
-  font-weight: 600;
+  font: var(--type-label-strong);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -317,8 +314,7 @@
 .workspace-activity-head h3 {
   margin: 0;
   color: var(--color-semantic-ink);
-  font-size: var(--text-sm);
-  font-weight: 600;
+  font: var(--type-label-strong);
 }
 
 .workspace-activity-head > span {
@@ -961,8 +957,7 @@
 .workspace-dossier-instructions-head h3 {
   margin: 0;
   color: var(--color-semantic-ink);
-  font-size: var(--text-sm);
-  font-weight: 600;
+  font: var(--type-label-strong);
 }
 
 .workspace-dossier-icon-btn {

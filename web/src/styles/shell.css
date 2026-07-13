@@ -42,7 +42,7 @@
 /* Admin (and future display-scale routes) — design-system display-lg title */
 .page-header-title--display {
   font: var(--type-display-lg);
-  letter-spacing: var(--letter-display);
+  letter-spacing: var(--letter-display-serif);
 }
 
 @media (max-width: 720px) {

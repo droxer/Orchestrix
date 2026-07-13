@@ -1,7 +1,8 @@
 "use client";
 
 import { useTranslation } from "react-i18next";
-import { CheckCircle2, CircleDot, MessageSquarePlus, XCircle, type LucideIcon } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { ActivityFailed, ActivityNewMessage, ActivityPending, ActivitySuccess } from "../../icons";
 import type { DashboardActivityItem } from "../../../api";
 import type { EmployeeRecord } from "../../../types";
 
@@ -12,10 +13,10 @@ interface ActivityFeedProps {
 }
 
 const ICONS: Record<string, { Icon: LucideIcon; tone: "info" | "good" | "bad" | "muted" }> = {
-  "session.created": { Icon: CircleDot, tone: "info" },
-  "session.completed": { Icon: CheckCircle2, tone: "good" },
-  "session.failed": { Icon: XCircle, tone: "bad" },
-  "task.created": { Icon: MessageSquarePlus, tone: "muted" },
+  "session.created": { Icon: ActivityPending, tone: "info" },
+  "session.completed": { Icon: ActivitySuccess, tone: "good" },
+  "session.failed": { Icon: ActivityFailed, tone: "bad" },
+  "task.created": { Icon: ActivityNewMessage, tone: "muted" },
 };
 
 export function ActivityFeed({ items, employees, className }: ActivityFeedProps) {
@@ -33,7 +34,7 @@ export function ActivityFeed({ items, employees, className }: ActivityFeedProps)
       ) : (
         <ul className="adm-dash-feed">
           {items.map((item, index) => {
-            const meta = ICONS[item.kind] ?? { Icon: CircleDot, tone: "muted" as const };
+            const meta = ICONS[item.kind] ?? { Icon: ActivityPending, tone: "muted" as const };
             const Icon = meta.Icon;
             const ownerName = item.employeeId ? employeeMap.get(item.employeeId) ?? item.employeeId : null;
             const relativeTime = formatRelative(item.timestamp, i18n.language);

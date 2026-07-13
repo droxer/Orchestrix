@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type ComponentProps } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Check, Pencil, Power, Trash2, X } from "lucide-react";
+import { ActionApprove, ActionEdit, ActionRemove, ActionToggle, AdminDelete } from "./icons";
 import { deleteAgentPlacement, deleteEmployeeAgent, getControlPanelAgent, updateEmployeeAgent, updateOwnEmployeeAgent } from "../api";
 import { agentLabel } from "../lib/plan";
 import type { AgentPlacement, ControlPanelDaemonNodeRecord, EmployeeAgent, EmployeeRecord } from "../types";
@@ -35,13 +35,13 @@ function DossierIconButton({
   ...props
 }: ComponentProps<"button">) {
   return (
-    <button
+    <Button variant="ghost"
       type="button"
       className={`workspace-dossier-icon-btn${className ? ` ${className}` : ""}`}
       {...props}
     >
       {children}
-    </button>
+    </Button>
   );
 }
 
@@ -251,7 +251,7 @@ export function AgentProfilePanel({
                 aria-label={t("admin.v2.edit_agent")}
                 title={t("admin.v2.edit_agent")}
               >
-                <Pencil size={14} aria-hidden="true" />
+                <ActionEdit size={14} aria-hidden="true" />
                 <span>{t("admin.v2.edit_agent")}</span>
               </DossierIconButton>
             ) : (
@@ -264,7 +264,7 @@ export function AgentProfilePanel({
                       aria-label={t("admin.v2.edit_agent")}
                       title={t("admin.v2.edit_agent")}
                     >
-                      <Pencil size={14} aria-hidden="true" />
+                      <ActionEdit size={14} aria-hidden="true" />
                     </DossierIconButton>
                   ) : null}
                 </div>
@@ -291,7 +291,7 @@ export function AgentProfilePanel({
                         aria-label={t("admin.v2.save")}
                         title={t("admin.v2.save")}
                       >
-                        <Check size={14} aria-hidden="true" />
+                        <ActionApprove size={14} aria-hidden="true" />
                       </DossierIconButton>
                       <DossierIconButton
                         onClick={() => setRenaming(false)}
@@ -299,7 +299,7 @@ export function AgentProfilePanel({
                         aria-label={t("admin.v2.cancel")}
                         title={t("admin.v2.cancel")}
                       >
-                        <X size={14} aria-hidden="true" />
+                        <ActionRemove size={14} aria-hidden="true" />
                       </DossierIconButton>
                     </div>
                   </>
@@ -320,7 +320,7 @@ export function AgentProfilePanel({
                 aria-label={t("agents_page.edit_instructions")}
                 title={t("agents_page.edit_instructions")}
               >
-                <Pencil size={14} aria-hidden="true" />
+                <ActionEdit size={14} aria-hidden="true" />
               </DossierIconButton>
             ) : null}
           </div>
@@ -344,7 +344,7 @@ export function AgentProfilePanel({
                   aria-label={t("admin.v2.save")}
                   title={t("admin.v2.save")}
                 >
-                  <Check size={14} aria-hidden="true" />
+                  <ActionApprove size={14} aria-hidden="true" />
                 </DossierIconButton>
                 <DossierIconButton
                   onClick={() => setEditingInstructions(false)}
@@ -352,7 +352,7 @@ export function AgentProfilePanel({
                   aria-label={t("admin.v2.cancel")}
                   title={t("admin.v2.cancel")}
                 >
-                  <X size={14} aria-hidden="true" />
+                  <ActionRemove size={14} aria-hidden="true" />
                 </DossierIconButton>
               </div>
             </>
@@ -391,7 +391,7 @@ export function AgentProfilePanel({
                 onClick={() => void handleToggleEnabled()}
                 disabled={saving}
               >
-                <Power size={14} aria-hidden="true" />
+                <ActionToggle size={14} aria-hidden="true" />
                 {agent.enabled ? t("admin.v2.agent_disable_action") : t("admin.v2.agent_enable_action")}
               </Button>
             ) : null}
@@ -431,7 +431,7 @@ export function AgentProfilePanel({
                             ) : null}
                           </span>
                         </span>
-                        <button
+                        <Button variant="ghost"
                           type="button"
                           className="adm-placement-remove"
                           onClick={() => void handleRemovePlacement(placement)}
@@ -439,8 +439,8 @@ export function AgentProfilePanel({
                           aria-label={t("admin.v2.remove_placement")}
                           title={t("admin.v2.remove_placement")}
                         >
-                          <Trash2 size={13} aria-hidden="true" />
-                        </button>
+                          <AdminDelete size={13} aria-hidden="true" />
+                        </Button>
                       </li>
                     );
                   })}
@@ -456,7 +456,7 @@ export function AgentProfilePanel({
                 onClick={() => void handleDeleteAgent()}
                 disabled={saving}
               >
-                <Trash2 size={14} aria-hidden="true" />
+                <AdminDelete size={14} aria-hidden="true" />
                 {t("admin.v2.delete_agent")}
               </Button>
               {error ? (
@@ -493,7 +493,7 @@ export function AgentProfilePanel({
               }}
               disabled={saving}
             />
-            <button
+            <Button variant="ghost"
               type="button"
               className="adm-copy-pill"
               onClick={() => void handleRenameSave()}
@@ -501,9 +501,9 @@ export function AgentProfilePanel({
               aria-label={t("admin.v2.save")}
               title={t("admin.v2.save")}
             >
-              <Check size={14} aria-hidden="true" />
-            </button>
-            <button
+              <ActionApprove size={14} aria-hidden="true" />
+            </Button>
+            <Button variant="ghost"
               type="button"
               className="adm-copy-pill"
               onClick={() => setRenaming(false)}
@@ -511,22 +511,22 @@ export function AgentProfilePanel({
               aria-label={t("admin.v2.cancel")}
               title={t("admin.v2.cancel")}
             >
-              <X size={14} aria-hidden="true" />
-            </button>
+              <ActionRemove size={14} aria-hidden="true" />
+            </Button>
           </div>
         ) : (
           <div className="adm-cred-value-line">
             <span className="adm-cred-value" translate="no">{agent.displayName}</span>
             {canEditProfile ? (
-              <button
+              <Button variant="ghost"
                 type="button"
                 className="adm-copy-pill"
                 onClick={startRename}
                 aria-label={t("admin.v2.edit_agent")}
                 title={t("admin.v2.edit_agent")}
               >
-                <Pencil size={14} aria-hidden="true" />
-              </button>
+                <ActionEdit size={14} aria-hidden="true" />
+              </Button>
             ) : null}
           </div>
         )}
@@ -548,7 +548,7 @@ export function AgentProfilePanel({
               placeholder={t("agents_page.instructions_placeholder")}
             />
             <div className="adm-cred-inline-actions">
-              <button
+              <Button variant="ghost"
                 type="button"
                 className="adm-copy-pill"
                 onClick={() => void handleInstructionsSave()}
@@ -556,9 +556,9 @@ export function AgentProfilePanel({
                 aria-label={t("admin.v2.save")}
                 title={t("admin.v2.save")}
               >
-                <Check size={14} aria-hidden="true" />
-              </button>
-              <button
+                <ActionApprove size={14} aria-hidden="true" />
+              </Button>
+              <Button variant="ghost"
                 type="button"
                 className="adm-copy-pill"
                 onClick={() => setEditingInstructions(false)}
@@ -566,8 +566,8 @@ export function AgentProfilePanel({
                 aria-label={t("admin.v2.cancel")}
                 title={t("admin.v2.cancel")}
               >
-                <X size={14} aria-hidden="true" />
-              </button>
+                <ActionRemove size={14} aria-hidden="true" />
+              </Button>
             </div>
           </div>
         ) : (
@@ -578,15 +578,15 @@ export function AgentProfilePanel({
                 : t("agents_page.instructions_empty")}
             </span>
             {canEditProfile ? (
-              <button
+              <Button variant="ghost"
                 type="button"
                 className="adm-copy-pill"
                 onClick={startEditInstructions}
                 aria-label={t("agents_page.edit_instructions")}
                 title={t("agents_page.edit_instructions")}
               >
-                <Pencil size={14} aria-hidden="true" />
-              </button>
+                <ActionEdit size={14} aria-hidden="true" />
+              </Button>
             ) : null}
           </div>
         )}
@@ -627,7 +627,7 @@ export function AgentProfilePanel({
               onClick={() => void handleToggleEnabled()}
               disabled={saving}
             >
-              <Power size={14} aria-hidden="true" />
+              <ActionToggle size={14} aria-hidden="true" />
               {agent.enabled ? t("admin.v2.agent_disable_action") : t("admin.v2.agent_enable_action")}
             </Button>
           ) : null}
@@ -670,7 +670,7 @@ export function AgentProfilePanel({
                     </span>
                   </span>
                   {canManage ? (
-                    <button
+                    <Button variant="ghost"
                       type="button"
                       className="adm-placement-remove"
                       onClick={() => void handleRemovePlacement(placement)}
@@ -678,8 +678,8 @@ export function AgentProfilePanel({
                       aria-label={t("admin.v2.remove_placement")}
                       title={t("admin.v2.remove_placement")}
                     >
-                      <Trash2 size={13} aria-hidden="true" />
-                    </button>
+                      <AdminDelete size={13} aria-hidden="true" />
+                    </Button>
                   ) : null}
                 </li>
               );
@@ -697,7 +697,7 @@ export function AgentProfilePanel({
             onClick={() => void handleDeleteAgent()}
             disabled={saving}
           >
-            <Trash2 size={14} aria-hidden="true" />
+            <AdminDelete size={14} aria-hidden="true" />
             {t("admin.v2.delete_agent")}
           </Button>
           {error ? (

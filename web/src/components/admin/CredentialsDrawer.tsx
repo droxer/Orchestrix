@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, Copy } from "lucide-react";
+import { ActionApprove, ActionCopy } from "../icons";
 import type { ControlPanelDaemonNodeRecord } from "../../types";
 import { useDialogs } from "@/components/ui/DialogProvider";
 import { Button } from "@/components/ui/button";
@@ -37,16 +37,16 @@ function CredCopyRow({ label, value, copyLabel, copied, onCopy, hint }: RowProps
       {hint ? <span className="adm-cred-hint">{hint}</span> : null}
       <div className="adm-cred-value-line">
         <code className="adm-cred-value mono">{value}</code>
-        <button
+        <Button variant="ghost"
           type="button"
           className={`adm-copy-pill ${copied ? "copied" : ""}`}
           onClick={onCopy}
           aria-label={copyLabel}
           title={copyLabel}
         >
-          {copied ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
+          {copied ? <ActionApprove size={14} aria-hidden="true" /> : <ActionCopy size={14} aria-hidden="true" />}
           <span>{copied ? t("admin.copied") : t("admin.copy")}</span>
-        </button>
+        </Button>
       </div>
     </div>
   );

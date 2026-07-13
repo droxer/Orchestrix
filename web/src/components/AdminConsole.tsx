@@ -5,9 +5,8 @@ import { DashboardView } from "./admin/dashboard/DashboardView";
 import { useFleetMetrics } from "../hooks/useFleetMetrics";
 import { useTranslation } from "react-i18next";
 import { useMutationError } from "../hooks/useMutationError";
-import { Server, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { NavRefresh } from "./icons";
+import { ActionAddPerson, AdminNode, NavRefresh } from "./icons";
 import { deleteControlPanelDaemonNode, deleteControlPanelEmployee, getAuthStatus, getMe, unassignControlPanelDaemonNode } from "../api";
 import type {
   AssignControlPanelDaemonNodeResponse,
@@ -369,7 +368,7 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
                 onClick={() => setAddEmployeeOpen(true)}
                 aria-label={t("admin.v2.add_employee_cta")}
               >
-                <UserPlus size={16} aria-hidden="true" />
+                <ActionAddPerson size={16} aria-hidden="true" />
                 <span className="adm-command-onboard-label">{t("admin.v2.add_employee_cta")}</span>
               </Button>
             ) : null}
@@ -380,7 +379,7 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
                 onClick={() => setAddNodeOpen(true)}
                 aria-label={t("admin.v2.add_node_cta")}
               >
-                <Server size={16} aria-hidden="true" />
+                <AdminNode size={16} aria-hidden="true" />
                 <span className="adm-command-onboard-label">{t("admin.v2.add_node_cta")}</span>
               </Button>
             ) : null}

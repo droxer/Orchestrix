@@ -6,6 +6,7 @@ import { listTaskArtifacts } from "../../api";
 import { artifactRawHref } from "../../lib/artifactPreview";
 import { useArtifactViewer } from "../ArtifactViewerProvider";
 import type { ArtifactIndexItem } from "../../types";
+import { Button } from "../ui/button";
 
 function taskArtifactDate(value: string | undefined, locale: string): string {
   if (!value) return "";
@@ -55,7 +56,7 @@ export function TaskDrawerArtifacts({ taskId }: { taskId: string }) {
         <ul className="task-drawer-artifact-list">
           {artifacts.map((artifact) => (
             <li key={artifact.id} className="task-drawer-artifact">
-              <button
+              <Button variant="ghost"
                 type="button"
                 className="task-drawer-artifact-main"
                 onClick={() => open(artifact, artifact.sessionId, artifacts ?? [artifact])}
@@ -68,7 +69,7 @@ export function TaskDrawerArtifacts({ taskId }: { taskId: string }) {
                 <span className="task-drawer-artifact-meta mono">
                   {taskArtifactDate(artifact.createdAt, i18n.language)}
                 </span>
-              </button>
+              </Button>
               <a
                 className="task-drawer-artifact-download"
                 href={artifactRawHref(artifact.sessionId, artifact.id)}

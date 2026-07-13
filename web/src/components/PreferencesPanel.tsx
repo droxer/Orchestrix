@@ -10,6 +10,7 @@ import {
 } from "../lib/appStorage";
 import { moveRadioSelection } from "../lib/radioGroupKeyboard";
 import { PrefAppearance, PrefLanguage } from "./icons";
+import { Button } from "./ui/button";
 
 export type { Language, Theme };
 export { SUPPORTED_LANGUAGES, SUPPORTED_THEMES };
@@ -77,9 +78,10 @@ function ThemeOption({
 }) {
   const { t } = useTranslation();
   return (
-    <button
+    <Button
       ref={(el) => { registerRef(value, el); }}
       type="button"
+      variant="ghost"
       role="radio"
       className={`pref-option-row ${selected ? "selected" : ""}`}
       aria-checked={selected}
@@ -92,7 +94,7 @@ function ThemeOption({
         <span className="pref-option-sub">{t(`pref.theme.${value}_sub`)}</span>
       </span>
       {selected ? <PrefSelectedCheck /> : null}
-    </button>
+    </Button>
   );
 }
 
@@ -152,9 +154,10 @@ function LanguageOption({
   registerRef: (code: Language, el: HTMLButtonElement | null) => void;
 }) {
   return (
-    <button
+    <Button
       ref={(el) => { registerRef(code, el); }}
       type="button"
+      variant="ghost"
       role="radio"
       className={`pref-option-row ${selected ? "selected" : ""}`}
       aria-checked={selected}
@@ -168,7 +171,7 @@ function LanguageOption({
         <span className="pref-option-sub">{label}</span>
       </span>
       {selected ? <PrefSelectedCheck /> : null}
-    </button>
+    </Button>
   );
 }
 
@@ -265,10 +268,11 @@ export function PreferencesPanel({
         }}
       >
         {CATEGORIES.map(({ id, labelKey, Icon }) => (
-          <button
+          <Button
             key={id}
             ref={(el) => { tabRefs.current.set(id, el); }}
             type="button"
+            variant="ghost"
             role="tab"
             id={`pref-tab-${id}`}
             className={`pref-nav-item ${active === id ? "active" : ""}`}
@@ -279,7 +283,7 @@ export function PreferencesPanel({
           >
             <Icon size={16} />
             <span className="pref-nav-label">{t(labelKey)}</span>
-          </button>
+          </Button>
         ))}
       </nav>
 

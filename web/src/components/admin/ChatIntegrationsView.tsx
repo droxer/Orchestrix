@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bot, Link2, LockKeyhole, MessageSquare, ShieldCheck, Trash2, Users } from "lucide-react";
+import { AdminChannel, AdminConnect, AdminDelete, AdminEmployees, AdminLocked, AdminVerified, PrefAgents } from "../icons";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import {
@@ -47,11 +47,11 @@ function statusTone(status: ChatIntegration["status"]): string {
   return "neutral";
 }
 
-function readiness(integration: ChatIntegration): Array<{ key: string; labelKey: string; ready: boolean; icon: typeof LockKeyhole }> {
+function readiness(integration: ChatIntegration): Array<{ key: string; labelKey: string; ready: boolean; icon: typeof AdminLocked }> {
   return [
-    { key: "secrets", labelKey: "admin.v2.chat_readiness_secrets", ready: integration.secretConfigured, icon: LockKeyhole },
-    { key: "links", labelKey: "admin.v2.chat_readiness_identity", ready: integration.identityLinkCount > 0, icon: Users },
-    { key: "allowlist", labelKey: "admin.v2.chat_readiness_allowlist", ready: integration.allowedConversationCount > 0, icon: ShieldCheck },
+    { key: "secrets", labelKey: "admin.v2.chat_readiness_secrets", ready: integration.secretConfigured, icon: AdminLocked },
+    { key: "links", labelKey: "admin.v2.chat_readiness_identity", ready: integration.identityLinkCount > 0, icon: AdminEmployees },
+    { key: "allowlist", labelKey: "admin.v2.chat_readiness_allowlist", ready: integration.allowedConversationCount > 0, icon: AdminVerified },
   ];
 }
 
@@ -158,7 +158,7 @@ export function ChatIntegrationsView() {
       <div className="adm-chat-grid">
         <section className="adm-chat-panel">
           <header className="adm-chat-panel-head">
-            <Bot size={18} aria-hidden="true" />
+            <PrefAgents size={18} aria-hidden="true" />
             <div>
               <h3>{t("admin.v2.chat_new_title")}</h3>
               <p>{t("admin.v2.chat_new_sub")}</p>
@@ -184,7 +184,7 @@ export function ChatIntegrationsView() {
               <input name="chat-secret" autoComplete="new-password" spellCheck={false} value={secret} onChange={(event) => setSecret(event.target.value)} type="password" placeholder={`${secretFieldByProvider[provider]}…`} />
             </label>
             <Button type="button" onClick={() => void handleCreate()} disabled={busy !== null}>
-              <Link2 size={16} aria-hidden="true" />
+              <AdminConnect size={16} aria-hidden="true" />
               <span>{t("admin.v2.chat_create")}</span>
             </Button>
           </div>
@@ -192,7 +192,7 @@ export function ChatIntegrationsView() {
 
         <section className="adm-chat-panel adm-chat-panel--list">
           <header className="adm-chat-panel-head">
-            <MessageSquare size={18} aria-hidden="true" />
+            <AdminChannel size={18} aria-hidden="true" />
             <div>
               <h3>{t("admin.v2.chat_existing_title")}</h3>
               <p>{query.isLoading ? t("admin.v2.dash_loading") : t("admin.v2.chat_existing_sub")}</p>
@@ -205,7 +205,7 @@ export function ChatIntegrationsView() {
               {integrations.map((integration) => {
                 const active = selected?.id === integration.id;
                 return (
-                  <button
+                  <Button variant="ghost"
                     key={integration.id}
                     type="button"
                     className={`adm-chat-integration ${active ? "active" : ""}`}
@@ -217,7 +217,7 @@ export function ChatIntegrationsView() {
                       <span className="mono">{providerLabel(integration.provider)} {integration.tenantId ? `· ${integration.tenantId}` : ""}</span>
                     </span>
                     <span className={`adm-status-pill tone-${statusTone(integration.status)}`}>{t(`admin.v2.chat_status_${integration.status}`, { defaultValue: integration.status })}</span>
-                  </button>
+                  </Button>
                 );
               })}
             </div>
@@ -282,9 +282,9 @@ export function ChatIntegrationsView() {
                     {selected.identityLinks.map((link) => (
                       <li key={link.id}>
                         <span><strong>@{link.employeeId}</strong><small className="mono">{link.externalUserId}</small></span>
-                        <button type="button" onClick={() => void mutate("delete-link", () => deleteChatIdentityLink(selected.id, link.id))} aria-label={t("admin.v2.chat_delete_link")}>
-                          <Trash2 size={13} aria-hidden="true" />
-                        </button>
+                        <Button variant="ghost" type="button" onClick={() => void mutate("delete-link", () => deleteChatIdentityLink(selected.id, link.id))} aria-label={t("admin.v2.chat_delete_link")}>
+                          <AdminDelete size={13} aria-hidden="true" />
+                        </Button>
                       </li>
                     ))}
                   </ul>
@@ -304,9 +304,9 @@ export function ChatIntegrationsView() {
                     {selected.allowedConversations.map((conversation) => (
                       <li key={conversation.id}>
                         <span><strong>{conversation.label}</strong><small className="mono">{conversation.conversationId}</small></span>
-                        <button type="button" onClick={() => void mutate("delete-conversation", () => deleteChatAllowedConversation(selected.id, conversation.id))} aria-label={t("admin.v2.chat_delete_allow")}>
-                          <Trash2 size={13} aria-hidden="true" />
-                        </button>
+                        <Button variant="ghost" type="button" onClick={() => void mutate("delete-conversation", () => deleteChatAllowedConversation(selected.id, conversation.id))} aria-label={t("admin.v2.chat_delete_allow")}>
+                          <AdminDelete size={13} aria-hidden="true" />
+                        </Button>
                       </li>
                     ))}
                   </ul>
