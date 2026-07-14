@@ -10,7 +10,7 @@
 
    Color is pinned via local --lg-* variables whose values are lifted
    verbatim from the dark (default) ramp in tokens/primitives.css
-   (cool charcoal canvas, Graphite Steel action, amber attention). Spacing,
+   (warm near-black canvas, Sleek Forest action, amber attention). Spacing,
    type scale, and radii are theme-independent tokens and are used
    directly. Documented stylelint exception — see web/.stylelintrc.json.
 
@@ -20,23 +20,23 @@
 
 .login-screen {
   /* Pinned dark ramp — mirrors the default (dark) register in tokens/primitives.css. */
-  --lg-canvas: #0b0d10;
-  --lg-elevated: #1f242c;
-  --lg-ink: #f3f5f7;
-  --lg-body: #c5ccd6;
-  --lg-muted: #8b93a0;
-  --lg-hairline: color-mix(in srgb, #f3f5f7 14%, #0b0d10);
-  --lg-hairline-soft: color-mix(in srgb, #f3f5f7 8%, #0b0d10);
-  --lg-steel: #5b87d6;
-  --lg-steel-active: #7aa0e0;
-  --lg-on-steel: #0a1220; /* text-on-accent (dark ink on the steel fill) */
-  --lg-up: #34d399;
-  --lg-amber: #fbbf24;
-  --lg-down: #f87171;
+  --lg-canvas: #141311;
+  --lg-elevated: #262420;
+  --lg-ink: #f5f3ec;
+  --lg-body: #d8d4c8;
+  --lg-muted: #8a8578;
+  --lg-hairline: color-mix(in srgb, #f5f3ec 14%, #141311);
+  --lg-hairline-soft: color-mix(in srgb, #f5f3ec 8%, #141311);
+  --lg-steel: #4f9d6e;
+  --lg-steel-active: #63b482;
+  --lg-on-steel: #0d1410; /* text-on-accent (dark ink on the forest fill) */
+  --lg-up: #2fb355;
+  --lg-amber: #e0a857;
+  --lg-down: #ef6f6f;
   /* Mode accent — steel while attaching, amber during first-run setup. */
   --lg-accent: var(--lg-steel);
   /* Pin semantic action to the pre-auth dark steel so RelayMark's lead
-     chevron stays Graphite Steel even when the operator's saved theme is light. */
+     chevron stays Sleek Forest even when the operator's saved theme is light. */
   --color-semantic-action: var(--lg-steel);
 
   position: relative;
