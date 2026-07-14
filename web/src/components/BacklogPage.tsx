@@ -86,24 +86,24 @@ function BacklogStats({ tasks }: { tasks: RelayTask[] }) {
   }, [tasks]);
 
   return (
-    <div className="backlog-stats" aria-label={t("backlog.metrics")}>
-      <div className="backlog-stat">
+    <p className="backlog-stats" aria-label={t("backlog.metrics")}>
+      <span className="backlog-stat">
         <span className="backlog-stat-eyebrow">{t("backlog.metric_total")}</span>
         <span className="backlog-stat-value">{stats.total}</span>
-      </div>
-      <div className="backlog-stat">
+      </span>
+      <span className="backlog-stat">
         <span className="backlog-stat-eyebrow">{t("backlog.metric_active")}</span>
         <span className="backlog-stat-value tone-active">{stats.active}</span>
-      </div>
-      <div className="backlog-stat">
+      </span>
+      <span className="backlog-stat">
         <span className="backlog-stat-eyebrow">{t("backlog.metric_blocked")}</span>
         <span className={cn("backlog-stat-value", stats.blocked > 0 && "tone-blocked")}>{stats.blocked}</span>
-      </div>
-      <div className="backlog-stat">
+      </span>
+      <span className="backlog-stat">
         <span className="backlog-stat-eyebrow">{t("backlog.metric_overdue")}</span>
         <span className={cn("backlog-stat-value", stats.overdue > 0 && "tone-overdue")}>{stats.overdue}</span>
-      </div>
-    </div>
+      </span>
+    </p>
   );
 }
 
@@ -583,7 +583,6 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
         kicker={t("nav.backlog")}
         title={t("backlog.title")}
         count={t("backlog.sub", { count: tasks.length })}
-        titleVariant="display"
         actions={
           <TaskBoardHeaderActions
             leading={<BacklogViewToggle view={view} onChange={changeView} />}

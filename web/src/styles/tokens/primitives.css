@@ -9,23 +9,24 @@
    property names with different values) since that's a fact about the
    color itself, not a role assignment.
 
-   Palette direction: Graphite Steel — cool charcoal canvas (#0b0d10)
-   with a four-step cool surface ladder, light-gray ink, and a
-   restrained steel-blue (#5b87d6) as the single chromatic accent, used
-   ONLY for the brand mark, primary actions, and focus. This replaces
-   Signal Cyan's electric telemetry accent with a calmer enterprise
-   blue that stays perceptually distinct from the green/red/amber
-   status trio and avoids both lavender-on-dark SaaS convergence and
-   neon cyan flash. Dark is the primary, default register; light is a
-   derived secondary theme that deepens the same steel family into
-   #2f5fad for AA contrast on a cool gray-white canvas. Status hues
-   (green/red/amber) remain the only other chroma in the system —
-   dots, borders, and text, never fills or actions. One crisp grotesk
-   (Geist) carries every text role; Geist Mono is reserved for code-like
+   Palette direction: Sleek Forest — a warm near-black canvas (#141311)
+   with a four-step warm surface ladder, warm off-white ink, and a
+   restrained forest green (#4f9d6e) as the single chromatic accent, used
+   ONLY for the brand mark, primary actions, and focus. Forest green sits
+   in the same hue family as the success status color, so success
+   (--color-green) is deliberately tuned brighter/more saturated
+   (#2fb355) than the muted accent so the two don't read as
+   interchangeable at small sizes (dots, badges). Dark is the primary,
+   default register; light is a derived secondary theme that deepens the
+   same forest family into #2f7a50 for AA contrast on a warm off-white
+   canvas. Status hues (green/red/amber) remain the only other chroma in
+   the system — dots, borders, and text, never fills or actions. One
+   crisp grotesk carries every text role; mono is reserved for code-like
    content. Geometry is tight (5–6px controls), hairlines draw all
    structure, and motion is fast with no overshoot. Because semantic.css
    only ever aliases these names, this whole reskin lives entirely in
-   this file; no component CSS changed.
+   this file; no component CSS changed except where noted in
+   docs/superpowers/plans/2026-07-14-web-sleek-forest-identity.md.
 
    No component CSS should ever reference a primitive directly — always
    go through a --color-semantic-* / --type-* / --shadow-* role in
@@ -45,45 +46,44 @@
 
 :root {
   /* ----- Color primitives — dark register (default) -------------- */
-  /* Cool charcoal canvas + Graphite Steel accent. Dark is the primary
+  /* Warm near-black canvas + Forest Green accent. Dark is the primary
      experience; html[data-theme="light"] supplies a derived secondary. */
 
-  /* Accent — Graphite Steel is the single chromatic action color: brand
-     mark, primary CTA, focus ring, link emphasis. A restrained steel
-     blue reads as enterprise calm (Stripe/Notion school) without the
-     neon flash of Signal Cyan or the lavender-on-dark convergence of
-     most dev-tool SaaS. Rest state is mid-bright, so on-accent text
-     goes DARK here — see --color-on-accent below. Disabled fades to a
-     desaturated steel-gray so dark-on-accent text stays legible. */
-  --color-accent: #5b87d6;
-  --color-accent-active: #7aa0e0;
-  --color-accent-disabled: #6a7a94;
-  --color-accent-tint: #152033; /* selection wash — a dark steel-tinted surface, not a pastel */
+  /* Accent — Forest Green is the single chromatic action color: brand
+     mark, primary CTA, focus ring, link emphasis. A muted forest reads
+     distinct from the blue/teal SaaS convergence without the neon flash
+     of a signal color. Rest state is mid-bright, so on-accent text goes
+     DARK here — see --color-on-accent below. Disabled fades toward the
+     canvas so dark-on-accent text stays legible. */
+  --color-accent: #4f9d6e;
+  --color-accent-active: #63b482;
+  --color-accent-disabled: #3d5c4b;
+  --color-accent-tint: #16241c; /* selection wash — a dark forest-tinted surface, not a pastel */
 
-  /* Ink — cool light-gray text ramp, darkest(brightest)-first. */
-  --color-ink-900: #f3f5f7;
-  --color-ink-700: #c5ccd6;
-  --color-ink-500: #8b93a0;
-  --color-ink-300: #636b78;
-  --color-ink-200: #4a5160; /* rail/decorative border step between hairline and ink-300 */
+  /* Ink — warm off-white text ramp, darkest(brightest)-first. */
+  --color-ink-900: #f5f3ec;
+  --color-ink-700: #d8d4c8;
+  --color-ink-500: #b8b4a8;
+  --color-ink-300: #8a8578;
+  --color-ink-200: #67645b; /* rail/decorative border step between hairline and ink-300 */
 
-  /* On-fill text — theme-varying: the dark theme's steel is bright
+  /* On-fill text — theme-varying: the dark theme's forest green is bright
      enough that on-accent text is near-black ink; the light theme's
      accent is deepened enough that on-accent stays white. */
-  --color-on-accent: #0a1220;
-  --color-porcelain: #f3f5f7;  /* text on ink/dark fills that appear in both themes */
+  --color-on-accent: #0d1410;
+  --color-porcelain: #f5f3ec;  /* text on ink/dark fills that appear in both themes */
 
   /* True white — always literal, never theme-varying. Used only as a
      color-mix input (alpha overlays mixing toward white); kept distinct
      from --color-on-accent, which flips to a dark ink in light mode. */
   --color-white: #ffffff;
 
-  /* Canvas — cool four-step charcoal surface ladder on a near-black
-     (#0b0d10) canvas. Structure comes from hairlines, not shadows. */
-  --color-canvas-base: #0b0d10;
-  --color-canvas-soft: #14171c;    /* surface-1 — default cards, product panels */
-  --color-canvas-strong: #1a1e25;  /* surface-2 — fills, search, hovered cards */
-  --color-canvas-raised: #1f242c;  /* surface-3 — modals, drawers, floating chrome */
+  /* Canvas — warm four-step near-black surface ladder on a warm
+     near-black (#141311) canvas. Structure comes from hairlines, not shadows. */
+  --color-canvas-base: #141311;
+  --color-canvas-soft: #1b1a16;    /* surface-1 — default cards, product panels */
+  --color-canvas-strong: #211f1a;  /* surface-2 — fills, search, hovered cards */
+  --color-canvas-raised: #262420;  /* surface-3 — modals, drawers, floating chrome */
 
   /* Graphite — the always-dark surface register (chrome that stays dark
      even on the light theme, e.g. dark buttons/fills, the always-dark
@@ -93,21 +93,23 @@
   --color-graphite-400: #9aa1ab;
 
   /* Hairline ramp. */
-  --color-hairline-300: #262b33;
-  --color-hairline-200: #1a1e25;
+  --color-hairline-300: #2c2a24;
+  --color-hairline-200: #211f1a;
 
   /* Status hues — the only other chroma in the system besides the
-     Graphite Steel accent. Text, dots, and borders only; never
-     background fills, never actions. Success matches Linear's
-     semantic-success directly; red/amber/slate carry forward this
-     app's dark-tuned values. */
-  --color-green: #27a644;    /* success — Linear semantic-success */
-  --color-red: #f87171;      /* danger */
-  --color-yellow: #fbbf24;   /* warning (dot-only contrast) */
-  --color-slate: #9aa1ab;    /* info — neutral, decoupled from the accent */
-  --color-yellow-deep: #fbbf24; /* warning as text — ~7:1 on the cool charcoal canvas */
-  --color-red-deep: #f87171;    /* danger as text */
-  --color-rust: #f0a868;        /* syntax-highlight numerals — orthogonal to the reskin */
+     Forest Green accent. Text, dots, and borders only; never
+     background fills, never actions. Success is intentionally a
+     brighter, more saturated green than the muted forest accent so a
+     "ready"/"done" dot and a primary button don't read as the same
+     color at a glance; red/amber/slate carry forward this app's
+     dark-tuned values. */
+  --color-green: #2fb355;    /* success — brighter/more saturated than the #4f9d6e accent */
+  --color-red: #ef6f6f;      /* danger */
+  --color-yellow: #e0a857;   /* warning (dot-only contrast) */
+  --color-slate: #8a8578;    /* info — neutral, decoupled from the accent */
+  --color-yellow-deep: #e0a857; /* warning as text — verify ~7:1 on the warm near-black canvas */
+  --color-red-deep: #ef6f6f;    /* danger as text */
+  --color-rust: #f0a868;        /* syntax-highlight numerals — orthogonal to the reskin, unchanged */
 
   /* True black — used only as color-mix inputs (alpha overlays), never
      assigned directly to a role. */
@@ -116,7 +118,7 @@
   /* Shadow tints — near-black drop-shadow bases and the modal scrim
      base. Linear's overlay scrim is pure black. */
   --color-shadow-ink: #000000;
-  --color-shadow-ink-ring: #262b33;
+  --color-shadow-ink-ring: #2c2a24;
   --color-scrim-base: #000000;
 
   /* Artifact kind accents — the one DECORATIVE color group in the system, a
@@ -124,7 +126,7 @@
      artifact palette so the transcript chip's left-border kind tag reads
      identically across the two surfaces. Tokenized (not inlined) so light
      and contrast can retune them; consumed only by artifact.css. Brightened
-     for the cool charcoal canvas. --color-diff-hunk is the hunk header inside
+     for the warm near-black canvas. --color-diff-hunk is the hunk header inside
      the always-dark diff viewer, so it does not flip. --color-kind-review
      is a named alias for the "review passed" green so the kind accent does
      not borrow the status-semantic-success token directly. */
@@ -133,7 +135,7 @@
   --color-kind-test: #a78bfa;     /* violet */
   --color-kind-log: #e879f9;      /* magenta */
   --color-kind-summary: #60a5fa;  /* blue */
-  --color-kind-review: #34d399;   /* green — named separately as a decorative alias */
+  --color-kind-review: #2dd4bf;   /* teal — shifted off green so it doesn't read as the accent color */
   --color-diff-hunk: #5eb3f5;
 
   /* ----- Structural primitives — theme-independent scales -------- */
@@ -271,45 +273,45 @@
 
 /* Light register — a derived secondary theme. The Linear reference is
    dark-only ("don't ship a light-mode marketing page"), so this
-   block extrapolates a lifted counterpart: the same Graphite Steel
-   family (deepened into #2f5fad for AA contrast on cool gray-white)
-   with a cool zinc ink ramp. `applyTheme` (appStorage.ts) resolves
+   block extrapolates a lifted counterpart: the same Sleek Forest
+   family (deepened into #2f7a50 for AA contrast on a warm off-white)
+   with a warm ink ramp. `applyTheme` (appStorage.ts) resolves
    "system" via matchMedia to light|dark; the pre-hydration script in
    app/layout.tsx mirrors the same logic to avoid a flash. Dark is the
    default/primary register above; this override only applies under
    html[data-theme="light"]. */
 html[data-theme="light"] {
-  /* Dark steel is bright enough on charcoal but too light to carry
+  /* Dark forest is bright enough on near-black but too light to carry
      white text on a pale canvas, so the light register deepens
-     rest/hover into #2f5fad (verified ~4.5:1+ white-text contrast).
-     Disabled fades to a mid steel-gray so white on-accent stays legible. */
-  --color-accent: #2f5fad;
-  --color-accent-active: #274f91;
-  --color-accent-disabled: #7a8aa3;
-  --color-accent-tint: #dce6f5;   /* selection wash — a lifted pale steel tint, not a pastel */
-  --color-on-accent: #ffffff; /* white text on the deepened steel fill */
+     rest/hover into #2f7a50 (verified ~4.5:1+ white-text contrast).
+     Disabled fades to a mid forest-gray so white on-accent stays legible. */
+  --color-accent: #2f7a50;
+  --color-accent-active: #266342;
+  --color-accent-disabled: #7a9a89;
+  --color-accent-tint: #dcefe3;   /* selection wash — a lifted pale forest tint, not a pastel */
+  --color-on-accent: #ffffff; /* white text on the deepened forest fill */
 
-  --color-ink-900: #12141a;
-  --color-ink-700: #3f4550;
-  --color-ink-500: #6b7280;
-  --color-ink-300: #9aa1ab;
-  --color-ink-200: #d1d5db;
+  --color-ink-900: #1c1a15;
+  --color-ink-700: #4a463c;
+  --color-ink-500: #746f61;
+  --color-ink-300: #a39c8c;
+  --color-ink-200: #ddd6c4;
 
-  --color-canvas-base: #f7f8fa;
+  --color-canvas-base: #faf8f4;
   --color-canvas-soft: #ffffff;
-  --color-canvas-strong: #eef0f3;
+  --color-canvas-strong: #f1ece0;
   --color-canvas-raised: #ffffff;
 
-  --color-hairline-300: #e2e5ea;
-  --color-hairline-200: #eef0f3;
+  --color-hairline-300: #ece6d8;
+  --color-hairline-200: #f1ece0;
 
-  --color-green: #10b981;
-  --color-red: #ef4444;
-  --color-slate: #6b7280;
+  --color-green: #1f9d4a;
+  --color-red: #dc4c4c;
+  --color-slate: #746f61;
   --color-rust: #b45309;
-  --color-yellow: #f59e0b;
-  --color-yellow-deep: #8a5c00; /* ~4.8:1 on cool gray-white */
-  --color-red-deep: #dc2626;    /* ~4.5:1 on cool gray-white */
+  --color-yellow: #c98a2e;
+  --color-yellow-deep: #8a5c00; /* ~4.8:1 on warm off-white, unchanged value still verified */
+  --color-red-deep: #dc2626;    /* ~4.5:1 on warm off-white, unchanged value still verified */
 
   /* Artifact kind accents — desaturated for the pale canvas. */
   --color-kind-plan: #0891b2;
@@ -317,7 +319,7 @@ html[data-theme="light"] {
   --color-kind-test: #7c3aed;
   --color-kind-log: #c026d3;
   --color-kind-summary: #2563eb;
-  --color-kind-review: #10b981;
+  --color-kind-review: #0d9488; /* teal — shifted off green, mirrors the dark theme's #2dd4bf */
 }
 
 /* International type — CJK coverage. Geist and Geist Mono carry no Han

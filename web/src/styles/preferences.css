@@ -304,31 +304,31 @@
    (dark/default values) and their html[data-theme="light"] overrides
    (light values). Documented stylelint exception — see web/.stylelintrc.json. */
 .pref-theme-swatch[data-tone="light"] {
-  background: #f7f8fa;
+  background: #faf8f4;
 }
 
 .pref-theme-swatch[data-tone="light"]::after {
-  background: #2f5fad; /* light theme's deepened steel (accent is theme-varying) */
+  background: #2f7a50; /* light theme's deepened forest green (accent is theme-varying) */
 }
 
 .pref-theme-swatch[data-tone="dark"] {
-  background: #0b0d10;
-  border-color: color-mix(in srgb, #f3f5f7 14%, transparent);
+  background: #141311;
+  border-color: color-mix(in srgb, #f5f3ec 14%, transparent);
 }
 
 .pref-theme-swatch[data-tone="dark"]::after {
-  background: #5b87d6; /* dark theme's steel-blue action */
+  background: #4f9d6e; /* dark theme's forest-green action */
 }
 
 .pref-theme-swatch[data-tone="system"] {
-  background: linear-gradient(135deg, #f7f8fa 0 50%, #0b0d10 50% 100%);
+  background: linear-gradient(135deg, #faf8f4 0 50%, #141311 50% 100%);
   border-color: color-mix(in srgb, var(--color-semantic-ink) 10%, transparent);
 }
 
 .pref-theme-swatch[data-tone="system"]::after {
-  /* Graphite Steel is theme-varying (deep steel on light / mid steel on
+  /* Forest Green is theme-varying (deepened on light / mid forest on
      dark), so the split-gradient dot shows both, half per theme. */
-  background: linear-gradient(90deg, #2f5fad 0 50%, #5b87d6 50% 100%);
+  background: linear-gradient(90deg, #2f7a50 0 50%, #4f9d6e 50% 100%);
 }
 
 /* ── Language badges ──────────────────────────────────────────────────────── */
