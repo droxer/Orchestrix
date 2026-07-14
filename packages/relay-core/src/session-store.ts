@@ -1,7 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, appendFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 
-import { getAgent } from "./agents.js";
 import { REPO_ROOT } from "./env.js";
 import type { AgentName, AgentTaskMode } from "./state.js";
 import { mergeTokenUsage, type TokenUsage } from "./token-usage.js";
@@ -15,7 +14,7 @@ export type HumanDecisionKind = "approve" | "reject" | "cancel" | "rerun" | "han
 export interface AgentRun {
   id: string;
   agent: AgentName;
-  role: AgentRole;
+  role?: AgentRole;
   mode: AgentTaskMode;
   status: "running" | "completed" | "failed" | "cancelled";
   startedAt: string;
@@ -109,7 +108,7 @@ export type RelayEvent =
       timestamp: string;
       runId: string;
       agent: AgentName;
-      role: AgentRole;
+      role?: AgentRole;
       mode: AgentTaskMode;
     }
   | {
@@ -231,12 +230,6 @@ export function nowIso(): string {
 export function newRelayId(prefix: string): string {
   const random = Math.random().toString(36).slice(2, 8);
   return `${prefix}_${Date.now().toString(36)}_${random}`;
-}
-
-export function roleForAgent(agent: AgentName, mode: AgentTaskMode = "action"): AgentRole {
-  if (mode === "review") return "reviewer";
-  // "ask" and "action" both fill the agent's normal action role.
-  return getAgent(agent).actionRole;
 }
 
 export class LocalSessionStore implements SessionStore {
@@ -433,7 +426,7 @@ export function materializeEvents(events: RelayEvent[]): RelaySession {
       session.agentRuns.push({
         id: event.runId,
         agent: event.agent,
-        role: event.role,
+        ...(event.role ? { role: event.role } : {}),
         mode: event.mode,
         status: "running",
         startedAt: event.timestamp,

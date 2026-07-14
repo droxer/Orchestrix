@@ -15,7 +15,6 @@ import {
   LocalSessionStore,
   newRelayId,
   relayEvent,
-  roleForAgent,
   type AgentEventSink,
   type AgentRole,
   type HumanDecisionKind,
@@ -29,7 +28,7 @@ import { relayTaskEvent, type TaskStore } from "./task-store.js";
 export interface WorkflowStep {
   agent: AgentName;
   mode: AgentTaskMode;
-  role?: ReturnType<typeof roleForAgent>;
+  role?: AgentRole;
 }
 
 export interface SessionControllerOptions {
@@ -221,11 +220,10 @@ export class SessionController implements AgentEventSink {
   async recordAgentStarted(sessionId: string, step: { runId: string; agent: AgentName; role?: AgentRole; mode: AgentTaskMode }): Promise<RelaySession> {
     this.activeSessionId = sessionId;
     await this.linkTaskSession(sessionId);
-    const role = step.role ?? roleForAgent(step.agent, step.mode);
     const session = await this.append(sessionId, relayEvent("agent.started", sessionId, {
       runId: step.runId,
       agent: step.agent,
-      role,
+      ...(step.role ? { role: step.role } : {}),
       mode: step.mode,
     }));
     await this.updateTaskStatus(step.mode === "review" ? "review" : "running", `${step.agent} ${step.mode} started.`, {
@@ -297,11 +295,10 @@ export class SessionController implements AgentEventSink {
     await this.linkTaskSession(sessionId);
     const runState = await this.stateForRun(sessionId, state, step.agent);
     const runId = newRelayId("run");
-    const role = step.role ?? roleForAgent(step.agent, step.mode);
     await this.append(sessionId, relayEvent("agent.started", sessionId, {
       runId,
       agent: step.agent,
-      role,
+      ...(step.role ? { role: step.role } : {}),
       mode: step.mode,
     }));
     await this.updateTaskStatus(step.mode === "review" ? "review" : "running", `${step.agent} ${step.mode} started.`, {
@@ -393,10 +390,10 @@ export class SessionController implements AgentEventSink {
     let next: Route = "claude_implement";
     while (next !== "__end__") {
       if (next === "claude_implement") {
-        state = await this.runStep(sessionId, state, { agent: "claude", mode: "action", role: "implementer" }, options);
+        state = await this.runStep(sessionId, state, { agent: "claude", mode: "action" }, options);
         next = routeClaudeHandoff(state, options.sink);
       } else if (next === "pi_implement") {
-        state = await this.runStep(sessionId, state, { agent: "pi", mode: "action", role: "tester" }, options);
+        state = await this.runStep(sessionId, state, { agent: "pi", mode: "action" }, options);
         next = routePiHandoff(state, options.sink);
       }
     }

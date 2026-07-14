@@ -1,6 +1,6 @@
 import { forwardRef, memo, useImperativeHandle, useMemo, type Dispatch, type SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
-import type { AgentName, AgentTaskMode } from "../../types";
+import type { AgentTaskMode } from "../../types";
 import type { MentionableAgent } from "../../lib/agentDisplayNames";
 import { sendShortcutLabel } from "../../lib/sendShortcut";
 import { ActionSend, ActionStop } from "../icons";
@@ -25,13 +25,12 @@ const ComposerView = forwardRef<ComposerHandle, {
   composerMode: AgentTaskMode;
   setComposerMode: Dispatch<SetStateAction<AgentTaskMode>>;
   activeAgentDisplayName: string;
-  agentRoleLabels?: Partial<Record<AgentName, string>>;
   selectedEmployee: string;
   running: boolean;
   onAgentPicked: (agent: MentionableAgent) => void;
   onSend: () => void;
   onCancelRun: () => void;
-}>(function Composer({ mentionAgents, composerMode, setComposerMode, activeAgentDisplayName, agentRoleLabels, selectedEmployee, running, onAgentPicked, onSend, onCancelRun }, ref) {
+}>(function Composer({ mentionAgents, composerMode, setComposerMode, activeAgentDisplayName, selectedEmployee, running, onAgentPicked, onSend, onCancelRun }, ref) {
   const { t } = useTranslation();
   const composer = useComposer({ mentionAgents, onAgentPicked });
   const {
@@ -60,7 +59,6 @@ const ComposerView = forwardRef<ComposerHandle, {
           <MentionPopover
             filteredAgents={filteredMentionAgents}
             mentionIndex={activeMentionIndex}
-            roleLabels={agentRoleLabels}
             insertMention={insertMention}
           />
         ) : null}

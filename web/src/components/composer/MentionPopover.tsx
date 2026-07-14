@@ -1,13 +1,12 @@
 import { useTranslation } from "react-i18next";
-import type { AgentName } from "../../types";
 import type { MentionableAgent } from "../../lib/agentDisplayNames";
+import { agentLabel } from "../../lib/plan";
 import { AgentMark } from "../AgentMark";
 import { mentionOptionId } from "../../lib/mentions";
 
-export function MentionPopover({ filteredAgents, mentionIndex, roleLabels, insertMention }: {
+export function MentionPopover({ filteredAgents, mentionIndex, insertMention }: {
   filteredAgents: MentionableAgent[];
   mentionIndex: number;
-  roleLabels?: Partial<Record<AgentName, string>>;
   insertMention: (agent: MentionableAgent) => void;
 }) {
   const { t } = useTranslation();
@@ -24,7 +23,7 @@ export function MentionPopover({ filteredAgents, mentionIndex, roleLabels, inser
         >
           <span className="agent-avatar" data-agent={agent.executorKind} aria-hidden="true"><AgentMark agent={agent.executorKind} size={16} /></span>
           <span translate="no">@{agent.displayName}</span>
-          <span className="mention-role">{roleLabels?.[agent.executorKind] ?? t(`agent.${agent.executorKind}.role`)}</span>
+          <span className="mention-role" translate="no">{agentLabel(agent.executorKind)}</span>
         </div>
       ))}
     </div>

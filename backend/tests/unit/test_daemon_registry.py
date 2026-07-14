@@ -3529,7 +3529,7 @@ def test_set_disabled_agents_blocks_dispatch_and_survives_restart() -> None:
     asyncio.run(run_flow())
 
 
-def test_effective_agent_roles_use_overrides_defaults_and_review_fallback() -> None:
+def test_effective_agent_roles_use_only_explicit_or_configured_roles() -> None:
     node = {
         "agentRoleDefaults": {"codex": "planner", "claude": "fixer"},
         "agentRoleOverrides": {"codex": "tester"},
@@ -3542,10 +3542,8 @@ def test_effective_agent_roles_use_overrides_defaults_and_review_fallback() -> N
         )
         == "reviewer"
     )
-    assert (
-        effective_role_for_assignment(node, {"agent": "codex"}, "review") == "reviewer"
-    )
-    assert effective_role_for_assignment({}, {"agent": "pi"}, "action") == "tester"
+    assert effective_role_for_assignment(node, {"agent": "codex"}, "review") == "tester"
+    assert effective_role_for_assignment({}, {"agent": "pi"}, "action") is None
 
 
 def test_daemon_run_records_effective_agent_role_override() -> None:

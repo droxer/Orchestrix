@@ -27,7 +27,6 @@ from ..persistence.stores import (
     LocalSessionStore,
     LocalTaskStore,
     relay_event,
-    role_for_agent,
 )
 from ..sessions import compute_prior_agent_bridge
 from ..sessions import compute_conversation_history
@@ -439,14 +438,12 @@ def normalize_agent_role_map(value: Any) -> dict[str, str]:
 
 
 def effective_role_for_assignment(
-    node: dict[str, Any], assignment: dict[str, Any], mode: str
-) -> str:
+    node: dict[str, Any], assignment: dict[str, Any], _mode: str
+) -> str | None:
     explicit_role = assignment.get("role")
     if explicit_role in AGENT_ROLES:
         return explicit_role
     agent = assignment.get("executorKind") or assignment["agent"]
-    if mode == "review":
-        return role_for_agent(agent, mode)
     overrides = (
         node.get("agentRoleOverrides")
         if isinstance(node.get("agentRoleOverrides"), dict)
@@ -457,7 +454,7 @@ def effective_role_for_assignment(
         if isinstance(node.get("agentRoleDefaults"), dict)
         else {}
     )
-    return overrides.get(agent) or defaults.get(agent) or role_for_agent(agent, mode)
+    return overrides.get(agent) or defaults.get(agent)
 
 
 def normalize_run_capacity(payload: dict[str, Any]) -> tuple[int, dict[str, int]]:
@@ -1941,14 +1938,13 @@ class DaemonNodeRegistry:
         assignment = run_request["assignments"][run_request.get("currentIndex", 0)]
         sandbox = self.sandboxes[command["_nodeId"]]
         controller = self._controller_for_sandbox(sandbox, run_request.get("taskId"))
+        role = effective_role_for_assignment(sandbox, assignment, command["mode"])
         controller.record_agent_started(
             run_request["sessionId"],
             {
                 "runId": command["runId"],
                 "agent": command["agent"],
-                "role": effective_role_for_assignment(
-                    sandbox, assignment, command["mode"]
-                ),
+                **({"role": role} if role else {}),
                 "mode": command["mode"],
                 **(
                     {"logicalAgentId": command["logicalAgentId"]}

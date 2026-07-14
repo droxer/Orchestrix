@@ -31,7 +31,9 @@ describe("SessionController prompt memory", () => {
     state = await controller.runStep(session.id, state, { agent: "claude", mode: "action" });
     state = await controller.runStep(session.id, state, { agent: "codex", mode: "action" });
     await controller.runStep(session.id, state, { agent: "claude", mode: "action" });
+    const updated = await store.getSession(session.id);
 
+    assert.equal(updated.agentRuns.every((run) => run.role === undefined), true);
     assert.doesNotMatch(commands[0], /\[Previous from/);
     assert.match(commands[1], /\[Previous from @claude\]\nimplementation note/);
     assert.doesNotMatch(commands[1], /\[Conversation so far\]/);

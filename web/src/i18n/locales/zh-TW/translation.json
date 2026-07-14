@@ -214,7 +214,7 @@
     "tab_workspace": "工作區",
     "tab_files": "檔案",
     "tab_activities": "活動",
-    "header_sub": "{{role}} · {{executor}}",
+    "header_executor": "{{executor}}",
     "snapshot_banner": "正在瀏覽已儲存的副本 — 智能體上線後將顯示即時檔案。",
     "dismiss": "關閉",
     "path_root": "根目錄",
@@ -514,7 +514,6 @@
       "placeholder_agent_name": "研究員",
       "section_agent_profile": "代理設定",
       "agent_runtime": "執行階段",
-      "agent_role": "預設角色",
       "section_runtime": "執行階段",
       "runtime_placement": "執行階段配置",
       "create_without_placement": "暫不配置",
@@ -652,9 +651,6 @@
       "agent_disabled": "已停用",
       "enable_agent": "在此節點啟用 {{agent}}",
       "disable_agent": "在此節點停用 {{agent}}",
-      "agent_default_role": "預設角色",
-      "agent_default_role_for": "{{agent}} 的預設角色",
-      "agent_role_builtin": "內建",
       "save": "儲存",
       "saving": "儲存中…",
       "agent_skills": "技能（{{count}}）",
@@ -680,13 +676,6 @@
       "system": "系統",
       "system_sub": "跟隨系統設定"
     }
-  },
-  "agent_role": {
-    "planner": "規劃者",
-    "implementer": "建置者",
-    "reviewer": "審查者",
-    "tester": "測試者",
-    "fixer": "修復者"
   },
   "transcript": {
     "new_session": "新工作區工作階段",
@@ -870,20 +859,16 @@
   },
   "agent": {
     "claude": {
-      "role": "建構者",
-      "blurb": "透過系統化的上下文將需求轉化為實作工作。"
+      "blurb": "由 Claude Code 驅動的通用智能體。"
     },
     "pi": {
-      "role": "規劃者",
-      "blurb": "探索取捨方案，規劃下一個可靠步驟。"
+      "blurb": "由 Pi 驅動的通用智能體。"
     },
     "codex": {
-      "role": "審閱者",
-      "blurb": "閱讀差異、檢查行為並指出風險。"
+      "blurb": "由 Codex 驅動的通用智能體。"
     },
     "kimi": {
-      "role": "建構者",
-      "blurb": "由 Kimi 代理提供長上下文的實作協助。"
+      "blurb": "由 Kimi 驅動的通用智能體。"
     }
   },
   "agents_page": {

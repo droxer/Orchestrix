@@ -6,7 +6,7 @@ from typing import Any
 from loguru import logger
 
 from ..core.ids import new_relay_id, now_iso
-from ..persistence.stores import LocalSessionStore, LocalTaskStore, relay_event, relay_task_event, role_for_agent
+from ..persistence.stores import LocalSessionStore, LocalTaskStore, relay_event, relay_task_event
 
 
 def initial_agent_state(task_goal: str) -> dict[str, Any]:
@@ -219,12 +219,12 @@ class SessionController:
     def record_agent_started(self, session_id: str, step: dict[str, Any]) -> dict[str, Any]:
         self.active_session_id = session_id
         self._link_task_session(session_id)
-        role = step.get("role") or role_for_agent(step["agent"], step["mode"])
+        role = step.get("role")
         logger.info("Agent run started", session_id=session_id, run_id=step["runId"], agent=step["agent"], mode=step["mode"], role=role)
         session = self._append(session_id, relay_event("agent.started", session_id, {
             "runId": step["runId"],
             "agent": step["agent"],
-            "role": role,
+            **({"role": role} if role else {}),
             "mode": step["mode"],
             **({"logicalAgentId": step["logicalAgentId"]} if step.get("logicalAgentId") else {}),
             **({"placementId": step["placementId"]} if step.get("placementId") else {}),

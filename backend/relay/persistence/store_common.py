@@ -172,7 +172,7 @@ def materialize_events(events: list[dict[str, Any]]) -> dict[str, Any]:
                     {
                         "id": event["runId"],
                         "agent": event["agent"],
-                        "role": event["role"],
+                        **({"role": event["role"]} if event.get("role") else {}),
                         "mode": event["mode"],
                         "status": "running",
                         "startedAt": event["timestamp"],
@@ -356,17 +356,6 @@ def daemon_event(event_type: str, payload: dict[str, Any]) -> dict[str, Any]:
 def safe_name(value: str) -> str:
     safe = "".join(ch if ch.isalnum() or ch in "._-" else "_" for ch in value)
     return safe or "relay"
-
-
-def role_for_agent(agent: str, mode: str = "action") -> str:
-    if mode == "review":
-        return "reviewer"
-    return {
-        "claude": "implementer",
-        "pi": "tester",
-        "codex": "fixer",
-        "kimi": "implementer",
-    }.get(agent, "implementer")
 
 
 def valid_agent(value: Any) -> AgentName | None:

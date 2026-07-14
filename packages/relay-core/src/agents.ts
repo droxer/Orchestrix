@@ -27,9 +27,6 @@ export interface StreamRenderer {
   feed(chunk: string): string;
 }
 
-/** The session-level role an agent fills in action mode (review mode always maps to "reviewer"). */
-export type AgentActionRole = "implementer" | "tester" | "planner" | "fixer";
-
 export interface AgentDefinition {
   name: AgentName;
   /** Human-facing name used in readiness output and avatars. */
@@ -40,8 +37,6 @@ export interface AgentDefinition {
   maxFailures: number;
   /** Mode chosen when a caller addresses the agent without specifying one. */
   defaultMode: AgentTaskMode;
-  /** Role recorded for an action-mode assignment. */
-  actionRole: AgentActionRole;
   buildActionCommand(state: AgentState): string;
   buildReviewCommand(state: AgentState): string;
   /** Read-only Q&A command (UI "Ask" mode). */
@@ -65,7 +60,6 @@ export const AGENT_REGISTRY: Record<AgentName, AgentDefinition> = {
     initial: "C",
     maxFailures: 3,
     defaultMode: "action",
-    actionRole: "implementer",
     buildActionCommand: buildClaudeActionCommand,
     buildReviewCommand: buildClaudeReviewCommand,
     buildAskCommand: buildClaudeAskCommand,
@@ -82,7 +76,6 @@ export const AGENT_REGISTRY: Record<AgentName, AgentDefinition> = {
     initial: "π",
     maxFailures: 2,
     defaultMode: "action",
-    actionRole: "tester",
     buildActionCommand: buildPiActionCommand,
     buildReviewCommand: buildPiReviewCommand,
     buildAskCommand: buildPiAskCommand,
@@ -99,7 +92,6 @@ export const AGENT_REGISTRY: Record<AgentName, AgentDefinition> = {
     initial: "X",
     maxFailures: 2,
     defaultMode: "action",
-    actionRole: "implementer",
     buildActionCommand: buildCodexActionCommand,
     buildReviewCommand: buildCodexReviewCommand,
     buildAskCommand: buildCodexAskCommand,
@@ -116,7 +108,6 @@ export const AGENT_REGISTRY: Record<AgentName, AgentDefinition> = {
     initial: "K",
     maxFailures: 2,
     defaultMode: "action",
-    actionRole: "implementer",
     buildActionCommand: buildKimiActionCommand,
     buildReviewCommand: buildKimiReviewCommand,
     buildAskCommand: buildKimiAskCommand,

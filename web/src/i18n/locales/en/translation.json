@@ -214,7 +214,7 @@
     "tab_workspace": "Workspace",
     "tab_files": "Files",
     "tab_activities": "Activities",
-    "header_sub": "{{role}} · {{executor}}",
+    "header_executor": "{{executor}}",
     "snapshot_banner": "Browsing saved copies — live files appear when this agent is online.",
     "dismiss": "Dismiss",
     "path_root": "home",
@@ -515,7 +515,6 @@
       "placeholder_agent_name": "Researcher",
       "section_agent_profile": "Agent profile",
       "agent_runtime": "Runtime",
-      "agent_role": "Default role",
       "section_runtime": "Runtime",
       "runtime_placement": "Runtime placement",
       "create_without_placement": "Create without placement",
@@ -653,9 +652,6 @@
       "agent_disabled": "Disabled",
       "enable_agent": "Enable {{agent}} on this node",
       "disable_agent": "Disable {{agent}} on this node",
-      "agent_default_role": "Default role",
-      "agent_default_role_for": "Default role for {{agent}}",
-      "agent_role_builtin": "Built-in",
       "save": "Save",
       "saving": "Saving…",
       "agent_skills": "Skills ({{count}})",
@@ -681,13 +677,6 @@
       "system": "System",
       "system_sub": "Follows OS setting"
     }
-  },
-  "agent_role": {
-    "planner": "Planner",
-    "implementer": "Builder",
-    "reviewer": "Reviewer",
-    "tester": "Tester",
-    "fixer": "Fixer"
   },
   "transcript": {
     "new_session": "New workspace session",
@@ -867,20 +856,16 @@
   },
   "agent": {
     "claude": {
-      "role": "Builder",
-      "blurb": "Turns requests into implementation work with methodical context."
+      "blurb": "A general-purpose agent powered by Claude Code."
     },
     "pi": {
-      "role": "Planner",
-      "blurb": "Explores trade-offs and shapes the next reliable step."
+      "blurb": "A general-purpose agent powered by Pi."
     },
     "codex": {
-      "role": "Reviewer",
-      "blurb": "Reads diffs, checks behavior, and calls out risks."
+      "blurb": "A general-purpose agent powered by Codex."
     },
     "kimi": {
-      "role": "Builder",
-      "blurb": "Long-context implementation help from the Kimi agent."
+      "blurb": "A general-purpose agent powered by Kimi."
     }
   },
   "agents_page": {

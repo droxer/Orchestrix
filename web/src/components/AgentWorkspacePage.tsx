@@ -354,10 +354,7 @@ export function AgentWorkspacePage({
 
   const headerSubtitle = pageTab === "profile"
     ? t("workspace.profile_sub", { agent: displayName })
-    : t("workspace.header_sub", {
-      role: t(`agent.${agent.executorKind}.role`),
-      executor: agentLabel(agent.executorKind),
-    });
+    : t("workspace.header_executor", { executor: agentLabel(agent.executorKind) });
 
   function pageTabCount(tab: WorkspacePageTab): number | undefined {
     if (tab === "artifacts") return artifacts.length || undefined;

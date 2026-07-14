@@ -31,6 +31,7 @@ def test_session_controller_records_review_run() -> None:
         assert updated["tokenUsage"]["total"] == 15
         assert updated["agentRuns"][0]["artifactIds"] == []
         assert updated["agentRuns"][0]["agentLog"] == "looks fine"
+        assert "role" not in updated["agentRuns"][0]
         assert updated["artifacts"] == []
         assert all(event["type"] != "review.verdict" for event in updated["events"])
 

@@ -3,7 +3,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { logout } from "./api";
-import { AGENT_NAMES } from "./types";
 import type { AgentName, AgentTaskMode, CurrentUser, DaemonNodeMonitorRecord, EmployeeAgent, RelayArtifact, RelaySession } from "./types";
 import { LoginScreen } from "./components/LoginScreen";
 import { type Theme, type Language } from "./components/PreferencesPanel";
@@ -50,8 +49,6 @@ const BacklogPage = lazy(() => import("./components/BacklogPage").then((m) => ({
 const ChannelsPage = lazy(() => import("./components/ChannelsPage").then((m) => ({ default: m.ChannelsPage })));
 const RoutinePage = lazy(() => import("./components/RoutinePage").then((m) => ({ default: m.RoutinePage })));
 const AgentsPage = lazy(() => import("./components/AgentsPage").then((m) => ({ default: m.AgentsPage })));
-
-const agents: AgentName[] = AGENT_NAMES;
 
 const WORK_ROUTE_SKIP_IDS: Record<Exclude<AppRoute, "main">, string> = {
   backlog: "backlog-panel",
@@ -134,17 +131,12 @@ export function App() {
     () => logicalAgents.find((agent) => agent.id === activeLogicalAgentId),
     [activeLogicalAgentId, logicalAgents],
   );
-  const agentRoleLabels = useMemo<Partial<Record<AgentName, string>>>(() => Object.fromEntries(
-    agents.map((executorKind) => {
-      return [executorKind, t(`agent.${executorKind}.role`)];
-    }),
-  ) as Partial<Record<AgentName, string>>, [logicalAgents, t]);
-  const agentDescriptors = useMemo<Record<AgentName, { role: string; blurb: string }>>(() => ({
-    claude: { role: agentRoleLabels.claude ?? t("agent.claude.role"), blurb: t("agent.claude.blurb") },
-    pi: { role: agentRoleLabels.pi ?? t("agent.pi.role"), blurb: t("agent.pi.blurb") },
-    codex: { role: agentRoleLabels.codex ?? t("agent.codex.role"), blurb: t("agent.codex.blurb") },
-    kimi: { role: agentRoleLabels.kimi ?? t("agent.kimi.role"), blurb: t("agent.kimi.blurb") },
-  }), [agentRoleLabels, t]);
+  const agentDescriptors = useMemo<Record<AgentName, { blurb: string }>>(() => ({
+    claude: { blurb: t("agent.claude.blurb") },
+    pi: { blurb: t("agent.pi.blurb") },
+    codex: { blurb: t("agent.codex.blurb") },
+    kimi: { blurb: t("agent.kimi.blurb") },
+  }), [t]);
   // The logged-in user is themselves an employee; their conversations are the
   // sessions they own. The backend already owner-scopes /sessions, so this is
   // just the non-archived sessions sorted most-recent first.
@@ -759,7 +751,6 @@ export function App() {
             onBackToThreads={() => navigateToMobileView("threads")}
             selectedEmployee={selectedEmployee}
             agentDescriptors={agentDescriptors}
-            agentRoleLabels={agentRoleLabels}
             composerMode={composerMode}
             setComposerMode={setComposerMode}
             handoffOpen={handoffOpen}

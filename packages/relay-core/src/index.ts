@@ -73,7 +73,6 @@ export {
   getAgent,
   isAgentName,
   type AgentDefinition,
-  type AgentActionRole,
   type StreamRenderer,
 } from "./agents.js";
 
@@ -203,7 +202,6 @@ export {
   newRelayId,
   nowIso,
   relayEvent,
-  roleForAgent,
   type AgentRole,
   type AgentRun,
   type HumanDecision,

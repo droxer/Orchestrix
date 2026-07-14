@@ -229,9 +229,6 @@ export function AgentProfilePanel({
               <AgentMark agent={agent.executorKind} size={20} />
             </span>
           ) : null}
-          {!embedInDrawer ? (
-            <p className="workspace-dossier-role">{t(`agent.${agent.executorKind}.role`)}</p>
-          ) : null}
           <p className="workspace-dossier-blurb">{t(`agent.${agent.executorKind}.blurb`)}</p>
           <div className="workspace-dossier-status">
             <span className={`workspace-status-pill tone-${agentAvailabilityTone(agent.availability)}`}>

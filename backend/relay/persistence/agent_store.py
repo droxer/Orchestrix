@@ -529,12 +529,12 @@ def _new_agent(supervisor_employee_id: str, payload: dict[str, Any]) -> dict[str
     supervisor_employee_id = supervisor_employee_id.strip()
     display_name = _required_string(payload, "displayName")
     executor_kind = _required_string(payload, "executorKind")
-    default_role = _optional_string(payload, "defaultRole") or "implementer"
+    default_role = _optional_string(payload, "defaultRole")
     if not supervisor_employee_id:
         raise ValueError("supervisorEmployeeId is required.")
     if executor_kind not in AGENT_NAMES:
         raise ValueError(f"executorKind must be one of: {', '.join(AGENT_NAMES)}.")
-    if default_role not in AGENT_ROLES:
+    if default_role is not None and default_role not in AGENT_ROLES:
         raise ValueError(f"defaultRole must be one of: {', '.join(AGENT_ROLES)}.")
     timestamp = now_iso()
     return {
@@ -542,7 +542,7 @@ def _new_agent(supervisor_employee_id: str, payload: dict[str, Any]) -> dict[str
         "supervisorEmployeeId": supervisor_employee_id,
         "displayName": display_name,
         "executorKind": executor_kind,
-        "defaultRole": default_role,
+        **({"defaultRole": default_role} if default_role else {}),
         **(
             {"instructions": payload["instructions"].strip()}
             if isinstance(payload.get("instructions"), str)

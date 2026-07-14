@@ -44,8 +44,7 @@ export type MainChatViewProps = {
   onRefresh: () => void;
   onBackToThreads: () => void;
   selectedEmployee: string;
-  agentDescriptors: Record<AgentName, { role: string; blurb: string }>;
-  agentRoleLabels: Partial<Record<AgentName, string>>;
+  agentDescriptors: Record<AgentName, { blurb: string }>;
   composerMode: AgentTaskMode;
   setComposerMode: Dispatch<SetStateAction<AgentTaskMode>>;
   handoffOpen: boolean;
@@ -96,7 +95,6 @@ export function MainChatView({
   onBackToThreads,
   selectedEmployee,
   agentDescriptors,
-  agentRoleLabels,
   composerMode,
   setComposerMode,
   handoffOpen,
@@ -216,7 +214,6 @@ export function MainChatView({
           composerMode={composerMode}
           setComposerMode={setComposerMode}
           activeAgentDisplayName={activeAgentDisplayName}
-          agentRoleLabels={agentRoleLabels}
           selectedEmployee={selectedEmployee}
           running={running}
           onAgentPicked={onAgentPicked}

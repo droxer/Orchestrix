@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { useEmployeeAgents } from "../hooks/useEmployeeAgents";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { agentAvailabilityTone } from "../lib/adminHelpers";
+import { agentLabel } from "../lib/plan";
 import type { AgentName, CurrentUser, EmployeeAgent, LogicalAgentAvailability } from "../types";
 import { ActionSearch, NavConversations, NavRefresh, StreamInfo } from "./icons";
 import { AgentStateBadge } from "./AgentStateBadge";
@@ -62,14 +63,12 @@ function formatRelativeTime(value: string, locale: string): string {
   }).format(date);
 }
 
-function agentDescriptors(
-  t: ReturnType<typeof useTranslation>["t"],
-): Record<AgentName, { role: string; blurb: string }> {
+function agentDescriptors(t: ReturnType<typeof useTranslation>["t"]): Record<AgentName, { blurb: string }> {
   return {
-    claude: { role: t("agent.claude.role"), blurb: t("agent.claude.blurb") },
-    pi: { role: t("agent.pi.role"), blurb: t("agent.pi.blurb") },
-    codex: { role: t("agent.codex.role"), blurb: t("agent.codex.blurb") },
-    kimi: { role: t("agent.kimi.role"), blurb: t("agent.kimi.blurb") },
+    claude: { blurb: t("agent.claude.blurb") },
+    pi: { blurb: t("agent.pi.blurb") },
+    codex: { blurb: t("agent.codex.blurb") },
+    kimi: { blurb: t("agent.kimi.blurb") },
   };
 }
 
@@ -121,7 +120,7 @@ function RosterFilterBar({
 
 function RosterRow({
   agent,
-  roleLabel,
+  executorLabel,
   locale,
   selected,
   onSelect,
@@ -129,7 +128,7 @@ function RosterRow({
   onOpenProfile,
 }: {
   agent: EmployeeAgent;
-  roleLabel: string;
+  executorLabel: string;
   locale: string;
   selected: boolean;
   onSelect: (agent: EmployeeAgent) => void;
@@ -168,7 +167,7 @@ function RosterRow({
                 {t(`admin.v2.placement_status.${agent.availability}`, { defaultValue: agent.availability })}
               </span>
               <span className="agents-roster-row-sep" aria-hidden="true">·</span>
-              <span>{roleLabel}</span>
+              <span translate="no">{executorLabel}</span>
               <span className="agents-roster-row-sep" aria-hidden="true">·</span>
               <span className="mono">
                 {placements.length === 0
@@ -249,7 +248,6 @@ export function AgentsPage({
           agent.displayName,
           agent.id,
           agent.executorKind,
-          descriptor.role,
           descriptor.blurb,
           agent.instructions ?? "",
         ].join(" ").toLowerCase();
@@ -323,7 +321,7 @@ export function AgentsPage({
                 <RosterRow
                   key={agent.id}
                   agent={agent}
-                  roleLabel={descriptor.role}
+                  executorLabel={agentLabel(agent.executorKind)}
                   locale={i18n.language}
                   selected={workspaceAgent?.id === agent.id}
                   onSelect={onOpenWorkspace}

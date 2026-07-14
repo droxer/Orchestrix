@@ -72,7 +72,6 @@ export function AgentProfileDrawer({
     );
   }
 
-  const roleLabel = t(`agent.${agent.executorKind}.role`);
   const executorLabel = agentLabel(agent.executorKind);
 
   return (
@@ -87,7 +86,7 @@ export function AgentProfileDrawer({
       }
       subtitle={
         <span className="adm-drawer-sub-role" translate="no">
-          {roleLabel} · {executorLabel}
+          {executorLabel}
         </span>
       }
       closeLabel={t("admin.v2.close_drawer")}

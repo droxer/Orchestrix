@@ -29,6 +29,8 @@ def test_employee_can_own_multiple_agents_of_the_same_executor_kind(
     )
 
     assert researcher["executorKind"] == reviewer["executorKind"] == "claude"
+    assert "defaultRole" not in researcher
+    assert reviewer["defaultRole"] == "reviewer"
     assert {
         agent["displayName"] for agent in store.list_agents(supervisor_employee_id="alice")
     } == {"Researcher", "Reviewer"}
