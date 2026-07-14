@@ -46,7 +46,7 @@
 
 :root {
   /* ----- Color primitives — dark register (default) -------------- */
-  /* Cool charcoal canvas + Graphite Steel accent. Dark is the primary
+  /* Warm near-black canvas + Forest Green accent. Dark is the primary
      experience; html[data-theme="light"] supplies a derived secondary. */
 
   /* Accent — Forest Green is the single chromatic action color: brand
@@ -67,7 +67,7 @@
   --color-ink-300: #8a8578;
   --color-ink-200: #67645b; /* rail/decorative border step between hairline and ink-300 */
 
-  /* On-fill text — theme-varying: the dark theme's steel is bright
+  /* On-fill text — theme-varying: the dark theme's forest green is bright
      enough that on-accent text is near-black ink; the light theme's
      accent is deepened enough that on-accent stays white. */
   --color-on-accent: #0d1410;
@@ -118,7 +118,7 @@
   /* Shadow tints — near-black drop-shadow bases and the modal scrim
      base. Linear's overlay scrim is pure black. */
   --color-shadow-ink: #000000;
-  --color-shadow-ink-ring: #262b33;
+  --color-shadow-ink-ring: #2c2a24;
   --color-scrim-base: #000000;
 
   /* Artifact kind accents — the one DECORATIVE color group in the system, a
@@ -126,7 +126,7 @@
      artifact palette so the transcript chip's left-border kind tag reads
      identically across the two surfaces. Tokenized (not inlined) so light
      and contrast can retune them; consumed only by artifact.css. Brightened
-     for the cool charcoal canvas. --color-diff-hunk is the hunk header inside
+     for the warm near-black canvas. --color-diff-hunk is the hunk header inside
      the always-dark diff viewer, so it does not flip. --color-kind-review
      is a named alias for the "review passed" green so the kind accent does
      not borrow the status-semantic-success token directly. */
