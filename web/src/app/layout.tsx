@@ -83,8 +83,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f7f8fa" },
-    { media: "(prefers-color-scheme: dark)", color: "#0b0d10" },
+    { media: "(prefers-color-scheme: light)", color: "#faf8f4" },
+    { media: "(prefers-color-scheme: dark)", color: "#141311" },
   ],
 };
 
@@ -106,7 +106,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "(function(){try{var t=localStorage.getItem('relay-web.theme')||'dark';if(t==='contrast'||t==='contrast-dark'){t='system';localStorage.setItem('relay-web.theme','system');}var d=matchMedia('(prefers-color-scheme: dark)').matches;var dk=t==='dark'||(t!=='light'&&d);var r=dk?'dark':'light';document.documentElement.setAttribute('data-theme',r);document.documentElement.classList.toggle('dark',dk);var c={light:'#f7f8fa',dark:'#0b0d10'}[r]||'#0b0d10';var m=document.querySelector('meta[name=\"theme-color\"][data-relay-theme-color]');if(!m){m=document.createElement('meta');m.setAttribute('name','theme-color');m.setAttribute('data-relay-theme-color','');document.head.appendChild(m);}m.removeAttribute('media');m.setAttribute('content',c);}catch(e){}})();",
+              "(function(){try{var t=localStorage.getItem('relay-web.theme')||'dark';if(t==='contrast'||t==='contrast-dark'){t='system';localStorage.setItem('relay-web.theme','system');}var d=matchMedia('(prefers-color-scheme: dark)').matches;var dk=t==='dark'||(t!=='light'&&d);var r=dk?'dark':'light';document.documentElement.setAttribute('data-theme',r);document.documentElement.classList.toggle('dark',dk);var c={light:'#faf8f4',dark:'#141311'}[r]||'#141311';var m=document.querySelector('meta[name=\"theme-color\"][data-relay-theme-color]');if(!m){m=document.createElement('meta');m.setAttribute('name','theme-color');m.setAttribute('data-relay-theme-color','');document.head.appendChild(m);}m.removeAttribute('media');m.setAttribute('content',c);}catch(e){}})();",
           }}
         />
       </head>
