@@ -484,7 +484,6 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
         kicker={t("nav.routine")}
         title={t("routine.title")}
         count={t("routine.sub", { count: routineTasks.length })}
-        titleVariant="display"
         actions={
           <TaskBoardHeaderActions
             leading={<RoutineViewToggle view={view} onChange={changeView} />}

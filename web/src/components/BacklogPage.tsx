@@ -583,7 +583,6 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
         kicker={t("nav.backlog")}
         title={t("backlog.title")}
         count={t("backlog.sub", { count: tasks.length })}
-        titleVariant="display"
         actions={
           <TaskBoardHeaderActions
             leading={<BacklogViewToggle view={view} onChange={changeView} />}
