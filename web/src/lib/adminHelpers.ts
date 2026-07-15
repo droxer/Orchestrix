@@ -49,7 +49,6 @@ export function buildDaemonStartCommand(
 }
 
 export const STALE_AFTER_MS = 15_000;
-export const QUIET_AFTER_MS = 10_000;
 export const adminNodeTokenStorageKey = "relay-web.adminNodeTokens";
 
 export interface StoredNodeToken {
@@ -111,13 +110,6 @@ export function formatRelativeTime(value: string | undefined, t: TFunction): str
   return rtf.format(-hours, "hour");
 }
 
-export interface AttentionItem {
-  nodeId: string;
-  employeeId?: string;
-  kind: "error" | "stale-run" | "quiet";
-  body: string;
-}
-
 export interface EmployeeNodeSummary {
   id: string;
   displayName: string;
@@ -128,36 +120,6 @@ export interface EmployeeNodeSummary {
   readyCount: number;
   runningCount: number;
   nodes: ControlPanelDaemonNodeRecord[];
-}
-
-export function buildAttentionItems(nodes: ControlPanelDaemonNodeRecord[], t: TFunction): AttentionItem[] {
-  const items: AttentionItem[] = [];
-  for (const node of nodes) {
-    if (node.lastError) {
-      items.push({ nodeId: node.id, employeeId: node.employeeId, kind: "error", body: node.lastError });
-    }
-    if (isStale(node) && node.activeRuns.length > 0) {
-      const count = node.activeRuns.length;
-      items.push({
-        nodeId: node.id,
-        employeeId: node.employeeId,
-        kind: "stale-run",
-        body: t("admin.stale_run_body", { count }),
-      });
-    }
-    const ageMs = node.lastSeenAgeMs ?? (node.lastSeenAt
-      ? Date.now() - new Date(node.lastSeenAt).getTime()
-      : Infinity);
-    if (!node.lastError && !isStale(node) && ageMs > QUIET_AFTER_MS) {
-      items.push({
-        nodeId: node.id,
-        employeeId: node.employeeId,
-        kind: "quiet",
-        body: t("admin.quiet_body", { time: formatRelativeTime(node.lastSeenAt, t) }),
-      });
-    }
-  }
-  return items;
 }
 
 export function buildEmployeeSummaries(
@@ -352,4 +314,13 @@ export async function copyText(value: string): Promise<void> {
 export function truncateId(id: string, head = 4, tail = 4): string {
   if (id.length <= head + tail + 1) return id;
   return `${id.slice(0, head)}…${id.slice(-tail)}`;
+}
+
+/** Initials for employee/operator avatars in admin drawers. */
+export function initialsOf(value: string): string {
+  const trimmed = value.replace(/^@/, "").trim();
+  if (!trimmed) return "?";
+  const parts = trimmed.split(/[\s._-]+/).filter(Boolean);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }

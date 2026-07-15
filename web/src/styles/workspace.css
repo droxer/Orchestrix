@@ -22,6 +22,7 @@
   color: var(--workspace-accent);
 }
 
+/* Title + vendor mark — operational scale (Geist title-lg), not a hero plate. */
 .workspace-header-title {
   display: inline-flex;
   align-items: center;
@@ -33,12 +34,27 @@
   display: inline-grid;
   place-items: center;
   flex: none;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--workspace-accent) 12%, var(--color-semantic-surface-strong));
   color: var(--color-semantic-ink);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--workspace-accent) 22%, var(--color-semantic-hairline));
+}
+
+/* Stacked workspace header stays compact in the agents detail pane. */
+.workspace-page .page-header {
+  padding-block: var(--space-base);
+}
+
+.workspace-page .page-header-subtitle {
+  max-width: 52ch;
+}
+
+.workspace-page .page-header-toolbar {
+  width: 100%;
+  max-width: 100%;
+  margin-top: var(--space-xs);
 }
 
 .workspace-page-tab-count {
@@ -100,11 +116,6 @@
 .workspace-page .workspace-page-tab[aria-selected="true"] .workspace-page-tab-count,
 .workspace-page .workspace-page-tab.is-active .workspace-page-tab-count {
   color: var(--color-semantic-body);
-}
-
-.workspace-page .page-header-toolbar {
-  width: 100%;
-  max-width: 100%;
 }
 
 .workspace-inspect {
@@ -419,7 +430,7 @@
 
 .workspace-status-pill.tone-good { color: var(--color-semantic-success); background: color-mix(in srgb, var(--color-semantic-success) 12%, transparent); }
 .workspace-status-pill.tone-info { color: var(--color-accent); background: color-mix(in srgb, var(--color-accent) 12%, transparent); }
-.workspace-status-pill.tone-warn { color: var(--color-semantic-warn); background: color-mix(in srgb, var(--color-semantic-warn) 12%, transparent); }
+.workspace-status-pill.tone-warn { color: var(--color-semantic-warning-text); background: color-mix(in srgb, var(--color-semantic-warning) 12%, transparent); }
 .workspace-status-pill.tone-bad { color: var(--color-semantic-danger); background: color-mix(in srgb, var(--color-semantic-danger) 12%, transparent); }
 .workspace-status-pill.tone-neutral { color: var(--color-semantic-muted); background: color-mix(in srgb, var(--color-semantic-muted) 10%, transparent); }
 
@@ -436,8 +447,8 @@
   display: flex;
   align-items: flex-start;
   gap: var(--space-sm);
-  border-bottom: 1px solid color-mix(in srgb, var(--color-semantic-warn) 28%, var(--color-semantic-hairline));
-  background: color-mix(in srgb, var(--color-semantic-warn) 8%, var(--color-semantic-canvas));
+  border-bottom: 1px solid color-mix(in srgb, var(--color-semantic-warning) 28%, var(--color-semantic-hairline));
+  background: color-mix(in srgb, var(--color-semantic-warning) 8%, var(--color-semantic-canvas));
   padding: var(--space-sm) var(--space-base);
   color: var(--color-semantic-body);
   font: var(--type-body-sm);

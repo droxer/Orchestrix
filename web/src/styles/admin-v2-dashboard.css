@@ -26,6 +26,13 @@
   background: var(--color-semantic-canvas);
 }
 
+/* Lean row — token usage not yet reported, so its tile is omitted and the
+   hero keeps the 2fr track alongside two 1fr tiles rather than leaving an
+   empty column. */
+.adm-dash-kpis--lean {
+  grid-template-columns: 2fr 1fr 1fr;
+}
+
 .adm-dash-kpis-wrap {
   position: relative;
 }
@@ -116,6 +123,16 @@
 
 .adm-dash-belt > .adm-dash-card--chart {
   grid-column: span 2;
+}
+
+/* Lean belt — without the token card the three remaining cards read
+   cleanest as a full-width threads chart over fleet + people. */
+.adm-dash-belt--lean {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.adm-dash-belt--lean > .adm-dash-card--chart {
+  grid-column: 1 / -1;
 }
 
 .adm-dash-card {

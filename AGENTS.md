@@ -103,6 +103,7 @@ Node.js 22.19 or newer is required.
 - Test: `npm test` or `make test`.
 - Run one built test file: `node --test dist/packages/relay-core/tests/handoff.test.js`
   after a build.
+- Run the web UI in dev mode (proxies API to the backend): `make web` (serves on `http://127.0.0.1:5000`).
 - Run the orchestrator TUI: `make run` or `npm run run`.
 - Run the TUI against another workspace: `make run WORKSPACE=/path/to/workspace`.
 - Run the read-only API server: `make serve`; default port is `8787`, override

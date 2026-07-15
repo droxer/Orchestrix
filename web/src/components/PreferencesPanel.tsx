@@ -10,7 +10,6 @@ import {
 } from "../lib/appStorage";
 import { moveRadioSelection } from "../lib/radioGroupKeyboard";
 import { PrefAppearance, PrefLanguage } from "./icons";
-import { Button } from "./ui/button";
 
 export type { Language, Theme };
 export { SUPPORTED_LANGUAGES, SUPPORTED_THEMES };
@@ -45,7 +44,7 @@ const LANGUAGE_BADGES: Record<Language, string> = {
 function PrefSelectedCheck() {
   return (
     <span className="pref-option-check" aria-hidden="true">
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
         <circle cx="7" cy="7" r="7" fill="var(--color-primary)" />
         <path d="M4 7l2 2 4-4" stroke="var(--color-on-primary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
@@ -78,10 +77,9 @@ function ThemeOption({
 }) {
   const { t } = useTranslation();
   return (
-    <Button
+    <button
       ref={(el) => { registerRef(value, el); }}
       type="button"
-      variant="ghost"
       role="radio"
       className={`pref-option-row ${selected ? "selected" : ""}`}
       aria-checked={selected}
@@ -94,47 +92,39 @@ function ThemeOption({
         <span className="pref-option-sub">{t(`pref.theme.${value}_sub`)}</span>
       </span>
       {selected ? <PrefSelectedCheck /> : null}
-    </Button>
+    </button>
   );
 }
 
 function AppearanceSection({
   theme,
   onThemeChange,
-  headingId,
 }: {
   theme: Theme;
   onThemeChange: (theme: Theme) => void;
-  headingId: string;
 }) {
   const { t } = useTranslation();
   const refs = useRef<Map<Theme, HTMLButtonElement | null>>(new Map());
   const registerRef = (value: Theme, el: HTMLButtonElement | null) => { refs.current.set(value, el); };
-  const renderOption = (value: Theme) => (
-    <ThemeOption
-      key={value}
-      value={value}
-      selected={theme === value}
-      onSelect={onThemeChange}
-      registerRef={registerRef}
-    />
-  );
   return (
-    <>
-      <h4 id={headingId} className="pref-section-label">
-        {t("pref.appearance")}
-      </h4>
-      <div
-        role="radiogroup"
-        aria-labelledby={headingId}
-        onKeyDown={(e) => moveRadioSelection(e, THEME_VALUES, theme, refs, onThemeChange)}
-      >
-        <p className="pref-group-label">{t("pref.theme.group")}</p>
-        <div className="pref-option-list">
-          {THEME_VALUES.map(renderOption)}
-        </div>
+    <div
+      role="radiogroup"
+      aria-label={t("pref.theme.group")}
+      onKeyDown={(e) => moveRadioSelection(e, THEME_VALUES, theme, refs, onThemeChange)}
+    >
+      <p className="pref-group-label">{t("pref.theme.group")}</p>
+      <div className="pref-option-list">
+        {THEME_VALUES.map((value) => (
+          <ThemeOption
+            key={value}
+            value={value}
+            selected={theme === value}
+            onSelect={onThemeChange}
+            registerRef={registerRef}
+          />
+        ))}
       </div>
-    </>
+    </div>
   );
 }
 
@@ -153,11 +143,11 @@ function LanguageOption({
   onSelect: (language: Language) => void;
   registerRef: (code: Language, el: HTMLButtonElement | null) => void;
 }) {
+  const showSub = native !== label;
   return (
-    <Button
+    <button
       ref={(el) => { registerRef(code, el); }}
       type="button"
-      variant="ghost"
       role="radio"
       className={`pref-option-row ${selected ? "selected" : ""}`}
       aria-checked={selected}
@@ -168,49 +158,42 @@ function LanguageOption({
       <LanguageBadge code={code} />
       <span className="pref-option-copy">
         <span className="pref-option-label">{native}</span>
-        <span className="pref-option-sub">{label}</span>
+        {showSub ? <span className="pref-option-sub">{label}</span> : null}
       </span>
       {selected ? <PrefSelectedCheck /> : null}
-    </Button>
+    </button>
   );
 }
 
 function LanguageSection({
   language,
   onLanguageChange,
-  headingId,
 }: {
   language: Language;
   onLanguageChange: (language: Language) => void;
-  headingId: string;
 }) {
   const { t } = useTranslation();
   const refs = useRef<Map<Language, HTMLButtonElement | null>>(new Map());
   const registerRef = (code: Language, el: HTMLButtonElement | null) => { refs.current.set(code, el); };
   return (
-    <>
-      <h4 id={headingId} className="pref-section-label">
-        {t("pref.language")}
-      </h4>
-      <div
-        className="pref-option-list"
-        role="radiogroup"
-        aria-labelledby={headingId}
-        onKeyDown={(e) => moveRadioSelection(e, LANGUAGE_VALUES, language, refs, onLanguageChange)}
-      >
-        {LANGUAGES.map(({ code, label, native }) => (
-          <LanguageOption
-            key={code}
-            code={code}
-            label={label}
-            native={native}
-            selected={language === code}
-            onSelect={onLanguageChange}
-            registerRef={registerRef}
-          />
-        ))}
-      </div>
-    </>
+    <div
+      className="pref-option-list"
+      role="radiogroup"
+      aria-label={t("pref.language")}
+      onKeyDown={(e) => moveRadioSelection(e, LANGUAGE_VALUES, language, refs, onLanguageChange)}
+    >
+      {LANGUAGES.map(({ code, label, native }) => (
+        <LanguageOption
+          key={code}
+          code={code}
+          label={label}
+          native={native}
+          selected={language === code}
+          onSelect={onLanguageChange}
+          registerRef={registerRef}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -268,11 +251,10 @@ export function PreferencesPanel({
         }}
       >
         {CATEGORIES.map(({ id, labelKey, Icon }) => (
-          <Button
+          <button
             key={id}
             ref={(el) => { tabRefs.current.set(id, el); }}
             type="button"
-            variant="ghost"
             role="tab"
             id={`pref-tab-${id}`}
             className={`pref-nav-item ${active === id ? "active" : ""}`}
@@ -281,9 +263,9 @@ export function PreferencesPanel({
             tabIndex={active === id ? 0 : -1}
             onClick={() => setActive(id)}
           >
-            <Icon size={16} />
+            <Icon size={14} />
             <span className="pref-nav-label">{t(labelKey)}</span>
-          </Button>
+          </button>
         ))}
       </nav>
 
@@ -298,7 +280,6 @@ export function PreferencesPanel({
             <AppearanceSection
               theme={theme}
               onThemeChange={onThemeChange}
-              headingId="pref-section-appearance"
             />
           )}
         </div>
@@ -312,7 +293,6 @@ export function PreferencesPanel({
             <LanguageSection
               language={language}
               onLanguageChange={onLanguageChange}
-              headingId="pref-section-language"
             />
           )}
         </div>

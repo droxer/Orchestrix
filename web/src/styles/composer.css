@@ -1,10 +1,7 @@
 /* ============================ composer ============================ */
-/* Modernized toward the floating-card composer pattern shared by Cursor,
-   Codex CLI, and Claude Code: a borderless elevated card (--shadow-lift,
-   not a hairline + soft drop), generous rounding, a circular send button,
-   and a pill-shaped mode toggle — rather than the boxier bordered-rectangle
-   input this replaces. All colors still route through semantic.css; no new
-   hardcoded values. */
+/* Operational assign surface: borderless elevated card (--shadow-lift),
+   tight control radii matching conversation-new / ink plates, transcript
+   dissolve scrim. Not a ChatGPT-style pill dock. Colors via semantic.css. */
 
 .composer {
   --composer-inline: var(--space-lg);
@@ -20,9 +17,8 @@
   background: transparent;
 }
 
-/* Scrim fade — the transcript appears to dissolve into the composer's
-   floating card rather than terminating at a hard edge. Purely decorative;
-   sits above the transcript's last pixels, below the card's own shadow. */
+/* Scrim fade — the transcript dissolves into the composer card rather
+   than terminating at a hard edge. Decorative only. */
 .composer::before {
   content: "";
   position: absolute;
@@ -35,25 +31,6 @@
 }
 
 .agent-picker-wrap { position: relative; }
-
-.agent-picker-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-xs);
-  height: 32px;
-  padding: 0 12px;
-  border: 1px solid var(--color-semantic-hairline);
-  border-radius: var(--radius-sm);
-  background: var(--color-semantic-canvas);
-  color: var(--color-semantic-ink);
-  font: var(--type-label-strong);
-  transition: border-color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
-}
-
-.agent-picker-trigger:hover {
-  border-color: var(--color-semantic-action);
-  color: var(--color-semantic-action);
-}
 
 .agent-picker {
   position: absolute;
@@ -78,7 +55,7 @@
   gap: var(--space-xs);
   min-height: var(--size-control-md);
   padding: var(--space-xs);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   text-align: left;
   color: var(--color-semantic-ink);
   font: var(--type-label-strong);
@@ -94,12 +71,11 @@
 .mode-chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-xs);
   height: 28px;
-  min-width: 132px;
-  padding: 0 12px 0 10px;
+  padding: 0 10px;
   border: 0;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   background: var(--color-semantic-surface-strong);
   color: var(--color-semantic-ink);
   font: var(--type-caption-strong);
@@ -112,18 +88,16 @@
 }
 
 .mode-chip[data-mode="action"] {
-  --mode-dot: var(--color-semantic-action);
   --mode-icon: var(--color-semantic-action);
   background: var(--color-semantic-action-soft);
 }
 
 .mode-chip[data-mode="ask"] {
-  --mode-dot: var(--color-semantic-muted);
   --mode-icon: var(--color-semantic-ink);
 }
 
 .mode-chip:hover {
-  background: color-mix(in srgb, var(--mode-dot) 16%, var(--color-semantic-surface-strong));
+  background: color-mix(in srgb, var(--mode-icon) 12%, var(--color-semantic-surface-strong));
 }
 
 .mode-chip:active { transform: scale(0.97); }
@@ -135,20 +109,8 @@
 .mode-chip-icon {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
   flex: 0 0 auto;
-  transition: transform var(--duration-base) var(--ease-spring);
   animation: mode-chip-icon-in var(--duration-fast) var(--ease-standard);
-}
-
-.mode-chip-icon::before {
-  content: "";
-  display: block;
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-full);
-  background: var(--mode-dot);
-  flex-shrink: 0;
 }
 
 .mode-chip-icon svg {
@@ -156,50 +118,19 @@
   flex-shrink: 0;
 }
 
-.mode-chip:hover .mode-chip-icon { transform: none; }
-
 @keyframes mode-chip-icon-in {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 
 .mode-chip-label {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   text-align: left;
   color: var(--color-semantic-ink);
 }
 
-.mode-chip-hint {
-  font-size: var(--text-2xs);
-  line-height: 1;
-  color: var(--color-semantic-muted);
-  opacity: 0;
-  transform: rotate(-20deg);
-  transition:
-    opacity var(--duration-base) var(--ease-standard),
-    transform var(--duration-base) var(--ease-spring);
-}
-
-.mode-chip:hover .mode-chip-hint,
-.mode-chip:focus-visible .mode-chip-hint {
-  opacity: 0.8;
-  transform: rotate(0deg);
-}
-
-.mode-chip:active .mode-chip-hint {
-  transform: rotate(340deg);
-}
-
-@media (pointer: coarse) {
-  .mode-chip-hint {
-    opacity: 0.65;
-    transform: none;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .mode-chip-icon { animation: none; }
-  .mode-chip-hint { transition: opacity var(--duration-fast) var(--ease-standard); transform: none !important; }
 }
 
 .composer-input-wrap {
@@ -207,7 +138,7 @@
   width: min(100%, 960px);
   margin: 0 auto;
   border: 0;
-  border-radius: var(--radius-3xl);
+  border-radius: var(--radius-lg);
   background: var(--color-semantic-surface-raised);
   box-shadow: var(--shadow-lift);
   transition: box-shadow var(--duration-base) var(--ease-standard);
@@ -217,7 +148,7 @@
   box-shadow: var(--ring-focus), var(--shadow-lift);
 }
 
-/* Running state — a quiet action hairline; no breathing glow. */
+/* Running state — quiet action hairline; send→stop carries the state change. */
 .composer-input-wrap[data-running] {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-semantic-action) 36%, transparent), var(--shadow-lift);
 }
@@ -291,6 +222,7 @@
 .composer-footer {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-sm);
   padding: 4px var(--space-sm) 10px var(--composer-inline);
 }
@@ -306,32 +238,25 @@
 
 .composer-footer-left {
   flex-wrap: wrap;
-}
-
-.composer-send-hint {
-  flex: 1 1 auto;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-align: center;
-  color: var(--color-semantic-muted);
-  font: var(--type-caption);
 }
 
+/* Primary assign plate — mirrors conversation-new-btn (36px ink plate). */
 .send-button {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   border: 1px solid transparent;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   background: var(--color-semantic-action);
   color: var(--color-semantic-on-action);
   cursor: pointer;
   transition:
-    background var(--duration-base) var(--ease-standard),
-    border-color var(--duration-base) var(--ease-standard);
+    background var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    transform 80ms var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
 }
 
 .send-button:hover:not(:disabled) {
@@ -340,6 +265,7 @@
 
 .send-button:active:not(:disabled) {
   background: var(--color-semantic-action-active);
+  transform: translateY(0.5px);
 }
 
 .send-button:focus-visible {
@@ -373,6 +299,10 @@
 
 @media (prefers-reduced-motion: reduce) {
   .send-button {
-    transition: none;
+    transition: background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+  }
+
+  .send-button:active:not(:disabled) {
+    transform: none;
   }
 }

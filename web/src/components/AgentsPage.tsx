@@ -8,13 +8,11 @@ import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { agentAvailabilityTone } from "../lib/adminHelpers";
 import { agentLabel } from "../lib/plan";
 import type { AgentName, CurrentUser, EmployeeAgent, LogicalAgentAvailability } from "../types";
-import { ActionSearch, NavConversations, NavRefresh, StreamInfo } from "./icons";
+import { ActionSearch, NavConversations, StreamInfo } from "./icons";
 import { AgentStateBadge } from "./AgentStateBadge";
 import { AgentWorkspacePage, type WorkspacePageTab } from "./AgentWorkspacePage";
-import { PageHeader } from "./PageHeader";
 import { RelayEmptyState } from "./RelayEmptyState";
 import { Badge } from "./ui/badge";
-import { Button } from "./ui/button";
 
 interface AgentsPageProps {
   currentUser: CurrentUser;
@@ -276,26 +274,6 @@ export function AgentsPage({
       tabIndex={-1}
     >
       <div className="agents-roster" aria-label={t("agents_page.title")}>
-        <PageHeader
-          kicker={t("nav.agents")}
-          title={t("agents_page.title")}
-          count={t("agents_page.sub", { count: activeAgents.length })}
-          titleVariant="display"
-          actions={(
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              aria-label={t("nav.refresh")}
-              disabled={isRefreshing}
-              onClick={() => void onRefresh()}
-            >
-              <NavRefresh size={16} className={isRefreshing ? "spin" : undefined} />
-            </Button>
-          )}
-        />
-
-
         <RosterFilterBar
           query={query}
           availability={availability}
@@ -311,7 +289,6 @@ export function AgentsPage({
           <RelayEmptyState
             title={activeAgents.length === 0 ? t("agents_page.empty_title") : t("agents_page.empty_filtered_title")}
             body={activeAgents.length === 0 ? t("agents_page.empty_body") : t("agents_page.empty_filtered_body")}
-            hint={t("agents_page.empty_hint")}
           />
         ) : (
           <ul className="agents-roster-list" aria-label={t("agents_page.title")}>
@@ -349,7 +326,6 @@ export function AgentsPage({
             fill
             title={t("agents_page.select_title")}
             body={t("agents_page.select_body")}
-            hint={activeAgents.length > 0 ? t("agents_page.select_hint") : undefined}
           />
         )}
       </div>

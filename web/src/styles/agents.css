@@ -196,7 +196,7 @@
 }
 
 /* Pin against admin-v2-views.css's bare .tone-* text-color utility (used
-   unscoped by AttentionRail's counts), which loads later and would
+   unscoped by count labels elsewhere), which loads later and would
    otherwise win at equal specificity and recolor this label instead of
    just the dot below. */
 .agents-availability.tone-good,

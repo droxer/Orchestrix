@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Relay" shape-rendering="geometricPrecision">
   <title>Relay</title>
-  <!-- Light standalone mark: cool gray-white canvas + deep steel lead. -->
-  <rect x="4" y="4" width="56" height="56" rx="15" fill="#f7f8fa"/>
-  <rect x="4" y="4" width="56" height="56" rx="15" fill="none" stroke="#e2e5ea" stroke-width="1"/>
+  <!-- Light standalone mark: Sleek Forest warm off-white canvas + deepened forest lead. -->
+  <rect x="4" y="4" width="56" height="56" rx="15" fill="#faf8f4"/>
+  <rect x="4" y="4" width="56" height="56" rx="15" fill="none" stroke="#ddd6c4" stroke-width="1"/>
   <g fill="none" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M22 20 L36 32 L22 44" stroke="#2f5fad"/>
-    <path d="M36 20 L50 32 L36 44" stroke="#12141a" opacity="0.5"/>
+    <path d="M22 20 L36 32 L22 44" stroke="#2f7a50"/>
+    <path d="M36 20 L50 32 L36 44" stroke="#1c1a15" opacity="0.45"/>
   </g>
 </svg>

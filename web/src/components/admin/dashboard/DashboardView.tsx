@@ -30,6 +30,7 @@ export function DashboardView({ nodes, employees, metrics }: DashboardViewProps)
   const fleetReady = nodes.length > 0 || employees.length > 0;
 
   const dash = "—";
+  const showTokens = tokens.available;
 
   const fleetSpark = sparkFromCounts([metrics.failed, metrics.running, metrics.ready]);
 
@@ -40,7 +41,10 @@ export function DashboardView({ nodes, employees, metrics }: DashboardViewProps)
   return (
     <div className="adm-dash">
       <div className="adm-dash-kpis-wrap">
-        <section className="adm-dash-kpis" aria-label={t("admin.v2.dash_kpis_label")}>
+        <section
+          className={`adm-dash-kpis${showTokens ? "" : " adm-dash-kpis--lean"}`}
+          aria-label={t("admin.v2.dash_kpis_label")}
+        >
           <KpiTile
             slot="sessions"
             hero
@@ -78,17 +82,19 @@ export function DashboardView({ nodes, employees, metrics }: DashboardViewProps)
             value={fleetReady ? metrics.employeeTotal : dash}
             hint={fleetReady ? t("admin.v2.dash_kpi_employees_hint", { count: employees.length }) : undefined}
           />
-          <KpiTile
-            slot="tokens"
-            enterIndex={3}
-            eyebrow={t("admin.v2.dash_kpi_tokens")}
-            value={tokens.available ? formatCompact(tokens.total, i18n.language) : dash}
-            hint={tokens.available ? t("admin.v2.dash_kpi_tokens_hint") : t("admin.v2.dash_coming_soon_tag")}
-          />
+          {showTokens ? (
+            <KpiTile
+              slot="tokens"
+              enterIndex={3}
+              eyebrow={t("admin.v2.dash_kpi_tokens")}
+              value={formatCompact(tokens.total, i18n.language)}
+              hint={t("admin.v2.dash_kpi_tokens_hint")}
+            />
+          ) : null}
         </section>
       </div>
 
-      <div className="adm-dash-belt">
+      <div className={`adm-dash-belt${showTokens ? "" : " adm-dash-belt--lean"}`}>
         <ActivityChart
           daily={sessions.dailyCounts}
           ready={sessionsReady}
@@ -101,7 +107,9 @@ export function DashboardView({ nodes, employees, metrics }: DashboardViewProps)
           ranked={sessions.topEmployees}
           className="relay-enter relay-enter-delay-7"
         />
-        <TokenUsageChart snapshot={tokens} compact className="relay-enter relay-enter-delay-8" />
+        {showTokens ? (
+          <TokenUsageChart snapshot={tokens} compact className="relay-enter relay-enter-delay-8" />
+        ) : null}
       </div>
 
       <ActivityFeed items={activity.items} employees={employees} className="relay-enter relay-enter-delay-9" />

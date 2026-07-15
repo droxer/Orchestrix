@@ -39,15 +39,10 @@
   margin-top: var(--space-sm);
 }
 
-/* Admin (and future display-scale routes) — design-system display-lg title */
+/* Stacked route titles — Geist title-lg. Instrument Serif (--type-display-*)
+   is reserved for login/empty heroes; using it here made admin/channels/
+   agent-workspace headers read as oversized serif headlines. */
 .page-header-title--display {
-  font: var(--type-display-lg);
-  letter-spacing: var(--letter-display-serif);
-}
-
-@media (max-width: 720px) {
-  .page-header-title--display {
-    font: var(--type-title-lg);
-    letter-spacing: var(--letter-tight);
-  }
+  font: var(--type-title-lg);
+  letter-spacing: var(--letter-tight);
 }

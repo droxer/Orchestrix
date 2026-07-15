@@ -49,9 +49,11 @@ export function ChatHeader({ activeAgent, logicalAgents, activeLogicalAgentId, o
         cache: numberFormat.format(tokenUsage.cache),
       })
     : "";
-  const activity = activeSession
+  const activityRaw = activeSession
     ? conversationActivity(activeSession.status, runningAgent)
     : null;
+  // "Completed" is settled noise in the chat header; keep working / waiting / failed / cancelled.
+  const activity = activityRaw?.kind === "good" ? null : activityRaw;
   const showMeta = Boolean(activity || tokenUsage);
   const activeLogicalAgent = logicalAgents.find((agent) => agent.id === activeLogicalAgentId);
   const moveLogicalAgent = (direction: 1 | -1) => {

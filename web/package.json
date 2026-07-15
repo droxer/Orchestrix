@@ -4,9 +4,9 @@
   "description": "Relay browser UI",
   "type": "module",
   "scripts": {
-    "dev": "next dev -H 127.0.0.1 -p 5000",
+    "dev": "next dev --webpack -H 127.0.0.1 -p 5000",
     "build": "next build --webpack",
-    "preview": "next dev -H 127.0.0.1 -p 5000",
+    "preview": "next dev --webpack -H 127.0.0.1 -p 5000",
     "lint:css": "stylelint \"src/**/*.css\""
   },
   "dependencies": {

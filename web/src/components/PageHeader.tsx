@@ -22,7 +22,7 @@ export function PageHeader({
   subtitle?: ReactNode;
   toolbar?: ReactNode;
   actions?: ReactNode;
-  /** `display` — admin page title per design system (`--type-display-lg`). */
+  /** `display` — stacked route title (`--type-title-lg`). */
   titleVariant?: "default" | "display";
   /** `stacked` — kicker, title, subtitle, and toolbar in a left column (admin). */
   layout?: "inline" | "stacked";

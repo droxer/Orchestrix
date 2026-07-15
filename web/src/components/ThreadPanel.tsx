@@ -55,8 +55,8 @@ export function ThreadPanel({
         <Button variant="ghost"
           type="button"
           className="conversation-new-btn"
-          aria-label={t("conversation.new")}
-          title={t("conversation.new")}
+          aria-label={t("thread.new_conversation")}
+          title={t("thread.new_conversation")}
           onClick={onNewConversation}
         >
           <ActionCompose size={16} />

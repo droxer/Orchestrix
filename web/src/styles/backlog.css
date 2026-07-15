@@ -347,7 +347,7 @@
 }
 
 /* Pin the glyph color against admin-v2-views.css's bare `.tone-good`/
-   `.tone-bad` text-color utility (used unscoped by AttentionRail's counts),
+   `.tone-bad` text-color utility (used unscoped by count labels elsewhere),
    which loads later in the stylesheet and would otherwise win at equal
    specificity and tint the vendor glyph (currentColor) green/red. The
    readiness pip below is the ONLY thing allowed to carry status color —

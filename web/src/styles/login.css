@@ -1,12 +1,9 @@
 /* =====================================================================
-   Login — the attach sequence
+   Login screen
 
-   Signing in to Relay is attaching a terminal to a live control plane,
-   and the page is staged that way: a pinned-dark ops room (pre-auth, no
-   user theme preference is loaded yet, so the surface does not follow
-   data-theme), agent transit lanes pulsing in the backdrop, and a
-   handshake block whose backend/daemon/node rows resolve one-by-one
-   while the operator types credentials into a terminal-style form.
+   Dark ops-room attach surface (no theme preference loaded yet). Agent
+   transit lanes pulse in the backdrop; backend/daemon/node rows resolve
+   one-by-one while credentials are entered.
 
    Color is pinned via local --lg-* variables whose values are lifted
    verbatim from the dark (default) ramp in tokens/primitives.css
@@ -81,7 +78,7 @@
 
 .login-lane-label {
   position: absolute;
-  left: 0;
+  left: var(--space-base);
   bottom: var(--space-xs);
   font-family: var(--font-mono);
   font-size: var(--text-2xs);
@@ -91,7 +88,34 @@
   opacity: 0.7;
 }
 
-/* The traveling packet: a short luminous dash with a soft tail. */
+/* Endpoint nodes anchor each hairline as a route between two points, so
+   the lane reads as an origin → destination path rather than a line that
+   trails off. Origin is lit (steel); destination is a dim terminal. */
+.login-lane-node {
+  position: absolute;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  margin-top: -2.5px;
+  border-radius: var(--radius-full);
+}
+
+.login-lane-node--origin {
+  left: 0;
+  transform: translateX(-50%);
+  background: var(--lg-steel);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lg-steel) 16%, transparent);
+}
+
+.login-lane-node--dest {
+  right: 0;
+  transform: translateX(50%);
+  background: color-mix(in srgb, var(--lg-ink) 22%, transparent);
+}
+
+/* The traveling packet: a short luminous dash with a soft tail, sweeping
+   the full lane from origin to destination (left/right are relative to the
+   lane, so the sweep is width-independent). */
 .login-lane::after {
   content: "";
   position: absolute;
@@ -99,6 +123,7 @@
   left: 0;
   width: 72px;
   height: 3px;
+  margin-left: -72px;
   border-radius: var(--radius-full);
   background: linear-gradient(to right, transparent, var(--lg-steel));
   opacity: 0;
@@ -107,10 +132,10 @@
 }
 
 @keyframes login-lane-travel {
-  0% { transform: translateX(-80px); opacity: 0; }
+  0% { left: 0; opacity: 0; }
   6% { opacity: 1; }
   88% { opacity: 1; }
-  100% { transform: translateX(calc(50vw + 80px)); opacity: 0; }
+  100% { left: 100%; opacity: 0; }
 }
 
 /* ---------- The column --------------------------------------------- */

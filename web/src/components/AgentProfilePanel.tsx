@@ -9,6 +9,8 @@ import { agentLabel } from "../lib/plan";
 import type { AgentPlacement, ControlPanelDaemonNodeRecord, EmployeeAgent, EmployeeRecord } from "../types";
 import { useDialogs } from "@/components/ui/DialogProvider";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { ADMIN_AGENTS_KEY } from "../lib/adminHelpers";
 import { EMPLOYEE_AGENTS_QUERY_KEY } from "../hooks/useEmployeeAgents";
 import { formatRelativeTime, truncateId, agentAvailabilityTone } from "./admin/helpers";
@@ -267,8 +269,7 @@ export function AgentProfilePanel({
                 </div>
                 {renaming ? (
                   <>
-                    <input
-                      className="adm-search-input"
+                    <Input
                       name="agent-display-name"
                       type="text"
                       aria-label={t("admin.v2.agent_name")}
@@ -282,22 +283,23 @@ export function AgentProfilePanel({
                       disabled={saving}
                     />
                     <div className="adm-cred-inline-actions">
-                      <DossierIconButton
-                        onClick={() => void handleRenameSave()}
-                        disabled={saving}
-                        aria-label={t("admin.v2.save")}
-                        title={t("admin.v2.save")}
-                      >
-                        <ActionApprove size={14} aria-hidden="true" />
-                      </DossierIconButton>
-                      <DossierIconButton
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
                         onClick={() => setRenaming(false)}
                         disabled={saving}
-                        aria-label={t("admin.v2.cancel")}
-                        title={t("admin.v2.cancel")}
                       >
-                        <ActionRemove size={14} aria-hidden="true" />
-                      </DossierIconButton>
+                        {t("admin.v2.cancel")}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => void handleRenameSave()}
+                        disabled={saving}
+                      >
+                        {t("admin.v2.save")}
+                      </Button>
                     </div>
                   </>
                 ) : (
@@ -323,8 +325,8 @@ export function AgentProfilePanel({
           </div>
           {editingInstructions ? (
             <>
-              <textarea
-                className="adm-search-input adm-instructions-input"
+              <Textarea
+                className="adm-instructions-input"
                 name="agent-instructions"
                 aria-label={t("agents_page.instructions_label")}
                 rows={5}
@@ -335,22 +337,23 @@ export function AgentProfilePanel({
                 placeholder={t("agents_page.instructions_placeholder")}
               />
               <div className="adm-cred-inline-actions">
-                <DossierIconButton
-                  onClick={() => void handleInstructionsSave()}
-                  disabled={saving}
-                  aria-label={t("admin.v2.save")}
-                  title={t("admin.v2.save")}
-                >
-                  <ActionApprove size={14} aria-hidden="true" />
-                </DossierIconButton>
-                <DossierIconButton
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setEditingInstructions(false)}
                   disabled={saving}
-                  aria-label={t("admin.v2.cancel")}
-                  title={t("admin.v2.cancel")}
                 >
-                  <ActionRemove size={14} aria-hidden="true" />
-                </DossierIconButton>
+                  {t("admin.v2.cancel")}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => void handleInstructionsSave()}
+                  disabled={saving}
+                >
+                  {t("admin.v2.save")}
+                </Button>
               </div>
             </>
           ) : (

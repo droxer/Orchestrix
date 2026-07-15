@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
-  buildAttentionItems,
   buildEmployeeSummaries,
+  initialsOf,
   isStale,
   statusTone,
   truncateId,
@@ -38,15 +38,6 @@ function employee(input: Partial<EmployeeRecord> & { id: string }): EmployeeReco
     departmentName: input.departmentName,
   };
 }
-
-const t = ((key: string, opts?: Record<string, unknown>) => {
-  if (key === "admin.stale_run_body") return `stale:${opts?.count ?? 0}`;
-  if (key === "admin.quiet_body") return `quiet:${opts?.time ?? ""}`;
-  if (key === "admin.time.never") return "never";
-  if (key === "admin.time.unknown") return "unknown";
-  if (key === "admin.time.now") return "now";
-  return key;
-}) as unknown as Parameters<typeof buildAttentionItems>[1];
 
 describe("isStale + visualStatus", () => {
   it("treats explicit stale flag as authoritative", () => {
@@ -93,35 +84,6 @@ describe("truncateId", () => {
   });
 });
 
-describe("buildAttentionItems", () => {
-  it("emits an error entry when lastError is set", () => {
-    const items = buildAttentionItems([node({ id: "a", lastError: "boom" })], t);
-    assert.ok(items.some((item) => item.kind === "error" && item.body === "boom"));
-  });
-
-  it("emits stale-run when stale node has active runs", () => {
-    const stale = node({
-      id: "a",
-      stale: true,
-      activeRuns: [{ commandId: "c1", sessionId: "s1", runId: "r1", agent: "claude", mode: "action", taskGoal: "do x", startedAt: new Date().toISOString() }],
-    });
-    const items = buildAttentionItems([stale], t);
-    assert.ok(items.some((item) => item.kind === "stale-run"));
-  });
-
-  it("emits quiet when node is fresh but last seen > QUIET_AFTER_MS ago", () => {
-    const quiet = node({ id: "a", lastSeenAgeMs: 12_000, lastSeenAt: new Date(Date.now() - 12_000).toISOString() });
-    const items = buildAttentionItems([quiet], t);
-    assert.ok(items.some((item) => item.kind === "quiet"));
-  });
-
-  it("does not emit quiet when node already has an error", () => {
-    const both = node({ id: "a", lastError: "boom", lastSeenAgeMs: 12_000 });
-    const items = buildAttentionItems([both], t);
-    assert.equal(items.filter((item) => item.kind === "quiet").length, 0);
-  });
-});
-
 describe("buildEmployeeSummaries", () => {
   it("aggregates nodes by employee and counts ready/running", () => {
     const employees = [employee({ id: "alice", displayName: "Alice" }), employee({ id: "bob" })];
@@ -154,5 +116,21 @@ describe("buildEmployeeSummaries", () => {
     assert.ok(phantom, "phantom missing");
     assert.equal(phantom.displayName, "phantom");
     assert.equal(phantom.nodeCount, 1);
+  });
+});
+
+describe("initialsOf", () => {
+  it("takes two letters from a single token", () => {
+    assert.equal(initialsOf("alice"), "AL");
+  });
+
+  it("combines first and last parts", () => {
+    assert.equal(initialsOf("alice.chen"), "AC");
+    assert.equal(initialsOf("@bob-smith"), "BS");
+  });
+
+  it("falls back for empty input", () => {
+    assert.equal(initialsOf(""), "?");
+    assert.equal(initialsOf("   "), "?");
   });
 });

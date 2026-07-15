@@ -5,7 +5,7 @@ import { Button } from "../ui/button";
 
 // The composer toggles between "Ask" (read-only Q&A) and "Agent" (does work,
 // stored as the "action" mode). "review" is a workflow-internal mode and is
-// not user-selectable here.
+// not user-selectable here. Shortcut lives in title/aria only — no hint glyph.
 export function ModeToggle({ mode, setMode }: {
   mode: AgentTaskMode;
   setMode: (mode: AgentTaskMode) => void;
@@ -26,7 +26,6 @@ export function ModeToggle({ mode, setMode }: {
         <Icon size={14} aria-hidden="true" />
       </span>
       <span className="mode-chip-label">{t(`mode.${mode}`)}</span>
-      <span className="mode-chip-hint" aria-hidden="true">⇧⇥</span>
     </Button>
   );
 }

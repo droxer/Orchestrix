@@ -375,7 +375,7 @@ export function AgentWorkspacePage({
         title={(
           <span className="workspace-header-title">
             <span className="workspace-header-mark" aria-hidden="true">
-              <AgentMark agent={agent.executorKind} size={16} />
+              <AgentMark agent={agent.executorKind} size={14} />
             </span>
             {displayName}
           </span>

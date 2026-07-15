@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { createControlPanelDaemonNode, createManagedNode } from "../../api";
+import { initialsOf } from "../../lib/adminHelpers";
 import type {
   CreateControlPanelDaemonNodeResponse,
   CreateManagedNodeResponse,
@@ -46,6 +47,11 @@ export function AddNodeDrawer({
   const isManaged = sandboxMode === "boxlite";
   const hasUnsavedChanges = Boolean(employeeId);
   const confirmDiscardChanges = useUnsavedChangesGuard(open && hasUnsavedChanges && !isBusy);
+
+  const selectedEmployee = useMemo(
+    () => employees.find((employee) => employee.id === employeeId) ?? null,
+    [employees, employeeId],
+  );
 
   useEffect(() => {
     if (!open) {
@@ -91,16 +97,21 @@ export function AddNodeDrawer({
     <Drawer
       open={open}
       onClose={() => { void requestClose(); }}
+      kicker={t("admin.v2.provision_kicker_node")}
       title={t("admin.v2.add_node_title")}
       subtitle={t(isManaged ? "admin.v2.add_node_sub_managed" : "admin.v2.add_node_sub_local")}
       closeLabel={t("admin.v2.close_drawer")}
       ariaLabel={t("admin.v2.add_node_title")}
       bodyClassName="adm-drawer-body--column"
-      width={420}
+      width={460}
     >
-      <form className="adm-form adm-form--streamlined" onSubmit={(event) => void handleSubmit(event)} noValidate>
-        <div className="adm-form-group">
-          <p className="adm-form-group-label">{t("admin.v2.section_execution_profile")}</p>
+      <form className="adm-form adm-provision-form" onSubmit={(event) => void handleSubmit(event)} noValidate>
+        <section className="adm-provision-section" aria-labelledby="adm-node-profile">
+          <header className="adm-provision-section-head">
+            <h3 id="adm-node-profile" className="adm-provision-section-title">
+              {t("admin.v2.section_execution_profile")}
+            </h3>
+          </header>
           <ExecutionProfileField
             value={sandboxMode}
             onChange={(mode) => {
@@ -110,10 +121,46 @@ export function AddNodeDrawer({
             name="add-node-sandbox-mode"
             disabled={isBusy}
           />
-        </div>
+          <aside
+            className={`adm-provision-outcome ${isManaged ? "is-managed" : "is-local"}`}
+            aria-live="polite"
+          >
+            <span className="adm-provision-outcome-label">
+              {t(isManaged ? "admin.v2.node_execution_managed" : "admin.v2.node_execution_local")}
+            </span>
+            <p className="adm-provision-outcome-body">
+              {t(isManaged ? "admin.v2.add_node_outcome_managed" : "admin.v2.add_node_outcome_local")}
+            </p>
+          </aside>
+        </section>
 
-        <div className="adm-form-group">
-          <p className="adm-form-group-label">{t("admin.v2.section_assignment")}</p>
+        <section className="adm-provision-section" aria-labelledby="adm-node-assignment">
+          <header className="adm-provision-section-head">
+            <h3 id="adm-node-assignment" className="adm-provision-section-title">
+              {t("admin.v2.section_assignment")}
+            </h3>
+            <span className="adm-provision-section-meta">{t("admin.v2.optional")}</span>
+          </header>
+
+          {selectedEmployee ? (
+            <div className="adm-assign-operator-card" aria-hidden="true">
+              <span className="adm-assign-avatar">
+                {initialsOf(selectedEmployee.id)}
+              </span>
+              <div className="adm-assign-operator-text">
+                <span className="adm-assign-operator-handle mono">
+                  @{selectedEmployee.id}
+                </span>
+                {selectedEmployee.displayName &&
+                selectedEmployee.displayName !== selectedEmployee.id ? (
+                  <span className="adm-assign-operator-name">
+                    {selectedEmployee.displayName}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
           <label className="adm-field">
             <span>{t("admin.employee")}</span>
             <Select
@@ -138,7 +185,11 @@ export function AddNodeDrawer({
               </SelectContent>
             </Select>
           </label>
-        </div>
+
+          {!selectedEmployee ? (
+            <p className="adm-form-hint">{t("admin.v2.add_node_assign_later")}</p>
+          ) : null}
+        </section>
 
         {error ? <div className="adm-form-error" role="alert">{error}</div> : null}
 

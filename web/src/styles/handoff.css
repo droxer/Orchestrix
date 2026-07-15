@@ -5,8 +5,8 @@
   flex-wrap: wrap;
   gap: var(--space-xs);
   padding: var(--space-sm);
-  border: 1px solid var(--color-semantic-hairline-soft);
-  border-radius: var(--radius-md);
+  border: 0;
+  border-radius: var(--radius-lg);
   background: var(--color-semantic-surface-soft);
 }
 

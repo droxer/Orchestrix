@@ -1,8 +1,8 @@
 /* =====================================================================
-   Tier 2 — Semantic. Graphite Steel direction (see tokens/primitives.css
-   for the full rationale): dark cool charcoal canvas by default, a
-   restrained steel-blue as the single chromatic action color —
-   calmer than Signal Cyan, distinct from lavender-on-dark SaaS.
+   Tier 2 — Semantic. Sleek Forest direction (see tokens/primitives.css
+   for the full rationale): warm near-black canvas by default, a
+   restrained forest green as the single chromatic action color —
+   muted vs neon signal hues, distinct from lavender-on-dark SaaS.
 
    Role-based aliases that consume primitives.css and give every value an
    intent-bearing name: --color-semantic-* for color roles, --type-* for
@@ -19,7 +19,7 @@
    ===================================================================== */
 
 :root {
-  /* Action — Graphite Steel (#5b87d6 dark / #2f5fad light) is the single
+  /* Action — Forest Green (#4f9d6e dark / #2f7a50 light) is the single
      chromatic action color: brand mark, primary CTA, focus ring, link
      emphasis. Status narrows to green/amber/red and remains the only
      other chroma in the system — never used as an action fill. */
@@ -36,7 +36,7 @@
   --color-semantic-on-action: var(--color-on-accent); /* text on the action fill */
   --color-semantic-on-dark: var(--color-porcelain);    /* text on always-dark fills, both themes */
 
-  /* Surfaces — layered cool-neutral canvas */
+  /* Surfaces — layered warm-neutral canvas */
   --color-semantic-canvas: var(--color-canvas-base);
   --color-semantic-surface-soft: var(--color-canvas-soft);       /* subtle tint — quotes, code, hover */
   --color-semantic-surface-strong: var(--color-canvas-strong);   /* fills, search, avatars */
@@ -57,8 +57,8 @@
   /* Syntax-highlight numerals — Geist Mono numeric literal in code blocks */
   --color-semantic-code-number: var(--color-rust);
 
-  /* Status — the only OTHER chroma in the system besides the Graphite
-     Steel action color (see --color-semantic-action above). Text, dots,
+  /* Status — the only OTHER chroma in the system besides the Forest
+     Green action color (see --color-semantic-action above). Text, dots,
      and borders only; never background fills, never actions. */
   --color-semantic-success: var(--color-green);
   --color-semantic-danger: var(--color-red);

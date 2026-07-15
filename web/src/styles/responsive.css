@@ -149,14 +149,19 @@
     border-bottom-color: var(--color-semantic-hairline-soft);
   }
 
-  .messenger-shell[data-route="admin"] .page-header {
+  /* Admin + agents keep their in-page lead (title, tabs). Other work routes
+     hide it because the mobile topbar already names the page. Agents must
+     keep the workspace segmented tabs — clipping the lead dropped them. */
+  .messenger-shell[data-route="admin"] .page-header,
+  .messenger-shell[data-route="agents"] .page-header {
     min-height: 0;
     justify-content: space-between;
     align-items: flex-start;
     border-bottom-color: var(--color-semantic-hairline-soft);
   }
 
-  .messenger-shell[data-route="admin"] .page-header-lead {
+  .messenger-shell[data-route="admin"] .page-header-lead,
+  .messenger-shell[data-route="agents"] .page-header-lead {
     position: static;
     width: auto;
     height: auto;
@@ -166,11 +171,6 @@
     clip: auto;
     white-space: normal;
     border: 0;
-  }
-
-  .messenger-shell[data-route="admin"] .page-header-title--display {
-    font: var(--type-title-lg);
-    letter-spacing: var(--letter-tight);
   }
 
   .mobile-topbar button {
@@ -451,23 +451,12 @@
     padding: var(--space-sm) var(--space-sm) max(env(safe-area-inset-bottom), var(--space-base));
   }
 
-  .composer-send-hint {
-    display: none;
-  }
-
   .mode-chip {
-    min-width: 0;
     flex: 0 1 auto;
   }
 
   .composer-footer {
-    flex-wrap: wrap;
     gap: var(--space-xs);
-  }
-
-  .composer-footer-left {
-    flex: 1 1 auto;
-    min-width: 0;
   }
 
   .adm-pulse {

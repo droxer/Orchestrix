@@ -191,7 +191,10 @@ body {
 .transcript-phase-node { background: var(--color-semantic-action); box-shadow: 0 0 0 4px var(--color-semantic-canvas); }
 .rail-node { border-color: var(--color-ink-200); border-radius: 50%; background: var(--color-canvas-raised); box-shadow: 0 0 0 4px var(--color-semantic-canvas); }
 .rail-node-user { width: 16px; height: 16px; background: var(--color-semantic-action); border-color: var(--color-semantic-action); }
-.msg header > span:first-child { font-family: var(--font-display); font-size: var(--text-md); font-weight: 600; }
+/* Author label (YOU / agent name) reads as a refined attribution eyebrow, not
+   a heading — kept at body size so it sits level with the turn text; the
+   display face, 600 weight, rail node, and uppercase YOU carry the hierarchy. */
+.msg header > span:first-child { font-family: var(--font-display); font-size: var(--text-sm); font-weight: 600; }
 .msg-time { color: var(--color-semantic-muted-soft); }
 
 /* Empty states keep the base type roles — no oversized display override. */
@@ -311,8 +314,7 @@ html[data-theme="dark"] .rail-node { background: var(--color-semantic-surface-ra
 .adm-form-section,
 .adm-assign-node,
 .adm-placement-item,
-.adm-agent-toggle-item,
-.pref-option-row {
+.adm-agent-toggle-item {
   border-color: var(--color-semantic-hairline);
   border-radius: var(--radius-md);
   background: var(--color-semantic-surface-soft);
@@ -385,8 +387,7 @@ html[data-theme="dark"] .task-drawer { background: var(--color-semantic-surface-
 html[data-theme="dark"] .adm-form-section,
 html[data-theme="dark"] .adm-assign-node,
 html[data-theme="dark"] .adm-placement-item,
-html[data-theme="dark"] .adm-agent-toggle-item,
-html[data-theme="dark"] .pref-option-row { background: var(--color-semantic-surface-soft); }
+html[data-theme="dark"] .adm-agent-toggle-item { background: var(--color-semantic-surface-soft); }
 
 html[data-theme="dark"] .mobile-topbar {
   background: var(--color-semantic-canvas);

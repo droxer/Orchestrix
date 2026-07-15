@@ -6,7 +6,6 @@
 .conversation-heading h1,
 .pref-header-text h3,
 .login-headline,
-.adm-rail-title,
 .adm-empty-title,
 .adm-auth-title {
   text-wrap: balance;
@@ -76,7 +75,6 @@
   .conversation-header button,
   .conversation-header .conversation-new-btn,
   .chat-header .icon-button,
-  .agent-picker-trigger,
   .agent-picker button,
   .agent-picker [role="option"],
   .mode-chip,

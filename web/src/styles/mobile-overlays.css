@@ -159,18 +159,6 @@
     min-height: 44px;
   }
 
-  /* ── Admin attention bottom sheet ──────────────────────────────── */
-  .adm-rail-sheet-backdrop {
-    padding-bottom: 0;
-  }
-
-  .adm-rail-sheet {
-    width: 100%;
-    max-height: min(78dvh, 640px);
-    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-    padding-bottom: max(env(safe-area-inset-bottom), 0px);
-  }
-
   /* ── Composer popovers — fixed lower sheet, clear of bottom nav ── */
   .agent-picker,
   .mention-popover {

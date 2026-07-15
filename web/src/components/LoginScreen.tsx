@@ -11,8 +11,8 @@ interface LoginScreenProps {
   onAuthenticated: (user: CurrentUser) => void;
 }
 
-/* Backdrop lane labels are the literal agent identities Relay routes work
-   across — product nouns, not copy, so they stay untranslated. */
+/* Backdrop lane labels are the literal agent identities Relay routes
+   across. Product nouns, not copy; leave them untranslated. */
 const AGENT_LANES = ["claude", "pi", "codex", "kimi"] as const;
 
 export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
@@ -91,8 +91,7 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
 
   return (
     <main className="login-screen" data-mode={mode}>
-      {/* Ambient backdrop: four agent transit lanes with traveling pulses —
-          the control plane at work behind the credential gate. */}
+      {/* Ambient backdrop: four agent transit lanes with traveling pulses. */}
       <div className="login-backdrop" aria-hidden="true">
         {AGENT_LANES.map((agent, index) => (
           <div
@@ -101,6 +100,8 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
             style={{ "--lane-index": index } as CSSProperties}
           >
             <span className="login-lane-label">{agent}</span>
+            <span className="login-lane-node login-lane-node--origin" />
+            <span className="login-lane-node login-lane-node--dest" />
           </div>
         ))}
       </div>
@@ -120,8 +121,7 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
           </h1>
           <p className="login-lede">{lede}</p>
 
-          {/* Handshake block — the plane reporting in while the operator
-              types. Rows resolve in sequence on load. */}
+          {/* Status rows resolve in sequence on load. */}
           <dl className="login-handshake">
             <div className="login-handshake-row" style={{ "--row-index": 0 } as CSSProperties}>
               <dt className="login-handshake-key">{t("login.system_backend")}</dt>

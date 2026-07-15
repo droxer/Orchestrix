@@ -1,6 +1,6 @@
 /* =====================================================================
    Preferences Modal  (pref-* namespace)
-   Centered popup dialog for theme and language settings.
+   Dense ops chrome for theme and language — list rows, not soft cards.
    Backdrop + panel motion from overlay.css.
    ===================================================================== */
 
@@ -16,12 +16,13 @@
 
 .pref-modal {
   position: relative;
-  width: min(680px, 100%);
-  max-height: min(680px, 90vh);
+  width: min(520px, 100%);
+  max-height: min(480px, 90vh);
   display: flex;
   flex-direction: column;
   background: var(--color-semantic-surface-raised);
-  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-semantic-hairline);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lift);
   overflow: hidden;
   overscroll-behavior: contain;
@@ -34,8 +35,8 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--space-base);
-  padding: var(--space-lg) var(--space-lg) var(--space-base);
+  gap: var(--space-sm);
+  padding: var(--space-base) var(--space-base) var(--space-sm);
   border-bottom: 1px solid var(--color-semantic-hairline);
   flex-shrink: 0;
 }
@@ -43,40 +44,38 @@
 .pref-header-text {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .pref-header-text h3 {
   margin: 0;
-  font: var(--type-title-lg);
+  font: var(--type-title-sm);
   color: var(--color-semantic-ink);
   letter-spacing: var(--letter-tight);
 }
 
 .pref-header-sub {
   color: var(--color-semantic-muted);
-  font: var(--type-caption-strong);
+  font: var(--type-meta);
 }
 
 .pref-close {
   flex-shrink: 0;
 }
 
-/* Master-detail body — left category rail + content panel + account footer */
+/* Master-detail — compact rail + content */
 .pref-body {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 150px 1fr;
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-columns: 132px 1fr;
 }
 
 .pref-nav {
-  grid-row: 1;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: var(--space-sm) var(--space-xs);
+  gap: 1px;
+  padding: var(--space-xs);
   border-right: 1px solid var(--color-semantic-hairline-soft);
   overflow-y: auto;
 }
@@ -86,16 +85,19 @@
   display: flex;
   align-items: center;
   gap: var(--space-xs);
-  padding: var(--space-xs) var(--space-sm);
-  border-radius: var(--radius-sm);
-  font: var(--type-nav-link);
+  width: 100%;
+  margin: 0;
+  padding: 6px var(--space-xs) 6px calc(var(--space-xs) + 2px);
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  font: var(--type-meta);
   color: var(--color-semantic-body);
   text-align: left;
+  cursor: pointer;
   transition: background var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
 }
 
-/* Icon reads as a quiet companion to the label until the row is active or
-   hovered, when it picks up the same ink as the text. */
 .pref-nav-item svg {
   flex-shrink: 0;
   color: var(--color-semantic-muted);
@@ -117,84 +119,35 @@
 }
 
 .pref-nav-item.active {
-  background: var(--color-semantic-surface-strong);
+  background: var(--color-semantic-surface-soft);
   color: var(--color-semantic-ink);
   font-weight: 600;
 }
 
-/* Active rail accent — ink bar, matching the sidenav selection cue */
 .pref-nav-item.active::before {
   content: "";
   position: absolute;
   left: 0;
   top: 50%;
   width: 2px;
-  height: 16px;
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  height: 12px;
   background: var(--color-semantic-action);
   transform: translateY(-50%);
 }
 
-/* Stable content height so the dialog footprint stays identical across
-   tabs — the shortest section (Language) holds the same height as the
-   tallest (Appearance) instead of the modal resizing on tab switch.
-   Content owns the scroll so the header and rail stay pinned. */
+.pref-nav-item:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-focus);
+}
+
 .pref-content {
-  grid-row: 1;
   min-width: 0;
-  min-height: 18rem;
-  padding: var(--space-lg);
+  padding: var(--space-sm) var(--space-base) var(--space-base);
   overflow-y: auto;
 }
 
-.pref-section-label {
-  margin: 0 0 var(--space-md);
-  font: var(--type-eyebrow);
-  letter-spacing: var(--letter-eyebrow);
-  text-transform: uppercase;
-  color: var(--color-semantic-muted);
-}
-
-.pref-empty,
-.pref-section-note {
-  margin: 0 0 var(--space-md);
-  color: var(--color-semantic-muted);
-  font: var(--type-caption);
-  line-height: 1.5;
-}
-
-.pref-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  flex-wrap: wrap;
-  margin-top: var(--space-base);
-}
-
-.pref-save {
-  min-height: 2rem;
-  padding: 0 var(--space-base);
-  border-radius: var(--radius-sm);
-  background: var(--color-semantic-action);
-  color: var(--color-semantic-on-action);
-  font: var(--type-label-strong);
-}
-
-.pref-save:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.pref-error {
-  margin: 0;
-  color: var(--color-semantic-danger-text);
-  font-size: var(--text-xs);
-}
-
-/* ── Shared option rows (theme, language, agents) ─────────────────────────── */
-
 .pref-group-label {
-  margin: 0 0 var(--space-sm);
+  margin: 0 0 var(--space-xs);
   font: var(--type-eyebrow);
   letter-spacing: var(--letter-eyebrow);
   text-transform: uppercase;
@@ -202,47 +155,63 @@
 }
 
 .pref-group-label--spaced {
-  margin-top: var(--space-lg);
+  margin-top: var(--space-base);
 }
 
+/* Framed list — hairlines, not pillow cards */
 .pref-option-list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
+  gap: 0;
+  border: 1px solid var(--color-semantic-hairline);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
 }
 
-/* Badge · label stack · trailing control — one rhythm across all tabs. */
 .pref-option-row {
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: var(--space-base);
-  padding: var(--space-sm) var(--space-base);
-  border: 1px solid var(--color-semantic-hairline);
-  border-radius: var(--radius-md);
-  background: var(--color-semantic-canvas);
+  gap: var(--space-sm);
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  padding: var(--space-row-y) var(--space-sm);
+  border: 0;
+  border-bottom: 1px solid var(--color-semantic-hairline-soft);
+  border-radius: 0;
+  background: transparent;
+  white-space: normal;
   text-align: left;
+  justify-content: flex-start;
+  cursor: pointer;
   transition:
-    border-color var(--duration-fast) var(--ease-standard),
     background var(--duration-fast) var(--ease-standard),
     box-shadow var(--duration-fast) var(--ease-standard);
-  cursor: pointer;
+}
+
+.pref-option-row:last-child {
+  border-bottom: 0;
 }
 
 .pref-option-row:hover {
-  border-color: var(--color-semantic-muted-soft);
-  background: var(--color-semantic-surface-soft);
+  background: color-mix(in srgb, var(--color-semantic-ink) 5%, transparent);
 }
 
 .pref-option-row.selected {
-  border-color: var(--color-semantic-action);
-  background: color-mix(in srgb, var(--color-semantic-action) 5%, var(--color-semantic-canvas));
+  background: color-mix(in srgb, var(--color-semantic-action) 10%, transparent);
+  box-shadow: inset 2px 0 0 var(--color-semantic-action);
 }
 
 .pref-option-row:focus-visible {
   outline: none;
-  border-color: var(--color-semantic-action);
   box-shadow: var(--ring-focus);
+  z-index: 1;
+}
+
+.pref-option-row.selected:focus-visible {
+  box-shadow: inset 2px 0 0 var(--color-semantic-action), var(--ring-focus);
 }
 
 .pref-option-copy {
@@ -250,22 +219,23 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 .pref-option-label {
-  font: var(--type-label-strong);
+  font: var(--type-label);
   color: var(--color-semantic-ink);
 }
 
 .pref-option-sub {
-  font-size: var(--text-xs);
+  font: var(--type-micro-strong);
+  font-weight: 400;
   color: var(--color-semantic-muted);
-  line-height: 1.35;
+  line-height: 1.3;
 }
 
-.pref-option-row.selected .pref-option-sub {
-  color: color-mix(in srgb, var(--color-semantic-action) 65%, var(--color-semantic-muted));
+.pref-option-row.selected .pref-option-label {
+  font-weight: 600;
 }
 
 .pref-option-check {
@@ -279,10 +249,10 @@
 
 .pref-theme-swatch {
   flex-shrink: 0;
-  width: 2.75rem;
-  height: 1.75rem;
+  width: 2.25rem;
+  height: 1.375rem;
   border-radius: var(--radius-xs);
-  border: 1px solid color-mix(in srgb, var(--color-semantic-ink) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-semantic-ink) 12%, transparent);
   position: relative;
   overflow: hidden;
 }
@@ -293,7 +263,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  height: 3px;
+  height: 2px;
 }
 
 /* Swatches preview the light/dark canvas + action color regardless of the
@@ -335,16 +305,16 @@
 
 .pref-lang-badge {
   flex-shrink: 0;
-  width: 2.75rem;
-  height: 1.75rem;
+  width: 2.25rem;
+  height: 1.375rem;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-xs);
   border: 1px solid var(--color-semantic-hairline);
-  background: var(--color-semantic-surface-soft);
+  background: color-mix(in srgb, var(--color-semantic-ink) 6%, transparent);
   font-family: var(--font-mono);
-  font-size: var(--text-xs);
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: var(--letter-caps);
   color: var(--color-semantic-ink);
@@ -353,55 +323,39 @@
 @media (max-width: 820px) {
   .pref-modal {
     max-height: 92dvh;
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   }
 
   .pref-option-row {
     min-height: 44px;
   }
 
-  /* Rail collapses to a horizontal scroller above the content */
   .pref-body {
     grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
   .pref-nav {
-    grid-row: 1;
     flex-direction: row;
     gap: var(--space-xxs);
     overflow-x: auto;
-    padding: var(--space-sm);
+    padding: var(--space-xs);
     border-right: none;
     border-bottom: 1px solid var(--color-semantic-hairline-soft);
   }
 
-  .pref-content {
-    grid-row: 2;
-  }
-
   .pref-nav-item {
     flex: 0 0 auto;
+    width: auto;
   }
 
-  /* The 1fr content row already gives a consistent footprint on mobile,
-     so drop the desktop fixed min-height to avoid overflowing short
-     viewports. */
-  .pref-content {
-    min-height: 0;
-  }
-
-  /* Active cue moves to the bottom edge in the horizontal rail */
   .pref-nav-item.active::before {
-    left: var(--space-sm);
-    right: var(--space-sm);
+    left: var(--space-xs);
+    right: var(--space-xs);
     top: auto;
     bottom: 0;
     width: auto;
     height: 2px;
-    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
     transform: none;
   }
 }
-
-/* Login styles moved to styles/login.css (editorial split-pane surface). */

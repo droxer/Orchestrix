@@ -623,7 +623,123 @@
   color: var(--color-semantic-muted);
 }
 
-/* ── Streamlined forms (add employee / add node) ─────────────────── */
+/* ── Provision forms (add employee / add node) ────────────────────── */
+.adm-provision-form {
+  gap: var(--space-xl);
+}
+
+.adm-provision-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.adm-provision-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-base);
+  padding-bottom: var(--space-xxs);
+  border-bottom: 1px dotted var(--color-semantic-hairline);
+}
+
+.adm-provision-section-title {
+  margin: 0;
+  font: var(--type-micro-strong);
+  letter-spacing: var(--letter-eyebrow-wide);
+  text-transform: uppercase;
+  color: var(--color-semantic-muted);
+}
+
+.adm-provision-section-meta {
+  font: var(--type-micro-strong);
+  letter-spacing: var(--letter-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-semantic-muted-soft);
+}
+
+.adm-provision-preview {
+  display: flex;
+  align-items: center;
+  gap: var(--space-base);
+  padding: var(--space-base) var(--space-lg);
+  border: 1px dashed var(--color-semantic-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--color-semantic-canvas);
+  opacity: 0.72;
+  transition:
+    opacity var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    border-style var(--duration-fast) var(--ease-standard);
+}
+
+.adm-provision-preview.is-live {
+  opacity: 1;
+  border-style: solid;
+  border-left: 2px solid var(--color-semantic-action);
+}
+
+.adm-provision-preview-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.adm-provision-preview-handle {
+  font-size: var(--text-lg);
+  font-weight: 500;
+  color: var(--color-semantic-ink);
+  line-height: 1.1;
+  word-break: break-all;
+}
+
+.adm-provision-preview:not(.is-live) .adm-provision-preview-handle {
+  color: var(--color-semantic-muted);
+  font-weight: 400;
+}
+
+.adm-provision-preview-name {
+  font-size: var(--text-xs);
+  color: var(--color-semantic-muted);
+}
+
+.adm-provision-outcome {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  padding: var(--space-sm) var(--space-base);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-semantic-hairline-soft);
+  background: var(--color-semantic-surface-soft);
+  border-left: 2px solid var(--color-semantic-muted-soft);
+}
+
+.adm-provision-outcome.is-managed {
+  border-left-color: var(--color-semantic-action);
+  background: color-mix(in srgb, var(--color-semantic-action) 5%, var(--color-semantic-canvas));
+}
+
+.adm-provision-outcome.is-local {
+  border-left-color: var(--color-semantic-info);
+  background: color-mix(in srgb, var(--color-semantic-info) 6%, var(--color-semantic-canvas));
+}
+
+.adm-provision-outcome-label {
+  font: var(--type-micro-strong);
+  letter-spacing: var(--letter-eyebrow-wide);
+  text-transform: uppercase;
+  color: var(--color-semantic-ink);
+}
+
+.adm-provision-outcome-body {
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 1.55;
+  color: var(--color-semantic-muted);
+}
+
+/* Legacy alias — kept so older class references keep spacing. */
 .adm-form--streamlined {
   gap: var(--space-base);
 }
@@ -732,8 +848,8 @@
   flex-shrink: 0;
 }
 
-.adm-profile-segment-dot[data-kind="managed"] { background: var(--color-semantic-info); }
-.adm-profile-segment-dot[data-kind="local"] { background: var(--color-semantic-success); }
+.adm-profile-segment-dot[data-kind="managed"] { background: var(--color-semantic-action); }
+.adm-profile-segment-dot[data-kind="local"] { background: var(--color-semantic-info); }
 
 .adm-profile-field > .adm-form-hint {
   margin: 0;

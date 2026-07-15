@@ -1,11 +1,10 @@
 /* =====================================================================
-   Relay web — Graphite Steel: a cool charcoal canvas (#0b0d10) with a
-   restrained steel-blue (#5b87d6) as the single chromatic accent — a
-   calmer enterprise action color that replaces Signal Cyan's neon
-   telemetry flash while staying distinct from lavender-on-dark SaaS
-   accents. Dark is the default, primary theme; light is a derived
-   secondary theme on cool gray-white (#f7f8fa) with deepened steel
-   (#2f5fad).
+   Relay web — Sleek Forest: a warm near-black canvas (#141311) with a
+   restrained forest green (#4f9d6e) as the single chromatic accent —
+   quiet enough for ops chrome, distinct from blue/teal SaaS and from
+   lavender-on-dark defaults. Dark is the default, primary theme; light
+   is a derived secondary on warm off-white (#faf8f4) with deepened
+   forest (#2f7a50).
 
    Token architecture, four tiers, one file per tier under ./tokens/:
      1. primitives.css     — raw hex/px/rem values, light + dark registers.
@@ -17,19 +16,19 @@
      4. base.css           — html/body reset, focus contract, and the
         shared utility classes (.mono, .eyebrow, .tone-*).
 
-   Visual language: a cool charcoal canvas (#0b0d10) with a four-step
+   Visual language: a warm near-black canvas (#141311) with a four-step
    surface ladder carries the product chrome by default; a derived
-   light theme lifts the same language onto cool gray-white. Graphite
-   Steel (#5b87d6 dark / #2f5fad light) is the single chromatic ACTION
+   light theme lifts the same language onto warm off-white. Forest
+   Green (#4f9d6e dark / #2f7a50 light) is the single chromatic ACTION
    color — brand mark, primary CTA, focus ring, link emphasis — never
    used decoratively. Hairlines draw all structure instead of shadows.
    Status is the only other chroma in the system — success / danger /
    warning (green / amber / red) as dots, borders, and text, never
    fills or actions; "info" is a neutral slate.
-   One crisp grotesk (Geist) carries every text role — display, chrome,
-   and body alike — with weight and tight display tracking doing the
-   differentiating, never a family switch. Geist Mono is reserved for
-   code-like content: tool/command lines, raw logs, code blocks, and IDs.
+   Geist carries dense chrome and body roles; Instrument Serif is the
+   one deliberate family switch for hero headlines (login, empty
+   states). Geist Mono is reserved for code-like content: tool/command
+   lines, raw logs, code blocks, and IDs.
 
    Structure is Linear's operational discipline throughout: tight 5–6px
    control geometry, fast motion with no overshoot, dense row rhythm, and

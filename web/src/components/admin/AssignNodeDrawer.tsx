@@ -12,7 +12,7 @@ import type {
 import type { AddNodeDrawerSuccess } from "./AddNodeDrawer";
 import { Drawer } from "./Drawer";
 import { ExecutionProfileField, type DaemonSandboxMode } from "./ExecutionProfileField";
-import { statusTone, visualStatus } from "./helpers";
+import { initialsOf, statusTone, visualStatus } from "./helpers";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -30,14 +30,6 @@ interface AssignNodeDrawerProps {
   defaultEmployeeId?: string;
   onAssignSuccess: (result: AssignControlPanelDaemonNodeResponse) => void;
   onCreateNodeSuccess: (outcome: AddNodeDrawerSuccess) => void;
-}
-
-function initialsOf(value: string): string {
-  const trimmed = value.replace(/^@/, "").trim();
-  if (!trimmed) return "?";
-  const parts = trimmed.split(/[\s._-]+/).filter(Boolean);
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
 export function AssignNodeDrawer({
@@ -345,7 +337,7 @@ export function AssignNodeDrawer({
               ? creatingNode ? t("admin.creating") : t("admin.assigning")
               : creatingNode
                 ? t(isManaged ? "admin.v2.provision_node" : "admin.v2.generate_node")
-                : t("admin.assign")}
+                : t("admin.assign_node")}
           </Button>
         </div>
       </form>

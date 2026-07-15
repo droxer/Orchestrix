@@ -42,7 +42,6 @@ import {
   Pencil,
   Plus,
   Power,
-  Radio,
   RefreshCw,
   ScanEye,
   Search,
@@ -175,7 +174,6 @@ export const ActionToggle = withStandardStroke(Power, "ActionToggle");
 export const AdminNode = withStandardStroke(Server, "AdminNode");
 export const AdminManageAgents = withStandardStroke(Settings2, "AdminManageAgents");
 export const AdminDelete = withStandardStroke(Trash2, "AdminDelete");
-export const AdminLive = withStandardStroke(Radio, "AdminLive");
 export const AdminDashboard = withStandardStroke(LayoutDashboard, "AdminDashboard");
 export const AdminEmployees = withStandardStroke(Users, "AdminEmployees");
 export const AdminConnect = withStandardStroke(Link2, "AdminConnect");

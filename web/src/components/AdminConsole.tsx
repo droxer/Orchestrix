@@ -19,7 +19,6 @@ import type {
 } from "../types";
 import { AgentProfileDrawer } from "./admin/AgentProfileDrawer";
 import { AssignNodeDrawer } from "./admin/AssignNodeDrawer";
-import { AttentionRail } from "./admin/AttentionRail";
 import { BootstrapScreen, LoginScreen } from "./admin/AuthScreens";
 import { CredentialsDrawer } from "./admin/CredentialsDrawer";
 import { FleetView } from "./admin/FleetView";
@@ -425,7 +424,6 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
               )}
             </div>
           </div>
-          <AttentionRail nodes={nodes} />
         </div>
       </div>
 

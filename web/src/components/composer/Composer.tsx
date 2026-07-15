@@ -10,6 +10,7 @@ import { useComposer } from "../../hooks/useComposer";
 import { boundedMentionIndex, mentionOptionId, nextMentionIndex } from "../../lib/mentions";
 import { Button } from "../ui/button";
 
+
 export type ComposerHandle = {
   clear: () => void;
   closeMentions: () => void;
@@ -39,8 +40,10 @@ const ComposerView = forwardRef<ComposerHandle, {
   } = composer;
   const hasMentionOptions = mentionOpen && filteredMentionAgents.length > 0;
   const activeMentionIndex = boundedMentionIndex(mentionIndex, filteredMentionAgents.length);
-  const sendShortcut = useMemo(() => sendShortcutLabel(), []);
-  const sendShortcutHint = t("composer.send_shortcut", { shortcut: sendShortcut });
+  const sendShortcutTitle = useMemo(
+    () => t("composer.send_shortcut", { shortcut: sendShortcutLabel() }),
+    [t],
+  );
 
   useImperativeHandle(ref, () => ({
     clear: () => {
@@ -108,7 +111,6 @@ const ComposerView = forwardRef<ComposerHandle, {
             <div className="composer-footer-left">
               <ModeToggle mode={composerMode} setMode={setComposerMode} />
             </div>
-            <span className="composer-send-hint" aria-hidden="true">{sendShortcutHint}</span>
             <div className="composer-footer-right">
               {running ? (
                 <Button variant="ghost"
@@ -126,7 +128,7 @@ const ComposerView = forwardRef<ComposerHandle, {
                   className="send-button"
                   disabled={!composerText.trim()}
                   aria-label={t("composer.send")}
-                  title={sendShortcutHint}
+                  title={sendShortcutTitle}
                 >
                   <ActionSend size={16} />
                 </Button>

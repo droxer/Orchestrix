@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Run the Python backend: `make backend` (default port `8790`). Serves the control panel at `/cp` and the exported web UI at the root path `/`. Starts the background task scheduler by default (`RELAY_TASK_SCHEDULER_ENABLED=1`); tune with `RELAY_TASK_SCHEDULER_INTERVAL_SECONDS` and `RELAY_TASK_SCHEDULER_MAX_DISPATCHES`, set the routine due-date timezone with `RELAY_TASK_SCHEDULER_TIMEZONE` (IANA name; defaults to server-local), or disable with `RELAY_TASK_SCHEDULER_ENABLED=0`.
 - Run a daemon: `make daemon` (registers against `RELAY_BACKEND_URL`, polls for commands, and runs agent CLIs inside BoxLite by default; set `SANDBOX_MODE=none` for an employee-local/manual node that should detect and run the current user's host agent installations).
 - Run the TUI: `make run` (or `npm run run`). `local-run` starts the backend and a BoxLite-sandboxed daemon if they are not already running, then connects the TUI (`RELAY_BACKEND_URL`, default `http://127.0.0.1:8790`).
-- Run the web UI in dev mode (proxies API to the backend): `make web`.
+- Run the web UI in dev mode (proxies API to the backend): `make web` (serves on `http://127.0.0.1:5000`).
 - Run the read-only/API server: `make serve` (default port `8787`, override with `PORT=9000`).
 - Run database migrations: `make backend-migrate` (Alembic; pass `DATABASE_URL=<url>` to target a non-default database).
 - Rebuild + export the BoxLite devbox image: `make run-fresh`. Only needed when `dockerfile` changes.

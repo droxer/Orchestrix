@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { createControlPanelEmployee } from "../../api";
+import { initialsOf } from "../../lib/adminHelpers";
 import type {
   ControlPanelDaemonNodeRecord,
   CreateControlPanelEmployeeResponse,
@@ -51,6 +52,9 @@ export function AddEmployeeDrawer({
     || selectedNodeId,
   );
   const confirmDiscardChanges = useUnsavedChangesGuard(open && hasUnsavedChanges && !isBusy);
+
+  const handlePreview = employeeId.trim().replace(/^@/, "");
+  const namePreview = displayName.trim();
 
   useEffect(() => {
     if (!open) {
@@ -102,89 +106,132 @@ export function AddEmployeeDrawer({
     <Drawer
       open={open}
       onClose={() => { void requestClose(); }}
+      kicker={t("admin.v2.provision_kicker_employee")}
       title={t("admin.v2.add_employee_title")}
       subtitle={t("admin.v2.add_employee_sub")}
       closeLabel={t("admin.v2.close_drawer")}
       ariaLabel={t("admin.v2.add_employee_title")}
       bodyClassName="adm-drawer-body--column"
-      width={420}
+      width={460}
     >
-      <form className="adm-form adm-form--streamlined" onSubmit={(event) => void handleSubmit(event)} noValidate>
-        <label className="adm-field">
-          <span>
-            {t("admin.employee_id")}
-            <span className="adm-field-req" aria-hidden="true">*</span>
-          </span>
-          <Input
-            name="employee-id"
-            className="mono"
-            value={employeeId}
-            onChange={(event) => setEmployeeId(event.target.value)}
-            autoComplete="off"
-            spellCheck={false}
-            placeholder={t("admin.v2.placeholder_employee_id")}
-          />
-        </label>
+      <form className="adm-form adm-provision-form" onSubmit={(event) => void handleSubmit(event)} noValidate>
+        <section className="adm-provision-section" aria-labelledby="adm-emp-identity">
+          <header className="adm-provision-section-head">
+            <h3 id="adm-emp-identity" className="adm-provision-section-title">
+              {t("admin.v2.section_identity")}
+            </h3>
+          </header>
 
-        <label className="adm-field">
-          <span>{t("admin.display_name")}</span>
-          <Input
-            name="display-name"
-            value={displayName}
-            onChange={(event) => setDisplayName(event.target.value)}
-            autoComplete="off"
-            placeholder={t("admin.v2.placeholder_display_name")}
-          />
-        </label>
+          <div className={`adm-provision-preview ${handlePreview ? "is-live" : ""}`} aria-live="polite">
+            <span className="adm-assign-avatar" aria-hidden="true">
+              {handlePreview ? initialsOf(handlePreview) : "?"}
+            </span>
+            <div className="adm-provision-preview-text">
+              <span className="adm-provision-preview-handle mono">
+                {handlePreview ? `@${handlePreview}` : t("admin.v2.provision_preview_placeholder")}
+              </span>
+              <span className="adm-provision-preview-name">
+                {namePreview || t("admin.v2.provision_preview_name_hint")}
+              </span>
+            </div>
+          </div>
 
-        <label className="adm-field">
-          <span>{t("admin.email")}</span>
-          <Input
-            name="email"
-            className="mono"
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            autoComplete="email"
-            placeholder={t("admin.v2.placeholder_email")}
-          />
-        </label>
+          <label className="adm-field">
+            <span>
+              {t("admin.employee_id")}
+              <span className="adm-field-req" aria-hidden="true">*</span>
+            </span>
+            <Input
+              name="employee-id"
+              className="mono"
+              value={employeeId}
+              onChange={(event) => setEmployeeId(event.target.value)}
+              autoComplete="off"
+              spellCheck={false}
+              placeholder={t("admin.v2.placeholder_employee_id")}
+            />
+          </label>
 
-        <label className="adm-field">
-          <span>
-            {t("admin.username")}
-            <span className="adm-field-req" aria-hidden="true">*</span>
-          </span>
-          <Input
-            name="username"
-            className="mono"
-            value={username}
-            onChange={(event) => setUsername(event.target.value)}
-            autoComplete="username"
-            spellCheck={false}
-            placeholder={t("admin.v2.placeholder_username")}
-          />
-        </label>
+          <label className="adm-field">
+            <span>
+              {t("admin.display_name")}
+              <span className="adm-field-opt">{t("admin.v2.optional")}</span>
+            </span>
+            <Input
+              name="display-name"
+              value={displayName}
+              onChange={(event) => setDisplayName(event.target.value)}
+              autoComplete="off"
+              placeholder={t("admin.v2.placeholder_display_name")}
+            />
+          </label>
 
-        <label className="adm-field">
-          <span>
-            {t("admin.password")}
-            <span className="adm-field-req" aria-hidden="true">*</span>
-          </span>
-          <Input
-            name="password"
-            className="mono"
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            autoComplete="new-password"
-          />
-        </label>
+          <label className="adm-field">
+            <span>
+              {t("admin.email")}
+              <span className="adm-field-opt">{t("admin.v2.optional")}</span>
+            </span>
+            <Input
+              name="email"
+              className="mono"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              autoComplete="email"
+              placeholder={t("admin.v2.placeholder_email")}
+            />
+          </label>
+        </section>
 
-        <div className="adm-form-group">
-          <p className="adm-form-group-label">{t("admin.v2.section_assignment")}</p>
+        <section className="adm-provision-section" aria-labelledby="adm-emp-credentials">
+          <header className="adm-provision-section-head">
+            <h3 id="adm-emp-credentials" className="adm-provision-section-title">
+              {t("admin.v2.section_credentials")}
+            </h3>
+          </header>
+
+          <label className="adm-field">
+            <span>
+              {t("admin.username")}
+              <span className="adm-field-req" aria-hidden="true">*</span>
+            </span>
+            <Input
+              name="username"
+              className="mono"
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              autoComplete="username"
+              spellCheck={false}
+              placeholder={t("admin.v2.placeholder_username")}
+            />
+          </label>
+
+          <label className="adm-field">
+            <span>
+              {t("admin.password")}
+              <span className="adm-field-req" aria-hidden="true">*</span>
+            </span>
+            <Input
+              name="password"
+              className="mono"
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              autoComplete="new-password"
+            />
+          </label>
+        </section>
+
+        <section className="adm-provision-section" aria-labelledby="adm-emp-assignment">
+          <header className="adm-provision-section-head">
+            <h3 id="adm-emp-assignment" className="adm-provision-section-title">
+              {t("admin.v2.section_assignment")}
+            </h3>
+            <span className="adm-provision-section-meta">{t("admin.v2.optional")}</span>
+          </header>
+
           {unassignedNodes.length === 0 ? (
-            <p className="adm-form-hint">{t("admin.unassigned_hint")}</p>
+            <p className="adm-form-hint adm-form-hint--notice">{t("admin.unassigned_hint")}</p>
           ) : (
             <label className="adm-field">
               <span>{t("admin.assign_node")}</span>
@@ -205,7 +252,7 @@ export function AddEmployeeDrawer({
               </Select>
             </label>
           )}
-        </div>
+        </section>
 
         {error ? <div className="adm-form-error" role="alert">{error}</div> : null}
 
