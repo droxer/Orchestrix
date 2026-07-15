@@ -12,8 +12,14 @@ describe("Admin channel setup navigation", () => {
     assert.match(consoleSource, /ChatIntegrationsView/);
     assert.match(toggleSource, /nav_integrations/);
     const setupSource = await readFile(resolve("web/src/components/admin/ChatIntegrationsView.tsx"), "utf8");
+    const englishCopy = await readFile(resolve("web/src/i18n/locales/en/translation.json"), "utf8");
     assert.match(setupSource, /chat-public-base-url/);
     assert.match(setupSource, /chat-edit-public-base-url/);
     assert.match(setupSource, /updateChatIntegration/);
+    assert.match(setupSource, /value="discord" disabled/);
+    assert.match(setupSource, /chat_provider_coming_soon/);
+    assert.doesNotMatch(setupSource, /value="lark"/);
+    assert.match(englishCopy, /"sub_integrations": "Telegram · Discord coming soon\."/);
+    assert.doesNotMatch(englishCopy, /Lark/);
   });
 });

@@ -21,27 +21,9 @@ import {
 import type { ChatIntegration, ChatProvider } from "../../types";
 
 const CHAT_INTEGRATIONS_KEY = ["admin", "chat-integrations"] as const;
-const PROVIDERS: ChatProvider[] = ["discord", "telegram", "lark"];
-
-const credentialFields: Record<ChatProvider, Array<{ key: string; secret: boolean }>> = {
-  discord: [
-    { key: "applicationId", secret: false },
-    { key: "publicKey", secret: false },
-    { key: "botToken", secret: true },
-  ],
-  telegram: [
-    { key: "botToken", secret: true },
-  ],
-  lark: [
-    { key: "appId", secret: false },
-    { key: "appSecret", secret: true },
-    { key: "verificationToken", secret: true },
-    { key: "encryptKey", secret: true },
-  ],
-};
+const TELEGRAM_CREDENTIAL_FIELDS = [{ key: "botToken", secret: true }] as const;
 
 function providerLabel(provider: ChatProvider): string {
-  if (provider === "lark") return "Lark";
   return provider[0].toUpperCase() + provider.slice(1);
 }
 
@@ -83,8 +65,7 @@ function readiness(integration: ChatIntegration): Array<{ key: string; labelKey:
 export function ChatIntegrationsView() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const [provider, setProvider] = useState<ChatProvider>("discord");
-  const [displayName, setDisplayName] = useState("Engineering Discord");
+  const [displayName, setDisplayName] = useState("Telegram Bot");
   const [tenantId, setTenantId] = useState("");
   const [publicBaseUrl, setPublicBaseUrl] = useState(() => typeof window === "undefined" ? "" : window.location.origin);
   const [credentials, setCredentials] = useState<Record<string, string>>({});
@@ -106,7 +87,7 @@ export function ChatIntegrationsView() {
     queryFn: ({ signal }) => listControlPanelAgents(undefined, signal),
   });
 
-  const integrations = query.data ?? [];
+  const integrations = (query.data ?? []).filter((integration) => integration.provider === "telegram");
   const selected = useMemo(
     () => integrations.find((integration) => integration.id === selectedId) ?? integrations[0] ?? null,
     [integrations, selectedId],
@@ -116,7 +97,7 @@ export function ChatIntegrationsView() {
     if (!selected) return;
     setEditPublicBaseUrl(typeof selected.config.publicBaseUrl === "string" ? selected.config.publicBaseUrl : "");
     setEditCredentials(Object.fromEntries(
-      credentialFields[selected.provider]
+      TELEGRAM_CREDENTIAL_FIELDS
         .filter((field) => !field.secret)
         .map((field) => {
           const value = selected.config[field.key];
@@ -170,12 +151,12 @@ export function ChatIntegrationsView() {
       setError(t("admin.v2.chat_error_name_required"));
       return;
     }
-    const normalizedPublicBaseUrl = provider === "telegram" ? normalizePublicBaseUrl(publicBaseUrl.trim()) : undefined;
-    if (provider === "telegram" && !normalizedPublicBaseUrl) {
+    const normalizedPublicBaseUrl = normalizePublicBaseUrl(publicBaseUrl.trim());
+    if (!normalizedPublicBaseUrl) {
       setError(t("admin.v2.chat_error_public_url"));
       return;
     }
-    const fields = credentialFields[provider];
+    const fields = TELEGRAM_CREDENTIAL_FIELDS;
     const missing = fields.find((field) => !credentials[field.key]?.trim());
     if (missing) {
       setError(`${missing.key} is required.`);
@@ -188,7 +169,7 @@ export function ChatIntegrationsView() {
       fields.filter((field) => field.secret).map((field) => [field.key, credentials[field.key].trim()]),
     );
     await mutate("create", () => createChatIntegration({
-      provider,
+      provider: "telegram",
       displayName: displayName.trim(),
       tenantId: tenantId.trim() || undefined,
       secrets,
@@ -224,12 +205,12 @@ export function ChatIntegrationsView() {
 
   async function handleUpdateConnection() {
     if (!selected) return;
-    const normalizedPublicBaseUrl = selected.provider === "telegram" ? normalizePublicBaseUrl(editPublicBaseUrl.trim()) : undefined;
-    if (selected.provider === "telegram" && !normalizedPublicBaseUrl) {
+    const normalizedPublicBaseUrl = normalizePublicBaseUrl(editPublicBaseUrl.trim());
+    if (!normalizedPublicBaseUrl) {
       setError(t("admin.v2.chat_error_public_url"));
       return;
     }
-    const fields = credentialFields[selected.provider];
+    const fields = TELEGRAM_CREDENTIAL_FIELDS;
     const missingPublicField = fields.find((field) => !field.secret && !editCredentials[field.key]?.trim());
     if (missingPublicField) {
       setError(`${missingPublicField.key} is required.`);
@@ -276,33 +257,32 @@ export function ChatIntegrationsView() {
           <div className="adm-chat-form">
             <label>
               <span>{t("admin.v2.chat_provider")}</span>
-              <select name="chat-provider" value={provider} onChange={(event) => { setProvider(event.target.value as ChatProvider); setCredentials({}); }}>
-                {PROVIDERS.map((item) => <option key={item} value={item}>{providerLabel(item)}</option>)}
+              <select name="chat-provider" defaultValue="telegram">
+                <option value="telegram">Telegram</option>
+                <option value="discord" disabled>{t("admin.v2.chat_provider_coming_soon", { provider: "Discord" })}</option>
               </select>
             </label>
             <label>
               <span>{t("admin.v2.chat_display_name")}</span>
-              <input name="chat-display-name" autoComplete="organization" value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Engineering Discord…" />
+              <input name="chat-display-name" autoComplete="organization" value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Telegram Bot…" />
             </label>
             <label>
               <span>{t("admin.v2.chat_tenant")}</span>
-              <input name="chat-tenant-id" autoComplete="off" spellCheck={false} value={tenantId} onChange={(event) => setTenantId(event.target.value)} placeholder={`${provider === "telegram" ? t("admin.v2.optional") : t("admin.v2.chat_tenant")}…`} />
+              <input name="chat-tenant-id" autoComplete="off" spellCheck={false} value={tenantId} onChange={(event) => setTenantId(event.target.value)} placeholder={`${t("admin.v2.optional")}…`} />
             </label>
-            {provider === "telegram" ? (
-              <label>
-                <span>{t("admin.v2.chat_public_url")}</span>
-                <input
-                  name="chat-public-base-url"
-                  autoComplete="url"
-                  spellCheck={false}
-                  value={publicBaseUrl}
-                  onChange={(event) => setPublicBaseUrl(event.target.value)}
-                  placeholder="https://relay.example.com"
-                />
-                <small>{t("admin.v2.chat_public_url_help")}</small>
-              </label>
-            ) : null}
-            {credentialFields[provider].map((field) => (
+            <label>
+              <span>{t("admin.v2.chat_public_url")}</span>
+              <input
+                name="chat-public-base-url"
+                autoComplete="url"
+                spellCheck={false}
+                value={publicBaseUrl}
+                onChange={(event) => setPublicBaseUrl(event.target.value)}
+                placeholder="https://relay.example.com"
+              />
+              <small>{t("admin.v2.chat_public_url_help")}</small>
+            </label>
+            {TELEGRAM_CREDENTIAL_FIELDS.map((field) => (
               <label key={field.key}>
                 <span>{field.key}</span>
                 <input
@@ -316,7 +296,7 @@ export function ChatIntegrationsView() {
                 />
               </label>
             ))}
-            {provider === "telegram" ? <small>{t("admin.v2.chat_telegram_secret_generated")}</small> : null}
+            <small>{t("admin.v2.chat_telegram_secret_generated")}</small>
             <Button type="button" onClick={() => void handleCreate()} disabled={busy !== null}>
               <AdminConnect size={16} aria-hidden="true" />
               <span>{t("admin.v2.chat_create")}</span>
@@ -396,7 +376,7 @@ export function ChatIntegrationsView() {
                     />
                   </label>
                 ) : null}
-                {credentialFields[selected.provider].map((field) => (
+                {TELEGRAM_CREDENTIAL_FIELDS.map((field) => (
                   <label key={field.key}>
                     <span>{field.key}</span>
                     <input
