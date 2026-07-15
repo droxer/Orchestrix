@@ -1022,7 +1022,7 @@
 .adm-copy-pill.copied {
   background: var(--color-semantic-canvas);
   border-color: var(--border-success);
-  color: var(--color-semantic-success);
+  color: var(--color-semantic-success-text);
 }
 
 .adm-cred-note {

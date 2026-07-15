@@ -546,6 +546,53 @@ describe("agent stream rendering", () => {
     assert.equal((output.match(/Hi from Pi JSON\./g) ?? []).length, 1);
   });
 
+  it("does not replay Pi text_end content after streaming deltas", () => {
+    const renderer = new PiStreamRenderer();
+    const output = [
+      { type: "turn_start" },
+      { type: "message_start", message: { role: "assistant", content: [] } },
+      {
+        type: "message_update",
+        message: { role: "assistant", content: [] },
+        assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "Hi from Pi JSON." },
+      },
+      {
+        type: "message_update",
+        message: { role: "assistant", content: [{ type: "text", text: "Hi from Pi JSON." }] },
+        assistantMessageEvent: { type: "text_end", contentIndex: 0, content: "Hi from Pi JSON." },
+      },
+      {
+        type: "message_end",
+        message: { role: "assistant", content: [{ type: "text", text: "Hi from Pi JSON." }], stopReason: "stop" },
+      },
+      {
+        type: "turn_end",
+        message: { role: "assistant", content: [{ type: "text", text: "Hi from Pi JSON." }], stopReason: "stop" },
+      },
+    ].map((event) => renderer.feed(`${JSON.stringify(event)}\n`)).join("");
+
+    assert.equal((output.match(/Hi from Pi JSON\./g) ?? []).length, 1);
+  });
+
+  it("renders Pi text_end content when no deltas streamed", () => {
+    const renderer = new PiStreamRenderer();
+    const output = [
+      { type: "turn_start" },
+      { type: "message_start", message: { role: "assistant", content: [] } },
+      {
+        type: "message_update",
+        message: { role: "assistant", content: [{ type: "text", text: "Hi from Pi JSON." }] },
+        assistantMessageEvent: { type: "text_end", contentIndex: 0, content: "Hi from Pi JSON." },
+      },
+      {
+        type: "message_end",
+        message: { role: "assistant", content: [{ type: "text", text: "Hi from Pi JSON." }], stopReason: "stop" },
+      },
+    ].map((event) => renderer.feed(`${JSON.stringify(event)}\n`)).join("");
+
+    assert.equal((output.match(/Hi from Pi JSON\./g) ?? []).length, 1);
+  });
+
   it("ignores Pi JSON empty assistant lifecycle events", () => {
     const output = formatPiJsonLine(JSON.stringify({
       type: "message_end",

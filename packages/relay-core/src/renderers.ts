@@ -111,6 +111,19 @@ export class PiStreamRenderer {
       return this.text.feed(sanitizeUntrustedText(delta));
     }
 
+    // text_end repeats the streamed deltas' full content; render it only when
+    // no deltas were seen (non-streaming responses), never as a replay.
+    const endedText = piAssistantEndedText(event);
+    if (endedText.trim()) {
+      if (this.sawAssistantTextInTurn) return "";
+      this.sawAssistantTextInTurn = true;
+      this.text.resetBlock();
+      return this.text.feed(`${sanitizeUntrustedText(endedText.trim())}\n`);
+    }
+    // Remaining message_update subtypes (thinking, tool calls) carry the
+    // accumulated message; extracting text from them would duplicate output.
+    if (event.type === "message_update") return "";
+
     const text = piAssistantText(event);
     if (text.trim()) {
       if (this.sawAssistantTextInTurn && isPiAssistantTerminalEvent(event)) return "";
@@ -390,6 +403,15 @@ function piAssistantText(event: Record<string, unknown>): string {
   if (event.type !== "message" && event.type !== "assistant_message" && message.role !== "assistant") return "";
   if (message.role && message.role !== "assistant") return "";
   return textFromContentRecord(message);
+}
+
+function piAssistantEndedText(event: Record<string, unknown>): string {
+  if (event.type !== "message_update") return "";
+  const message = asRecord(event.message);
+  if (message.role !== "assistant") return "";
+  const assistantEvent = asRecord(event.assistantMessageEvent);
+  if (assistantEvent.type !== "text_end") return "";
+  return typeof assistantEvent.content === "string" ? assistantEvent.content : "";
 }
 
 function piAssistantTextDelta(event: Record<string, unknown>): string {

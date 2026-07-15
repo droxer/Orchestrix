@@ -352,7 +352,7 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
                 aria-hidden="true"
               />
               {headerError ? (
-                <span className="adm-command-status-text text-danger">
+                <span className="adm-command-status-text text-danger-strong">
                   {t("admin.fetch_error", { message: headerError })}
                 </span>
               ) : lastUpdatedStr ? (

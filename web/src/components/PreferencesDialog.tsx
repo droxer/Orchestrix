@@ -37,7 +37,7 @@ export function PreferencesDialog({ open, onClose, preferences }: PreferencesDia
       >
         <header className="pref-header">
           <div className="pref-header-text">
-            <h3 id="pref-dialog-title">{t("pref.title")}</h3>
+            <h2 id="pref-dialog-title">{t("pref.title")}</h2>
             <span id="pref-dialog-sub" className="pref-header-sub">
               {t("pref.sub")}
             </span>

@@ -50,6 +50,12 @@
   --color-danger: var(--color-semantic-danger);
   --color-warning: var(--color-semantic-warning);
   --color-info: var(--color-semantic-info);
+  /* Tone colors as TEXT need the deepened “-text” variants — the raw dot
+     colors fall below 4.5:1 on the light canvas. text-success-strong /
+     text-danger-strong / text-warning-strong are the AA-safe utilities. */
+  --color-success-strong: var(--color-semantic-success-text);
+  --color-danger-strong: var(--color-semantic-danger-text);
+  --color-warning-strong: var(--color-semantic-warning-text);
   --color-brand-soft: var(--color-semantic-action-soft);
 
   /* Radii — one scale for component CSS and Tailwind utilities

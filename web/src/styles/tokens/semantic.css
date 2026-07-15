@@ -71,6 +71,7 @@
      status reads as a word or a numeral, not a dot. */
   --color-semantic-warning-text: var(--color-yellow-deep);
   --color-semantic-danger-text: var(--color-red-deep);
+  --color-semantic-success-text: var(--color-green-deep);
 
   /* Overlay scrim — behind modal drawers/dialogs. One token so every
      floating surface dims the canvas identically. Deepened by default so
@@ -107,12 +108,17 @@
 
   /* Focus ring — single token, used by every interactive surface so the
      focus treatment never drifts between buttons, inputs, and rows.
-     3px action-alpha halo with no inner solid keeps WCAG contrast
-     without overpowering the brand color. */
-  --ring-focus: 0 0 0 3px color-mix(in srgb, var(--color-semantic-action) 28%, transparent);
+     The 2px solid inner ring is the WCAG 1.4.11 indicator (≥3:1 against
+     both canvases — a pure alpha halo was ~1.5:1 and invisible to
+     low-vision users); the wider 22% halo keeps the soft brand glow. */
+  --ring-focus:
+    0 0 0 2px var(--color-semantic-action),
+    0 0 0 5px color-mix(in srgb, var(--color-semantic-action) 22%, transparent);
   /* Danger counterpart — destructive controls (cancel-send, delete rows)
-     swap the brand halo for the status red at the same 3px/28% recipe. */
-  --ring-focus-danger: 0 0 0 3px color-mix(in srgb, var(--color-semantic-danger) 28%, transparent);
+     swap the brand ring for the status red at the same solid+halo recipe. */
+  --ring-focus-danger:
+    0 0 0 2px var(--color-semantic-danger),
+    0 0 0 5px color-mix(in srgb, var(--color-semantic-danger) 22%, transparent);
 
   /* Semantic typography. Geist (grotesk) carries every dense chrome role —
      titles, labels, body alike — so weight is what separates emphasis
@@ -131,6 +137,10 @@
   --type-title-sm:   600 16px/1.3  var(--font-sans);
   --type-body-md:    400 17px/1.5  var(--font-sans);
   --type-body-sm:    400 14px/1.5  var(--font-sans);
+  /* Composer entry text — one step above the 14px transcript body so typing
+     feels focal without the 17px→14px shrink on send; coarse pointers bump
+     to 16px in composer.css to keep iOS from zooming the field on focus. */
+  --type-body-input: 400 15px/1.5  var(--font-sans);
   --type-caption:    400 14px/1.5  var(--font-sans);
   --type-caption-strong: 600 13px/1.5 var(--font-sans);
   --type-button:     600 14px/1.15 var(--font-sans);
@@ -154,6 +164,7 @@ html:lang(zh-CN),
 html:lang(zh-TW) {
   --type-body-md:     400 17px/1.7 var(--font-sans);
   --type-body-sm:     400 14px/1.7 var(--font-sans);
+  --type-body-input:  400 15px/1.7 var(--font-sans);
   --type-caption:     400 14px/1.65 var(--font-sans);
 }
 

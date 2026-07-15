@@ -23,6 +23,19 @@ html[data-theme="light"] {
 
 * { box-sizing: border-box; }
 
+/* Root type size: 87.5% of the user's browser default (14px at the stock
+   16px), so raising the browser font-size preference scales every rem token
+   in the type scale (WCAG 1.4.4). Never pin this to a px value — that
+   silently discards the user's setting. body inherits this size; do not
+   re-declare font-size on html below (on the root element 1rem resolves to
+   the browser default, which would undo the 87.5%). */
+html {
+  font-size: 87.5%;
+}
+
+/* overflow-x: hidden is a last-resort clip, not a layout tool — it hides
+   horizontal overflow instead of surfacing it, so reflow regressions must be
+   caught by testing at the 320px floor (WCAG 1.4.10), not papered over here. */
 html,
 body {
   min-width: 320px;
@@ -32,7 +45,6 @@ body {
   background: var(--color-semantic-canvas);
   color: var(--color-semantic-body);
   font-family: var(--font-sans);
-  font-size: var(--text-base);
   line-height: 1.5;
 }
 

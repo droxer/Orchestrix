@@ -641,7 +641,7 @@
 .backlog-row-actions .backlog-action-done:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--color-semantic-success) 45%, var(--color-semantic-hairline));
   background: color-mix(in srgb, var(--color-semantic-success) 10%, var(--color-semantic-canvas));
-  color: var(--color-semantic-success);
+  color: var(--color-semantic-success-text);
 }
 
 .backlog-task-actions .backlog-action-block:hover:not(:disabled),

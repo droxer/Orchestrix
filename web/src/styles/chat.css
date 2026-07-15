@@ -675,7 +675,7 @@
 }
 
 .msg-turn-action.is-copied {
-  color: var(--color-semantic-success);
+  color: var(--color-semantic-success-text);
   border-color: color-mix(in srgb, var(--color-semantic-success) 28%, var(--color-semantic-hairline));
 }
 

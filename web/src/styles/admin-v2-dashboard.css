@@ -103,7 +103,7 @@
   letter-spacing: var(--letter-open);
 }
 
-.adm-dash-delta.tone-up { color: var(--color-semantic-success); }
+.adm-dash-delta.tone-up { color: var(--color-semantic-success-text); }
 .adm-dash-delta.tone-down { color: var(--color-semantic-danger-text); }
 .adm-dash-delta.tone-flat { color: var(--color-semantic-muted); }
 
@@ -400,7 +400,7 @@
   background: currentColor;
 }
 
-.adm-dash-stat.tone-good { color: var(--color-semantic-success); }
+.adm-dash-stat.tone-good { color: var(--color-semantic-success-text); }
 .adm-dash-stat.tone-info { color: var(--color-semantic-info); }
 .adm-dash-stat.tone-bad  { color: var(--color-semantic-danger-text); }
 .adm-dash-stat.tone-muted { color: var(--color-semantic-muted); }
@@ -527,8 +527,8 @@
   z-index: 1;
 }
 
-.adm-dash-feed-icon.tone-good { color: var(--color-semantic-success); }
-.adm-dash-feed-icon.tone-bad  { color: var(--color-semantic-danger); }
+.adm-dash-feed-icon.tone-good { color: var(--color-semantic-success-text); }
+.adm-dash-feed-icon.tone-bad  { color: var(--color-semantic-danger-text); }
 .adm-dash-feed-icon.tone-info { color: var(--color-semantic-info); }
 .adm-dash-feed-icon.tone-muted { color: var(--color-semantic-muted); }
 

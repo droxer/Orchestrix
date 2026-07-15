@@ -406,10 +406,10 @@
   flex-shrink: 0;
 }
 
-.agent-status-good    { color: var(--color-semantic-success); }
-.agent-status-good    > svg { color: var(--color-semantic-success); }
+.agent-status-good    { color: var(--color-semantic-success-text); }
+.agent-status-good    > svg { color: var(--color-semantic-success-text); }
 .agent-status-bad { color: var(--color-semantic-danger-text); }
-.agent-status-bad > svg { color: var(--color-semantic-danger); }
+.agent-status-bad > svg { color: var(--color-semantic-danger-text); }
 .agent-status-warn  { color: var(--color-semantic-muted); }
 .agent-status-warn  > svg { color: var(--color-semantic-warning-text); }
 .agent-status-info  { color: var(--color-semantic-body); }

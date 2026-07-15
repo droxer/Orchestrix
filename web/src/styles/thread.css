@@ -245,7 +245,7 @@
 }
 
 .conversation-remove-btn:hover {
-  color: var(--color-semantic-danger);
+  color: var(--color-semantic-danger-text);
   background: color-mix(in srgb, var(--color-semantic-ink) 8%, transparent);
 }
 
@@ -400,7 +400,7 @@
 }
 
 .icon-button--tinted.danger:hover {
-  color: var(--color-semantic-danger);
+  color: var(--color-semantic-danger-text);
   background: color-mix(in srgb, var(--color-semantic-danger) 10%, transparent);
 }
 

@@ -237,7 +237,7 @@
   background: var(--color-semantic-canvas);
 }
 
-.workspace-pane-head h3 {
+.workspace-pane-head h2 {
   margin: 0;
   min-width: 0;
   overflow: hidden;
@@ -322,7 +322,7 @@
   padding: 0 var(--space-base);
 }
 
-.workspace-activity-head h3 {
+.workspace-activity-head h2 {
   margin: 0;
   color: var(--color-semantic-ink);
   font: var(--type-label-strong);
@@ -428,10 +428,10 @@
   font: var(--type-caption-strong);
 }
 
-.workspace-status-pill.tone-good { color: var(--color-semantic-success); background: color-mix(in srgb, var(--color-semantic-success) 12%, transparent); }
+.workspace-status-pill.tone-good { color: var(--color-semantic-success-text); background: color-mix(in srgb, var(--color-semantic-success) 12%, transparent); }
 .workspace-status-pill.tone-info { color: var(--color-accent); background: color-mix(in srgb, var(--color-accent) 12%, transparent); }
 .workspace-status-pill.tone-warn { color: var(--color-semantic-warning-text); background: color-mix(in srgb, var(--color-semantic-warning) 12%, transparent); }
-.workspace-status-pill.tone-bad { color: var(--color-semantic-danger); background: color-mix(in srgb, var(--color-semantic-danger) 12%, transparent); }
+.workspace-status-pill.tone-bad { color: var(--color-semantic-danger-text); background: color-mix(in srgb, var(--color-semantic-danger) 12%, transparent); }
 .workspace-status-pill.tone-neutral { color: var(--color-semantic-muted); background: color-mix(in srgb, var(--color-semantic-muted) 10%, transparent); }
 
 /* ---- browse pane: files + snapshot banner --------------------------- */
@@ -965,7 +965,7 @@
   gap: var(--space-sm);
 }
 
-.workspace-dossier-instructions-head h3 {
+.workspace-dossier-instructions-head h2 {
   margin: 0;
   color: var(--color-semantic-ink);
   font: var(--type-label-strong);

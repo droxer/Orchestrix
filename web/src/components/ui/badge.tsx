@@ -14,7 +14,7 @@ const badgeVariants = cva(
         secondary:
           "border-transparent bg-secondary text-secondary-foreground [a]:hover:bg-secondary/90",
         destructive:
-          "border-destructive/30 bg-background text-destructive [a]:hover:border-destructive",
+          "border-destructive/30 bg-background text-danger-strong [a]:hover:border-destructive",
         outline:
           "text-foreground [a]:hover:bg-accent [a]:hover:text-accent-foreground",
         // Status tones — carry a leading dot so they read as live status
@@ -22,13 +22,13 @@ const badgeVariants = cva(
         neutral:
           "border-hairline bg-surface-strong text-ink before:content-[''] before:size-1.5 before:rounded-full before:bg-muted-soft",
         success:
-          "border-success/35 bg-background text-success before:content-[''] before:size-1.5 before:rounded-full before:bg-success",
+          "border-success/35 bg-background text-success-strong before:content-[''] before:size-1.5 before:rounded-full before:bg-success",
         info:
           "border-info/30 bg-background text-info before:content-[''] before:size-1.5 before:rounded-full before:bg-info",
         warning:
           "border-hairline bg-background text-muted-foreground before:content-[''] before:size-1.5 before:rounded-full before:bg-warning",
         danger:
-          "border-danger/35 bg-background text-destructive before:content-[''] before:size-1.5 before:rounded-full before:bg-danger",
+          "border-danger/35 bg-background text-danger-strong before:content-[''] before:size-1.5 before:rounded-full before:bg-danger",
       },
     },
     defaultVariants: {

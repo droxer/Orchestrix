@@ -113,7 +113,7 @@
     padding: var(--space-base);
   }
 
-  .pref-header-text h3 {
+  .pref-header-text h2 {
     font: var(--type-title-md);
   }
 

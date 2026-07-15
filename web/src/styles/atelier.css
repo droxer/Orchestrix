@@ -254,7 +254,9 @@ html[data-theme="dark"] .rail-node { background: var(--color-semantic-surface-ra
 .backlog-lane,
 .backlog-task,
 .workspace-pane,
-.workspace-profile-panel {
+.workspace-profile-panel,
+.adm-chat-panel,
+.adm-chat-stage {
   border: 1px solid var(--color-semantic-hairline);
   border-radius: var(--radius-lg);
   background: var(--color-semantic-surface-raised);

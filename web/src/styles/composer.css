@@ -207,8 +207,12 @@
   background: transparent;
   padding: 16px var(--composer-inline) 6px;
   color: var(--color-semantic-ink);
-  font-size: var(--text-md);
-  line-height: 1.5;
+  font: var(--type-body-input);
+}
+
+/* iOS zooms any focused field under 16px; coarse pointers get the bump. */
+@media (pointer: coarse) {
+  .composer-input textarea { font-size: 16px; }
 }
 
 .composer-input textarea:focus-visible {
@@ -297,6 +301,13 @@
   box-shadow: var(--ring-focus-danger);
 }
 
+/* Send↔stop glyph swap — same fade the mode chip's icon gets, so the
+   composer's most important state change doesn't snap. */
+.send-button-icon {
+  display: inline-flex;
+  animation: mode-chip-icon-in var(--duration-fast) var(--ease-standard);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .send-button {
     transition: background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
@@ -305,4 +316,6 @@
   .send-button:active:not(:disabled) {
     transform: none;
   }
+
+  .send-button-icon { animation: none; }
 }

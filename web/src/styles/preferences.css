@@ -47,7 +47,7 @@
   gap: 2px;
 }
 
-.pref-header-text h3 {
+.pref-header-text h2 {
   margin: 0;
   font: var(--type-title-sm);
   color: var(--color-semantic-ink);
@@ -314,7 +314,7 @@
   border: 1px solid var(--color-semantic-hairline);
   background: color-mix(in srgb, var(--color-semantic-ink) 6%, transparent);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--text-micro);
   font-weight: 600;
   letter-spacing: var(--letter-caps);
   color: var(--color-semantic-ink);

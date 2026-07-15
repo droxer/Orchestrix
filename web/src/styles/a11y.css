@@ -4,7 +4,7 @@
 
 /* Headings: prefer balanced line breaks to prevent widows */
 .conversation-heading h1,
-.pref-header-text h3,
+.pref-header-text h2,
 .login-headline,
 .adm-empty-title,
 .adm-auth-title {

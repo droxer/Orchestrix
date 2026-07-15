@@ -55,7 +55,7 @@
 .dialog-danger-icon {
   flex-shrink: 0;
   margin-top: 2px;
-  color: var(--color-semantic-danger);
+  color: var(--color-semantic-danger-text);
 }
 
 .dialog-title {

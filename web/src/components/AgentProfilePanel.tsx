@@ -256,7 +256,7 @@ export function AgentProfilePanel({
             ) : (
               <>
                 <div className="workspace-dossier-instructions-head">
-                  <h3 id="workspace-dossier-name-title">{t("admin.v2.agent_name")}</h3>
+                  <h2 id="workspace-dossier-name-title">{t("admin.v2.agent_name")}</h2>
                   {!renaming ? (
                     <DossierIconButton
                       onClick={startRename}
@@ -312,7 +312,7 @@ export function AgentProfilePanel({
 
         <section className="workspace-dossier-instructions" aria-labelledby="workspace-dossier-instructions-title">
           <div className="workspace-dossier-instructions-head">
-            <h3 id="workspace-dossier-instructions-title">{t("agents_page.instructions_label")}</h3>
+            <h2 id="workspace-dossier-instructions-title">{t("agents_page.instructions_label")}</h2>
             {canEditProfile && !editingInstructions ? (
               <DossierIconButton
                 onClick={startEditInstructions}

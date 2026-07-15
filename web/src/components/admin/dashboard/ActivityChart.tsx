@@ -81,7 +81,7 @@ export function ActivityChart({ daily, ready, className }: ActivityChartProps) {
     <section className={`adm-dash-card adm-dash-card--chart${className ? ` ${className}` : ""}`}>
       <header className="adm-dash-card-head">
         <div className="adm-dash-card-eyebrow">{t("admin.v2.dash_sessions_eyebrow")}</div>
-        <h3 className="adm-dash-card-title">{t("admin.v2.dash_sessions_title")}</h3>
+        <h2 className="adm-dash-card-title">{t("admin.v2.dash_sessions_title")}</h2>
       </header>
       <svg
         className="adm-dash-chart"

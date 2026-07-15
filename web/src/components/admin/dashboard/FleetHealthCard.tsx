@@ -45,7 +45,7 @@ export function FleetHealthCard({ nodes, className }: FleetHealthCardProps) {
     <section className={`adm-dash-card${className ? ` ${className}` : ""}`}>
       <header className="adm-dash-card-head">
         <div className="adm-dash-card-eyebrow">{t("admin.v2.dash_health_eyebrow")}</div>
-        <h3 className="adm-dash-card-title">{t("admin.v2.dash_health_title")}</h3>
+        <h2 className="adm-dash-card-title">{t("admin.v2.dash_health_title")}</h2>
       </header>
 
       <div

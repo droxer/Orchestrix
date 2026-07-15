@@ -27,7 +27,7 @@ export function ActivityFeed({ items, employees, className }: ActivityFeedProps)
     <section className={`adm-dash-card adm-dash-card--feed${className ? ` ${className}` : ""}`}>
       <header className="adm-dash-card-head">
         <div className="adm-dash-card-eyebrow">{t("admin.v2.dash_feed_eyebrow")}</div>
-        <h3 className="adm-dash-card-title">{t("admin.v2.dash_feed_title")}</h3>
+        <h2 className="adm-dash-card-title">{t("admin.v2.dash_feed_title")}</h2>
       </header>
       {items.length === 0 ? (
         <p className="adm-dash-card-hint">{t("admin.v2.dash_feed_empty")}</p>

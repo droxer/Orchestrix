@@ -125,7 +125,7 @@ function PaneHeader({
 }) {
   return (
     <header className="workspace-pane-head">
-      <h3>{title}</h3>
+      <h2>{title}</h2>
       {count !== undefined ? <span className="mono">{count}</span> : null}
       {meta ?? null}
       {actions ? <div className="workspace-pane-head-actions">{actions}</div> : null}
@@ -707,7 +707,7 @@ function ActivitySection({ title, count, index = 0, children }: { title: string;
   return (
     <section className="workspace-activity-section" style={{ animationDelay: `${40 + index * 80}ms` }}>
       <header className="workspace-activity-head">
-        <h3>{title}</h3>
+        <h2>{title}</h2>
         <span className="mono">{count}</span>
       </header>
       {children}

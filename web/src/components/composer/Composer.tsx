@@ -8,7 +8,6 @@ import { ModeToggle } from "./ModeToggle";
 import { MentionPopover } from "./MentionPopover";
 import { useComposer } from "../../hooks/useComposer";
 import { boundedMentionIndex, mentionOptionId, nextMentionIndex } from "../../lib/mentions";
-import { Button } from "../ui/button";
 
 
 export type ComposerHandle = {
@@ -56,7 +55,7 @@ const ComposerView = forwardRef<ComposerHandle, {
   }), [composerText, setComposerText, setMentionOpen, textareaRef]);
 
   return (
-    <form className="composer" onSubmit={(e) => { e.preventDefault(); onSend(); }}>
+    <form className="composer" onSubmit={(e) => { e.preventDefault(); if (!running) onSend(); }}>
       <div className="composer-input-wrap" data-running={running || undefined}>
         {hasMentionOptions ? (
           <MentionPopover
@@ -103,7 +102,7 @@ const ComposerView = forwardRef<ComposerHandle, {
                 setComposerMode((m) => (m === "action" ? "ask" : "action"));
                 return;
               }
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); onSend(); }
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); if (!running) onSend(); }
             }}
             rows={1}
           />
@@ -112,27 +111,20 @@ const ComposerView = forwardRef<ComposerHandle, {
               <ModeToggle mode={composerMode} setMode={setComposerMode} />
             </div>
             <div className="composer-footer-right">
-              {running ? (
-                <Button variant="ghost"
-                  type="button"
-                  className="send-button send-button-cancel"
-                  onClick={onCancelRun}
-                  aria-label={t("composer.cancel_run")}
-                  title={t("composer.cancel_run")}
-                >
-                  <ActionStop size={16} />
-                </Button>
-              ) : (
-                <Button variant="ghost"
-                  type="submit"
-                  className="send-button"
-                  disabled={!composerText.trim()}
-                  aria-label={t("composer.send")}
-                  title={sendShortcutTitle}
-                >
-                  <ActionSend size={16} />
-                </Button>
-              )}
+              {/* One mounted element for send↔stop so keyboard focus survives
+                  the run starting; the glyph cross-fades instead. */}
+              <button
+                type={running ? "button" : "submit"}
+                className={running ? "send-button send-button-cancel" : "send-button"}
+                disabled={!running && !composerText.trim()}
+                onClick={running ? onCancelRun : undefined}
+                aria-label={running ? t("composer.cancel_run") : t("composer.send")}
+                title={running ? t("composer.cancel_run") : sendShortcutTitle}
+              >
+                <span className="send-button-icon" key={running ? "stop" : "send"}>
+                  {running ? <ActionStop size={16} /> : <ActionSend size={16} />}
+                </span>
+              </button>
             </div>
           </div>
         </div>
