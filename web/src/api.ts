@@ -474,9 +474,30 @@ export function checkChatIntegration(integrationId: string): Promise<{ integrati
   );
 }
 
-export function activateChatIntegration(integrationId: string): Promise<{ integration: ChatIntegration }> {
+export function updateChatIntegration(
+  integrationId: string,
+  input: { displayName?: string; tenantId?: string; secrets?: Record<string, string>; config?: Record<string, string | number | boolean> },
+): Promise<{ integration: ChatIntegration }> {
   return apiJson<{ integration: ChatIntegration }>(
+    `/cp/chat-integrations/${encodeURIComponent(integrationId)}`,
+    { method: "PATCH", body: input },
+  );
+}
+
+export function activateChatIntegration(
+  integrationId: string,
+): Promise<{ integration: ChatIntegration; provisioning: { ok: boolean; message: string } }> {
+  return apiJson<{ integration: ChatIntegration; provisioning: { ok: boolean; message: string } }>(
     `/cp/chat-integrations/${encodeURIComponent(integrationId)}/activate`,
+    { method: "POST" },
+  );
+}
+
+export function rotateTelegramWebhookSecret(
+  integrationId: string,
+): Promise<{ integration: ChatIntegration; provisioning: { ok: boolean; message: string } }> {
+  return apiJson<{ integration: ChatIntegration; provisioning: { ok: boolean; message: string } }>(
+    `/cp/chat-integrations/${encodeURIComponent(integrationId)}/rotate-webhook-secret`,
     { method: "POST" },
   );
 }

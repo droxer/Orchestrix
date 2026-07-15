@@ -237,6 +237,13 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
     raw_assignments = body.get("assignments")
     if not task_goal or not isinstance(raw_assignments, list) or not raw_assignments:
         raise HTTPException(400, "taskGoal and at least one assignment are required.")
+    idempotency_key = string_field(body, "idempotencyKey") or string_field(
+        body, "idempotency_key"
+    )
+    if idempotency_key:
+        existing = ctx.backend.idempotent_run(idempotency_key, actor["employeeId"])
+        if existing:
+            return existing
     assignments = []
     for item in raw_assignments:
         if (
@@ -287,6 +294,8 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
         )
         if user_message_id:
             parsed["userMessageId"] = user_message_id
+        if idempotency_key:
+            parsed["idempotencyKey"] = idempotency_key
         decision = body.get("decision")
         if isinstance(decision, dict):
             kind = decision.get("kind")

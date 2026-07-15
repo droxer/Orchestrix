@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from hashlib import sha256
 from typing import Any
 
 from ..core.ids import new_sandbox_id, now_iso
@@ -39,6 +40,16 @@ class ServerDaemonNodeBackend:
         self.agent_store = agent_store
         self.agent_placement_store = agent_placement_store
         self.registry.logical_assignment_validator = self._validate_logical_assignment
+
+    def idempotent_run(self, idempotency_key: str, actor_employee_id: str | None) -> dict[str, Any] | None:
+        with self.registry.dispatch_lock:
+            request = self.registry.daemon_store.get_run_request(_idempotent_run_request_id(idempotency_key))
+            if not request:
+                return None
+            session = self.registry.store.get_session(request["sessionId"])
+            if actor_employee_id:
+                assert_session_owned_by_employee(self.registry.store, session["id"], actor_employee_id)
+            return session
 
     def _validate_logical_assignment(self, assignment: dict[str, Any]) -> None:
         if self.agent_store is None or self.agent_placement_store is None:
@@ -179,6 +190,22 @@ class ServerDaemonNodeBackend:
                     for assignment in request["assignments"]
                 ],
             }
+            idempotency_key = request.get("idempotencyKey")
+            run_request_id = (
+                _idempotent_run_request_id(idempotency_key)
+                if isinstance(idempotency_key, str) and idempotency_key
+                else None
+            )
+            if run_request_id:
+                existing_request = self.registry.daemon_store.get_run_request(run_request_id)
+                if existing_request:
+                    session = self.registry.store.get_session(existing_request["sessionId"])
+                    actor_employee_id = request.get("actorEmployeeId")
+                    if actor_employee_id:
+                        assert_session_owned_by_employee(
+                            self.registry.store, session["id"], actor_employee_id
+                        )
+                    return session
             self.registry.reap_stale_runs()
             active_runs_by_node: dict[str, list[dict[str, Any]]] = defaultdict(list)
             for active_run in self.registry.daemon_store.list_active_runs():
@@ -392,6 +419,7 @@ class ServerDaemonNodeBackend:
                         else sandbox_id
                     )
                 ],
+                request_id=run_request_id,
             )
             return self.registry.store.get_session(session_id)
 
@@ -416,6 +444,10 @@ class ServerDaemonNodeBackend:
                 return session
             raise KeyError(f"Session {session_id} has no active daemon node run.")
         return self.registry.store.get_session(session_id)
+
+
+def _idempotent_run_request_id(idempotency_key: str) -> str:
+    return f"drun_idem_{sha256(idempotency_key.encode()).hexdigest()}"
 
 
 def assert_session_owned_by_employee(

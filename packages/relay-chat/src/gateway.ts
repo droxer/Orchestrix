@@ -45,6 +45,7 @@ export class RelayChatGateway {
             mode: request.mode,
             sessionId,
             employeeId: identity.employeeId,
+            idempotencyKey: request.idempotencyKey,
             signal,
           });
       // Persist the thread -> session binding so follow-ups, status, and cancel

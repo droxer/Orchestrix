@@ -25,8 +25,9 @@ updates without exposing raw agent output.
 `relay-chat-server` is the deployable HTTP entrypoint. It reads active provider
 settings from the Relay backend with `RELAY_CHAT_TOKEN`, stores provider event
 IDs durably under `.relay/chat/`, and exposes the verified webhook handlers.
-Set `RELAY_CHAT_PUBLIC_URL` so startup can register Discord commands and the
-Telegram webhook.
+Set `RELAY_CHAT_PUBLIC_URL` so startup can register Discord commands. Telegram's
+public callback origin and bot token are configured in Admin Console -> Channels;
+its authenticated Activate action registers and confirms the webhook.
 
 Use `RelayChatIdentityResolver` with the Admin Console's chat integration setup
 when running provider adapters in production. It resolves provider users through

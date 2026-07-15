@@ -7,7 +7,7 @@ from .integrations import (
     DatabaseChatIntegrationStore,
     LocalChatIntegrationStore,
 )
-from .provider_health import probe_chat_integration
+from .provider_health import probe_chat_integration, provision_chat_integration
 
 __all__ = [
     "CHAT_PROVIDERS",
@@ -18,4 +18,5 @@ __all__ = [
     "DatabaseChatIntegrationStore",
     "LocalChatIntegrationStore",
     "probe_chat_integration",
+    "provision_chat_integration",
 ]

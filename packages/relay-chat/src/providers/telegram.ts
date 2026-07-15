@@ -1,6 +1,6 @@
 import type { ChatConversationRef } from "../types.js";
 import { timingSafeEqual } from "node:crypto";
-import { dispatchProviderCommand, retryProviderDispatch, type ChatCommandGateway, type ProviderEventStore, type ProviderHttpResponse } from "./runtime.js";
+import { dispatchProviderCommand, type ChatCommandGateway, type ProviderEventStore, type ProviderHttpResponse } from "./runtime.js";
 
 export interface TelegramConversationInput {
   userId: string | number;
@@ -73,13 +73,31 @@ export async function handleTelegramWebhook(
       });
     },
   };
-  retryProviderDispatch(
-    "Telegram webhook",
-    () => dispatchProviderCommand(ref, message.text, gateway, messenger),
-    options.eventStore,
-    namespace,
-    eventId,
-  );
+  let runStarted = false;
+  try {
+    await dispatchProviderCommand(ref, message.text, gateway, messenger, {
+      idempotencyKey: `${namespace}:${eventId}`,
+      runStarted: async () => {
+        runStarted = true;
+        await options.eventStore.complete(namespace, eventId);
+      },
+    });
+  } catch (error) {
+    if (runStarted) {
+      console.error("Telegram response failed after the Relay run started; suppressing duplicate delivery.", error);
+      return { status: 200 };
+    }
+    await options.eventStore.release(namespace, eventId);
+    console.error("Telegram webhook dispatch failed; requesting provider retry.", error);
+    return { status: 500 };
+  }
+  try {
+    if (!runStarted) await options.eventStore.complete(namespace, eventId);
+  } catch (error) {
+    // Dispatch already succeeded. Keep the pending receipt instead of releasing
+    // it and risking a duplicate agent run.
+    console.error("Telegram webhook completed but its receipt could not be saved.", error);
+  }
   return { status: 200 };
 }
 

@@ -24,7 +24,7 @@ from .persistence.stores import (
 )
 from .daemon_registry import DaemonNodeRegistry, ServerDaemonNodeBackend
 from .security.auth import auth_store_from_env
-from .chat import DatabaseChatIntegrationStore, LocalChatIntegrationStore, probe_chat_integration
+from .chat import DatabaseChatIntegrationStore, LocalChatIntegrationStore, probe_chat_integration, provision_chat_integration
 from .tasks import TaskScheduler
 from .services.managed_nodes import LocalManagedNodeStore
 from .persistence.agent_store import DatabaseAgentStore, LocalAgentStore
@@ -74,6 +74,8 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     app.state.daemon_store = daemon_store
     app.state.chat_store = chat_store
     app.state.chat_probe = probe_chat_integration
+    app.state.chat_provision = provision_chat_integration
+    app.state.chat_rotation_locks = {}
     app.state.registry = registry
     app.state.backend = backend
     app.state.auth_store = auth_store

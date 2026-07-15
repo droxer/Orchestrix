@@ -1355,6 +1355,7 @@ class DaemonNodeRegistry:
         task_id: str | None = None,
         *,
         active_runs: list[dict[str, Any]] | None = None,
+        request_id: str | None = None,
     ) -> dict[str, Any]:
         with self.dispatch_lock:
             return self._start_run_request_unlocked(
@@ -1365,6 +1366,7 @@ class DaemonNodeRegistry:
                 state,
                 task_id,
                 active_runs,
+                request_id,
             )
 
     def _start_run_request_unlocked(
@@ -1376,11 +1378,13 @@ class DaemonNodeRegistry:
         state: dict[str, Any],
         task_id: str | None,
         active_runs: list[dict[str, Any]] | None,
+        request_id: str | None,
     ) -> dict[str, Any]:
         if self.daemon_store.active_run_request_for_session(sandbox_id, session_id):
             raise ValueError(f"Session {session_id} already has an active daemon run.")
         request = self.daemon_store.create_run_request(
             {
+                **({"id": request_id} if request_id else {}),
                 "nodeId": sandbox_id,
                 "sessionId": session_id,
                 "taskGoal": task_goal,

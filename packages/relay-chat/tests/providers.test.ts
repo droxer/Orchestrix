@@ -1,13 +1,17 @@
 import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import {
+  configureRelayChatProviders,
   handleDiscordInteraction,
   handleLarkEvent,
   handleTelegramWebhook,
+  FileProviderEventStore,
   MemoryProviderEventStore,
-  configureRelayChatProviders,
   type ChatAgentRequest,
   type ChatRun,
   type ChatSessionSink,
@@ -26,7 +30,24 @@ describe("provider webhook handlers", () => {
     assert.equal(await store.claim("telegram:bot-a", "1"), false);
   });
 
-  it("configures Telegram delivery and Discord slash commands from active backend settings", async () => {
+  it("keeps an in-flight Telegram receipt leased across server instances", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "relay-chat-events-"));
+    const path = join(directory, "events.jsonl");
+    try {
+      const firstProcess = new FileProviderEventStore(path);
+      const secondProcess = new FileProviderEventStore(path);
+      const claims = await Promise.all([
+        firstProcess.claim("telegram:bot", "10"),
+        secondProcess.claim("telegram:bot", "10"),
+      ]);
+      assert.deepEqual(claims.sort(), [false, true]);
+      assert.equal(await firstProcess.claim("telegram:bot", "10"), false);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps Discord command registration without reconfiguring Telegram", async () => {
     const calls: Array<{ url: string; init?: RequestInit }> = [];
     const fetchFn = async (url: string | URL | Request, init?: RequestInit) => {
       calls.push({ url: String(url), init });
@@ -44,21 +65,10 @@ describe("provider webhook handlers", () => {
       chatToken: "chat-token",
       eventStorePath: "/tmp/unused-events",
       fetchFn,
-    }, "https://relay.example/chat/");
+    }, "https://relay.example");
 
-    assert.ok(calls.some((call) => call.url.endsWith("/bottg-token/setWebhook")));
     assert.ok(calls.some((call) => call.url.endsWith("/applications/app/commands") && call.init?.method === "PUT"));
-  });
-
-  it("rejects Telegram's HTTP-200 setup error envelope", async () => {
-    await assert.rejects(() => configureRelayChatProviders({
-      backendUrl: "http://relay.local",
-      chatToken: "chat-token",
-      eventStorePath: "/tmp/unused-events",
-      fetchFn: async (url) => String(url).endsWith("/chat/integrations/runtime")
-        ? jsonResponse({ integrations: [{ id: "tg", provider: "telegram", config: {}, secrets: { botToken: "token", webhookSecret: "hook" } }] })
-        : jsonResponse({ ok: false, description: "invalid webhook" }),
-    }, "https://relay.example"), /could not be configured/);
+    assert.equal(calls.some((call) => call.url.includes("api.telegram.org")), false);
   });
 
   it("verifies and dispatches a Telegram webhook", async () => {
@@ -96,6 +106,66 @@ describe("provider webhook handlers", () => {
       eventStore: new MemoryProviderEventStore(),
     });
     assert.equal(response.status, 401);
+  });
+
+  it("returns a retryable failure when Telegram dispatch does not start", async () => {
+    const store = new MemoryProviderEventStore();
+    const requests: ChatAgentRequest[] = [];
+    const gateway = fakeGateway(requests);
+    let attempts = 0;
+    const originalRun = gateway.run.bind(gateway);
+    gateway.run = async (...args) => {
+      attempts += 1;
+      if (attempts === 1) throw new Error("backend unavailable");
+      return originalRun(...args);
+    };
+    const input = {
+      rawBody: JSON.stringify({
+        update_id: 9,
+        message: { message_id: 7, text: "/relay run --agent agent_builder retry me", from: { id: 42 }, chat: { id: -100 } },
+      }),
+      secretHeader: "hook",
+    };
+    const options = {
+      integrationId: "tg",
+      botToken: "token",
+      webhookSecret: "hook",
+      eventStore: store,
+      fetchFn: async () => jsonResponse({ ok: true, result: { message_id: 91 } }),
+    };
+
+    assert.equal((await handleTelegramWebhook(input, gateway, options)).status, 500);
+    assert.equal((await handleTelegramWebhook(input, gateway, options)).status, 200);
+    assert.equal(requests.length, 1);
+  });
+
+  it("does not redeliver a Telegram command after the Relay run starts", async () => {
+    const store = new MemoryProviderEventStore();
+    const requests: ChatAgentRequest[] = [];
+    let apiCalls = 0;
+    const input = {
+      rawBody: JSON.stringify({
+        update_id: 11,
+        message: { message_id: 7, text: "/relay run --agent agent_builder once", from: { id: 42 }, chat: { id: -100 } },
+      }),
+      secretHeader: "hook",
+    };
+    const options = {
+      integrationId: "tg",
+      botToken: "token",
+      webhookSecret: "hook",
+      eventStore: store,
+      fetchFn: async () => {
+        apiCalls += 1;
+        return apiCalls === 1
+          ? jsonResponse({ ok: true, result: { message_id: 91 } })
+          : jsonResponse({ ok: false });
+      },
+    };
+
+    assert.equal((await handleTelegramWebhook(input, fakeGateway(requests), options)).status, 200);
+    assert.equal((await handleTelegramWebhook(input, fakeGateway(requests), options)).status, 200);
+    assert.equal(requests.length, 1);
   });
 
   it("verifies Discord's Ed25519 signature before acknowledging interactions", async () => {

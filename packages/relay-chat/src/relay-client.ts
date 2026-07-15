@@ -43,6 +43,7 @@ export class RelayChatClient implements RelayChatBackend {
     mode?: AgentTaskMode;
     sessionId?: string;
     employeeId?: string;
+    idempotencyKey?: string;
     signal?: AbortSignal;
   }): Promise<RelaySession> {
     return this.request<RelaySession>("/agent-runs", {
@@ -53,6 +54,7 @@ export class RelayChatClient implements RelayChatBackend {
         taskGoal: input.taskGoal,
         assignments: [{ agentId: input.agentId, mode: input.mode ?? "action" }],
         sessionId: input.sessionId,
+        idempotencyKey: input.idempotencyKey,
       },
     });
   }

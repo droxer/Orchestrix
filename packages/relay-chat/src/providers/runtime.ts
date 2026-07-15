@@ -1,5 +1,5 @@
 import type { RelaySession } from "relay-core";
-import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, open, readFile, stat, unlink, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { commandToAgentRequest, parseChatCommand } from "../commands.js";
 import type {
@@ -29,6 +29,11 @@ export interface ChatCommandGateway {
 export interface ProviderMessenger {
   send(text: string): Promise<string | undefined>;
   edit(messageId: string, text: string): Promise<void>;
+}
+
+export interface ProviderDispatchLifecycle {
+  idempotencyKey?: string;
+  runStarted?(): Promise<void> | void;
 }
 
 export interface ProviderEventStore {
@@ -97,7 +102,7 @@ export class FileProviderEventStore implements ProviderEventStore {
   constructor(private readonly path: string) {}
 
   claim(namespace: string, eventId: string): Promise<boolean> {
-    return this.serial(async () => {
+    return this.locked(async () => {
       await this.load();
       const key = `${namespace}:${eventId}`;
       const record = this.records.get(key);
@@ -110,11 +115,19 @@ export class FileProviderEventStore implements ProviderEventStore {
   }
 
   complete(namespace: string, eventId: string): Promise<void> {
-    return this.serial(async () => this.record(`${namespace}:${eventId}`, "completed", Date.now()));
+    return this.locked(async () => this.record(`${namespace}:${eventId}`, "completed", Date.now()));
   }
 
   release(namespace: string, eventId: string): Promise<void> {
-    return this.serial(async () => this.record(`${namespace}:${eventId}`, "released", Date.now()));
+    return this.locked(async () => this.record(`${namespace}:${eventId}`, "released", Date.now()));
+  }
+
+  private locked<T>(operation: () => Promise<T>): Promise<T> {
+    return this.serial(() => this.withFileLock(async () => {
+      this.loaded = false;
+      this.records.clear();
+      return operation();
+    }));
   }
 
   private serial<T>(operation: () => Promise<T>): Promise<T> {
@@ -144,6 +157,36 @@ export class FileProviderEventStore implements ProviderEventStore {
     this.loaded = true;
   }
 
+  private async withFileLock<T>(operation: () => Promise<T>): Promise<T> {
+    const lockPath = `${this.path}.lock`;
+    await mkdir(dirname(this.path), { recursive: true });
+    let handle;
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        handle = await open(lockPath, "wx", 0o600);
+        break;
+      } catch (error: any) {
+        if (error?.code !== "EEXIST") throw error;
+        if (attempt >= 500) throw new Error(`Timed out acquiring provider event lock ${lockPath}.`);
+        try {
+          const lock = await stat(lockPath);
+          if (Date.now() - lock.mtimeMs > 30_000) await unlink(lockPath);
+        } catch (lockError: any) {
+          if (lockError?.code !== "ENOENT") throw lockError;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+    }
+    try {
+      return await operation();
+    } finally {
+      await handle.close();
+      await unlink(lockPath).catch((error: any) => {
+        if (error?.code !== "ENOENT") throw error;
+      });
+    }
+  }
+
   private async record(key: string, state: "pending" | "completed" | "released", at: number): Promise<void> {
     await this.load();
     if (state === "released") this.records.delete(key);
@@ -170,6 +213,7 @@ export async function dispatchProviderCommand(
   text: string,
   gateway: ChatCommandGateway,
   messenger: ProviderMessenger,
+  lifecycle: ProviderDispatchLifecycle = {},
 ): Promise<void> {
   const command = parseChatCommand(text);
   if (!command) {
@@ -191,7 +235,8 @@ export async function dispatchProviderCommand(
     progressId = progressId ?? await messenger.send("Relay request accepted.") ?? ref.messageId;
     const request = commandToAgentRequest({ ...ref, messageId: progressId }, command);
     if (!request) return;
-    await gateway.run(request, sessionSink(messenger, progressId));
+    request.idempotencyKey = lifecycle.idempotencyKey;
+    await gateway.run(request, sessionSink(messenger, progressId, lifecycle));
     return;
   }
   if (command.kind === "status") {
@@ -215,14 +260,17 @@ export async function dispatchProviderCommand(
   await messenger.send(`This conversation now uses Relay session ${command.sessionId}.`);
 }
 
-function sessionSink(messenger: ProviderMessenger, messageId?: string): ChatSessionSink {
+function sessionSink(messenger: ProviderMessenger, messageId?: string, lifecycle: ProviderDispatchLifecycle = {}): ChatSessionSink {
   let lastProgressAt = 0;
   const edit = async (text: string) => {
     if (messageId) await messenger.edit(messageId, text);
     else await messenger.send(text);
   };
   return {
-    started: ({ session }) => edit(`Relay session ${session.id} started.`),
+    started: async ({ session }) => {
+      await lifecycle.runStarted?.();
+      await edit(`Relay session ${session.id} started.`);
+    },
     event: async ({ event }) => {
       if (event.type !== "agent.output" || Date.now() - lastProgressAt < 1_000) return;
       lastProgressAt = Date.now();

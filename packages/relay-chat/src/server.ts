@@ -47,31 +47,22 @@ export function createRelayChatServer(options: RelayChatServerOptions) {
   });
 }
 
-export async function configureRelayChatProviders(options: RelayChatServerOptions, publicUrl: string): Promise<void> {
+export async function configureRelayChatProviders(options: RelayChatServerOptions, _publicUrl: string): Promise<void> {
   const fetchFn = options.fetchFn ?? fetch;
   const integrations = await runtimeIntegrations(options, fetchFn);
   const errors: Error[] = [];
   for (const integration of integrations) {
+    if (integration.provider !== "discord") continue;
     try {
-      if (integration.provider === "telegram") {
-        const result = await providerRequest(fetchFn, `https://api.telegram.org/bot${integration.secrets.botToken}/setWebhook`, {
-          url: `${publicUrl.replace(/\/$/, "")}/webhooks/telegram/${integration.id}`,
-          secret_token: integration.secrets.webhookSecret,
-          allowed_updates: ["message"],
-        });
-        if ((result as any)?.ok !== true) throw new Error("Telegram webhook setup failed.");
-      }
-      if (integration.provider === "discord") {
-        await providerRequest(
-          fetchFn,
-          `https://discord.com/api/v10/applications/${integration.config.applicationId}/commands`,
-          discordCommands(),
-          { Authorization: `Bot ${integration.secrets.botToken}` },
-          "PUT",
-        );
-      }
+      await providerRequest(
+        fetchFn,
+        `https://discord.com/api/v10/applications/${integration.config.applicationId}/commands`,
+        discordCommands(),
+        { Authorization: `Bot ${integration.secrets.botToken}` },
+        "PUT",
+      );
     } catch (error) {
-      errors.push(new Error(`${integration.provider} integration ${integration.id}: ${error instanceof Error ? error.message : String(error)}`));
+      errors.push(new Error(`discord integration ${integration.id}: ${error instanceof Error ? error.message : String(error)}`));
     }
   }
   if (errors.length) throw new AggregateError(errors, "One or more chat providers could not be configured.");

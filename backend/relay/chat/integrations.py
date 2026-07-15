@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
 from pathlib import Path
 from threading import RLock
 from typing import Any, Literal
+from urllib.parse import urlparse, urlunsplit
 
 from sqlalchemy import JSON, Column, DateTime, MetaData, Table, Text, create_engine, insert, select, update
 from cryptography.fernet import Fernet, InvalidToken
@@ -60,8 +62,13 @@ class LocalChatIntegrationStore:
 
     def create_integration(self, payload: dict[str, Any], actor: str | None = None) -> dict[str, Any]:
         with self._lock:
-            self._validate_secret_patch(payload.get("secrets"))
+            payload = dict(payload)
             provider = _provider(payload.get("provider"))
+            secret_values = dict(payload.get("secrets")) if isinstance(payload.get("secrets"), dict) else {}
+            if provider == "telegram":
+                secret_values["webhookSecret"] = secrets.token_urlsafe(32)
+                payload["secrets"] = secret_values
+            self._validate_secret_patch(payload.get("secrets"))
             now = now_iso()
             integration = {
                 "id": new_relay_id("chat"),
@@ -89,7 +96,15 @@ class LocalChatIntegrationStore:
 
     def update_integration(self, integration_id: str, payload: dict[str, Any], actor: str | None = None) -> dict[str, Any]:
         with self._lock:
-            self._validate_secret_patch(payload.get("secrets"))
+            integration = self._find_integration(integration_id)
+            secret_patch = payload.get("secrets")
+            if (
+                integration.get("provider") == "telegram"
+                and isinstance(secret_patch, dict)
+                and "webhookSecret" in secret_patch
+            ):
+                raise ValueError("Use the Telegram webhook secret rotation action instead.")
+            self._validate_secret_patch(secret_patch)
             integrations = self._read_integrations()
             for index, integration in enumerate(integrations):
                 if integration.get("id") != integration_id:
@@ -124,21 +139,48 @@ class LocalChatIntegrationStore:
             for index, integration in enumerate(integrations):
                 if integration.get("id") != integration_id:
                     continue
-                public = self._public_integration(integration)
-                if public["identityLinkCount"] == 0:
-                    raise ValueError("Add at least one identity link before activation.")
-                if public["allowedConversationCount"] == 0:
-                    raise ValueError("Add at least one allowed conversation before activation.")
-                if not public["secretConfigured"]:
-                    raise ValueError("Configure provider secrets before activation.")
-                if not public.get("health", {}).get("ok"):
-                    raise ValueError("Run a successful provider connection check before activation.")
+                self._validate_activation_integration(integration)
                 updated = {**integration, "status": "active", "updatedAt": now_iso()}
                 integrations[index] = updated
                 self._write_integrations(integrations)
                 self._audit("chat.integration.activated", integration_id, actor, {})
                 return self._public_integration(updated)
             raise KeyError(integration_id)
+
+    def validate_activation(self, integration_id: str) -> None:
+        with self._lock:
+            self._validate_activation_integration(self._find_integration(integration_id))
+
+    def validate_telegram_webhook_rotation(self, integration_id: str) -> None:
+        with self._lock:
+            integration = self._find_integration(integration_id)
+            if integration.get("provider") != "telegram":
+                raise ValueError("Webhook secret rotation is only available for Telegram integrations.")
+            settings = self.connection_settings(integration_id)
+            if not _string(settings.get("secrets", {}).get("botToken")):
+                raise ValueError("Configure the Telegram bot token before rotating the webhook secret.")
+            public_callback_base_url(integration)
+
+    def set_telegram_webhook_secret(
+        self,
+        integration_id: str,
+        webhook_secret: str,
+        actor: str | None = None,
+    ) -> dict[str, Any]:
+        with self._lock:
+            integration = self._find_integration(integration_id)
+            if integration.get("provider") != "telegram":
+                raise ValueError("Webhook secret rotation is only available for Telegram integrations.")
+            self._write_secret_patch(integration_id, {"webhookSecret": webhook_secret})
+            integrations = self._read_integrations()
+            updated = {**integration, "updatedAt": now_iso()}
+            for index, record in enumerate(integrations):
+                if record.get("id") == integration_id:
+                    integrations[index] = updated
+                    break
+            self._write_integrations(integrations)
+            self._audit("chat.integration.webhook_secret_rotated", integration_id, actor, {})
+            return self._public_integration(updated)
 
     def check_integration(
         self,
@@ -375,6 +417,19 @@ class LocalChatIntegrationStore:
                 return integration
         raise KeyError(integration_id)
 
+    def _validate_activation_integration(self, integration: dict[str, Any]) -> None:
+        public = self._public_integration(integration)
+        if public["identityLinkCount"] == 0:
+            raise ValueError("Add at least one identity link before activation.")
+        if public["allowedConversationCount"] == 0:
+            raise ValueError("Add at least one allowed conversation before activation.")
+        if not public["secretConfigured"]:
+            raise ValueError("Configure provider secrets before activation.")
+        if not public.get("health", {}).get("ok"):
+            raise ValueError("Run a successful provider connection check before activation.")
+        if integration.get("provider") == "telegram":
+            public_callback_base_url(integration)
+
     def _public_integration(self, integration: dict[str, Any]) -> dict[str, Any]:
         secrets = self._read_secrets().get(str(integration.get("id")), {})
         identity_links = integration.get("identityLinks") if isinstance(integration.get("identityLinks"), list) else []
@@ -475,6 +530,18 @@ class DatabaseChatIntegrationStore(LocalChatIntegrationStore):
     ) -> dict[str, Any]:
         return self._atomic(
             lambda: super(DatabaseChatIntegrationStore, self).check_integration(integration_id, actor, provider_health)
+        )
+
+    def set_telegram_webhook_secret(
+        self,
+        integration_id: str,
+        webhook_secret: str,
+        actor: str | None = None,
+    ) -> dict[str, Any]:
+        return self._atomic(
+            lambda: super(DatabaseChatIntegrationStore, self).set_telegram_webhook_secret(
+                integration_id, webhook_secret, actor
+            )
         )
 
     def add_identity_link(self, integration_id: str, payload: dict[str, Any], actor: str | None = None) -> dict[str, Any]:
@@ -662,6 +729,26 @@ def _public_config(value: Any) -> dict[str, Any]:
         for key, item in value.items()
         if key not in SECRET_FIELDS and item is not None and not isinstance(item, (dict, list))
     }
+
+
+def public_callback_base_url(integration: dict[str, Any]) -> str:
+    config = integration.get("config") if isinstance(integration.get("config"), dict) else {}
+    value = _string(config.get("publicBaseUrl"))
+    parsed = urlparse(value or "")
+    if (
+        not value
+        or any(character.isspace() for character in value)
+        or "\\" in value
+        or parsed.scheme != "https"
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.path not in {"", "/"}
+        or bool(parsed.query)
+        or bool(parsed.fragment)
+    ):
+        raise ValueError("A valid HTTPS public callback URL must be configured from the Channels setup page.")
+    return urlunsplit((parsed.scheme, parsed.netloc, parsed.path.rstrip("/"), "", ""))
 
 
 def _conversation_key(payload: dict[str, Any]) -> str:

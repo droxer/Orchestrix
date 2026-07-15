@@ -28,6 +28,7 @@ import { AdminViewToggle, type AdminView } from "./admin/AdminViewToggle";
 import { AddEmployeeDrawer } from "./admin/AddEmployeeDrawer";
 import { AddNodeDrawer, type AddNodeDrawerSuccess } from "./admin/AddNodeDrawer";
 import { EmployeesView } from "./admin/EmployeesView";
+import { ChatIntegrationsView } from "./admin/ChatIntegrationsView";
 import { PulseStrip } from "./admin/PulseStrip";
 import { useAdminFleet } from "../hooks/useAdminFleet";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
@@ -41,7 +42,7 @@ import {
 } from "./admin/helpers";
 
 type AuthScreen = "login" | "bootstrap";
-const ADMIN_VIEWS: AdminView[] = ["dashboard", "employees", "fleet"];
+const ADMIN_VIEWS: AdminView[] = ["dashboard", "employees", "fleet", "integrations"];
 
 function parseAdminView(value: string | null): AdminView {
   return ADMIN_VIEWS.includes(value as AdminView) ? value as AdminView : "dashboard";
@@ -387,7 +388,7 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
       />
 
       <div className="adm-main">
-        {view !== "dashboard" ? (
+        {view === "employees" || view === "fleet" ? (
           <PulseStrip
             view={view}
             running={metrics.running}
@@ -411,7 +412,7 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
                   highlightedEmployeeId={highlightedEmployeeId}
                   onSelectAgent={setAgentProfileId}
                 />
-              ) : (
+              ) : view === "fleet" ? (
                 <FleetView
                   nodes={nodes}
                   employees={employees}
@@ -421,6 +422,8 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
                   onDeleteNode={handleDeleteNode}
                   onAddNode={() => setAddNodeOpen(true)}
                 />
+              ) : (
+                <ChatIntegrationsView />
               )}
             </div>
           </div>

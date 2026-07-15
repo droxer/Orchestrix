@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 from collections import Counter
 from datetime import datetime, timedelta, timezone
+import secrets
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response
@@ -391,10 +393,18 @@ async def update_chat_integration(integration_id: str, request: Request, ctx: Ap
 async def activate_chat_integration(integration_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     user = require_admin_session(request, ctx.auth_store)
     try:
+        ctx.chat_store.validate_activation(integration_id)
+        settings = ctx.chat_store.connection_settings(integration_id)
+        if settings.get("provider") == "telegram":
+            provisioned, message = await request.app.state.chat_provision(settings, integration_id)
+            if not provisioned:
+                raise ValueError(message)
+        else:
+            message = "Integration activated."
         integration = ctx.chat_store.activate_integration(integration_id, actor=_actor_name(user))
     except (KeyError, ValueError) as error:
         raise _chat_error(error) from error
-    return {"integration": integration}
+    return {"integration": integration, "provisioning": {"ok": True, "message": message}}
 
 
 @router.post("/cp/chat-integrations/{integration_id}/check")
@@ -411,6 +421,53 @@ async def check_chat_integration(integration_id: str, request: Request, ctx: App
     except (KeyError, ValueError) as error:
         raise _chat_error(error) from error
     return {"integration": integration}
+
+
+@router.post("/cp/chat-integrations/{integration_id}/rotate-webhook-secret")
+async def rotate_telegram_webhook_secret(
+    integration_id: str,
+    request: Request,
+    ctx: AppContextDep,
+) -> dict[str, Any]:
+    user = require_admin_session(request, ctx.auth_store)
+    locks = request.app.state.chat_rotation_locks
+    lock = locks.setdefault(integration_id, asyncio.Lock())
+    async with lock:
+        return await _rotate_telegram_webhook_secret(integration_id, request, ctx, user)
+
+
+async def _rotate_telegram_webhook_secret(
+    integration_id: str,
+    request: Request,
+    ctx: AppContextDep,
+    user: dict[str, Any],
+) -> dict[str, Any]:
+    try:
+        ctx.chat_store.validate_telegram_webhook_rotation(integration_id)
+        previous_settings = ctx.chat_store.connection_settings(integration_id)
+        previous_secret = previous_settings.get("secrets", {}).get("webhookSecret")
+        webhook_secret = secrets.token_urlsafe(32)
+        integration = ctx.chat_store.set_telegram_webhook_secret(
+            integration_id,
+            webhook_secret,
+            actor=_actor_name(user),
+        )
+        settings = ctx.chat_store.connection_settings(integration_id)
+        provisioned, message = await request.app.state.chat_provision(settings, integration_id)
+        if not provisioned:
+            if isinstance(previous_secret, str) and previous_secret:
+                restored, restore_message = await request.app.state.chat_provision(previous_settings, integration_id)
+                if restored:
+                    ctx.chat_store.set_telegram_webhook_secret(integration_id, previous_secret, actor=_actor_name(user))
+                else:
+                    raise ValueError(
+                        f"{message} The previous webhook could not be restored ({restore_message}); "
+                        "Relay retained the new secret to avoid rejecting a webhook that Telegram may have accepted."
+                    )
+            raise ValueError(message)
+    except (KeyError, ValueError) as error:
+        raise _chat_error(error) from error
+    return {"integration": integration, "provisioning": {"ok": True, "message": message}}
 
 
 @router.post("/cp/chat-integrations/{integration_id}/identity-links", status_code=201)

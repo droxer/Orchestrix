@@ -11,11 +11,15 @@ from fastapi.testclient import TestClient
 
 from relay.app import create_app
 from relay.chat import DatabaseChatIntegrationStore, LocalChatIntegrationStore
-from relay.chat.provider_health import probe_chat_integration
+from relay.chat.provider_health import probe_chat_integration, provision_chat_integration
 
 
 async def _healthy_provider(_settings):
     return True, "Provider credentials verified."
+
+
+async def _healthy_provision(_settings, _integration_id):
+    return True, "Provider callback registered."
 
 
 def test_provider_probe_uses_telegram_get_me() -> None:
@@ -29,6 +33,49 @@ def test_provider_probe_uses_telegram_get_me() -> None:
             }, client)
 
     assert asyncio.run(run_probe()) == (True, "Provider credentials verified.")
+
+
+def test_provider_provision_uses_ui_callback_url() -> None:
+    captured = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/setWebhook"):
+            captured.update(json.loads(request.content))
+            return httpx.Response(200, json={"ok": True}, request=request)
+        return httpx.Response(200, json={
+            "ok": True,
+            "result": {"url": "https://relay.example/webhooks/telegram/chat_123"},
+        }, request=request)
+
+    async def run_provision():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            return await provision_chat_integration({
+                "provider": "telegram",
+                "config": {"publicBaseUrl": "https://relay.example"},
+                "secrets": {"botToken": "token", "webhookSecret": "hook"},
+            }, "chat_123", client=client)
+
+    assert asyncio.run(run_provision()) == (True, "Telegram webhook registered.")
+    assert captured["url"] == "https://relay.example/webhooks/telegram/chat_123"
+
+
+def test_telegram_provision_rejects_unconfirmed_webhook_url() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = {"ok": True} if request.url.path.endswith("/setWebhook") else {
+            "ok": True,
+            "result": {"url": "https://wrong.example/webhook"},
+        }
+        return httpx.Response(200, json=payload, request=request)
+
+    async def run_provision():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            return await provision_chat_integration({
+                "provider": "telegram",
+                "config": {"publicBaseUrl": "https://relay.example"},
+                "secrets": {"botToken": "token", "webhookSecret": "hook"},
+            }, "chat_123", client=client)
+
+    assert asyncio.run(run_provision()) == (False, "Telegram did not confirm the configured webhook URL.")
 
 
 def _bootstrap_admin(client: TestClient) -> None:
@@ -54,6 +101,7 @@ def test_chat_integration_setup_flow_redacts_secrets(monkeypatch) -> None:
     with TemporaryDirectory() as root:
         client = TestClient(create_app(root))
         client.app.state.chat_probe = _healthy_provider
+        client.app.state.chat_provision = _healthy_provision
         _bootstrap_admin(client)
         _login(client, "admin", "secret123")
         assert client.post("/cp/users", json={
@@ -114,6 +162,7 @@ def test_chat_integration_setup_flow_redacts_secrets(monkeypatch) -> None:
         activate = client.post(f"/cp/chat-integrations/{integration_id}/activate")
         assert activate.status_code == 200
         assert activate.json()["integration"]["status"] == "active"
+        assert activate.json()["provisioning"]["ok"] is True
         assert "discord-secret-token" not in activate.text
 
         runtime = client.get(
@@ -198,6 +247,95 @@ def test_chat_integration_check_rejects_invalid_provider_credentials(monkeypatch
         assert activate.status_code == 400
 
 
+def test_chat_integration_activation_requires_ui_callback_url(monkeypatch) -> None:
+    provisioned_secrets = []
+
+    async def capture_provision(settings, _integration_id):
+        provisioned_secrets.append(settings["secrets"]["webhookSecret"])
+        return True, "Telegram webhook registered."
+
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        client.app.state.chat_probe = _healthy_provider
+        client.app.state.chat_provision = capture_provision
+        _bootstrap_admin(client)
+        _login(client, "admin", "secret123")
+        assert client.post("/cp/users", json={
+            "username": "alice",
+            "password": "AlicePass123!",
+            "employeeId": "alice",
+        }).status_code == 201
+        created = client.post("/cp/chat-integrations", json={
+            "provider": "telegram",
+            "displayName": "Operations Telegram",
+            "secrets": {"botToken": "token", "webhookSecret": "caller-must-not-control-this"},
+        }).json()["integration"]
+        integration_id = created["id"]
+        assert created["secretKeys"] == ["botToken", "webhookSecret"]
+        generated_secret = client.app.state.chat_store.connection_settings(integration_id)["secrets"]["webhookSecret"]
+        assert generated_secret != "caller-must-not-control-this"
+        forbidden_patch = client.patch(f"/cp/chat-integrations/{integration_id}", json={
+            "secrets": {"webhookSecret": "bypass-rotation"},
+        })
+        assert forbidden_patch.status_code == 400
+
+        client.app.state.chat_store.secrets_path.write_text(json.dumps({
+            integration_id: {"botToken": "token"},
+        }))
+        client.patch(f"/cp/chat-integrations/{integration_id}", json={
+            "config": {"publicBaseUrl": "https://relay.example"},
+        })
+        repaired = client.post(f"/cp/chat-integrations/{integration_id}/rotate-webhook-secret")
+        assert repaired.status_code == 200
+        client.patch(f"/cp/chat-integrations/{integration_id}", json={"config": {}})
+        client.post(f"/cp/chat-integrations/{integration_id}/identity-links", json={
+            "externalUserId": "42", "employeeId": "alice",
+        })
+        client.post(f"/cp/chat-integrations/{integration_id}/allowed-conversations", json={
+            "conversationId": "-100",
+        })
+        client.post(f"/cp/chat-integrations/{integration_id}/check")
+
+        activate = client.post(f"/cp/chat-integrations/{integration_id}/activate")
+
+        assert activate.status_code == 400
+        assert "public callback URL" in activate.json()["detail"]
+
+        malformed = client.patch(f"/cp/chat-integrations/{integration_id}", json={
+            "config": {"publicBaseUrl": "https://relay.example/base?wrong=path"},
+        })
+        assert malformed.status_code == 200
+        client.post(f"/cp/chat-integrations/{integration_id}/check")
+        assert client.post(f"/cp/chat-integrations/{integration_id}/activate").status_code == 400
+
+        updated = client.patch(f"/cp/chat-integrations/{integration_id}", json={
+            "config": {"publicBaseUrl": "https://relay.example"},
+        })
+        assert updated.status_code == 200
+        client.post(f"/cp/chat-integrations/{integration_id}/check")
+        activate = client.post(f"/cp/chat-integrations/{integration_id}/activate")
+        assert activate.status_code == 200
+        rotated = client.post(f"/cp/chat-integrations/{integration_id}/rotate-webhook-secret")
+        assert rotated.status_code == 200
+        assert rotated.json()["provisioning"]["message"] == "Telegram webhook registered."
+        assert len(provisioned_secrets) == 3
+        assert provisioned_secrets[0] == provisioned_secrets[1]
+        assert provisioned_secrets[2] != provisioned_secrets[1]
+
+        previous_secret = client.app.state.chat_store.connection_settings(integration_id)["secrets"]["webhookSecret"]
+
+        async def reject_then_restore(settings, _integration_id):
+            if settings["secrets"]["webhookSecret"] == previous_secret:
+                return True, "Previous Telegram webhook restored."
+            return False, "Telegram webhook confirmation failed."
+
+        client.app.state.chat_provision = reject_then_restore
+        failed_rotation = client.post(f"/cp/chat-integrations/{integration_id}/rotate-webhook-secret")
+        assert failed_rotation.status_code == 400
+        assert client.app.state.chat_store.connection_settings(integration_id)["secrets"]["webhookSecret"] == previous_secret
+
+
 def test_chat_integrations_require_admin(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
@@ -249,6 +387,7 @@ def test_database_chat_integration_store_encrypts_secrets(monkeypatch) -> None:
         integration = store.create_integration({
             "provider": "discord",
             "displayName": "Engineering Discord",
+            "config": {"publicBaseUrl": "https://relay.example"},
             "secrets": {"botToken": "secret-token"},
         }, actor="admin")
         store.add_identity_link(integration["id"], {"externalUserId": "u1", "employeeId": "alice"})

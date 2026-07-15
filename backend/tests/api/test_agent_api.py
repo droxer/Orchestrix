@@ -270,14 +270,27 @@ def test_employee_dispatches_work_by_logical_agent_id(monkeypatch) -> None:
             json={
                 "taskGoal": "Build the feature",
                 "assignments": [{"agentId": agent["id"], "mode": "action"}],
+                "idempotencyKey": "telegram:chat_1:42",
             },
         )
 
         assert response.status_code == 202
+        duplicate = client.post(
+            "/agent-runs",
+            json={
+                "taskGoal": "Build the feature",
+                "assignments": [{"agentId": agent["id"], "mode": "action"}],
+                "idempotencyKey": "telegram:chat_1:42",
+            },
+        )
+        assert duplicate.status_code == 202
+        assert duplicate.json()["id"] == response.json()["id"]
         run = response.json()["agentRuns"][0]
         assert run["logicalAgentId"] == agent["id"]
         assert run["daemonNodeId"] == "node_a"
-        command = app.state.daemon_store.take_queued_commands("node_a")[0]["command"]
+        commands = app.state.daemon_store.take_queued_commands("node_a")
+        assert len(commands) == 1
+        command = commands[0]["command"]
         assert command["logicalAgentId"] == agent["id"]
 
 

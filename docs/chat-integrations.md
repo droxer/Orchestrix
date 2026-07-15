@@ -70,10 +70,10 @@ Build and run `relay-chat-server` as a separate channel-plane service. It loads
 only active integration credentials through the chat-service-authenticated
 `GET /chat/integrations/runtime` endpoint, exposes provider webhook paths under
 `/webhooks/<provider>/<integration-id>`, registers Discord's `/relay` command,
-and configures Telegram's webhook when `RELAY_CHAT_PUBLIC_URL` is set. Provider
-registration is refreshed every minute so activation and credential rotation
-do not require a service restart. Lark and Discord callback URLs must also be
-entered in their provider consoles.
+and delivers channel messages to Relay. Telegram setup is owned by Admin
+Console -> Channels: activation registers and confirms the webhook using the
+public HTTPS callback origin entered by the administrator. Lark and Discord
+callback URLs must still be entered in their provider consoles.
 
 Database-backed channel credentials additionally require a Fernet key. Keep it
 in the deployment secret manager and retain it across restarts and rotations:

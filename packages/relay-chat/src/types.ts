@@ -30,6 +30,7 @@ export interface ChatAgentRequest extends ChatConversationRef {
   sessionId?: string;
   /** Start a fresh conversation, ignoring any existing thread->session binding. */
   forceNew?: boolean;
+  idempotencyKey?: string;
 }
 
 export interface ChatCancelRequest extends ChatConversationRef {
@@ -87,6 +88,7 @@ export interface RelayChatBackend {
     mode?: AgentTaskMode;
     sessionId?: string;
     employeeId?: string;
+    idempotencyKey?: string;
     signal?: AbortSignal;
   }): Promise<RelaySession>;
   cancelSessionRun?(input: {

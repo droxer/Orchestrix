@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AdminChannel, AdminConnect, AdminDelete, AdminEmployees, AdminLocked, AdminVerified, PrefAgents } from "../icons";
 import { useTranslation } from "react-i18next";
@@ -15,6 +15,8 @@ import {
   deleteChatIdentityLink,
   listChatIntegrations,
   listControlPanelAgents,
+  rotateTelegramWebhookSecret,
+  updateChatIntegration,
 } from "../../api";
 import type { ChatIntegration, ChatProvider } from "../../types";
 
@@ -29,7 +31,6 @@ const credentialFields: Record<ChatProvider, Array<{ key: string; secret: boolea
   ],
   telegram: [
     { key: "botToken", secret: true },
-    { key: "webhookSecret", secret: true },
   ],
   lark: [
     { key: "appId", secret: false },
@@ -42,6 +43,17 @@ const credentialFields: Record<ChatProvider, Array<{ key: string; secret: boolea
 function providerLabel(provider: ChatProvider): string {
   if (provider === "lark") return "Lark";
   return provider[0].toUpperCase() + provider.slice(1);
+}
+
+export function normalizePublicBaseUrl(value: string): string | undefined {
+  if (!value || /\s|\\/.test(value)) return undefined;
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.search || parsed.hash || parsed.pathname !== "/") return undefined;
+    return parsed.toString().replace(/\/$/, "");
+  } catch {
+    return undefined;
+  }
 }
 
 function ProviderAvatar({ provider, size }: { provider: ChatProvider; size?: "lg" }) {
@@ -61,6 +73,7 @@ function statusTone(status: ChatIntegration["status"]): string {
 
 function readiness(integration: ChatIntegration): Array<{ key: string; labelKey: string; ready: boolean; icon: typeof AdminLocked }> {
   return [
+    ...(integration.provider === "telegram" ? [{ key: "callback", labelKey: "admin.v2.chat_readiness_callback", ready: typeof integration.config.publicBaseUrl === "string", icon: AdminConnect }] : []),
     { key: "secrets", labelKey: "admin.v2.chat_readiness_secrets", ready: integration.secretConfigured, icon: AdminLocked },
     { key: "links", labelKey: "admin.v2.chat_readiness_identity", ready: integration.identityLinkCount > 0, icon: AdminEmployees },
     { key: "allowlist", labelKey: "admin.v2.chat_readiness_allowlist", ready: integration.allowedConversationCount > 0, icon: AdminVerified },
@@ -73,12 +86,16 @@ export function ChatIntegrationsView() {
   const [provider, setProvider] = useState<ChatProvider>("discord");
   const [displayName, setDisplayName] = useState("Engineering Discord");
   const [tenantId, setTenantId] = useState("");
+  const [publicBaseUrl, setPublicBaseUrl] = useState(() => typeof window === "undefined" ? "" : window.location.origin);
   const [credentials, setCredentials] = useState<Record<string, string>>({});
+  const [editPublicBaseUrl, setEditPublicBaseUrl] = useState("");
+  const [editCredentials, setEditCredentials] = useState<Record<string, string>>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [identityForm, setIdentityForm] = useState({ externalUserId: "", employeeId: "", displayName: "", defaultAgentId: "" });
   const [conversationForm, setConversationForm] = useState({ conversationId: "", threadId: "", label: "" });
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const query = useQuery({
     queryKey: CHAT_INTEGRATIONS_KEY,
@@ -95,6 +112,19 @@ export function ChatIntegrationsView() {
     [integrations, selectedId],
   );
 
+  useEffect(() => {
+    if (!selected) return;
+    setEditPublicBaseUrl(typeof selected.config.publicBaseUrl === "string" ? selected.config.publicBaseUrl : "");
+    setEditCredentials(Object.fromEntries(
+      credentialFields[selected.provider]
+        .filter((field) => !field.secret)
+        .map((field) => {
+          const value = selected.config[field.key];
+          return [field.key, typeof value === "string" ? value : ""];
+        }),
+    ));
+  }, [selected]);
+
   function mergeIntegration(updated: ChatIntegration) {
     queryClient.setQueryData<ChatIntegration[]>(CHAT_INTEGRATIONS_KEY, (prev) => {
       const current = prev ?? [];
@@ -106,6 +136,7 @@ export function ChatIntegrationsView() {
   async function mutate(label: string, action: () => Promise<{ integration: ChatIntegration }>) {
     setBusy(label);
     setError(null);
+    setNotice(null);
     try {
       const result = await action();
       mergeIntegration(result.integration);
@@ -116,9 +147,32 @@ export function ChatIntegrationsView() {
     }
   }
 
+  async function provision(
+    label: string,
+    action: () => Promise<{ integration: ChatIntegration; provisioning: { ok: boolean; message: string } }>,
+  ) {
+    setBusy(label);
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await action();
+      mergeIntegration(result.integration);
+      setNotice(result.provisioning.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function handleCreate() {
     if (!displayName.trim()) {
       setError(t("admin.v2.chat_error_name_required"));
+      return;
+    }
+    const normalizedPublicBaseUrl = provider === "telegram" ? normalizePublicBaseUrl(publicBaseUrl.trim()) : undefined;
+    if (provider === "telegram" && !normalizedPublicBaseUrl) {
+      setError(t("admin.v2.chat_error_public_url"));
       return;
     }
     const fields = credentialFields[provider];
@@ -138,7 +192,7 @@ export function ChatIntegrationsView() {
       displayName: displayName.trim(),
       tenantId: tenantId.trim() || undefined,
       secrets,
-      config: { commandName: "relay", ...config },
+      config: { commandName: "relay", ...(normalizedPublicBaseUrl ? { publicBaseUrl: normalizedPublicBaseUrl } : {}), ...config },
     }));
     setCredentials({});
   }
@@ -168,9 +222,41 @@ export function ChatIntegrationsView() {
     setConversationForm({ conversationId: "", threadId: "", label: "" });
   }
 
+  async function handleUpdateConnection() {
+    if (!selected) return;
+    const normalizedPublicBaseUrl = selected.provider === "telegram" ? normalizePublicBaseUrl(editPublicBaseUrl.trim()) : undefined;
+    if (selected.provider === "telegram" && !normalizedPublicBaseUrl) {
+      setError(t("admin.v2.chat_error_public_url"));
+      return;
+    }
+    const fields = credentialFields[selected.provider];
+    const missingPublicField = fields.find((field) => !field.secret && !editCredentials[field.key]?.trim());
+    if (missingPublicField) {
+      setError(`${missingPublicField.key} is required.`);
+      return;
+    }
+    const config = {
+      ...selected.config,
+      ...(normalizedPublicBaseUrl ? { publicBaseUrl: normalizedPublicBaseUrl } : {}),
+      ...Object.fromEntries(fields.filter((field) => !field.secret).map((field) => [field.key, editCredentials[field.key].trim()])),
+    };
+    const secrets = Object.fromEntries(
+      fields.filter((field) => field.secret && editCredentials[field.key]?.trim())
+        .map((field) => [field.key, editCredentials[field.key].trim()]),
+    );
+    await mutate("update", () => updateChatIntegration(selected.id, {
+      config,
+      ...(Object.keys(secrets).length ? { secrets } : {}),
+    }));
+    setEditCredentials((current) => Object.fromEntries(
+      Object.entries(current).map(([key, value]) => [key, fields.some((field) => field.key === key && field.secret) ? "" : value]),
+    ));
+  }
+
   return (
     <div className="adm-view adm-chat">
       {error ? <p className="adm-view-error" role="alert" aria-live="polite">{t("admin.v2.action_failed", { message: error })}</p> : null}
+      {notice ? <p className="adm-view-notice" role="status" aria-live="polite">{notice}</p> : null}
       {query.error ? (
         <div className="adm-view-error" role="alert">
           <span>{t("admin.v2.chat_load_error")}</span>{" "}
@@ -202,6 +288,20 @@ export function ChatIntegrationsView() {
               <span>{t("admin.v2.chat_tenant")}</span>
               <input name="chat-tenant-id" autoComplete="off" spellCheck={false} value={tenantId} onChange={(event) => setTenantId(event.target.value)} placeholder={`${provider === "telegram" ? t("admin.v2.optional") : t("admin.v2.chat_tenant")}…`} />
             </label>
+            {provider === "telegram" ? (
+              <label>
+                <span>{t("admin.v2.chat_public_url")}</span>
+                <input
+                  name="chat-public-base-url"
+                  autoComplete="url"
+                  spellCheck={false}
+                  value={publicBaseUrl}
+                  onChange={(event) => setPublicBaseUrl(event.target.value)}
+                  placeholder="https://relay.example.com"
+                />
+                <small>{t("admin.v2.chat_public_url_help")}</small>
+              </label>
+            ) : null}
             {credentialFields[provider].map((field) => (
               <label key={field.key}>
                 <span>{field.key}</span>
@@ -216,6 +316,7 @@ export function ChatIntegrationsView() {
                 />
               </label>
             ))}
+            {provider === "telegram" ? <small>{t("admin.v2.chat_telegram_secret_generated")}</small> : null}
             <Button type="button" onClick={() => void handleCreate()} disabled={busy !== null}>
               <AdminConnect size={16} aria-hidden="true" />
               <span>{t("admin.v2.chat_create")}</span>
@@ -281,14 +382,65 @@ export function ChatIntegrationsView() {
                 })}
               </div>
 
+              <div className="adm-chat-form compact adm-chat-connection-form">
+                <h3>{t("admin.v2.chat_connection_title")}</h3>
+                {selected.provider === "telegram" ? (
+                  <label>
+                    <span>{t("admin.v2.chat_public_url")}</span>
+                    <input
+                      name="chat-edit-public-base-url"
+                      autoComplete="url"
+                      spellCheck={false}
+                      value={editPublicBaseUrl}
+                      onChange={(event) => setEditPublicBaseUrl(event.target.value)}
+                    />
+                  </label>
+                ) : null}
+                {credentialFields[selected.provider].map((field) => (
+                  <label key={field.key}>
+                    <span>{field.key}</span>
+                    <input
+                      name={`chat-edit-${field.key}`}
+                      autoComplete={field.secret ? "new-password" : "off"}
+                      spellCheck={false}
+                      type={field.secret ? "password" : "text"}
+                      value={editCredentials[field.key] ?? ""}
+                      onChange={(event) => setEditCredentials((current) => ({ ...current, [field.key]: event.target.value }))}
+                      placeholder={field.secret ? t("admin.v2.chat_secret_unchanged") : undefined}
+                    />
+                  </label>
+                ))}
+                <Button type="button" variant="secondary" onClick={() => void handleUpdateConnection()} disabled={busy !== null}>
+                  {t("admin.v2.chat_save_connection")}
+                </Button>
+                {selected.provider === "telegram" ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => void provision("rotate-secret", () => rotateTelegramWebhookSecret(selected.id))}
+                    disabled={busy !== null}
+                  >
+                    {t("admin.v2.chat_rotate_webhook_secret")}
+                  </Button>
+                ) : null}
+              </div>
+
               <div className="adm-chat-actions">
                 <Button type="button" variant="secondary" onClick={() => void mutate("check", () => checkChatIntegration(selected.id))} disabled={busy !== null}>
                   {t("admin.v2.chat_check")}
                 </Button>
-                <Button type="button" onClick={() => void mutate("activate", () => activateChatIntegration(selected.id))} disabled={busy !== null || selected.status === "active"}>
+                <Button type="button" onClick={() => void provision("activate", () => activateChatIntegration(selected.id))} disabled={busy !== null || selected.status === "active"}>
                   {t("admin.v2.chat_activate")}
                 </Button>
               </div>
+
+              {selected.provider === "telegram" && typeof selected.config.publicBaseUrl === "string" ? (
+                <div className="adm-chat-callback">
+                  <strong>{t("admin.v2.chat_callback_url")}</strong>
+                  <code>{`${String(selected.config.publicBaseUrl).replace(/\/+$/, "")}/webhooks/${selected.provider}/${selected.id}`}</code>
+                  <small>{t(`admin.v2.chat_callback_help_${selected.provider}`)}</small>
+                </div>
+              ) : null}
 
               <div className="adm-chat-split">
                 <div>

@@ -1126,6 +1126,15 @@
   gap: var(--space-lg);
 }
 
+.adm-view-notice {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--color-semantic-success) 35%, transparent);
+  border-radius: var(--radius-md);
+  color: var(--color-semantic-success-text);
+  background: color-mix(in srgb, var(--color-semantic-success) 8%, transparent);
+}
+
 .adm-chat-band {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -1249,6 +1258,7 @@
    vendor brand hues by default. The provider glyph carries identity. */
 
 .adm-chat-panel-head h3,
+.adm-chat-connection-form h3,
 .adm-chat-split h4 {
   margin: 0;
   color: var(--color-semantic-ink);
@@ -1389,6 +1399,33 @@
   gap: var(--space-sm);
   padding-bottom: var(--space-base);
   border-bottom: 1px solid var(--color-semantic-hairline-soft);
+}
+
+.adm-chat-callback {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-semantic-border);
+  border-radius: var(--radius-md);
+  background: var(--color-semantic-surface-subtle);
+}
+
+.adm-chat-callback code {
+  overflow-wrap: anywhere;
+  color: var(--color-semantic-accent);
+}
+
+.adm-chat-callback small,
+.adm-chat-form label small {
+  color: var(--color-semantic-muted);
+  font-size: var(--text-2xs);
+  line-height: 1.4;
+}
+
+.adm-chat-connection-form {
+  padding: var(--space-3);
+  border: 1px solid var(--color-semantic-border);
+  border-radius: var(--radius-md);
 }
 
 .adm-chat-split {
