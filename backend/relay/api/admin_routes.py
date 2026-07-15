@@ -401,7 +401,13 @@ async def activate_chat_integration(integration_id: str, request: Request, ctx: 
 async def check_chat_integration(integration_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     user = require_admin_session(request, ctx.auth_store)
     try:
-        integration = ctx.chat_store.check_integration(integration_id, actor=_actor_name(user))
+        settings = ctx.chat_store.connection_settings(integration_id)
+        provider_health = await request.app.state.chat_probe(settings)
+        integration = ctx.chat_store.check_integration(
+            integration_id,
+            actor=_actor_name(user),
+            provider_health=provider_health,
+        )
     except (KeyError, ValueError) as error:
         raise _chat_error(error) from error
     return {"integration": integration}

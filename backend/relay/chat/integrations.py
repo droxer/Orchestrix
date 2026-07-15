@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from threading import RLock
 from typing import Any, Literal
 
 from sqlalchemy import JSON, Column, DateTime, MetaData, Table, Text, create_engine, insert, select, update
+from cryptography.fernet import Fernet, InvalidToken
 
 from ..core.ids import new_relay_id, now_iso
 from ..persistence.store_common import _append_jsonl, _parse_iso, _read_json, _write_json, database_id_column
@@ -58,6 +60,7 @@ class LocalChatIntegrationStore:
 
     def create_integration(self, payload: dict[str, Any], actor: str | None = None) -> dict[str, Any]:
         with self._lock:
+            self._validate_secret_patch(payload.get("secrets"))
             provider = _provider(payload.get("provider"))
             now = now_iso()
             integration = {
@@ -86,6 +89,7 @@ class LocalChatIntegrationStore:
 
     def update_integration(self, integration_id: str, payload: dict[str, Any], actor: str | None = None) -> dict[str, Any]:
         with self._lock:
+            self._validate_secret_patch(payload.get("secrets"))
             integrations = self._read_integrations()
             for index, integration in enumerate(integrations):
                 if integration.get("id") != integration_id:
@@ -102,6 +106,10 @@ class LocalChatIntegrationStore:
                     updated["status"] = _status(payload.get("status"))
                 if "config" in payload:
                     updated["config"] = _public_config(payload.get("config"))
+                if {"tenantId", "config", "secrets"}.intersection(payload):
+                    updated["health"] = {"ok": False, "message": "Run the provider connection check again.", "lastCheckedAt": None}
+                    if updated.get("status") == "active":
+                        updated["status"] = "degraded"
                 updated["updatedAt"] = now_iso()
                 integrations[index] = updated
                 self._write_integrations(integrations)
@@ -123,6 +131,8 @@ class LocalChatIntegrationStore:
                     raise ValueError("Add at least one allowed conversation before activation.")
                 if not public["secretConfigured"]:
                     raise ValueError("Configure provider secrets before activation.")
+                if not public.get("health", {}).get("ok"):
+                    raise ValueError("Run a successful provider connection check before activation.")
                 updated = {**integration, "status": "active", "updatedAt": now_iso()}
                 integrations[index] = updated
                 self._write_integrations(integrations)
@@ -130,7 +140,12 @@ class LocalChatIntegrationStore:
                 return self._public_integration(updated)
             raise KeyError(integration_id)
 
-    def check_integration(self, integration_id: str, actor: str | None = None) -> dict[str, Any]:
+    def check_integration(
+        self,
+        integration_id: str,
+        actor: str | None = None,
+        provider_health: tuple[bool, str] | None = None,
+    ) -> dict[str, Any]:
         with self._lock:
             integrations = self._read_integrations()
             for index, integration in enumerate(integrations):
@@ -144,14 +159,17 @@ class LocalChatIntegrationStore:
                     checks.append("identity links")
                 if public["allowedConversationCount"] > 0:
                     checks.append("allowed conversations")
-                ok = len(checks) == 3
+                configured = len(checks) == 3
                 missing = [label for label in ("secrets", "identity links", "allowed conversations") if label not in checks]
+                provider_ok, provider_message = provider_health or (False, "Provider connection was not checked.")
+                ok = configured and provider_ok
+                message = provider_message if configured else f"Missing {', '.join(missing)}."
                 updated = {
                     **integration,
                     "status": integration.get("status") if ok else "degraded",
                     "health": {
                         "ok": ok,
-                        "message": "Ready for provider traffic." if ok else f"Missing {', '.join(missing)}.",
+                        "message": message,
                         "lastCheckedAt": now_iso(),
                     },
                     "updatedAt": now_iso(),
@@ -161,6 +179,24 @@ class LocalChatIntegrationStore:
                 self._audit("chat.integration.checked", integration_id, actor, {"ok": ok})
                 return self._public_integration(updated)
             raise KeyError(integration_id)
+
+    def connection_settings(self, integration_id: str) -> dict[str, Any]:
+        with self._lock:
+            integration = self._find_integration(integration_id)
+            return {
+                "provider": integration.get("provider"),
+                "tenantId": integration.get("tenantId"),
+                "config": dict(integration.get("config") or {}),
+                "secrets": dict(self._read_secrets().get(integration_id) or {}),
+            }
+
+    def runtime_integrations(self) -> list[dict[str, Any]]:
+        with self._lock:
+            return [
+                {"id": integration["id"], **self.connection_settings(integration["id"])}
+                for integration in self._read_integrations()
+                if integration.get("status") == "active"
+            ]
 
     def add_identity_link(self, integration_id: str, payload: dict[str, Any], actor: str | None = None) -> dict[str, Any]:
         with self._lock:
@@ -172,7 +208,6 @@ class LocalChatIntegrationStore:
                 "employeeId": employee_id,
                 "displayName": _string(payload.get("displayName")),
                 "defaultAgentId": _string(payload.get("defaultAgentId")),
-                "defaultSandboxId": _string(payload.get("defaultSandboxId")),
                 "createdAt": now_iso(),
                 "updatedAt": now_iso(),
             }
@@ -246,7 +281,6 @@ class LocalChatIntegrationStore:
                     "employeeId": link["employeeId"],
                     "displayName": link.get("displayName"),
                     "defaultAgentId": link.get("defaultAgentId"),
-                    "defaultSandboxId": link.get("defaultSandboxId"),
                 }
             return None
 
@@ -267,7 +301,13 @@ class LocalChatIntegrationStore:
             records = self._read_conversations()
             for index, record in enumerate(records):
                 if record.get("key") == key:
-                    updated = {**record, "sessionId": session_id, "ownerEmployeeId": owner_employee_id, "updatedAt": now}
+                    updated = {
+                        **record,
+                        "sessionId": session_id,
+                        "ownerEmployeeId": owner_employee_id,
+                        "providerMessageId": _string(payload.get("messageId")) or record.get("providerMessageId"),
+                        "updatedAt": now,
+                    }
                     records[index] = updated
                     self._write_conversations(records)
                     return updated
@@ -277,6 +317,7 @@ class LocalChatIntegrationStore:
                 "tenantId": _string(payload.get("tenantId")),
                 "conversationId": _required_string(payload.get("conversationId"), "conversationId"),
                 "threadId": _string(payload.get("threadId")),
+                "providerMessageId": _string(payload.get("messageId")),
                 "sessionId": session_id,
                 "ownerEmployeeId": owner_employee_id,
                 "createdAt": now,
@@ -325,6 +366,9 @@ class LocalChatIntegrationStore:
         secrets[integration_id] = {**current, **patch}
         _write_json(self.secrets_path, secrets, mode=0o600)
 
+    def _validate_secret_patch(self, raw: Any) -> None:
+        return
+
     def _find_integration(self, integration_id: str) -> dict[str, Any]:
         for integration in self._read_integrations():
             if integration.get("id") == integration_id:
@@ -349,7 +393,13 @@ class LocalChatIntegrationStore:
             if integration.get("id") != integration_id:
                 continue
             existing = integration.get(collection) if isinstance(integration.get(collection), list) else []
-            updated = {**integration, collection: [record, *existing], "updatedAt": now_iso()}
+            updated = {
+                **integration,
+                collection: [record, *existing],
+                "health": {"ok": False, "message": "Run the provider connection check again.", "lastCheckedAt": None},
+                "status": "degraded" if integration.get("status") == "active" else integration.get("status"),
+                "updatedAt": now_iso(),
+            }
             integrations[index] = updated
             self._write_integrations(integrations)
             return updated
@@ -364,7 +414,13 @@ class LocalChatIntegrationStore:
             updated_items = [item for item in existing if item.get("id") != record_id]
             if len(updated_items) == len(existing):
                 raise KeyError(record_id)
-            updated = {**integration, collection: updated_items, "updatedAt": now_iso()}
+            updated = {
+                **integration,
+                collection: updated_items,
+                "health": {"ok": False, "message": "Run the provider connection check again.", "lastCheckedAt": None},
+                "status": "degraded" if integration.get("status") == "active" else integration.get("status"),
+                "updatedAt": now_iso(),
+            }
             integrations[index] = updated
             self._write_integrations(integrations)
             return updated
@@ -396,8 +452,60 @@ class DatabaseChatIntegrationStore(LocalChatIntegrationStore):
     def __init__(self, database_url: str, *, create_schema: bool = False):
         self._lock = RLock()
         self.engine = create_engine(database_url, future=True)
+        self._transaction_connection = None
+        raw_key = os.environ.get("RELAY_CHAT_SECRET_KEY", "").strip()
+        self._secret_cipher = Fernet(raw_key.encode()) if raw_key else None
         if create_schema:
             self.metadata.create_all(self.engine)
+
+    def create_integration(self, payload: dict[str, Any], actor: str | None = None) -> dict[str, Any]:
+        return self._atomic(lambda: super(DatabaseChatIntegrationStore, self).create_integration(payload, actor))
+
+    def update_integration(self, integration_id: str, payload: dict[str, Any], actor: str | None = None) -> dict[str, Any]:
+        return self._atomic(lambda: super(DatabaseChatIntegrationStore, self).update_integration(integration_id, payload, actor))
+
+    def activate_integration(self, integration_id: str, actor: str | None = None) -> dict[str, Any]:
+        return self._atomic(lambda: super(DatabaseChatIntegrationStore, self).activate_integration(integration_id, actor))
+
+    def check_integration(
+        self,
+        integration_id: str,
+        actor: str | None = None,
+        provider_health: tuple[bool, str] | None = None,
+    ) -> dict[str, Any]:
+        return self._atomic(
+            lambda: super(DatabaseChatIntegrationStore, self).check_integration(integration_id, actor, provider_health)
+        )
+
+    def add_identity_link(self, integration_id: str, payload: dict[str, Any], actor: str | None = None) -> dict[str, Any]:
+        return self._atomic(lambda: super(DatabaseChatIntegrationStore, self).add_identity_link(integration_id, payload, actor))
+
+    def delete_identity_link(self, integration_id: str, link_id: str, actor: str | None = None) -> dict[str, Any]:
+        return self._atomic(lambda: super(DatabaseChatIntegrationStore, self).delete_identity_link(integration_id, link_id, actor))
+
+    def add_allowed_conversation(self, integration_id: str, payload: dict[str, Any], actor: str | None = None) -> dict[str, Any]:
+        return self._atomic(
+            lambda: super(DatabaseChatIntegrationStore, self).add_allowed_conversation(integration_id, payload, actor)
+        )
+
+    def delete_allowed_conversation(
+        self,
+        integration_id: str,
+        conversation_record_id: str,
+        actor: str | None = None,
+    ) -> dict[str, Any]:
+        return self._atomic(
+            lambda: super(DatabaseChatIntegrationStore, self).delete_allowed_conversation(
+                integration_id, conversation_record_id, actor
+            )
+        )
+
+    def set_conversation_session(self, payload: dict[str, Any], session_id: str, owner_employee_id: str) -> dict[str, Any]:
+        return self._atomic(
+            lambda: super(DatabaseChatIntegrationStore, self).set_conversation_session(
+                payload, session_id, owner_employee_id
+            )
+        )
 
     def audit_events(self, integration_id: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
         with self._lock:
@@ -419,7 +527,25 @@ class DatabaseChatIntegrationStore(LocalChatIntegrationStore):
         self._write_document("integrations", integrations)
 
     def _read_secrets(self) -> dict[str, dict[str, str]]:
-        return self._read_document("secrets", {})
+        if self._transaction_connection is None:
+            return self._atomic(self._read_secrets)
+        encrypted = self._read_document("secrets", {})
+        if not encrypted:
+            return {}
+        if not self._secret_cipher:
+            raise ValueError("RELAY_CHAT_SECRET_KEY is required to read database chat secrets.")
+        if isinstance(encrypted, dict) and not isinstance(encrypted.get("ciphertext"), str):
+            ciphertext = self._secret_cipher.encrypt(json.dumps(encrypted, separators=(",", ":")).encode()).decode()
+            self._write_document("secrets", {"ciphertext": ciphertext})
+            return encrypted
+        if not isinstance(encrypted, dict) or not isinstance(encrypted.get("ciphertext"), str):
+            raise ValueError("Database chat secrets have an invalid encrypted format.")
+        try:
+            decoded = self._secret_cipher.decrypt(encrypted["ciphertext"].encode())
+        except InvalidToken as error:
+            raise ValueError("RELAY_CHAT_SECRET_KEY cannot decrypt database chat secrets.") from error
+        value = json.loads(decoded)
+        return value if isinstance(value, dict) else {}
 
     def _write_secret_patch(self, integration_id: str, raw: Any) -> None:
         if not isinstance(raw, dict):
@@ -431,10 +557,23 @@ class DatabaseChatIntegrationStore(LocalChatIntegrationStore):
         }
         if not patch:
             return
+        if not self._secret_cipher:
+            raise ValueError("RELAY_CHAT_SECRET_KEY is required to store database chat secrets.")
         secrets = self._read_secrets()
         current = secrets.get(integration_id, {})
         secrets[integration_id] = {**current, **patch}
-        self._write_document("secrets", secrets)
+        ciphertext = self._secret_cipher.encrypt(json.dumps(secrets, separators=(",", ":")).encode()).decode()
+        self._write_document("secrets", {"ciphertext": ciphertext})
+
+    def _validate_secret_patch(self, raw: Any) -> None:
+        if not isinstance(raw, dict) or not any(
+            key in SECRET_FIELDS and value is not None and str(value).strip()
+            for key, value in raw.items()
+        ):
+            return
+        if not self._secret_cipher:
+            raise ValueError("RELAY_CHAT_SECRET_KEY is required to store database chat secrets.")
+        self._read_secrets()
 
     def _audit(self, event_type: str, integration_id: str, actor: str | None, payload: dict[str, Any]) -> None:
         events = self._read_document("audit", [])
@@ -449,20 +588,44 @@ class DatabaseChatIntegrationStore(LocalChatIntegrationStore):
         self._write_document("audit", events)
 
     def _read_document(self, key: str, default: Any) -> Any:
-        with self.engine.begin() as conn:
+        conn = self._transaction_connection
+        if conn is not None:
             row = conn.execute(select(self.documents.c.payload).where(self.documents.c.document_key == key)).mappings().first()
+        else:
+            with self.engine.begin() as connection:
+                row = connection.execute(
+                    select(self.documents.c.payload).where(self.documents.c.document_key == key)
+                ).mappings().first()
         if not row:
             return default
         return row["payload"]
 
     def _write_document(self, key: str, payload: Any) -> None:
         now = _parse_iso(now_iso())
-        with self.engine.begin() as conn:
-            existing = conn.scalar(select(self.documents.c.id).where(self.documents.c.document_key == key))
-            if existing:
-                conn.execute(update(self.documents).where(self.documents.c.id == existing).values(payload=payload, updated_at=now))
-            else:
-                conn.execute(insert(self.documents).values(document_key=key, payload=payload, updated_at=now))
+        conn = self._transaction_connection
+        if conn is not None:
+            self._upsert_document(conn, key, payload, now)
+            return
+        with self.engine.begin() as connection:
+            self._upsert_document(connection, key, payload, now)
+
+    def _upsert_document(self, conn: Any, key: str, payload: Any, now: Any) -> None:
+        existing = conn.scalar(select(self.documents.c.id).where(self.documents.c.document_key == key))
+        if existing:
+            conn.execute(update(self.documents).where(self.documents.c.id == existing).values(payload=payload, updated_at=now))
+        else:
+            conn.execute(insert(self.documents).values(document_key=key, payload=payload, updated_at=now))
+
+    def _atomic(self, operation: Any) -> Any:
+        with self._lock:
+            if self._transaction_connection is not None:
+                return operation()
+            with self.engine.begin() as conn:
+                self._transaction_connection = conn
+                try:
+                    return operation()
+                finally:
+                    self._transaction_connection = None
 
 
 def _provider(value: Any) -> ChatProvider:

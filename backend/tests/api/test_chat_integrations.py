@@ -1,13 +1,34 @@
 from __future__ import annotations
 
+import asyncio
+import json
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+import httpx
 from fastapi.testclient import TestClient
 
 from relay.app import create_app
 from relay.chat import DatabaseChatIntegrationStore, LocalChatIntegrationStore
+from relay.chat.provider_health import probe_chat_integration
+
+
+async def _healthy_provider(_settings):
+    return True, "Provider credentials verified."
+
+
+def test_provider_probe_uses_telegram_get_me() -> None:
+    transport = httpx.MockTransport(lambda request: httpx.Response(200, json={"ok": True}, request=request))
+
+    async def run_probe():
+        async with httpx.AsyncClient(transport=transport) as client:
+            return await probe_chat_integration({
+                "provider": "telegram",
+                "secrets": {"botToken": "token", "webhookSecret": "webhook"},
+            }, client)
+
+    assert asyncio.run(run_probe()) == (True, "Provider credentials verified.")
 
 
 def _bootstrap_admin(client: TestClient) -> None:
@@ -32,6 +53,7 @@ def test_chat_integration_setup_flow_redacts_secrets(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_CHAT_TOKEN", "chat_secret")
     with TemporaryDirectory() as root:
         client = TestClient(create_app(root))
+        client.app.state.chat_probe = _healthy_provider
         _bootstrap_admin(client)
         _login(client, "admin", "secret123")
         assert client.post("/cp/users", json={
@@ -94,6 +116,13 @@ def test_chat_integration_setup_flow_redacts_secrets(monkeypatch) -> None:
         assert activate.json()["integration"]["status"] == "active"
         assert "discord-secret-token" not in activate.text
 
+        runtime = client.get(
+            "/chat/integrations/runtime",
+            headers={"Authorization": "Bearer chat_secret"},
+        )
+        assert runtime.status_code == 200
+        assert runtime.json()["integrations"][0]["secrets"]["botToken"] == "discord-secret-token"
+
         resolved = client.post(
             "/chat/identity/resolve",
             headers={"Authorization": "Bearer chat_secret"},
@@ -128,6 +157,45 @@ def test_chat_integration_setup_flow_redacts_secrets(monkeypatch) -> None:
         audit = client.get(f"/cp/chat-integrations/{integration_id}/audit")
         assert audit.status_code == 200
         assert [event["type"] for event in audit.json()["events"]][-1] == "chat.integration.activated"
+
+
+def test_chat_integration_check_rejects_invalid_provider_credentials(monkeypatch) -> None:
+    async def invalid_provider(_settings):
+        return False, "Provider rejected the configured credentials."
+
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        client.app.state.chat_probe = invalid_provider
+        _bootstrap_admin(client)
+        _login(client, "admin", "secret123")
+        assert client.post("/cp/users", json={
+            "username": "alice",
+            "password": "AlicePass123!",
+            "employeeId": "alice",
+        }).status_code == 201
+        integration_id = client.post("/cp/chat-integrations", json={
+            "provider": "telegram",
+            "displayName": "Operations Telegram",
+            "secrets": {"botToken": "invalid"},
+        }).json()["integration"]["id"]
+        client.post(f"/cp/chat-integrations/{integration_id}/identity-links", json={
+            "externalUserId": "42", "employeeId": "alice",
+        })
+        client.post(f"/cp/chat-integrations/{integration_id}/allowed-conversations", json={
+            "conversationId": "-100",
+        })
+
+        check = client.post(f"/cp/chat-integrations/{integration_id}/check")
+        activate = client.post(f"/cp/chat-integrations/{integration_id}/activate")
+
+        assert check.status_code == 200
+        assert check.json()["integration"]["health"] == {
+            "ok": False,
+            "message": "Provider rejected the configured credentials.",
+            "lastCheckedAt": check.json()["integration"]["health"]["lastCheckedAt"],
+        }
+        assert activate.status_code == 400
 
 
 def test_chat_integrations_require_admin(monkeypatch) -> None:
@@ -172,7 +240,10 @@ def test_chat_integration_store_serializes_concurrent_creates() -> None:
         assert all(item["secretConfigured"] for item in integrations)
 
 
-def test_database_chat_integration_store_persists_without_local_files() -> None:
+def test_database_chat_integration_store_encrypts_secrets(monkeypatch) -> None:
+    from cryptography.fernet import Fernet
+
+    monkeypatch.setenv("RELAY_CHAT_SECRET_KEY", Fernet.generate_key().decode())
     with TemporaryDirectory() as root:
         store = DatabaseChatIntegrationStore(f"sqlite:///{root}/chat.db", create_schema=True)
         integration = store.create_integration({
@@ -182,6 +253,7 @@ def test_database_chat_integration_store_persists_without_local_files() -> None:
         }, actor="admin")
         store.add_identity_link(integration["id"], {"externalUserId": "u1", "employeeId": "alice"})
         store.add_allowed_conversation(integration["id"], {"conversationId": "c1"})
+        store.check_integration(integration["id"], provider_health=(True, "Provider credentials verified."))
         activated = store.activate_integration(integration["id"], actor="admin")
 
         assert activated["status"] == "active"
@@ -192,3 +264,8 @@ def test_database_chat_integration_store_persists_without_local_files() -> None:
         })["employeeId"] == "alice"
         assert store.audit_events(integration["id"])[-1]["type"] == "chat.integration.activated"
         assert not (Path(root) / "chat").exists()
+        with store.engine.begin() as connection:
+            encrypted = connection.execute(
+                store.documents.select().where(store.documents.c.document_key == "secrets")
+            ).mappings().one()["payload"]
+        assert "secret-token" not in json.dumps(encrypted)

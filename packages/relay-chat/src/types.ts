@@ -16,7 +16,6 @@ export interface ChatIdentity {
   employeeId: string;
   displayName?: string;
   defaultAgentId?: string;
-  defaultSandboxId?: string;
   isAdmin?: boolean;
 }
 
@@ -24,25 +23,16 @@ export interface ChatIdentityResolver {
   resolve(ref: ChatConversationRef): Promise<ChatIdentity | undefined>;
 }
 
-export interface ChatSandboxResolver {
-  resolve(input: {
-    identity: ChatIdentity;
-    request: ChatAgentRequest;
-  }): Promise<string | undefined>;
-}
-
 export interface ChatAgentRequest extends ChatConversationRef {
   taskGoal: string;
-  agent: AgentName;
+  agentId?: string;
   mode: AgentTaskMode;
-  sandboxId?: string;
   sessionId?: string;
   /** Start a fresh conversation, ignoring any existing thread->session binding. */
   forceNew?: boolean;
 }
 
 export interface ChatCancelRequest extends ChatConversationRef {
-  sandboxId?: string;
   sessionId: string;
   reason?: string;
 }
@@ -52,16 +42,22 @@ export interface ChatStatusRequest extends ChatConversationRef {
 }
 
 export type ChatCommand =
-  | { kind: "run"; taskGoal: string; agent: AgentName; mode: AgentTaskMode; sandboxId?: string; sessionId?: string }
-  | { kind: "new"; taskGoal: string; agent: AgentName; mode: AgentTaskMode; sandboxId?: string }
+  | { kind: "run"; taskGoal: string; agentId?: string; mode: AgentTaskMode; sessionId?: string }
+  | { kind: "new"; taskGoal: string; agentId?: string; mode: AgentTaskMode }
   | { kind: "list" }
   | { kind: "switch"; sessionId: string }
   | { kind: "status"; sessionId: string }
-  | { kind: "cancel"; sessionId: string; sandboxId?: string; reason?: string };
+  | { kind: "cancel"; sessionId: string; reason?: string };
 
 export interface ChatRun {
   session: RelaySession;
   conversation: ChatConversationRef;
+  recovery: "persisted" | "degraded";
+}
+
+export interface ChatConversationBinding {
+  session?: RelaySession;
+  providerMessageId?: string;
 }
 
 export interface ChatSessionUpdate {
@@ -74,6 +70,7 @@ export interface ChatSessionSink {
   started?(run: ChatRun): Promise<void> | void;
   event?(update: ChatSessionUpdate): Promise<void> | void;
   completed?(session: RelaySession): Promise<void> | void;
+  degraded?(error: unknown, run: ChatRun): Promise<void> | void;
   failed?(error: unknown): Promise<void> | void;
 }
 
@@ -83,7 +80,7 @@ export interface RelayChatRequestContext {
 }
 
 export interface RelayChatBackend {
-  listEmployeeAgents?(employeeId: string, signal?: AbortSignal): Promise<Array<{ id: string; executorKind: AgentName; availability?: string }>>;
+  listEmployeeAgents?(employeeId: string, signal?: AbortSignal): Promise<Array<{ id: string; executorKind: AgentName; availability: string }>>;
   startAgentRun?(input: {
     agentId: string;
     taskGoal: string;
@@ -98,21 +95,6 @@ export interface RelayChatBackend {
     employeeId?: string;
     signal?: AbortSignal;
   }): Promise<RelaySession>;
-  startSandboxRun(input: {
-    sandboxId: string;
-    taskGoal: string;
-    assignments: Array<{ agent: AgentName; mode?: AgentTaskMode }>;
-    sessionId?: string;
-    employeeId?: string;
-    signal?: AbortSignal;
-  }): Promise<RelaySession>;
-  cancelSandboxRun(input: {
-    sandboxId: string;
-    sessionId: string;
-    reason?: string;
-    employeeId?: string;
-    signal?: AbortSignal;
-  }): Promise<RelaySession>;
   getSession(sessionId: string, context?: RelayChatRequestContext): Promise<RelaySession>;
   streamSessionEvents(
     sessionId: string,
@@ -121,6 +103,7 @@ export interface RelayChatBackend {
   ): Promise<void>;
   /** The live session a chat thread is currently bound to, if any. */
   resolveConversationSession?(ref: ChatConversationRef, signal?: AbortSignal): Promise<RelaySession | undefined>;
+  resolveConversationBinding?(ref: ChatConversationRef, signal?: AbortSignal): Promise<ChatConversationBinding | undefined>;
   /** Bind (or rebind) a chat thread to one of the owner's sessions. */
   bindConversationSession?(ref: ChatConversationRef, sessionId: string, signal?: AbortSignal): Promise<void>;
   /** The owner's open conversations, for list/switch commands. */

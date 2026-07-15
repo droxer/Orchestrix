@@ -22,9 +22,7 @@ def _resolve_owner(ctx: AppContextDep, body: dict[str, Any]) -> dict[str, Any]:
 
 
 def _owned_by(session: dict[str, Any], employee_id: str) -> bool:
-    owner = session.get("ownerEmployeeId")
-    # Ownerless legacy sessions stay accessible; otherwise the owner must match.
-    return owner is None or owner == employee_id
+    return session.get("ownerEmployeeId") == employee_id
 
 
 @router.post("/chat/identity/resolve")
@@ -32,6 +30,13 @@ async def resolve_chat_identity(request: Request, ctx: AppContextDep) -> dict[st
     require_chat_service_request(request)
     body = await json_body(request)
     return {"identity": _resolve_owner(ctx, body)}
+
+
+@router.get("/chat/integrations/runtime")
+async def runtime_chat_integrations(request: Request, ctx: AppContextDep) -> dict[str, Any]:
+    """Active provider settings for the separately deployed chat webhook service."""
+    require_chat_service_request(request)
+    return {"integrations": ctx.chat_store.runtime_integrations()}
 
 
 @router.post("/chat/conversation/session")
@@ -42,15 +47,15 @@ async def chat_conversation_session(request: Request, ctx: AppContextDep) -> dic
     identity = _resolve_owner(ctx, body)
     record = ctx.chat_store.get_conversation_session(body)
     if not record or not record.get("sessionId"):
-        return {"session": None}
+        return {"session": None, "mapping": record}
     try:
         session = ctx.session_store.get_session(record["sessionId"])
     except KeyError:
-        return {"session": None}
+        return {"session": None, "mapping": record}
     # Never surface another employee's session, or a closed (archived) one.
     if not _owned_by(session, identity["employeeId"]) or session.get("archived"):
-        return {"session": None}
-    return {"session": session}
+        return {"session": None, "mapping": record}
+    return {"session": session, "mapping": record}
 
 
 @router.post("/chat/conversation/sessions")

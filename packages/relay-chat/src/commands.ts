@@ -1,7 +1,6 @@
-import { isAgentName, type AgentName, type AgentTaskMode } from "relay-core";
+import type { AgentTaskMode } from "relay-core";
 import type { ChatAgentRequest, ChatCommand, ChatConversationRef } from "./types.js";
 
-const DEFAULT_AGENT: AgentName = "codex";
 const DEFAULT_MODE: AgentTaskMode = "action";
 
 export function parseChatCommand(text: string): ChatCommand | undefined {
@@ -23,11 +22,10 @@ export function parseChatCommand(text: string): ChatCommand | undefined {
   if (action === "cancel") {
     const sessionId = tokens.shift();
     if (!sessionId) return undefined;
-    const parsed = parseKnownOptions(tokens, new Set(["sandbox"]));
+    const parsed = parseKnownOptions(tokens, new Set());
     return {
       kind: "cancel",
       sessionId,
-      sandboxId: stringOption(parsed.options, "sandbox"),
       reason: parsed.rest.join(" ").trim() || undefined,
     };
   }
@@ -39,9 +37,8 @@ export function commandToAgentRequest(ref: ChatConversationRef, command: ChatCom
     return {
       ...ref,
       taskGoal: command.taskGoal,
-      agent: command.agent,
+      agentId: command.agentId,
       mode: command.mode,
-      sandboxId: command.sandboxId,
       sessionId: command.sessionId,
     };
   }
@@ -49,9 +46,8 @@ export function commandToAgentRequest(ref: ChatConversationRef, command: ChatCom
     return {
       ...ref,
       taskGoal: command.taskGoal,
-      agent: command.agent,
+      agentId: command.agentId,
       mode: command.mode,
-      sandboxId: command.sandboxId,
       forceNew: true,
     };
   }
@@ -59,20 +55,22 @@ export function commandToAgentRequest(ref: ChatConversationRef, command: ChatCom
 }
 
 function parseRunCommand(tokens: string[], kind: "run" | "new"): ChatCommand | undefined {
-  const parsed = parseKnownOptions(tokens, new Set(["agent", "mode", "sandbox", "session"]));
-  const agent = agentOption(parsed.options) ?? DEFAULT_AGENT;
-  const mode = modeOption(parsed.options) ?? DEFAULT_MODE;
+  if (tokens.some((token) => /^--?sandbox(?:=|$)/.test(token))) return undefined;
+  const parsed = parseKnownOptions(tokens, new Set(["agent", "mode", "session"]));
+  const agentId = stringOption(parsed.options, "agent");
+  const rawMode = stringOption(parsed.options, "mode");
+  const mode = rawMode ? modeOption(parsed.options) : DEFAULT_MODE;
+  if (!mode) return undefined;
   const taskGoal = parsed.rest.join(" ").trim();
   if (!taskGoal) return undefined;
   if (kind === "new") {
-    return { kind: "new", taskGoal, agent, mode, sandboxId: stringOption(parsed.options, "sandbox") };
+    return { kind: "new", taskGoal, agentId, mode };
   }
   return {
     kind: "run",
     taskGoal,
-    agent,
+    agentId,
     mode,
-    sandboxId: stringOption(parsed.options, "sandbox"),
     sessionId: stringOption(parsed.options, "session"),
   };
 }
@@ -133,11 +131,6 @@ function splitCommand(text: string): string[] {
 
 function stripCommandSuffix(value: string): string {
   return value.replace(/^\/+/, "").split("@", 1)[0];
-}
-
-function agentOption(options: Map<string, string>): AgentName | undefined {
-  const value = stringOption(options, "agent");
-  return isAgentName(value) ? value : undefined;
 }
 
 function modeOption(options: Map<string, string>): AgentTaskMode | undefined {

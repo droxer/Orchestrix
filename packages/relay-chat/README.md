@@ -14,8 +14,19 @@ The package keeps platform details at the edge:
 - Telegram user/chat/topic IDs stay in the Telegram adapter.
 - Lark `open_id`, `union_id`, `chat_id`, and `thread_id` stay in the Lark adapter.
 
-The shared core works with `employeeId`, `sandboxId`, `sessionId`, agent,
+The shared core works with `employeeId`, `sessionId`, logical `agentId`,
 mode, and task goal. Authorization remains a backend responsibility.
+
+The provider modules also export verified webhook handlers for Discord
+interactions, Telegram updates, and Lark events. They acknowledge provider
+requests, normalize commands, call `RelayChatGateway`, and send throttled status
+updates without exposing raw agent output.
+
+`relay-chat-server` is the deployable HTTP entrypoint. It reads active provider
+settings from the Relay backend with `RELAY_CHAT_TOKEN`, stores provider event
+IDs durably under `.relay/chat/`, and exposes the verified webhook handlers.
+Set `RELAY_CHAT_PUBLIC_URL` so startup can register Discord commands and the
+Telegram webhook.
 
 Use `RelayChatIdentityResolver` with the Admin Console's chat integration setup
 when running provider adapters in production. It resolves provider users through

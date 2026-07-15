@@ -21,10 +21,22 @@ import type { ChatIntegration, ChatProvider } from "../../types";
 const CHAT_INTEGRATIONS_KEY = ["admin", "chat-integrations"] as const;
 const PROVIDERS: ChatProvider[] = ["discord", "telegram", "lark"];
 
-const secretFieldByProvider: Record<ChatProvider, string> = {
-  discord: "botToken",
-  telegram: "botToken",
-  lark: "appSecret",
+const credentialFields: Record<ChatProvider, Array<{ key: string; secret: boolean }>> = {
+  discord: [
+    { key: "applicationId", secret: false },
+    { key: "publicKey", secret: false },
+    { key: "botToken", secret: true },
+  ],
+  telegram: [
+    { key: "botToken", secret: true },
+    { key: "webhookSecret", secret: true },
+  ],
+  lark: [
+    { key: "appId", secret: false },
+    { key: "appSecret", secret: true },
+    { key: "verificationToken", secret: true },
+    { key: "encryptKey", secret: true },
+  ],
 };
 
 function providerLabel(provider: ChatProvider): string {
@@ -61,7 +73,7 @@ export function ChatIntegrationsView() {
   const [provider, setProvider] = useState<ChatProvider>("discord");
   const [displayName, setDisplayName] = useState("Engineering Discord");
   const [tenantId, setTenantId] = useState("");
-  const [secret, setSecret] = useState("");
+  const [credentials, setCredentials] = useState<Record<string, string>>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [identityForm, setIdentityForm] = useState({ externalUserId: "", employeeId: "", displayName: "", defaultAgentId: "" });
   const [conversationForm, setConversationForm] = useState({ conversationId: "", threadId: "", label: "" });
@@ -109,15 +121,26 @@ export function ChatIntegrationsView() {
       setError(t("admin.v2.chat_error_name_required"));
       return;
     }
-    const secretKey = secretFieldByProvider[provider];
+    const fields = credentialFields[provider];
+    const missing = fields.find((field) => !credentials[field.key]?.trim());
+    if (missing) {
+      setError(`${missing.key} is required.`);
+      return;
+    }
+    const config = Object.fromEntries(
+      fields.filter((field) => !field.secret).map((field) => [field.key, credentials[field.key].trim()]),
+    );
+    const secrets = Object.fromEntries(
+      fields.filter((field) => field.secret).map((field) => [field.key, credentials[field.key].trim()]),
+    );
     await mutate("create", () => createChatIntegration({
       provider,
       displayName: displayName.trim(),
       tenantId: tenantId.trim() || undefined,
-      secrets: secret.trim() ? { [secretKey]: secret.trim() } : undefined,
-      config: { commandName: "relay" },
+      secrets,
+      config: { commandName: "relay", ...config },
     }));
-    setSecret("");
+    setCredentials({});
   }
 
   async function handleAddIdentity() {
@@ -167,7 +190,7 @@ export function ChatIntegrationsView() {
           <div className="adm-chat-form">
             <label>
               <span>{t("admin.v2.chat_provider")}</span>
-              <select name="chat-provider" value={provider} onChange={(event) => setProvider(event.target.value as ChatProvider)}>
+              <select name="chat-provider" value={provider} onChange={(event) => { setProvider(event.target.value as ChatProvider); setCredentials({}); }}>
                 {PROVIDERS.map((item) => <option key={item} value={item}>{providerLabel(item)}</option>)}
               </select>
             </label>
@@ -179,10 +202,20 @@ export function ChatIntegrationsView() {
               <span>{t("admin.v2.chat_tenant")}</span>
               <input name="chat-tenant-id" autoComplete="off" spellCheck={false} value={tenantId} onChange={(event) => setTenantId(event.target.value)} placeholder={`${provider === "telegram" ? t("admin.v2.optional") : t("admin.v2.chat_tenant")}…`} />
             </label>
-            <label>
-              <span>{t("admin.v2.chat_secret")}</span>
-              <input name="chat-secret" autoComplete="new-password" spellCheck={false} value={secret} onChange={(event) => setSecret(event.target.value)} type="password" placeholder={`${secretFieldByProvider[provider]}…`} />
-            </label>
+            {credentialFields[provider].map((field) => (
+              <label key={field.key}>
+                <span>{field.key}</span>
+                <input
+                  name={`chat-${field.key}`}
+                  autoComplete={field.secret ? "new-password" : "off"}
+                  spellCheck={false}
+                  value={credentials[field.key] ?? ""}
+                  onChange={(event) => setCredentials((current) => ({ ...current, [field.key]: event.target.value }))}
+                  type={field.secret ? "password" : "text"}
+                  placeholder={`${field.key}…`}
+                />
+              </label>
+            ))}
             <Button type="button" onClick={() => void handleCreate()} disabled={busy !== null}>
               <AdminConnect size={16} aria-hidden="true" />
               <span>{t("admin.v2.chat_create")}</span>

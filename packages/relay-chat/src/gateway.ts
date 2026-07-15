@@ -3,10 +3,10 @@ import type {
   ChatAgentRequest,
   ChatCancelRequest,
   ChatConversationRef,
+  ChatConversationBinding,
   ChatIdentity,
   ChatIdentityResolver,
   ChatRun,
-  ChatSandboxResolver,
   ChatSessionSink,
   ChatStatusRequest,
   RelayChatBackend,
@@ -15,18 +15,15 @@ import type {
 export interface RelayChatGatewayOptions {
   backend: RelayChatBackend;
   identities: ChatIdentityResolver;
-  sandboxes?: ChatSandboxResolver;
 }
 
 export class RelayChatGateway {
   private readonly backend: RelayChatBackend;
   private readonly identities: ChatIdentityResolver;
-  private readonly sandboxes?: ChatSandboxResolver;
 
   constructor(options: RelayChatGatewayOptions) {
     this.backend = options.backend;
     this.identities = options.identities;
-    this.sandboxes = options.sandboxes;
   }
 
   async run(request: ChatAgentRequest, sink: ChatSessionSink = {}, signal?: AbortSignal): Promise<ChatRun> {
@@ -38,7 +35,7 @@ export class RelayChatGateway {
       if (!sessionId && !request.forceNew) {
         sessionId = (await this.backend.resolveConversationSession?.(request, signal))?.id;
       }
-      const agentId = await this.resolveAgentId(identity, request.agent, signal);
+      const agentId = await this.resolveAgentId(identity, request.agentId, signal);
       if (!agentId || !this.backend.startAgentRun) {
         throw new Error(`No ready Relay agent is configured for ${identity.employeeId}.`);
       }
@@ -52,13 +49,19 @@ export class RelayChatGateway {
           });
       // Persist the thread -> session binding so follow-ups, status, and cancel
       // resume the same conversation after a bot restart.
+      const run: ChatRun = { session, conversation: request, recovery: "persisted" };
       try {
-        await this.backend.bindConversationSession?.(request, session.id, signal);
-      } catch {
-        // The run is already active; keep the live stream usable even if the
-        // durable chat mapping cannot be refreshed.
+        if (!this.backend.bindConversationSession) {
+          throw new Error("The Relay backend does not support persistent conversation bindings.");
+        }
+        await this.backend.bindConversationSession(request, session.id, signal);
+      } catch (error) {
+        run.recovery = "degraded";
+        await sink.started?.(run);
+        await sink.degraded?.(error, run);
+        void this.followSession(session.id, identity.employeeId, sink, signal);
+        return run;
       }
-      const run = { session, conversation: request };
       await sink.started?.(run);
       void this.followSession(session.id, identity.employeeId, sink, signal);
       return run;
@@ -74,6 +77,11 @@ export class RelayChatGateway {
     return (await this.backend.listConversationSessions?.(ref, signal)) ?? [];
   }
 
+  async conversationBinding(ref: ChatConversationRef, signal?: AbortSignal): Promise<ChatConversationBinding | undefined> {
+    await this.requireIdentity(ref);
+    return this.backend.resolveConversationBinding?.(ref, signal);
+  }
+
   /** Rebind a chat thread to an existing session for `/relay switch`. */
   async switchConversation(ref: ChatConversationRef, sessionId: string, signal?: AbortSignal): Promise<void> {
     await this.requireIdentity(ref);
@@ -82,18 +90,8 @@ export class RelayChatGateway {
 
   async cancel(request: ChatCancelRequest, signal?: AbortSignal): Promise<RelaySession> {
     const identity = await this.requireIdentity(request);
-    if (this.backend.cancelSessionRun) {
-      return this.backend.cancelSessionRun({
-        sessionId: request.sessionId,
-        reason: request.reason,
-        employeeId: identity.employeeId,
-        signal,
-      });
-    }
-    const sandboxId = request.sandboxId ?? identity.defaultSandboxId;
-    if (!sandboxId) throw new Error(`No sandbox is configured for employee ${identity.employeeId}.`);
-    return this.backend.cancelSandboxRun({
-      sandboxId,
+    if (!this.backend.cancelSessionRun) throw new Error("The Relay backend does not support session cancellation.");
+    return this.backend.cancelSessionRun({
       sessionId: request.sessionId,
       reason: request.reason,
       employeeId: identity.employeeId,
@@ -125,24 +123,10 @@ export class RelayChatGateway {
     return identity;
   }
 
-  private async resolveAgentId(identity: ChatIdentity, executorKind: ChatAgentRequest["agent"], signal?: AbortSignal): Promise<string | undefined> {
+  private async resolveAgentId(identity: ChatIdentity, requestedAgentId: string | undefined, signal?: AbortSignal): Promise<string | undefined> {
     const agents = await this.backend.listEmployeeAgents?.(identity.employeeId, signal);
-    if (identity.defaultAgentId) {
-      const defaultAgent = agents?.find((agent) => agent.id === identity.defaultAgentId);
-      if (defaultAgent?.executorKind === executorKind && defaultAgent.availability === "ready") {
-        return defaultAgent.id;
-      }
-    }
-    return agents?.find((agent) => agent.executorKind === executorKind && agent.availability === "ready")?.id;
-  }
-
-  private async requireSandbox(identity: ChatIdentity, request: ChatAgentRequest): Promise<string> {
-    const sandboxId = request.sandboxId
-      ?? await this.sandboxes?.resolve({ identity, request })
-      ?? identity.defaultSandboxId;
-    if (!sandboxId) {
-      throw new Error(`No sandbox is configured for employee ${identity.employeeId}.`);
-    }
-    return sandboxId;
+    const agentId = requestedAgentId ?? identity.defaultAgentId;
+    if (!agentId) return undefined;
+    return agents?.find((agent) => agent.id === agentId && agent.availability === "ready")?.id;
   }
 }

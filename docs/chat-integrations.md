@@ -31,11 +31,9 @@ type ChatAgentRequest = {
   threadId?: string;
   messageId?: string;
   tenantId?: string;
-  employeeId?: string;
-  sandboxId?: string;
   sessionId?: string;
-  agent: "claude" | "pi" | "codex" | "kimi";
-  mode: "implement" | "review";
+  agentId?: string;
+  mode: "action" | "review" | "ask";
   taskGoal: string;
 };
 ```
@@ -64,6 +62,24 @@ Configure each chat service with:
 ```bash
 RELAY_BACKEND_URL=http://127.0.0.1:8790
 RELAY_CHAT_TOKEN=replace-with-the-same-secret
+RELAY_CHAT_PUBLIC_URL=https://chat.example.com
+RELAY_CHAT_PORT=8791
+```
+
+Build and run `relay-chat-server` as a separate channel-plane service. It loads
+only active integration credentials through the chat-service-authenticated
+`GET /chat/integrations/runtime` endpoint, exposes provider webhook paths under
+`/webhooks/<provider>/<integration-id>`, registers Discord's `/relay` command,
+and configures Telegram's webhook when `RELAY_CHAT_PUBLIC_URL` is set. Provider
+registration is refreshed every minute so activation and credential rotation
+do not require a service restart. Lark and Discord callback URLs must also be
+entered in their provider consoles.
+
+Database-backed channel credentials additionally require a Fernet key. Keep it
+in the deployment secret manager and retain it across restarts and rotations:
+
+```bash
+RELAY_CHAT_SECRET_KEY=<url-safe-base64-fernet-key>
 ```
 
 When `relay-chat` calls the backend, it sends:
@@ -74,8 +90,8 @@ X-Relay-Employee-Id: <employeeId>
 ```
 
 The backend treats this as a non-admin employee actor. The actor can access only
-records and sandboxes allowed for that employee unless a route explicitly allows
-public access.
+records and logical agents allowed for that employee unless a route explicitly
+allows public access.
 
 ## Web Setup
 
@@ -105,7 +121,7 @@ chat_identity_links
 - integration_id
 - external_user_id
 - employee_id
-- default_sandbox_id
+- default_agent_id
 
 chat_allowed_conversations
 - integration_id
@@ -164,13 +180,6 @@ packages/relay-chat/
   src/providers/telegram.ts
   src/providers/lark.ts
 
-packages/relay-chat-bot/
-  src/index.ts
-  src/providers/discord.ts
-  src/providers/telegram.ts
-  src/providers/lark.ts
-  src/identity-store.ts
-  src/message-renderer.ts
 ```
 
 `relay-chat` owns:
@@ -201,20 +210,20 @@ const identities = new StaticChatIdentityResolver([
     tenantId: "discord-guild-id",
     externalUserId: "discord-user-id",
     employeeId: "alice",
-    defaultSandboxId: "sbx_alice",
+    defaultAgentId: "agent_alice_builder",
   },
   {
     provider: "telegram",
     externalUserId: "telegram-user-id",
     employeeId: "alice",
-    defaultSandboxId: "sbx_alice",
+    defaultAgentId: "agent_alice_builder",
   },
   {
     provider: "lark",
     tenantId: "lark-tenant-key",
     externalUserId: "lark-union-id-or-open-id",
     employeeId: "alice",
-    defaultSandboxId: "sbx_alice",
+    defaultAgentId: "agent_alice_builder",
   },
 ]);
 ```
@@ -227,7 +236,7 @@ chat_identity_links
 - tenant_id
 - external_user_id
 - employee_id
-- default_sandbox_id
+- default_agent_id
 - created_at
 - updated_at
 ```
@@ -244,8 +253,8 @@ Prefer stable organization-wide IDs:
 Support the same logical commands everywhere:
 
 ```text
-/relay run --agent codex --mode implement fix the auth flow
-/relay run --agent claude --mode review --sandbox sbx_alice review this diff
+/relay run --agent agent_alice_builder --mode action fix the auth flow
+/relay run --agent agent_alice_reviewer --mode review review this diff
 /relay status sess_123
 /relay cancel sess_123 no longer needed
 ```
@@ -257,7 +266,6 @@ The current shared parser supports:
 - `cancel`
 - `--agent`
 - `--mode`
-- `--sandbox`
 - `--session`
 
 Provider adapters can expose richer native controls, but should normalize them
@@ -300,7 +308,6 @@ async function handleText(ref, text, sink) {
     await gateway.cancel({
       ...ref,
       sessionId: command.sessionId,
-      sandboxId: command.sandboxId,
       reason: command.reason,
     });
   }
@@ -331,9 +338,18 @@ const sink = {
 Throttle output updates. Agent output can be noisy, and provider edit APIs often
 have rate limits or edit limits.
 
+All webhook handlers require a `ProviderEventStore`. Use
+`FileProviderEventStore` in deployed services so provider retries are deduplicated
+across process restarts. Accepted work is retried with backoff until dispatch and
+receipt persistence succeed; the in-memory implementation is intended only for
+tests.
+
 ## Discord
 
-Use `discord.js`.
+For HTTP interactions, call `handleDiscordInteraction` with the exact raw body
+and the `X-Signature-Timestamp` and `X-Signature-Ed25519` headers. Configure
+`applicationId`, `publicKey`, and `botToken`; the handler verifies Ed25519 before
+acknowledging the interaction and edits the deferred response as Relay runs.
 
 Discord concepts:
 
@@ -371,14 +387,17 @@ Recommended flow:
 Use slash-command options for structured input:
 
 ```text
-/relay run agent:codex mode:implement prompt:"fix auth"
+/relay run agent:agent_alice_builder mode:action prompt:"fix auth"
 /relay status session:sess_123
 /relay cancel session:sess_123 reason:"no longer needed"
 ```
 
 ## Telegram
 
-Use the Telegram Bot API directly or a Node wrapper.
+Pass the exact webhook body and `X-Telegram-Bot-Api-Secret-Token` header to
+`handleTelegramWebhook`. Configure both `botToken` and `webhookSecret`; the
+handler rejects mismatched secrets, uses `sendMessage` for the durable progress
+message, and updates it through `editMessageText`.
 
 Telegram concepts:
 
@@ -422,7 +441,11 @@ large output.
 
 ## Lark
 
-Use Lark Open Platform, either event callbacks or the official WebSocket client.
+Pass the exact callback body plus the Lark timestamp, nonce, and signature
+headers to `handleLarkEvent`. Configure `appId`, `appSecret`,
+`verificationToken`, and `encryptKey`; the handler verifies the callback,
+decrypts encrypted payloads, handles URL verification, and sends coarse Relay
+status updates through the Lark message API.
 
 Lark concepts:
 

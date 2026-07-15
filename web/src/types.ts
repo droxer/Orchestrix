@@ -413,7 +413,6 @@ export interface ChatIdentityLink {
   employeeId: string;
   displayName?: string | null;
   defaultAgentId?: string | null;
-  defaultSandboxId?: string | null;
   createdAt: string;
   updatedAt: string;
 }

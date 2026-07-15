@@ -10,12 +10,13 @@ dependencies = [
   "psycopg>=3.2.0",
   "sqlalchemy>=2.0.0",
   "uvicorn[standard]>=0.38.0",
+  "cryptography>=49.0.0",
+  "httpx>=0.28.1",
 ]
 
 [project.optional-dependencies]
 dev = [
   "alembic>=1.17.0",
-  "httpx>=0.28.0",
   "pre-commit>=4.0.0",
   "pytest>=9.0.0",
 ]

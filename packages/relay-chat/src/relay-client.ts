@@ -1,5 +1,5 @@
 import type { AgentName, AgentTaskMode, RelayEvent, RelaySession } from "relay-core";
-import type { ChatConversationRef, RelayChatBackend, RelayChatRequestContext } from "./types.js";
+import type { ChatConversationBinding, ChatConversationRef, RelayChatBackend, RelayChatRequestContext } from "./types.js";
 
 function conversationBody(ref: ChatConversationRef): Record<string, unknown> {
   return {
@@ -7,6 +7,7 @@ function conversationBody(ref: ChatConversationRef): Record<string, unknown> {
     externalUserId: ref.externalUserId,
     conversationId: ref.conversationId,
     threadId: ref.threadId,
+    messageId: ref.messageId,
     tenantId: ref.tenantId,
   };
 }
@@ -28,8 +29,8 @@ export class RelayChatClient implements RelayChatBackend {
     this.fetchFn = options.fetchFn ?? fetch;
   }
 
-  async listEmployeeAgents(employeeId: string, signal?: AbortSignal): Promise<Array<{ id: string; executorKind: AgentName; availability?: string }>> {
-    const body = await this.request<{ agents?: Array<{ id: string; executorKind: AgentName; availability?: string }> }>("/agents", {
+  async listEmployeeAgents(employeeId: string, signal?: AbortSignal): Promise<Array<{ id: string; executorKind: AgentName; availability: string }>> {
+    const body = await this.request<{ agents?: Array<{ id: string; executorKind: AgentName; availability: string }> }>("/agents", {
       employeeId,
       signal,
     });
@@ -70,46 +71,6 @@ export class RelayChatClient implements RelayChatBackend {
     });
   }
 
-  async startSandboxRun(input: {
-    sandboxId: string;
-    taskGoal: string;
-    assignments: Array<{ agent: AgentName; mode?: AgentTaskMode }>;
-    sessionId?: string;
-    employeeId?: string;
-    signal?: AbortSignal;
-  }): Promise<RelaySession> {
-    return this.request<RelaySession>(`/sandboxes/${encodeURIComponent(input.sandboxId)}/runs`, {
-      method: "POST",
-      signal: input.signal,
-      employeeId: input.employeeId,
-      body: {
-        taskGoal: input.taskGoal,
-        assignments: input.assignments,
-        sessionId: input.sessionId,
-      },
-    });
-  }
-
-  async cancelSandboxRun(input: {
-    sandboxId: string;
-    sessionId: string;
-    reason?: string;
-    employeeId?: string;
-    signal?: AbortSignal;
-  }): Promise<RelaySession> {
-    return this.request<RelaySession>(
-      `/sandboxes/${encodeURIComponent(input.sandboxId)}/runs/${encodeURIComponent(input.sessionId)}/cancel`,
-      {
-        method: "POST",
-        signal: input.signal,
-        employeeId: input.employeeId,
-        body: {
-          reason: input.reason,
-        },
-      },
-    );
-  }
-
   async getSession(sessionId: string, context: RelayChatRequestContext = {}): Promise<RelaySession> {
     return this.request<RelaySession>(`/sessions/${encodeURIComponent(sessionId)}`, {
       signal: context.signal,
@@ -148,12 +109,20 @@ export class RelayChatClient implements RelayChatBackend {
   }
 
   async resolveConversationSession(ref: ChatConversationRef, signal?: AbortSignal): Promise<RelaySession | undefined> {
-    const body = await this.request<{ session?: RelaySession | null }>("/chat/conversation/session", {
+    return (await this.resolveConversationBinding(ref, signal))?.session;
+  }
+
+  async resolveConversationBinding(ref: ChatConversationRef, signal?: AbortSignal): Promise<ChatConversationBinding | undefined> {
+    const body = await this.request<{ session?: RelaySession | null; mapping?: { providerMessageId?: string } | null }>("/chat/conversation/session", {
       method: "POST",
       signal,
       body: conversationBody(ref),
     });
-    return body.session ?? undefined;
+    if (!body.session && !body.mapping) return undefined;
+    return {
+      session: body.session ?? undefined,
+      providerMessageId: body.mapping?.providerMessageId,
+    };
   }
 
   async bindConversationSession(ref: ChatConversationRef, sessionId: string, signal?: AbortSignal): Promise<void> {

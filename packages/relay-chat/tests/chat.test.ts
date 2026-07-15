@@ -18,24 +18,22 @@ import type { RelayEvent, RelaySession } from "relay-core";
 
 describe("relay-chat command parsing", () => {
   it("parses a provider-neutral run command", () => {
-    const command = parseChatCommand('/relay run --agent=claude --mode=review --sandbox sbx_alice "review auth flow"');
+    const command = parseChatCommand('/relay run --agent=agent_reviewer --mode=review "review auth flow"');
     assert.deepEqual(command, {
       kind: "run",
-      agent: "claude",
+      agentId: "agent_reviewer",
       mode: "review",
-      sandboxId: "sbx_alice",
       sessionId: undefined,
       taskGoal: "review auth flow",
     });
   });
 
   it("parses ask mode for read-only chat collaboration", () => {
-    const command = parseChatCommand("/relay run --agent codex --mode ask explain the failing tests");
+    const command = parseChatCommand("/relay run --agent agent_builder --mode ask explain the failing tests");
     assert.deepEqual(command, {
       kind: "run",
-      agent: "codex",
+      agentId: "agent_builder",
       mode: "ask",
-      sandboxId: undefined,
       sessionId: undefined,
       taskGoal: "explain the failing tests",
     });
@@ -43,26 +41,30 @@ describe("relay-chat command parsing", () => {
 
   it("turns parsed run command into a chat request", () => {
     const ref = discordConversation({ userId: "u1", channelId: "c1", guildId: "g1" });
-    const command = parseChatCommand("/relay run --agent codex implement the chat gateway");
+    const command = parseChatCommand("/relay run --agent agent_builder implement the chat gateway");
     assert.ok(command);
     const request = commandToAgentRequest(ref, command);
     assert.equal(request?.provider, "discord");
     assert.equal(request?.externalUserId, "u1");
-    assert.equal(request?.agent, "codex");
+    assert.equal(request?.agentId, "agent_builder");
     assert.equal(request?.taskGoal, "implement the chat gateway");
   });
 
   it("parses new, list, and switch conversation commands", () => {
-    assert.deepEqual(parseChatCommand('/relay new --agent codex "second task"'), {
+    assert.deepEqual(parseChatCommand('/relay new --agent agent_builder "second task"'), {
       kind: "new",
-      agent: "codex",
+      agentId: "agent_builder",
       mode: "action",
-      sandboxId: undefined,
       taskGoal: "second task",
     });
     assert.deepEqual(parseChatCommand("/relay list"), { kind: "list" });
     assert.deepEqual(parseChatCommand("/relay switch ses_42"), { kind: "switch", sessionId: "ses_42" });
     assert.equal(parseChatCommand("/relay switch"), undefined);
+  });
+
+  it("rejects sandbox routing and invalid modes", () => {
+    assert.equal(parseChatCommand("/relay run --sandbox sbx_alice do work"), undefined);
+    assert.equal(parseChatCommand("/relay run --mode revieew do work"), undefined);
   });
 
   it("marks a new command as forcing a fresh conversation", () => {
@@ -104,7 +106,7 @@ describe("provider conversation mapping", () => {
 });
 
 describe("RelayChatClient", () => {
-  it("starts sandbox runs through the backend and keeps Relay as the authorization boundary", async () => {
+  it("starts named-agent runs through the backend authorization boundary", async () => {
     const calls: Array<{ url: string; init: RequestInit }> = [];
     const fetchFn = async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
       calls.push({ url: String(url), init: init ?? {} });
@@ -115,18 +117,18 @@ describe("RelayChatClient", () => {
       });
     };
     const client = new RelayChatClient({ baseUrl: "http://relay.local/", token: "svc", fetchFn });
-    await client.startSandboxRun({
-      sandboxId: "sbx_alice",
+    await client.startAgentRun({
+      agentId: "agent_builder",
       employeeId: "alice",
       taskGoal: "build it",
-      assignments: [{ agent: "codex", mode: "action" }],
+      mode: "action",
     });
-    assert.equal(calls[0].url, "http://relay.local/sandboxes/sbx_alice/runs");
+    assert.equal(calls[0].url, "http://relay.local/agent-runs");
     assert.equal((calls[0].init.headers as Record<string, string>).Authorization, "Bearer svc");
     assert.equal((calls[0].init.headers as Record<string, string>)["X-Relay-Employee-Id"], "alice");
     assert.deepEqual(JSON.parse(String(calls[0].init.body)), {
       taskGoal: "build it",
-      assignments: [{ agent: "codex", mode: "action" }],
+      assignments: [{ agentId: "agent_builder", mode: "action" }],
     });
   });
 
@@ -217,12 +219,6 @@ describe("RelayChatGateway", () => {
         assert.equal(input.employeeId, "alice");
         return makeSession("running");
       },
-      async startSandboxRun() {
-        throw new Error("sandbox routing should not be used");
-      },
-      async cancelSandboxRun() {
-        return makeSession("cancelled");
-      },
       async getSession() {
         return makeSession("completed");
       },
@@ -235,7 +231,7 @@ describe("RelayChatGateway", () => {
 
     await gateway.run({
       ...telegramConversation({ userId: 42, chatId: 42 }),
-      agent: "codex",
+      agentId: "agent_builder",
       mode: "action",
       taskGoal: "ship chat support",
     });
@@ -253,8 +249,6 @@ describe("RelayChatGateway", () => {
         ];
       },
       async startAgentRun(input) { selectedAgentId = input.agentId; return makeSession("running"); },
-      async startSandboxRun() { throw new Error("sandbox routing should not be used"); },
-      async cancelSandboxRun() { return makeSession("cancelled"); },
       async getSession() { return makeSession("completed"); },
       async streamSessionEvents() {},
     };
@@ -263,7 +257,7 @@ describe("RelayChatGateway", () => {
     ]);
     await new RelayChatGateway({ backend, identities }).run({
       ...telegramConversation({ userId: 42, chatId: 42 }),
-      agent: "codex",
+      agentId: "agent_builder",
       mode: "action",
       taskGoal: "build it",
     });
@@ -278,10 +272,6 @@ describe("RelayChatGateway", () => {
         assert.equal(input.agentId, "agent_builder");
         assert.equal(input.employeeId, "alice");
         return makeSession("running");
-      },
-      async startSandboxRun() { throw new Error("sandbox routing should not be used"); },
-      async cancelSandboxRun() {
-        return makeSession("cancelled");
       },
       async getSession(_sessionId, context) {
         assert.equal(context?.employeeId, "alice");
@@ -301,7 +291,7 @@ describe("RelayChatGateway", () => {
     const seen: RelayEvent[] = [];
     const run = await gateway.run({
       ...telegramConversation({ userId: 42, chatId: 42 }),
-      agent: "codex",
+      agentId: "agent_builder",
       mode: "action",
       taskGoal: "ship chat support",
     }, {
@@ -317,12 +307,6 @@ describe("RelayChatGateway", () => {
 
   it("passes identity context when checking status", async () => {
     const backend: RelayChatBackend = {
-      async startSandboxRun() {
-        return makeSession("running");
-      },
-      async cancelSandboxRun() {
-        return makeSession("cancelled");
-      },
       async getSession(_sessionId, context) {
         assert.equal(context?.employeeId, "alice");
         return makeSession("completed");
@@ -330,7 +314,7 @@ describe("RelayChatGateway", () => {
       async streamSessionEvents() {},
     };
     const identities = new StaticChatIdentityResolver([
-      { provider: "discord", externalUserId: "u1", employeeId: "alice", defaultSandboxId: "sbx_alice" },
+      { provider: "discord", externalUserId: "u1", employeeId: "alice" },
     ]);
     const gateway = new RelayChatGateway({ backend, identities });
 
@@ -354,10 +338,6 @@ describe("RelayChatGateway", () => {
         calls.ranWith.push(input.sessionId);
         return makeSession("running");
       },
-      async startSandboxRun() { throw new Error("sandbox routing should not be used"); },
-      async cancelSandboxRun() {
-        return makeSession("cancelled");
-      },
       async getSession() {
         return makeSession("completed");
       },
@@ -377,7 +357,7 @@ describe("RelayChatGateway", () => {
 
     await gateway.run({
       ...discordConversation({ userId: "u1", channelId: "c1" }),
-      agent: "codex",
+      agentId: "agent_builder",
       mode: "action",
       taskGoal: "follow up",
     });
@@ -388,18 +368,15 @@ describe("RelayChatGateway", () => {
     assert.deepEqual(calls.boundTo, ["sess_1"]);
   });
 
-  it("keeps a started chat run alive when conversation binding fails", async () => {
+  it("reports degraded recovery while keeping a started run alive", async () => {
     const seen: RelayEvent[] = [];
     let started = 0;
     let failed = 0;
+    let degraded = 0;
     const backend: RelayChatBackend = {
       async listEmployeeAgents() { return [{ id: "agent_builder", executorKind: "codex", availability: "ready" }]; },
       async startAgentRun() {
         return makeSession("running");
-      },
-      async startSandboxRun() { throw new Error("sandbox routing should not be used"); },
-      async cancelSandboxRun() {
-        return makeSession("cancelled");
       },
       async getSession() {
         return makeSession("completed");
@@ -418,7 +395,7 @@ describe("RelayChatGateway", () => {
 
     const run = await gateway.run({
       ...discordConversation({ userId: "u1", channelId: "c1" }),
-      agent: "codex",
+      agentId: "agent_builder",
       mode: "action",
       taskGoal: "continue anyway",
     }, {
@@ -427,6 +404,9 @@ describe("RelayChatGateway", () => {
       },
       failed: () => {
         failed += 1;
+      },
+      degraded: () => {
+        degraded += 1;
       },
       event: (update) => {
         seen.push(update.event);
@@ -437,6 +417,7 @@ describe("RelayChatGateway", () => {
     assert.equal(run.session.id, "sess_1");
     assert.equal(started, 1);
     assert.equal(failed, 0);
+    assert.equal(degraded, 1);
     assert.equal(seen[0].type, "agent.output");
   });
 
@@ -448,10 +429,6 @@ describe("RelayChatGateway", () => {
       async startAgentRun(input) {
         ranWith.push(input.sessionId);
         return makeSession("running");
-      },
-      async startSandboxRun() { throw new Error("sandbox routing should not be used"); },
-      async cancelSandboxRun() {
-        return makeSession("cancelled");
       },
       async getSession() {
         return makeSession("completed");
@@ -470,7 +447,7 @@ describe("RelayChatGateway", () => {
 
     await gateway.run({
       ...discordConversation({ userId: "u1", channelId: "c1" }),
-      agent: "codex",
+      agentId: "agent_builder",
       mode: "action",
       taskGoal: "fresh start",
       forceNew: true,

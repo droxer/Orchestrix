@@ -15,6 +15,10 @@ CONVERSATION = {
 }
 
 
+async def _healthy_provider(_settings):
+    return True, "Provider credentials verified."
+
+
 def _bootstrap_admin(client: TestClient) -> None:
     assert client.post("/auth/bootstrap", json={
         "token": "admin_token", "username": "admin", "password": "secret123",
@@ -23,6 +27,7 @@ def _bootstrap_admin(client: TestClient) -> None:
 
 
 def _active_integration(client: TestClient) -> str:
+    client.app.state.chat_probe = _healthy_provider
     assert client.post("/cp/users", json={
         "username": "alice",
         "password": "AlicePass123!",
@@ -41,6 +46,7 @@ def _active_integration(client: TestClient) -> str:
     client.post(f"/cp/chat-integrations/{integration_id}/allowed-conversations", json={
         "conversationId": "channel_123", "label": "team-agents",
     })
+    assert client.post(f"/cp/chat-integrations/{integration_id}/check").status_code == 200
     assert client.post(f"/cp/chat-integrations/{integration_id}/activate").status_code == 200
     return integration_id
 
@@ -70,10 +76,15 @@ def test_conversation_mapping_round_trip(monkeypatch) -> None:
         assert unbound.json()["session"] is None
 
         # Bind the thread to alice's session.
-        bind = client.post("/chat/conversation/mapping", headers=CHAT_HEADERS, json={**CONVERSATION, "sessionId": session_id})
+        bind = client.post(
+            "/chat/conversation/mapping",
+            headers=CHAT_HEADERS,
+            json={**CONVERSATION, "sessionId": session_id, "messageId": "provider_reply_1"},
+        )
         assert bind.status_code == 200
         assert bind.json()["mapping"]["sessionId"] == session_id
         assert bind.json()["mapping"]["ownerEmployeeId"] == "alice"
+        assert bind.json()["mapping"]["providerMessageId"] == "provider_reply_1"
 
         # Resolving now returns the bound session.
         resolved = client.post("/chat/conversation/session", headers=CHAT_HEADERS, json=CONVERSATION)
@@ -97,6 +108,29 @@ def test_conversation_mapping_rejects_foreign_session(monkeypatch) -> None:
 
         # alice's thread may not bind to bob's session.
         rejected = client.post("/chat/conversation/mapping", headers=CHAT_HEADERS, json={**CONVERSATION, "sessionId": bob_session})
+        assert rejected.status_code == 403
+
+
+def test_conversation_mapping_rejects_ownerless_legacy_session(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    monkeypatch.setenv("RELAY_CHAT_TOKEN", "chat_secret")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _active_integration(client)
+        legacy_session = app.state.session_store.create_session({
+            "workspacePath": "/workspace",
+            "taskGoal": "legacy task",
+            "participants": ["human"],
+        })["id"]
+
+        rejected = client.post(
+            "/chat/conversation/mapping",
+            headers=CHAT_HEADERS,
+            json={**CONVERSATION, "sessionId": legacy_session},
+        )
+
         assert rejected.status_code == 403
 
 

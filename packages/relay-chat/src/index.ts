@@ -24,29 +24,50 @@ export {
 
 export {
   discordConversation,
+  handleDiscordInteraction,
   type DiscordConversationInput,
+  type DiscordInteractionInput,
+  type DiscordInteractionOptions,
 } from "./providers/discord.js";
 
 export {
   telegramConversation,
+  handleTelegramWebhook,
   type TelegramConversationInput,
+  type TelegramWebhookInput,
+  type TelegramWebhookOptions,
 } from "./providers/telegram.js";
 
 export {
   larkConversation,
+  handleLarkEvent,
   type LarkConversationInput,
+  type LarkEventInput,
+  type LarkEventOptions,
 } from "./providers/lark.js";
+
+export {
+  FileProviderEventStore,
+  MemoryProviderEventStore,
+  type ProviderEventStore,
+} from "./providers/runtime.js";
+
+export {
+  configureRelayChatProviders,
+  createRelayChatServer,
+  type RelayChatServerOptions,
+} from "./server.js";
 
 export type {
   ChatAgentRequest,
   ChatCancelRequest,
   ChatCommand,
+  ChatConversationBinding,
   ChatConversationRef,
   ChatIdentity,
   ChatIdentityResolver,
   ChatProvider,
   ChatRun,
-  ChatSandboxResolver,
   ChatSessionSink,
   ChatSessionUpdate,
   ChatStatusRequest,
