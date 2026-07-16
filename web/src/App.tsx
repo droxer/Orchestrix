@@ -384,7 +384,7 @@ export function App() {
     navigateToAgentWorkspace(agent.id);
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
-      if (tab && tab !== "artifacts") url.searchParams.set("workspaceTab", tab);
+      if (tab && tab !== "activities") url.searchParams.set("workspaceTab", tab);
       else url.searchParams.delete("workspaceTab");
       window.history.replaceState(window.history.state, "", url);
     }
@@ -678,6 +678,13 @@ export function App() {
       setPrefsOpen={setPrefsOpen}
       skipLinkHref={skipLinkHref}
       activeConversationLabel={activeConversationLabel}
+      mobileChatChrome={{
+        artifactCount: visibleArtifacts.length,
+        hasSession: Boolean(activeSession),
+        isRefreshing,
+        onOpenArtifacts: () => openArtifactsDrawer(),
+        onRefresh: () => void refresh(),
+      }}
       user={user}
       onLogout={() => void handleLogout()}
       theme={theme}

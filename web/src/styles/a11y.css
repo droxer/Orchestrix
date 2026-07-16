@@ -28,7 +28,6 @@
 .conversation-row,
 .workspace-pick-list > li,
 .workspace-file-pick,
-.backlog-row,
 .backlog-task,
 .routine-card,
 .adm-emp-row,
@@ -38,6 +37,10 @@
   content-visibility: auto;
   contain-intrinsic-size: auto 96px;
 }
+
+/* .backlog-row is intentionally excluded above: its mobile layout is a taller,
+   variable-height stacked card, and content-visibility's size estimate clamps
+   and clips it. The task list is bounded, so the render-skip saving is minimal. */
 
 .backlog-task,
 .routine-card,
@@ -97,7 +100,8 @@
   .adm-search,
   .adm-fleet-chip,
   .adm-emp-delete,
-  .adm-node-card-icon-btn {
+  .adm-node-card-icon-btn,
+  .msg-turn-action {
     min-height: 44px;
   }
 
@@ -147,6 +151,12 @@
   .adm-chat-rows button {
     width: 44px;
     height: 44px;
+  }
+
+  .msg-turn-action {
+    min-width: 44px;
+    height: 44px;
+    padding-inline: var(--space-sm);
   }
 
   .adm-view-toggle-btn {

@@ -70,26 +70,58 @@
     display: none;
   }
 
+  /* Open conversation: single header = back + title + tools/settings.
+     The in-panel .chat-header is hidden so we reclaim ~64px of transcript. */
   .messenger-shell[data-mobile-view="chat"] .mobile-topbar--chat {
-    grid-template-columns: minmax(0, 1fr) 44px;
+    grid-template-columns: 44px minmax(0, 1fr) auto;
   }
 
-  .messenger-shell[data-mobile-view="chat"] .mobile-topbar--chat > button:first-of-type {
+  .messenger-shell[data-mobile-view="chat"] .chat-header {
     display: none;
   }
 
-  .messenger-shell[data-mobile-view="chat"] .mobile-topbar--chat > button:nth-of-type(2) {
-    justify-self: stretch;
-    pointer-events: none;
-    cursor: default;
-    background: transparent;
-    color: var(--color-semantic-ink);
-    font: var(--type-label-strong);
+  /* The mobile topbar replaces the in-panel chat header, so .chat-header is
+     hidden above. Its grid track must go too — otherwise the transcript
+     auto-places into the leftover fixed header row (clipped to --header-h)
+     and the composer lands in the 1fr track and stretches full-height. */
+  .messenger-shell[data-mobile-view="chat"] .chat-panel {
+    grid-template-rows: minmax(0, 1fr) auto;
   }
 
-  .messenger-shell[data-mobile-view="chat"] .mobile-topbar--chat > button:nth-of-type(2).active {
-    background: transparent;
-    color: var(--color-semantic-ink);
+  .mobile-topbar-back {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    justify-self: start;
+  }
+
+  .mobile-topbar-chat-title {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding-inline: var(--space-xs);
+    text-align: center;
+  }
+
+  .mobile-topbar-chat-title .mobile-topbar-title {
+    max-width: 100%;
+  }
+
+  .mobile-topbar-chat-tools {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    justify-self: end;
+  }
+
+  .mobile-topbar-chat-tools .icon-button,
+  .mobile-topbar-chat-tools .mobile-settings {
+    position: relative;
+    width: 44px;
+    height: 44px;
+    padding: 0;
   }
 
   .mobile-topbar-route {
@@ -124,9 +156,13 @@
   }
 
   .mobile-topbar .mobile-settings {
-    grid-column: -1;
     width: 44px;
     padding: 0;
+  }
+
+  .mobile-topbar--route .mobile-settings,
+  .messenger-shell[data-mobile-view="threads"] .mobile-topbar--chat .mobile-settings {
+    grid-column: -1;
   }
 
   /* Work routes — mobile topbar already names the page; drop the in-page
@@ -223,6 +259,7 @@
   .sidenav-brand-row,
   .sidenav-bottom,
   .sidenav-separator,
+  .sidenav-group-label,
   .sidenav-tooltip,
   .sidenav-settings-menu {
     display: none;
@@ -238,13 +275,21 @@
     width: 100%;
   }
 
+  .sidenav-group,
+  .sidenav-panel[data-expanded="true"] .sidenav-group {
+    display: contents;
+  }
+
   .sidenav-btn,
   .sidenav-panel[data-expanded="true"] .sidenav-btn {
     position: relative;
-    width: 62px;
-    min-width: 58px;
+    /* Equal-width tabs that shrink to share the row, so all destinations stay
+       visible without horizontal scroll on narrow phones (≤360px). Labels
+       ellipsize (below); the 50px height keeps a comfortable touch target. */
+    width: auto;
+    min-width: 0;
     height: 50px;
-    flex: 1 0 58px;
+    flex: 1 1 0;
     flex-direction: column;
     justify-content: center;
     gap: 2px;
@@ -265,10 +310,15 @@
     transform: translateX(-50%);
   }
 
+  /* Active tab reads as selected via three cues: full-strength ink label +
+     icon (vs muted inactive), the soft accent tint, and the accent tick
+     above (.sidenav-btn.active::before). The accent stays the underline —
+     the text itself is high-contrast foreground, not the mid-tone green. */
   .sidenav-btn.active {
     color: var(--color-semantic-ink);
     background: var(--color-semantic-action-soft);
     border-color: color-mix(in srgb, var(--color-semantic-action) 18%, var(--color-semantic-hairline));
+    box-shadow: none;
   }
 
   .sidenav-btn.active:hover {
@@ -287,6 +337,16 @@
   .messenger-shell .sidenav-nav .sidenav-btn:nth-child(5) { animation-delay: 200ms; }
   .messenger-shell .sidenav-nav .sidenav-btn:nth-child(6) { animation-delay: 240ms; }
   .messenger-shell .sidenav-nav .sidenav-btn:nth-child(7) { animation-delay: 280ms; }
+
+  /* Admin Channels/Admin collapse into a More overflow so five primary tabs
+     fit a 390pt phone without horizontal scroll. */
+  .sidenav-overflow-item {
+    display: none !important;
+  }
+
+  .sidenav-more-btn {
+    display: inline-flex;
+  }
 
   .sidenav-btn .sidenav-label,
   .sidenav-panel[data-expanded="true"] .sidenav-btn .sidenav-label {
@@ -362,54 +422,6 @@
     grid-template-columns: auto minmax(0, 1fr);
   }
 
-  .messenger-shell[data-mobile-view="chat"] .chat-title-text h2 {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
-  }
-
-  .messenger-shell[data-mobile-view="chat"] .chat-title-text {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-
-  .messenger-shell[data-mobile-view="chat"] .chat-title-meta {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-
-  .messenger-shell[data-mobile-view="chat"] .chat-title {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-
-  .messenger-shell[data-mobile-view="chat"] .chat-tools {
-    flex: 0 0 auto;
-  }
-
-  .mobile-back-button {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-xs);
-    min-height: 44px;
-    padding: 0 var(--space-sm);
-    border: 1px solid var(--color-semantic-hairline);
-    border-radius: 50%;
-    background: color-mix(in srgb, var(--color-semantic-surface-raised) 72%, transparent);
-    color: var(--color-semantic-ink);
-    font: var(--type-label-strong);
-  }
-
-  .mobile-back-button span {
-    display: none;
-  }
-
   .chat-title .employee-avatar {
     display: none;
   }
@@ -446,9 +458,11 @@
     grid-template-columns: 1fr;
   }
 
+  /* Bottom tab bar already owns safe-area-inset-bottom. Composer sits above
+     it, so a second inset here creates a dead band on notched phones. */
   .composer {
     --composer-inline: 18px;
-    padding: var(--space-sm) var(--space-sm) max(env(safe-area-inset-bottom), var(--space-base));
+    padding: var(--space-sm) var(--space-sm) var(--space-base);
   }
 
   .mode-chip {

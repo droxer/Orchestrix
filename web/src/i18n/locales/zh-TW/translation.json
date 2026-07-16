@@ -35,6 +35,7 @@
     "chats": "訊息",
     "workspace": "工作區",
     "workspace_label": "工作區",
+    "manage": "管理",
     "backlog": "待辦",
     "backlog_label": "待辦",
     "routine": "例行",
@@ -53,6 +54,8 @@
     "collapse_sidebar": "收合側欄",
     "expand_sidebar": "展開側欄",
     "settings": "設定",
+    "more": "更多",
+    "more_label": "更多入口",
     "mobile_section": "Relay"
   },
   "thread": {

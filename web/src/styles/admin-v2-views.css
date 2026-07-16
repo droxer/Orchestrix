@@ -377,6 +377,24 @@
   .adm-node-agent-list {
     grid-template-columns: 1fr;
   }
+
+  /* Employee rows: the 3-column grid (minmax(220px,…)) can't fit a phone, so
+     stack identity → agents → metrics. The column-label header is meaningless
+     stacked, so hide it. */
+  .adm-emp-cols {
+    display: none;
+  }
+
+  .adm-emp-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-sm);
+    padding: var(--space-base) 0;
+  }
+
+  .adm-emp-metrics {
+    justify-self: start;
+    text-align: left;
+  }
 }
 
 /* tone helpers — text-safe red for the word/number case; icons and dots read

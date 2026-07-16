@@ -329,23 +329,20 @@ html[data-theme="light"] {
 
 /* International type — CJK coverage. Geist and Geist Mono carry no Han
    glyphs, so under a Chinese locale we keep the Latin face first and let
-   Han characters fall through the stack. System CJK fonts come first —
+   Han characters fall through the stack. System CJK fonts come first:
    PingFang (macOS/iOS), HarmonyOS Sans / MiSans, Microsoft YaHei/JhengHei
-   (Windows) — because native rendering is sharper and costs no download;
-   the Noto Sans SC/TC webfonts (loaded by next/font in layout.tsx,
-   preload off) are the last-resort fallback whose unicode-range chunks
-   only download when every system font misses. --font-display aliases
-   --font-sans, so overriding --font-sans here also retargets display —
-   no separate display stack is needed. --font-number aliases --font-sans
-   and inherits these via substitution. */
+   (Windows). Literal Noto Sans names remain as the Linux fallback without
+   asking next/font/google to generate hundreds of Turbopack font chunks.
+   --font-display aliases --font-sans via --font-app-sans, so overriding
+   --font-sans here also retargets display. */
 html:lang(zh-CN) {
-  --font-sans: var(--font-app-sans), "PingFang SC", "HarmonyOS Sans SC", "MiSans", "Microsoft YaHei UI", "Microsoft YaHei", var(--font-noto-sans-sc), "Noto Sans SC", sans-serif;
-  --font-mono: var(--font-geist-mono), "PingFang SC", "Microsoft YaHei", var(--font-noto-sans-sc), "Noto Sans SC", monospace;
+  --font-sans: var(--font-app-sans), "Geist", "PingFang SC", "HarmonyOS Sans SC", "MiSans", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --font-mono: var(--font-geist-mono), "Geist Mono", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", monospace;
 }
 
 html:lang(zh-TW) {
-  --font-sans: var(--font-app-sans), "PingFang TC", "Microsoft JhengHei UI", "Microsoft JhengHei", var(--font-noto-sans-tc), "Noto Sans TC", sans-serif;
-  --font-mono: var(--font-geist-mono), "PingFang TC", "Microsoft JhengHei", var(--font-noto-sans-tc), "Noto Sans TC", monospace;
+  --font-sans: var(--font-app-sans), "Geist", "PingFang TC", "Microsoft JhengHei UI", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+  --font-mono: var(--font-geist-mono), "Geist Mono", "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", monospace;
 }
 
 /* CJK typographic corrections — Han glyphs are full-width squares:

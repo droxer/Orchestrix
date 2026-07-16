@@ -47,7 +47,7 @@ type Selection =
 
 const parsePageTab = (value: string | null): WorkspacePageTab => {
   if (value === "files") return "workspace";
-  return PAGE_TABS.includes(value as WorkspacePageTab) ? value as WorkspacePageTab : "artifacts";
+  return PAGE_TABS.includes(value as WorkspacePageTab) ? value as WorkspacePageTab : "activities";
 };
 const parseString = (value: string | null): string => value ?? "";
 
@@ -234,7 +234,7 @@ export function AgentWorkspacePage({
   const { t, i18n } = useTranslation();
   const [selected, setSelected] = useState<Selection | null>(null);
   const [filePath, setFilePath] = useUrlSearchState("workspacePath", "", parseString, (value) => value || null);
-  const [pageTab, setPageTab] = useUrlSearchState("workspaceTab", "artifacts" as WorkspacePageTab, parsePageTab, (value) => value === "artifacts" ? null : value);
+  const [pageTab, setPageTab] = useUrlSearchState("workspaceTab", "activities" as WorkspacePageTab, parsePageTab, (value) => value === "activities" ? null : value);
   const [selectedKey, setSelectedKey] = useUrlSearchState("workspaceItem", "", parseString, (value) => value || null);
   const [snapshotBannerDismissed, setSnapshotBannerDismissed] = useState(false);
   const previousScopeId = useRef(agent.id);
@@ -279,7 +279,7 @@ export function AgentWorkspacePage({
     setFilePath("");
     setSelected(null);
     setSelectedKey("");
-    setPageTab("artifacts");
+    setPageTab("activities");
     setSnapshotBannerDismissed(false);
   }, [agent.id, setFilePath, setPageTab, setSelectedKey]);
 

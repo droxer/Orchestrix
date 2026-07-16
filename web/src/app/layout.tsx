@@ -4,8 +4,6 @@ import {
   Geist,
   Geist_Mono,
   Instrument_Serif,
-  Noto_Sans_SC,
-  Noto_Sans_TC,
 } from "next/font/google";
 
 import "../styles.css";
@@ -19,6 +17,10 @@ import { Providers } from "./providers";
 // Geist Mono is reserved for code-like content: tool/command lines, raw
 // logs, code blocks, and IDs. latin-ext widens coverage to accented
 // European/Vietnamese names in employee and sandbox labels.
+//
+// CJK stays system-first (PingFang / YaHei / etc. in primitives.css). We do
+// not load Noto Sans SC/TC through next/font — those unicode-range chunks
+// balloon Turbopack compile and only matter on bare Linux.
 const appSans = Geist({
   subsets: ["latin", "latin-ext"],
   variable: "--font-app-sans",
@@ -35,37 +37,13 @@ const geistMono = Geist_Mono({
 
 // Editorial display serif — reserved for the rare, large hero-headline
 // moments (login attach screen, empty states) via --type-display-lg/sm in
-// tokens/semantic.css. Everywhere else (page titles, drawer headers, chat
-// title) stays on Geist Sans: a small serif would clash with the app's
-// dense operational chrome. Instrument Serif ships weight 400 only —
-// font-synthesis:none (base.css) means no faked bold, so display roles
-// carry emphasis through size/tracking instead of weight, matching the
-// face's intended elegant-regular treatment.
+// tokens/semantic.css. Everywhere else stays on Geist Sans.
 const displaySerif = Instrument_Serif({
   subsets: ["latin", "latin-ext"],
   variable: "--font-instrument-serif",
   display: "swap",
   weight: "400",
   style: ["normal", "italic"],
-});
-
-// CJK fallback for the zh-CN / zh-TW locales. The :lang() stacks in
-// tokens.css are system-first (PingFang, HarmonyOS Sans, YaHei…), so
-// Noto Sans SC/TC only download when a Han glyph misses every system
-// font (e.g. bare Linux). preload is off — CJK has no single subset to
-// preload — so the unicode-range chunks stay untouched until needed.
-const notoSansSC = Noto_Sans_SC({
-  variable: "--font-noto-sans-sc",
-  display: "swap",
-  weight: ["400", "500", "600"],
-  preload: false,
-});
-
-const notoSansTC = Noto_Sans_TC({
-  variable: "--font-noto-sans-tc",
-  display: "swap",
-  weight: ["400", "500", "600"],
-  preload: false,
 });
 
 export const metadata: Metadata = {
@@ -82,6 +60,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
+  viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#faf8f4" },
     { media: "(prefers-color-scheme: dark)", color: "#141311" },
@@ -95,7 +74,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
       lang="en"
-      className={`${appSans.variable} ${geistMono.variable} ${displaySerif.variable} ${notoSansSC.variable} ${notoSansTC.variable}`}
+      className={`${appSans.variable} ${geistMono.variable} ${displaySerif.variable}`}
       suppressHydrationWarning
     >
       <head>

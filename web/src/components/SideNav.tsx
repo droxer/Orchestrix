@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type Dispatch, type MouseEvent, type SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  NavAdmin, NavAgents, NavBacklog, NavChannels, NavConversations, NavLogout, NavPreferences,
+  NavAdmin, NavAgents, NavBacklog, NavChannels, NavConversations, NavLogout, NavMore, NavPreferences,
   NavRoutine, NavSidebarCollapse, NavSidebarExpand,
 } from "./icons";
 import { RelayMark } from "./RelayMark";
@@ -24,8 +24,11 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
   const { t } = useTranslation();
   const [navTooltip, setNavTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
   const [settingsMenu, setSettingsMenu] = useState<{ x: number; y: number } | null>(null);
+  const [moreMenu, setMoreMenu] = useState<{ x: number; y: number } | null>(null);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
   const settingsMenuRef = useRef<HTMLDivElement>(null);
+  const moreButtonRef = useRef<HTMLButtonElement>(null);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!settingsMenu) return;
@@ -71,6 +74,50 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
     };
   }, [settingsMenu]);
 
+  useEffect(() => {
+    if (!moreMenu) return;
+
+    const firstMenuItem = moreMenuRef.current?.querySelector<HTMLAnchorElement>('[role="menuitem"]');
+    firstMenuItem?.focus();
+
+    function closeMenu(returnFocus: boolean) {
+      setMoreMenu(null);
+      if (returnFocus) moreButtonRef.current?.focus();
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (moreMenuRef.current?.contains(target) || moreButtonRef.current?.contains(target)) return;
+      closeMenu(false);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeMenu(true);
+        return;
+      }
+      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+      const items = Array.from(moreMenuRef.current?.querySelectorAll<HTMLAnchorElement>('[role="menuitem"]') ?? []);
+      if (items.length === 0) return;
+      event.preventDefault();
+      const currentIndex = items.indexOf(document.activeElement as HTMLAnchorElement);
+      const direction = event.key === "ArrowDown" ? 1 : -1;
+      const nextIndex = currentIndex < 0
+        ? 0
+        : (currentIndex + direction + items.length) % items.length;
+      items[nextIndex].focus();
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [moreMenu]);
+
   function showNavTooltip(text: string, el: HTMLElement) {
     if (sidenavExpanded) return;
     const rect = el.getBoundingClientRect();
@@ -79,6 +126,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
   function hideNavTooltip() { setNavTooltip(null); }
   function toggleSettingsMenu(el: HTMLElement) {
     hideNavTooltip();
+    setMoreMenu(null);
     setSettingsMenu((current) => {
       if (current) return null;
       const rect = el.getBoundingClientRect();
@@ -89,6 +137,16 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
       return sidenavExpanded
         ? { x: rect.left, y: rect.top - 8 }
         : { x: rect.right + 10, y: rect.top - 8 };
+    });
+  }
+  function toggleMoreMenu(el: HTMLElement) {
+    hideNavTooltip();
+    setSettingsMenu(null);
+    setMoreMenu((current) => {
+      if (current) return null;
+      const rect = el.getBoundingClientRect();
+      // Mobile bottom tab: rise above the control, left-aligned to its plate.
+      return { x: Math.max(8, rect.left), y: rect.top - 8 };
     });
   }
   function openPreferences() {
@@ -102,15 +160,21 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
   function handleRouteClick(event: MouseEvent<HTMLAnchorElement>, nextRoute: AppRoute) {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.altKey || event.ctrlKey || event.shiftKey) return;
     event.preventDefault();
+    setMoreMenu(null);
     onNavigateRoute(nextRoute);
   }
+
+  const moreActive = route === "channels" || route === "admin";
 
   return (
     <aside className="sidenav-panel" aria-label="Relay" data-expanded={sidenavExpanded ? "true" : "false"}>
       <div className="sidenav-brand-row">
         <div className="sidenav-brand" aria-hidden="true">
-          <RelayMark width={28} height={28} />
-          <span className="sidenav-brand-word">Relay</span>
+          <span className="sidenav-brand-mark"><RelayMark width={24} height={24} /></span>
+          <span className="sidenav-brand-copy">
+            <span className="sidenav-brand-word">Relay</span>
+            <span className="sidenav-brand-meta">{t("nav.workspace")}</span>
+          </span>
         </div>
         <Button
           type="button"
@@ -128,76 +192,79 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
           <span className="sidenav-toggle-label">{sidenavExpanded ? t("nav.collapse") : t("nav.expand")}</span>
         </Button>
       </div>
-      <nav className="sidenav-nav" aria-label={t("nav.conversations")}>
-        <a
-          className={`sidenav-btn ${route === "main" ? "active" : ""}`}
-          data-nav="conversations"
-          href={hrefForRoute("main")}
-          aria-label={t("nav.conversations")}
-          aria-current={route === "main" ? "page" : undefined}
-          title={t("nav.conversations")}
-          onClick={(event) => handleRouteClick(event, "main")}
-          onMouseEnter={(e) => showNavTooltip(t("nav.conversations"), e.currentTarget)}
-          onMouseLeave={hideNavTooltip}
-          onFocus={(e) => showNavTooltip(t("nav.conversations"), e.currentTarget)}
-          onBlur={hideNavTooltip}
-        >
-          <NavConversations size={18} />
-          <span className="sidenav-label">{t("nav.conversations")}</span>
-        </a>
-        <a
-          className={`sidenav-btn ${route === "backlog" ? "active" : ""}`}
-          data-nav="backlog"
-          href={hrefForRoute("backlog")}
-          aria-label={t("nav.backlog_label")}
-          aria-current={route === "backlog" ? "page" : undefined}
-          title={t("nav.backlog_label")}
-          onClick={(event) => handleRouteClick(event, "backlog")}
-          onMouseEnter={(e) => showNavTooltip(t("nav.backlog"), e.currentTarget)}
-          onMouseLeave={hideNavTooltip}
-          onFocus={(e) => showNavTooltip(t("nav.backlog"), e.currentTarget)}
-          onBlur={hideNavTooltip}
-        >
-          <NavBacklog size={18} />
-          <span className="sidenav-label">{t("nav.backlog")}</span>
-        </a>
-        <a
-          className={`sidenav-btn ${route === "routine" ? "active" : ""}`}
-          data-nav="routine"
-          href={hrefForRoute("routine")}
-          aria-label={t("nav.routine_label")}
-          aria-current={route === "routine" ? "page" : undefined}
-          title={t("nav.routine_label")}
-          onClick={(event) => handleRouteClick(event, "routine")}
-          onMouseEnter={(e) => showNavTooltip(t("nav.routine"), e.currentTarget)}
-          onMouseLeave={hideNavTooltip}
-          onFocus={(e) => showNavTooltip(t("nav.routine"), e.currentTarget)}
-          onBlur={hideNavTooltip}
-        >
-          <NavRoutine size={18} />
-          <span className="sidenav-label">{t("nav.routine")}</span>
-        </a>
-        <a
-          className={`sidenav-btn ${route === "agents" ? "active" : ""}`}
-          data-nav="agents"
-          href={hrefForRoute("agents")}
-          aria-label={t("nav.agents_label")}
-          aria-current={route === "agents" ? "page" : undefined}
-          title={t("nav.agents_label")}
-          onClick={(event) => handleRouteClick(event, "agents")}
-          onMouseEnter={(e) => showNavTooltip(t("nav.agents"), e.currentTarget)}
-          onMouseLeave={hideNavTooltip}
-          onFocus={(e) => showNavTooltip(t("nav.agents"), e.currentTarget)}
-          onBlur={hideNavTooltip}
-        >
-          <NavAgents size={18} />
-          <span className="sidenav-label">{t("nav.agents")}</span>
-        </a>
+      <nav className="sidenav-nav" aria-label={t("nav.workspace_label")}>
+        <div className="sidenav-group" role="group" aria-label={t("nav.workspace")}>
+          <span className="sidenav-group-label" aria-hidden="true">{t("nav.workspace")}</span>
+          <a
+            className={`sidenav-btn ${route === "main" ? "active" : ""}`}
+            data-nav="conversations"
+            href={hrefForRoute("main")}
+            aria-label={t("nav.conversations")}
+            aria-current={route === "main" ? "page" : undefined}
+            title={t("nav.conversations")}
+            onClick={(event) => handleRouteClick(event, "main")}
+            onMouseEnter={(e) => showNavTooltip(t("nav.conversations"), e.currentTarget)}
+            onMouseLeave={hideNavTooltip}
+            onFocus={(e) => showNavTooltip(t("nav.conversations"), e.currentTarget)}
+            onBlur={hideNavTooltip}
+          >
+            <NavConversations size={18} />
+            <span className="sidenav-label">{t("nav.conversations")}</span>
+          </a>
+          <a
+            className={`sidenav-btn ${route === "backlog" ? "active" : ""}`}
+            data-nav="backlog"
+            href={hrefForRoute("backlog")}
+            aria-label={t("nav.backlog_label")}
+            aria-current={route === "backlog" ? "page" : undefined}
+            title={t("nav.backlog_label")}
+            onClick={(event) => handleRouteClick(event, "backlog")}
+            onMouseEnter={(e) => showNavTooltip(t("nav.backlog"), e.currentTarget)}
+            onMouseLeave={hideNavTooltip}
+            onFocus={(e) => showNavTooltip(t("nav.backlog"), e.currentTarget)}
+            onBlur={hideNavTooltip}
+          >
+            <NavBacklog size={18} />
+            <span className="sidenav-label">{t("nav.backlog")}</span>
+          </a>
+          <a
+            className={`sidenav-btn ${route === "routine" ? "active" : ""}`}
+            data-nav="routine"
+            href={hrefForRoute("routine")}
+            aria-label={t("nav.routine_label")}
+            aria-current={route === "routine" ? "page" : undefined}
+            title={t("nav.routine_label")}
+            onClick={(event) => handleRouteClick(event, "routine")}
+            onMouseEnter={(e) => showNavTooltip(t("nav.routine"), e.currentTarget)}
+            onMouseLeave={hideNavTooltip}
+            onFocus={(e) => showNavTooltip(t("nav.routine"), e.currentTarget)}
+            onBlur={hideNavTooltip}
+          >
+            <NavRoutine size={18} />
+            <span className="sidenav-label">{t("nav.routine")}</span>
+          </a>
+          <a
+            className={`sidenav-btn ${route === "agents" ? "active" : ""}`}
+            data-nav="agents"
+            href={hrefForRoute("agents")}
+            aria-label={t("nav.agents_label")}
+            aria-current={route === "agents" ? "page" : undefined}
+            title={t("nav.agents_label")}
+            onClick={(event) => handleRouteClick(event, "agents")}
+            onMouseEnter={(e) => showNavTooltip(t("nav.agents"), e.currentTarget)}
+            onMouseLeave={hideNavTooltip}
+            onFocus={(e) => showNavTooltip(t("nav.agents"), e.currentTarget)}
+            onBlur={hideNavTooltip}
+          >
+            <NavAgents size={18} />
+            <span className="sidenav-label">{t("nav.agents")}</span>
+          </a>
+        </div>
         {isAdmin ? (
-          <>
-            <div className="sidenav-separator" aria-hidden="true" />
+          <div className="sidenav-group sidenav-group--admin" role="group" aria-label={t("nav.manage")}>
+            <span className="sidenav-group-label sidenav-overflow-item" aria-hidden="true">{t("nav.manage")}</span>
             <a
-              className={`sidenav-btn ${route === "channels" ? "active" : ""}`}
+              className={`sidenav-btn sidenav-overflow-item ${route === "channels" ? "active" : ""}`}
               data-nav="channels"
               href={hrefForRoute("channels")}
               aria-label={t("nav.channels_label")}
@@ -213,7 +280,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
               <span className="sidenav-label">{t("nav.channels")}</span>
             </a>
             <a
-              className={`sidenav-btn ${route === "admin" ? "active" : ""}`}
+              className={`sidenav-btn sidenav-overflow-item ${route === "admin" ? "active" : ""}`}
               data-nav="admin"
               href={hrefForRoute("admin")}
               aria-label={t("nav.admin_label")}
@@ -228,7 +295,22 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
               <NavAdmin size={18} />
               <span className="sidenav-label">{t("nav.admin")}</span>
             </a>
-          </>
+            <Button
+              ref={moreButtonRef}
+              type="button"
+              variant="ghost"
+              className={`sidenav-btn sidenav-more-btn ${moreActive || moreMenu ? "active" : ""}`}
+              data-nav="more"
+              aria-label={t("nav.more_label")}
+              aria-haspopup="menu"
+              aria-expanded={Boolean(moreMenu)}
+              title={t("nav.more_label")}
+              onClick={(event) => toggleMoreMenu(event.currentTarget)}
+            >
+              <NavMore size={18} />
+              <span className="sidenav-label">{t("nav.more")}</span>
+            </Button>
+          </div>
         ) : null}
       </nav>
       <div className="sidenav-bottom">
@@ -268,6 +350,36 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
             <NavLogout size={16} />
             <span>{t("nav.logout")}</span>
           </Button>
+        </div>
+      ) : null}
+      {moreMenu ? (
+        <div
+          ref={moreMenuRef}
+          className="sidenav-more-menu"
+          role="menu"
+          aria-label={t("nav.more_label")}
+          style={{ top: moreMenu.y, left: moreMenu.x }}
+        >
+          <a
+            className={`sidenav-more-item ${route === "channels" ? "active" : ""}`}
+            role="menuitem"
+            href={hrefForRoute("channels")}
+            aria-current={route === "channels" ? "page" : undefined}
+            onClick={(event) => handleRouteClick(event, "channels")}
+          >
+            <NavChannels size={16} />
+            <span>{t("nav.channels")}</span>
+          </a>
+          <a
+            className={`sidenav-more-item ${route === "admin" ? "active" : ""}`}
+            role="menuitem"
+            href={hrefForRoute("admin")}
+            aria-current={route === "admin" ? "page" : undefined}
+            onClick={(event) => handleRouteClick(event, "admin")}
+          >
+            <NavAdmin size={16} />
+            <span>{t("nav.admin")}</span>
+          </a>
         </div>
       ) : null}
       {navTooltip ? (

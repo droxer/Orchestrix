@@ -35,6 +35,7 @@
     "chats": "Chats",
     "workspace": "Workspace",
     "workspace_label": "Workspace",
+    "manage": "Manage",
     "backlog": "Backlog",
     "backlog_label": "Backlog",
     "routine": "Routine",
@@ -53,6 +54,8 @@
     "collapse_sidebar": "Collapse sidebar",
     "expand_sidebar": "Expand sidebar",
     "settings": "Settings",
+    "more": "More",
+    "more_label": "More destinations",
     "mobile_section": "Relay"
   },
   "thread": {
