@@ -1156,6 +1156,37 @@
   background: var(--color-semantic-surface-raised);
 }
 
+.adm-chat-stage-intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+/* Wide viewports: split the onboarding stage into pitch + form so it reads as
+   an intentional two-up rather than a lone card floating in a large canvas.
+   Collapses back to the single stacked card below the breakpoint. */
+@media (min-width: 1040px) {
+  .adm-chat-stage {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+    gap: var(--space-xxl);
+    max-width: 880px;
+    padding: var(--space-xxl);
+  }
+
+  .adm-chat-stage-form {
+    padding-top: 0;
+    padding-left: var(--space-xxl);
+    border-top: none;
+    border-left: 1px solid var(--color-semantic-hairline-soft);
+  }
+
+  .adm-chat-stage-mark {
+    justify-content: flex-start;
+  }
+}
+
 .adm-chat-stage-mark {
   display: flex;
   justify-content: center;

@@ -9,6 +9,11 @@ const nextConfig = (phase: string): NextConfig => {
     ...(!isDev ? { output: "export" as const } : {}),
     ...(isDev
       ? {
+          // Suppress the Next dev-mode indicator badge: it renders fixed at the
+          // bottom-left corner and overlaps the SideNav "Settings" control. It
+          // never ships (production uses `output: "export"`), so hiding it only
+          // affects local dev ergonomics.
+          devIndicators: false,
           // The app is a single-page client app (only src/app/page.tsx). In
           // production the backend serves index.html for any unmatched path, so
           // client-side views like /login and /channels resolve. Next dev has no

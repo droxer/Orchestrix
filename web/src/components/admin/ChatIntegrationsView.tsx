@@ -516,17 +516,19 @@ export function ChatIntegrationsView({
       <div className="adm-view adm-chat">
         {alerts}
         <div className="adm-chat-stage relay-enter">
-          <div className="adm-chat-stage-mark relay-enter relay-enter-delay-1">
-            <ProviderAvatar provider="telegram" size="hero" />
+          <div className="adm-chat-stage-intro">
+            <div className="adm-chat-stage-mark relay-enter relay-enter-delay-1">
+              <ProviderAvatar provider="telegram" size="hero" />
+            </div>
+            <RelayEmptyState
+              className="adm-chat-stage-empty"
+              title={t("admin.v2.chat_stage_title")}
+              body={t("admin.v2.chat_stage_body")}
+              hint={t("admin.v2.chat_stage_hint")}
+              animate={false}
+              titleId="channels-stage-title"
+            />
           </div>
-          <RelayEmptyState
-            className="adm-chat-stage-empty"
-            title={t("admin.v2.chat_stage_title")}
-            body={t("admin.v2.chat_stage_body")}
-            hint={t("admin.v2.chat_stage_hint")}
-            animate={false}
-            titleId="channels-stage-title"
-          />
           <div className="adm-chat-stage-form relay-enter relay-enter-delay-3">
             <ChannelCreateForm {...createFormProps} idPrefix="chat" />
           </div>

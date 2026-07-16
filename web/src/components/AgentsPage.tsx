@@ -324,6 +324,7 @@ export function AgentsPage({
         ) : (
           <RelayEmptyState
             fill
+            mark
             title={t("agents_page.select_title")}
             body={t("agents_page.select_body")}
           />
