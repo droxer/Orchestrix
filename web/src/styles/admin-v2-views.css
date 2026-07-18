@@ -109,7 +109,7 @@
   grid-template-columns: minmax(220px, 1.2fr) minmax(0, 2fr) auto;
   gap: var(--space-lg);
   align-items: center;
-  padding: var(--space-lg) 0;
+  padding: var(--space-sm) 0;
   border-bottom: 1px solid var(--color-semantic-hairline-soft);
   position: relative;
   transition: border-color var(--duration-base) var(--ease-standard);
@@ -457,6 +457,11 @@
   gap: var(--space-xs);
 }
 
+.adm-emp-card-metric .mono {
+  font: var(--type-label-strong);
+  font-variant-numeric: tabular-nums;
+}
+
 .adm-node-card.is-pulse::after {
   content: "";
   position: absolute;
@@ -471,7 +476,7 @@
    both views share one table language. ────────────────────────────────── */
 .adm-node-cols {
   display: grid;
-  grid-template-columns: minmax(200px, 1.4fr) minmax(0, 2fr) 8rem 6rem auto;
+  grid-template-columns: minmax(200px, 1.4fr) minmax(0, 2fr) auto;
   gap: var(--space-lg);
   padding: 0 0 var(--space-sm);
   border-bottom: 1px solid var(--color-semantic-hairline);
@@ -485,10 +490,10 @@
 
 .adm-node-row {
   display: grid;
-  grid-template-columns: minmax(200px, 1.4fr) minmax(0, 2fr) 8rem 6rem auto;
+  grid-template-columns: minmax(200px, 1.4fr) minmax(0, 2fr) auto;
   gap: var(--space-lg);
   align-items: center;
-  padding: var(--space-base) 0;
+  padding: var(--space-sm) 0;
   border-bottom: 1px solid var(--color-semantic-hairline-soft);
   position: relative;
   transition: border-color var(--duration-base) var(--ease-standard);
@@ -524,14 +529,6 @@
   flex-wrap: wrap;
   gap: var(--space-xs);
   min-width: 0;
-}
-
-.adm-node-row-status {
-  justify-self: start;
-}
-
-.adm-node-row-seen {
-  font-size: var(--text-xs);
 }
 
 .adm-node-row-actions {
@@ -589,11 +586,6 @@
 .adm-node-card.tone-muted::before { background: var(--color-semantic-muted-soft); }
 .adm-node-card.tone-neutral::before { background: var(--color-semantic-muted-soft); }
 
-@keyframes adm-node-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-
 .adm-node-profile {
   display: flex;
   flex-wrap: wrap;
@@ -612,34 +604,41 @@
   margin-bottom: var(--space-sm);
 }
 
+/* Execution profile chip — a tinted, icon-led badge so managed vs local reads
+   at a glance on the card (icon + label + tone all carry the same cue). */
 .adm-node-profile-kind {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-xs);
+  gap: var(--space-xxs);
+  padding: 1px var(--space-xs);
+  border: 1px solid transparent;
+  border-radius: var(--radius-xs);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   font-weight: 600;
   color: var(--color-semantic-ink);
 }
 
-.adm-node-profile-kind::before {
-  content: "";
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
+.adm-node-profile-icon {
   flex-shrink: 0;
+  opacity: 0.9;
 }
 
-.adm-node-profile-kind[data-kind="managed"]::before {
-  background: var(--color-semantic-info);
+.adm-node-profile-kind[data-kind="managed"] {
+  color: var(--color-semantic-info);
+  border-color: color-mix(in srgb, var(--color-semantic-info) 32%, transparent);
+  background: color-mix(in srgb, var(--color-semantic-info) 10%, transparent);
 }
 
-.adm-node-profile-kind[data-kind="local"]::before {
-  background: var(--color-semantic-success);
+.adm-node-profile-kind[data-kind="local"] {
+  color: var(--color-semantic-success-text);
+  border-color: color-mix(in srgb, var(--color-semantic-success) 32%, transparent);
+  background: color-mix(in srgb, var(--color-semantic-success) 10%, transparent);
 }
 
-.adm-node-profile-kind[data-kind="pending"]::before {
-  border: 1px solid var(--color-semantic-muted);
+.adm-node-profile-kind[data-kind="pending"] {
+  color: var(--color-semantic-muted);
+  border-color: var(--color-semantic-hairline);
   background: transparent;
 }
 
@@ -683,6 +682,22 @@
   border: 1px solid var(--color-semantic-hairline);
   font: var(--type-caption-strong);
   letter-spacing: var(--letter-open);
+}
+
+/* Employee cards represent people: a circular avatar that reads as a
+   profile picture, with slightly stronger ink so the person identity is
+   the anchor. */
+.adm-node-avatar.adm-emp-avatar {
+  border-radius: var(--radius-full);
+  color: var(--color-semantic-ink);
+  background: var(--color-semantic-surface-soft);
+}
+
+/* Node cards represent machines: keep the technical square container and
+   mute the icon so the status pill carries health meaning. */
+.adm-node-avatar.adm-node-avatar--machine {
+  color: var(--color-semantic-muted);
+  background: var(--color-semantic-surface-strong);
 }
 
 .adm-node-card-identity {
@@ -754,23 +769,8 @@
 }
 
 /* Running/provisioning stay hue-free on the dot — the accent is reserved for
-   action, selection, and focus, never a passive status indicator; liveness
-   reads from the pulsing dot's motion, not its hue. */
+   action, selection, and focus, never a passive status indicator. */
 .adm-status-pill.tone-info .adm-status-dot { background: var(--color-semantic-muted-soft); }
-
-/* A running node earns a slow breathing dot — liveness without a
-   coloured bar. Disabled under reduced-motion. */
-@media (prefers-reduced-motion: no-preference) {
-  .adm-node-card.is-running .adm-status-dot {
-    animation: adm-node-pulse 2.4s ease-in-out infinite;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .adm-node-card.is-running .adm-status-dot {
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-semantic-success) 35%, transparent);
-  }
-}
 
 .adm-node-id {
   display: inline-flex;

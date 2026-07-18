@@ -8,13 +8,9 @@ import { AgentMark } from "../AgentMark";
 import {
   agentStatusTone,
   copyText,
-  formatRelativeTime,
-  isStale,
-  statusTone,
   truncateId,
   visibleNodeAgentNames,
   type StoredNodeTokenMap,
-  visualStatus,
 } from "./helpers";
 import { NodeProfileBadges } from "./NodeProfileBadges";
 import { Button } from "../ui/button";
@@ -22,13 +18,6 @@ import { ActionApprove, ActionCopy, ActionKey, AdminDelete, AdminManageAgents, A
 
 function isAgentDisabled(node: ControlPanelDaemonNodeRecord, agent: AgentName): boolean {
   return Boolean(node.disabledAgents?.includes(agent));
-}
-
-function ownerInitials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
 function agentTitle(node: ControlPanelDaemonNodeRecord, agent: AgentName, t: TFunction): string {
@@ -69,9 +58,6 @@ export function NodeCard({
   const [copied, setCopied] = useState(false);
   const [deletePending, setDeletePending] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const status = visualStatus(node);
-  const tone = statusTone(status);
-  const running = !isStale(node) && node.status === "running";
 
   async function handleCopyId() {
     await copyText(node.id);
@@ -103,10 +89,10 @@ export function NodeCard({
     : t("admin.unassigned");
 
   return (
-    <article className={`adm-node-card tone-${tone}${running ? " is-running" : ""}`}>
+    <article className="adm-node-card">
       <header className="adm-node-card-head">
-        <span className={`adm-node-avatar tone-${tone}`} aria-hidden="true" translate="no">
-          {node.employeeId ? ownerInitials(nodeName) : <AdminNode size={16} aria-hidden="true" />}
+        <span className="adm-node-avatar adm-node-avatar--machine" aria-hidden="true" translate="no">
+          <AdminNode size={18} aria-hidden="true" />
         </span>
         <div className="adm-node-card-identity">
           <span
@@ -122,10 +108,6 @@ export function NodeCard({
           )}
         </div>
         <div className="adm-node-card-meta-col">
-          <span className={`adm-status-pill tone-${tone}`}>
-            <i className="adm-status-dot" aria-hidden="true" />
-            {t(`status.${status}`, { defaultValue: status })}
-          </span>
           <Button variant="ghost"
             type="button"
             className="adm-node-id mono"
@@ -144,6 +126,8 @@ export function NodeCard({
         storedTokens={storedTokens}
         colocated={colocated}
         t={t}
+        hideThisHost
+        hideSavedHere
       />
 
       <div className="adm-node-card-body">
@@ -169,7 +153,6 @@ export function NodeCard({
       </div>
 
       <footer className="adm-node-card-foot">
-        <span className="adm-node-card-meta mono tone-muted">{formatRelativeTime(node.lastSeenAt, t)}</span>
         {node.queuedCommandCount > 0 ? (
           <span className="adm-node-card-queued mono tone-info">{node.queuedCommandCount} {t("admin.queued")}</span>
         ) : null}

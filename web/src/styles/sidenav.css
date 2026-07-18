@@ -233,6 +233,7 @@
 
 .sidenav-settings-menu button {
   display: flex;
+  justify-content: flex-start;
   align-items: center;
   gap: var(--space-sm);
   width: 100%;

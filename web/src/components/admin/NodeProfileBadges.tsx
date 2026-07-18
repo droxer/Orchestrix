@@ -2,11 +2,19 @@
 
 import type { TFunction } from "i18next";
 import type { ControlPanelDaemonNodeRecord } from "../../types";
+import { NodeLocal, NodeManaged, NodePending } from "../icons";
 import {
   nodeExecutionProfile,
   nodeLocalityKinds,
+  type NodeExecutionProfile,
   type StoredNodeTokenMap,
 } from "./helpers";
+
+const EXECUTION_ICON: Record<NodeExecutionProfile, typeof NodeManaged> = {
+  managed: NodeManaged,
+  local: NodeLocal,
+  pending: NodePending,
+};
 
 interface NodeProfileBadgesProps {
   node: ControlPanelDaemonNodeRecord;
@@ -14,11 +22,19 @@ interface NodeProfileBadgesProps {
   colocated: boolean;
   t: TFunction;
   compact?: boolean;
+  /** Drop the "This host" locality — redundant on the node card, where the
+   *  status pill already conveys liveness. */
+  hideThisHost?: boolean;
+  /** Drop the "Saved here" locality on the node card; credential state is
+   *  noise in the fleet overview. */
+  hideSavedHere?: boolean;
 }
 
-export function NodeProfileBadges({ node, storedTokens, colocated, t, compact = false }: NodeProfileBadgesProps) {
+export function NodeProfileBadges({ node, storedTokens, colocated, t, compact = false, hideThisHost = false, hideSavedHere = false }: NodeProfileBadgesProps) {
   const execution = nodeExecutionProfile(node);
-  const localities = nodeLocalityKinds(node, { storedTokens, colocated });
+  const localities = nodeLocalityKinds(node, { storedTokens, colocated })
+    .filter((locality) => !(hideThisHost && locality === "this_host"))
+    .filter((locality) => !(hideSavedHere && locality === "saved_here"));
   const executionLabel = t(`admin.v2.node_execution_${execution}`);
   const executionHint = t(`admin.v2.node_execution_${execution}_hint`);
   const localityText = localities
@@ -27,6 +43,7 @@ export function NodeProfileBadges({ node, storedTokens, colocated, t, compact = 
   const localityHint = localities
     .map((locality) => t(`admin.v2.node_locality_${locality}_hint`))
     .join(" · ");
+  const ExecutionIcon = EXECUTION_ICON[execution];
 
   return (
     <div
@@ -39,6 +56,7 @@ export function NodeProfileBadges({ node, storedTokens, colocated, t, compact = 
         title={executionHint}
         translate="no"
       >
+        <ExecutionIcon size={13} className="adm-node-profile-icon" aria-hidden="true" />
         {executionLabel}
       </span>
       {localityText ? (
@@ -50,13 +68,5 @@ export function NodeProfileBadges({ node, storedTokens, colocated, t, compact = 
         </>
       ) : null}
     </div>
-  );
-}
-
-export function FleetProfileLegend({ t }: { t: TFunction }) {
-  return (
-    <p className="adm-fleet-profile-hint" role="note">
-      {t("admin.v2.fleet_profile_legend_copy")}
-    </p>
   );
 }

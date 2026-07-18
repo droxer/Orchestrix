@@ -62,14 +62,16 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
   const [authScreen, setAuthScreen] = useState<AuthScreen>("login");
   const [authError, setAuthError] = useState<string | null>(null);
 
-  const { nodes, employees, pollError, isFetching, mergeFleet, refetch } = useAdminFleet(Boolean(admin));
-
   const [view, setView] = useUrlSearchState("adminView", "dashboard" as AdminView, parseAdminView, (value) => value);
   const [layout, setLayout] = useUrlSearchState<AdminLayout>(
     "adminLayout",
     "card",
     (value) => (value === "list" ? "list" : "card"),
     (value) => (value === "card" ? null : value),
+  );
+  const { nodes, employees, pollError, isFetching, mergeFleet, refetch } = useAdminFleet(
+    Boolean(admin),
+    view === "dashboard" || layout === "list",
   );
   const setAdminView = useRelayStore((state) => state.setAdminView);
   const [addEmployeeOpen, setAddEmployeeOpen] = useState(false);

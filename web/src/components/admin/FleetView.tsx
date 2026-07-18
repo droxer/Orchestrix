@@ -1,19 +1,19 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { RelayEmptyState } from "@/components/RelayEmptyState";
 import { Button } from "@/components/ui/button";
 import type { ControlPanelDaemonNodeRecord, EmployeeRecord } from "../../types";
-import { AdminNode, ICON_STROKE_LARGE } from "../icons";
+import { AdminNode, ActionSearch, ICON_STROKE_LARGE } from "../icons";
 import { canUseLocalControlPanel } from "../../lib/controlPanel";
 import { useUrlSearchState } from "../../hooks/useUrlSearchState";
 import type { StoredNodeTokenMap } from "./helpers";
 import { visualStatus } from "./helpers";
 import { NodeCard } from "./NodeCard";
 import { NodeRow } from "./NodeRow";
-import { FleetProfileLegend } from "./NodeProfileBadges";
+import { NodeProfileBadges } from "./NodeProfileBadges";
 import { AdminLayoutToggle, type AdminLayout } from "./AdminLayoutToggle";
 
 type FleetFilter = "all" | "ready" | "running" | "provisioning" | "failed" | "unassigned";
@@ -61,6 +61,7 @@ function filterLabel(filter: FleetFilter, t: TFunction): string {
 export function FleetView({ nodes, employees, storedTokens, layout, onLayoutChange, onRevealCredentials, onManageAgents, onDeleteNode, onAddNode }: FleetViewProps) {
   const { t } = useTranslation();
   const [filter, setFilter] = useUrlSearchState("fleetFilter", "all" as FleetFilter, parseFleetFilter, serializeFleetFilter);
+  const [query, setQuery] = useState("");
   const colocated = canUseLocalControlPanel();
 
   const counts = useMemo(() => {
@@ -82,12 +83,30 @@ export function FleetView({ nodes, employees, storedTokens, layout, onLayoutChan
     return result;
   }, [nodes]);
 
-  const filtered = useMemo(() => nodes.filter((node) => matchesFilter(node, filter)), [nodes, filter]);
   const employeeById = useMemo(() => new Map(employees.map((employee) => [employee.id, employee])), [employees]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return nodes.filter((node) => {
+      if (!matchesFilter(node, filter)) return false;
+      if (!q) return true;
+      const employee = node.employeeId ? employeeById.get(node.employeeId) : undefined;
+      const haystack = [
+        node.id,
+        node.employeeId ?? "",
+        employee?.displayName ?? "",
+        node.workspacePath ?? "",
+        node.sandboxMode ?? "",
+        ...Object.keys(node.agents),
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [nodes, filter, query, employeeById]);
 
   return (
     <div className="adm-view">
-      {colocated ? <FleetProfileLegend t={t} /> : null}
       <div className="adm-view-controls">
         <div className="adm-fleet-filters" role="group" aria-label={t("admin.v2.filter_label")}>
           {FILTERS.map((id) => {
@@ -108,6 +127,21 @@ export function FleetView({ nodes, employees, storedTokens, layout, onLayoutChan
           })}
         </div>
         <AdminLayoutToggle layout={layout} onChange={onLayoutChange} />
+      </div>
+
+      <div className="relay-search adm-search">
+        <ActionSearch size={16} aria-hidden="true" />
+        <input
+          className="adm-search-input"
+          name="admin-nodes-search"
+          type="search"
+          autoComplete="off"
+          spellCheck={false}
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder={t("admin.v2.search_nodes_placeholder")}
+          aria-label={t("admin.v2.search_nodes_placeholder")}
+        />
       </div>
 
       {filtered.length === 0 ? (
@@ -143,8 +177,6 @@ export function FleetView({ nodes, employees, storedTokens, layout, onLayoutChan
           <div className="adm-node-cols" aria-hidden="true">
             <span className="adm-emp-col-label">{t("admin.v2.nav_fleet")}</span>
             <span className="adm-emp-col-label">{t("admin.col_agents")}</span>
-            <span className="adm-emp-col-label">{t("admin.v2.col_status")}</span>
-            <span className="adm-emp-col-label">{t("admin.v2.col_last_seen")}</span>
             <span className="adm-emp-col-label adm-emp-col-label--metrics">{t("admin.v2.col_actions")}</span>
           </div>
           <ul className="adm-node-list">

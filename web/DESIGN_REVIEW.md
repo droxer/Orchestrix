@@ -334,3 +334,16 @@ The Employees view was list-only (department-grouped rows) and Nodes was card-on
 - New i18n keys in en/zh-CN/zh-TW: `admin.v2.{layout_label,view_card,view_list,col_status,col_last_seen,col_actions,emp_state_*}`.
 
 **Verify:** dark 1280×900 — Employees card (5 cards, dept eyebrow + IDLE pills), Employees list (grouped), Nodes list (5-col table), Nodes card (unchanged) all render; toggle top-right of each view switches layout and the URL carries `adminLayout=list`. tsc clean, stylelint clean, translation JSON valid.
+
+### Node card: managed/local visual cues + "This host" removed (2026-07-18)
+
+The node card's execution profile was a bare mono label with a 5px color dot — too weak to distinguish managed from local at a glance. Turned it into an icon-led tinted chip, and dropped the redundant "This host" locality from the card.
+
+**Shipped:**
+
+- `NodeProfileBadges` renders a per-kind glyph before the label (`icons.tsx`: `NodeManaged` = Container/box for BoxLite VM, `NodeLocal` = Terminal for host processes, `NodePending` = CircleDashed for awaiting daemon), driven by an `EXECUTION_ICON` map keyed on `NodeExecutionProfile`.
+- `.adm-node-profile-kind` is now a tinted chip (padding + border + `color-mix` background) toned per `data-kind`: managed → info/blue, local → success/green, pending → muted outline. Icon inherits `currentColor`. Replaces the old `::before` dot.
+- Cue is triple-encoded (icon + tone + label) so it doesn't rely on color alone.
+- `NodeProfileBadges` gained `hideThisHost`; `NodeCard` passes it so the card drops the "This host" locality (the status pill already conveys liveness). CredentialsDrawer keeps the full locality set.
+
+**Verify:** dark 1280×900 nodes card — managed nodes show a boxed blue "Managed" chip, local nodes a green terminal "Local" chip, pending a dashed "Awaiting daemon" chip; no "This host" on cards. tsc + stylelint clean.

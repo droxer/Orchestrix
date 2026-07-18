@@ -3,16 +3,9 @@
 import type { TFunction } from "i18next";
 import { AgentMark } from "../AgentMark";
 import { Button } from "../ui/button";
-import { AdminDelete } from "../icons";
+import { AdminDelete, AdminEmployees } from "../icons";
 import { agentAvailabilityTone, type EmployeeNodeSummary } from "./helpers";
 import type { EmployeeAgent } from "../../types";
-
-function ownerInitials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
 
 // Employee fleet state, collapsed to the same tone vocabulary the node status
 // pill uses so the two cards read as one system.
@@ -49,8 +42,8 @@ export function EmployeeCard({
       data-employee={member.id}
     >
       <header className="adm-node-card-head">
-        <span className={`adm-node-avatar tone-${tone}`} aria-hidden="true" translate="no">
-          {ownerInitials(member.displayName)}
+        <span className="adm-node-avatar adm-emp-avatar" aria-hidden="true" translate="no">
+          <AdminEmployees size={18} aria-hidden="true" />
         </span>
         <div className="adm-node-card-identity">
           <span className="adm-node-card-name" translate="no">{member.displayName}</span>

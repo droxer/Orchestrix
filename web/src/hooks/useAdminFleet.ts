@@ -17,8 +17,9 @@ export interface AdminFleet {
 
 // Admin console fleet snapshot (daemon nodes + employees). Node polling shares
 // CONTROL_PANEL_NODES_KEY with useLocalDaemonNodes so localhost chat + admin
-// reuse one /cp/daemon-nodes poll instead of two timers.
-export function useAdminFleet(enabled: boolean): {
+// reuse one /cp/daemon-nodes poll instead of two timers. When `live` is false the
+// data is fetched once and not refreshed, which keeps the admin card view stable.
+export function useAdminFleet(enabled: boolean, live: boolean = true): {
   nodes: ControlPanelDaemonNodeRecord[];
   employees: EmployeeRecord[];
   lastUpdated: Date | null;
@@ -35,14 +36,14 @@ export function useAdminFleet(enabled: boolean): {
         queryKey: CONTROL_PANEL_NODES_KEY,
         queryFn: ({ signal }: { signal: AbortSignal }) => fetchControlPanelNodes(signal),
         enabled,
-        refetchInterval: CONTROL_PANEL_POLL_MS,
+        refetchInterval: live ? CONTROL_PANEL_POLL_MS : false,
       },
       {
         queryKey: ADMIN_EMPLOYEES_KEY,
         queryFn: async ({ signal }: { signal: AbortSignal }) =>
           (await listControlPanelEmployees(signal)).employees,
         enabled,
-        refetchInterval: CONTROL_PANEL_POLL_MS,
+        refetchInterval: live ? CONTROL_PANEL_POLL_MS : false,
       },
     ],
   });

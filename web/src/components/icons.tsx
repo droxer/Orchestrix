@@ -15,6 +15,8 @@ import {
   CalendarClock,
   CalendarDays,
   Columns3,
+  Container,
+  CircleDashed,
   FileText,
   FolderClosed,
   Rows3,
@@ -126,6 +128,12 @@ export const ViewBoard = withStandardStroke(Columns3, "ViewBoard");
 export const ViewList = withStandardStroke(Rows3, "ViewList");
 export const ViewGrid = withStandardStroke(LayoutGrid, "ViewGrid");
 export const ActionKey = withStandardStroke(KeyRound, "ActionKey");
+
+// Node execution profile glyphs — managed (BoxLite VM = a container/box),
+// local (host processes = a shell), pending (awaiting daemon = a dashed ring).
+export const NodeManaged = withStandardStroke(Container, "NodeManaged");
+export const NodeLocal = withStandardStroke(Terminal, "NodeLocal");
+export const NodePending = withStandardStroke(CircleDashed, "NodePending");
 
 // Agent mode (智能体): a zap glyph reads as "execute work" without reusing
 // the Bot mark reserved for preferences and artifact output types.

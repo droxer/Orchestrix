@@ -7,21 +7,10 @@ import { useDialogs } from "@/components/ui/DialogProvider";
 import { AgentMark } from "../AgentMark";
 import {
   agentStatusTone,
-  formatRelativeTime,
-  isStale,
-  statusTone,
   visibleNodeAgentNames,
-  visualStatus,
 } from "./helpers";
 import { Button } from "../ui/button";
 import { ActionKey, AdminDelete, AdminManageAgents, AdminNode } from "../icons";
-
-function ownerInitials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
 
 function isAgentDisabled(node: ControlPanelDaemonNodeRecord, agent: AgentName): boolean {
   return Boolean(node.disabledAgents?.includes(agent));
@@ -40,9 +29,6 @@ export function NodeRow({ node, employee, onReveal, onManageAgents, onDelete, t 
   const { confirm } = useDialogs();
   const [deletePending, setDeletePending] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const status = visualStatus(node);
-  const tone = statusTone(status);
-  const running = !isStale(node) && node.status === "running";
   const nodeName = node.employeeId ? employee?.displayName || node.employeeId : t("admin.unassigned");
 
   async function handleDelete() {
@@ -65,10 +51,10 @@ export function NodeRow({ node, employee, onReveal, onManageAgents, onDelete, t 
   }
 
   return (
-    <li className={`adm-node-row tone-${tone}${running ? " is-running" : ""}`} data-node={node.id}>
+    <li className="adm-node-row" data-node={node.id}>
       <div className="adm-node-row-id">
-        <span className={`adm-node-avatar tone-${tone}`} aria-hidden="true" translate="no">
-          {node.employeeId ? ownerInitials(nodeName) : <AdminNode size={16} aria-hidden="true" />}
+        <span className="adm-node-avatar adm-node-avatar--machine" aria-hidden="true" translate="no">
+          <AdminNode size={16} aria-hidden="true" />
         </span>
         <span className="adm-node-row-identity">
           <span className={`adm-node-card-name ${node.employeeId ? "" : "tone-muted"}`} translate="no">
@@ -99,13 +85,6 @@ export function NodeRow({ node, employee, onReveal, onManageAgents, onDelete, t 
           );
         })}
       </div>
-
-      <span className={`adm-status-pill tone-${tone} adm-node-row-status`}>
-        <i className="adm-status-dot" aria-hidden="true" />
-        {t(`status.${status}`, { defaultValue: status })}
-      </span>
-
-      <span className="adm-node-row-seen mono tone-muted">{formatRelativeTime(node.lastSeenAt, t)}</span>
 
       <div className="adm-node-row-actions">
         {node.managedNodeId ? null : (
