@@ -10,11 +10,11 @@ import type { AgentPlacement, ControlPanelDaemonNodeRecord, EmployeeAgent, Emplo
 import { useDialogs } from "@/components/ui/DialogProvider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { ADMIN_AGENTS_KEY } from "../lib/adminHelpers";
 import { EMPLOYEE_AGENTS_QUERY_KEY } from "../hooks/useEmployeeAgents";
 import { formatRelativeTime, truncateId, agentAvailabilityTone } from "./admin/helpers";
 import { AgentMark } from "./AgentMark";
+import { AgentInstructionEditor } from "./AgentInstructionEditor";
 
 export interface AgentProfilePanelProps {
   agent: EmployeeAgent;
@@ -310,58 +310,17 @@ export function AgentProfilePanel({
           </section>
         ) : null}
 
-        <section className="workspace-dossier-instructions" aria-labelledby="workspace-dossier-instructions-title">
-          <div className="workspace-dossier-instructions-head">
-            <h2 id="workspace-dossier-instructions-title">{t("agents_page.instructions_label")}</h2>
-            {canEditProfile && !editingInstructions ? (
-              <DossierIconButton
-                onClick={startEditInstructions}
-                aria-label={t("agents_page.edit_instructions")}
-                title={t("agents_page.edit_instructions")}
-              >
-                <ActionEdit size={14} aria-hidden="true" />
-              </DossierIconButton>
-            ) : null}
-          </div>
-          {editingInstructions ? (
-            <>
-              <Textarea
-                className="adm-instructions-input"
-                name="agent-instructions"
-                aria-label={t("agents_page.instructions_label")}
-                rows={5}
-                autoFocus
-                value={instructionsDraft}
-                onChange={(event) => setInstructionsDraft(event.target.value)}
-                disabled={saving}
-                placeholder={t("agents_page.instructions_placeholder")}
-              />
-              <div className="adm-cred-inline-actions">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setEditingInstructions(false)}
-                  disabled={saving}
-                >
-                  {t("admin.v2.cancel")}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() => void handleInstructionsSave()}
-                  disabled={saving}
-                >
-                  {t("admin.v2.save")}
-                </Button>
-              </div>
-            </>
-          ) : (
-            <p className={`workspace-dossier-prose${agent.instructions?.trim() ? "" : " is-empty"}`}>
-              {agent.instructions?.trim() ? agent.instructions.trim() : t("agents_page.instructions_empty")}
-            </p>
-          )}
-        </section>
+        <AgentInstructionEditor
+          value={agent.instructions ?? ""}
+          draft={instructionsDraft}
+          editing={editingInstructions}
+          editable={canEditProfile}
+          saving={saving}
+          onStartEdit={startEditInstructions}
+          onDraftChange={setInstructionsDraft}
+          onCancel={() => setEditingInstructions(false)}
+          onSave={() => void handleInstructionsSave()}
+        />
 
         <details className="workspace-dossier-details">
           <summary>{t("workspace.profile_details")}</summary>
@@ -532,65 +491,17 @@ export function AgentProfilePanel({
         )}
       </div>
 
-      <div className="adm-cred-row">
-        <span className="adm-cred-label">{t("agents_page.instructions_label")}</span>
-        {editingInstructions ? (
-          <div className="adm-cred-value-line adm-cred-value-line--stack">
-            <textarea
-              className="adm-search-input adm-instructions-input"
-              name="agent-instructions"
-              aria-label={t("agents_page.instructions_label")}
-              rows={4}
-              autoFocus
-              value={instructionsDraft}
-              onChange={(event) => setInstructionsDraft(event.target.value)}
-              disabled={saving}
-              placeholder={t("agents_page.instructions_placeholder")}
-            />
-            <div className="adm-cred-inline-actions">
-              <Button variant="ghost"
-                type="button"
-                className="adm-copy-pill"
-                onClick={() => void handleInstructionsSave()}
-                disabled={saving}
-                aria-label={t("admin.v2.save")}
-                title={t("admin.v2.save")}
-              >
-                <ActionApprove size={14} aria-hidden="true" />
-              </Button>
-              <Button variant="ghost"
-                type="button"
-                className="adm-copy-pill"
-                onClick={() => setEditingInstructions(false)}
-                disabled={saving}
-                aria-label={t("admin.v2.cancel")}
-                title={t("admin.v2.cancel")}
-              >
-                <ActionRemove size={14} aria-hidden="true" />
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="adm-cred-value-line">
-            <span className="adm-cred-value">
-              {agent.instructions?.trim()
-                ? agent.instructions.trim()
-                : t("agents_page.instructions_empty")}
-            </span>
-            {canEditProfile ? (
-              <Button variant="ghost"
-                type="button"
-                className="adm-copy-pill"
-                onClick={startEditInstructions}
-                aria-label={t("agents_page.edit_instructions")}
-                title={t("agents_page.edit_instructions")}
-              >
-                <ActionEdit size={14} aria-hidden="true" />
-              </Button>
-            ) : null}
-          </div>
-        )}
-      </div>
+      <AgentInstructionEditor
+        value={agent.instructions ?? ""}
+        draft={instructionsDraft}
+        editing={editingInstructions}
+        editable={canEditProfile}
+        saving={saving}
+        onStartEdit={startEditInstructions}
+        onDraftChange={setInstructionsDraft}
+        onCancel={() => setEditingInstructions(false)}
+        onSave={() => void handleInstructionsSave()}
+      />
 
       <div className="adm-cred-row">
         <span className="adm-cred-label">{t("admin.v2.agent_runtime")}</span>

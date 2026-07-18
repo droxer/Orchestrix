@@ -940,14 +940,248 @@
   font: var(--type-meta);
 }
 
-.workspace-dossier-instructions {
+/* A durable agent brief, shown to employees and admins. */
+.agent-instruction-card {
   display: flex;
   flex-direction: column;
-  gap: var(--space-sm);
+  gap: var(--space-base);
   padding: var(--space-base);
+  overflow: hidden;
   border: 1px solid var(--color-semantic-hairline-soft);
   border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--color-semantic-surface-soft) 55%, var(--color-semantic-canvas));
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--color-semantic-action) 5%, var(--color-semantic-canvas)) 0%,
+      var(--color-semantic-canvas) 46%
+    );
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--color-semantic-action) 48%, transparent);
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
+}
+
+.agent-instruction-card.is-editing {
+  border-color: color-mix(in srgb, var(--color-semantic-action) 42%, var(--color-semantic-hairline));
+  box-shadow:
+    inset 3px 0 0 var(--color-semantic-action),
+    0 10px 30px color-mix(in srgb, var(--color-semantic-action) 8%, transparent);
+}
+
+.agent-instruction-card-head {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-sm);
+}
+
+.agent-instruction-card-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid color-mix(in srgb, var(--color-semantic-action) 24%, var(--color-semantic-hairline));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-semantic-action) 8%, var(--color-semantic-surface-strong));
+  color: var(--color-semantic-action);
+}
+
+.agent-instruction-card-heading {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.agent-instruction-card-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.agent-instruction-card-title-row h2 {
+  margin: 0;
+  color: var(--color-semantic-ink);
+  font: var(--type-label-strong);
+}
+
+.agent-instruction-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 19px;
+  padding: 0 7px;
+  border: 1px solid var(--color-semantic-hairline-soft);
+  border-radius: 999px;
+  color: var(--color-semantic-muted);
+  font: var(--type-micro-strong);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.agent-instruction-state::before {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-semantic-muted-soft);
+  content: "";
+}
+
+.agent-instruction-state.is-custom {
+  border-color: color-mix(in srgb, var(--color-semantic-action) 28%, var(--color-semantic-hairline));
+  color: var(--color-semantic-action);
+}
+
+.agent-instruction-state.is-custom::before {
+  background: var(--color-semantic-action);
+}
+
+.agent-instruction-card-help {
+  max-width: 62ch;
+  color: var(--color-semantic-muted);
+  font: var(--type-caption);
+  line-height: 1.45;
+}
+
+.agent-instruction-edit-action {
+  align-self: center;
+  white-space: nowrap;
+}
+
+.agent-instruction-prose {
+  margin: 0 0 0 38px;
+  padding: var(--space-sm) var(--space-base);
+  border: 1px solid var(--color-semantic-hairline-soft);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-semantic-surface-strong) 78%, transparent);
+  color: var(--color-semantic-body);
+  font: var(--type-body-sm);
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.agent-instruction-empty {
+  margin-left: 38px;
+  padding: var(--space-sm) var(--space-base);
+  border: 1px dashed var(--color-semantic-hairline);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-semantic-surface-soft) 48%, transparent);
+}
+
+.agent-instruction-empty p,
+.agent-instruction-empty span {
+  display: block;
+  margin: 0;
+}
+
+.agent-instruction-empty p {
+  color: var(--color-semantic-body);
+  font: var(--type-caption-strong);
+}
+
+.agent-instruction-empty span {
+  margin-top: 2px;
+  color: var(--color-semantic-muted);
+  font: var(--type-caption);
+  line-height: 1.45;
+}
+
+.agent-instruction-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.agent-instruction-editor-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 24px;
+  color: var(--color-semantic-muted);
+  font: var(--type-micro-strong);
+  letter-spacing: var(--letter-eyebrow);
+  text-transform: uppercase;
+}
+
+.agent-instruction-editor-toolbar button {
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-semantic-action);
+  font: var(--type-caption-strong);
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: pointer;
+}
+
+.agent-instruction-editor-toolbar button:hover {
+  color: var(--color-semantic-action-active);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.agent-instruction-editor-toolbar button:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-focus);
+}
+
+.agent-instruction-textarea {
+  min-height: 218px;
+  resize: vertical;
+  border-color: var(--color-semantic-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--color-semantic-surface-strong);
+  font-size: var(--text-sm);
+  line-height: 1.65;
+}
+
+.agent-instruction-editor-foot {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.agent-instruction-count,
+.agent-instruction-save-hint {
+  color: var(--color-semantic-muted);
+  font: var(--type-micro);
+}
+
+.agent-instruction-save-hint {
+  text-align: right;
+}
+
+.agent-instruction-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+@media (max-width: 700px) {
+  .agent-instruction-card-head {
+    grid-template-columns: 30px minmax(0, 1fr);
+  }
+
+  .agent-instruction-edit-action {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .agent-instruction-prose,
+  .agent-instruction-empty {
+    margin-left: 0;
+  }
+
+  .agent-instruction-editor-foot {
+    grid-template-columns: 1fr auto;
+  }
+
+  .agent-instruction-save-hint {
+    display: none;
+  }
 }
 
 .workspace-dossier-instructions-head {
@@ -1008,19 +1242,6 @@
   margin: 0;
   color: var(--color-semantic-ink);
   font: var(--type-label-strong);
-}
-
-.workspace-dossier-prose {
-  margin: 0;
-  color: var(--color-semantic-body);
-  font: var(--type-body-sm);
-  line-height: 1.6;
-  white-space: pre-wrap;
-}
-
-.workspace-dossier-prose.is-empty {
-  color: var(--color-semantic-muted);
-  font-style: italic;
 }
 
 .workspace-dossier-details {
