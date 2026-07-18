@@ -18,7 +18,7 @@ import {
   agentAvailabilityTone,
   type EmployeeNodeSummary,
 } from "./helpers";
-import { EmployeeCard } from "./EmployeeCard";
+import { EmployeeCard, summaryTone } from "./EmployeeCard";
 import { AdminLayoutToggle, type AdminLayout } from "./AdminLayoutToggle";
 
 interface EmployeesViewProps {
@@ -231,11 +231,13 @@ export function EmployeesView({
             <span className="adm-emp-col-label">{t("admin.col_employee")}</span>
             <span className="adm-emp-col-label">{t("admin.col_agents")}</span>
             <span className="adm-emp-col-label adm-emp-col-label--metrics">{t("admin.v2.col_metrics")}</span>
+            <span className="adm-emp-col-label adm-emp-col-label--metrics">{t("admin.v2.col_actions")}</span>
           </div>
           <ul className="adm-emp-list">
             {filtered.map((member) => {
               const memberAgents = agents.filter((agent) => agent.employeeId === member.id && !agent.deletedAt);
               const highlight = highlightedEmployeeId === member.id;
+              const { tone, key } = summaryTone(member);
               return (
                 <li
                   key={member.id}
@@ -243,7 +245,13 @@ export function EmployeesView({
                   data-employee={member.id}
                 >
                   <div className="adm-emp-id">
-                    <p className="adm-emp-name" translate="no">{member.displayName}</p>
+                    <div className="adm-emp-id-line">
+                      <p className="adm-emp-name" translate="no">{member.displayName}</p>
+                      <span className={`adm-status-pill tone-${tone}`}>
+                        <i className="adm-status-dot" aria-hidden="true" />
+                        {t(`admin.v2.emp_state_${key}`, { defaultValue: key })}
+                      </span>
+                    </div>
                     <p className="adm-emp-meta mono">
                       <span translate="no">@{member.id}</span>
                       {member.email ? <span translate="no">{member.email}</span> : null}
@@ -288,16 +296,18 @@ export function EmployeesView({
                         {member.readyCount}/{member.nodeCount}
                       </span>
                     </div>
+                  </div>
+                  <div className="adm-emp-actions">
                     {onDeleteEmployee ? (
                       <Button variant="ghost"
                         type="button"
-                        className="adm-emp-delete"
+                        className="icon-button icon-button--sm icon-button--tinted adm-node-card-icon-btn danger"
                         onClick={() => void handleDeleteEmployee(member.id)}
                         disabled={pendingDelete !== null}
                         aria-label={t("admin.v2.delete_employee_action")}
                         title={t("admin.v2.delete_employee_action")}
                       >
-                        <AdminDelete size={13} aria-hidden="true" />
+                        <AdminDelete size={14} aria-hidden="true" />
                       </Button>
                     ) : null}
                   </div>

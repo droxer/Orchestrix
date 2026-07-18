@@ -1,6 +1,7 @@
 import { StreamAttachment } from "./icons";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
+import { UserRound } from "lucide-react";
 import { AgentMark } from "./AgentMark";
 import { AgentStream } from "./AgentStream";
 import { MessageTurnActions } from "./MessageTurnActions";
@@ -163,12 +164,11 @@ export function MessageBlock({
   const { t } = useTranslation();
   if (message.kind === "user") {
     return (
-      <article className="msg msg-user">
-        <span className="rail-node rail-node-user" aria-hidden="true" />
+      <article className="msg msg-user" aria-label={t("message.user_label")}>
+        <span className="rail-node rail-node-user" aria-hidden="true">
+          <UserRound size={13} strokeWidth={1.9} />
+        </span>
         <div className="turn-body">
-          <header>
-            <span className="turn-who" translate="no">{t("message.user_label")}</span>
-          </header>
           <p className="user-text">{message.text}</p>
         </div>
         <time className="msg-time mono" dateTime={message.timestamp}>{formatTime(message.timestamp)}</time>
@@ -189,7 +189,6 @@ export function MessageBlock({
           <header>
             <span className="agent-title" translate="no">
               {agentName}
-              <span className="agent-mode" data-mode={message.mode}>{message.mode}</span>
             </span>
             {message.streaming ? (
               <span className="agent-live-pulse" aria-label={t("agent_stream.empty_working")} />

@@ -542,18 +542,18 @@ export function ChatIntegrationsView({
 
       <div className="adm-chat-toolbar relay-enter">
         <div className="adm-chat-metrics" role="group" aria-label={t("admin.v2.chat_metrics_label")}>
-          <div>
-            <strong>{integrations.length}</strong>
-            <span>{t("admin.v2.chat_metric_integrations")}</span>
-          </div>
-          <div>
-            <strong>{activeCount}</strong>
-            <span>{t("admin.v2.chat_metric_active")}</span>
-          </div>
-          <div>
-            <strong>{linkCount}</strong>
-            <span>{t("admin.v2.chat_metric_links")}</span>
-          </div>
+          <span className="adm-chat-metric">
+            <span className="adm-chat-metric-label">{t("admin.v2.chat_metric_integrations")}</span>
+            <strong className="adm-chat-metric-value">{integrations.length}</strong>
+          </span>
+          <span className="adm-chat-metric">
+            <span className="adm-chat-metric-label">{t("admin.v2.chat_metric_active")}</span>
+            <strong className="adm-chat-metric-value">{activeCount}</strong>
+          </span>
+          <span className="adm-chat-metric">
+            <span className="adm-chat-metric-label">{t("admin.v2.chat_metric_links")}</span>
+            <strong className="adm-chat-metric-value">{linkCount}</strong>
+          </span>
         </div>
         {showToolbarCreate ? (
           <Button type="button" size="sm" onClick={() => setCreateOpen(true)} disabled={busy !== null}>

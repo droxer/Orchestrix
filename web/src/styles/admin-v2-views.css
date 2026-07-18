@@ -87,7 +87,7 @@
 
 .adm-emp-cols {
   display: grid;
-  grid-template-columns: minmax(220px, 1.2fr) minmax(0, 2fr) auto;
+  grid-template-columns: minmax(220px, 1.2fr) minmax(0, 2fr) auto auto;
   gap: var(--space-lg);
   padding: 0 0 var(--space-sm);
   border-bottom: 1px solid var(--color-semantic-hairline);
@@ -106,7 +106,7 @@
 
 .adm-emp-row {
   display: grid;
-  grid-template-columns: minmax(220px, 1.2fr) minmax(0, 2fr) auto;
+  grid-template-columns: minmax(220px, 1.2fr) minmax(0, 2fr) auto auto;
   gap: var(--space-lg);
   align-items: center;
   padding: var(--space-sm) 0;
@@ -136,6 +136,13 @@
 }
 
 .adm-emp-id { min-width: 0; }
+
+.adm-emp-id-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+}
 
 .adm-emp-name {
   margin: 0;
@@ -234,24 +241,13 @@
   font-size: var(--text-xs);
 }
 
-.adm-emp-delete {
-  appearance: none;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: var(--space-xxs);
-  color: var(--color-semantic-danger-text);
-  display: inline-flex;
+/* Dedicated actions cell — mirrors the Nodes list ACTIONS column: a quiet
+   neutral icon button that tints red only on hover, not a red-at-rest glyph. */
+.adm-emp-actions {
+  display: flex;
   align-items: center;
-  border-radius: var(--radius-xs);
+  justify-content: flex-end;
 }
-
-.adm-emp-delete:hover:not(:disabled) { background: color-mix(in srgb, var(--color-semantic-danger) 8%, transparent); }
-.adm-emp-delete:focus-visible {
-  outline: none;
-  box-shadow: var(--ring-focus-danger);
-}
-.adm-emp-delete:disabled { opacity: 0.5; cursor: progress; }
 
 .adm-view-error {
   margin: 0 0 var(--space-base);
@@ -289,6 +285,11 @@
   .adm-emp-metrics {
     justify-self: start;
     text-align: left;
+  }
+
+  .adm-emp-actions {
+    justify-self: start;
+    justify-content: flex-start;
   }
 }
 
@@ -524,6 +525,16 @@
   white-space: nowrap;
 }
 
+/* Execution-profile parity with the fleet card — the tinted chip stands alone
+   in the identity stack (no wrapper box, matching the card treatment). */
+.adm-node-row-identity .adm-node-profile {
+  margin: var(--space-xxs) 0 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+}
+
 .adm-node-row-agents {
   display: flex;
   flex-wrap: wrap;
@@ -602,6 +613,17 @@
 .adm-node-profile.is-compact {
   padding-top: 0;
   margin-bottom: var(--space-sm);
+}
+
+/* On the node card the profile is just the tinted execution chip (locality is
+   hidden), so the bordered container wraps a single badge and leaves a large
+   empty box. Drop the wrapper chrome there and let the chip stand alone; the
+   drawer usage (with locality text) keeps its box. */
+.adm-node-card > .adm-node-profile {
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 0;
 }
 
 /* Execution profile chip — a tinted, icon-led badge so managed vs local reads
@@ -1187,39 +1209,44 @@
   gap: var(--space-base);
 }
 
+/* Flush inline stat strip — same grammar as the Backlog/Routine metric row
+   (eyebrow · value, hairline-separated) rather than a raised card, so the
+   Channels toolbar reads as one system with the rest of the app. */
 .adm-chat-metrics {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(88px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
   flex: 1;
   min-width: min(100%, 280px);
-  border: 1px solid var(--color-semantic-hairline);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  background: var(--color-semantic-surface-raised);
 }
 
-.adm-chat-metrics div {
-  display: flex;
-  flex-direction: column;
+.adm-chat-metric {
+  display: inline-flex;
+  align-items: baseline;
   gap: var(--space-xxs);
-  min-width: 0;
-  padding: var(--space-sm) var(--space-base);
-  border-right: 1px solid var(--color-semantic-hairline);
 }
 
-.adm-chat-metrics div:last-child { border-right: none; }
-
-.adm-chat-metrics strong {
-  color: var(--color-semantic-ink);
-  font-family: var(--font-display);
-  font-size: var(--text-xl);
-  font-weight: 500;
-  letter-spacing: var(--letter-tight);
-}
-
-.adm-chat-metrics span {
+.adm-chat-metric:not(:last-child)::after {
+  content: "·";
+  margin: 0 var(--space-sm);
   color: var(--color-semantic-muted);
-  font-size: var(--text-2xs);
+}
+
+.adm-chat-metric-label {
+  font: var(--type-eyebrow);
+  letter-spacing: var(--letter-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-semantic-muted);
+}
+
+.adm-chat-metric-value {
+  font-family: var(--font-number);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: var(--letter-number-fluid);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-semantic-ink);
 }
 
 /* Master–detail: list leads, inspector follows. */
@@ -1629,7 +1656,6 @@
 }
 
 @media (max-width: 720px) {
-  .adm-chat-metrics,
   .adm-chat-split {
     grid-template-columns: 1fr;
   }

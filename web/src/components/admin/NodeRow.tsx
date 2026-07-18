@@ -8,7 +8,9 @@ import { AgentMark } from "../AgentMark";
 import {
   agentStatusTone,
   visibleNodeAgentNames,
+  type StoredNodeTokenMap,
 } from "./helpers";
+import { NodeProfileBadges } from "./NodeProfileBadges";
 import { Button } from "../ui/button";
 import { ActionKey, AdminDelete, AdminManageAgents, AdminNode } from "../icons";
 
@@ -19,13 +21,15 @@ function isAgentDisabled(node: ControlPanelDaemonNodeRecord, agent: AgentName): 
 interface NodeRowProps {
   node: ControlPanelDaemonNodeRecord;
   employee?: EmployeeRecord;
+  storedTokens: StoredNodeTokenMap;
+  colocated: boolean;
   onReveal: (node: ControlPanelDaemonNodeRecord) => void;
   onManageAgents: (node: ControlPanelDaemonNodeRecord) => void;
   onDelete?: (node: ControlPanelDaemonNodeRecord) => Promise<void>;
   t: TFunction;
 }
 
-export function NodeRow({ node, employee, onReveal, onManageAgents, onDelete, t }: NodeRowProps) {
+export function NodeRow({ node, employee, storedTokens, colocated, onReveal, onManageAgents, onDelete, t }: NodeRowProps) {
   const { confirm } = useDialogs();
   const [deletePending, setDeletePending] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -65,6 +69,15 @@ export function NodeRow({ node, employee, onReveal, onManageAgents, onDelete, t 
           ) : (
             <span className="adm-node-card-handle tone-muted">{t("admin.unassigned")}</span>
           )}
+          <NodeProfileBadges
+            node={node}
+            storedTokens={storedTokens}
+            colocated={colocated}
+            t={t}
+            compact
+            hideThisHost
+            hideSavedHere
+          />
         </span>
       </div>
 

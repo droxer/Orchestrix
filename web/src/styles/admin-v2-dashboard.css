@@ -586,4 +586,7 @@
   .adm-dash-tile--nodes { border-right: 1px solid var(--color-semantic-hairline); border-bottom: 1px solid var(--color-semantic-hairline); }
   .adm-dash-tile--employees { border-right: none; border-bottom: 1px solid var(--color-semantic-hairline); }
   .adm-dash-tile--tokens { grid-column: 1 / -1; border-right: none; }
+  /* Half-width tiles can't fit hint + sparkline on one line — the line then
+     draws across the wrapped caption. Drop the decorative spark here. */
+  .adm-dash-spark { display: none; }
 }

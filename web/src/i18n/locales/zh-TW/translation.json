@@ -117,6 +117,7 @@
     "handoff": "移交"
   },
   "handoff": {
+    "title": "轉交此回合",
     "route_to": "路由至",
     "mode": "模式",
     "note_label": "備註",
@@ -699,8 +700,8 @@
     "ready_no_employee": "為 {{agent}} 選擇員工工作區。",
     "hint_mention": "輸入 @ 切換 Agent",
     "awaiting_first": "等待首則訊息",
-    "phase_agent": "{{agent}} · {{mode}}",
-    "phase_handoff": "移交 · {{agent}} · {{mode}}"
+    "phase_agent": "{{mode}}",
+    "phase_handoff": "移交 · {{mode}}"
   },
   "login": {
     "username": "使用者名稱",

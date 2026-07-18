@@ -530,7 +530,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
   }
 
   function linkedSession(task: RelayTask): RelaySession | undefined {
-    const latest = task.linkedSessionIds.at(-1);
+    const latest = task.linkedSessionIds?.at(-1);
     return latest ? sessions.find((session) => session.id === latest) : undefined;
   }
 

@@ -70,6 +70,32 @@
   background: var(--color-semantic-canvas);
 }
 
+/* Panel header — the routing icon in an action-tinted chip plus a title, so
+   the drawer reads as a deliberate "pass this turn to another agent" affordance
+   rather than a bare stack of selects. */
+.handoff-panel-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding-bottom: var(--space-xs);
+  border-bottom: 1px solid var(--color-semantic-hairline-soft);
+}
+
+.handoff-panel-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  background: var(--color-semantic-action-soft);
+  color: var(--color-semantic-action);
+}
+
+.handoff-panel-title {
+  font: var(--type-label-strong);
+  color: var(--color-semantic-ink);
+}
+
 .handoff-row {
   display: grid;
   grid-template-columns: auto 1fr 1fr;

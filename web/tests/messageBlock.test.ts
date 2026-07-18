@@ -10,8 +10,8 @@ const timestamp = "2026-06-19T12:00:00.000Z";
 const t = ((key: string, options?: Record<string, unknown>) => {
   if (key === "message.artifact") return `Artifact - ${String(options?.kind)}`;
   if (key.startsWith("artifact.kind.")) return String(options?.defaultValue ?? key.split(".").at(-1));
-  if (key === "transcript.phase_agent") return `${String(options?.agent)} · ${String(options?.mode)}`;
-  if (key === "transcript.phase_handoff") return `Handoff · ${String(options?.agent)} · ${String(options?.mode)}`;
+  if (key === "transcript.phase_agent") return String(options?.mode);
+  if (key === "transcript.phase_handoff") return `Handoff · ${String(options?.mode)}`;
   if (key.startsWith("mode.")) return String(key.split(".").at(-1));
   return key;
 }) as unknown as TFunction;
@@ -180,8 +180,9 @@ describe("projectMessages artifact projection", () => {
       ["art_plan"],
       ["art_review", "art_deck"],
     ]);
-    // The agent-turn eyebrow renders `<agent> · <mode>`; the mode is carried
-    // from agent.started so action and review turns read distinctly.
+    // The agent-turn eyebrow shows the agent name only; the mode is still
+    // carried from agent.started so downstream behavior can distinguish action
+    // and review turns even though it is not rendered in the header.
     assert.deepEqual(agentMessages.map((message) => message.mode), ["action", "review"]);
   });
 
@@ -399,7 +400,7 @@ describe("phaseDividerLabel", () => {
     ]), t);
 
     const agentIndex = messages.findIndex((message) => message.kind === "agent");
-    assert.equal(phaseDividerLabel(messages, agentIndex, t), "claude · action");
+    assert.equal(phaseDividerLabel(messages, agentIndex, t), "action");
   });
 
   it("labels agent handoffs across different agents", () => {
@@ -429,6 +430,6 @@ describe("phaseDividerLabel", () => {
     const codexIndex = messages.findIndex(
       (message) => message.kind === "agent" && message.agent === "codex",
     );
-    assert.equal(phaseDividerLabel(messages, codexIndex, t), "Handoff · codex · review");
+    assert.equal(phaseDividerLabel(messages, codexIndex, t), "Handoff · review");
   });
 });

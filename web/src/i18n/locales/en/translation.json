@@ -117,6 +117,7 @@
     "handoff": "Handoff"
   },
   "handoff": {
+    "title": "Hand off this turn",
     "route_to": "Route to",
     "mode": "Mode",
     "note_label": "Note",
@@ -699,8 +700,8 @@
     "ready_no_employee": "Select an employee workspace for {{agent}}.",
     "hint_mention": "Type @ to switch agents",
     "awaiting_first": "waiting for first message",
-    "phase_agent": "{{agent}} · {{mode}}",
-    "phase_handoff": "Handoff · {{agent}} · {{mode}}"
+    "phase_agent": "{{mode}}",
+    "phase_handoff": "Handoff · {{mode}}"
   },
   "login": {
     "headline_a": "Sign in to",

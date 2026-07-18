@@ -117,6 +117,7 @@
     "handoff": "移交"
   },
   "handoff": {
+    "title": "转交此回合",
     "route_to": "路由至",
     "mode": "模式",
     "note_label": "备注",
@@ -699,8 +700,8 @@
     "ready_no_employee": "为 {{agent}} 选择员工工作区。",
     "hint_mention": "输入 @ 切换 Agent",
     "awaiting_first": "等待首条消息",
-    "phase_agent": "{{agent}} · {{mode}}",
-    "phase_handoff": "移交 · {{agent}} · {{mode}}"
+    "phase_agent": "{{mode}}",
+    "phase_handoff": "移交 · {{mode}}"
   },
   "login": {
     "headline_a": "登录",

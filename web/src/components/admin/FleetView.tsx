@@ -185,6 +185,8 @@ export function FleetView({ nodes, employees, storedTokens, layout, onLayoutChan
                 key={node.id}
                 node={node}
                 employee={node.employeeId ? employeeById.get(node.employeeId) : undefined}
+                storedTokens={storedTokens}
+                colocated={colocated}
                 onReveal={onRevealCredentials}
                 onManageAgents={onManageAgents}
                 onDelete={onDeleteNode}

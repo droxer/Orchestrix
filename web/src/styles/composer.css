@@ -90,8 +90,13 @@
   background: var(--color-semantic-action-soft);
 }
 
+/* Ask is the read-only counterpart to Agent: no green work-fill, a quiet
+   slate outline instead. The filled-green vs outlined-slate asymmetry is the
+   signal — "does work" vs "just asks". */
 .mode-chip[data-mode="ask"] {
-  --mode-icon: var(--color-semantic-ink);
+  --mode-icon: var(--color-semantic-info);
+  background: var(--color-semantic-surface-raised);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-semantic-info) 24%, transparent);
 }
 
 .mode-chip:hover {

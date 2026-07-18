@@ -170,11 +170,6 @@ body {
 }
 .transcript-phase-node { background: var(--color-semantic-action); box-shadow: 0 0 0 4px var(--color-semantic-canvas); }
 .rail-node { border-color: var(--color-semantic-rail-node-border); border-radius: 50%; background: var(--color-semantic-rail-node); box-shadow: 0 0 0 4px var(--color-semantic-canvas); }
-.rail-node-user { width: 16px; height: 16px; background: var(--color-semantic-action); border-color: var(--color-semantic-action); }
-/* Author label (YOU / agent name) reads as a refined attribution eyebrow, not
-   a heading — kept at body size so it sits level with the turn text; the
-   display face, 600 weight, rail node, and uppercase YOU carry the hierarchy. */
-.msg header > span:first-child { font-family: var(--font-display); font-size: var(--text-sm); font-weight: 600; }
 .msg-time { color: var(--color-semantic-muted-soft); }
 
 /* Empty states keep the base type roles — no oversized display override. */

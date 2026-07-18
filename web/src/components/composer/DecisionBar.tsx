@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import type { AgentTaskMode, EmployeeAgent } from "../../types";
 import { isLogicalAgentRoutable } from "../../lib/agentDisplayNames";
-import { ActionApprove, ActionHandoff } from "../icons";
+import { ActionApprove, ActionHandoff, ActionRoute } from "../icons";
 import { Button } from "../ui/button";
 
 export function DecisionBar({ logicalAgents, sendDecision, handoffOpen, setHandoffOpen, handoffAgentId, setHandoffAgentId, handoffMode, setHandoffMode, handoffNote, setHandoffNote, sendHandoff }: {
@@ -27,6 +27,10 @@ export function DecisionBar({ logicalAgents, sendDecision, handoffOpen, setHando
       </div>
       {handoffOpen ? (
         <div id="handoff-panel" className="handoff-panel">
+          <div className="handoff-panel-head">
+            <span className="handoff-panel-mark" aria-hidden="true"><ActionRoute size={14} /></span>
+            <span className="handoff-panel-title">{t("handoff.title")}</span>
+          </div>
           <div className="handoff-row">
             <label htmlFor="handoff-agent">{t("handoff.route_to")}</label>
             <select id="handoff-agent" name="handoff-agent" value={handoffAgentId} onChange={(e) => setHandoffAgentId(e.target.value)}>

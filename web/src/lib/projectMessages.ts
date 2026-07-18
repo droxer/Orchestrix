@@ -59,7 +59,6 @@ export function phaseDividerLabel(
   messages: DerivedMessage[],
   index: number,
   t: TFunction,
-  agentDisplayNames?: Partial<Record<AgentName, string>>,
 ): string | null {
   const message = messages[index];
   if (message.kind !== "agent" || isGroupedContinuation(messages, index)) return null;
@@ -68,12 +67,11 @@ export function phaseDividerLabel(
   if (!prev) return null;
 
   const mode = t(`mode.${message.mode}`);
-  const agentName = agentDisplayNames?.[message.agent] ?? message.agent;
   if (prev.kind === "agent" && prev.agent !== message.agent) {
-    return t("transcript.phase_handoff", { agent: agentName, mode });
+    return t("transcript.phase_handoff", { mode });
   }
   if (prev.kind === "user") {
-    return t("transcript.phase_agent", { agent: agentName, mode });
+    return t("transcript.phase_agent", { mode });
   }
   return null;
 }

@@ -3,6 +3,7 @@
 // semantics later.
 
 import {
+  ArrowRightLeft,
   ArrowUp,
   Bot,
   Check,
@@ -116,6 +117,9 @@ export const ActionRetry = withStandardStroke(RefreshCw, "ActionRetry");
 export const ActionSend = withStandardStroke(ArrowUp, "ActionSend");
 export const ActionApprove = withStandardStroke(Check, "ActionApprove");
 export const ActionHandoff = withStandardStroke(Forward, "ActionHandoff");
+// Routing a turn to another agent — the two-way arrows read as "pass along",
+// matching the transcript handoff phase divider.
+export const ActionRoute = withStandardStroke(ArrowRightLeft, "ActionRoute");
 export const ActionStart = withStandardStroke(Play, "ActionStart");
 export const ActionStop = withStandardStroke(CircleStop, "ActionStop");
 export const ActionAddPerson = withStandardStroke(UserPlus, "ActionAddPerson");

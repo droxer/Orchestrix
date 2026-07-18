@@ -348,6 +348,15 @@
   white-space: nowrap;
 }
 
+.transcript-phase-icon {
+  display: inline-block;
+  vertical-align: middle;
+  width: 12px;
+  height: 12px;
+  margin-right: var(--space-xs);
+  color: var(--color-semantic-muted);
+}
+
 .transcript-phase-label::after {
   content: "";
   display: inline-block;
@@ -421,8 +430,8 @@
   border: 1px solid var(--color-semantic-hairline);
   box-shadow: 0 0 0 2px var(--color-semantic-canvas);
   z-index: 1;
-  /* Agents are squares; the human is a circle (overridden below). Monochrome
-     only — agent identity is the glyph inside, never color. */
+  /* Agents are squares; the human is a rounded badge/avatar filled with the
+     action color. Agent identity is the glyph inside, never color. */
   border-radius: var(--radius-xs);
   animation: node-in var(--duration-fast) var(--ease-standard) both;
 }
@@ -430,13 +439,49 @@
 .rail-node-agent > svg { display: block; }
 
 .rail-node-user {
-  background: var(--color-semantic-ink);
-  border-color: var(--color-semantic-ink);
-  border-radius: var(--radius-full);
-  width: 14px;
-  height: 14px;
-  justify-self: center;
+  background: var(--color-semantic-action);
+  border-color: var(--color-semantic-action);
+  border-radius: var(--radius-md);
+  color: var(--color-semantic-on-action);
 }
+
+/* ---- Speaker avatars: a matched but distinct pair ------------------------
+   The two voices in the thread read as "human" vs "product" at a glance.
+   Scoped one level deeper than the bare .rail-node so they win over the
+   atelier.css circle override regardless of import order.
+
+   You    → a round solid action-green avatar. Round reads as "a person"; the
+            circle silhouette is the fast human-vs-machine tell.
+   Agent  → a square light product tile carrying the specific executor's
+            vendor glyph. The circle-vs-square contrast, not colour, separates
+            the two speakers. (The generic Relay product mark lives on the
+            agent-phase divider, not here.) */
+.msg-user .rail-node.rail-node-user {
+  border-radius: var(--radius-full);
+  border-color: transparent;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--color-semantic-on-action) 22%, var(--color-semantic-action)),
+      var(--color-semantic-action)
+    );
+  color: var(--color-semantic-on-action);
+  box-shadow:
+    0 0 0 2px var(--color-semantic-canvas),
+    inset 0 1px 0 color-mix(in srgb, var(--color-semantic-on-action) 30%, transparent);
+}
+
+.msg-agent .rail-node.rail-node-agent {
+  border-radius: var(--radius-sm);
+  background: var(--color-semantic-surface-raised);
+  border-color: color-mix(in srgb, var(--color-semantic-action) 32%, var(--color-semantic-hairline));
+  box-shadow:
+    0 0 0 2px var(--color-semantic-canvas),
+    0 1px 2px color-mix(in srgb, var(--color-semantic-ink) 8%, transparent);
+}
+
+/* The vendor glyph paints in ink against the light tile. */
+.msg-agent .rail-node.rail-node-agent > svg { color: var(--color-semantic-ink); }
 
 .rail-node-system {
   width: 10px;
@@ -545,36 +590,6 @@
   gap: var(--space-xs);
 }
 
-/* The mode half of the agent-turn eyebrow (`claude · action`). The agent name
-   stays ink; the mode token drops to muted so the pair reads as one label
-   without competing for weight (design-system.md agent-turn). A leading `·`
-   binds it to the name. */
-.msg header .agent-mode {
-  color: var(--color-semantic-muted);
-}
-
-.msg header .agent-mode::before {
-  content: "· ";
-}
-
-/* A review turn earns a slate info dot and label so reviews read distinctly
-   from action turns without borrowing the ink action color. Status color
-   only; never an action fill. */
-.msg header .agent-mode[data-mode="review"] {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--color-semantic-info);
-}
-
-.msg header .agent-mode[data-mode="review"]::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-full);
-  background: var(--color-semantic-info);
-}
-
 /* Live-run pulse in the agent-turn eyebrow — mirrors the conversation-row
    working signal so long runs stay legible even when scrolled mid-output. */
 .agent-live-pulse {
@@ -603,14 +618,20 @@
   100% { box-shadow: 0 0 0 2px var(--color-semantic-canvas), 0 0 0 9px color-mix(in srgb, var(--color-semantic-info) 0%, transparent); }
 }
 
-/* User voice — on the rail, not a bubble. The circular node + mono "YOU"
-   eyebrow carry attribution; the text is plain ink, medium weight, so the
-   human instruction reads as a peer turn in the same thread as the agents. */
-.msg-user .turn-who {
-  font: var(--type-meta);
-  letter-spacing: var(--letter-caps-wide);
-  text-transform: uppercase;
-  color: var(--color-semantic-ink);
+/* The user turn is a compact, content-hugging bubble — not a full-width card.
+   A short "who are you" should read as a tight peer turn, not float in an
+   oversized soft box. Hairline + soft fill give it just enough definition to
+   distinguish it from the bubble-less agent turns on the same rail. */
+.msg-user .turn-body {
+  justify-self: start;
+  width: fit-content;
+  max-width: min(100%, 42rem);
+  gap: var(--space-xxs);
+  padding: var(--space-xs) var(--space-base);
+  background: var(--color-semantic-surface-soft);
+  border: 1px solid var(--color-semantic-hairline-soft);
+  border-radius: var(--radius-lg);
+  border-top-left-radius: var(--radius-xs);
 }
 
 .msg-user .user-text {
@@ -618,7 +639,7 @@
   color: var(--color-semantic-ink);
   font-size: var(--text-base);
   font-weight: 500;
-  line-height: var(--leading-loose);
+  line-height: var(--leading-normal);
   white-space: pre-wrap;
   word-break: break-word;
 }

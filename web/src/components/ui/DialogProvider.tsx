@@ -263,7 +263,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                   </Button>
                   {request.kind === "confirm" ? (
                     <Button
-                      variant={request.opts.tone === "danger" ? "destructive" : "default"}
+                      variant="default"
                       data-dialog-default={request.opts.tone === "danger" ? undefined : ""}
                       onClick={() => settle(true)}
                     >

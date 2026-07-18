@@ -1,5 +1,19 @@
 # Relay Web — Design Review
 
+## Chat speaker identity + Ask/Handoff mode design (2026-07-19)
+
+Gave the two chat voices a designed, matched-but-distinct identity, moved the Relay product mark onto the generic agent-phase marker, and gave the Ask/Handoff modes their own visual language.
+
+**Shipped:**
+
+- **Speaker avatars — circle vs square.** The human "You" turn is now a **round** solid action-green avatar (`.rail-node.rail-node-user`, `radius-full`, `UserRound` glyph at the app's 1.75 stroke); the agent turn keeps its **square** light product tile (`radius-sm`, raised surface, faint action-tinted border) carrying the **specific** executor's vendor glyph (`AgentMark` — Claude/Kimi/etc.). Circle-vs-square, not colour, is the fast human-vs-machine tell. Selectors are scoped one level deep (`.msg-user .rail-node.rail-node-user`) so the fill wins over atelier's `html[data-theme="dark"] .rail-node` background override (specificity 0,3,0 > 0,2,1) in both themes.
+- **Product mark on the agent-phase divider.** The generic `AGENT` phase eyebrow swapped its lucide `Bot` for the `RelayMark` chevron (`MainChatView`) — "the agent" as one product. Ask/Review/Handoff phase icons keep their semantic lucide glyphs. Per-turn headers deliberately keep the vendor mark + agent name (the "which agent ran" signal).
+- **Compact user bubble.** `.msg-user .turn-body` went from a full-width soft card that dwarfed short messages to a `fit-content`, `max-width: 42rem` bubble with a hairline, tighter padding, `leading-normal`, and a subtle top-left notch (`radius-xs`) pointing at the avatar. The redundant `YOU` eyebrow was dropped (the green avatar already attributes it; preserved as an `aria-label` on the article). `.msg-user .turn-who` deleted.
+- **Ask mode = quiet slate outline.** `.mode-chip[data-mode="ask"]` now carries a slate (`--color-semantic-info`) icon + inset slate ring on a neutral raised surface, vs the Agent chip's green fill — the filled-vs-outlined asymmetry reads as "does work" vs "just asks" (respects the palette rule: status colours as icon/border, never fills).
+- **Handoff panel header.** Added an action-tinted route-icon chip (`ActionRoute` = `ArrowRightLeft`, new in `icons.tsx`) + "Hand off this turn" title + hairline divider (`.handoff-panel-head`), so the drawer reads as a deliberate affordance. New i18n `handoff.title` in en/zh-CN/zh-TW.
+
+**Verify:** chat `#/chat/*` light + dark 1280 — You is a round green avatar + tight single-line bubble; Agent is a square tile + Claude mark + name; `» AGENT` divider shows the Relay chevron; composer Ask chip is slate-outlined; the waiting-for-human decision bar's Handoff opens a panel with the route-chip header. tsc clean, stylelint clean, full web suite 241 pass.
+
 _Date: 2026-06-26 · Scope: entire `web/` frontend · Method: code/CSS audit + live screenshots of public screens (gated surfaces pending an authenticated pass)._
 
 ## Verdict
@@ -347,3 +361,18 @@ The node card's execution profile was a bare mono label with a 5px color dot —
 - `NodeProfileBadges` gained `hideThisHost`; `NodeCard` passes it so the card drops the "This host" locality (the status pill already conveys liveness). CredentialsDrawer keeps the full locality set.
 
 **Verify:** dark 1280×900 nodes card — managed nodes show a boxed blue "Managed" chip, local nodes a green terminal "Local" chip, pending a dashed "Awaiting daemon" chip; no "This host" on cards. tsc + stylelint clean.
+
+## Whole-app visual pass — consistency cleanup (2026-07-18)
+
+Authenticated screenshot pass (mocked-API Playwright, light/dark/mobile) across login, chat, backlog, routine, channels, admin dashboard, and admin Employees/Nodes (card + list). System is strong and cohesive — Graphite Steel holds in both themes, the dashboard reads as one rhythm, the managed/local chips land. Findings were consistency nits, now fixed. Build ✓ (tsc), stylelint ✓, full web suite ✓ (241 pass).
+
+**Shipped:**
+
+- **Employees ↔ Nodes list alignment.** The Employees list carried a **red-at-rest** trash crammed into the metrics cell with no `ACTIONS` column, while the Nodes list used quiet neutral action icons in a dedicated column. Employees list now has its own `ACTIONS` column (4-col grid) with the same `icon-button--sm --tinted danger` glyph (neutral, tints red only on hover) the card and Nodes list already use. `.adm-emp-delete` deleted.
+- **List status parity.** Card views showed state (employee `IDLE` pill, node managed/local chip) that the list views dropped. Employees list rows now carry the `adm-status-pill` beside the name (via exported `summaryTone`); Nodes list rows render the standalone execution-profile chip under the handle (`NodeRow` gains `storedTokens`/`colocated`, threaded from `FleetView`).
+- **Node card profile box.** With locality hidden on the card, the tinted execution chip sat alone inside a full-width bordered box (large dead space). Dropped the wrapper chrome on `.adm-node-card > .adm-node-profile` (and the list's `.adm-node-row-identity .adm-node-profile`); the drawer usage with locality text keeps its box.
+- **Channels stat tiles → flush strip.** The `Channels / Active / Links` counters were raised white cards (number-over-label) — the one surface still using a boxier grammar than the flush hairline metric strips on Backlog/Routine. Re-cast `.adm-chat-metrics` as an inline `eyebrow · value` strip mirroring `.backlog-stats` (markup reordered label-first).
+- **Mobile KPI sparkline collision.** On the ≤900px 2-col dashboard KPI grid the Nodes tile's sparkline drew a diagonal line across the wrapped "N ready · N failed" caption. Hidden `.adm-dash-spark` at that breakpoint.
+- **Robustness (not design, found while fixturing).** `visibleConversationArtifacts` and `BacklogPage.linkedSession` assumed `session.artifacts` / `task.linkedSessionIds` always present and threw a full-page dev overlay otherwise — hardened with `?? []` / `?.at(-1)`.
+
+**Verify:** admin Employees list (neutral trash in ACTIONS col + IDLE pill), Nodes list (profile chip under handle), Nodes card (chip stands alone), Channels toolbar once ≥1 channel exists (inline stat strip), mobile admin dashboard (no sparkline over the Nodes caption) — light/dark, 1440 / 390.

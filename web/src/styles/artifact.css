@@ -38,9 +38,8 @@
 .artifact-chip {
   min-width: 0;
   border: 1px solid var(--color-semantic-hairline);
-  border-left: 3px solid var(--artifact-accent);
   border-radius: var(--radius-md);
-  background: var(--color-semantic-canvas);
+  background: var(--color-semantic-surface-soft);
   overflow: hidden;
   transition: border-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
 }

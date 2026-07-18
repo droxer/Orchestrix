@@ -2,6 +2,8 @@
 
 import { useMemo, type Dispatch, RefObject, SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
+import { ArrowRightLeft, MessageCircleQuestion, Scan } from "lucide-react";
+import { RelayMark } from "./RelayMark";
 import type { AgentName, AgentTaskMode, EmployeeAgent, RelayArtifact, RelaySession } from "../types";
 import { buildExecutorDisplayNameMap, displayNameForExecutor, mentionableAgents, type MentionableAgent } from "../lib/agentDisplayNames";
 import type { ConversationItem } from "./ConversationRow";
@@ -160,13 +162,39 @@ export function MainChatView({
             {activeSession || pendingUserMessage ? (
               <>
                 {displayMessages.map((msg, i) => {
-                  const phaseLabel = phaseDividerLabel(displayMessages, i, t, agentDisplayNames);
+                  const phaseLabel = phaseDividerLabel(displayMessages, i, t);
+                  const prev = i > 0 ? displayMessages[i - 1] : undefined;
+                  const isHandoff =
+                    msg.kind === "agent" && prev?.kind === "agent" && prev.agent !== msg.agent;
+                  // The generic agent-phase marker carries the Relay product
+                  // mark — "the agent" as a product — while each turn header
+                  // keeps its specific executor glyph. Ask/Review/Handoff keep
+                  // their own semantic lucide icons.
+                  const isAgentPhase =
+                    msg.kind === "agent" && !isHandoff && msg.mode === "action";
+                  const PhaseIcon =
+                    msg.kind === "agent"
+                      ? isHandoff
+                        ? ArrowRightLeft
+                        : msg.mode === "ask"
+                          ? MessageCircleQuestion
+                          : msg.mode === "review"
+                            ? Scan
+                            : null
+                      : null;
                   return (
                     <div key={msg.id} className="transcript-turn">
                       {phaseLabel ? (
                         <div className="transcript-phase" role="separator" aria-label={phaseLabel}>
                           <span className="transcript-phase-node" aria-hidden="true" />
-                          <span className="transcript-phase-label">{phaseLabel}</span>
+                          <span className="transcript-phase-label">
+                            {isAgentPhase ? (
+                              <RelayMark width={12} height={12} className="transcript-phase-icon transcript-phase-mark" />
+                            ) : PhaseIcon ? (
+                              <PhaseIcon size={12} className="transcript-phase-icon" aria-hidden="true" />
+                            ) : null}
+                            {phaseLabel}
+                          </span>
                         </div>
                       ) : null}
                       <MessageBlock

@@ -9,7 +9,7 @@ import type { EmployeeAgent } from "../../types";
 
 // Employee fleet state, collapsed to the same tone vocabulary the node status
 // pill uses so the two cards read as one system.
-function summaryTone(member: EmployeeNodeSummary): { tone: string; key: string } {
+export function summaryTone(member: EmployeeNodeSummary): { tone: string; key: string } {
   if (member.runningCount > 0) return { tone: "info", key: "running" };
   if (member.readyCount > 0) return { tone: "good", key: "ready" };
   if (member.nodeCount > 0) return { tone: "muted", key: "idle" };
