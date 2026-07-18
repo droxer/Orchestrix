@@ -90,7 +90,7 @@ export function CredentialsDrawer({ open, onClose, node, storedToken, onUnassign
       tone: "danger",
     });
     if (!ok) return;
-    void runAction("delete", () => onDelete(node));
+    await runAction("delete", () => onDelete(node));
   }
 
   async function handleCopy(field: string, value: string) {

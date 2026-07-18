@@ -35,10 +35,6 @@
   overflow: hidden;
 }
 
-.admin-console .page-header-title--display {
-  transition: opacity var(--duration-fast) var(--ease-standard);
-}
-
 .admin-console.adm-bare {
   background: var(--color-semantic-surface-soft);
   display: flex;
@@ -161,45 +157,3 @@
 
 .adm-live-dot.fetching { background: var(--color-semantic-info); }
 .adm-live-dot.offline { background: var(--color-semantic-danger); }
-
-/* ── Pulse strip ──────────────────────────────────────────────────── */
-.adm-pulse {
-  display: grid;
-  padding: var(--space-lg) var(--space-xl);
-  border-bottom: 1px solid var(--color-semantic-hairline);
-  flex-shrink: 0;
-  gap: 0;
-}
-
-.adm-pulse--alerts {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.adm-pulse-cell {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xxs);
-  padding: 0 var(--space-base);
-  border-right: 1px solid var(--color-semantic-hairline);
-}
-
-.adm-pulse-cell:first-child { padding-left: 0; }
-.adm-pulse-cell:last-child { border-right: none; padding-right: 0; }
-
-.adm-pulse-value {
-  font: var(--type-number);
-  color: var(--color-semantic-ink);
-  font-feature-settings: "tnum" 1;
-}
-
-.adm-pulse-value.tone-good { color: var(--color-semantic-success-text); }
-.adm-pulse-value.tone-info { color: var(--color-semantic-info); }
-.adm-pulse-value.tone-bad { color: var(--color-semantic-danger-text); }
-.adm-pulse-value.tone-neutral { color: var(--color-semantic-ink); }
-
-.adm-pulse-label {
-  font: var(--type-eyebrow);
-  letter-spacing: var(--letter-eyebrow);
-  text-transform: uppercase;
-  color: var(--color-semantic-muted);
-}

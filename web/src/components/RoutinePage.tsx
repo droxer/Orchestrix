@@ -231,7 +231,10 @@ function RoutineCard({
       </div>
       <div className="backlog-task-actions" role="group" aria-label={t("backlog.actions")}>
         <div className="backlog-action-group" aria-label={t("backlog.actions_dispatch")}>
-          <Button variant="ghost" type="button" className="backlog-action-primary backlog-action-icon" onClick={onStart} disabled={!task.assignedAgent || !task.routineEnabled || task.status === "running" || task.status === "done"} aria-label={t("backlog.start")} title={t("backlog.start")}>
+          <Button variant="default"
+            type="button"
+            className="backlog-action-primary backlog-action-icon"
+            onClick={onStart} disabled={!task.assignedAgent || !task.routineEnabled || task.status === "running" || task.status === "done"} aria-label={t("backlog.start")} title={t("backlog.start")}>
             <ActionStart size={14} />
           </Button>
         </div>
@@ -320,7 +323,7 @@ function RoutineRow({
       </span>
       <div className="backlog-row-actions" role="group" aria-label={t("backlog.actions")}>
         <div className="backlog-action-group" aria-label={t("backlog.actions_dispatch")}>
-          <Button variant="ghost"
+          <Button variant="default"
             type="button"
             className="backlog-action-primary backlog-action-icon"
             onClick={onStart}

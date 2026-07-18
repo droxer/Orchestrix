@@ -14,7 +14,7 @@ export function RelayMark({ className, width = 32, height = 32 }: RelayMarkProps
       className={className}
       role="img"
       aria-label="Relay"
-      style={{ shapeRendering: "geometricPrecision" }}
+      shapeRendering="geometricPrecision"
     >
       <title>Relay</title>
       <g

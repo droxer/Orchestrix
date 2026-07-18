@@ -2,7 +2,7 @@
    Tier 4 — Base.
 
    Global element resets, focus contract, and the small set of utility
-   classes shared across the app (.mono, .eyebrow, .tone-*, .kbd-hint).
+   classes shared across the app (.mono, .eyebrow, .tone-*).
    Everything here consumes semantic.css roles; it never declares a new
    token itself.
    ===================================================================== */
@@ -140,19 +140,6 @@ button[data-slot="button"][data-variant="default"]:disabled {
   opacity: 1;
 }
 
-/* Inline keyboard hint — small rotated badge used inside chips and tooltips
-   to expose a shortcut without stealing focus. */
-.kbd-hint {
-  display: inline-flex;
-  align-items: center;
-  font-family: var(--font-sans);
-  font-size: var(--text-2xs);
-  font-weight: 600;
-  line-height: 1;
-  color: var(--color-semantic-muted);
-  letter-spacing: 0.02em;
-}
-
 /* Tabular numerals — renders in the sans (--font-number aliases --font-sans
    per the Linear model); the name is retained for its many consumers. Elements
    that must stay monospace (session IDs, hashes) re-specify --font-mono locally. */
@@ -169,23 +156,6 @@ button[data-slot="button"][data-variant="default"]:disabled {
   font: var(--type-eyebrow);
   letter-spacing: var(--letter-eyebrow);
   text-transform: uppercase;
-}
-
-.panel-kicker {
-  margin: 0;
-  color: var(--color-semantic-muted);
-  font: var(--type-caption-strong);
-  text-transform: none;
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-}
-
-.panel-kicker::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: var(--color-semantic-hairline-soft);
 }
 
 /* Status tone driver — the single source for dot + pill color. A component

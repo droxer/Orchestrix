@@ -67,7 +67,6 @@ export function TokenUsageChart({ snapshot, compact, className }: TokenUsageChar
     return (
       <section className={`adm-dash-card${className ? ` ${className}` : ""}`}>
         <header className="adm-dash-card-head">
-          <div className="adm-dash-card-eyebrow">{t("admin.v2.dash_tokens_eyebrow")}</div>
           <h2 className="adm-dash-card-title">{t("admin.v2.dash_tokens_title")}</h2>
         </header>
         <div className={`adm-dash-empty${compact ? " adm-dash-empty--compact" : ""}`}>
@@ -99,7 +98,6 @@ export function TokenUsageChart({ snapshot, compact, className }: TokenUsageChar
   return (
     <section className={`adm-dash-card${className ? ` ${className}` : ""}`}>
       <header className="adm-dash-card-head">
-        <div className="adm-dash-card-eyebrow">{t("admin.v2.dash_tokens_eyebrow")}</div>
         <h2 className="adm-dash-card-title">{t("admin.v2.dash_tokens_title")}</h2>
       </header>
       <p className="adm-dash-card-hint">

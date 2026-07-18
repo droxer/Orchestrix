@@ -48,7 +48,7 @@ export function ThreadPanel({
           <h1>
             {t("thread.messages")}
             <small className="mono conversation-heading-count">
-              {conversations.length.toString().padStart(2, "0")}
+              {conversations.length}
             </small>
           </h1>
         </div>

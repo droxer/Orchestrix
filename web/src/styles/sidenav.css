@@ -7,9 +7,7 @@
   flex-direction: column;
   align-items: center;
   gap: var(--space-sm);
-  padding: 10px var(--space-xs) var(--space-sm);
-  background: color-mix(in srgb, var(--color-semantic-surface-soft) 48%, var(--color-semantic-canvas));
-  border-right: 1px solid var(--color-semantic-hairline);
+  /* padding, background, and border-right are owned by atelier.css */
   min-height: 0;
   overflow: hidden;
   transition: width var(--duration-base) var(--ease-standard);
@@ -65,7 +63,7 @@
   height: 36px;
   flex: 0 0 36px;
   border: 1px solid var(--color-semantic-hairline);
-  border-radius: 10px;
+  border-radius: var(--radius-xl);
   background: var(--color-semantic-canvas);
   box-shadow: 0 1px 0 color-mix(in srgb, var(--color-semantic-ink) 6%, transparent);
 }
@@ -185,8 +183,8 @@
   clip: auto;
   color: var(--color-semantic-muted);
   font: var(--type-eyebrow);
-  font-size: 10px;
-  letter-spacing: 0.12em;
+  font-size: var(--text-micro);
+  letter-spacing: var(--letter-eyebrow-wide);
   text-transform: uppercase;
 }
 
@@ -194,7 +192,7 @@
   width: 28px;
   height: 1px;
   margin: var(--space-xs) 0;
-  background: var(--color-semantic-hairline-soft);
+  /* fill color owned by atelier.css (hairline) */
   flex-shrink: 0;
 }
 
@@ -210,9 +208,10 @@
   gap: var(--space-xs);
   width: 100%;
   padding: var(--space-xs);
-  border: 1px solid var(--color-semantic-hairline-soft);
+  /* border color + background owned by atelier.css */
+  border-width: 1px;
+  border-style: solid;
   border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--color-semantic-canvas) 70%, transparent);
 }
 
 .sidenav-panel[data-expanded="true"] .sidenav-bottom {
@@ -255,6 +254,7 @@
 
 .sidenav-settings-menu button:focus-visible {
   outline: none;
+  box-shadow: var(--ring-focus);
 }
 
 .sidenav-settings-menu button.danger {
@@ -265,11 +265,9 @@
   flex-shrink: 0;
 }
 
-/* Mobile-only More overflow (Channels / Admin). Hidden on desktop where
-   those destinations stay as primary rail items. */
-.sidenav-more-btn {
-  display: none;
-}
+/* Mobile-only More overflow (Channels / Admin): hidden on desktop where
+   those destinations stay as primary rail items. The hide rule lives at the
+   end of this file so it outranks every `.sidenav-btn` display rule above. */
 
 .sidenav-more-menu {
   position: fixed;
@@ -332,15 +330,14 @@
   }
 }
 
+/* NOTE: size, radius, and state fills for .sidenav-btn are owned by
+   atelier.css (44px control, --radius-lg, solid action plate for the
+   active route) — this file keeps only the structural + focus rules. */
 .sidenav-btn {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 48px;
-  border-radius: var(--radius-sm);
-  color: var(--color-semantic-muted);
   background: transparent;
   border: 1px solid transparent;
   font: inherit;
@@ -354,25 +351,6 @@
   flex-shrink: 0;
 }
 
-.sidenav-btn:hover {
-  color: var(--color-semantic-ink);
-  background: var(--color-semantic-surface-strong);
-  border-color: var(--color-semantic-hairline-soft);
-}
-
-/* Selected routes get a quiet tint plus a precise edge marker. */
-.sidenav-btn.active {
-  color: var(--color-semantic-ink);
-  background: var(--color-semantic-action-soft);
-  border-color: color-mix(in srgb, var(--color-semantic-action) 18%, var(--color-semantic-hairline));
-  box-shadow: inset 3px 0 0 var(--color-semantic-action);
-}
-
-.sidenav-btn.active:hover {
-  background: var(--color-semantic-action-soft);
-  border-color: color-mix(in srgb, var(--color-semantic-action) 18%, var(--color-semantic-hairline));
-}
-
 .sidenav-btn:focus-visible {
   outline: none;
   box-shadow: var(--ring-focus);
@@ -384,7 +362,9 @@
   border-color: var(--color-semantic-hairline-soft);
 }
 
-.sidenav-toggle {
+/* The collapse toggle is a smaller 32px control; the extra class lifts it
+   above atelier.css's 44px .sidenav-btn sizing. */
+.sidenav-btn.sidenav-toggle {
   width: 32px;
   height: 32px;
 }
@@ -425,11 +405,11 @@
 .sidenav-panel[data-expanded="true"] .sidenav-btn:nth-child(2) .sidenav-label { transition-delay: 55ms; }
 .sidenav-panel[data-expanded="true"] .sidenav-btn:nth-child(3) .sidenav-label { transition-delay: 80ms; }
 .sidenav-panel[data-expanded="true"] .sidenav-btn:nth-child(4) .sidenav-label { transition-delay: 105ms; }
-.sidenav-panel[data-expanded="true"] .sidenav-btn:nth-child(5) .sidenav-label { transition-delay: 120ms; }
+.sidenav-panel[data-expanded="true"] .sidenav-btn:nth-child(5) .sidenav-label { transition-delay: var(--duration-fast); }
 .sidenav-panel[data-expanded="true"] .sidenav-btn:nth-child(6) .sidenav-label { transition-delay: var(--duration-fast); }
 .sidenav-panel[data-expanded="true"] .sidenav-btn:nth-child(7) .sidenav-label { transition-delay: var(--duration-fast); }
 .sidenav-panel[data-expanded="true"] .sidenav-btn:nth-child(8) .sidenav-label { transition-delay: var(--duration-fast); }
-.sidenav-panel[data-expanded="true"] .sidenav-bottom .sidenav-btn:nth-child(1) .sidenav-label { transition-delay: 120ms; }
+.sidenav-panel[data-expanded="true"] .sidenav-bottom .sidenav-btn:nth-child(1) .sidenav-label { transition-delay: var(--duration-fast); }
 .sidenav-panel[data-expanded="true"] .sidenav-bottom .sidenav-btn:nth-child(2) .sidenav-label { transition-delay: var(--duration-fast); }
 
 /* Expanded button layout: icon + label side by side. Vercel-style compact
@@ -496,4 +476,13 @@
   min-height: 0;
   background: var(--color-semantic-canvas);
   border-color: var(--color-semantic-hairline);
+}
+
+/* Mobile-only More overflow trigger (Channels / Admin) — hidden on desktop
+   where those destinations stay as primary rail items. Last in this file at
+   3-class specificity so it outranks every `.sidenav-btn` display rule above
+   (including `.sidenav-panel[data-expanded="true"] .sidenav-btn`); the mobile
+   bottom-tab media query in responsive.css re-shows it at equal specificity. */
+.sidenav-panel .sidenav-btn.sidenav-more-btn {
+  display: none;
 }

@@ -336,6 +336,11 @@ export function App() {
   }, [activeSession?.id]);
 
   useEffect(() => {
+    // Wait for the stored preference to be read (the [mounted] effect above)
+    // before applying/persisting; otherwise the default "system" state
+    // clobbers the saved theme on every load. Pre-paint theming is handled
+    // by the inline script in layout.tsx.
+    if (!mounted) return;
     applyTheme(theme);
     writeTheme(theme);
     // Re-resolve "system" when the OS color scheme changes.
@@ -344,7 +349,7 @@ export function App() {
     const onChange = () => applyTheme(theme);
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
-  }, [theme]);
+  }, [mounted, theme]);
 
   useEffect(() => {
     writeLanguage(language);

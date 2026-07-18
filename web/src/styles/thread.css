@@ -90,7 +90,7 @@
   background: transparent;
   color: var(--color-semantic-ink);
   transition: background var(--duration-fast) var(--ease-standard);
-  animation: thread-row-in 360ms var(--ease-out-quint) both;
+  animation: thread-row-in var(--duration-slow) var(--ease-out-quint) both;
 }
 
 /* Staggered reveal — first 8 rows fade-rise on mount. Cheap delight; the
@@ -137,10 +137,6 @@
 
 .conversation-row.active {
   background: var(--color-semantic-action-soft);
-}
-
-.conversation-row.active::before {
-  content: none;
 }
 
 .conversation-empty {
@@ -204,13 +200,6 @@
   font-size: var(--text-sm);
 }
 
-.conversation-topline-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xxs);
-  flex-shrink: 0;
-}
-
 .conversation-row-actions {
   display: flex;
   align-items: center;
@@ -225,8 +214,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border: 0;
   border-radius: var(--radius-sm);

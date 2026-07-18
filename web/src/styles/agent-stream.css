@@ -20,7 +20,7 @@
   color: var(--color-semantic-muted);
   font-size: var(--text-xs);
   font-weight: 600;
-  letter-spacing: var(--letter-label);
+  letter-spacing: var(--letter-eyebrow);
   text-transform: uppercase;
 }
 
@@ -48,7 +48,7 @@
   border-right: 1px solid var(--color-semantic-muted);
   border-bottom: 1px solid var(--color-semantic-muted);
   transform: rotate(-45deg);
-  transition: transform 120ms ease;
+  transition: transform var(--duration-fast) var(--ease-standard);
 }
 
 .collaboration-node[open] > summary .collaboration-branch { transform: rotate(45deg); }
@@ -77,6 +77,8 @@
 }
 
 .collaboration-node-body {
+  /* 8px marker column + 3px optical nudge so the thread line sits under
+     the status dot center, not the grid edge. */
   margin-left: 11px;
   padding-left: var(--space-base);
   border-left: 1px solid var(--color-semantic-hairline-soft);
@@ -86,7 +88,7 @@
   margin: 0 0 var(--space-xxs);
   color: var(--color-semantic-muted);
   font-size: var(--text-sm);
-  line-height: var(--leading-base);
+  line-height: var(--leading-normal);
 }
 
 .agent-text {
@@ -154,9 +156,9 @@
   margin-top: 0;
 }
 
-.agent-prose h1 { font-size: calc(var(--text-base) * 1.35); }
-.agent-prose h2 { font-size: calc(var(--text-base) * 1.2); }
-.agent-prose h3 { font-size: calc(var(--text-base) * 1.1); }
+.agent-prose h1 { font-size: var(--text-lg); }
+.agent-prose h2 { font-size: var(--text-md); }
+.agent-prose h3 { font-size: var(--text-base); }
 .agent-prose h4,
 .agent-prose h5,
 .agent-prose h6 { font-size: var(--text-base); }
@@ -407,9 +409,7 @@
 }
 
 .agent-status-good    { color: var(--color-semantic-success-text); }
-.agent-status-good    > svg { color: var(--color-semantic-success-text); }
 .agent-status-bad { color: var(--color-semantic-danger-text); }
-.agent-status-bad > svg { color: var(--color-semantic-danger-text); }
 .agent-status-warn  { color: var(--color-semantic-muted); }
 .agent-status-warn  > svg { color: var(--color-semantic-warning-text); }
 .agent-status-info  { color: var(--color-semantic-body); }

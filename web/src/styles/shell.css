@@ -5,7 +5,7 @@
   grid-template-columns: var(--sidenav-w) var(--thread-w) minmax(0, 1fr);
   height: 100vh;
   height: 100svh;
-  min-height: 100vh;
+  min-height: 100svh;
   overflow: hidden;
   background: var(--color-semantic-canvas);
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
@@ -20,7 +20,7 @@
   display: none;
 }
 
-/* Stacked PageHeader — kicker color from atelier .eyebrow-brand */
+/* Stacked PageHeader — shared eyebrow grammar from atelier.css */
 .page-header-kicker {
   font: var(--type-eyebrow);
   letter-spacing: var(--letter-eyebrow);

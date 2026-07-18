@@ -57,6 +57,11 @@
   /* Syntax-highlight numerals — Geist Mono numeric literal in code blocks */
   --color-semantic-code-number: var(--color-rust);
 
+  /* Transcript rail node — the timeline dots in the agent stream
+     (consumed by atelier.css .rail-node). */
+  --color-semantic-rail-node: var(--color-canvas-raised);
+  --color-semantic-rail-node-border: var(--color-ink-200);
+
   /* Status — the only OTHER chroma in the system besides the Forest
      Green action color (see --color-semantic-action above). Text, dots,
      and borders only; never background fills, never actions. */

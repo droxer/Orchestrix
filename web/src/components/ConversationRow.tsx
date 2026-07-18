@@ -1,4 +1,4 @@
-import { ActionRemove } from "./icons";
+import { ActionEdit, ActionRemove } from "./icons";
 import { useTranslation } from "react-i18next";
 import { useDialogs } from "./ui/DialogProvider";
 import { AgentMark } from "./AgentMark";
@@ -136,7 +136,7 @@ export function ConversationRow({ item, selected, agentDisplayNames, onSelect, o
             title={t("conversation.rename")}
             onClick={() => onRename(session)}
           >
-            <span aria-hidden="true">✎</span>
+            <ActionEdit size={11} />
           </Button>
         ) : null}
         {onClose ? (

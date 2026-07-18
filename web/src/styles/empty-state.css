@@ -143,16 +143,3 @@ html[data-theme="dark"] .relay-bleed-mark {
   gap: var(--space-xs);
   margin-top: var(--space-sm);
 }
-
-.relay-empty-link {
-  display: inline-block;
-  margin-top: var(--space-xs);
-  font: var(--type-label-md);
-  color: var(--color-semantic-action);
-  text-decoration: none;
-  transition: opacity var(--duration-fast) var(--ease-standard);
-}
-
-.relay-empty-link:hover {
-  opacity: 0.75;
-}

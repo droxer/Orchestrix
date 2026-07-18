@@ -524,7 +524,6 @@ export function ChatIntegrationsView({
               className="adm-chat-stage-empty"
               title={t("admin.v2.chat_stage_title")}
               body={t("admin.v2.chat_stage_body")}
-              hint={t("admin.v2.chat_stage_hint")}
               animate={false}
               titleId="channels-stage-title"
             />

@@ -56,8 +56,9 @@
   color: var(--color-semantic-muted);
 }
 
-.agents-roster-search:focus {
+.agents-roster-search:focus-visible {
   outline: none;
+  box-shadow: var(--ring-focus);
 }
 
 .agents-roster-select {
@@ -240,6 +241,7 @@
   background: var(--color-semantic-surface-strong);
   color: var(--color-semantic-muted);
   cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
 }
 
 .agents-roster-row-action:hover {

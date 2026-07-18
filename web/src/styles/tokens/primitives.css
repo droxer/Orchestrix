@@ -153,7 +153,6 @@
   --radius-3xl: 14px;
   --radius-4xl: 16px;
   --radius-full: 9999px;
-  --radius-pill: var(--radius-sm); /* retired — aliases sm */
 
   /* Spacing — 4px base unit. */
   --space-xxs: 4px;
@@ -262,12 +261,10 @@
   /* Motion — canonical curves + durations. `--ease-out-quint` is the
      confident rise (login pane, transcript empty); `--ease-standard` is
      everything else; `--ease-emphasized` is the firmer decelerate used by
-     tab underlines and the preferences modal rise. `--ease-spring` is
-     RETIRED — the precision system never overshoots — and aliases the
-     standard curve for its remaining consumers. */
+     tab underlines and the preferences modal rise. The precision system
+     never overshoots — no spring curve. */
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-out-quint: cubic-bezier(0.2, 0.7, 0.2, 1);
-  --ease-spring: cubic-bezier(0.2, 0, 0, 1); /* retired — no overshoot; aliases standard */
   --ease-emphasized: cubic-bezier(0.22, 1, 0.36, 1);
   --duration-fast: 120ms;
   --duration-base: 160ms;

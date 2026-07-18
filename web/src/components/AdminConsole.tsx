@@ -28,8 +28,7 @@ import { AdminViewToggle, type AdminView } from "./admin/AdminViewToggle";
 import { AddEmployeeDrawer } from "./admin/AddEmployeeDrawer";
 import { AddNodeDrawer, type AddNodeDrawerSuccess } from "./admin/AddNodeDrawer";
 import { EmployeesView } from "./admin/EmployeesView";
-import { ChatIntegrationsView } from "./admin/ChatIntegrationsView";
-import { PulseStrip } from "./admin/PulseStrip";
+import type { AdminLayout } from "./admin/AdminLayoutToggle";
 import { useAdminFleet } from "../hooks/useAdminFleet";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { useRelayStore } from "../lib/store";
@@ -42,7 +41,7 @@ import {
 } from "./admin/helpers";
 
 type AuthScreen = "login" | "bootstrap";
-const ADMIN_VIEWS: AdminView[] = ["dashboard", "employees", "fleet", "integrations"];
+const ADMIN_VIEWS: AdminView[] = ["dashboard", "employees", "fleet"];
 
 function parseAdminView(value: string | null): AdminView {
   return ADMIN_VIEWS.includes(value as AdminView) ? value as AdminView : "dashboard";
@@ -63,9 +62,15 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
   const [authScreen, setAuthScreen] = useState<AuthScreen>("login");
   const [authError, setAuthError] = useState<string | null>(null);
 
-  const { nodes, employees, lastUpdated, pollError, isFetching, mergeFleet, refetch } = useAdminFleet(Boolean(admin));
+  const { nodes, employees, pollError, isFetching, mergeFleet, refetch } = useAdminFleet(Boolean(admin));
 
   const [view, setView] = useUrlSearchState("adminView", "dashboard" as AdminView, parseAdminView, (value) => value);
+  const [layout, setLayout] = useUrlSearchState<AdminLayout>(
+    "adminLayout",
+    "card",
+    (value) => (value === "list" ? "list" : "card"),
+    (value) => (value === "card" ? null : value),
+  );
   const setAdminView = useRelayStore((state) => state.setAdminView);
   const [addEmployeeOpen, setAddEmployeeOpen] = useState(false);
   const [addNodeOpen, setAddNodeOpen] = useState(false);
@@ -307,11 +312,12 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
   }
 
   const headerError = authError ?? pollError;
-  const lastUpdatedStr = lastUpdated
-    ? lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
-    : null;
   const viewTitle = t(`admin.v2.title_${view}`);
-  const viewSubtitle = t(`admin.v2.sub_${view}`);
+  const headerCount = view === "employees"
+    ? t("admin.employee_count", { count: employees.length })
+    : view === "fleet"
+      ? t("admin.node_count", { count: nodes.length })
+      : undefined;
 
   return (
     <section
@@ -325,12 +331,23 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
       <PageHeader
         kicker={t("nav.admin")}
         title={viewTitle}
-        subtitle={viewSubtitle}
-        titleVariant="display"
-        layout="stacked"
-        toolbar={<AdminViewToggle view={view} onChange={setView} />}
+        count={headerCount}
         actions={
           <>
+            <AdminViewToggle view={view} onChange={setView} />
+            {headerError ? (
+              <span
+                className="adm-command-status flex items-center gap-xs text-xs"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+              >
+                <span className="adm-live-dot offline" aria-hidden="true" />
+                <span className="adm-command-status-text text-danger-strong">
+                  {t("admin.fetch_error", { message: headerError })}
+                </span>
+              </span>
+            ) : null}
             <Button
               type="button"
               variant="outline"
@@ -341,26 +358,6 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
             >
               <NavRefresh size={16} className={isFetching ? "spin" : undefined} />
             </Button>
-            <span
-              className="adm-command-status flex items-center gap-xs text-xs text-muted-foreground"
-              role="status"
-              aria-live="polite"
-              aria-atomic="true"
-            >
-              <span
-                className={`adm-live-dot ${headerError ? "offline" : isFetching ? "fetching" : ""}`}
-                aria-hidden="true"
-              />
-              {headerError ? (
-                <span className="adm-command-status-text text-danger-strong">
-                  {t("admin.fetch_error", { message: headerError })}
-                </span>
-              ) : lastUpdatedStr ? (
-                <span className="adm-command-status-text mono">
-                  {t("admin.updated_at", { time: lastUpdatedStr })}
-                </span>
-              ) : null}
-            </span>
             {view === "employees" ? (
               <Button
                 type="button"
@@ -388,16 +385,6 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
       />
 
       <div className="adm-main">
-        {view === "employees" || view === "fleet" ? (
-          <PulseStrip
-            view={view}
-            running={metrics.running}
-            failed={metrics.failed}
-            queued={metrics.queued}
-            unassignedNodes={unassignedNodes.length}
-          />
-        ) : null}
-
         <div className="adm-content">
           <div className="adm-content-main">
             <div key={view} className="adm-view-stage">
@@ -407,23 +394,25 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
                 <EmployeesView
                   employees={employees}
                   nodes={nodes}
+                  layout={layout}
+                  onLayoutChange={setLayout}
                   onAddEmployee={() => setAddEmployeeOpen(true)}
                   onDeleteEmployee={handleDeleteEmployee}
                   highlightedEmployeeId={highlightedEmployeeId}
                   onSelectAgent={setAgentProfileId}
                 />
-              ) : view === "fleet" ? (
+              ) : (
                 <FleetView
                   nodes={nodes}
                   employees={employees}
                   storedTokens={storedTokens}
+                  layout={layout}
+                  onLayoutChange={setLayout}
                   onRevealCredentials={handleRevealCredentials}
                   onManageAgents={handleManageAgents}
                   onDeleteNode={handleDeleteNode}
                   onAddNode={() => setAddNodeOpen(true)}
                 />
-              ) : (
-                <ChatIntegrationsView />
               )}
             </div>
           </div>

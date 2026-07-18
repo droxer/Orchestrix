@@ -154,7 +154,7 @@
 .artifact-diff {
   font-family: var(--font-mono);
   font-size: var(--text-sm);
-  line-height: 1.55;
+  line-height: var(--leading-normal);
   overflow-x: auto;
   color: var(--color-semantic-ink);
   background: var(--color-semantic-surface-soft);
@@ -216,7 +216,7 @@
   border-radius: var(--radius-sm);
   font-family: var(--font-mono);
   font-size: var(--text-sm);
-  line-height: 1.55;
+  line-height: var(--leading-normal);
   white-space: pre-wrap;
   overflow-x: auto;
   overflow-wrap: anywhere;
@@ -243,7 +243,7 @@
   min-height: 480px;
   border: 0;
   border-radius: var(--radius-sm);
-  background: #ffffff; /* document paper — previews assume a white page in every theme */
+  background: var(--color-white); /* document paper — previews assume a white page in every theme */
 }
 
 /* ── Unified artifact library drawer ─────────────────────────────────── */

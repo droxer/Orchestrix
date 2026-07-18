@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type Dispatch, type MouseEvent, type SetStateAction } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import {
   NavAdmin, NavAgents, NavBacklog, NavChannels, NavConversations, NavLogout, NavMore, NavPreferences,
@@ -145,8 +146,12 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
     setMoreMenu((current) => {
       if (current) return null;
       const rect = el.getBoundingClientRect();
-      // Mobile bottom tab: rise above the control, left-aligned to its plate.
-      return { x: Math.max(8, rect.left), y: rect.top - 8 };
+      // Mobile bottom tab: rise above the control, left-aligned to its plate
+      // but clamped so the 180px-min menu never clips the right viewport edge
+      // (More is the rightmost tab).
+      const menuWidth = 188;
+      const maxX = window.innerWidth - menuWidth - 8;
+      return { x: Math.max(8, Math.min(rect.left, maxX)), y: rect.top - 8 };
     });
   }
   function openPreferences() {
@@ -352,7 +357,11 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
           </Button>
         </div>
       ) : null}
-      {moreMenu ? (
+      {/* Portaled to <body>: the mobile bottom bar has a backdrop-filter,
+          which makes the panel the containing block for position:fixed —
+          rendering the menu inside it would mis-place the viewport-based
+          coordinates and scroll the tab row. */}
+      {moreMenu ? createPortal(
         <div
           ref={moreMenuRef}
           className="sidenav-more-menu"
@@ -380,7 +389,8 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
             <NavAdmin size={16} />
             <span>{t("nav.admin")}</span>
           </a>
-        </div>
+        </div>,
+        document.body,
       ) : null}
       {navTooltip ? (
         <div

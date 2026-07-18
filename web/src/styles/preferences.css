@@ -154,10 +154,6 @@
   color: var(--color-semantic-muted);
 }
 
-.pref-group-label--spaced {
-  margin-top: var(--space-base);
-}
-
 /* Framed list — hairlines, not pillow cards */
 .pref-option-list {
   display: flex;

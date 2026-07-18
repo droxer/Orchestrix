@@ -12,7 +12,9 @@ import { useUrlSearchState } from "../../hooks/useUrlSearchState";
 import type { StoredNodeTokenMap } from "./helpers";
 import { visualStatus } from "./helpers";
 import { NodeCard } from "./NodeCard";
+import { NodeRow } from "./NodeRow";
 import { FleetProfileLegend } from "./NodeProfileBadges";
+import { AdminLayoutToggle, type AdminLayout } from "./AdminLayoutToggle";
 
 type FleetFilter = "all" | "ready" | "running" | "provisioning" | "failed" | "unassigned";
 
@@ -20,6 +22,8 @@ interface FleetViewProps {
   nodes: ControlPanelDaemonNodeRecord[];
   employees: EmployeeRecord[];
   storedTokens: StoredNodeTokenMap;
+  layout: AdminLayout;
+  onLayoutChange: (next: AdminLayout) => void;
   onRevealCredentials: (node: ControlPanelDaemonNodeRecord) => void;
   onManageAgents: (node: ControlPanelDaemonNodeRecord) => void;
   onDeleteNode?: (node: ControlPanelDaemonNodeRecord) => Promise<void>;
@@ -54,7 +58,7 @@ function filterLabel(filter: FleetFilter, t: TFunction): string {
   return t(`status.${filter}`, { defaultValue: filter });
 }
 
-export function FleetView({ nodes, employees, storedTokens, onRevealCredentials, onManageAgents, onDeleteNode, onAddNode }: FleetViewProps) {
+export function FleetView({ nodes, employees, storedTokens, layout, onLayoutChange, onRevealCredentials, onManageAgents, onDeleteNode, onAddNode }: FleetViewProps) {
   const { t } = useTranslation();
   const [filter, setFilter] = useUrlSearchState("fleetFilter", "all" as FleetFilter, parseFleetFilter, serializeFleetFilter);
   const colocated = canUseLocalControlPanel();
@@ -84,23 +88,26 @@ export function FleetView({ nodes, employees, storedTokens, onRevealCredentials,
   return (
     <div className="adm-view">
       {colocated ? <FleetProfileLegend t={t} /> : null}
-      <div className="adm-fleet-filters" role="group" aria-label={t("admin.v2.filter_label")}>
-        {FILTERS.map((id) => {
-          const active = filter === id;
-          return (
-            <Button variant="ghost"
-              key={id}
-              type="button"
-              className="adm-fleet-chip"
-              data-active={active ? "true" : "false"}
-              aria-pressed={active}
-              onClick={() => setFilter(id)}
-            >
-              <span>{filterLabel(id, t)}</span>
-              <span className="adm-fleet-chip-count mono">{counts[id]}</span>
-            </Button>
-          );
-        })}
+      <div className="adm-view-controls">
+        <div className="adm-fleet-filters" role="group" aria-label={t("admin.v2.filter_label")}>
+          {FILTERS.map((id) => {
+            const active = filter === id;
+            return (
+              <Button variant="ghost"
+                key={id}
+                type="button"
+                className="adm-fleet-chip"
+                data-active={active ? "true" : "false"}
+                aria-pressed={active}
+                onClick={() => setFilter(id)}
+              >
+                <span>{filterLabel(id, t)}</span>
+                <span className="adm-fleet-chip-count mono">{counts[id]}</span>
+              </Button>
+            );
+          })}
+        </div>
+        <AdminLayoutToggle layout={layout} onChange={onLayoutChange} />
       </div>
 
       {filtered.length === 0 ? (
@@ -115,7 +122,7 @@ export function FleetView({ nodes, employees, storedTokens, onRevealCredentials,
             </Button>
           ) : undefined}
         />
-      ) : (
+      ) : layout === "card" ? (
         <div className="adm-fleet-grid">
           {filtered.map((node) => (
             <NodeCard
@@ -131,6 +138,29 @@ export function FleetView({ nodes, employees, storedTokens, onRevealCredentials,
             />
           ))}
         </div>
+      ) : (
+        <>
+          <div className="adm-node-cols" aria-hidden="true">
+            <span className="adm-emp-col-label">{t("admin.v2.nav_fleet")}</span>
+            <span className="adm-emp-col-label">{t("admin.col_agents")}</span>
+            <span className="adm-emp-col-label">{t("admin.v2.col_status")}</span>
+            <span className="adm-emp-col-label">{t("admin.v2.col_last_seen")}</span>
+            <span className="adm-emp-col-label adm-emp-col-label--metrics">{t("admin.v2.col_actions")}</span>
+          </div>
+          <ul className="adm-node-list">
+            {filtered.map((node) => (
+              <NodeRow
+                key={node.id}
+                node={node}
+                employee={node.employeeId ? employeeById.get(node.employeeId) : undefined}
+                onReveal={onRevealCredentials}
+                onManageAgents={onManageAgents}
+                onDelete={onDeleteNode}
+                t={t}
+              />
+            ))}
+          </ul>
+        </>
       )}
     </div>
   );

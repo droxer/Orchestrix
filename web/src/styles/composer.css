@@ -30,8 +30,6 @@
   pointer-events: none;
 }
 
-.agent-picker-wrap { position: relative; }
-
 .agent-picker {
   position: absolute;
   bottom: calc(100% + 8px);

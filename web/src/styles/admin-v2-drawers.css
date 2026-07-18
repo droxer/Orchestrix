@@ -1,93 +1,8 @@
-/* ── Mode tabs (drawer) — refined segmented control ───────────────── */
-.adm-mode-tabs {
-  position: relative;
-  display: inline-flex;
-  gap: 0;
-  padding: 0;
-  margin-bottom: var(--space-lg);
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid var(--color-semantic-hairline);
-}
-
-.adm-mode-tab {
-  position: relative;
-  height: var(--size-control-md);
-  padding: 0 var(--space-base) 0 0;
-  margin-right: var(--space-lg);
-  border: none;
-  background: transparent;
-  color: var(--color-semantic-muted);
-  font: var(--type-label-strong);
-  letter-spacing: var(--letter-caps);
-  text-transform: uppercase;
-  border-radius: var(--radius-none);
-  cursor: pointer;
-  transition: color var(--duration-base) var(--ease-emphasized);
-}
-
-.adm-mode-tab::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: var(--space-base);
-  bottom: -1px;
-  height: 2px;
-  background: var(--color-semantic-action);
-  transform: scaleX(0);
-  transform-origin: left center;
-  transition: transform var(--duration-base) var(--ease-emphasized);
-}
-
-.adm-mode-tab:hover:not(:disabled) { color: var(--color-semantic-ink); }
-.adm-mode-tab:focus-visible {
-  outline: none;
-  box-shadow: var(--ring-focus);
-}
-.adm-mode-tab:disabled { color: var(--color-semantic-muted-soft); cursor: not-allowed; }
-
-.adm-mode-tab.active { color: var(--color-semantic-ink); }
-.adm-mode-tab.active::after { transform: scaleX(1); }
-
 /* ── Empty states ─────────────────────────────────────────────────── */
-.adm-empty-block {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-base);
-  padding: var(--space-section) var(--space-xl);
-  max-width: 520px;
-  border-left: 2px solid var(--color-semantic-action);
-}
-
-.adm-empty-block--editorial {
-  border-left: none;
-  padding: var(--space-xxl);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--color-semantic-hairline);
-}
-
-.adm-empty-kicker {
-  margin: 0;
-  font-size: var(--text-2xs);
-  letter-spacing: var(--letter-eyebrow-wide);
-  text-transform: uppercase;
-  color: var(--color-semantic-action);
-}
-
-.adm-empty-title {
-  margin: 0;
-  font-size: var(--text-2xl);
-  font-weight: 500;
-  letter-spacing: var(--letter-display);
-  color: var(--color-semantic-ink);
-  line-height: 1.1;
-}
-
 .adm-empty-body {
   margin: 0;
   font-size: var(--text-base);
-  line-height: 1.6;
+  line-height: var(--leading-normal);
   color: var(--color-semantic-muted);
 }
 
@@ -229,10 +144,6 @@
 .adm-drawer-body--column {
   display: flex;
   flex-direction: column;
-}
-
-.adm-drawer-body--column .adm-mode-tabs {
-  align-self: flex-start;
 }
 
 .adm-drawer-close {
@@ -739,37 +650,6 @@
   color: var(--color-semantic-muted);
 }
 
-/* Legacy alias — kept so older class references keep spacing. */
-.adm-form--streamlined {
-  gap: var(--space-base);
-}
-
-.adm-form--streamlined .adm-form-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-  padding-top: var(--space-sm);
-  margin-top: var(--space-xs);
-  border-top: 1px solid var(--color-semantic-hairline-soft);
-}
-
-.adm-form--streamlined .adm-form-group-label {
-  margin: 0;
-  font: var(--type-micro-strong);
-  letter-spacing: var(--letter-eyebrow);
-  text-transform: uppercase;
-  color: var(--color-semantic-muted);
-}
-
-.adm-form--streamlined .adm-field > span {
-  font: var(--type-label);
-  color: var(--color-semantic-body);
-}
-
-.adm-form--streamlined .adm-field-req {
-  font-weight: 500;
-}
-
 /* ── Execution profile segmented control ──────────────────────────── */
 .adm-profile-field {
   display: flex;
@@ -1094,16 +974,6 @@
   .adm-content {
     grid-template-columns: minmax(0, 1fr);
   }
-  .adm-pulse {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-base) 0;
-  }
-  .adm-pulse-cell {
-    flex: 1 1 calc(33.333% - var(--space-base));
-    min-width: 120px;
-  }
-  .adm-pulse-cell:nth-child(3n) { border-right: none; }
 }
 
 @media (max-width: 768px) {
@@ -1111,8 +981,6 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .adm-pulse { padding: var(--space-base); }
-  .adm-pulse--alerts { display: grid; grid-template-columns: repeat(3, 1fr); }
   .adm-content-main { padding: var(--space-base); }
   .adm-emp-cols {
     display: none;

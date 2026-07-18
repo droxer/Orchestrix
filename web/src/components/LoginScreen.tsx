@@ -193,7 +193,7 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
               </p>
             )}
 
-            <Button variant="ghost" type="submit" className="login-submit" disabled={isLoading || !canSubmit}>
+            <Button variant="default" type="submit" className="login-submit" disabled={isLoading || !canSubmit}>
               <span>{isLoading ? t("login.loading") : submitLabel}</span>
               <span className="login-submit-arrow" aria-hidden="true">
                 →

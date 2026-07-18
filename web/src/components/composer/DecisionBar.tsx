@@ -21,7 +21,7 @@ export function DecisionBar({ logicalAgents, sendDecision, handoffOpen, setHando
         <Button variant="ghost" type="button" onClick={() => void sendDecision("rerun")}>{t("decision.rerun")}</Button>
         <Button variant="ghost" type="button" onClick={() => void sendDecision("mark_done")}>{t("decision.mark_done")}</Button>
         <Button variant="ghost" type="button" className="danger-soft" onClick={() => void sendDecision("reject")}>{t("decision.reject")}</Button>
-        <Button variant="ghost" type="button" className="primary" aria-controls="handoff-panel" aria-expanded={handoffOpen} onClick={() => setHandoffOpen(!handoffOpen)}>
+          <Button variant="default" type="button" className="primary" aria-controls="handoff-panel" aria-expanded={handoffOpen} onClick={() => setHandoffOpen(!handoffOpen)}>
           <ActionHandoff size={14} /> {t("decision.handoff")}
         </Button>
       </div>
@@ -48,7 +48,10 @@ export function DecisionBar({ logicalAgents, sendDecision, handoffOpen, setHando
               <option value="review">{t("mode.review")}</option>
             </select>
           </div>
-          <input aria-label={t("handoff.note_placeholder")} name="handoff-note" autoComplete="off" placeholder={t("handoff.note_placeholder")} value={handoffNote} onChange={(e) => setHandoffNote(e.target.value)} />
+          <div className="handoff-row handoff-row--note">
+            <label htmlFor="handoff-note">{t("handoff.note_label")}</label>
+            <input id="handoff-note" name="handoff-note" autoComplete="off" placeholder={t("handoff.note_placeholder")} value={handoffNote} onChange={(e) => setHandoffNote(e.target.value)} />
+          </div>
           <div className="handoff-actions">
             <Button variant="ghost" type="button" onClick={() => setHandoffOpen(false)}>{t("handoff.cancel")}</Button>
             <Button variant="ghost" type="button" className="primary" onClick={() => void sendHandoff()}>{t("handoff.send")}</Button>

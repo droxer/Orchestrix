@@ -53,7 +53,7 @@ export function RelayEmptyState({
         {title}
       </h2>
       {body ? (
-        <p className={cn("relay-empty-body", enter(illustration ? 2 : 2))}>{body}</p>
+        <p className={cn("relay-empty-body", enter(2))}>{body}</p>
       ) : null}
       {hint ? <p className={cn("relay-empty-hint", enter(3))}>{hint}</p> : null}
       {actions ? (

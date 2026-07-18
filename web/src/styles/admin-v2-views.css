@@ -202,56 +202,6 @@
   box-shadow: var(--ring-focus);
 }
 
-.adm-node-chip-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-full);
-  background: var(--tone, var(--color-semantic-muted-soft));
-}
-
-.adm-node-chip-pulse {
-  width: 4px;
-  height: 4px;
-  border-radius: var(--radius-full);
-  background: var(--color-semantic-info);
-  animation: adm-blink 1400ms ease-in-out infinite;
-}
-
-@keyframes adm-blink {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 1; }
-}
-
-.adm-emp-add-node {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-xxs);
-  height: 28px;
-  padding: 0 var(--space-sm) 0 calc(var(--space-sm) - 2px);
-  border: 1px dashed var(--color-semantic-hairline);
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--color-semantic-muted);
-  font: var(--type-micro-strong);
-  letter-spacing: var(--letter-eyebrow);
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: border-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
-}
-
-.adm-emp-add-node:hover:not(:disabled) {
-  border-color: var(--color-semantic-action);
-  color: var(--color-semantic-action);
-  background: color-mix(in srgb, var(--color-semantic-action) 6%, transparent);
-  border-style: solid;
-}
-
-.adm-emp-add-node:disabled {
-  color: var(--color-semantic-muted-soft);
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
 .adm-emp-metrics {
   display: flex;
   align-items: center;
@@ -309,61 +259,6 @@
   color: var(--color-semantic-danger-text);
 }
 
-.adm-node-agent-card-glyph {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-  width: 34px;
-  height: 34px;
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--color-semantic-action) 8%, var(--color-semantic-surface-strong));
-  border: 1px solid color-mix(in srgb, var(--color-semantic-action) 18%, var(--color-semantic-hairline));
-  color: var(--color-semantic-ink);
-  font: var(--type-caption-strong);
-  letter-spacing: var(--letter-open);
-}
-
-.adm-node-agent-card-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xxs);
-  min-width: 0;
-}
-
-.adm-node-agent-card-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-xs);
-}
-
-.adm-node-agent-card-name {
-  margin: 0;
-  font: var(--type-label-strong);
-  color: var(--color-semantic-ink);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.adm-node-agent-card-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-xs);
-  margin: 0;
-  font-size: var(--text-2xs);
-  color: var(--color-semantic-muted);
-}
-
-.adm-node-agent-card-note {
-  margin: var(--space-xxs) 0 0;
-  font-size: var(--text-2xs);
-  line-height: 1.45;
-  color: var(--color-semantic-warning-text);
-}
-
 @media (max-width: 720px) {
   .adm-node-agent-head {
     grid-template-columns: auto minmax(0, 1fr);
@@ -414,8 +309,8 @@
 
 /* Pin the node chip's text color against the scoped .tone-* utility above —
    same two-class specificity, so it must come after in source order to win.
-   The node name/handle is identity, not status; availability reads from
-   --adm-node-chip-dot's --tone, never from the chip's own text. */
+   The node name/handle is identity, not status; availability reads from the
+   tone modifier, never from the chip's own text. */
 .adm-node-chip.tone-good,
 .adm-node-chip.tone-info,
 .adm-node-chip.tone-warn,
@@ -497,85 +392,169 @@
   letter-spacing: var(--letter-caps);
 }
 
-/* Legacy tab styles retained for chat integrations view */
-.adm-tabs {
-  position: relative;
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-lg);
-  padding: 0 0 2px;
-  margin-bottom: var(--space-base);
-  border-bottom: 1px solid var(--color-semantic-hairline);
-}
-
-.adm-tab {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  height: var(--size-control-md);
-  padding: 0 2px;
-  background: transparent;
-  border: none;
-  color: var(--color-semantic-muted);
-  font: var(--type-micro-strong);
-  letter-spacing: var(--letter-eyebrow-wide);
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: color var(--duration-base) var(--ease-emphasized);
-}
-
-.adm-tab::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -3px;
-  height: 2px;
-  background: var(--color-semantic-ink);
-  transform: scaleX(0);
-  transform-origin: left center;
-  transition: transform var(--duration-base) var(--ease-emphasized);
-}
-
-.adm-tab:hover { color: var(--color-semantic-ink); }
-.adm-tab:hover::after { transform: scaleX(0.35); background: var(--color-semantic-muted); }
-
-.adm-tab.active {
-  color: var(--color-semantic-ink);
-}
-
-.adm-tab.active::after {
-  transform: scaleX(1);
-  background: var(--color-semantic-action);
-}
-
-.adm-tab-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 22px;
-  height: 18px;
-  padding: 0 6px;
-  border-radius: var(--radius-xs);
-  background: var(--color-semantic-surface-strong);
-  color: var(--color-semantic-muted);
-  font-family: var(--font-mono);
-  font-size: var(--text-micro);
-  font-weight: 500;
-  line-height: 1;
-  transition: background var(--duration-base) var(--ease-standard), color var(--duration-base) var(--ease-standard);
-}
-
-.adm-tab.active .adm-tab-count {
-  background: var(--color-semantic-ink);
-  color: var(--color-semantic-canvas);
-}
-
 .adm-fleet-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: var(--space-base);
+}
+
+/* ── Shared control row (filters/search on the left, card/list toggle on
+   the right) — keeps the Employees and Nodes views chrome-aligned. ─────── */
+.adm-view-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-base);
+}
+
+.adm-view-controls > .adm-fleet-filters {
+  margin-bottom: 0;
+  flex: 1 1 auto;
+}
+
+.adm-view-controls > .adm-search {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.adm-layout-toggle {
+  flex: 0 0 auto;
+}
+
+/* ── Employee card (card view) — inherits the node-card frame so the two
+   views read as one system; only the interior slots differ. ───────────── */
+.adm-emp-card .adm-node-card-body {
+  gap: var(--space-sm);
+}
+
+.adm-emp-card-dept {
+  font: var(--type-micro-strong);
+  letter-spacing: var(--letter-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-semantic-muted);
+  text-align: right;
+}
+
+.adm-emp-card-email {
+  margin: 0;
+  font-size: var(--text-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.adm-emp-card-metrics {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  font-feature-settings: "tnum" 1;
+}
+
+.adm-emp-card-metric {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+}
+
+.adm-node-card.is-pulse::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px var(--color-semantic-action);
+  animation: adm-pulse-fade 2400ms var(--ease-standard) forwards;
+  pointer-events: none;
+}
+
+/* ── Node list (list view) — row geometry mirrors the employee list so
+   both views share one table language. ────────────────────────────────── */
+.adm-node-cols {
+  display: grid;
+  grid-template-columns: minmax(200px, 1.4fr) minmax(0, 2fr) 8rem 6rem auto;
+  gap: var(--space-lg);
+  padding: 0 0 var(--space-sm);
+  border-bottom: 1px solid var(--color-semantic-hairline);
+}
+
+.adm-node-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.adm-node-row {
+  display: grid;
+  grid-template-columns: minmax(200px, 1.4fr) minmax(0, 2fr) 8rem 6rem auto;
+  gap: var(--space-lg);
+  align-items: center;
+  padding: var(--space-base) 0;
+  border-bottom: 1px solid var(--color-semantic-hairline-soft);
+  position: relative;
+  transition: border-color var(--duration-base) var(--ease-standard);
+}
+
+.adm-node-row:hover {
+  border-bottom-color: var(--color-semantic-ink);
+}
+
+.adm-node-row-id {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.adm-node-row-identity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxs);
+  min-width: 0;
+}
+
+.adm-node-row-identity .adm-node-card-name,
+.adm-node-row-identity .adm-node-card-handle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.adm-node-row-agents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.adm-node-row-status {
+  justify-self: start;
+}
+
+.adm-node-row-seen {
+  font-size: var(--text-xs);
+}
+
+.adm-node-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-xxs);
+}
+
+@media (max-width: 720px) {
+  .adm-node-cols {
+    display: none;
+  }
+
+  .adm-node-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-sm);
+    padding: var(--space-base) 0;
+  }
+
+  .adm-node-row-actions {
+    justify-content: flex-start;
+  }
 }
 
 .adm-node-card {
@@ -926,46 +905,6 @@
   min-width: 0;
 }
 
-.adm-agent-role-field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xxs);
-}
-
-.adm-agent-role-field-label {
-  font: var(--type-micro-strong);
-  letter-spacing: var(--letter-eyebrow);
-  text-transform: uppercase;
-  color: var(--color-semantic-muted);
-}
-
-.adm-agent-role-field select {
-  width: 100%;
-  height: 2rem;
-  padding: 0 var(--space-sm);
-  border: 1px solid var(--color-semantic-hairline);
-  border-radius: var(--radius-xs);
-  background: var(--color-semantic-surface-raised);
-  color: var(--color-semantic-ink);
-  font: var(--type-label-strong);
-  cursor: pointer;
-  transition:
-    border-color var(--duration-fast) var(--ease-standard),
-    background var(--duration-fast) var(--ease-standard),
-    opacity var(--duration-fast) var(--ease-standard);
-}
-
-.adm-agent-role-field select:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.adm-agent-role-field select:focus-visible {
-  outline: none;
-  border-color: var(--color-semantic-action);
-  box-shadow: var(--ring-focus);
-}
-
 .adm-agent-inventory {
   display: flex;
   flex-direction: column;
@@ -1135,6 +1074,13 @@
 
 .adm-node-card-error {
   margin: var(--space-xs) 0 0;
+  font-size: var(--text-2xs);
+  color: var(--color-semantic-danger-text);
+}
+
+.adm-node-row-error {
+  grid-column: 1 / -1;
+  margin: 0;
   font-size: var(--text-2xs);
   color: var(--color-semantic-danger-text);
 }

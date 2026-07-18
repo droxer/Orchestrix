@@ -49,6 +49,23 @@ type AppShellProps = {
   onLanguageChange: (language: Language) => void;
 };
 
+function MobileSettingsButton({ prefsOpen, setPrefsOpen }: { prefsOpen: boolean; setPrefsOpen: Dispatch<SetStateAction<boolean>> }) {
+  const { t } = useTranslation();
+  return (
+    <Button
+      variant="ghost"
+      type="button"
+      className={`mobile-settings ${prefsOpen ? "active" : ""}`}
+      aria-label={t("nav.settings")}
+      aria-haspopup="dialog"
+      aria-expanded={prefsOpen}
+      onClick={() => setPrefsOpen((v) => !v)}
+    >
+      <NavPreferences size={16} />
+    </Button>
+  );
+}
+
 export function AppShell({
   route,
   onNavigateRoute,
@@ -129,17 +146,7 @@ export function AppShell({
                 >
                   <NavRefresh size={16} className={mobileChatChrome.isRefreshing ? "spin" : ""} />
                 </Button>
-                <Button
-                  variant="ghost"
-                  type="button"
-                  className={`mobile-settings ${prefsOpen ? "active" : ""}`}
-                  aria-label={t("nav.settings")}
-                  aria-haspopup="dialog"
-                  aria-expanded={prefsOpen}
-                  onClick={() => setPrefsOpen((v) => !v)}
-                >
-                  <NavPreferences size={16} />
-                </Button>
+                <MobileSettingsButton prefsOpen={prefsOpen} setPrefsOpen={setPrefsOpen} />
               </div>
             </>
           ) : (
@@ -161,9 +168,7 @@ export function AppShell({
               >
                 <span>{activeConversationLabel}</span>
               </Button>
-              <Button variant="ghost" type="button" className={`mobile-settings ${prefsOpen ? "active" : ""}`} aria-label={t("nav.settings")} aria-haspopup="dialog" aria-expanded={prefsOpen} onClick={() => setPrefsOpen((v) => !v)}>
-                <NavPreferences size={16} />
-              </Button>
+              <MobileSettingsButton prefsOpen={prefsOpen} setPrefsOpen={setPrefsOpen} />
             </>
           )
         ) : (
@@ -172,9 +177,7 @@ export function AppShell({
               <span className="mobile-topbar-eyebrow">{route === "admin" ? t("nav.admin") : t("nav.mobile_section")}</span>
               <span className="mobile-topbar-title">{mobileRouteTitle}</span>
             </div>
-            <Button variant="ghost" type="button" className={`mobile-settings ${prefsOpen ? "active" : ""}`} aria-label={t("nav.settings")} aria-haspopup="dialog" aria-expanded={prefsOpen} onClick={() => setPrefsOpen((v) => !v)}>
-              <NavPreferences size={16} />
-            </Button>
+            <MobileSettingsButton prefsOpen={prefsOpen} setPrefsOpen={setPrefsOpen} />
           </>
         )}
       </div>

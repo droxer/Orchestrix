@@ -270,7 +270,7 @@ function BacklogTaskCard({
       </div>
       <div className="backlog-task-actions" role="group" aria-label={t("backlog.actions")}>
         <div className="backlog-action-group" aria-label={t("backlog.actions_dispatch")}>
-          <Button variant="ghost"
+          <Button variant="default"
             type="button"
             className="backlog-action-primary backlog-action-icon"
             onClick={onStart}
@@ -386,7 +386,7 @@ function BacklogTaskRow({
       </span>
       <div className="backlog-row-actions" role="group" aria-label={t("backlog.actions")}>
         <div className="backlog-action-group" aria-label={t("backlog.actions_dispatch")}>
-          <Button variant="ghost"
+          <Button variant="default"
             type="button"
             className="backlog-action-primary backlog-action-icon"
             onClick={onStart}

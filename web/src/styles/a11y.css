@@ -6,7 +6,6 @@
 .conversation-heading h1,
 .pref-header-text h2,
 .login-headline,
-.adm-empty-title,
 .adm-auth-title {
   text-wrap: balance;
 }
@@ -90,7 +89,6 @@
   .backlog-row-actions button,
   .code-view-toggle,
   .adm-view-toggle-btn,
-  .adm-mode-tab,
   .adm-copy-pill,
   .adm-form-actions [data-slot="button"],
   .overlay-close,

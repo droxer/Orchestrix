@@ -38,7 +38,6 @@ export function TopEmployees({ employees, nodes, ranked, className }: TopEmploye
   return (
     <section className={`adm-dash-card${className ? ` ${className}` : ""}`}>
       <header className="adm-dash-card-head">
-        <div className="adm-dash-card-eyebrow">{t("admin.v2.dash_top_eyebrow")}</div>
         <h2 className="adm-dash-card-title">{t("admin.v2.dash_top_title")}</h2>
       </header>
       {rows.length === 0 ? (
@@ -47,7 +46,7 @@ export function TopEmployees({ employees, nodes, ranked, className }: TopEmploye
         <ol className="adm-dash-top-list">
           {rows.map((row, index) => (
             <li key={row.id} className="adm-dash-top-row">
-              <span className="adm-dash-top-rank mono">{String(index + 1).padStart(2, "0")}</span>
+              <span className="adm-dash-top-rank mono">{index + 1}</span>
               <EmployeeAvatar employeeId={row.id} running={false} size={28} />
               <div className="adm-dash-top-meta">
                 <span className="adm-dash-top-name">{row.displayName}</span>

@@ -171,7 +171,9 @@
     overflow-y: auto;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
-    z-index: calc(var(--z-popover) + 10);
+    /* Rendered as fixed lower sheets on mobile — sit on the sheet layer,
+       above the bottom bar and the FAB (--z-sheet's documented beat). */
+    z-index: var(--z-sheet);
   }
 
   .mention-popover {

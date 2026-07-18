@@ -27,6 +27,7 @@
   --lg-steel: #4f9d6e;
   --lg-steel-active: #63b482;
   --lg-on-steel: #0d1410; /* text-on-accent (dark ink on the forest fill) */
+  --lg-on-amber: #2b1c02; /* text-on-amber for bootstrap-mode fills */
   --lg-up: #2fb355;
   --lg-amber: #e0a857;
   --lg-down: #ef6f6f;
@@ -39,6 +40,7 @@
   position: relative;
   display: flex;
   min-height: 100vh;
+  min-height: 100svh;
   background:
     radial-gradient(120% 90% at 12% 0%, color-mix(in srgb, var(--lg-steel) 7%, transparent), transparent 55%),
     linear-gradient(to right, var(--lg-hairline-soft) 1px, transparent 1px) 0 0 / 56px 56px,
@@ -148,6 +150,7 @@
   justify-content: space-between;
   width: min(100%, 520px);
   min-height: 100vh;
+  min-height: 100svh;
   padding: var(--space-xl) clamp(var(--space-lg), 6vw, var(--space-xxl));
   background: color-mix(in srgb, var(--lg-canvas) 72%, transparent);
   backdrop-filter: blur(2px);
@@ -395,7 +398,7 @@
 
 .login-screen[data-mode="bootstrap"] .login-submit {
   /* Amber fill needs dark ink, same as the steel on-action — keep it. */
-  color: #2b1c02;
+  color: var(--lg-on-amber);
 }
 
 .login-submit:hover:not(:disabled) {
@@ -403,7 +406,7 @@
 }
 
 .login-screen[data-mode="bootstrap"] .login-submit:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--lg-amber) 85%, #ffffff);
+  background: color-mix(in srgb, var(--lg-amber) 85%, var(--color-white));
 }
 
 .login-submit:active:not(:disabled) {
@@ -489,6 +492,7 @@
   align-items: center;
   justify-content: center;
   min-height: 100vh;
+  min-height: 100svh;
   /* Renders before .login-screen mounts, so --lg-* isn't in scope yet —
      fall back to the theme-independent "always dark" surface primitives
      (also used by the diff viewer / artifact chrome) rather than a
@@ -508,7 +512,7 @@
   content: "▌";
   margin-left: var(--space-xxs);
   /* Pre-mount caret on the pinned dark canvas — matches --lg-ink. */
-  color: #f3f5f7;
+  color: #f5f3ec;
 }
 
 /* ---------- Motion --------------------------------------------------- */

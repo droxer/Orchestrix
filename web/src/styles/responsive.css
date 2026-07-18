@@ -344,8 +344,11 @@
     display: none !important;
   }
 
-  .sidenav-more-btn {
-    display: inline-flex;
+  /* Matches the desktop hide rule's specificity (sidenav.css, end of file);
+     this file loads later so the mobile tab wins. display:flex to match the
+     column icon-over-label layout of the other bottom tabs. */
+  .sidenav-panel .sidenav-btn.sidenav-more-btn {
+    display: flex;
   }
 
   .sidenav-btn .sidenav-label,
@@ -471,10 +474,6 @@
 
   .composer-footer {
     gap: var(--space-xs);
-  }
-
-  .adm-pulse {
-    padding: var(--space-base);
   }
 
   .adm-content-main {

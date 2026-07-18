@@ -59,7 +59,7 @@
   --color-brand-soft: var(--color-semantic-action-soft);
 
   /* Radii — one scale for component CSS and Tailwind utilities
-     (rounded-sm … rounded-4xl). --radius-pill is a retired alias. */
+     (rounded-sm … rounded-4xl). */
   --radius-xs: var(--radius-xs);
   --radius-sm: var(--radius-sm);
   --radius-md: var(--radius-md);

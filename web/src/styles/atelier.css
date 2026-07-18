@@ -31,15 +31,7 @@
   background: var(--surface-header-bg);
 }
 
-.surface-header::after,
-.chat-header::after,
-.page-header::after {
-  content: none;
-}
-
-.eyebrow-brand,
 .page-header-kicker,
-.chat-header-kicker,
 .mobile-topbar-eyebrow {
   color: var(--color-semantic-muted);
   font: var(--type-eyebrow);
@@ -48,10 +40,8 @@
   text-transform: uppercase;
 }
 
-.display-title,
 .chat-title h2,
-.adm-drawer-title,
-.adm-empty-title {
+.adm-drawer-title {
   font-family: var(--font-display);
   font-weight: 500;
   letter-spacing: var(--letter-display);
@@ -105,16 +95,6 @@
   background: var(--color-semantic-action);
   color: var(--color-semantic-on-action);
   box-shadow: none;
-}
-
-.paper-card {
-  border: 1px solid var(--color-semantic-hairline);
-  border-radius: var(--radius-lg);
-  background: var(--color-semantic-surface-raised);
-}
-
-.paper-card--interactive:hover {
-  border-color: color-mix(in srgb, var(--color-semantic-action) 30%, var(--color-semantic-hairline));
 }
 
 body {
@@ -189,7 +169,7 @@ body {
   background: transparent;
 }
 .transcript-phase-node { background: var(--color-semantic-action); box-shadow: 0 0 0 4px var(--color-semantic-canvas); }
-.rail-node { border-color: var(--color-ink-200); border-radius: 50%; background: var(--color-canvas-raised); box-shadow: 0 0 0 4px var(--color-semantic-canvas); }
+.rail-node { border-color: var(--color-semantic-rail-node-border); border-radius: 50%; background: var(--color-semantic-rail-node); box-shadow: 0 0 0 4px var(--color-semantic-canvas); }
 .rail-node-user { width: 16px; height: 16px; background: var(--color-semantic-action); border-color: var(--color-semantic-action); }
 /* Author label (YOU / agent name) reads as a refined attribution eyebrow, not
    a heading — kept at body size so it sits level with the turn text; the
@@ -230,8 +210,7 @@ html[data-theme="dark"] .rail-node { background: var(--color-semantic-surface-ra
 }
 
 .backlog-stats,
-.workspace-metric-strip,
-.adm-pulse {
+.workspace-metric-strip {
   border: 0;
   border-bottom: 1px solid var(--color-semantic-hairline);
   border-radius: 0;
@@ -240,8 +219,7 @@ html[data-theme="dark"] .rail-node { background: var(--color-semantic-surface-ra
 }
 
 .backlog-stat-value,
-.workspace-metric-item strong,
-.adm-pulse-value {
+.workspace-metric-item strong {
   font-family: var(--font-display);
   font-weight: 500;
   letter-spacing: var(--letter-tight);
@@ -329,26 +307,14 @@ html[data-theme="dark"] .rail-node { background: var(--color-semantic-surface-ra
   color: var(--color-semantic-on-action);
 }
 
-/* The login screen owns its backdrop in login.css; do not re-wash it here. */
-.login-headline,
-.login-wordmark {
-  font-family: var(--font-display);
-  font-weight: 500;
-  letter-spacing: var(--letter-display);
-}
-
-.login-input { border-radius: var(--radius-md); }
-.login-submit { border-radius: var(--radius-md); background: var(--color-semantic-action); }
+/* The login screen owns its entire look in login.css (pinned pre-auth
+   palette, serif headline, underline inputs) — do not re-wash it here. */
 
 /* Mobile — same header grammar, no extra chrome */
 @media (max-width: 820px) {
   .mobile-topbar {
     border-bottom: 1px solid var(--color-semantic-hairline);
     background: var(--surface-header-bg);
-  }
-
-  .mobile-topbar::after {
-    content: none;
   }
 
   .mobile-topbar-title {

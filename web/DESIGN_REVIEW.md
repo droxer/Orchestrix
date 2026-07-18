@@ -271,3 +271,66 @@ Reskin from Signal Cyan to **Graphite Steel** — cool charcoal surfaces + restr
 
 **Verify:** login CTA, preferences theme picker, chat shell, backlog, admin dashboard — light/dark, 1440 / 390. `npm run lint:css -w web`, `make web-test`.
 
+
+## Anti-slop pass (2026-07-17)
+
+Targeted removal of remaining templated-AI patterns. Build ✓, full web suite ✓ (241 pass).
+
+**Shipped:**
+
+- **Dashboard card eyebrows removed** — every belt card carried an uppercase eyebrow that near-duplicated its own title ("Node health"/"Node status", "Tokens"/"Token usage", "Employees"/"Most active employees", "Recent"/"Recent activity"). Cards now lead with the title alone; the Threads chart folds the removed "14d" range into its title ("Threads · last 14 days"). KPI tile eyebrows stay — there the label IS the metric name, not decoration. `.adm-dash-card-eyebrow` CSS deleted.
+- **Rank numbering** — Top-employees list drops the zero-padded "01 02 03" editorial mono numbering for plain ranks.
+- **Copy** — visible em-dash removed (`chat_provider_coming_soon` → "(coming soon)" across en/zh-CN/zh-TW); artifact "Copied!" loses the exclamation; channels surface no longer says "coming soon" three ways (route subtitle → "Telegram channels.", stage hint rewritten as a plain requirement sentence; the disabled Discord option keeps the single mention).
+- **Test** — `adminChannels.test.ts` copy assertion updated to the new subtitle.
+
+**Audited and intentionally kept:** login grid/wash (signature), skeleton shimmer + chart hatch gradients (functional), status dots (semantic state only), drawer/page kickers (navigation context), "—" as missing-data placeholder.
+
+**Screenshot verification (mocked-API Playwright pass, light/dark at 1440/390):** dashboard cards render with single titles and plain ranks in both themes; channels stage reads cleanly as the two-up intro + form.
+
+**Follow-ups from the screenshot pass:**
+
+- **Channels stage hint removed** — the `RelayEmptyState` hint slot renders uppercase micro-caps, so the rewritten hint sentence read as shouting, and the adjacent form already states the requirements. `chat_stage_hint` deleted from all locales.
+- **Theme preference clobber fixed (real bug)** — `App.tsx`'s `[theme]` effect ran on first render with the default `"system"` and `writeTheme`-clobbered the stored preference before the `[mounted]` effect read it, resetting every user's saved theme on every load (and defeating dark-mode screenshots). The apply/persist effect now waits for `mounted`; pre-paint theming stays with the `layout.tsx` inline script.
+
+**Verify:** theme choice survives reload (pick Dark, reload, still dark); channels stage on desktop; artifact copy toast.
+
+## SideNav "More" duplication fix (2026-07-18)
+
+User report: the admin "More" overflow appeared on desktop alongside the primary Channels/Admin rail items, so its menu duplicated visible destinations.
+
+**Root cause:** `.sidenav-more-btn { display: none }` (2-class specificity, mid-file) lost to the later `.sidenav-panel[data-expanded="true"] .sidenav-btn { display: flex }` (3-class). The mobile-only trigger therefore rendered at every width.
+
+**Shipped:**
+
+- **Hide rule moved to end of `sidenav.css`** at matching 3-class specificity (`.sidenav-panel .sidenav-btn.sidenav-more-btn`); the mobile bottom-tab media query in `responsive.css` re-shows it at equal specificity (later stylesheet wins) with `display: flex` to match the column tab layout.
+- **More menu portaled to `<body>`** (`SideNav.tsx`) — the mobile bottom bar's `backdrop-filter` made the panel the containing block for the `position: fixed` menu, so the viewport-based coordinates landed inside the scrollable tab strip: the menu rendered clipped below the fold and focusing its first item scrolled the tab row out of view.
+- **Right-edge clamp** in `toggleMoreMenu` — More is the rightmost tab; the 180px-min menu at `rect.left` overflowed the 390px viewport. `x` now clamps to `innerWidth - 188 - 8`.
+
+**Verify:** desktop 1440 (expanded + collapsed), 1000, 860 — Channels/Admin in rail, no More; mobile 390 — More tab opens the menu fully on-screen above the tab bar. Full web suite 241 pass.
+
+## Admin console Channels tab removed (2026-07-18)
+
+The admin console's fourth segment ("Channels") rendered the exact same `ChatIntegrationsView` as the top-level `#/channels` route in the sidebar Manage group — a leftover from before channels config was promoted to its own route. Duplicate entry point removed; the console tightens to Dashboard / Employees / Nodes.
+
+**Shipped:**
+
+- `AdminConsoleView` (store) and `ADMIN_VIEWS` drop `"integrations"`; old `?adminView=integrations` deep links fall back to Dashboard via `parseAdminView`.
+- `AdminViewToggle` drops the fourth segment (and the now-unused `AdminChannel` icon import); `AdminConsole` drops the `ChatIntegrationsView` import/branch.
+- `admin.v2.nav_integrations` removed from en/zh-CN/zh-TW (`title_integrations`/`sub_integrations` stay — `ChannelsPage` uses them).
+- `adminChannels.test.ts` inverted: it now pins that the admin console does NOT embed the integrations view and that `#/channels` is the only home.
+
+**Verify:** admin toggle shows 3 segments; `#/admin?adminView=integrations` lands on Dashboard with hash normalized to `#/admin`; `#/channels` still renders the Telegram setup stage. Full web suite 241 pass.
+
+## Admin Employees/Nodes aligned + card/list views (2026-07-18)
+
+The Employees view was list-only (department-grouped rows) and Nodes was card-only; the two admin surfaces read as different systems. Both now share one chrome language and each supports **card** and **list** layouts via a segmented toggle mirroring the Backlog/Routine `backlog-view-toggle` geometry.
+
+**Shipped:**
+
+- `AdminLayoutToggle` (new) — `card`/`list` switch reusing `backlog-view-toggle`/`backlog-view-btn` (ViewGrid / ViewList icons). Layout state is lifted to `AdminConsole`, URL-persisted as `?adminLayout` (default `card`, omitted when card) and shared across both views so the preference is consistent.
+- Both views gain a `.adm-view-controls` row: filters (Nodes) / search (Employees) on the left, layout toggle on the right.
+- **Employees card view** (`EmployeeCard`, new) reuses the `.adm-node-card` frame — avatar initials, name, `@handle`, a status pill (`emp_state_running|ready|idle|no_nodes`), department eyebrow, email, agent chips, and a running / ready·total metric footer with delete. Flat responsive grid (`.adm-fleet-grid`), no department sections — matching Nodes. List view keeps the grouped rows.
+- **Nodes list view** (`NodeRow`, new) — column header (`.adm-node-cols`) + `.adm-node-list` rows sharing the employee-list table language: avatar + identity, agent chips, status pill, last-seen, action icons. Card view unchanged.
+- New i18n keys in en/zh-CN/zh-TW: `admin.v2.{layout_label,view_card,view_list,col_status,col_last_seen,col_actions,emp_state_*}`.
+
+**Verify:** dark 1280×900 — Employees card (5 cards, dept eyebrow + IDLE pills), Employees list (grouped), Nodes list (5-col table), Nodes card (unchanged) all render; toggle top-right of each view switches layout and the URL carries `adminLayout=list`. tsc clean, stylelint clean, translation JSON valid.

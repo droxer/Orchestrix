@@ -83,20 +83,26 @@
 }
 
 .handoff-row select,
-.handoff-panel input {
+.handoff-row input,
+.handoff-panel > input {
   min-width: 0;
-  height: 48px;
+  height: var(--size-control-md);
   border: 1px solid var(--color-semantic-hairline);
   border-radius: var(--radius-md);
   outline: 0;
   background: var(--color-semantic-canvas);
   padding: 0 var(--space-base);
   color: var(--color-semantic-ink);
-  font-size: var(--text-md);
+  font-size: var(--text-base);
 }
 
-.handoff-row select:focus,
-.handoff-panel input:focus {
+.handoff-row--note input {
+  grid-column: 2 / span 2;
+}
+
+.handoff-row select:focus-visible,
+.handoff-row input:focus-visible,
+.handoff-panel > input:focus-visible {
   border-color: var(--color-semantic-action);
   box-shadow: var(--ring-focus);
 }

@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { cn } from "@/lib/utils";
 import { useEmployeeAgents } from "../hooks/useEmployeeAgents";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
@@ -45,13 +46,13 @@ function activePlacements(agent: EmployeeAgent) {
   return agent.placements.filter((placement) => placement.desiredState !== "removed");
 }
 
-function formatRelativeTime(value: string, locale: string): string {
+function formatRelativeTime(value: string, locale: string, t: TFunction): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  const deltaMs = Date.now() - date.getTime();
   const relativeTime = new Intl.RelativeTimeFormat(locale || undefined, { numeric: "auto", style: "short" });
+  const deltaMs = Date.now() - date.getTime();
   const minutes = Math.round(deltaMs / 60_000);
-  if (minutes < 1) return relativeTime.format(0, "second");
+  if (minutes < 1) return t("agents_page.just_now");
   if (minutes < 60) return relativeTime.format(-minutes, "minute");
   const hours = Math.round(minutes / 60);
   if (hours < 48) return relativeTime.format(-hours, "hour");
@@ -174,7 +175,7 @@ function RosterRow({
               </span>
             </span>
             <span className="agents-roster-row-updated">
-              {t("agents_page.meta_updated")} {formatRelativeTime(agent.updatedAt, locale)}
+              {t("agents_page.meta_updated")} {formatRelativeTime(agent.updatedAt, locale, t)}
             </span>
           </span>
         </button>

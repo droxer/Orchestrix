@@ -3,7 +3,7 @@
 import { useTranslation } from "react-i18next";
 import type { AdminConsoleView } from "../../lib/store";
 import { Button } from "../ui/button";
-import { AdminChannel, AdminDashboard, AdminEmployees, AdminNode } from "../icons";
+import { AdminDashboard, AdminEmployees, AdminNode } from "../icons";
 
 export type AdminView = AdminConsoleView;
 
@@ -20,7 +20,6 @@ export function AdminViewToggle({ view, onChange }: AdminViewToggleProps) {
     { id: "dashboard", label: t("admin.v2.nav_dashboard"), icon: AdminDashboard },
     { id: "employees", label: t("admin.v2.nav_employees"), icon: AdminEmployees },
     { id: "fleet", label: t("admin.v2.nav_fleet"), icon: AdminNode },
-    { id: "integrations", label: t("admin.v2.nav_integrations"), icon: AdminChannel },
   ];
 
   return (
