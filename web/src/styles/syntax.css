@@ -4,7 +4,7 @@
    `code.hljs` block is rendered (workspace file preview, Markdown fences). */
 
 .hljs {
-  color: var(--color-semantic-ink);
+  color: var(--ink-1);
   background: transparent;
 }
 
@@ -15,7 +15,7 @@
 .hljs-literal,
 .hljs-selector-tag,
 .hljs-name {
-  color: var(--color-semantic-ink);
+  color: var(--ink-1);
   font-weight: 600;
 }
 
@@ -25,7 +25,7 @@
 .hljs-char.escape_,
 .hljs-template-tag,
 .hljs-quote {
-  color: var(--color-semantic-body);
+  color: var(--ink-2);
   font-style: italic;
 }
 
@@ -34,14 +34,14 @@
 .hljs-symbol,
 .hljs-bullet,
 .hljs-link {
-  color: var(--color-semantic-code-number);
+  color: var(--ink-2);
 }
 
 /* Comments and metadata: muted italic, recedes from the code. */
 .hljs-comment,
 .hljs-meta,
 .hljs-meta .hljs-keyword {
-  color: var(--color-semantic-muted);
+  color: var(--ink-3);
   font-style: italic;
 }
 
@@ -56,7 +56,7 @@
 .hljs-variable,
 .hljs-params,
 .hljs-tag {
-  color: var(--color-semantic-body);
+  color: var(--ink-2);
 }
 
 .hljs-emphasis {
@@ -68,9 +68,9 @@
 }
 
 .hljs-addition {
-  color: color-mix(in srgb, var(--color-semantic-success) 75%, var(--color-semantic-ink));
+  color: color-mix(in srgb, var(--ok) 75%, var(--ink-1));
 }
 
 .hljs-deletion {
-  color: color-mix(in srgb, var(--color-semantic-danger) 75%, var(--color-semantic-ink));
+  color: color-mix(in srgb, var(--err) 75%, var(--ink-1));
 }

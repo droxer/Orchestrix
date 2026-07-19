@@ -1,32 +1,11 @@
 import { ActionEdit, ActionRemove } from "./icons";
 import { useTranslation } from "react-i18next";
 import { useDialogs } from "./ui/DialogProvider";
-import { AgentMark } from "./AgentMark";
-import type { AgentName, RelaySession } from "../types";
-import { conversationLabel, sessionAgents, type ConversationItem } from "../lib/conversations";
-import { labelForExecutor } from "../lib/agentDisplayNames";
-import {
-  conversationActivity,
-  type ConversationActivityKind,
-} from "../lib/conversationActivity";
+import type { RelaySession } from "../types";
+import { conversationLabel, type ConversationItem } from "../lib/conversations";
 import { Button } from "./ui/button";
 
 export type { ConversationItem };
-
-// How each activity kind renders: the leading indicator (a slate pulse for a
-// live run, else a status pip) and whether the line reads muted. The tone→pip
-// class table lives once here; the kind decision is the pure
-// `conversationActivity` (see conversationActivity.ts).
-const ACTIVITY_STYLE: Record<
-  ConversationActivityKind,
-  { className: string; dotClass: string; pulse?: boolean }
-> = {
-  working: { className: "working", dotClass: "", pulse: true },
-  warn: { className: "", dotClass: "status-dot status-dot-warn" },
-  bad: { className: "", dotClass: "status-dot status-dot-bad" },
-  good: { className: "muted", dotClass: "status-dot status-dot-good" },
-  neutral: { className: "muted", dotClass: "status-dot status-dot-neutral" },
-};
 
 function relativeTime(iso: string | undefined, locale: string): string {
   if (!iso) return "";
@@ -52,27 +31,18 @@ function relativeTime(iso: string | undefined, locale: string): string {
 type ConversationRowProps = {
   item: ConversationItem;
   selected: boolean;
-  agentDisplayNames?: Partial<Record<AgentName, string>>;
   onSelect: (sessionId: string) => void;
   onRename?: (session: RelaySession) => void;
   onClose?: (sessionId: string) => void;
 };
 
-export function ConversationRow({ item, selected, agentDisplayNames, onSelect, onRename, onClose }: ConversationRowProps) {
+export function ConversationRow({ item, selected, onSelect, onRename, onClose }: ConversationRowProps) {
   const { t, i18n } = useTranslation();
   const { confirm } = useDialogs();
-  const { session, runningAgent } = item;
+  const { session } = item;
   const label = conversationLabel(session);
   const stamp = relativeTime(session.updatedAt, i18n.language);
-  const agents = sessionAgents(session);
-  const activity = conversationActivity(session.status, runningAgent);
-  const activityStyle = activity ? ACTIVITY_STYLE[activity.kind] : null;
-  const activityText = activity
-    ? activity.kind === "working"
-      ? t(activity.labelKey, { agent: labelForExecutor(runningAgent!, agentDisplayNames) })
-      : t(activity.labelKey)
-    : undefined;
-  const rowLabel = [label, stamp, activityText].filter(Boolean).join(" · ");
+  const rowLabel = [label, stamp].filter(Boolean).join(" · ");
 
   async function handleClose() {
     if (!onClose) return;
@@ -96,13 +66,6 @@ export function ConversationRow({ item, selected, agentDisplayNames, onSelect, o
         <span className="conversation-copy">
           <span className="conversation-topline">
             <span className="conversation-name">
-              {agents.length > 0 ? (
-                <span className="conversation-agents" role="img" aria-label={agents.join(", ")}>
-                  {agents.map((agent) => (
-                    <AgentMark key={agent} agent={agent} size={14} />
-                  ))}
-                </span>
-              ) : null}
               <strong>{label}</strong>
             </span>
             {stamp ? (
@@ -111,20 +74,6 @@ export function ConversationRow({ item, selected, agentDisplayNames, onSelect, o
               </span>
             ) : null}
           </span>
-          {activity && activityStyle ? (
-            <span className={`conversation-activity ${activityStyle.className}`.trimEnd()}>
-              {activityStyle.pulse ? (
-                <span className="conversation-activity-pulse" aria-hidden="true" />
-              ) : (
-                <span className={activityStyle.dotClass} aria-hidden="true" />
-              )}
-              {activity.kind === "working" ? (
-                <em>{activityText}</em>
-              ) : (
-                <span>{activityText}</span>
-              )}
-            </span>
-          ) : null}
         </span>
       </Button>
       <span className="conversation-row-actions">

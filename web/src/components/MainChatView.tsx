@@ -134,7 +134,6 @@ export function MainChatView({
         query={employeeQuery}
         setQuery={setEmployeeQuery}
         selectedSessionId={activeSession?.id}
-        agentDisplayNames={agentDisplayNames}
         onSelectConversation={onSelectConversation}
         onNewConversation={onNewConversation}
         onRenameConversation={onRenameConversation}

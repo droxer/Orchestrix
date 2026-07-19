@@ -3,7 +3,7 @@
 
    Backdrop scrim, panel entrance curves, close affordance, and toast
    motion shared by confirm dialogs, preferences, and admin drawers.
-   Pick surface grammar by role — see tokens/semantic.css overlay ladder.
+   Pick surface grammar by role — see the overlay grammar note in tokens/palette.css.
    ===================================================================== */
 
 @keyframes overlay-backdrop-in {
@@ -35,17 +35,18 @@
   position: fixed;
   inset: 0;
   display: flex;
-  background: var(--color-semantic-overlay);
+  background: var(--scrim);
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(2px);
   overscroll-behavior: contain;
-  animation: overlay-backdrop-in var(--duration-fast) var(--ease-standard) both;
+  animation: overlay-backdrop-in var(--t-fast) var(--ease) both;
 }
 
-/* Stacked drawers — deepen the scrim per layer so nested panels read clearly. */
-.adm-drawer-backdrop--layer-1 { background: var(--color-semantic-overlay-layer-1); }
-.adm-drawer-backdrop--layer-2 { background: var(--color-semantic-overlay-layer-2); }
-.adm-drawer-backdrop--layer-3 { background: var(--color-semantic-overlay-layer-3); }
+/* Stacked drawers — every layer uses the one scrim; nested backdrops
+   composite on top of each other, so depth darkens on its own. */
+.adm-drawer-backdrop--layer-1,
+.adm-drawer-backdrop--layer-2,
+.adm-drawer-backdrop--layer-3 { background: var(--scrim); }
 
 .overlay-close {
   display: inline-flex;
@@ -56,16 +57,16 @@
   height: 36px;
   margin-top: 4px;
   border: none;
-  border-radius: var(--radius-full);
+  border-radius: var(--r-full);
   background: transparent;
-  color: var(--color-semantic-muted);
+  color: var(--ink-3);
   cursor: pointer;
   transition:
-    background var(--duration-fast) var(--ease-standard),
-    color var(--duration-fast) var(--ease-standard);
+    background var(--t-fast) var(--ease),
+    color var(--t-fast) var(--ease);
 }
 
 .overlay-close:hover {
-  background: var(--color-semantic-surface-strong);
-  color: var(--color-semantic-ink);
+  background: var(--surface-2);
+  color: var(--ink-1);
 }

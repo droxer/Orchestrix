@@ -102,7 +102,7 @@ export function ActivityChart({ daily, ready, className }: ActivityChartProps) {
             x2={WIDTH - PADDING.right}
             y1={y}
             y2={y}
-            stroke="var(--color-hairline-soft)"
+            stroke="var(--line-2)"
             strokeWidth={1}
             strokeDasharray={i === gridLines.length - 1 ? "0" : "2 3"}
           />
@@ -125,7 +125,7 @@ export function ActivityChart({ daily, ready, className }: ActivityChartProps) {
             fontSize={10}
             textAnchor="end"
             fill="var(--color-muted)"
-            fontFamily="var(--font-number)"
+            fontFamily="var(--font-sans)"
           >
             {tick.value}
           </text>
@@ -138,7 +138,7 @@ export function ActivityChart({ daily, ready, className }: ActivityChartProps) {
             fontSize={10}
             textAnchor="middle"
             fill="var(--color-muted)"
-            fontFamily="var(--font-number)"
+            fontFamily="var(--font-sans)"
           >
             {tick.label}
           </text>

@@ -1,10 +1,10 @@
 /* ============================ composer ============================ */
-/* Operational assign surface: borderless elevated card (--shadow-lift),
+/* Operational assign surface: borderless elevated card (--shadow-2),
    tight control radii matching conversation-new / ink plates, transcript
-   dissolve scrim. Not a ChatGPT-style pill dock. Colors via semantic.css. */
+   dissolve scrim. Not a ChatGPT-style pill dock. Colors via tokens. */
 
 .composer {
-  --composer-inline: var(--space-lg);
+  --composer-inline: var(--sp-6);
   position: relative;
   display: grid;
   /* Side padding matters now that the card floats on shadow alone (no
@@ -12,7 +12,7 @@
      chat panel is narrower than the 960px cap on .composer-input-wrap —
      the common case — and the shadow gets clipped instead of reading as
      floating. */
-  padding: var(--space-sm) var(--space-lg) max(var(--space-base), env(safe-area-inset-bottom, 0px));
+  padding: var(--sp-3) var(--sp-6) max(var(--sp-4), env(safe-area-inset-bottom, 0px));
   border-top: 0;
   background: transparent;
 }
@@ -25,8 +25,8 @@
   left: 0;
   right: 0;
   bottom: 100%;
-  height: var(--space-xl);
-  background: linear-gradient(to bottom, transparent, var(--color-semantic-canvas));
+  height: var(--sp-7);
+  background: linear-gradient(to bottom, transparent, var(--surface-0));
   pointer-events: none;
 }
 
@@ -38,11 +38,11 @@
   width: 200px;
   display: grid;
   gap: 2px;
-  padding: var(--space-xxs);
+  padding: var(--sp-1);
   border: 0;
-  border-radius: var(--radius-xl);
-  background: var(--color-semantic-surface-raised);
-  box-shadow: var(--shadow-lift);
+  border-radius: var(--r-3);
+  background: var(--surface-3);
+  box-shadow: var(--shadow-2);
 }
 
 .agent-picker button,
@@ -50,12 +50,12 @@
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr);
   align-items: center;
-  gap: var(--space-xs);
-  min-height: var(--size-control-md);
-  padding: var(--space-xs);
-  border-radius: var(--radius-sm);
+  gap: var(--sp-2);
+  min-height: var(--control-h);
+  padding: var(--sp-2);
+  border-radius: var(--r-2);
   text-align: left;
-  color: var(--color-semantic-ink);
+  color: var(--ink-1);
   font: var(--type-label-strong);
 }
 
@@ -63,57 +63,57 @@
 .agent-picker button.active,
 .agent-picker [role="option"]:hover,
 .agent-picker [role="option"].active {
-  background: var(--color-semantic-surface-strong);
+  background: var(--surface-2);
 }
 
 .mode-chip {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-xs);
+  gap: var(--sp-2);
   height: 28px;
   padding: 0 10px;
   border: 0;
-  border-radius: var(--radius-sm);
-  background: var(--color-semantic-surface-strong);
-  color: var(--color-semantic-ink);
-  font: var(--type-caption-strong);
-  letter-spacing: var(--letter-open);
+  border-radius: var(--r-2);
+  background: var(--surface-2);
+  color: var(--ink-1);
+  font: var(--type-label-strong);
+  letter-spacing: var(--track-0);
   cursor: pointer;
   white-space: nowrap;
   transition:
-    background var(--duration-base) var(--ease-standard),
-    box-shadow var(--duration-base) var(--ease-standard);
+    background var(--t-fast) var(--ease),
+    box-shadow var(--t-fast) var(--ease);
 }
 
 .mode-chip[data-mode="action"] {
-  --mode-icon: var(--color-semantic-action);
-  background: var(--color-semantic-action-soft);
+  --mode-icon: var(--action);
+  background: var(--action-soft);
 }
 
 /* Ask is the read-only counterpart to Agent: no green work-fill, a quiet
    slate outline instead. The filled-green vs outlined-slate asymmetry is the
    signal — "does work" vs "just asks". */
 .mode-chip[data-mode="ask"] {
-  --mode-icon: var(--color-semantic-info);
-  background: var(--color-semantic-surface-raised);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-semantic-info) 24%, transparent);
+  --mode-icon: var(--info);
+  background: var(--surface-3);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--info) 24%, transparent);
 }
 
 .mode-chip:hover {
-  background: color-mix(in srgb, var(--mode-icon) 12%, var(--color-semantic-surface-strong));
+  background: color-mix(in srgb, var(--mode-icon) 12%, var(--surface-2));
 }
 
 .mode-chip:active { transform: scale(0.97); }
 
 .mode-chip:focus-visible {
-  box-shadow: var(--ring-focus);
+  box-shadow: var(--focus-ring);
 }
 
 .mode-chip-icon {
   display: inline-flex;
   align-items: center;
   flex: 0 0 auto;
-  animation: mode-chip-icon-in var(--duration-fast) var(--ease-standard);
+  animation: mode-chip-icon-in var(--t-fast) var(--ease);
 }
 
 .mode-chip-icon svg {
@@ -129,7 +129,7 @@
 .mode-chip-label {
   flex: 0 1 auto;
   text-align: left;
-  color: var(--color-semantic-ink);
+  color: var(--ink-1);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -141,19 +141,19 @@
   width: min(100%, 960px);
   margin: 0 auto;
   border: 0;
-  border-radius: var(--radius-lg);
-  background: var(--color-semantic-surface-raised);
-  box-shadow: var(--shadow-lift);
-  transition: box-shadow var(--duration-base) var(--ease-standard);
+  border-radius: var(--r-3);
+  background: var(--surface-3);
+  box-shadow: var(--shadow-2);
+  transition: box-shadow var(--t-fast) var(--ease);
 }
 
 .composer-input-wrap:has(.composer-input:focus-within) {
-  box-shadow: var(--ring-focus), var(--shadow-lift);
+  box-shadow: var(--focus-ring), var(--shadow-2);
 }
 
 /* Running state — quiet action hairline; send→stop carries the state change. */
 .composer-input-wrap[data-running] {
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-semantic-action) 36%, transparent), var(--shadow-lift);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--action) 36%, transparent), var(--shadow-2);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -180,23 +180,23 @@
 
 .mention-popover [role="option"] {
   grid-template-columns: 28px minmax(0, 1fr) auto;
-  gap: var(--space-sm);
+  gap: var(--sp-3);
   cursor: pointer;
 }
 
 .mention-popover .agent-avatar {
   width: 28px;
   height: 28px;
-  font-size: var(--text-xs);
+  font-size: var(--fs-2);
 }
 
 .mention-role {
-  color: var(--color-semantic-muted);
+  color: var(--ink-3);
   font: var(--type-label);
 }
 
 .mention-popover [role="option"].active .mention-role {
-  color: var(--color-semantic-ink);
+  color: var(--ink-1);
 }
 
 .composer-input textarea {
@@ -209,8 +209,8 @@
   outline: 0;
   background: transparent;
   padding: 16px var(--composer-inline) 6px;
-  color: var(--color-semantic-ink);
-  font: var(--type-body-input);
+  color: var(--ink-1);
+  font: var(--type-body);
 }
 
 /* iOS zooms any focused field under 16px; coarse pointers get the bump. */
@@ -223,22 +223,22 @@
 }
 
 .composer-input textarea::placeholder {
-  color: var(--color-semantic-muted);
+  color: var(--ink-3);
 }
 
 .composer-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-sm);
-  padding: 4px var(--space-sm) 10px var(--composer-inline);
+  gap: var(--sp-3);
+  padding: 4px var(--sp-3) 10px var(--composer-inline);
 }
 
 .composer-footer-left,
 .composer-footer-right {
   display: flex;
   align-items: center;
-  gap: var(--space-xs);
+  gap: var(--sp-2);
   min-height: 36px;
   flex: 0 0 auto;
 }
@@ -255,65 +255,65 @@
   width: 36px;
   height: 36px;
   border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  background: var(--color-semantic-action);
-  color: var(--color-semantic-on-action);
+  border-radius: var(--r-2);
+  background: var(--action);
+  color: var(--on-action);
   cursor: pointer;
   transition:
-    background var(--duration-fast) var(--ease-standard),
-    border-color var(--duration-fast) var(--ease-standard),
-    transform 80ms var(--ease-standard),
-    box-shadow var(--duration-fast) var(--ease-standard);
+    background var(--t-fast) var(--ease),
+    border-color var(--t-fast) var(--ease),
+    transform 80ms var(--ease),
+    box-shadow var(--t-fast) var(--ease);
 }
 
 .send-button:hover:not(:disabled) {
-  background: var(--color-semantic-action-active);
+  background: var(--action-hover);
 }
 
 .send-button:active:not(:disabled) {
-  background: var(--color-semantic-action-active);
+  background: var(--action-hover);
   transform: translateY(0.5px);
 }
 
 .send-button:focus-visible {
   outline: none;
-  box-shadow: var(--ring-focus);
+  box-shadow: var(--focus-ring);
 }
 
 .send-button:disabled {
-  background: var(--color-semantic-surface-strong);
-  border-color: var(--color-semantic-hairline);
-  color: color-mix(in srgb, var(--color-semantic-ink) 48%, transparent);
+  background: var(--surface-2);
+  border-color: var(--line-1);
+  color: color-mix(in srgb, var(--ink-1) 48%, transparent);
   cursor: not-allowed;
   opacity: 1;
   transform: none;
 }
 
 .send-button.send-button-cancel {
-  background: var(--color-semantic-canvas);
-  border-color: var(--border-danger);
-  color: var(--color-semantic-danger-text);
+  background: var(--surface-0);
+  border-color: color-mix(in srgb, var(--err) 32%, transparent);
+  color: var(--err);
 }
 
 .send-button.send-button-cancel:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--color-semantic-danger) 6%, var(--color-semantic-canvas));
-  border-color: var(--color-semantic-danger);
+  background: color-mix(in srgb, var(--err) 6%, var(--surface-0));
+  border-color: var(--err);
 }
 
 .send-button.send-button-cancel:focus-visible {
-  box-shadow: var(--ring-focus-danger);
+  box-shadow: var(--focus-ring-danger);
 }
 
 /* Send↔stop glyph swap — same fade the mode chip's icon gets, so the
    composer's most important state change doesn't snap. */
 .send-button-icon {
   display: inline-flex;
-  animation: mode-chip-icon-in var(--duration-fast) var(--ease-standard);
+  animation: mode-chip-icon-in var(--t-fast) var(--ease);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .send-button {
-    transition: background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+    transition: background var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
   }
 
   .send-button:active:not(:disabled) {

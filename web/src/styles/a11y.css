@@ -13,12 +13,12 @@
 /* Focus replacement for containers that delegate focus to descendants */
 .adm-search:focus-within {
   outline: none;
-  box-shadow: var(--ring-focus);
+  box-shadow: var(--focus-ring);
 }
 
 .pref-modal:focus-visible {
   outline: none;
-  box-shadow: var(--ring-focus);
+  box-shadow: var(--focus-ring);
 }
 
 /* Large operational collections stay cheap without changing DOM semantics or
@@ -71,6 +71,7 @@
    pointer:coarse so desktop mouse density is unaffected. Loads from a11y.css
    (last in source order) so it wins the equal-specificity tie. */
 @media (pointer: coarse) {
+  [data-slot="button"],
   .decision-bar button,
   .handoff-actions button,
   .dialog-actions [data-slot="button"],
@@ -154,7 +155,7 @@
   .msg-turn-action {
     min-width: 44px;
     height: 44px;
-    padding-inline: var(--space-sm);
+    padding-inline: var(--sp-3);
   }
 
   .adm-view-toggle-btn {
@@ -163,7 +164,7 @@
 
   .adm-fleet-chip {
     min-width: 44px;
-    padding-inline: var(--space-sm);
+    padding-inline: var(--sp-3);
   }
 
   .adm-emp-delete,
@@ -176,16 +177,16 @@
 /* OS “increase contrast” — boost hairlines and body copy. */
 @media (prefers-contrast: more) {
   html[data-theme="light"] {
-    --color-semantic-body: var(--color-semantic-ink);
-    --color-semantic-hairline: color-mix(in srgb, var(--color-semantic-ink) 42%, var(--color-semantic-canvas));
-    --color-semantic-hairline-soft: color-mix(in srgb, var(--color-semantic-ink) 28%, var(--color-semantic-canvas));
-    --ring-focus: 0 0 0 3px var(--color-semantic-ink);
+    --ink-2: var(--ink-1);
+    --line-1: color-mix(in srgb, var(--ink-1) 42%, var(--surface-0));
+    --line-2: color-mix(in srgb, var(--ink-1) 28%, var(--surface-0));
+    --focus-ring: 0 0 0 3px var(--ink-1);
   }
 
   html[data-theme="dark"] {
-    --color-semantic-body: color-mix(in srgb, var(--color-semantic-on-dark) 92%, var(--color-semantic-surface-dark));
-    --color-semantic-hairline: color-mix(in srgb, var(--color-semantic-on-dark) 38%, var(--color-semantic-surface-dark));
-    --color-semantic-hairline-soft: color-mix(in srgb, var(--color-semantic-on-dark) 26%, var(--color-semantic-surface-dark));
-    --ring-focus: 0 0 0 3px var(--color-semantic-on-dark);
+    --ink-2: color-mix(in srgb, var(--dark-ink) 92%, var(--dark-surface));
+    --line-1: color-mix(in srgb, var(--dark-ink) 38%, var(--dark-surface));
+    --line-2: color-mix(in srgb, var(--dark-ink) 26%, var(--dark-surface));
+    --focus-ring: 0 0 0 3px var(--dark-ink);
   }
 }

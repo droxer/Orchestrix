@@ -49,7 +49,7 @@
   display: grid;
   place-items: center;
   min-height: 12rem;
-  padding: var(--space-xl);
-  color: var(--color-semantic-muted);
+  padding: var(--sp-7);
+  color: var(--ink-3);
   font: var(--type-body-sm);
 }

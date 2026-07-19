@@ -1,12 +1,6 @@
-/* =====================================================================
-   Tier 3 — shadcn/ui bridge.
-
-   Exposes semantic.css's roles to Tailwind utilities (bg-primary,
-   text-muted-foreground, rounded-xl, ...) and to shadcn/ui's own
-   component variables (--background, --primary, ...). Nothing here
-   originates a value — every declaration is a var() pointing at
-   semantic.css or primitives.css.
-   ===================================================================== */
+/* shadcn/ui + Tailwind bridge. Nothing here originates a value — every
+   declaration points at palette.css / roles.css. Utility names stay
+   stable so component markup never tracks token renames. */
 
 @theme inline {
   --color-background: var(--background);
@@ -28,103 +22,89 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  /* Relay palette — brand, surfaces, tones, and hairlines exposed as
-     utilities so the full design language (not just shadcn's semantic
-     aliases) is addressable: bg-surface-soft, text-ink, text-body,
-     border-hairline, text-success. `inline` means these resolve to the
-     :root var at the use site rather than emitting a competing custom
-     property. */
-  --color-ink: var(--color-semantic-ink);
-  --color-body: var(--color-semantic-body);
-  --color-muted-soft: var(--color-semantic-muted-soft);
-  --color-on-primary: var(--color-semantic-on-action);
-  --color-primary-active: var(--color-semantic-action-active);
-  --color-primary-disabled: var(--color-semantic-action-disabled);
-  --color-surface-soft: var(--color-semantic-surface-soft);
-  --color-surface-strong: var(--color-semantic-surface-strong);
-  --color-surface-raised: var(--color-semantic-surface-raised);
-  --color-surface-dark: var(--color-semantic-surface-dark);
-  --color-hairline: var(--color-semantic-hairline);
-  --color-hairline-soft: var(--color-semantic-hairline-soft);
-  --color-success: var(--color-semantic-success);
-  --color-danger: var(--color-semantic-danger);
-  --color-warning: var(--color-semantic-warning);
-  --color-info: var(--color-semantic-info);
-  /* Tone colors as TEXT need the deepened “-text” variants — the raw dot
-     colors fall below 4.5:1 on the light canvas. text-success-strong /
-     text-danger-strong / text-warning-strong are the AA-safe utilities. */
-  --color-success-strong: var(--color-semantic-success-text);
-  --color-danger-strong: var(--color-semantic-danger-text);
-  --color-warning-strong: var(--color-semantic-warning-text);
-  --color-brand-soft: var(--color-semantic-action-soft);
+  /* Relay palette as utilities: bg-surface-soft, text-ink, border-hairline… */
+  --color-ink: var(--ink-1);
+  --color-body: var(--ink-2);
+  --color-muted-soft: var(--ink-4);
+  --color-on-primary: var(--on-action);
+  --color-primary-active: var(--action-hover);
+  --color-surface-soft: var(--surface-1);
+  --color-surface-strong: var(--surface-2);
+  --color-surface-raised: var(--surface-3);
+  --color-surface-dark: var(--dark-surface);
+  --color-hairline: var(--line-1);
+  --color-hairline-soft: var(--line-2);
+  --color-success: var(--ok);
+  --color-danger: var(--err);
+  --color-warning: var(--warn);
+  --color-info: var(--info);
+  --color-success-strong: var(--ok);
+  --color-danger-strong: var(--err);
+  --color-warning-strong: var(--warn);
+  --color-brand-soft: var(--action-soft);
 
-  /* Radii — one scale for component CSS and Tailwind utilities
-     (rounded-sm … rounded-4xl). */
-  --radius-xs: var(--radius-xs);
-  --radius-sm: var(--radius-sm);
-  --radius-md: var(--radius-md);
-  --radius-lg: var(--radius-lg);
-  --radius-xl: var(--radius-xl);
-  --radius-2xl: var(--radius-2xl);
-  --radius-3xl: var(--radius-3xl);
-  --radius-4xl: var(--radius-4xl);
-  --radius-full: var(--radius-full);
+  /* Radii → rounded-* utilities. */
+  --radius-xs: var(--r-1);
+  --radius-sm: var(--r-1);
+  --radius-md: var(--r-2);
+  --radius-lg: var(--r-3);
+  --radius-xl: var(--r-3);
+  --radius-2xl: var(--r-3);
+  --radius-3xl: var(--r-3);
+  --radius-4xl: var(--r-3);
+  --radius-full: var(--r-full);
 
-  /* Spacing — the 4px-base named scale → p-md, gap-sm, etc. Coexists with
-     Tailwind's numeric spacing (p-4) since the keys are named, not numeric. */
-  --spacing-xxs: var(--space-xxs);
-  --spacing-xs: var(--space-xs);
-  --spacing-sm: var(--space-sm);
-  --spacing-base: var(--space-base);
-  --spacing-md: var(--space-md);
-  --spacing-lg: var(--space-lg);
-  --spacing-xl: var(--space-xl);
-  --spacing-xxl: var(--space-xxl);
+  /* Spacing → p-md, gap-sm, … (named keys coexist with numeric p-4). */
+  --spacing-xxs: var(--sp-1);
+  --spacing-xs: var(--sp-2);
+  --spacing-sm: var(--sp-3);
+  --spacing-base: var(--sp-4);
+  --spacing-md: var(--sp-5);
+  --spacing-lg: var(--sp-6);
+  --spacing-xl: var(--sp-7);
+  --spacing-xxl: var(--sp-8);
 
-  /* Type scale — the operational chat surface sizes (px). Registering these
-     makes the documented scale the source of truth for text-* utilities, so
-     text-md / text-2xs / text-micro exist and text-base means 13px. */
-  --text-micro: var(--text-micro);
-  --text-2xs: var(--text-2xs);
-  --text-xs: var(--text-xs);
-  --text-sm: var(--text-sm);
-  --text-base: var(--text-base);
-  --text-md: var(--text-md);
-  --text-lg: var(--text-lg);
-  --text-xl: var(--text-xl);
-  --text-2xl: var(--text-2xl);
-  --text-3xl: var(--text-3xl);
-  --text-4xl: var(--text-4xl);
+  /* Type sizes → text-* utilities. */
+  --text-micro: var(--fs-1);
+  --text-2xs: var(--fs-2);
+  --text-xs: var(--fs-2);
+  --text-sm: var(--fs-3);
+  --text-base: var(--fs-3);
+  --text-md: var(--fs-4);
+  --text-lg: var(--fs-5);
+  --text-xl: var(--fs-5);
+  --text-2xl: var(--fs-5);
+  --text-3xl: var(--fs-5);
+  --text-4xl: var(--fs-6);
 
-  /* Leading scale → leading-tight / leading-loose for migrated prose. */
+  /* Leading → leading-tight / leading-loose. */
   --leading-tight: var(--leading-tight);
-  --leading-snug: var(--leading-snug);
   --leading-normal: var(--leading-normal);
   --leading-loose: var(--leading-loose);
 
-  /* Typography families exposed to Tailwind utilities */
+  /* Families */
   --font-sans: var(--font-sans);
-  --font-display: var(--font-display);
+  --font-display: var(--font-sans);
   --font-mono: var(--font-mono);
 }
 
 :root {
-  --background: var(--color-semantic-canvas);
-  --foreground: var(--color-semantic-ink);
-  --card: var(--color-semantic-canvas);
-  --card-foreground: var(--color-semantic-ink);
-  --popover: var(--color-semantic-canvas);
-  --popover-foreground: var(--color-semantic-ink);
-  --primary: var(--color-semantic-action);
-  --primary-foreground: var(--color-semantic-on-action);
-  --secondary: var(--color-semantic-surface-strong);
-  --secondary-foreground: var(--color-semantic-ink);
-  --muted: var(--color-semantic-surface-strong);
-  --muted-foreground: var(--color-semantic-muted);
-  --accent: var(--color-semantic-surface-soft);
-  --accent-foreground: var(--color-semantic-ink);
-  --destructive: var(--color-semantic-danger);
-  --border: var(--color-semantic-hairline);
-  --input: var(--color-semantic-hairline);
-  --ring: var(--color-semantic-action);
+  --background: var(--surface-0);
+  --foreground: var(--ink-1);
+  --card: var(--surface-0);
+  --card-foreground: var(--ink-1);
+  --popover: var(--surface-0);
+  --popover-foreground: var(--ink-1);
+  --primary: var(--action);
+  --primary-foreground: var(--on-action);
+  --secondary: var(--surface-2);
+  --secondary-foreground: var(--ink-1);
+  --muted: var(--surface-2);
+  --muted-foreground: var(--ink-3);
+  --accent: var(--surface-1); /* shadcn "accent" = subtle hover surface */
+  --accent-foreground: var(--ink-1);
+  --destructive: var(--err);
+  --border: var(--line-1);
+  --input: var(--line-1);
+  --ring: var(--action);
 }

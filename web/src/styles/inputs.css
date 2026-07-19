@@ -6,15 +6,15 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: var(--space-xs);
-  min-height: var(--size-control-md);
-  padding: 0 var(--space-xs) 0 var(--space-base);
-  border: 1px solid var(--color-semantic-hairline-soft);
-  border-radius: var(--radius-sm);
-  background: var(--color-semantic-surface-strong);
-  color: var(--color-semantic-ink);
+  gap: var(--sp-2);
+  min-height: var(--control-h);
+  padding: 0 var(--sp-2) 0 var(--sp-4);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-2);
+  background: var(--surface-2);
+  color: var(--ink-1);
   max-width: 480px;
-  transition: border-color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
+  transition: border-color var(--t-fast) var(--ease), background var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease);
 }
 
 .conversation-search {
@@ -23,7 +23,7 @@
 
 .relay-search svg,
 .adm-search svg {
-  color: var(--color-semantic-muted);
+  color: var(--ink-3);
   flex-shrink: 0;
 }
 
@@ -34,21 +34,21 @@
   border: 0;
   outline: 0;
   background: transparent;
-  color: var(--color-semantic-ink);
+  color: var(--ink-1);
   font-family: var(--font-sans);
-  font-size: var(--text-base);
+  font-size: var(--fs-3);
 }
 
 .relay-search input::placeholder,
 .adm-search-input::placeholder {
-  color: var(--color-semantic-muted);
+  color: var(--ink-3);
 }
 
 .relay-search:focus-within,
 .adm-search:focus-within {
-  border-color: var(--color-semantic-action);
-  background: var(--color-semantic-canvas);
-  box-shadow: var(--ring-focus);
+  border-color: var(--action);
+  background: var(--surface-0);
+  box-shadow: var(--focus-ring);
 }
 
 .search-connect-btn {
@@ -56,23 +56,23 @@
   place-items: center;
   width: 26px;
   height: 26px;
-  border-radius: var(--radius-full);
-  background: var(--color-semantic-action);
-  color: var(--color-semantic-on-action);
+  border-radius: var(--r-full);
+  background: var(--action);
+  color: var(--on-action);
   flex-shrink: 0;
-  transition: background var(--duration-fast) var(--ease-standard);
+  transition: background var(--t-fast) var(--ease);
 }
 
-.search-connect-btn:hover { background: var(--color-semantic-action-active); }
+.search-connect-btn:hover { background: var(--action-hover); }
 
 .employee-avatar,
 .agent-avatar {
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  border-radius: var(--radius-md);
-  background: var(--color-semantic-surface-strong);
-  color: var(--color-semantic-ink);
+  border-radius: var(--r-2);
+  background: var(--surface-2);
+  color: var(--ink-1);
   font-family: var(--font-sans);
   font-weight: 600;
   position: relative;
@@ -81,9 +81,9 @@
 .employee-avatar {
   width: var(--avatar-size, 36px);
   height: var(--avatar-size, 36px);
-  font-size: var(--text-sm);
-  background: var(--color-semantic-surface-strong);
-  box-shadow: inset 0 0 0 1px var(--color-semantic-hairline-soft);
+  font-size: var(--fs-3);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--line-2);
 }
 
 /* Status pip — single source of truth on the avatar. Drives all
@@ -95,18 +95,18 @@
   bottom: -1px;
   width: 10px;
   height: 10px;
-  border: 2px solid var(--color-semantic-canvas);
-  border-radius: var(--radius-full);
-  background: var(--color-semantic-muted-soft);
+  border: 2px solid var(--surface-0);
+  border-radius: var(--r-full);
+  background: var(--ink-4);
   z-index: 2;
-  transition: background var(--duration-fast) var(--ease-standard);
+  transition: background var(--t-fast) var(--ease);
 }
 
-.employee-avatar.tone-good::after    { background: var(--color-semantic-success); }
-.employee-avatar.tone-info::after    { background: var(--color-semantic-info); }
-.employee-avatar.tone-bad::after     { background: var(--color-semantic-danger); }
-.employee-avatar.tone-warn::after    { background: var(--color-semantic-warning); }
-.employee-avatar.tone-neutral::after { background: var(--color-semantic-muted-soft); }
+.employee-avatar.tone-good::after    { background: var(--ok); }
+.employee-avatar.tone-info::after    { background: var(--info); }
+.employee-avatar.tone-bad::after     { background: var(--err); }
+.employee-avatar.tone-warn::after    { background: var(--warn); }
+.employee-avatar.tone-neutral::after { background: var(--ink-4); }
 
 /* Running state — concentric pulse ring around the pip. */
 .employee-avatar.running::before {
@@ -116,15 +116,15 @@
   bottom: -5px;
   width: 18px;
   height: 18px;
-  border-radius: var(--radius-full);
-  background: var(--color-semantic-warning);
+  border-radius: var(--r-full);
+  background: var(--warn);
   opacity: 0.35;
   z-index: 1;
-  animation: avatar-pulse 1.8s ease-out infinite;
+  animation: avatar-pulse 1.8s var(--ease) infinite;
 }
 
 .employee-avatar.running::after {
-  background: var(--color-semantic-warning);
+  background: var(--warn);
 }
 
 @keyframes avatar-pulse {
@@ -140,8 +140,8 @@
 .agent-avatar {
   width: 32px;
   height: 32px;
-  color: var(--color-semantic-ink);
-  font-size: var(--text-sm);
+  color: var(--ink-1);
+  font-size: var(--fs-3);
 }
 
 /* Monochrome agent avatars. The precision system reserves color for
@@ -152,8 +152,8 @@
 .agent-avatar[data-agent="pi"],
 .agent-avatar[data-agent="codex"],
 .agent-avatar[data-agent="kimi"] {
-  background: var(--color-semantic-surface-strong);
-  color: var(--color-semantic-ink);
+  background: var(--surface-2);
+  color: var(--ink-1);
 }
 
 .agent-avatar > svg {

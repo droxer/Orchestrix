@@ -65,8 +65,8 @@ describe("Relay web theme storage", () => {
   });
 
   it("maps explicit themes to browser chrome colors", () => {
-    assert.equal(themeColorForTheme("light"), "#faf8f4");
-    assert.equal(themeColorForTheme("dark"), "#141311");
+    assert.equal(themeColorForTheme("light"), "#f7f8f9");
+    assert.equal(themeColorForTheme("dark"), "#101214");
   });
 
   it("applyTheme resolves system via matchMedia", () => {

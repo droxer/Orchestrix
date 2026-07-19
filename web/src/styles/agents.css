@@ -11,7 +11,7 @@
   overflow: hidden;
   display: grid;
   grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
-  background: var(--color-semantic-canvas);
+  background: var(--surface-0);
 }
 
 /* ---- roster (left rail) --------------------------------------------- */
@@ -21,25 +21,25 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--color-semantic-hairline);
-  background: var(--color-semantic-canvas);
+  border-right: 1px solid var(--line-1);
+  background: var(--surface-0);
 }
 
 .agents-roster-filter {
   display: flex;
   align-items: center;
-  gap: var(--space-xs);
-  border-bottom: 1px solid var(--color-semantic-hairline);
-  padding: var(--space-xs) var(--space-sm);
+  gap: var(--sp-2);
+  border-bottom: 1px solid var(--line-1);
+  padding: var(--sp-2) var(--sp-3);
 }
 
 .agents-roster-search-wrap {
   display: flex;
   flex: 1;
   align-items: center;
-  gap: var(--space-xxs);
+  gap: var(--sp-1);
   min-width: 0;
-  color: var(--color-semantic-muted);
+  color: var(--ink-3);
 }
 
 .agents-roster-search {
@@ -47,35 +47,35 @@
   min-width: 0;
   border: 0;
   background: transparent;
-  padding: var(--space-xxs) 0;
-  color: var(--color-semantic-ink);
+  padding: var(--sp-1) 0;
+  color: var(--ink-1);
   font: var(--type-body-sm);
 }
 
 .agents-roster-search::placeholder {
-  color: var(--color-semantic-muted);
+  color: var(--ink-3);
 }
 
 .agents-roster-search:focus-visible {
   outline: none;
-  box-shadow: var(--ring-focus);
+  box-shadow: var(--focus-ring);
 }
 
 .agents-roster-select {
   flex: none;
   max-width: 108px;
   min-height: 28px;
-  border: 1px solid var(--color-semantic-hairline);
-  border-radius: var(--radius-sm);
-  background: var(--color-semantic-surface-strong);
-  padding: 0 var(--space-xs);
-  color: var(--color-semantic-body);
-  font: var(--type-meta);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-2);
+  background: var(--surface-2);
+  padding: 0 var(--sp-2);
+  color: var(--ink-2);
+  font: var(--type-label);
 }
 
 .agents-roster-select:focus-visible {
   outline: none;
-  box-shadow: var(--ring-focus);
+  box-shadow: var(--focus-ring);
 }
 
 .agents-roster-list {
@@ -88,29 +88,29 @@
 }
 
 /* Availability accent, reused from the roster row's left rail marker. */
-.agents-roster-row[data-availability="ready"] { --row-accent: var(--color-semantic-success); }
-.agents-roster-row[data-availability="busy"] { --row-accent: var(--color-semantic-info); }
-.agents-roster-row[data-availability="pending"] { --row-accent: var(--color-semantic-warning); }
-.agents-roster-row[data-availability="offline"] { --row-accent: var(--color-semantic-muted-soft); }
+.agents-roster-row[data-availability="ready"] { --row-accent: var(--ok); }
+.agents-roster-row[data-availability="busy"] { --row-accent: var(--info); }
+.agents-roster-row[data-availability="pending"] { --row-accent: var(--warn); }
+.agents-roster-row[data-availability="offline"] { --row-accent: var(--ink-4); }
 
 .agents-roster-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
-  gap: var(--space-xs);
+  gap: var(--sp-2);
   width: 100%;
   min-width: 0;
   border-left: 2px solid transparent;
-  border-bottom: 1px solid var(--color-semantic-hairline-soft);
-  padding: var(--space-sm);
-  transition: background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+  border-bottom: 1px solid var(--line-2);
+  padding: var(--sp-3);
+  transition: background var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
 }
 
 .agents-roster-row-select {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: start;
-  gap: var(--space-xs);
+  gap: var(--sp-2);
   min-width: 0;
   border: 0;
   background: transparent;
@@ -121,7 +121,7 @@
 }
 
 .agents-roster-row:hover {
-  background: color-mix(in srgb, var(--color-semantic-surface-soft) 70%, transparent);
+  background: color-mix(in srgb, var(--surface-1) 70%, transparent);
 }
 
 /* Selection reads as the action-soft wash everywhere else in the app
@@ -130,13 +130,13 @@
    "available" stay two independent signals: action-soft is the selection
    state, --row-accent on the left border is the availability status. */
 .agents-roster-row[data-selected="true"] {
-  background: var(--color-semantic-action-soft);
-  border-left-color: var(--row-accent, var(--color-semantic-action));
+  background: var(--action-soft);
+  border-left-color: var(--row-accent, var(--action));
 }
 
 .agents-roster-row:focus-within {
   outline: none;
-  box-shadow: var(--ring-focus);
+  box-shadow: var(--focus-ring);
 }
 
 .agents-roster-row-badge {
@@ -155,15 +155,15 @@
 .agents-roster-row-title {
   display: flex;
   align-items: center;
-  gap: var(--space-xs);
+  gap: var(--sp-2);
   min-width: 0;
 }
 
 .agents-roster-row-name {
   overflow: hidden;
-  color: var(--color-semantic-ink);
+  color: var(--ink-1);
   font: var(--type-label-strong);
-  letter-spacing: var(--letter-body);
+  letter-spacing: var(--track-0);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -172,9 +172,9 @@
   display: flex;
   min-width: 0;
   overflow: hidden;
-  gap: var(--space-xxs);
-  color: var(--color-semantic-muted);
-  font: var(--type-meta);
+  gap: var(--sp-1);
+  color: var(--ink-3);
+  font: var(--type-label);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -183,45 +183,12 @@
   opacity: 0.6;
 }
 
-.agents-roster-row-updated {
-  color: var(--color-semantic-muted);
-  font: var(--type-meta);
-  opacity: 0.85;
-}
-
-.agents-availability {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-xxs);
-  color: var(--color-semantic-body);
-}
-
-/* Pin against admin-v2-views.css's bare .tone-* text-color utility (used
-   unscoped by count labels elsewhere), which loads later and would
-   otherwise win at equal specificity and recolor this label instead of
-   just the dot below. */
-.agents-availability.tone-good,
-.agents-availability.tone-info,
-.agents-availability.tone-warn,
-.agents-availability.tone-neutral {
-  color: var(--color-semantic-body);
-}
-
-.agents-availability::before {
-  content: "";
-  flex: none;
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-full);
-  background: var(--tone, var(--color-semantic-muted-soft));
-}
-
 .agents-roster-row-actions {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xxs);
+  gap: var(--sp-1);
   opacity: 0;
-  transition: opacity var(--duration-fast) var(--ease-standard);
+  transition: opacity var(--t-fast) var(--ease);
 }
 
 .agents-roster-row:hover .agents-roster-row-actions,
@@ -236,17 +203,17 @@
   justify-content: center;
   width: 24px;
   height: 24px;
-  border: 1px solid var(--color-semantic-hairline);
-  border-radius: var(--radius-sm);
-  background: var(--color-semantic-surface-strong);
-  color: var(--color-semantic-muted);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-2);
+  background: var(--surface-2);
+  color: var(--ink-3);
   cursor: pointer;
-  transition: color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+  transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
 }
 
 .agents-roster-row-action:hover {
-  color: var(--color-semantic-ink);
-  border-color: color-mix(in srgb, var(--color-semantic-ink) 20%, var(--color-semantic-hairline));
+  color: var(--ink-1);
+  border-color: color-mix(in srgb, var(--ink-1) 20%, var(--line-1));
 }
 
 .agents-roster-row-action:disabled {
@@ -281,7 +248,7 @@
 
   .agents-roster {
     border-right: 0;
-    border-bottom: 1px solid var(--color-semantic-hairline);
+    border-bottom: 1px solid var(--line-1);
     max-height: 46vh;
   }
 

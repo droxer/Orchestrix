@@ -3,18 +3,18 @@
 .thread-panel {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
-  gap: var(--space-base);
-  padding: var(--space-base) 0 0;
-  border-right: 1px solid var(--color-semantic-hairline);
-  background: var(--color-semantic-canvas);
+  gap: var(--sp-4);
+  padding: var(--sp-4) 0 0;
+  border-right: 1px solid var(--line-1);
+  background: var(--surface-0);
 }
 
 .conversation-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-base);
-  padding: 0 var(--space-base);
+  gap: var(--sp-4);
+  padding: 0 var(--sp-4);
 }
 
 .conversation-heading {
@@ -24,10 +24,10 @@
 }
 
 .conversation-heading-eyebrow {
-  font: var(--type-eyebrow);
-  letter-spacing: var(--letter-eyebrow);
+  font: var(--type-micro);
+  letter-spacing: var(--track-caps);
   text-transform: uppercase;
-  color: var(--color-semantic-muted);
+  color: var(--ink-3);
   line-height: 1;
 }
 
@@ -35,14 +35,14 @@
   margin: 0;
   display: inline-flex;
   align-items: baseline;
-  gap: var(--space-xs);
-  color: var(--color-semantic-ink);
-  font: var(--type-title-md);
+  gap: var(--sp-2);
+  color: var(--ink-1);
+  font: var(--type-title);
 }
 
 .conversation-heading-count {
-  color: var(--color-semantic-muted);
-  font-size: var(--text-xs);
+  color: var(--ink-3);
+  font-size: var(--fs-2);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
@@ -53,20 +53,20 @@
   width: 36px;
   height: 36px;
   border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  color: var(--color-semantic-muted);
+  border-radius: var(--r-2);
+  color: var(--ink-3);
   background: transparent;
 }
 
 .conversation-header button:hover {
-  color: var(--color-semantic-ink);
-  background: var(--color-semantic-surface-strong);
-  border-color: var(--color-semantic-hairline-soft);
+  color: var(--ink-1);
+  background: var(--surface-2);
+  border-color: var(--line-2);
 }
 
 .conversation-search {
-  background: var(--color-semantic-surface-strong);
-  margin: 0 var(--space-base);
+  background: var(--surface-2);
+  margin: 0 var(--sp-4);
   align-self: start;
 }
 
@@ -76,7 +76,7 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-  border-top: 1px solid var(--color-semantic-hairline-soft);
+  border-top: 1px solid var(--line-2);
 }
 
 .conversation-row {
@@ -86,11 +86,11 @@
   width: 100%;
   content-visibility: auto;
   contain-intrinsic-size: auto 68px;
-  border-bottom: 1px solid var(--color-semantic-hairline-soft);
+  border-bottom: 1px solid var(--line-2);
   background: transparent;
-  color: var(--color-semantic-ink);
-  transition: background var(--duration-fast) var(--ease-standard);
-  animation: thread-row-in var(--duration-slow) var(--ease-out-quint) both;
+  color: var(--ink-1);
+  transition: background var(--t-fast) var(--ease);
+  animation: thread-row-in var(--t-slow) var(--ease) both;
 }
 
 /* Staggered reveal — first 8 rows fade-rise on mount. Cheap delight; the
@@ -118,13 +118,13 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-items: center;
-  gap: var(--space-sm);
+  gap: var(--sp-3);
   flex: 1;
   min-width: 0;
   min-height: 68px;
-  padding: var(--space-row-y) var(--space-base);
+  padding: var(--sp-row) var(--sp-4);
   border: 0;
-  border-radius: var(--radius-none);
+  border-radius: 0;
   background: transparent;
   color: inherit;
   text-align: left;
@@ -132,25 +132,25 @@
 }
 
 .conversation-row:hover {
-  background: var(--color-semantic-surface-soft);
+  background: var(--surface-1);
 }
 
 .conversation-row.active {
-  background: var(--color-semantic-action-soft);
+  background: var(--action-soft);
 }
 
 .conversation-empty {
   margin: 0;
-  padding: var(--space-base);
-  color: var(--color-semantic-muted);
-  font-size: var(--text-sm);
+  padding: var(--sp-4);
+  color: var(--ink-3);
+  font-size: var(--fs-3);
   line-height: 1.5;
 }
 
 .conversation-copy {
   min-width: 0;
   display: grid;
-  gap: var(--space-xxs);
+  gap: var(--sp-1);
 }
 
 .conversation-topline {
@@ -158,7 +158,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-xs);
+  gap: var(--sp-2);
 }
 
 .conversation-name {
@@ -166,29 +166,14 @@
   flex: 1;
   display: inline-flex;
   align-items: center;
-  gap: var(--space-xs);
-}
-
-/* The agents that have worked this thread — a tight cluster of monochrome
-   marks (shape carries identity, never vendor hue). Muted so the title stays
-   the row's anchor. */
-.conversation-agents {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  color: var(--color-semantic-muted);
-}
-
-.conversation-row.active .conversation-agents {
-  color: var(--color-semantic-ink);
+  gap: var(--sp-2);
 }
 
 .conversation-name strong {
   min-width: 0;
-  color: var(--color-semantic-ink);
+  color: var(--ink-1);
   font: var(--type-label-strong);
-  letter-spacing: var(--letter-body);
+  letter-spacing: var(--track-0);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -197,7 +182,7 @@
 .conversation-name strong.mono {
   font-family: var(--font-mono);
   font-weight: 500;
-  font-size: var(--text-sm);
+  font-size: var(--fs-3);
 }
 
 .conversation-row-actions {
@@ -206,7 +191,7 @@
   align-self: center;
   flex-shrink: 0;
   gap: 2px;
-  padding-right: var(--space-sm);
+  padding-right: var(--sp-3);
 }
 
 .conversation-rename-btn,
@@ -218,24 +203,24 @@
   height: 24px;
   padding: 0;
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--r-2);
   background: transparent;
-  color: var(--color-semantic-muted);
+  color: var(--ink-3);
   cursor: pointer;
-  transition: color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
+  transition: color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
   opacity: 0;
-  font-size: var(--text-xs);
+  font-size: var(--fs-2);
   line-height: 1;
 }
 
 .conversation-rename-btn:hover {
-  color: var(--color-semantic-ink);
-  background: color-mix(in srgb, var(--color-semantic-ink) 8%, transparent);
+  color: var(--ink-1);
+  background: color-mix(in srgb, var(--ink-1) 8%, transparent);
 }
 
 .conversation-remove-btn:hover {
-  color: var(--color-semantic-danger-text);
-  background: color-mix(in srgb, var(--color-semantic-ink) 8%, transparent);
+  color: var(--err);
+  background: color-mix(in srgb, var(--ink-1) 8%, transparent);
 }
 
 .conversation-row:hover .conversation-rename-btn,
@@ -247,7 +232,7 @@
 
 /* "New conversation" is the primary entry point for starting fresh work as the
    current employee — a 36px ink plate, mirroring the composer send button
-   (design-system.md §Operational components). Tight --radius-sm, not a pill.
+   (design-system.md §Operational components). Tight --r-2, not a pill.
    Scoped under .conversation-header to outrank the round `header button` rule. */
 .conversation-header .conversation-new-btn {
   display: grid;
@@ -256,15 +241,15 @@
   height: 36px;
   padding: 0;
   border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  color: var(--color-semantic-on-action);
-  background: var(--color-semantic-action);
+  border-radius: var(--r-2);
+  color: var(--on-action);
+  background: var(--action);
   cursor: pointer;
-  transition: background var(--duration-fast) var(--ease-standard), transform 80ms var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
+  transition: background var(--t-fast) var(--ease), transform 80ms var(--ease), box-shadow var(--t-fast) var(--ease);
 }
 
 .conversation-header .conversation-new-btn:hover {
-  background: var(--color-semantic-action-active);
+  background: var(--action-hover);
 }
 
 .conversation-header .conversation-new-btn:active {
@@ -277,93 +262,36 @@
 
 .conversation-stamp {
   flex-shrink: 0;
-  color: var(--color-semantic-muted);
+  color: var(--ink-3);
   font: var(--type-label);
 }
 
 .conversation-row.active .conversation-stamp {
-  color: var(--color-semantic-muted);
-}
-
-.status-dot {
-  flex-shrink: 0;
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-full);
-  background: var(--color-semantic-muted-soft);
-}
-
-.status-dot-good    { background: var(--color-semantic-success); }
-.status-dot-bad     { background: var(--color-semantic-danger); }
-.status-dot-warn    { background: var(--color-semantic-warning); }
-.status-dot-neutral { background: var(--color-semantic-muted-soft); }
-
-/* Single activity line — the row's live signal (running pulse / status pip). */
-.conversation-activity {
-  min-width: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-xs);
-  color: var(--color-semantic-body);
-  font-size: var(--text-sm);
-  line-height: 1.5;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.conversation-activity.muted {
-  color: var(--color-semantic-muted);
-  font-style: italic;
-}
-
-.conversation-activity.working em {
-  font-style: italic;
-  color: var(--color-semantic-info);
-  font-weight: 500;
-}
-
-.conversation-activity-pulse {
-  flex-shrink: 0;
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-full);
-  background: var(--color-semantic-info);
-  box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-semantic-info) 40%, transparent);
-  animation: conv-pulse 1.4s ease-out infinite;
-}
-
-@keyframes conv-pulse {
-  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-semantic-info) 45%, transparent); }
-  100% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--color-semantic-info) 0%, transparent); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .conversation-activity-pulse { animation: none; }
+  color: var(--ink-3);
 }
 
 .icon-button {
   display: grid;
   place-items: center;
-  width: var(--size-control-md);
-  height: var(--size-control-md);
+  width: var(--control-h);
+  height: var(--control-h);
   border: 1px solid transparent;
-  border-radius: var(--radius-full);
-  color: var(--color-semantic-muted);
+  border-radius: var(--r-full);
+  color: var(--ink-3);
   background: transparent;
-  transition: background var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+  transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
 }
 
 .icon-button:hover,
 .icon-button.active {
-  color: var(--color-semantic-ink);
-  background: var(--color-semantic-surface-strong);
-  border-color: var(--color-semantic-hairline-soft);
+  color: var(--ink-1);
+  background: var(--surface-2);
+  border-color: var(--line-2);
 }
 
 .icon-button:focus-visible {
   outline: none;
-  box-shadow: var(--ring-focus);
+  box-shadow: var(--focus-ring);
 }
 
 .icon-button:disabled {
@@ -383,36 +311,36 @@
    settings/reveal affordance or a destructive delete) instead of the
    neutral ink hover above. `.danger` swaps the tint to the status red. */
 .icon-button--tinted:hover {
-  color: var(--color-semantic-action);
-  background: color-mix(in srgb, var(--color-semantic-action) 10%, transparent);
+  color: var(--action);
+  background: color-mix(in srgb, var(--action) 10%, transparent);
   border-color: transparent;
 }
 
 .icon-button--tinted.danger:hover {
-  color: var(--color-semantic-danger-text);
-  background: color-mix(in srgb, var(--color-semantic-danger) 10%, transparent);
+  color: var(--err);
+  background: color-mix(in srgb, var(--err) 10%, transparent);
 }
 
 /* ===================== state-grouped sections ===================== */
 .conversation-group + .conversation-group {
-  margin-top: var(--space-sm);
+  margin-top: var(--sp-3);
 }
 
 .conversation-group-label {
   display: flex;
   align-items: baseline;
-  gap: var(--space-xs);
-  padding: var(--space-xs) var(--space-base) var(--space-xxs);
-  font: var(--type-meta);
-  letter-spacing: var(--letter-caps-wide);
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-4) var(--sp-1);
+  font: var(--type-label);
+  letter-spacing: var(--track-caps);
   text-transform: uppercase;
-  color: var(--color-semantic-muted);
+  color: var(--ink-3);
 }
 
 /* Needs-you earns a leading warning dot — the label stays muted so status
    hue reads as a pip, not running text (design-system.md status fill rules). */
 .conversation-group[data-tone="attn"] .conversation-group-label {
-  color: var(--color-semantic-muted);
+  color: var(--ink-3);
 }
 
 .conversation-group[data-tone="attn"] .conversation-group-label::before {
@@ -420,11 +348,11 @@
   flex: none;
   width: 6px;
   height: 6px;
-  border-radius: var(--radius-full);
-  background: var(--color-semantic-warning);
+  border-radius: var(--r-full);
+  background: var(--warn);
 }
 
 .conversation-group-count {
-  color: var(--color-semantic-muted-soft);
+  color: var(--ink-4);
   font-variant-numeric: tabular-nums;
 }

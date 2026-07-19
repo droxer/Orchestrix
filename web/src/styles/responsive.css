@@ -10,7 +10,7 @@
   }
 
   .header-agent-tabs button {
-    padding-inline: var(--space-xs);
+    padding-inline: var(--sp-2);
   }
 }
 
@@ -31,7 +31,7 @@
   .messenger-shell[data-route][data-sidenav] {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr) auto;
-    min-height: 100svh;
+    min-height: 100dvh;
     padding: 0;
   }
 
@@ -48,11 +48,11 @@
     grid-row: 1;
     grid-column: 1 / -1;
     align-items: center;
-    gap: var(--space-xs);
+    gap: var(--sp-2);
     min-width: 0;
-    padding: max(env(safe-area-inset-top), var(--space-xs)) max(env(safe-area-inset-right), var(--space-base)) var(--space-xs) max(env(safe-area-inset-left), var(--space-base));
-    border-bottom: 1px solid var(--color-semantic-hairline);
-    background: var(--color-semantic-canvas);
+    padding: max(env(safe-area-inset-top), var(--sp-2)) max(env(safe-area-inset-right), var(--sp-4)) var(--sp-2) max(env(safe-area-inset-left), var(--sp-4));
+    border-bottom: 1px solid var(--line-1);
+    background: var(--surface-0);
     z-index: var(--z-drawer);
   }
 
@@ -101,7 +101,7 @@
     align-items: center;
     justify-content: center;
     min-height: 44px;
-    padding-inline: var(--space-xs);
+    padding-inline: var(--sp-2);
     text-align: center;
   }
 
@@ -133,15 +133,15 @@
     gap: 2px;
     min-width: 0;
     min-height: 44px;
-    padding-inline: var(--space-xs);
+    padding-inline: var(--sp-2);
     text-align: center;
   }
 
   .mobile-topbar-eyebrow {
-    font: var(--type-eyebrow);
-    letter-spacing: var(--letter-eyebrow);
+    font: var(--type-micro);
+    letter-spacing: var(--track-caps);
     text-transform: uppercase;
-    color: var(--color-semantic-muted);
+    color: var(--ink-3);
     line-height: 1;
   }
 
@@ -150,7 +150,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: var(--color-semantic-ink);
+    color: var(--ink-1);
     font: var(--type-label-strong);
     line-height: 1.2;
   }
@@ -182,7 +182,7 @@
   .messenger-shell[data-route]:not([data-route="main"]) .page-header {
     min-height: 0;
     justify-content: flex-end;
-    border-bottom-color: var(--color-semantic-hairline-soft);
+    border-bottom-color: var(--line-2);
   }
 
   /* Admin + agents keep their in-page lead (title, tabs). Other work routes
@@ -193,7 +193,7 @@
     min-height: 0;
     justify-content: space-between;
     align-items: flex-start;
-    border-bottom-color: var(--color-semantic-hairline-soft);
+    border-bottom-color: var(--line-2);
   }
 
   .messenger-shell[data-route="admin"] .page-header-lead,
@@ -213,12 +213,12 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: var(--space-xs);
+    gap: var(--sp-2);
     min-width: 0;
     min-height: 44px;
-    padding: 0 var(--space-sm);
-    border-radius: var(--radius-sm);
-    color: var(--color-semantic-body);
+    padding: 0 var(--sp-3);
+    border-radius: var(--r-2);
+    color: var(--ink-2);
     font: var(--type-label-strong);
   }
 
@@ -230,8 +230,8 @@
   }
 
   .mobile-topbar button.active {
-    background: var(--color-semantic-surface-strong);
-    color: var(--color-semantic-ink);
+    background: var(--surface-2);
+    color: var(--ink-1);
   }
 
   .sidenav-panel {
@@ -242,10 +242,10 @@
     align-items: stretch;
     gap: 0;
     min-height: 58px;
-    padding: 4px max(env(safe-area-inset-right), var(--space-xs)) max(env(safe-area-inset-bottom), 4px) max(env(safe-area-inset-left), var(--space-xs));
-    border-top: 1px solid var(--color-semantic-hairline);
+    padding: 4px max(env(safe-area-inset-right), var(--sp-2)) max(env(safe-area-inset-bottom), 4px) max(env(safe-area-inset-left), var(--sp-2));
+    border-top: 1px solid var(--line-1);
     border-right: 0;
-    background: color-mix(in srgb, var(--color-semantic-canvas) 94%, transparent);
+    background: color-mix(in srgb, var(--surface-0) 94%, transparent);
     backdrop-filter: blur(14px);
     overflow-x: auto;
     overflow-y: hidden;
@@ -305,8 +305,8 @@
     left: 50%;
     width: 20px;
     height: 2px;
-    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
-    background: var(--color-semantic-action);
+    border-radius: 0 0 var(--r-2) var(--r-2);
+    background: var(--action);
     transform: translateX(-50%);
   }
 
@@ -315,19 +315,19 @@
      above (.sidenav-btn.active::before). The accent stays the underline —
      the text itself is high-contrast foreground, not the mid-tone green. */
   .sidenav-btn.active {
-    color: var(--color-semantic-ink);
-    background: var(--color-semantic-action-soft);
-    border-color: color-mix(in srgb, var(--color-semantic-action) 18%, var(--color-semantic-hairline));
+    color: var(--ink-1);
+    background: var(--action-soft);
+    border-color: color-mix(in srgb, var(--action) 18%, var(--line-1));
     box-shadow: none;
   }
 
   .sidenav-btn.active:hover {
-    background: var(--color-semantic-action-soft);
+    background: var(--action-soft);
   }
 
   .messenger-shell .sidenav-btn {
     opacity: 0;
-    animation: relay-rise var(--duration-base) var(--ease-standard) forwards;
+    animation: relay-rise var(--t-fast) var(--ease) forwards;
   }
 
   .messenger-shell .sidenav-nav .sidenav-btn:nth-child(1) { animation-delay: 40ms; }
@@ -361,7 +361,7 @@
     overflow: hidden;
     clip: auto;
     color: inherit;
-    font-size: var(--text-micro);
+    font-size: var(--fs-1);
     font-weight: 600;
     line-height: 1.1;
     letter-spacing: 0;
@@ -403,11 +403,11 @@
 
   .thread-panel {
     border-right: 0;
-    padding: var(--space-sm) 0 0;
+    padding: var(--sp-3) 0 0;
   }
 
   .conversation-header {
-    padding-inline: var(--space-base);
+    padding-inline: var(--sp-4);
   }
 
   .conversation-heading {
@@ -415,13 +415,13 @@
   }
 
   .conversation-search {
-    margin-inline: var(--space-base);
+    margin-inline: var(--sp-4);
   }
 
   .chat-header {
     min-width: 0;
     min-height: var(--header-h);
-    padding: var(--space-sm);
+    padding: var(--sp-3);
     grid-template-columns: auto minmax(0, 1fr);
   }
 
@@ -450,11 +450,11 @@
   /* .header-agent-tabs is already hidden at the 900px breakpoint above. */
 
   .transcript-inner {
-    padding: var(--space-md) var(--space-base) var(--space-lg);
+    padding: var(--sp-5) var(--sp-4) var(--sp-6);
   }
 
   .transcript-empty {
-    margin-top: var(--space-md);
+    margin-top: var(--sp-5);
   }
 
   .handoff-row {
@@ -465,7 +465,7 @@
      it, so a second inset here creates a dead band on notched phones. */
   .composer {
     --composer-inline: 18px;
-    padding: var(--space-sm) var(--space-sm) var(--space-base);
+    padding: var(--sp-3) var(--sp-3) var(--sp-4);
   }
 
   .mode-chip {
@@ -473,15 +473,15 @@
   }
 
   .composer-footer {
-    gap: var(--space-xs);
+    gap: var(--sp-2);
   }
 
   .adm-content-main {
-    padding: var(--space-base);
+    padding: var(--sp-4);
   }
 
   .adm-dash-kpis {
-    padding-inline: var(--space-base);
+    padding-inline: var(--sp-4);
   }
 
   @media (prefers-reduced-motion: reduce) {

@@ -8,7 +8,7 @@ import { AgentStateBadge } from "./AgentStateBadge";
  *
  * The avatar hue is derived deterministically from the name so the same
  * person keeps a stable color across the app. Colors are mixed against theme
- * tokens (transparent tint, `--color-ink` text) so the chip adapts to light
+ * tokens (transparent tint, `--ink-1` text) so the chip adapts to light
  * and dark themes without hard-coded lightness.
  */
 

@@ -6,8 +6,8 @@
    one-by-one while credentials are entered.
 
    Color is pinned via local --lg-* variables whose values are lifted
-   verbatim from the dark (default) ramp in tokens/primitives.css
-   (warm near-black canvas, Sleek Forest action, amber attention). Spacing,
+   verbatim from the dark (default) register in tokens/palette.css
+   (graphite canvas, steel-blue action, amber attention). Spacing,
    type scale, and radii are theme-independent tokens and are used
    directly. Documented stylelint exception — see web/.stylelintrc.json.
 
@@ -16,26 +16,26 @@
    ===================================================================== */
 
 .login-screen {
-  /* Pinned dark ramp — mirrors the default (dark) register in tokens/primitives.css. */
-  --lg-canvas: #141311;
-  --lg-elevated: #262420;
-  --lg-ink: #f5f3ec;
-  --lg-body: #d8d4c8;
-  --lg-muted: #8a8578;
-  --lg-hairline: color-mix(in srgb, #f5f3ec 14%, #141311);
-  --lg-hairline-soft: color-mix(in srgb, #f5f3ec 8%, #141311);
-  --lg-steel: #4f9d6e;
-  --lg-steel-active: #63b482;
-  --lg-on-steel: #0d1410; /* text-on-accent (dark ink on the forest fill) */
+  /* Pinned dark ramp — mirrors the default (dark) register in tokens/palette.css. */
+  --lg-canvas: #101214;
+  --lg-elevated: #22262b;
+  --lg-ink: #f2f4f6;
+  --lg-body: #c9ced4;
+  --lg-muted: #99a0a8;
+  --lg-hairline: color-mix(in srgb, #f2f4f6 14%, #101214);
+  --lg-hairline-soft: color-mix(in srgb, #f2f4f6 8%, #101214);
+  --lg-steel: #6ba1d4;
+  --lg-steel-active: #84b3e0;
+  --lg-on-steel: #0e1216; /* text-on-action (dark ink on the steel fill) */
   --lg-on-amber: #2b1c02; /* text-on-amber for bootstrap-mode fills */
-  --lg-up: #2fb355;
-  --lg-amber: #e0a857;
-  --lg-down: #ef6f6f;
+  --lg-up: #3fb96c;
+  --lg-amber: #d9a13f;
+  --lg-down: #e5635f;
   /* Mode accent — steel while attaching, amber during first-run setup. */
   --lg-accent: var(--lg-steel);
-  /* Pin semantic action to the pre-auth dark steel so RelayMark's lead
-     chevron stays Sleek Forest even when the operator's saved theme is light. */
-  --color-semantic-action: var(--lg-steel);
+  /* Pin the action color to the pre-auth dark steel so RelayMark's lead
+     chevron stays graphite steel even when the operator's saved theme is light. */
+  --action: var(--lg-steel);
 
   position: relative;
   display: flex;
@@ -67,7 +67,7 @@
   flex-direction: column;
   justify-content: center;
   gap: clamp(56px, 9vh, 96px);
-  padding-right: clamp(var(--space-lg), 6vw, var(--space-xxl));
+  padding-right: clamp(var(--sp-6), 6vw, var(--sp-8));
   pointer-events: none;
   user-select: none;
 }
@@ -80,11 +80,11 @@
 
 .login-lane-label {
   position: absolute;
-  left: var(--space-base);
-  bottom: var(--space-xs);
+  left: var(--sp-4);
+  bottom: var(--sp-2);
   font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  letter-spacing: var(--letter-caps);
+  font-size: var(--fs-2);
+  letter-spacing: var(--track-caps);
   text-transform: uppercase;
   color: var(--lg-muted);
   opacity: 0.7;
@@ -99,7 +99,7 @@
   width: 5px;
   height: 5px;
   margin-top: -2.5px;
-  border-radius: var(--radius-full);
+  border-radius: var(--r-full);
 }
 
 .login-lane-node--origin {
@@ -126,7 +126,7 @@
   width: 72px;
   height: 3px;
   margin-left: -72px;
-  border-radius: var(--radius-full);
+  border-radius: var(--r-full);
   background: linear-gradient(to right, transparent, var(--lg-steel));
   opacity: 0;
   animation: login-lane-travel calc(7s + var(--lane-index) * 1.4s) linear infinite;
@@ -151,7 +151,7 @@
   width: min(100%, 520px);
   min-height: 100vh;
   min-height: 100svh;
-  padding: var(--space-xl) clamp(var(--space-lg), 6vw, var(--space-xxl));
+  padding: var(--sp-7) clamp(var(--sp-6), 6vw, var(--sp-8));
   background: color-mix(in srgb, var(--lg-canvas) 72%, transparent);
   backdrop-filter: blur(2px);
   border-right: 1px solid var(--lg-hairline-soft);
@@ -161,29 +161,29 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-base);
+  gap: var(--sp-4);
   opacity: 0;
-  animation: login-rise var(--duration-editorial) var(--ease-out-quint) forwards;
+  animation: login-rise var(--t-slow) var(--ease) forwards;
 }
 
 .login-brand {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-xs);
+  gap: var(--sp-2);
   color: var(--lg-ink);
 }
 
 .login-wordmark {
-  font-family: var(--font-display);
-  font-size: var(--text-md);
+  font-family: var(--font-sans);
+  font-size: var(--fs-4);
   font-weight: 600;
-  letter-spacing: var(--letter-display);
+  letter-spacing: var(--track-tight);
 }
 
 .login-kicker {
   font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  letter-spacing: var(--letter-caps);
+  font-size: var(--fs-2);
+  letter-spacing: var(--track-caps);
   text-transform: uppercase;
   color: var(--lg-accent);
 }
@@ -198,19 +198,19 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding-block: var(--space-xl);
+  padding-block: var(--sp-7);
 }
 
 .login-headline {
-  margin: 0 0 var(--space-base);
-  font-family: var(--font-display-serif);
-  font-size: clamp(34px, 4.4vw, 46px);
-  font-weight: 400;
-  line-height: 1.08;
-  letter-spacing: var(--letter-display-serif);
+  margin: 0 0 var(--sp-4);
+  font-family: var(--font-sans);
+  font-size: clamp(30px, 3.8vw, 40px);
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: var(--track-tight);
   color: var(--lg-ink);
   opacity: 0;
-  animation: login-rise var(--duration-editorial) var(--ease-out-quint) forwards;
+  animation: login-rise var(--t-slow) var(--ease) forwards;
   animation-delay: 80ms;
 }
 
@@ -220,13 +220,13 @@
 }
 
 .login-lede {
-  margin: 0 0 var(--space-lg);
+  margin: 0 0 var(--sp-6);
   max-width: 42ch;
-  font-size: var(--text-sm);
+  font-size: var(--fs-3);
   line-height: var(--leading-loose);
   color: var(--lg-body);
   opacity: 0;
-  animation: login-rise var(--duration-editorial) var(--ease-out-quint) forwards;
+  animation: login-rise var(--t-slow) var(--ease) forwards;
   animation-delay: 160ms;
 }
 
@@ -237,14 +237,14 @@
 .login-handshake {
   display: grid;
   grid-template-columns: auto 1fr auto;
-  gap: var(--space-xs) var(--space-sm);
+  gap: var(--sp-2) var(--sp-3);
   align-items: center;
-  margin: 0 0 var(--space-xl);
-  padding: var(--space-base) 0;
+  margin: 0 0 var(--sp-7);
+  padding: var(--sp-4) 0;
   border-top: 1px solid var(--lg-hairline-soft);
   border-bottom: 1px solid var(--lg-hairline-soft);
   font-family: var(--font-mono);
-  font-size: var(--text-xs);
+  font-size: var(--fs-2);
 }
 
 .login-handshake-row {
@@ -261,7 +261,7 @@
   background: var(--lg-hairline);
   transform: scaleX(0);
   transform-origin: left;
-  animation: login-wire-draw 420ms var(--ease-out-quint) forwards;
+  animation: login-wire-draw 420ms var(--ease) forwards;
   animation-delay: calc(360ms + var(--row-index) * 260ms);
 }
 
@@ -273,12 +273,12 @@
   margin: 0;
   display: inline-flex;
   align-items: center;
-  gap: var(--space-xxs);
+  gap: var(--sp-1);
   justify-self: end;
   color: var(--lg-ink);
   font-feature-settings: "tnum" 1;
   opacity: 0;
-  animation: login-state-resolve 320ms var(--ease-out-quint) forwards;
+  animation: login-state-resolve 320ms var(--ease) forwards;
   animation-delay: calc(700ms + var(--row-index) * 260ms);
 }
 
@@ -291,7 +291,7 @@
   content: "";
   width: 6px;
   height: 6px;
-  border-radius: var(--radius-full);
+  border-radius: var(--r-full);
   background: var(--lg-up);
 }
 
@@ -301,7 +301,7 @@
 
 .login-handshake-state[data-state="pending"]::before {
   background: var(--lg-amber);
-  animation: login-pulse 1.6s ease-in-out infinite;
+  animation: login-pulse 1.6s var(--ease) infinite;
 }
 
 /* ---------- Terminal form ------------------------------------------ */
@@ -312,22 +312,22 @@
   counter-reset: login-field;
   display: flex;
   flex-direction: column;
-  gap: var(--space-lg);
+  gap: var(--sp-6);
   opacity: 0;
-  animation: login-rise var(--duration-editorial) var(--ease-out-quint) forwards;
+  animation: login-rise var(--t-slow) var(--ease) forwards;
   animation-delay: 240ms;
 }
 
 .login-field {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
+  gap: var(--sp-2);
 }
 
 .login-field-label {
   font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  letter-spacing: var(--letter-caps);
+  font-size: var(--fs-2);
+  letter-spacing: var(--track-caps);
   text-transform: uppercase;
   color: var(--lg-muted);
 }
@@ -340,16 +340,16 @@
 
 .login-input {
   width: 100%;
-  padding: var(--space-xs) 0;
+  padding: var(--sp-2) 0;
   border: none;
   border-bottom: 1px solid var(--lg-hairline);
   border-radius: 0;
   background: transparent;
   color: var(--lg-ink);
   font-family: var(--font-mono);
-  font-size: var(--text-md);
+  font-size: var(--fs-4);
   caret-color: var(--lg-accent);
-  transition: border-color var(--duration-fast) var(--ease-standard);
+  transition: border-color var(--t-fast) var(--ease);
 }
 
 .login-input:hover {
@@ -370,12 +370,12 @@
 
 .login-error {
   margin: 0;
-  padding: var(--space-sm) var(--space-base);
+  padding: var(--sp-3) var(--sp-4);
   border-left: 2px solid var(--lg-down);
   background: color-mix(in srgb, var(--lg-down) 10%, var(--lg-canvas));
   color: var(--lg-down);
   font-family: var(--font-mono);
-  font-size: var(--text-xs);
+  font-size: var(--fs-2);
   line-height: var(--leading-normal);
 }
 
@@ -383,17 +383,17 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-sm);
+  gap: var(--sp-3);
   width: 100%;
   height: 48px;
-  padding-inline: var(--space-base);
+  padding-inline: var(--sp-4);
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: var(--r-2);
   background: var(--lg-accent);
   color: var(--lg-on-steel);
-  font: var(--type-button);
+  font: var(--type-label-strong);
   cursor: pointer;
-  transition: background var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
+  transition: background var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
 }
 
 .login-screen[data-mode="bootstrap"] .login-submit {
@@ -406,7 +406,7 @@
 }
 
 .login-screen[data-mode="bootstrap"] .login-submit:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--lg-amber) 85%, var(--color-white));
+  background: color-mix(in srgb, var(--lg-amber) 85%, white);
 }
 
 .login-submit:active:not(:disabled) {
@@ -432,7 +432,7 @@
 
 .login-submit-arrow {
   font-family: var(--font-mono);
-  transition: transform var(--duration-fast) var(--ease-standard);
+  transition: transform var(--t-fast) var(--ease);
 }
 
 .login-submit:hover:not(:disabled) .login-submit-arrow {
@@ -445,24 +445,24 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-base);
-  padding-top: var(--space-base);
+  gap: var(--sp-4);
+  padding-top: var(--sp-4);
   border-top: 1px solid var(--lg-hairline-soft);
   opacity: 0;
-  animation: login-rise var(--duration-editorial) var(--ease-out-quint) forwards;
+  animation: login-rise var(--t-slow) var(--ease) forwards;
   animation-delay: 320ms;
 }
 
 /* Mode switch — bracketed mono affordance, a command rather than a link. */
 .login-switch {
-  padding: var(--space-xxs) 0;
+  padding: var(--sp-1) 0;
   border: none;
   background: none;
   color: var(--lg-body);
   font-family: var(--font-mono);
-  font-size: var(--text-xs);
+  font-size: var(--fs-2);
   cursor: pointer;
-  transition: color var(--duration-fast) var(--ease-standard);
+  transition: color var(--t-fast) var(--ease);
 }
 
 .login-switch::before { content: "[ "; color: var(--lg-muted); }
@@ -479,8 +479,8 @@
 
 .login-foot-meta {
   font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  letter-spacing: var(--letter-caps);
+  font-size: var(--fs-2);
+  letter-spacing: var(--track-caps);
   text-transform: uppercase;
   color: var(--lg-muted);
 }
@@ -497,20 +497,20 @@
      fall back to the theme-independent "always dark" surface primitives
      (also used by the diff viewer / artifact chrome) rather than a
      one-off literal. */
-  background: var(--color-semantic-surface-dark);
-  color: var(--color-semantic-on-dark-soft);
+  background: var(--dark-surface);
+  color: var(--dark-ink-soft);
 }
 
 .login-checking-text {
   margin: 0;
   font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  animation: login-pulse 1.6s ease-in-out infinite;
+  font-size: var(--fs-3);
+  animation: login-pulse 1.6s var(--ease) infinite;
 }
 
 .login-checking-text::after {
   content: "▌";
-  margin-left: var(--space-xxs);
+  margin-left: var(--sp-1);
   /* Pre-mount caret on the pinned dark canvas — matches --lg-ink. */
   color: #f5f3ec;
 }
@@ -538,9 +538,9 @@
     width: 100%;
     min-height: 100svh;
     border-right: none;
-    padding-top: max(env(safe-area-inset-top), var(--space-lg));
-    padding-bottom: max(env(safe-area-inset-bottom), var(--space-lg));
-    padding-inline: max(env(safe-area-inset-left), var(--space-base)) max(env(safe-area-inset-right), var(--space-base));
+    padding-top: max(env(safe-area-inset-top), var(--sp-6));
+    padding-bottom: max(env(safe-area-inset-bottom), var(--sp-6));
+    padding-inline: max(env(safe-area-inset-left), var(--sp-4)) max(env(safe-area-inset-right), var(--sp-4));
   }
 
   .login-body {
@@ -561,7 +561,7 @@
   .login-foot {
     flex-direction: column;
     align-items: flex-start;
-    gap: var(--space-xs);
+    gap: var(--sp-2);
   }
 
   .login-switch {

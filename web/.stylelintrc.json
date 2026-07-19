@@ -3,28 +3,37 @@
     "color-no-hex": [
       true,
       {
-        "message": "Hardcoded hex colors are only allowed in web/src/styles/tokens/primitives.css — add a --color-* primitive there and reference it with var() instead. See docs/design-system.md."
+        "message": "Hardcoded hex colors are only allowed in web/src/styles/tokens/palette.css — add a token there and reference it with var() instead. See docs/design-system.md."
       }
     ],
     "function-disallowed-list": [
-      ["rgb", "rgba", "hsl", "hsla"],
+      [
+        "rgb",
+        "rgba",
+        "hsl",
+        "hsla"
+      ],
       {
-        "message": "Use color-mix(in srgb, var(--color-*) N%, transparent) against a primitive instead of rgb()/rgba()/hsl()/hsla() literals — keeps every color traceable to tokens/primitives.css."
+        "message": "Use color-mix(in srgb, var(--token) N%, transparent) against a palette token instead of rgb()/rgba()/hsl()/hsla() literals — keeps every color traceable to tokens/palette.css."
       }
     ]
   },
   "overrides": [
     {
-      "comment": "primitives.css is the only file allowed to originate a raw color value.",
-      "files": ["src/styles/tokens/primitives.css"],
+      "comment": "palette.css is the only file allowed to originate a raw color value.",
+      "files": [
+        "src/styles/tokens/palette.css"
+      ],
       "rules": {
         "color-no-hex": null,
         "function-disallowed-list": null
       }
     },
     {
-      "comment": "login.css pins its own pre-auth dark ramp (--lg-*) independent of the authenticated theme — documented exception, mirrors tokens/primitives.css's dark register verbatim.",
-      "files": ["src/styles/login.css"],
+      "comment": "login.css pins its own pre-auth dark ramp (--lg-*) independent of the authenticated theme — documented exception, mirrors tokens/palette.css's dark register verbatim.",
+      "files": [
+        "src/styles/login.css"
+      ],
       "rules": {
         "color-no-hex": null,
         "function-disallowed-list": null
@@ -32,7 +41,9 @@
     },
     {
       "comment": "preferences.css theme swatches must show both light and dark simultaneously, so they can't resolve a single var() — documented exception.",
-      "files": ["src/styles/preferences.css"],
+      "files": [
+        "src/styles/preferences.css"
+      ],
       "rules": {
         "color-no-hex": null,
         "function-disallowed-list": null
@@ -40,7 +51,9 @@
     },
     {
       "comment": "artifact.css's frame-preview background is a literal white document page in every theme — documented single-use exception (see inline comment).",
-      "files": ["src/styles/artifact.css"],
+      "files": [
+        "src/styles/artifact.css"
+      ],
       "rules": {
         "color-no-hex": null
       }

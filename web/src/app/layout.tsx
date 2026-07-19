@@ -1,24 +1,20 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
-import {
-  Geist,
-  Geist_Mono,
-  Instrument_Serif,
-} from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 
 import "../styles.css";
 
 import { Providers } from "./providers";
 
 // One crisp precision grotesk carries display, chrome, AND body text —
-// the monochrome system differentiates with weight and tracking, never a
-// family switch. This one variable Geist instance backs both --font-sans
-// and --font-display in tokens/primitives.css (both alias --font-app-sans).
-// Geist Mono is reserved for code-like content: tool/command lines, raw
-// logs, code blocks, and IDs. latin-ext widens coverage to accented
-// European/Vietnamese names in employee and sandbox labels.
+// the graphite system differentiates with weight and tracking, never a
+// family switch. This one variable Geist instance backs --font-sans in
+// tokens/palette.css (via --font-app-sans). Geist Mono is reserved for
+// code-like content: tool/command lines, raw logs, code blocks, and IDs.
+// latin-ext widens coverage to accented European/Vietnamese names in
+// employee and sandbox labels.
 //
-// CJK stays system-first (PingFang / YaHei / etc. in primitives.css). We do
+// CJK stays system-first (PingFang / YaHei / etc. in palette.css). We do
 // not load Noto Sans SC/TC through next/font — those unicode-range chunks
 // balloon Turbopack compile and only matter on bare Linux.
 const appSans = Geist({
@@ -33,17 +29,6 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   display: "swap",
   weight: "variable",
-});
-
-// Editorial display serif — reserved for the rare, large hero-headline
-// moments (login attach screen, empty states) via --type-display-lg/sm in
-// tokens/semantic.css. Everywhere else stays on Geist Sans.
-const displaySerif = Instrument_Serif({
-  subsets: ["latin", "latin-ext"],
-  variable: "--font-instrument-serif",
-  display: "swap",
-  weight: "400",
-  style: ["normal", "italic"],
 });
 
 export const metadata: Metadata = {
@@ -62,8 +47,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#faf8f4" },
-    { media: "(prefers-color-scheme: dark)", color: "#141311" },
+    { media: "(prefers-color-scheme: light)", color: "#f7f8f9" },
+    { media: "(prefers-color-scheme: dark)", color: "#101214" },
   ],
 };
 
@@ -74,7 +59,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
       lang="en"
-      className={`${appSans.variable} ${geistMono.variable} ${displaySerif.variable}`}
+      className={`${appSans.variable} ${geistMono.variable}`}
       suppressHydrationWarning
     >
       <head>
@@ -85,7 +70,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "(function(){try{var t=localStorage.getItem('relay-web.theme')||'dark';if(t==='contrast'||t==='contrast-dark'){t='system';localStorage.setItem('relay-web.theme','system');}var d=matchMedia('(prefers-color-scheme: dark)').matches;var dk=t==='dark'||(t!=='light'&&d);var r=dk?'dark':'light';document.documentElement.setAttribute('data-theme',r);document.documentElement.classList.toggle('dark',dk);var c={light:'#faf8f4',dark:'#141311'}[r]||'#141311';var m=document.querySelector('meta[name=\"theme-color\"][data-relay-theme-color]');if(!m){m=document.createElement('meta');m.setAttribute('name','theme-color');m.setAttribute('data-relay-theme-color','');document.head.appendChild(m);}m.removeAttribute('media');m.setAttribute('content',c);}catch(e){}})();",
+              "(function(){try{var t=localStorage.getItem('relay-web.theme')||'dark';if(t==='contrast'||t==='contrast-dark'){t='system';localStorage.setItem('relay-web.theme','system');}var d=matchMedia('(prefers-color-scheme: dark)').matches;var dk=t==='dark'||(t!=='light'&&d);var r=dk?'dark':'light';document.documentElement.setAttribute('data-theme',r);document.documentElement.classList.toggle('dark',dk);var c={light:'#f7f8f9',dark:'#101214'}[r]||'#101214';var m=document.querySelector('meta[name=\"theme-color\"][data-relay-theme-color]');if(!m){m=document.createElement('meta');m.setAttribute('name','theme-color');m.setAttribute('data-relay-theme-color','');document.head.appendChild(m);}m.removeAttribute('media');m.setAttribute('content',c);}catch(e){}})();",
           }}
         />
       </head>

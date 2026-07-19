@@ -36,7 +36,7 @@ function PlaceholderBars({ compact }: { compact?: boolean }) {
             y={y}
             width={barW}
             height={h}
-            fill="var(--color-hairline)"
+            fill="var(--line-1)"
             opacity={0.55}
           />
         );
@@ -46,7 +46,7 @@ function PlaceholderBars({ compact }: { compact?: boolean }) {
         x2={WIDTH - PADDING.right}
         y1={PADDING.top + innerH + 0.5}
         y2={PADDING.top + innerH + 0.5}
-        stroke="var(--color-hairline-soft)"
+        stroke="var(--line-2)"
         strokeWidth={1}
       />
     </svg>
@@ -119,7 +119,7 @@ export function TokenUsageChart({ snapshot, compact, className }: TokenUsageChar
           x2={WIDTH - PADDING.right}
           y1={PADDING.top + innerH + 0.5}
           y2={PADDING.top + innerH + 0.5}
-          stroke="var(--color-hairline-soft)"
+          stroke="var(--line-2)"
           strokeWidth={1}
         />
         {points.map((point, i) => {

@@ -1,5 +1,25 @@
 # Relay Web — Design Review
 
+## Graphite — new identity + token system rebuild (2026-07-19)
+
+Replaced the Sleek Forest identity (warm near-black + forest green + Instrument Serif) and its bloated 4-tier token system with **Graphite**: true-neutral canvas, one steel-blue action color, status-only chroma, two registers designed side by side. Spec: `docs/superpowers/specs/2026-07-19-graphite-tokens-design.md`; living specimen: `docs/design-system-preview.html`; reference: `docs/design-system.md` (fully rewritten).
+
+- **New tiers.** `tokens/primitives.css` + `semantic.css` → `tokens/palette.css` (raw values, both registers side by side — dual-first, neither derived) + `roles.css` (10 `--type-*` roles, 2 shadows, focus rings, `--info` alias). `shadcn-bridge.css`/`base.css` rewired; Tailwind utility names kept stable so TSX never tracked the rename.
+- **New names, collapsed scales.** `--surface-0..3`, `--ink-1..4`, `--line-1/2`, `--action*`/`--on-action` (not `--accent` — shadcn reserves `--accent`/`--ring`), `--ok/--warn/--err/--info`, `--r-1..3+full` (9 radii → 4), `--sp-1..9`, `--fs-1..6` (11 sizes → 6), `--track-tight/0/caps` (8 → 3), one `--ease` + `--t-fast/--t-slow` (3 eases × 4 durations → 1 × 2), z 7 → 5 layers, one `--scrim` (3-layer stack deleted; stacked backdrops composite). ~3.4k mechanical replacements across 36 files; zero old names survive outside the bridge.
+- **Chroma cuts.** Artifact kind rainbow (7 hues) → monochrome chips (icon + mono label carry kind); `--color-rust` code numerals → ink; dot-vs-text dual status ramps → one AA-safe value per hue per register; info = ink. Status is dot/border/text only, never fills; disabled is opacity, not a hex.
+- **Serif deleted.** Instrument Serif removed from `layout.tsx` (font payload gone); login/empty heroes are Geist 600 with tight tracking. Body 17px → 15px (deliberate — denser console read).
+- **Rebranded assets.** favicon/relay-mark/relay-logo SVGs, theme-color metas, `appStorage` chrome colors, login `--lg-*` pinned ramp, preferences theme swatches — all retuned to graphite + steel (#6ba1d4 dark / #33689e light on #101214 / #f7f8f9).
+
+**Verify:** stylelint clean (hex-only-in-palette now points at `palette.css`), tsc clean, full web suite passing except pre-existing `adminChannels` failure (fails at clean HEAD). Screenshots light+dark 1440: login, chat, backlog, and admin dashboard all verified on the Graphite registers. Harness gotcha reconfirmed: `/\/sessions$/` swallows `/cp/dashboard/sessions` — anchor list-endpoint regexes to the URL root.
+
+The redesigned agent-instructions card read as too heavy against the app's monochrome, hairline-driven spec. Stripped the decoration to bring it in line:
+
+- **Flat card, no accent chrome.** `.agent-instruction-card` dropped the 135° action-tinted gradient, the `inset 3px` action left-bar, and the `is-editing` drop shadow. It's now a plain `surface-soft` panel with a `hairline-soft` border; editing just firms the border to `hairline` and lifts the fill to `surface-strong`.
+- **Dropped the icon tile.** Removed the bordered, action-tinted `StreamThinking` mark (`.agent-instruction-card-mark`) and its 3-column grid head; the head is a simple flex row (heading + edit button). Title/state/help stand on their own.
+- **Prose sits inline.** `.agent-instruction-prose` and `.agent-instruction-empty` lost the 38px left indent and their nested bordered/ dashed boxes — now plain text separated from the head by a single `hairline-soft` top rule. State pill kept (monochrome default, action tint only when custom).
+
+**Verify:** agent workspace profile + admin agent drawer, light + dark — instruction card is a quiet hairline card, no gradient/left-bar/icon-tile, prose flows directly under a thin divider. tsc clean, stylelint clean.
+
 ## Chat speaker identity + Ask/Handoff mode design (2026-07-19)
 
 Gave the two chat voices a designed, matched-but-distinct identity, moved the Relay product mark onto the generic agent-phase marker, and gave the Ask/Handoff modes their own visual language.

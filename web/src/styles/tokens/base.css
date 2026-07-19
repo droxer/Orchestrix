@@ -1,16 +1,10 @@
-/* =====================================================================
-   Tier 4 — Base.
-
-   Global element resets, focus contract, and the small set of utility
-   classes shared across the app (.mono, .eyebrow, .tone-*).
-   Everything here consumes semantic.css roles; it never declares a new
-   token itself.
-   ===================================================================== */
+/* Base — element resets, focus contract, shared utilities
+   (.mono, .eyebrow, .tone-*). Consumes tokens only. */
 
 :root {
   color-scheme: dark;
-  background: var(--color-semantic-canvas);
-  color: var(--color-semantic-ink);
+  background: var(--surface-0);
+  color: var(--ink-1);
   font-family: var(--font-sans);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -23,52 +17,47 @@ html[data-theme="light"] {
 
 * { box-sizing: border-box; }
 
-/* Root type size: 87.5% of the user's browser default (14px at the stock
-   16px), so raising the browser font-size preference scales every rem token
-   in the type scale (WCAG 1.4.4). Never pin this to a px value — that
-   silently discards the user's setting. body inherits this size; do not
-   re-declare font-size on html below (on the root element 1rem resolves to
-   the browser default, which would undo the 87.5%). */
+/* Root type size: 87.5% of the browser default (14px at the stock 16px)
+   so the user's font-size preference scales every rem token (WCAG 1.4.4).
+   Never pin this to px. */
 html {
   font-size: 87.5%;
 }
 
-/* overflow-x: hidden is a last-resort clip, not a layout tool — it hides
-   horizontal overflow instead of surfacing it, so reflow regressions must be
-   caught by testing at the 320px floor (WCAG 1.4.10), not papered over here. */
+/* overflow-x: hidden is a last-resort clip — reflow regressions must be
+   caught at the 320px floor (WCAG 1.4.10), not papered over here. */
 html,
 body {
   min-width: 320px;
   min-height: 100vh;
+  min-height: 100dvh;
   margin: 0;
   overflow-x: hidden;
-  background: var(--color-semantic-canvas);
-  color: var(--color-semantic-body);
+  background: var(--surface-0);
+  color: var(--ink-2);
   font-family: var(--font-sans);
   line-height: 1.5;
 }
 
 ::selection {
-  background: var(--color-semantic-action);
-  color: var(--color-semantic-on-action);
+  background: var(--action);
+  color: var(--on-action);
 }
 
 .skip-link {
   position: fixed;
-  left: var(--space-base);
-  top: var(--space-base);
-  /* Topmost when focused so it clears the float layer (sidenav flyouts,
-     tooltips at --z-float) that a literal 100 sat beneath. */
+  left: var(--sp-4);
+  top: var(--sp-4);
   z-index: var(--z-dialog);
-  transform: translateY(calc(-100% - var(--space-base)));
-  padding: var(--space-xs) var(--space-sm);
-  border-radius: var(--radius-sm);
-  background: var(--color-semantic-action);
-  color: var(--color-semantic-on-action);
-  font-size: var(--text-base);
+  transform: translateY(calc(-100% - var(--sp-4)));
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-2);
+  background: var(--action);
+  color: var(--on-action);
+  font-size: var(--fs-3);
   font-weight: 600;
   text-decoration: none;
-  transition: transform var(--duration-fast) var(--ease-standard);
+  transition: transform var(--t-fast) var(--ease);
 }
 
 .skip-link:focus-visible {
@@ -88,7 +77,7 @@ a,
 input,
 textarea,
 select {
-  -webkit-tap-highlight-color: color-mix(in srgb, var(--color-semantic-action) 14%, transparent);
+  -webkit-tap-highlight-color: color-mix(in srgb, var(--action) 14%, transparent);
   touch-action: manipulation;
 }
 
@@ -98,53 +87,43 @@ button {
   cursor: pointer;
 }
 
+/* Disabled is opacity — there is no disabled hex in the palette. */
 button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }
 
-/* Focus — single ring contract. Components that need a stacked shadow
-   (composer wrap, cards on hover) override locally; everything else picks
-   up the brand-alpha halo here. */
+button:not(:disabled):active {
+  transform: translateY(1px);
+}
+
+/* Focus — single ring contract. */
 :where(button, a, input, textarea, select):focus-visible {
   outline: none;
-  box-shadow: var(--ring-focus);
+  box-shadow: var(--focus-ring);
 }
 
 .chat-panel:focus-visible {
   outline: none;
-  box-shadow: var(--ring-focus);
+  box-shadow: var(--focus-ring);
   outline-offset: 0;
 }
 
-/* Primary CTA enabled — the unlayered `button { background: none }` reset above
-   outranks Tailwind's layered `bg-primary`/`text-primary-foreground` utilities
-   (an unlayered rule beats any @layer regardless of specificity), so the
-   default-variant <Button> would otherwise render with no fill once enabled.
-   Restore the brand fill here to match the disabled rule below. */
+/* Primary CTA — the unlayered `button { background: none }` reset above
+   outranks Tailwind's layered bg-primary utility, so restore the fill. */
 button[data-slot="button"][data-variant="default"] {
-  background: var(--color-semantic-action);
-  color: var(--color-semantic-on-action);
+  background: var(--action);
+  color: var(--on-action);
 }
 
 button[data-slot="button"][data-variant="default"]:hover:not(:disabled) {
-  background: var(--color-semantic-action-active);
+  background: var(--action-hover);
 }
 
-/* Primary CTA disabled — the shadcn <Button> default variant is the primary
-   CTA (it renders data-variant="default"), so its disabled state uses the
-   dedicated faded-ink token instead of generic opacity. */
-button[data-slot="button"][data-variant="default"]:disabled {
-  background: var(--color-semantic-action-disabled);
-  color: var(--color-semantic-on-action);
-  opacity: 1;
-}
-
-/* Tabular numerals — renders in the sans (--font-number aliases --font-sans
-   per the Linear model); the name is retained for its many consumers. Elements
-   that must stay monospace (session IDs, hashes) re-specify --font-mono locally. */
+/* Tabular numerals in the sans; elements that must stay monospace
+   (session IDs, hashes) re-specify --font-mono locally. */
 .mono {
-  font-family: var(--font-number);
+  font-family: var(--font-sans);
   font-feature-settings: "tnum" 1;
   font-variant-numeric: tabular-nums;
   font-weight: 500;
@@ -152,19 +131,16 @@ button[data-slot="button"][data-variant="default"]:disabled {
 
 .eyebrow {
   margin: 0;
-  color: var(--color-semantic-muted);
-  font: var(--type-eyebrow);
-  letter-spacing: var(--letter-eyebrow);
+  color: var(--ink-3);
+  font: var(--type-micro);
+  letter-spacing: var(--track-caps);
   text-transform: uppercase;
 }
 
-/* Status tone driver — the single source for dot + pill color. A component
-   sets a `tone-*` modifier on the element; dots fill with var(--tone) and
-   outlined pills take it as currentColor. Tone classes only set the
-   variable so they never fight an element's own text color — consumers
+/* Status tone driver — tone classes only set the variable; consumers
    opt in by reading var(--tone). */
-.tone-good    { --tone: var(--color-semantic-success); }
-.tone-info    { --tone: var(--color-semantic-info); }
-.tone-bad     { --tone: var(--color-semantic-danger); }
-.tone-warn    { --tone: var(--color-semantic-warning); }
-.tone-neutral { --tone: var(--color-semantic-muted-soft); }
+.tone-good    { --tone: var(--ok); }
+.tone-info    { --tone: var(--info); }
+.tone-bad     { --tone: var(--err); }
+.tone-warn    { --tone: var(--warn); }
+.tone-neutral { --tone: var(--ink-4); }

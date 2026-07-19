@@ -4,12 +4,12 @@
   display: grid;
   grid-template-columns: var(--sidenav-w) var(--thread-w) minmax(0, 1fr);
   height: 100vh;
-  height: 100svh;
-  min-height: 100svh;
+  height: 100dvh;
+  min-height: 100dvh;
   overflow: hidden;
-  background: var(--color-semantic-canvas);
+  background: var(--surface-0);
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-  transition: grid-template-columns var(--duration-base) var(--ease-standard);
+  transition: grid-template-columns var(--t-fast) var(--ease);
 }
 
 .messenger-shell[data-sidenav="open"] {
@@ -22,27 +22,27 @@
 
 /* Stacked PageHeader — shared eyebrow grammar from atelier.css */
 .page-header-kicker {
-  font: var(--type-eyebrow);
-  letter-spacing: var(--letter-eyebrow);
+  font: var(--type-micro);
+  letter-spacing: var(--track-caps);
   text-transform: uppercase;
 }
 
 .page-header-subtitle {
   margin: 0;
   max-width: 46ch;
-  font-size: var(--text-sm);
+  font-size: var(--fs-3);
   line-height: 1.45;
-  color: var(--color-semantic-muted);
+  color: var(--ink-3);
 }
 
 .page-header-toolbar {
-  margin-top: var(--space-sm);
+  margin-top: var(--sp-3);
 }
 
-/* Stacked route titles — Geist title-lg. Instrument Serif (--type-display-*)
+/* Stacked route titles — Geist --type-title.
    is reserved for login/empty heroes; using it here made admin/channels/
    agent-workspace headers read as oversized serif headlines. */
 .page-header-title--display {
-  font: var(--type-title-lg);
-  letter-spacing: var(--letter-tight);
+  font: var(--type-title);
+  letter-spacing: var(--track-tight);
 }

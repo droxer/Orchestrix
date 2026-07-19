@@ -1,0 +1,169 @@
+/* Graphite palette — raw values, both registers side by side.
+   True-neutral canvas, one steel-blue action color, status as
+   dot/border/text only. The only file allowed to originate a color.
+   Rationale: docs/superpowers/specs/2026-07-19-graphite-tokens-design.md
+
+   Breakpoints (reference — custom properties can't drive @media):
+   mobile 820px · tablet 1040px · login-stack 879px · admin-drawer 768px
+   admin-compact 640px · preferences 600px · artifact-chip 560px */
+
+:root {
+  /* Dark register (default) */
+  --surface-0: #101214; /* canvas */
+  --surface-1: #16181b; /* cards, panels */
+  --surface-2: #1c1f23; /* fills, search, hover */
+  --surface-3: #22262b; /* drawers, modals */
+
+  --ink-1: #f2f4f6; /* headings, emphasis */
+  --ink-2: #c9ced4; /* body */
+  --ink-3: #99a0a8; /* secondary labels */
+  --ink-4: #6b727b; /* timestamps, disabled */
+
+  --line-1: #282c31; /* structural hairline */
+  --line-2: #1f2226; /* soft hairline */
+
+  /* Action — the only chromatic action color. No disabled hex: disabled
+     is opacity. Bright on dark, so on-action text is dark ink. */
+  --action: #6ba1d4;
+  --action-hover: #84b3e0;
+  --action-soft: #15202c; /* selection wash, active nav */
+  --on-action: #0e1216;
+
+  /* Status — dot/border/text only, never fills, never actions.
+     One value per hue, AA-safe as small text. */
+  --ok: #3fb96c;
+  --warn: #d9a13f;
+  --err: #e5635f;
+
+  /* Always-dark register — surfaces that never flip (diff viewer,
+     ink-fill chrome). Same values as the dark register above. */
+  --dark-surface: #16181b;
+  --dark-surface-2: #1c1f23;
+  --dark-ink: #f2f4f6;
+  --dark-ink-soft: #99a0a8;
+  --dark-line: color-mix(in srgb, #f2f4f6 14%, transparent);
+
+  --scrim: rgba(0, 0, 0, 0.66);
+  --shadow-tint: rgba(0, 0, 0, 0.5);
+  --shadow-tint-wide: rgba(0, 0, 0, 0.45);
+  --shadow-edge: rgba(255, 255, 255, 0.06);
+
+  /* ----- Register-invariant scales ----- */
+
+  /* Radii — chips 4, controls 6, cards/drawers/modals 10. */
+  --r-1: 4px;
+  --r-2: 6px;
+  --r-3: 10px;
+  --r-full: 9999px;
+
+  /* Spacing — 4px base. */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-7: 32px;
+  --sp-8: 48px;
+  --sp-9: 64px;
+  --sp-row: var(--sp-3); /* dense row rhythm */
+
+  --control-h: 40px;
+
+  /* Shell */
+  --sidenav-w: 72px;
+  --sidenav-w-open: 228px;
+  --thread-w: 318px;
+  --header-h: 64px;
+
+  /* Z layers — popover < drawer < sheet < float < dialog. */
+  --z-popover: 20;
+  --z-drawer: 30;
+  --z-sheet: 50;
+  --z-float: 120;
+  --z-dialog: 300;
+
+  /* Type sizes — rem so browser font-size preference scales the UI
+     (root pinned to 87.5% in base.css; 1rem = 14px at the default). */
+  --fs-1: 0.7857rem; /* 11px */
+  --fs-2: 0.9286rem; /* 13px */
+  --fs-3: 1rem;      /* 14px */
+  --fs-4: 1.0714rem; /* 15px */
+  --fs-5: 1.5714rem; /* 22px */
+  --fs-6: 2.2857rem; /* 32px */
+
+  /* Leading */
+  --leading-tight: 1.15;
+  --leading-normal: 1.5;
+  --leading-loose: 1.65;
+
+  /* Tracking — tight for display ≥22px, caps for uppercase labels. */
+  --track-tight: -0.02em;
+  --track-0: 0;
+  --track-caps: 0.05em;
+
+  /* Families — Geist everywhere; mono for code, IDs, logs. */
+  --font-sans: var(--font-app-sans), "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-mono: var(--font-geist-mono), "Geist Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+
+  /* Motion — one ease, two speeds, no overshoot. */
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --t-fast: 120ms;
+  --t-slow: 320ms;
+}
+
+/* Light register — designed alongside dark, not derived from it. */
+html[data-theme="light"] {
+  --surface-0: #f7f8f9;
+  --surface-1: #ffffff;
+  --surface-2: #eef0f2;
+  --surface-3: #ffffff; /* + --shadow-1 carries the lift */
+
+  --ink-1: #16181b;
+  --ink-2: #3f444b;
+  --ink-3: #5c636b;
+  --ink-4: #7d848d;
+
+  --line-1: #e2e5e8;
+  --line-2: #eceef0;
+
+  --action: #33689e;
+  --action-hover: #2a5786;
+  --action-soft: #e4eef7;
+  --on-action: #ffffff;
+
+  --ok: #1e8a4c;
+  --warn: #9a6b1a;
+  --err: #c93d3d;
+
+  --scrim: rgba(12, 14, 16, 0.55);
+  --shadow-tint: rgba(12, 14, 16, 0.06);
+  --shadow-tint-wide: rgba(12, 14, 16, 0.1);
+  --shadow-edge: rgba(12, 14, 16, 0.05);
+}
+
+/* CJK — Geist has no Han glyphs; system CJK faces fall in behind it.
+   Full-width squares want neutral tracking and looser leading. */
+html:lang(zh-CN) {
+  --font-sans: var(--font-app-sans), "Geist", "PingFang SC", "HarmonyOS Sans SC", "MiSans", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --font-mono: var(--font-geist-mono), "Geist Mono", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", monospace;
+}
+
+html:lang(zh-TW) {
+  --font-sans: var(--font-app-sans), "Geist", "PingFang TC", "Microsoft JhengHei UI", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+  --font-mono: var(--font-geist-mono), "Geist Mono", "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", monospace;
+}
+
+html:lang(zh-CN),
+html:lang(zh-TW) {
+  --track-tight: 0;
+  --track-caps: 0.03em;
+  --leading-normal: 1.7;
+  --leading-loose: 1.8;
+}
+
+/* Density escape hatch — data-dense surfaces (admin tables, backlog). */
+[data-density="compact"] {
+  --leading-loose: 1.5;
+  --sp-row: var(--sp-2);
+}

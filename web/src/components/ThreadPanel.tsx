@@ -4,7 +4,6 @@ import { ActionCompose, ActionSearch } from "./icons";
 import { ConversationRow, type ConversationItem } from "./ConversationRow";
 import { groupConversations } from "../lib/conversationGroups";
 import type { RelaySession } from "../types";
-import type { AgentName } from "../types";
 import { Button } from "./ui/button";
 
 // The logged-in employee's own conversations. Each row is a session; the list
@@ -15,7 +14,6 @@ export function ThreadPanel({
   query,
   setQuery,
   selectedSessionId,
-  agentDisplayNames,
   onSelectConversation,
   onNewConversation,
   onRenameConversation,
@@ -25,7 +23,6 @@ export function ThreadPanel({
   query: string;
   setQuery: Dispatch<SetStateAction<string>>;
   selectedSessionId: string | undefined;
-  agentDisplayNames?: Partial<Record<AgentName, string>>;
   onSelectConversation: (sessionId: string) => void;
   onNewConversation: () => void;
   onRenameConversation: (session: RelaySession) => void;
@@ -87,7 +84,6 @@ export function ThreadPanel({
                   key={item.session.id}
                   item={item}
                   selected={selectedSessionId === item.session.id}
-                  agentDisplayNames={agentDisplayNames}
                   onSelect={onSelectConversation}
                   onRename={onRenameConversation}
                   onClose={onCloseConversation}

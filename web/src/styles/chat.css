@@ -6,24 +6,24 @@
   min-height: 0;
   display: grid;
   grid-template-rows: var(--header-h) minmax(0, 1fr) auto;
-  background: var(--color-semantic-canvas);
+  background: var(--surface-0);
 }
 
 .chat-header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: var(--space-sm);
-  padding: 0 var(--space-base);
-  border-bottom: 1px solid var(--color-semantic-hairline);
-  background: var(--color-semantic-canvas);
+  gap: var(--sp-3);
+  padding: 0 var(--sp-4);
+  border-bottom: 1px solid var(--line-1);
+  background: var(--surface-0);
 }
 
 .chat-title {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  gap: var(--sp-3);
 }
 
 .mobile-back-button {
@@ -33,30 +33,30 @@
 .chat-title .employee-avatar {
   width: 36px;
   height: 36px;
-  font-size: var(--text-sm);
+  font-size: var(--fs-3);
 }
 
 .chat-title-text {
   min-width: 0;
   display: flex;
   align-items: baseline;
-  gap: var(--space-xs);
+  gap: var(--sp-2);
 }
 
 .chat-title-meta {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-xs);
+  gap: var(--sp-2);
   margin: 0;
   flex: 0 1 auto;
   min-width: 0;
-  color: var(--color-semantic-muted);
+  color: var(--ink-3);
 }
 
 .chat-title-status {
   flex: 0 0 auto;
   padding: 1px 7px;
-  font: var(--type-meta);
+  font: var(--type-label);
   font-weight: 500;
   text-transform: none;
 }
@@ -72,12 +72,12 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   padding: 1px 7px;
-  border: 1px solid var(--color-semantic-hairline);
-  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-2);
   background: transparent;
-  color: var(--color-semantic-muted);
-  font: var(--type-eyebrow);
-  letter-spacing: var(--letter-eyebrow);
+  color: var(--ink-3);
+  font: var(--type-micro);
+  letter-spacing: var(--track-caps);
   text-transform: uppercase;
 }
 
@@ -85,11 +85,11 @@
   min-width: 0;
   margin: 0;
   flex: 1 1 auto;
-  color: var(--color-semantic-ink);
-  font: var(--type-title-md);
-  font-size: var(--text-lg);
-  line-height: var(--leading-snug);
-  letter-spacing: var(--letter-body);
+  color: var(--ink-1);
+  font: var(--type-title);
+  font-size: var(--fs-5);
+  line-height: var(--leading-normal);
+  letter-spacing: var(--track-0);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -98,7 +98,7 @@
 .chat-tools {
   display: flex;
   align-items: center;
-  gap: var(--space-xs);
+  gap: var(--sp-2);
   min-width: 0;
 }
 
@@ -107,11 +107,11 @@
   align-items: center;
   gap: 5px;
   min-height: 30px;
-  padding: 0 var(--space-sm);
-  border: 1px solid var(--color-semantic-hairline);
-  border-radius: var(--radius-sm);
-  color: var(--color-semantic-muted);
-  font: var(--type-meta);
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-2);
+  color: var(--ink-3);
+  font: var(--type-label);
   white-space: nowrap;
 }
 
@@ -123,7 +123,7 @@
 .chat-header .icon-button {
   width: 36px;
   height: 36px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--r-2);
 }
 
 .chat-header .icon-button:disabled {
@@ -132,7 +132,7 @@
 }
 
 .chat-header .icon-button:disabled:hover {
-  color: var(--color-semantic-muted);
+  color: var(--ink-3);
   background: transparent;
   border-color: transparent;
 }
@@ -150,11 +150,11 @@
   display: grid;
   place-items: center;
   padding: 0 4px;
-  border: 1px solid var(--color-semantic-canvas);
-  border-radius: var(--radius-full);
-  background: var(--color-semantic-ink);
-  color: var(--color-semantic-canvas);
-  font-size: var(--text-micro);
+  border: 1px solid var(--surface-0);
+  border-radius: var(--r-full);
+  background: var(--ink-1);
+  color: var(--surface-0);
+  font-size: var(--fs-1);
   font-weight: 600;
   line-height: 1;
 }
@@ -163,9 +163,9 @@
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  padding: var(--space-xxs);
-  border-radius: var(--radius-sm);
-  background: var(--color-semantic-surface-strong);
+  padding: var(--sp-1);
+  border-radius: var(--r-2);
+  background: var(--surface-2);
 }
 
 .header-agent-tabs button {
@@ -173,11 +173,11 @@
   align-items: center;
   gap: 5px;
   min-height: 30px;
-  padding: 0 var(--space-sm);
+  padding: 0 var(--sp-3);
   border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  color: var(--color-semantic-body);
-  font: var(--type-meta);
+  border-radius: var(--r-2);
+  color: var(--ink-2);
+  font: var(--type-label);
   background: transparent;
   white-space: nowrap;
 }
@@ -185,7 +185,7 @@
 .header-agent-tab-mark {
   flex: 0 0 auto;
   opacity: 0.85;
-  transition: opacity var(--duration-fast) var(--ease-standard);
+  transition: opacity var(--t-fast) var(--ease);
 }
 
 /* Ghost-button's default hover fill (--muted) resolves to the same token as
@@ -193,9 +193,9 @@
    surface-raised + a hairline instead so hover reads on a track that's
    already elevated. */
 .header-agent-tabs button:hover {
-  color: var(--color-semantic-ink);
-  background: var(--color-semantic-surface-raised);
-  border-color: var(--color-semantic-hairline);
+  color: var(--ink-1);
+  background: var(--surface-3);
+  border-color: var(--line-1);
 }
 
 .header-agent-tabs button:hover .header-agent-tab-mark,
@@ -204,14 +204,14 @@
 }
 
 .header-agent-tabs button.active {
-  background: var(--color-semantic-canvas);
-  color: var(--color-semantic-ink);
-  border-color: var(--color-semantic-hairline);
+  background: var(--surface-0);
+  color: var(--ink-1);
+  border-color: var(--line-1);
 }
 
 .header-agent-tabs button.agent-tab-disabled,
 .header-agent-tabs button.agent-tab-disabled:hover {
-  color: var(--color-semantic-muted);
+  color: var(--ink-3);
   opacity: 0.55;
   text-decoration: line-through;
   text-decoration-thickness: 1px;
@@ -221,7 +221,7 @@
 }
 
 .header-agent-tabs button.agent-tab-busy {
-  color: var(--color-semantic-ink);
+  color: var(--ink-1);
 }
 
 .header-agent-tabs button.agent-tab-busy .header-agent-tab-mark {
@@ -232,16 +232,16 @@
   flex: 0 0 auto;
   width: 6px;
   height: 6px;
-  border-radius: var(--radius-full);
-  background: var(--color-semantic-info);
-  box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-semantic-info) 55%, transparent);
-  animation: header-agent-busy-pulse 1.6s var(--ease-standard) infinite;
+  border-radius: var(--r-full);
+  background: var(--info);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--info) 55%, transparent);
+  animation: header-agent-busy-pulse 1.6s var(--ease) infinite;
 }
 
 @keyframes header-agent-busy-pulse {
   0%,
   100% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-semantic-info) 45%, transparent);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--info) 45%, transparent);
     opacity: 1;
   }
   55% {
@@ -257,11 +257,11 @@
 }
 
 .header-agent-tabs button.agent-tab-failed {
-  color: var(--color-semantic-danger-text);
+  color: var(--err);
 }
 
 .header-agent-tabs button.agent-tab-not-ready {
-  color: var(--color-semantic-muted);
+  color: var(--ink-3);
   opacity: 0.72;
 }
 
@@ -269,17 +269,17 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  background: var(--color-semantic-canvas);
+  background: var(--surface-0);
 }
 
 .transcript-inner {
   width: min(100%, 960px);
   min-height: 100%;
   margin: 0 auto;
-  padding: var(--space-xl) var(--space-lg) var(--space-xxl);
+  padding: var(--sp-7) var(--sp-6) var(--sp-8);
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
+  gap: var(--sp-5);
 }
 
 /* Active transcript — container spine, subtle left-edge warmth. */
@@ -288,7 +288,7 @@
   background:
     linear-gradient(
       90deg,
-      color-mix(in srgb, var(--color-semantic-action-soft) 28%, transparent) 0%,
+      color-mix(in srgb, var(--action-soft) 28%, transparent) 0%,
       transparent 140px
     );
 }
@@ -296,18 +296,18 @@
 .transcript-inner:not(:has(.transcript-empty))::before {
   content: "";
   position: absolute;
-  left: calc(var(--space-lg) + 9px);
-  top: var(--space-xl);
-  bottom: var(--space-xxl);
+  left: calc(var(--sp-6) + 9px);
+  top: var(--sp-7);
+  bottom: var(--sp-8);
   width: 1px;
-  background: var(--color-semantic-hairline);
+  background: var(--line-1);
   pointer-events: none;
 }
 
 /* Empty transcript — flat soft surface behind the shared empty state. */
 .transcript-inner:has(.transcript-empty) {
-  background: var(--color-semantic-surface-soft);
-  border-radius: var(--radius-xl);
+  background: var(--surface-1);
+  border-radius: var(--r-3);
 }
 
 /* Transcript empty — layout shell; visual language from empty-state.css */
@@ -323,25 +323,25 @@
 .transcript-phase {
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr) auto;
-  gap: var(--space-sm);
+  gap: var(--sp-3);
   align-items: center;
-  padding: var(--space-xxs) 0;
-  color: var(--color-semantic-muted);
+  padding: var(--sp-1) 0;
+  color: var(--ink-3);
 }
 
 .transcript-phase-node {
   width: 8px;
   height: 8px;
   margin-left: 6px;
-  border-radius: var(--radius-full);
-  background: var(--color-semantic-hairline);
-  box-shadow: 0 0 0 2px var(--color-semantic-canvas);
+  border-radius: var(--r-full);
+  background: var(--line-1);
+  box-shadow: 0 0 0 2px var(--surface-0);
   justify-self: center;
 }
 
 .transcript-phase-label {
-  font: var(--type-eyebrow);
-  letter-spacing: var(--letter-eyebrow);
+  font: var(--type-micro);
+  letter-spacing: var(--track-caps);
   text-transform: uppercase;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -353,8 +353,8 @@
   vertical-align: middle;
   width: 12px;
   height: 12px;
-  margin-right: var(--space-xs);
-  color: var(--color-semantic-muted);
+  margin-right: var(--sp-2);
+  color: var(--ink-3);
 }
 
 .transcript-phase-label::after {
@@ -363,16 +363,16 @@
   width: 100%;
   max-width: 120px;
   height: 1px;
-  margin-left: var(--space-sm);
+  margin-left: var(--sp-3);
   vertical-align: middle;
-  background: var(--color-semantic-hairline-soft);
+  background: var(--line-2);
 }
 
 .msg {
   position: relative;
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr) auto;
-  column-gap: var(--space-sm);
+  column-gap: var(--sp-3);
   align-items: start;
   content-visibility: auto;
   contain-intrinsic-size: auto 160px;
@@ -380,29 +380,29 @@
 
 /* Staggered reveal — first dozen turns fade-rise on mount. */
 .transcript-inner > .transcript-turn:nth-child(1) .msg,
-.transcript-inner > .transcript-turn:nth-child(1) .transcript-phase { animation: message-in var(--duration-base) var(--ease-out-quint) both; animation-delay: 30ms; }
+.transcript-inner > .transcript-turn:nth-child(1) .transcript-phase { animation: message-in var(--t-fast) var(--ease) both; animation-delay: 30ms; }
 .transcript-inner > .transcript-turn:nth-child(2) .msg,
-.transcript-inner > .transcript-turn:nth-child(2) .transcript-phase { animation: message-in var(--duration-base) var(--ease-out-quint) both; animation-delay: 60ms; }
+.transcript-inner > .transcript-turn:nth-child(2) .transcript-phase { animation: message-in var(--t-fast) var(--ease) both; animation-delay: 60ms; }
 .transcript-inner > .transcript-turn:nth-child(3) .msg,
-.transcript-inner > .transcript-turn:nth-child(3) .transcript-phase { animation: message-in var(--duration-base) var(--ease-out-quint) both; animation-delay: 90ms; }
+.transcript-inner > .transcript-turn:nth-child(3) .transcript-phase { animation: message-in var(--t-fast) var(--ease) both; animation-delay: 90ms; }
 .transcript-inner > .transcript-turn:nth-child(4) .msg,
-.transcript-inner > .transcript-turn:nth-child(4) .transcript-phase { animation: message-in var(--duration-base) var(--ease-out-quint) both; animation-delay: 120ms; }
+.transcript-inner > .transcript-turn:nth-child(4) .transcript-phase { animation: message-in var(--t-fast) var(--ease) both; animation-delay: 120ms; }
 .transcript-inner > .transcript-turn:nth-child(5) .msg,
-.transcript-inner > .transcript-turn:nth-child(5) .transcript-phase { animation: message-in var(--duration-base) var(--ease-out-quint) both; animation-delay: 150ms; }
+.transcript-inner > .transcript-turn:nth-child(5) .transcript-phase { animation: message-in var(--t-fast) var(--ease) both; animation-delay: 150ms; }
 .transcript-inner > .transcript-turn:nth-child(6) .msg,
-.transcript-inner > .transcript-turn:nth-child(6) .transcript-phase { animation: message-in var(--duration-base) var(--ease-out-quint) both; animation-delay: 180ms; }
+.transcript-inner > .transcript-turn:nth-child(6) .transcript-phase { animation: message-in var(--t-fast) var(--ease) both; animation-delay: 180ms; }
 .transcript-inner > .transcript-turn:nth-child(7) .msg,
-.transcript-inner > .transcript-turn:nth-child(7) .transcript-phase { animation: message-in var(--duration-base) var(--ease-out-quint) both; animation-delay: 210ms; }
+.transcript-inner > .transcript-turn:nth-child(7) .transcript-phase { animation: message-in var(--t-fast) var(--ease) both; animation-delay: 210ms; }
 .transcript-inner > .transcript-turn:nth-child(8) .msg,
-.transcript-inner > .transcript-turn:nth-child(8) .transcript-phase { animation: message-in var(--duration-base) var(--ease-out-quint) both; animation-delay: 240ms; }
+.transcript-inner > .transcript-turn:nth-child(8) .transcript-phase { animation: message-in var(--t-fast) var(--ease) both; animation-delay: 240ms; }
 .transcript-inner > .transcript-turn:nth-child(9) .msg,
-.transcript-inner > .transcript-turn:nth-child(9) .transcript-phase { animation: message-in var(--duration-base) var(--ease-out-quint) both; animation-delay: 270ms; }
+.transcript-inner > .transcript-turn:nth-child(9) .transcript-phase { animation: message-in var(--t-fast) var(--ease) both; animation-delay: 270ms; }
 .transcript-inner > .transcript-turn:nth-child(10) .msg,
-.transcript-inner > .transcript-turn:nth-child(10) .transcript-phase { animation: message-in var(--duration-base) var(--ease-out-quint) both; animation-delay: 300ms; }
+.transcript-inner > .transcript-turn:nth-child(10) .transcript-phase { animation: message-in var(--t-fast) var(--ease) both; animation-delay: 300ms; }
 .transcript-inner > .transcript-turn:nth-child(11) .msg,
-.transcript-inner > .transcript-turn:nth-child(11) .transcript-phase { animation: message-in var(--duration-base) var(--ease-out-quint) both; animation-delay: 330ms; }
+.transcript-inner > .transcript-turn:nth-child(11) .transcript-phase { animation: message-in var(--t-fast) var(--ease) both; animation-delay: 330ms; }
 .transcript-inner > .transcript-turn:nth-child(12) .msg,
-.transcript-inner > .transcript-turn:nth-child(12) .transcript-phase { animation: message-in var(--duration-base) var(--ease-out-quint) both; animation-delay: 360ms; }
+.transcript-inner > .transcript-turn:nth-child(12) .transcript-phase { animation: message-in var(--t-fast) var(--ease) both; animation-delay: 360ms; }
 
 @media (prefers-reduced-motion: reduce) {
   .transcript-inner > .transcript-turn .msg,
@@ -425,24 +425,24 @@
   grid-column: 1;
   grid-row: 1;
   align-self: start;
-  color: var(--color-semantic-ink);
-  background: var(--color-semantic-canvas);
-  border: 1px solid var(--color-semantic-hairline);
-  box-shadow: 0 0 0 2px var(--color-semantic-canvas);
+  color: var(--ink-1);
+  background: var(--surface-0);
+  border: 1px solid var(--line-1);
+  box-shadow: 0 0 0 2px var(--surface-0);
   z-index: 1;
   /* Agents are squares; the human is a rounded badge/avatar filled with the
      action color. Agent identity is the glyph inside, never color. */
-  border-radius: var(--radius-xs);
-  animation: node-in var(--duration-fast) var(--ease-standard) both;
+  border-radius: var(--r-1);
+  animation: node-in var(--t-fast) var(--ease) both;
 }
 
 .rail-node-agent > svg { display: block; }
 
 .rail-node-user {
-  background: var(--color-semantic-action);
-  border-color: var(--color-semantic-action);
-  border-radius: var(--radius-md);
-  color: var(--color-semantic-on-action);
+  background: var(--action);
+  border-color: var(--action);
+  border-radius: var(--r-2);
+  color: var(--on-action);
 }
 
 /* ---- Speaker avatars: a matched but distinct pair ------------------------
@@ -457,45 +457,45 @@
             the two speakers. (The generic Relay product mark lives on the
             agent-phase divider, not here.) */
 .msg-user .rail-node.rail-node-user {
-  border-radius: var(--radius-full);
+  border-radius: var(--r-full);
   border-color: transparent;
   background:
     linear-gradient(
       180deg,
-      color-mix(in srgb, var(--color-semantic-on-action) 22%, var(--color-semantic-action)),
-      var(--color-semantic-action)
+      color-mix(in srgb, var(--on-action) 22%, var(--action)),
+      var(--action)
     );
-  color: var(--color-semantic-on-action);
+  color: var(--on-action);
   box-shadow:
-    0 0 0 2px var(--color-semantic-canvas),
-    inset 0 1px 0 color-mix(in srgb, var(--color-semantic-on-action) 30%, transparent);
+    0 0 0 2px var(--surface-0),
+    inset 0 1px 0 color-mix(in srgb, var(--on-action) 30%, transparent);
 }
 
 .msg-agent .rail-node.rail-node-agent {
-  border-radius: var(--radius-sm);
-  background: var(--color-semantic-surface-raised);
-  border-color: color-mix(in srgb, var(--color-semantic-action) 32%, var(--color-semantic-hairline));
+  border-radius: var(--r-2);
+  background: var(--surface-3);
+  border-color: color-mix(in srgb, var(--action) 32%, var(--line-1));
   box-shadow:
-    0 0 0 2px var(--color-semantic-canvas),
-    0 1px 2px color-mix(in srgb, var(--color-semantic-ink) 8%, transparent);
+    0 0 0 2px var(--surface-0),
+    0 1px 2px color-mix(in srgb, var(--ink-1) 8%, transparent);
 }
 
 /* The vendor glyph paints in ink against the light tile. */
-.msg-agent .rail-node.rail-node-agent > svg { color: var(--color-semantic-ink); }
+.msg-agent .rail-node.rail-node-agent > svg { color: var(--ink-1); }
 
 .rail-node-system {
   width: 10px;
   height: 10px;
   border: none;
-  border-radius: var(--radius-full);
-  background: var(--color-semantic-muted-soft);
-  box-shadow: 0 0 0 2px var(--color-semantic-canvas);
+  border-radius: var(--r-full);
+  background: var(--ink-4);
+  box-shadow: 0 0 0 2px var(--surface-0);
   justify-self: center;
 }
 
-.rail-node-system.tone-good { background: var(--color-semantic-success); }
-.rail-node-system.tone-bad  { background: var(--color-semantic-danger); }
-.rail-node-system.tone-info { background: var(--color-semantic-info); }
+.rail-node-system.tone-good { background: var(--ok); }
+.rail-node-system.tone-bad  { background: var(--err); }
+.rail-node-system.tone-info { background: var(--info); }
 
 @keyframes node-in {
   from { transform: scale(0.4); opacity: 0; }
@@ -511,9 +511,9 @@
 }
 
 .msg-agent.grouped .rail-node-agent {
-  border-color: color-mix(in srgb, var(--color-semantic-hairline) 55%, transparent);
+  border-color: color-mix(in srgb, var(--line-1) 55%, transparent);
   background: transparent;
-  box-shadow: 0 0 0 2px var(--color-semantic-canvas);
+  box-shadow: 0 0 0 2px var(--surface-0);
 }
 
 .msg-agent.grouped .rail-node-agent > svg {
@@ -521,21 +521,21 @@
 }
 
 .msg-agent + .msg-agent.grouped {
-  margin-top: calc(var(--space-xs) - var(--space-md));
+  margin-top: calc(var(--sp-2) - var(--sp-5));
 }
 
 .turn-body {
   display: grid;
-  gap: var(--space-xs);
+  gap: var(--sp-2);
   min-width: 0;
   grid-column: 2;
   grid-row: 1;
 }
 
 .msg-time {
-  color: var(--color-semantic-muted);
-  font-family: var(--font-number);
-  font-size: var(--text-xs);
+  color: var(--ink-3);
+  font-family: var(--font-sans);
+  font-size: var(--fs-2);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -563,31 +563,31 @@
   }
 
   .msg-time {
-    font-size: var(--text-2xs);
+    font-size: var(--fs-2);
   }
 }
 
-/* Agent-turn eyebrow — the agent label + timestamp in --type-meta (12px sans,
+/* Agent-turn eyebrow — the agent label + timestamp in --type-label (12px sans,
    the Linear model: chrome text rides the sans, mono is reserved for tool
    lines and code). The mono tool `⏺` lines below carry the code-like signal. */
 .msg header {
   display: flex;
   align-items: baseline;
-  gap: var(--space-sm);
+  gap: var(--sp-3);
   padding: 0;
-  color: var(--color-semantic-muted);
-  font: var(--type-meta);
+  color: var(--ink-3);
+  font: var(--type-label);
 }
 
 .msg header > span:first-child {
-  color: var(--color-semantic-ink);
-  font: var(--type-meta);
+  color: var(--ink-1);
+  font: var(--type-label);
 }
 
 .msg header .agent-title {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-xs);
+  gap: var(--sp-2);
 }
 
 /* Live-run pulse in the agent-turn eyebrow — mirrors the conversation-row
@@ -596,26 +596,26 @@
   flex: none;
   width: 6px;
   height: 6px;
-  border-radius: var(--radius-full);
-  background: var(--color-semantic-info);
-  box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-semantic-info) 40%, transparent);
-  animation: conv-pulse 1.4s ease-out infinite;
+  border-radius: var(--r-full);
+  background: var(--info);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--info) 40%, transparent);
+  animation: conv-pulse 1.4s var(--ease) infinite;
 }
 
 /* A streaming turn breathes on the rail node so liveness reads even when the
    transcript body is quiet between tool calls. */
 @media (prefers-reduced-motion: no-preference) {
   .msg-agent.streaming .rail-node-agent {
-    border-color: var(--color-semantic-info);
+    border-color: var(--info);
     animation:
-      node-in var(--duration-fast) var(--ease-standard) both,
-      agent-rail-pulse 1.4s ease-out infinite;
+      node-in var(--t-fast) var(--ease) both,
+      agent-rail-pulse 1.4s var(--ease) infinite;
   }
 }
 
 @keyframes agent-rail-pulse {
-  0%   { box-shadow: 0 0 0 2px var(--color-semantic-canvas), 0 0 0 2px color-mix(in srgb, var(--color-semantic-info) 45%, transparent); }
-  100% { box-shadow: 0 0 0 2px var(--color-semantic-canvas), 0 0 0 9px color-mix(in srgb, var(--color-semantic-info) 0%, transparent); }
+  0%   { box-shadow: 0 0 0 2px var(--surface-0), 0 0 0 2px color-mix(in srgb, var(--info) 45%, transparent); }
+  100% { box-shadow: 0 0 0 2px var(--surface-0), 0 0 0 9px color-mix(in srgb, var(--info) 0%, transparent); }
 }
 
 /* The user turn is a compact, content-hugging bubble — not a full-width card.
@@ -626,18 +626,18 @@
   justify-self: start;
   width: fit-content;
   max-width: min(100%, 42rem);
-  gap: var(--space-xxs);
-  padding: var(--space-xs) var(--space-base);
-  background: var(--color-semantic-surface-soft);
-  border: 1px solid var(--color-semantic-hairline-soft);
-  border-radius: var(--radius-lg);
-  border-top-left-radius: var(--radius-xs);
+  gap: var(--sp-1);
+  padding: var(--sp-2) var(--sp-4);
+  background: var(--surface-1);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-3);
+  border-top-left-radius: var(--r-1);
 }
 
 .msg-user .user-text {
   margin: 0;
-  color: var(--color-semantic-ink);
-  font-size: var(--text-base);
+  color: var(--ink-1);
+  font-size: var(--fs-3);
   font-weight: 500;
   line-height: var(--leading-normal);
   white-space: pre-wrap;
@@ -647,7 +647,7 @@
 .msg-quiet {
   margin: 0;
   max-width: 100%;
-  color: var(--color-semantic-muted);
+  color: var(--ink-3);
   font: var(--type-label);
 }
 
@@ -662,7 +662,7 @@
   align-items: center;
   justify-content: flex-end;
   gap: 2px;
-  margin-top: var(--space-xxs);
+  margin-top: var(--sp-1);
 }
 
 .msg-turn-action {
@@ -670,24 +670,24 @@
   align-items: center;
   gap: 5px;
   height: 26px;
-  padding: 0 var(--space-sm);
+  padding: 0 var(--sp-3);
   border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  background: var(--color-semantic-surface-raised);
-  color: var(--color-semantic-muted);
+  border-radius: var(--r-2);
+  background: var(--surface-3);
+  color: var(--ink-3);
   font: var(--type-label);
   cursor: pointer;
   white-space: nowrap;
   transition:
-    color var(--duration-fast) var(--ease-standard),
-    border-color var(--duration-fast) var(--ease-standard),
-    background var(--duration-fast) var(--ease-standard);
+    color var(--t-fast) var(--ease),
+    border-color var(--t-fast) var(--ease),
+    background var(--t-fast) var(--ease);
 }
 
 .msg-turn-action:hover:not(:disabled) {
-  color: var(--color-semantic-ink);
-  border-color: var(--color-semantic-hairline);
-  background: var(--color-semantic-surface-raised);
+  color: var(--ink-1);
+  border-color: var(--line-1);
+  background: var(--surface-3);
 }
 
 .msg-turn-action:disabled {
@@ -696,12 +696,12 @@
 }
 
 .msg-turn-action.is-copied {
-  color: var(--color-semantic-success-text);
-  border-color: color-mix(in srgb, var(--color-semantic-success) 28%, var(--color-semantic-hairline));
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 28%, var(--line-1));
 }
 
 .msg-turn-action:focus-visible {
-  outline: 2px solid var(--color-semantic-action);
+  outline: 2px solid var(--action);
   outline-offset: 2px;
 }
 

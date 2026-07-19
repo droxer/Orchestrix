@@ -24,8 +24,6 @@
     --color-chart-3: var(--chart-3);
     --color-chart-2: var(--chart-2);
     --color-chart-1: var(--chart-1);
-    --color-semantic-muted: var(--muted);
-    --color-semantic-action: var(--primary);
 }
 
 /* Core shadcn aliases (--background, --foreground, …) live in
@@ -33,19 +31,19 @@
    tokens. Only the sidebar/chart extras that shadcn/ui expects are
    declared here. */
 :root {
-    --chart-1: var(--color-semantic-action);
-    --chart-2: var(--color-semantic-info);
-    --chart-3: var(--color-semantic-success);
-    --chart-4: var(--color-semantic-warning);
-    --chart-5: var(--color-semantic-danger);
-    --sidebar: var(--color-semantic-surface-soft);
-    --sidebar-foreground: var(--color-semantic-ink);
-    --sidebar-primary: var(--color-semantic-action);
-    --sidebar-primary-foreground: var(--color-semantic-on-action);
-    --sidebar-accent: var(--color-semantic-surface-strong);
-    --sidebar-accent-foreground: var(--color-semantic-ink);
-    --sidebar-border: var(--color-semantic-hairline);
-    --sidebar-ring: var(--color-semantic-action);
+    --chart-1: var(--action);
+    --chart-2: var(--info);
+    --chart-3: var(--ok);
+    --chart-4: var(--warn);
+    --chart-5: var(--err);
+    --sidebar: var(--surface-1);
+    --sidebar-foreground: var(--ink-1);
+    --sidebar-primary: var(--action);
+    --sidebar-primary-foreground: var(--on-action);
+    --sidebar-accent: var(--surface-2);
+    --sidebar-accent-foreground: var(--ink-1);
+    --sidebar-border: var(--line-1);
+    --sidebar-ring: var(--action);
 }
 
 @layer base {

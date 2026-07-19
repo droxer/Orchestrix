@@ -1,0 +1,41 @@
+/* Graphite roles — aliases and composites over palette.css.
+   Component CSS consumes these plus the palette scales; it never
+   originates a value. */
+
+:root {
+  /* Info is not a color — neutral notice text. */
+  --info: var(--ink-3);
+
+  /* Elevation — shadow-1 for surfaces that already carry a hairline,
+     shadow-2 (ring + drop) for borderless floating chrome. */
+  --shadow-1: 0 1px 2px var(--shadow-tint);
+  --shadow-2: 0 4px 14px var(--shadow-tint-wide), 0 0 0 1px var(--shadow-edge);
+
+  /* Focus — 2px solid ring (WCAG 1.4.11) + soft halo. */
+  --focus-ring:
+    0 0 0 2px var(--action),
+    0 0 0 5px color-mix(in srgb, var(--action) 22%, transparent);
+  --focus-ring-danger:
+    0 0 0 2px var(--err),
+    0 0 0 5px color-mix(in srgb, var(--err) 22%, transparent);
+
+  /* Type roles — Geist carries every role; weight and size differentiate,
+     never a family switch. Mono is code, IDs, logs. */
+  --type-display:      600 var(--fs-6)/1.15 var(--font-sans);
+  --type-title:        600 var(--fs-5)/1.2  var(--font-sans);
+  --type-heading:      600 1.1429rem/1.3  var(--font-sans);
+  --type-body:         400 var(--fs-4)/1.5  var(--font-sans);
+  --type-body-sm:      400 var(--fs-3)/1.5  var(--font-sans);
+  --type-label:        500 var(--fs-2)/1.4  var(--font-sans);
+  --type-label-strong: 600 var(--fs-2)/1.4  var(--font-sans);
+  --type-micro:        500 var(--fs-1)/1.4  var(--font-sans); /* + uppercase + --track-caps */
+  --type-number:       600 1.3571rem/1.4  var(--font-sans); /* + tabular-nums */
+  --type-code:         400 var(--fs-2)/1.5  var(--font-mono);
+}
+
+/* CJK — reading roles want looser leading. */
+html:lang(zh-CN),
+html:lang(zh-TW) {
+  --type-body:    400 var(--fs-4)/1.7 var(--font-sans);
+  --type-body-sm: 400 var(--fs-3)/1.7 var(--font-sans);
+}

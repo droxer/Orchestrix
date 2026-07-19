@@ -13,7 +13,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--space-base);
+  padding: var(--sp-4);
 }
 
 .dialog-modal {
@@ -21,57 +21,57 @@
   width: min(420px, 100%);
   display: flex;
   flex-direction: column;
-  gap: var(--space-sm);
+  gap: var(--sp-3);
   max-height: min(100%, 640px);
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: var(--space-lg);
-  background: var(--color-semantic-surface-raised);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-lift);
-  animation: overlay-panel-in var(--duration-base) var(--ease-emphasized) both;
+  padding: var(--sp-6);
+  background: var(--surface-3);
+  border-radius: var(--r-3);
+  box-shadow: var(--shadow-2);
+  animation: overlay-panel-in var(--t-fast) var(--ease) both;
   outline: none;
 }
 
 .dialog-modal[data-tone="danger"] {
-  border-left: 3px solid var(--color-semantic-danger);
-  padding-left: calc(var(--space-lg) - 2px);
+  border-left: 3px solid var(--err);
+  padding-left: calc(var(--sp-6) - 2px);
 }
 
 .dialog-kicker {
   margin: 0;
-  font: var(--type-eyebrow);
-  letter-spacing: var(--letter-eyebrow);
+  font: var(--type-micro);
+  letter-spacing: var(--track-caps);
   text-transform: uppercase;
-  color: var(--color-semantic-danger-text);
+  color: var(--err);
 }
 
 .dialog-title-row {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-sm);
+  gap: var(--sp-3);
 }
 
 .dialog-danger-icon {
   flex-shrink: 0;
   margin-top: 2px;
-  color: var(--color-semantic-danger-text);
+  color: var(--err);
 }
 
 .dialog-title {
   margin: 0;
-  font: var(--type-title-md);
-  color: var(--color-semantic-ink);
+  font: var(--type-title);
+  color: var(--ink-1);
 }
 
 .dialog-modal[data-tone="danger"] .dialog-title {
-  color: var(--color-semantic-danger-text);
+  color: var(--err);
 }
 
 .dialog-message {
   margin: 0;
   font: var(--type-body-sm);
-  color: var(--color-semantic-body);
+  color: var(--ink-2);
 }
 
 .dialog-form {
@@ -80,64 +80,64 @@
 
 .dialog-input {
   width: 100%;
-  height: var(--size-control-md);
-  padding: 0 var(--space-sm);
-  border: 1px solid var(--color-semantic-hairline);
-  border-radius: var(--radius-md);
-  background: var(--color-semantic-canvas);
-  color: var(--color-semantic-ink);
-  font-size: var(--text-md);
-  transition: border-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
+  height: var(--control-h);
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-2);
+  background: var(--surface-0);
+  color: var(--ink-1);
+  font-size: var(--fs-4);
+  transition: border-color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease);
 }
 
 .dialog-input:focus-visible {
   outline: none;
-  border-color: var(--color-semantic-action);
-  box-shadow: var(--ring-focus);
+  border-color: var(--action);
+  box-shadow: var(--focus-ring);
 }
 
 .dialog-actions {
   display: flex;
   justify-content: flex-end;
-  gap: var(--space-xs);
-  margin-top: var(--space-xs);
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
 }
 
 .dialog-toast {
   position: fixed;
-  right: var(--space-lg);
-  bottom: var(--space-lg);
+  right: var(--sp-6);
+  bottom: var(--sp-6);
   z-index: calc(var(--z-dialog) + 1);
-  width: min(420px, calc(100vw - var(--space-lg) * 2));
-  padding: var(--space-sm) var(--space-base);
-  border: 1px solid var(--color-semantic-hairline);
-  border-left: 3px solid var(--color-semantic-info);
-  border-radius: var(--radius-md);
-  background: var(--color-semantic-surface-raised);
-  color: var(--color-semantic-ink);
-  box-shadow: var(--shadow-lift);
+  width: min(420px, calc(100vw - var(--sp-6) * 2));
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--line-1);
+  border-left: 3px solid var(--info);
+  border-radius: var(--r-2);
+  background: var(--surface-3);
+  color: var(--ink-1);
+  box-shadow: var(--shadow-2);
   font: var(--type-body-sm);
   line-height: 1.45;
-  animation: overlay-toast-in var(--duration-base) var(--ease-emphasized) both;
+  animation: overlay-toast-in var(--t-fast) var(--ease) both;
 }
 
 .dialog-toast.dialog-toast--exit {
-  animation: overlay-toast-out var(--duration-fast) var(--ease-standard) both;
+  animation: overlay-toast-out var(--t-fast) var(--ease) both;
 }
 
 .dialog-toast[data-tone="error"] {
-  border-left-color: var(--color-semantic-danger);
-  color: var(--color-semantic-danger-text);
+  border-left-color: var(--err);
+  color: var(--err);
 }
 
 .dialog-toast[data-tone="success"] {
-  border-left-color: var(--color-semantic-success);
+  border-left-color: var(--ok);
 }
 
 @media (max-width: 600px) {
   .dialog-toast {
-    right: var(--space-base);
-    bottom: var(--space-base);
-    width: calc(100vw - var(--space-base) * 2);
+    right: var(--sp-4);
+    bottom: var(--sp-4);
+    width: calc(100vw - var(--sp-4) * 2);
   }
 }

@@ -2,11 +2,8 @@
 
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import type { TFunction } from "i18next";
-import { cn } from "@/lib/utils";
 import { useEmployeeAgents } from "../hooks/useEmployeeAgents";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
-import { agentAvailabilityTone } from "../lib/adminHelpers";
 import { agentLabel } from "../lib/plan";
 import type { AgentName, CurrentUser, EmployeeAgent, LogicalAgentAvailability } from "../types";
 import { ActionSearch, NavConversations, StreamInfo } from "./icons";
@@ -46,23 +43,8 @@ function activePlacements(agent: EmployeeAgent) {
   return agent.placements.filter((placement) => placement.desiredState !== "removed");
 }
 
-function formatRelativeTime(value: string, locale: string, t: TFunction): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  const relativeTime = new Intl.RelativeTimeFormat(locale || undefined, { numeric: "auto", style: "short" });
-  const deltaMs = Date.now() - date.getTime();
-  const minutes = Math.round(deltaMs / 60_000);
-  if (minutes < 1) return t("agents_page.just_now");
-  if (minutes < 60) return relativeTime.format(-minutes, "minute");
-  const hours = Math.round(minutes / 60);
-  if (hours < 48) return relativeTime.format(-hours, "hour");
-  return new Intl.DateTimeFormat(locale || undefined, {
-    month: "short",
-    day: "numeric",
-  }).format(date);
-}
-
-function agentDescriptors(t: ReturnType<typeof useTranslation>["t"]): Record<AgentName, { blurb: string }> {
+function agentDescriptors(t: ReturnType<typeof useTranslation>["t"]):
+Record<AgentName, { blurb: string }> {
   return {
     claude: { blurb: t("agent.claude.blurb") },
     pi: { blurb: t("agent.pi.blurb") },
@@ -120,7 +102,6 @@ function RosterFilterBar({
 function RosterRow({
   agent,
   executorLabel,
-  locale,
   selected,
   onSelect,
   onStartConversation,
@@ -128,7 +109,6 @@ function RosterRow({
 }: {
   agent: EmployeeAgent;
   executorLabel: string;
-  locale: string;
   selected: boolean;
   onSelect: (agent: EmployeeAgent) => void;
   onStartConversation: (agent: EmployeeAgent) => void;
@@ -162,10 +142,6 @@ function RosterRow({
               {!agent.enabled ? <Badge variant="neutral">{t("agents_page.disabled")}</Badge> : null}
             </span>
             <span className="agents-roster-row-meta">
-              <span className={cn("agents-availability", `tone-${agentAvailabilityTone(agent.availability)}`)}>
-                {t(`admin.v2.placement_status.${agent.availability}`, { defaultValue: agent.availability })}
-              </span>
-              <span className="agents-roster-row-sep" aria-hidden="true">·</span>
               <span translate="no">{executorLabel}</span>
               <span className="agents-roster-row-sep" aria-hidden="true">·</span>
               <span className="mono">
@@ -173,9 +149,6 @@ function RosterRow({
                   ? t("agents_page.no_placements")
                   : t("agents_page.placements_ready", { ready: readyPlacements, total: placements.length })}
               </span>
-            </span>
-            <span className="agents-roster-row-updated">
-              {t("agents_page.meta_updated")} {formatRelativeTime(agent.updatedAt, locale, t)}
             </span>
           </span>
         </button>
@@ -220,7 +193,7 @@ export function AgentsPage({
   onStartConversation,
   onOpenConversation,
 }: AgentsPageProps) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { agents, isFetching } = useEmployeeAgents(currentUser.employeeId);
   const descriptors = useMemo(() => agentDescriptors(t), [t]);
   const [query, setQuery] = useUrlSearchState("agentsQ", "", (value) => value ?? "", (value) => value || null);
@@ -300,7 +273,6 @@ export function AgentsPage({
                   key={agent.id}
                   agent={agent}
                   executorLabel={agentLabel(agent.executorKind)}
-                  locale={i18n.language}
                   selected={workspaceAgent?.id === agent.id}
                   onSelect={onOpenWorkspace}
                   onStartConversation={onStartConversation}

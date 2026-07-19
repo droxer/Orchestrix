@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { ActionEdit, StreamThinking } from "./icons";
+import { ActionEdit } from "./icons";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 
@@ -54,9 +54,6 @@ export function AgentInstructionEditor({
       aria-labelledby={titleId}
     >
       <div className="agent-instruction-card-head">
-        <span className="agent-instruction-card-mark" aria-hidden="true">
-          <StreamThinking size={15} />
-        </span>
         <div className="agent-instruction-card-heading">
           <div className="agent-instruction-card-title-row">
             <h2 id={titleId}>

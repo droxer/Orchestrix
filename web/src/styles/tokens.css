@@ -1,51 +1,14 @@
-/* =====================================================================
-   Relay web — Sleek Forest: a warm near-black canvas (#141311) with a
-   restrained forest green (#4f9d6e) as the single chromatic accent —
-   quiet enough for ops chrome, distinct from blue/teal SaaS and from
-   lavender-on-dark defaults. Dark is the default, primary theme; light
-   is a derived secondary on warm off-white (#faf8f4) with deepened
-   forest (#2f7a50).
+/* Relay web — Graphite tokens.
+   True-neutral canvas, one steel-blue action color, status as
+   dot/border/text only, two registers designed side by side.
+   Spec: docs/superpowers/specs/2026-07-19-graphite-tokens-design.md
 
-   Token architecture, four tiers, one file per tier under ./tokens/:
-     1. primitives.css     — raw hex/px/rem values, light + dark registers.
-        Hex values live here and nowhere else.
-     2. semantic.css       — role-based aliases (--color-semantic-*,
-        --type-*, shadows, focus ring) consumed by component CSS.
-     3. shadcn-bridge.css  — the @theme bridge exposing tokens to
-        Tailwind utilities used by src/components/ui.
-     4. base.css           — html/body reset, focus contract, and the
-        shared utility classes (.mono, .eyebrow, .tone-*).
+   palette.css — raw values (only place a color originates)
+   roles.css   — type roles, elevation, focus
+   shadcn-bridge.css — exposes tokens to Tailwind / shadcn components
+   base.css    — reset, focus contract, shared utilities */
 
-   Visual language: a warm near-black canvas (#141311) with a four-step
-   surface ladder carries the product chrome by default; a derived
-   light theme lifts the same language onto warm off-white. Forest
-   Green (#4f9d6e dark / #2f7a50 light) is the single chromatic ACTION
-   color — brand mark, primary CTA, focus ring, link emphasis — never
-   used decoratively. Hairlines draw all structure instead of shadows.
-   Status is the only other chroma in the system — success / danger /
-   warning (green / amber / red) as dots, borders, and text, never
-   fills or actions; "info" is a neutral slate.
-   Geist carries dense chrome and body roles; Instrument Serif is the
-   one deliberate family switch for hero headlines (login, empty
-   states). Geist Mono is reserved for code-like content: tool/command
-   lines, raw logs, code blocks, and IDs.
-
-   Structure is Linear's operational discipline throughout: tight 5–6px
-   control geometry, fast motion with no overshoot, dense row rhythm, and
-   flat surfaces where hairlines carry the chrome — reserving soft
-   shadows for the handful of places (drawers, dialogs, nav) that should
-   read as elevated.
-
-   Every color/type/radius primitive lives in tokens/primitives.css;
-   component CSS everywhere else only ever consumes a var() — no file
-   after this manifest redeclares a primitive. Component-specific
-   structural rules (decorative motion, per-surface layout) live in
-   atelier.css, loaded after this manifest so it can reshape component
-   layout without owning colors. This file is a pure @import manifest —
-   add new tokens to the tier file they belong to, not here.
-   ===================================================================== */
-
-@import "./tokens/primitives.css";
-@import "./tokens/semantic.css";
+@import "./tokens/palette.css";
+@import "./tokens/roles.css";
 @import "./tokens/shadcn-bridge.css";
 @import "./tokens/base.css";
