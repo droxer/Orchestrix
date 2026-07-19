@@ -271,6 +271,38 @@ def test_task_start_requests_managed_capacity_when_no_node_is_ready(monkeypatch)
         assert managed["employeeId"] == "alice"
 
 
+def test_task_start_reports_restart_of_stopped_managed_capacity(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _create_user(client, "alice", employee_id="alice")
+        managed = app.state.managed_node_store.create_node({"employeeId": "alice"})
+        app.state.managed_node_store.update_node(
+            managed["id"], {"desiredState": "stopped"}
+        )
+        task = client.post(
+            "/tasks",
+            json={
+                "title": "Restart managed capacity",
+                "ownerEmployeeId": "alice",
+                "assigneeEmployeeId": "alice",
+                "assignedAgent": "codex",
+            },
+        ).json()
+
+        started = client.post(f"/tasks/{task['id']}/start", json={"agent": "codex"})
+
+        assert started.status_code == 202
+        assert started.json()["task"]["activity"][-1]["message"] == (
+            "Managed node provisioning requested for alice."
+        )
+        restarted = app.state.managed_node_store.get_node(managed["id"])
+        assert restarted["desiredState"] == "running"
+        assert restarted["phase"] == "requested"
+
+
 def test_task_start_discussion_runs_multi_agent_ask_and_keeps_task_open(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:

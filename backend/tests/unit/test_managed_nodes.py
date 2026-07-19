@@ -47,6 +47,29 @@ def test_managed_nodes_require_boxlite(tmp_path: Path) -> None:
         store.create_node({"employeeId": "alice", "sandboxMode": "none"})
 
 
+def test_managed_capacity_restart_is_reported_as_requested(tmp_path: Path) -> None:
+    store = LocalManagedNodeStore(tmp_path)
+    node = store.create_node({"employeeId": "alice"})
+    store.update_node(node["id"], {"desiredState": "stopped"})
+
+    restarted, requested = store.ensure_node_for_employee("alice")
+
+    assert requested is True
+    assert restarted["id"] == node["id"]
+    assert restarted["desiredState"] == "running"
+    assert restarted["phase"] == "requested"
+
+
+def test_running_managed_capacity_is_not_requested_twice(tmp_path: Path) -> None:
+    store = LocalManagedNodeStore(tmp_path)
+    node = store.create_node({"employeeId": "alice"})
+
+    existing, requested = store.ensure_node_for_employee("alice")
+
+    assert requested is False
+    assert existing["id"] == node["id"]
+
+
 def test_successful_enrollment_links_observed_daemon(tmp_path: Path) -> None:
     store = LocalManagedNodeStore(tmp_path)
     node = store.create_node({"employeeId": "alice"})

@@ -131,6 +131,41 @@ def test_scheduler_waits_for_an_employee_local_node_instead_of_provisioning_mana
     asyncio.run(run_flow())
 
 
+def test_scheduler_falls_back_to_managed_after_local_node_is_removed() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            task_store = LocalTaskStore(root)
+            registry = DaemonNodeRegistry(
+                LocalSessionStore(root), LocalDaemonStore(root), task_store=task_store
+            )
+            local_node, _ui_token, _node_token = registry.provision_pending(
+                "alice", "/Users/alice/workspace", sandbox_mode="none"
+            )
+            registry.delete(local_node["id"])
+            managed_nodes = LocalManagedNodeStore(root)
+            task_store.create_task(
+                {
+                    "title": "Continue after Alice disconnects local mode",
+                    "assignedAgent": "codex",
+                    "assigneeEmployeeId": "alice",
+                    "status": "assigned",
+                }
+            )
+
+            await TaskScheduler(
+                task_store=task_store,
+                registry=registry,
+                backend=ServerDaemonNodeBackend(registry),
+                managed_node_store=managed_nodes,
+            ).tick()
+
+            [managed] = managed_nodes.list_nodes()
+            assert managed["employeeId"] == "alice"
+            assert managed["desiredState"] == "running"
+
+    asyncio.run(run_flow())
+
+
 def test_scheduler_dispatches_task_by_logical_agent_placement() -> None:
     async def run_flow() -> None:
         with TemporaryDirectory() as root:

@@ -107,7 +107,7 @@ class LocalManagedNodeStore:
             return node
 
     def ensure_node_for_employee(self, employee_id: str) -> tuple[dict[str, Any], bool]:
-        """Return running managed capacity for an employee, creating it once."""
+        """Return managed capacity and whether provisioning was newly requested."""
         employee_id = employee_id.strip()
         if not employee_id:
             raise ValueError("employeeId is required for managed capacity.")
@@ -124,6 +124,7 @@ class LocalManagedNodeStore:
             if existing:
                 if existing.get("desiredState") != "running":
                     existing = self.update_node(existing["id"], {"desiredState": "running"})
+                    return existing, True
                 return existing, False
             return self.create_node({"employeeId": employee_id}), True
 
