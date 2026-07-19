@@ -224,9 +224,8 @@ async def start_task_on_ready_node(
         employee_id = task.get("assigneeEmployeeId") or task.get("ownerEmployeeId")
         requested_capacity = False
         if employee_id and not employee_has_local_node(ctx.registry, employee_id):
-            _managed_node, requested_capacity = (
-                ctx.managed_node_store.ensure_node_for_employee(employee_id)
-            )
+            capacity = ctx.managed_node_store.ensure_node_for_employee(employee_id)
+            requested_capacity = capacity.provisioning_requested
         if record_pending:
             label = ", ".join(dict.fromkeys(item["agent"] for item in run_assignments))
             message = (

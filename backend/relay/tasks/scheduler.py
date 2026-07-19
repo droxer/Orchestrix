@@ -211,8 +211,8 @@ class TaskScheduler:
         employee_id = task.get("assigneeEmployeeId") or task.get("ownerEmployeeId")
         if not employee_id or employee_has_local_node(self.registry, employee_id):
             return
-        _node, requested = self.managed_node_store.ensure_node_for_employee(employee_id)
-        if requested:
+        capacity = self.managed_node_store.ensure_node_for_employee(employee_id)
+        if capacity.provisioning_requested:
             logger.info(
                 "Managed node provisioning requested for queued task",
                 task_id=task["id"],

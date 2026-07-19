@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import hashlib
 import hmac
@@ -41,6 +42,12 @@ PROVISIONING_ATTEMPT_STATUSES = frozenset({
     "cancelled",
 })
 TERMINAL_ATTEMPT_STATUSES = frozenset({"succeeded", "failed", "cancelled"})
+
+
+@dataclass(frozen=True)
+class ManagedCapacityResolution:
+    node: dict[str, Any]
+    provisioning_requested: bool
 
 
 def _new_id(prefix: str) -> str:
@@ -106,27 +113,30 @@ class LocalManagedNodeStore:
             self._write_node(node)
             return node
 
-    def ensure_node_for_employee(self, employee_id: str) -> tuple[dict[str, Any], bool]:
+    def ensure_node_for_employee(self, employee_id: str) -> ManagedCapacityResolution:
         """Return managed capacity and whether provisioning was newly requested."""
         employee_id = employee_id.strip()
         if not employee_id:
             raise ValueError("employeeId is required for managed capacity.")
         with self._lock:
+            candidates = [
+                node
+                for node in self.list_nodes()
+                if node.get("employeeId") == employee_id
+                and node.get("assignmentMode") == "dedicated"
+            ]
             existing = next(
-                (
-                    node
-                    for node in self.list_nodes()
-                    if node.get("employeeId") == employee_id
-                    and node.get("assignmentMode") == "dedicated"
-                ),
-                None,
+                (node for node in candidates if node.get("desiredState") == "running"),
+                candidates[0] if candidates else None,
             )
             if existing:
                 if existing.get("desiredState") != "running":
                     existing = self.update_node(existing["id"], {"desiredState": "running"})
-                    return existing, True
-                return existing, False
-            return self.create_node({"employeeId": employee_id}), True
+                    return ManagedCapacityResolution(existing, True)
+                return ManagedCapacityResolution(existing, False)
+            return ManagedCapacityResolution(
+                self.create_node({"employeeId": employee_id}), True
+            )
 
     def list_nodes(self, *, include_deleted: bool = False) -> list[dict[str, Any]]:
         nodes = [_read_json(path) for path in self.nodes_dir.glob("*.json")]
