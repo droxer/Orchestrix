@@ -131,7 +131,7 @@ export function AddNodeDrawer({
             aria-live="polite"
           >
             <span className="adm-provision-outcome-label">
-              {t(isManaged ? "admin.v2.node_execution_managed" : "admin.v2.node_execution_local")}
+              {t(isManaged ? "admin.v2.node_ownership_managed" : "admin.v2.node_ownership_local")}
             </span>
             <p className="adm-provision-outcome-body">
               {t(isManaged ? "admin.v2.add_node_outcome_managed" : "admin.v2.add_node_outcome_local")}

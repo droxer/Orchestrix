@@ -185,13 +185,13 @@ export interface NodeLocalityFlags {
   isColocatedLive: boolean;
 }
 
-export type NodeExecutionProfile = "managed" | "local" | "pending";
+export type NodeOwnershipProfile = "managed" | "local" | "pending";
 export type NodeSandboxProfile = "boxlite" | "host" | "pending";
 
 export type NodeLocalityKind = "this_host" | "saved_here" | "remote";
 
 /** Management ownership is independent of the daemon's sandbox implementation. */
-export function nodeExecutionProfile(node: Pick<ControlPanelDaemonNodeRecord, "managedNodeId" | "sandboxMode">): NodeExecutionProfile {
+export function nodeOwnershipProfile(node: Pick<ControlPanelDaemonNodeRecord, "managedNodeId" | "sandboxMode">): NodeOwnershipProfile {
   if (node.managedNodeId) return "managed";
   if (node.sandboxMode) return "local";
   return "pending";

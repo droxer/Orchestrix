@@ -48,25 +48,47 @@ describe("describeAgentPlacements", () => {
 
     assert.deepEqual(result.map((item) => ({
       id: item.placement.id,
-      rank: item.rank,
+      preference: item.preference,
       ownership: item.ownership,
       sandbox: item.sandbox,
       name: item.nodeName,
     })), [
       {
         id: "placement_managed",
-        rank: "primary",
+        preference: "preferred",
         ownership: "managed",
         sandbox: "boxlite",
         name: "Managed node for Alice",
       },
       {
         id: "placement_local",
-        rank: "fallback",
+        preference: "alternate",
         ownership: "local",
         sandbox: "host",
         name: "Alice’s MacBook",
       },
+    ]);
+  });
+
+  it("does not describe draining placements as preferred routes", () => {
+    const result = describeAgentPlacements([
+      placement({
+        id: "placement_draining",
+        daemonNodeId: "node_old",
+        priority: 50,
+        desiredState: "draining",
+        status: "offline",
+      }),
+      placement({
+        id: "placement_ready",
+        daemonNodeId: "node_ready",
+        priority: 100,
+      }),
+    ]);
+
+    assert.deepEqual(result.map((item) => [item.placement.id, item.preference]), [
+      ["placement_draining", null],
+      ["placement_ready", "preferred"],
     ]);
   });
 });

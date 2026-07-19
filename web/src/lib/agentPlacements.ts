@@ -2,23 +2,25 @@ import type { AgentPlacement } from "../types.js";
 
 export type PlacementOwnership = "managed" | "local" | "pending";
 export type PlacementSandbox = "boxlite" | "host" | "pending";
-export type PlacementRank = "primary" | "fallback";
+export type PlacementPreference = "preferred" | "alternate";
 
 export interface AgentPlacementDescription {
   placement: AgentPlacement;
   nodeName: string;
   ownership: PlacementOwnership;
   sandbox: PlacementSandbox;
-  rank: PlacementRank;
+  /** Configured route order. Draining placements do not accept work. */
+  preference: PlacementPreference | null;
 }
 
 export function describeAgentPlacements(
   placements: AgentPlacement[],
 ): AgentPlacementDescription[] {
+  let activeIndex = 0;
   return placements
     .filter((placement) => placement.desiredState !== "removed")
     .sort((left, right) => left.priority - right.priority || left.id.localeCompare(right.id))
-    .map((placement, index) => ({
+    .map((placement) => ({
       placement,
       nodeName: placement.nodeDisplayName || placement.daemonNodeId,
       ownership: placement.nodeOwnership === "managed"
@@ -31,6 +33,8 @@ export function describeAgentPlacements(
         : placement.nodeSandboxMode === "none"
           ? "host"
           : "pending",
-      rank: index === 0 ? "primary" : "fallback",
+      preference: placement.desiredState === "active"
+        ? activeIndex++ === 0 ? "preferred" : "alternate"
+        : null,
     }));
 }

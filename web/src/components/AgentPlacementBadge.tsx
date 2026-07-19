@@ -23,7 +23,7 @@ export function AgentPlacementBadge({
 }) {
   const { t } = useTranslation();
   const OwnershipIcon = OWNERSHIP_ICON[description.ownership];
-  const ownershipLabel = t(`admin.v2.node_execution_${description.ownership}`);
+  const ownershipLabel = t(`admin.v2.node_ownership_${description.ownership}`);
   const sandboxLabel = t(`admin.v2.node_sandbox_${description.sandbox}`);
 
   return (
@@ -40,9 +40,12 @@ export function AgentPlacementBadge({
       {showSandbox ? (
         <span className="agent-placement-badge-sandbox">{sandboxLabel}</span>
       ) : null}
-      {showRank ? (
-        <span className="agent-placement-badge-rank" data-rank={description.rank}>
-          {t(`admin.v2.placement_rank_${description.rank}`)}
+      {showRank && description.preference ? (
+        <span
+          className="agent-placement-badge-rank"
+          data-rank={description.preference === "preferred" ? "primary" : "alternate"}
+        >
+          {t(`admin.v2.placement_preference_${description.preference}`)}
         </span>
       ) : null}
     </span>

@@ -9,7 +9,7 @@ import {
 } from "../src/lib/daemonNodes.js";
 import {
   buildDaemonStartCommand,
-  nodeExecutionProfile,
+  nodeOwnershipProfile,
   nodeSandboxProfile,
   nodeLocalityFlags,
   nodeLocalityKinds,
@@ -438,13 +438,13 @@ describe("Relay web admin node helpers", () => {
 
     assert.equal(flags.hasCachedCredentials, true);
     assert.equal(flags.isColocatedLive, true);
-    assert.equal(nodeExecutionProfile(node), "managed");
+    assert.equal(nodeOwnershipProfile(node), "managed");
     assert.deepEqual(nodeLocalityKinds(node, {
       colocated: true,
       storedTokens: { sbx_alice: { nodeToken: "tok_cached", savedAt: "2026-06-12T00:00:00.000Z" } },
     }), ["saved_here", "this_host"]);
-    assert.equal(nodeExecutionProfile({ sandboxMode: "boxlite" }), "local");
-    assert.equal(nodeExecutionProfile({ sandboxMode: "none", managedNodeId: "mnode_alice" }), "managed");
+    assert.equal(nodeOwnershipProfile({ sandboxMode: "boxlite" }), "local");
+    assert.equal(nodeOwnershipProfile({ sandboxMode: "none", managedNodeId: "mnode_alice" }), "managed");
     assert.equal(nodeSandboxProfile({ sandboxMode: "boxlite" }), "boxlite");
     assert.equal(nodeSandboxProfile({ sandboxMode: "none" }), "host");
     assert.equal(nodeSandboxProfile({}), "pending");
