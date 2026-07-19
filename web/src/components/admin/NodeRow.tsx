@@ -76,7 +76,7 @@ export function NodeRow({ node, storedTokens, colocated, onReveal, onManageAgent
         </span>
       </div>
 
-      <div className="adm-node-row-agents">
+      <div className="adm-node-row-agents" aria-label={t("admin.v2.executors")}>
         {visibleNodeAgentNames(node).map((name) => {
           const agentTone = agentStatusTone(node.agents[name] ?? "unknown");
           const disabled = isAgentDisabled(node, name);

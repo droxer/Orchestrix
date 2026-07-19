@@ -14,6 +14,7 @@ import { Drawer } from "./Drawer";
 import { ExecutionProfileField, type DaemonSandboxMode } from "./ExecutionProfileField";
 import { initialsOf, statusTone, visualStatus } from "./helpers";
 import { Button } from "@/components/ui/button";
+import { NodeProfileBadges } from "./NodeProfileBadges";
 import {
   Select,
   SelectContent,
@@ -233,7 +234,9 @@ export function AssignNodeDrawer({
                           aria-hidden="true"
                         />
                         <span className="adm-assign-node-body">
-                          <span className="adm-assign-node-id mono">{node.id}</span>
+                          <span className="adm-assign-node-id mono">
+                            {node.displayName || node.id}
+                          </span>
                           {node.workspacePath ? (
                             <span className="adm-assign-node-path mono">
                               {node.workspacePath}
@@ -243,6 +246,13 @@ export function AssignNodeDrawer({
                               {t("admin.workspace_none")}
                             </span>
                           )}
+                          <NodeProfileBadges
+                            node={node}
+                            storedTokens={{}}
+                            colocated={false}
+                            t={t}
+                            compact
+                          />
                         </span>
                         <span className={`adm-assign-node-status tone-${tone}`}>
                           {t(`status.${status}`, { defaultValue: status })}

@@ -15,6 +15,8 @@ import { EMPLOYEE_AGENTS_QUERY_KEY } from "../hooks/useEmployeeAgents";
 import { formatRelativeTime, truncateId, agentAvailabilityTone } from "./admin/helpers";
 import { AgentMark } from "./AgentMark";
 import { AgentInstructionEditor } from "./AgentInstructionEditor";
+import { AgentPlacementBadge } from "./AgentPlacementBadge";
+import { describeAgentPlacements } from "../lib/agentPlacements";
 
 export interface AgentProfilePanelProps {
   agent: EmployeeAgent;
@@ -196,7 +198,9 @@ export function AgentProfilePanel({
   async function handleRemovePlacement(placement: AgentPlacement) {
     const node = nodes.find((item) => item.id === placement.daemonNodeId);
     const ok = await confirm({
-      title: t("admin.v2.remove_placement_confirm", { node: node ? truncateId(node.id) : placement.daemonNodeId }),
+      title: t("admin.v2.remove_placement_confirm", {
+        node: node?.displayName || placement.nodeDisplayName || placement.daemonNodeId,
+      }),
       confirmLabel: t("admin.v2.remove_placement"),
       tone: "danger",
     });
@@ -216,7 +220,7 @@ export function AgentProfilePanel({
 
   const owner = employees.find((employee) => employee.id === agent.employeeId);
   const ownerLabel = owner?.displayName || agent.employeeId;
-  const activePlacements = agent.placements.filter((placement) => placement.desiredState !== "removed");
+  const placementDescriptions = describeAgentPlacements(agent.placements);
   const isWorkspace = variant === "workspace";
 
   if (isWorkspace) {
@@ -366,21 +370,24 @@ export function AgentProfilePanel({
           <>
             <div className="adm-drawer-section">
               <p className="workspace-dossier-section-title">{t("admin.v2.agent_placements_title")}</p>
-              {activePlacements.length === 0 ? (
+              {placementDescriptions.length === 0 ? (
                 <p className="adm-cred-empty">{t("admin.v2.no_runtime_placement")}</p>
               ) : (
                 <ul className="adm-placement-list">
-                  {activePlacements.map((placement) => {
-                    const node = nodes.find((item) => item.id === placement.daemonNodeId);
-                    const nodeMissing = nodes.length > 0 && !node;
+                  {placementDescriptions.map((description) => {
+                    const placement = description.placement;
+                    const nodeMissing = nodes.length > 0
+                      && !nodes.some((node) => node.id === placement.daemonNodeId);
                     const tone = placementStatusTone(placement.status);
                     return (
                       <li key={placement.id} className="adm-placement-item">
                         <span className={`adm-placement-dot tone-${tone}`} aria-hidden="true" />
                         <span className="adm-placement-body">
-                          <span className="adm-placement-id mono" title={placement.daemonNodeId}>
-                            {truncateId(placement.daemonNodeId)}
-                          </span>
+                          <AgentPlacementBadge
+                            description={description}
+                            showRank={placementDescriptions.length > 1}
+                            showSandbox
+                          />
                           <span className="adm-placement-status-row">
                             <span className={`adm-placement-status tone-${tone}`}>
                               {t(`admin.v2.placement_status.${placement.status}`, { defaultValue: placement.status })}
@@ -556,21 +563,24 @@ export function AgentProfilePanel({
 
       <div className="adm-drawer-section">
         <p className="adm-drawer-section-title">{t("admin.v2.agent_placements_title")}</p>
-        {activePlacements.length === 0 ? (
+        {placementDescriptions.length === 0 ? (
           <p className="adm-cred-empty">{t("admin.v2.no_runtime_placement")}</p>
         ) : (
           <ul className="adm-placement-list">
-            {activePlacements.map((placement) => {
-              const node = nodes.find((item) => item.id === placement.daemonNodeId);
-              const nodeMissing = nodes.length > 0 && !node;
+            {placementDescriptions.map((description) => {
+              const placement = description.placement;
+              const nodeMissing = nodes.length > 0
+                && !nodes.some((node) => node.id === placement.daemonNodeId);
               const tone = placementStatusTone(placement.status);
               return (
                 <li key={placement.id} className={`adm-placement-item${canManage ? "" : " adm-placement-item--compact"}`}>
                   <span className={`adm-placement-dot tone-${tone}`} aria-hidden="true" />
                   <span className="adm-placement-body">
-                    <span className="adm-placement-id mono" title={placement.daemonNodeId}>
-                      {truncateId(placement.daemonNodeId)}
-                    </span>
+                    <AgentPlacementBadge
+                      description={description}
+                      showRank={placementDescriptions.length > 1}
+                      showSandbox
+                    />
                     <span className="adm-placement-status-row">
                       <span className={`adm-placement-status tone-${tone}`}>
                         {t(`admin.v2.placement_status.${placement.status}`, { defaultValue: placement.status })}

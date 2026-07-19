@@ -122,6 +122,7 @@ export function NodeCard({
 
       <div className="adm-node-card-body">
         <div className="adm-agents">
+          <span className="adm-agents-label">{t("admin.v2.executors")}</span>
           {visibleNodeAgentNames(node).map((name) => {
             const agentStatus = node.agents[name] ?? "unknown";
             const agentTone = agentStatusTone(agentStatus);

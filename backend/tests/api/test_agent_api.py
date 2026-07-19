@@ -216,6 +216,93 @@ def test_admin_places_agents_on_different_runtime_nodes(monkeypatch) -> None:
         }
 
 
+def test_agent_placements_describe_managed_and_local_runtime_nodes(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        assert client.post(
+            "/cp/employees",
+            json={
+                "employeeId": "alice",
+                "username": "alice",
+                "password": "userpass",
+            },
+        ).status_code == 201
+        app.state.registry.register(
+            {
+                "sandboxId": "node_local",
+                "employeeId": "alice",
+                "token": "token_local",
+                "workspacePath": "/Users/alice/relay",
+                "sandboxMode": "none",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }
+        )
+        managed = client.post(
+            "/cp/managed-nodes",
+            json={"employeeId": "alice", "displayName": "Alice managed node"},
+        ).json()["node"]
+        attempt = client.post(
+            f"/cp/managed-nodes/{managed['id']}/attempts"
+        ).json()
+        enrolled = client.post(
+            "/daemon-enroll",
+            json={"workspacePath": "/workspace/alice"},
+            headers={
+                "Authorization": f"Enrollment {attempt['enrollmentCredential']}"
+            },
+        ).json()
+        assert client.post(
+            "/daemon-nodes/register",
+            json={
+                "sandboxId": enrolled["sandboxId"],
+                "token": enrolled["token"],
+                "workspacePath": "/workspace/alice",
+                "workspaceId": "employee:alice:home",
+                "sandboxMode": "boxlite",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            },
+        ).status_code == 200
+        agent = client.post(
+            "/cp/employees/alice/agents",
+            json={"displayName": "Builder", "executorKind": "codex"},
+        ).json()["agent"]
+        assert client.post(
+            f"/cp/agents/{agent['id']}/placements",
+            json={"daemonNodeId": enrolled["sandboxId"], "priority": 100},
+        ).status_code == 201
+        assert client.post(
+            f"/cp/agents/{agent['id']}/placements",
+            json={"daemonNodeId": "node_local", "priority": 200},
+        ).status_code == 201
+
+        listed = next(
+            item
+            for item in client.get(
+                "/cp/agents?supervisorEmployeeId=alice"
+            ).json()["agents"]
+            if item["id"] == agent["id"]
+        )
+        placements = {
+            item["daemonNodeId"]: item for item in listed["placements"]
+        }
+
+        assert placements[enrolled["sandboxId"]]["nodeDisplayName"] == (
+            "Alice managed node"
+        )
+        assert placements[enrolled["sandboxId"]]["nodeOwnership"] == "managed"
+        assert placements[enrolled["sandboxId"]]["nodeSandboxMode"] == "boxlite"
+        assert placements["node_local"]["nodeDisplayName"] == "node_local"
+        assert placements["node_local"]["nodeOwnership"] == "user-run"
+        assert placements["node_local"]["nodeSandboxMode"] == "none"
+
+
 def test_employee_dispatches_work_by_logical_agent_id(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:

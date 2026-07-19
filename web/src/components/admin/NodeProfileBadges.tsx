@@ -6,6 +6,7 @@ import { NodeLocal, NodeManaged, NodePending } from "../icons";
 import {
   nodeExecutionProfile,
   nodeLocalityKinds,
+  nodeSandboxProfile,
   type NodeExecutionProfile,
   type StoredNodeTokenMap,
 } from "./helpers";
@@ -32,11 +33,14 @@ interface NodeProfileBadgesProps {
 
 export function NodeProfileBadges({ node, storedTokens, colocated, t, compact = false, hideThisHost = false, hideSavedHere = false }: NodeProfileBadgesProps) {
   const execution = nodeExecutionProfile(node);
+  const sandbox = nodeSandboxProfile(node);
   const localities = nodeLocalityKinds(node, { storedTokens, colocated })
     .filter((locality) => !(hideThisHost && locality === "this_host"))
     .filter((locality) => !(hideSavedHere && locality === "saved_here"));
   const executionLabel = t(`admin.v2.node_execution_${execution}`);
   const executionHint = t(`admin.v2.node_execution_${execution}_hint`);
+  const sandboxLabel = t(`admin.v2.node_sandbox_${sandbox}`);
+  const sandboxHint = t(`admin.v2.node_sandbox_${sandbox}_hint`);
   const localityText = localities
     .map((locality) => t(`admin.v2.node_locality_${locality}`))
     .join(" · ");
@@ -48,7 +52,10 @@ export function NodeProfileBadges({ node, storedTokens, colocated, t, compact = 
   return (
     <div
       className={`adm-node-profile${compact ? " is-compact" : ""}`}
-      aria-label={t("admin.v2.node_profile_label", { execution: executionLabel })}
+      aria-label={t("admin.v2.node_profile_label", {
+        execution: executionLabel,
+        sandbox: sandboxLabel,
+      })}
     >
       <span
         className="adm-node-profile-kind"
@@ -58,6 +65,14 @@ export function NodeProfileBadges({ node, storedTokens, colocated, t, compact = 
       >
         <ExecutionIcon size={13} className="adm-node-profile-icon" aria-hidden="true" />
         {executionLabel}
+      </span>
+      <span className="adm-node-profile-sep" aria-hidden="true">·</span>
+      <span
+        className="adm-node-profile-sandbox"
+        data-sandbox={sandbox}
+        title={sandboxHint}
+      >
+        {sandboxLabel}
       </span>
       {localityText ? (
         <>

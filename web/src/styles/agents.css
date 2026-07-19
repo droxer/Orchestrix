@@ -179,6 +179,78 @@
   white-space: nowrap;
 }
 
+.agents-roster-row-placements {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  min-width: 0;
+  margin-top: var(--sp-1);
+}
+
+.agent-placement-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+  max-width: 100%;
+  padding: 2px var(--sp-2);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-1);
+  background: var(--surface-1);
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-2);
+  line-height: 1.35;
+}
+
+.agent-placement-badge.is-compact {
+  padding-block: 1px;
+}
+
+.agent-placement-badge[data-ownership="managed"] {
+  border-color: color-mix(in srgb, var(--info) 30%, var(--line-1));
+}
+
+.agent-placement-badge[data-ownership="local"] {
+  border-color: color-mix(in srgb, var(--ok) 30%, var(--line-1));
+}
+
+.agent-placement-badge-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink-1);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-placement-badge-kind,
+.agent-placement-badge-sandbox {
+  flex: none;
+}
+
+.agent-placement-badge-kind::before,
+.agent-placement-badge-sandbox::before {
+  content: "·";
+  margin-right: var(--sp-1);
+  color: var(--ink-4);
+}
+
+.agent-placement-badge-rank {
+  flex: none;
+  padding: 0 var(--sp-1);
+  border-radius: var(--r-1);
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--track-1);
+}
+
+.agent-placement-badge-rank[data-rank="primary"] {
+  color: var(--action);
+}
+
 .agents-roster-row-sep {
   opacity: 0.6;
 }

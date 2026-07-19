@@ -668,10 +668,25 @@
   color: var(--ink-3);
 }
 
+.adm-node-profile-sandbox {
+  font-family: var(--font-mono);
+  font-size: var(--fs-2);
+  color: var(--ink-2);
+}
+
 .adm-node-profile-locality {
   font-family: var(--font-mono);
   font-size: var(--fs-2);
   color: var(--ink-3);
+}
+
+.adm-agents-label {
+  display: block;
+  width: 100%;
+  color: var(--ink-3);
+  font: var(--type-label);
+  letter-spacing: var(--track-1);
+  text-transform: uppercase;
 }
 
 .adm-cred-hint {

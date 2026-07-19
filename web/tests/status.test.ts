@@ -10,6 +10,7 @@ import {
 import {
   buildDaemonStartCommand,
   nodeExecutionProfile,
+  nodeSandboxProfile,
   nodeLocalityFlags,
   nodeLocalityKinds,
   resolveNodeCredentials,
@@ -444,6 +445,9 @@ describe("Relay web admin node helpers", () => {
     }), ["saved_here", "this_host"]);
     assert.equal(nodeExecutionProfile({ sandboxMode: "boxlite" }), "local");
     assert.equal(nodeExecutionProfile({ sandboxMode: "none", managedNodeId: "mnode_alice" }), "managed");
+    assert.equal(nodeSandboxProfile({ sandboxMode: "boxlite" }), "boxlite");
+    assert.equal(nodeSandboxProfile({ sandboxMode: "none" }), "host");
+    assert.equal(nodeSandboxProfile({}), "pending");
   });
 
   it("persists ephemeral control-panel node tokens into the stored map", () => {

@@ -186,6 +186,7 @@ export interface NodeLocalityFlags {
 }
 
 export type NodeExecutionProfile = "managed" | "local" | "pending";
+export type NodeSandboxProfile = "boxlite" | "host" | "pending";
 
 export type NodeLocalityKind = "this_host" | "saved_here" | "remote";
 
@@ -193,6 +194,14 @@ export type NodeLocalityKind = "this_host" | "saved_here" | "remote";
 export function nodeExecutionProfile(node: Pick<ControlPanelDaemonNodeRecord, "managedNodeId" | "sandboxMode">): NodeExecutionProfile {
   if (node.managedNodeId) return "managed";
   if (node.sandboxMode) return "local";
+  return "pending";
+}
+
+export function nodeSandboxProfile(
+  node: Pick<ControlPanelDaemonNodeRecord, "sandboxMode">,
+): NodeSandboxProfile {
+  if (node.sandboxMode === "boxlite") return "boxlite";
+  if (node.sandboxMode === "none") return "host";
   return "pending";
 }
 

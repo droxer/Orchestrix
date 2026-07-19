@@ -466,6 +466,13 @@
   min-width: 0;
 }
 
+.adm-assign-node-body .adm-node-profile {
+  margin: var(--sp-1) 0 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
 .adm-assign-node-id {
   font: var(--type-label-strong);
   color: var(--ink-1);

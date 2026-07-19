@@ -365,4 +365,21 @@ def _placement_view(ctx: AppContextDep, placement: dict[str, Any]) -> dict[str, 
         None,
     )
     agent = ctx.agent_store.get_agent(placement["agentId"])
-    return placement_status(placement, agent, node)
+    view = placement_status(placement, agent, node)
+    if not node:
+        return {**view, "nodeOwnership": "unknown"}
+    managed_node = (
+        ctx.managed_node_store.get_node(node["managedNodeId"])
+        if node.get("managedNodeId")
+        else None
+    )
+    return {
+        **view,
+        "nodeDisplayName": (managed_node or {}).get("displayName") or node["id"],
+        "nodeOwnership": "managed" if node.get("managedNodeId") else "user-run",
+        **(
+            {"nodeSandboxMode": node["sandboxMode"]}
+            if node.get("sandboxMode") in ("boxlite", "none")
+            else {}
+        ),
+    }

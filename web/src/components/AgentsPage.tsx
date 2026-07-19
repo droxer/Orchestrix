@@ -11,6 +11,8 @@ import { AgentStateBadge } from "./AgentStateBadge";
 import { AgentWorkspacePage, type WorkspacePageTab } from "./AgentWorkspacePage";
 import { RelayEmptyState } from "./RelayEmptyState";
 import { Badge } from "./ui/badge";
+import { AgentPlacementBadge } from "./AgentPlacementBadge";
+import { describeAgentPlacements } from "../lib/agentPlacements";
 
 interface AgentsPageProps {
   currentUser: CurrentUser;
@@ -116,6 +118,7 @@ function RosterRow({
 }) {
   const { t } = useTranslation();
   const placements = activePlacements(agent);
+  const placementDescriptions = describeAgentPlacements(placements);
   const readyPlacements = placements.filter((placement) => placement.status === "ready").length;
   const ready = agent.enabled && agent.availability === "ready";
   const canChat = ready;
@@ -150,6 +153,18 @@ function RosterRow({
                   : t("agents_page.placements_ready", { ready: readyPlacements, total: placements.length })}
               </span>
             </span>
+            {placementDescriptions.length > 0 ? (
+              <span className="agents-roster-row-placements">
+                {placementDescriptions.map((description) => (
+                  <AgentPlacementBadge
+                    key={description.placement.id}
+                    description={description}
+                    compact
+                    showRank={placementDescriptions.length > 1}
+                  />
+                ))}
+              </span>
+            ) : null}
           </span>
         </button>
         <span className="agents-roster-row-actions" role="group" aria-label={t("agents_page.actions")}>

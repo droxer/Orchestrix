@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { AgentMark } from "../AgentMark";
 import { Drawer } from "./Drawer";
 import { agentStatusTone } from "./helpers";
+import { NodeProfileBadges } from "./NodeProfileBadges";
 
 interface ManageAgentsDrawerProps {
   open: boolean;
@@ -130,6 +131,13 @@ export function ManageAgentsDrawer({ open, onClose, node, onUpdated }: ManageAge
       bodyClassName="adm-drawer-body--column"
     >
       <div className="adm-form">
+        <NodeProfileBadges
+          node={node}
+          storedTokens={{}}
+          colocated={false}
+          t={t}
+          compact
+        />
         <p className="adm-cred-note adm-agent-drawer-note">{t("admin.v2.manage_agents_help")}</p>
         <ul className="adm-agent-toggle-list">
         {AGENT_NAMES.map((agent) => {

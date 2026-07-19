@@ -231,7 +231,7 @@ export interface UnassignControlPanelDaemonNodeResponse {
 export interface CreateControlPanelDaemonNodeInput {
   employeeId?: string;
   workspacePath?: string;
-  /** "boxlite" = managed BoxLite VM (default); "none" = local host processes. */
+  /** Runtime isolation only; management ownership is represented by managedNodeId. */
   sandboxMode?: "boxlite" | "none";
 }
 
@@ -290,6 +290,9 @@ export interface AgentPlacement {
   agentId: string;
   employeeId: string;
   daemonNodeId: string;
+  nodeDisplayName?: string;
+  nodeOwnership?: "managed" | "user-run" | "unknown";
+  nodeSandboxMode?: "boxlite" | "none";
   executorKind: AgentName;
   desiredState: "active" | "draining" | "removed";
   status: "pending" | "ready" | "busy" | "offline" | "incompatible" | "failed";

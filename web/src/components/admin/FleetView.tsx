@@ -170,7 +170,7 @@ export function FleetView({ nodes, storedTokens, layout, onLayoutChange, onRevea
         <>
           <div className="adm-node-cols" aria-hidden="true">
             <span className="adm-emp-col-label">{t("admin.v2.nav_fleet")}</span>
-            <span className="adm-emp-col-label">{t("admin.col_agents")}</span>
+            <span className="adm-emp-col-label">{t("admin.v2.executors")}</span>
             <span className="adm-emp-col-label adm-emp-col-label--metrics">{t("admin.v2.col_actions")}</span>
           </div>
           <ul className="adm-node-list">
