@@ -27,6 +27,8 @@ MANAGED_NODE_PHASES = frozenset({
     "draining",
     "stopped",
     "deleting",
+    "deleted",
+    "failed",
 })
 PROVISIONING_ATTEMPT_STATUSES = frozenset({
     "pending",
@@ -104,6 +106,27 @@ class LocalManagedNodeStore:
             self._write_node(node)
             return node
 
+    def ensure_node_for_employee(self, employee_id: str) -> tuple[dict[str, Any], bool]:
+        """Return running managed capacity for an employee, creating it once."""
+        employee_id = employee_id.strip()
+        if not employee_id:
+            raise ValueError("employeeId is required for managed capacity.")
+        with self._lock:
+            existing = next(
+                (
+                    node
+                    for node in self.list_nodes()
+                    if node.get("employeeId") == employee_id
+                    and node.get("assignmentMode") == "dedicated"
+                ),
+                None,
+            )
+            if existing:
+                if existing.get("desiredState") != "running":
+                    existing = self.update_node(existing["id"], {"desiredState": "running"})
+                return existing, False
+            return self.create_node({"employeeId": employee_id}), True
+
     def list_nodes(self, *, include_deleted: bool = False) -> list[dict[str, Any]]:
         nodes = [_read_json(path) for path in self.nodes_dir.glob("*.json")]
         if not include_deleted:
@@ -120,7 +143,14 @@ class LocalManagedNodeStore:
             if not node:
                 raise KeyError(node_id)
             provider_fields = {"provider", "providerConfigRef", "profile", "sandboxMode", "workspacePolicy"}
-            allowed_fields = provider_fields | {"displayName", "employeeId", "assignmentMode", "desiredState", "phase"}
+            allowed_fields = provider_fields | {
+                "displayName",
+                "employeeId",
+                "assignmentMode",
+                "desiredState",
+                "phase",
+                "conditions",
+            }
             unknown = set(patch) - allowed_fields
             if unknown:
                 raise ValueError(f"Unsupported managed node field(s): {', '.join(sorted(unknown))}.")
@@ -137,6 +167,8 @@ class LocalManagedNodeStore:
                 raise ValueError("employeeId is required for a dedicated managed node.")
             if "phase" in patch and patch["phase"] not in MANAGED_NODE_PHASES:
                 raise ValueError("Invalid managed node phase.")
+            if "conditions" in patch and not isinstance(patch["conditions"], list):
+                raise ValueError("conditions must be an array.")
             updated = {**node, **patch, "updatedAt": now_iso()}
             generation_changed = any(field in patch and patch[field] != node.get(field) for field in provider_fields)
             if generation_changed:
@@ -224,6 +256,17 @@ class LocalManagedNodeStore:
                 node_patch = {**node, "updatedAt": now}
                 if status in phase_by_status:
                     node_patch["phase"] = phase_by_status[status]
+                if status == "failed":
+                    node_patch["phase"] = "failed"
+                    node_patch["conditions"] = [
+                        {
+                            "type": "Provisioned",
+                            "status": "False",
+                            "reason": patch.get("errorCode") or "provisioning_failed",
+                            "message": patch.get("errorMessage") or "Managed node provisioning failed.",
+                            "updatedAt": now,
+                        }
+                    ]
                 if status in TERMINAL_ATTEMPT_STATUSES and node.get("activeAttemptId") == attempt_id:
                     node_patch.pop("activeAttemptId", None)
                 self._write_node(node_patch)

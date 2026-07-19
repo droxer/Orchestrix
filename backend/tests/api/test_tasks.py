@@ -243,6 +243,34 @@ def test_task_start_preserves_ask_mode(monkeypatch) -> None:
         assert command["state"]["task_goal"] == "Explain backlog"
 
 
+def test_task_start_requests_managed_capacity_when_no_node_is_ready(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _create_user(client, "alice", employee_id="alice")
+        task = client.post(
+            "/tasks",
+            json={
+                "title": "Provision before running",
+                "ownerEmployeeId": "alice",
+                "assigneeEmployeeId": "alice",
+                "assignedAgent": "codex",
+            },
+        ).json()
+
+        started = client.post(f"/tasks/{task['id']}/start", json={"agent": "codex"})
+
+        assert started.status_code == 202
+        assert started.json()["session"] is None
+        assert started.json()["task"]["activity"][-1]["message"] == (
+            "Managed node provisioning requested for alice."
+        )
+        [managed] = app.state.managed_node_store.list_nodes()
+        assert managed["employeeId"] == "alice"
+
+
 def test_task_start_discussion_runs_multi_agent_ask_and_keeps_task_open(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:

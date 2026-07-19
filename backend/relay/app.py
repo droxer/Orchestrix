@@ -56,7 +56,12 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
         agent_placement_store=agent_placement_store,
     )
 
-    scheduler = task_scheduler_from_env(task_store=task_store, registry=registry, backend=backend)
+    scheduler = task_scheduler_from_env(
+        task_store=task_store,
+        registry=registry,
+        backend=backend,
+        managed_node_store=managed_node_store,
+    )
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -165,7 +170,13 @@ def chat_store_from_env(root_dir: Path) -> Any:
     return DatabaseChatIntegrationStore(database_url_from_env(setting=setting))
 
 
-def task_scheduler_from_env(*, task_store: Any, registry: DaemonNodeRegistry, backend: ServerDaemonNodeBackend) -> TaskScheduler | None:
+def task_scheduler_from_env(
+    *,
+    task_store: Any,
+    registry: DaemonNodeRegistry,
+    backend: ServerDaemonNodeBackend,
+    managed_node_store: Any | None = None,
+) -> TaskScheduler | None:
     enabled = os.environ.get("RELAY_TASK_SCHEDULER_ENABLED", "1").strip().lower()
     if enabled in ("0", "false", "no", "off"):
         return None
@@ -173,6 +184,7 @@ def task_scheduler_from_env(*, task_store: Any, registry: DaemonNodeRegistry, ba
         task_store=task_store,
         registry=registry,
         backend=backend,
+        managed_node_store=managed_node_store,
         interval_seconds=float(os.environ.get("RELAY_TASK_SCHEDULER_INTERVAL_SECONDS", "10")),
         max_dispatches_per_tick=max(1, int(os.environ.get("RELAY_TASK_SCHEDULER_MAX_DISPATCHES", "5"))),
         today=scheduler_today_from_env(),

@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { RelayEmptyState } from "@/components/RelayEmptyState";
 import { Button } from "@/components/ui/button";
-import type { ControlPanelDaemonNodeRecord, EmployeeRecord } from "../../types";
+import type { ControlPanelDaemonNodeRecord } from "../../types";
 import { AdminNode, ActionSearch, ICON_STROKE_LARGE } from "../icons";
 import { canUseLocalControlPanel } from "../../lib/controlPanel";
 import { useUrlSearchState } from "../../hooks/useUrlSearchState";
@@ -20,7 +20,6 @@ type FleetFilter = "all" | "ready" | "running" | "provisioning" | "failed" | "un
 
 interface FleetViewProps {
   nodes: ControlPanelDaemonNodeRecord[];
-  employees: EmployeeRecord[];
   storedTokens: StoredNodeTokenMap;
   layout: AdminLayout;
   onLayoutChange: (next: AdminLayout) => void;
@@ -58,7 +57,7 @@ function filterLabel(filter: FleetFilter, t: TFunction): string {
   return t(`status.${filter}`, { defaultValue: filter });
 }
 
-export function FleetView({ nodes, employees, storedTokens, layout, onLayoutChange, onRevealCredentials, onManageAgents, onDeleteNode, onAddNode }: FleetViewProps) {
+export function FleetView({ nodes, storedTokens, layout, onLayoutChange, onRevealCredentials, onManageAgents, onDeleteNode, onAddNode }: FleetViewProps) {
   const { t } = useTranslation();
   const [filter, setFilter] = useUrlSearchState("fleetFilter", "all" as FleetFilter, parseFleetFilter, serializeFleetFilter);
   const [query, setQuery] = useState("");
@@ -83,18 +82,14 @@ export function FleetView({ nodes, employees, storedTokens, layout, onLayoutChan
     return result;
   }, [nodes]);
 
-  const employeeById = useMemo(() => new Map(employees.map((employee) => [employee.id, employee])), [employees]);
-
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return nodes.filter((node) => {
       if (!matchesFilter(node, filter)) return false;
       if (!q) return true;
-      const employee = node.employeeId ? employeeById.get(node.employeeId) : undefined;
       const haystack = [
         node.id,
-        node.employeeId ?? "",
-        employee?.displayName ?? "",
+        node.displayName ?? "",
         node.workspacePath ?? "",
         node.sandboxMode ?? "",
         ...Object.keys(node.agents),
@@ -103,7 +98,7 @@ export function FleetView({ nodes, employees, storedTokens, layout, onLayoutChan
         .toLowerCase();
       return haystack.includes(q);
     });
-  }, [nodes, filter, query, employeeById]);
+  }, [nodes, filter, query]);
 
   return (
     <div className="adm-view">
@@ -162,7 +157,6 @@ export function FleetView({ nodes, employees, storedTokens, layout, onLayoutChan
             <NodeCard
               key={node.id}
               node={node}
-              employee={node.employeeId ? employeeById.get(node.employeeId) : undefined}
               storedTokens={storedTokens}
               colocated={colocated}
               onReveal={onRevealCredentials}
@@ -184,7 +178,6 @@ export function FleetView({ nodes, employees, storedTokens, layout, onLayoutChan
               <NodeRow
                 key={node.id}
                 node={node}
-                employee={node.employeeId ? employeeById.get(node.employeeId) : undefined}
                 storedTokens={storedTokens}
                 colocated={colocated}
                 onReveal={onRevealCredentials}

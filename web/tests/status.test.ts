@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { assignControlPanelDaemonNode, createControlPanelDaemonNode, createControlPanelEmployee, createManagedNode } from "../src/api.js";
+import { assignControlPanelDaemonNode, createControlPanelDaemonNode, createControlPanelEmployee, createManagedNode, deleteManagedNode } from "../src/api.js";
 import { conversationDaemonStatus } from "../src/lib/conversationStatus.js";
 import {
   mergeVisibleDaemonNodes,
@@ -294,6 +294,27 @@ describe("Relay web conversation status", () => {
       });
       assert.equal(result.node.phase, "requested");
       assert.equal("daemonCommand" in result, false);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("deletes managed desired state through the managed-node endpoint", async () => {
+    const originalFetch = globalThis.fetch;
+    let requestPath = "";
+    let requestInit: RequestInit | undefined;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      requestPath = String(input);
+      requestInit = init;
+      return new Response(JSON.stringify({ node: { id: "mnode_alice", desiredState: "deleted" } }), {
+        status: 202,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+    try {
+      await deleteManagedNode("mnode_alice");
+      assert.equal(requestPath, "/cp/managed-nodes/mnode_alice");
+      assert.equal(requestInit?.method, "DELETE");
     } finally {
       globalThis.fetch = originalFetch;
     }

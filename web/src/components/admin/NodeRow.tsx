@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { TFunction } from "i18next";
-import type { AgentName, ControlPanelDaemonNodeRecord, EmployeeRecord } from "../../types";
+import type { AgentName, ControlPanelDaemonNodeRecord } from "../../types";
 import { useDialogs } from "@/components/ui/DialogProvider";
 import { AgentMark } from "../AgentMark";
 import {
@@ -20,7 +20,6 @@ function isAgentDisabled(node: ControlPanelDaemonNodeRecord, agent: AgentName): 
 
 interface NodeRowProps {
   node: ControlPanelDaemonNodeRecord;
-  employee?: EmployeeRecord;
   storedTokens: StoredNodeTokenMap;
   colocated: boolean;
   onReveal: (node: ControlPanelDaemonNodeRecord) => void;
@@ -29,11 +28,11 @@ interface NodeRowProps {
   t: TFunction;
 }
 
-export function NodeRow({ node, employee, storedTokens, colocated, onReveal, onManageAgents, onDelete, t }: NodeRowProps) {
+export function NodeRow({ node, storedTokens, colocated, onReveal, onManageAgents, onDelete, t }: NodeRowProps) {
   const { confirm } = useDialogs();
   const [deletePending, setDeletePending] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const nodeName = node.employeeId ? employee?.displayName || node.employeeId : t("admin.unassigned");
+  const nodeName = node.displayName || node.id;
 
   async function handleDelete() {
     if (!onDelete) return;
@@ -61,14 +60,10 @@ export function NodeRow({ node, employee, storedTokens, colocated, onReveal, onM
           <AdminNode size={16} aria-hidden="true" />
         </span>
         <span className="adm-node-row-identity">
-          <span className={`adm-node-card-name ${node.employeeId ? "" : "tone-muted"}`} translate="no">
+          <span className="adm-node-card-name" translate="no">
             {nodeName}
           </span>
-          {node.employeeId ? (
-            <span className="adm-node-card-handle mono" translate="no">@{node.employeeId}</span>
-          ) : (
-            <span className="adm-node-card-handle tone-muted">{t("admin.unassigned")}</span>
-          )}
+          <span className="adm-node-card-handle mono" translate="no">{node.id}</span>
           <NodeProfileBadges
             node={node}
             storedTokens={storedTokens}
@@ -112,7 +107,7 @@ export function NodeRow({ node, employee, storedTokens, colocated, onReveal, onM
             <ActionKey size={14} aria-hidden="true" />
           </Button>
         )}
-        <Button
+        {!node.provisioningPlaceholder ? <Button
           variant="ghost"
           type="button"
           className="icon-button icon-button--sm icon-button--tinted adm-node-card-icon-btn"
@@ -121,7 +116,7 @@ export function NodeRow({ node, employee, storedTokens, colocated, onReveal, onM
           title={t("admin.v2.manage_agents")}
         >
           <AdminManageAgents size={14} aria-hidden="true" />
-        </Button>
+        </Button> : null}
         {onDelete ? (
           <Button
             variant="ghost"

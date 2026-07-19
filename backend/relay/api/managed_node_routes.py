@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 
 from ..security.auth import require_admin_session
 from .deps import AppContextDep
@@ -49,7 +49,11 @@ async def get_managed_node(node_id: str, request: Request, ctx: AppContextDep) -
 async def update_managed_node(node_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     try:
-        return {"node": ctx.managed_node_store.update_node(node_id, await json_body(request))}
+        patch = await json_body(request)
+        node = ctx.managed_node_store.update_node(node_id, patch)
+        if patch.get("desiredState") in ("stopped", "deleted"):
+            _fence_active_runtime(ctx, node)
+        return {"node": node}
     except (KeyError, ValueError) as error:
         raise _admin_error(error) from error
 
@@ -58,7 +62,11 @@ async def update_managed_node(node_id: str, request: Request, ctx: AppContextDep
 async def delete_managed_node(node_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     try:
-        return {"node": ctx.managed_node_store.update_node(node_id, {"desiredState": "deleted"})}
+        node = ctx.managed_node_store.update_node(
+            node_id, {"desiredState": "deleted"}
+        )
+        _fence_active_runtime(ctx, node)
+        return {"node": node}
     except (KeyError, ValueError) as error:
         raise _admin_error(error) from error
 
@@ -110,9 +118,34 @@ async def retry_managed_node(node_id: str, request: Request, ctx: AppContextDep)
 async def drain_managed_node(node_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     try:
-        return {"node": ctx.managed_node_store.update_node(node_id, {"desiredState": "stopped"})}
+        node = ctx.managed_node_store.update_node(node_id, {"desiredState": "stopped"})
+        _fence_active_runtime(ctx, node)
+        return {"node": node}
     except (KeyError, ValueError) as error:
         raise _admin_error(error) from error
+
+
+@router.delete("/cp/managed-nodes/{node_id}/runtime", status_code=204)
+async def retire_managed_node_runtime(
+    node_id: str, request: Request, ctx: AppContextDep
+) -> Response:
+    require_admin_session(request, ctx.auth_store)
+    node = ctx.managed_node_store.get_node(node_id)
+    if not node:
+        raise HTTPException(404, "Managed node not found.")
+    daemon_node_id = node.get("activeDaemonNodeId")
+    if daemon_node_id and ctx.registry.get(daemon_node_id):
+        try:
+            ctx.registry.delete(daemon_node_id)
+        except ValueError as error:
+            raise HTTPException(409, str(error)) from error
+    return Response(status_code=204)
+
+
+def _fence_active_runtime(ctx: Any, node: dict[str, Any]) -> None:
+    daemon_node_id = node.get("activeDaemonNodeId")
+    if daemon_node_id and ctx.registry.get(daemon_node_id):
+        ctx.registry.fence_managed_node(daemon_node_id)
 
 
 @router.post("/daemon-enroll", status_code=201)

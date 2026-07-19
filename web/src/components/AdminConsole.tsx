@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next";
 import { useMutationError } from "../hooks/useMutationError";
 import { Button } from "@/components/ui/button";
 import { ActionAddPerson, AdminNode, NavRefresh } from "./icons";
-import { deleteControlPanelDaemonNode, deleteControlPanelEmployee, getAuthStatus, getMe, unassignControlPanelDaemonNode } from "../api";
+import { deleteControlPanelDaemonNode, deleteControlPanelEmployee, deleteManagedNode, getAuthStatus, getMe, unassignControlPanelDaemonNode } from "../api";
 import type {
   AssignControlPanelDaemonNodeResponse,
   ControlPanelDaemonNodeRecord,
@@ -45,6 +45,25 @@ const ADMIN_VIEWS: AdminView[] = ["dashboard", "employees", "fleet"];
 
 function parseAdminView(value: string | null): AdminView {
   return ADMIN_VIEWS.includes(value as AdminView) ? value as AdminView : "dashboard";
+}
+
+function managedNodePlaceholder(node: CreateManagedNodeResponse["node"]): ControlPanelDaemonNodeRecord {
+  return {
+    id: node.id,
+    managedNodeId: node.id,
+    displayName: node.displayName,
+    employeeId: node.employeeId,
+    sandboxMode: node.sandboxMode,
+    status: node.desiredState === "running" ? "provisioning" : "stopped",
+    agents: { claude: "unknown", pi: "unknown", codex: "unknown", kimi: "unknown" },
+    createdAt: node.createdAt,
+    updatedAt: node.updatedAt,
+    queuedCommandCount: 0,
+    activeRuns: [],
+    online: false,
+    stale: true,
+    provisioningPlaceholder: true,
+  };
 }
 
 export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null }) {
@@ -181,10 +200,15 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
 
   async function handleDeleteNode(node: ControlPanelDaemonNodeRecord) {
     try {
-      await deleteControlPanelDaemonNode(node.id);
+      if (node.managedNodeId) await deleteManagedNode(node.managedNodeId);
+      else await deleteControlPanelDaemonNode(node.id);
       mergeFleet((prev) => ({
         ...prev,
-        nodes: prev.nodes.filter((current) => current.id !== node.id),
+        nodes: prev.nodes.filter((current) => (
+          node.managedNodeId
+            ? current.managedNodeId !== node.managedNodeId
+            : current.id !== node.id
+        )),
       }));
       setCredentialsNodeId(null);
     } catch (error) {
@@ -248,6 +272,13 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
 
   function handleCreateManagedNodeSuccess(result: CreateManagedNodeResponse) {
     const { node } = result;
+    mergeFleet((prev) => ({
+      ...prev,
+      nodes: [
+        managedNodePlaceholder(node),
+        ...prev.nodes.filter((current) => current.managedNodeId !== node.id),
+      ],
+    }));
     setHighlightedEmployeeId(node.employeeId ?? null);
     window.setTimeout(() => setHighlightedEmployeeId((prev) => (prev === node.employeeId ? null : prev)), 2400);
     setAddNodeOpen(false);
@@ -406,7 +437,6 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
               ) : (
                 <FleetView
                   nodes={nodes}
-                  employees={employees}
                   storedTokens={storedTokens}
                   layout={layout}
                   onLayoutChange={setLayout}

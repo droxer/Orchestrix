@@ -251,7 +251,9 @@ export type ManagedNodePhase =
   | "ready"
   | "draining"
   | "stopped"
-  | "deleting";
+  | "deleting"
+  | "deleted"
+  | "failed";
 
 export interface ManagedNodeRecord {
   id: string;
@@ -273,7 +275,7 @@ export interface ManagedNodeRecord {
 }
 
 export interface CreateManagedNodeInput {
-  employeeId?: string;
+  employeeId: string;
   sandboxMode: "boxlite";
 }
 

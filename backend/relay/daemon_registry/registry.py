@@ -481,6 +481,8 @@ def node_accepts_run(
     active_runs: list[dict[str, Any]],
     session_id: str | None = None,
 ) -> bool:
+    if node.get("retiredAt"):
+        return False
     if session_id and any(run.get("sessionId") == session_id for run in active_runs):
         return False
     requested_modes = [assignment.get("mode") or "action" for assignment in assignments]
@@ -736,6 +738,7 @@ class DaemonNodeRegistry:
         prior_disabled = list((existing or {}).get("disabledAgents") or [])
         prior_role_defaults = dict((existing or {}).get("agentRoleDefaults") or {})
         prior_role_overrides = dict((existing or {}).get("agentRoleOverrides") or {})
+        retired_at = (existing or {}).get("retiredAt")
         capacity_input = {
             **(
                 {"maxConcurrentRuns": (existing or {}).get("maxConcurrentRuns")}
@@ -797,7 +800,9 @@ class DaemonNodeRegistry:
             ),
             **({"sandboxMode": sandbox_mode} if sandbox_mode else {}),
             **({"capabilities": capabilities} if capabilities else {}),
-            "status": "running"
+            "status": "stopped"
+            if retired_at
+            else "running"
             if payload.get("status") == "busy"
             else "stopped"
             if payload.get("status") == "stopped"
@@ -821,6 +826,7 @@ class DaemonNodeRegistry:
                 if prior_role_overrides
                 else {}
             ),
+            **({"retiredAt": retired_at} if retired_at else {}),
             "maxConcurrentRuns": max_concurrent_runs,
             "runCapacityByMode": run_capacity_by_mode,
             "uiTokenHash": next_ui_hash,
@@ -854,6 +860,8 @@ class DaemonNodeRegistry:
         if not sandbox:
             return
         next_patch = {k: v for k, v in patch.items() if v is not None}
+        if sandbox.get("retiredAt"):
+            next_patch["status"] = "stopped"
         if next_patch.get("status") in ("ready", "running"):
             next_patch["status"] = node_status_for_active_runs(
                 {**sandbox, **next_patch},
@@ -983,6 +991,23 @@ class DaemonNodeRegistry:
             "Daemon node disabled agents updated",
             sandbox_id=sandbox_id,
             disabled_agents=normalized,
+        )
+        return updated
+
+    def fence_managed_node(self, sandbox_id: str) -> dict[str, Any]:
+        sandbox = self.sandboxes.get(sandbox_id)
+        if not sandbox:
+            raise KeyError(sandbox_id)
+        retired_at = now_iso()
+        updated = {
+            **sandbox,
+            "retiredAt": retired_at,
+            "status": "stopped",
+            "updatedAt": retired_at,
+        }
+        self.sandboxes[sandbox_id] = updated
+        self.daemon_store.mark_node_seen(
+            sandbox_id, {"retiredAt": retired_at, "status": "stopped"}
         )
         return updated
 

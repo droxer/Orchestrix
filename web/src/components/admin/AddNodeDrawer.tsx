@@ -65,12 +65,17 @@ export function AddNodeDrawer({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    if (isManaged && !employeeId) {
+      setError(t("admin.employee_required"));
+      return;
+    }
+
     setIsBusy(true);
     setError(null);
     try {
       if (isManaged) {
         const result = await createManagedNode({
-          employeeId: employeeId || undefined,
+          employeeId,
           sandboxMode: "boxlite",
         });
         onSuccess({ kind: "managed", result });
@@ -139,7 +144,9 @@ export function AddNodeDrawer({
             <h3 id="adm-node-assignment" className="adm-provision-section-title">
               {t("admin.v2.section_assignment")}
             </h3>
-            <span className="adm-provision-section-meta">{t("admin.v2.optional")}</span>
+            <span className="adm-provision-section-meta">
+              {t(isManaged ? "admin.v2.required" : "admin.v2.optional")}
+            </span>
           </header>
 
           {selectedEmployee ? (
@@ -187,7 +194,9 @@ export function AddNodeDrawer({
           </label>
 
           {!selectedEmployee ? (
-            <p className="adm-form-hint">{t("admin.v2.add_node_assign_later")}</p>
+            <p className="adm-form-hint">
+              {t(isManaged ? "admin.employee_required" : "admin.v2.add_node_assign_later")}
+            </p>
           ) : null}
         </section>
 
@@ -197,7 +206,7 @@ export function AddNodeDrawer({
           <Button type="button" variant="ghost" onClick={() => void requestClose()} disabled={isBusy}>
             {t("admin.v2.cancel")}
           </Button>
-          <Button type="submit" disabled={isBusy}>
+          <Button type="submit" disabled={isBusy || (isManaged && !employeeId)}>
             {isBusy ? t("admin.creating") : t(isManaged ? "admin.v2.provision_node" : "admin.v2.generate_node")}
           </Button>
         </div>

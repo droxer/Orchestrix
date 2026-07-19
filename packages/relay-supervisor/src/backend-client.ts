@@ -23,7 +23,8 @@ export class SupervisorBackendClient implements SupervisorBackend, ManagedNodeBa
   }
 
   async listDaemonNodes(): Promise<ControlPanelDaemonNodeRecord[]> {
-    return (await this.request<{ nodes: ControlPanelDaemonNodeRecord[] }>("/cp/daemon-nodes")).nodes;
+    return (await this.request<{ nodes: ControlPanelDaemonNodeRecord[] }>("/cp/daemon-nodes")).nodes
+      .filter((node) => !node.provisioningPlaceholder);
   }
 
   async provisionDaemonNode(input: { employeeId: string; workspacePath?: string }): Promise<ProvisionedDaemonNode> {
@@ -54,6 +55,12 @@ export class SupervisorBackendClient implements SupervisorBackend, ManagedNodeBa
     })).node;
   }
 
+  async retireManagedNodeRuntime(nodeId: string): Promise<void> {
+    await this.request(`/cp/managed-nodes/${encodeURIComponent(nodeId)}/runtime`, {
+      method: "DELETE",
+    });
+  }
+
   async updateProvisioningAttempt(nodeId: string, attemptId: string, patch: Record<string, unknown>): Promise<ProvisioningAttemptRecord> {
     return (await this.request<{ attempt: ProvisioningAttemptRecord }>(
       `/cp/managed-nodes/${encodeURIComponent(nodeId)}/attempts/${encodeURIComponent(attemptId)}`,
@@ -72,6 +79,7 @@ export class SupervisorBackendClient implements SupervisorBackend, ManagedNodeBa
     if (!response.ok) {
       throw new Error(`${init.method ?? "GET"} ${path} failed: ${response.status} ${await response.text()}`);
     }
+    if (response.status === 204) return undefined as T;
     return await response.json() as T;
   }
 }

@@ -8,6 +8,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response
 
+from ..core.models import AGENT_NAMES
 from ..daemon_registry import public_sandbox_record
 from ..security.auth import require_admin_session
 from ..services.node_agents import sync_node_agents
@@ -17,11 +18,55 @@ from .helpers import daemon_start_command, daemon_start_env, employee_record, js
 router = APIRouter()
 
 
+def _with_node_display_name(ctx: AppContextDep, node: dict[str, Any]) -> dict[str, Any]:
+    managed_node = (
+        ctx.managed_node_store.get_node(node["managedNodeId"])
+        if node.get("managedNodeId")
+        else None
+    )
+    return {
+        **node,
+        "displayName": (managed_node or {}).get("displayName") or node["id"],
+    }
+
+
 def _public_control_panel_node(ctx: AppContextDep, node: dict[str, Any]) -> dict[str, Any]:
-    return next(
+    public_node = next(
         (item for item in ctx.registry.control_panel_nodes() if item["id"] == node["id"]),
         public_sandbox_record(node),
     )
+    return _with_node_display_name(ctx, public_node)
+
+
+def _managed_node_placeholder(node: dict[str, Any]) -> dict[str, Any]:
+    desired_state = node.get("desiredState")
+    phase = node.get("phase")
+    status = (
+        "stopped"
+        if desired_state != "running"
+        else "failed"
+        if phase in ("ready", "failed")
+        else "provisioning"
+    )
+    conditions = node.get("conditions") or []
+    last_error = conditions[-1].get("message") if conditions else None
+    return {
+        "id": node["id"],
+        "managedNodeId": node["id"],
+        "displayName": node.get("displayName") or node["id"],
+        **({"employeeId": node["employeeId"]} if node.get("employeeId") else {}),
+        "sandboxMode": node.get("sandboxMode") or "boxlite",
+        "status": status,
+        "agents": {agent: "unknown" for agent in AGENT_NAMES},
+        "createdAt": node["createdAt"],
+        "updatedAt": node["updatedAt"],
+        "queuedCommandCount": 0,
+        "activeRuns": [],
+        "online": False,
+        "stale": True,
+        "provisioningPlaceholder": True,
+        **({"lastError": last_error} if last_error else {}),
+    }
 
 
 @router.get("/cp/users")
@@ -131,6 +176,9 @@ async def soft_delete_employee(employee_id: str, request: Request, ctx: AppConte
         deleted = ctx.managed_node_store.update_node(
             node["id"], {"desiredState": "deleted"}
         )
+        daemon_node_id = deleted.get("activeDaemonNodeId")
+        if daemon_node_id and ctx.registry.get(daemon_node_id):
+            ctx.registry.fence_managed_node(daemon_node_id)
         deleted_managed_nodes.append(deleted["id"])
     return {
         "employee": record,
@@ -290,8 +338,20 @@ async def update_control_panel_daemon_node_agent_role_defaults(node_id: str, req
 @router.delete("/cp/daemon-nodes/{node_id}", status_code=204)
 async def delete_control_panel_daemon_node(node_id: str, request: Request, ctx: AppContextDep) -> Response:
     require_admin_session(request, ctx.auth_store)
-    if not ctx.registry.get(node_id):
+    node = ctx.registry.get(node_id)
+    if not node:
         raise HTTPException(404, "Daemon node not found.")
+    if node.get("managedNodeId"):
+        try:
+            ctx.managed_node_store.update_node(
+                node["managedNodeId"], {"desiredState": "deleted"}
+            )
+            ctx.registry.fence_managed_node(node_id)
+        except KeyError as error:
+            raise HTTPException(404, "Managed node not found.") from error
+        except ValueError as error:
+            raise HTTPException(409, str(error)) from error
+        return Response(status_code=204)
     try:
         ctx.registry.delete(node_id)
     except KeyError as error:
@@ -304,7 +364,25 @@ async def delete_control_panel_daemon_node(node_id: str, request: Request, ctx: 
 @router.get("/cp/daemon-nodes")
 async def control_panel_nodes(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
-    return {"nodes": ctx.registry.control_panel_nodes()}
+    observed = []
+    for node in ctx.registry.control_panel_nodes():
+        managed_node = (
+            ctx.managed_node_store.get_node(node["managedNodeId"])
+            if node.get("managedNodeId")
+            else None
+        )
+        if managed_node and managed_node.get("desiredState") == "deleted":
+            continue
+        observed.append(_with_node_display_name(ctx, node))
+    observed_managed_ids = {
+        node["managedNodeId"] for node in observed if node.get("managedNodeId")
+    }
+    pending = [
+        _managed_node_placeholder(node)
+        for node in ctx.managed_node_store.list_nodes()
+        if node["id"] not in observed_managed_ids
+    ]
+    return {"nodes": [*observed, *pending]}
 
 
 @router.post("/cp/daemon-nodes", status_code=201)

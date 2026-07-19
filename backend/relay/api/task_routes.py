@@ -16,7 +16,7 @@ from ..persistence.stores import (
     valid_agent,
 )
 from ..sessions import SessionController
-from ..tasks import next_routine_date, ready_node_for_task, task_goal_text
+from ..tasks import employee_has_local_node, next_routine_date, ready_node_for_task, task_goal_text
 from ..services.agent_routing import AgentRoutingError, resolve_agent_assignments
 from .deps import AppContextDep
 from .helpers import (
@@ -221,12 +221,23 @@ async def start_task_on_ready_node(
     else:
         node = ready_node_for_task(ctx.registry, task, run_assignments)
     if not node:
+        employee_id = task.get("assigneeEmployeeId") or task.get("ownerEmployeeId")
+        requested_capacity = False
+        if employee_id and not employee_has_local_node(ctx.registry, employee_id):
+            _managed_node, requested_capacity = (
+                ctx.managed_node_store.ensure_node_for_employee(employee_id)
+            )
         if record_pending:
             label = ", ".join(dict.fromkeys(item["agent"] for item in run_assignments))
+            message = (
+                f"Managed node provisioning requested for {employee_id}."
+                if requested_capacity
+                else f"No ready node is available for {label}."
+            )
             return {
                 "task": ctx.task_store.record_activity(
                     task["id"],
-                    f"No ready node is available for {label}.",
+                    message,
                     {"agent": agent},
                 ),
                 "session": None,

@@ -43,6 +43,7 @@ class TaskScheduler:
         task_store: Any,
         registry: Any,
         backend: Any,
+        managed_node_store: Any | None = None,
         interval_seconds: float = 10.0,
         max_dispatches_per_tick: int = 5,
         today: Callable[[], date] = date.today,
@@ -50,6 +51,7 @@ class TaskScheduler:
         self.task_store = task_store
         self.registry = registry
         self.backend = backend
+        self.managed_node_store = managed_node_store
         self.interval_seconds = interval_seconds
         self.max_dispatches_per_tick = max_dispatches_per_tick
         self._today = today
@@ -186,6 +188,7 @@ class TaskScheduler:
             else:
                 node = ready_node_for_task(self.registry, task, assignments)
             if not node:
+                self._ensure_managed_capacity(task)
                 skipped += 1
                 continue
             claimed = self.task_store.claim_task_for_dispatch(task["id"], agent)
@@ -201,6 +204,20 @@ class TaskScheduler:
             else:
                 self._register_dispatch_failure(task["id"])
         return dispatched, skipped
+
+    def _ensure_managed_capacity(self, task: dict[str, Any]) -> None:
+        if not self.managed_node_store:
+            return
+        employee_id = task.get("assigneeEmployeeId") or task.get("ownerEmployeeId")
+        if not employee_id or employee_has_local_node(self.registry, employee_id):
+            return
+        _node, created = self.managed_node_store.ensure_node_for_employee(employee_id)
+        if created:
+            logger.info(
+                "Managed node provisioning requested for queued task",
+                task_id=task["id"],
+                employee_id=employee_id,
+            )
 
     async def _dispatch_claimed_task(
         self,
@@ -322,6 +339,15 @@ def ready_node_for_task(
         ):
             return node
     return None
+
+
+def employee_has_local_node(registry: Any, employee_id: str) -> bool:
+    return any(
+        node.get("employeeId") == employee_id
+        and node.get("sandboxMode") == "none"
+        and not node.get("retiredAt")
+        for node in registry.monitor_nodes()
+    )
 
 
 def next_routine_date(run_date: date, cadence: str, today: date) -> date | None:

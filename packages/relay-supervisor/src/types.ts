@@ -18,7 +18,7 @@ export interface SupervisorBackend {
 }
 
 export type ManagedNodeDesiredState = "running" | "stopped" | "deleted";
-export type ManagedNodePhase = "requested" | "allocating" | "bootstrapping" | "registering" | "ready" | "draining" | "stopped" | "deleting";
+export type ManagedNodePhase = "requested" | "allocating" | "bootstrapping" | "registering" | "ready" | "draining" | "stopped" | "deleting" | "deleted" | "failed";
 
 export interface ManagedNodeRecord {
   id: string;
@@ -56,10 +56,12 @@ export interface ProvisioningAttemptRecord {
 
 export interface ManagedNodeBackend {
   listManagedNodes(): Promise<ManagedNodeRecord[]>;
+  listDaemonNodes(): Promise<ControlPanelDaemonNodeRecord[]>;
   listProvisioningAttempts(nodeId: string): Promise<ProvisioningAttemptRecord[]>;
   createProvisioningAttempt(nodeId: string): Promise<{ attempt: ProvisioningAttemptRecord; enrollmentCredential: string }>;
   updateProvisioningAttempt(nodeId: string, attemptId: string, patch: Record<string, unknown>): Promise<ProvisioningAttemptRecord>;
   updateManagedNode(nodeId: string, patch: Record<string, unknown>): Promise<ManagedNodeRecord>;
+  retireManagedNodeRuntime(nodeId: string): Promise<void>;
 }
 
 export interface EnsureManagedNodeInput {

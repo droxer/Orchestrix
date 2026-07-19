@@ -48,31 +48,84 @@ export class ManagedNodeReconciler {
 
   async reconcileOnce(): Promise<ManagedReconcileResult> {
     const nodes = await this.backend.listManagedNodes();
+    const daemonNodes = await this.backend.listDaemonNodes();
+    const daemonById = new Map(daemonNodes.map((node) => [node.id, node]));
     let started = 0;
     let skipped = 0;
     let failed = 0;
     for (const node of nodes) {
       const provider = this.providers.get(node.provider);
       if (!provider) {
+        const message = `Managed node provider ${node.provider} is unavailable.`;
+        const currentCondition = node.conditions.find((condition) =>
+          condition.type === "ProviderAvailable"
+          && condition.reason === "ProviderUnavailable"
+          && condition.observedGeneration === node.generation
+          && condition.message === message
+        );
+        if (node.phase !== "failed" || !currentCondition) {
+          await this.backend.updateManagedNode(node.id, {
+            phase: "failed",
+            conditions: [
+              ...node.conditions.filter((condition) =>
+                condition.type !== "ProviderAvailable"
+                || condition.observedGeneration !== node.generation
+              ),
+              {
+                type: "ProviderAvailable",
+                status: "False",
+                reason: "ProviderUnavailable",
+                message,
+                observedGeneration: node.generation,
+                updatedAt: new Date().toISOString(),
+              },
+            ],
+          });
+        }
         this.logger?.error("managed node provider unavailable", { nodeId: node.id, provider: node.provider });
         failed += 1;
         continue;
       }
       if (node.desiredState !== "running") {
+        const terminalPhase = node.desiredState === "deleted" ? "deleted" : "stopped";
+        if (node.phase === terminalPhase) {
+          skipped += 1;
+          continue;
+        }
         const attempts = await this.backend.listProvisioningAttempts(node.id);
         const instanceId = [...attempts].reverse().find((attempt) => attempt.providerInstanceId)?.providerInstanceId;
         if (instanceId) {
           if (node.desiredState === "deleted") await provider.delete(instanceId);
           else await provider.stop(instanceId);
+          if (await provider.inspect(instanceId) === "running") {
+            skipped += 1;
+            continue;
+          }
+        }
+        if (node.activeDaemonNodeId) {
+          await this.backend.retireManagedNodeRuntime(node.id);
         }
         this.instances.delete(node.id);
-        await this.backend.updateManagedNode(node.id, { phase: node.desiredState === "deleted" ? "deleting" : "stopped" });
+        await this.backend.updateManagedNode(node.id, { phase: terminalPhase });
         skipped += 1;
         continue;
       }
       if (node.phase === "ready") {
-        skipped += 1;
-        continue;
+        const daemon = node.activeDaemonNodeId ? daemonById.get(node.activeDaemonNodeId) : undefined;
+        if (daemon?.online && !daemon.stale && (daemon.status === "ready" || daemon.status === "busy" || daemon.status === "running")) {
+          skipped += 1;
+          continue;
+        }
+        const attempts = await this.backend.listProvisioningAttempts(node.id);
+        const instanceId = [...attempts].reverse().find((attempt) => attempt.providerInstanceId)?.providerInstanceId;
+        if (instanceId && await provider.inspect(instanceId) === "running") {
+          await provider.stop(instanceId);
+        }
+        if (node.activeDaemonNodeId) {
+          await this.backend.retireManagedNodeRuntime(node.id);
+        }
+        this.instances.delete(node.id);
+        await this.backend.updateManagedNode(node.id, { phase: "requested" });
       }
       const tracked = this.instances.get(node.id);
       if (tracked) {

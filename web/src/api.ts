@@ -208,14 +208,20 @@ export function createManagedNode(input: CreateManagedNodeInput): Promise<Create
   return apiJson<CreateManagedNodeResponse>("/cp/managed-nodes", {
     method: "POST",
     body: {
-      ...(input.employeeId ? { employeeId: input.employeeId } : {}),
-      assignmentMode: input.employeeId ? "dedicated" : "pooled",
+      employeeId: input.employeeId,
+      assignmentMode: "dedicated",
       provider: "local-process",
       profile: "standard",
       sandboxMode: input.sandboxMode,
-      workspacePolicy: { kind: input.employeeId ? "employee-home" : "managed-pool" },
+      workspacePolicy: { kind: "employee-home" },
       desiredState: "running",
     },
+  });
+}
+
+export function deleteManagedNode(nodeId: string): Promise<CreateManagedNodeResponse> {
+  return apiJson<CreateManagedNodeResponse>(`/cp/managed-nodes/${encodeURIComponent(nodeId)}`, {
+    method: "DELETE",
   });
 }
 

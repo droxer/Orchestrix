@@ -10,6 +10,7 @@ from relay.persistence.session_store import LocalSessionStore
 from relay.persistence.task_store import LocalTaskStore
 from relay.persistence.employee_agent_store import LocalEmployeeAgentStore
 from relay.persistence.agent_placement_store import LocalAgentPlacementStore
+from relay.services.managed_nodes import LocalManagedNodeStore
 from relay.tasks import ROUTINE_SKIP_NO_AGENT_MESSAGE, TaskScheduler, next_routine_date
 
 
@@ -57,6 +58,75 @@ def test_scheduler_dispatches_assigned_task_to_ready_node() -> None:
             assert command["type"] == "run.start"
             assert command["agent"] == "codex"
             assert command["taskGoal"] == "Ship scheduled backlog\n\nRun automatically."
+
+    asyncio.run(run_flow())
+
+
+def test_scheduler_requests_managed_capacity_once_when_no_node_is_ready() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            task_store = LocalTaskStore(root)
+            registry = DaemonNodeRegistry(
+                LocalSessionStore(root), LocalDaemonStore(root), task_store=task_store
+            )
+            managed_nodes = LocalManagedNodeStore(root)
+            task_store.create_task(
+                {
+                    "title": "Needs managed capacity",
+                    "assignedAgent": "codex",
+                    "assigneeEmployeeId": "alice",
+                    "status": "assigned",
+                }
+            )
+            scheduler = TaskScheduler(
+                task_store=task_store,
+                registry=registry,
+                backend=ServerDaemonNodeBackend(registry),
+                managed_node_store=managed_nodes,
+            )
+
+            first = await scheduler.tick()
+            second = await scheduler.tick()
+
+            assert first.dispatched == 0
+            assert first.skipped == 1
+            assert second.dispatched == 0
+            assert len(managed_nodes.list_nodes()) == 1
+            [node] = managed_nodes.list_nodes()
+            assert node["employeeId"] == "alice"
+            assert node["desiredState"] == "running"
+
+    asyncio.run(run_flow())
+
+
+def test_scheduler_waits_for_an_employee_local_node_instead_of_provisioning_managed() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            task_store = LocalTaskStore(root)
+            registry = DaemonNodeRegistry(
+                LocalSessionStore(root), LocalDaemonStore(root), task_store=task_store
+            )
+            registry.provision_pending(
+                "alice", "/Users/alice/workspace", sandbox_mode="none"
+            )
+            managed_nodes = LocalManagedNodeStore(root)
+            task_store.create_task(
+                {
+                    "title": "Wait for Alice's computer",
+                    "assignedAgent": "codex",
+                    "assigneeEmployeeId": "alice",
+                    "status": "assigned",
+                }
+            )
+
+            await TaskScheduler(
+                task_store=task_store,
+                registry=registry,
+                backend=ServerDaemonNodeBackend(registry),
+                managed_node_store=managed_nodes,
+            ).tick()
+
+            assert managed_nodes.list_nodes() == []
 
     asyncio.run(run_flow())
 

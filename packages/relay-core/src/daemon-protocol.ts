@@ -2,7 +2,7 @@ import type { AgentName, AgentTaskMode } from "./state.js";
 import type { DaemonAgentAdapter, DaemonAgentInventory, DaemonNodeSandboxMode } from "./daemon-node-protocol.js";
 import type { AgentRole } from "./session-store.js";
 
-export type SandboxStatus = "provisioning" | "ready" | "running" | "stopped" | "failed";
+export type SandboxStatus = "provisioning" | "ready" | "busy" | "running" | "stopped" | "failed";
 
 export interface SandboxRecord {
   id: string;
@@ -66,5 +66,7 @@ export interface DaemonNodeMonitorRecord extends Omit<SandboxRecord, "token" | "
 }
 
 export interface ControlPanelDaemonNodeRecord extends DaemonNodeMonitorRecord {
+  displayName?: string;
+  provisioningPlaceholder?: boolean;
   nodeToken?: string;
 }

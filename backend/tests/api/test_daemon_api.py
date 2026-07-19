@@ -89,6 +89,12 @@ def test_managed_node_provisioning_enrolls_runtime_with_single_use_grant(monkeyp
         assert created.status_code == 202
         managed_node = created.json()["node"]
 
+        [placeholder] = client.get("/cp/daemon-nodes").json()["nodes"]
+        assert placeholder["id"] == managed_node["id"]
+        assert placeholder["managedNodeId"] == managed_node["id"]
+        assert placeholder["provisioningPlaceholder"] is True
+        assert placeholder["status"] == "provisioning"
+
         attempt_response = client.post(f"/cp/managed-nodes/{managed_node['id']}/attempts")
         assert attempt_response.status_code == 201
         credential = attempt_response.json()["enrollmentCredential"]
@@ -126,7 +132,52 @@ def test_managed_node_provisioning_enrolls_runtime_with_single_use_grant(monkeyp
         assert managed.json()["node"]["phase"] == "ready"
         control_panel_node = client.get("/cp/daemon-nodes").json()["nodes"][0]
         assert control_panel_node["managedNodeId"] == managed_node["id"]
+        assert control_panel_node["displayName"] == managed_node["displayName"]
         assert "nodeToken" not in control_panel_node
+
+        deleted = client.delete(f"/cp/managed-nodes/{managed_node['id']}")
+        assert deleted.status_code == 202
+        assert deleted.json()["node"]["desiredState"] == "deleted"
+        fenced = client.app.state.registry.get(runtime["sandboxId"])
+        assert fenced["status"] == "stopped"
+        assert fenced["retiredAt"]
+        heartbeat = client.post("/daemon-nodes/register", json={
+            "sandboxId": runtime["sandboxId"],
+            "token": runtime["token"],
+            "workspacePath": "/workspace/alice",
+            "sandboxMode": "boxlite",
+            "protocolVersion": 1,
+            "supportedAgents": ["codex"],
+            "status": "ready",
+        })
+        assert heartbeat.status_code == 200
+        assert heartbeat.json()["status"] == "stopped"
+        assert client.get("/cp/daemon-nodes").json()["nodes"] == []
+
+
+def test_failed_managed_node_is_visible_as_failed(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _login_admin(client)
+        managed = client.post(
+            "/cp/managed-nodes",
+            json={"employeeId": "alice", "sandboxMode": "boxlite"},
+        ).json()["node"]
+        attempt = client.post(
+            f"/cp/managed-nodes/{managed['id']}/attempts"
+        ).json()["attempt"]
+
+        failed = client.patch(
+            f"/cp/managed-nodes/{managed['id']}/attempts/{attempt['id']}",
+            json={"status": "failed", "errorMessage": "provider unavailable"},
+        )
+
+        assert failed.status_code == 200
+        [placeholder] = client.get("/cp/daemon-nodes").json()["nodes"]
+        assert placeholder["status"] == "failed"
+        assert placeholder["lastError"] == "provider unavailable"
 
 
 def test_fastapi_daemon_routes_register_and_poll(monkeypatch) -> None:
@@ -801,6 +852,7 @@ def test_control_panel_creates_pending_daemon_node_and_reuses_duplicate(monkeypa
         assert listing.status_code == 200
         listed = next(item for item in listing.json()["nodes"] if item["id"] == node["id"])
         assert listed["sandboxMode"] == "boxlite"
+        assert listed["displayName"] == node["id"]
 
         sandboxes = client.get("/sandboxes", headers={"Authorization": f"Bearer {body['sandboxToken']}"})
         assert sandboxes.status_code == 200

@@ -2,13 +2,12 @@
 
 import { useState } from "react";
 import type { TFunction } from "i18next";
-import type { AgentName, ControlPanelDaemonNodeRecord, EmployeeRecord } from "../../types";
+import type { AgentName, ControlPanelDaemonNodeRecord } from "../../types";
 import { useDialogs } from "@/components/ui/DialogProvider";
 import { AgentMark } from "../AgentMark";
 import {
   agentStatusTone,
   copyText,
-  truncateId,
   visibleNodeAgentNames,
   type StoredNodeTokenMap,
 } from "./helpers";
@@ -35,7 +34,6 @@ function agentTitle(node: ControlPanelDaemonNodeRecord, agent: AgentName, t: TFu
 
 interface NodeCardProps {
   node: ControlPanelDaemonNodeRecord;
-  employee?: EmployeeRecord;
   storedTokens?: StoredNodeTokenMap;
   colocated?: boolean;
   onReveal: (node: ControlPanelDaemonNodeRecord) => void;
@@ -46,7 +44,6 @@ interface NodeCardProps {
 
 export function NodeCard({
   node,
-  employee,
   storedTokens = {},
   colocated = false,
   onReveal,
@@ -84,9 +81,7 @@ export function NodeCard({
     }
   }
 
-  const nodeName = node.employeeId
-    ? employee?.displayName || node.employeeId
-    : t("admin.unassigned");
+  const nodeName = node.displayName || node.id;
 
   return (
     <article className="adm-node-card">
@@ -96,26 +91,21 @@ export function NodeCard({
         </span>
         <div className="adm-node-card-identity">
           <span
-            className={`adm-node-card-name ${node.employeeId ? "" : "tone-muted"}`}
+            className="adm-node-card-name"
             translate="no"
           >
             {nodeName}
           </span>
-          {node.employeeId ? (
-            <span className="adm-node-card-handle mono" translate="no">@{node.employeeId}</span>
-          ) : (
-            <span className="adm-node-card-handle tone-muted">{t("admin.unassigned")}</span>
-          )}
+          <span className="adm-node-card-handle mono" translate="no">{node.id}</span>
         </div>
         <div className="adm-node-card-meta-col">
           <Button variant="ghost"
             type="button"
-            className="adm-node-id mono"
+            className="icon-button icon-button--sm icon-button--tinted adm-node-card-icon-btn"
             onClick={() => void handleCopyId()}
             aria-label={copied ? t("admin.copied") : t("admin.copy_node_id")}
             title={node.id}
           >
-            <span translate="no">{truncateId(node.id)}</span>
             {copied ? <ActionApprove size={12} aria-hidden="true" /> : <ActionCopy size={12} aria-hidden="true" />}
           </Button>
         </div>
@@ -168,7 +158,7 @@ export function NodeCard({
               <ActionKey size={14} aria-hidden="true" />
             </Button>
           )}
-          <Button variant="ghost"
+          {!node.provisioningPlaceholder ? <Button variant="ghost"
             type="button"
             className="icon-button icon-button--sm icon-button--tinted adm-node-card-icon-btn"
             onClick={() => onManageAgents(node)}
@@ -176,7 +166,7 @@ export function NodeCard({
             title={t("admin.v2.manage_agents")}
           >
             <AdminManageAgents size={14} aria-hidden="true" />
-          </Button>
+          </Button> : null}
           {onDelete ? (
             <Button variant="ghost"
               type="button"
