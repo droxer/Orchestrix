@@ -93,7 +93,7 @@
 
 /* Endpoint nodes anchor each hairline as a route between two points, so
    the lane reads as an origin → destination path rather than a line that
-   trails off. Origin is lit (steel); destination is a dim terminal. */
+   trails off. Origin is lit (white); destination is a dim terminal. */
 .login-lane-node {
   position: absolute;
   top: 50%;
@@ -400,7 +400,7 @@
 }
 
 .login-screen[data-mode="bootstrap"] .login-submit {
-  /* Amber fill needs dark ink, same as the steel on-action — keep it. */
+  /* Mid-grey fill needs dark ink, same as the white on-action — keep it. */
   color: var(--lg-on-amber);
 }
 
@@ -418,10 +418,10 @@
 
 .login-submit:disabled {
   /* Label uses --lg-muted (neutral gray, not a lg-on-steel/lg-accent blend):
-     on-steel is dark ink for the steel rest state, so blending it
+     on-steel is dark ink for the white rest state, so blending it
      toward the accent here collapsed text and background to the same
      dark hue and made the label unreadable. A neutral muted gray stays
-     legible against the darkened steel fill regardless of which direction
+     legible against the darkened white fill regardless of which direction
      on-steel points in a given accent scheme. */
   background: color-mix(in srgb, var(--lg-accent) 40%, var(--lg-canvas));
   color: var(--lg-muted);
