@@ -1,7 +1,9 @@
-/* Graphite palette — raw values, both registers side by side.
-   True-neutral canvas, one steel-blue action color, status as
-   dot/border/text only. The only file allowed to originate a color.
-   Rationale: docs/superpowers/specs/2026-07-19-graphite-tokens-design.md
+/* Monochrome palette — raw values, both registers side by side.
+   True-neutral canvas, white/black action (Linear-style), status as a
+   grey brightness hierarchy on dot/border/text only. The only file
+   allowed to originate a color.
+   Rationale: docs/superpowers/specs/2026-07-20-monochrome-tokens-design.md
+   (supersedes the color values of 2026-07-19-graphite-tokens-design.md)
 
    Breakpoints (reference — custom properties can't drive @media):
    mobile 820px · tablet 1040px · login-stack 879px · admin-drawer 768px
@@ -22,18 +24,19 @@
   --line-1: #282c31; /* structural hairline */
   --line-2: #1f2226; /* soft hairline */
 
-  /* Action — the only chromatic action color. No disabled hex: disabled
-     is opacity. Bright on dark, so on-action text is dark ink. */
-  --action: #6ba1d4;
-  --action-hover: #84b3e0;
-  --action-soft: #15202c; /* selection wash, active nav */
-  --on-action: #0e1216;
+  /* Action — white fill on the dark canvas, dark ink on top
+     (Linear-style). No disabled hex: disabled is opacity. */
+  --action: #f2f4f6;
+  --action-hover: #ffffff;
+  --action-soft: color-mix(in srgb, #f2f4f6 9%, transparent); /* selection wash, active nav */
+  --on-action: #101214;
 
-  /* Status — dot/border/text only, never fills, never actions.
-     One value per hue, AA-safe as small text. */
-  --ok: #3fb96c;
-  --warn: #d9a13f;
-  --err: #e5635f;
+  /* Status — a grey brightness hierarchy: loud = bright, calm = dim.
+     Dot/border/text only, never fills, never actions.
+     AA-safe as small text on the dark surfaces. */
+  --ok: #6b727b;
+  --warn: #99a0a8;
+  --err: #f2f4f6;
 
   /* Always-dark register — surfaces that never flip (diff viewer,
      ink-fill chrome). Same values as the dark register above. */
@@ -127,14 +130,14 @@ html[data-theme="light"] {
   --line-1: #e2e5e8;
   --line-2: #eceef0;
 
-  --action: #33689e;
-  --action-hover: #2a5786;
-  --action-soft: #e4eef7;
+  --action: #16181b;
+  --action-hover: #000000;
+  --action-soft: color-mix(in srgb, #16181b 7%, transparent);
   --on-action: #ffffff;
 
-  --ok: #1e8a4c;
-  --warn: #9a6b1a;
-  --err: #c93d3d;
+  --ok: #7d848d;
+  --warn: #5c636b;
+  --err: #16181b;
 
   --scrim: rgba(12, 14, 16, 0.55);
   --shadow-tint: rgba(12, 14, 16, 0.06);
