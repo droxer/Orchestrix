@@ -76,3 +76,18 @@ describe("monochrome login palette", () => {
     }
   });
 });
+
+const preferences = readStyle("preferences.css");
+
+describe("monochrome theme-picker swatches", () => {
+  it("mirrors the monochrome registers", () => {
+    assert.match(preferences, /\.pref-theme-swatch\[data-tone="light"\]::after \{\s*background: #16181b;/);
+    assert.match(preferences, /\.pref-theme-swatch\[data-tone="dark"\]::after \{\s*background: #f2f4f6;/);
+    assert.match(preferences, /linear-gradient\(90deg, #16181b 0 50%, #f2f4f6 50% 100%\)/);
+  });
+
+  it("drops the steel-blue swatch accents", () => {
+    assert.ok(!preferences.includes("#33689e"), "preferences.css still contains #33689e");
+    assert.ok(!preferences.includes("#6ba1d4"), "preferences.css still contains #6ba1d4");
+  });
+});

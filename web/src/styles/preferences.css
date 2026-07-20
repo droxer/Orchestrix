@@ -274,7 +274,7 @@
 }
 
 .pref-theme-swatch[data-tone="light"]::after {
-  background: #33689e; /* light register's deepened steel blue */
+  background: #16181b; /* light register's black action */
 }
 
 .pref-theme-swatch[data-tone="dark"] {
@@ -283,7 +283,7 @@
 }
 
 .pref-theme-swatch[data-tone="dark"]::after {
-  background: #6ba1d4; /* dark register's steel-blue action */
+  background: #f2f4f6; /* dark register's white action */
 }
 
 .pref-theme-swatch[data-tone="system"] {
@@ -292,9 +292,9 @@
 }
 
 .pref-theme-swatch[data-tone="system"]::after {
-  /* The action color is register-varying (deepened on light / bright on
+  /* The action color is register-varying (black on light / white on
      dark), so the split-gradient dot shows both, half per register. */
-  background: linear-gradient(90deg, #33689e 0 50%, #6ba1d4 50% 100%);
+  background: linear-gradient(90deg, #16181b 0 50%, #f2f4f6 50% 100%);
 }
 
 /* ── Language badges ──────────────────────────────────────────────────────── */
