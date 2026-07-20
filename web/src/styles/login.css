@@ -32,6 +32,7 @@
   --lg-up: #f2f4f6;
   --lg-amber: #99a0a8;
   --lg-down: #6b727b;
+  --lg-err: #f2f4f6; /* error is the loud/bright tier — dots stay calm */
   /* Mode accent — white while attaching, mid grey during first-run setup. */
   --lg-accent: var(--lg-steel);
   /* Pin the action color to the pre-auth white so RelayMark's lead
@@ -373,9 +374,9 @@
 .login-error {
   margin: 0;
   padding: var(--sp-3) var(--sp-4);
-  border-left: 2px solid var(--lg-down);
-  background: color-mix(in srgb, var(--lg-down) 10%, var(--lg-canvas));
-  color: var(--lg-down);
+  border-left: 2px solid var(--lg-err);
+  background: color-mix(in srgb, var(--lg-err) 10%, var(--lg-canvas));
+  color: var(--lg-err);
   font-family: var(--font-mono);
   font-size: var(--fs-2);
   line-height: var(--leading-normal);

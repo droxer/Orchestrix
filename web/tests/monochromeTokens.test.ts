@@ -64,6 +64,8 @@ describe("monochrome login palette", () => {
     assert.match(login, /--lg-on-amber:\s*#101214;/);
     assert.match(login, /--lg-up:\s*#f2f4f6;/);
     assert.match(login, /--lg-down:\s*#6b727b;/);
+    assert.match(login, /--lg-err:\s*#f2f4f6;/);
+    assert.match(login, /\.login-error \{[^}]*var\(--lg-err\)/s);
     assert.match(login, /color-mix\(in srgb, var\(--lg-steel\) 5%, transparent\)/);
   });
 
