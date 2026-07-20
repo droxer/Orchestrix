@@ -51,9 +51,23 @@ export function emptyRoutineForm(currentUser: CurrentUser, date = new Date()): R
     assignedAgentId: "",
     routineType: "task",
     routineCadence: "weekly",
-    routineNextRunDate: localDateKey(date),
+    routineNextRunDate: nextRoutineRunDate("weekly", date),
     routineEnabled: true,
   };
+}
+
+export function nextRoutineRunDate(cadence: TaskRoutineCadence, date = new Date()): string {
+  const next = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  if (cadence === "custom") return "";
+  if (cadence === "daily") next.setDate(next.getDate() + 1);
+  else if (cadence === "weekly") next.setDate(next.getDate() + 7);
+  else {
+    const targetMonth = next.getMonth() + 1;
+    const lastDay = new Date(next.getFullYear(), targetMonth + 1, 0).getDate();
+    next.setDate(Math.min(next.getDate(), lastDay));
+    next.setMonth(targetMonth);
+  }
+  return localDateKey(next);
 }
 
 export function taskBoardFormsEqual(a: TaskBoardFormState, b: TaskBoardFormState): boolean {

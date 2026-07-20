@@ -206,7 +206,6 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
             href={hrefForRoute("main")}
             aria-label={t("nav.conversations")}
             aria-current={route === "main" ? "page" : undefined}
-            title={t("nav.conversations")}
             onClick={(event) => handleRouteClick(event, "main")}
             onMouseEnter={(e) => showNavTooltip(t("nav.conversations"), e.currentTarget)}
             onMouseLeave={hideNavTooltip}
@@ -222,7 +221,6 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
             href={hrefForRoute("backlog")}
             aria-label={t("nav.backlog_label")}
             aria-current={route === "backlog" ? "page" : undefined}
-            title={t("nav.backlog_label")}
             onClick={(event) => handleRouteClick(event, "backlog")}
             onMouseEnter={(e) => showNavTooltip(t("nav.backlog"), e.currentTarget)}
             onMouseLeave={hideNavTooltip}
@@ -238,7 +236,6 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
             href={hrefForRoute("routine")}
             aria-label={t("nav.routine_label")}
             aria-current={route === "routine" ? "page" : undefined}
-            title={t("nav.routine_label")}
             onClick={(event) => handleRouteClick(event, "routine")}
             onMouseEnter={(e) => showNavTooltip(t("nav.routine"), e.currentTarget)}
             onMouseLeave={hideNavTooltip}
@@ -254,7 +251,6 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
             href={hrefForRoute("agents")}
             aria-label={t("nav.agents_label")}
             aria-current={route === "agents" ? "page" : undefined}
-            title={t("nav.agents_label")}
             onClick={(event) => handleRouteClick(event, "agents")}
             onMouseEnter={(e) => showNavTooltip(t("nav.agents"), e.currentTarget)}
             onMouseLeave={hideNavTooltip}
@@ -274,7 +270,6 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
               href={hrefForRoute("channels")}
               aria-label={t("nav.channels_label")}
               aria-current={route === "channels" ? "page" : undefined}
-              title={t("nav.channels_label")}
               onClick={(event) => handleRouteClick(event, "channels")}
               onMouseEnter={(e) => showNavTooltip(t("nav.channels"), e.currentTarget)}
               onMouseLeave={hideNavTooltip}
@@ -290,7 +285,6 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
               href={hrefForRoute("admin")}
               aria-label={t("nav.admin_label")}
               aria-current={route === "admin" ? "page" : undefined}
-              title={t("nav.admin_label")}
               onClick={(event) => handleRouteClick(event, "admin")}
               onMouseEnter={(e) => showNavTooltip(t("nav.admin"), e.currentTarget)}
               onMouseLeave={hideNavTooltip}
@@ -309,7 +303,6 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
               aria-label={t("nav.more_label")}
               aria-haspopup="menu"
               aria-expanded={Boolean(moreMenu)}
-              title={t("nav.more_label")}
               onClick={(event) => toggleMoreMenu(event.currentTarget)}
             >
               <NavMore size={18} />
@@ -328,7 +321,6 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
           aria-haspopup="menu"
           aria-expanded={Boolean(settingsMenu)}
           aria-label={t("nav.settings")}
-          title={t("nav.settings")}
           onClick={(event) => toggleSettingsMenu(event.currentTarget)}
           onMouseEnter={(e) => showNavTooltip(t("nav.settings"), e.currentTarget)}
           onMouseLeave={hideNavTooltip}
@@ -339,7 +331,11 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
           <span className="sidenav-label">{t("nav.settings")}</span>
         </Button>
       </div>
-      {settingsMenu ? (
+      {/* Portaled to <body>: the mobile bottom bar has a backdrop-filter,
+          which makes the panel the containing block for position:fixed —
+          rendering these viewport-coordinate overlays inside it would
+          mis-place them and scroll the tab row. */}
+      {settingsMenu ? createPortal(
         <div
           ref={settingsMenuRef}
           className="sidenav-settings-menu"
@@ -355,12 +351,9 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
             <NavLogout size={16} />
             <span>{t("nav.logout")}</span>
           </Button>
-        </div>
+        </div>,
+        document.body,
       ) : null}
-      {/* Portaled to <body>: the mobile bottom bar has a backdrop-filter,
-          which makes the panel the containing block for position:fixed —
-          rendering the menu inside it would mis-place the viewport-based
-          coordinates and scroll the tab row. */}
       {moreMenu ? createPortal(
         <div
           ref={moreMenuRef}
@@ -392,14 +385,15 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
         </div>,
         document.body,
       ) : null}
-      {navTooltip ? (
+      {navTooltip ? createPortal(
         <div
           className="sidenav-tooltip"
           role="tooltip"
           style={{ top: navTooltip.y, left: navTooltip.x }}
         >
           {navTooltip.text}
-        </div>
+        </div>,
+        document.body,
       ) : null}
     </aside>
   );

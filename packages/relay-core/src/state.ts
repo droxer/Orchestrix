@@ -27,6 +27,12 @@ export interface AgentState {
   prior_handoff_note?: string;
   /** Control-plane instructions for the selected logical agent identity. */
   agent_instructions?: string;
+  /**
+   * Personal home subdir (slash-separated, under the shared node workspace)
+   * for this run's logical agent, e.g. "agents/agent-<b64>". Runs execute at
+   * the shared workspace root; this names the agent's private area.
+   */
+  agent_home_subdir?: string;
 }
 
 export interface AgentRunOptions {
@@ -38,8 +44,6 @@ export interface AgentRunOptions {
   agent?: AgentName;
   sessionController?: SessionStepRunner;
   sessionId?: string;
-  /** Relative subdirectory (under GUEST_WORKSPACE) this run's cwd should use, e.g. "agents/<agentId>". */
-  agentWorkspaceSubdir?: string;
 }
 
 export interface AgentEventSink {

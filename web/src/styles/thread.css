@@ -207,6 +207,7 @@
   background: transparent;
   color: var(--ink-3);
   cursor: pointer;
+  touch-action: manipulation;
   transition: color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
   opacity: 0;
   font-size: var(--fs-2);
@@ -228,6 +229,24 @@
 .conversation-rename-btn:focus-visible,
 .conversation-remove-btn:focus-visible {
   opacity: 1;
+}
+
+/* No hover on touch — the row actions stay visible instead of hiding
+   behind a hover state that never fires. */
+@media (hover: none) {
+  .conversation-rename-btn,
+  .conversation-remove-btn {
+    opacity: 1;
+  }
+}
+
+/* Coarse pointers get the full touch-target hit area; desktop stays 24px. */
+@media (pointer: coarse) {
+  .conversation-rename-btn,
+  .conversation-remove-btn {
+    width: var(--touch-target);
+    height: var(--touch-target);
+  }
 }
 
 /* "New conversation" is the primary entry point for starting fresh work as the
@@ -258,6 +277,7 @@
 
 .conversation-header .conversation-new-btn:focus-visible {
   outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .conversation-stamp {

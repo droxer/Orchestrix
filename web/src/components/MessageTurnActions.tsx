@@ -4,6 +4,7 @@ import { ActionCopy, ActionRetry, CheckIcon } from "./icons";
 import type { AgentName, AgentTaskMode } from "../types";
 import { agentMessagePlainText } from "../lib/agentStream";
 import { Button } from "./ui/button";
+import { useDialogs } from "./ui/DialogProvider";
 
 type MessageTurnActionsProps = {
   agent: AgentName;
@@ -25,6 +26,7 @@ export function MessageTurnActions({
   onRetry,
 }: MessageTurnActionsProps) {
   const { t } = useTranslation();
+  const { announce } = useDialogs();
   const [copied, setCopied] = useState(false);
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -41,9 +43,11 @@ export function MessageTurnActions({
       if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
       resetTimerRef.current = setTimeout(() => setCopied(false), 1800);
     } catch {
-      // Clipboard unavailable — silently no-op
+      // Clipboard unavailable (permissions, non-secure context) — tell the
+      // user and give them the manual fallback.
+      announce({ message: t("errors.copy_message"), tone: "error" });
     }
-  }, [agent, stdout, stderr, streaming, t]);
+  }, [agent, stdout, stderr, streaming, t, announce]);
 
   const handleRetry = useCallback(() => {
     if (retryDisabled || streaming || !onRetry) return;
@@ -57,6 +61,8 @@ export function MessageTurnActions({
 
   return (
     <div className="msg-turn-actions" role="group" aria-label={t("message.actions_label")}>
+      {/* The copied state swaps the button glyph only, so announce it here. */}
+      <span className="sr-only" role="status">{copied ? t("message.copied") : ""}</span>
       {canCopy ? (
         <Button variant="ghost"
           type="button"

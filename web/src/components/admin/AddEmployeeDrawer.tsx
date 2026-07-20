@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { createControlPanelEmployee } from "../../api";
 import { initialsOf } from "../../lib/adminHelpers";
@@ -42,7 +42,15 @@ export function AddEmployeeDrawer({
   const [password, setPassword] = useState("");
   const [selectedNodeId, setSelectedNodeId] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{
+    employeeId?: string;
+    username?: string;
+    password?: string;
+  }>({});
   const [isBusy, setIsBusy] = useState(false);
+  const employeeIdRef = useRef<HTMLInputElement>(null);
+  const usernameRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
   const hasUnsavedChanges = Boolean(
     employeeId.trim()
     || displayName.trim()
@@ -65,16 +73,34 @@ export function AddEmployeeDrawer({
       setPassword("");
       setSelectedNodeId("");
       setError(null);
+      setFieldErrors({});
       setIsBusy(false);
     }
   }, [open]);
 
+  function clearFieldError(field: "employeeId" | "username" | "password") {
+    setFieldErrors((current) => (current[field] ? { ...current, [field]: undefined } : current));
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextEmployeeId = employeeId.trim().replace(/^@/, "");
-    if (!nextEmployeeId) return setError(t("admin.employee_required"));
-    if (!username.trim()) return setError(t("admin.username_required"));
-    if (!password) return setError(t("admin.password_required"));
+    const nextFieldErrors: typeof fieldErrors = {};
+    if (!nextEmployeeId) nextFieldErrors.employeeId = t("admin.employee_required");
+    if (!username.trim()) nextFieldErrors.username = t("admin.username_required");
+    if (!password) nextFieldErrors.password = t("admin.password_required");
+    setFieldErrors(nextFieldErrors);
+    const firstInvalid = nextFieldErrors.employeeId
+      ? employeeIdRef
+      : nextFieldErrors.username
+        ? usernameRef
+        : nextFieldErrors.password
+          ? passwordRef
+          : null;
+    if (firstInvalid) {
+      firstInvalid.current?.focus();
+      return;
+    }
 
     setIsBusy(true);
     setError(null);
@@ -142,14 +168,25 @@ export function AddEmployeeDrawer({
               <span className="adm-field-req" aria-hidden="true">*</span>
             </span>
             <Input
+              ref={employeeIdRef}
               name="employee-id"
               className="mono"
               value={employeeId}
-              onChange={(event) => setEmployeeId(event.target.value)}
+              onChange={(event) => {
+                setEmployeeId(event.target.value);
+                clearFieldError("employeeId");
+              }}
               autoComplete="off"
               spellCheck={false}
               placeholder={t("admin.v2.placeholder_employee_id")}
+              aria-invalid={Boolean(fieldErrors.employeeId) || undefined}
+              aria-describedby={fieldErrors.employeeId ? "add-emp-employee-id-error" : undefined}
             />
+            {fieldErrors.employeeId ? (
+              <span id="add-emp-employee-id-error" className="text-sm text-danger-strong" role="alert">
+                {fieldErrors.employeeId}
+              </span>
+            ) : null}
           </label>
 
           <label className="adm-field">
@@ -178,6 +215,7 @@ export function AddEmployeeDrawer({
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               autoComplete="email"
+              spellCheck={false}
               placeholder={t("admin.v2.placeholder_email")}
             />
           </label>
@@ -196,14 +234,25 @@ export function AddEmployeeDrawer({
               <span className="adm-field-req" aria-hidden="true">*</span>
             </span>
             <Input
+              ref={usernameRef}
               name="username"
               className="mono"
               value={username}
-              onChange={(event) => setUsername(event.target.value)}
+              onChange={(event) => {
+                setUsername(event.target.value);
+                clearFieldError("username");
+              }}
               autoComplete="username"
               spellCheck={false}
               placeholder={t("admin.v2.placeholder_username")}
+              aria-invalid={Boolean(fieldErrors.username) || undefined}
+              aria-describedby={fieldErrors.username ? "add-emp-username-error" : undefined}
             />
+            {fieldErrors.username ? (
+              <span id="add-emp-username-error" className="text-sm text-danger-strong" role="alert">
+                {fieldErrors.username}
+              </span>
+            ) : null}
           </label>
 
           <label className="adm-field">
@@ -212,13 +261,24 @@ export function AddEmployeeDrawer({
               <span className="adm-field-req" aria-hidden="true">*</span>
             </span>
             <Input
+              ref={passwordRef}
               name="password"
               className="mono"
               type="password"
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              onChange={(event) => {
+                setPassword(event.target.value);
+                clearFieldError("password");
+              }}
               autoComplete="new-password"
+              aria-invalid={Boolean(fieldErrors.password) || undefined}
+              aria-describedby={fieldErrors.password ? "add-emp-password-error" : undefined}
             />
+            {fieldErrors.password ? (
+              <span id="add-emp-password-error" className="text-sm text-danger-strong" role="alert">
+                {fieldErrors.password}
+              </span>
+            ) : null}
           </label>
         </section>
 

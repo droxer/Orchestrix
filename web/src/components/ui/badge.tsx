@@ -4,15 +4,17 @@ import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
+// `default` and `secondary` share styling; both names stay public for callers.
+const secondaryBadgeClasses =
+  "border-transparent bg-secondary text-secondary-foreground [a]:hover:bg-secondary/90"
+
 const badgeVariants = cva(
-  "group/badge inline-flex w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-sm border px-3 py-1 text-xs font-semibold whitespace-nowrap transition-[color,box-shadow,border-color,background] focus-visible:shadow-[var(--focus-ring)] focus-visible:ring-0 [&>svg]:pointer-events-none [&>svg]:size-3",
+  "group/badge inline-flex w-fit shrink-0 items-center justify-center gap-1 truncate overflow-hidden rounded-sm border px-3 py-1 text-xs font-semibold whitespace-nowrap transition-[color,box-shadow,border-color,background-color] focus-visible:shadow-[var(--focus-ring)] focus-visible:ring-0 [&>svg]:pointer-events-none [&>svg]:size-3",
   {
     variants: {
       variant: {
-        default:
-          "border-transparent bg-secondary text-secondary-foreground [a]:hover:bg-secondary/90",
-        secondary:
-          "border-transparent bg-secondary text-secondary-foreground [a]:hover:bg-secondary/90",
+        default: secondaryBadgeClasses,
+        secondary: secondaryBadgeClasses,
         destructive:
           "border-destructive/30 bg-background text-danger-strong [a]:hover:border-destructive",
         outline:

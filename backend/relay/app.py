@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 from fastapi import FastAPI
 from loguru import logger
 
-from .api import admin_routes, agent_routes, agent_workspace_routes, auth_routes, chat_routes, daemon_node_routes, managed_node_routes, sandbox_routes, session_routes, task_routes, web_routes
+from .api import admin_routes, agent_routes, agent_workspace_routes, auth_routes, chat_routes, daemon_node_routes, managed_node_routes, node_workspace_routes, sandbox_routes, session_routes, task_routes, web_routes
 from .core.environment import load_backend_env
 from .core.storage_config import database_url_from_env, use_postgres_storage
 from .persistence.stores import (
@@ -28,7 +28,7 @@ from .chat import DatabaseChatIntegrationStore, LocalChatIntegrationStore, probe
 from .tasks import TaskScheduler
 from .services.managed_nodes import LocalManagedNodeStore
 from .persistence.agent_store import DatabaseAgentStore, LocalAgentStore
-from .persistence.agent_placement_store import DatabaseAgentPlacementStore, LocalAgentPlacementStore
+from .persistence.agent_placement_store import DatabaseAgentPlacementStore, LocalAgentPlacementStore, reconcile_single_active_placement
 from .services.workspace_query import WorkspaceQueryBroker
 
 load_backend_env()
@@ -49,6 +49,9 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     managed_node_store = LocalManagedNodeStore(root_dir)
     agent_store = agent_store_from_env(root_dir)
     agent_placement_store = agent_placement_store_from_env(root_dir)
+    # Heal any agent left with multiple active placements before the
+    # one-agent-one-computer invariant (idempotent; a no-op once collapsed).
+    reconcile_single_active_placement(agent_placement_store)
     registry = DaemonNodeRegistry(session_store, daemon_store, task_store=task_store)
     backend = ServerDaemonNodeBackend(
         registry,
@@ -116,6 +119,7 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     app.include_router(auth_routes.router)
     app.include_router(agent_routes.router)
     app.include_router(agent_workspace_routes.router)
+    app.include_router(node_workspace_routes.router)
     app.include_router(admin_routes.router)
     app.include_router(chat_routes.router)
     app.include_router(task_routes.router)

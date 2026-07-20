@@ -13,6 +13,7 @@ import {
 } from "../icons";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
+import { useDialogs } from "@/components/ui/DialogProvider";
 import { RelayEmptyState } from "../RelayEmptyState";
 import { Drawer } from "./Drawer";
 import {
@@ -143,7 +144,13 @@ function ChannelCreateForm({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="adm-chat-form">
+    <form
+      className="adm-chat-form"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit();
+      }}
+    >
       <label>
         <span>{t("admin.v2.chat_provider")}</span>
         <select name={`${idPrefix}-provider`} defaultValue="telegram">
@@ -185,7 +192,7 @@ function ChannelCreateForm({
           spellCheck={false}
           value={publicBaseUrl}
           onChange={(event) => onPublicBaseUrlChange(event.target.value)}
-          placeholder="https://relay.example.com"
+          placeholder="https://relay.example.com…"
         />
         <small>{t("admin.v2.chat_public_url_help")}</small>
       </label>
@@ -204,11 +211,11 @@ function ChannelCreateForm({
         </label>
       ))}
       <small>{t("admin.v2.chat_telegram_secret_generated")}</small>
-      <Button type="button" onClick={onSubmit} disabled={busy}>
+      <Button type="submit" disabled={busy} aria-busy={busy || undefined}>
         <AdminConnect size={16} aria-hidden="true" />
-        <span>{submitLabel}</span>
+        <span>{busy ? t("admin.creating") : submitLabel}</span>
       </Button>
-    </div>
+    </form>
   );
 }
 
@@ -248,6 +255,7 @@ export function ChatIntegrationsView({
 } = {}) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const { confirm } = useDialogs();
   const [displayName, setDisplayName] = useState("Telegram Bot");
   const [tenantId, setTenantId] = useState("");
   const [publicBaseUrl, setPublicBaseUrl] = useState(() =>
@@ -427,6 +435,31 @@ export function ChatIntegrationsView({
     setConversationForm({ conversationId: "", threadId: "", label: "" });
   }
 
+  async function handleDeleteIdentityLink(link: ChatIntegration["identityLinks"][number]) {
+    if (!selected) return;
+    const ok = await confirm({
+      title: t("admin.v2.chat_delete_link_confirm", { id: link.externalUserId }),
+      confirmLabel: t("admin.v2.chat_delete_link"),
+      tone: "danger",
+    });
+    if (!ok) return;
+    await mutate("delete-link", () => deleteChatIdentityLink(selected.id, link.id));
+  }
+
+  async function handleDeleteConversation(conversation: ChatIntegration["allowedConversations"][number]) {
+    if (!selected) return;
+    const ok = await confirm({
+      title: t("admin.v2.chat_delete_allow_confirm", { id: conversation.conversationId }),
+      confirmLabel: t("admin.v2.chat_delete_allow"),
+      tone: "danger",
+    });
+    if (!ok) return;
+    await mutate(
+      "delete-conversation",
+      () => deleteChatAllowedConversation(selected.id, conversation.id),
+    );
+  }
+
   async function handleUpdateConnection() {
     if (!selected) return;
     const normalizedPublicBaseUrl = normalizePublicBaseUrl(editPublicBaseUrl.trim());
@@ -580,7 +613,8 @@ export function ChatIntegrationsView({
                   variant="ghost"
                   key={integration.id}
                   type="button"
-                  className={`adm-chat-integration relay-enter relay-enter-delay-${Math.min(index + 2, 5)} ${active ? "active" : ""}`}
+                  className={`adm-chat-integration relay-enter relay-enter-delay-${Math.min(index + 2, 5)}`}
+                  data-active={active ? "true" : "false"}
                   onClick={() => setSelectedId(integration.id)}
                 >
                   <ProviderAvatar provider={integration.provider} />
@@ -774,15 +808,13 @@ export function ChatIntegrationsView({
                     {selected.identityLinks.map((link) => (
                       <li key={link.id}>
                         <span>
-                          <strong>@{link.employeeId}</strong>
-                          <small className="mono">{link.externalUserId}</small>
+                          <strong translate="no">@{link.employeeId}</strong>
+                          <small className="mono" translate="no">{link.externalUserId}</small>
                         </span>
                         <Button
                           variant="ghost"
                           type="button"
-                          onClick={() =>
-                            void mutate("delete-link", () => deleteChatIdentityLink(selected.id, link.id))
-                          }
+                          onClick={() => void handleDeleteIdentityLink(link)}
                           aria-label={t("admin.v2.chat_delete_link")}
                         >
                           <AdminDelete size={13} aria-hidden="true" />
@@ -840,17 +872,12 @@ export function ChatIntegrationsView({
                       <li key={conversation.id}>
                         <span>
                           <strong>{conversation.label}</strong>
-                          <small className="mono">{conversation.conversationId}</small>
+                          <small className="mono" translate="no">{conversation.conversationId}</small>
                         </span>
                         <Button
                           variant="ghost"
                           type="button"
-                          onClick={() =>
-                            void mutate(
-                              "delete-conversation",
-                              () => deleteChatAllowedConversation(selected.id, conversation.id),
-                            )
-                          }
+                          onClick={() => void handleDeleteConversation(conversation)}
                           aria-label={t("admin.v2.chat_delete_allow")}
                         >
                           <AdminDelete size={13} aria-hidden="true" />

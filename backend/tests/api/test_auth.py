@@ -533,8 +533,9 @@ def test_workspace_brief_summarizes_employee_workspace(monkeypatch) -> None:
         brief = brief_response.json()
         assert brief["employeeId"] == "alice"
         assert "workspacePath" not in brief
-        assert brief["primaryNode"]["id"] == "sbx_alice"
-        assert "nodeToken" not in brief["primaryNode"]
+        assert "primaryNode" not in brief
+        assert brief["nodes"][0]["id"] == "sbx_alice"
+        assert "nodeToken" not in brief["nodes"][0]
         assert brief["metrics"]["nodeCount"] == 1
         assert brief["metrics"]["sessionCount"] == 1
         assert brief["metrics"]["taskCount"] == 1

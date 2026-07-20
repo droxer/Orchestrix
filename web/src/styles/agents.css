@@ -193,6 +193,7 @@
   gap: var(--sp-1);
   min-width: 0;
   max-width: 100%;
+  overflow: hidden;
   padding: 2px var(--sp-2);
   border: 1px solid var(--line-1);
   border-radius: var(--r-1);
@@ -207,16 +208,38 @@
   padding-block: 1px;
 }
 
+/* Same ownership mapping as .adm-node-profile-kind: managed = action tint,
+   local = neutral hairline (green/red stay reserved for health). */
 .agent-placement-badge[data-ownership="managed"] {
-  border-color: color-mix(in srgb, var(--info) 30%, var(--line-1));
+  border-color: color-mix(in srgb, var(--action) 35%, var(--line-1));
 }
 
-.agent-placement-badge[data-ownership="local"] {
-  border-color: color-mix(in srgb, var(--ok) 30%, var(--line-1));
+.agent-placement-badge > svg {
+  flex: none;
+}
+
+/* Status hue lives only on the dot (tone-* sets --tone in base.css), matching
+   the placement list — the node name stays identity-colored. A soft tone ring
+   (as on .adm-placement-dot) makes ready/busy/offline legible at a glance. */
+.agent-placement-badge-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: var(--r-full);
+  background: var(--tone, var(--ink-4));
+}
+
+.agent-placement-badge-dot:not(.tone-neutral) {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tone, transparent) 16%, transparent);
 }
 
 .agent-placement-badge-name {
-  min-width: 0;
+  /* Shrink here first — the ownership term should stay whole while a long
+     node name ellipsizes (floor below keeps it legible). */
+  flex: 0 4 auto;
+  /* Floor, not 0 — the node name is the badge's identity; when space runs
+     out it must ellipsize, never vanish into an orphaned separator. */
+  min-width: 6ch;
   overflow: hidden;
   color: var(--ink-1);
   font-weight: 600;
@@ -224,9 +247,16 @@
   white-space: nowrap;
 }
 
+/* Ownership/runtime echo the fleet badge voice: sans micro-caps, quieter
+   than the mono node name they annotate. The term stays whole — the name's
+   shrink floor plus the badge's overflow guard absorb tight rows. */
 .agent-placement-badge-kind,
 .agent-placement-badge-sandbox {
   flex: none;
+  font: var(--type-micro);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .agent-placement-badge-kind::before,
@@ -234,21 +264,6 @@
   content: "·";
   margin-right: var(--sp-1);
   color: var(--ink-4);
-}
-
-.agent-placement-badge-rank {
-  flex: none;
-  padding: 0 var(--sp-1);
-  border-radius: var(--r-1);
-  background: var(--surface-2);
-  color: var(--ink-2);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: var(--track-1);
-}
-
-.agent-placement-badge-rank[data-rank="primary"] {
-  color: var(--action);
 }
 
 .agents-roster-row-sep {

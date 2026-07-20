@@ -52,6 +52,7 @@ export function NodeProfileBadges({ node, storedTokens, colocated, t, compact = 
   return (
     <div
       className={`adm-node-profile${compact ? " is-compact" : ""}`}
+      role="group"
       aria-label={t("admin.v2.node_profile_label", {
         ownership: ownershipLabel,
         sandbox: sandboxLabel,

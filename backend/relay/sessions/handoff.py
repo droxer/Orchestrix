@@ -7,7 +7,11 @@ from typing import Any
 from .bridge import latest_user_turn_marker
 
 
-def compute_prior_handoff_note(session: dict[str, Any], agent: str | None = None) -> str | None:
+def compute_prior_handoff_note(
+    session: dict[str, Any],
+    agent: str | None = None,
+    agent_id: str | None = None,
+) -> str | None:
     """Return the latest handoff note after the current user turn, if any."""
     latest_user = latest_user_turn_marker(session)
     latest: tuple[tuple[str, int], dict[str, Any]] | None = None
@@ -24,6 +28,9 @@ def compute_prior_handoff_note(session: dict[str, Any], agent: str | None = None
         return None
     decision = latest[1]
     if decision.get("kind") != "handoff":
+        return None
+    target_agent_id = decision.get("targetAgentId")
+    if target_agent_id and target_agent_id != agent_id:
         return None
     target_agent = decision.get("targetAgent")
     if agent and target_agent and target_agent != agent:

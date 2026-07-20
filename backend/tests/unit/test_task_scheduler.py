@@ -62,6 +62,57 @@ def test_scheduler_dispatches_assigned_task_to_ready_node() -> None:
     asyncio.run(run_flow())
 
 
+def test_scheduler_dispatches_when_employee_owns_multiple_computers() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store = LocalSessionStore(root)
+            task_store = LocalTaskStore(root)
+            registry = DaemonNodeRegistry(
+                session_store, LocalDaemonStore(root), task_store=task_store
+            )
+            backend = ServerDaemonNodeBackend(registry)
+            for suffix in ("one", "two"):
+                registry.register(
+                    {
+                        "sandboxId": f"sbx_alice_{suffix}",
+                        "employeeId": "alice",
+                        "token": f"node_token_{suffix}",
+                        "workspacePath": f"/workspace/alice/{suffix}",
+                        "protocolVersion": 1,
+                        "supportedAgents": ["codex"],
+                        "status": "ready",
+                    },
+                    "ui_token",
+                )
+            task = task_store.create_task(
+                {
+                    "title": "Runs on either computer",
+                    "assignedAgent": "codex",
+                    "assigneeEmployeeId": "alice",
+                    "status": "assigned",
+                }
+            )
+            scheduler = TaskScheduler(
+                task_store=task_store, registry=registry, backend=backend
+            )
+
+            result = await scheduler.tick()
+
+            assert result.dispatched == 1
+            assert task_store.get_task(task["id"])["status"] == "running"
+            commands = [
+                command
+                for suffix in ("one", "two")
+                for command in registry.take_commands(
+                    f"sbx_alice_{suffix}", f"node_token_{suffix}"
+                )
+                if command["type"] == "run.start"
+            ]
+            assert len(commands) == 1
+
+    asyncio.run(run_flow())
+
+
 def test_scheduler_requests_managed_capacity_once_when_no_node_is_ready() -> None:
     async def run_flow() -> None:
         with TemporaryDirectory() as root:

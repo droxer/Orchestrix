@@ -7,6 +7,7 @@ import type {
   DaemonWorkspaceErrorCode,
   DaemonWorkspaceListCommand,
   DaemonWorkspaceReadCommand,
+  DaemonWorkspaceScope,
 } from "relay-core";
 
 import { agentWorkspaceSubpath } from "./agent-workspace.js";
@@ -20,8 +21,15 @@ export class WorkspaceReadError extends Error {
   }
 }
 
-function resolveInsideHome(workspaceRoot: string, agentId: string, relativePath: string): { path: string; target: string } {
-  const home = resolve(workspaceRoot, agentWorkspaceSubpath(agentId));
+function scopeBase(workspaceRoot: string, agentId: string | undefined, scope: DaemonWorkspaceScope): string {
+  if (scope === "shared") return resolve(workspaceRoot);
+  if (!agentId) {
+    throw new WorkspaceReadError("invalid-path", "agentId is required for agent-home workspace reads.");
+  }
+  return resolve(workspaceRoot, agentWorkspaceSubpath(agentId));
+}
+
+function resolveInsideBase(home: string, relativePath: string): { path: string; target: string } {
   const requested = relativePath.trim();
   if (requested.startsWith("/")) {
     throw new WorkspaceReadError("invalid-path", "Path must be relative to the agent workspace.");
@@ -55,10 +63,11 @@ function relativeHomePath(home: string, target: string): string {
 
 export function listAgentWorkspace(
   workspaceRoot: string,
-  agentId: string,
+  agentId: string | undefined,
   relativePath: string,
+  scope: DaemonWorkspaceScope = "agent-home",
 ): { path: string; exists: boolean; entries: DaemonWorkspaceEntry[] } {
-  const { path, target } = resolveInsideHome(workspaceRoot, agentId, relativePath);
+  const { path, target } = resolveInsideBase(scopeBase(workspaceRoot, agentId, scope), relativePath);
   let stats: ReturnType<typeof lstatSync>;
   try {
     stats = lstatSync(target);
@@ -91,11 +100,12 @@ export function listAgentWorkspace(
 
 export function readAgentWorkspaceFile(
   workspaceRoot: string,
-  agentId: string,
+  agentId: string | undefined,
   relativePath: string,
   limitBytes = DEFAULT_READ_LIMIT_BYTES,
+  scope: DaemonWorkspaceScope = "agent-home",
 ): { path: string; bytes: number; isBinary: boolean; truncated: boolean; contentBase64?: string } {
-  const { path, target } = resolveInsideHome(workspaceRoot, agentId, relativePath);
+  const { path, target } = resolveInsideBase(scopeBase(workspaceRoot, agentId, scope), relativePath);
   let info: ReturnType<typeof lstatSync>;
   try {
     info = lstatSync(target);
@@ -137,25 +147,27 @@ export function workspaceCommandEvent(
   workspaceRoot: string,
   command: WorkspaceCommand,
 ): WorkspaceCommandEvent {
+  const scope = command.scope ?? "agent-home";
+  const identity = command.agentId ? { agentId: command.agentId } : {};
   try {
     if (command.type === "workspace.list") {
-      const listing = listAgentWorkspace(workspaceRoot, command.agentId, command.path);
+      const listing = listAgentWorkspace(workspaceRoot, command.agentId, command.path, scope);
       return {
         type: "workspace.listing",
         commandId: command.id,
         ...(command.leaseId ? { leaseId: command.leaseId } : {}),
-        agentId: command.agentId,
+        ...identity,
         path: listing.path,
         exists: listing.exists,
         entries: listing.entries,
       };
     }
-    const file = readAgentWorkspaceFile(workspaceRoot, command.agentId, command.path);
+    const file = readAgentWorkspaceFile(workspaceRoot, command.agentId, command.path, undefined, scope);
     return {
       type: "workspace.file",
       commandId: command.id,
       ...(command.leaseId ? { leaseId: command.leaseId } : {}),
-      agentId: command.agentId,
+      ...identity,
       path: file.path,
       bytes: file.bytes,
       isBinary: file.isBinary,
@@ -167,7 +179,7 @@ export function workspaceCommandEvent(
       type: "workspace.error",
       commandId: command.id,
       ...(command.leaseId ? { leaseId: command.leaseId } : {}),
-      agentId: command.agentId,
+      ...identity,
       path: command.path,
       code: error instanceof WorkspaceReadError ? error.code : "io-error",
       message: error instanceof Error ? error.message : String(error),

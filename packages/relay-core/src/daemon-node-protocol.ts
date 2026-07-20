@@ -56,10 +56,12 @@ export const DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS: readonly number[] = [1];
  * in its run.completed event, so the backend never has to walk the workspace
  * itself (which only works when they share a filesystem).
  */
-export type DaemonNodeCapability = "generated-files" | "workspace-read" | "structured-agent-events";
+export type DaemonNodeCapability = "generated-files" | "workspace-read" | "workspace-read-shared" | "structured-agent-events";
 export const DAEMON_CAPABILITY_GENERATED_FILES: DaemonNodeCapability = "generated-files";
 /** The daemon can serve agent-home file listings and reads via workspace commands. */
 export const DAEMON_CAPABILITY_WORKSPACE_READ: DaemonNodeCapability = "workspace-read";
+/** The daemon can serve the node's shared workspace root via scope: "shared" workspace commands. */
+export const DAEMON_CAPABILITY_WORKSPACE_READ_SHARED: DaemonNodeCapability = "workspace-read-shared";
 /** The daemon emits normalized nested-agent lifecycle events in addition to raw output. */
 export const DAEMON_CAPABILITY_STRUCTURED_AGENT_EVENTS: DaemonNodeCapability = "structured-agent-events";
 
@@ -136,13 +138,22 @@ export interface DaemonWorkspaceEntry {
   updatedAt: string;
 }
 
+/**
+ * Which base directory a workspace command reads: an agent's personal home
+ * ("agent-home", the default) or the node's shared workspace root ("shared",
+ * only sent to daemons advertising the workspace-read-shared capability).
+ */
+export type DaemonWorkspaceScope = "agent-home" | "shared";
+
 export interface DaemonWorkspaceListCommand {
   id: string;
   type: "workspace.list";
   leaseId?: string;
   leaseExpiresAt?: string;
   attempt?: number;
-  agentId: string;
+  scope?: DaemonWorkspaceScope;
+  /** Required for agent-home scope; optional for shared scope. */
+  agentId?: string;
   path: string;
 }
 
@@ -152,7 +163,9 @@ export interface DaemonWorkspaceReadCommand {
   leaseId?: string;
   leaseExpiresAt?: string;
   attempt?: number;
-  agentId: string;
+  scope?: DaemonWorkspaceScope;
+  /** Required for agent-home scope; optional for shared scope. */
+  agentId?: string;
   path: string;
 }
 
@@ -222,7 +235,7 @@ export type DaemonNodeEvent =
       type: "workspace.listing";
       commandId: string;
       leaseId?: string;
-      agentId: string;
+      agentId?: string;
       path: string;
       exists: boolean;
       entries: DaemonWorkspaceEntry[];
@@ -231,7 +244,7 @@ export type DaemonNodeEvent =
       type: "workspace.file";
       commandId: string;
       leaseId?: string;
-      agentId: string;
+      agentId?: string;
       path: string;
       bytes: number;
       isBinary: boolean;
@@ -242,7 +255,7 @@ export type DaemonNodeEvent =
       type: "workspace.error";
       commandId: string;
       leaseId?: string;
-      agentId: string;
+      agentId?: string;
       path: string;
       code: DaemonWorkspaceErrorCode;
       message: string;

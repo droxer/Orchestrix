@@ -41,6 +41,8 @@ export interface RelayTask {
   activity: RelayTaskActivity[];
   createdAt: string;
   updatedAt: string;
+  /** Set when a task.deleted event has been recorded; deleted tasks are hidden from lists. */
+  deletedAt?: string;
   events: RelayTaskEvent[];
 }
 
@@ -96,6 +98,12 @@ export type RelayTaskEvent =
     }
   | {
       id: string;
+      type: "task.deleted";
+      taskId: string;
+      timestamp: string;
+    }
+  | {
+      id: string;
       type: "task.session_linked";
       taskId: string;
       timestamp: string;
@@ -129,6 +137,7 @@ export interface TaskStore {
   appendEvent(taskId: string, event: RelayTaskEvent): Promise<RelayTask>;
   getTask(taskId: string): Promise<RelayTask>;
   listTasks(): Promise<RelayTask[]>;
+  deleteTask(taskId: string): Promise<RelayTask>;
   updateTask(taskId: string, input: { title?: string; description?: string; priority?: TaskPriority; status?: TaskStatus; assigneeEmployeeId?: string; dueDate?: string; isRoutine?: boolean; routineType?: TaskRoutineType; routineCadence?: TaskRoutineCadence; routineNextRunDate?: string; routineEnabled?: boolean }): Promise<RelayTask>;
   assignTask(taskId: string, agent: AgentName, agentId?: string): Promise<RelayTask>;
   claimNextTaskForAgent(agent: AgentName, assigneeEmployeeId?: string): Promise<RelayTask | undefined>;
@@ -214,7 +223,14 @@ export class LocalTaskStore implements TaskStore {
     return readdirSync(this.tasksDir, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
       .map((entry) => this.getTaskSync(entry.name))
+      .filter((task) => !task.deletedAt)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
+
+  async deleteTask(taskId: string): Promise<RelayTask> {
+    const task = await this.getTask(taskId);
+    if (task.deletedAt) return task;
+    return this.appendEvent(taskId, relayTaskEvent("task.deleted", taskId, {}));
   }
 
   async updateTask(taskId: string, input: { title?: string; description?: string; priority?: TaskPriority; status?: TaskStatus; assigneeEmployeeId?: string; dueDate?: string; isRoutine?: boolean; routineType?: TaskRoutineType; routineCadence?: TaskRoutineCadence; routineNextRunDate?: string; routineEnabled?: boolean }): Promise<RelayTask> {
@@ -370,6 +386,8 @@ export function materializeTaskEvents(events: RelayTaskEvent[]): RelayTask {
       else delete task.assignedAgentId;
     } else if (event.type === "task.status") {
       task.status = event.status;
+    } else if (event.type === "task.deleted") {
+      task.deletedAt = event.timestamp;
     } else if (event.type === "task.session_linked") {
       if (!task.linkedSessionIds.includes(event.sessionId)) task.linkedSessionIds.push(event.sessionId);
     } else if (event.type === "task.activity") {

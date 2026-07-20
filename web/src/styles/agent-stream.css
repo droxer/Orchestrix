@@ -447,6 +447,16 @@
   animation: caret 1s steps(1, end) infinite;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .agent-stream.streaming .agent-text:last-child .agent-prose > :last-child:is(p, h1, h2, h3, h4, h5, h6)::after,
+  .agent-stream.streaming .agent-text:last-child .agent-prose > :last-child:is(ul, ol) li:last-child::after,
+  .agent-stream.streaming .agent-text:last-child .agent-prose > blockquote:last-child p:last-child::after,
+  .agent-stream.streaming .agent-text:last-child .agent-prose > pre:last-child > code::after,
+  .agent-stream.streaming .agent-thinking:last-child .agent-thinking-body p:last-child::after {
+    animation: none;
+  }
+}
+
 /* Live-run footer — a pulsing dot when the agent is still working but the
    last visible segment is not streaming text (tool runs, status, silence). */
 .agent-stream-activity {
@@ -465,7 +475,11 @@
   border-radius: var(--r-full);
   background: var(--info);
   box-shadow: 0 0 0 0 color-mix(in srgb, var(--info) 40%, transparent);
-  animation: conv-pulse 1.4s var(--ease) infinite;
+  animation: pulse-ring 1.4s var(--ease) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-stream-pulse { animation: none; }
 }
 
 @keyframes caret { 50% { opacity: 0; } }

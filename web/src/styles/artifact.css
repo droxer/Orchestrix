@@ -3,8 +3,9 @@
    kind tag plus a one-line semantic stat (+/−, pass/fail) — so large
    bodies (diffs, logs) never disrupt the conversation flow. */
 
-/* Artifact chips are monochrome — kind is carried by the icon and the
-   mono kind tag, not by hue. One neutral accent for every kind. */
+/* Artifact chips take a single neutral accent (--info) — the icon plate and
+   kind tag are tinted washes of it. Kind is carried by the icon and the mono
+   kind tag, never by a per-kind hue. */
 .artifact-chip,
 .artifact-kind-tag {
   --artifact-accent: var(--info);
@@ -282,8 +283,8 @@
 }
 
 .artifact-index-btn:focus-visible {
-  outline: 2px solid var(--action);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 /* Expanded list panel (shown when .strip-expanded) */
@@ -333,6 +334,11 @@
   background: transparent;
   color: var(--ink-1);
   font: var(--type-label);
+}
+
+.artifact-index-search input:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .artifact-index-search input::placeholder {
@@ -401,8 +407,8 @@
 }
 
 .artifact-index-row:focus-visible {
-  outline: 2px solid var(--action);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .artifact-index-row-icon {

@@ -33,7 +33,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .adm-view-stage {
+  .adm-view-stage,
+  .adm-emp-row.is-pulse::after,
+  .adm-node-card.is-pulse::after {
     animation: none;
   }
 }
@@ -215,7 +217,7 @@
   justify-content: flex-end;
   flex-wrap: wrap;
   gap: var(--sp-4);
-  font-feature-settings: "tnum" 1;
+  font-variant-numeric: tabular-nums;
 }
 
 .adm-emp-metric {
@@ -580,23 +582,6 @@
   contain-intrinsic-size: auto 240px;
 }
 
-.adm-node-card::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: var(--sp-4);
-  bottom: var(--sp-4);
-  width: 2px;
-  background: var(--line-1);
-}
-
-.adm-node-card.tone-good::before { background: var(--ok); }
-.adm-node-card.tone-info::before { background: var(--info); }
-.adm-node-card.tone-bad::before { background: var(--err); }
-.adm-node-card.tone-warn::before { background: var(--warn); }
-.adm-node-card.tone-muted::before { background: var(--ink-4); }
-.adm-node-card.tone-neutral::before { background: var(--ink-4); }
-
 .adm-node-profile {
   display: flex;
   flex-wrap: wrap;
@@ -626,19 +611,23 @@
   border-radius: 0;
 }
 
-/* Execution profile chip — a tinted, icon-led badge so managed vs local reads
-   at a glance on the card (icon + label + tone all carry the same cue). */
+/* Ownership badge — identity, never status. Micro-caps + icon set the badge
+   apart from agent chips (vendor mark + lowercase name) and status pills
+   (tone dot + word). Managed carries the action tint ("Relay runs this");
+   a local computer is a person's machine and stays deliberately un-tinted,
+   keeping green/red reserved for health. */
 .adm-node-profile-kind {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-1);
-  padding: 1px var(--sp-2);
+  height: 20px;
+  padding: 0 var(--sp-2);
   border: 1px solid transparent;
   border-radius: var(--r-1);
-  font-family: var(--font-mono);
-  font-size: var(--fs-2);
-  font-weight: 600;
-  color: var(--ink-1);
+  font: var(--type-micro);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .adm-node-profile-icon {
@@ -647,20 +636,23 @@
 }
 
 .adm-node-profile-kind[data-kind="managed"] {
-  color: var(--info);
-  border-color: color-mix(in srgb, var(--info) 32%, transparent);
-  background: color-mix(in srgb, var(--info) 10%, transparent);
+  color: var(--action);
+  border-color: color-mix(in srgb, var(--action) 35%, transparent);
+  background: color-mix(in srgb, var(--action) 10%, transparent);
 }
 
 .adm-node-profile-kind[data-kind="local"] {
-  color: var(--ok);
-  border-color: color-mix(in srgb, var(--ok) 32%, transparent);
-  background: color-mix(in srgb, var(--ok) 10%, transparent);
+  color: var(--ink-2);
+  border-color: var(--line-1);
+  background: var(--surface-2);
 }
 
 .adm-node-profile-kind[data-kind="pending"] {
+  /* ink-3, not ink-4 — pending is a meaningful state and 11px caps needs
+     the AA 4.5:1 floor in both themes. */
   color: var(--ink-3);
   border-color: var(--line-1);
+  border-style: dashed;
   background: transparent;
 }
 
@@ -685,7 +677,7 @@
   width: 100%;
   color: var(--ink-3);
   font: var(--type-label);
-  letter-spacing: var(--track-1);
+  letter-spacing: var(--track-caps);
   text-transform: uppercase;
 }
 
@@ -701,6 +693,13 @@
   display: flex;
   align-items: flex-start;
   gap: var(--sp-3);
+}
+
+/* Status pill anchors the top-right of the card; the identity block (flex:1)
+   pushes it to the edge. Never let the label shrink or wrap. */
+.adm-node-card-head .adm-status-pill {
+  flex: none;
+  margin-top: 2px;
 }
 
 /* Neutral owner monogram — the identity anchor. Node health is carried
@@ -842,6 +841,60 @@
   gap: var(--sp-1);
 }
 
+/* Executor readiness is secondary detail under the hosted-agent list, so it
+   sheds the boxed-chip treatment the primary agent list wears: a bare strip of
+   vendor glyphs with no caps label (the label lives in the row's title tip).
+   The glyph shape carries identity; a single small dot per mark carries
+   readiness (green/red/neutral), matching "only the dot carries status"
+   everywhere else. The unlabelled glyph strip is the whole hierarchy point
+   against the boxed agent chips above. */
+.adm-node-runtimes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-1) var(--sp-3);
+  margin-top: var(--sp-1);
+}
+
+/* Inter-mark gap stays wider than the dot→glyph gap (sp-1) inside each mark so
+   every [dot glyph] reads as one unit rather than a run of bullet separators. */
+.adm-node-runtimes-marks {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.adm-runtime-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+.adm-runtime-mark .adm-agent-dot { background: var(--ink-4); }
+.adm-runtime-mark.tone-good .adm-agent-dot { background: var(--ok); }
+.adm-runtime-mark.tone-bad .adm-agent-dot { background: var(--err); }
+
+.adm-runtime-mark.is-disabled {
+  opacity: 0.4;
+}
+
+/* An agent-less node would otherwise leave a bare one-line string floating in
+   a tall card; give the empty state a quiet dashed placeholder so the card
+   reads as intentionally empty rather than unfinished. */
+.adm-agents-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: var(--sp-3);
+  color: var(--ink-3);
+  font-size: var(--fs-2);
+  border: 1px dashed var(--line-2);
+  border-radius: var(--r-2);
+  background: var(--surface-1);
+}
+
 .adm-agent-chip {
   display: inline-flex;
   align-items: center;
@@ -852,6 +905,7 @@
   font: var(--type-label-strong);
   letter-spacing: var(--track-0);
   text-transform: none;
+  border: 1px solid var(--line-2);
   border-radius: var(--r-1);
   background: var(--surface-1);
   color: var(--ink-3);
@@ -1080,6 +1134,9 @@
   display: flex;
   align-items: center;
   gap: var(--sp-2);
+  /* Pin the action row to the bottom so footers align across a grid row of
+     unequal-content cards (stretched to equal height by the grid). */
+  margin-top: auto;
   padding-top: var(--sp-3);
   border-top: 1px solid var(--line-2);
   font-size: var(--fs-2);
@@ -1475,7 +1532,8 @@
   background: var(--surface-1);
 }
 
-.adm-chat-integration.active {
+.adm-chat-integration.active,
+.adm-chat-integration[data-active="true"] {
   border-color: color-mix(in srgb, var(--action) 40%, var(--line-1));
   background: var(--action-soft);
 }

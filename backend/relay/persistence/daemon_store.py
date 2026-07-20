@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from contextlib import contextmanager
 from datetime import timedelta
+import fcntl
 from pathlib import Path
 from threading import RLock
-from typing import Any
+from typing import Any, Iterator
 
 from sqlalchemy import (
     JSON,
     Column,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     MetaData,
     Table,
@@ -23,6 +26,7 @@ from sqlalchemy import (
     select,
     update,
 )
+from sqlalchemy.exc import IntegrityError
 
 from .store_common import (
     DEFAULT_RELAY_DATA_DIR,
@@ -125,6 +129,7 @@ class LocalDaemonStore:
         self.commands_dir = root / "daemon" / "commands"
         self.runs_dir = root / "daemon" / "runs"
         self.run_requests_dir = root / "daemon" / "run-requests"
+        self.run_request_claim_lock_path = root / "daemon" / ".run-request-claims.lock"
         self.events_dir = root / "daemon" / "events"
         for path in (
             self.nodes_dir,
@@ -546,18 +551,34 @@ class LocalDaemonStore:
             "updatedAt": now,
             **request,
         }
-        _write_json(self.run_requests_dir / f"{safe_name(record['id'])}.json", record)
-        self.append_daemon_event(
-            daemon_event(
-                "daemon.run_request.created",
-                {
-                    "nodeId": record["nodeId"],
-                    "runRequestId": record["id"],
-                    "sessionId": record["sessionId"],
-                },
+        with self._lock, self._run_request_claim_lock():
+            if self.active_run_request_for_session_any_node(record["sessionId"]):
+                raise ValueError(
+                    f"Session {record['sessionId']} already has an active daemon run."
+                )
+            _write_json(
+                self.run_requests_dir / f"{safe_name(record['id'])}.json", record
             )
-        )
+            self.append_daemon_event(
+                daemon_event(
+                    "daemon.run_request.created",
+                    {
+                        "nodeId": record["nodeId"],
+                        "runRequestId": record["id"],
+                        "sessionId": record["sessionId"],
+                    },
+                )
+            )
         return record
+
+    @contextmanager
+    def _run_request_claim_lock(self) -> Iterator[None]:
+        with self.run_request_claim_lock_path.open("a+", encoding="utf-8") as lock_file:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
     def get_run_request(self, request_id: str) -> dict[str, Any] | None:
         path = self.run_requests_dir / f"{safe_name(request_id)}.json"
@@ -581,6 +602,18 @@ class LocalDaemonStore:
             (
                 request
                 for request in self.list_active_run_requests(node_id)
+                if request["sessionId"] == session_id
+            ),
+            None,
+        )
+
+    def active_run_request_for_session_any_node(
+        self, session_id: str
+    ) -> dict[str, Any] | None:
+        return next(
+            (
+                request
+                for request in self.list_active_run_requests()
                 if request["sessionId"] == session_id
             ),
             None,
@@ -1041,6 +1074,13 @@ class DatabaseDaemonStore:
         Column("created_at", DateTime(timezone=True), nullable=False),
         Column("updated_at", DateTime(timezone=True), nullable=False),
         Column("completed_at", DateTime(timezone=True), nullable=True),
+    )
+    Index(
+        "uq_daemon_run_requests_active_session",
+        run_requests.c.session_public_id,
+        unique=True,
+        postgresql_where=run_requests.c.status.in_(ACTIVE_RUN_REQUEST_STATUSES),
+        sqlite_where=run_requests.c.status.in_(ACTIVE_RUN_REQUEST_STATUSES),
     )
     events = Table(
         "daemon_events",
@@ -1644,24 +1684,31 @@ class DatabaseDaemonStore:
             "updatedAt": now,
             **request,
         }
-        with self.engine.begin() as conn:
-            node_pk = self._node_pk(conn, record["nodeId"])
-            conn.execute(
-                insert(self.run_requests).values(
-                    **run_request_to_row(record, node_pk=node_pk)
+        try:
+            with self.engine.begin() as conn:
+                node_pk = self._node_pk(conn, record["nodeId"])
+                conn.execute(
+                    insert(self.run_requests).values(
+                        **run_request_to_row(record, node_pk=node_pk)
+                    )
                 )
-            )
-            self._append_daemon_event(
-                conn,
-                daemon_event(
-                    "daemon.run_request.created",
-                    {
-                        "nodeId": record["nodeId"],
-                        "runRequestId": record["id"],
-                        "sessionId": record["sessionId"],
-                    },
-                ),
-            )
+                self._append_daemon_event(
+                    conn,
+                    daemon_event(
+                        "daemon.run_request.created",
+                        {
+                            "nodeId": record["nodeId"],
+                            "runRequestId": record["id"],
+                            "sessionId": record["sessionId"],
+                        },
+                    ),
+                )
+        except IntegrityError as error:
+            if self.active_run_request_for_session_any_node(record["sessionId"]):
+                raise ValueError(
+                    f"Session {record['sessionId']} already has an active daemon run."
+                ) from error
+            raise
         return record
 
     def get_run_request(self, request_id: str) -> dict[str, Any] | None:
@@ -1696,6 +1743,18 @@ class DatabaseDaemonStore:
             (
                 request
                 for request in self.list_active_run_requests(node_id)
+                if request["sessionId"] == session_id
+            ),
+            None,
+        )
+
+    def active_run_request_for_session_any_node(
+        self, session_id: str
+    ) -> dict[str, Any] | None:
+        return next(
+            (
+                request
+                for request in self.list_active_run_requests()
                 if request["sessionId"] == session_id
             ),
             None,

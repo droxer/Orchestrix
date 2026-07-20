@@ -15,7 +15,7 @@ import { EMPLOYEE_AGENTS_QUERY_KEY } from "../hooks/useEmployeeAgents";
 import { formatRelativeTime, truncateId, agentAvailabilityTone } from "./admin/helpers";
 import { AgentMark } from "./AgentMark";
 import { AgentInstructionEditor } from "./AgentInstructionEditor";
-import { AgentPlacementBadge } from "./AgentPlacementBadge";
+import { PlacementList } from "./PlacementList";
 import { describeAgentPlacements } from "../lib/agentPlacements";
 
 export interface AgentProfilePanelProps {
@@ -47,14 +47,6 @@ function DossierIconButton({
       {children}
     </Button>
   );
-}
-
-function placementStatusTone(status: AgentPlacement["status"]): string {
-  if (status === "ready") return "good";
-  if (status === "busy") return "info";
-  if (status === "pending") return "warn";
-  if (status === "failed" || status === "incompatible") return "bad";
-  return "neutral";
 }
 
 export function AgentProfilePanel({
@@ -277,6 +269,7 @@ export function AgentProfilePanel({
                       name="agent-display-name"
                       type="text"
                       aria-label={t("admin.v2.agent_name")}
+                      autoComplete="off"
                       autoFocus
                       value={nameDraft}
                       onChange={(event) => setNameDraft(event.target.value)}
@@ -373,44 +366,14 @@ export function AgentProfilePanel({
               {placementDescriptions.length === 0 ? (
                 <p className="adm-cred-empty">{t("admin.v2.no_runtime_placement")}</p>
               ) : (
-                <ul className="adm-placement-list">
-                  {placementDescriptions.map((description) => {
-                    const placement = description.placement;
-                    const nodeMissing = nodes.length > 0
-                      && !nodes.some((node) => node.id === placement.daemonNodeId);
-                    const tone = placementStatusTone(placement.status);
-                    return (
-                      <li key={placement.id} className="adm-placement-item">
-                        <span className={`adm-placement-dot tone-${tone}`} aria-hidden="true" />
-                        <span className="adm-placement-body">
-                          <AgentPlacementBadge
-                            description={description}
-                            showRank={placementDescriptions.length > 1}
-                            showSandbox
-                          />
-                          <span className="adm-placement-status-row">
-                            <span className={`adm-placement-status tone-${tone}`}>
-                              {t(`admin.v2.placement_status.${placement.status}`, { defaultValue: placement.status })}
-                            </span>
-                            {nodeMissing ? (
-                              <span className="adm-placement-status tone-bad">{t("admin.v2.agents_node_missing")}</span>
-                            ) : null}
-                          </span>
-                        </span>
-                        <Button variant="ghost"
-                          type="button"
-                          className="adm-placement-remove"
-                          onClick={() => void handleRemovePlacement(placement)}
-                          disabled={pendingPlacementId !== null}
-                          aria-label={t("admin.v2.remove_placement")}
-                          title={t("admin.v2.remove_placement")}
-                        >
-                          <AdminDelete size={13} aria-hidden="true" />
-                        </Button>
-                      </li>
-                    );
-                  })}
-                </ul>
+                <PlacementList
+                  descriptions={placementDescriptions}
+                  canManage={canManage}
+                  pendingPlacementId={pendingPlacementId}
+                  onRemove={(placement) => void handleRemovePlacement(placement)}
+                  nodeMissingFor={(description) => nodes.length > 0
+                    && !nodes.some((node) => node.id === description.placement.daemonNodeId)}
+                />
               )}
             </div>
 
@@ -450,6 +413,7 @@ export function AgentProfilePanel({
               name="agent-display-name"
               type="text"
               aria-label={t("admin.v2.agent_name")}
+              autoComplete="off"
               autoFocus
               value={nameDraft}
               onChange={(event) => setNameDraft(event.target.value)}
@@ -566,46 +530,14 @@ export function AgentProfilePanel({
         {placementDescriptions.length === 0 ? (
           <p className="adm-cred-empty">{t("admin.v2.no_runtime_placement")}</p>
         ) : (
-          <ul className="adm-placement-list">
-            {placementDescriptions.map((description) => {
-              const placement = description.placement;
-              const nodeMissing = nodes.length > 0
-                && !nodes.some((node) => node.id === placement.daemonNodeId);
-              const tone = placementStatusTone(placement.status);
-              return (
-                <li key={placement.id} className={`adm-placement-item${canManage ? "" : " adm-placement-item--compact"}`}>
-                  <span className={`adm-placement-dot tone-${tone}`} aria-hidden="true" />
-                  <span className="adm-placement-body">
-                    <AgentPlacementBadge
-                      description={description}
-                      showRank={placementDescriptions.length > 1}
-                      showSandbox
-                    />
-                    <span className="adm-placement-status-row">
-                      <span className={`adm-placement-status tone-${tone}`}>
-                        {t(`admin.v2.placement_status.${placement.status}`, { defaultValue: placement.status })}
-                      </span>
-                      {nodeMissing ? (
-                        <span className="adm-placement-status tone-bad">{t("admin.v2.agents_node_missing")}</span>
-                      ) : null}
-                    </span>
-                  </span>
-                  {canManage ? (
-                    <Button variant="ghost"
-                      type="button"
-                      className="adm-placement-remove"
-                      onClick={() => void handleRemovePlacement(placement)}
-                      disabled={pendingPlacementId !== null}
-                      aria-label={t("admin.v2.remove_placement")}
-                      title={t("admin.v2.remove_placement")}
-                    >
-                      <AdminDelete size={13} aria-hidden="true" />
-                    </Button>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
+          <PlacementList
+            descriptions={placementDescriptions}
+            canManage={canManage}
+            pendingPlacementId={pendingPlacementId}
+            onRemove={(placement) => void handleRemovePlacement(placement)}
+            nodeMissingFor={(description) => nodes.length > 0
+              && !nodes.some((node) => node.id === description.placement.daemonNodeId)}
+          />
         )}
       </div>
 

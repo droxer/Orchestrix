@@ -60,10 +60,19 @@
   background: var(--action);
   color: var(--on-action);
   flex-shrink: 0;
+  touch-action: manipulation;
   transition: background var(--t-fast) var(--ease);
 }
 
 .search-connect-btn:hover { background: var(--action-hover); }
+
+/* Coarse pointers get the full touch-target hit area; desktop stays 26px. */
+@media (pointer: coarse) {
+  .search-connect-btn {
+    width: var(--touch-target);
+    height: var(--touch-target);
+  }
+}
 
 .employee-avatar,
 .agent-avatar {
@@ -120,17 +129,12 @@
   background: var(--warn);
   opacity: 0.35;
   z-index: 1;
-  animation: avatar-pulse 1.8s var(--ease) infinite;
+  --pulse-color: var(--warn);
+  animation: pulse-ring 1.8s var(--ease) infinite;
 }
 
 .employee-avatar.running::after {
   background: var(--warn);
-}
-
-@keyframes avatar-pulse {
-  0%   { transform: scale(0.6); opacity: 0.5; }
-  70%  { transform: scale(1.4); opacity: 0; }
-  100% { transform: scale(1.4); opacity: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

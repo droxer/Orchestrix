@@ -33,6 +33,7 @@ import { useAdminFleet } from "../hooks/useAdminFleet";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { useRelayStore } from "../lib/store";
 import {
+  HIGHLIGHT_PULSE_MS,
   persistStoredNodeTokenMap,
   readStoredNodeTokens,
   upsertStoredCredentialsFromNodes,
@@ -93,12 +94,42 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
     view === "dashboard" || layout === "list",
   );
   const setAdminView = useRelayStore((state) => state.setAdminView);
-  const [addEmployeeOpen, setAddEmployeeOpen] = useState(false);
-  const [addNodeOpen, setAddNodeOpen] = useState(false);
-  const [assignTarget, setAssignTarget] = useState<{ employeeId?: string } | null>(null);
-  const [credentialsNodeId, setCredentialsNodeId] = useState<string | null>(null);
-  const [manageAgentsNodeId, setManageAgentsNodeId] = useState<string | null>(null);
-  const [agentProfileId, setAgentProfileId] = useState<string | null>(null);
+  const [addEmployeeOpen, setAddEmployeeOpen] = useUrlSearchState(
+    "adminAddEmployee",
+    false,
+    (value) => value === "1",
+    (value) => (value ? "1" : null),
+  );
+  const [addNodeOpen, setAddNodeOpen] = useUrlSearchState(
+    "adminAddNode",
+    false,
+    (value) => value === "1",
+    (value) => (value ? "1" : null),
+  );
+  const [assignTarget, setAssignTarget] = useUrlSearchState<{ employeeId?: string } | null>(
+    "adminAssign",
+    null,
+    (value) => (value === null ? null : value ? { employeeId: value } : {}),
+    (value) => (value === null ? null : value.employeeId ?? ""),
+  );
+  const [credentialsNodeId, setCredentialsNodeId] = useUrlSearchState<string | null>(
+    "adminCredentials",
+    null,
+    (value) => value,
+    (value) => value,
+  );
+  const [manageAgentsNodeId, setManageAgentsNodeId] = useUrlSearchState<string | null>(
+    "adminManageAgents",
+    null,
+    (value) => value,
+    (value) => value,
+  );
+  const [agentProfileId, setAgentProfileId] = useUrlSearchState<string | null>(
+    "adminAgentProfile",
+    null,
+    (value) => value,
+    (value) => value,
+  );
   const [highlightedEmployeeId, setHighlightedEmployeeId] = useState<string | null>(null);
   const [storedTokens, setStoredTokens] = useState<StoredNodeTokenMap>(() => readStoredNodeTokens());
 
@@ -250,7 +281,7 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
     }
 
     setHighlightedEmployeeId(result.employee.id);
-    window.setTimeout(() => setHighlightedEmployeeId((prev) => (prev === result.employee.id ? null : prev)), 2400);
+    window.setTimeout(() => setHighlightedEmployeeId((prev) => (prev === result.employee.id ? null : prev)), HIGHLIGHT_PULSE_MS);
 
     setAddEmployeeOpen(false);
     setView("employees");
@@ -265,7 +296,7 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
       employees: [result.employee, ...prev.employees.filter((employee) => employee.id !== result.employee.id)],
     }));
     setHighlightedEmployeeId(result.employee.id);
-    window.setTimeout(() => setHighlightedEmployeeId((prev) => (prev === result.employee.id ? null : prev)), 2400);
+    window.setTimeout(() => setHighlightedEmployeeId((prev) => (prev === result.employee.id ? null : prev)), HIGHLIGHT_PULSE_MS);
     setAssignTarget(null);
     setView("employees");
   }
@@ -280,7 +311,7 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
       ],
     }));
     setHighlightedEmployeeId(node.employeeId ?? null);
-    window.setTimeout(() => setHighlightedEmployeeId((prev) => (prev === node.employeeId ? null : prev)), 2400);
+    window.setTimeout(() => setHighlightedEmployeeId((prev) => (prev === node.employeeId ? null : prev)), HIGHLIGHT_PULSE_MS);
     setAddNodeOpen(false);
     setAssignTarget(null);
     setView("fleet");
@@ -305,7 +336,7 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
     });
     setStoredTokens(readStoredNodeTokens());
     setHighlightedEmployeeId(node.employeeId ?? null);
-    window.setTimeout(() => setHighlightedEmployeeId((prev) => (prev === node.employeeId ? null : prev)), 2400);
+    window.setTimeout(() => setHighlightedEmployeeId((prev) => (prev === node.employeeId ? null : prev)), HIGHLIGHT_PULSE_MS);
     setAddNodeOpen(false);
     setAssignTarget(null);
     setView("fleet");
@@ -323,7 +354,7 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
   if (!authChecked) {
     return (
       <section className="admin-console adm-bare">
-        <div className="adm-loading">{t("admin.loading")}</div>
+        <div className="adm-loading" role="status">{t("admin.loading")}</div>
       </section>
     );
   }

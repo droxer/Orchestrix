@@ -17,6 +17,7 @@ import { AgentMark } from "../AgentMark";
 import { Drawer } from "./Drawer";
 import { agentStatusTone } from "./helpers";
 import { NodeProfileBadges } from "./NodeProfileBadges";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 
 interface ManageAgentsDrawerProps {
   open: boolean;
@@ -51,6 +52,14 @@ export function ManageAgentsDrawer({ open, onClose, node, onUpdated }: ManageAge
     setSaving(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, nodeId]);
+
+  const dirty = !disabledSetsEqual(disabled, initialDisabled);
+  const confirmDiscardChanges = useUnsavedChangesGuard(open && dirty && !saving);
+
+  async function requestClose() {
+    if (saving) return;
+    if (await confirmDiscardChanges()) onClose();
+  }
 
   function toggle(agent: AgentName) {
     setDisabled((prev) => {
@@ -112,12 +121,10 @@ export function ManageAgentsDrawer({ open, onClose, node, onUpdated }: ManageAge
     );
   }
 
-  const dirty = !disabledSetsEqual(disabled, initialDisabled);
-
   return (
     <Drawer
       open={open}
-      onClose={onClose}
+      onClose={() => { void requestClose(); }}
       title={t("admin.v2.manage_agents_title")}
       subtitle={
         <span className="mono" translate="no">
@@ -219,11 +226,11 @@ export function ManageAgentsDrawer({ open, onClose, node, onUpdated }: ManageAge
           <p className="adm-form-error" role="alert">{t("admin.v2.action_failed", { message: error })}</p>
         ) : null}
         <div className="adm-form-actions">
-          <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>
+          <Button type="button" variant="ghost" onClick={() => void requestClose()} disabled={saving}>
             {t("admin.v2.cancel")}
           </Button>
           <Button type="button" onClick={() => void handleSave()} disabled={saving || !dirty}>
-            {saving ? t("admin.v2.saving") : t("admin.v2.save")}
+            {saving ? t("admin.v2.saving") : t("admin.v2.save_agent_settings")}
           </Button>
         </div>
       </div>

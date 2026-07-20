@@ -144,3 +144,24 @@ button[data-slot="button"][data-variant="default"]:hover:not(:disabled) {
 .tone-bad     { --tone: var(--err); }
 .tone-warn    { --tone: var(--warn); }
 .tone-neutral { --tone: var(--ink-4); }
+
+/* Shared cross-surface utilities. */
+:root {
+  /* WCAG 2.5.5 / Apple HIG minimum touch target. */
+  --touch-target: 44px;
+}
+
+/* Generic ring/fade pulse — the one pattern behind the live/run indicators
+   (agent-stream pulse, agent live pulse, avatar pulse). The ring reads
+   --pulse-color so callers can re-tint; it falls back to --info. */
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--pulse-color, var(--info)) 40%, transparent); }
+  100% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--pulse-color, var(--info)) 0%, transparent); }
+}
+
+/* Long-list render skip — the browser reserves a representative 72px row
+   height for off-screen items to prevent scroll jumps. */
+.list-virtual {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 72px;
+}

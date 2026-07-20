@@ -53,16 +53,16 @@ class LocalAgentStore:
             self._append(agent["id"], "agent.created", {"agent": agent})
             return agent
 
-    def ensure_compatibility_agent(self, supervisor_employee_id: str, executor_kind: str) -> dict[str, Any]:
+    def ensure_compatibility_agent(self, supervisor_employee_id: str, executor_kind: str, daemon_node_id: str, *, node_name: str | None = None) -> dict[str, Any]:
         if executor_kind not in AGENT_NAMES:
             raise ValueError(f"executorKind must be one of: {', '.join(AGENT_NAMES)}.")
-        key = f"{supervisor_employee_id}:{executor_kind}"
+        key = _compatibility_key(supervisor_employee_id, daemon_node_id, executor_kind)
         with self._lock:
             existing = next((agent for agent in self.list_agents(supervisor_employee_id=supervisor_employee_id) if agent.get("compatibilityKey") == key), None)
             if existing:
                 return existing
             agent = self.create_agent(supervisor_employee_id, {
-                "displayName": _compatibility_display_name(self.list_agents(supervisor_employee_id=supervisor_employee_id), executor_kind),
+                "displayName": _compatibility_display_name(self.list_agents(supervisor_employee_id=supervisor_employee_id), executor_kind, node_name or daemon_node_id),
                 "executorKind": executor_kind,
             })
             return self.update_agent(agent["id"], {"compatibilityKey": key})
@@ -291,15 +291,15 @@ class DatabaseAgentStore:
             ) from error
         return agent
 
-    def ensure_compatibility_agent(self, supervisor_employee_id: str, executor_kind: str) -> dict[str, Any]:
+    def ensure_compatibility_agent(self, supervisor_employee_id: str, executor_kind: str, daemon_node_id: str, *, node_name: str | None = None) -> dict[str, Any]:
         if executor_kind not in AGENT_NAMES:
             raise ValueError(f"executorKind must be one of: {', '.join(AGENT_NAMES)}.")
-        key = f"{supervisor_employee_id}:{executor_kind}"
+        key = _compatibility_key(supervisor_employee_id, daemon_node_id, executor_kind)
         existing = next((agent for agent in self.list_agents(supervisor_employee_id=supervisor_employee_id) if agent.get("compatibilityKey") == key), None)
         if existing:
             return existing
         agent = self.create_agent(supervisor_employee_id, {
-            "displayName": _compatibility_display_name(self.list_agents(supervisor_employee_id=supervisor_employee_id), executor_kind),
+            "displayName": _compatibility_display_name(self.list_agents(supervisor_employee_id=supervisor_employee_id), executor_kind, node_name or daemon_node_id),
             "executorKind": executor_kind,
         })
         return self.update_agent(agent["id"], {"compatibilityKey": key})
@@ -570,9 +570,15 @@ def _normalized_agent_snapshot(
     return {**agent, "supervisorEmployeeId": owner} if owner else agent
 
 
-def _compatibility_display_name(agents: list[dict[str, Any]], executor_kind: str) -> str:
+def _compatibility_key(supervisor_employee_id: str, daemon_node_id: str, executor_kind: str) -> str:
+    # A compatibility agent belongs to one computer: keying by node keeps each
+    # computer's auto-materialized agents distinct (one agent = one computer).
+    return f"{supervisor_employee_id}:{daemon_node_id}:{executor_kind}"
+
+
+def _compatibility_display_name(agents: list[dict[str, Any]], executor_kind: str, node_label: str) -> str:
     existing_names = {agent.get("displayName", "").casefold() for agent in agents}
-    base = f"{executor_kind.capitalize()} (legacy)"
+    base = f"{executor_kind.capitalize()} · {node_label}"
     if base.casefold() not in existing_names:
         return base
     suffix = 2

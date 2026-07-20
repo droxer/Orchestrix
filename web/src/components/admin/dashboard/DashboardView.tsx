@@ -50,7 +50,7 @@ export function DashboardView({ nodes, employees, metrics }: DashboardViewProps)
             hero
             enterIndex={0}
             eyebrow={t("admin.v2.dash_kpi_sessions")}
-            value={sessionsReady ? sessions.total : dash}
+            value={sessionsReady ? formatCompact(sessions.total, i18n.language) : dash}
             delta={
               sessionsReady
                 ? {
@@ -67,7 +67,7 @@ export function DashboardView({ nodes, employees, metrics }: DashboardViewProps)
             slot="nodes"
             enterIndex={1}
             eyebrow={t("admin.v2.dash_kpi_nodes")}
-            value={fleetReady ? metrics.total : dash}
+            value={fleetReady ? formatCompact(metrics.total, i18n.language) : dash}
             hint={
               fleetReady
                 ? t("admin.v2.dash_kpi_nodes_hint", { ready: metrics.ready, failed: metrics.failed })
@@ -79,7 +79,7 @@ export function DashboardView({ nodes, employees, metrics }: DashboardViewProps)
             slot="employees"
             enterIndex={2}
             eyebrow={t("admin.v2.dash_kpi_employees")}
-            value={fleetReady ? metrics.employeeTotal : dash}
+            value={fleetReady ? formatCompact(metrics.employeeTotal, i18n.language) : dash}
             hint={fleetReady ? t("admin.v2.dash_kpi_employees_hint", { count: employees.length }) : undefined}
           />
           {showTokens ? (

@@ -3,17 +3,21 @@
 import { useState } from "react";
 import type { TFunction } from "i18next";
 import type { AgentName, ControlPanelDaemonNodeRecord } from "../../types";
-import { useDialogs } from "@/components/ui/DialogProvider";
 import { AgentMark } from "../AgentMark";
+import { useNodeDelete } from "../../hooks/useNodeDelete";
 import {
+  COPY_FEEDBACK_MS,
   agentStatusTone,
   copyText,
+  statusTone,
   visibleNodeAgentNames,
+  visualStatus,
   type StoredNodeTokenMap,
 } from "./helpers";
+import { NodeActions } from "./NodeActions";
 import { NodeProfileBadges } from "./NodeProfileBadges";
 import { Button } from "../ui/button";
-import { ActionApprove, ActionCopy, ActionKey, AdminDelete, AdminManageAgents, AdminNode } from "../icons";
+import { ActionApprove, ActionCopy, AdminNode } from "../icons";
 
 function isAgentDisabled(node: ControlPanelDaemonNodeRecord, agent: AgentName): boolean {
   return Boolean(node.disabledAgents?.includes(agent));
@@ -51,37 +55,23 @@ export function NodeCard({
   onDelete,
   t,
 }: NodeCardProps) {
-  const { confirm } = useDialogs();
   const [copied, setCopied] = useState(false);
-  const [deletePending, setDeletePending] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const { deletePending, deleteError, handleDelete } = useNodeDelete(node, onDelete, t);
 
   async function handleCopyId() {
     await copyText(node.id);
     setCopied(true);
-    window.setTimeout(() => setCopied(false), 1400);
+    window.setTimeout(() => setCopied(false), COPY_FEEDBACK_MS);
   }
 
-  async function handleDelete() {
-    if (!onDelete) return;
-    const ok = await confirm({
-      title: t("admin.v2.delete_confirm", { id: node.id }),
-      confirmLabel: t("admin.v2.delete_action"),
-      tone: "danger",
-    });
-    if (!ok) return;
-    setDeletePending(true);
-    setDeleteError(null);
-    try {
-      await onDelete(node);
-    } catch (error) {
-      setDeleteError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setDeletePending(false);
-    }
-  }
-
-  const nodeName = node.displayName || node.id;
+  const hasName = Boolean(node.displayName);
+  const nodeName = hasName ? node.displayName! : node.id;
+  // Only show the id handle when it adds information — a node whose display
+  // name is (or equals) its id would otherwise print the same string twice.
+  const showHandle = hasName && node.id !== nodeName;
+  const status = visualStatus(node);
+  const tone = statusTone(status);
+  const statusLabel = t(`status.${status}`, { defaultValue: status });
 
   return (
     <article className="adm-node-card">
@@ -91,24 +81,19 @@ export function NodeCard({
         </span>
         <div className="adm-node-card-identity">
           <span
-            className="adm-node-card-name"
+            className={`adm-node-card-name${hasName ? "" : " mono"}`}
             translate="no"
           >
             {nodeName}
           </span>
-          <span className="adm-node-card-handle mono" translate="no">{node.id}</span>
+          {showHandle ? (
+            <span className="adm-node-card-handle mono" translate="no">{node.id}</span>
+          ) : null}
         </div>
-        <div className="adm-node-card-meta-col">
-          <Button variant="ghost"
-            type="button"
-            className="icon-button icon-button--sm icon-button--tinted adm-node-card-icon-btn"
-            onClick={() => void handleCopyId()}
-            aria-label={copied ? t("admin.copied") : t("admin.copy_node_id")}
-            title={node.id}
-          >
-            {copied ? <ActionApprove size={12} aria-hidden="true" /> : <ActionCopy size={12} aria-hidden="true" />}
-          </Button>
-        </div>
+        <span className={`adm-status-pill tone-${tone}`}>
+          <i className="adm-status-dot" aria-hidden="true" />
+          {statusLabel}
+        </span>
       </header>
 
       <NodeProfileBadges
@@ -121,25 +106,30 @@ export function NodeCard({
       />
 
       <div className="adm-node-card-body">
-        <div className="adm-agents">
-          <span className="adm-agents-label">{t("admin.v2.executors")}</span>
-          {visibleNodeAgentNames(node).map((name) => {
-            const agentStatus = node.agents[name] ?? "unknown";
-            const agentTone = agentStatusTone(agentStatus);
-            const disabled = isAgentDisabled(node, name);
-            return (
-              <span
-                key={name}
-                className={`adm-agent-chip tone-${agentTone}${disabled ? " is-disabled" : ""}`}
-                data-agent={name}
-                title={agentTitle(node, name, t)}
-              >
-                <i className="adm-agent-dot" aria-hidden="true" />
-                <AgentMark agent={name} size={12} className="adm-agent-chip-mark" />
-                {name}
-              </span>
-            );
-          })}
+        <div className="adm-node-runtimes" title={t("admin.v2.node_runtimes")}>
+          {visibleNodeAgentNames(node).length === 0 ? (
+            <span className="adm-agents-empty">{t("admin.v2.node_hosted_agents_empty")}</span>
+          ) : (
+            <span className="adm-node-runtimes-marks">
+              {visibleNodeAgentNames(node).map((name) => {
+                const agentStatus = node.agents[name] ?? "unknown";
+                const agentTone = agentStatusTone(agentStatus);
+                const disabled = isAgentDisabled(node, name);
+                return (
+                  <span
+                    key={name}
+                    className={`adm-runtime-mark tone-${agentTone}${disabled ? " is-disabled" : ""}`}
+                    data-agent={name}
+                    title={agentTitle(node, name, t)}
+                    translate="no"
+                  >
+                    <i className="adm-agent-dot" aria-hidden="true" />
+                    <AgentMark agent={name} size={14} className="adm-agent-chip-mark" />
+                  </span>
+                );
+              })}
+            </span>
+          )}
         </div>
       </div>
 
@@ -148,42 +138,28 @@ export function NodeCard({
           <span className="adm-node-card-queued mono tone-info">{node.queuedCommandCount} {t("admin.queued")}</span>
         ) : null}
         <div className="adm-node-card-actions">
-          {node.managedNodeId ? null : (
-            <Button variant="ghost"
-              type="button"
-              className="icon-button icon-button--sm icon-button--tinted adm-node-card-icon-btn"
-              onClick={() => onReveal(node)}
-              aria-label={t("admin.v2.reveal_credentials_for", { id: node.id })}
-              title={t("admin.v2.reveal_credentials")}
-            >
-              <ActionKey size={14} aria-hidden="true" />
-            </Button>
-          )}
-          {!node.provisioningPlaceholder ? <Button variant="ghost"
+          <Button variant="ghost"
             type="button"
             className="icon-button icon-button--sm icon-button--tinted adm-node-card-icon-btn"
-            onClick={() => onManageAgents(node)}
-            aria-label={t("admin.v2.manage_agents_for", { id: node.id })}
-            title={t("admin.v2.manage_agents")}
+            onClick={() => void handleCopyId()}
+            aria-label={copied ? t("admin.copied") : t("admin.copy_node_id")}
+            title={node.id}
           >
-            <AdminManageAgents size={14} aria-hidden="true" />
-          </Button> : null}
-          {onDelete ? (
-            <Button variant="ghost"
-              type="button"
-              className="icon-button icon-button--sm icon-button--tinted adm-node-card-icon-btn danger"
-              onClick={() => void handleDelete()}
-              disabled={deletePending}
-              aria-label={t("admin.v2.delete_action")}
-              title={t("admin.v2.delete_action")}
-            >
-              <AdminDelete size={14} aria-hidden="true" />
-            </Button>
-          ) : null}
+            {copied ? <ActionApprove size={14} aria-hidden="true" /> : <ActionCopy size={14} aria-hidden="true" />}
+          </Button>
+          <NodeActions
+            node={node}
+            onReveal={onReveal}
+            onManageAgents={onManageAgents}
+            onDelete={onDelete}
+            deletePending={deletePending}
+            onDeleteRequest={() => void handleDelete()}
+            t={t}
+          />
         </div>
       </footer>
       {deleteError ? (
-        <p className="adm-node-card-error">{t("admin.v2.action_failed", { message: deleteError })}</p>
+        <p className="adm-node-card-error" role="alert">{t("admin.v2.action_failed", { message: deleteError })}</p>
       ) : null}
     </article>
   );

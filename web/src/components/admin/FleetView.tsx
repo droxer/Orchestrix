@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { RelayEmptyState } from "@/components/RelayEmptyState";
@@ -39,6 +39,14 @@ function serializeFleetFilter(value: FleetFilter): string | null {
   return value === "all" ? null : value;
 }
 
+function parseSearchQuery(value: string | null): string {
+  return value ?? "";
+}
+
+function serializeSearchQuery(value: string): string | null {
+  return value.trim() === "" ? null : value;
+}
+
 function matchesFilter(node: ControlPanelDaemonNodeRecord, filter: FleetFilter): boolean {
   if (filter === "all") return true;
   if (filter === "unassigned") return !node.employeeId;
@@ -60,7 +68,7 @@ function filterLabel(filter: FleetFilter, t: TFunction): string {
 export function FleetView({ nodes, storedTokens, layout, onLayoutChange, onRevealCredentials, onManageAgents, onDeleteNode, onAddNode }: FleetViewProps) {
   const { t } = useTranslation();
   const [filter, setFilter] = useUrlSearchState("fleetFilter", "all" as FleetFilter, parseFleetFilter, serializeFleetFilter);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useUrlSearchState("fleetQuery", "", parseSearchQuery, serializeSearchQuery);
   const colocated = canUseLocalControlPanel();
 
   const counts = useMemo(() => {
@@ -170,7 +178,7 @@ export function FleetView({ nodes, storedTokens, layout, onLayoutChange, onRevea
         <>
           <div className="adm-node-cols" aria-hidden="true">
             <span className="adm-emp-col-label">{t("admin.v2.nav_fleet")}</span>
-            <span className="adm-emp-col-label">{t("admin.v2.executors")}</span>
+            <span className="adm-emp-col-label">{t("admin.v2.node_runtimes")}</span>
             <span className="adm-emp-col-label adm-emp-col-label--metrics">{t("admin.v2.col_actions")}</span>
           </div>
           <ul className="adm-node-list">

@@ -1,0 +1,74 @@
+from __future__ import annotations
+
+from fastapi.testclient import TestClient
+
+from relay.app import create_app
+
+
+def _bootstrap(client: TestClient) -> None:
+    assert client.post("/auth/bootstrap", json={"token": "admin_token", "username": "admin", "password": "secret123"}).status_code == 200
+
+
+def _register_node(app, *, capabilities: list[str]) -> None:
+    app.state.registry.register({
+        "sandboxId": "node_1",
+        "employeeId": "alice",
+        "token": "node_token",
+        "protocolVersion": 1,
+        "supportedAgents": ["codex"],
+        "capabilities": capabilities,
+        "status": "ready",
+    })
+
+
+def test_admin_browses_node_shared_workspace(monkeypatch, tmp_path):
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    app = create_app(tmp_path)
+    client = TestClient(app)
+    _bootstrap(client)
+    _register_node(app, capabilities=["workspace-read", "workspace-read-shared"])
+
+    async def dispatch(_ctx, node, command):
+        assert node["id"] == "node_1"
+        assert command["scope"] == "shared"
+        assert "agentId" not in command
+        if command["type"] == "workspace.list":
+            return {"type": "workspace.listing", "path": "", "exists": True, "entries": [{"name": "shared.md", "path": "shared.md", "kind": "file", "bytes": 5, "updatedAt": "2026-07-19T00:00:00Z"}]}
+        return {"type": "workspace.file", "path": "shared.md", "bytes": 5, "isBinary": False, "truncated": False, "contentBase64": "aGVsbG8="}
+
+    monkeypatch.setattr("relay.api.node_workspace_routes._dispatch", dispatch)
+    listing = client.get("/cp/daemon-nodes/node_1/workspace/files")
+    assert listing.status_code == 200, listing.text
+    assert listing.json()["nodeId"] == "node_1"
+    assert listing.json()["scope"] == "shared"
+    assert listing.json()["entries"][0]["name"] == "shared.md"
+
+    file = client.get("/cp/daemon-nodes/node_1/workspace/file?path=shared.md")
+    assert file.status_code == 200
+    assert file.json()["content"] == "hello"
+
+
+def test_node_workspace_requires_admin(monkeypatch, tmp_path):
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    app = create_app(tmp_path)
+    admin = TestClient(app)
+    _bootstrap(admin)
+    _register_node(app, capabilities=["workspace-read", "workspace-read-shared"])
+    assert admin.post("/cp/users", json={"username": "bob", "password": "userpass", "employeeId": "bob"}).status_code == 201
+    bob = TestClient(app)
+    assert bob.post("/auth/login", json={"username": "bob", "password": "userpass"}).status_code == 200
+    assert bob.get("/cp/daemon-nodes/node_1/workspace/files").status_code == 403
+
+
+def test_node_workspace_unavailable_without_shared_capability(monkeypatch, tmp_path):
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    app = create_app(tmp_path)
+    client = TestClient(app)
+    _bootstrap(client)
+    _register_node(app, capabilities=["workspace-read"])
+
+    response = client.get("/cp/daemon-nodes/node_1/workspace/files")
+    assert response.status_code == 503
+    assert response.json()["detail"] == {"reason": "placement-unavailable"}
+    assert client.get("/cp/daemon-nodes/missing/workspace/files").status_code == 404
+    assert client.get("/cp/daemon-nodes/node_1/workspace/file?path=../x").status_code == 400

@@ -55,7 +55,7 @@
 
 .chat-title-status {
   flex: 0 0 auto;
-  padding: 1px 7px;
+  padding: 1px var(--sp-2);
   font: var(--type-label);
   font-weight: 500;
   text-transform: none;
@@ -71,7 +71,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  padding: 1px 7px;
+  padding: 1px var(--sp-2);
   border: 1px solid var(--line-1);
   border-radius: var(--r-2);
   background: transparent;
@@ -105,7 +105,7 @@
 .chat-active-agent {
   display: none;
   align-items: center;
-  gap: 5px;
+  gap: var(--sp-1);
   min-height: 30px;
   padding: 0 var(--sp-3);
   border: 1px solid var(--line-1);
@@ -118,12 +118,6 @@
 .chat-active-agent-mark {
   flex: 0 0 auto;
   opacity: 0.8;
-}
-
-.chat-header .icon-button {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--r-2);
 }
 
 .chat-header .icon-button:disabled {
@@ -171,7 +165,7 @@
 .header-agent-tabs button {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: var(--sp-1);
   min-height: 30px;
   padding: 0 var(--sp-3);
   border: 1px solid transparent;
@@ -599,7 +593,11 @@
   border-radius: var(--r-full);
   background: var(--info);
   box-shadow: 0 0 0 0 color-mix(in srgb, var(--info) 40%, transparent);
-  animation: conv-pulse 1.4s var(--ease) infinite;
+  animation: pulse-ring 1.4s var(--ease) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-live-pulse { animation: none; }
 }
 
 /* A streaming turn breathes on the rail node so liveness reads even when the

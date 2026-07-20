@@ -396,3 +396,72 @@ Authenticated screenshot pass (mocked-API Playwright, light/dark/mobile) across 
 - **Robustness (not design, found while fixturing).** `visibleConversationArtifacts` and `BacklogPage.linkedSession` assumed `session.artifacts` / `task.linkedSessionIds` always present and threw a full-page dev overlay otherwise — hardened with `?? []` / `?.at(-1)`.
 
 **Verify:** admin Employees list (neutral trash in ACTIONS col + IDLE pill), Nodes list (profile chip under handle), Nodes card (chip stands alone), Channels toolbar once ≥1 channel exists (inline stat strip), mobile admin dashboard (no sparkline over the Nodes caption) — light/dark, 1440 / 390.
+
+### Ownership badges: identity, not status (2026-07-19)
+
+The graphite token migration silently broke the managed/local chips: `--info` is now neutral ink, so "Managed node" rendered as a washed-out gray chip (read as disabled), while "Local computer" kept `--ok` green — colliding with online/healthy status semantics. Worse, the drawer's execution-profile picker dots used the opposite mapping (managed = action blue, local = gray).
+
+**Shipped:**
+
+- **Ownership badge family** (`.adm-node-profile-kind`): micro-caps (`--type-micro` + `--track-caps` + uppercase), 20px, icon-led — a form visibly distinct from status pills (tone dot + word) and agent chips (vendor mark + lowercase name). Ownership is identity, never status.
+- **Managed node** → `--action` tint (text/border/bg via `color-mix`): the brand color says "Relay runs this". **Local computer** → neutral filled (`--ink-2` on `--surface-2`, `--line-1` border): a person's machine, deliberately un-tinted so green/red stay reserved for health. **Ownership pending** → dashed hairline, `--ink-4`.
+- **Picker dots aligned** (`.adm-profile-segment-dot`): managed = `--action`, local = `--ink-3` — same mapping as the badges; no more contradiction between the fleet view and the Add/Assign drawers.
+- **Agent chips joined the chip family**: `.adm-agent-chip` gains a soft `--line-2` hairline so the executor chips sitting next to the ownership badge read as one system instead of borderless fills; tone still lives only in the dot.
+
+**Verify:** nodes card + list, light/dark 1280×900 (mocked-API Playwright) — blue MANAGED NODE, neutral LOCAL COMPUTER, dashed OWNERSHIP PENDING, bordered executor chips. stylelint clean.
+
+### Rename: "Managed node" → "Cloud computer" (2026-07-19)
+
+Copy-only rename across en / zh-CN (云端电脑) / zh-TW (雲端電腦): `node_ownership_managed` (+hint) and the legacy `node_execution_managed`. "Cloud computer" pairs symmetrically with "Local computer" and says where the machine lives instead of who administers it. Keys and code identifiers keep the `managed` slug.
+
+### Badge review fixes (2026-07-19)
+
+Guidelines pass over the ownership badges + executor chips. Fixed: Agents-page `.agent-placement-badge` still carried the pre-graphite mapping (managed border tinted `--info` → invisible; local tinted `--ok` → status collision) — remapped to managed = `--action` mix, local = plain hairline; pending badge text `--ink-4` → `--ink-3` (11px caps was ~3.5:1, below AA; now 6.7:1 dark / 5.5:1 light); two uses of undefined `--track-1` → `--track-caps` (`.adm-agents-label`, `.agent-placement-badge-rank`). Noted, not changed: list-row executor chips signal status by dot color alone (no title); hints are title-only (aria-label covers SR). stylelint clean, dark card re-verified.
+
+### Agents roster placement badges — collapse fix (2026-07-19)
+
+The roster's placement badges broke under width pressure: every element except the node name was `flex: none`, so a badge with a rank chip collapsed the *name* to zero width (orphaned "·" separator, ownership icon crushed too — the svg had no `flex: none`), while "PREFERRED ROUTE" rendered at full mono badge size, louder than the identity it annotates.
+
+**Shipped:**
+
+- `.agent-placement-badge > svg` pinned `flex: none`; name gets a `min-width: 6ch` floor — it ellipsizes, never vanishes.
+- Ownership/runtime text (`-kind`/`-sandbox`) recast in the fleet badge voice — sans micro-caps (`--type-micro` + `--track-caps`), shrinkable with ellipsis after the name so a tight row truncates the annotation, not the panel edge. Rank chip dropped to micro-caps too.
+- Rank copy shortened: "Preferred route/Alternate route" → "Preferred/Alternate" (en; zh-CN 首选/备用, zh-TW 首選/備援) — keys only used in this badge.
+- Compact badges with a rank chip hide the ownership *text* (`:has()` guard) — the rank is the information there; ownership stays on the icon and the `title`.
+
+**Verify:** #/agents dark 1440×900, agent with two placements (managed preferred + local alternate) — full node names, no panel overflow, no orphaned separators; single-placement badges keep "· CLOUD COMPUTER". stylelint clean, agentPlacements tests pass.
+
+### Placements are peer infra — rank chips removed (2026-07-19)
+
+Cloud computer and local computer are both infrastructure an agent runs on, not a primary/fallback pair — but the placement badges said "PREFERRED"/"ALTERNATE", framing the local machine as second-class. Removed the rank display entirely (`AgentPlacementBadge` drops `showRank`; roster + PlacementList callers updated; `placement_preference_*` keys deleted from all three locales; rank CSS removed). A placement badge is now just where the agent runs: icon + node name + ownership term, a flat set of peers. Routing priority still exists in the data (`describeAgentPlacements` keeps `preference` for the scheduler-facing logic/tests); the UI just no longer editorializes it. Ownership term now stays whole under pressure (name carries the shrink with a 6ch floor; badge gets an overflow guard).
+
+**Verify:** #/agents dark+light — "Fleet box 01 · CLOUD COMPUTER" and "Alice's Mac… · LOCAL COMPUTER" render as symmetric peer badges, no rank chips, no overflow. tsc clean, stylelint clean, agentPlacements tests pass.
+
+### Computers host agents — shared root + personal homes (2026-07-20)
+
+Model decision, full-stack: a **computer (daemon node) is infrastructure for agents** — it hosts them; an employee can have several computers and several agents; and **agents on the same computer collaborate through the shared node workspace root**, each keeping a private home (`agents/agent-<b64>/`) for personal state. Runs now intentionally execute at the shared root (they already did de facto — the daemon's `runAsAgent` cd wins over the exec cwd), the agent prompt gains a `[Workspace]` prelude naming its private directory, generated-file scanning covers the shared root while excluding sibling homes (a concurrent sibling's private output is never cross-attributed; root-level files are shared-attribution, bounded by the per-run mtime/bytes diff), and routing prefers co-locating a multi-agent run on the already-selected computer.
+
+**Shipped (web):**
+
+- **Fleet cards/rows lead with hosted agents.** `NodeCard`/`NodeRow` show the logical agents placed on the computer (name + vendor mark + status dot, via new `lib/nodeAgents.ts`); executor readiness chips demoted to a secondary "Runtimes" line (`.adm-agents--runtimes`, 82% opacity). Rows fall back to runtime chips when no agents are placed.
+- **Workspace page splits Shared / Personal.** The Files tab gains a scope toggle (`workspace-scope-toggle`): "Personal home" (existing behavior incl. snapshot fallback) vs "Shared workspace" (live-only via `scope=shared`; a 503 renders "the computer is offline" instead of a raw error — the shared root has no snapshot history).
+- **`primaryNode` removed** from the workspace brief (backend + types) — the employee-level "primary computer" was the last primary/secondary vestige.
+- New admin `/cp/daemon-nodes/{id}/workspace/*` shared-browse endpoints + `api.ts` fetchers land with this change; an admin-side browser drawer is a follow-up (admins can already browse any agent's shared scope from the agent page).
+- i18n: `workspace.scope_*`, `workspace.shared_unavailable`, `admin.v2.node_hosted_agents(_empty)`, `admin.v2.node_runtimes` in en / zh-CN / zh-TW.
+
+**Verify:** backend pytest suite green (routing co-location, multi-computer scheduling, shared-scope + node workspace APIs); relay-core 81 / relay-daemon 45 / web 239 node-test pass; web tsc + stylelint clean. Manual: two agents on one computer see each other's files at the root; the workspace Files tab toggles Personal/Shared; fleet cards list hosted agents.
+
+### One agent = one computer (2026-07-21)
+
+Model correction from the user: an agent belongs to **exactly one computer**, and a computer hosts **many** agents (one-to-many, not many-to-many). This reverses the earlier multi-placement direction — the shared-workspace collaboration story is now purely *within* a computer (its team of agents share the root).
+
+**Shipped:**
+
+- **Placement invariant** (`agent_placement_store.create_placement`): an agent has at most one active placement; assigning a different computer **moves** it (supersedes the prior placement). Same-computer re-assign still rejects.
+- **Per-computer compatibility agents** (`ensure_compatibility_agent` keyed `employee:node:executor`): each computer materializes its own auto-agents — previously one per-employee agent got placed on every matching computer, the one path that made an agent span computers.
+- **Roster shows one computer.** `AgentsPage` drops the "N/M ready" count and the badge *list*; each agent shows a single `AgentPlacementBadge` (or "Not placed"). The badge gained a status tone dot (`--tone` on the dot, name stays identity-colored) — resolving the earlier "count implies health the badges don't show" gap, now that there's exactly one.
+- Routing co-location preference removed (dead once an agent has ≤1 placement); `placementStatusTone` consolidated into `lib/agentPlacements` (shared by roster badge, PlacementList, fleet hosted-agent chips).
+
+**Pre-invariant data** is healed by `reconcile_single_active_placement` (agent_placement_store.py), run in `create_app` at startup: it collapses any agent holding 2+ active placements to its top-priority one (idempotent, tolerant of a not-yet-migrated DB). Covers file and DB stores at boot, so no separate Alembic migration was needed.
+
+**Verify:** backend pytest 323 pass (placement move, per-computer compat agents, two-agents-one-computer routing); web 245 + core suites pass; web tsc + stylelint clean.

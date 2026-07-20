@@ -269,38 +269,40 @@ def test_agent_placements_describe_managed_and_local_runtime_nodes(monkeypatch) 
                 "status": "ready",
             },
         ).status_code == 200
-        agent = client.post(
+        # One agent lives on one computer, so a managed and a local runtime are
+        # described through two agents — one placed on each.
+        managed_agent = client.post(
             "/cp/employees/alice/agents",
-            json={"displayName": "Builder", "executorKind": "codex"},
+            json={"displayName": "Managed Builder", "executorKind": "codex"},
+        ).json()["agent"]
+        local_agent = client.post(
+            "/cp/employees/alice/agents",
+            json={"displayName": "Local Builder", "executorKind": "codex"},
         ).json()["agent"]
         assert client.post(
-            f"/cp/agents/{agent['id']}/placements",
+            f"/cp/agents/{managed_agent['id']}/placements",
             json={"daemonNodeId": enrolled["sandboxId"], "priority": 100},
         ).status_code == 201
         assert client.post(
-            f"/cp/agents/{agent['id']}/placements",
+            f"/cp/agents/{local_agent['id']}/placements",
             json={"daemonNodeId": "node_local", "priority": 200},
         ).status_code == 201
 
-        listed = next(
-            item
+        listed = {
+            item["id"]: item
             for item in client.get(
                 "/cp/agents?supervisorEmployeeId=alice"
             ).json()["agents"]
-            if item["id"] == agent["id"]
-        )
-        placements = {
-            item["daemonNodeId"]: item for item in listed["placements"]
         }
+        managed_placement = listed[managed_agent["id"]]["placements"][0]
+        local_placement = listed[local_agent["id"]]["placements"][0]
 
-        assert placements[enrolled["sandboxId"]]["nodeDisplayName"] == (
-            "Alice managed node"
-        )
-        assert placements[enrolled["sandboxId"]]["nodeOwnership"] == "managed"
-        assert placements[enrolled["sandboxId"]]["nodeSandboxMode"] == "boxlite"
-        assert placements["node_local"]["nodeDisplayName"] == "node_local"
-        assert placements["node_local"]["nodeOwnership"] == "user-run"
-        assert placements["node_local"]["nodeSandboxMode"] == "none"
+        assert managed_placement["nodeDisplayName"] == "Alice managed node"
+        assert managed_placement["nodeOwnership"] == "managed"
+        assert managed_placement["nodeSandboxMode"] == "boxlite"
+        assert local_placement["nodeDisplayName"] == "node_local"
+        assert local_placement["nodeOwnership"] == "user-run"
+        assert local_placement["nodeSandboxMode"] == "none"
 
 
 def test_employee_dispatches_work_by_logical_agent_id(monkeypatch) -> None:
@@ -440,6 +442,137 @@ def test_existing_session_dispatch_normalizes_legacy_agent_supervisor(monkeypatc
         assert response.status_code == 202, response.text
 
 
+def test_logical_agent_handoff_records_the_target_agent_id(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        assert client.post(
+            "/cp/employees",
+            json={
+                "employeeId": "alice",
+                "username": "alice",
+                "password": "userpass",
+            },
+        ).status_code == 201
+        app.state.registry.register(
+            {
+                "sandboxId": "node_a",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }
+        )
+        builder = app.state.agent_store.create_agent(
+            "alice", {"displayName": "Builder", "executorKind": "codex"}
+        )
+        reviewer = app.state.agent_store.create_agent(
+            "alice", {"displayName": "Reviewer", "executorKind": "codex"}
+        )
+        for agent in (builder, reviewer):
+            app.state.agent_placement_store.create_placement(agent, "node_a")
+        session = app.state.session_store.create_session(
+            {
+                "workspacePath": "/workspace/alice",
+                "ownerEmployeeId": "alice",
+                "taskGoal": "Build the feature",
+                "participants": ["human", "codex"],
+            }
+        )
+
+        response = client.post(
+            "/agent-runs",
+            json={
+                "taskGoal": session["taskGoal"],
+                "sessionId": session["id"],
+                "assignments": [{"agentId": reviewer["id"], "mode": "review"}],
+                "decision": {"kind": "handoff", "targetAgent": "codex"},
+            },
+        )
+
+        assert response.status_code == 202, response.text
+        assert response.json()["decisions"][-1]["targetAgentId"] == reviewer["id"]
+
+
+def test_employee_dispatches_a_team_across_shared_workspace_nodes(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        assert client.post(
+            "/cp/employees",
+            json={
+                "employeeId": "alice",
+                "username": "alice",
+                "password": "userpass",
+            },
+        ).status_code == 201
+        for node_id, executor in (("node_a", "claude"), ("node_b", "codex")):
+            app.state.registry.register(
+                {
+                    "sandboxId": node_id,
+                    "employeeId": "alice",
+                    "token": f"token_{node_id}",
+                    "workspacePath": "/workspace/shared",
+                    "workspaceId": "workspace:alice:shared",
+                    "protocolVersion": 1,
+                    "supportedAgents": [executor],
+                    "maxConcurrentRuns": 2,
+                    "runCapacityByMode": {"ask": 2},
+                    "status": "ready",
+                }
+            )
+        planner = app.state.agent_store.create_agent(
+            "alice", {"displayName": "Planner", "executorKind": "claude"}
+        )
+        builder = app.state.agent_store.create_agent(
+            "alice", {"displayName": "Builder", "executorKind": "codex"}
+        )
+        for agent, node_id in ((planner, "node_a"), (builder, "node_b")):
+            app.state.agent_placement_store.create_placement(
+                agent,
+                node_id,
+                {"workspacePolicy": {"kind": "shared-path"}},
+            )
+        assert client.post("/auth/logout").status_code == 200
+        assert client.post(
+            "/auth/login", json={"username": "alice", "password": "userpass"}
+        ).status_code == 200
+
+        seeded = client.post(
+            "/agent-runs",
+            json={
+                "taskGoal": "Research the feature",
+                "assignments": [{"agentId": planner["id"], "mode": "ask"}],
+            },
+        )
+        assert seeded.status_code == 202, seeded.text
+
+        response = client.post(
+            "/agent-runs",
+            json={
+                "taskGoal": "Plan and build the feature",
+                "assignments": [
+                    {"agentId": planner["id"], "mode": "ask"},
+                    {"agentId": builder["id"], "mode": "action"},
+                ],
+            },
+        )
+
+        assert response.status_code == 202, response.text
+        queued = next(
+            item
+            for item in app.state.daemon_store.take_queued_commands("node_a")
+            if item["command"]["sessionId"] == response.json()["id"]
+        )
+        assert queued["command"]["logicalAgentId"] == planner["id"]
+
+
 def test_employee_cannot_list_or_dispatch_another_employees_agent(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
@@ -541,7 +674,7 @@ def test_legacy_run_materializes_compatibility_agent_without_get_side_effects(
         assert response.status_code == 202
         [agent] = client.get("/agents").json()["agents"]
         assert agent["executorKind"] == "codex"
-        assert agent["compatibilityKey"] == "alice:codex"
+        assert agent["compatibilityKey"] == "alice:node_a:codex"
         assert agent["placements"][0]["daemonNodeId"] == "node_a"
         assert response.json()["agentRuns"][0]["logicalAgentId"] == agent["id"]
 

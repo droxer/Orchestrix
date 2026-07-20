@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 interface KpiTileProps {
   eyebrow: string;
@@ -46,6 +47,7 @@ export function KpiTile({ eyebrow, value, hero, enterIndex = 0, slot, delta, hin
 }
 
 function Sparkline({ values }: { values: number[] }) {
+  const { t } = useTranslation();
   const width = 96;
   const height = 24;
   const max = Math.max(...values, 1);
@@ -56,14 +58,24 @@ function Sparkline({ values }: { values: number[] }) {
     return { x, y };
   });
   return (
-    <svg
-      className="adm-dash-spark"
-      width={width}
-      height={height}
-      viewBox={`0 0 ${width} ${height}`}
-      aria-hidden="true"
-    >
-      <polyline fill="none" stroke="currentColor" strokeWidth={1.25} points={points.map((p) => `${p.x},${p.y}`).join(" ")} />
-    </svg>
+    <>
+      <svg
+        className="adm-dash-spark"
+        width={width}
+        height={height}
+        viewBox={`0 0 ${width} ${height}`}
+        aria-hidden="true"
+      >
+        <polyline fill="none" stroke="currentColor" strokeWidth={1.25} points={points.map((p) => `${p.x},${p.y}`).join(" ")} />
+      </svg>
+      {/* Sparkline is aria-hidden; expose its shape as text for screen readers. */}
+      <span className="sr-only">
+        {t("admin.v2.dash_spark_summary", {
+          min: Math.min(...values),
+          max: Math.max(...values),
+          latest: values[values.length - 1],
+        })}
+      </span>
+    </>
   );
 }

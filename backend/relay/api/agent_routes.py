@@ -273,12 +273,6 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
             placement_store=ctx.agent_placement_store,
             daemon_nodes=ctx.registry.monitor_nodes(),
         )
-        dispatch_nodes = {assignment["daemonNodeId"] for assignment in resolved}
-        if len(dispatch_nodes) != 1:
-            raise AgentRoutingError(
-                "distributed_run_unsupported",
-                "One run cannot span multiple runtime nodes yet. Place the selected agents on a shared node.",
-            )
         parsed: dict[str, Any] = {
             "taskGoal": task_goal,
             "assignments": resolved,
@@ -304,9 +298,16 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
                 raise HTTPException(
                     400, "decision requires rerun or handoff and targetAgent."
                 )
+            target_assignment = resolved[0]
+            if target_agent != target_assignment["executorKind"]:
+                raise HTTPException(400, "decision targetAgent does not match assignment.")
+            requested_target_id = decision.get("targetAgentId")
+            if requested_target_id and requested_target_id != target_assignment["agentId"]:
+                raise HTTPException(400, "decision targetAgentId does not match assignment.")
             parsed["decision"] = {
                 "kind": kind,
-                "targetAgent": target_agent,
+                "targetAgent": target_assignment["executorKind"],
+                "targetAgentId": target_assignment["agentId"],
                 **(
                     {"note": decision["note"]}
                     if isinstance(decision.get("note"), str)

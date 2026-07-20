@@ -1,8 +1,9 @@
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import type { AgentName, EmployeeAgent, RelaySession } from "../types";
-import { NavConversations, NavRefresh, StreamAttachment } from "./icons";
+import { NavConversations } from "./icons";
 import { AgentMark } from "./AgentMark";
+import { ArtifactNavButton } from "./ArtifactNavButton";
 import { Badge } from "@/components/ui/badge";
 import {
   conversationActivity,
@@ -39,7 +40,7 @@ export function ChatHeader({ activeAgent, logicalAgents, activeLogicalAgentId, o
   onBackToThreads: () => void;
 }) {
   const { t, i18n } = useTranslation();
-  const numberFormat = new Intl.NumberFormat(i18n.language || undefined);
+  const numberFormat = useMemo(() => new Intl.NumberFormat(i18n.language || undefined), [i18n.language]);
   const tabsRef = useRef<HTMLDivElement>(null);
   const tokenUsage = activeSession?.tokenUsage;
   const tokenUsageTitle = tokenUsage
@@ -97,7 +98,7 @@ export function ChatHeader({ activeAgent, logicalAgents, activeLogicalAgentId, o
         </div>
       </div>
       <div className="chat-tools">
-        <div className="chat-active-agent" aria-label={t("thread.talk_to_agent")}>
+        <div className="chat-active-agent" role="group" aria-label={t("thread.talk_to_agent")}>
           <AgentMark agent={activeAgent} size={16} className="chat-active-agent-mark" />
           <span className="mono" translate="no">{activeLogicalAgent?.displayName ?? activeAgent}</span>
         </div>
@@ -106,6 +107,10 @@ export function ChatHeader({ activeAgent, logicalAgents, activeLogicalAgentId, o
             const isRoutable = isLogicalAgentRoutable(logicalAgent.availability);
             const isBusy = logicalAgent.availability === "busy";
             const isActive = logicalAgent.id === activeLogicalAgentId;
+            // Non-routable agents stay focusable (aria-disabled, not removed
+            // from the tab order) and carry the reason as sr-only text so
+            // keyboard/AT users can learn why the agent is unavailable.
+            const unavailableLabel = !isRoutable ? `${logicalAgent.displayName}: ${logicalAgent.availability}` : undefined;
             return (
               <Button variant="ghost"
                 key={logicalAgent.id}
@@ -116,13 +121,13 @@ export function ChatHeader({ activeAgent, logicalAgents, activeLogicalAgentId, o
                 data-availability={logicalAgent.availability}
                 aria-checked={isActive}
                 aria-disabled={!isRoutable || undefined}
-                tabIndex={isActive ? 0 : -1}
+                tabIndex={isActive || !isRoutable ? 0 : -1}
                 className={[
                   isActive ? "active" : "",
                   !isRoutable ? "agent-tab-disabled" : "",
                   isBusy && isRoutable ? "agent-tab-busy" : "",
                 ].filter(Boolean).join(" ")}
-                title={!isRoutable ? `${logicalAgent.displayName}: ${logicalAgent.availability}` : undefined}
+                title={unavailableLabel}
                 onClick={() => { if (isRoutable) onLogicalAgentPicked(logicalAgent); }}
                 onKeyDown={(event) => {
                   if (event.key === "ArrowRight" || event.key === "ArrowDown") {
@@ -136,29 +141,20 @@ export function ChatHeader({ activeAgent, logicalAgents, activeLogicalAgentId, o
               >
                 <AgentMark agent={logicalAgent.executorKind} size={16} className="header-agent-tab-mark" />
                 <span translate="no">{logicalAgent.displayName}</span>
+                {unavailableLabel ? <span className="sr-only">{unavailableLabel}</span> : null}
                 {isBusy && isRoutable ? <span className="header-agent-busy-pip" aria-hidden="true" /> : null}
               </Button>
             );
           }) : <span className="text-muted-foreground">{t("thread.no_agents")}</span>}
         </div>
-        <Button variant="ghost"
-          className="icon-button chat-artifacts-button"
-          type="button"
-          aria-label={t("artifact.open_drawer")}
-          title={t("artifact.open_drawer")}
-          disabled={!activeSession}
-          onClick={onOpenArtifacts}
-        >
-          <StreamAttachment size={16} />
-          {artifactCount > 0 ? (
-            <span className="chat-artifacts-count mono" aria-label={t("artifact.drawer_subtitle", { count: artifactCount })}>
-              {artifactCount}
-            </span>
-          ) : null}
-        </Button>
-        <Button variant="ghost" className="icon-button" type="button" aria-label={t("nav.refresh")} title={t("nav.refresh")} onClick={onRefresh}>
-          <NavRefresh size={16} className={isRefreshing ? "spin" : ""} />
-        </Button>
+        <ArtifactNavButton
+          artifactCount={artifactCount}
+          hasSession={Boolean(activeSession)}
+          isRefreshing={isRefreshing}
+          onOpenArtifacts={onOpenArtifacts}
+          onRefresh={onRefresh}
+          artifactsClassName="icon-button chat-artifacts-button"
+        />
       </div>
     </header>
   );

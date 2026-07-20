@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useId, useMemo, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { ActionAdd, ActionApprove, AdminInbox } from "../icons";
 import { assignControlPanelDaemonNode, createControlPanelDaemonNode, createManagedNode } from "../../api";
@@ -15,6 +15,7 @@ import { ExecutionProfileField, type DaemonSandboxMode } from "./ExecutionProfil
 import { initialsOf, statusTone, visualStatus } from "./helpers";
 import { Button } from "@/components/ui/button";
 import { NodeProfileBadges } from "./NodeProfileBadges";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import {
   Select,
   SelectContent,
@@ -43,6 +44,7 @@ export function AssignNodeDrawer({
   onCreateNodeSuccess,
 }: AssignNodeDrawerProps) {
   const { t } = useTranslation();
+  const employeeLabelId = useId();
   const [employeeId, setEmployeeId] = useState("");
   const [nodeId, setNodeId] = useState("");
   const [createNew, setCreateNew] = useState(false);
@@ -120,13 +122,18 @@ export function AssignNodeDrawer({
     : employeeId
       ? `@${employeeId.replace(/^@/, "")}`
       : "";
+  const hasUnsavedChanges = createNew || Boolean(nodeId) || employeeId !== (defaultEmployeeId ?? "");
+  const confirmDiscardChanges = useUnsavedChangesGuard(open && hasUnsavedChanges && !isBusy);
+
+  async function requestClose() {
+    if (isBusy) return;
+    if (await confirmDiscardChanges()) onClose();
+  }
 
   return (
     <Drawer
       open={open}
-      onClose={() => {
-        if (!isBusy) onClose();
-      }}
+      onClose={() => { void requestClose(); }}
       title={t("admin.v2.assign_title")}
       subtitle={t("admin.v2.assign_sub")}
       width={520}
@@ -163,14 +170,14 @@ export function AssignNodeDrawer({
           </section>
         ) : (
           <section className="adm-assign-picker" aria-label={t("admin.employee")}>
-            <label className="adm-field">
-              <span>{t("admin.employee")}</span>
+            <div className="adm-field">
+              <span id={employeeLabelId}>{t("admin.employee")}</span>
               <Select
                 value={employeeId || undefined}
                 onValueChange={(value) => setEmployeeId(value ?? "")}
                 disabled={employees.length === 0}
               >
-                <SelectTrigger className="w-full mono">
+                <SelectTrigger className="w-full mono" aria-labelledby={employeeLabelId}>
                   <SelectValue
                     placeholder={
                       employees.length === 0
@@ -190,7 +197,7 @@ export function AssignNodeDrawer({
                   ))}
                 </SelectContent>
               </Select>
-            </label>
+            </div>
           </section>
         )}
 
@@ -207,7 +214,6 @@ export function AssignNodeDrawer({
           {hasNodes ? (
             <ul
               className="adm-assign-node-list"
-              role="radiogroup"
               aria-label={t("admin.assign_node")}
             >
               {unassignedNodes.map((node) => {
@@ -234,11 +240,11 @@ export function AssignNodeDrawer({
                           aria-hidden="true"
                         />
                         <span className="adm-assign-node-body">
-                          <span className="adm-assign-node-id mono">
+                          <span className="adm-assign-node-id mono" translate="no">
                             {node.displayName || node.id}
                           </span>
                           {node.workspacePath ? (
-                            <span className="adm-assign-node-path mono">
+                            <span className="adm-assign-node-path mono" translate="no">
                               {node.workspacePath}
                             </span>
                           ) : (
@@ -337,7 +343,7 @@ export function AssignNodeDrawer({
           <Button
             type="button"
             variant="ghost"
-            onClick={onClose}
+            onClick={() => void requestClose()}
             disabled={isBusy}
           >
             {t("admin.v2.cancel")}

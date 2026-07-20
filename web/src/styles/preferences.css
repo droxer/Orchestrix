@@ -17,7 +17,7 @@
 .pref-modal {
   position: relative;
   width: min(640px, 100%);
-  height: min(440px, 90vh);
+  height: min(440px, 90dvh);
   display: flex;
   flex-direction: column;
   background: var(--surface-3);

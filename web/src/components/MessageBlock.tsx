@@ -30,6 +30,14 @@ function formatTime(value: string): string {
   }).format(date);
 }
 
+// A malformed timestamp formats to "", so render no <time> at all rather than
+// an empty element with a bogus dateTime.
+function MsgTime({ value }: { value: string }) {
+  const formatted = formatTime(value);
+  if (!formatted) return null;
+  return <time className="msg-time mono" dateTime={value}>{formatted}</time>;
+}
+
 function formatArtifactSize(bytes: number | undefined, t: TFunction): string {
   if (typeof bytes !== "number" || Number.isNaN(bytes)) return t("artifact.size_unknown");
   const units = [
@@ -108,6 +116,7 @@ function ArtifactChip({ artifact, sessionId, allArtifacts, onOpenArtifact }: { a
   const body = useArtifactBody(sessionId, artifact.id, { enabled: shouldLoadBody });
   const stat = shouldLoadBody && body.isSuccess ? summarizeArtifact(artifact.kind, body.data ?? "") : null;
   const kindLabel = t(`artifact.kind.${artifact.kind}`, { defaultValue: artifact.kind });
+  const createdTime = formatTime(artifact.createdAt);
 
   return (
     <article className="artifact-chip" data-kind={artifact.kind}>
@@ -132,7 +141,7 @@ function ArtifactChip({ artifact, sessionId, allArtifacts, onOpenArtifact }: { a
               <span className="artifact-stat tone-neutral">{formatArtifactSize(artifact.bytes, t)}</span>
             )}
             <span aria-hidden="true">·</span>
-            <time dateTime={artifact.createdAt}>{formatTime(artifact.createdAt)}</time>
+            {createdTime ? <time dateTime={artifact.createdAt}>{createdTime}</time> : null}
           </span>
           <strong>{artifact.title}</strong>
         </span>
@@ -171,7 +180,7 @@ export function MessageBlock({
         <div className="turn-body">
           <p className="user-text">{message.text}</p>
         </div>
-        <time className="msg-time mono" dateTime={message.timestamp}>{formatTime(message.timestamp)}</time>
+        <MsgTime value={message.timestamp} />
       </article>
     );
   }
@@ -181,6 +190,7 @@ export function MessageBlock({
     return (
       <article
         className={`msg msg-agent ${message.streaming ? "streaming" : ""} ${grouped ? "grouped" : ""}`}
+        aria-label={t("message.agent_header", { employee: agentName })}
       >
         <span className="rail-node rail-node-agent" aria-hidden="true">
           <AgentMark agent={message.agent} size={12} />
@@ -191,7 +201,7 @@ export function MessageBlock({
               {agentName}
             </span>
             {message.streaming ? (
-              <span className="agent-live-pulse" aria-label={t("agent_stream.empty_working")} />
+              <span className="agent-live-pulse" role="status" aria-label={t("agent_stream.empty_working")} />
             ) : null}
           </header>
           <AgentStream
@@ -218,7 +228,7 @@ export function MessageBlock({
             onRetry={onRetryAgent}
           />
         </div>
-        <time className="msg-time mono" dateTime={message.timestamp}>{formatTime(message.timestamp)}</time>
+        <MsgTime value={message.timestamp} />
       </article>
     );
   }
@@ -233,7 +243,7 @@ export function MessageBlock({
         <div className="msg-system-body">
           <ArtifactCard artifact={message.artifact} sessionId={sessionId} onOpenArtifact={onOpenArtifact} />
         </div>
-        <time className="msg-time mono" dateTime={message.timestamp}>{formatTime(message.timestamp)}</time>
+        <MsgTime value={message.timestamp} />
       </div>
     );
   }
@@ -249,7 +259,7 @@ export function MessageBlock({
           <span className="msg-system-detail">{message.detail}</span>
         ) : null}
       </div>
-      <time className="msg-time mono" dateTime={message.timestamp}>{formatTime(message.timestamp)}</time>
+      <MsgTime value={message.timestamp} />
     </div>
   );
 }

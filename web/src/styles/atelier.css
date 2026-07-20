@@ -122,7 +122,7 @@ body {
 
 .sidenav-brand-row { margin-bottom: var(--sp-4); }
 .sidenav-brand { color: var(--ink-1); }
-.sidenav-btn { width: 44px; height: 44px; border-radius: var(--r-3); color: var(--ink-3); }
+.sidenav-btn { width: var(--touch-target); height: var(--touch-target); border-radius: var(--r-3); color: var(--ink-3); }
 .sidenav-btn:hover { background: var(--surface-3); border-color: transparent; color: var(--ink-1); }
 .sidenav-btn.active,
 .sidenav-btn.active:hover {
@@ -160,7 +160,7 @@ body {
 .transcript { background: transparent; }
 .transcript-inner { width: min(100%, 960px); padding: var(--sp-7) var(--sp-6) var(--sp-8); gap: var(--sp-5); }
 .transcript-inner:not(:has(.transcript-empty)) { background: none; }
-.transcript-inner:not(:has(.transcript-empty))::before { left: calc(var(--sp-6) + 9px); opacity: 0.35; background: var(--line-1); }
+.transcript-inner:not(:has(.transcript-empty))::before { left: calc(var(--sp-6) + var(--sp-2)); opacity: 0.35; background: var(--line-1); }
 .transcript-inner:has(.transcript-empty) {
   margin: 0 auto;
   min-height: 100%;

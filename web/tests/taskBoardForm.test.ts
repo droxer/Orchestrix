@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   emptyBacklogForm,
   emptyRoutineForm,
+  nextRoutineRunDate,
   taskBoardFormsEqual,
   type BacklogTaskFormState,
   type RoutineTaskFormState,
@@ -22,9 +23,17 @@ describe("taskBoardForm", () => {
   it("detects equal routine forms", () => {
     const a = emptyRoutineForm(user, new Date(2026, 6, 7, 9));
     const b: RoutineTaskFormState = { ...a, routineEnabled: false };
-    assert.equal(a.routineNextRunDate, "2026-07-07");
+    assert.equal(a.routineNextRunDate, "2026-07-14");
     assert.equal(taskBoardFormsEqual(a, a), true);
     assert.equal(taskBoardFormsEqual(a, b), false);
+  });
+
+  it("calculates the next run from cadence", () => {
+    const today = new Date(2026, 0, 31, 9);
+    assert.equal(nextRoutineRunDate("daily", today), "2026-02-01");
+    assert.equal(nextRoutineRunDate("weekly", today), "2026-02-07");
+    assert.equal(nextRoutineRunDate("monthly", today), "2026-02-28");
+    assert.equal(nextRoutineRunDate("custom", today), "");
   });
 
   it("rejects mixed variants", () => {

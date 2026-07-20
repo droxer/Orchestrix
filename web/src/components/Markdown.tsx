@@ -35,6 +35,11 @@ const MARKDOWN_COMPONENTS: Components = {
       {children}
     </a>
   ),
+  // Intrinsic dimensions of markdown images are unknown, so no width/height
+  // hints — just lazy-load them instead of blocking on the transcript render.
+  img: ({ src, alt, ...rest }) => (
+    <img src={src} alt={alt ?? ""} loading="lazy" decoding="async" {...rest} />
+  ),
 };
 
 /**

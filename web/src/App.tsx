@@ -70,7 +70,7 @@ function useStableEvent<TArgs extends unknown[], TResult>(handler: (...args: TAr
 
 export function App() {
   const { t, i18n } = useTranslation();
-  const { prompt } = useDialogs();
+  const { prompt, confirm } = useDialogs();
   const { reportMutationError } = useMutationError();
   const {
     renameSessionMutation,
@@ -425,6 +425,14 @@ export function App() {
   }
 
   async function closeConversation(sessionId: string) {
+    const session = myConversations.find((s) => s.id === sessionId);
+    const label = session ? (session.title?.trim() || session.taskGoal) : sessionId;
+    const ok = await confirm({
+      title: t("conversation.close_confirm", { name: label }),
+      confirmLabel: t("conversation.close"),
+      tone: "danger",
+    });
+    if (!ok) return;
     try {
       await archiveSessionMutation.mutateAsync({ sessionId, token: selectedToken });
       if (activeSession?.id === sessionId) {
@@ -630,7 +638,12 @@ export function App() {
           taskGoal: activeSession.taskGoal,
           assignments: [{ agentId: logicalAgent.id, mode: handoffMode }],
           sessionId: activeSession.id,
-          decision: { kind: "handoff", targetAgent: logicalAgent.executorKind, ...(note ? { note } : {}) },
+          decision: {
+            kind: "handoff",
+            targetAgent: logicalAgent.executorKind,
+            targetAgentId: logicalAgent.id,
+            ...(note ? { note } : {}),
+          },
         });
       setSelectedSessionId(done.id); setHandoffNote(""); setHandoffMode("action"); setHandoffOpen(false); setActiveAgent(logicalAgent.executorKind); setActiveLogicalAgentId(logicalAgent.id);
       syncChatHash(done.id, true);
@@ -659,7 +672,7 @@ export function App() {
   if (!mounted || !authChecked) {
     return (
       <main className="login-checking" aria-busy="true">
-        <p className="login-checking-text" suppressHydrationWarning>
+        <p className="login-checking-text">
           {mounted ? t("login.checking") : "Checking authentication…"}
         </p>
       </main>

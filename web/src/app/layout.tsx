@@ -65,12 +65,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <head>
         {/* Set data-theme before first paint so dark/system users never
             flash the light canvas. Mirrors applyTheme() in appStorage.ts:
-            dark is the default/primary theme; "system" resolves via
-            matchMedia, otherwise honor the pin. */}
+            "system" is the default and resolves via matchMedia, otherwise
+            honor the pin. */}
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "(function(){try{var t=localStorage.getItem('relay-web.theme')||'dark';if(t==='contrast'||t==='contrast-dark'){t='system';localStorage.setItem('relay-web.theme','system');}var d=matchMedia('(prefers-color-scheme: dark)').matches;var dk=t==='dark'||(t!=='light'&&d);var r=dk?'dark':'light';document.documentElement.setAttribute('data-theme',r);document.documentElement.classList.toggle('dark',dk);var c={light:'#f7f8f9',dark:'#101214'}[r]||'#101214';var m=document.querySelector('meta[name=\"theme-color\"][data-relay-theme-color]');if(!m){m=document.createElement('meta');m.setAttribute('name','theme-color');m.setAttribute('data-relay-theme-color','');document.head.appendChild(m);}m.removeAttribute('media');m.setAttribute('content',c);}catch(e){}})();",
+              "(function(){try{var t=localStorage.getItem('relay-web.theme')||'system';if(t==='contrast'||t==='contrast-dark'){t='system';localStorage.setItem('relay-web.theme','system');}var d=matchMedia('(prefers-color-scheme: dark)').matches;var dk=t==='dark'||(t!=='light'&&d);var r=dk?'dark':'light';document.documentElement.setAttribute('data-theme',r);document.documentElement.classList.toggle('dark',dk);var c={light:'#f7f8f9',dark:'#101214'}[r]||'#101214';var m=document.querySelector('meta[name=\"theme-color\"][data-relay-theme-color]');if(!m){m=document.createElement('meta');m.setAttribute('name','theme-color');m.setAttribute('data-relay-theme-color','');document.head.appendChild(m);}m.removeAttribute('media');m.setAttribute('content',c);}catch(e){}})();",
           }}
         />
       </head>

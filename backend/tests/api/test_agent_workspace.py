@@ -83,6 +83,49 @@ def test_live_workspace_listing_uses_the_selected_placement(monkeypatch, tmp_pat
     assert response.json()["entries"][0]["name"] == "report.md"
 
 
+def test_shared_scope_lists_the_node_workspace_root(monkeypatch, tmp_path):
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    app = create_app(tmp_path)
+    client = TestClient(app)
+    _bootstrap(client)
+    agent = _agent(client)
+    app.state.registry.register({"sandboxId": "node_1", "employeeId": "alice", "token": "node_token", "protocolVersion": 1, "supportedAgents": ["codex"], "capabilities": ["workspace-read", "workspace-read-shared"], "status": "ready"})
+    app.state.agent_placement_store.create_placement(agent, "node_1", {})
+
+    async def listing(_ctx, node, command):
+        assert node["id"] == "node_1"
+        assert command["type"] == "workspace.list"
+        assert command["scope"] == "shared"
+        return {"type": "workspace.listing", "path": "", "exists": True, "entries": [{"name": "shared.md", "path": "shared.md", "kind": "file", "bytes": 5, "updatedAt": "2026-07-19T00:00:00Z"}]}
+
+    monkeypatch.setattr("relay.api.agent_workspace_routes._dispatch", listing)
+    response = client.get(f"/agents/{agent['id']}/workspace/files?scope=shared")
+    assert response.status_code == 200, response.text
+    assert response.json()["source"] == "live"
+    assert response.json()["scope"] == "shared"
+    assert response.json()["entries"][0]["name"] == "shared.md"
+
+
+def test_shared_scope_has_no_snapshot_fallback(monkeypatch, tmp_path):
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    app = create_app(tmp_path)
+    client = TestClient(app)
+    _bootstrap(client)
+    agent = _agent(client)
+
+    # No live node at all: shared scope must not fall back to snapshots.
+    response = client.get(f"/agents/{agent['id']}/workspace/files?scope=shared")
+    assert response.status_code == 503
+    assert response.json()["detail"] == {"reason": "placement-unavailable"}
+
+    # A live node without the shared-read capability is equally unavailable.
+    app.state.registry.register({"sandboxId": "node_1", "employeeId": "alice", "token": "node_token", "protocolVersion": 1, "supportedAgents": ["codex"], "capabilities": ["workspace-read"], "status": "ready"})
+    app.state.agent_placement_store.create_placement(agent, "node_1", {})
+    response = client.get(f"/agents/{agent['id']}/workspace/files?scope=shared")
+    assert response.status_code == 503
+    assert response.json()["detail"] == {"reason": "placement-unavailable"}
+
+
 def test_agent_workspace_requires_supervisor_or_admin(monkeypatch, tmp_path):
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     app = create_app(tmp_path)

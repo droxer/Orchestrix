@@ -98,6 +98,16 @@ function withEnv<T>(env: NodeJS.ProcessEnv, fn: () => T): T {
   }
 }
 
+async function withEnvAsync<T>(env: NodeJS.ProcessEnv, fn: () => Promise<T>): Promise<T> {
+  const oldEnv = process.env;
+  process.env = { ...env };
+  try {
+    return await fn();
+  } finally {
+    process.env = oldEnv;
+  }
+}
+
 function runShellCommand(command: string, env: NodeJS.ProcessEnv = process.env) {
   const result = spawnSync("bash", ["-c", command], {
     cwd: env.RELAY_AGENT_WORKSPACE,
@@ -215,6 +225,35 @@ describe("prompts", () => {
 
     assert.match(prompt, /^\[Agent instructions\]\nAct as the employee's security reviewer\./);
     assert.match(prompt, /\[User\]\nImplement the endpoint$/);
+  });
+  it("describes the shared workspace and the agent's private home", () => {
+    const sharedWorkspaceState = state({
+      task_goal: "Draft the report",
+      agent_home_subdir: "agents/agent-YWdlbnRfMQ",
+    });
+
+    const prompt = claudeTaskPrompt(sharedWorkspaceState);
+
+    assert.match(prompt, /\[Workspace\]\n.*shared with the other agents on this computer/);
+    assert.match(prompt, /Your private directory is `agents\/agent-YWdlbnRfMQ\/`/);
+    assert.match(prompt, /\[User\]\nDraft the report$/);
+  });
+  it("omits the workspace prelude when no personal home is set", () => {
+    assert.doesNotMatch(claudeTaskPrompt(state({ task_goal: "Fix auth" })), /\[Workspace\]/);
+  });
+  it("runs agents at the shared workspace root", async () => {
+    const workspace = mkdtempSync(join(tmpdir(), "relay-shared-root-"));
+    const cwds: Array<string | undefined> = [];
+    await withEnvAsync({ ...process.env, RELAY_AGENT_WORKSPACE: workspace }, () =>
+      runAgentNode("claude", "action", state({ agent_home_subdir: "agents/agent-YWdlbnRfMQ" }), {
+        execStream: async (_command, _args, options) => {
+          cwds.push(options?.cwd);
+          return { exit_code: 0, stdout: "", stderr: "" };
+        },
+      }),
+    );
+
+    assert.deepEqual(cwds, [workspace]);
   });
   it("Claude action prompt carries the task goal", () => {
     const prompt = claudeTaskPrompt(state({ task_goal: "Fix auth" }));

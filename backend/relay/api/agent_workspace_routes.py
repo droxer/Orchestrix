@@ -35,6 +35,13 @@ def _authorized_agent(ctx: Any, request: Request, agent_id: str) -> dict[str, An
     return agent
 
 
+def _scope(request: Request) -> str:
+    raw = (request.query_params.get("scope") or "agent-home").strip()
+    if raw not in ("agent-home", "shared"):
+        raise HTTPException(400, "Workspace scope must be agent-home or shared.")
+    return raw
+
+
 def _path(raw: str | None, *, required: bool = False) -> str:
     requested = (raw or "").strip()
     if requested.startswith("/") or ".." in requested.split("/"):
@@ -64,31 +71,47 @@ def _workspace_error(event: dict[str, Any]) -> None:
     raise HTTPException(status, message)
 
 
+def _select_node(ctx: Any, agent: dict[str, Any], scope: str) -> dict[str, Any] | None:
+    capability = "workspace-read-shared" if scope == "shared" else "workspace-read"
+    return select_workspace_node(agent, ctx.agent_placement_store, ctx.registry.monitor_nodes(), capability=capability)
+
+
+def _scope_command(scope: str, agent_id: str) -> dict[str, Any]:
+    return {"agentId": agent_id, **({"scope": "shared"} if scope == "shared" else {})}
+
+
 @router.get("/agents/{agent_id}/workspace/files")
 async def agent_workspace_files(agent_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     agent = _authorized_agent(ctx, request, agent_id)
+    scope = _scope(request)
     path = _path(request.query_params.get("path"))
-    node = select_workspace_node(agent, ctx.agent_placement_store, ctx.registry.monitor_nodes())
+    node = _select_node(ctx, agent, scope)
     if node:
-        event = await _dispatch(ctx, node, {"id": new_relay_id("cmd"), "type": "workspace.list", "agentId": agent_id, "path": path})
+        event = await _dispatch(ctx, node, {"id": new_relay_id("cmd"), "type": "workspace.list", **_scope_command(scope, agent_id), "path": path})
         _workspace_error(event)
-        return {"agentId": agent_id, "source": "live", "nodeId": node["id"], "path": event.get("path", path), "exists": bool(event.get("exists")), "entries": event.get("entries") or [], "generatedAt": _timestamp()}
+        return {"agentId": agent_id, "scope": scope, "source": "live", "nodeId": node["id"], "path": event.get("path", path), "exists": bool(event.get("exists")), "entries": event.get("entries") or [], "generatedAt": _timestamp()}
+    if scope == "shared":
+        # The shared workspace only exists on a live computer; no snapshot fallback.
+        raise HTTPException(503, {"reason": "placement-unavailable"})
     artifacts = newest_agent_workspace_artifacts(ctx.session_store, agent_id)
-    return {"agentId": agent_id, "source": "snapshot", "path": path, "exists": True, "entries": snapshot_listing(artifacts, agent_id, path), "generatedAt": _timestamp()}
+    return {"agentId": agent_id, "scope": scope, "source": "snapshot", "path": path, "exists": True, "entries": snapshot_listing(artifacts, agent_id, path), "generatedAt": _timestamp()}
 
 
 @router.get("/agents/{agent_id}/workspace/file")
 async def agent_workspace_file(agent_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     agent = _authorized_agent(ctx, request, agent_id)
+    scope = _scope(request)
     path = _path(request.query_params.get("path"), required=True)
-    node = select_workspace_node(agent, ctx.agent_placement_store, ctx.registry.monitor_nodes())
+    node = _select_node(ctx, agent, scope)
     if node:
-        event = await _dispatch(ctx, node, {"id": new_relay_id("cmd"), "type": "workspace.read", "agentId": agent_id, "path": path})
+        event = await _dispatch(ctx, node, {"id": new_relay_id("cmd"), "type": "workspace.read", **_scope_command(scope, agent_id), "path": path})
         _workspace_error(event)
         raw = event.get("contentBase64")
         content = base64.b64decode(raw).decode("utf-8", errors="replace") if isinstance(raw, str) else None
-        return {"agentId": agent_id, "source": "live", "nodeId": node["id"], "path": event.get("path", path), "exists": True, "isBinary": bool(event.get("isBinary")), "bytes": event.get("bytes") or 0, "content": content, "truncated": bool(event.get("truncated")), "limitBytes": WORKSPACE_FILE_PREVIEW_LIMIT, "generatedAt": _timestamp()}
+        return {"agentId": agent_id, "scope": scope, "source": "live", "nodeId": node["id"], "path": event.get("path", path), "exists": True, "isBinary": bool(event.get("isBinary")), "bytes": event.get("bytes") or 0, "content": content, "truncated": bool(event.get("truncated")), "limitBytes": WORKSPACE_FILE_PREVIEW_LIMIT, "generatedAt": _timestamp()}
+    if scope == "shared":
+        raise HTTPException(503, {"reason": "placement-unavailable"})
     result = snapshot_file(ctx.session_store, newest_agent_workspace_artifacts(ctx.session_store, agent_id), agent_id, path)
     if result is None:
         raise HTTPException(404, "Workspace file path was not found.")
-    return {"agentId": agent_id, "source": "snapshot", "exists": True, **result, "limitBytes": WORKSPACE_FILE_PREVIEW_LIMIT, "generatedAt": _timestamp()}
+    return {"agentId": agent_id, "scope": scope, "source": "snapshot", "exists": True, **result, "limitBytes": WORKSPACE_FILE_PREVIEW_LIMIT, "generatedAt": _timestamp()}

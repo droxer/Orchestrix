@@ -378,10 +378,10 @@ def daemon_node_event(value: dict[str, Any]) -> dict[str, Any]:
     if event_type in {"workspace.listing", "workspace.file", "workspace.error"}:
         agent_id = string_field(value, "agentId")
         path = string_field(value, "path")
-        if not command_id or not agent_id:
-            raise ValueError("workspace event requires commandId and agentId.")
+        if not command_id:
+            raise ValueError("workspace event requires commandId.")
         lease_id = string_field(value, "leaseId")
-        common = {"type": event_type, "commandId": command_id, **({"leaseId": lease_id} if lease_id else {}), "agentId": agent_id, "path": path}
+        common = {"type": event_type, "commandId": command_id, **({"leaseId": lease_id} if lease_id else {}), **({"agentId": agent_id} if agent_id else {}), "path": path}
         if event_type == "workspace.listing":
             entries = value.get("entries")
             if not isinstance(value.get("exists"), bool) or not isinstance(entries, list):

@@ -155,7 +155,15 @@ class SessionController:
             }))
         return self.store.get_session(session_id)
 
-    def handoff_session(self, session_id: str, target_agent: str, assignments: list[dict[str, Any]], note: str | None = None) -> dict[str, Any]:
+    def handoff_session(
+        self,
+        session_id: str,
+        target_agent: str,
+        assignments: list[dict[str, Any]],
+        note: str | None = None,
+        target_agent_id: str | None = None,
+    ) -> dict[str, Any]:
+        self._validate_assignment(session_id)
         self._append(session_id, relay_event("human.decision", session_id, {
             "decision": {
                 "id": new_relay_id("dec"),
@@ -163,6 +171,7 @@ class SessionController:
                 "createdAt": now_iso(),
                 **({"note": note} if note else {}),
                 "targetAgent": target_agent,
+                **({"targetAgentId": target_agent_id} if target_agent_id else {}),
             }
         }))
         self.assign_session(session_id, assignments)
@@ -189,11 +198,7 @@ class SessionController:
         return session
 
     def assign_session(self, session_id: str, assignments: list[dict[str, Any]]) -> dict[str, Any]:
-        snapshot = self.store.get_session(session_id)
-        if snapshot.get("archived"):
-            raise SessionArchivedError(session_id)
-        if any(run.get("status") == "running" for run in snapshot.get("agentRuns", [])):
-            raise SessionRunInFlightError(session_id)
+        self._validate_assignment(session_id)
         self.create_artifact(session_id, {
             "kind": "plan",
             "title": "Assignment plan",
@@ -205,6 +210,13 @@ class SessionController:
             "status": "running",
             "phase": "assigned",
         }))
+
+    def _validate_assignment(self, session_id: str) -> None:
+        snapshot = self.store.get_session(session_id)
+        if snapshot.get("archived"):
+            raise SessionArchivedError(session_id)
+        if any(run.get("status") == "running" for run in snapshot.get("agentRuns", [])):
+            raise SessionRunInFlightError(session_id)
 
     def create_artifact(self, session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         if hasattr(self.store, "create_artifact"):

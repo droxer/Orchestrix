@@ -192,7 +192,6 @@ async def workspace_brief(request: Request, ctx: AppContextDep) -> dict[str, Any
         raise HTTPException(404, "Agent owner not found.")
 
     nodes = [node for node in ctx.registry.monitor_nodes() if node.get("employeeId") == employee_id]
-    primary_node = nodes[0] if nodes else None
     active_runs = [run for node in nodes for run in node.get("activeRuns", []) if not agent or run.get("currentLogicalAgentId") == agent["id"]]
 
     sessions = [session for session in ctx.session_store.list_sessions() if session.get("ownerEmployeeId") == employee_id and (not agent or session_uses_agent(session, agent["id"]))]
@@ -215,7 +214,6 @@ async def workspace_brief(request: Request, ctx: AppContextDep) -> dict[str, Any
     return {
         "employeeId": employee_id,
         **({"agentId": agent["id"]} if agent else {}),
-        "primaryNode": primary_node,
         "nodes": nodes,
         "activeRuns": sorted(active_runs, key=lambda item: item.get("startedAt") or "", reverse=True),
         "sessions": [session_brief_item(session) for session in recent_sessions],

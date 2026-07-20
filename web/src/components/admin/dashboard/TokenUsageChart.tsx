@@ -147,10 +147,17 @@ export function TokenUsageChart({ snapshot, compact, className }: TokenUsageChar
           });
         })}
       </svg>
-      <div className="adm-token-legend" aria-label={t("admin.v2.dash_tokens_legend")}>
-        <span><i className="adm-token-dot adm-token-dot--input" />{t("admin.v2.dash_tokens_input")}</span>
-        <span><i className="adm-token-dot adm-token-dot--output" />{t("admin.v2.dash_tokens_output")}</span>
-        <span><i className="adm-token-dot adm-token-dot--cache" />{t("admin.v2.dash_tokens_cache")}</span>
+      <ul className="sr-only">
+        {points.map((point) => (
+          <li key={point.date}>
+            {`${point.date}: ${t("admin.v2.dash_tokens_input")} ${numberFormat.format(point.input)}, ${t("admin.v2.dash_tokens_output")} ${numberFormat.format(point.output)}, ${t("admin.v2.dash_tokens_cache")} ${numberFormat.format(point.cache)}`}
+          </li>
+        ))}
+      </ul>
+      <div className="adm-token-legend" role="group" aria-label={t("admin.v2.dash_tokens_legend")}>
+        <span><i className="adm-token-dot adm-token-dot--input" aria-hidden="true" />{t("admin.v2.dash_tokens_input")}</span>
+        <span><i className="adm-token-dot adm-token-dot--output" aria-hidden="true" />{t("admin.v2.dash_tokens_output")}</span>
+        <span><i className="adm-token-dot adm-token-dot--cache" aria-hidden="true" />{t("admin.v2.dash_tokens_cache")}</span>
       </div>
     </section>
   );

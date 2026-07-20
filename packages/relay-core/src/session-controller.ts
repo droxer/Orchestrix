@@ -27,6 +27,7 @@ import { relayTaskEvent, type TaskStore } from "./task-store.js";
 
 export interface WorkflowStep {
   agent: AgentName;
+  agentId?: string;
   mode: AgentTaskMode;
   role?: AgentRole;
 }
@@ -168,12 +169,15 @@ export class SessionController implements AgentEventSink {
   }
 
   async handoffSession(sessionId: string, targetAgent: AgentName, assignments: WorkflowStep[] = [{ agent: targetAgent, mode: "action" }], note?: string): Promise<RelaySession> {
+    await this.validateAssignment(sessionId);
+    const targetAgentId = assignments[0]?.agentId;
     const decision = {
       id: newRelayId("dec"),
       kind: "handoff" as const,
       createdAt: new Date().toISOString(),
       note,
       targetAgent,
+      ...(targetAgentId ? { targetAgentId } : {}),
       ...(this.options.ownerEmployeeId ? { actorEmployeeId: this.options.ownerEmployeeId } : {}),
     };
     await this.append(sessionId, relayEvent("human.decision", sessionId, { decision }));
@@ -185,6 +189,7 @@ export class SessionController implements AgentEventSink {
   }
 
   async assignSession(sessionId: string, assignments: WorkflowStep[]): Promise<RelaySession> {
+    await this.validateAssignment(sessionId);
     const body = JSON.stringify({ assignments }, null, 2);
     await this.createArtifact(sessionId, {
       kind: "plan",
@@ -196,6 +201,14 @@ export class SessionController implements AgentEventSink {
       status: "running",
       phase: "assigned",
     }));
+  }
+
+  private async validateAssignment(sessionId: string): Promise<void> {
+    const session = await this.store.getSession(sessionId);
+    if (session.archived) throw new Error(`Session ${sessionId} is archived.`);
+    if (session.agentRuns.some((run) => run.status === "running")) {
+      throw new Error(`Session ${sessionId} already has a run in flight.`);
+    }
   }
 
   async createArtifact(
@@ -293,7 +306,7 @@ export class SessionController implements AgentEventSink {
   ): Promise<AgentState> {
     this.activeSessionId = sessionId;
     await this.linkTaskSession(sessionId);
-    const runState = await this.stateForRun(sessionId, state, step.agent);
+    const runState = await this.stateForRun(sessionId, state, step.agent, step.agentId);
     const runId = newRelayId("run");
     await this.append(sessionId, relayEvent("agent.started", sessionId, {
       runId,
@@ -444,7 +457,12 @@ export class SessionController implements AgentEventSink {
     await Promise.all([...this.pendingOutputWrites]);
   }
 
-  private async stateForRun(sessionId: string, state: AgentState, agent: AgentName): Promise<AgentState> {
+  private async stateForRun(
+    sessionId: string,
+    state: AgentState,
+    agent: AgentName,
+    agentId?: string,
+  ): Promise<AgentState> {
     const next: AgentState = { ...state };
     delete next.prior_agent_bridge;
     delete next.prior_conversation;
@@ -455,7 +473,7 @@ export class SessionController implements AgentEventSink {
     if (bridge) next.prior_agent_bridge = bridge;
     const conversation = await computeConversationHistory(session, this.store);
     if (conversation) next.prior_conversation = conversation;
-    const handoffNote = computePriorHandoffNote(session, agent);
+    const handoffNote = computePriorHandoffNote(session, agent, agentId);
     if (handoffNote) next.prior_handoff_note = handoffNote;
     return next;
   }
@@ -666,7 +684,11 @@ function capHistoryBlocks(
   return kept;
 }
 
-function computePriorHandoffNote(session: RelaySession, agent?: AgentName): string | undefined {
+function computePriorHandoffNote(
+  session: RelaySession,
+  agent?: AgentName,
+  agentId?: string,
+): string | undefined {
   const latestUser = latestUserTurnMarker(session);
   let latest: { marker: TurnMarker; decision: RelaySession["decisions"][number] } | undefined;
   session.events.forEach((event, index) => {
@@ -678,6 +700,7 @@ function computePriorHandoffNote(session: RelaySession, agent?: AgentName): stri
     }
   });
   if (!latest || latest.decision.kind !== "handoff") return undefined;
+  if (latest.decision.targetAgentId && latest.decision.targetAgentId !== agentId) return undefined;
   if (agent && latest.decision.targetAgent && latest.decision.targetAgent !== agent) return undefined;
   const note = latest.decision.note?.trim();
   return note ? `[Handoff note]\n${note}` : undefined;

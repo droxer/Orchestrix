@@ -26,7 +26,9 @@
     "task_action": "無法更新任務。請重新整理看板後重試。",
     "admin_unassign_node": "無法取消指派節點。請檢查連線後重試。",
     "admin_delete_node": "無法刪除節點。請檢查連線後重試。",
-    "admin_delete_employee": "無法刪除員工。請檢查連線後重試。"
+    "admin_delete_employee": "無法刪除員工。請檢查連線後重試。",
+    "copy_message": "無法複製訊息。請手動選取文字複製。",
+    "delete_task": "無法刪除任務。請檢查連線後重試。"
   },
   "skip_to_conversation": "跳至對話",
   "skip_to_content": "跳至內容",
@@ -107,14 +109,17 @@
     "choose_agent": "選擇 Agent",
     "choose_mode": "選擇模式",
     "address_agent": "提及智能體",
-    "send_shortcut": "{{shortcut}} 傳送"
+    "send_shortcut": "{{shortcut}} 傳送",
+    "mode_toggle_label": "模式：{{mode}}——切換到{{next}}"
   },
   "decision": {
     "approve": "核准",
     "rerun": "重新執行",
     "mark_done": "標記完成",
     "reject": "拒絕",
-    "handoff": "移交"
+    "handoff": "移交",
+    "reject_confirm_title": "要拒絕本輪嗎？",
+    "reject_confirm_message": "將把本輪標記為已拒絕，Agent 不會自動重跑。"
   },
   "handoff": {
     "title": "轉交此回合",
@@ -207,7 +212,9 @@
       "high": "高",
       "normal": "一般",
       "low": "低"
-    }
+    },
+    "delete_task": "刪除",
+    "deleting": "正在刪除…"
   },
   "workspace": {
     "title": "工作區",
@@ -253,6 +260,12 @@
     "files_unavailable": "此主機上無工作區路徑。",
     "source_live": "即時",
     "source_snapshot": "快照 · 智慧代理離線",
+    "scope_label": "工作區範圍",
+    "scope_personal": "個人目錄",
+    "scope_shared": "共享工作區",
+    "scope_personal_hint": "該智慧代理的私有檔案。",
+    "scope_shared_hint": "與這台電腦上的所有智慧代理共享。",
+    "shared_unavailable": "電腦已離線——共享工作區僅在電腦連線時可用。",
     "no_files_yet": "尚無檔案。",
     "parent_directory": "上層目錄",
     "load_failed": "工作區不可用。",
@@ -309,7 +322,13 @@
       "weekly": "每週",
       "monthly": "每月",
       "custom": "自訂"
-    }
+    },
+    "meta": "例行狀態",
+    "no_activity": "尚無執行紀錄。",
+    "next_run_hint": "例行任務會在當天開始時執行，請選擇今天或之後的日期。",
+    "enabled_hint": "關閉後排程將暫停，不會再派發執行。",
+    "delete_title": "刪除例行任務？",
+    "delete_body": "將刪除「{{title}}」及其排程，歷史執行紀錄會保留。"
   },
   "admin": {
     "title": "管理",
@@ -544,13 +563,13 @@
       "credentials_from_server": "來自控制面板。請立即複製；重啟後明文會清除。",
       "credentials_from_cache_and_server": "已合併瀏覽器快取與控制面板新權杖。",
       "node_profile_label": "歸屬：{{ownership}}；執行環境：{{sandbox}}",
-      "node_ownership_managed": "託管節點",
-      "node_ownership_managed_hint": "由 Relay 自動建立和維護。",
+      "node_ownership_managed": "雲端電腦",
+      "node_ownership_managed_hint": "由 Relay 在雲端自動建立和維護。",
       "node_ownership_local": "本機電腦",
       "node_ownership_local_hint": "由使用者在自己的電腦上啟動和維護。",
       "node_ownership_pending": "歸屬待確認",
       "node_ownership_pending_hint": "節點尚未回報歸屬資訊。",
-      "node_execution_managed": "託管節點",
+      "node_execution_managed": "雲端電腦",
       "node_execution_local": "本機電腦",
       "node_sandbox_boxlite": "BoxLite",
       "node_sandbox_boxlite_hint": "Agent 在隔離的 BoxLite 虛擬機中執行。",
@@ -558,9 +577,10 @@
       "node_sandbox_host_hint": "Agent 直接在守護程式所在電腦上執行。",
       "node_sandbox_pending": "執行環境待確認",
       "node_sandbox_pending_hint": "節點尚未回報執行隔離方式。",
-      "placement_preference_preferred": "首選路由",
-      "placement_preference_alternate": "備援路由",
       "executors": "執行器",
+      "node_hosted_agents": "智慧代理",
+      "node_hosted_agents_empty": "尚無智慧代理",
+      "node_runtimes": "執行環境",
       "node_locality_this_host": "本機",
       "node_locality_this_host_hint": "守護程式已上線並連線到此同機後端。",
       "node_locality_saved_here": "已儲存",
@@ -684,8 +704,17 @@
       "saving": "儲存中…",
       "agent_skills": "技能（{{count}}）",
       "agent_mcp": "MCP（{{count}}）",
-      "agent_no_inventory": "未安裝技能或 MCP"
-    }
+      "agent_no_inventory": "未安裝技能或 MCP",
+      "delete_node_for": "刪除節點 {{id}}",
+      "unassigning": "解除綁定中…",
+      "deleting": "刪除中…",
+      "save_agent_settings": "儲存執行器設定",
+      "selected_employee": "已選員工",
+      "dash_spark_summary": "最小 {{min}}，最大 {{max}}，最新 {{latest}}",
+      "chat_delete_link_confirm": "刪除 {{id}} 的身分連結？",
+      "chat_delete_allow_confirm": "刪除允許的對話 {{id}}？"
+    },
+    "signing_in": "登入中…"
   },
   "pref": {
     "title": "偏好設定",

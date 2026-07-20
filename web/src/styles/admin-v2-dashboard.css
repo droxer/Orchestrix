@@ -97,7 +97,7 @@
 .adm-dash-delta {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--sp-1);
   font-size: var(--fs-2);
   font-family: var(--font-sans);
   letter-spacing: var(--track-0);
@@ -298,7 +298,7 @@
   letter-spacing: var(--track-caps);
   text-transform: uppercase;
   color: var(--action);
-  padding: 2px 8px;
+  padding: 2px var(--sp-2);
   border: 1px solid var(--line-1);
   border-radius: var(--r-2);
   background: var(--surface-0);

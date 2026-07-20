@@ -26,7 +26,9 @@
     "task_action": "无法更新任务。请刷新看板后重试。",
     "admin_unassign_node": "无法取消分配节点。请检查连接后重试。",
     "admin_delete_node": "无法删除节点。请检查连接后重试。",
-    "admin_delete_employee": "无法删除员工。请检查连接后重试。"
+    "admin_delete_employee": "无法删除员工。请检查连接后重试。",
+    "copy_message": "无法复制消息。请手动选中文字复制。",
+    "delete_task": "无法删除任务。请检查连接后重试。"
   },
   "skip_to_conversation": "跳至对话",
   "skip_to_content": "跳至内容",
@@ -107,14 +109,17 @@
     "choose_agent": "选择 Agent",
     "choose_mode": "选择模式",
     "address_agent": "提及智能体",
-    "send_shortcut": "{{shortcut}} 发送"
+    "send_shortcut": "{{shortcut}} 发送",
+    "mode_toggle_label": "模式：{{mode}}——切换到{{next}}"
   },
   "decision": {
     "approve": "批准",
     "rerun": "重新运行",
     "mark_done": "标记完成",
     "reject": "拒绝",
-    "handoff": "移交"
+    "handoff": "移交",
+    "reject_confirm_title": "要拒绝本轮吗？",
+    "reject_confirm_message": "将把本轮标记为已拒绝，Agent 不会自动重跑。"
   },
   "handoff": {
     "title": "转交此回合",
@@ -207,7 +212,9 @@
       "high": "高",
       "normal": "普通",
       "low": "低"
-    }
+    },
+    "delete_task": "删除",
+    "deleting": "正在删除…"
   },
   "workspace": {
     "title": "工作区",
@@ -253,6 +260,12 @@
     "files_unavailable": "此主机上无工作区路径。",
     "source_live": "实时",
     "source_snapshot": "快照 · 智能体离线",
+    "scope_label": "工作区范围",
+    "scope_personal": "个人目录",
+    "scope_shared": "共享工作区",
+    "scope_personal_hint": "该智能体的私有文件。",
+    "scope_shared_hint": "与这台电脑上的所有智能体共享。",
+    "shared_unavailable": "电脑已离线——共享工作区仅在电脑在线时可用。",
     "no_files_yet": "尚无文件。",
     "parent_directory": "上级目录",
     "load_failed": "工作区不可用。",
@@ -309,7 +322,13 @@
       "weekly": "每周",
       "monthly": "每月",
       "custom": "自定义"
-    }
+    },
+    "meta": "例程状态",
+    "no_activity": "暂无运行记录。",
+    "next_run_hint": "例程会在当天开始时运行，请选择今天或之后的日期。",
+    "enabled_hint": "关闭后计划将暂停，不会再派发运行。",
+    "delete_title": "删除例程？",
+    "delete_body": "将删除“{{title}}”及其计划，历史运行记录会保留。"
   },
   "admin": {
     "title": "管理",
@@ -544,13 +563,13 @@
       "credentials_from_server": "来自控制面板。请立即复制；重启后明文会清除。",
       "credentials_from_cache_and_server": "已合并浏览器缓存与控制面板新令牌。",
       "node_profile_label": "归属：{{ownership}}；运行环境：{{sandbox}}",
-      "node_ownership_managed": "托管节点",
-      "node_ownership_managed_hint": "由 Relay 自动创建和维护。",
+      "node_ownership_managed": "云端电脑",
+      "node_ownership_managed_hint": "由 Relay 在云端自动创建和维护。",
       "node_ownership_local": "本地电脑",
       "node_ownership_local_hint": "由用户在自己的电脑上启动和维护。",
       "node_ownership_pending": "归属待确认",
       "node_ownership_pending_hint": "节点尚未报告归属信息。",
-      "node_execution_managed": "托管节点",
+      "node_execution_managed": "云端电脑",
       "node_execution_local": "本地电脑",
       "node_sandbox_boxlite": "BoxLite",
       "node_sandbox_boxlite_hint": "Agent 在隔离的 BoxLite 虚拟机中运行。",
@@ -558,9 +577,10 @@
       "node_sandbox_host_hint": "Agent 直接在守护进程所在电脑上运行。",
       "node_sandbox_pending": "运行环境待确认",
       "node_sandbox_pending_hint": "节点尚未报告运行隔离方式。",
-      "placement_preference_preferred": "首选路由",
-      "placement_preference_alternate": "备用路由",
       "executors": "执行器",
+      "node_hosted_agents": "智能体",
+      "node_hosted_agents_empty": "暂无智能体",
+      "node_runtimes": "运行时",
       "node_locality_this_host": "本机",
       "node_locality_this_host_hint": "守护进程已在线并连接到此同机后端。",
       "node_locality_saved_here": "已保存",
@@ -684,8 +704,17 @@
       "saving": "保存中…",
       "agent_skills": "技能（{{count}}）",
       "agent_mcp": "MCP（{{count}}）",
-      "agent_no_inventory": "未安装技能或 MCP"
-    }
+      "agent_no_inventory": "未安装技能或 MCP",
+      "delete_node_for": "删除节点 {{id}}",
+      "unassigning": "解除绑定中…",
+      "deleting": "删除中…",
+      "save_agent_settings": "保存执行器设置",
+      "selected_employee": "已选员工",
+      "dash_spark_summary": "最小 {{min}}，最大 {{max}}，最新 {{latest}}",
+      "chat_delete_link_confirm": "删除 {{id}} 的身份关联？",
+      "chat_delete_allow_confirm": "删除允许的会话 {{id}}？"
+    },
+    "signing_in": "登录中…"
   },
   "pref": {
     "title": "偏好设置",

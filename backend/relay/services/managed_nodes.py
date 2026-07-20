@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+import fcntl
 import hashlib
 import hmac
+import json
 from pathlib import Path
 import secrets
 from threading import RLock
-from typing import Any
+from typing import Any, Iterator
 from uuid import uuid4
 
 from ..persistence.store_common import DEFAULT_RELAY_DATA_DIR, _read_json, _write_json, now_iso, safe_name
@@ -67,6 +70,21 @@ def _validate_managed_sandbox_mode(value: Any) -> None:
         raise ValueError("Managed nodes require sandboxMode boxlite.")
 
 
+def _managed_node_policy_slot(node: dict[str, Any]) -> tuple[Any, ...]:
+    return (
+        node.get("assignmentMode") or "dedicated",
+        node.get("provider") or "local-process",
+        node.get("providerConfigRef"),
+        node.get("profile") or "standard",
+        node.get("sandboxMode") or "boxlite",
+        json.dumps(
+            node.get("workspacePolicy") or {"kind": "employee-home"},
+            sort_keys=True,
+            separators=(",", ":"),
+        ),
+    )
+
+
 class LocalManagedNodeStore:
     """Durable local-first store for managed-node desired state and attempts."""
 
@@ -75,11 +93,14 @@ class LocalManagedNodeStore:
         self.nodes_dir = root / "nodes"
         self.attempts_dir = root / "attempts"
         self.grants_dir = root / "enrollment-grants"
+        self.slot_lock_path = root / ".policy-slots.lock"
         self._lock = RLock()
         for path in (self.nodes_dir, self.attempts_dir, self.grants_dir):
             path.mkdir(parents=True, exist_ok=True)
 
-    def create_node(self, payload: dict[str, Any]) -> dict[str, Any]:
+    def create_node(
+        self, payload: dict[str, Any], *, _policy_slot_locked: bool = False
+    ) -> dict[str, Any]:
         assignment_mode = payload.get("assignmentMode") or "dedicated"
         desired_state = payload.get("desiredState") or "running"
         sandbox_mode = payload.get("sandboxMode") or "boxlite"
@@ -91,7 +112,8 @@ class LocalManagedNodeStore:
         _validate_managed_sandbox_mode(sandbox_mode)
         if not employee_id:
             raise ValueError("employeeId is required for a dedicated managed node.")
-        with self._lock:
+        slot_lock = nullcontext() if _policy_slot_locked else self._policy_slot_lock()
+        with self._lock, slot_lock:
             now = now_iso()
             node = {
                 "id": _new_id("mnode"),
@@ -110,20 +132,69 @@ class LocalManagedNodeStore:
                 "createdAt": now,
                 "updatedAt": now,
             }
+            self._assert_active_policy_slot_available(node)
             self._write_node(node)
             return node
 
-    def ensure_node_for_employee(self, employee_id: str) -> ManagedCapacityResolution:
+    @contextmanager
+    def _policy_slot_lock(self) -> Iterator[None]:
+        with self.slot_lock_path.open("a+", encoding="utf-8") as lock_file:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+    def _assert_active_policy_slot_available(
+        self, candidate: dict[str, Any], *, exclude_node_id: str | None = None
+    ) -> None:
+        if candidate.get("desiredState") != "running":
+            return
+        slot = _managed_node_policy_slot(candidate)
+        duplicate = next(
+            (
+                node
+                for node in self.list_nodes()
+                if node["id"] != exclude_node_id
+                and node.get("desiredState") == "running"
+                and node.get("employeeId") == candidate.get("employeeId")
+                and _managed_node_policy_slot(node) == slot
+            ),
+            None,
+        )
+        if duplicate:
+            raise ValueError(
+                "Employee already has an active managed node in this policy slot."
+            )
+
+    def ensure_node_for_employee(
+        self, employee_id: str, *, policy: dict[str, Any] | None = None
+    ) -> ManagedCapacityResolution:
         """Return managed capacity and whether provisioning was newly requested."""
         employee_id = employee_id.strip()
         if not employee_id:
             raise ValueError("employeeId is required for managed capacity.")
-        with self._lock:
+        policy = policy or {}
+        allowed_policy_fields = {
+            "assignmentMode",
+            "provider",
+            "providerConfigRef",
+            "profile",
+            "sandboxMode",
+            "workspacePolicy",
+        }
+        unknown = set(policy) - allowed_policy_fields
+        if unknown:
+            raise ValueError(
+                f"Unsupported managed capacity policy field(s): {', '.join(sorted(unknown))}."
+            )
+        requested_slot = _managed_node_policy_slot(policy)
+        with self._lock, self._policy_slot_lock():
             candidates = [
                 node
                 for node in self.list_nodes()
                 if node.get("employeeId") == employee_id
-                and node.get("assignmentMode") == "dedicated"
+                and _managed_node_policy_slot(node) == requested_slot
             ]
             existing = next(
                 (node for node in candidates if node.get("desiredState") == "running"),
@@ -131,11 +202,19 @@ class LocalManagedNodeStore:
             )
             if existing:
                 if existing.get("desiredState") != "running":
-                    existing = self.update_node(existing["id"], {"desiredState": "running"})
+                    existing = self.update_node(
+                        existing["id"],
+                        {"desiredState": "running"},
+                        _policy_slot_locked=True,
+                    )
                     return ManagedCapacityResolution(existing, True)
                 return ManagedCapacityResolution(existing, False)
             return ManagedCapacityResolution(
-                self.create_node({"employeeId": employee_id}), True
+                self.create_node(
+                    {"employeeId": employee_id, **policy},
+                    _policy_slot_locked=True,
+                ),
+                True,
             )
 
     def list_nodes(self, *, include_deleted: bool = False) -> list[dict[str, Any]]:
@@ -148,8 +227,15 @@ class LocalManagedNodeStore:
         path = self.nodes_dir / f"{safe_name(node_id)}.json"
         return _read_json(path) if path.exists() else None
 
-    def update_node(self, node_id: str, patch: dict[str, Any]) -> dict[str, Any]:
-        with self._lock:
+    def update_node(
+        self,
+        node_id: str,
+        patch: dict[str, Any],
+        *,
+        _policy_slot_locked: bool = False,
+    ) -> dict[str, Any]:
+        slot_lock = nullcontext() if _policy_slot_locked else self._policy_slot_lock()
+        with self._lock, slot_lock:
             node = self.get_node(node_id)
             if not node:
                 raise KeyError(node_id)
@@ -181,8 +267,23 @@ class LocalManagedNodeStore:
             if "conditions" in patch and not isinstance(patch["conditions"], list):
                 raise ValueError("conditions must be an array.")
             updated = {**node, **patch, "updatedAt": now_iso()}
-            generation_changed = any(field in patch and patch[field] != node.get(field) for field in provider_fields)
+            self._assert_active_policy_slot_available(
+                updated, exclude_node_id=node_id
+            )
+            generation_fields = provider_fields | {"desiredState"}
+            generation_changed = any(
+                field in patch and patch[field] != node.get(field)
+                for field in generation_fields
+            )
             if generation_changed:
+                active_attempt = self.active_attempt(node_id)
+                if (
+                    active_attempt
+                    and active_attempt.get("generation") == node.get("generation")
+                ):
+                    self.update_attempt(
+                        active_attempt["id"], {"status": "cancelled"}
+                    )
                 updated["generation"] = int(node.get("generation") or 1) + 1
                 updated["phase"] = "requested" if desired_state == "running" else updated["phase"]
                 updated.pop("activeAttemptId", None)
@@ -246,6 +347,11 @@ class LocalManagedNodeStore:
             status = patch.get("status", attempt["status"])
             if status not in PROVISIONING_ATTEMPT_STATUSES:
                 raise ValueError("Invalid provisioning attempt status.")
+            if (
+                attempt["status"] in TERMINAL_ATTEMPT_STATUSES
+                and status != attempt["status"]
+            ):
+                raise ValueError("Provisioning attempt is already terminal.")
             allowed = {"status", "providerInstanceId", "providerOperationId", "errorCode", "errorMessage", "retryAt"}
             unknown = set(patch) - allowed
             if unknown:
@@ -301,11 +407,13 @@ class LocalManagedNodeStore:
             if not hmac.compare_digest(grant["secretHash"], _secret_hash(secret)):
                 raise PermissionError("Invalid enrollment credential.")
             attempt = self._get_attempt(grant["attemptId"])
-            if not attempt or attempt.get("status") in TERMINAL_ATTEMPT_STATUSES:
+            if not attempt:
                 raise PermissionError("Provisioning attempt is not active.")
             node = self.get_node(attempt["managedNodeId"])
             if not node or node.get("desiredState") != "running" or node.get("generation") != attempt.get("generation"):
                 raise PermissionError("Managed node no longer accepts this enrollment grant.")
+            if attempt.get("status") in TERMINAL_ATTEMPT_STATUSES:
+                raise PermissionError("Provisioning attempt is not active.")
             consumed_at = now_iso()
             _write_json(path, {**grant, "consumedAt": consumed_at})
             return node, attempt

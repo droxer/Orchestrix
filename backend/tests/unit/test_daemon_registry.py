@@ -8,7 +8,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from threading import Event
+from threading import Barrier, Event
 
 import pytest
 
@@ -2130,6 +2130,72 @@ def test_daemon_terminal_event_after_registry_restart_finalizes_session() -> Non
             assert session_store.get_session(session["id"])["status"] == "completed"
 
     asyncio.run(run_flow())
+
+
+def test_active_session_run_request_is_global_after_cross_node_handoff() -> None:
+    with TemporaryDirectory() as root:
+        session_store = LocalSessionStore(root)
+        daemon_store = LocalDaemonStore(root)
+        registry = DaemonNodeRegistry(session_store, daemon_store)
+        session = session_store.create_session(
+            {
+                "workspacePath": "/workspace/shared",
+                "ownerEmployeeId": "alice",
+                "taskGoal": "plan and build",
+                "participants": ["human", "claude", "codex"],
+            }
+        )
+        active = daemon_store.create_run_request(
+            {
+                "nodeId": "node_a",
+                "sessionId": session["id"],
+                "taskGoal": session["taskGoal"],
+                "assignments": [{"agent": "claude", "mode": "ask"}],
+                "state": {},
+            }
+        )
+        daemon_store.update_run_request(active["id"], {"nodeId": "node_b"})
+
+        with pytest.raises(ValueError, match="already has an active daemon run"):
+            registry.start_run_request(
+                "node_a",
+                session["id"],
+                session["taskGoal"],
+                [{"agent": "claude", "mode": "ask"}],
+                {},
+            )
+
+
+@pytest.mark.parametrize("store_factory", DAEMON_STORE_FACTORIES)
+def test_active_session_run_request_claim_is_atomic_across_store_instances(
+    store_factory,
+) -> None:
+    with TemporaryDirectory() as root:
+        stores = (store_factory(root), store_factory(root))
+        stores[0].register_node(store_node_payload())
+        barrier = Barrier(2)
+
+        def create(store) -> str:
+            barrier.wait()
+            return store.create_run_request(
+                {
+                    "nodeId": "sbx_alice",
+                    "sessionId": "ses_shared",
+                    "taskGoal": "do one thing",
+                    "assignments": [{"agent": "codex", "mode": "action"}],
+                    "state": {},
+                }
+            )["id"]
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = [executor.submit(create, store) for store in stores]
+
+        assert sum(future.exception() is None for future in futures) == 1
+        failure = next(
+            future.exception() for future in futures if future.exception() is not None
+        )
+        assert isinstance(failure, ValueError)
+        assert "already has an active daemon run" in str(failure)
 
 
 def test_daemon_output_retry_after_registry_restart_is_deduplicated() -> None:

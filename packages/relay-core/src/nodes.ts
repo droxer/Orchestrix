@@ -1,4 +1,3 @@
-import { join } from "node:path";
 import { getAgent } from "./agents.js";
 import { StderrLineRenderer } from "./renderers.js";
 import {
@@ -43,9 +42,9 @@ export async function runAgentNode(
         ? def.buildAskCommand(state)
         : def.buildActionCommand(state);
   const actionLabel = mode === "ask" ? def.askLabel : def.actionLabel;
-  const cwd = options.agentWorkspaceSubdir
-    ? join(agentWorkspacePath(), options.agentWorkspaceSubdir)
-    : agentWorkspacePath();
+  // Runs execute at the shared workspace root so agents on the same computer
+  // collaborate through it; state.agent_home_subdir names the private area.
+  const cwd = agentWorkspacePath();
   const result = await execute("bash", ["-c", command], {
     cwd,
     stdoutRenderer: (chunk) => {

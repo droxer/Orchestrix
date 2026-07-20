@@ -32,7 +32,7 @@
 
 .agent-picker {
   position: absolute;
-  bottom: calc(100% + 8px);
+  bottom: calc(100% + var(--sp-2));
   left: 0;
   z-index: var(--z-popover);
   width: 200px;
@@ -133,6 +133,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .mode-chip:active { transform: none; }
+
   .mode-chip-icon { animation: none; }
 }
 
@@ -208,7 +210,7 @@
   border: 0;
   outline: 0;
   background: transparent;
-  padding: 16px var(--composer-inline) 6px;
+  padding: var(--sp-4) var(--composer-inline) 6px;
   color: var(--ink-1);
   font: var(--type-body);
 }

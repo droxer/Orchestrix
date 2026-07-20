@@ -414,3 +414,55 @@ def test_database_task_store_promotes_due_routine_once() -> None:
             len([task for task in store.list_tasks() if task["id"] != routine["id"]])
             == 1
         )
+
+
+def assert_store_delete_hides_task_everywhere(store) -> None:
+    routine = store.create_task(
+        {
+            "title": "Due routine",
+            "description": "",
+            "priority": "normal",
+            "isRoutine": True,
+            "routineEnabled": True,
+            "routineCadence": "weekly",
+            "routineNextRunDate": "2026-06-25",
+        }
+    )
+    assigned = store.create_task(
+        {"title": "Dispatchable", "description": "", "priority": "high"}
+    )
+    assigned = store.assign_task(assigned["id"], "codex")
+
+    deleted = store.delete_task(routine["id"])
+    assert deleted["deletedAt"]
+    again = store.delete_task(routine["id"])
+    assert again["deletedAt"] == deleted["deletedAt"]
+    assert (
+        len([event for event in again["events"] if event["type"] == "task.deleted"])
+        == 1
+    )
+
+    deleted_assigned = store.delete_task(assigned["id"])
+    assert deleted_assigned["deletedAt"]
+
+    assert store.list_tasks() == []
+    assert store.list_due_routines("2026-06-25") == []
+    assert store.list_dispatchable_tasks() == []
+    assert store.claim_next_task_for_agent("codex") is None
+    assert store.claim_task_for_dispatch(assigned["id"], "codex") is None
+    assert store.promote_due_routine(routine["id"], "2026-06-25", "2026-07-02") is None
+
+    persisted = store.get_task(routine["id"])
+    assert persisted["deletedAt"] == deleted["deletedAt"]
+
+
+def test_local_task_store_delete_hides_task_everywhere() -> None:
+    with TemporaryDirectory() as root:
+        assert_store_delete_hides_task_everywhere(LocalTaskStore(root))
+
+
+def test_database_task_store_delete_hides_task_everywhere() -> None:
+    with TemporaryDirectory() as root:
+        assert_store_delete_hides_task_everywhere(
+            DatabaseTaskStore(f"sqlite:///{root}/relay.db", create_schema=True)
+        )

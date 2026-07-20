@@ -206,17 +206,16 @@ class TaskScheduler:
         return dispatched, skipped
 
     def _ensure_managed_capacity(self, task: dict[str, Any]) -> None:
-        if not self.managed_node_store:
-            return
-        employee_id = task.get("assigneeEmployeeId") or task.get("ownerEmployeeId")
-        if not employee_id or employee_has_local_node(self.registry, employee_id):
-            return
-        capacity = self.managed_node_store.ensure_node_for_employee(employee_id)
-        if capacity.provisioning_requested:
+        capacity = ensure_managed_capacity_for_task(
+            task, self.registry, self.managed_node_store
+        )
+        if capacity and capacity.provisioning_requested:
             logger.info(
                 "Managed node provisioning requested for queued task",
                 task_id=task["id"],
-                employee_id=employee_id,
+                employee_id=(
+                    task.get("assigneeEmployeeId") or task.get("ownerEmployeeId")
+                ),
             )
 
     async def _dispatch_claimed_task(
@@ -348,6 +347,17 @@ def employee_has_local_node(registry: Any, employee_id: str) -> bool:
         and not node.get("retiredAt")
         for node in registry.monitor_nodes()
     )
+
+
+def ensure_managed_capacity_for_task(
+    task: dict[str, Any], registry: Any, managed_node_store: Any | None
+) -> Any | None:
+    if not managed_node_store:
+        return None
+    employee_id = task.get("assigneeEmployeeId") or task.get("ownerEmployeeId")
+    if not employee_id or employee_has_local_node(registry, employee_id):
+        return None
+    return managed_node_store.ensure_node_for_employee(employee_id)
 
 
 def next_routine_date(run_date: date, cadence: str, today: date) -> date | None:

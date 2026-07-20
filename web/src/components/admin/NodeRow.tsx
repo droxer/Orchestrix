@@ -1,21 +1,33 @@
 "use client";
 
-import { useState } from "react";
 import type { TFunction } from "i18next";
 import type { AgentName, ControlPanelDaemonNodeRecord } from "../../types";
-import { useDialogs } from "@/components/ui/DialogProvider";
 import { AgentMark } from "../AgentMark";
+import { useNodeDelete } from "../../hooks/useNodeDelete";
 import {
   agentStatusTone,
   visibleNodeAgentNames,
   type StoredNodeTokenMap,
 } from "./helpers";
+import { NodeActions } from "./NodeActions";
 import { NodeProfileBadges } from "./NodeProfileBadges";
-import { Button } from "../ui/button";
-import { ActionKey, AdminDelete, AdminManageAgents, AdminNode } from "../icons";
+import { AdminNode } from "../icons";
 
 function isAgentDisabled(node: ControlPanelDaemonNodeRecord, agent: AgentName): boolean {
   return Boolean(node.disabledAgents?.includes(agent));
+}
+
+function agentTitle(node: ControlPanelDaemonNodeRecord, agent: AgentName, t: TFunction): string {
+  const agentStatus = node.agents[agent] ?? "unknown";
+  const statusLabel = t(`status.${agentStatus}`, { defaultValue: agentStatus });
+  const detail = node.agentDetails?.[agent];
+  const parts = [
+    t("fleet.agent_status_title", { agent, status: statusLabel }),
+    detail?.version,
+    detail?.detail,
+    isAgentDisabled(node, agent) ? t("admin.v2.agent_disabled") : null,
+  ].filter(Boolean);
+  return parts.join(" · ");
 }
 
 interface NodeRowProps {
@@ -29,29 +41,8 @@ interface NodeRowProps {
 }
 
 export function NodeRow({ node, storedTokens, colocated, onReveal, onManageAgents, onDelete, t }: NodeRowProps) {
-  const { confirm } = useDialogs();
-  const [deletePending, setDeletePending] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const { deletePending, deleteError, handleDelete } = useNodeDelete(node, onDelete, t);
   const nodeName = node.displayName || node.id;
-
-  async function handleDelete() {
-    if (!onDelete) return;
-    const ok = await confirm({
-      title: t("admin.v2.delete_confirm", { id: node.id }),
-      confirmLabel: t("admin.v2.delete_action"),
-      tone: "danger",
-    });
-    if (!ok) return;
-    setDeletePending(true);
-    setDeleteError(null);
-    try {
-      await onDelete(node);
-    } catch (error) {
-      setDeleteError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setDeletePending(false);
-    }
-  }
 
   return (
     <li className="adm-node-row" data-node={node.id}>
@@ -76,63 +67,48 @@ export function NodeRow({ node, storedTokens, colocated, onReveal, onManageAgent
         </span>
       </div>
 
-      <div className="adm-node-row-agents" aria-label={t("admin.v2.executors")}>
-        {visibleNodeAgentNames(node).map((name) => {
-          const agentTone = agentStatusTone(node.agents[name] ?? "unknown");
-          const disabled = isAgentDisabled(node, name);
-          return (
-            <span
-              key={name}
-              className={`adm-agent-chip tone-${agentTone}${disabled ? " is-disabled" : ""}`}
-              data-agent={name}
-            >
-              <i className="adm-agent-dot" aria-hidden="true" />
-              <AgentMark agent={name} size={12} className="adm-agent-chip-mark" />
-              {name}
-            </span>
-          );
-        })}
+      <div
+        className="adm-node-row-agents"
+        aria-label={t("admin.v2.node_runtimes")}
+        title={t("admin.v2.node_runtimes")}
+      >
+        {visibleNodeAgentNames(node).length === 0 ? (
+          <span className="adm-agents-empty">{t("admin.v2.node_hosted_agents_empty")}</span>
+        ) : (
+          <span className="adm-node-runtimes-marks">
+            {visibleNodeAgentNames(node).map((name) => {
+              const agentTone = agentStatusTone(node.agents[name] ?? "unknown");
+              const disabled = isAgentDisabled(node, name);
+              return (
+                <span
+                  key={name}
+                  className={`adm-runtime-mark tone-${agentTone}${disabled ? " is-disabled" : ""}`}
+                  data-agent={name}
+                  title={agentTitle(node, name, t)}
+                  translate="no"
+                >
+                  <i className="adm-agent-dot" aria-hidden="true" />
+                  <AgentMark agent={name} size={14} className="adm-agent-chip-mark" />
+                </span>
+              );
+            })}
+          </span>
+        )}
       </div>
 
       <div className="adm-node-row-actions">
-        {node.managedNodeId ? null : (
-          <Button
-            variant="ghost"
-            type="button"
-            className="icon-button icon-button--sm icon-button--tinted adm-node-card-icon-btn"
-            onClick={() => onReveal(node)}
-            aria-label={t("admin.v2.reveal_credentials_for", { id: node.id })}
-            title={t("admin.v2.reveal_credentials")}
-          >
-            <ActionKey size={14} aria-hidden="true" />
-          </Button>
-        )}
-        {!node.provisioningPlaceholder ? <Button
-          variant="ghost"
-          type="button"
-          className="icon-button icon-button--sm icon-button--tinted adm-node-card-icon-btn"
-          onClick={() => onManageAgents(node)}
-          aria-label={t("admin.v2.manage_agents_for", { id: node.id })}
-          title={t("admin.v2.manage_agents")}
-        >
-          <AdminManageAgents size={14} aria-hidden="true" />
-        </Button> : null}
-        {onDelete ? (
-          <Button
-            variant="ghost"
-            type="button"
-            className="icon-button icon-button--sm icon-button--tinted adm-node-card-icon-btn danger"
-            onClick={() => void handleDelete()}
-            disabled={deletePending}
-            aria-label={t("admin.v2.delete_action")}
-            title={t("admin.v2.delete_action")}
-          >
-            <AdminDelete size={14} aria-hidden="true" />
-          </Button>
-        ) : null}
+        <NodeActions
+          node={node}
+          onReveal={onReveal}
+          onManageAgents={onManageAgents}
+          onDelete={onDelete}
+          deletePending={deletePending}
+          onDeleteRequest={() => void handleDelete()}
+          t={t}
+        />
       </div>
       {deleteError ? (
-        <p className="adm-node-row-error">{t("admin.v2.action_failed", { message: deleteError })}</p>
+        <p className="adm-node-row-error" role="alert">{t("admin.v2.action_failed", { message: deleteError })}</p>
       ) : null}
     </li>
   );

@@ -47,7 +47,8 @@ export function LoginScreen({ onLogin, needsBootstrap, onSwitchToBootstrap }: Lo
       await login({ username: username.trim(), password });
       onLogin();
     } catch (err) {
-      setError(t("admin.error_generic"));
+      const message = err instanceof Error ? err.message : "";
+      setError(message ? t("admin.v2.action_failed", { message }) : t("admin.error_generic"));
     } finally {
       setIsLoading(false);
     }
@@ -71,6 +72,7 @@ export function LoginScreen({ onLogin, needsBootstrap, onSwitchToBootstrap }: Lo
             onChange={(event) => setUsername(event.target.value)}
             autoComplete="username"
             spellCheck={false}
+            required
           />
         </label>
         <label className="adm-field">
@@ -82,6 +84,7 @@ export function LoginScreen({ onLogin, needsBootstrap, onSwitchToBootstrap }: Lo
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             autoComplete="current-password"
+            required
           />
         </label>
         {error ? <div className="adm-form-error" role="alert">{error}</div> : null}
@@ -90,7 +93,7 @@ export function LoginScreen({ onLogin, needsBootstrap, onSwitchToBootstrap }: Lo
           className="w-full"
           disabled={isLoading || !username.trim() || !password}
         >
-          {isLoading ? t("admin.creating") : t("admin.sign_in")}
+          {isLoading ? t("admin.signing_in") : t("admin.sign_in")}
         </Button>
         {needsBootstrap ? (
           <Button type="button" variant="ghost" className="w-full" onClick={onSwitchToBootstrap}>
@@ -118,7 +121,8 @@ export function BootstrapScreen({ onBootstrapped, onSwitchToLogin }: BootstrapSc
       await bootstrapUser({ token: token.trim(), username: username.trim(), password });
       onBootstrapped();
     } catch (err) {
-      setError(t("admin.error_generic"));
+      const message = err instanceof Error ? err.message : "";
+      setError(message ? t("admin.v2.action_failed", { message }) : t("admin.error_generic"));
     } finally {
       setIsLoading(false);
     }
@@ -141,6 +145,7 @@ export function BootstrapScreen({ onBootstrapped, onSwitchToLogin }: BootstrapSc
             onChange={(event) => setToken(event.target.value)}
             autoComplete="off"
             spellCheck={false}
+            required
           />
         </label>
         <label className="adm-field">
@@ -152,6 +157,7 @@ export function BootstrapScreen({ onBootstrapped, onSwitchToLogin }: BootstrapSc
             onChange={(event) => setUsername(event.target.value)}
             autoComplete="username"
             spellCheck={false}
+            required
           />
         </label>
         <label className="adm-field">
@@ -163,6 +169,7 @@ export function BootstrapScreen({ onBootstrapped, onSwitchToLogin }: BootstrapSc
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             autoComplete="new-password"
+            required
           />
         </label>
         {error ? <div className="adm-form-error" role="alert">{error}</div> : null}

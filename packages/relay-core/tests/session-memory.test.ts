@@ -85,6 +85,70 @@ describe("SessionController prompt memory", () => {
     assert.doesNotMatch(commands[0], /Handoff note:\nverify token refresh/);
   });
 
+  it("targets a handoff note to one logical agent", async () => {
+    const store = tempStore();
+    const commands: string[] = [];
+    const execStream: AgentExecutor = async (_cmd, args) => {
+      commands.push(args?.[1] ?? "");
+      return { exit_code: 0, stdout: "● checked it", stderr: "" };
+    };
+    const controller = new SessionController(store, { execStream });
+    const session = await controller.createSession("fix auth", ["human", "codex"]);
+
+    await controller.handoffSession(
+      session.id,
+      "codex",
+      [{ agent: "codex", agentId: "agent_reviewer", mode: "review" }],
+      "verify token refresh",
+    );
+    await controller.runStep(session.id, initialAgentState("fix auth"), {
+      agent: "codex",
+      agentId: "agent_builder",
+      mode: "action",
+    });
+
+    assert.doesNotMatch(commands[0], /\[Handoff note\]/);
+    assert.equal((await store.getSession(session.id)).decisions[0]?.targetAgentId, "agent_reviewer");
+  });
+
+  it("does not send a logical-agent handoff note to an unidentified run", async () => {
+    const store = tempStore();
+    const commands: string[] = [];
+    const execStream: AgentExecutor = async (_cmd, args) => {
+      commands.push(args?.[1] ?? "");
+      return { exit_code: 0, stdout: "● checked it", stderr: "" };
+    };
+    const controller = new SessionController(store, { execStream });
+    const session = await controller.createSession("fix auth", ["human", "codex"]);
+
+    await controller.handoffSession(
+      session.id,
+      "codex",
+      [{ agent: "codex", agentId: "agent_reviewer", mode: "review" }],
+      "verify token refresh",
+    );
+    await controller.runStep(session.id, initialAgentState("fix auth"), {
+      agent: "codex",
+      mode: "action",
+    });
+
+    assert.doesNotMatch(commands[0], /\[Handoff note\]/);
+  });
+
+  it("does not record a handoff when assignment validation fails", async () => {
+    const store = tempStore();
+    const controller = new SessionController(store);
+    const session = await controller.createSession("fix auth", ["human", "codex"]);
+    await store.appendEvent(session.id, relayEvent("session.archived", session.id, {}));
+
+    await assert.rejects(
+      controller.handoffSession(session.id, "codex"),
+      /archived/i,
+    );
+
+    assert.deepEqual((await store.getSession(session.id)).decisions, []);
+  });
+
   it("does not reuse an older handoff note after a newer rerun decision", async () => {
     const store = tempStore();
     const commands: string[] = [];

@@ -173,7 +173,17 @@ class LocalTaskStore:
             for path in self.tasks_dir.iterdir()
             if path.is_dir()
         ]
-        return sorted(tasks, key=lambda item: item["updatedAt"], reverse=True)
+        live = [task for task in tasks if not task.get("deletedAt")]
+        return sorted(live, key=lambda item: item["updatedAt"], reverse=True)
+
+    def delete_task(self, task_id: str) -> dict[str, Any]:
+        task = self.get_task(task_id)
+        if task.get("deletedAt"):
+            return task
+        logger.info("Task deleted", task_id=task_id)
+        return self.append_event(
+            task_id, relay_task_event("task.deleted", task_id, {})
+        )
 
     def list_due_routines(self, today: str) -> list[dict[str, Any]]:
         tasks = [
@@ -229,6 +239,7 @@ class LocalTaskStore:
                 if task.get("status") == "assigned"
                 and task.get("assignedAgent") == agent
                 and not task.get("isRoutine")
+                and not task.get("deletedAt")
                 and (
                     not assignee_employee_id
                     or task.get("assigneeEmployeeId") == assignee_employee_id
@@ -256,6 +267,8 @@ class LocalTaskStore:
     ) -> dict[str, Any] | None:
         with self._lock:
             task = self.get_task(task_id)
+            if task.get("deletedAt"):
+                return None
             if task.get("status") != "assigned" or task.get("assignedAgent") != agent:
                 return None
             if task.get("isRoutine"):
@@ -271,13 +284,20 @@ class LocalTaskStore:
             )
 
     def promote_due_routine(
-        self, task_id: str, today: str, next_run_date: str | None
+        self,
+        task_id: str,
+        today: str,
+        next_run_date: str | None,
+        *,
+        agent_override: AgentName | None = None,
     ) -> dict[str, Any] | None:
         with self._lock:
             routine = self.get_task(task_id)
+            if routine.get("deletedAt"):
+                return None
             if not routine_due_for_promotion(routine, today):
                 return None
-            agent = routine.get("assignedAgent")
+            agent = routine.get("assignedAgent") or agent_override
             if not agent:
                 return None
             occurrence_events = routine_occurrence_events(routine, agent)
@@ -602,7 +622,18 @@ class DatabaseTaskStore:
                 .mappings()
                 .all()
             )
-        return [row["snapshot"] for row in rows]
+        return [
+            row["snapshot"] for row in rows if not row["snapshot"].get("deletedAt")
+        ]
+
+    def delete_task(self, task_id: str) -> dict[str, Any]:
+        task = self.get_task(task_id)
+        if task.get("deletedAt"):
+            return task
+        logger.info("Database task deleted", task_id=task_id)
+        return self.append_event(
+            task_id, relay_task_event("task.deleted", task_id, {})
+        )
 
     def list_due_routines(self, today: str) -> list[dict[str, Any]]:
         try:
@@ -629,7 +660,8 @@ class DatabaseTaskStore:
         return [
             row["snapshot"]
             for row in rows
-            if routine_due_for_promotion(row["snapshot"], today)
+            if not row["snapshot"].get("deletedAt")
+            and routine_due_for_promotion(row["snapshot"], today)
         ]
 
     def list_dispatchable_tasks(self, limit: int | None = None) -> list[dict[str, Any]]:
@@ -645,11 +677,12 @@ class DatabaseTaskStore:
                 self.tasks.c.created_at.asc(),
             )
         )
-        if limit is not None:
-            statement = statement.limit(limit)
         with self.engine.begin() as conn:
             rows = conn.execute(statement).mappings().all()
-        return [row["snapshot"] for row in rows]
+        live = [
+            row["snapshot"] for row in rows if not row["snapshot"].get("deletedAt")
+        ]
+        return live[:limit] if limit is not None else live
 
     def update_task(self, task_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         task = self.append_event(
@@ -695,6 +728,7 @@ class DatabaseTaskStore:
                 row["snapshot"]
                 for row in rows
                 if not row["snapshot"].get("isRoutine")
+                and not row["snapshot"].get("deletedAt")
                 and (
                     not assignee_employee_id
                     or row["snapshot"].get("assigneeEmployeeId") == assignee_employee_id
@@ -778,7 +812,8 @@ class DatabaseTaskStore:
                 return None
             snapshot = row["snapshot"] or {}
             if (
-                snapshot.get("status") != "assigned"
+                snapshot.get("deletedAt")
+                or snapshot.get("status") != "assigned"
                 or snapshot.get("assignedAgent") != agent
                 or snapshot.get("isRoutine")
             ):
@@ -825,7 +860,12 @@ class DatabaseTaskStore:
         return claimed
 
     def promote_due_routine(
-        self, task_id: str, today: str, next_run_date: str | None
+        self,
+        task_id: str,
+        today: str,
+        next_run_date: str | None,
+        *,
+        agent_override: AgentName | None = None,
     ) -> dict[str, Any] | None:
         with self.engine.begin() as conn:
             row = (
@@ -840,9 +880,11 @@ class DatabaseTaskStore:
             if not row:
                 return None
             routine = row["snapshot"] or {}
+            if routine.get("deletedAt"):
+                return None
             if not routine_due_for_promotion(routine, today):
                 return None
-            agent = routine.get("assignedAgent")
+            agent = routine.get("assignedAgent") or agent_override
             if not agent:
                 return None
 

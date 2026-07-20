@@ -97,11 +97,6 @@ const ComposerView = forwardRef<ComposerHandle, {
                 if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); insertMention(filteredMentionAgents[activeMentionIndex]); return; }
                 if (e.key === "Escape") { e.preventDefault(); setMentionOpen(false); return; }
               }
-              if (e.key === "Tab" && e.shiftKey) {
-                e.preventDefault();
-                setComposerMode((m) => (m === "action" ? "ask" : "action"));
-                return;
-              }
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); if (!running) onSend(); }
             }}
             rows={1}

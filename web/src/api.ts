@@ -39,6 +39,9 @@ import type {
   WorkspaceBriefResponse,
   AgentWorkspaceFilesResponse,
   AgentWorkspaceFileResponse,
+  NodeWorkspaceFilesResponse,
+  NodeWorkspaceFileResponse,
+  WorkspaceScope,
 } from "./types.js";
 
 export class RelayApiError extends Error {
@@ -342,21 +345,41 @@ export function getWorkspaceBrief(
 }
 
 export function listAgentWorkspaceFiles(
-  input: { agentId: string; path?: string },
+  input: { agentId: string; path?: string; scope?: WorkspaceScope },
   signal?: AbortSignal,
 ): Promise<AgentWorkspaceFilesResponse> {
   const params = new URLSearchParams();
   if (input.path) params.set("path", input.path);
+  if (input.scope && input.scope !== "agent-home") params.set("scope", input.scope);
   const query = params.toString();
   return apiJson<AgentWorkspaceFilesResponse>(`/agents/${encodeURIComponent(input.agentId)}/workspace/files${query ? `?${query}` : ""}`, { signal });
 }
 
 export function readAgentWorkspaceFile(
-  input: { agentId: string; path: string },
+  input: { agentId: string; path: string; scope?: WorkspaceScope },
   signal?: AbortSignal,
 ): Promise<AgentWorkspaceFileResponse> {
   const params = new URLSearchParams({ path: input.path });
+  if (input.scope && input.scope !== "agent-home") params.set("scope", input.scope);
   return apiJson<AgentWorkspaceFileResponse>(`/agents/${encodeURIComponent(input.agentId)}/workspace/file?${params.toString()}`, { signal });
+}
+
+export function listNodeWorkspaceFiles(
+  input: { nodeId: string; path?: string },
+  signal?: AbortSignal,
+): Promise<NodeWorkspaceFilesResponse> {
+  const params = new URLSearchParams();
+  if (input.path) params.set("path", input.path);
+  const query = params.toString();
+  return apiJson<NodeWorkspaceFilesResponse>(`/cp/daemon-nodes/${encodeURIComponent(input.nodeId)}/workspace/files${query ? `?${query}` : ""}`, { signal });
+}
+
+export function readNodeWorkspaceFile(
+  input: { nodeId: string; path: string },
+  signal?: AbortSignal,
+): Promise<NodeWorkspaceFileResponse> {
+  const params = new URLSearchParams({ path: input.path });
+  return apiJson<NodeWorkspaceFileResponse>(`/cp/daemon-nodes/${encodeURIComponent(input.nodeId)}/workspace/file?${params.toString()}`, { signal });
 }
 
 export function listTasks(signal?: AbortSignal): Promise<TasksResponse> {
@@ -374,6 +397,12 @@ export function updateTask(taskId: string, input: TaskMutationInput): Promise<Re
   return apiJson<RelayTask>(`/tasks/${encodeURIComponent(taskId)}`, {
     method: "PATCH",
     body: input,
+  });
+}
+
+export function deleteTask(taskId: string): Promise<RelayTask> {
+  return apiJson<RelayTask>(`/tasks/${encodeURIComponent(taskId)}`, {
+    method: "DELETE",
   });
 }
 

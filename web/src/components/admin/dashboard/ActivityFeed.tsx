@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { LucideIcon } from "lucide-react";
 import { ActivityFailed, ActivityNewMessage, ActivityPending, ActivitySuccess } from "../../icons";
@@ -22,6 +23,14 @@ const ICONS: Record<string, { Icon: LucideIcon; tone: "info" | "good" | "bad" | 
 export function ActivityFeed({ items, employees, className }: ActivityFeedProps) {
   const { t, i18n } = useTranslation();
   const employeeMap = new Map(employees.map((e) => [e.id, e.displayName] as const));
+
+  // Relative timestamps are computed from Date.now() at render; tick every
+  // minute so "5m ago" entries stay honest without a data refetch.
+  const [, setNowTick] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setNowTick((tick) => tick + 1), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
 
   return (
     <section className={`adm-dash-card adm-dash-card--feed${className ? ` ${className}` : ""}`}>

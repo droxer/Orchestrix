@@ -112,7 +112,7 @@ def test_routine_create_defaults_next_run_when_omitted(monkeypatch) -> None:
 
         assert created.status_code == 201
         task = created.json()
-        assert task["routineNextRunDate"] == "2026-07-07"
+        assert task["routineNextRunDate"] == "2026-07-08"
         assert task["routineEnabled"] is True
 
         explicit_unscheduled = client.post("/tasks", json={
@@ -125,6 +125,50 @@ def test_routine_create_defaults_next_run_when_omitted(monkeypatch) -> None:
 
         assert explicit_unscheduled.status_code == 201
         assert "routineNextRunDate" not in explicit_unscheduled.json()
+
+
+def test_routine_cadence_change_and_reenable_recalculate_next_run(monkeypatch) -> None:
+    class FixedDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return cls(2026, 7, 7)
+
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    monkeypatch.setattr(task_routes, "date", FixedDate)
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _create_user(client, "alice", employee_id="alice")
+        created = client.post("/tasks", json={
+            "title": "Routine",
+            "ownerEmployeeId": "alice",
+            "assigneeEmployeeId": "alice",
+            "isRoutine": True,
+            "routineCadence": "weekly",
+            "routineNextRunDate": "2026-06-01",
+            "routineEnabled": False,
+        })
+        assert created.status_code == 201
+
+        reenabled = client.patch(f"/tasks/{created.json()['id']}", json={
+            "routineEnabled": True,
+            "routineNextRunDate": "2026-06-01",
+        })
+        assert reenabled.status_code == 200
+        assert reenabled.json()["routineNextRunDate"] == "2026-07-14"
+
+        cadence_changed = client.patch(f"/tasks/{created.json()['id']}", json={
+            "routineCadence": "daily",
+            "routineNextRunDate": "2026-07-14",
+        })
+        assert cadence_changed.status_code == 200
+        assert cadence_changed.json()["routineNextRunDate"] == "2026-07-08"
+
+        title_changed = client.patch(f"/tasks/{created.json()['id']}", json={
+            "title": "Renamed routine",
+        })
+        assert title_changed.status_code == 200
+        assert title_changed.json()["routineNextRunDate"] == "2026-07-08"
 
 
 def test_marking_task_done_completes_linked_running_session(monkeypatch) -> None:
@@ -388,7 +432,8 @@ def test_task_start_discussion_runs_multi_agent_ask_and_keeps_task_open(monkeypa
 def test_task_start_without_agent_runs_ready_team_discussion(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
-        client = TestClient(create_app(root))
+        app = create_app(root)
+        client = TestClient(app)
         _bootstrap_admin(client)
         _create_user(client, "alice", employee_id="alice")
         registered = client.post("/daemon-nodes/register", json={
@@ -401,6 +446,24 @@ def test_task_start_without_agent_runs_ready_team_discussion(monkeypatch) -> Non
             "status": "ready",
         }, headers={"Authorization": "Bearer ui_token"})
         assert registered.status_code == 200
+        team_agents = {
+            agent["executorKind"]: agent
+            for agent in app.state.agent_store.list_agents(
+                supervisor_employee_id="alice"
+            )
+        }
+        for executor_kind, agent in team_agents.items():
+            team_agents[executor_kind] = app.state.agent_store.update_agent(
+                agent["id"],
+                {"instructions": f"Act as Alice's {executor_kind} teammate."},
+            )
+            [placement] = app.state.agent_placement_store.list_placements(
+                agent_id=agent["id"]
+            )
+            app.state.agent_placement_store.update_placement(
+                placement["id"],
+                {"agentVersion": team_agents[executor_kind]["version"]},
+            )
         created = client.post("/tasks", json={
             "title": "Design checkout recovery",
             "description": "Find the right implementation plan and risks.",
@@ -421,6 +484,10 @@ def test_task_start_without_agent_runs_ready_team_discussion(monkeypatch) -> Non
         assert commands.status_code == 200
         [first] = commands.json()["commands"]
         assert first["agent"] == "claude"
+        assert first["logicalAgentId"] == team_agents["claude"]["id"]
+        assert first["state"]["agent_instructions"] == (
+            "Act as Alice's claude teammate."
+        )
         assert first["mode"] == "ask"
         assert first["taskGoal"] == "Design checkout recovery\n\nFind the right implementation plan and risks."
 
@@ -441,6 +508,10 @@ def test_task_start_without_agent_runs_ready_team_discussion(monkeypatch) -> Non
         assert commands.status_code == 200
         [second] = commands.json()["commands"]
         assert second["agent"] == "codex"
+        assert second["logicalAgentId"] == team_agents["codex"]["id"]
+        assert second["state"]["agent_instructions"] == (
+            "Act as Alice's codex teammate."
+        )
         assert second["mode"] == "ask"
         assert "prior_agent_bridge" in second["state"]
 
@@ -543,7 +614,6 @@ def test_routine_start_preserves_discussion_assignments(monkeypatch) -> None:
             "title": "Weekly retro",
             "ownerEmployeeId": "alice",
             "assigneeEmployeeId": "alice",
-            "assignedAgent": "codex",
             "isRoutine": True,
             "routineCadence": "weekly",
             "routineNextRunDate": "2026-06-25",
@@ -560,6 +630,8 @@ def test_routine_start_preserves_discussion_assignments(monkeypatch) -> None:
         assert started.status_code == 202
         occurrence = started.json()["task"]
         assert occurrence["id"] != created.json()["id"]
+        definition = client.get(f"/tasks/{created.json()['id']}").json()
+        assert definition["routineNextRunDate"] == "2026-07-02"
 
         commands = client.get("/daemon-nodes/sbx_alice/commands", headers={"Authorization": "Bearer node_token"})
         assert commands.status_code == 200
@@ -707,3 +779,38 @@ def test_task_rejects_invalid_routine_fields(monkeypatch) -> None:
         invalid_enabled = client.post("/tasks", json={"title": "Bad enabled", "isRoutine": True, "routineEnabled": "yes"})
         assert invalid_enabled.status_code == 400
         assert "routineEnabled" in invalid_enabled.json()["detail"]
+
+
+def test_task_delete_hides_task_from_list_and_get(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _create_user(client, "alice", employee_id="alice")
+
+        created = client.post("/tasks", json={
+            "title": "Delete me",
+            "ownerEmployeeId": "alice",
+            "assigneeEmployeeId": "alice",
+            "isRoutine": True,
+            "routineType": "task",
+            "routineCadence": "daily",
+            "routineEnabled": True,
+        })
+        assert created.status_code == 201
+        task_id = created.json()["id"]
+
+        deleted = client.delete(f"/tasks/{task_id}")
+        assert deleted.status_code == 200
+        assert deleted.json()["deletedAt"]
+
+        again = client.delete(f"/tasks/{task_id}")
+        assert again.status_code == 200
+        assert again.json()["deletedAt"] == deleted.json()["deletedAt"]
+
+        listed = client.get("/tasks")
+        assert listed.status_code == 200
+        assert all(task["id"] != task_id for task in listed.json()["tasks"])
+
+        missing = client.delete("/tasks/task_missing")
+        assert missing.status_code == 404

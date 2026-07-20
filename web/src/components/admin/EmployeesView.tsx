@@ -44,6 +44,14 @@ function serializeEmployeeFilter(value: EmployeeFilter): string | null {
   return value === "all" ? null : value;
 }
 
+function parseSearchQuery(value: string | null): string {
+  return value ?? "";
+}
+
+function serializeSearchQuery(value: string): string | null {
+  return value.trim() === "" ? null : value;
+}
+
 // Employee activity slices mirror the Nodes status chips (and the card status
 // pill). running/ready overlap by design — an employee can own one running and
 // one ready node — so counts are per-predicate membership, like the Fleet view.
@@ -73,7 +81,7 @@ export function EmployeesView({
 }: EmployeesViewProps) {
   const { t } = useTranslation();
   const { confirm } = useDialogs();
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useUrlSearchState("empQuery", "", parseSearchQuery, serializeSearchQuery);
   const [filter, setFilter] = useUrlSearchState<EmployeeFilter>(
     "empFilter",
     "all",
@@ -199,7 +207,7 @@ export function EmployeesView({
       </div>
 
       {deleteError ? (
-        <p className="adm-view-error">{t("admin.v2.action_failed", { message: deleteError })}</p>
+        <p className="adm-view-error" role="alert">{t("admin.v2.action_failed", { message: deleteError })}</p>
       ) : null}
       {agentsQuery.error ? (
         <p className="adm-view-error" role="alert">

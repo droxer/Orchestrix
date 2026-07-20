@@ -722,7 +722,8 @@
   opacity: 0.55;
 }
 
-.adm-profile-segment-btn.active {
+.adm-profile-segment-btn.active,
+.adm-profile-segment-btn[data-active="true"] {
   background: var(--surface-0);
   color: var(--ink-1);
   box-shadow: inset 0 0 0 1px var(--line-1);
@@ -735,8 +736,10 @@
   flex-shrink: 0;
 }
 
+/* Same ownership mapping as .adm-node-profile-kind: managed = action tint,
+   local = neutral ink. */
 .adm-profile-segment-dot[data-kind="managed"] { background: var(--action); }
-.adm-profile-segment-dot[data-kind="local"] { background: var(--info); }
+.adm-profile-segment-dot[data-kind="local"] { background: var(--ink-3); }
 
 .adm-profile-field > .adm-form-hint {
   margin: 0;

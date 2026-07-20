@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useId, useMemo, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { createControlPanelDaemonNode, createManagedNode } from "../../api";
 import { initialsOf } from "../../lib/adminHelpers";
@@ -39,6 +39,9 @@ export function AddNodeDrawer({
   onSuccess,
 }: AddNodeDrawerProps) {
   const { t } = useTranslation();
+  const profileHeadingId = useId();
+  const assignmentHeadingId = useId();
+  const employeeLabelId = useId();
 
   const [sandboxMode, setSandboxMode] = useState<DaemonSandboxMode>("boxlite");
   const [employeeId, setEmployeeId] = useState("");
@@ -111,9 +114,9 @@ export function AddNodeDrawer({
       width={460}
     >
       <form className="adm-form adm-provision-form" onSubmit={(event) => void handleSubmit(event)} noValidate>
-        <section className="adm-provision-section" aria-labelledby="adm-node-profile">
+        <section className="adm-provision-section" aria-labelledby={profileHeadingId}>
           <header className="adm-provision-section-head">
-            <h3 id="adm-node-profile" className="adm-provision-section-title">
+            <h3 id={profileHeadingId} className="adm-provision-section-title">
               {t("admin.v2.section_execution_profile")}
             </h3>
           </header>
@@ -139,9 +142,9 @@ export function AddNodeDrawer({
           </aside>
         </section>
 
-        <section className="adm-provision-section" aria-labelledby="adm-node-assignment">
+        <section className="adm-provision-section" aria-labelledby={assignmentHeadingId}>
           <header className="adm-provision-section-head">
-            <h3 id="adm-node-assignment" className="adm-provision-section-title">
+            <h3 id={assignmentHeadingId} className="adm-provision-section-title">
               {t("admin.v2.section_assignment")}
             </h3>
             <span className="adm-provision-section-meta">
@@ -150,7 +153,8 @@ export function AddNodeDrawer({
           </header>
 
           {selectedEmployee ? (
-            <div className="adm-assign-operator-card" aria-hidden="true">
+            <div className="adm-assign-operator-card">
+              <span className="sr-only">{t("admin.v2.selected_employee")}</span>
               <span className="adm-assign-avatar">
                 {initialsOf(selectedEmployee.id)}
               </span>
@@ -168,14 +172,14 @@ export function AddNodeDrawer({
             </div>
           ) : null}
 
-          <label className="adm-field">
-            <span>{t("admin.employee")}</span>
+          <div className="adm-field">
+            <span id={employeeLabelId}>{t("admin.employee")}</span>
             <Select
               value={employeeId || undefined}
               onValueChange={(value) => setEmployeeId(value ?? "")}
               disabled={employees.length === 0}
             >
-              <SelectTrigger className="w-full mono">
+              <SelectTrigger className="w-full mono" aria-labelledby={employeeLabelId}>
                 <SelectValue
                   placeholder={employees.length === 0 ? t("admin.no_employees") : t("admin.select_employee")}
                 />
@@ -191,7 +195,7 @@ export function AddNodeDrawer({
                 ))}
               </SelectContent>
             </Select>
-          </label>
+          </div>
 
           {!selectedEmployee ? (
             <p className="adm-form-hint">

@@ -285,8 +285,6 @@ class ServerDaemonNodeBackend:
                 ),
                 None,
             )
-            session_id_for_capacity = request.get("sessionId")
-            active_runs = active_runs_by_node[sandbox_id]
             if request.get("sessionId"):
                 owner_employee_id = (
                     (self.agent_store.get_agent(owner_agent_id) or {}).get(
@@ -300,23 +298,14 @@ class ServerDaemonNodeBackend:
                 assert_session_owned_by_employee(
                     self.registry.store, request["sessionId"], owner_employee_id
                 )
-                if self.registry.daemon_store.active_run_request_for_session(
-                    sandbox_id, request["sessionId"]
+                if self.registry.daemon_store.active_run_request_for_session_any_node(
+                    request["sessionId"]
                 ):
                     raise ValueError(
                         f"Session {request['sessionId']} already has an active daemon run."
                     )
             if sandbox["status"] in ("stopped", "failed", "provisioning"):
                 raise ValueError(f"Sandbox {sandbox_id} daemon node is not ready.")
-            if not node_accepts_run(
-                sandbox,
-                assignments=request["assignments"],
-                active_runs=active_runs,
-                session_id=session_id_for_capacity,
-            ):
-                raise ValueError(
-                    f"Sandbox {sandbox_id} daemon node has no available execution slot."
-                )
             task_id = (
                 request.get("taskId")
                 if isinstance(request.get("taskId"), str) and request.get("taskId")
@@ -402,7 +391,11 @@ class ServerDaemonNodeBackend:
                     controller.record_decision(session_id, "rerun", note, target_agent)
                 elif kind == "handoff" and target_agent:
                     controller.handoff_session(
-                        session_id, target_agent, request["assignments"], note
+                        session_id,
+                        target_agent,
+                        request["assignments"],
+                        note,
+                        decision.get("targetAgentId"),
                     )
             state = initial_agent_state(dispatch_task_goal)
             self.registry.start_run_request(

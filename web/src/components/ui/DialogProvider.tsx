@@ -13,6 +13,7 @@ import { createPortal } from "react-dom";
 import { TriangleAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 // Promise-based confirm/prompt that replaces the native window.confirm /
 // window.prompt. Those drop OS chrome into a precision/monochrome product and
@@ -138,7 +139,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
       // Minimal focus trap — cycle Tab within the modal's focusables.
       if (event.key === "Tab") {
         const focusables = dialogRef.current?.querySelectorAll<HTMLElement>(
-          'button, input, [href], [tabindex]:not([tabindex="-1"])',
+          'button, input, select, textarea, [href], [tabindex]:not([tabindex="-1"])',
         );
         if (!focusables || focusables.length === 0) return;
         const first = focusables[0];
@@ -222,7 +223,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                   {isDangerConfirm ? (
                     <TriangleAlert size={20} className="dialog-danger-icon" aria-hidden="true" />
                   ) : null}
-                  <h2 id="dialog-title" className="dialog-title">
+                  <h2 id="dialog-title" className="dialog-title" translate="no">
                     {request.opts.title}
                   </h2>
                 </div>
@@ -240,7 +241,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                       settle(inputValue.trim());
                     }}
                   >
-                    <input
+                    <Input
                       data-dialog-default
                       className="dialog-input"
                       name="dialog-prompt"

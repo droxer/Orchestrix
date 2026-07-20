@@ -152,6 +152,9 @@ async def run_sandbox(
             "targetAgent": string_field(decision, "targetAgent")
             or string_field(decision, "target_agent")
             or None,
+            "targetAgentId": string_field(decision, "targetAgentId")
+            or string_field(decision, "target_agent_id")
+            or None,
         }
         parsed["decision"] = {
             key: value for key, value in parsed_decision.items() if value
@@ -178,7 +181,9 @@ def _resolve_legacy_assignment(
     sandbox_id: str,
     assignment: dict[str, Any],
 ) -> dict[str, Any]:
-    agent = ctx.agent_store.ensure_compatibility_agent(employee_id, assignment["agent"])
+    node = ctx.registry.get(sandbox_id)
+    node_name = (node or {}).get("displayName") or sandbox_id
+    agent = ctx.agent_store.ensure_compatibility_agent(employee_id, assignment["agent"], sandbox_id, node_name=node_name)
     placement = next((item for item in ctx.agent_placement_store.list_placements(agent_id=agent["id"]) if item["daemonNodeId"] == sandbox_id), None)
     if placement is None:
         placement = ctx.agent_placement_store.create_placement(agent, sandbox_id)

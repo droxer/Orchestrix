@@ -106,6 +106,15 @@ export interface GeneratedFileCandidate {
 
 export type GeneratedFileSnapshot = Record<string, { mtimeMs: number; bytes: number }>;
 
+export interface GeneratedFileScanOptions {
+  /**
+   * The running agent's own personal-home subdir (slash-separated, e.g.
+   * "agents/agent-<b64>"). When set, sibling agents/* homes are skipped so a
+   * concurrent agent's private files are never attributed to this run.
+   */
+  ownAgentHomeSubdir?: string;
+}
+
 function fileExtension(name: string): string {
   const dot = name.lastIndexOf(".");
   return dot > 0 ? name.slice(dot).toLowerCase() : "";
@@ -116,8 +125,18 @@ function isOutputFile(relativePath: string, extension: string): boolean {
   return first === "output" && OUTPUT_FILE_TEXT_EXTENSIONS.has(extension);
 }
 
-function listCandidates(workspacePath: string | undefined): GeneratedFileCandidate[] {
+function isSiblingAgentHome(relativeDir: string, ownAgentHomeSubdir: string | undefined): boolean {
+  if (!ownAgentHomeSubdir) return false;
+  if (!/^agents\/[^/]+$/.test(relativeDir)) return false;
+  return relativeDir !== ownAgentHomeSubdir;
+}
+
+function listCandidates(
+  workspacePath: string | undefined,
+  options: GeneratedFileScanOptions = {},
+): GeneratedFileCandidate[] {
   if (!workspacePath) return [];
+  const ownAgentHomeSubdir = options.ownAgentHomeSubdir?.split(sep).join("/");
   const files: GeneratedFileCandidate[] = [];
   let visited = 0;
   const pending: string[] = [workspacePath];
@@ -139,7 +158,10 @@ function listCandidates(workspacePath: string | undefined): GeneratedFileCandida
       visited += 1;
       const path = join(dir, entry.name);
       if (entry.isDirectory()) {
-        if (!GENERATED_FILE_EXCLUDED_DIRS.has(entry.name)) pending.push(path);
+        const relativeDir = relative(workspacePath, path).split(sep).join("/");
+        if (GENERATED_FILE_EXCLUDED_DIRS.has(entry.name)) continue;
+        if (isSiblingAgentHome(relativeDir, ownAgentHomeSubdir)) continue;
+        pending.push(path);
         continue;
       }
       if (!entry.isFile() || entry.name.startsWith("~$")) continue;
@@ -166,9 +188,12 @@ function listCandidates(workspacePath: string | undefined): GeneratedFileCandida
   return files;
 }
 
-export function snapshotGeneratedFiles(workspacePath: string | undefined): GeneratedFileSnapshot {
+export function snapshotGeneratedFiles(
+  workspacePath: string | undefined,
+  options: GeneratedFileScanOptions = {},
+): GeneratedFileSnapshot {
   const snapshot: GeneratedFileSnapshot = {};
-  for (const item of listCandidates(workspacePath)) {
+  for (const item of listCandidates(workspacePath, options)) {
     snapshot[item.path] = { mtimeMs: item.mtimeMs, bytes: item.bytes };
   }
   return snapshot;
@@ -177,8 +202,9 @@ export function snapshotGeneratedFiles(workspacePath: string | undefined): Gener
 export function diffGeneratedFiles(
   workspacePath: string | undefined,
   before: GeneratedFileSnapshot,
+  options: GeneratedFileScanOptions = {},
 ): DaemonGeneratedFile[] {
-  const changed = listCandidates(workspacePath)
+  const changed = listCandidates(workspacePath, options)
     .filter((item) => {
       const previous = before[item.path];
       return !previous || previous.mtimeMs !== item.mtimeMs || previous.bytes !== item.bytes;

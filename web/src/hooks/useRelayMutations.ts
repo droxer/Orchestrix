@@ -7,6 +7,7 @@ import {
   assignTask,
   cancelRun,
   createTask,
+  deleteTask,
   recordDecision,
   renameSession,
   runSandbox,
@@ -90,6 +91,12 @@ export function useRelayMutations() {
     onError: onRelayError("Failed to update task", "errors.save_task"),
   });
 
+  const deleteTaskMutation = useMutation({
+    mutationFn: ({ taskId }: { taskId: string }) => deleteTask(taskId),
+    onSuccess: () => void invalidateRelay(),
+    onError: onRelayError("Failed to delete task", "errors.delete_task"),
+  });
+
   const assignTaskMutation = useMutation({
     mutationFn: ({ taskId, agent }: { taskId: string; agent: AgentName }) => assignTask(taskId, agent),
     onSuccess: () => void invalidateRelay(),
@@ -119,6 +126,7 @@ export function useRelayMutations() {
     runLogicalAgentsMutation,
     createTaskMutation,
     updateTaskMutation,
+    deleteTaskMutation,
     assignTaskMutation,
     startTaskMutation,
     invalidateRelay,

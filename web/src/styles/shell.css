@@ -20,12 +20,8 @@
   display: none;
 }
 
-/* Stacked PageHeader — shared eyebrow grammar from atelier.css */
-.page-header-kicker {
-  font: var(--type-micro);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
-}
+/* Stacked PageHeader — the .page-header-kicker eyebrow grammar is canonical
+   in atelier.css (shared with .mobile-topbar-eyebrow). */
 
 .page-header-subtitle {
   margin: 0;

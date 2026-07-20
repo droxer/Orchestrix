@@ -1,13 +1,13 @@
 ---
 version: 1.0
 name: Relay-Graphite
-description: Graphite — a true-neutral, dual-register design system for an agent-orchestration control plane. A neutral graphite canvas (#101214 dark / #f7f8f9 light) with a four-step surface ladder carries the chrome; one restrained steel blue (#6ba1d4 dark / #33689e light) is the single chromatic ACTION color — brand mark, primary CTA, focus ring, link emphasis. Status (green / amber / red) is the only other chroma, carried as dots, borders, and text — never fills, never actions; "info" is neutral ink. Both registers are designed side by side — neither derives from the other. One crisp grotesk (Geist) carries every text role with weight doing the differentiating; Geist Mono is reserved for code, IDs, and logs. Geometry is tight — 4px chips, 6px controls, 10px cards — and depth comes from hairline borders, not shadows. Motion is one ease, two speeds, no overshoot. The result reads as serious infrastructure software — a dense, calm control plane for AI agents.
+description: Graphite — a true-neutral, dual-register design system for an agent-orchestration control plane. A neutral graphite canvas (#101214 dark / #f7f8f9 light) with a four-step surface ladder carries the chrome; the ACTION color is pure monochrome, Linear-style — white (#f2f4f6) on dark, black (#16181b) on light — brand mark, primary CTA, focus ring, link emphasis. There are no chromatic accent colors at all: status is a grey brightness hierarchy (loud = bright, calm = dim) carried as dots, borders, and text — never fills, never actions; "info" is neutral ink. Both registers are designed side by side — neither derives from the other. One crisp grotesk (Geist) carries every text role with weight doing the differentiating; Geist Mono is reserved for code, IDs, and logs. Geometry is tight — 4px chips, 6px controls, 10px cards — and depth comes from hairline borders, not shadows. Motion is one ease, two speeds, no overshoot. The result reads as serious infrastructure software — a dense, calm control plane for AI agents.
 
 colors:
-  action: "#6ba1d4"
-  action-hover: "#84b3e0"
-  action-soft: "#15202c"
-  on-action: "#0e1216"
+  action: "#f2f4f6"
+  action-hover: "#ffffff"
+  action-soft: "color-mix(in srgb, #f2f4f6 9%, transparent)"
+  on-action: "#101214"
   ink-1: "#f2f4f6"
   ink-2: "#c9ced4"
   ink-3: "#99a0a8"
@@ -18,9 +18,9 @@ colors:
   surface-1: "#16181b"
   surface-2: "#1c1f23"
   surface-3: "#22262b"
-  ok: "#3fb96c"
-  warn: "#d9a13f"
-  err: "#e5635f"
+  ok: "#7d848d"
+  warn: "#99a0a8"
+  err: "#f2f4f6"
   info: "#99a0a8"
 
 typography:
@@ -152,19 +152,21 @@ components:
 
 ## Overview
 
-Relay's visual language is **Graphite**: a true-neutral canvas, one steel-blue
-action color, status-only chroma, and two registers designed side by side.
-Every other unit of chroma in the interface is a unit of information.
+Relay's visual language is **Graphite**: a true-neutral canvas, a monochrome
+white/black action color, status as a grey brightness hierarchy, and two
+registers designed side by side. There is no chroma in the interface at all —
+every step of brightness is a unit of information.
 
-- **One action color.** Steel blue (`{colors.action}` — #6ba1d4 dark /
-  #33689e light) carries the brand mark, primary CTAs, focus, links, and
-  selection. On dark the fill is bright, so on-action text is dark ink
-  (#0e1216); on light the fill deepens and carries white. There is no
+- **One action color.** White on dark, black on light (`{colors.action}` —
+  #f2f4f6 dark / #16181b light) carries the brand mark, primary CTAs, focus,
+  links, and selection. On dark the fill is bright, so on-action text is dark
+  ink (#101214); on light the fill is black and carries white. There is no
   disabled hex — disabled is opacity.
 - **Status is dot / border / text — never fills.** `--ok` `--warn` `--err`
-  hold exactly one value per register each, tuned to pass AA as small text
-  (the dot color and the text color are the same token). `--info` is not a
-  color: it aliases `--ink-3`.
+  are a grey brightness hierarchy — loud = bright (`--err` brightest),
+  calm = dim (`--ok` dimmest) — holding exactly one value per register each,
+  tuned to pass AA as small text (the dot color and the text color are the
+  same token). `--info` is not a separate value: it aliases `--ink-3`.
 - **Dual-first registers.** The light theme is not derived from the dark
   one; each hex pair is picked for its own canvas and both live side by
   side in `palette.css`. Dark is the default register (`:root`);

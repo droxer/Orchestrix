@@ -9,7 +9,7 @@ import { AgentStateBadge } from "./AgentStateBadge";
 import { PriorityBadge } from "./PriorityBadge";
 import { cn } from "@/lib/utils";
 import { AGENT_NAMES, type CurrentUser, type DaemonNodeMonitorRecord, type RelaySession, type RelayTask, type TaskStatus } from "../types";
-import { ActionApprove, ActionCalendar, ActionSearch, ActionStart, ActionStop, ModeAsk, NavConversations, NavRefresh, ViewBoard, ViewList } from "./icons";
+import { ActionApprove, ActionCalendar, ActionStart, ActionStop, ModeAsk, NavConversations, NavRefresh, ViewBoard, ViewList } from "./icons";
 import { agentReadyForTask, discussionAgentsForTask, dueTone, filterTasks, TASK_PRIORITIES, TASK_STATUSES, tasksByStatus, type BacklogFilters } from "../lib/backlog";
 import { emptyBacklogForm, taskBoardFormsEqual, type BacklogTaskFormState } from "../lib/taskBoardForm";
 import { TaskDrawer } from "./task-board/TaskDrawer";
@@ -20,6 +20,7 @@ import { TaskAssignee } from "./TaskAssignee";
 import { readViewPreference, writeViewPreference } from "../lib/viewPreference";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { Button } from "./ui/button";
+import { FiltersBar } from "./FiltersBar";
 
 interface BacklogPageProps {
   tasks: RelayTask[];
@@ -107,6 +108,21 @@ function BacklogStats({ tasks }: { tasks: RelayTask[] }) {
   );
 }
 
+function formatDueDate(value: string): string {
+  // Date-only values ("2026-07-19") parse as UTC midnight; construct a local
+  // date so the rendered day does not shift with the viewer's timezone.
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  const date = dateOnly
+    ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
+    : new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat(document.documentElement.lang || undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  }).format(date);
+}
+
 function BacklogFiltersBar({
   filters,
   onChange,
@@ -115,108 +131,71 @@ function BacklogFiltersBar({
   onChange: (next: BacklogFilters) => void;
 }) {
   const { t } = useTranslation();
-  const [expanded, setExpanded] = useState(false);
-  const activeCount = activeFilterCount(filters);
 
   return (
-    <div className="backlog-filter-bar" aria-label={t("backlog.filters")}>
-      <div className="backlog-filter-primary">
-        <div className="backlog-filter-search-wrap">
-          <ActionSearch size={15} aria-hidden="true" />
-          <input
-            className="backlog-filter-search"
-            name="backlog-query"
-            type="search"
-            autoComplete="off"
-            spellCheck={false}
-            value={filters.query}
-            placeholder={t("backlog.search")}
-            aria-label={t("backlog.search")}
-            onChange={(event) => onChange({ ...filters, query: event.target.value })}
-          />
-        </div>
-        <div className="backlog-filter-actions">
-          <Button variant="ghost"
-            type="button"
-            className="backlog-filter-chip"
-            data-active={expanded ? "true" : "false"}
-            data-applied={activeCount > 0 ? "true" : "false"}
-            aria-expanded={expanded}
-            onClick={() => setExpanded((value) => !value)}
-          >
-            {expanded ? t("backlog.hide_filters") : t("backlog.show_filters")}
-            {activeCount > 0 ? (
-              <span className="backlog-filter-count" aria-hidden="true">{activeCount}</span>
-            ) : null}
-          </Button>
-          {activeCount > 0 ? (
-            <Button variant="ghost"
-              type="button"
-              className="backlog-filter-clear"
-              onClick={() => onChange(initialFilters)}
-            >
-              {t("backlog.clear_filters")}
-            </Button>
-          ) : null}
-        </div>
-      </div>
-      {expanded ? (
-        <div className="backlog-filter-secondary">
-          <select
-            name="backlog-status-filter"
-            value={filters.status}
-            aria-label={t("backlog.status")}
-            onChange={(event) => onChange({ ...filters, status: event.target.value as BacklogFilters["status"] })}
-          >
-            <option value="all">{t("backlog.all_statuses")}</option>
-            {TASK_STATUSES.map((status) => (
-              <option key={status} value={status}>{t(`backlog.statuses.${status}`)}</option>
-            ))}
-          </select>
-          <select
-            name="backlog-priority-filter"
-            value={filters.priority}
-            aria-label={t("backlog.priority")}
-            onChange={(event) => onChange({ ...filters, priority: event.target.value as BacklogFilters["priority"] })}
-          >
-            <option value="all">{t("backlog.all_priorities")}</option>
-            {TASK_PRIORITIES.map((priority) => (
-              <option key={priority} value={priority}>{t(`backlog.priorities.${priority}`)}</option>
-            ))}
-          </select>
-          <select
-            name="backlog-agent-filter"
-            value={filters.agent}
-            aria-label={t("backlog.agent")}
-            onChange={(event) => onChange({ ...filters, agent: event.target.value as BacklogFilters["agent"] })}
-          >
-            <option value="all">{t("backlog.all_agents")}</option>
-            {AGENT_NAMES.map((agent) => (
-              <option key={agent} value={agent}>{agent}</option>
-            ))}
-          </select>
-          <input
-            name="backlog-assignee-filter"
-            autoComplete="off"
-            value={filters.assignee}
-            placeholder={t("backlog.assignee_filter")}
-            aria-label={t("backlog.assignee_filter")}
-            onChange={(event) => onChange({ ...filters, assignee: event.target.value })}
-          />
-          <select
-            name="backlog-due-filter"
-            value={filters.due}
-            aria-label={t("backlog.due")}
-            onChange={(event) => onChange({ ...filters, due: event.target.value as BacklogFilters["due"] })}
-          >
-            <option value="all">{t("backlog.all_due")}</option>
-            <option value="overdue">{t("backlog.overdue")}</option>
-            <option value="today">{t("backlog.today")}</option>
-            <option value="unscheduled">{t("backlog.unscheduled")}</option>
-          </select>
-        </div>
-      ) : null}
-    </div>
+    <FiltersBar
+      ariaLabel={t("backlog.filters")}
+      searchName="backlog-query"
+      searchLabel={t("backlog.search")}
+      query={filters.query}
+      onQueryChange={(query) => onChange({ ...filters, query })}
+      activeCount={activeFilterCount(filters)}
+      onClear={() => onChange(initialFilters)}
+    >
+      <select
+        name="backlog-status-filter"
+        value={filters.status}
+        aria-label={t("backlog.status")}
+        onChange={(event) => onChange({ ...filters, status: event.target.value as BacklogFilters["status"] })}
+      >
+        <option value="all">{t("backlog.all_statuses")}</option>
+        {TASK_STATUSES.map((status) => (
+          <option key={status} value={status}>{t(`backlog.statuses.${status}`)}</option>
+        ))}
+      </select>
+      <select
+        name="backlog-priority-filter"
+        value={filters.priority}
+        aria-label={t("backlog.priority")}
+        onChange={(event) => onChange({ ...filters, priority: event.target.value as BacklogFilters["priority"] })}
+      >
+        <option value="all">{t("backlog.all_priorities")}</option>
+        {TASK_PRIORITIES.map((priority) => (
+          <option key={priority} value={priority}>{t(`backlog.priorities.${priority}`)}</option>
+        ))}
+      </select>
+      <select
+        name="backlog-agent-filter"
+        value={filters.agent}
+        aria-label={t("backlog.agent")}
+        onChange={(event) => onChange({ ...filters, agent: event.target.value as BacklogFilters["agent"] })}
+      >
+        <option value="all">{t("backlog.all_agents")}</option>
+        {AGENT_NAMES.map((agent) => (
+          <option key={agent} value={agent}>{agent}</option>
+        ))}
+      </select>
+      <input
+        name="backlog-assignee-filter"
+        autoComplete="off"
+        spellCheck={false}
+        value={filters.assignee}
+        placeholder={t("backlog.assignee_filter")}
+        aria-label={t("backlog.assignee_filter")}
+        onChange={(event) => onChange({ ...filters, assignee: event.target.value })}
+      />
+      <select
+        name="backlog-due-filter"
+        value={filters.due}
+        aria-label={t("backlog.due")}
+        onChange={(event) => onChange({ ...filters, due: event.target.value as BacklogFilters["due"] })}
+      >
+        <option value="all">{t("backlog.all_due")}</option>
+        <option value="overdue">{t("backlog.overdue")}</option>
+        <option value="today">{t("backlog.today")}</option>
+        <option value="unscheduled">{t("backlog.unscheduled")}</option>
+      </select>
+    </FiltersBar>
   );
 }
 
@@ -247,7 +226,7 @@ function BacklogTaskCard({
   const tone = dueTone(task);
 
   return (
-    <article className="backlog-task group" data-priority={task.priority}>
+    <article className="backlog-task group list-virtual" data-priority={task.priority}>
       <div className="backlog-task-badges">
         <PriorityBadge priority={task.priority} />
         <AgentStateBadge agent={task.assignedAgent} ready={ready} />
@@ -259,7 +238,7 @@ function BacklogTaskCard({
         <span className="backlog-meta-sep" aria-hidden="true">·</span>
         <span className={cn("backlog-due", tone !== "neutral" && tone)}>
           <ActionCalendar size={13} />
-          {task.dueDate || t("backlog.no_due")}
+          {task.dueDate ? formatDueDate(task.dueDate) : t("backlog.no_due")}
         </span>
         {session ? (
           <>
@@ -368,7 +347,7 @@ function BacklogTaskRow({
   const tone = dueTone(task);
 
   return (
-    <article className="backlog-row group" role="listitem" data-status={task.status} data-priority={task.priority}>
+    <article className="backlog-row group list-virtual" role="listitem" data-status={task.status} data-priority={task.priority}>
       <div className="backlog-row-lead">
         <span className="backlog-row-dot" aria-hidden="true" />
         <Button variant="ghost" type="button" className="backlog-row-title" onClick={onEdit}>{task.title}</Button>
@@ -382,7 +361,7 @@ function BacklogTaskRow({
       </span>
       <span className={cn("backlog-row-due", tone !== "neutral" && tone)}>
         <ActionCalendar size={13} />
-        {task.dueDate || t("backlog.no_due")}
+        {task.dueDate ? formatDueDate(task.dueDate) : t("backlog.no_due")}
       </span>
       <div className="backlog-row-actions" role="group" aria-label={t("backlog.actions")}>
         <div className="backlog-action-group" aria-label={t("backlog.actions_dispatch")}>

@@ -70,6 +70,38 @@ def test_resolves_each_logical_agent_to_its_own_runtime_node(tmp_path: Path) -> 
     assert resolved[0]["agentInstructions"] == "Compare sources before answering."
 
 
+def test_agents_on_same_computer_resolve_together(tmp_path: Path) -> None:
+    agents = LocalAgentStore(tmp_path)
+    placements = LocalAgentPlacementStore(tmp_path)
+    researcher = agents.create_agent(
+        "alice", {"displayName": "Researcher", "executorKind": "claude"}
+    )
+    builder = agents.create_agent(
+        "alice", {"displayName": "Builder", "executorKind": "codex"}
+    )
+    placements.create_placement(researcher, "node_a")
+    placements.create_placement(builder, "node_a")
+    computer = {
+        **node("node_a", "claude"),
+        "agents": {"claude": "ready", "codex": "ready"},
+        "maxConcurrentRuns": 2,
+    }
+
+    resolved = resolve_agent_assignments(
+        [
+            {"agentId": researcher["id"], "mode": "ask"},
+            {"agentId": builder["id"], "mode": "action"},
+        ],
+        employee_id="alice",
+        is_admin=False,
+        agent_store=agents,
+        placement_store=placements,
+        daemon_nodes=[computer],
+    )
+
+    assert [item["daemonNodeId"] for item in resolved] == ["node_a", "node_a"]
+
+
 def test_employee_cannot_route_another_employees_agent(tmp_path: Path) -> None:
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)

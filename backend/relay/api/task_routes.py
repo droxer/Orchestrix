@@ -7,7 +7,6 @@ from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
 
 from ..core.models import AGENT_NAMES
-from ..daemon_registry import node_accepts_run
 from ..persistence.stores import (
     task_priority,
     task_routine_cadence,
@@ -16,7 +15,7 @@ from ..persistence.stores import (
     valid_agent,
 )
 from ..sessions import SessionController
-from ..tasks import employee_has_local_node, next_routine_date, ready_node_for_task, task_goal_text
+from ..tasks import ensure_managed_capacity_for_task, next_routine_date, ready_node_for_task, task_goal_text
 from ..services.agent_routing import AgentRoutingError, resolve_agent_assignments
 from .deps import AppContextDep
 from .helpers import (
@@ -130,20 +129,26 @@ def routine_fields(
             bool((current or {}).get("routineEnabled")) if current else next_is_routine
         )
     )
+    resolved_cadence = cadence or (current or {}).get("routineCadence") or "weekly"
+    cadence_changed = bool(
+        current and cadence and cadence != current.get("routineCadence")
+    )
+    reenabled = bool(
+        current and enabled is True and not current.get("routineEnabled")
+    )
     if (
-        not has_next_run_input
-        and next_is_routine
+        next_is_routine
         and next_enabled
-        and (
-            current is None
-            or (enabled is True and not current.get("routineNextRunDate"))
-        )
+        and resolved_cadence != "custom"
+        and ((current is None and not has_next_run_input) or cadence_changed or reenabled)
     ):
-        next_run = date.today().isoformat()
+        today = date.today()
+        calculated_next_run = next_routine_date(today, resolved_cadence, today)
+        next_run = calculated_next_run.isoformat() if calculated_next_run else None
     return {
         "isRoutine": is_routine if is_routine is not None else next_is_routine,
         "routineType": routine_type or (current or {}).get("routineType") or "task",
-        "routineCadence": cadence or (current or {}).get("routineCadence") or "weekly",
+        "routineCadence": resolved_cadence,
         "routineNextRunDate": next_run,
         "routineEnabled": next_enabled,
     }
@@ -153,27 +158,34 @@ def team_assignments_for_task(
     ctx: AppContextDep, task: dict[str, Any]
 ) -> list[dict[str, Any]]:
     employee_id = task.get("assigneeEmployeeId") or task.get("ownerEmployeeId")
-    for node in ctx.registry.list_ready():
-        if employee_id and node.get("employeeId") != employee_id:
+    if not employee_id:
+        return []
+    selected: list[dict[str, Any]] = []
+    daemon_nodes = ctx.registry.monitor_nodes()
+    for agent in ctx.agent_store.list_agents(
+        supervisor_employee_id=employee_id
+    ):
+        if not agent.get("enabled", True):
             continue
-        if node.get("status") in (
-            "stopped",
-            "failed",
-            "provisioning",
-        ) or not ctx.registry.is_live(node["id"]):
+        candidate = {
+            "agentId": agent["id"],
+            "agent": agent["executorKind"],
+            "mode": "ask",
+            **({"role": agent["defaultRole"]} if agent.get("defaultRole") else {}),
+        }
+        try:
+            resolve_agent_assignments(
+                [*selected, candidate],
+                employee_id=employee_id,
+                is_admin=True,
+                agent_store=ctx.agent_store,
+                placement_store=ctx.agent_placement_store,
+                daemon_nodes=daemon_nodes,
+            )
+        except AgentRoutingError:
             continue
-        disabled = set(node.get("disabledAgents") or [])
-        assignments = [
-            {"agent": agent, "mode": "ask"}
-            for agent in AGENT_NAMES
-            if agent not in disabled and node.get("agents", {}).get(agent) == "ready"
-        ]
-        if not assignments:
-            continue
-        active_runs = ctx.registry.daemon_store.list_active_runs(node["id"])
-        if node_accepts_run(node, assignments=assignments, active_runs=active_runs):
-            return assignments
-    return []
+        selected.append(candidate)
+    return selected if len(selected) > 1 else []
 
 
 async def start_task_on_ready_node(
@@ -222,10 +234,10 @@ async def start_task_on_ready_node(
         node = ready_node_for_task(ctx.registry, task, run_assignments)
     if not node:
         employee_id = task.get("assigneeEmployeeId") or task.get("ownerEmployeeId")
-        requested_capacity = False
-        if employee_id and not employee_has_local_node(ctx.registry, employee_id):
-            capacity = ctx.managed_node_store.ensure_node_for_employee(employee_id)
-            requested_capacity = capacity.provisioning_requested
+        capacity = ensure_managed_capacity_for_task(
+            task, ctx.registry, ctx.managed_node_store
+        )
+        requested_capacity = bool(capacity and capacity.provisioning_requested)
         if record_pending:
             label = ", ".join(dict.fromkeys(item["agent"] for item in run_assignments))
             message = (
@@ -313,7 +325,6 @@ async def start_routine_occurrence_on_ready_node(
     if (
         scheduled_run_date
         and scheduled_run_date <= today
-        and valid_agent(routine.get("assignedAgent"))
     ):
         next_run = next_routine_date(
             scheduled_run_date, routine.get("routineCadence") or "weekly", today
@@ -322,6 +333,7 @@ async def start_routine_occurrence_on_ready_node(
             routine["id"],
             today.isoformat(),
             next_run.isoformat() if next_run else None,
+            agent_override=agent,
         )
         if not occurrence:
             return None
@@ -565,6 +577,21 @@ async def update_task(
     if status == "done":
         complete_linked_task_sessions(ctx, task, "Task marked done.")
         task = ctx.task_store.get_task(task_id)
+    return task
+
+
+@router.delete("/tasks/{task_id}")
+async def delete_task(
+    task_id: str, request: Request, ctx: AppContextDep
+) -> dict[str, Any]:
+    actor = request_actor(request, ctx.auth_store)
+    get_task_for_actor(ctx.task_store, task_id, actor)
+    task = ctx.task_store.delete_task(task_id)
+    logger.info(
+        "Task deleted",
+        task_id=task_id,
+        actor=actor.get("employeeId") or actor.get("username"),
+    )
     return task
 
 

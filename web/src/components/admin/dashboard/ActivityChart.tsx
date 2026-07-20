@@ -144,6 +144,15 @@ export function ActivityChart({ daily, ready, className }: ActivityChartProps) {
           </text>
         ))}
       </svg>
+      {daily.length > 0 ? (
+        <ul className="sr-only">
+          {daily.map((point) => (
+            <li key={point.date}>
+              {`${formatDate(point.date, i18n.language)}: ${point.count}`}
+            </li>
+          ))}
+        </ul>
+      ) : null}
       <footer className="adm-dash-card-foot">
         <span className="adm-dash-card-hint">
           {ready ? t("admin.v2.dash_sessions_hint", { count: max }) : t("admin.v2.dash_loading")}

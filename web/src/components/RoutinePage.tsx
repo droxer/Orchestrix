@@ -6,13 +6,14 @@ import { Input } from "@/components/ui/input";
 import { useRelayMutations } from "../hooks/useRelayMutations";
 import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
 import { useEmployeeAgents } from "../hooks/useEmployeeAgents";
+import { useDialogs } from "@/components/ui/DialogProvider";
 import { AgentStateBadge } from "./AgentStateBadge";
 import { Badge } from "@/components/ui/badge";
 import { PriorityBadge } from "./PriorityBadge";
 import { TaskStatusBadge } from "./TaskStatusBadge";
 import { cn } from "@/lib/utils";
 import { AGENT_NAMES, type CurrentUser, type DaemonNodeMonitorRecord, type RelaySession, type RelayTask } from "../types";
-import { ActionApprove, ActionCalendar, ActionSearch, ActionStart, ActionStop, NavConversations, NavRefresh, ViewGrid, ViewList } from "./icons";
+import { ActionApprove, ActionCalendar, ActionStart, ActionStop, NavConversations, NavRefresh, ViewGrid, ViewList } from "./icons";
 import { agentReadyForTask } from "../lib/backlog";
 import { TaskAssignee } from "./TaskAssignee";
 import { readViewPreference, writeViewPreference } from "../lib/viewPreference";
@@ -24,6 +25,7 @@ import { BoardEmpty } from "./BoardEmpty";
 import { TaskBoardHeaderActions } from "./TaskBoardHeaderActions";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { Button } from "./ui/button";
+import { FiltersBar } from "./FiltersBar";
 
 interface RoutinePageProps {
   tasks: RelayTask[];
@@ -109,74 +111,55 @@ function RoutineStats({ tasks }: { tasks: RelayTask[] }) {
   );
 }
 
+function formatNextRunDate(value: string): string {
+  // Date-only values ("2026-07-19") parse as UTC midnight; construct a local
+  // date so the rendered day does not shift with the viewer's timezone.
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  const date = dateOnly
+    ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
+    : new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat(document.documentElement.lang || undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  }).format(date);
+}
+
 function RoutineFiltersBar({ filters, onChange }: { filters: RoutineFilters; onChange: (next: RoutineFilters) => void }) {
   const { t } = useTranslation();
-  const [expanded, setExpanded] = useState(false);
-  const activeCount = activeFilterCount(filters);
 
   return (
-    <div className="backlog-filter-bar" aria-label={t("routine.filters")}>
-      <div className="backlog-filter-primary">
-        <div className="backlog-filter-search-wrap">
-          <ActionSearch size={15} aria-hidden="true" />
-          <input
-            className="backlog-filter-search"
-            name="routine-query"
-            type="search"
-            autoComplete="off"
-            spellCheck={false}
-            value={filters.query}
-            placeholder={t("routine.search")}
-            aria-label={t("routine.search")}
-            onChange={(event) => onChange({ ...filters, query: event.target.value })}
-          />
-        </div>
-        <div className="backlog-filter-actions">
-          <Button variant="ghost"
-            type="button"
-            className="backlog-filter-chip"
-            data-active={expanded ? "true" : "false"}
-            data-applied={activeCount > 0 ? "true" : "false"}
-            aria-expanded={expanded}
-            onClick={() => setExpanded((value) => !value)}
-          >
-            {expanded ? t("backlog.hide_filters") : t("backlog.show_filters")}
-            {activeCount > 0 ? (
-              <span className="backlog-filter-count" aria-hidden="true">{activeCount}</span>
-            ) : null}
-          </Button>
-          {activeCount > 0 ? (
-            <Button variant="ghost" type="button" className="backlog-filter-clear" onClick={() => onChange(initialFilters)}>
-              {t("backlog.clear_filters")}
-            </Button>
-          ) : null}
-        </div>
-      </div>
-      {expanded ? (
-        <div className="backlog-filter-secondary">
-          <select name="routine-type-filter" value={filters.type} aria-label={t("routine.type")} onChange={(event) => onChange({ ...filters, type: event.target.value as RoutineFilters["type"] })}>
-            <option value="all">{t("routine.all_types")}</option>
-            {TASK_ROUTINE_TYPES.map((type) => <option key={type} value={type}>{t(`routine.types.${type}`)}</option>)}
-          </select>
-          <select name="routine-cadence-filter" value={filters.cadence} aria-label={t("routine.cadence")} onChange={(event) => onChange({ ...filters, cadence: event.target.value as RoutineFilters["cadence"] })}>
-            <option value="all">{t("routine.all_cadences")}</option>
-            {TASK_ROUTINE_CADENCES.map((cadence) => <option key={cadence} value={cadence}>{t(`routine.cadences.${cadence}`)}</option>)}
-          </select>
-          <select name="routine-agent-filter" value={filters.agent} aria-label={t("backlog.agent")} onChange={(event) => onChange({ ...filters, agent: event.target.value as RoutineFilters["agent"] })}>
-            <option value="all">{t("backlog.all_agents")}</option>
-            {AGENT_NAMES.map((agent) => <option key={agent} value={agent}>{agent}</option>)}
-          </select>
-          <input name="routine-assignee-filter" autoComplete="off" value={filters.assignee} placeholder={t("backlog.assignee_filter")} aria-label={t("backlog.assignee_filter")} onChange={(event) => onChange({ ...filters, assignee: event.target.value })} />
-          <select name="routine-state-filter" value={filters.state} aria-label={t("routine.state")} onChange={(event) => onChange({ ...filters, state: event.target.value as RoutineFilters["state"] })}>
-            <option value="all">{t("routine.all_states")}</option>
-            <option value="enabled">{t("routine.enabled")}</option>
-            <option value="disabled">{t("routine.disabled")}</option>
-            <option value="due">{t("routine.due")}</option>
-            <option value="unscheduled">{t("routine.unscheduled")}</option>
-          </select>
-        </div>
-      ) : null}
-    </div>
+    <FiltersBar
+      ariaLabel={t("routine.filters")}
+      searchName="routine-query"
+      searchLabel={t("routine.search")}
+      query={filters.query}
+      onQueryChange={(query) => onChange({ ...filters, query })}
+      activeCount={activeFilterCount(filters)}
+      onClear={() => onChange(initialFilters)}
+    >
+      <select name="routine-type-filter" value={filters.type} aria-label={t("routine.type")} onChange={(event) => onChange({ ...filters, type: event.target.value as RoutineFilters["type"] })}>
+        <option value="all">{t("routine.all_types")}</option>
+        {TASK_ROUTINE_TYPES.map((type) => <option key={type} value={type}>{t(`routine.types.${type}`)}</option>)}
+      </select>
+      <select name="routine-cadence-filter" value={filters.cadence} aria-label={t("routine.cadence")} onChange={(event) => onChange({ ...filters, cadence: event.target.value as RoutineFilters["cadence"] })}>
+        <option value="all">{t("routine.all_cadences")}</option>
+        {TASK_ROUTINE_CADENCES.map((cadence) => <option key={cadence} value={cadence}>{t(`routine.cadences.${cadence}`)}</option>)}
+      </select>
+      <select name="routine-agent-filter" value={filters.agent} aria-label={t("backlog.agent")} onChange={(event) => onChange({ ...filters, agent: event.target.value as RoutineFilters["agent"] })}>
+        <option value="all">{t("backlog.all_agents")}</option>
+        {AGENT_NAMES.map((agent) => <option key={agent} value={agent}>{agent}</option>)}
+      </select>
+      <input name="routine-assignee-filter" autoComplete="off" spellCheck={false} value={filters.assignee} placeholder={t("backlog.assignee_filter")} aria-label={t("backlog.assignee_filter")} onChange={(event) => onChange({ ...filters, assignee: event.target.value })} />
+      <select name="routine-state-filter" value={filters.state} aria-label={t("routine.state")} onChange={(event) => onChange({ ...filters, state: event.target.value as RoutineFilters["state"] })}>
+        <option value="all">{t("routine.all_states")}</option>
+        <option value="enabled">{t("routine.enabled")}</option>
+        <option value="disabled">{t("routine.disabled")}</option>
+        <option value="due">{t("routine.due")}</option>
+        <option value="unscheduled">{t("routine.unscheduled")}</option>
+      </select>
+    </FiltersBar>
   );
 }
 
@@ -203,7 +186,7 @@ function RoutineCard({
   const tone = routineDueTone(task);
 
   return (
-    <article className="routine-card backlog-task" data-priority={task.priority} data-status={task.status}>
+    <article className="routine-card backlog-task list-virtual" data-priority={task.priority} data-status={task.status}>
       <div className="backlog-task-badges">
         <Badge variant={task.routineEnabled ? "success" : "neutral"}>{task.routineEnabled ? t("routine.enabled") : t("routine.disabled")}</Badge>
         <PriorityBadge priority={task.priority} />
@@ -218,7 +201,7 @@ function RoutineCard({
         <span className="backlog-meta-sep" aria-hidden="true">·</span>
         <span className={cn("backlog-due", tone !== "neutral" && tone)}>
           <ActionCalendar size={13} />
-          {task.routineNextRunDate || t("routine.no_next_run")}
+          {task.routineNextRunDate ? formatNextRunDate(task.routineNextRunDate) : t("routine.no_next_run")}
         </span>
         <span className="backlog-meta-sep" aria-hidden="true">·</span>
         <TaskStatusBadge status={task.status} />
@@ -305,7 +288,7 @@ function RoutineRow({
   const tone = routineDueTone(task);
 
   return (
-    <article className="backlog-row group" role="listitem" data-status={task.status} data-priority={task.priority}>
+    <article className="backlog-row group list-virtual" role="listitem" data-status={task.status} data-priority={task.priority}>
       <div className="backlog-row-lead">
         <span className="backlog-row-dot" aria-hidden="true" />
         <Button variant="ghost" type="button" className="backlog-row-title" onClick={onEdit}>{task.title}</Button>
@@ -319,7 +302,7 @@ function RoutineRow({
       </span>
       <span className={cn("backlog-row-due", tone !== "neutral" && tone)}>
         <ActionCalendar size={13} />
-        {task.routineNextRunDate || t("routine.no_next_run")}
+        {task.routineNextRunDate ? formatNextRunDate(task.routineNextRunDate) : t("routine.no_next_run")}
       </span>
       <div className="backlog-row-actions" role="group" aria-label={t("backlog.actions")}>
         <div className="backlog-action-group" aria-label={t("backlog.actions_dispatch")}>
@@ -372,21 +355,56 @@ function RoutineRow({
   );
 }
 
+function RoutineDrawerMeta({
+  task,
+  session,
+  onOpenThread,
+}: {
+  task: RelayTask;
+  session?: RelaySession;
+  onOpenThread: (sessionId: string) => void;
+}) {
+  const { t } = useTranslation();
+  const lastActivity = task.activity.at(-1);
+
+  return (
+    <section className="task-drawer-meta" aria-label={t("routine.meta")}>
+      <div className="task-drawer-meta-row">
+        <TaskStatusBadge status={task.status} />
+        <Badge variant={task.routineEnabled ? "success" : "neutral"}>
+          {task.routineEnabled ? t("routine.enabled") : t("routine.disabled")}
+        </Badge>
+        {session ? (
+          <Button variant="ghost" size="sm" type="button" onClick={() => onOpenThread(session.id)}>
+            {t("backlog.open_thread")}
+          </Button>
+        ) : null}
+      </div>
+      <p className="task-drawer-meta-activity">
+        {lastActivity ? lastActivity.message : t("routine.no_activity")}
+      </p>
+    </section>
+  );
+}
+
 export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing, onRefresh, onOpenConversation }: RoutinePageProps) {
   const { agents: logicalAgents } = useEmployeeAgents(currentUser.employeeId);
   const { t } = useTranslation();
+  const { confirm } = useDialogs();
   const {
     startTaskMutation,
     updateTaskMutation,
     createTaskMutation,
+    deleteTaskMutation,
   } = useRelayMutations();
   const [filters, setFilters] = useUrlSearchState("routineFilters", initialFilters, parseRoutineFilters, serializeRoutineFilters);
   const [view, setView] = useUrlSearchState("routineView", parseRoutineView(null), parseRoutineView, (value) => value);
   const [form, setForm] = useState<RoutineTaskFormState | null>(null);
   const [formBaseline, setFormBaseline] = useState<RoutineTaskFormState | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const formDirty = Boolean(form && formBaseline && !taskBoardFormsEqual(form, formBaseline));
-  const confirmDiscardChanges = useUnsavedChangesGuard(formDirty && !saving);
+  const confirmDiscardChanges = useUnsavedChangesGuard(formDirty && !saving && !deleting);
   const routineTasks = useMemo(() => tasks.filter((task) => task.isRoutine), [tasks]);
   const filteredTasks = useMemo(() => filterRoutineTasks(tasks, filters), [tasks, filters]);
   const employees = useMemo(() => {
@@ -411,7 +429,7 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
   }
 
   async function closeRoutineForm() {
-    if (saving) return;
+    if (saving || deleting) return;
     if (!(await confirmDiscardChanges())) return;
     setForm(null);
     setFormBaseline(null);
@@ -447,8 +465,10 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
         isRoutine: true,
         routineType: form.routineType,
         routineCadence: form.routineCadence,
-        routineNextRunDate: form.routineNextRunDate,
         routineEnabled: form.routineEnabled,
+        ...(form.routineCadence === "custom"
+          ? { routineNextRunDate: form.routineNextRunDate }
+          : {}),
         ...(form.assignedAgent ? { assignedAgent: form.assignedAgent } : {}),
         ...(form.assignedAgentId ? { assignedAgentId: form.assignedAgentId } : {}),
       };
@@ -463,10 +483,35 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
     }
   }
 
+  async function deleteRoutine() {
+    if (!form?.id || deleting) return;
+    const confirmed = await confirm({
+      title: t("routine.delete_title"),
+      message: t("routine.delete_body", { title: form.title }),
+      confirmLabel: t("backlog.delete_task"),
+      cancelLabel: t("dialog.cancel"),
+      tone: "danger",
+    });
+    if (!confirmed) return;
+    setDeleting(true);
+    try {
+      await deleteTaskMutation.mutateAsync({ taskId: form.id });
+      setForm(null);
+      setFormBaseline(null);
+    } catch {
+      // mutation onError surfaces a toast; keep the drawer open for retry.
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   function linkedSession(task: RelayTask): RelaySession | undefined {
     const latest = task.linkedSessionIds.at(-1);
     return latest ? sessions.find((session) => session.id === latest) : undefined;
   }
+
+  const editingTask = form?.id ? tasks.find((task) => task.id === form.id) : undefined;
+  const editingSession = editingTask ? linkedSession(editingTask) : undefined;
 
   function routineHandlers(task: RelayTask, session?: RelaySession) {
     return {
@@ -555,14 +600,25 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
           employees={employees}
           logicalAgents={logicalAgents}
           saving={saving}
+          deleting={deleting}
           title={form.id ? t("routine.edit") : t("routine.new")}
-          subtitle={form.id ?? t("routine.new_routine_id")}
+          subtitle={form.id
+            ? `${t(`routine.types.${form.routineType}`)} · ${t(`routine.cadences.${form.routineCadence}`)}`
+            : t("routine.new_routine_id")}
           employeeDatalistId="routine-employees"
+          meta={editingTask ? (
+            <RoutineDrawerMeta
+              task={editingTask}
+              session={editingSession}
+              onOpenThread={onOpenConversation}
+            />
+          ) : undefined}
           onClose={() => { void closeRoutineForm(); }}
           onChange={(next) => {
             if (next.variant === "routine") setForm(next);
           }}
           onSubmit={(event) => void submitRoutine(event)}
+          onDelete={form.id ? () => { void deleteRoutine(); } : undefined}
         />
       ) : null}
     </section>

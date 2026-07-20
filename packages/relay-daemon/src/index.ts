@@ -33,6 +33,7 @@ import {
   DAEMON_CAPABILITY_GENERATED_FILES,
   DAEMON_CAPABILITY_STRUCTURED_AGENT_EVENTS,
   DAEMON_CAPABILITY_WORKSPACE_READ,
+  DAEMON_CAPABILITY_WORKSPACE_READ_SHARED,
   DAEMON_NODE_PROTOCOL_VERSION,
 } from "relay-core";
 import { workspaceCommandEvent } from "./workspace-read.js";
@@ -201,6 +202,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
     capabilities: [
       DAEMON_CAPABILITY_GENERATED_FILES,
       DAEMON_CAPABILITY_WORKSPACE_READ,
+      DAEMON_CAPABILITY_WORKSPACE_READ_SHARED,
       DAEMON_CAPABILITY_STRUCTURED_AGENT_EVENTS,
     ],
     agentHealth,
@@ -720,31 +722,31 @@ async function executeCommand(
       );
     },
   };
-  // Each logical agent gets its own subdirectory under the node's shared
-  // workspace mount so concurrent agents don't collide; the host directory
-  // is created before the run since BoxLite bind-mounts make it immediately
-  // visible in the guest.
-  const agentWorkspaceSubdir = command.logicalAgentId
-    ? agentWorkspaceSubpath(command.logicalAgentId)
+  // Runs execute at the shared node workspace root so agents on the same
+  // computer collaborate through it. Each logical agent keeps a personal home
+  // subdirectory for private state; the host directory is created before the
+  // run since BoxLite bind-mounts make it immediately visible in the guest.
+  const agentHomeSubdir = command.logicalAgentId
+    ? agentWorkspaceSubpath(command.logicalAgentId).split(sep).join("/")
     : undefined;
   if (command.logicalAgentId) {
     ensureAgentWorkspaceDir(nodeWorkspacePath, command.logicalAgentId);
   }
-  const generatedFilesScanPath = agentWorkspaceSubdir
-    ? join(nodeWorkspacePath, agentWorkspaceSubdir)
-    : nodeWorkspacePath;
+  const scanOptions = { ownAgentHomeSubdir: agentHomeSubdir };
   const options = {
     execStream: environment.execStream,
     eventSink,
     runId: command.runId,
     agent: command.agent,
     signal,
-    agentWorkspaceSubdir,
   };
+  const runState = agentHomeSubdir
+    ? { ...state, agent_home_subdir: agentHomeSubdir }
+    : state;
   // Snapshot document-type workspace files so a successful run can report
   // exactly what it created or changed (see generated-files.ts).
-  const workspaceSnapshot = snapshotGeneratedFiles(generatedFilesScanPath);
-  const patch = await runAgentNode(command.agent, command.mode, state, options);
+  const workspaceSnapshot = snapshotGeneratedFiles(nodeWorkspacePath, scanOptions);
+  const patch = await runAgentNode(command.agent, command.mode, runState, options);
   const next = mergeAgentState(state, patch);
   await outputPostChain;
   const agentLog = next.agent_logs.slice(-1)[0] ?? "";
@@ -777,12 +779,7 @@ async function executeCommand(
     return;
   }
   const generatedFiles = next.last_exit_code === 0
-    ? diffGeneratedFiles(generatedFilesScanPath, workspaceSnapshot).map((file) => ({
-      ...file,
-      relativePath: agentWorkspaceSubdir
-        ? `${agentWorkspaceSubdir.split(sep).join("/")}/${file.relativePath}`
-        : file.relativePath,
-    }))
+    ? diffGeneratedFiles(nodeWorkspacePath, workspaceSnapshot, scanOptions)
     : [];
   logger.info("run completed", {
     ...commandLogFields(sandboxId, command),

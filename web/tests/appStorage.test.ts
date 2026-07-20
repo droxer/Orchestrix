@@ -34,13 +34,13 @@ describe("Relay web theme storage", () => {
     delete (globalThis as { matchMedia?: typeof globalThis.matchMedia }).matchMedia;
   });
 
-  it("defaults readTheme to dark when storage is empty", () => {
-    assert.equal(readTheme(), "dark");
+  it("defaults readTheme to system when storage is empty", () => {
+    assert.equal(readTheme(), "system");
   });
 
   it("rejects unknown stored themes", () => {
     storage.set("relay-web.theme", "neon");
-    assert.equal(readTheme(), "dark");
+    assert.equal(readTheme(), "system");
   });
 
   it("migrates legacy high-contrast themes to system", () => {

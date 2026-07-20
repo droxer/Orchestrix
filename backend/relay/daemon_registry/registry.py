@@ -134,11 +134,13 @@ PERSISTED_AGENT_STATE_KEYS = frozenset(
 )
 DAEMON_CAPABILITY_GENERATED_FILES = "generated-files"
 DAEMON_CAPABILITY_WORKSPACE_READ = "workspace-read"
+DAEMON_CAPABILITY_WORKSPACE_READ_SHARED = "workspace-read-shared"
 DAEMON_CAPABILITY_STRUCTURED_AGENT_EVENTS = "structured-agent-events"
 DAEMON_NODE_CAPABILITIES = frozenset(
     {
         DAEMON_CAPABILITY_GENERATED_FILES,
         DAEMON_CAPABILITY_WORKSPACE_READ,
+        DAEMON_CAPABILITY_WORKSPACE_READ_SHARED,
         DAEMON_CAPABILITY_STRUCTURED_AGENT_EVENTS,
     }
 )
@@ -1405,7 +1407,7 @@ class DaemonNodeRegistry:
         active_runs: list[dict[str, Any]] | None,
         request_id: str | None,
     ) -> dict[str, Any]:
-        if self.daemon_store.active_run_request_for_session(sandbox_id, session_id):
+        if self.daemon_store.active_run_request_for_session_any_node(session_id):
             raise ValueError(f"Session {session_id} already has an active daemon run.")
         request = self.daemon_store.create_run_request(
             {
@@ -1876,7 +1878,9 @@ class DaemonNodeRegistry:
         if conversation:
             state["prior_conversation"] = conversation
         handoff_note = compute_prior_handoff_note(
-            session_snapshot, assignment["executorKind"]
+            session_snapshot,
+            assignment["executorKind"],
+            assignment.get("agentId"),
         )
         if handoff_note:
             state["prior_handoff_note"] = handoff_note

@@ -11,11 +11,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import type { EmployeeAgent, TaskPriority, TaskRoutineCadence, TaskRoutineType, TaskStatus } from "../../types";
 import { TASK_PRIORITIES, TASK_STATUSES } from "../../lib/backlog";
-import { TASK_ROUTINE_CADENCES, TASK_ROUTINE_TYPES } from "../../lib/routine";
-import type { TaskBoardFormState } from "../../lib/taskBoardForm";
+import { TASK_ROUTINE_CADENCES, TASK_ROUTINE_TYPES, isoToday } from "../../lib/routine";
+import { nextRoutineRunDate, type BacklogTaskFormState, type RoutineTaskFormState, type TaskBoardFormState } from "../../lib/taskBoardForm";
 import { Drawer } from "../admin/Drawer";
 import { ActionAddPerson } from "../icons";
 import { TaskDrawerArtifacts } from "./TaskDrawerArtifacts";
@@ -30,10 +31,103 @@ type TaskDrawerProps = {
   title: string;
   subtitle: string;
   employeeDatalistId: string;
+  deleting?: boolean;
   onClose: () => void;
   onChange: (next: TaskBoardFormState) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onDelete?: () => void;
+  /** Read-only context (status, linked thread, recent activity) shown above the form in edit mode. */
+  meta?: ReactNode;
 };
+
+function BacklogFields({ form, onChange }: { form: BacklogTaskFormState; onChange: (next: TaskBoardFormState) => void }) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <label className="adm-field">
+        <span>{t("backlog.status")}</span>
+        <Select
+          value={form.status}
+          onValueChange={(value) => {
+            if (value == null) return
+            onChange({ ...form, status: value as TaskStatus })
+          }}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {TASK_STATUSES.map((status) => (
+              <SelectItem key={status} value={status}>{t(`backlog.statuses.${status}`)}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </label>
+      <label className="adm-field">
+        <span>{t("backlog.due")}</span>
+        <Input
+          name="backlog-due-date"
+          type="date"
+          value={form.dueDate}
+          onChange={(event) => onChange({ ...form, dueDate: event.target.value })}
+        />
+      </label>
+    </>
+  );
+}
+
+function RoutineFields({ form, onChange }: { form: RoutineTaskFormState; onChange: (next: TaskBoardFormState) => void }) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <label className="adm-field">
+        <span>{t("routine.type")}</span>
+        <Select
+          value={form.routineType}
+          onValueChange={(value) => {
+            if (value == null) return
+            onChange({ ...form, routineType: value as TaskRoutineType })
+          }}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {TASK_ROUTINE_TYPES.map((type) => (
+              <SelectItem key={type} value={type}>{t(`routine.types.${type}`)}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </label>
+      <label className="adm-field">
+        <span>{t("routine.cadence")}</span>
+        <Select
+          value={form.routineCadence}
+          onValueChange={(value) => {
+            if (value == null) return
+            const routineCadence = value as TaskRoutineCadence;
+            onChange({
+              ...form,
+              routineCadence,
+              routineNextRunDate: routineCadence === "custom"
+                ? form.routineNextRunDate
+                : nextRoutineRunDate(routineCadence),
+            })
+          }}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {TASK_ROUTINE_CADENCES.map((cadence) => (
+              <SelectItem key={cadence} value={cadence}>{t(`routine.cadences.${cadence}`)}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </label>
+    </>
+  );
+}
 
 export function TaskDrawer({
   form,
@@ -43,128 +137,42 @@ export function TaskDrawer({
   title,
   subtitle,
   employeeDatalistId,
+  deleting = false,
   onClose,
   onChange,
   onSubmit,
+  onDelete,
+  meta,
 }: TaskDrawerProps) {
   const { t } = useTranslation();
   const fieldPrefix = form.variant;
+  const busy = saving || deleting;
 
   function updateBase(patch: Partial<TaskBoardFormState>): void {
     onChange({ ...form, ...patch } as TaskBoardFormState);
   }
 
-  let variantFields: ReactNode = null;
-  if (form.variant === "backlog") {
-    variantFields = (
-      <>
-        <label className="adm-field">
-          <span>{t("backlog.status")}</span>
-          <Select
-            value={form.status}
-            onValueChange={(value) => {
-              if (value == null) return
-              onChange({ ...form, status: value as TaskStatus })
-            }}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {TASK_STATUSES.map((status) => (
-                <SelectItem key={status} value={status}>{t(`backlog.statuses.${status}`)}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </label>
-        <label className="adm-field">
-          <span>{t("backlog.due")}</span>
-          <Input
-            name={`${fieldPrefix}-due-date`}
-            type="date"
-            value={form.dueDate}
-            onChange={(event) => onChange({ ...form, dueDate: event.target.value })}
-          />
-        </label>
-      </>
-    );
-  } else {
-    variantFields = (
-      <>
-        <label className="adm-field">
-          <span>{t("routine.type")}</span>
-          <Select
-            value={form.routineType}
-            onValueChange={(value) => {
-              if (value == null) return
-              onChange({ ...form, routineType: value as TaskRoutineType })
-            }}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {TASK_ROUTINE_TYPES.map((type) => (
-                <SelectItem key={type} value={type}>{t(`routine.types.${type}`)}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </label>
-        <label className="adm-field">
-          <span>{t("routine.cadence")}</span>
-          <Select
-            value={form.routineCadence}
-            onValueChange={(value) => {
-              if (value == null) return
-              onChange({ ...form, routineCadence: value as TaskRoutineCadence })
-            }}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {TASK_ROUTINE_CADENCES.map((cadence) => (
-                <SelectItem key={cadence} value={cadence}>{t(`routine.cadences.${cadence}`)}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </label>
-        <label className="adm-field">
-          <span>{t("routine.next_run")}</span>
-          <Input
-            name={`${fieldPrefix}-next-run-date`}
-            type="date"
-            value={form.routineNextRunDate}
-            onChange={(event) => onChange({ ...form, routineNextRunDate: event.target.value })}
-          />
-        </label>
-        <label className="adm-field routine-toggle">
-          <span>{t("routine.enabled")}</span>
-          <input
-            name={`${fieldPrefix}-enabled`}
-            type="checkbox"
-            checked={form.routineEnabled}
-            onChange={(event) => onChange({ ...form, routineEnabled: event.target.checked })}
-          />
-        </label>
-      </>
-    );
-  }
+  const agentOptions = logicalAgents.filter((agent) =>
+    !form.assigneeEmployeeId
+    || agent.employeeId === form.assigneeEmployeeId
+    || agent.id === form.assignedAgentId
+  );
 
   return (
     <Drawer
       open
       onClose={() => {
-        if (!saving) onClose();
+        if (!busy) onClose();
       }}
       title={title}
       subtitle={subtitle}
-      width={420}
+      width={form.variant === "routine" ? 520 : 420}
       closeLabel={t("dialog.cancel")}
       ariaLabel={title}
       bodyClassName="adm-drawer-body--column"
     >
       <form className="adm-form task-board-drawer-form" onSubmit={onSubmit}>
+        {meta}
         <label className="adm-field">
           <span>{t("backlog.title_field")}</span>
           <Input
@@ -184,7 +192,7 @@ export function TaskDrawer({
           />
         </label>
         <div className="task-drawer-form-grid">
-          {form.variant === "routine" ? variantFields : null}
+          {form.variant === "routine" ? <RoutineFields form={form} onChange={onChange} /> : null}
           <label className="adm-field">
             <span>{t("backlog.priority")}</span>
             <Select
@@ -204,7 +212,7 @@ export function TaskDrawer({
               </SelectContent>
             </Select>
           </label>
-          {form.variant === "backlog" ? variantFields : null}
+          {form.variant === "backlog" ? <BacklogFields form={form} onChange={onChange} /> : null}
           <label className="adm-field">
             <span>{t("backlog.agent")}</span>
             <Select
@@ -228,15 +236,41 @@ export function TaskDrawer({
                 <SelectItem value={NO_AGENT}>
                   {form.variant === "backlog" ? t("backlog.agent_team") : t("backlog.no_agent")}
                 </SelectItem>
-                {logicalAgents
-                  .filter((agent) => !form.assigneeEmployeeId || agent.employeeId === form.assigneeEmployeeId)
-                  .map((agent) => (
-                    <SelectItem key={agent.id} value={agent.id}>{agent.displayName} · {agent.executorKind}</SelectItem>
-                  ))}
+                {agentOptions.map((agent) => (
+                  <SelectItem key={agent.id} value={agent.id}>{agent.displayName} · {agent.executorKind}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </label>
         </div>
+        {form.variant === "routine" ? (
+          <>
+            <label className="adm-field">
+              <span>{t("routine.next_run")}</span>
+              <Input
+                name={`${fieldPrefix}-next-run-date`}
+                type="date"
+                min={isoToday()}
+                value={form.routineNextRunDate}
+                readOnly={form.routineCadence !== "custom"}
+                onChange={(event) => onChange({ ...form, routineNextRunDate: event.target.value })}
+              />
+              <span className="adm-form-hint">{t("routine.next_run_hint")}</span>
+            </label>
+            <div className="adm-field routine-toggle">
+              <span className="routine-toggle-text">
+                <span>{t("routine.enabled")}</span>
+                <span className="adm-form-hint">{t("routine.enabled_hint")}</span>
+              </span>
+              <Switch
+                name={`${fieldPrefix}-enabled`}
+                checked={form.routineEnabled}
+                onCheckedChange={(checked) => onChange({ ...form, routineEnabled: checked })}
+                aria-label={t("routine.enabled")}
+              />
+            </div>
+          </>
+        ) : null}
         <label className="adm-field">
           <span>{t("backlog.assignee")}</span>
           <div className="task-drawer-assignee">
@@ -255,10 +289,22 @@ export function TaskDrawer({
         </label>
         {form.variant === "backlog" && form.id ? <TaskDrawerArtifacts taskId={form.id} /> : null}
         <div className="adm-form-actions">
-          <Button type="button" variant="outline" size="default" onClick={onClose} disabled={saving}>
+          {form.id && onDelete ? (
+            <Button
+              type="button"
+              variant="destructive"
+              size="default"
+              className="adm-form-actions-leading"
+              onClick={onDelete}
+              disabled={busy}
+            >
+              {deleting ? t("backlog.deleting") : t("backlog.delete_task")}
+            </Button>
+          ) : null}
+          <Button type="button" variant="outline" size="default" onClick={onClose} disabled={busy}>
             {t("dialog.cancel")}
           </Button>
-          <Button type="submit" variant="default" size="default" disabled={saving || !form.title.trim()}>
+          <Button type="submit" variant="default" size="default" disabled={busy || !form.title.trim()}>
             {saving ? t("admin.saving") : t("dialog.confirm")}
           </Button>
         </div>

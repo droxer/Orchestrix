@@ -6,6 +6,9 @@ from relay.persistence.agent_placement_store import (
     DatabaseAgentPlacementStore,
     LocalAgentPlacementStore,
     placement_status,
+    reconcile_single_active_placement,
+    _new_placement,
+    _placement_row,
 )
 from relay.persistence.agent_store import (
     DatabaseAgentStore,
@@ -28,6 +31,100 @@ def test_agents_can_be_placed_on_different_nodes(tmp_path: Path) -> None:
 
     assert first["daemonNodeId"] == "node_a"
     assert second["daemonNodeId"] == "node_b"
+
+
+def test_moving_an_agent_to_a_new_computer_supersedes_the_old_placement(
+    tmp_path: Path,
+) -> None:
+    agents = LocalAgentStore(tmp_path)
+    placements = LocalAgentPlacementStore(tmp_path)
+    agent = agents.create_agent(
+        "alice", {"displayName": "Researcher", "executorKind": "claude"}
+    )
+
+    first = placements.create_placement(agent, "node_a")
+    second = placements.create_placement(agent, "node_b")
+
+    # One agent lives on exactly one computer: the second assignment moves it.
+    active = placements.list_placements(agent_id=agent["id"])
+    assert [placement["daemonNodeId"] for placement in active] == ["node_b"]
+    assert placements.get_placement(first["id"])["desiredState"] == "removed"
+    assert second["daemonNodeId"] == "node_b"
+
+
+def test_reassigning_the_same_computer_is_rejected(tmp_path: Path) -> None:
+    agents = LocalAgentStore(tmp_path)
+    placements = LocalAgentPlacementStore(tmp_path)
+    agent = agents.create_agent(
+        "alice", {"displayName": "Researcher", "executorKind": "claude"}
+    )
+    placements.create_placement(agent, "node_a")
+
+    try:
+        placements.create_placement(agent, "node_a")
+    except ValueError as error:
+        assert "already" in str(error)
+    else:  # pragma: no cover - guard
+        raise AssertionError("expected a rejection for a duplicate placement")
+
+
+def test_database_store_moves_an_agent_between_computers(tmp_path: Path) -> None:
+    database_url = f"sqlite:///{tmp_path}/move.db"
+    agents = DatabaseAgentStore(database_url, create_schema=True)
+    placements = DatabaseAgentPlacementStore(database_url, create_schema=True)
+    agent = agents.create_agent(
+        "alice", {"displayName": "Researcher", "executorKind": "claude"}
+    )
+
+    placements.create_placement(agent, "node_a")
+    placements.create_placement(agent, "node_b")
+
+    active = placements.list_placements(agent_id=agent["id"])
+    assert [placement["daemonNodeId"] for placement in active] == ["node_b"]
+
+
+def test_reconcile_collapses_pre_invariant_multi_placements(tmp_path: Path) -> None:
+    agents = LocalAgentStore(tmp_path)
+    placements = LocalAgentPlacementStore(tmp_path)
+    agent = agents.create_agent(
+        "alice", {"displayName": "Researcher", "executorKind": "claude"}
+    )
+    # Simulate data created before the one-agent-one-computer invariant by
+    # appending a second active placement straight to the event log (bypassing
+    # create_placement's guard).
+    placements.create_placement(agent, "node_low", {"priority": 200})
+    extra = _new_placement(agent, "node_top", {"priority": 50})
+    placements._append(extra["id"], "placement.created", extra)
+    assert len(placements.list_placements(agent_id=agent["id"])) == 2
+
+    superseded = reconcile_single_active_placement(placements)
+
+    active = placements.list_placements(agent_id=agent["id"])
+    # The top-priority (lowest number) placement survives; the rest are removed.
+    assert [placement["daemonNodeId"] for placement in active] == ["node_top"]
+    assert superseded  # the priority-200 placement was moved to removed
+    # Idempotent: a second pass has nothing left to collapse.
+    assert reconcile_single_active_placement(placements) == []
+
+
+def test_database_reconcile_collapses_pre_invariant_multi_placements(tmp_path: Path) -> None:
+    database_url = f"sqlite:///{tmp_path}/reconcile.db"
+    agents = DatabaseAgentStore(database_url, create_schema=True)
+    placements = DatabaseAgentPlacementStore(database_url, create_schema=True)
+    agent = agents.create_agent(
+        "alice", {"displayName": "Researcher", "executorKind": "claude"}
+    )
+    placements.create_placement(agent, "node_low", {"priority": 200})
+    extra = _new_placement(agent, "node_top", {"priority": 50})
+    with placements.engine.begin() as conn:
+        conn.execute(placements.placements.insert().values(**_placement_row(extra, event_version=1)))
+    assert len(placements.list_placements(agent_id=agent["id"])) == 2
+
+    reconcile_single_active_placement(placements)
+
+    active = placements.list_placements(agent_id=agent["id"])
+    assert [placement["daemonNodeId"] for placement in active] == ["node_top"]
+    assert reconcile_single_active_placement(placements) == []
 
 
 def test_placement_availability_is_derived_from_agent_and_node_health(

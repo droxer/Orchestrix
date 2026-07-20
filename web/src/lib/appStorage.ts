@@ -25,13 +25,13 @@ export function writeTokens(tokens: TokenMap): void {
 }
 
 export function readTheme(): Theme {
-  if (typeof localStorage === "undefined") return "dark";
+  if (typeof localStorage === "undefined") return "system";
   const stored = localStorage.getItem(themeStorageKey);
   if (stored === "contrast" || stored === "contrast-dark") {
     localStorage.setItem(themeStorageKey, "system");
     return "system";
   }
-  return SUPPORTED_THEMES.includes(stored as Theme) ? stored as Theme : "dark";
+  return SUPPORTED_THEMES.includes(stored as Theme) ? stored as Theme : "system";
 }
 
 export function readLanguage(): Language {

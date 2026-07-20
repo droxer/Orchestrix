@@ -3,6 +3,7 @@ import type { AgentTaskMode, EmployeeAgent } from "../../types";
 import { isLogicalAgentRoutable } from "../../lib/agentDisplayNames";
 import { ActionApprove, ActionHandoff, ActionRoute } from "../icons";
 import { Button } from "../ui/button";
+import { useDialogs } from "../ui/DialogProvider";
 
 export function DecisionBar({ logicalAgents, sendDecision, handoffOpen, setHandoffOpen, handoffAgentId, setHandoffAgentId, handoffMode, setHandoffMode, handoffNote, setHandoffNote, sendHandoff }: {
   logicalAgents: EmployeeAgent[];
@@ -14,14 +15,29 @@ export function DecisionBar({ logicalAgents, sendDecision, handoffOpen, setHando
   sendHandoff: () => Promise<void>;
 }) {
   const { t } = useTranslation();
+  const { confirm } = useDialogs();
+
+  // Reject discards the turn, so it confirms first — approve/rerun/mark_done
+  // stay one-click since they are recoverable.
+  const handleReject = async () => {
+    const ok = await confirm({
+      title: t("decision.reject_confirm_title"),
+      message: t("decision.reject_confirm_message"),
+      confirmLabel: t("decision.reject"),
+      tone: "danger",
+    });
+    if (!ok) return;
+    await sendDecision("reject");
+  };
+
   return (
     <>
       <div className="decision-bar">
         <Button variant="ghost" type="button" onClick={() => void sendDecision("approve")}><ActionApprove size={14} /> {t("decision.approve")}</Button>
         <Button variant="ghost" type="button" onClick={() => void sendDecision("rerun")}>{t("decision.rerun")}</Button>
         <Button variant="ghost" type="button" onClick={() => void sendDecision("mark_done")}>{t("decision.mark_done")}</Button>
-        <Button variant="ghost" type="button" className="danger-soft" onClick={() => void sendDecision("reject")}>{t("decision.reject")}</Button>
-          <Button variant="default" type="button" className="primary" aria-controls="handoff-panel" aria-expanded={handoffOpen} onClick={() => setHandoffOpen(!handoffOpen)}>
+        <Button variant="ghost" type="button" className="danger-soft" onClick={() => void handleReject()}>{t("decision.reject")}</Button>
+        <Button variant="ghost" type="button" className="primary" aria-controls={handoffOpen ? "handoff-panel" : undefined} aria-expanded={handoffOpen} onClick={() => setHandoffOpen(!handoffOpen)}>
           <ActionHandoff size={14} /> {t("decision.handoff")}
         </Button>
       </div>

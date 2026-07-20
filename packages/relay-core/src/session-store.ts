@@ -45,6 +45,8 @@ export interface HumanDecision {
   createdAt: string;
   note?: string;
   targetAgent?: AgentName;
+  /** Stable logical-agent identity when the decision targets a named agent. */
+  targetAgentId?: string;
   /** Employee who made the decision, for governance/audit attribution. */
   actorEmployeeId?: string;
 }

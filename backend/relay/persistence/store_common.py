@@ -312,6 +312,8 @@ def materialize_task_events(events: list[dict[str, Any]]) -> dict[str, Any]:
                 task.pop("assignedAgentId", None)
         elif event_type == "task.status":
             task["status"] = event["status"]
+        elif event_type == "task.deleted":
+            task["deletedAt"] = event["timestamp"]
         elif event_type == "task.session_linked":
             if event["sessionId"] not in task["linkedSessionIds"]:
                 task["linkedSessionIds"].append(event["sessionId"])

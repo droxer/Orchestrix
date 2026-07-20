@@ -120,7 +120,6 @@ export interface WorkspaceBriefTask {
 export interface WorkspaceBriefResponse {
   employeeId: string;
   workspacePath?: string;
-  primaryNode?: DaemonNodeMonitorRecord | null;
   nodes: DaemonNodeMonitorRecord[];
   activeRuns: DaemonNodeMonitorRecord["activeRuns"];
   sessions: WorkspaceBriefSession[];
@@ -150,8 +149,12 @@ export interface WorkspaceFileEntry {
 
 export type AgentWorkspaceSource = "live" | "snapshot";
 
+/** Personal agent home vs the computer's shared workspace root. */
+export type WorkspaceScope = "agent-home" | "shared";
+
 export interface AgentWorkspaceFilesResponse {
   agentId: string;
+  scope?: WorkspaceScope;
   source: AgentWorkspaceSource;
   nodeId?: string;
   path: string;
@@ -162,8 +165,33 @@ export interface AgentWorkspaceFilesResponse {
 
 export interface AgentWorkspaceFileResponse {
   agentId: string;
+  scope?: WorkspaceScope;
   source: AgentWorkspaceSource;
   nodeId?: string;
+  path: string;
+  exists: boolean;
+  isBinary: boolean;
+  bytes: number;
+  content: string | null;
+  truncated: boolean;
+  limitBytes: number;
+  generatedAt: string;
+}
+
+export interface NodeWorkspaceFilesResponse {
+  nodeId: string;
+  scope: "shared";
+  source: "live";
+  path: string;
+  exists: boolean;
+  entries: WorkspaceFileEntry[];
+  generatedAt: string;
+}
+
+export interface NodeWorkspaceFileResponse {
+  nodeId: string;
+  scope: "shared";
+  source: "live";
   path: string;
   exists: boolean;
   isBinary: boolean;
@@ -338,6 +366,7 @@ export interface AgentRunInput {
   decision?: {
     kind: "rerun" | "handoff";
     targetAgent: AgentName;
+    targetAgentId?: string;
     note?: string;
   };
 }
@@ -359,6 +388,7 @@ export interface RunInput {
     kind: "rerun" | "handoff";
     note?: string;
     targetAgent?: AgentName;
+    targetAgentId?: string;
   };
 }
 

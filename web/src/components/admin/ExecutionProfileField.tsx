@@ -41,7 +41,7 @@ export function ExecutionProfileField({ value, onChange, name, disabled }: Execu
                 disabled={disabled}
                 onChange={() => onChange(mode)}
               />
-              <span className={`adm-profile-segment-btn ${selected ? "active" : ""}`}>
+              <span className="adm-profile-segment-btn" data-active={selected ? "true" : "false"}>
                 <span className="adm-profile-segment-dot" data-kind={kind} aria-hidden="true" />
                 {t(`admin.v2.node_execution_${kind}`)}
               </span>

@@ -2,10 +2,11 @@
 
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
-import { NavConversations, NavPreferences, NavRefresh, StreamAttachment } from "./icons";
+import { NavConversations, NavPreferences } from "./icons";
 import { PreferencesDialog } from "./PreferencesDialog";
 import type { Theme, Language } from "./PreferencesPanel";
 import { SideNav } from "./SideNav";
+import { ArtifactNavButton } from "./ArtifactNavButton";
 import type { AppRoute, MobileView } from "@/lib/viewTypes";
 import type { CurrentUser } from "@/types";
 import { useRelayStore } from "@/lib/store";
@@ -97,12 +98,11 @@ export function AppShell({
   const isMobileChat = route === "main" && mobileView === "chat";
 
   return (
-    <main className="messenger-shell" data-mobile-view={mobileView} data-route={route} data-sidenav={sidenavExpanded ? "open" : "closed"}>
+    <div className="messenger-shell" data-mobile-view={mobileView} data-route={route} data-sidenav={sidenavExpanded ? "open" : "closed"}>
       <a className="skip-link" href={skipLinkHref}>{t("skip_to_content")}</a>
 
       <div
         className={`mobile-topbar ${route === "main" ? "mobile-topbar--chat" : "mobile-topbar--route"}`}
-        aria-label={route === "main" ? t("nav.conversations") : t(WORK_ROUTE_LABEL_KEYS[route])}
       >
         {route === "main" ? (
           isMobileChat ? (
@@ -120,32 +120,13 @@ export function AppShell({
                 <span className="mobile-topbar-title">{activeConversationLabel}</span>
               </div>
               <div className="mobile-topbar-chat-tools">
-                <Button
-                  variant="ghost"
-                  className="icon-button"
-                  type="button"
-                  aria-label={t("artifact.open_drawer")}
-                  title={t("artifact.open_drawer")}
-                  disabled={!mobileChatChrome.hasSession}
-                  onClick={mobileChatChrome.onOpenArtifacts}
-                >
-                  <StreamAttachment size={16} />
-                  {mobileChatChrome.artifactCount > 0 ? (
-                    <span className="chat-artifacts-count mono" aria-label={t("artifact.drawer_subtitle", { count: mobileChatChrome.artifactCount })}>
-                      {mobileChatChrome.artifactCount}
-                    </span>
-                  ) : null}
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="icon-button"
-                  type="button"
-                  aria-label={t("nav.refresh")}
-                  title={t("nav.refresh")}
-                  onClick={mobileChatChrome.onRefresh}
-                >
-                  <NavRefresh size={16} className={mobileChatChrome.isRefreshing ? "spin" : ""} />
-                </Button>
+                <ArtifactNavButton
+                  artifactCount={mobileChatChrome.artifactCount}
+                  hasSession={mobileChatChrome.hasSession}
+                  isRefreshing={mobileChatChrome.isRefreshing}
+                  onOpenArtifacts={mobileChatChrome.onOpenArtifacts}
+                  onRefresh={mobileChatChrome.onRefresh}
+                />
                 <MobileSettingsButton prefsOpen={prefsOpen} setPrefsOpen={setPrefsOpen} />
               </div>
             </>
@@ -194,7 +175,12 @@ export function AppShell({
         onLogout={onLogout}
       />
 
-      {children}
+      {/* display:contents keeps the route panels as direct grid items of
+          .messenger-shell while the <main> landmark stays a sibling of the
+          SideNav <nav> instead of wrapping it. */}
+      <main style={{ display: "contents" }}>
+        {children}
+      </main>
 
       <PreferencesDialog
         open={prefsOpen}
@@ -206,7 +192,7 @@ export function AppShell({
           onLanguageChange,
         }}
       />
-    </main>
+    </div>
   );
 }
 

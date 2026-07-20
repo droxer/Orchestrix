@@ -51,6 +51,10 @@ const parsePageTab = (value: string | null): WorkspacePageTab => {
 };
 const parseString = (value: string | null): string => value ?? "";
 
+/** Personal home (default) vs the computer's shared workspace root. */
+type WorkspaceFileScope = "personal" | "shared";
+const parseFileScope = (value: string | null): WorkspaceFileScope => value === "shared" ? "shared" : "personal";
+
 const WORKSPACE_BRIEF_POLL_MS = 3000;
 
 function compactDate(value: string | undefined, locale: string): string {
@@ -245,9 +249,10 @@ export function AgentWorkspacePage({
     queryFn: ({ signal }) => getWorkspaceBrief({ agentId: agent.id }, signal),
     enabled: pageTab === "activities",
   });
+  const [fileScope, setFileScope] = useUrlSearchState("workspaceScope", "personal" as WorkspaceFileScope, parseFileScope, (value) => value === "personal" ? null : value);
   const fileQuery = useQuery({
-    queryKey: ["agent-workspace", agent.id, filePath],
-    queryFn: ({ signal }) => listAgentWorkspaceFiles({ agentId: agent.id, path: filePath }, signal),
+    queryKey: ["agent-workspace", agent.id, fileScope, filePath],
+    queryFn: ({ signal }) => listAgentWorkspaceFiles({ agentId: agent.id, path: filePath, scope: fileScope === "shared" ? "shared" : undefined }, signal),
     enabled: pageTab === "workspace",
   });
   const homeStatus = workspaceHomeStatus(fileQuery.data, snapshotBannerDismissed);
@@ -258,9 +263,9 @@ export function AgentWorkspacePage({
   });
   const selectedFilePath = selected?.type === "file" ? selected.path : "";
   const contentQuery = useQuery({
-    queryKey: ["agent-workspace-file", agent.id, selectedFilePath],
+    queryKey: ["agent-workspace-file", agent.id, fileScope, selectedFilePath],
     enabled: selected?.type === "file",
-    queryFn: ({ signal }) => readAgentWorkspaceFile({ agentId: agent.id, path: selectedFilePath }, signal),
+    queryFn: ({ signal }) => readAgentWorkspaceFile({ agentId: agent.id, path: selectedFilePath, scope: fileScope === "shared" ? "shared" : undefined }, signal),
   });
 
   const brief = query.data;
@@ -280,8 +285,9 @@ export function AgentWorkspacePage({
     setSelected(null);
     setSelectedKey("");
     setPageTab("activities");
+    setFileScope("personal");
     setSnapshotBannerDismissed(false);
-  }, [agent.id, setFilePath, setPageTab, setSelectedKey]);
+  }, [agent.id, setFilePath, setFileScope, setPageTab, setSelectedKey]);
 
   useEffect(() => {
     if (pageTab === "profile" || pageTab === "activities") {
@@ -326,6 +332,14 @@ export function AgentWorkspacePage({
 
   function openDirectory(path: string): void {
     setFilePath(path);
+  }
+
+  function switchFileScope(next: WorkspaceFileScope): void {
+    if (next === fileScope) return;
+    setFileScope(next);
+    setFilePath("");
+    setSelected(null);
+    setSelectedKey("");
   }
 
   function selectWorkspaceItem(selection: Selection): void {
@@ -494,9 +508,28 @@ export function AgentWorkspacePage({
                   </div>
                 ) : (
                   <div className="workspace-tabpanel-files">
-                    {homeStatus.kind === "snapshot-banner" ? (
+                    {fileScope === "personal" && homeStatus.kind === "snapshot-banner" ? (
                       <SnapshotBanner onDismiss={() => setSnapshotBannerDismissed(true)} />
                     ) : null}
+                    <div className="workspace-scope-toggle" role="group" aria-label={t("workspace.scope_label")}>
+                      {(["personal", "shared"] as const).map((scopeOption) => (
+                        <Button
+                          key={scopeOption}
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="workspace-scope-chip"
+                          data-active={fileScope === scopeOption ? "true" : "false"}
+                          aria-pressed={fileScope === scopeOption}
+                          onClick={() => switchFileScope(scopeOption)}
+                        >
+                          {scopeOption === "personal" ? t("workspace.scope_personal") : t("workspace.scope_shared")}
+                        </Button>
+                      ))}
+                      <span className="workspace-scope-hint">
+                        {fileScope === "shared" ? t("workspace.scope_shared_hint") : t("workspace.scope_personal_hint")}
+                      </span>
+                    </div>
                     <div className="workspace-files-bar">
                       <WorkspacePathBreadcrumb path={filePath} onNavigate={openDirectory} />
                       {homeStatus.kind === "live" ? <span className="workspace-home-status workspace-home-status--live">● {t("workspace.source_live")}{homeStatus.nodeId ? <span className="workspace-home-node"> {homeStatus.nodeId}</span> : null}</span> : null}
@@ -509,6 +542,7 @@ export function AgentWorkspacePage({
                       error={fileQuery.error}
                       isLoading={fileQuery.isLoading}
                       path={filePath}
+                      scope={fileScope}
                       selectedPath={selectedFilePath}
                       onOpenDirectory={openDirectory}
                       onSelectFile={(entry) => selectWorkspaceItem({ type: "file", path: entry.path, name: entry.name })}
@@ -745,6 +779,7 @@ function FilesPane({
   error,
   isLoading,
   path,
+  scope = "personal",
   selectedPath,
   onOpenDirectory,
   onSelectFile,
@@ -754,6 +789,7 @@ function FilesPane({
   error: unknown;
   isLoading: boolean;
   path: string;
+  scope?: WorkspaceFileScope;
   selectedPath: string;
   onOpenDirectory: (path: string) => void;
   onSelectFile: (entry: WorkspaceFileEntry) => void;
@@ -762,7 +798,10 @@ function FilesPane({
   const { t, i18n } = useTranslation();
   const entries = data?.entries ?? [];
   const emptyState = workspaceFilesEmptyState(data?.source);
-  const message = error instanceof Error ? error.message : error ? String(error) : "";
+  const sharedUnavailable = scope === "shared" && isWorkspaceRetryableError(error);
+  const message = sharedUnavailable
+    ? t("workspace.shared_unavailable")
+    : error instanceof Error ? error.message : error ? String(error) : "";
 
   return (
     <div className="workspace-pane-body">

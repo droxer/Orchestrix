@@ -54,13 +54,15 @@ class LocalAgentPlacementStore:
     ) -> dict[str, Any]:
         placement = _new_placement(agent, daemon_node_id, payload or {})
         with self._lock:
-            if _has_active_placement(
-                self.list_placements(agent_id=agent["id"]),
-                placement["daemonNodeId"],
-            ):
+            active = self.list_placements(agent_id=agent["id"])
+            if _has_active_placement(active, placement["daemonNodeId"]):
                 raise ValueError(
                     "Agent already has an active placement on this daemon node."
                 )
+            # One agent lives on exactly one computer: assigning a different
+            # computer moves the agent by superseding its prior placement.
+            for existing in active:
+                self.update_placement(existing["id"], {"desiredState": "removed"})
             self._append(placement["id"], "placement.created", placement)
             return placement
 
@@ -224,12 +226,15 @@ class DatabaseAgentPlacementStore:
         payload: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         placement = _new_placement(agent, daemon_node_id, payload or {})
-        if _has_active_placement(
-            self.list_placements(agent_id=agent["id"]), placement["daemonNodeId"]
-        ):
+        active = self.list_placements(agent_id=agent["id"])
+        if _has_active_placement(active, placement["daemonNodeId"]):
             raise ValueError(
                 "Agent already has an active placement on this daemon node."
             )
+        # One agent lives on exactly one computer: assigning a different computer
+        # moves the agent by superseding its prior placement.
+        for existing in active:
+            self.update_placement(existing["id"], {"desiredState": "removed"})
         event = _placement_event(placement["id"], "placement.created", placement)
         with self.engine.begin() as conn:
             row = _placement_row(placement, event_version=1)
@@ -412,6 +417,41 @@ def _has_active_placement(
         and placement.get("desiredState") != "removed"
         for placement in placements
     )
+
+
+def _placements_to_supersede(active_placements: list[dict[str, Any]]) -> list[str]:
+    """Given active placements sorted by (priority, id), return the ids beyond
+    each agent's top-priority one — the extras a one-agent-one-computer
+    invariant must move to removed."""
+    seen: set[str] = set()
+    extras: list[str] = []
+    for placement in active_placements:
+        agent_id = placement.get("agentId")
+        if agent_id in seen:
+            extras.append(placement["id"])
+        else:
+            seen.add(agent_id)
+    return extras
+
+
+def reconcile_single_active_placement(store: Any) -> list[str]:
+    """Collapse any agent holding multiple active placements down to its
+    highest-priority one, moving the rest to removed. Idempotent; returns the
+    superseded placement ids. Heals data written before the invariant existed
+    (both file and database stores, via their public list/update API).
+
+    Tolerates a not-yet-migrated database (schema created by Alembic after the
+    app builds its stores) by skipping when the table is absent."""
+    try:
+        active = store.list_placements()
+    except Exception as error:  # noqa: BLE001 - narrow check below
+        if "no such table" in str(error) or "does not exist" in str(error):
+            return []
+        raise
+    superseded = _placements_to_supersede(active)
+    for placement_id in superseded:
+        store.update_placement(placement_id, {"desiredState": "removed"})
+    return superseded
 
 
 def _new_placement(

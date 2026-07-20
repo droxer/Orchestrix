@@ -32,6 +32,15 @@ export function actionPrompt(state: AgentState): string {
 function promptPreludes(state: AgentState): string[] {
   const preludes: string[] = [];
   if (state.agent_instructions) preludes.push(`[Agent instructions]\n${state.agent_instructions}`);
+  if (state.agent_home_subdir) {
+    preludes.push(
+      [
+        "[Workspace]",
+        "The current directory is a workspace shared with the other agents on this computer; files here are visible to all of them.",
+        `Your private directory is \`${state.agent_home_subdir}/\`; keep personal state there and collaborate through the shared workspace.`,
+      ].join("\n"),
+    );
+  }
   if (state.prior_conversation) preludes.push(state.prior_conversation);
   if (state.prior_agent_bridge) preludes.push(state.prior_agent_bridge);
   if (state.prior_handoff_note) preludes.push(state.prior_handoff_note);

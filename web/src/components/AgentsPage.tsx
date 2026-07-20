@@ -4,7 +4,6 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useEmployeeAgents } from "../hooks/useEmployeeAgents";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
-import { agentLabel } from "../lib/plan";
 import type { AgentName, CurrentUser, EmployeeAgent, LogicalAgentAvailability } from "../types";
 import { ActionSearch, NavConversations, StreamInfo } from "./icons";
 import { AgentStateBadge } from "./AgentStateBadge";
@@ -69,7 +68,7 @@ function RosterFilterBar({
   const { t } = useTranslation();
 
   return (
-    <div className="agents-roster-filter" aria-label={t("agents_page.filters")}>
+    <div className="agents-roster-filter" role="group" aria-label={t("agents_page.filters")}>
       <div className="agents-roster-search-wrap">
         <ActionSearch size={14} aria-hidden="true" />
         <input
@@ -103,14 +102,12 @@ function RosterFilterBar({
 
 function RosterRow({
   agent,
-  executorLabel,
   selected,
   onSelect,
   onStartConversation,
   onOpenProfile,
 }: {
   agent: EmployeeAgent;
-  executorLabel: string;
   selected: boolean;
   onSelect: (agent: EmployeeAgent) => void;
   onStartConversation: (agent: EmployeeAgent) => void;
@@ -119,12 +116,13 @@ function RosterRow({
   const { t } = useTranslation();
   const placements = activePlacements(agent);
   const placementDescriptions = describeAgentPlacements(placements);
-  const readyPlacements = placements.filter((placement) => placement.status === "ready").length;
+  // One agent lives on exactly one computer.
+  const computer = placementDescriptions[0] ?? null;
   const ready = agent.enabled && agent.availability === "ready";
   const canChat = ready;
 
   return (
-    <li>
+    <li className="list-virtual">
       <article
         className="agents-roster-row"
         data-availability={agent.availability}
@@ -144,27 +142,17 @@ function RosterRow({
               <span className="agents-roster-row-name">{agent.displayName}</span>
               {!agent.enabled ? <Badge variant="neutral">{t("agents_page.disabled")}</Badge> : null}
             </span>
-            <span className="agents-roster-row-meta">
-              <span translate="no">{executorLabel}</span>
-              <span className="agents-roster-row-sep" aria-hidden="true">·</span>
-              <span className="mono">
-                {placements.length === 0
-                  ? t("agents_page.no_placements")
-                  : t("agents_page.placements_ready", { ready: readyPlacements, total: placements.length })}
-              </span>
-            </span>
-            {placementDescriptions.length > 0 ? (
+            {/* The executor is carried by the AgentStateBadge glyph; the row's
+                one infra line is the computer the agent runs on. */}
+            {computer ? (
               <span className="agents-roster-row-placements">
-                {placementDescriptions.map((description) => (
-                  <AgentPlacementBadge
-                    key={description.placement.id}
-                    description={description}
-                    compact
-                    showRank={placementDescriptions.length > 1}
-                  />
-                ))}
+                <AgentPlacementBadge description={computer} compact />
               </span>
-            ) : null}
+            ) : (
+              <span className="agents-roster-row-meta">
+                <span className="mono">{t("agents_page.no_placements")}</span>
+              </span>
+            )}
           </span>
         </button>
         <span className="agents-roster-row-actions" role="group" aria-label={t("agents_page.actions")}>
@@ -281,20 +269,16 @@ export function AgentsPage({
           />
         ) : (
           <ul className="agents-roster-list" aria-label={t("agents_page.title")}>
-            {visibleAgents.map((agent) => {
-              const descriptor = descriptors[agent.executorKind];
-              return (
-                <RosterRow
-                  key={agent.id}
-                  agent={agent}
-                  executorLabel={agentLabel(agent.executorKind)}
-                  selected={workspaceAgent?.id === agent.id}
-                  onSelect={onOpenWorkspace}
-                  onStartConversation={onStartConversation}
-                  onOpenProfile={(selected) => onOpenWorkspace(selected, "profile")}
-                />
-              );
-            })}
+            {visibleAgents.map((agent) => (
+              <RosterRow
+                key={agent.id}
+                agent={agent}
+                selected={workspaceAgent?.id === agent.id}
+                onSelect={onOpenWorkspace}
+                onStartConversation={onStartConversation}
+                onOpenProfile={(selected) => onOpenWorkspace(selected, "profile")}
+              />
+            ))}
           </ul>
         )}
       </div>

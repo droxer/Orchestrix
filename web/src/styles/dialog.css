@@ -106,7 +106,7 @@
 .dialog-toast {
   position: fixed;
   right: var(--sp-6);
-  bottom: var(--sp-6);
+  bottom: calc(var(--sp-6) + env(safe-area-inset-bottom));
   z-index: calc(var(--z-dialog) + 1);
   width: min(420px, calc(100vw - var(--sp-6) * 2));
   padding: var(--sp-3) var(--sp-4);
@@ -137,7 +137,7 @@
 @media (max-width: 600px) {
   .dialog-toast {
     right: var(--sp-4);
-    bottom: var(--sp-4);
+    bottom: calc(var(--sp-4) + env(safe-area-inset-bottom));
     width: calc(100vw - var(--sp-4) * 2);
   }
 }

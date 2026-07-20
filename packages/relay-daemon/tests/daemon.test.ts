@@ -1609,7 +1609,7 @@ test("backend reconnect delay uses capped equal jitter", () => {
 });
 
 test("relay daemon reports generated workspace documents in run.completed", async (t: TestContext) => {
-  const { mkdtempSync, rmSync, writeFileSync: writeFile } = await import("node:fs");
+  const { mkdtempSync, mkdirSync: makeDir, rmSync, writeFileSync: writeFile } = await import("node:fs");
   const { tmpdir } = await import("node:os");
   const { join: joinPath } = await import("node:path");
   const workspace = mkdtempSync(joinPath(tmpdir(), "relay-daemon-generated-"));
@@ -1641,6 +1641,9 @@ test("relay daemon reports generated workspace documents in run.completed", asyn
         if (!isInventoryProbe(args)) {
           writeFile(joinPath(workspace, agentWorkspaceSubpath("agent_research"), "quarterly-report.pdf"), "pdf bytes");
           writeFile(joinPath(workspace, agentWorkspaceSubpath("agent_research"), "server.key"), "not a document");
+          writeFile(joinPath(workspace, "shared-summary.csv"), "a,b\n");
+          makeDir(joinPath(workspace, agentWorkspaceSubpath("agent_other")), { recursive: true });
+          writeFile(joinPath(workspace, agentWorkspaceSubpath("agent_other"), "private.pdf"), "sibling private");
         }
         const rendered = options?.stdoutRenderer?.("done\n") ?? "done\n";
         options?.sink?.(rendered);
@@ -1673,9 +1676,15 @@ test("relay daemon reports generated workspace documents in run.completed", asyn
   assert.equal(registrations[0]?.capabilities?.includes("generated-files"), true);
   const completed = events.find((event) => event.type === "run.completed");
   assert.ok(completed && completed.type === "run.completed");
-  assert.equal(completed.generatedFiles?.length, 1);
-  const [file] = completed.generatedFiles ?? [];
-  assert.equal(file.relativePath, "agents/agent-YWdlbnRfcmVzZWFyY2g/quarterly-report.pdf");
+  const reported = (completed.generatedFiles ?? []).map((item) => item.relativePath).sort();
+  // Shared-root files and the agent's own home are reported; a sibling
+  // agent's private home is never attributed to this run.
+  assert.deepEqual(reported, [
+    "agents/agent-YWdlbnRfcmVzZWFyY2g/quarterly-report.pdf",
+    "shared-summary.csv",
+  ]);
+  const file = (completed.generatedFiles ?? []).find((item) => item.relativePath.endsWith(".pdf"));
+  assert.ok(file);
   assert.equal(file.contentType, "application/pdf");
   assert.equal(Buffer.from(file.contentBase64 ?? "", "base64").toString("utf-8"), "pdf bytes");
 });
@@ -1702,6 +1711,33 @@ test("generated-file diff detects changed files and skips excluded directories",
   const changed = diffGeneratedFiles(workspace, before);
   assert.deepEqual(changed.map((file) => file.relativePath).sort(), ["data.csv", "output/summary.md", "report.html"]);
   assert.deepEqual(diffGeneratedFiles(workspace, snapshotGeneratedFiles(workspace)), []);
+});
+
+test("generated-file scan skips sibling agent homes but keeps the running agent's own", async (t: TestContext) => {
+  const { mkdtempSync, mkdirSync: makeDir, rmSync, writeFileSync: writeFile } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join: joinPath } = await import("node:path");
+  const { diffGeneratedFiles } = await import("../src/generated-files.js");
+  const workspace = mkdtempSync(joinPath(tmpdir(), "relay-generated-homes-"));
+  t.after(() => rmSync(workspace, { recursive: true, force: true }));
+
+  const own = agentWorkspaceSubpath("agent_self");
+  const sibling = agentWorkspaceSubpath("agent_other");
+  makeDir(joinPath(workspace, own), { recursive: true });
+  makeDir(joinPath(workspace, sibling, "nested"), { recursive: true });
+  writeFile(joinPath(workspace, "shared.csv"), "a,b\n");
+  writeFile(joinPath(workspace, own, "mine.pdf"), "mine");
+  writeFile(joinPath(workspace, sibling, "theirs.pdf"), "theirs");
+  writeFile(joinPath(workspace, sibling, "nested", "deep.pdf"), "deep");
+
+  const changed = diffGeneratedFiles(workspace, {}, { ownAgentHomeSubdir: own });
+  assert.deepEqual(
+    changed.map((file) => file.relativePath).sort(),
+    [`${own}/mine.pdf`, "shared.csv"],
+  );
+
+  const unscoped = diffGeneratedFiles(workspace, {});
+  assert.equal(unscoped.length, 4);
 });
 
 test("listAgentWorkspace confines files to an agent home and sorts directories first", () => {
@@ -1749,6 +1785,29 @@ test("readAgentWorkspaceFile rejects escapes and caps text while identifying bin
   }
 });
 
+test("shared-scope workspace reads expose the node root but never escape it", () => {
+  const root = mkdtempSync(join(tmpdir(), "relay-ws-shared-"));
+  try {
+    const home = join(root, agentWorkspaceSubpath("agent_1"));
+    mkdirSync(home, { recursive: true });
+    writeFileSync(join(root, "shared.md"), "team notes");
+    writeFileSync(join(home, "private.md"), "mine");
+
+    const listing = listAgentWorkspace(root, undefined, "", "shared");
+    assert.equal(listing.exists, true);
+    assert.deepEqual(listing.entries.map((entry) => entry.name), ["agents", "shared.md"]);
+    const file = readAgentWorkspaceFile(root, undefined, "shared.md", undefined, "shared");
+    assert.equal(Buffer.from(file.contentBase64 ?? "", "base64").toString(), "team notes");
+    // Personal homes stay reachable through the shared root — same computer, same workspace.
+    const nested = readAgentWorkspaceFile(root, "agent_1", `agents/${agentWorkspaceSubpath("agent_1").split("/").pop()}/private.md`, undefined, "shared");
+    assert.equal(Buffer.from(nested.contentBase64 ?? "", "base64").toString(), "mine");
+    assert.throws(() => readAgentWorkspaceFile(root, undefined, "../escape.md", undefined, "shared"), (error: unknown) => error instanceof WorkspaceReadError && error.code === "invalid-path");
+    assert.throws(() => listAgentWorkspace(root, undefined, ""), (error: unknown) => error instanceof WorkspaceReadError && error.code === "invalid-path");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("relay daemon serves agent-home workspace commands", async () => {
   const root = mkdtempSync(join(tmpdir(), "relay-ws-"));
   const home = join(root, agentWorkspaceSubpath("agent_1"));
@@ -1785,6 +1844,7 @@ test("relay daemon serves agent-home workspace commands", async () => {
   rmSync(root, { recursive: true, force: true });
 
   assert.equal(registration?.capabilities?.includes("workspace-read"), true);
+  assert.equal(registration?.capabilities?.includes("workspace-read-shared"), true);
   const listing = events.find((event) => event.type === "workspace.listing");
   assert.ok(listing && listing.type === "workspace.listing");
   assert.deepEqual(listing.entries.map((entry) => entry.name), ["report.md"]);

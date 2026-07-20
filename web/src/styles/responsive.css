@@ -36,11 +36,11 @@
   }
 
   .mobile-topbar--chat {
-    grid-template-columns: 1fr 1fr 44px;
+    grid-template-columns: 1fr 1fr var(--touch-target);
   }
 
   .mobile-topbar--route {
-    grid-template-columns: minmax(0, 1fr) 44px;
+    grid-template-columns: minmax(0, 1fr) var(--touch-target);
   }
 
   .mobile-topbar {
@@ -59,7 +59,7 @@
   /* Chat route — one contextual segment per mobile view (not two competing
      toggles plus a duplicate title in the chat header). */
   .messenger-shell[data-mobile-view="threads"] .mobile-topbar--chat {
-    grid-template-columns: minmax(0, 1fr) 44px;
+    grid-template-columns: minmax(0, 1fr) var(--touch-target);
   }
 
   .messenger-shell[data-mobile-view="threads"] .mobile-topbar--chat > button:first-of-type {
@@ -73,7 +73,7 @@
   /* Open conversation: single header = back + title + tools/settings.
      The in-panel .chat-header is hidden so we reclaim ~64px of transcript. */
   .messenger-shell[data-mobile-view="chat"] .mobile-topbar--chat {
-    grid-template-columns: 44px minmax(0, 1fr) auto;
+    grid-template-columns: var(--touch-target) minmax(0, 1fr) auto;
   }
 
   .messenger-shell[data-mobile-view="chat"] .chat-header {
@@ -89,8 +89,8 @@
   }
 
   .mobile-topbar-back {
-    width: 44px;
-    height: 44px;
+    width: var(--touch-target);
+    height: var(--touch-target);
     padding: 0;
     justify-self: start;
   }
@@ -100,7 +100,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 44px;
+    min-height: var(--touch-target);
     padding-inline: var(--sp-2);
     text-align: center;
   }
@@ -119,8 +119,8 @@
   .mobile-topbar-chat-tools .icon-button,
   .mobile-topbar-chat-tools .mobile-settings {
     position: relative;
-    width: 44px;
-    height: 44px;
+    width: var(--touch-target);
+    height: var(--touch-target);
     padding: 0;
   }
 
@@ -132,16 +132,15 @@
     justify-content: center;
     gap: 2px;
     min-width: 0;
-    min-height: 44px;
+    min-height: var(--touch-target);
     padding-inline: var(--sp-2);
     text-align: center;
   }
 
   .mobile-topbar-eyebrow {
-    font: var(--type-micro);
-    letter-spacing: var(--track-caps);
-    text-transform: uppercase;
-    color: var(--ink-3);
+    /* Eyebrow grammar (type, tracking, caps, color) is canonical in
+       atelier.css, shared with .page-header-kicker; mobile only tightens
+       the leading. */
     line-height: 1;
   }
 
@@ -156,7 +155,7 @@
   }
 
   .mobile-topbar .mobile-settings {
-    width: 44px;
+    width: var(--touch-target);
     padding: 0;
   }
 
@@ -174,7 +173,7 @@
     padding: 0;
     margin: -1px;
     overflow: hidden;
-    clip: rect(0, 0, 0, 0);
+    clip-path: inset(50%);
     white-space: nowrap;
     border: 0;
   }
@@ -204,7 +203,7 @@
     padding: 0;
     margin: 0;
     overflow: visible;
-    clip: auto;
+    clip-path: none;
     white-space: normal;
     border: 0;
   }
@@ -215,7 +214,7 @@
     justify-content: center;
     gap: var(--sp-2);
     min-width: 0;
-    min-height: 44px;
+    min-height: var(--touch-target);
     padding: 0 var(--sp-3);
     border-radius: var(--r-2);
     color: var(--ink-2);
@@ -359,7 +358,7 @@
     margin: 0;
     padding: 0;
     overflow: hidden;
-    clip: auto;
+    clip-path: none;
     color: inherit;
     font-size: var(--fs-1);
     font-weight: 600;

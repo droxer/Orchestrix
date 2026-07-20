@@ -12,13 +12,19 @@ class AgentRoutingError(ValueError):
         self.code = code
 
 
-def select_workspace_node(agent: dict[str, Any], placement_store: Any, daemon_nodes: list[dict[str, Any]]) -> dict[str, Any] | None:
-    """Return the highest-priority live placement that can read an agent home."""
+def select_workspace_node(
+    agent: dict[str, Any],
+    placement_store: Any,
+    daemon_nodes: list[dict[str, Any]],
+    *,
+    capability: str = "workspace-read",
+) -> dict[str, Any] | None:
+    """Return the highest-priority live placement whose node has the read capability."""
     nodes = {node["id"]: node for node in daemon_nodes}
     candidates: list[tuple[int, str, dict[str, Any]]] = []
     for placement in placement_store.list_placements(agent_id=agent["id"]):
         node = nodes.get(placement["daemonNodeId"])
-        if not node or "workspace-read" not in (node.get("capabilities") or []):
+        if not node or capability not in (node.get("capabilities") or []):
             continue
         if placement_status(placement, agent, node)["status"] in ("ready", "busy"):
             candidates.append((int(placement.get("priority") or 100), placement["id"], node))
