@@ -10,6 +10,7 @@ const readStyle = (rel: string) => readFileSync(path.join(repoRoot, "web", "src"
 
 const palette = readStyle("tokens/palette.css");
 const lightMarker = 'html[data-theme="light"]';
+assert.ok(palette.includes(lightMarker), "palette.css is missing the light register marker");
 const darkRegister = palette.slice(0, palette.indexOf(lightMarker));
 const lightRegister = palette.slice(palette.indexOf(lightMarker));
 
@@ -24,7 +25,7 @@ describe("monochrome palette tokens", () => {
   it("dark register status is a grey brightness hierarchy (loud = bright)", () => {
     assert.match(darkRegister, /--err:\s*#f2f4f6;/);
     assert.match(darkRegister, /--warn:\s*#99a0a8;/);
-    assert.match(darkRegister, /--ok:\s*#6b727b;/);
+    assert.match(darkRegister, /--ok:\s*#7d848d;/);
   });
 
   it("light register inverts to a black action fill", () => {
@@ -34,7 +35,7 @@ describe("monochrome palette tokens", () => {
     assert.match(lightRegister, /--action-soft:\s*color-mix\(in srgb, #16181b 7%, transparent\);/);
     assert.match(lightRegister, /--err:\s*#16181b;/);
     assert.match(lightRegister, /--warn:\s*#5c636b;/);
-    assert.match(lightRegister, /--ok:\s*#7d848d;/);
+    assert.match(lightRegister, /--ok:\s*#6b727b;/);
   });
 
   it("no chromatic graphite-era values remain in palette.css", () => {

@@ -33,8 +33,8 @@
 
   /* Status — a grey brightness hierarchy: loud = bright, calm = dim.
      Dot/border/text only, never fills, never actions.
-     AA-safe as small text on the dark surfaces. */
-  --ok: #6b727b;
+     Warn/err are AA-safe as small text; ok is the decorative-calm tier. */
+  --ok: #7d848d;
   --warn: #99a0a8;
   --err: #f2f4f6;
 
@@ -135,7 +135,7 @@ html[data-theme="light"] {
   --action-soft: color-mix(in srgb, #16181b 7%, transparent);
   --on-action: #ffffff;
 
-  --ok: #7d848d;
+  --ok: #6b727b;
   --warn: #5c636b;
   --err: #16181b;
 
