@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-07-20-monochrome-tokens-design.md`
 
-**Review amendments (folded in):** the `--ok` grey is shifted off each register's `--ink-4` (dark `#7d848d`, light `#6b727b`) so admin dashboard bar segments stay distinguishable, and the login backdrop glow uses `var(--lg-steel) 5%` (same rendered value as the literal, better traceability).
+**Review amendments (folded in):** the `--ok` grey is shifted off each register's `--ink-4` (dark `#7d848d`, light `#6b727b`) so admin dashboard bar segments stay distinguishable; the login backdrop glow uses `var(--lg-steel) 5%` (same rendered value as the literal, better traceability); and login.css adds `--lg-err: #f2f4f6` consumed by `.login-error` (the `--lg-down` remap had dropped the error banner below WCAG AA).
 
 ---
 
@@ -468,6 +468,7 @@ Run: `make web` and open `http://127.0.0.1:5000`. Check:
 5. Preferences theme-picker swatches: light swatch shows a black accent bar, dark swatch a white one, system swatch split black/white.
 6. Admin dashboard stacked bar chart: `tone-good` and `tone-muted` segments are visibly distinct greys in both themes.
 7. An invalid/danger form field (e.g. a failing validation state): confirm the danger focus ring is visible — it is intentionally identical to the normal focus ring under monochrome (spec-accepted tradeoff), so verify the field state is still communicated by the error text/icon.
+8. Login error banner (submit bad credentials): bright (`--lg-err`) text/border, clearly legible on the dark canvas.
 
 - [ ] **Step 4: Commit any fixes the visual pass surfaces, or record completion**
 

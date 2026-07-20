@@ -59,6 +59,9 @@ with no change needed; contrast on the dark canvas stays strong.
   `--lg-on-amber: #101214`
 - Readiness dots map as activity, not error: `--lg-up: #f2f4f6`
   (bright = ready), `--lg-down: #6b727b` (dim = offline)
+- The error banner gets its own loud-tier pin, `--lg-err: #f2f4f6`
+  (consuming `--lg-down` dropped it below WCAG AA); `.login-error`
+  consumes `--lg-err` for border, wash, and text
 - Backdrop radial glow: `color-mix(in srgb, var(--lg-steel) 7%, transparent)`
   → `color-mix(in srgb, var(--lg-steel) 5%, transparent)` (keeps the var;
   `--lg-steel` is now `#f2f4f6`, so a literal and the var render identically)
