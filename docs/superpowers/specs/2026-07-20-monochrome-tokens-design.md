@@ -35,7 +35,8 @@ TypeScript changes. Exactly three files change values:
 - Status as a brightness hierarchy — loud = bright, calm = dim:
   - `--err: #f2f4f6`
   - `--warn: #99a0a8`
-  - `--ok: #6b727b`
+  - `--ok: #7d848d` (shifted off `--ink-4 #6b727b` so dashboard bar
+    segments `tone-good` vs `tone-muted` stay distinguishable)
 
 The focus ring in `roles.css` reads `--action`, so it becomes a white ring
 with no change needed; contrast on the dark canvas stays strong.
@@ -49,7 +50,7 @@ with no change needed; contrast on the dark canvas stays strong.
 - Status:
   - `--err: #16181b`
   - `--warn: #5c636b`
-  - `--ok: #7d848d`
+  - `--ok: #6b727b` (distinct from light `--ink-4 #7d848d` and `--warn`)
 
 ### 3. `login.css` — pinned pre-auth palette
 
@@ -59,7 +60,8 @@ with no change needed; contrast on the dark canvas stays strong.
 - Readiness dots map as activity, not error: `--lg-up: #f2f4f6`
   (bright = ready), `--lg-down: #6b727b` (dim = offline)
 - Backdrop radial glow: `color-mix(in srgb, var(--lg-steel) 7%, transparent)`
-  → `color-mix(in srgb, #f2f4f6 5%, transparent)`
+  → `color-mix(in srgb, var(--lg-steel) 5%, transparent)` (keeps the var;
+  `--lg-steel` is now `#f2f4f6`, so a literal and the var render identically)
 - Header comment rewritten — no more "steel-blue action, amber attention"
 
 ### 4. `preferences.css` — theme-picker swatches
@@ -75,8 +77,8 @@ Swatches mirror the registers:
 
 - `chart-3/4/5` alias ok/warn/err, so charts go greyscale for free.
 - Status badges that tint via `color-mix(in srgb, var(--err) 6%, transparent)`
-  become subtle neutral washes; text stays AA-safe since the err/warn/ok
-  greys reuse ink-ramp values.
+  become subtle neutral washes; warn/err text stays AA-safe, while ok is the
+  decorative-calm tier (below AA for small text by design).
 - shadcn `--ring` aliases `--action`, so Tailwind ring utilities follow.
 - All component markup, TSX, tests, and bridge files are untouched.
 

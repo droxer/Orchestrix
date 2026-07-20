@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-07-20-monochrome-tokens-design.md`
 
-**Deviation from spec (approved-level detail):** in `login.css` the backdrop glow becomes `color-mix(in srgb, var(--lg-steel) 5%, transparent)` (reusing the pinned var, which is now `#f2f4f6`) instead of a literal `#f2f4f6 5%` — same rendered value, better traceability. The guard test asserts the `var(--lg-steel) 5%` form.
+**Review amendments (folded in):** the `--ok` grey is shifted off each register's `--ink-4` (dark `#7d848d`, light `#6b727b`) so admin dashboard bar segments stay distinguishable, and the login backdrop glow uses `var(--lg-steel) 5%` (same rendered value as the literal, better traceability).
 
 ---
 
@@ -36,6 +36,7 @@ const readStyle = (rel: string) => readFileSync(path.join(repoRoot, "web", "src"
 
 const palette = readStyle("tokens/palette.css");
 const lightMarker = 'html[data-theme="light"]';
+assert.ok(palette.includes(lightMarker), "palette.css is missing the light register marker");
 const darkRegister = palette.slice(0, palette.indexOf(lightMarker));
 const lightRegister = palette.slice(palette.indexOf(lightMarker));
 
@@ -50,7 +51,7 @@ describe("monochrome palette tokens", () => {
   it("dark register status is a grey brightness hierarchy (loud = bright)", () => {
     assert.match(darkRegister, /--err:\s*#f2f4f6;/);
     assert.match(darkRegister, /--warn:\s*#99a0a8;/);
-    assert.match(darkRegister, /--ok:\s*#6b727b;/);
+    assert.match(darkRegister, /--ok:\s*#7d848d;/);
   });
 
   it("light register inverts to a black action fill", () => {
@@ -60,7 +61,7 @@ describe("monochrome palette tokens", () => {
     assert.match(lightRegister, /--action-soft:\s*color-mix\(in srgb, #16181b 7%, transparent\);/);
     assert.match(lightRegister, /--err:\s*#16181b;/);
     assert.match(lightRegister, /--warn:\s*#5c636b;/);
-    assert.match(lightRegister, /--ok:\s*#7d848d;/);
+    assert.match(lightRegister, /--ok:\s*#6b727b;/);
   });
 
   it("no chromatic graphite-era values remain in palette.css", () => {
@@ -146,8 +147,8 @@ with:
 
   /* Status — a grey brightness hierarchy: loud = bright, calm = dim.
      Dot/border/text only, never fills, never actions.
-     AA-safe as small text on the dark surfaces. */
-  --ok: #6b727b;
+     Warn/err are AA-safe as small text; ok is the decorative-calm tier. */
+  --ok: #7d848d;
   --warn: #99a0a8;
   --err: #f2f4f6;
 ```
@@ -175,7 +176,7 @@ with:
   --action-soft: color-mix(in srgb, #16181b 7%, transparent);
   --on-action: #ffffff;
 
-  --ok: #7d848d;
+  --ok: #6b727b;
   --warn: #5c636b;
   --err: #16181b;
 ```
@@ -465,6 +466,8 @@ Run: `make web` and open `http://127.0.0.1:5000`. Check:
 3. App, dark theme: white primary buttons/CTAs with dark text, white focus rings, grey status dots (err brightest, ok dimmest), neutral selection/active-nav wash.
 4. App, light theme (Preferences → theme → light): black primary buttons with white text, black focus rings, inverted status greys.
 5. Preferences theme-picker swatches: light swatch shows a black accent bar, dark swatch a white one, system swatch split black/white.
+6. Admin dashboard stacked bar chart: `tone-good` and `tone-muted` segments are visibly distinct greys in both themes.
+7. An invalid/danger form field (e.g. a failing validation state): confirm the danger focus ring is visible — it is intentionally identical to the normal focus ring under monochrome (spec-accepted tradeoff), so verify the field state is still communicated by the error text/icon.
 
 - [ ] **Step 4: Commit any fixes the visual pass surfaces, or record completion**
 
