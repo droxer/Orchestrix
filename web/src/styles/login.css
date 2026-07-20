@@ -7,12 +7,12 @@
 
    Color is pinned via local --lg-* variables whose values are lifted
    verbatim from the dark (default) register in tokens/palette.css
-   (graphite canvas, steel-blue action, amber attention). Spacing,
+   (graphite canvas, white action, mid-grey attention). Spacing,
    type scale, and radii are theme-independent tokens and are used
    directly. Documented stylelint exception — see web/.stylelintrc.json.
 
-   Bootstrap mode (data-mode="bootstrap") swings the accent from steel
-   to amber: the plane is awaiting credentials, not ready.
+   Bootstrap mode (data-mode="bootstrap") swings the accent from white
+   to mid grey: the plane is awaiting credentials, not ready.
    ===================================================================== */
 
 .login-screen {
@@ -24,17 +24,18 @@
   --lg-muted: #99a0a8;
   --lg-hairline: color-mix(in srgb, #f2f4f6 14%, #101214);
   --lg-hairline-soft: color-mix(in srgb, #f2f4f6 8%, #101214);
-  --lg-steel: #6ba1d4;
-  --lg-steel-active: #84b3e0;
-  --lg-on-steel: #0e1216; /* text-on-action (dark ink on the steel fill) */
-  --lg-on-amber: #2b1c02; /* text-on-amber for bootstrap-mode fills */
-  --lg-up: #3fb96c;
-  --lg-amber: #d9a13f;
-  --lg-down: #e5635f;
-  /* Mode accent — steel while attaching, amber during first-run setup. */
+  /* Names --lg-steel/--lg-amber are historical; the values are neutral now. */
+  --lg-steel: #f2f4f6;
+  --lg-steel-active: #ffffff;
+  --lg-on-steel: #101214; /* text-on-action (dark ink on the white fill) */
+  --lg-on-amber: #101214; /* text on the mid-grey bootstrap fill */
+  --lg-up: #f2f4f6;
+  --lg-amber: #99a0a8;
+  --lg-down: #6b727b;
+  /* Mode accent — white while attaching, mid grey during first-run setup. */
   --lg-accent: var(--lg-steel);
-  /* Pin the action color to the pre-auth dark steel so RelayMark's lead
-     chevron stays graphite steel even when the operator's saved theme is light. */
+  /* Pin the action color to the pre-auth white so RelayMark's lead
+     chevron stays neutral white even when the operator's saved theme is light. */
   --action: var(--lg-steel);
 
   position: relative;
@@ -42,7 +43,7 @@
   min-height: 100vh;
   min-height: 100svh;
   background:
-    radial-gradient(120% 90% at 12% 0%, color-mix(in srgb, var(--lg-steel) 7%, transparent), transparent 55%),
+    radial-gradient(120% 90% at 12% 0%, color-mix(in srgb, var(--lg-steel) 5%, transparent), transparent 55%),
     linear-gradient(to right, var(--lg-hairline-soft) 1px, transparent 1px) 0 0 / 56px 56px,
     linear-gradient(to bottom, var(--lg-hairline-soft) 1px, transparent 1px) 0 0 / 56px 56px,
     var(--lg-canvas);
@@ -349,6 +350,7 @@
   font-family: var(--font-mono);
   font-size: var(--fs-4);
   caret-color: var(--lg-accent);
+  touch-action: manipulation;
   transition: border-color var(--t-fast) var(--ease);
 }
 
@@ -393,6 +395,7 @@
   color: var(--lg-on-steel);
   font: var(--type-label-strong);
   cursor: pointer;
+  touch-action: manipulation;
   transition: background var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
 }
 
@@ -462,6 +465,7 @@
   font-family: var(--font-mono);
   font-size: var(--fs-2);
   cursor: pointer;
+  touch-action: manipulation;
   transition: color var(--t-fast) var(--ease);
 }
 
@@ -511,8 +515,10 @@
 .login-checking-text::after {
   content: "▌";
   margin-left: var(--sp-1);
-  /* Pre-mount caret on the pinned dark canvas — matches --lg-ink. */
-  color: #f5f3ec;
+  /* Pre-mount caret on the pinned dark canvas — matches --lg-ink. The var
+     isn't in scope before .login-screen mounts, so the literal fallback
+     carries the value until it is. */
+  color: var(--lg-ink, #f2f4f6);
 }
 
 /* ---------- Motion --------------------------------------------------- */
@@ -574,6 +580,10 @@
 /* ---------- Reduced motion ------------------------------------------- */
 
 @media (prefers-reduced-motion: reduce) {
+  .login-submit:active:not(:disabled) {
+    transform: none;
+  }
+
   .login-masthead,
   .login-headline,
   .login-lede,
