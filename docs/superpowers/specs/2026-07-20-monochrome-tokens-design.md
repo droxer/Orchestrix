@@ -84,6 +84,13 @@ Swatches mirror the registers:
   decorative-calm tier (below AA for small text by design).
 - shadcn `--ring` aliases `--action`, so Tailwind ring utilities follow.
 - All component markup, TSX, tests, and bridge files are untouched.
+- Deliberate semantic inversion: login readiness dots map brightness to
+  activity (ready = bright, offline = dim), while in-app status maps
+  brightness to urgency (err = bright, ok = calm). Both are intentional —
+  do not "align" them.
+- In the dark register `--err == --ink-1 == --action` (`#f2f4f6`), so
+  dark-theme error text is pixel-identical to heading text; error states
+  lean on icon/context. Inherent to the approved loud = bright hierarchy.
 
 ## Comment sweep
 

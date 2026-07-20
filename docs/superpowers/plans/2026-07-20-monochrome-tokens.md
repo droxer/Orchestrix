@@ -222,6 +222,8 @@ describe("monochrome login palette", () => {
     assert.match(login, /--lg-on-amber:\s*#101214;/);
     assert.match(login, /--lg-up:\s*#f2f4f6;/);
     assert.match(login, /--lg-down:\s*#6b727b;/);
+    assert.match(login, /--lg-err:\s*#f2f4f6;/);
+    assert.match(login, /\.login-error \{[^}]*var\(--lg-err\)/s);
     assert.match(login, /color-mix\(in srgb, var\(--lg-steel\) 5%, transparent\)/);
   });
 
@@ -297,6 +299,7 @@ with:
   --lg-up: #f2f4f6;
   --lg-amber: #99a0a8;
   --lg-down: #6b727b;
+  --lg-err: #f2f4f6; /* error is the loud/bright tier — dots stay calm; consumed by .login-error */
   /* Mode accent — white while attaching, mid grey during first-run setup. */
   --lg-accent: var(--lg-steel);
   /* Pin the action color to the pre-auth white so RelayMark's lead
