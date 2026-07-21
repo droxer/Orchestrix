@@ -155,6 +155,29 @@ def test_managed_node_provisioning_enrolls_runtime_with_single_use_grant(monkeyp
         assert client.get("/cp/daemon-nodes").json()["nodes"] == []
 
 
+def test_legacy_managed_node_with_retired_policy_can_be_deleted(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _login_admin(client)
+
+        node = app.state.managed_node_store.create_node({"employeeId": "alice"})
+        app.state.managed_node_store._write_node({
+            **node,
+            "displayName": "Managed node for pool",
+            "assignmentMode": "pooled",
+            "sandboxMode": "none",
+            "workspacePolicy": {"kind": "managed-pool"},
+        })
+
+        deleted = client.delete(f"/cp/managed-nodes/{node['id']}")
+
+        assert deleted.status_code == 202
+        assert deleted.json()["node"]["desiredState"] == "deleted"
+
+
 def test_failed_managed_node_is_visible_as_failed(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:

@@ -72,6 +72,11 @@ export function visualStatus(node: ControlPanelDaemonNodeRecord): string {
   return isStale(node) ? "stale" : node.status;
 }
 
+/** A computer is "online" when its daemon is connected and its heartbeat is fresh. */
+export function isNodeOnline(node: ControlPanelDaemonNodeRecord): boolean {
+  return Boolean(node.online) && !isStale(node);
+}
+
 export function statusTone(status: string): Tone {
   if (status === "ready") return "good";
   if (status === "running" || status === "provisioning") return "info";

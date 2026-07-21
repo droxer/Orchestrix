@@ -444,21 +444,6 @@
   box-shadow: inset 2px 0 0 var(--action);
 }
 
-.adm-assign-node-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--r-full);
-  background: var(--tone, var(--ink-4));
-  flex-shrink: 0;
-  position: relative;
-}
-
-/* Toned dots carry a soft halo; neutral stays a flat dot. The tone→color
-   table lives in tokens.css (.tone-* sets --tone). */
-.adm-assign-node-dot:not(.tone-neutral) {
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tone, transparent) 16%, transparent);
-}
-
 .adm-assign-node-body {
   display: flex;
   flex-direction: column;

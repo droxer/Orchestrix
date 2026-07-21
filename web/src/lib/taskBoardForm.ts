@@ -52,7 +52,7 @@ export function emptyRoutineForm(currentUser: CurrentUser, date = new Date()): R
     routineType: "task",
     routineCadence: "weekly",
     routineNextRunDate: nextRoutineRunDate("weekly", date),
-    routineEnabled: true,
+    routineEnabled: false,
   };
 }
 

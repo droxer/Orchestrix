@@ -6,11 +6,15 @@ import { AgentMark } from "../AgentMark";
 import { useNodeDelete } from "../../hooks/useNodeDelete";
 import {
   agentStatusTone,
+  isNodeOnline,
+  statusTone,
   visibleNodeAgentNames,
+  visualStatus,
   type StoredNodeTokenMap,
 } from "./helpers";
 import { NodeActions } from "./NodeActions";
 import { NodeProfileBadges } from "./NodeProfileBadges";
+import { NodePresence } from "./NodePresence";
 import { AdminNode } from "../icons";
 
 function isAgentDisabled(node: ControlPanelDaemonNodeRecord, agent: AgentName): boolean {
@@ -43,16 +47,27 @@ interface NodeRowProps {
 export function NodeRow({ node, storedTokens, colocated, onReveal, onManageAgents, onDelete, t }: NodeRowProps) {
   const { deletePending, deleteError, handleDelete } = useNodeDelete(node, onDelete, t);
   const nodeName = node.displayName || node.id;
+  const status = visualStatus(node);
+  const tone = statusTone(status);
+  const statusLabel = t(`status.${status}`, { defaultValue: status });
+  const online = isNodeOnline(node);
 
   return (
-    <li className="adm-node-row" data-node={node.id}>
+    <li className="adm-node-row" data-node={node.id} data-online={online ? "true" : "false"}>
       <div className="adm-node-row-id">
-        <span className="adm-node-avatar adm-node-avatar--machine" aria-hidden="true" translate="no">
+        <span className="adm-node-avatar adm-node-avatar--machine" translate="no">
           <AdminNode size={16} aria-hidden="true" />
+          <NodePresence node={node} t={t} className="adm-presence--corner" />
         </span>
         <span className="adm-node-row-identity">
-          <span className="adm-node-card-name" translate="no">
-            {nodeName}
+          <span className="adm-node-row-nameline">
+            <span className="adm-node-card-name" translate="no">
+              {nodeName}
+            </span>
+            <span className={`adm-status-pill tone-${tone}`}>
+              <i className="adm-status-dot" aria-hidden="true" />
+              {statusLabel}
+            </span>
           </span>
           <span className="adm-node-card-handle mono" translate="no">{node.id}</span>
           <NodeProfileBadges

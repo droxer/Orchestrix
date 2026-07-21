@@ -8,7 +8,7 @@ import { useEmployeeAgents } from "../hooks/useEmployeeAgents";
 import { AgentStateBadge } from "./AgentStateBadge";
 import { PriorityBadge } from "./PriorityBadge";
 import { cn } from "@/lib/utils";
-import { AGENT_NAMES, type CurrentUser, type DaemonNodeMonitorRecord, type RelaySession, type RelayTask, type TaskStatus } from "../types";
+import { type CurrentUser, type DaemonNodeMonitorRecord, type EmployeeAgent, type RelaySession, type RelayTask, type TaskStatus } from "../types";
 import { ActionApprove, ActionCalendar, ActionStart, ActionStop, ModeAsk, NavConversations, NavRefresh, ViewBoard, ViewList } from "./icons";
 import { agentReadyForTask, discussionAgentsForTask, dueTone, filterTasks, TASK_PRIORITIES, TASK_STATUSES, tasksByStatus, type BacklogFilters } from "../lib/backlog";
 import { emptyBacklogForm, taskBoardFormsEqual, type BacklogTaskFormState } from "../lib/taskBoardForm";
@@ -125,9 +125,11 @@ function formatDueDate(value: string): string {
 
 function BacklogFiltersBar({
   filters,
+  agents,
   onChange,
 }: {
   filters: BacklogFilters;
+  agents: EmployeeAgent[];
   onChange: (next: BacklogFilters) => void;
 }) {
   const { t } = useTranslation();
@@ -171,8 +173,8 @@ function BacklogFiltersBar({
         onChange={(event) => onChange({ ...filters, agent: event.target.value as BacklogFilters["agent"] })}
       >
         <option value="all">{t("backlog.all_agents")}</option>
-        {AGENT_NAMES.map((agent) => (
-          <option key={agent} value={agent}>{agent}</option>
+        {agents.map((agent) => (
+          <option key={agent.id} value={agent.id}>{agent.displayName}</option>
         ))}
       </select>
       <input
@@ -203,6 +205,7 @@ function BacklogTaskCard({
   task,
   session,
   ready,
+  agentDisplayName,
   canDiscuss,
   onEdit,
   onStart,
@@ -214,6 +217,7 @@ function BacklogTaskCard({
   task: RelayTask;
   session?: RelaySession;
   ready: boolean;
+  agentDisplayName?: string;
   canDiscuss: boolean;
   onEdit: () => void;
   onStart: () => void;
@@ -234,7 +238,7 @@ function BacklogTaskCard({
       <Button variant="ghost" type="button" className="backlog-task-title" onClick={onEdit}>{task.title}</Button>
       {task.description ? <p className="backlog-description">{task.description}</p> : null}
       <div className="backlog-meta">
-        <TaskAssignee task={task} ready={ready} unassignedLabel={t("backlog.unassigned")} showAgent={false} />
+        <TaskAssignee task={task} ready={ready} agentDisplayName={agentDisplayName} unassignedLabel={t("backlog.unassigned")} showAgent={false} />
         <span className="backlog-meta-sep" aria-hidden="true">·</span>
         <span className={cn("backlog-due", tone !== "neutral" && tone)}>
           <ActionCalendar size={13} />
@@ -253,9 +257,9 @@ function BacklogTaskCard({
             type="button"
             className="backlog-action-primary backlog-action-icon"
             onClick={onStart}
-            disabled={(!task.assignedAgent && !canDiscuss) || task.status === "running" || task.status === "done"}
-            aria-label={task.assignedAgent ? t("backlog.start") : t("backlog.start_team")}
-            title={task.assignedAgent ? t("backlog.start") : t("backlog.start_team")}
+            disabled={(!task.assignedAgentId && !canDiscuss) || task.status === "running" || task.status === "done"}
+            aria-label={task.assignedAgentId ? t("backlog.start") : t("backlog.start_team")}
+            title={task.assignedAgentId ? t("backlog.start") : t("backlog.start_team")}
           >
             <ActionStart size={14} />
           </Button>
@@ -324,6 +328,7 @@ function BacklogTaskRow({
   task,
   session,
   ready,
+  agentDisplayName,
   canDiscuss,
   onEdit,
   onStart,
@@ -335,6 +340,7 @@ function BacklogTaskRow({
   task: RelayTask;
   session?: RelaySession;
   ready: boolean;
+  agentDisplayName?: string;
   canDiscuss: boolean;
   onEdit: () => void;
   onStart: () => void;
@@ -357,7 +363,7 @@ function BacklogTaskRow({
         <PriorityBadge priority={task.priority} />
       </div>
       <span className="backlog-row-assignee">
-        <TaskAssignee task={task} ready={ready} unassignedLabel={t("backlog.unassigned")} />
+        <TaskAssignee task={task} ready={ready} agentDisplayName={agentDisplayName} unassignedLabel={t("backlog.unassigned")} />
       </span>
       <span className={cn("backlog-row-due", tone !== "neutral" && tone)}>
         <ActionCalendar size={13} />
@@ -369,9 +375,9 @@ function BacklogTaskRow({
             type="button"
             className="backlog-action-primary backlog-action-icon"
             onClick={onStart}
-            disabled={(!task.assignedAgent && !canDiscuss) || task.status === "running" || task.status === "done"}
-            aria-label={task.assignedAgent ? t("backlog.start") : t("backlog.start_team")}
-            title={task.assignedAgent ? t("backlog.start") : t("backlog.start_team")}
+            disabled={(!task.assignedAgentId && !canDiscuss) || task.status === "running" || task.status === "done"}
+            aria-label={task.assignedAgentId ? t("backlog.start") : t("backlog.start_team")}
+            title={task.assignedAgentId ? t("backlog.start") : t("backlog.start_team")}
           >
             <ActionStart size={14} />
           </Button>
@@ -439,21 +445,11 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
   const [saving, setSaving] = useState(false);
   const formDirty = Boolean(form && formBaseline && !taskBoardFormsEqual(form, formBaseline));
   const confirmDiscardChanges = useUnsavedChangesGuard(formDirty && !saving);
-  const filteredTasks = useMemo(() => filterTasks(tasks, filters), [tasks, filters]);
+  const backlogTasks = useMemo(() => tasks.filter((task) => !task.isRoutine), [tasks]);
+  const filteredTasks = useMemo(() => filterTasks(backlogTasks, filters), [backlogTasks, filters]);
   const grouped = useMemo(() => tasksByStatus(filteredTasks), [filteredTasks]);
-  const employees = useMemo(() => {
-    const values = new Set<string>();
-    for (const task of tasks) {
-      if (task.assigneeEmployeeId) values.add(task.assigneeEmployeeId);
-      if (task.ownerEmployeeId) values.add(task.ownerEmployeeId);
-    }
-    for (const node of nodes) if (node.employeeId) values.add(node.employeeId);
-    if (currentUser.employeeId) values.add(currentUser.employeeId);
-    return [...values].sort((a, b) => a.localeCompare(b));
-  }, [currentUser.employeeId, nodes, tasks]);
-
   const hasFilterResults = filteredTasks.length > 0;
-  const showEmptyBoard = tasks.length === 0 || !hasFilterResults;
+  const showEmptyBoard = backlogTasks.length === 0 || !hasFilterResults;
 
   function openTaskForm(next: BacklogTaskFormState) {
     setForm(next);
@@ -493,9 +489,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
         priority: form.priority,
         status: form.status,
         dueDate: form.dueDate,
-        assigneeEmployeeId: form.assigneeEmployeeId.trim(),
-        ...(form.assignedAgent ? { assignedAgent: form.assignedAgent } : {}),
-        ...(form.assignedAgentId ? { assignedAgentId: form.assignedAgentId } : {}),
+        assignedAgentId: form.assignedAgentId || null,
       };
       if (form.id) await updateTaskMutation.mutateAsync({ taskId: form.id, input: payload });
       else await createTaskMutation.mutateAsync(payload);
@@ -523,23 +517,22 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
     const discussionAssignments = logicalAgents
       .filter((agent) => agent.enabled && agent.availability === "ready")
       .map((agent) => ({ agentId: agent.id, agent: agent.executorKind, mode: "ask" as const }));
-    const fallbackDiscussionAssignments = discussionAgents.map((agent) => ({ agent, mode: "ask" as const }));
     return {
       onEdit: () => editTask(task),
       onStart: () => void startTaskMutation.mutate(
-        task.assignedAgent
+        task.assignedAgentId
           ? { taskId: task.id }
-          : { taskId: task.id, assignments: discussionAssignments.length > 0 ? discussionAssignments : fallbackDiscussionAssignments },
+          : { taskId: task.id, assignments: discussionAssignments },
         {
           onSuccess: (result) => {
-            if (!task.assignedAgent && result.session) onOpenConversation(result.session.id);
+            if (!task.assignedAgentId && result.session) onOpenConversation(result.session.id);
           },
         },
       ),
       onDiscuss: () => void startTaskMutation.mutate(
         {
           taskId: task.id,
-          assignments: discussionAssignments.length > 0 ? discussionAssignments : fallbackDiscussionAssignments,
+          assignments: discussionAssignments,
         },
         {
           onSuccess: (result) => {
@@ -561,7 +554,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
       <PageHeader
         kicker={t("nav.backlog")}
         title={t("backlog.title")}
-        count={t("backlog.sub", { count: tasks.length })}
+        count={t("backlog.sub", { count: backlogTasks.length })}
         actions={
           <TaskBoardHeaderActions
             leading={<BacklogViewToggle view={view} onChange={changeView} />}
@@ -574,12 +567,12 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
         }
       />
 
-      <BacklogStats tasks={tasks} />
-      <BacklogFiltersBar filters={filters} onChange={setFilters} />
+      <BacklogStats tasks={backlogTasks} />
+      <BacklogFiltersBar filters={filters} agents={logicalAgents} onChange={setFilters} />
 
       {showEmptyBoard ? (
         (() => {
-          const filtered = tasks.length > 0 && !hasFilterResults;
+          const filtered = backlogTasks.length > 0 && !hasFilterResults;
           return (
             <BoardEmpty
               title={filtered ? t("backlog.no_match_title") : t("backlog.no_tasks_title")}
@@ -607,6 +600,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
                 key={task.id}
                 task={task}
                 session={session}
+                agentDisplayName={logicalAgents.find((agent) => agent.id === task.assignedAgentId)?.displayName}
                 ready={agentReadyForTask(task, nodes, logicalAgents)}
                 canDiscuss={discussionAgents.length > 0}
                 {...taskHandlers(task, session)}
@@ -633,6 +627,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
                       key={task.id}
                       task={task}
                       session={session}
+                      agentDisplayName={logicalAgents.find((agent) => agent.id === task.assignedAgentId)?.displayName}
                       ready={agentReadyForTask(task, nodes, logicalAgents)}
                       canDiscuss={discussionAgents.length > 0}
                       {...taskHandlers(task, session)}
@@ -648,12 +643,10 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
       {form ? (
         <TaskDrawer
           form={form}
-          employees={employees}
           logicalAgents={logicalAgents}
           saving={saving}
           title={form.id ? t("backlog.edit_task") : t("backlog.new_task")}
           subtitle={form.id ?? t("backlog.new_task_id")}
-          employeeDatalistId="backlog-employees"
           onClose={() => { void closeTaskForm(); }}
           onChange={(next) => {
             if (next.variant === "backlog") setForm(next);

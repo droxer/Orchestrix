@@ -6,8 +6,8 @@ from datetime import date
 from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
 
-from ..core.models import AGENT_NAMES
 from ..persistence.stores import (
+    relay_task_event,
     task_priority,
     task_routine_cadence,
     task_routine_type,
@@ -16,7 +16,12 @@ from ..persistence.stores import (
 )
 from ..sessions import SessionController
 from ..tasks import ensure_managed_capacity_for_task, next_routine_date, ready_node_for_task, task_goal_text
-from ..services.agent_routing import AgentRoutingError, resolve_agent_assignments
+from ..services.agent_routing import (
+    AgentRoutingError,
+    dispatch_failure_code,
+    dispatch_reason_code,
+    resolve_agent_assignments,
+)
 from .deps import AppContextDep
 from .helpers import (
     actor_can_access_record,
@@ -35,6 +40,13 @@ from .helpers import (
 )
 
 router = APIRouter()
+
+PERMANENT_DISPATCH_CODES = {
+    "agent_disabled",
+    "agent_forbidden",
+    "agent_not_found",
+    "executor_mismatch",
+}
 
 
 def logical_agent_for_assignment(
@@ -204,29 +216,66 @@ async def start_task_on_ready_node(
     if not agent:
         return None
     if not run_assignments:
-        run_assignments = [{"agent": agent, "mode": agent_task_mode(mode)}]
+        run_assignments = [
+            {
+                "agent": agent,
+                "mode": agent_task_mode(mode),
+                **(
+                    {"agentId": task["assignedAgentId"]}
+                    if task.get("assignedAgentId")
+                    else {}
+                ),
+            }
+        ]
     if task.get("isRoutine"):
         return None
-    if task.get("status") in ("running", "review", "done"):
+    if task.get("status") not in ("backlog", "assigned"):
         return None
+    if task.get("assignedAgentId") and task.get("status") == "backlog":
+        task = ctx.task_store.update_task(task["id"], {"status": "assigned"})
     agent_first = any(item.get("agentId") for item in run_assignments)
     if agent_first:
         try:
             run_assignments = resolve_agent_assignments(
                 run_assignments,
-                employee_id=actor["employeeId"],
-                is_admin=actor["isAdmin"],
+                employee_id=task.get("ownerEmployeeId")
+                or task.get("assigneeEmployeeId")
+                or actor["employeeId"],
+                is_admin=False,
                 agent_store=ctx.agent_store,
                 placement_store=ctx.agent_placement_store,
                 daemon_nodes=ctx.registry.monitor_nodes(),
             )
         except AgentRoutingError as error:
             if record_pending:
+                code = dispatch_reason_code(error.code)
+                state = "rejected" if error.code in PERMANENT_DISPATCH_CODES else "queued"
+                message = str(error)
+                if state == "queued":
+                    capacity = ensure_managed_capacity_for_task(
+                        task, ctx.registry, ctx.managed_node_store
+                    )
+                    if capacity and capacity.provisioning_requested:
+                        employee_id = task.get("assigneeEmployeeId") or task.get(
+                            "ownerEmployeeId"
+                        )
+                        message = (
+                            f"Managed node provisioning requested for {employee_id}."
+                        )
+                        ctx.task_store.record_activity(
+                            task["id"], message, {"agent": agent}
+                        )
+                updated = ctx.task_store.record_dispatch_outcome(
+                    task["id"], state, code=code, message=message
+                )
                 return {
-                    "task": ctx.task_store.record_activity(
-                        task["id"], str(error), {"agent": agent}
-                    ),
+                    "task": updated,
                     "session": None,
+                    "dispatch": {
+                        "state": state,
+                        "code": code,
+                        "message": message,
+                    },
                 }
             raise
         node = ctx.registry.get(run_assignments[0]["daemonNodeId"])
@@ -245,27 +294,46 @@ async def start_task_on_ready_node(
                 if requested_capacity
                 else f"No ready node is available for {label}."
             )
+            ctx.task_store.record_activity(task["id"], message, {"agent": agent})
+            code = "configuration_pending" if requested_capacity else "agent_offline"
+            updated = ctx.task_store.record_dispatch_outcome(
+                task["id"], "queued", code=code, message=message
+            )
             return {
-                "task": ctx.task_store.record_activity(
-                    task["id"],
-                    message,
-                    {"agent": agent},
-                ),
+                "task": updated,
                 "session": None,
+                "dispatch": {
+                    "state": "queued",
+                    "code": code,
+                    "message": message,
+                },
             }
         return None
+    temporary_team_status = False
+    if task.get("status") == "backlog":
+        task = ctx.task_store.update_task(task["id"], {"status": "assigned"})
+        temporary_team_status = not bool(task.get("assignedAgentId"))
     # Claim the task before dispatching so the background scheduler (which only
     # dispatches "assigned" tasks it can claim) cannot start a second session
     # for the same task in the window before the run flips it to running.
-    claim_agent = valid_agent(task.get("assignedAgent"))
+    claim_agent = valid_agent(task.get("assignedAgent")) or agent
     claimed = None
-    if claim_agent and task.get("status") == "assigned":
+    if claim_agent:
         claimed = ctx.task_store.claim_task_for_dispatch(
             task["id"], claim_agent, message=f"Claimed by {agent}."
         )
         if not claimed:
-            return {"task": ctx.task_store.get_task(task["id"]), "session": None}
+            return {
+                "task": ctx.task_store.get_task(task["id"]),
+                "session": None,
+                "dispatch": {
+                    "state": "queued",
+                    "code": "dispatch_in_progress",
+                    "message": "This task already has a dispatch in progress.",
+                },
+            }
         task = claimed
+    claim_id = (task.get("dispatchClaim") or {}).get("id")
     try:
         run_request = {
             "taskGoal": task_goal_text(task),
@@ -273,19 +341,32 @@ async def start_task_on_ready_node(
             "taskId": task["id"],
             "actorIsAdmin": actor["isAdmin"],
             **({"agentFirst": True} if agent_first else {}),
+            **({"idempotencyKey": claim_id} if claim_id else {}),
         }
         if not actor["isAdmin"]:
             run_request["actorEmployeeId"] = actor["employeeId"]
         session = await ctx.backend.run(node["id"], run_request)
-    except (ValueError, PermissionError) as error:
-        if claimed:
-            ctx.task_store.assign_task(task["id"], claim_agent)
+    except Exception as error:
+        code = dispatch_failure_code(error)
+        released = bool(claim_id and code != "dispatch_failed")
+        if released:
+            ctx.task_store.release_dispatch_claim(task["id"], claim_id)
+        if temporary_team_status and released:
+            ctx.task_store.update_task(task["id"], {"status": "backlog"})
         if record_pending:
-            updated = ctx.task_store.record_activity(
-                task["id"], str(error), {"agent": agent}
+            state = "rejected" if code == "agent_forbidden" else "queued"
+            updated = ctx.task_store.record_dispatch_outcome(
+                task["id"], state, code=code, message=str(error)
             )
-            return {"task": updated, "session": None}
+            return {
+                "task": updated,
+                "session": None,
+                "dispatch": {"state": state, "code": code, "message": str(error)},
+            }
         raise
+    ctx.task_store.update_task(task["id"], {"status": "running"})
+    if claim_id:
+        ctx.task_store.release_dispatch_claim(task["id"], claim_id)
     message = (
         "Discussion started."
         if all(item.get("mode") == "ask" for item in run_assignments)
@@ -303,7 +384,12 @@ async def start_task_on_ready_node(
         assignments=run_assignments,
         node_id=node["id"],
     )
-    return {"task": updated_task, "session": session}
+    updated_task = ctx.task_store.record_dispatch_outcome(task["id"], "started")
+    return {
+        "task": updated_task,
+        "session": session,
+        "dispatch": {"state": "started"},
+    }
 
 
 async def start_routine_occurrence_on_ready_node(
@@ -320,8 +406,8 @@ async def start_routine_occurrence_on_ready_node(
     today = date.today()
     scheduled_run_date = routine_next_run_date(routine)
     occurrence = None
-    # Promotion requires the routine's own assigned agent; an agentless routine
-    # started manually (e.g. as a team discussion) takes the ad-hoc path below.
+    # A due routine uses the atomic promotion path; an early manual start still
+    # records the same parent/occurrence lineage.
     if (
         scheduled_run_date
         and scheduled_run_date <= today
@@ -346,6 +432,8 @@ async def start_routine_occurrence_on_ready_node(
                 "ownerEmployeeId": routine.get("ownerEmployeeId"),
                 "assigneeEmployeeId": routine.get("assigneeEmployeeId"),
                 "dueDate": today.isoformat(),
+                "sourceRoutineId": routine["id"],
+                "scheduledFor": today.isoformat(),
                 "assignedAgent": agent,
                 **(
                     {"assignedAgentId": routine["assignedAgentId"]}
@@ -355,10 +443,16 @@ async def start_routine_occurrence_on_ready_node(
                 "status": "assigned",
             }
         )
-        ctx.task_store.record_activity(
+        ctx.task_store.append_event(
             routine["id"],
-            f"Routine occurrence created: {occurrence['id']}.",
-            {"agent": agent},
+            relay_task_event(
+                "task.occurrence_created",
+                routine["id"],
+                {
+                    "occurrenceId": occurrence["id"],
+                    "scheduledFor": today.isoformat(),
+                },
+            ),
         )
     result = await start_task_on_ready_node(
         ctx, occurrence, actor, mode=mode, assignments=assignments
@@ -421,19 +515,24 @@ async def create_task(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     owner = owner_employee_id_for_create(actor, body)
     assignee = assignee_employee_id_for_task(actor, body, owner)
     assigned_agent_id = string_field(body, "assignedAgentId") or None
+    if "assignedAgent" in body:
+        raise HTTPException(400, "assignedAgent is read-only; use assignedAgentId.")
     logical_agent = logical_agent_for_assignment(
-        ctx, actor, assigned_agent_id, expected_employee_id=assignee
+        ctx, actor, assigned_agent_id, expected_employee_id=owner
     )
-    requested_agent = valid_agent(body.get("assignedAgent"))
-    if (
-        logical_agent
-        and requested_agent
-        and requested_agent != logical_agent["executorKind"]
-    ):
-        raise HTTPException(
-            400, "assignedAgent does not match assignedAgentId executor kind."
-        )
-    agent = logical_agent["executorKind"] if logical_agent else requested_agent
+    if logical_agent:
+        assignee = logical_agent["supervisorEmployeeId"]
+    agent = logical_agent["executorKind"] if logical_agent else None
+    status = task_status(body.get("status"))
+    if "status" in body and not status:
+        raise HTTPException(400, "status is not a recognized task status.")
+    if status == "assigned" and not assigned_agent_id:
+        raise HTTPException(400, "assigned status requires assignedAgentId.")
+    routine = routine_fields(body)
+    if routine.get("isRoutine") and not assigned_agent_id and "routineEnabled" not in body:
+        routine["routineEnabled"] = False
+    if routine.get("routineEnabled") and not assigned_agent_id:
+        raise HTTPException(400, "An enabled routine requires assignedAgentId.")
     task = ctx.task_store.create_task(
         {
             "title": title,
@@ -442,12 +541,15 @@ async def create_task(request: Request, ctx: AppContextDep) -> dict[str, Any]:
             "ownerEmployeeId": owner,
             "assigneeEmployeeId": assignee,
             "dueDate": date_field(body, "dueDate"),
-            **routine_fields(body),
+            "status": status,
+            **routine,
         }
     )
     logger.info("Task created", task_id=task["id"], title=title, owner=owner)
     if agent:
-        task = ctx.task_store.assign_task(task["id"], agent, assigned_agent_id)
+        task = ctx.task_store.set_task_assignment(
+            task["id"], agent, assigned_agent_id
+        )
         logger.info(
             "Task assigned", task_id=task["id"], agent=agent, agent_id=assigned_agent_id
         )
@@ -500,6 +602,8 @@ async def update_task(
     )
     priority = task_priority(body.get("priority"))
     status = task_status(body.get("status"))
+    if "status" in body and not status:
+        raise HTTPException(400, "status is not a recognized task status.")
     due_date = date_field(body, "dueDate")
     routine = routine_fields(body, current=current)
     assignee = (
@@ -511,6 +615,8 @@ async def update_task(
     assigned_agent_id = (
         string_field(body, "assignedAgentId") if "assignedAgentId" in body else None
     )
+    if "assignedAgent" in body:
+        raise HTTPException(400, "assignedAgent is read-only; use assignedAgentId.")
     assignee_changed = bool(
         assignee and assignee != current.get("assigneeEmployeeId")
     )
@@ -527,9 +633,8 @@ async def update_task(
         ctx,
         actor,
         assigned_agent_id,
-        expected_employee_id=assignee
-        or current.get("assigneeEmployeeId")
-        or current.get("ownerEmployeeId"),
+        expected_employee_id=current.get("ownerEmployeeId")
+        or current.get("assigneeEmployeeId"),
     )
     if logical_agent:
         if agent and agent != logical_agent["executorKind"]:
@@ -537,10 +642,7 @@ async def update_task(
                 400, "assignedAgent does not match assignedAgentId executor kind."
             )
         agent = logical_agent["executorKind"]
-    if "assignedAgent" in body and body.get("assignedAgent") and not agent:
-        raise HTTPException(
-            400, f"assignedAgent must be one of: {', '.join(AGENT_NAMES)}."
-        )
+        assignee = logical_agent["supervisorEmployeeId"]
     if (
         not title
         and description is None
@@ -556,6 +658,17 @@ async def update_task(
             400,
             "PATCH requires title, description, priority, dueDate, assigneeEmployeeId, assignedAgentId, assignedAgent, or status.",
         )
+    next_routine_enabled = routine.get("routineEnabled", current.get("routineEnabled"))
+    next_is_routine = routine.get("isRoutine", current.get("isRoutine"))
+    next_agent_id = (
+        assigned_agent_id
+        if "assignedAgentId" in body
+        else current.get("assignedAgentId")
+    )
+    if next_is_routine and next_routine_enabled and not next_agent_id:
+        raise HTTPException(400, "An enabled routine requires assignedAgentId.")
+    if status == "assigned" and not next_agent_id:
+        raise HTTPException(400, "assigned status requires assignedAgentId.")
     task = ctx.task_store.update_task(
         task_id,
         {
@@ -568,12 +681,10 @@ async def update_task(
             **routine,
         },
     )
-    if agent:
-        task = ctx.task_store.assign_task(task_id, agent, assigned_agent_id)
-    elif "assignedAgentId" in body and not assigned_agent_id and current.get(
-        "assignedAgent"
-    ):
-        task = ctx.task_store.assign_task(task_id, current["assignedAgent"])
+    if logical_agent and assigned_agent_id != current.get("assignedAgentId"):
+        task = ctx.task_store.set_task_assignment(task_id, agent, assigned_agent_id)
+    elif "assignedAgentId" in body and not assigned_agent_id:
+        task = ctx.task_store.unassign_task(task_id)
     if status == "done":
         complete_linked_task_sessions(ctx, task, "Task marked done.")
         task = ctx.task_store.get_task(task_id)
@@ -610,18 +721,16 @@ async def assign_task(
         actor,
         assigned_agent_id,
         expected_employee_id=get_task_for_actor(ctx.task_store, task_id, actor).get(
-            "assigneeEmployeeId"
+            "ownerEmployeeId"
         )
         or actor["employeeId"],
     )
-    agent = (
-        logical_agent["executorKind"]
-        if logical_agent
-        else valid_agent(body.get("agent"))
+    if not logical_agent or not assigned_agent_id:
+        raise HTTPException(400, "agentId is required for task assignment.")
+    task = ctx.task_store.set_task_assignment(
+        task_id, logical_agent["executorKind"], assigned_agent_id
     )
-    if not agent:
-        raise HTTPException(400, f"agent must be one of: {', '.join(AGENT_NAMES)}.")
-    task = ctx.task_store.assign_task(task_id, agent, assigned_agent_id)
+    task = ctx.task_store.update_task(task_id, {"status": "assigned"})
     return task
 
 
@@ -633,6 +742,44 @@ async def start_task(
     task = get_task_for_actor(ctx.task_store, task_id, actor)
     body = await json_body(request)
     assignments = assignment_list(body.get("assignments"))
+    if body.get("agent") is not None:
+        raise HTTPException(400, "agent is read-only; start through assignedAgentId.")
+    if assignments and any(not assignment.get("agentId") for assignment in assignments):
+        updated = ctx.task_store.record_dispatch_outcome(
+            task_id,
+            "rejected",
+            code="agent_not_found",
+            message="Every start assignment requires a named agentId.",
+        )
+        return {
+            "task": updated,
+            "session": None,
+            "dispatch": {
+                "state": "rejected",
+                "code": "agent_not_found",
+                "message": "Every start assignment requires a named agentId.",
+            },
+        }
+    if (
+        not assignments
+        and task.get("assignedAgent")
+        and not task.get("assignedAgentId")
+    ):
+        updated = ctx.task_store.record_dispatch_outcome(
+            task_id,
+            "rejected",
+            code="agent_not_found",
+            message="Select a named agent before starting this legacy task.",
+        )
+        return {
+            "task": updated,
+            "session": None,
+            "dispatch": {
+                "state": "rejected",
+                "code": "agent_not_found",
+                "message": "Select a named agent before starting this legacy task.",
+            },
+        }
     if not assignments and task.get("assignedAgentId") and task.get("assignedAgent"):
         assignments = [
             {
@@ -641,7 +788,7 @@ async def start_task(
                 "mode": agent_task_mode(body.get("mode")),
             }
         ]
-    agent = valid_agent(body.get("agent")) or valid_agent(task.get("assignedAgent"))
+    agent = valid_agent(task.get("assignedAgent"))
     if not agent and assignments:
         agent = assignments[0]["agent"]
     if not agent and not assignments:
@@ -649,16 +796,39 @@ async def start_task(
         if assignments:
             agent = assignments[0]["agent"]
     if not agent:
+        updated = ctx.task_store.record_dispatch_outcome(
+            task_id,
+            "rejected",
+            code="agent_not_found",
+            message="Select a named agent before starting this task.",
+        )
         return {
-            "task": ctx.task_store.record_activity(
-                task_id, "No ready agent team is available."
-            ),
+            "task": updated,
             "session": None,
+            "dispatch": {
+                "state": "rejected",
+                "code": "agent_not_found",
+                "message": "Select a named agent before starting this task.",
+            },
         }
-    if not assignments and task.get("assignedAgent") != agent:
-        task = ctx.task_store.assign_task(task_id, agent)
     mode = agent_task_mode(body.get("mode"))
     if task.get("isRoutine"):
+        if not task.get("assignedAgentId"):
+            updated = ctx.task_store.record_dispatch_outcome(
+                task_id,
+                "rejected",
+                code="agent_not_found",
+                message="A routine requires a named agent before it can start.",
+            )
+            return {
+                "task": updated,
+                "session": None,
+                "dispatch": {
+                    "state": "rejected",
+                    "code": "agent_not_found",
+                    "message": "A routine requires a named agent before it can start.",
+                },
+            }
         result = await start_routine_occurrence_on_ready_node(
             ctx, task, actor, agent=agent, mode=mode, assignments=assignments or None
         )
@@ -667,29 +837,25 @@ async def start_task(
             ctx, task, actor, mode=mode, assignments=assignments or None
         )
     if not result or not result.get("session"):
-        return {"task": result["task"] if result else task, "session": None}
+        return (
+            result
+            if result
+            else {
+                "task": task,
+                "session": None,
+                "dispatch": {"state": "rejected", "code": "invalid_state"},
+            }
+        )
     return result
 
 
 @router.post("/tasks/claim-next")
 async def claim_next_task(request: Request, ctx: AppContextDep) -> dict[str, Any]:
-    actor = request_actor(request, ctx.auth_store)
-    body = await json_body(request)
-    agent = valid_agent(body.get("agent"))
-    if not agent:
-        raise HTTPException(400, f"agent must be one of: {', '.join(AGENT_NAMES)}.")
-    requested_assignee = string_field(body, "assigneeEmployeeId") or string_field(
-        body, "assignee_employee_id"
+    request_actor(request, ctx.auth_store)
+    raise HTTPException(
+        410,
+        "Executor claim-next is retired; tasks dispatch through named-agent leases.",
     )
-    assignee = (
-        requested_assignee
-        if actor["isAdmin"] and requested_assignee
-        else actor["employeeId"]
-    )
-    task = ctx.task_store.claim_next_task_for_agent(agent, assignee)
-    if task and not actor_can_access_record(actor, task):
-        raise HTTPException(403, "Task access denied.")
-    return {"task": task}
 
 
 @router.post("/tasks/{task_id}/pickup")
@@ -699,14 +865,22 @@ async def pickup_task(
     actor = request_actor(request, ctx.auth_store)
     body = await json_body(request)
     current = get_task_for_actor(ctx.task_store, task_id, actor)
-    agent = valid_agent(body.get("agent")) or current.get("assignedAgent")
-    if not agent:
-        raise HTTPException(400, f"agent must be one of: {', '.join(AGENT_NAMES)}.")
-    task = (
-        current
-        if current.get("assignedAgent") == agent
-        else ctx.task_store.assign_task(task_id, agent)
+    agent_id = string_field(body, "agentId") or string_field(
+        body, "assignedAgentId"
     )
+    logical_agent = logical_agent_for_assignment(
+        ctx,
+        actor,
+        agent_id,
+        expected_employee_id=current.get("ownerEmployeeId") or actor["employeeId"],
+    )
+    if not logical_agent or not agent_id:
+        raise HTTPException(400, "agentId is required to pick up a task.")
+    agent = logical_agent["executorKind"]
+    ctx.task_store.update_task(
+        task_id, {"assigneeEmployeeId": logical_agent["supervisorEmployeeId"]}
+    )
+    task = ctx.task_store.set_task_assignment(task_id, agent, agent_id)
     workspace_path = string_field(body, "workspacePath") or "/workspace"
     controller = SessionController(
         ctx.session_store,
@@ -714,11 +888,13 @@ async def pickup_task(
         task_id=task["id"],
         workspace_path=workspace_path,
         owner_employee_id=current.get("ownerEmployeeId") or actor["employeeId"],
-        owner_agent_id=current.get("assignedAgentId"),
+        owner_agent_id=agent_id,
     )
     session = controller.create_session(task_goal_text(task), ["human", agent])
     mode = agent_task_mode(body.get("mode"))
-    controller.assign_session(session["id"], [{"agent": agent, "mode": mode}])
+    controller.assign_session(
+        session["id"], [{"agentId": agent_id, "agent": agent, "mode": mode}]
+    )
     task = ctx.task_store.record_activity(
         task["id"],
         f"{agent} picked up the task.",

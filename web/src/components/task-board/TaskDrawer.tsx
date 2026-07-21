@@ -18,19 +18,16 @@ import { TASK_PRIORITIES, TASK_STATUSES } from "../../lib/backlog";
 import { TASK_ROUTINE_CADENCES, TASK_ROUTINE_TYPES, isoToday } from "../../lib/routine";
 import { nextRoutineRunDate, type BacklogTaskFormState, type RoutineTaskFormState, type TaskBoardFormState } from "../../lib/taskBoardForm";
 import { Drawer } from "../admin/Drawer";
-import { ActionAddPerson } from "../icons";
 import { TaskDrawerArtifacts } from "./TaskDrawerArtifacts";
 
 const NO_AGENT = "__none__";
 
 type TaskDrawerProps = {
   form: TaskBoardFormState;
-  employees: string[];
   logicalAgents: EmployeeAgent[];
   saving: boolean;
   title: string;
   subtitle: string;
-  employeeDatalistId: string;
   deleting?: boolean;
   onClose: () => void;
   onChange: (next: TaskBoardFormState) => void;
@@ -131,12 +128,10 @@ function RoutineFields({ form, onChange }: { form: RoutineTaskFormState; onChang
 
 export function TaskDrawer({
   form,
-  employees,
   logicalAgents,
   saving,
   title,
   subtitle,
-  employeeDatalistId,
   deleting = false,
   onClose,
   onChange,
@@ -216,16 +211,29 @@ export function TaskDrawer({
           <label className="adm-field">
             <span>{t("backlog.agent")}</span>
             <Select
-              value={form.assignedAgentId || form.assignedAgent || NO_AGENT}
+              value={form.assignedAgentId || NO_AGENT}
               onValueChange={(value) => {
                 if (value == null) return
                 if (value === NO_AGENT) {
-                  updateBase({ assignedAgent: "", assignedAgentId: "" });
+                  onChange(
+                    form.variant === "routine"
+                      ? {
+                          ...form,
+                          assignedAgent: "",
+                          assignedAgentId: "",
+                          routineEnabled: false,
+                        }
+                      : { ...form, assignedAgent: "", assignedAgentId: "" },
+                  );
                   return;
                 }
                 const logicalAgent = logicalAgents.find((agent) => agent.id === value);
                 if (logicalAgent) {
-                  updateBase({ assignedAgent: logicalAgent.executorKind, assignedAgentId: logicalAgent.id });
+                  updateBase({
+                    assignedAgent: logicalAgent.executorKind,
+                    assignedAgentId: logicalAgent.id,
+                    assigneeEmployeeId: logicalAgent.employeeId,
+                  });
                 }
               }}
             >
@@ -264,29 +272,14 @@ export function TaskDrawer({
               </span>
               <Switch
                 name={`${fieldPrefix}-enabled`}
-                checked={form.routineEnabled}
+            checked={form.routineEnabled}
+            disabled={!form.assignedAgentId && !form.routineEnabled}
                 onCheckedChange={(checked) => onChange({ ...form, routineEnabled: checked })}
                 aria-label={t("routine.enabled")}
               />
             </div>
           </>
         ) : null}
-        <label className="adm-field">
-          <span>{t("backlog.assignee")}</span>
-          <div className="task-drawer-assignee">
-            <ActionAddPerson size={15} aria-hidden="true" />
-            <Input
-              name={`${fieldPrefix}-assignee`}
-              list={employeeDatalistId}
-              value={form.assigneeEmployeeId}
-              onChange={(event) => updateBase({ assigneeEmployeeId: event.target.value })}
-              className="h-auto min-h-0 border-0 bg-transparent px-0 py-0 shadow-none focus-visible:border-transparent focus-visible:shadow-none"
-            />
-            <datalist id={employeeDatalistId}>
-              {employees.map((employee) => <option key={employee} value={employee} />)}
-            </datalist>
-          </div>
-        </label>
         {form.variant === "backlog" && form.id ? <TaskDrawerArtifacts taskId={form.id} /> : null}
         <div className="adm-form-actions">
           {form.id && onDelete ? (

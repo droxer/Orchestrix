@@ -410,9 +410,7 @@ export interface TaskMutationInput {
   routineCadence?: TaskRoutineCadence;
   routineNextRunDate?: string;
   routineEnabled?: boolean;
-  assigneeEmployeeId?: string;
-  assignedAgent?: AgentName;
-  assignedAgentId?: string;
+  assignedAgentId?: string | null;
 }
 
 export interface CreateTaskInput extends TaskMutationInput {
@@ -422,6 +420,11 @@ export interface CreateTaskInput extends TaskMutationInput {
 export interface StartTaskResponse {
   task: RelayTask;
   session: RelaySession | null;
+  dispatch: {
+    state: "started" | "queued" | "rejected";
+    code?: string;
+    message?: string;
+  };
 }
 
 export interface ApiErrorBody {

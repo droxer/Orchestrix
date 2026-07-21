@@ -12,9 +12,20 @@ from ..core.models import AgentName
 from ..daemon_registry import node_accepts_run
 from ..persistence.stores import valid_agent
 from ..persistence.task_store import routine_due_sort_key, task_claim_sort_key
-from ..services.agent_routing import AgentRoutingError, resolve_agent_assignments
+from ..services.agent_routing import (
+    AgentRoutingError,
+    dispatch_failure_code,
+    dispatch_reason_code,
+    resolve_agent_assignments,
+)
 
 MAX_DISPATCH_BACKOFF_SECONDS = 3600.0
+PERMANENT_DISPATCH_CODES = {
+    "agent_disabled",
+    "agent_forbidden",
+    "agent_not_found",
+    "executor_mismatch",
+}
 
 ROUTINE_SKIP_NO_AGENT_MESSAGE = (
     "Routine skipped: no assigned agent. Assign an agent so the scheduler can run it."
@@ -105,7 +116,7 @@ class TaskScheduler:
         skipped = 0
         for routine in self._due_routines(today):
             agent = valid_agent(routine.get("assignedAgent"))
-            if not agent:
+            if not agent or not routine.get("assignedAgentId"):
                 skipped += 1
                 self._record_routine_skip(routine)
                 continue
@@ -138,13 +149,25 @@ class TaskScheduler:
 
     async def _dispatch_assigned_tasks(self) -> tuple[int, int]:
         dispatched = 0
-        skipped = 0
+        dispatchable = self._dispatchable_tasks()
+        legacy = [
+            task
+            for task in dispatchable
+            if valid_agent(task.get("assignedAgent")) and not task.get("assignedAgentId")
+        ]
+        for task in legacy:
+            self._record_dispatch_deferred(
+                task,
+                "agent_not_found",
+                "Select a named agent before this task can be dispatched.",
+            )
+        skipped = len(legacy)
         attempts = 0
         now = time.monotonic()
         candidates = [
             task
-            for task in self._dispatchable_tasks()
-            if valid_agent(task.get("assignedAgent"))
+            for task in dispatchable
+            if valid_agent(task.get("assignedAgent")) and task.get("assignedAgentId")
         ]
         candidate_ids = {task["id"] for task in candidates}
         self._dispatch_backoff = {
@@ -163,30 +186,32 @@ class TaskScheduler:
                 {
                     "agent": agent,
                     "mode": "action",
-                    **(
-                        {"agentId": task["assignedAgentId"]}
-                        if task.get("assignedAgentId")
-                        else {}
-                    ),
+                    "agentId": task["assignedAgentId"],
                 }
             ]
-            if task.get("assignedAgentId"):
-                try:
-                    assignments = resolve_agent_assignments(
-                        assignments,
-                        employee_id=task.get("assigneeEmployeeId")
-                        or task.get("ownerEmployeeId")
-                        or "",
-                        is_admin=True,
-                        agent_store=self.backend.agent_store,
-                        placement_store=self.backend.agent_placement_store,
-                        daemon_nodes=self.registry.monitor_nodes(),
-                    )
-                    node = self.registry.get(assignments[0]["daemonNodeId"])
-                except AgentRoutingError:
-                    node = None
-            else:
-                node = ready_node_for_task(self.registry, task, assignments)
+            try:
+                assignments = resolve_agent_assignments(
+                    assignments,
+                    employee_id=task.get("ownerEmployeeId")
+                    or task.get("assigneeEmployeeId")
+                    or "",
+                    is_admin=False,
+                    agent_store=self.backend.agent_store,
+                    placement_store=self.backend.agent_placement_store,
+                    daemon_nodes=self.registry.monitor_nodes(),
+                )
+                node = self.registry.get(assignments[0]["daemonNodeId"])
+            except AgentRoutingError as error:
+                state = (
+                    "rejected" if error.code in PERMANENT_DISPATCH_CODES else "queued"
+                )
+                self._record_dispatch_deferred(
+                    task, dispatch_reason_code(error.code), str(error), state=state
+                )
+                if error.code in PERMANENT_DISPATCH_CODES:
+                    skipped += 1
+                    continue
+                node = None
             if not node:
                 self._ensure_managed_capacity(task)
                 skipped += 1
@@ -204,6 +229,21 @@ class TaskScheduler:
             else:
                 self._register_dispatch_failure(task["id"])
         return dispatched, skipped
+
+    def _record_dispatch_deferred(
+        self,
+        task: dict[str, Any],
+        code: str,
+        message: str,
+        *,
+        state: str = "queued",
+    ) -> None:
+        current = task.get("dispatchOutcome") or {}
+        if current.get("state") == state and current.get("code") == code:
+            return
+        self.task_store.record_dispatch_outcome(
+            task["id"], state, code=code, message=message
+        )
 
     def _ensure_managed_capacity(self, task: dict[str, Any]) -> None:
         capacity = ensure_managed_capacity_for_task(
@@ -225,6 +265,8 @@ class TaskScheduler:
         node_id: str,
         assignments: list[dict[str, Any]],
     ) -> bool:
+        claim = task.get("dispatchClaim") or {}
+        claim_id = claim.get("id")
         try:
             session = await self.backend.run(
                 node_id,
@@ -233,13 +275,19 @@ class TaskScheduler:
                     "assignments": assignments,
                     "taskId": task["id"],
                     "actorIsAdmin": True,
-                    **({"agentFirst": True} if task.get("assignedAgentId") else {}),
+                    "agentFirst": True,
+                    **({"idempotencyKey": claim_id} if claim_id else {}),
                 },
             )
         except Exception as error:
-            self.task_store.assign_task(task["id"], agent)
-            self.task_store.record_activity(
-                task["id"], f"Scheduled dispatch failed: {error}", {"agent": agent}
+            code = dispatch_failure_code(error)
+            if claim_id and code != "dispatch_failed":
+                self.task_store.release_dispatch_claim(task["id"], claim_id)
+            self.task_store.record_dispatch_outcome(
+                task["id"],
+                "queued",
+                code=code,
+                message=str(error),
             )
             logger.warning(
                 "Scheduled task dispatch failed",
@@ -248,6 +296,10 @@ class TaskScheduler:
                 error=str(error),
             )
             return False
+        self.task_store.update_task(task["id"], {"status": "running"})
+        if claim_id:
+            self.task_store.release_dispatch_claim(task["id"], claim_id)
+        self.task_store.record_dispatch_outcome(task["id"], "started")
         self.task_store.record_activity(
             task["id"],
             f"Scheduled dispatch started by {agent}.",

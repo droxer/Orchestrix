@@ -15,6 +15,7 @@ import { ExecutionProfileField, type DaemonSandboxMode } from "./ExecutionProfil
 import { initialsOf, statusTone, visualStatus } from "./helpers";
 import { Button } from "@/components/ui/button";
 import { NodeProfileBadges } from "./NodeProfileBadges";
+import { NodePresence } from "./NodePresence";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import {
   Select,
@@ -235,10 +236,7 @@ export function AssignNodeDrawer({
                         }}
                       />
                       <span className={`adm-assign-node ${isSelected ? "selected" : ""}`}>
-                        <span
-                          className={`adm-assign-node-dot tone-${tone}`}
-                          aria-hidden="true"
-                        />
+                        <NodePresence node={node} t={t} />
                         <span className="adm-assign-node-body">
                           <span className="adm-assign-node-id mono" translate="no">
                             {node.displayName || node.id}

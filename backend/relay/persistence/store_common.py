@@ -274,6 +274,7 @@ def materialize_task_events(events: list[dict[str, Any]]) -> dict[str, Any]:
         "isRoutine": bool(created.get("isRoutine")),
         "routineEnabled": bool(created.get("routineEnabled")),
         "linkedSessionIds": [],
+        "occurrenceIds": [],
         "activity": [],
         "createdAt": created["timestamp"],
         "updatedAt": created["timestamp"],
@@ -285,6 +286,10 @@ def materialize_task_events(events: list[dict[str, Any]]) -> dict[str, Any]:
         task["assigneeEmployeeId"] = created["assigneeEmployeeId"]
     if created.get("dueDate"):
         task["dueDate"] = created["dueDate"]
+    if created.get("sourceRoutineId"):
+        task["sourceRoutineId"] = created["sourceRoutineId"]
+    if created.get("scheduledFor"):
+        task["scheduledFor"] = created["scheduledFor"]
     _apply_task_routine_fields(task, created)
     for event in events:
         task["events"].append(event)
@@ -310,6 +315,20 @@ def materialize_task_events(events: list[dict[str, Any]]) -> dict[str, Any]:
                 task["assignedAgentId"] = event["agentId"]
             else:
                 task.pop("assignedAgentId", None)
+        elif event_type == "task.unassigned":
+            task.pop("assignedAgent", None)
+            task.pop("assignedAgentId", None)
+        elif event_type == "task.dispatch_claimed":
+            task["dispatchClaim"] = event["claim"]
+        elif event_type == "task.dispatch_released":
+            if task.get("dispatchClaim", {}).get("id") == event.get("claimId"):
+                task.pop("dispatchClaim", None)
+        elif event_type == "task.dispatch_outcome":
+            task["dispatchOutcome"] = event["outcome"]
+        elif event_type == "task.occurrence_created":
+            occurrence_id = event["occurrenceId"]
+            if occurrence_id not in task["occurrenceIds"]:
+                task["occurrenceIds"].append(occurrence_id)
         elif event_type == "task.status":
             task["status"] = event["status"]
         elif event_type == "task.deleted":

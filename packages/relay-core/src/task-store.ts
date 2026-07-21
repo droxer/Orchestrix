@@ -35,8 +35,20 @@ export interface RelayTask {
   /** Date-only next routine run date in YYYY-MM-DD format. */
   routineNextRunDate?: string;
   routineEnabled: boolean;
+  /** Parent routine for a generated occurrence. */
+  sourceRoutineId?: string;
+  /** Calendar date this occurrence was generated for. */
+  scheduledFor?: string;
+  /** Generated occurrence tasks, in creation order. */
+  occurrenceIds?: string[];
   assignedAgent?: AgentName;
   assignedAgentId?: string;
+  dispatchClaim?: { id: string; claimedAt: string; expiresAt: string };
+  dispatchOutcome?: {
+    state: "started" | "queued" | "rejected";
+    code?: string;
+    message?: string;
+  };
   linkedSessionIds: string[];
   activity: RelayTaskActivity[];
   createdAt: string;
@@ -63,6 +75,8 @@ export type RelayTaskEvent =
       routineCadence?: TaskRoutineCadence;
       routineNextRunDate?: string;
       routineEnabled?: boolean;
+      sourceRoutineId?: string;
+      scheduledFor?: string;
     }
   | {
       id: string;
@@ -87,6 +101,45 @@ export type RelayTaskEvent =
       timestamp: string;
       agent: AgentName;
       agentId?: string;
+    }
+  | {
+      id: string;
+      type: "task.unassigned";
+      taskId: string;
+      timestamp: string;
+    }
+  | {
+      id: string;
+      type: "task.dispatch_claimed";
+      taskId: string;
+      timestamp: string;
+      claim: { id: string; claimedAt: string; expiresAt: string };
+    }
+  | {
+      id: string;
+      type: "task.dispatch_released";
+      taskId: string;
+      timestamp: string;
+      claimId: string;
+    }
+  | {
+      id: string;
+      type: "task.dispatch_outcome";
+      taskId: string;
+      timestamp: string;
+      outcome: {
+        state: "started" | "queued" | "rejected";
+        code?: string;
+        message?: string;
+      };
+    }
+  | {
+      id: string;
+      type: "task.occurrence_created";
+      taskId: string;
+      timestamp: string;
+      occurrenceId: string;
+      scheduledFor: string;
     }
   | {
       id: string;
@@ -356,6 +409,9 @@ export function materializeTaskEvents(events: RelayTaskEvent[]): RelayTask {
     status: "backlog",
     isRoutine: Boolean(created.isRoutine),
     routineEnabled: Boolean(created.routineEnabled),
+    ...(created.sourceRoutineId ? { sourceRoutineId: created.sourceRoutineId } : {}),
+    ...(created.scheduledFor ? { scheduledFor: created.scheduledFor } : {}),
+    occurrenceIds: [],
     linkedSessionIds: [],
     activity: [],
     createdAt: created.timestamp,
@@ -384,6 +440,17 @@ export function materializeTaskEvents(events: RelayTaskEvent[]): RelayTask {
       task.assignedAgent = event.agent;
       if (event.agentId) task.assignedAgentId = event.agentId;
       else delete task.assignedAgentId;
+    } else if (event.type === "task.unassigned") {
+      delete task.assignedAgent;
+      delete task.assignedAgentId;
+    } else if (event.type === "task.dispatch_claimed") {
+      task.dispatchClaim = event.claim;
+    } else if (event.type === "task.dispatch_released") {
+      if (task.dispatchClaim?.id === event.claimId) delete task.dispatchClaim;
+    } else if (event.type === "task.dispatch_outcome") {
+      task.dispatchOutcome = event.outcome;
+    } else if (event.type === "task.occurrence_created") {
+      if (!task.occurrenceIds?.includes(event.occurrenceId)) task.occurrenceIds?.push(event.occurrenceId);
     } else if (event.type === "task.status") {
       task.status = event.status;
     } else if (event.type === "task.deleted") {

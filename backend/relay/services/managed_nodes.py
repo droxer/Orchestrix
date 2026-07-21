@@ -255,12 +255,19 @@ class LocalManagedNodeStore:
             if desired_state not in MANAGED_NODE_DESIRED_STATES:
                 raise ValueError("desiredState must be running, stopped, or deleted.")
             sandbox_mode = patch.get("sandboxMode", node["sandboxMode"])
-            _validate_managed_sandbox_mode(sandbox_mode)
+            if "sandboxMode" in patch or desired_state == "running":
+                _validate_managed_sandbox_mode(sandbox_mode)
             assignment_mode = patch.get("assignmentMode", node["assignmentMode"])
-            if assignment_mode not in MANAGED_NODE_ASSIGNMENT_MODES:
+            if (
+                "assignmentMode" in patch or desired_state == "running"
+            ) and assignment_mode not in MANAGED_NODE_ASSIGNMENT_MODES:
                 raise ValueError("assignmentMode must be dedicated.")
             employee_id = patch.get("employeeId", node.get("employeeId"))
-            if assignment_mode == "dedicated" and not employee_id:
+            if (
+                "employeeId" in patch
+                or "assignmentMode" in patch
+                or desired_state == "running"
+            ) and assignment_mode == "dedicated" and not employee_id:
                 raise ValueError("employeeId is required for a dedicated managed node.")
             if "phase" in patch and patch["phase"] not in MANAGED_NODE_PHASES:
                 raise ValueError("Invalid managed node phase.")

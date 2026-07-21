@@ -153,7 +153,8 @@ def test_task_claim_orders_by_priority_due_date_and_assignee() -> None:
 
         assert claimed is not None
         assert claimed["id"] == earlier["id"]
-        assert claimed["status"] == "running"
+        assert claimed["status"] == "assigned"
+        assert claimed["dispatchClaim"]["id"]
         assert store.get_task(wrong_assignee["id"])["status"] == "assigned"
 
 
@@ -178,7 +179,8 @@ def test_task_store_claims_exact_task_for_dispatch() -> None:
         second_claim = store.claim_task_for_dispatch(task["id"], "codex")
 
         assert claimed is not None
-        assert claimed["status"] == "running"
+        assert claimed["status"] == "assigned"
+        assert claimed["dispatchClaim"]["id"]
         assert second_claim is None
 
 
@@ -251,7 +253,8 @@ def test_database_task_claim_orders_by_priority_due_date_and_assignee() -> None:
 
         assert claimed is not None
         assert claimed["id"] == earlier["id"]
-        assert claimed["status"] == "running"
+        assert claimed["status"] == "assigned"
+        assert claimed["dispatchClaim"]["id"]
         assert store.get_task(wrong_assignee["id"])["status"] == "assigned"
 
 
@@ -276,7 +279,8 @@ def test_database_task_store_claims_exact_task_for_dispatch() -> None:
         second_claim = store.claim_task_for_dispatch(task["id"], "codex")
 
         assert claimed is not None
-        assert claimed["status"] == "running"
+        assert claimed["status"] == "assigned"
+        assert claimed["dispatchClaim"]["id"]
         assert second_claim is None
 
 
@@ -413,6 +417,111 @@ def test_database_task_store_promotes_due_routine_once() -> None:
         assert (
             len([task for task in store.list_tasks() if task["id"] != routine["id"]])
             == 1
+        )
+
+
+def assert_store_supports_canonical_assignment_and_dispatch_leases(store) -> None:
+    task = store.create_task(
+        {
+            "title": "Keep explicit state",
+            "status": "blocked",
+            "ownerEmployeeId": "alice",
+            "assigneeEmployeeId": "alice",
+        }
+    )
+
+    assigned = store.set_task_assignment(task["id"], "codex", "agent_builder")
+    assert assigned["status"] == "blocked"
+    assert assigned["assignedAgentId"] == "agent_builder"
+
+    store.update_task(task["id"], {"status": "assigned"})
+    claimed = store.claim_task_for_dispatch(task["id"], "codex")
+    assert claimed is not None
+    assert claimed["status"] == "assigned"
+    assert claimed["dispatchClaim"]["id"]
+    assert store.claim_task_for_dispatch(task["id"], "codex") is None
+
+    released = store.release_dispatch_claim(task["id"], claimed["dispatchClaim"]["id"])
+    assert "dispatchClaim" not in released
+    assert released["assignedAgentId"] == "agent_builder"
+
+    store.append_event(
+        task["id"],
+        relay_task_event(
+            "task.dispatch_claimed",
+            task["id"],
+            {
+                "claim": {
+                    "id": "claim_abandoned",
+                    "claimedAt": "2020-01-01T00:00:00Z",
+                    "expiresAt": "2020-01-01T00:01:00Z",
+                }
+            },
+        ),
+    )
+    recovered = store.claim_task_for_dispatch(task["id"], "codex")
+    assert recovered is not None
+    assert recovered["dispatchClaim"]["id"] == "claim_abandoned"
+    assert recovered["dispatchClaim"]["expiresAt"] != "2020-01-01T00:01:00Z"
+    assert store.claim_task_for_dispatch(task["id"], "codex") is None
+    store.release_dispatch_claim(task["id"], recovered["dispatchClaim"]["id"])
+
+    unassigned = store.unassign_task(task["id"])
+    assert "assignedAgent" not in unassigned
+    assert "assignedAgentId" not in unassigned
+    assert unassigned["status"] == "assigned"
+
+
+def test_local_task_store_supports_canonical_assignment_and_dispatch_leases() -> None:
+    with TemporaryDirectory() as root:
+        assert_store_supports_canonical_assignment_and_dispatch_leases(
+            LocalTaskStore(root)
+        )
+
+
+def test_database_task_store_supports_canonical_assignment_and_dispatch_leases() -> None:
+    with TemporaryDirectory() as root:
+        assert_store_supports_canonical_assignment_and_dispatch_leases(
+            DatabaseTaskStore(f"sqlite:///{root}/relay.db", create_schema=True)
+        )
+
+
+def assert_store_records_routine_occurrence_lineage(store) -> None:
+    routine = store.create_task(
+        {
+            "title": "Weekly report",
+            "isRoutine": True,
+            "routineEnabled": True,
+            "routineCadence": "weekly",
+            "routineNextRunDate": "2026-06-25",
+            "assignedAgent": "codex",
+            "assignedAgentId": "agent_builder",
+            "ownerEmployeeId": "alice",
+            "assigneeEmployeeId": "alice",
+        }
+    )
+
+    occurrence = store.promote_due_routine(
+        routine["id"], "2026-06-25", "2026-07-02"
+    )
+
+    assert occurrence is not None
+    assert occurrence["sourceRoutineId"] == routine["id"]
+    assert occurrence["scheduledFor"] == "2026-06-25"
+    assert occurrence["assignedAgentId"] == "agent_builder"
+    updated = store.get_task(routine["id"])
+    assert updated["occurrenceIds"] == [occurrence["id"]]
+
+
+def test_local_task_store_records_routine_occurrence_lineage() -> None:
+    with TemporaryDirectory() as root:
+        assert_store_records_routine_occurrence_lineage(LocalTaskStore(root))
+
+
+def test_database_task_store_records_routine_occurrence_lineage() -> None:
+    with TemporaryDirectory() as root:
+        assert_store_records_routine_occurrence_lineage(
+            DatabaseTaskStore(f"sqlite:///{root}/relay.db", create_schema=True)
         )
 
 

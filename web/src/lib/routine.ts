@@ -1,4 +1,4 @@
-import type { AgentName, RelayTask, TaskRoutineCadence, TaskRoutineType } from "../types.js";
+import type { RelaySession, RelayTask, TaskRoutineCadence, TaskRoutineType } from "../types.js";
 
 export const TASK_ROUTINE_TYPES: TaskRoutineType[] = ["task", "job"];
 export const TASK_ROUTINE_CADENCES: TaskRoutineCadence[] = ["daily", "weekly", "monthly", "custom"];
@@ -7,7 +7,7 @@ export interface RoutineFilters {
   query: string;
   type: "all" | TaskRoutineType;
   cadence: "all" | TaskRoutineCadence;
-  agent: "all" | AgentName;
+  agent: string;
   assignee: string;
   state: "all" | "enabled" | "disabled" | "due" | "unscheduled";
 }
@@ -19,7 +19,7 @@ export function filterRoutineTasks(tasks: RelayTask[], filters: RoutineFilters, 
     if (!task.isRoutine) return false;
     if (filters.type !== "all" && task.routineType !== filters.type) return false;
     if (filters.cadence !== "all" && task.routineCadence !== filters.cadence) return false;
-    if (filters.agent !== "all" && task.assignedAgent !== filters.agent) return false;
+    if (filters.agent !== "all" && task.assignedAgentId !== filters.agent) return false;
     if (assignee && !(task.assigneeEmployeeId ?? task.ownerEmployeeId ?? "").toLowerCase().includes(assignee)) return false;
     if (filters.state === "enabled" && !task.routineEnabled) return false;
     if (filters.state === "disabled" && task.routineEnabled) return false;
@@ -34,10 +34,31 @@ export function filterRoutineTasks(tasks: RelayTask[], filters: RoutineFilters, 
 }
 
 export function routineDueTone(task: RelayTask, today = isoToday()): "neutral" | "warn" | "bad" {
-  if (!task.routineEnabled || !task.routineNextRunDate || task.status === "done") return "neutral";
+  if (!task.routineEnabled || !task.routineNextRunDate) return "neutral";
   if (task.routineNextRunDate < today) return "bad";
   if (task.routineNextRunDate === today) return "warn";
   return "neutral";
+}
+
+export function latestRoutineSession(
+  routine: RelayTask,
+  tasks: RelayTask[],
+  sessions: RelaySession[],
+): RelaySession | undefined {
+  const occurrenceIds = new Set(routine.occurrenceIds ?? []);
+  const occurrences = tasks
+    .filter((task) => occurrenceIds.has(task.id) || task.sourceRoutineId === routine.id)
+    .sort((left, right) =>
+      (left.scheduledFor ?? left.createdAt).localeCompare(
+        right.scheduledFor ?? right.createdAt,
+      ) || left.createdAt.localeCompare(right.createdAt),
+    );
+  const sessionById = new Map(sessions.map((session) => [session.id, session]));
+  const linkedIds = [
+    ...routine.linkedSessionIds,
+    ...occurrences.flatMap((occurrence) => occurrence.linkedSessionIds),
+  ];
+  return [...linkedIds].reverse().map((id) => sessionById.get(id)).find(Boolean);
 }
 
 function compareRoutineTasks(left: RelayTask, right: RelayTask): number {

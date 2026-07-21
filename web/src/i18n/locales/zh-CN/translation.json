@@ -885,7 +885,11 @@
     "retry": "重试"
   },
   "fleet": {
-    "agent_status_title": "{{agent}}：{{status}}"
+    "agent_status_title": "{{agent}}：{{status}}",
+    "presence_online": "在线",
+    "presence_offline": "离线",
+    "presence_online_title": "在线",
+    "presence_offline_title": "离线 · 最后在线 {{time}}"
   },
   "sheet": {
     "close": "关闭"

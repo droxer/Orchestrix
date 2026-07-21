@@ -15,15 +15,17 @@ import {
   startTask,
   updateTask,
 } from "../api";
-import type { AgentName, AgentRunInput, AgentTaskMode, CreateTaskInput, RelaySession, RunInput, TaskMutationInput } from "../types";
+import type { AgentRunInput, AgentTaskMode, CreateTaskInput, RelaySession, RunInput, TaskMutationInput } from "../types";
 import { RELAY_QUERY_KEY } from "./useRelayData";
 import { useMutationError } from "./useMutationError";
+import { useDialogs } from "../components/ui/DialogProvider";
 
 type TokenArg = { token?: string };
 
 export function useRelayMutations() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
+  const { announce } = useDialogs();
   const { reportMutationError } = useMutationError();
 
   const invalidateRelay = () => queryClient.invalidateQueries({ queryKey: RELAY_QUERY_KEY });
@@ -98,7 +100,7 @@ export function useRelayMutations() {
   });
 
   const assignTaskMutation = useMutation({
-    mutationFn: ({ taskId, agent }: { taskId: string; agent: AgentName }) => assignTask(taskId, agent),
+    mutationFn: ({ taskId, agentId }: { taskId: string; agentId: string }) => assignTask(taskId, agentId),
     onSuccess: () => void invalidateRelay(),
     onError: onRelayError("Failed to assign task", "errors.task_action"),
   });
@@ -109,11 +111,20 @@ export function useRelayMutations() {
       ...input
     }: {
       taskId: string;
-      agent?: AgentName;
       mode?: AgentTaskMode;
       assignments?: RunInput["assignments"];
     }) => startTask(taskId, input),
-    onSuccess: () => void invalidateRelay(),
+    onSuccess: (result) => {
+      void invalidateRelay();
+      announce({
+        message: result.dispatch.message ?? t("backlog.toast_started"),
+        tone: result.dispatch.state === "rejected"
+          ? "error"
+          : result.dispatch.state === "started"
+            ? "success"
+            : "info",
+      });
+    },
     onError: onRelayError("Failed to start task", "errors.task_action"),
   });
 

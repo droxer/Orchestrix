@@ -742,7 +742,7 @@ def test_task_persists_and_dispatches_a_logical_agent_assignment(monkeypatch) ->
         )
 
 
-def test_task_reassignment_cannot_retain_another_employees_agent(monkeypatch) -> None:
+def test_task_owner_cannot_be_reassigned_to_another_employees_agent(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
         client = TestClient(create_app(root))
@@ -784,12 +784,62 @@ def test_task_reassignment_cannot_retain_another_employees_agent(monkeypatch) ->
                 "assignedAgentId": agents["bob"]["id"],
             },
         )
-        assert reassigned.status_code == 200
-        assert reassigned.json()["assigneeEmployeeId"] == "bob"
-        assert reassigned.json()["assignedAgentId"] == agents["bob"]["id"]
+        assert reassigned.status_code == 403
+
+
+def test_employee_task_writes_require_named_agents_and_preserve_status(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        assert client.post(
+            "/cp/employees",
+            json={
+                "employeeId": "alice",
+                "username": "alice",
+                "password": "userpass",
+            },
+        ).status_code == 201
+        agent = client.post(
+            "/cp/employees/alice/agents",
+            json={"displayName": "Builder", "executorKind": "codex"},
+        ).json()["agent"]
+        assert client.post("/auth/logout").status_code == 200
+        assert client.post(
+            "/auth/login", json={"username": "alice", "password": "userpass"}
+        ).status_code == 200
+
+        legacy = client.post(
+            "/tasks", json={"title": "Legacy assignment", "assignedAgent": "codex"}
+        )
+        assert legacy.status_code == 400
+
+        agentless_routine = client.post(
+            "/tasks",
+            json={
+                "title": "Unsafe routine",
+                "isRoutine": True,
+                "routineEnabled": True,
+            },
+        )
+        assert agentless_routine.status_code == 400
+
+        created = client.post(
+            "/tasks",
+            json={
+                "title": "Explicitly blocked",
+                "status": "blocked",
+                "assignedAgentId": agent["id"],
+            },
+        )
+        assert created.status_code == 201
+        assert created.json()["status"] == "blocked"
+        assert created.json()["assigneeEmployeeId"] == "alice"
 
         cleared = client.patch(
-            f"/tasks/{task['id']}", json={"assignedAgentId": ""}
+            f"/tasks/{created.json()['id']}", json={"assignedAgentId": None}
         )
         assert cleared.status_code == 200
+        assert cleared.json()["status"] == "blocked"
+        assert "assignedAgent" not in cleared.json()
         assert "assignedAgentId" not in cleared.json()

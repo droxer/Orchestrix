@@ -706,6 +706,7 @@
    by the status pill's tone dot, not by tinting the avatar (semantic
    colors are text/dot only, never background fills). */
 .adm-node-avatar {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -807,6 +808,96 @@
 /* Running/provisioning stay hue-free on the dot — the accent is reserved for
    action, selection, and focus, never a passive status indicator. */
 .adm-status-pill.tone-info .adm-status-dot { background: var(--ink-4); }
+
+/* ---- Computer presence (online / offline) --------------------------------
+   Monochrome liveness cue reused on the fleet card, list row, and assign
+   drawer. Online = a filled, calm dot (--ok, the quiet tier) with a slow
+   breathing halo — motion, not brightness, carries "alive". Offline = a
+   static, bright hollow ring (--err, the loud tier) reading as "dark / no
+   signal". Semantic hue lives on the dot only, never as a fill. */
+.adm-presence {
+  --presence: var(--err);
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  width: 9px;
+  height: 9px;
+}
+
+/* The dot itself: offline is a hollow ring, online fills in. */
+.adm-presence::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--r-full);
+  border: 1.5px solid var(--presence);
+  background: transparent;
+  transition: background var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+}
+
+.adm-presence[data-online="true"] {
+  --presence: var(--ok);
+}
+
+.adm-presence[data-online="true"]::before {
+  background: var(--presence);
+  border-color: var(--presence);
+}
+
+/* Breathing halo — online only. A single expanding ring, slow and low-opacity,
+   so it reads as a heartbeat rather than an alert. */
+.adm-presence[data-online="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--r-full);
+  background: var(--presence);
+  opacity: 0;
+  animation: adm-presence-pulse 2600ms var(--ease) infinite;
+}
+
+@keyframes adm-presence-pulse {
+  0% { opacity: 0.4; transform: scale(1); }
+  70%, 100% { opacity: 0; transform: scale(2.6); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .adm-presence[data-online="true"]::after { animation: none; }
+}
+
+/* Corner badge — pinned to the machine avatar's lower-right, with a ring the
+   colour of the avatar fill so the dot separates cleanly from the glyph. */
+.adm-presence--corner {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  box-shadow: 0 0 0 2px var(--surface-2);
+  border-radius: var(--r-full);
+}
+
+/* Offline machines recede: the avatar glyph dims so a dark computer reads as
+   dark at a glance across a grid or list. Identity text stays legible. */
+.adm-node-card[data-online="false"] .adm-node-avatar--machine,
+.adm-node-row[data-online="false"] .adm-node-avatar--machine {
+  color: var(--ink-4);
+}
+
+/* List row: name and status pill share one line so the row gains the status
+   readout the card already had. */
+.adm-node-row-nameline {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.adm-node-row-nameline .adm-node-card-name {
+  min-width: 0;
+}
+
+.adm-node-row-nameline .adm-status-pill {
+  flex: none;
+}
 
 .adm-node-id {
   display: inline-flex;

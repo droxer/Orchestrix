@@ -2,13 +2,12 @@ import type { AgentName, DaemonNodeMonitorRecord, EmployeeAgent, RelayTask, Task
 
 export const TASK_STATUSES: TaskStatus[] = ["backlog", "assigned", "running", "waiting_for_human", "review", "blocked", "done"];
 export const TASK_PRIORITIES: TaskPriority[] = ["high", "normal", "low"];
-const DISCUSSION_AGENT_NAMES: AgentName[] = ["claude", "pi", "codex", "kimi"];
 
 export interface BacklogFilters {
   query: string;
   status: "all" | TaskStatus;
   priority: "all" | TaskPriority;
-  agent: "all" | AgentName;
+  agent: string;
   assignee: string;
   due: "all" | "overdue" | "today" | "unscheduled";
 }
@@ -17,9 +16,10 @@ export function filterTasks(tasks: RelayTask[], filters: BacklogFilters, today =
   const query = filters.query.trim().toLowerCase();
   const assignee = filters.assignee.trim().toLowerCase();
   return tasks.filter((task) => {
+    if (task.isRoutine) return false;
     if (filters.status !== "all" && task.status !== filters.status) return false;
     if (filters.priority !== "all" && task.priority !== filters.priority) return false;
-    if (filters.agent !== "all" && task.assignedAgent !== filters.agent) return false;
+    if (filters.agent !== "all" && task.assignedAgentId !== filters.agent) return false;
     if (assignee && !(task.assigneeEmployeeId ?? task.ownerEmployeeId ?? "").toLowerCase().includes(assignee)) return false;
     if (query) {
       const haystack = `${task.title} ${task.description} ${task.id}`.toLowerCase();
@@ -39,14 +39,11 @@ export function tasksByStatus(tasks: RelayTask[]): Record<TaskStatus, RelayTask[
   }, {} as Record<TaskStatus, RelayTask[]>);
 }
 
-// agentReadyForTask and nodeAcceptsAskRun mirror the backend's
-// ready_node_for_task (relay/tasks/scheduler.py) and node_accepts_run
-// (relay/daemon_registry/registry.py); keep them in sync when capacity
-// rules change. Action dispatches are exclusive, so readiness for an
-// assigned agent requires an idle node.
+// Employee workflows use named logical-agent availability only. Legacy
+// executor-only assignments stay visible but cannot be dispatched.
 export function agentReadyForTask(
   task: RelayTask,
-  nodes: DaemonNodeMonitorRecord[],
+  _nodes: DaemonNodeMonitorRecord[],
   logicalAgents: EmployeeAgent[] = [],
 ): boolean {
   if (task.assignedAgentId) {
@@ -54,43 +51,18 @@ export function agentReadyForTask(
       (agent) => agent.id === task.assignedAgentId && agent.enabled && agent.availability === "ready",
     );
   }
-  if (!task.assignedAgent) return false;
-  const employeeId = task.assigneeEmployeeId ?? task.ownerEmployeeId;
-  return nodes.some((node) =>
-    (!employeeId || node.employeeId === employeeId)
-    && node.status !== "stopped"
-    && node.status !== "failed"
-    && node.status !== "provisioning"
-    && node.online !== false
-    && node.activeRuns.length === 0
-    && !(node.disabledAgents ?? []).includes(task.assignedAgent!)
-    && node.agents?.[task.assignedAgent!] === "ready"
-  );
+  return false;
 }
 
 export function discussionAgentsForTask(
-  task: RelayTask,
-  nodes: DaemonNodeMonitorRecord[],
+  _task: RelayTask,
+  _nodes: DaemonNodeMonitorRecord[],
   logicalAgents: EmployeeAgent[] = [],
 ): AgentName[] {
   const readyLogicalAgents = logicalAgents.filter(
     (agent) => agent.enabled && agent.availability === "ready",
   );
-  if (readyLogicalAgents.length > 0) {
-    return [...new Set(readyLogicalAgents.map((agent) => agent.executorKind))];
-  }
-  const employeeId = task.assigneeEmployeeId ?? task.ownerEmployeeId;
-  const node = nodes.find((item) =>
-    (!employeeId || item.employeeId === employeeId)
-    && item.status !== "stopped"
-    && item.status !== "failed"
-    && item.status !== "provisioning"
-    && item.online !== false
-    && nodeAcceptsAskRun(item)
-  );
-  if (!node) return [];
-  const disabled = new Set(node.disabledAgents ?? []);
-  return DISCUSSION_AGENT_NAMES.filter((agent) => !disabled.has(agent) && node.agents?.[agent] === "ready");
+  return [...new Set(readyLogicalAgents.map((agent) => agent.executorKind))];
 }
 
 export function dueTone(task: RelayTask, today = isoToday()): "neutral" | "warn" | "bad" {
@@ -119,18 +91,4 @@ function compareTasks(left: RelayTask, right: RelayTask): number {
 
 function priorityRank(priority: TaskPriority): number {
   return { high: 0, normal: 1, low: 2 }[priority] ?? 1;
-}
-
-function nodeAcceptsAskRun(node: DaemonNodeMonitorRecord): boolean {
-  if (node.activeRuns.some((run) => run.mode !== "ask")) return false;
-  const byMode = node.runCapacityByMode ?? {};
-  const askCapacity = positiveInteger(byMode.ask) ?? 1;
-  const modeCapacities = (["action", "review", "ask"] as const).map((mode) => positiveInteger(byMode[mode]) ?? 1);
-  const maxConcurrent = positiveInteger(node.maxConcurrentRuns) ?? Math.max(...modeCapacities);
-  const activeAsk = node.activeRuns.filter((run) => run.mode === "ask").length;
-  return node.activeRuns.length < maxConcurrent && activeAsk < askCapacity;
-}
-
-function positiveInteger(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : undefined;
 }

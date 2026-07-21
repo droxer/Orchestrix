@@ -22,7 +22,6 @@ def _bootstrap(client: TestClient) -> None:
 def _create_task_with_session(client: TestClient, workspace_path: str, *, title: str = "Ship the quarterly deck") -> dict[str, Any]:
     response = client.post("/tasks", json={
         "title": title,
-        "assignedAgent": "claude",
         "createSession": True,
         "workspacePath": workspace_path,
     })
@@ -83,9 +82,15 @@ def test_task_artifacts_dedupes_regenerated_file_across_sessions(monkeypatch) ->
         _bootstrap(client)
         task = _create_task_with_session(client, ws)
         first_session = task["linkedSessionIds"][0]
+        agent = app.state.agent_store.create_agent(
+            "admin", {"displayName": "Artifact Reviewer", "executorKind": "claude"}
+        )
 
         # A second run of the same task regenerates deck.pptx in a new session.
-        pickup = client.post(f"/tasks/{task['id']}/pickup", json={"agent": "claude", "workspacePath": ws})
+        pickup = client.post(
+            f"/tasks/{task['id']}/pickup",
+            json={"agentId": agent["id"], "workspacePath": ws},
+        )
         assert pickup.status_code == 200, pickup.text
         second_session = pickup.json()["session"]["id"]
 

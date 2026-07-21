@@ -14,6 +14,24 @@ from relay.services.managed_nodes import LocalManagedNodeStore
 from relay.tasks import ROUTINE_SKIP_NO_AGENT_MESSAGE, TaskScheduler, next_routine_date
 
 
+def _logical_backend(root: str, registry, *node_ids: str):
+    agent_store = LocalEmployeeAgentStore(root)
+    placement_store = LocalAgentPlacementStore(root)
+    agent = agent_store.create_agent(
+        "alice", {"displayName": "Builder", "executorKind": "codex"}
+    )
+    for node_id in node_ids:
+        placement_store.create_placement(agent, node_id)
+    return (
+        ServerDaemonNodeBackend(
+            registry,
+            employee_agent_store=agent_store,
+            agent_placement_store=placement_store,
+        ),
+        agent,
+    )
+
+
 def test_scheduler_dispatches_assigned_task_to_ready_node() -> None:
     async def run_flow() -> None:
         with TemporaryDirectory() as root:
@@ -22,7 +40,6 @@ def test_scheduler_dispatches_assigned_task_to_ready_node() -> None:
             registry = DaemonNodeRegistry(
                 session_store, LocalDaemonStore(root), task_store=task_store
             )
-            backend = ServerDaemonNodeBackend(registry)
             registry.register(
                 {
                     "sandboxId": "sbx_alice",
@@ -35,11 +52,13 @@ def test_scheduler_dispatches_assigned_task_to_ready_node() -> None:
                 },
                 "ui_token",
             )
+            backend, agent = _logical_backend(root, registry, "sbx_alice")
             task = task_store.create_task(
                 {
                     "title": "Ship scheduled backlog",
                     "description": "Run automatically.",
                     "assignedAgent": "codex",
+                    "assignedAgentId": agent["id"],
                     "assigneeEmployeeId": "alice",
                     "status": "assigned",
                 }
@@ -70,7 +89,6 @@ def test_scheduler_dispatches_when_employee_owns_multiple_computers() -> None:
             registry = DaemonNodeRegistry(
                 session_store, LocalDaemonStore(root), task_store=task_store
             )
-            backend = ServerDaemonNodeBackend(registry)
             for suffix in ("one", "two"):
                 registry.register(
                     {
@@ -84,10 +102,14 @@ def test_scheduler_dispatches_when_employee_owns_multiple_computers() -> None:
                     },
                     "ui_token",
                 )
+            backend, agent = _logical_backend(
+                root, registry, "sbx_alice_one", "sbx_alice_two"
+            )
             task = task_store.create_task(
                 {
                     "title": "Runs on either computer",
                     "assignedAgent": "codex",
+                    "assignedAgentId": agent["id"],
                     "assigneeEmployeeId": "alice",
                     "status": "assigned",
                 }
@@ -121,10 +143,12 @@ def test_scheduler_requests_managed_capacity_once_when_no_node_is_ready() -> Non
                 LocalSessionStore(root), LocalDaemonStore(root), task_store=task_store
             )
             managed_nodes = LocalManagedNodeStore(root)
+            backend, agent = _logical_backend(root, registry)
             task_store.create_task(
                 {
                     "title": "Needs managed capacity",
                     "assignedAgent": "codex",
+                    "assignedAgentId": agent["id"],
                     "assigneeEmployeeId": "alice",
                     "status": "assigned",
                 }
@@ -132,7 +156,7 @@ def test_scheduler_requests_managed_capacity_once_when_no_node_is_ready() -> Non
             scheduler = TaskScheduler(
                 task_store=task_store,
                 registry=registry,
-                backend=ServerDaemonNodeBackend(registry),
+                    backend=backend,
                 managed_node_store=managed_nodes,
             )
 
@@ -161,10 +185,12 @@ def test_scheduler_waits_for_an_employee_local_node_instead_of_provisioning_mana
                 "alice", "/Users/alice/workspace", sandbox_mode="none"
             )
             managed_nodes = LocalManagedNodeStore(root)
+            backend, agent = _logical_backend(root, registry)
             task_store.create_task(
                 {
                     "title": "Wait for Alice's computer",
                     "assignedAgent": "codex",
+                    "assignedAgentId": agent["id"],
                     "assigneeEmployeeId": "alice",
                     "status": "assigned",
                 }
@@ -173,7 +199,7 @@ def test_scheduler_waits_for_an_employee_local_node_instead_of_provisioning_mana
             await TaskScheduler(
                 task_store=task_store,
                 registry=registry,
-                backend=ServerDaemonNodeBackend(registry),
+                backend=backend,
                 managed_node_store=managed_nodes,
             ).tick()
 
@@ -194,10 +220,12 @@ def test_scheduler_falls_back_to_managed_after_local_node_is_removed() -> None:
             )
             registry.delete(local_node["id"])
             managed_nodes = LocalManagedNodeStore(root)
+            backend, agent = _logical_backend(root, registry)
             task_store.create_task(
                 {
                     "title": "Continue after Alice disconnects local mode",
                     "assignedAgent": "codex",
+                    "assignedAgentId": agent["id"],
                     "assigneeEmployeeId": "alice",
                     "status": "assigned",
                 }
@@ -206,7 +234,7 @@ def test_scheduler_falls_back_to_managed_after_local_node_is_removed() -> None:
             await TaskScheduler(
                 task_store=task_store,
                 registry=registry,
-                backend=ServerDaemonNodeBackend(registry),
+                backend=backend,
                 managed_node_store=managed_nodes,
             ).tick()
 
@@ -278,7 +306,6 @@ def test_scheduler_promotes_due_routine_and_advances_next_run() -> None:
             registry = DaemonNodeRegistry(
                 session_store, LocalDaemonStore(root), task_store=task_store
             )
-            backend = ServerDaemonNodeBackend(registry)
             registry.register(
                 {
                     "sandboxId": "sbx_alice",
@@ -291,12 +318,14 @@ def test_scheduler_promotes_due_routine_and_advances_next_run() -> None:
                 },
                 "ui_token",
             )
+            backend, agent = _logical_backend(root, registry, "sbx_alice")
             routine = task_store.create_task(
                 {
                     "title": "Weekly report",
                     "description": "Prepare the weekly status.",
                     "priority": "high",
                     "assignedAgent": "codex",
+                    "assignedAgentId": agent["id"],
                     "ownerEmployeeId": "alice",
                     "assigneeEmployeeId": "alice",
                     "isRoutine": True,
@@ -342,7 +371,6 @@ def test_scheduler_dispatches_by_priority_not_recency() -> None:
             registry = DaemonNodeRegistry(
                 session_store, LocalDaemonStore(root), task_store=task_store
             )
-            backend = ServerDaemonNodeBackend(registry)
             registry.register(
                 {
                     "sandboxId": "sbx_alice",
@@ -355,11 +383,13 @@ def test_scheduler_dispatches_by_priority_not_recency() -> None:
                 },
                 "ui_token",
             )
+            backend, agent = _logical_backend(root, registry, "sbx_alice")
             high = task_store.create_task(
                 {
                     "title": "Older high priority",
                     "priority": "high",
                     "assignedAgent": "codex",
+                    "assignedAgentId": agent["id"],
                     "assigneeEmployeeId": "alice",
                     "status": "assigned",
                 }
@@ -369,6 +399,7 @@ def test_scheduler_dispatches_by_priority_not_recency() -> None:
                     "title": "Newer low priority",
                     "priority": "low",
                     "assignedAgent": "codex",
+                    "assignedAgentId": agent["id"],
                     "assigneeEmployeeId": "alice",
                     "status": "assigned",
                 }
@@ -446,7 +477,6 @@ def test_scheduler_backs_off_after_failed_dispatch() -> None:
             registry = DaemonNodeRegistry(
                 session_store, LocalDaemonStore(root), task_store=task_store
             )
-            backend = FailingBackend()
             registry.register(
                 {
                     "sandboxId": "sbx_alice",
@@ -459,10 +489,15 @@ def test_scheduler_backs_off_after_failed_dispatch() -> None:
                 },
                 "ui_token",
             )
+            routing_backend, agent = _logical_backend(root, registry, "sbx_alice")
+            backend = FailingBackend()
+            backend.agent_store = routing_backend.agent_store
+            backend.agent_placement_store = routing_backend.agent_placement_store
             task = task_store.create_task(
                 {
                     "title": "Keeps failing",
                     "assignedAgent": "codex",
+                    "assignedAgentId": agent["id"],
                     "assigneeEmployeeId": "alice",
                     "status": "assigned",
                 }
@@ -478,7 +513,11 @@ def test_scheduler_backs_off_after_failed_dispatch() -> None:
             assert backend.calls == 1
             # The failed task is back in the queue but skipped until its
             # backoff window elapses, so the immediate retick does not re-run.
-            assert task_store.get_task(task["id"])["status"] == "assigned"
+            failed = task_store.get_task(task["id"])
+            assert failed["status"] == "assigned"
+            assert failed["assignedAgentId"] == agent["id"]
+            assert failed["dispatchClaim"]["id"]
+            assert failed["dispatchOutcome"]["code"] == "dispatch_failed"
             assert second.dispatched == 0
             assert second.skipped == 1
             assert backend.calls == 1
@@ -519,6 +558,72 @@ def test_scheduler_uses_targeted_task_queue_queries() -> None:
         assert result.skipped == 0
         assert store.due_queries == 1
         assert store.dispatch_queries == 1
+
+    asyncio.run(run_flow())
+
+
+def test_scheduler_rejects_legacy_and_cross_employee_assignments() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            task_store = LocalTaskStore(root)
+            registry = DaemonNodeRegistry(
+                LocalSessionStore(root), LocalDaemonStore(root), task_store=task_store
+            )
+            registry.register(
+                {
+                    "sandboxId": "sbx_alice",
+                    "employeeId": "alice",
+                    "token": "node_token",
+                    "workspacePath": "/workspace/alice",
+                    "protocolVersion": 1,
+                    "supportedAgents": ["codex"],
+                    "status": "ready",
+                },
+                "ui_token",
+            )
+            backend, agent = _logical_backend(root, registry, "sbx_alice")
+            legacy = task_store.create_task(
+                {
+                    "title": "Legacy executor task",
+                    "assignedAgent": "codex",
+                    "assigneeEmployeeId": "alice",
+                    "status": "assigned",
+                }
+            )
+            legacy_routine = task_store.create_task(
+                {
+                    "title": "Legacy executor routine",
+                    "assignedAgent": "codex",
+                    "assigneeEmployeeId": "alice",
+                    "isRoutine": True,
+                    "routineEnabled": True,
+                    "routineCadence": "daily",
+                    "routineNextRunDate": "2020-01-01",
+                }
+            )
+            crossed = task_store.create_task(
+                {
+                    "title": "Wrong owner",
+                    "assignedAgent": "codex",
+                    "assignedAgentId": agent["id"],
+                    "ownerEmployeeId": "bob",
+                    "assigneeEmployeeId": "alice",
+                    "status": "assigned",
+                }
+            )
+
+            result = await TaskScheduler(
+                task_store=task_store, registry=registry, backend=backend
+            ).tick()
+
+            assert result.dispatched == 0
+            assert result.promoted == 0
+            assert result.skipped == 3
+            assert task_store.get_task(legacy["id"])["dispatchOutcome"]["code"] == "agent_not_found"
+            assert task_store.get_task(crossed["id"])["dispatchOutcome"]["code"] == "agent_forbidden"
+            assert task_store.get_task(crossed["id"])["dispatchOutcome"]["state"] == "rejected"
+            assert task_store.get_task(legacy_routine["id"])["occurrenceIds"] == []
+            assert registry.take_commands("sbx_alice", "node_token") == []
 
     asyncio.run(run_flow())
 

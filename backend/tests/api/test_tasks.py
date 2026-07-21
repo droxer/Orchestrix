@@ -29,12 +29,38 @@ def _create_user(client: TestClient, username: str, *, employee_id: str) -> None
     assert response.status_code == 201
 
 
+def _create_agent(
+    client: TestClient,
+    employee_id: str,
+    *,
+    executor_kind: str = "codex",
+    node_id: str | None = None,
+) -> dict:
+    response = client.post(
+        f"/cp/employees/{employee_id}/agents",
+        json={
+            "displayName": f"{executor_kind.title()} Task Agent",
+            "executorKind": executor_kind,
+        },
+    )
+    assert response.status_code == 201
+    agent = response.json()["agent"]
+    if node_id:
+        placement = client.post(
+            f"/cp/agents/{agent['id']}/placements",
+            json={"daemonNodeId": node_id},
+        )
+        assert placement.status_code == 201
+    return agent
+
+
 def test_task_create_update_and_claim_next(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
         client = TestClient(create_app(root))
         _bootstrap_admin(client)
         _create_user(client, "alice", employee_id="alice")
+        agent = _create_agent(client, "alice")
 
         created = client.post("/tasks", json={
             "title": "Ship backlog",
@@ -47,7 +73,7 @@ def test_task_create_update_and_claim_next(monkeypatch) -> None:
             "routineType": "job",
             "routineCadence": "weekly",
             "routineNextRunDate": "2026-06-25",
-            "routineEnabled": True,
+            "routineEnabled": False,
         })
         assert created.status_code == 201
         task = created.json()
@@ -57,36 +83,35 @@ def test_task_create_update_and_claim_next(monkeypatch) -> None:
         assert task["routineType"] == "job"
         assert task["routineCadence"] == "weekly"
         assert task["routineNextRunDate"] == "2026-06-25"
-        assert task["routineEnabled"] is True
+        assert task["routineEnabled"] is False
 
         updated = client.patch(f"/tasks/{task['id']}", json={
             "priority": "low",
-            "assignedAgent": "codex",
+            "assignedAgentId": agent["id"],
             "routineNextRunDate": "2026-07-02",
             "routineEnabled": False,
         })
         assert updated.status_code == 200
         assert updated.json()["assignedAgent"] == "codex"
-        assert updated.json()["status"] == "assigned"
+        assert updated.json()["status"] == "backlog"
         assert updated.json()["routineNextRunDate"] == "2026-07-02"
         assert updated.json()["routineEnabled"] is False
 
         skipped_routine = client.post("/tasks/claim-next", json={"agent": "codex", "assigneeEmployeeId": "alice"})
-        assert skipped_routine.status_code == 200
-        assert skipped_routine.json()["task"] is None
+        assert skipped_routine.status_code == 410
 
         normal = client.post("/tasks", json={
             "title": "Claim normal backlog",
             "ownerEmployeeId": "alice",
             "assigneeEmployeeId": "alice",
-            "assignedAgent": "codex",
+            "assignedAgentId": agent["id"],
+            "status": "assigned",
         })
         assert normal.status_code == 201
 
         claimed = client.post("/tasks/claim-next", json={"agent": "codex", "assigneeEmployeeId": "alice"})
-        assert claimed.status_code == 200
-        assert claimed.json()["task"]["id"] == normal.json()["id"]
-        assert claimed.json()["task"]["status"] == "running"
+        assert claimed.status_code == 410
+        assert client.get(f"/tasks/{normal.json()['id']}").json()["status"] == "assigned"
 
 
 def test_routine_create_defaults_next_run_when_omitted(monkeypatch) -> None:
@@ -113,7 +138,7 @@ def test_routine_create_defaults_next_run_when_omitted(monkeypatch) -> None:
         assert created.status_code == 201
         task = created.json()
         assert task["routineNextRunDate"] == "2026-07-08"
-        assert task["routineEnabled"] is True
+        assert task["routineEnabled"] is False
 
         explicit_unscheduled = client.post("/tasks", json={
             "title": "Manual routine",
@@ -139,6 +164,10 @@ def test_routine_cadence_change_and_reenable_recalculate_next_run(monkeypatch) -
         client = TestClient(create_app(root))
         _bootstrap_admin(client)
         _create_user(client, "alice", employee_id="alice")
+        agent = client.post(
+            "/cp/employees/alice/agents",
+            json={"displayName": "Scheduler", "executorKind": "codex"},
+        ).json()["agent"]
         created = client.post("/tasks", json={
             "title": "Routine",
             "ownerEmployeeId": "alice",
@@ -147,6 +176,7 @@ def test_routine_cadence_change_and_reenable_recalculate_next_run(monkeypatch) -
             "routineCadence": "weekly",
             "routineNextRunDate": "2026-06-01",
             "routineEnabled": False,
+            "assignedAgentId": agent["id"],
         })
         assert created.status_code == 201
 
@@ -221,11 +251,21 @@ def test_assigned_backlog_waits_for_scheduler_and_start_can_dispatch_manually(mo
         }, headers={"Authorization": "Bearer ui_token"})
         assert registered.status_code == 200
 
+        agent = client.post(
+            "/cp/employees/alice/agents",
+            json={"displayName": "Builder", "executorKind": "codex"},
+        ).json()["agent"]
+        assert client.post(
+            f"/cp/agents/{agent['id']}/placements",
+            json={"daemonNodeId": "sbx_alice"},
+        ).status_code == 201
+
         created = client.post("/tasks", json={
             "title": "Run from backlog",
             "ownerEmployeeId": "alice",
             "assigneeEmployeeId": "alice",
-            "assignedAgent": "codex",
+            "assignedAgentId": agent["id"],
+            "status": "assigned",
         })
         assert created.status_code == 201
         task = created.json()
@@ -236,7 +276,7 @@ def test_assigned_backlog_waits_for_scheduler_and_start_can_dispatch_manually(mo
         assert pending_commands.status_code == 200
         assert pending_commands.json()["commands"] == []
 
-        started = client.post(f"/tasks/{task['id']}/start", json={"agent": "codex"})
+        started = client.post(f"/tasks/{task['id']}/start", json={})
         assert started.status_code == 202
         assert started.json()["session"]["id"]
         assert started.json()["task"]["id"] == task["id"]
@@ -268,15 +308,16 @@ def test_task_start_preserves_ask_mode(monkeypatch) -> None:
             "status": "ready",
         }, headers={"Authorization": "Bearer ui_token"})
         assert registered.status_code == 200
+        agent = _create_agent(client, "alice", node_id="sbx_alice")
         created = client.post("/tasks", json={
             "title": "Explain backlog",
             "ownerEmployeeId": "alice",
             "assigneeEmployeeId": "alice",
-            "assignedAgent": "codex",
+            "assignedAgentId": agent["id"],
         })
         assert created.status_code == 201
 
-        started = client.post(f"/tasks/{created.json()['id']}/start", json={"agent": "codex", "mode": "ask"})
+        started = client.post(f"/tasks/{created.json()['id']}/start", json={"mode": "ask"})
         assert started.status_code == 202
 
         commands = client.get("/daemon-nodes/sbx_alice/commands", headers={"Authorization": "Bearer node_token"})
@@ -294,17 +335,18 @@ def test_task_start_requests_managed_capacity_when_no_node_is_ready(monkeypatch)
         client = TestClient(app)
         _bootstrap_admin(client)
         _create_user(client, "alice", employee_id="alice")
+        agent = _create_agent(client, "alice")
         task = client.post(
             "/tasks",
             json={
                 "title": "Provision before running",
                 "ownerEmployeeId": "alice",
                 "assigneeEmployeeId": "alice",
-                "assignedAgent": "codex",
+                "assignedAgentId": agent["id"],
             },
         ).json()
 
-        started = client.post(f"/tasks/{task['id']}/start", json={"agent": "codex"})
+        started = client.post(f"/tasks/{task['id']}/start", json={})
 
         assert started.status_code == 202
         assert started.json()["session"] is None
@@ -322,6 +364,7 @@ def test_task_start_reports_restart_of_stopped_managed_capacity(monkeypatch) -> 
         client = TestClient(app)
         _bootstrap_admin(client)
         _create_user(client, "alice", employee_id="alice")
+        agent = _create_agent(client, "alice")
         managed = app.state.managed_node_store.create_node({"employeeId": "alice"})
         app.state.managed_node_store.update_node(
             managed["id"], {"desiredState": "stopped"}
@@ -332,11 +375,11 @@ def test_task_start_reports_restart_of_stopped_managed_capacity(monkeypatch) -> 
                 "title": "Restart managed capacity",
                 "ownerEmployeeId": "alice",
                 "assigneeEmployeeId": "alice",
-                "assignedAgent": "codex",
+                "assignedAgentId": agent["id"],
             },
         ).json()
 
-        started = client.post(f"/tasks/{task['id']}/start", json={"agent": "codex"})
+        started = client.post(f"/tasks/{task['id']}/start", json={})
 
         assert started.status_code == 202
         assert started.json()["task"]["activity"][-1]["message"] == (
@@ -363,6 +406,10 @@ def test_task_start_discussion_runs_multi_agent_ask_and_keeps_task_open(monkeypa
             "status": "ready",
         }, headers={"Authorization": "Bearer ui_token"})
         assert registered.status_code == 200
+        claude_agent = _create_agent(
+            client, "alice", executor_kind="claude", node_id="sbx_alice"
+        )
+        codex_agent = _create_agent(client, "alice", node_id="sbx_alice")
         created = client.post("/tasks", json={
             "title": "Plan onboarding",
             "description": "Discuss rollout and implementation.",
@@ -373,8 +420,8 @@ def test_task_start_discussion_runs_multi_agent_ask_and_keeps_task_open(monkeypa
 
         started = client.post(f"/tasks/{created.json()['id']}/start", json={
             "assignments": [
-                {"agent": "claude", "mode": "ask"},
-                {"agent": "codex", "mode": "ask"},
+                {"agentId": claude_agent["id"], "agent": "claude", "mode": "ask"},
+                {"agentId": codex_agent["id"], "agent": "codex", "mode": "ask"},
             ],
         })
         assert started.status_code == 202
@@ -552,6 +599,7 @@ def test_review_run_leaves_task_in_review_for_human(monkeypatch) -> None:
             "status": "ready",
         }, headers={"Authorization": "Bearer ui_token"})
         assert registered.status_code == 200
+        agent = _create_agent(client, "alice", node_id="sbx_alice")
         created = client.post("/tasks", json={
             "title": "Audit the release",
             "ownerEmployeeId": "alice",
@@ -560,7 +608,9 @@ def test_review_run_leaves_task_in_review_for_human(monkeypatch) -> None:
         assert created.status_code == 201
 
         started = client.post(f"/tasks/{created.json()['id']}/start", json={
-            "assignments": [{"agent": "codex", "mode": "review"}],
+            "assignments": [
+                {"agentId": agent["id"], "agent": "codex", "mode": "review"}
+            ],
         })
         assert started.status_code == 202
 
@@ -587,7 +637,7 @@ def test_review_run_leaves_task_in_review_for_human(monkeypatch) -> None:
         assert task.json()["status"] == "review"
 
 
-def test_routine_start_preserves_discussion_assignments(monkeypatch) -> None:
+def test_agentless_routine_cannot_start_as_team_discussion(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
 
     class FixedDate(date):
@@ -617,7 +667,7 @@ def test_routine_start_preserves_discussion_assignments(monkeypatch) -> None:
             "isRoutine": True,
             "routineCadence": "weekly",
             "routineNextRunDate": "2026-06-25",
-            "routineEnabled": True,
+            "routineEnabled": False,
         })
         assert created.status_code == 201
 
@@ -628,16 +678,9 @@ def test_routine_start_preserves_discussion_assignments(monkeypatch) -> None:
             ],
         })
         assert started.status_code == 202
-        occurrence = started.json()["task"]
-        assert occurrence["id"] != created.json()["id"]
-        definition = client.get(f"/tasks/{created.json()['id']}").json()
-        assert definition["routineNextRunDate"] == "2026-07-02"
-
-        commands = client.get("/daemon-nodes/sbx_alice/commands", headers={"Authorization": "Bearer node_token"})
-        assert commands.status_code == 200
-        [first] = commands.json()["commands"]
-        assert first["agent"] == "claude"
-        assert first["mode"] == "ask"
+        assert started.json()["session"] is None
+        assert started.json()["dispatch"]["state"] == "rejected"
+        assert started.json()["dispatch"]["code"] == "agent_not_found"
 
 
 def test_scheduler_dispatches_assigned_backlog_task(monkeypatch) -> None:
@@ -657,12 +700,21 @@ def test_scheduler_dispatches_assigned_backlog_task(monkeypatch) -> None:
             "status": "ready",
         }, headers={"Authorization": "Bearer ui_token"})
         assert registered.status_code == 200
+        agent = client.post(
+            "/cp/employees/alice/agents",
+            json={"displayName": "Scheduled Builder", "executorKind": "codex"},
+        ).json()["agent"]
+        assert client.post(
+            f"/cp/agents/{agent['id']}/placements",
+            json={"daemonNodeId": "sbx_alice"},
+        ).status_code == 201
 
         created = client.post("/tasks", json={
             "title": "Scheduled backlog",
             "ownerEmployeeId": "alice",
             "assigneeEmployeeId": "alice",
-            "assignedAgent": "codex",
+            "assignedAgentId": agent["id"],
+            "status": "assigned",
         })
         assert created.status_code == 201
         assert created.json()["status"] == "assigned"
@@ -706,12 +758,20 @@ def test_routine_start_dispatches_occurrence_not_definition(monkeypatch) -> None
             "status": "ready",
         }, headers={"Authorization": "Bearer ui_token"})
         assert registered.status_code == 200
+        agent = client.post(
+            "/cp/employees/alice/agents",
+            json={"displayName": "Routine Builder", "executorKind": "codex"},
+        ).json()["agent"]
+        assert client.post(
+            f"/cp/agents/{agent['id']}/placements",
+            json={"daemonNodeId": "sbx_alice"},
+        ).status_code == 201
 
         created = client.post("/tasks", json={
             "title": "Weekly report",
             "ownerEmployeeId": "alice",
             "assigneeEmployeeId": "alice",
-            "assignedAgent": "codex",
+            "assignedAgentId": agent["id"],
             "isRoutine": True,
             "routineCadence": "weekly",
             "routineNextRunDate": "2026-06-25",
@@ -720,10 +780,10 @@ def test_routine_start_dispatches_occurrence_not_definition(monkeypatch) -> None
         assert created.status_code == 201
         task = created.json()
         assert task["isRoutine"] is True
-        assert task["status"] == "assigned"
+        assert task["status"] == "backlog"
         assert task["linkedSessionIds"] == []
 
-        start = client.post(f"/tasks/{task['id']}/start", json={"agent": "codex"})
+        start = client.post(f"/tasks/{task['id']}/start", json={})
         assert start.status_code == 202
         assert start.json()["session"]["id"]
         occurrence = start.json()["task"]
@@ -731,10 +791,13 @@ def test_routine_start_dispatches_occurrence_not_definition(monkeypatch) -> None
         assert occurrence["isRoutine"] is False
         assert occurrence["status"] == "running"
         assert occurrence["dueDate"] == "2026-06-25"
+        assert occurrence["sourceRoutineId"] == task["id"]
+        assert occurrence["scheduledFor"] == "2026-06-25"
 
         updated_definition = client.get(f"/tasks/{task['id']}").json()
-        assert updated_definition["status"] == "assigned"
+        assert updated_definition["status"] == "backlog"
         assert updated_definition["routineNextRunDate"] == "2026-07-02"
+        assert updated_definition["occurrenceIds"] == [occurrence["id"]]
         assert updated_definition["linkedSessionIds"] == [start.json()["session"]["id"]]
 
         commands = client.get("/daemon-nodes/sbx_alice/commands", headers={"Authorization": "Bearer node_token"})
@@ -756,6 +819,16 @@ def test_task_rejects_invalid_due_date(monkeypatch) -> None:
 
         assert response.status_code == 400
         assert "YYYY-MM-DD" in response.json()["detail"]
+
+        invalid_status = client.post(
+            "/tasks", json={"title": "Bad status", "status": "queued-ish"}
+        )
+        assert invalid_status.status_code == 400
+
+        assigned_without_agent = client.post(
+            "/tasks", json={"title": "Missing agent", "status": "assigned"}
+        )
+        assert assigned_without_agent.status_code == 400
 
 
 def test_task_rejects_invalid_routine_fields(monkeypatch) -> None:
@@ -795,7 +868,7 @@ def test_task_delete_hides_task_from_list_and_get(monkeypatch) -> None:
             "isRoutine": True,
             "routineType": "task",
             "routineCadence": "daily",
-            "routineEnabled": True,
+            "routineEnabled": False,
         })
         assert created.status_code == 201
         task_id = created.json()["id"]

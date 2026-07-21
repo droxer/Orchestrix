@@ -406,14 +406,14 @@ export function deleteTask(taskId: string): Promise<RelayTask> {
   });
 }
 
-export function assignTask(taskId: string, agent: AgentName): Promise<RelayTask> {
+export function assignTask(taskId: string, agentId: string): Promise<RelayTask> {
   return apiJson<RelayTask>(`/tasks/${encodeURIComponent(taskId)}/assign`, {
     method: "POST",
-    body: { agent },
+    body: { agentId },
   });
 }
 
-export function startTask(taskId: string, input: { agent?: AgentName; mode?: AgentTaskMode; assignments?: RunInput["assignments"] } = {}): Promise<StartTaskResponse> {
+export function startTask(taskId: string, input: { mode?: AgentTaskMode; assignments?: RunInput["assignments"] } = {}): Promise<StartTaskResponse> {
   return apiJson<StartTaskResponse>(`/tasks/${encodeURIComponent(taskId)}/start`, {
     method: "POST",
     body: input,

@@ -16,8 +16,10 @@ import {
 } from "./helpers";
 import { NodeActions } from "./NodeActions";
 import { NodeProfileBadges } from "./NodeProfileBadges";
+import { NodePresence } from "./NodePresence";
 import { Button } from "../ui/button";
 import { ActionApprove, ActionCopy, AdminNode } from "../icons";
+import { isNodeOnline } from "../../lib/adminHelpers";
 
 function isAgentDisabled(node: ControlPanelDaemonNodeRecord, agent: AgentName): boolean {
   return Boolean(node.disabledAgents?.includes(agent));
@@ -72,12 +74,14 @@ export function NodeCard({
   const status = visualStatus(node);
   const tone = statusTone(status);
   const statusLabel = t(`status.${status}`, { defaultValue: status });
+  const online = isNodeOnline(node);
 
   return (
-    <article className="adm-node-card">
+    <article className="adm-node-card" data-online={online ? "true" : "false"}>
       <header className="adm-node-card-head">
-        <span className="adm-node-avatar adm-node-avatar--machine" aria-hidden="true" translate="no">
+        <span className="adm-node-avatar adm-node-avatar--machine" translate="no">
           <AdminNode size={18} aria-hidden="true" />
+          <NodePresence node={node} t={t} className="adm-presence--corner" />
         </span>
         <div className="adm-node-card-identity">
           <span

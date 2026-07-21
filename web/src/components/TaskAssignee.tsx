@@ -29,26 +29,28 @@ export function TaskAssignee({
   task,
   ready,
   unassignedLabel,
+  agentDisplayName,
   showAgent = true,
 }: {
   task: RelayTask;
   ready: boolean;
   unassignedLabel: string;
+  agentDisplayName?: string;
   showAgent?: boolean;
 }) {
-  const employee = task.assigneeEmployeeId ?? task.ownerEmployeeId;
-  const name = employee ?? unassignedLabel;
+  const assigned = Boolean(task.assignedAgentId && agentDisplayName);
+  const name = assigned ? agentDisplayName! : unassignedLabel;
 
   return (
-    <span className="task-assignee" translate="no" data-unassigned={employee ? "false" : "true"}>
+    <span className="task-assignee" translate="no" data-unassigned={assigned ? "false" : "true"}>
       <span
         className="task-assignee-avatar"
         aria-hidden="true"
         style={{ "--avatar-hue": hueFor(name) } as CSSProperties}
       >
-        {employee ? initialFor(name) : null}
+        {assigned ? initialFor(name) : null}
       </span>
-      <span className="task-assignee-name">@{name}</span>
+      <span className="task-assignee-name">{name}</span>
       {showAgent ? <AgentStateBadge agent={task.assignedAgent} ready={ready} /> : null}
     </span>
   );

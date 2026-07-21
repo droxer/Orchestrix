@@ -12,6 +12,32 @@ class AgentRoutingError(ValueError):
         self.code = code
 
 
+def dispatch_reason_code(code: str) -> str:
+    return {
+        "agent_configuration_pending": "configuration_pending",
+        "executor_not_ready": "agent_offline",
+        "node_offline": "agent_offline",
+    }.get(code, code)
+
+
+def dispatch_failure_code(error: Exception) -> str:
+    if isinstance(error, AgentRoutingError):
+        return dispatch_reason_code(error.code)
+    if isinstance(error, PermissionError):
+        return "agent_forbidden"
+    message = str(error)
+    for code in (
+        "capacity_exhausted",
+        "workspace_unavailable",
+        "configuration_pending",
+        "agent_offline",
+        "agent_forbidden",
+    ):
+        if code in message:
+            return code
+    return "dispatch_failed"
+
+
 def select_workspace_node(
     agent: dict[str, Any],
     placement_store: Any,

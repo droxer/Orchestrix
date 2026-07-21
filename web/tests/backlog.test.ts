@@ -56,7 +56,7 @@ function node(input: Partial<DaemonNodeMonitorRecord> & { id: string }): DaemonN
 describe("filterTasks", () => {
   it("filters by status priority agent assignee and due state", () => {
     const tasks = [
-      task({ id: "a", title: "Ship board", status: "assigned", priority: "high", assignedAgent: "codex", assigneeEmployeeId: "alice", dueDate: "2026-06-20" }),
+      task({ id: "a", title: "Ship board", status: "assigned", priority: "high", assignedAgent: "codex", assignedAgentId: "agent_builder", assigneeEmployeeId: "alice", dueDate: "2026-06-20" }),
       task({ id: "b", title: "Polish copy", status: "backlog", priority: "low", assignedAgent: "claude", assigneeEmployeeId: "bob", dueDate: "2026-06-26" }),
     ];
 
@@ -65,7 +65,7 @@ describe("filterTasks", () => {
       query: "ship",
       status: "assigned",
       priority: "high",
-      agent: "codex",
+      agent: "agent_builder",
       assignee: "ali",
       due: "overdue",
     }, "2026-06-24");
@@ -83,13 +83,22 @@ describe("filterTasks", () => {
     assert.equal(grouped.done.length, 1);
     assert.equal(grouped.running.length, 0);
   });
+
+  it("excludes routine definitions from the backlog", () => {
+    const result = filterTasks([
+      task({ id: "work", title: "One-off work" }),
+      task({ id: "routine", title: "Weekly report", isRoutine: true }),
+    ], baseFilters);
+
+    assert.deepEqual(result.map((item) => item.id), ["work"]);
+  });
 });
 
 describe("agentReadyForTask", () => {
-  it("requires matching employee, ready node, enabled agent, and ready agent health", () => {
+  it("does not treat legacy executor/node state as a named-agent assignment", () => {
     const backlogTask = task({ id: "a", title: "A", assignedAgent: "codex", assigneeEmployeeId: "alice" });
 
-    assert.equal(agentReadyForTask(backlogTask, [node({ id: "n1", employeeId: "alice" })]), true);
+    assert.equal(agentReadyForTask(backlogTask, [node({ id: "n1", employeeId: "alice" })]), false);
     assert.equal(agentReadyForTask(backlogTask, [node({ id: "n2", employeeId: "bob" })]), false);
     assert.equal(agentReadyForTask(backlogTask, [node({ id: "n3", employeeId: "alice", disabledAgents: ["codex"] })]), false);
     assert.equal(agentReadyForTask(backlogTask, [node({
@@ -136,31 +145,13 @@ describe("discussionAgentsForTask", () => {
     ]), ["claude", "codex"]);
   });
 
-  it("returns ready enabled agents from the matching employee node", () => {
+  it("does not synthesize employee-facing agents from daemon nodes", () => {
     const backlogTask = task({ id: "a", title: "A", assigneeEmployeeId: "alice" });
 
     assert.deepEqual(discussionAgentsForTask(backlogTask, [
       node({ id: "n1", employeeId: "bob" }),
       node({ id: "n2", employeeId: "alice", agents: { claude: "ready", pi: "failed", codex: "ready", kimi: "unknown" }, disabledAgents: ["codex"] }),
-    ]), ["claude"]);
-  });
-
-  it("requires ask-mode capacity without an exclusive active run", () => {
-    const backlogTask = task({ id: "a", title: "A", assigneeEmployeeId: "alice" });
-    const activeAsk = { commandId: "cmd_1", sessionId: "ses_1", runId: "run_1", agent: "codex" as const, mode: "ask" as const, taskGoal: "question", startedAt: "2026-06-28T00:00:00.000Z" };
-
-    assert.deepEqual(discussionAgentsForTask(backlogTask, [node({
-      id: "n1",
-      employeeId: "alice",
-      maxConcurrentRuns: 2,
-      runCapacityByMode: { ask: 2 },
-      activeRuns: [activeAsk],
-    })]), ["claude", "pi", "codex", "kimi"]);
-    assert.deepEqual(discussionAgentsForTask(backlogTask, [node({
-      id: "n2",
-      employeeId: "alice",
-      activeRuns: [{ ...activeAsk, mode: "action" }],
-    })]), []);
+    ]), []);
   });
 });
 

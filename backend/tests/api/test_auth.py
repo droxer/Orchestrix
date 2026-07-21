@@ -497,6 +497,9 @@ def test_workspace_brief_summarizes_employee_workspace(monkeypatch) -> None:
             "status": "ready",
         }, headers={"Authorization": "Bearer ui_token"})
         assert register.status_code == 200
+        agent = app.state.employee_agent_store.create_agent(
+            "alice", {"displayName": "Auth Maintainer", "executorKind": "codex"}
+        )
 
         alice_client = TestClient(app)
         bob_client = TestClient(app)
@@ -513,7 +516,7 @@ def test_workspace_brief_summarizes_employee_workspace(monkeypatch) -> None:
         task = alice_client.post("/tasks", json={
             "title": "Patch auth",
             "status": "assigned",
-            "assignedAgent": "codex",
+            "assignedAgentId": agent["id"],
             "isRoutine": True,
             "routineType": "job",
             "routineCadence": "weekly",
