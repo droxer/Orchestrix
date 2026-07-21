@@ -164,9 +164,10 @@ every step of brightness is a unit of information.
   disabled hex — disabled is opacity.
 - **Status is dot / border / text — never fills.** `--ok` `--warn` `--err`
   are a grey brightness hierarchy — loud = bright (`--err` brightest),
-  calm = dim (`--ok` dimmest) — holding exactly one value per register each,
-  tuned to pass AA as small text (the dot color and the text color are the
-  same token). `--info` is not a separate value: it aliases `--ink-3`.
+  calm = dim (`--ok` dimmest) — holding exactly one value per register each
+  (the dot color and the text color are the same token). `--warn` and `--err`
+  pass AA as small text; `--ok` is the decorative-calm tier, below AA by
+  design. `--info` is not a separate value: it aliases `--ink-3`.
 - **Dual-first registers.** The light theme is not derived from the dark
   one; each hex pair is picked for its own canvas and both live side by
   side in `palette.css`. Dark is the default register (`:root`);
@@ -236,15 +237,22 @@ Dark register / light register:
 | `--ink-4` | `#6b727b` | `#7d848d` | timestamps, disabled |
 | `--line-1` | `#282c31` | `#e2e5e8` | structural hairline |
 | `--line-2` | `#1f2226` | `#eceef0` | soft hairline |
-| `--action` | `#6ba1d4` | `#33689e` | actions, focus, brand |
-| `--action-hover` | `#84b3e0` | `#2a5786` | hover / active |
-| `--action-soft` | `#15202c` | `#e4eef7` | selection wash, active nav |
-| `--on-action` | `#0e1216` | `#ffffff` | text on the action fill |
-| `--ok` | `#3fb96c` | `#1e8a4c` | ready, passed, done |
-| `--warn` | `#d9a13f` | `#9a6b1a` | attention, degraded |
-| `--err` | `#e5635f` | `#c93d3d` | failed, destructive |
+| `--action` | `#f2f4f6` | `#16181b` | actions, focus, brand |
+| `--action-hover` | `#ffffff` | `#000000` | hover / active |
+| `--action-soft` | 9% action wash | 7% action wash | selection wash, active nav |
+| `--on-action` | `#101214` | `#ffffff` | text on the action fill |
+| `--ok` | `#7d848d` | `#6b727b` | ready, passed, done — calm (dim) |
+| `--warn` | `#99a0a8` | `#5c636b` | attention, degraded |
+| `--err` | `#f2f4f6` | `#16181b` | failed, destructive — loud (bright) |
 | `--info` | = `--ink-3` | = `--ink-3` | neutral notice |
 | `--scrim` | `rgba(0,0,0,.66)` | `rgba(12,14,16,.55)` | overlay scrim (one layer) |
+
+`--action-soft` is not a hex: it is `color-mix(in srgb, <action> 9%, transparent)`
+on dark and the 7% equivalent on light, so the selection wash always tracks the
+action color. Note the deliberate collision in the dark register:
+`--err == --ink-1 == --action` (`#f2f4f6`), so dark-theme error text is
+pixel-identical to heading text and error states lean on icon and context.
+This is inherent to the loud = bright hierarchy — do not "fix" it by tinting.
 
 An **always-dark group** (`--dark-surface`, `--dark-surface-2`,
 `--dark-ink`, `--dark-ink-soft`, `--dark-line`) mirrors the dark register
@@ -311,10 +319,11 @@ loosen leading — all in `palette.css` (+ the two reading roles restated in
 - Use `--action` for actions, and use it scarcely: brand mark, primary CTA,
   focus ring, link emphasis, selection.
 - Pair the action fill with `--on-action` — dark ink on the dark register's
-  bright steel, white on the light register's deepened steel.
+  white fill, white on the light register's black fill.
 - Use `--action-soft` for selected rows, active nav, running affordances.
-- Reserve all other hue for status, as dots/borders/text; use `--info`
-  (neutral ink) for status without alarm.
+- Carry status as dots/borders/text on the grey brightness hierarchy
+  (loud = bright, calm = dim); use `--info` (neutral ink) for status
+  without alarm.
 - Disable with opacity, not a dedicated hex.
 - Carry depth with hairlines first; shadows only on floating chrome.
 - Add new raw values to `palette.css` and new roles to `roles.css` — never
@@ -322,8 +331,8 @@ loosen leading — all in `palette.css` (+ the two reading roles restated in
 
 ### Don't
 - Don't use a status color as an action, or the action color as a status.
-- Don't introduce a second chromatic accent or use steel as a decorative
-  fill.
+- Don't introduce any chromatic color — there is no hue in the interface,
+  in either register; brightness is the only signal.
 - Don't fill backgrounds with status colors.
 - Don't tint agent avatars with vendor brand colors — glyph shape carries
   identity.
@@ -341,9 +350,12 @@ loosen leading — all in `palette.css` (+ the two reading roles restated in
 
 ## Data visualization
 
-The admin token-usage chart uses a fixed three-segment ramp: input =
-`--action`, output = `--ok`, cache = `--ink-4`. Fleet-health bars and
-activity charts use the status tones inside chart segments only.
+Charts are greyscale — a brightness ramp, not a hue ramp. The admin
+token-usage chart uses a fixed three-segment ramp: input = `--action`
+(brightest), output = `--ok`, cache = `--ink-4` (dimmest). Fleet-health
+bars and activity charts use the status greys inside chart segments only
+(`chart-3/4/5` alias `--ok`/`--warn`/`--err`, so they follow the palette
+for free).
 
 ## History
 
@@ -351,3 +363,9 @@ Graphite (2026-07-19) replaces the Sleek Forest identity (warm near-black +
 forest green + Instrument Serif) and its four-tier primitives/semantic token
 system. Design rationale and the migration map live in
 `docs/superpowers/specs/2026-07-19-graphite-tokens-design.md`.
+
+The monochrome remap (2026-07-20) then retired Graphite's steel-blue action
+color and chromatic status hues in favor of the Linear-style white/black
+action and the grey status brightness hierarchy — a token-value-only change;
+the architecture above is unchanged. Rationale and the exact value map live
+in `docs/superpowers/specs/2026-07-20-monochrome-tokens-design.md`.
