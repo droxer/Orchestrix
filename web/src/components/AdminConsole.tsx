@@ -48,25 +48,6 @@ function parseAdminView(value: string | null): AdminView {
   return ADMIN_VIEWS.includes(value as AdminView) ? value as AdminView : "dashboard";
 }
 
-function managedNodePlaceholder(node: CreateManagedNodeResponse["node"]): ControlPanelDaemonNodeRecord {
-  return {
-    id: node.id,
-    managedNodeId: node.id,
-    displayName: node.displayName,
-    employeeId: node.employeeId,
-    sandboxMode: node.sandboxMode,
-    status: node.desiredState === "running" ? "provisioning" : "stopped",
-    agents: { claude: "unknown", pi: "unknown", codex: "unknown", kimi: "unknown" },
-    createdAt: node.createdAt,
-    updatedAt: node.updatedAt,
-    queuedCommandCount: 0,
-    activeRuns: [],
-    online: false,
-    stale: true,
-    provisioningPlaceholder: true,
-  };
-}
-
 export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null }) {
   const { t } = useTranslation();
   const { reportMutationError } = useMutationError();
@@ -303,13 +284,6 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
 
   function handleCreateManagedNodeSuccess(result: CreateManagedNodeResponse) {
     const { node } = result;
-    mergeFleet((prev) => ({
-      ...prev,
-      nodes: [
-        managedNodePlaceholder(node),
-        ...prev.nodes.filter((current) => current.managedNodeId !== node.id),
-      ],
-    }));
     setHighlightedEmployeeId(node.employeeId ?? null);
     window.setTimeout(() => setHighlightedEmployeeId((prev) => (prev === node.employeeId ? null : prev)), HIGHLIGHT_PULSE_MS);
     setAddNodeOpen(false);

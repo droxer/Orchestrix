@@ -27,7 +27,7 @@ export function defaultBackendUrl(): string {
 /** Mirror backend daemon_start_command so cached node tokens stay usable after restart. */
 export function buildDaemonStartCommand(
   node: Pick<ControlPanelDaemonNodeRecord, "id" | "employeeId" | "workspacePath" | "sandboxMode">,
-  nodeToken: string,
+  _nodeToken: string,
   backendUrl = defaultBackendUrl(),
 ): string {
   const sandboxMode = node.sandboxMode === "none" ? "none" : "boxlite";
@@ -37,20 +37,16 @@ export function buildDaemonStartCommand(
     backendUrl,
     "--sandbox-id",
     node.id,
-    "--token",
-    nodeToken,
     "--sandbox",
     sandboxMode,
   ];
   if (sandboxMode === "none") parts.push("--use-local-agent-home");
   if (node.employeeId) parts.push("--employee-id", node.employeeId);
   if (node.workspacePath) parts.push("--workspace", node.workspacePath);
-  return parts.map(shellQuote).join(" ");
+  return `read -rsp 'Relay node token: ' RELAY_DAEMON_NODE_TOKEN && echo && export RELAY_DAEMON_NODE_TOKEN && ${parts.map(shellQuote).join(" ")}`;
 }
 
 export const STALE_AFTER_MS = 15_000;
-export const adminNodeTokenStorageKey = "relay-web.adminNodeTokens";
-
 export interface StoredNodeToken {
   employeeId?: string;
   sandboxToken?: string;
@@ -60,6 +56,7 @@ export interface StoredNodeToken {
 }
 
 export type StoredNodeTokenMap = Record<string, StoredNodeToken>;
+let volatileNodeTokens: StoredNodeTokenMap = {};
 
 export function isStale(node: ControlPanelDaemonNodeRecord): boolean {
   if (typeof node.stale === "boolean") return node.stale;
@@ -164,25 +161,11 @@ export function buildEmployeeSummaries(
 }
 
 export function readStoredNodeTokens(): StoredNodeTokenMap {
-  if (typeof window === "undefined") return {};
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(adminNodeTokenStorageKey) ?? "null") as StoredNodeTokenMap | null;
-    if (!parsed || typeof parsed !== "object") return {};
-    return parsed;
-  } catch {
-    return {};
-  }
+  return { ...volatileNodeTokens };
 }
 
 export function writeStoredNodeToken(nodeId: string, token: StoredNodeToken): void {
-  if (typeof window === "undefined") return;
-  try {
-    const map = readStoredNodeTokens();
-    const next = { ...map, [nodeId]: token };
-    window.localStorage.setItem(adminNodeTokenStorageKey, JSON.stringify(next));
-  } catch {
-    /* ignore quota errors */
-  }
+  volatileNodeTokens = { ...volatileNodeTokens, [nodeId]: token };
 }
 
 export interface NodeLocalityFlags {
@@ -196,9 +179,9 @@ export type NodeSandboxProfile = "boxlite" | "host" | "pending";
 export type NodeLocalityKind = "this_host" | "saved_here" | "remote";
 
 /** Management ownership is independent of the daemon's sandbox implementation. */
-export function nodeOwnershipProfile(node: Pick<ControlPanelDaemonNodeRecord, "managedNodeId" | "sandboxMode">): NodeOwnershipProfile {
-  if (node.managedNodeId) return "managed";
-  if (node.sandboxMode) return "local";
+export function nodeOwnershipProfile(node: Pick<ControlPanelDaemonNodeRecord, "nodeLocation" | "sandboxMode">): NodeOwnershipProfile {
+  if (node.nodeLocation === "managed") return "managed";
+  if (node.nodeLocation === "employee-device") return "local";
   return "pending";
 }
 
@@ -217,7 +200,6 @@ export function nodeLocalityKind(
   if (!options.colocated) return "remote";
   const cached = options.storedTokens[node.id];
   if (cached?.nodeToken || cached?.sandboxToken || cached?.daemonCommand) return "saved_here";
-  if (node.online && !isStale(node)) return "this_host";
   return "remote";
 }
 
@@ -229,7 +211,6 @@ export function nodeLocalityKinds(
   const kinds: Array<Exclude<NodeLocalityKind, "remote">> = [];
   const cached = options.storedTokens[node.id];
   if (cached?.nodeToken || cached?.sandboxToken || cached?.daemonCommand) kinds.push("saved_here");
-  if (node.online && !isStale(node)) kinds.push("this_host");
   return kinds;
 }
 
@@ -240,7 +221,7 @@ export function nodeLocalityFlags(
   const cached = options.storedTokens[node.id];
   return {
     hasCachedCredentials: Boolean(cached?.nodeToken || cached?.sandboxToken || cached?.daemonCommand),
-    isColocatedLive: options.colocated && node.online && !isStale(node),
+    isColocatedLive: false,
   };
 }
 
@@ -301,12 +282,7 @@ export function upsertStoredCredentialsFromNodes(
 }
 
 export function persistStoredNodeTokenMap(map: StoredNodeTokenMap): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(adminNodeTokenStorageKey, JSON.stringify(map));
-  } catch {
-    /* ignore quota errors */
-  }
+  volatileNodeTokens = { ...map };
 }
 
 export async function copyText(value: string): Promise<void> {

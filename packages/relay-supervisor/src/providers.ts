@@ -1,5 +1,6 @@
 import { execFile, spawn, type ChildProcess } from "node:child_process";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { promisify } from "node:util";
 import type { EnsureManagedNodeInput, ManagedNodeProvider, ProviderInstance, SupervisorLogger } from "./types.js";
 
@@ -11,6 +12,7 @@ export interface LocalProcessProviderOptions {
   readProcessStart?: (pid: number) => Promise<string | undefined>;
   stopTimeoutMs?: number;
   stopPollIntervalMs?: number;
+  stateDirectory?: string;
 }
 
 const execFileAsync = promisify(execFile);
@@ -20,11 +22,15 @@ export class LocalProcessProvider implements ManagedNodeProvider {
   private readonly command: string;
   private readonly logger?: SupervisorLogger;
   private readonly children = new Map<string, ChildProcess>();
+  private readonly instancesByGeneration = new Map<string, string>();
+  private readonly generationByInstance = new Map<string, string>();
+  private readonly pendingEnsures = new Map<string, Promise<ProviderInstance>>();
   private readonly signalProcess: (pid: number, signal: NodeJS.Signals) => void;
   private readonly readProcessCommand: (pid: number) => Promise<string | undefined>;
   private readonly readProcessStart: (pid: number) => Promise<string | undefined>;
   private readonly stopTimeoutMs: number;
   private readonly stopPollIntervalMs: number;
+  private readonly stateDirectory: string;
 
   constructor(options: LocalProcessProviderOptions = {}) {
     this.command = options.command ?? "relay-daemon";
@@ -34,13 +40,51 @@ export class LocalProcessProvider implements ManagedNodeProvider {
     this.readProcessStart = options.readProcessStart ?? readProcessStart;
     this.stopTimeoutMs = options.stopTimeoutMs ?? 5_000;
     this.stopPollIntervalMs = options.stopPollIntervalMs ?? 50;
+    this.stateDirectory = options.stateDirectory ?? join(process.cwd(), ".relay", "supervisor", "local-process");
   }
 
   async ensure(input: EnsureManagedNodeInput): Promise<ProviderInstance> {
+    const generationKey = `${input.node.id}:${input.node.generation}`;
+    const instanceId = this.instancesByGeneration.get(generationKey);
+    const current = instanceId ? this.children.get(instanceId) : undefined;
+    if (instanceId && current && current.exitCode === null && !current.signalCode) {
+      return { id: instanceId, child: current };
+    }
+    const pending = this.pendingEnsures.get(generationKey);
+    if (pending) return pending;
+    const statePath = this.statePath(generationKey);
+    const durable = readProviderState(statePath);
+    if (durable?.instanceId) {
+      if (await this.inspect(durable.instanceId) === "running") {
+        this.instancesByGeneration.set(generationKey, durable.instanceId);
+        this.generationByInstance.set(durable.instanceId, generationKey);
+        return { id: durable.instanceId };
+      }
+      rmSync(statePath, { force: true });
+    } else if (durable?.status === "allocating") {
+      throw new Error(`Managed node ${generationKey} has an indeterminate local process allocation; refusing to create a duplicate.`);
+    }
+    mkdirSync(this.stateDirectory, { recursive: true });
+    writeProviderState(statePath, { status: "allocating" });
+    const started = this.start(input, generationKey).then((instance) => {
+      writeProviderState(statePath, { status: "running", instanceId: instance.id });
+      return instance;
+    }).catch((error) => {
+      rmSync(statePath, { force: true });
+      throw error;
+    });
+    this.pendingEnsures.set(generationKey, started);
+    try {
+      return await started;
+    } finally {
+      this.pendingEnsures.delete(generationKey);
+    }
+  }
+
+  private async start(input: EnsureManagedNodeInput, generationKey: string): Promise<ProviderInstance> {
     mkdirSync(input.workspacePath, { recursive: true });
     const child = spawn(this.command, [
       "--backend-url", input.backendUrl,
-      "--enrollment-token", input.enrollmentCredential,
       "--workspace", input.workspacePath,
       "--workspace-id", input.workspaceId,
       "--sandbox", input.node.sandboxMode,
@@ -88,8 +132,15 @@ export class LocalProcessProvider implements ManagedNodeProvider {
     const processIdentity = encodeIdentity(processStart);
     const instanceId = `local-process:${child.pid}:${workspaceIdentity}:${processIdentity}`;
     this.children.set(instanceId, child);
+    this.instancesByGeneration.set(generationKey, instanceId);
+    this.generationByInstance.set(instanceId, generationKey);
     child.once("exit", (code, signal) => {
       this.children.delete(instanceId);
+      if (this.instancesByGeneration.get(generationKey) === instanceId) {
+        this.instancesByGeneration.delete(generationKey);
+      }
+      this.generationByInstance.delete(instanceId);
+      this.clearState(generationKey, instanceId);
       this.logger?.warn("managed local process exited", { instanceId, code, signal });
     });
     return { id: instanceId, child };
@@ -135,6 +186,23 @@ export class LocalProcessProvider implements ManagedNodeProvider {
   async delete(instanceId: string): Promise<void> {
     await this.stop(instanceId);
     this.children.delete(instanceId);
+    const generationKey = this.generationByInstance.get(instanceId);
+    if (generationKey && this.instancesByGeneration.get(generationKey) === instanceId) {
+      this.instancesByGeneration.delete(generationKey);
+    }
+    this.generationByInstance.delete(instanceId);
+    if (generationKey) this.clearState(generationKey, instanceId);
+  }
+
+  private statePath(generationKey: string): string {
+    return join(this.stateDirectory, `${encodeIdentity(generationKey)}.json`);
+  }
+
+  private clearState(generationKey: string, instanceId: string): void {
+    const path = this.statePath(generationKey);
+    if (readProviderState(path)?.instanceId === instanceId) {
+      rmSync(path, { force: true });
+    }
   }
 
   private async waitUntilStopped(instanceId: string): Promise<boolean> {
@@ -145,6 +213,24 @@ export class LocalProcessProvider implements ManagedNodeProvider {
       await delay(this.stopPollIntervalMs);
     } while (true);
   }
+}
+
+interface ProviderState {
+  status: "allocating" | "running";
+  instanceId?: string;
+}
+
+function readProviderState(path: string): ProviderState | undefined {
+  try {
+    return JSON.parse(readFileSync(path, "utf8")) as ProviderState;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw error;
+  }
+}
+
+function writeProviderState(path: string, state: ProviderState): void {
+  writeFileSync(path, JSON.stringify(state), { mode: 0o600 });
 }
 
 function localProcessIdentity(instanceId: string): { pid: number; workspaceId: string; processStart: string } | undefined {

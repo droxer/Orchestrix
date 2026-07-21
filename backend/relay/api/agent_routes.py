@@ -377,7 +377,7 @@ def _placement_view(ctx: AppContextDep, placement: dict[str, Any]) -> dict[str, 
     return {
         **view,
         "nodeDisplayName": (managed_node or {}).get("displayName") or node["id"],
-        "nodeOwnership": "managed" if node.get("managedNodeId") else "user-run",
+        "nodeOwnership": node.get("nodeLocation") or "unknown",
         **(
             {"nodeSandboxMode": node["sandboxMode"]}
             if node.get("sandboxMode") in ("boxlite", "none")

@@ -174,7 +174,7 @@ def test_scheduler_requests_managed_capacity_once_when_no_node_is_ready() -> Non
     asyncio.run(run_flow())
 
 
-def test_scheduler_waits_for_an_employee_local_node_instead_of_provisioning_managed() -> None:
+def test_scheduler_waits_for_an_employee_device_node_regardless_of_sandbox_mode() -> None:
     async def run_flow() -> None:
         with TemporaryDirectory() as root:
             task_store = LocalTaskStore(root)
@@ -182,7 +182,10 @@ def test_scheduler_waits_for_an_employee_local_node_instead_of_provisioning_mana
                 LocalSessionStore(root), LocalDaemonStore(root), task_store=task_store
             )
             registry.provision_pending(
-                "alice", "/Users/alice/workspace", sandbox_mode="none"
+                "alice",
+                "/Users/alice/workspace",
+                sandbox_mode="boxlite",
+                node_location="employee-device",
             )
             managed_nodes = LocalManagedNodeStore(root)
             backend, agent = _logical_backend(root, registry)

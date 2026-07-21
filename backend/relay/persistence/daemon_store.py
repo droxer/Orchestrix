@@ -970,6 +970,7 @@ class DatabaseDaemonStore:
         Column("workspace_path", Text, nullable=True),
         Column("workspace_id", Text, nullable=True),
         Column("sandbox_mode", Text, nullable=True),
+        Column("node_location", Text, nullable=True),
         Column("managed_node_id", Text, nullable=True),
         Column("provisioning_attempt_id", Text, nullable=True),
         Column("credential_version", Integer, nullable=False, default=1),
@@ -2254,6 +2255,7 @@ def node_to_row(
         "workspace_path": node.get("workspacePath"),
         "workspace_id": node.get("workspaceId"),
         "sandbox_mode": node.get("sandboxMode"),
+        "node_location": node.get("nodeLocation"),
         "managed_node_id": node.get("managedNodeId"),
         "provisioning_attempt_id": node.get("provisioningAttemptId"),
         "credential_version": int(node.get("credentialVersion") or 1),
@@ -2290,6 +2292,11 @@ def row_to_node(row: Any) -> dict[str, Any]:
         ),
         **({"workspaceId": row["workspace_id"]} if row.get("workspace_id") else {}),
         **({"sandboxMode": row["sandbox_mode"]} if row.get("sandbox_mode") else {}),
+        **(
+            {"nodeLocation": row["node_location"]}
+            if row.get("node_location")
+            else {}
+        ),
         **(
             {"managedNodeId": row["managed_node_id"]}
             if row.get("managed_node_id")

@@ -230,11 +230,21 @@ def test_agent_placements_describe_managed_and_local_runtime_nodes(monkeypatch) 
                 "password": "userpass",
             },
         ).status_code == 201
+        local_runtime = client.post(
+            "/cp/daemon-nodes",
+            json={
+                "employeeId": "alice",
+                "workspacePath": "/Users/alice/relay",
+                "sandboxMode": "none",
+                "nodeLocation": "employee-device",
+            },
+        ).json()
+        local_node_id = local_runtime["node"]["id"]
         app.state.registry.register(
             {
-                "sandboxId": "node_local",
+                "sandboxId": local_node_id,
                 "employeeId": "alice",
-                "token": "token_local",
+                "token": local_runtime["nodeToken"],
                 "workspacePath": "/Users/alice/relay",
                 "sandboxMode": "none",
                 "protocolVersion": 1,
@@ -285,7 +295,7 @@ def test_agent_placements_describe_managed_and_local_runtime_nodes(monkeypatch) 
         ).status_code == 201
         assert client.post(
             f"/cp/agents/{local_agent['id']}/placements",
-            json={"daemonNodeId": "node_local", "priority": 200},
+            json={"daemonNodeId": local_node_id, "priority": 200},
         ).status_code == 201
 
         listed = {
@@ -300,8 +310,8 @@ def test_agent_placements_describe_managed_and_local_runtime_nodes(monkeypatch) 
         assert managed_placement["nodeDisplayName"] == "Alice managed node"
         assert managed_placement["nodeOwnership"] == "managed"
         assert managed_placement["nodeSandboxMode"] == "boxlite"
-        assert local_placement["nodeDisplayName"] == "node_local"
-        assert local_placement["nodeOwnership"] == "user-run"
+        assert local_placement["nodeDisplayName"] == local_node_id
+        assert local_placement["nodeOwnership"] == "employee-device"
         assert local_placement["nodeSandboxMode"] == "none"
 
 

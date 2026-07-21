@@ -10,7 +10,7 @@ import type {
   EmployeeRecord,
 } from "../../types";
 import { Drawer } from "./Drawer";
-import { ExecutionProfileField, type DaemonSandboxMode } from "./ExecutionProfileField";
+import { ExecutionProfileField, type NodeLocation } from "./ExecutionProfileField";
 import { Button } from "@/components/ui/button";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import {
@@ -43,12 +43,14 @@ export function AddNodeDrawer({
   const assignmentHeadingId = useId();
   const employeeLabelId = useId();
 
-  const [sandboxMode, setSandboxMode] = useState<DaemonSandboxMode>("boxlite");
+  const [nodeLocation, setNodeLocation] = useState<NodeLocation>("managed");
+  const [sandboxMode, setSandboxMode] = useState<"boxlite" | "none">("boxlite");
+  const [workspacePath, setWorkspacePath] = useState("");
   const [employeeId, setEmployeeId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
-  const isManaged = sandboxMode === "boxlite";
-  const hasUnsavedChanges = Boolean(employeeId);
+  const isManaged = nodeLocation === "managed";
+  const hasUnsavedChanges = Boolean(employeeId || workspacePath || nodeLocation !== "managed");
   const confirmDiscardChanges = useUnsavedChangesGuard(open && hasUnsavedChanges && !isBusy);
 
   const selectedEmployee = useMemo(
@@ -58,7 +60,9 @@ export function AddNodeDrawer({
 
   useEffect(() => {
     if (!open) {
+      setNodeLocation("managed");
       setSandboxMode("boxlite");
+      setWorkspacePath("");
       setEmployeeId("");
       setError(null);
       setIsBusy(false);
@@ -70,6 +74,10 @@ export function AddNodeDrawer({
 
     if (isManaged && !employeeId) {
       setError(t("admin.employee_required"));
+      return;
+    }
+    if (!isManaged && !workspacePath.trim()) {
+      setError(t("admin.v2.workspace_path_required"));
       return;
     }
 
@@ -85,7 +93,9 @@ export function AddNodeDrawer({
       } else {
         const result = await createControlPanelDaemonNode({
           employeeId: employeeId || undefined,
-          sandboxMode: "none",
+          workspacePath: workspacePath.trim(),
+          sandboxMode,
+          nodeLocation: "employee-device",
         });
         onSuccess({ kind: "manual", result });
       }
@@ -121,14 +131,31 @@ export function AddNodeDrawer({
             </h3>
           </header>
           <ExecutionProfileField
-            value={sandboxMode}
-            onChange={(mode) => {
-              setSandboxMode(mode);
+            value={nodeLocation}
+            onChange={(location) => {
+              setNodeLocation(location);
+              if (location === "managed") setSandboxMode("boxlite");
               setError(null);
             }}
-            name="add-node-sandbox-mode"
+            name="add-node-location"
             disabled={isBusy}
           />
+          {!isManaged ? (
+            <>
+              <label className="adm-field">
+                <span>{t("admin.v2.runtime_isolation")}</span>
+                <select value={sandboxMode} onChange={(event) => setSandboxMode(event.target.value as "boxlite" | "none")} disabled={isBusy}>
+                  <option value="boxlite">{t("admin.v2.node_sandbox_boxlite")}</option>
+                  <option value="none">{t("admin.v2.node_sandbox_host")}</option>
+                </select>
+              </label>
+              <label className="adm-field">
+                <span>{t("workspace_label")}</span>
+                <input value={workspacePath} onChange={(event) => setWorkspacePath(event.target.value)} placeholder="/Users/alice/project" disabled={isBusy} />
+              </label>
+              <p className="adm-form-hint">{t("admin.v2.workspace_path_hint")}</p>
+            </>
+          ) : null}
           <aside
             className={`adm-provision-outcome ${isManaged ? "is-managed" : "is-local"}`}
             aria-live="polite"
@@ -210,7 +237,7 @@ export function AddNodeDrawer({
           <Button type="button" variant="ghost" onClick={() => void requestClose()} disabled={isBusy}>
             {t("admin.v2.cancel")}
           </Button>
-          <Button type="submit" disabled={isBusy || (isManaged && !employeeId)}>
+          <Button type="submit" disabled={isBusy || (isManaged && !employeeId) || (!isManaged && !workspacePath.trim())}>
             {isBusy ? t("admin.creating") : t(isManaged ? "admin.v2.provision_node" : "admin.v2.generate_node")}
           </Button>
         </div>

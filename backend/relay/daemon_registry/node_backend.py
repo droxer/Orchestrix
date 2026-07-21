@@ -170,6 +170,7 @@ class ServerDaemonNodeBackend:
             payload.get("employeeId"),
             payload.get("workspacePath"),
             payload.get("sandboxMode") or "boxlite",
+            payload.get("nodeLocation"),
         )
         return {
             **sandbox,

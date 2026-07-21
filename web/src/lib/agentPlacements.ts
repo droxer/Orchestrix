@@ -35,7 +35,7 @@ export function describeAgentPlacements(
       nodeName: placement.nodeDisplayName || placement.daemonNodeId,
       ownership: placement.nodeOwnership === "managed"
         ? "managed"
-        : placement.nodeOwnership === "user-run"
+        : placement.nodeOwnership === "employee-device"
           ? "local"
           : "pending",
       sandbox: placement.nodeSandboxMode === "boxlite"

@@ -12,7 +12,7 @@ from ..core.models import DaemonNodeRegistration
 from ..daemon_registry import public_sandbox_record
 from ..services.node_agents import sync_node_agents
 from .deps import AppContextDep
-from .helpers import actor_can_access_sandbox, authorized_sandbox_for_token, bearer_token, daemon_node_event, json_body, request_actor_or_none
+from .helpers import actor_can_access_sandbox, authorized_sandbox_for_token, bearer_token, daemon_node_event, daemon_start_command, daemon_start_env, json_body, request_actor, request_actor_or_none, string_field, valid_employee_workspace_path
 
 router = APIRouter()
 WORKSPACE_EVENT_TYPES = frozenset({"workspace.listing", "workspace.file", "workspace.error"})
@@ -85,6 +85,40 @@ async def list_daemon_nodes(request: Request, ctx: AppContextDep) -> dict[str, A
     else:
         nodes = ctx.registry.monitor_nodes()
     return {"nodes": nodes}
+
+
+@router.post("/daemon-nodes/local-enrollment", status_code=201)
+async def create_local_device_enrollment(
+    request: Request, ctx: AppContextDep
+) -> dict[str, Any]:
+    actor = request_actor(request, ctx.auth_store)
+    body = await json_body(request)
+    workspace_path = string_field(body, "workspacePath")
+    sandbox_mode = string_field(body, "sandboxMode") or "boxlite"
+    if not valid_employee_workspace_path(workspace_path):
+        raise HTTPException(
+            400, "An absolute workspacePath on the employee device is required."
+        )
+    if sandbox_mode not in ("boxlite", "none"):
+        raise HTTPException(400, 'sandboxMode must be "boxlite" or "none".')
+    node = ctx.backend.provision_daemon_node(
+        {
+            "employeeId": actor["employeeId"],
+            "workspacePath": workspace_path,
+            "sandboxMode": sandbox_mode,
+            "nodeLocation": "employee-device",
+        }
+    )
+    response: dict[str, Any] = {
+        "node": public_sandbox_record(ctx.registry.get(node["id"]) or node),
+        "daemonEnv": daemon_start_env(request, node, sandbox_mode),
+    }
+    if node.get("sandboxToken"):
+        response["sandboxToken"] = node["sandboxToken"]
+    if node.get("nodeToken"):
+        response["nodeToken"] = node["nodeToken"]
+        response["daemonCommand"] = daemon_start_command(request, node, sandbox_mode)
+    return response
 
 
 @router.patch("/daemon-nodes/{sandbox_id}/agent-role-overrides")

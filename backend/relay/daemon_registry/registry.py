@@ -801,6 +801,11 @@ class DaemonNodeRegistry:
                 else {}
             ),
             **({"sandboxMode": sandbox_mode} if sandbox_mode else {}),
+            **(
+                {"nodeLocation": (existing or {}).get("nodeLocation")}
+                if (existing or {}).get("nodeLocation")
+                else {}
+            ),
             **({"capabilities": capabilities} if capabilities else {}),
             "status": "stopped"
             if retired_at
@@ -1078,24 +1083,48 @@ class DaemonNodeRegistry:
         employee_id: str | None = None,
         workspace_path: str | None = None,
         sandbox_mode: str = "boxlite",
+        node_location: str | None = "employee-device",
     ) -> tuple[dict[str, Any], str | None, str | None]:
         if sandbox_mode not in DAEMON_SANDBOX_MODES:
             sandbox_mode = "boxlite"
         if employee_id:
             existing = self.find_by_employee(employee_id, workspace_path)
             if existing:
+                node_token = self.plain_node_tokens.get(existing["id"])
+                updates: dict[str, Any] = {}
                 if not existing.get("sandboxMode"):
+                    updates["sandboxMode"] = sandbox_mode
+                if not existing.get("nodeLocation") and node_location:
+                    updates["nodeLocation"] = node_location
+                if updates:
                     existing = {
                         **existing,
-                        "sandboxMode": sandbox_mode,
+                        **updates,
                         "updatedAt": now_iso(),
                     }
                     self.sandboxes[existing["id"]] = existing
                     self.daemon_store.register_node(existing)
+                if (
+                    node_location == "employee-device"
+                    and existing.get("status") == "provisioning"
+                    and not node_token
+                ):
+                    # Plaintext launch credentials are intentionally volatile.
+                    # Reissuing an unfinished enrollment after restart rotates
+                    # the old credential instead of creating a duplicate node.
+                    node_token = new_daemon_node_token()
+                    existing = {
+                        **existing,
+                        "nodeTokenHash": hash_daemon_node_token(node_token),
+                        "updatedAt": now_iso(),
+                    }
+                    self.sandboxes[existing["id"]] = existing
+                    self.daemon_store.register_node(existing)
+                    self._remember_control_panel_node_token(existing, node_token)
                 return (
                     existing,
                     None,
-                    self.plain_node_tokens.get(existing["id"]),
+                    node_token,
                 )
         sandbox_id = new_sandbox_id(employee_id or "node")
         ui_token = new_daemon_node_token()
@@ -1106,6 +1135,7 @@ class DaemonNodeRegistry:
             **({"employeeId": employee_id} if employee_id else {}),
             **({"workspacePath": workspace_path} if workspace_path else {}),
             "sandboxMode": sandbox_mode,
+            **({"nodeLocation": node_location} if node_location else {}),
             "status": "provisioning",
             "agents": {agent: "unknown" for agent in AGENT_NAMES},
             "maxConcurrentRuns": 1,
@@ -1157,6 +1187,7 @@ class DaemonNodeRegistry:
                 else {}
             ),
             "sandboxMode": managed_node.get("sandboxMode") or "boxlite",
+            "nodeLocation": "managed",
             "managedNodeId": managed_node["id"],
             "provisioningAttemptId": attempt["id"],
             "credentialVersion": 1,
@@ -2509,6 +2540,11 @@ class DaemonNodeRegistry:
             )
             self.sandboxes[sandbox["id"]] = {
                 **sandbox,
+                **(
+                    {"nodeLocation": sandbox.get("nodeLocation") or "managed"}
+                    if sandbox.get("nodeLocation") or sandbox.get("managedNodeId")
+                    else {}
+                ),
                 "status": waiting_status,
                 "agents": {agent: "unknown" for agent in AGENT_NAMES},
                 "updatedAt": now_iso(),

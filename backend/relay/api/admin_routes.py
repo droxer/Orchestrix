@@ -13,7 +13,7 @@ from ..daemon_registry import public_sandbox_record
 from ..security.auth import require_admin_session
 from ..services.node_agents import sync_node_agents
 from .deps import AppContextDep
-from .helpers import daemon_start_command, daemon_start_env, employee_record, json_body, string_field
+from .helpers import daemon_start_command, daemon_start_env, employee_record, json_body, string_field, valid_employee_workspace_path
 
 router = APIRouter()
 
@@ -56,6 +56,7 @@ def _managed_node_placeholder(node: dict[str, Any]) -> dict[str, Any]:
         "displayName": node.get("displayName") or node["id"],
         **({"employeeId": node["employeeId"]} if node.get("employeeId") else {}),
         "sandboxMode": node.get("sandboxMode") or "boxlite",
+        "nodeLocation": "managed",
         "status": status,
         "agents": {agent: "unknown" for agent in AGENT_NAMES},
         "createdAt": node["createdAt"],
@@ -391,15 +392,24 @@ async def create_control_panel_daemon_node(request: Request, ctx: AppContextDep)
     body = await json_body(request)
     employee_id = string_field(body, "employeeId") or None
     sandbox_mode = string_field(body, "sandboxMode") or "boxlite"
+    requested_location = string_field(body, "nodeLocation") or None
     if sandbox_mode not in ("boxlite", "none"):
         raise HTTPException(400, 'sandboxMode must be "boxlite" or "none".')
+    workspace_path = string_field(body, "workspacePath") or None
+    if requested_location not in (None, "employee-device"):
+        raise HTTPException(400, 'nodeLocation must be "employee-device".')
+    if requested_location == "employee-device" and not valid_employee_workspace_path(workspace_path):
+        raise HTTPException(
+            400, "An absolute workspacePath on the employee device is required."
+        )
     if hasattr(ctx.auth_store, "ensure_employee"):
         if employee_id:
             ctx.auth_store.ensure_employee(employee_id)
     node = ctx.backend.provision_daemon_node({
         **({"employeeId": employee_id} if employee_id else {}),
-        "workspacePath": string_field(body, "workspacePath") or None,
+        "workspacePath": workspace_path,
         "sandboxMode": sandbox_mode,
+        **({"nodeLocation": "employee-device"} if requested_location else {}),
     })
     effective_sandbox_mode = node.get("sandboxMode") if node.get("sandboxMode") in ("boxlite", "none") else sandbox_mode
     public_node = _public_control_panel_node(ctx, node)

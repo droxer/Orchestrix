@@ -6,6 +6,7 @@ import mimetypes
 import os
 import secrets
 import shlex
+from pathlib import PurePosixPath, PureWindowsPath
 from pathlib import Path
 from typing import Any
 
@@ -93,6 +94,12 @@ def backend_base_url(request: Request) -> str:
     return str(request.base_url).rstrip("/")
 
 
+def valid_employee_workspace_path(value: str | None) -> bool:
+    return bool(value) and (
+        PurePosixPath(value).is_absolute() or PureWindowsPath(value).is_absolute()
+    )
+
+
 def daemon_start_env(request: Request, node: dict[str, Any], sandbox_mode: str = "boxlite") -> dict[str, str]:
     env = {
         "RELAY_BACKEND_URL": backend_base_url(request),
@@ -119,8 +126,6 @@ def daemon_start_command(request: Request, node: dict[str, Any], sandbox_mode: s
         backend_base_url(request),
         "--sandbox-id",
         node["id"],
-        "--token",
-        node.get("nodeToken") or "",
         "--sandbox",
         sandbox_mode,
     ]
@@ -130,7 +135,11 @@ def daemon_start_command(request: Request, node: dict[str, Any], sandbox_mode: s
         parts.extend(["--employee-id", node["employeeId"]])
     if node.get("workspacePath"):
         parts.extend(["--workspace", node["workspacePath"]])
-    return " ".join(shlex.quote(part) for part in parts)
+    command = " ".join(shlex.quote(part) for part in parts)
+    return (
+        "read -rsp 'Relay node token: ' RELAY_DAEMON_NODE_TOKEN && echo && "
+        f"export RELAY_DAEMON_NODE_TOKEN && {command}"
+    )
 
 
 def get_session_or_404(store: Any, session_id: str) -> dict[str, Any]:

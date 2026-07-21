@@ -392,10 +392,10 @@ def ready_node_for_task(
     return None
 
 
-def employee_has_local_node(registry: Any, employee_id: str) -> bool:
+def employee_has_device_node(registry: Any, employee_id: str) -> bool:
     return any(
         node.get("employeeId") == employee_id
-        and node.get("sandboxMode") == "none"
+        and node.get("nodeLocation") == "employee-device"
         and not node.get("retiredAt")
         for node in registry.monitor_nodes()
     )
@@ -407,7 +407,7 @@ def ensure_managed_capacity_for_task(
     if not managed_node_store:
         return None
     employee_id = task.get("assigneeEmployeeId") or task.get("ownerEmployeeId")
-    if not employee_id or employee_has_local_node(registry, employee_id):
+    if not employee_id or employee_has_device_node(registry, employee_id):
         return None
     return managed_node_store.ensure_node_for_employee(employee_id)
 

@@ -33,7 +33,7 @@ describe("describeAgentPlacements", () => {
         daemonNodeId: "node_local",
         priority: 200,
         nodeDisplayName: "Alice’s MacBook",
-        nodeOwnership: "user-run",
+        nodeOwnership: "employee-device",
         nodeSandboxMode: "none",
       }),
       placement({

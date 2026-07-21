@@ -11,7 +11,7 @@ import type {
 } from "../../types";
 import type { AddNodeDrawerSuccess } from "./AddNodeDrawer";
 import { Drawer } from "./Drawer";
-import { ExecutionProfileField, type DaemonSandboxMode } from "./ExecutionProfileField";
+import { ExecutionProfileField, type NodeLocation } from "./ExecutionProfileField";
 import { initialsOf, statusTone, visualStatus } from "./helpers";
 import { Button } from "@/components/ui/button";
 import { NodeProfileBadges } from "./NodeProfileBadges";
@@ -49,7 +49,9 @@ export function AssignNodeDrawer({
   const [employeeId, setEmployeeId] = useState("");
   const [nodeId, setNodeId] = useState("");
   const [createNew, setCreateNew] = useState(false);
-  const [sandboxMode, setSandboxMode] = useState<DaemonSandboxMode>("boxlite");
+  const [nodeLocation, setNodeLocation] = useState<NodeLocation>("managed");
+  const [sandboxMode, setSandboxMode] = useState<"boxlite" | "none">("boxlite");
+  const [workspacePath, setWorkspacePath] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
 
@@ -58,7 +60,9 @@ export function AssignNodeDrawer({
       setEmployeeId(defaultEmployeeId ?? "");
       setNodeId("");
       setCreateNew(false);
+      setNodeLocation("managed");
       setSandboxMode("boxlite");
+      setWorkspacePath("");
       setError(null);
       setIsBusy(false);
     }
@@ -72,13 +76,14 @@ export function AssignNodeDrawer({
   const hasNodes = unassignedNodes.length > 0;
   // With no unassigned nodes, creating one is the only path — force it.
   const creatingNode = createNew || !hasNodes;
-  const isManaged = sandboxMode === "boxlite";
+  const isManaged = nodeLocation === "managed";
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextEmployeeId = employeeId.trim().replace(/^@/, "");
     if (!nextEmployeeId) return setError(t("admin.employee_required"));
     if (!creatingNode && !nodeId) return setError(t("admin.node_required"));
+    if (creatingNode && !isManaged && !workspacePath.trim()) return setError(t("admin.v2.workspace_path_required"));
 
     setIsBusy(true);
     setError(null);
@@ -93,7 +98,9 @@ export function AssignNodeDrawer({
         } else {
           const result = await createControlPanelDaemonNode({
             employeeId: nextEmployeeId,
-            sandboxMode: "none",
+            workspacePath: workspacePath.trim(),
+            sandboxMode,
+            nodeLocation: "employee-device",
           });
           onCreateNodeSuccess({ kind: "manual", result });
         }
@@ -116,7 +123,7 @@ export function AssignNodeDrawer({
   }
 
   const canSubmit = creatingNode
-    ? Boolean(employeeId.trim())
+    ? Boolean(employeeId.trim()) && (isManaged || Boolean(workspacePath.trim()))
     : Boolean(employeeId && nodeId);
   const displayHandle = selectedEmployee
     ? `@${selectedEmployee.id}`
@@ -321,14 +328,30 @@ export function AssignNodeDrawer({
           <fieldset className="adm-form-section">
             <legend className="adm-form-legend">{t("admin.v2.section_node")}</legend>
             <ExecutionProfileField
-              value={sandboxMode}
-              onChange={(mode) => {
-                setSandboxMode(mode);
+              value={nodeLocation}
+              onChange={(location) => {
+                setNodeLocation(location);
+                if (location === "managed") setSandboxMode("boxlite");
                 setError(null);
               }}
-              name="assign-sandbox-mode"
+              name="assign-node-location"
               disabled={isBusy}
             />
+            {!isManaged ? (
+              <>
+                <label className="adm-field">
+                  <span>{t("admin.v2.runtime_isolation")}</span>
+                  <select value={sandboxMode} onChange={(event) => setSandboxMode(event.target.value as "boxlite" | "none")} disabled={isBusy}>
+                    <option value="boxlite">{t("admin.v2.node_sandbox_boxlite")}</option>
+                    <option value="none">{t("admin.v2.node_sandbox_host")}</option>
+                  </select>
+                </label>
+                <label className="adm-field">
+                  <span>{t("workspace_label")}</span>
+                  <input value={workspacePath} onChange={(event) => setWorkspacePath(event.target.value)} placeholder="/Users/alice/project" disabled={isBusy} />
+                </label>
+              </>
+            ) : null}
             <p className="adm-form-hint">
               {sandboxMode === "boxlite" ? t("admin.v2.node_help_managed") : t("admin.v2.node_help_local")}
             </p>

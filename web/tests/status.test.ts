@@ -370,7 +370,7 @@ describe("Relay web admin node helpers", () => {
     }, "tok_secret", "http://127.0.0.1:8790");
 
     assert.match(command, /--sandbox-id sbx_alice/);
-    assert.match(command, /--token tok_secret/);
+    assert.doesNotMatch(command, /tok_secret|--token/);
     assert.match(command, /--sandbox boxlite/);
     assert.doesNotMatch(command, /--use-local-agent-home/);
     assert.match(command, /--employee-id alice/);
@@ -417,16 +417,17 @@ describe("Relay web admin node helpers", () => {
 
     assert.equal(resolved.source, "cache");
     assert.equal(resolved.nodeToken, "tok_cached");
-    assert.match(resolved.daemonCommand ?? "", /--token tok_cached/);
+    assert.doesNotMatch(resolved.daemonCommand ?? "", /tok_cached|--token/);
   });
 
-  it("labels colocated live nodes and browser-provisioned nodes", () => {
+  it("keeps device location separate from sandbox isolation", () => {
     const node = controlPanelNode({
       id: "sbx_alice",
       employeeId: "alice",
       online: true,
       stale: false,
       sandboxMode: "none",
+      nodeLocation: "managed",
       managedNodeId: "mnode_alice",
     });
     const flags = nodeLocalityFlags(node, {
@@ -437,14 +438,15 @@ describe("Relay web admin node helpers", () => {
     });
 
     assert.equal(flags.hasCachedCredentials, true);
-    assert.equal(flags.isColocatedLive, true);
+    assert.equal(flags.isColocatedLive, false);
     assert.equal(nodeOwnershipProfile(node), "managed");
     assert.deepEqual(nodeLocalityKinds(node, {
       colocated: true,
       storedTokens: { sbx_alice: { nodeToken: "tok_cached", savedAt: "2026-06-12T00:00:00.000Z" } },
-    }), ["saved_here", "this_host"]);
-    assert.equal(nodeOwnershipProfile({ sandboxMode: "boxlite" }), "local");
-    assert.equal(nodeOwnershipProfile({ sandboxMode: "none", managedNodeId: "mnode_alice" }), "managed");
+    }), ["saved_here"]);
+    assert.equal(nodeOwnershipProfile({ nodeLocation: "employee-device", sandboxMode: "boxlite" }), "local");
+    assert.equal(nodeOwnershipProfile({ nodeLocation: "managed", sandboxMode: "none" }), "managed");
+    assert.equal(nodeOwnershipProfile({ sandboxMode: "none" }), "pending");
     assert.equal(nodeSandboxProfile({ sandboxMode: "boxlite" }), "boxlite");
     assert.equal(nodeSandboxProfile({ sandboxMode: "none" }), "host");
     assert.equal(nodeSandboxProfile({}), "pending");
@@ -461,7 +463,7 @@ describe("Relay web admin node helpers", () => {
 
     assert.ok(updated);
     assert.equal(updated?.sbx_alice.nodeToken, "tok_live");
-    assert.match(updated?.sbx_alice.daemonCommand ?? "", /--token tok_live/);
+    assert.doesNotMatch(updated?.sbx_alice.daemonCommand ?? "", /tok_live|--token/);
     assert.match(updated?.sbx_alice.daemonCommand ?? "", /--sandbox boxlite/);
     assert.doesNotMatch(updated?.sbx_alice.daemonCommand ?? "", /--use-local-agent-home/);
   });

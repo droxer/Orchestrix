@@ -64,6 +64,43 @@ def run_start_command(command_id: str, run_id: str) -> dict[str, str]:
     }
 
 
+@pytest.mark.parametrize("daemon_store_factory", DAEMON_STORE_FACTORIES)
+def test_pending_employee_device_enrollment_rotates_token_after_restart(
+    daemon_store_factory,
+) -> None:
+    with TemporaryDirectory() as root:
+        first = DaemonNodeRegistry(
+            LocalSessionStore(root), daemon_store_factory(root)
+        )
+        node, _, first_token = first.provision_pending(
+            "alice", "/Users/alice/project", "boxlite", "employee-device"
+        )
+
+        restarted = DaemonNodeRegistry(
+            LocalSessionStore(root), daemon_store_factory(root)
+        )
+        retried, _, replacement_token = restarted.provision_pending(
+            "alice", "/Users/alice/project", "boxlite", "employee-device"
+        )
+
+        assert retried["id"] == node["id"]
+        assert replacement_token
+        assert replacement_token != first_token
+        registration = {
+            "sandboxId": node["id"],
+            "employeeId": "alice",
+            "workspacePath": "/Users/alice/project",
+            "protocolVersion": 1,
+            "supportedAgents": ["codex"],
+            "status": "ready",
+        }
+        with pytest.raises(PermissionError):
+            restarted.register({**registration, "token": first_token})
+        assert restarted.register(
+            {**registration, "token": replacement_token}
+        )["status"] == "ready"
+
+
 def test_explicit_sandbox_provision_targets_requested_node() -> None:
     with TemporaryDirectory() as root:
         session_store = LocalSessionStore(root)
@@ -2759,7 +2796,7 @@ def test_registry_restart_does_not_recover_plaintext_node_token(store_factory) -
         ),
     ],
 )
-def test_daemon_store_persists_sandbox_mode(store_factory) -> None:
+def test_daemon_store_persists_sandbox_mode_and_node_location(store_factory) -> None:
     with TemporaryDirectory() as root:
         store = store_factory(root)
         store.register_node(
@@ -2768,6 +2805,7 @@ def test_daemon_store_persists_sandbox_mode(store_factory) -> None:
                 "employeeId": "alice",
                 "workspacePath": "/workspace/alice",
                 "sandboxMode": "boxlite",
+                "nodeLocation": "employee-device",
                 "status": "ready",
                 "agents": {"codex": "ready"},
                 "token": None,
@@ -2779,6 +2817,7 @@ def test_daemon_store_persists_sandbox_mode(store_factory) -> None:
 
         [node] = store.list_nodes()
         assert node["sandboxMode"] == "boxlite"
+        assert node["nodeLocation"] == "employee-device"
 
 
 @pytest.mark.parametrize("store_factory", DAEMON_STORE_FACTORIES)

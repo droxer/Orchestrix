@@ -264,6 +264,7 @@ export type {
   ControlPanelDaemonNodeRecord,
   DaemonNodeActiveRun,
   DaemonNodeMonitorRecord,
+  DaemonNodeLocation,
   SandboxRecord,
   SandboxRunAssignment,
   SandboxStatus,

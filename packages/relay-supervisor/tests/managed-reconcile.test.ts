@@ -1,5 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { join } from "node:path";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { ManagedNodeReconciler, workspaceIdForManagedNode } from "../src/managed-reconcile.js";
 import { LocalProcessProvider } from "../src/providers.js";
 import type { ControlPanelDaemonNodeRecord } from "relay-core";
@@ -116,6 +119,40 @@ test("local process provider reports spawn failures without an unhandled error e
     workspacePath: "/tmp/relay-supervisor-missing-command",
     workspaceId: "employee:alice:home",
   }), /ENOENT/);
+});
+
+test("local process provider is idempotent for a managed node generation", async () => {
+  const stateDirectory = mkdtempSync(join(tmpdir(), "relay-provider-state-"));
+  const provider = new LocalProcessProvider({
+    command: join(process.cwd(), "packages/relay-supervisor/tests/fixtures/long-running-daemon.sh"),
+    async readProcessStart() { return "Tue Jul 21 12:00:00 2026"; },
+    stateDirectory,
+  });
+  const node = managedNode();
+  const attempt = (await new FakeManagedBackend([]).createProvisioningAttempt(node.id)).attempt;
+  const input = {
+    node,
+    attempt,
+    backendUrl: "http://backend.test",
+    enrollmentCredential: "grant.secret",
+    workspacePath: "/tmp",
+    workspaceId: "employee:alice:home",
+  };
+
+  const first = await provider.ensure(input);
+  const second = await provider.ensure(input);
+  try {
+    assert.equal(second.id, first.id);
+    const restarted = new LocalProcessProvider({
+      command: "must-not-spawn",
+      stateDirectory,
+      async readProcessCommand() { return "relay-daemon --workspace-id employee:alice:home"; },
+      async readProcessStart() { return "Tue Jul 21 12:00:00 2026"; },
+    });
+    assert.equal((await restarted.ensure(input)).id, first.id);
+  } finally {
+    await Promise.allSettled([provider.stop(first.id), provider.stop(second.id)]);
+  }
 });
 
 test("managed reconciler creates an attempt and starts the declared provider", async () => {

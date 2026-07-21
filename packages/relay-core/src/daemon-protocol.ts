@@ -3,12 +3,14 @@ import type { DaemonAgentAdapter, DaemonAgentInventory, DaemonNodeSandboxMode } 
 import type { AgentRole } from "./session-store.js";
 
 export type SandboxStatus = "provisioning" | "ready" | "busy" | "running" | "stopped" | "failed";
+export type DaemonNodeLocation = "employee-device" | "managed";
 
 export interface SandboxRecord {
   id: string;
   employeeId?: string;
   workspacePath?: string;
   sandboxMode?: DaemonNodeSandboxMode;
+  nodeLocation?: DaemonNodeLocation;
   managedNodeId?: string;
   provisioningAttemptId?: string;
   credentialVersion?: number;

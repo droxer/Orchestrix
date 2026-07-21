@@ -859,7 +859,7 @@ def test_control_panel_creates_pending_daemon_node_and_reuses_duplicate(monkeypa
         assert node["status"] == "provisioning"
         assert body["sandboxToken"].startswith("tok_")
         assert body["nodeToken"].startswith("tok_")
-        assert body["nodeToken"] in body["daemonCommand"]
+        assert body["nodeToken"] not in body["daemonCommand"]
         # Managed (boxlite) is the default sandbox mode for generated commands.
         assert "--sandbox boxlite" in body["daemonCommand"]
         assert "--use-local-agent-home" not in body["daemonCommand"]
@@ -949,13 +949,16 @@ def test_control_panel_creates_local_mode_daemon_node(monkeypatch) -> None:
             "employeeId": "alice",
             "workspacePath": "/workspace/alice",
             "sandboxMode": "none",
+            "nodeLocation": "employee-device",
         })
 
         assert response.status_code == 201
         body = response.json()
         assert body["node"]["sandboxMode"] == "none"
+        assert body["node"]["nodeLocation"] == "employee-device"
         assert "--sandbox none" in body["daemonCommand"]
         assert "--use-local-agent-home" in body["daemonCommand"]
+        assert body["nodeToken"] not in body["daemonCommand"]
         assert body["daemonEnv"]["RELAY_SANDBOX_MODE"] == "none"
         assert body["daemonEnv"]["RELAY_USE_LOCAL_AGENT_HOME"] == "1"
 
@@ -993,6 +996,55 @@ def test_control_panel_rejects_unknown_sandbox_mode(monkeypatch) -> None:
         assert response.status_code == 400
 
 
+def test_employee_device_node_requires_an_absolute_workspace(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _login_admin(client)
+
+        response = client.post(
+            "/cp/daemon-nodes",
+            json={
+                "employeeId": "alice",
+                "workspacePath": "relative/project",
+                "sandboxMode": "boxlite",
+                "nodeLocation": "employee-device",
+            },
+        )
+
+        assert response.status_code == 400
+        assert "absolute workspacePath" in response.json()["detail"]
+
+
+def test_employee_can_create_own_device_enrollment(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        _login_admin(client)
+        assert client.post(
+            "/cp/employees",
+            json={"employeeId": "alice", "username": "alice", "password": "userpass"},
+        ).status_code == 201
+        assert client.post("/auth/logout").status_code == 200
+        assert client.post(
+            "/auth/login", json={"username": "alice", "password": "userpass"}
+        ).status_code == 200
+
+        response = client.post(
+            "/daemon-nodes/local-enrollment",
+            json={"workspacePath": "/Users/alice/project", "sandboxMode": "boxlite"},
+        )
+
+        assert response.status_code == 201
+        body = response.json()
+        assert body["node"]["employeeId"] == "alice"
+        assert body["node"]["nodeLocation"] == "employee-device"
+        assert body["node"]["workspacePath"] == "/Users/alice/project"
+        assert body["nodeToken"] not in body["daemonCommand"]
+
+
 def test_control_panel_creates_unassigned_pending_daemon_node(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
@@ -1011,6 +1063,7 @@ def test_control_panel_creates_unassigned_pending_daemon_node(monkeypatch) -> No
         assert "employeeId" not in node
         assert node["workspacePath"] == "/workspace/shared"
         assert node["status"] == "provisioning"
+        assert "nodeLocation" not in node
         assert body["sandboxToken"].startswith("tok_")
         assert body["nodeToken"].startswith("tok_")
         assert "--employee-id" not in body["daemonCommand"]

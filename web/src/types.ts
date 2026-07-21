@@ -259,6 +259,7 @@ export interface UnassignControlPanelDaemonNodeResponse {
 export interface CreateControlPanelDaemonNodeInput {
   employeeId?: string;
   workspacePath?: string;
+  nodeLocation?: "employee-device";
   /** Runtime isolation only; management ownership is represented by managedNodeId. */
   sandboxMode?: "boxlite" | "none";
 }
@@ -319,7 +320,7 @@ export interface AgentPlacement {
   employeeId: string;
   daemonNodeId: string;
   nodeDisplayName?: string;
-  nodeOwnership?: "managed" | "user-run" | "unknown";
+  nodeOwnership?: "managed" | "employee-device" | "unknown";
   nodeSandboxMode?: "boxlite" | "none";
   executorKind: AgentName;
   desiredState: "active" | "draining" | "removed";
