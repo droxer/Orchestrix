@@ -24,13 +24,13 @@
     --ink-4: #7d848d;
     --line-1: #e2e5e8;
     --line-2: #eceef0;
-    --action: #33689e;
-    --action-hover: #2a5786;
-    --action-soft: #e4eef7;
+    --action: #16181b;
+    --action-hover: #000000;
+    --action-soft: color-mix(in srgb, #16181b 7%, transparent);
     --on-action: #ffffff;
-    --ok: #1e8a4c;
-    --warn: #9a6b1a;
-    --err: #c93d3d;
+    --ok: #6b727b;
+    --warn: #5c636b;
+    --err: #16181b;
     --info: var(--ink-3);
     --scrim: rgba(12, 14, 16, 0.55);
     --shadow-1: 0 1px 2px rgba(12, 14, 16, 0.06);
@@ -66,13 +66,13 @@
       --ink-4: #6b727b;
       --line-1: #282c31;
       --line-2: #1f2226;
-      --action: #6ba1d4;
-      --action-hover: #84b3e0;
-      --action-soft: #15202c;
-      --on-action: #0e1216;
-      --ok: #3fb96c;
-      --warn: #d9a13f;
-      --err: #e5635f;
+      --action: #f2f4f6;
+      --action-hover: #ffffff;
+      --action-soft: color-mix(in srgb, #f2f4f6 9%, transparent);
+      --on-action: #101214;
+      --ok: #7d848d;
+      --warn: #99a0a8;
+      --err: #f2f4f6;
       --scrim: rgba(0, 0, 0, 0.66);
       --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.5);
       --shadow-2: 0 4px 14px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.06);
@@ -90,13 +90,13 @@
     --ink-4: #6b727b;
     --line-1: #282c31;
     --line-2: #1f2226;
-    --action: #6ba1d4;
-    --action-hover: #84b3e0;
-    --action-soft: #15202c;
-    --on-action: #0e1216;
-    --ok: #3fb96c;
-    --warn: #d9a13f;
-    --err: #e5635f;
+    --action: #f2f4f6;
+    --action-hover: #ffffff;
+    --action-soft: color-mix(in srgb, #f2f4f6 9%, transparent);
+    --on-action: #101214;
+    --ok: #7d848d;
+    --warn: #99a0a8;
+    --err: #f2f4f6;
     --scrim: rgba(0, 0, 0, 0.66);
     --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.5);
     --shadow-2: 0 4px 14px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.06);
@@ -113,13 +113,13 @@
     --ink-4: #7d848d;
     --line-1: #e2e5e8;
     --line-2: #eceef0;
-    --action: #33689e;
-    --action-hover: #2a5786;
-    --action-soft: #e4eef7;
+    --action: #16181b;
+    --action-hover: #000000;
+    --action-soft: color-mix(in srgb, #16181b 7%, transparent);
     --on-action: #ffffff;
-    --ok: #1e8a4c;
-    --warn: #9a6b1a;
-    --err: #c93d3d;
+    --ok: #6b727b;
+    --warn: #5c636b;
+    --err: #16181b;
     --scrim: rgba(12, 14, 16, 0.55);
     --shadow-1: 0 1px 2px rgba(12, 14, 16, 0.06);
     --shadow-2: 0 4px 14px rgba(12, 14, 16, 0.10), 0 0 0 1px rgba(12, 14, 16, 0.05);
@@ -411,9 +411,9 @@
 <div class="page">
   <header class="masthead">
     <div>
-      <p class="eyebrow">Relay · design tokens · proposal</p>
+      <p class="eyebrow">Relay · design tokens · specimen</p>
       <h1 class="type-display">Graphite</h1>
-      <p class="sub type-body-sm">True-neutral canvas · one steel-blue accent · status as dots, borders, text — never fills. Two registers, designed side by side.</p>
+      <p class="sub type-body-sm">True-neutral canvas · monochrome white/black action · status as a grey brightness hierarchy — dots, borders, text, never fills. Two registers, designed side by side.</p>
     </div>
     <div class="register-toggle" role="group" aria-label="Register">
       <button type="button" id="btn-dark" aria-pressed="false">Dark</button>
@@ -446,30 +446,30 @@
 
   <!-- Accent -->
   <section>
-    <h2 class="type-title section-title">Accent — one steel blue</h2>
-    <p class="section-note type-body-sm">The entire action family: rest, hover, selection wash, and the text that sits on the fill. No disabled hex — disabled is opacity. On dark the accent is bright, so on-accent text is dark ink; on light it deepens and carries white.</p>
+    <h2 class="type-title section-title">Action — white on dark, black on light</h2>
+    <p class="section-note type-body-sm">The entire action family: rest, hover, selection wash, and the text that sits on the fill. Pure monochrome, Linear-style — no chroma anywhere. No disabled hex — disabled is opacity. On dark the fill is white, so on-action text is dark ink; on light it is black and carries white.</p>
     <div class="swatch-table" role="table" aria-label="Accent tokens">
       <div class="swatch-row head type-label">
         <span></span><span>Token</span><span>Dark</span><span>Light</span><span>Role</span>
       </div>
-      <div class="swatch-row"><span class="swatch-chip" style="background: var(--action)"></span><span class="swatch-name">--action</span><span class="swatch-hex">#6ba1d4</span><span class="swatch-hex">#33689e</span><span class="swatch-role">actions, focus, brand</span></div>
-      <div class="swatch-row"><span class="swatch-chip" style="background: var(--action-hover)"></span><span class="swatch-name">--action-hover</span><span class="swatch-hex">#84b3e0</span><span class="swatch-hex">#2a5786</span><span class="swatch-role">hover / active</span></div>
-      <div class="swatch-row"><span class="swatch-chip" style="background: var(--action-soft)"></span><span class="swatch-name">--action-soft</span><span class="swatch-hex">#15202c</span><span class="swatch-hex">#e4eef7</span><span class="swatch-role">selection wash, active nav</span></div>
-      <div class="swatch-row"><span class="swatch-chip" style="background: var(--on-action)"></span><span class="swatch-name">--on-action</span><span class="swatch-hex">#0e1216</span><span class="swatch-hex">#ffffff</span><span class="swatch-role">text on the accent fill</span></div>
+      <div class="swatch-row"><span class="swatch-chip" style="background: var(--action)"></span><span class="swatch-name">--action</span><span class="swatch-hex">#f2f4f6</span><span class="swatch-hex">#16181b</span><span class="swatch-role">actions, focus, brand</span></div>
+      <div class="swatch-row"><span class="swatch-chip" style="background: var(--action-hover)"></span><span class="swatch-name">--action-hover</span><span class="swatch-hex">#ffffff</span><span class="swatch-hex">#000000</span><span class="swatch-role">hover / active</span></div>
+      <div class="swatch-row"><span class="swatch-chip" style="background: var(--action-soft)"></span><span class="swatch-name">--action-soft</span><span class="swatch-hex">9% mix</span><span class="swatch-hex">7% mix</span><span class="swatch-role">selection wash, active nav</span></div>
+      <div class="swatch-row"><span class="swatch-chip" style="background: var(--on-action)"></span><span class="swatch-name">--on-action</span><span class="swatch-hex">#101214</span><span class="swatch-hex">#ffffff</span><span class="swatch-role">text on the action fill</span></div>
     </div>
   </section>
 
   <!-- Status -->
   <section>
     <h2 class="type-title section-title">Status — dots, borders, text. Never fills.</h2>
-    <p class="section-note type-body-sm">One value per hue per register, tuned to pass AA as small text — the dot color and the text color are the same token. Info is not a color; it aliases <span class="type-code">--ink-3</span>.</p>
+    <p class="section-note type-body-sm">A grey brightness hierarchy — loud = bright (<span class="type-code">--err</span> brightest), calm = dim (<span class="type-code">--ok</span> dimmest); the dot color and the text color are the same token. Warn and err pass AA as small text; ok is the decorative-calm tier. Info is not a color; it aliases <span class="type-code">--ink-3</span>.</p>
     <div class="swatch-table" role="table" aria-label="Status tokens">
       <div class="swatch-row head type-label">
         <span></span><span>Token</span><span>Dark</span><span>Light</span><span>Role</span>
       </div>
-      <div class="swatch-row"><span class="swatch-chip" style="background: var(--ok)"></span><span class="swatch-name">--ok</span><span class="swatch-hex">#3fb96c</span><span class="swatch-hex">#1e8a4c</span><span class="swatch-role">ready, passed, done</span></div>
-      <div class="swatch-row"><span class="swatch-chip" style="background: var(--warn)"></span><span class="swatch-name">--warn</span><span class="swatch-hex">#d9a13f</span><span class="swatch-hex">#9a6b1a</span><span class="swatch-role">attention, degraded</span></div>
-      <div class="swatch-row"><span class="swatch-chip" style="background: var(--err)"></span><span class="swatch-name">--err</span><span class="swatch-hex">#e5635f</span><span class="swatch-hex">#c93d3d</span><span class="swatch-role">failed, destructive</span></div>
+      <div class="swatch-row"><span class="swatch-chip" style="background: var(--ok)"></span><span class="swatch-name">--ok</span><span class="swatch-hex">#7d848d</span><span class="swatch-hex">#6b727b</span><span class="swatch-role">ready, passed, done — calm (dim)</span></div>
+      <div class="swatch-row"><span class="swatch-chip" style="background: var(--warn)"></span><span class="swatch-name">--warn</span><span class="swatch-hex">#99a0a8</span><span class="swatch-hex">#5c636b</span><span class="swatch-role">attention, degraded</span></div>
+      <div class="swatch-row"><span class="swatch-chip" style="background: var(--err)"></span><span class="swatch-name">--err</span><span class="swatch-hex">#f2f4f6</span><span class="swatch-hex">#16181b</span><span class="swatch-role">failed, destructive — loud (bright)</span></div>
       <div class="swatch-row"><span class="swatch-chip" style="background: var(--info)"></span><span class="swatch-name">--info</span><span class="swatch-hex">= --ink-3</span><span class="swatch-hex">= --ink-3</span><span class="swatch-role">neutral notice</span></div>
     </div>
   </section>
@@ -595,7 +595,7 @@
   </section>
 
   <footer class="colophon">
-    <span>Relay · Graphite token proposal — replaces Sleek Forest</span>
+    <span>Relay · Graphite — monochrome specimen (2026-07-20 remap)</span>
     <span class="type-code">~24 color tokens / register · 10 type roles · 4 radii · 1 ease</span>
   </footer>
 </div>
