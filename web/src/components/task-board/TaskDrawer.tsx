@@ -238,7 +238,15 @@ export function TaskDrawer({
               }}
             >
               <SelectTrigger className="w-full">
-                <SelectValue />
+                <SelectValue>
+                  {(value: string) => {
+                    if (value === NO_AGENT) {
+                      return form.variant === "backlog" ? t("backlog.agent_team") : t("backlog.no_agent");
+                    }
+                    const agent = agentOptions.find((candidate) => candidate.id === value);
+                    return agent ? `${agent.displayName} · ${agent.executorKind}` : value;
+                  }}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={NO_AGENT}>

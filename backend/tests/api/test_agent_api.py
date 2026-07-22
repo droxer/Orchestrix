@@ -689,6 +689,123 @@ def test_legacy_run_materializes_compatibility_agent_without_get_side_effects(
         assert response.json()["agentRuns"][0]["logicalAgentId"] == agent["id"]
 
 
+def test_compatibility_agent_drops_from_roster_when_its_computer_is_gone(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        assert client.post(
+            "/cp/employees",
+            json={"employeeId": "alice", "username": "alice", "password": "userpass"},
+        ).status_code == 201
+        # A custom agent with no placement stays visible on the roster.
+        client.post(
+            "/cp/employees/alice/agents",
+            json={"displayName": "Freelancer", "executorKind": "claude"},
+        )
+        app.state.registry.register(
+            {
+                "sandboxId": "node_a",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }
+        )
+        # Materialize the node's compatibility agent + placement.
+        from types import SimpleNamespace
+
+        from relay.services.node_agents import sync_node_agents
+
+        sync_node_agents(
+            SimpleNamespace(
+                agent_store=app.state.agent_store,
+                agent_placement_store=app.state.agent_placement_store,
+            ),
+            app.state.registry.get("node_a"),
+        )
+
+        assert client.post("/auth/logout").status_code == 200
+        assert client.post(
+            "/auth/login", json={"username": "alice", "password": "userpass"}
+        ).status_code == 200
+
+        before = client.get("/agents").json()["agents"]
+        names = {agent["displayName"] for agent in before}
+        assert "Freelancer" in names
+        assert any(name.endswith("· node_a") for name in names)
+
+        # Unassigning the computer retires the placement; the per-computer agent
+        # must leave the roster while the placement-less custom agent remains.
+        assert client.post("/auth/logout").status_code == 200
+        assert client.post(
+            "/auth/login", json={"username": "admin", "password": "secret123"}
+        ).status_code == 200
+        assert client.post("/cp/daemon-nodes/node_a/unassign").status_code == 200
+        assert client.post("/auth/logout").status_code == 200
+        assert client.post(
+            "/auth/login", json={"username": "alice", "password": "userpass"}
+        ).status_code == 200
+
+        after = client.get("/agents").json()["agents"]
+        assert {agent["displayName"] for agent in after} == {"Freelancer"}
+
+
+def test_compatibility_agent_drops_when_its_computer_is_deregistered(monkeypatch) -> None:
+    """A placement left dangling at a node that vanished from the registry must
+    not linger as a struck-through, computer-less entry in the header/roster."""
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        assert client.post(
+            "/cp/employees",
+            json={"employeeId": "alice", "username": "alice", "password": "userpass"},
+        ).status_code == 201
+        app.state.registry.register(
+            {
+                "sandboxId": "node_a",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }
+        )
+        from types import SimpleNamespace
+
+        from relay.services.node_agents import sync_node_agents
+
+        sync_node_agents(
+            SimpleNamespace(
+                agent_store=app.state.agent_store,
+                agent_placement_store=app.state.agent_placement_store,
+            ),
+            app.state.registry.get("node_a"),
+        )
+
+        assert client.post("/auth/logout").status_code == 200
+        assert client.post(
+            "/auth/login", json={"username": "alice", "password": "userpass"}
+        ).status_code == 200
+        assert any(
+            agent["displayName"].endswith("· node_a")
+            for agent in client.get("/agents").json()["agents"]
+        )
+
+        # The computer vanishes from the registry (crash / re-enroll under a new
+        # id) WITHOUT the placement being retired — the exact stale state seen in
+        # the header. The dangling active placement must no longer surface it.
+        app.state.registry.delete("node_a")
+
+        assert client.get("/agents").json()["agents"] == []
+
+
 def test_task_persists_and_dispatches_a_logical_agent_assignment(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:

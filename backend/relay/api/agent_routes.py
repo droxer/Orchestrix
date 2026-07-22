@@ -27,11 +27,32 @@ AGENT_META_FIELDS = frozenset({"displayName", "instructions"})
 async def list_agents(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     actor = request_actor(request, ctx.auth_store)
     agents = ctx.agent_store.list_agents(supervisor_employee_id=actor["employeeId"])
+    live_node_ids = {node["id"] for node in ctx.registry.monitor_nodes()}
+    views = [
+        _agent_with_placements(ctx, agent)
+        for agent in agents
+        if agent.get("enabled", True)
+    ]
+
+    def _on_live_computer(view: dict[str, Any]) -> bool:
+        return any(
+            placement.get("daemonNodeId") in live_node_ids
+            for placement in view["placements"]
+        )
+
+    # A compatibility agent belongs to exactly one computer. Once that computer
+    # is gone — unassigned/deleted (placement removed) or no longer registered
+    # (an active placement left dangling at a node that vanished) — the agent is
+    # stale and must drop out of the roster and the chat header instead of
+    # lingering as a struck-through, computer-less entry that inflates the count.
+    # An offline-but-registered node still counts as live, so its agent stays
+    # (shown disabled). Custom agents (no compatibilityKey) may legitimately have
+    # no placement, so they always stay.
     return {
         "agents": [
-            _agent_with_placements(ctx, agent)
-            for agent in agents
-            if agent.get("enabled", True)
+            view
+            for view in views
+            if not view.get("compatibilityKey") or _on_live_computer(view)
         ]
     }
 

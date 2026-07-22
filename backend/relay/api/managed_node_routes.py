@@ -5,6 +5,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request, Response
 
 from ..security.auth import require_admin_session
+from ..services.node_agents import remove_node_agents
 from .deps import AppContextDep
 from .helpers import json_body
 
@@ -66,7 +67,9 @@ async def delete_managed_node(node_id: str, request: Request, ctx: AppContextDep
             node_id, {"desiredState": "deleted"}
         )
         _fence_active_runtime(ctx, node)
-        return {"node": node}
+        daemon_node_id = node.get("activeDaemonNodeId")
+        removed_agents = remove_node_agents(ctx, daemon_node_id) if daemon_node_id else []
+        return {"node": node, "removedAgents": removed_agents}
     except (KeyError, ValueError) as error:
         raise _admin_error(error) from error
 

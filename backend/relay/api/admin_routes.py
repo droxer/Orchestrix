@@ -11,7 +11,7 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from ..core.models import AGENT_NAMES
 from ..daemon_registry import public_sandbox_record
 from ..security.auth import require_admin_session
-from ..services.node_agents import sync_node_agents
+from ..services.node_agents import remove_node_agents, sync_node_agents
 from .deps import AppContextDep
 from .helpers import daemon_start_command, daemon_start_env, employee_record, json_body, string_field, valid_employee_workspace_path
 
@@ -352,6 +352,7 @@ async def delete_control_panel_daemon_node(node_id: str, request: Request, ctx: 
             raise HTTPException(404, "Managed node not found.") from error
         except ValueError as error:
             raise HTTPException(409, str(error)) from error
+        remove_node_agents(ctx, node_id)
         return Response(status_code=204)
     try:
         ctx.registry.delete(node_id)
@@ -359,6 +360,7 @@ async def delete_control_panel_daemon_node(node_id: str, request: Request, ctx: 
         raise HTTPException(404, "Daemon node not found.") from error
     except ValueError as error:
         raise HTTPException(409, str(error)) from error
+    remove_node_agents(ctx, node_id)
     return Response(status_code=204)
 
 

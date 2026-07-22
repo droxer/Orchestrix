@@ -25,3 +25,37 @@ def sync_node_agents(ctx: Any, node: dict[str, Any]) -> None:
             ctx.agent_placement_store.create_placement(agent, node["id"])
         elif placement.get("desiredState") == "removed":
             ctx.agent_placement_store.update_placement(placement["id"], {"desiredState": "active"})
+
+
+def remove_node_agents(ctx: Any, node_id: str) -> list[str]:
+    """Delete compatibility agents and placements bound to a deleted computer.
+
+    A compatibility agent lives on exactly one computer (one agent = one
+    computer), so deleting the computer must retire its auto-materialized agents
+    too — otherwise they linger in the roster with no computer to run on. Removed
+    placements are still swept so an agent whose node was unassigned first is
+    cleaned up as well.
+    """
+    removed_agents: list[str] = []
+    seen: set[str] = set()
+    try:
+        placements = ctx.agent_placement_store.list_placements(
+            daemon_node_id=node_id, include_removed=True
+        )
+    except Exception as error:
+        if "no such table" in str(error) or "does not exist" in str(error):
+            logger.warning("Skipping agent removal during rolling upgrade", node_id=node_id, error=str(error))
+            return removed_agents
+        raise
+    for placement in placements:
+        if placement.get("desiredState") != "removed":
+            ctx.agent_placement_store.update_placement(placement["id"], {"desiredState": "removed"})
+        agent_id = placement.get("agentId")
+        if not agent_id or agent_id in seen:
+            continue
+        seen.add(agent_id)
+        agent = ctx.agent_store.get_agent(agent_id)
+        if agent and not agent.get("deletedAt"):
+            ctx.agent_store.delete_agent(agent_id)
+            removed_agents.append(agent_id)
+    return removed_agents
