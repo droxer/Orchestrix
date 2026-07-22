@@ -27,3 +27,9 @@ export function isDrawerUnderlay(id: symbol): boolean {
   const top = entries[entries.length - 1];
   return top.id !== id;
 }
+
+/** True when no drawer is stacked above this one — i.e. it owns the keyboard. */
+export function isDrawerTop(id: symbol): boolean {
+  if (entries.length === 0) return true;
+  return entries[entries.length - 1].id === id;
+}

@@ -5,7 +5,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request, Response
 
 from ..security.auth import require_admin_session
-from ..services.node_agents import remove_node_agents
+from ..services.node_agents import assert_node_agent_runs_drained, remove_node_agents
 from .deps import AppContextDep
 from .helpers import json_body
 
@@ -51,9 +51,17 @@ async def update_managed_node(node_id: str, request: Request, ctx: AppContextDep
     require_admin_session(request, ctx.auth_store)
     try:
         patch = await json_body(request)
-        node = ctx.managed_node_store.update_node(node_id, patch)
-        if patch.get("desiredState") in ("stopped", "deleted"):
-            _fence_active_runtime(ctx, node)
+        with ctx.registry.dispatch_lock:
+            if patch.get("desiredState") in ("stopped", "deleted"):
+                existing = ctx.managed_node_store.get_node(node_id)
+                if not existing:
+                    raise KeyError(node_id)
+                daemon_node_id = existing.get("activeDaemonNodeId")
+                if daemon_node_id:
+                    assert_node_agent_runs_drained(ctx, daemon_node_id)
+            node = ctx.managed_node_store.update_node(node_id, patch)
+            if patch.get("desiredState") in ("stopped", "deleted"):
+                _fence_active_runtime(ctx, node)
         return {"node": node}
     except (KeyError, ValueError) as error:
         raise _admin_error(error) from error
@@ -63,12 +71,19 @@ async def update_managed_node(node_id: str, request: Request, ctx: AppContextDep
 async def delete_managed_node(node_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     try:
-        node = ctx.managed_node_store.update_node(
-            node_id, {"desiredState": "deleted"}
-        )
-        _fence_active_runtime(ctx, node)
-        daemon_node_id = node.get("activeDaemonNodeId")
-        removed_agents = remove_node_agents(ctx, daemon_node_id) if daemon_node_id else []
+        with ctx.registry.dispatch_lock:
+            existing = ctx.managed_node_store.get_node(node_id)
+            if not existing:
+                raise KeyError(node_id)
+            daemon_node_id = existing.get("activeDaemonNodeId")
+            if daemon_node_id:
+                assert_node_agent_runs_drained(ctx, daemon_node_id)
+            node = ctx.managed_node_store.update_node(
+                node_id, {"desiredState": "deleted"}
+            )
+            _fence_active_runtime(ctx, node)
+            daemon_node_id = node.get("activeDaemonNodeId")
+            removed_agents = remove_node_agents(ctx, daemon_node_id) if daemon_node_id else []
         return {"node": node, "removedAgents": removed_agents}
     except (KeyError, ValueError) as error:
         raise _admin_error(error) from error
@@ -121,8 +136,17 @@ async def retry_managed_node(node_id: str, request: Request, ctx: AppContextDep)
 async def drain_managed_node(node_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     try:
-        node = ctx.managed_node_store.update_node(node_id, {"desiredState": "stopped"})
-        _fence_active_runtime(ctx, node)
+        with ctx.registry.dispatch_lock:
+            existing = ctx.managed_node_store.get_node(node_id)
+            if not existing:
+                raise KeyError(node_id)
+            daemon_node_id = existing.get("activeDaemonNodeId")
+            if daemon_node_id:
+                assert_node_agent_runs_drained(ctx, daemon_node_id)
+            node = ctx.managed_node_store.update_node(
+                node_id, {"desiredState": "stopped"}
+            )
+            _fence_active_runtime(ctx, node)
         return {"node": node}
     except (KeyError, ValueError) as error:
         raise _admin_error(error) from error
@@ -133,15 +157,20 @@ async def retire_managed_node_runtime(
     node_id: str, request: Request, ctx: AppContextDep
 ) -> Response:
     require_admin_session(request, ctx.auth_store)
-    node = ctx.managed_node_store.get_node(node_id)
-    if not node:
-        raise HTTPException(404, "Managed node not found.")
-    daemon_node_id = node.get("activeDaemonNodeId")
-    if daemon_node_id and ctx.registry.get(daemon_node_id):
-        try:
-            ctx.registry.delete(daemon_node_id)
-        except ValueError as error:
-            raise HTTPException(409, str(error)) from error
+    try:
+        with ctx.registry.dispatch_lock:
+            node = ctx.managed_node_store.get_node(node_id)
+            if not node:
+                raise KeyError(node_id)
+            daemon_node_id = node.get("activeDaemonNodeId")
+            if daemon_node_id and ctx.registry.get(daemon_node_id):
+                assert_node_agent_runs_drained(ctx, daemon_node_id)
+                remove_node_agents(ctx, daemon_node_id)
+                ctx.registry.delete(daemon_node_id)
+    except KeyError as error:
+        raise HTTPException(404, "Managed node not found.") from error
+    except ValueError as error:
+        raise HTTPException(409, str(error)) from error
     return Response(status_code=204)
 
 

@@ -7,7 +7,7 @@ import { agentLabel } from "../../lib/plan";
 import type { ControlPanelDaemonNodeRecord, EmployeeAgent, EmployeeRecord } from "../../types";
 import { AgentMark } from "../AgentMark";
 import { AgentProfilePanel } from "../AgentProfilePanel";
-import { Drawer } from "./Drawer";
+import { Drawer } from "../ui/Drawer";
 
 interface AgentProfileDrawerProps {
   open: boolean;

@@ -15,7 +15,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { useDialogs } from "@/components/ui/DialogProvider";
 import { RelayEmptyState } from "../RelayEmptyState";
-import { Drawer } from "./Drawer";
+import { Drawer } from "../ui/Drawer";
 import {
   activateChatIntegration,
   addChatAllowedConversation,

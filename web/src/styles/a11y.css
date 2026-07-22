@@ -98,7 +98,6 @@
   .relay-search,
   .adm-search,
   .adm-fleet-chip,
-  .adm-emp-delete,
   .adm-node-card-icon-btn,
   .msg-turn-action {
     min-height: var(--touch-target);
@@ -167,7 +166,6 @@
     padding-inline: var(--sp-3);
   }
 
-  .adm-emp-delete,
   .adm-node-card-icon-btn {
     width: var(--touch-target);
     height: var(--touch-target);

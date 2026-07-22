@@ -53,6 +53,7 @@ class SessionController:
         workspace_path: str = "/workspace",
         owner_employee_id: str | None = None,
         owner_agent_id: str | None = None,
+        team_id: str | None = None,
     ):
         self.store = store or LocalSessionStore()
         self.task_store = task_store
@@ -60,6 +61,7 @@ class SessionController:
         self.workspace_path = workspace_path
         self.owner_employee_id = owner_employee_id
         self.owner_agent_id = owner_agent_id
+        self.team_id = team_id
         self.active_session_id = ""
 
     def create_session(self, task_goal: str, participants: list[str] | None = None, pending_start: bool = False) -> dict[str, Any]:
@@ -67,6 +69,7 @@ class SessionController:
             "workspacePath": self.workspace_path,
             **({"ownerEmployeeId": self.owner_employee_id} if self.owner_employee_id else {}),
             **({"ownerAgentId": self.owner_agent_id} if self.owner_agent_id else {}),
+            **({"teamId": self.team_id} if self.team_id else {}),
             "taskGoal": task_goal,
             "participants": participants or ["human"],
             "status": "running",
@@ -242,6 +245,7 @@ class SessionController:
             **({"placementId": step["placementId"]} if step.get("placementId") else {}),
             **({"daemonNodeId": step["daemonNodeId"]} if step.get("daemonNodeId") else {}),
             **({"agentVersion": step["agentVersion"]} if step.get("agentVersion") else {}),
+            **({"workspaceIdentity": step["workspaceIdentity"]} if step.get("workspaceIdentity") else {}),
         }))
         self._update_task_status("review" if step["mode"] == "review" else "running", f"{step['agent']} {step['mode']} started.", {
             "agent": step["agent"],

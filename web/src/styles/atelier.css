@@ -49,8 +49,7 @@
 }
 
 .segmented,
-.adm-view-toggle,
-.header-agent-tabs {
+.adm-view-toggle {
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -62,8 +61,7 @@
 
 .segmented > button,
 .segmented > [role="tab"],
-.adm-view-toggle-btn,
-.header-agent-tabs button {
+.adm-view-toggle-btn {
   border: 0;
   border-radius: calc(var(--r-2) - 2px);
   background: transparent;
@@ -81,8 +79,7 @@
 .segmented > button[data-active="true"],
 .segmented > [role="tab"][aria-selected="true"],
 .segmented > [role="tab"].is-active,
-.adm-view-toggle-btn[data-active="true"],
-.header-agent-tabs button.active {
+.adm-view-toggle-btn[data-active="true"] {
   background: var(--surface-3);
   color: var(--ink-1);
   box-shadow: inset 0 0 0 1px var(--line-1);
@@ -90,8 +87,7 @@
 
 .segmented--brand > button.active,
 .segmented--brand > button[aria-selected="true"],
-.segmented--brand > button[data-active="true"],
-.header-agent-tabs button.active {
+.segmented--brand > button[data-active="true"] {
   background: var(--action);
   color: var(--on-action);
   box-shadow: none;
@@ -181,7 +177,6 @@ body {
 html[data-theme="dark"] .thread-panel { background: var(--surface-1); }
 html[data-theme="dark"] .conversation-row:hover { background: var(--surface-3); }
 html[data-theme="dark"] .conversation-row.active { background: var(--action-soft); }
-html[data-theme="dark"] .header-agent-tabs { background: var(--surface-1); }
 html[data-theme="dark"] .chat-header,
 html[data-theme="dark"] .page-header {
   --surface-header-bg: var(--surface-0);

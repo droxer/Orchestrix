@@ -526,6 +526,11 @@ def workspace_identity(node: dict[str, Any]) -> tuple[str, str] | None:
     return None
 
 
+def workspace_identity_record(node: dict[str, Any]) -> dict[str, str] | None:
+    identity = workspace_identity(node)
+    return {"kind": identity[0], "value": identity[1]} if identity else None
+
+
 def _string_metadata(value: Any, limit: int = 500) -> str | None:
     if not isinstance(value, str):
         return None
@@ -802,8 +807,11 @@ class DaemonNodeRegistry:
             ),
             **({"sandboxMode": sandbox_mode} if sandbox_mode else {}),
             **(
-                {"nodeLocation": (existing or {}).get("nodeLocation")}
-                if (existing or {}).get("nodeLocation")
+                {
+                    "nodeLocation": payload.get("nodeLocation")
+                    or (existing or {}).get("nodeLocation")
+                }
+                if payload.get("nodeLocation") or (existing or {}).get("nodeLocation")
                 else {}
             ),
             **({"capabilities": capabilities} if capabilities else {}),
@@ -1941,6 +1949,11 @@ class DaemonNodeRegistry:
                 else {}
             ),
             **(
+                {"workspaceIdentity": assignment["workspaceIdentity"]}
+                if assignment.get("workspaceIdentity")
+                else {}
+            ),
+            **(
                 {"workspacePath": sandbox["workspacePath"]}
                 if sandbox.get("workspacePath")
                 else {}
@@ -2024,6 +2037,11 @@ class DaemonNodeRegistry:
                 **(
                     {"agentVersion": command["agentVersion"]}
                     if command.get("agentVersion")
+                    else {}
+                ),
+                **(
+                    {"workspaceIdentity": command["workspaceIdentity"]}
+                    if command.get("workspaceIdentity")
                     else {}
                 ),
             },

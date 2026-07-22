@@ -11,6 +11,7 @@ from ..daemon_registry import (
     sandbox_ui_auth_error,
     sandbox_ui_token_matches,
 )
+from ..daemon_registry.registry import workspace_identity_record
 from .deps import AppContextDep
 from .helpers import (
     actor_can_access_sandbox,
@@ -187,7 +188,15 @@ def _resolve_legacy_assignment(
     placement = next((item for item in ctx.agent_placement_store.list_placements(agent_id=agent["id"]) if item["daemonNodeId"] == sandbox_id), None)
     if placement is None:
         placement = ctx.agent_placement_store.create_placement(agent, sandbox_id)
-    return {**assignment, "agentId": agent["id"], "agentVersion": agent["version"], "placementId": placement["id"], "daemonNodeId": sandbox_id, "workspacePolicy": placement.get("workspacePolicy")}
+    return {
+        **assignment,
+        "agentId": agent["id"],
+        "agentVersion": agent["version"],
+        "placementId": placement["id"],
+        "daemonNodeId": sandbox_id,
+        "workspaceIdentity": workspace_identity_record(node or {}),
+        "workspacePolicy": placement.get("workspacePolicy"),
+    }
 
 
 @router.post("/sandboxes/{sandbox_id}/runs/{session_id}/cancel", status_code=202)

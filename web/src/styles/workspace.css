@@ -878,6 +878,84 @@
   font: var(--type-body-sm);
 }
 
+/* ---- artifacts empty: ghost ledger ----------------------------------
+   The empty artifacts pane previews the list's own anatomy instead of an
+   icon tile: three dashed specimen rows (kind tag · title bar · time slot)
+   that fade out downward. Geometry mirrors .workspace-pick and the tag
+   mirrors .artifact-kind-tag, so the promise — "runs file documents
+   here" — reads in the list's own vocabulary. */
+.artifacts-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: auto;
+  padding: var(--sp-8) var(--sp-7);
+  width: 100%;
+  max-width: 360px;
+  text-align: center;
+}
+
+.artifacts-empty-ghosts {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin: 0 0 var(--sp-4);
+  padding: 0;
+  list-style: none;
+}
+
+.artifacts-empty-ghost {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-2);
+  border-bottom: 1px dashed var(--line-1);
+  animation: artifacts-ghost-in var(--t-slow) var(--ease) backwards;
+}
+
+/* Downward fade: the top row is nearly real, the last almost gone — the
+   list trails off into the space real artifacts will occupy. */
+.artifacts-empty-ghost:nth-child(1) { opacity: 0.9; }
+.artifacts-empty-ghost:nth-child(2) { opacity: 0.6; animation-delay: 90ms; }
+.artifacts-empty-ghost:nth-child(3) { opacity: 0.32; animation-delay: 180ms; }
+
+.artifacts-empty-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border: 1px dashed color-mix(in srgb, var(--info) 45%, transparent);
+  border-radius: var(--r-2);
+  color: color-mix(in srgb, var(--info) 80%, transparent);
+  font: var(--type-label-strong);
+  letter-spacing: var(--track-0);
+  white-space: nowrap;
+}
+
+.artifacts-empty-line {
+  justify-self: start;
+  width: 100%;
+  height: 6px;
+  border-radius: var(--r-full);
+  background: color-mix(in srgb, var(--ink-4) 30%, transparent);
+}
+
+.artifacts-empty-ghost:nth-child(2) .artifacts-empty-line { width: 72%; }
+.artifacts-empty-ghost:nth-child(3) .artifacts-empty-line { width: 48%; }
+
+.artifacts-empty-date {
+  color: var(--ink-4);
+  font-size: var(--fs-2);
+}
+
+@keyframes artifacts-ghost-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
 .workspace-empty-state-mark.is-pulse {
   background: color-mix(in srgb, var(--ok) 14%, var(--surface-2));
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok) 24%, var(--line-2));
@@ -1437,6 +1515,10 @@
     animation: none;
     opacity: 1;
     transform: none;
+  }
+
+  .artifacts-empty-ghost {
+    animation: none;
   }
 
   .workspace-metric-item.is-live strong::after {

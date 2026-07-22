@@ -23,6 +23,10 @@ import type {
   DaemonNodesResponse,
   EmployeeAgentsResponse,
   EmployeeAgent,
+  AgentTeam,
+  AgentTeamsResponse,
+  TeamArtifactsResponse,
+  TeamMutationInput,
   AgentPlacement,
   AgentRunInput,
   RelaySession,
@@ -113,6 +117,29 @@ export function listControlPanelAgents(employeeId?: string, signal?: AbortSignal
   return apiJson<EmployeeAgentsResponse>(`/cp/agents${query}`, { signal });
 }
 
+export function listTeams(signal?: AbortSignal): Promise<AgentTeamsResponse> {
+  return apiJson<AgentTeamsResponse>("/teams", { signal });
+}
+
+export function createTeam(input: TeamMutationInput): Promise<{ team: AgentTeam }> {
+  return apiJson<{ team: AgentTeam }>("/teams", { method: "POST", body: input });
+}
+
+export function updateTeam(teamId: string, input: Partial<TeamMutationInput>): Promise<{ team: AgentTeam }> {
+  return apiJson<{ team: AgentTeam }>(`/teams/${encodeURIComponent(teamId)}`, {
+    method: "PATCH",
+    body: input,
+  });
+}
+
+export function deleteTeam(teamId: string): Promise<{ team: AgentTeam }> {
+  return apiJson<{ team: AgentTeam }>(`/teams/${encodeURIComponent(teamId)}`, { method: "DELETE" });
+}
+
+export function getTeamArtifacts(teamId: string, signal?: AbortSignal): Promise<TeamArtifactsResponse> {
+  return apiJson<TeamArtifactsResponse>(`/teams/${encodeURIComponent(teamId)}/artifacts`, { signal });
+}
+
 export function getControlPanelAgent(agentId: string, signal?: AbortSignal): Promise<{ agent: EmployeeAgent }> {
   return apiJson<{ agent: EmployeeAgent }>(`/cp/agents/${encodeURIComponent(agentId)}`, { signal });
 }
@@ -124,9 +151,6 @@ export type EmployeeAgentMetaPatch = {
 
 export type EmployeeAgentAdminPatch = EmployeeAgentMetaPatch & {
   enabled?: boolean;
-  skillPolicy?: Record<string, unknown>;
-  toolPolicy?: Record<string, unknown>;
-  modelPolicy?: Record<string, unknown>;
 };
 
 export function updateOwnEmployeeAgent(
@@ -335,12 +359,13 @@ export function listArtifacts(
 }
 
 export function getWorkspaceBrief(
-  input: { employeeId?: string; agentId?: string } = {},
+  input: { employeeId?: string; agentId?: string; teamId?: string } = {},
   signal?: AbortSignal,
 ): Promise<WorkspaceBriefResponse> {
   const params = new URLSearchParams();
   if (input.employeeId) params.set("employeeId", input.employeeId);
   if (input.agentId) params.set("agentId", input.agentId);
+  if (input.teamId) params.set("teamId", input.teamId);
   const query = params.toString();
   return apiJson<WorkspaceBriefResponse>(`/workspace/brief${query ? `?${query}` : ""}`, { signal });
 }
@@ -411,6 +436,13 @@ export function assignTask(taskId: string, agentId: string): Promise<RelayTask> 
   return apiJson<RelayTask>(`/tasks/${encodeURIComponent(taskId)}/assign`, {
     method: "POST",
     body: { agentId },
+  });
+}
+
+export function assignTaskToTeam(taskId: string, teamId: string): Promise<RelayTask> {
+  return apiJson<RelayTask>(`/tasks/${encodeURIComponent(taskId)}/assign`, {
+    method: "POST",
+    body: { teamId },
   });
 }
 

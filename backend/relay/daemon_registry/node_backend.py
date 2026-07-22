@@ -15,6 +15,7 @@ from .registry import (
     sandbox_node_auth_error,
     sandbox_ui_auth_error,
     workspace_identity,
+    workspace_identity_record,
 )
 
 
@@ -57,6 +58,13 @@ class ServerDaemonNodeBackend:
         agent = self.agent_store.get_agent(assignment.get("agentId"))
         if not agent or agent.get("deletedAt") or not agent.get("enabled", True):
             raise ValueError("logical agent is disabled or missing")
+        if any(
+            agent.get(field)
+            for field in ("skillPolicy", "toolPolicy", "modelPolicy")
+        ):
+            raise ValueError(
+                "agent_policy_unsupported: logical agent policy is not enforceable by this runtime"
+            )
         if agent.get("executorKind") != assignment.get("executorKind"):
             raise ValueError("logical agent executor changed")
         if agent.get("version") != assignment.get("agentVersion"):
@@ -72,7 +80,6 @@ class ServerDaemonNodeBackend:
             != agent.get("supervisorEmployeeId")
             or placement.get("daemonNodeId") != assignment.get("daemonNodeId")
             or placement.get("executorKind") != agent.get("executorKind")
-            or placement.get("agentVersion") != agent.get("version")
             or (placement.get("workspacePolicy") or {"kind": "node-affine"})
             != (assignment.get("workspacePolicy") or {"kind": "node-affine"})
         ):
@@ -80,6 +87,8 @@ class ServerDaemonNodeBackend:
         node = self.registry.get(assignment.get("daemonNodeId"))
         if not node:
             raise ValueError("daemon node is no longer available")
+        if assignment.get("workspaceIdentity") != workspace_identity_record(node):
+            raise ValueError("daemon node workspace identity changed")
 
     def provision(self, payload: dict[str, Any]) -> dict[str, Any]:
         requested_sandbox_id = payload.get("sandboxId")
@@ -150,6 +159,7 @@ class ServerDaemonNodeBackend:
                 "employeeId": payload["employeeId"],
                 "token": payload["nodeToken"],
                 "workspacePath": payload.get("workspacePath"),
+                "nodeLocation": "employee-device",
                 "protocolVersion": DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS[0],
                 "supportedAgents": [],
                 "status": "stopped",
@@ -180,17 +190,22 @@ class ServerDaemonNodeBackend:
 
     async def run(self, sandbox_id: str, request: dict[str, Any]) -> dict[str, Any]:
         with self.registry.dispatch_lock:
-            request = {
-                **request,
-                "assignments": [
-                    {
-                        **assignment,
-                        "executorKind": assignment.get("executorKind")
-                        or assignment.get("agent"),
-                    }
-                    for assignment in request["assignments"]
-                ],
-            }
+            resolved_assignments = []
+            for assignment in request["assignments"]:
+                resolved = {
+                    **assignment,
+                    "executorKind": assignment.get("executorKind")
+                    or assignment.get("agent"),
+                }
+                if assignment.get("agentId") and not assignment.get("workspaceIdentity"):
+                    assignment_workspace_identity = workspace_identity_record(
+                        self.registry.get(assignment.get("daemonNodeId") or sandbox_id)
+                        or {}
+                    )
+                    if assignment_workspace_identity:
+                        resolved["workspaceIdentity"] = assignment_workspace_identity
+                resolved_assignments.append(resolved)
+            request = {**request, "assignments": resolved_assignments}
             idempotency_key = request.get("idempotencyKey")
             run_request_id = (
                 _idempotent_run_request_id(idempotency_key)
@@ -248,6 +263,22 @@ class ServerDaemonNodeBackend:
             ):
                 raise ValueError(
                     "workspace_unavailable: cross-node agent placements require shared-path policy."
+                )
+            existing_session = (
+                self.registry.store.get_session(request["sessionId"])
+                if request.get("sessionId")
+                else None
+            )
+            if existing_session and agent_first:
+                from ..services.agent_routing import (
+                    validate_session_workspace_assignments,
+                )
+
+                validate_session_workspace_assignments(
+                    request["assignments"],
+                    session=existing_session,
+                    placement_store=self.agent_placement_store,
+                    daemon_nodes=self.registry.monitor_nodes(),
                 )
             for assignment in request["assignments"]:
                 node_id = assignment.get("daemonNodeId") or sandbox_id
@@ -325,15 +356,16 @@ class ServerDaemonNodeBackend:
                     else actor_employee_id or sandbox.get("employeeId")
                 ),
                 owner_agent_id=owner_agent_id,
+                team_id=(
+                    request.get("teamId")
+                    if isinstance(request.get("teamId"), str)
+                    and request.get("teamId")
+                    else None
+                ),
             )
             decision = (
                 request.get("decision")
                 if isinstance(request.get("decision"), dict)
-                else None
-            )
-            existing_session = (
-                self.registry.store.get_session(request["sessionId"])
-                if request.get("sessionId")
                 else None
             )
             session_id = (

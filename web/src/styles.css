@@ -35,6 +35,7 @@
 @import "./styles/workspace.css";
 @import "./styles/backlog.css";
 @import "./styles/agents.css";
+@import "./styles/teams.css";
 @import "./styles/overlay.css";
 @import "./styles/preferences.css";
 @import "./styles/dialog.css";

@@ -685,6 +685,10 @@
   gap: var(--sp-4);
 }
 
+.task-drawer-next-run {
+  grid-column: 1 / -1;
+}
+
 @media (max-width: 480px) {
   .task-drawer-form-grid {
     grid-template-columns: 1fr;
@@ -1056,12 +1060,34 @@
   color: var(--ink-3);
 }
 
-.backlog-rows-head-lead { flex: 1 1 auto; min-width: 0; padding-left: calc(8px + var(--sp-3)); }
-.backlog-rows-head-status { flex: none; width: 96px; }
-.backlog-rows-head-tags { flex: none; width: 104px; }
-.backlog-rows-head-assignee { flex: none; width: 150px; }
-.backlog-rows-head-due { flex: none; width: 116px; }
-.backlog-rows-head-actions { flex: none; width: 176px; text-align: right; }
+/* Column widths are declared ONCE, shared by the header cell and the row cell
+   — drift between the two silently misaligns the header from the data. The
+   status dot gets its own fixed cell so the lead column aligns without
+   padding compensation. */
+.backlog-rows-head-dot,
+.backlog-row-dot-cell { flex: none; width: 8px; }
+
+.backlog-rows-head-status,
+.backlog-row-status { flex: none; width: 96px; }
+
+.backlog-rows-head-tags,
+.backlog-row-tags { flex: none; width: 104px; }
+
+.backlog-rows-head-assignee,
+.backlog-row-assignee { flex: none; width: 150px; }
+
+.backlog-rows-head-due,
+.backlog-row-due { flex: none; width: 116px; }
+
+.backlog-rows-head-actions,
+.backlog-row-actions { flex: none; width: 176px; }
+
+.backlog-rows-head-lead { flex: 1 1 auto; min-width: 0; }
+.backlog-rows-head-actions { text-align: right; }
+
+/* The row's flex gap is --sp-4 but the dot used to sit inside the lead cell
+   with a --sp-3 gap; pull it 4px closer so the title keeps its old offset. */
+.backlog-row-dot-cell { margin-right: calc(var(--sp-3) - var(--sp-4)); }
 
 .backlog-row {
   --row-accent: var(--ink-4);
@@ -1082,12 +1108,10 @@
    initial-value declaration). Keep rows sized purely by content. */
 
 .backlog-row-tags {
-  flex: none;
   display: flex;
   align-items: center;
   flex-wrap: nowrap;
   gap: var(--sp-1);
-  width: 104px;
   overflow: hidden;
 }
 
@@ -1160,19 +1184,15 @@
 }
 
 .backlog-row-status {
-  flex: none;
-  width: 96px;
   color: var(--ink-3);
   font: var(--type-label);
   letter-spacing: var(--track-0);
 }
 
 .backlog-row-assignee {
-  flex: none;
   display: flex;
   align-items: center;
   min-width: 0;
-  width: 150px;
   overflow: hidden;
 }
 
@@ -1227,11 +1247,9 @@
 }
 
 .backlog-row-due {
-  flex: none;
   display: inline-flex;
   align-items: center;
   gap: var(--sp-1);
-  width: 116px;
   color: var(--ink-3);
   font: var(--type-label);
 }
@@ -1243,8 +1261,6 @@
    row exposes its actions without a hover reveal. Shorter action sets (no
    linked thread / non-blockable) simply leave space on the leading edge. */
 .backlog-row-actions {
-  flex: none;
-  width: 176px;
   display: flex;
   align-items: center;
   justify-content: flex-end;

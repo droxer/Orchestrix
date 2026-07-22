@@ -4,6 +4,9 @@ import {
   emptyBacklogForm,
   emptyRoutineForm,
   nextRoutineRunDate,
+  parseTaskAssignmentValue,
+  teamAssignmentPatch,
+  taskAssignmentValue,
   taskBoardFormsEqual,
   type BacklogTaskFormState,
   type RoutineTaskFormState,
@@ -40,6 +43,27 @@ describe("taskBoardForm", () => {
     const backlog: BacklogTaskFormState = emptyBacklogForm(user);
     const routine: RoutineTaskFormState = emptyRoutineForm(user);
     assert.equal(taskBoardFormsEqual(backlog, routine), false);
+  });
+
+  it("tracks team assignment changes and parses picker values", () => {
+    const base = emptyBacklogForm(user);
+    const assigned = { ...base, assignedTeamId: "team_delivery" };
+
+    assert.equal(taskBoardFormsEqual(base, assigned), false);
+    assert.equal(taskAssignmentValue(assigned), "team:team_delivery");
+    assert.deepEqual(parseTaskAssignmentValue("team:team_delivery"), {
+      kind: "team",
+      id: "team_delivery",
+    });
+    assert.deepEqual(parseTaskAssignmentValue("agent:agent_builder"), {
+      kind: "agent",
+      id: "agent_builder",
+    });
+    assert.deepEqual(teamAssignmentPatch("team_delivery"), {
+      assignedAgent: "",
+      assignedAgentId: "",
+      assignedTeamId: "team_delivery",
+    });
   });
 });
 

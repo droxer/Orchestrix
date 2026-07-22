@@ -6,7 +6,7 @@ import { ActionApprove, ActionCopy } from "../icons";
 import type { ControlPanelDaemonNodeRecord } from "../../types";
 import { useDialogs } from "@/components/ui/DialogProvider";
 import { Button } from "@/components/ui/button";
-import { Drawer } from "./Drawer";
+import { Drawer } from "../ui/Drawer";
 import { NodeProfileBadges } from "./NodeProfileBadges";
 import { COPY_FEEDBACK_MS, copyText, resolveNodeCredentials, type StoredNodeToken } from "./helpers";
 import { canUseLocalControlPanel } from "../../lib/controlPanel";
@@ -235,7 +235,7 @@ export function CredentialsDrawer({ open, onClose, node, storedToken, onUnassign
               ) : null}
             </div>
             <div className="adm-form-actions">
-              <Button type="button" variant="ghost" onClick={onClose} disabled={actionPending !== null}>
+              <Button size="cta" type="button" variant="ghost" onClick={onClose} disabled={actionPending !== null}>
                 {t("admin.v2.close_drawer")}
               </Button>
             </div>

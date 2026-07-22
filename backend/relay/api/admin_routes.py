@@ -11,7 +11,12 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from ..core.models import AGENT_NAMES
 from ..daemon_registry import public_sandbox_record
 from ..security.auth import require_admin_session
-from ..services.node_agents import remove_node_agents, sync_node_agents
+from ..services.node_agents import (
+    assert_node_agent_runs_drained,
+    remove_node_agents,
+    sync_node_agents,
+)
+from ..services.team_membership import remove_agent_from_teams
 from .deps import AppContextDep
 from .helpers import daemon_start_command, daemon_start_env, employee_record, json_body, string_field, valid_employee_workspace_path
 
@@ -169,6 +174,7 @@ async def soft_delete_employee(employee_id: str, request: Request, ctx: AppConte
             )
             removed_placements.append(removed["id"])
         deleted = ctx.agent_store.delete_agent(agent["id"])
+        remove_agent_from_teams(ctx.team_store, agent["id"], employee_id)
         deleted_agents.append(deleted["id"])
     deleted_managed_nodes: list[str] = []
     for node in ctx.managed_node_store.list_nodes():
@@ -339,28 +345,24 @@ async def update_control_panel_daemon_node_agent_role_defaults(node_id: str, req
 @router.delete("/cp/daemon-nodes/{node_id}", status_code=204)
 async def delete_control_panel_daemon_node(node_id: str, request: Request, ctx: AppContextDep) -> Response:
     require_admin_session(request, ctx.auth_store)
-    node = ctx.registry.get(node_id)
-    if not node:
-        raise HTTPException(404, "Daemon node not found.")
-    if node.get("managedNodeId"):
-        try:
-            ctx.managed_node_store.update_node(
-                node["managedNodeId"], {"desiredState": "deleted"}
-            )
-            ctx.registry.fence_managed_node(node_id)
-        except KeyError as error:
-            raise HTTPException(404, "Managed node not found.") from error
-        except ValueError as error:
-            raise HTTPException(409, str(error)) from error
-        remove_node_agents(ctx, node_id)
-        return Response(status_code=204)
     try:
-        ctx.registry.delete(node_id)
+        with ctx.registry.dispatch_lock:
+            node = ctx.registry.get(node_id)
+            if not node:
+                raise KeyError(node_id)
+            assert_node_agent_runs_drained(ctx, node_id)
+            if node.get("managedNodeId"):
+                ctx.managed_node_store.update_node(
+                    node["managedNodeId"], {"desiredState": "deleted"}
+                )
+                ctx.registry.fence_managed_node(node_id)
+            else:
+                ctx.registry.delete(node_id)
+            remove_node_agents(ctx, node_id)
     except KeyError as error:
         raise HTTPException(404, "Daemon node not found.") from error
     except ValueError as error:
         raise HTTPException(409, str(error)) from error
-    remove_node_agents(ctx, node_id)
     return Response(status_code=204)
 
 

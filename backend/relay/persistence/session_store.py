@@ -44,6 +44,7 @@ class LocalSessionStore:
                 "workspacePath": payload["workspacePath"],
                 **({"ownerEmployeeId": payload["ownerEmployeeId"]} if payload.get("ownerEmployeeId") else {}),
                 **({"ownerAgentId": payload["ownerAgentId"]} if payload.get("ownerAgentId") else {}),
+                **({"teamId": payload["teamId"]} if payload.get("teamId") else {}),
                 "taskGoal": payload["taskGoal"],
                 "participants": payload.get("participants", ["human"]),
             })
@@ -252,6 +253,7 @@ class DatabaseSessionStore:
             "workspacePath": payload["workspacePath"],
             **({"ownerEmployeeId": payload["ownerEmployeeId"]} if payload.get("ownerEmployeeId") else {}),
             **({"ownerAgentId": payload["ownerAgentId"]} if payload.get("ownerAgentId") else {}),
+            **({"teamId": payload["teamId"]} if payload.get("teamId") else {}),
             "taskGoal": payload["taskGoal"],
             "participants": payload.get("participants", ["human"]),
         })]

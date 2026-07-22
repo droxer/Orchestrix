@@ -83,6 +83,184 @@ def test_employee_agent_admin_routes_require_admin(monkeypatch) -> None:
         )
 
 
+def test_unprovisioned_daemon_registration_cannot_mint_logical_agents(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        assert client.post(
+            "/cp/employees",
+            json={
+                "employeeId": "alice",
+                "username": "alice",
+                "password": "userpass",
+            },
+        ).status_code == 201
+
+        registered = client.post(
+            "/daemon-nodes/register",
+            headers={"Authorization": "Bearer untrusted_ui_token"},
+            json={
+                "sandboxId": "unprovisioned",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "stopped",
+            },
+        )
+
+        assert registered.status_code == 200
+        heartbeat = client.post(
+            "/daemon-nodes/register",
+            headers={"Authorization": "Bearer untrusted_ui_token"},
+            json={
+                "sandboxId": "unprovisioned",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            },
+        )
+        assert heartbeat.status_code == 200
+        assert client.get("/cp/agents?employeeId=alice").json()["agents"] == []
+
+
+def test_control_plane_provisioned_node_materializes_compatibility_agents(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        assert client.post(
+            "/cp/employees",
+            json={
+                "employeeId": "alice",
+                "username": "alice",
+                "password": "userpass",
+            },
+        ).status_code == 201
+        provisioned = client.post(
+            "/cp/daemon-nodes",
+            json={
+                "employeeId": "alice",
+                "workspacePath": "/workspace/alice",
+                "sandboxMode": "boxlite",
+            },
+        ).json()
+
+        registered = client.post(
+            "/daemon-nodes/register",
+            json={
+                "sandboxId": provisioned["node"]["id"],
+                "token": provisioned["nodeToken"],
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            },
+        )
+
+        assert registered.status_code == 200
+        agents = client.get("/cp/agents?employeeId=alice").json()["agents"]
+        assert any(agent["executorKind"] == "codex" for agent in agents)
+
+
+def test_agent_policies_are_rejected_until_runtime_enforcement_exists(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+        assert client.post(
+            "/cp/employees",
+            json={
+                "employeeId": "alice",
+                "username": "alice",
+                "password": "userpass",
+            },
+        ).status_code == 201
+
+        rejected_create = client.post(
+            "/cp/employees/alice/agents",
+            json={
+                "displayName": "Restricted",
+                "executorKind": "codex",
+                "toolPolicy": {"allowedTools": ["read"]},
+            },
+        )
+        assert rejected_create.status_code == 400
+        assert "runtime enforcement" in rejected_create.json()["detail"]
+
+        agent = client.post(
+            "/cp/employees/alice/agents",
+            json={"displayName": "Builder", "executorKind": "codex"},
+        ).json()["agent"]
+        rejected_update = client.patch(
+            f"/cp/agents/{agent['id']}",
+            json={"modelPolicy": {"model": "example"}},
+        )
+        assert rejected_update.status_code == 400
+        assert "runtime enforcement" in rejected_update.json()["detail"]
+
+
+def test_legacy_sandbox_run_blocks_unenforced_agent_policy(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        assert client.post(
+            "/cp/employees",
+            json={
+                "employeeId": "alice",
+                "username": "alice",
+                "password": "userpass",
+            },
+        ).status_code == 201
+        app.state.registry.register(
+            {
+                "sandboxId": "node_a",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }
+        )
+        agent = app.state.agent_store.ensure_compatibility_agent(
+            "alice", "codex", "node_a"
+        )
+        app.state.agent_placement_store.create_placement(agent, "node_a")
+        _write_json(
+            app.state.agent_store._snapshot_path(agent["id"]),
+            {**agent, "toolPolicy": {"allowedTools": ["read"]}},
+        )
+        assert client.post("/auth/logout").status_code == 200
+        assert client.post(
+            "/auth/login", json={"username": "alice", "password": "userpass"}
+        ).status_code == 200
+
+        response = client.post(
+            "/sandboxes/node_a/runs",
+            json={
+                "taskGoal": "Blocked legacy policy",
+                "assignments": [{"agent": "codex", "mode": "action"}],
+            },
+        )
+
+        assert response.status_code == 409
+        assert "agent_policy_unsupported" in response.json()["detail"]
+
+
 def test_employee_updates_own_agent_meta(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
@@ -364,6 +542,12 @@ def test_employee_dispatches_work_by_logical_agent_id(monkeypatch) -> None:
             ).status_code
             == 200
         )
+        updated = client.patch(
+            f"/agents/{agent['id']}",
+            json={"instructions": "Use the repository tests as evidence."},
+        )
+        assert updated.status_code == 200
+        assert updated.json()["agent"]["availability"] == "ready"
         response = client.post(
             "/agent-runs",
             json={
@@ -387,10 +571,24 @@ def test_employee_dispatches_work_by_logical_agent_id(monkeypatch) -> None:
         run = response.json()["agentRuns"][0]
         assert run["logicalAgentId"] == agent["id"]
         assert run["daemonNodeId"] == "node_a"
+        assert run["workspaceIdentity"] == {
+            "kind": "path",
+            "value": "/workspace/alice",
+        }
         commands = app.state.daemon_store.take_queued_commands("node_a")
         assert len(commands) == 1
         command = commands[0]["command"]
         assert command["logicalAgentId"] == agent["id"]
+        assert command["state"]["agent_instructions"] == (
+            "Use the repository tests as evidence."
+        )
+        assert client.post("/auth/logout").status_code == 200
+        assert client.post(
+            "/auth/login", json={"username": "admin", "password": "secret123"}
+        ).status_code == 200
+        deleting = client.delete(f"/cp/agents/{agent['id']}")
+        assert deleting.status_code == 409
+        assert not app.state.agent_store.get_agent(agent["id"]).get("deletedAt")
 
 
 def test_existing_session_dispatch_normalizes_legacy_agent_supervisor(monkeypatch) -> None:
@@ -970,3 +1168,51 @@ def test_employee_task_writes_require_named_agents_and_preserve_status(monkeypat
         assert cleared.json()["status"] == "blocked"
         assert "assignedAgent" not in cleared.json()
         assert "assignedAgentId" not in cleared.json()
+
+
+def test_manual_start_materializes_a_legacy_task_assignment(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        assert client.post(
+            "/cp/employees",
+            json={
+                "employeeId": "alice",
+                "username": "alice",
+                "password": "userpass",
+            },
+        ).status_code == 201
+        app.state.registry.register(
+            {
+                "sandboxId": "node_a",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }
+        )
+        legacy = app.state.task_store.create_task(
+            {
+                "title": "Start legacy work",
+                "ownerEmployeeId": "requester",
+                "assigneeEmployeeId": "alice",
+                "assignedAgent": "codex",
+                "status": "assigned",
+            }
+        )
+        assert client.post("/auth/logout").status_code == 200
+        assert client.post(
+            "/auth/login", json={"username": "alice", "password": "userpass"}
+        ).status_code == 200
+
+        started = client.post(f"/tasks/{legacy['id']}/start", json={})
+
+        assert started.status_code == 202
+        updated = app.state.task_store.get_task(legacy["id"])
+        agent = app.state.agent_store.get_agent(updated["assignedAgentId"])
+        assert agent["compatibilityKey"] == "alice:node_a:codex"
+        assert started.json()["session"]["agentRuns"][0]["logicalAgentId"] == agent["id"]

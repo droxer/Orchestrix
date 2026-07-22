@@ -10,7 +10,7 @@ import type {
   EmployeeRecord,
 } from "../../types";
 import type { AddNodeDrawerSuccess } from "./AddNodeDrawer";
-import { Drawer } from "./Drawer";
+import { Drawer } from "../ui/Drawer";
 import { ExecutionProfileField, type NodeLocation } from "./ExecutionProfileField";
 import { initialsOf, statusTone, visualStatus } from "./helpers";
 import { Button } from "@/components/ui/button";
@@ -361,7 +361,7 @@ export function AssignNodeDrawer({
         {error ? <div className="adm-form-error" role="alert">{error}</div> : null}
 
         <div className="adm-form-actions">
-          <Button
+          <Button size="cta"
             type="button"
             variant="ghost"
             onClick={() => void requestClose()}
@@ -369,7 +369,7 @@ export function AssignNodeDrawer({
           >
             {t("admin.v2.cancel")}
           </Button>
-          <Button type="submit" disabled={isBusy || !canSubmit}>
+          <Button size="cta" type="submit" disabled={isBusy || !canSubmit}>
             {isBusy
               ? creatingNode ? t("admin.creating") : t("admin.assigning")
               : creatingNode

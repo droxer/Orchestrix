@@ -1,6 +1,7 @@
 "use client";
 
 import { ActionRemove } from "../icons";
+import { cn } from "@/lib/utils";
 import { Button } from "./button";
 
 type OverlayCloseButtonProps = {
@@ -9,14 +10,16 @@ type OverlayCloseButtonProps = {
   className?: string;
 };
 
-/** Shared dismiss control for drawers and centered modals. */
+/** Shared dismiss control for drawers and centered modals. Geometry comes from
+ *  the Button primitive (icon-lg = 36px, rounded-full); `.overlay-close` only
+ *  contributes color/hover/focus and the header offset. */
 export function OverlayCloseButton({ label, onClick, className = "overlay-close" }: OverlayCloseButtonProps) {
   return (
     <Button
       variant="ghost"
-      size="icon"
+      size="icon-lg"
       type="button"
-      className={className}
+      className={cn("rounded-full", className)}
       aria-label={label}
       title={label}
       onClick={onClick}

@@ -178,6 +178,54 @@ def test_legacy_managed_node_with_retired_policy_can_be_deleted(monkeypatch) -> 
         assert deleted.json()["node"]["desiredState"] == "deleted"
 
 
+def test_managed_node_runtime_cannot_be_drained_or_retired_during_active_run(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _login_admin(client)
+
+        managed = app.state.managed_node_store.create_node({"employeeId": "alice"})
+        runtime_id = "sbx_busy_managed"
+        app.state.managed_node_store._write_node(
+            {
+                **managed,
+                "activeDaemonNodeId": runtime_id,
+                "phase": "ready",
+            }
+        )
+        app.state.registry.register(
+            {
+                "sandboxId": runtime_id,
+                "employeeId": "alice",
+                "token": "node_token",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }
+        )
+        app.state.registry.daemon_store.create_run_request(
+            {
+                "nodeId": runtime_id,
+                "sessionId": "session_busy_managed",
+                "taskGoal": "Keep this runtime busy",
+                "assignments": [],
+                "state": {},
+            }
+        )
+
+        drained = client.post(f"/cp/managed-nodes/{managed['id']}/drain")
+        retired = client.delete(f"/cp/managed-nodes/{managed['id']}/runtime")
+
+        assert drained.status_code == 409
+        assert retired.status_code == 409
+        assert app.state.registry.get(runtime_id) is not None
+        assert app.state.managed_node_store.get_node(managed["id"])["desiredState"] == "running"
+
+
 def test_failed_managed_node_is_visible_as_failed(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
@@ -1416,6 +1464,15 @@ def test_admin_can_soft_delete_employee_and_unassign_nodes(monkeypatch) -> None:
             "/cp/employees/alice/agents",
             json={"displayName": "Builder", "executorKind": "codex"},
         ).json()["agent"]
+        team = client.post(
+            "/cp/teams",
+            json={
+                "ownerEmployeeId": "alice",
+                "name": "Delivery",
+                "leadAgentId": agent["id"],
+                "memberAgentIds": [agent["id"]],
+            },
+        ).json()["team"]
         placement = client.post(
             f"/cp/agents/{agent['id']}/placements",
             json={"daemonNodeId": node_id},
@@ -1446,6 +1503,9 @@ def test_admin_can_soft_delete_employee_and_unassign_nodes(monkeypatch) -> None:
         assert body["removedPlacements"] == [placement["id"]]
         assert body["deletedManagedNodes"] == [managed_node["id"]]
         assert app.state.employee_agent_store.get_agent(agent["id"])["enabled"] is False
+        cleaned_team = app.state.team_store.get_team(team["id"])
+        assert cleaned_team["memberAgentIds"] == []
+        assert cleaned_team["leadAgentId"] is None
         assert app.state.agent_placement_store.get_placement(placement["id"])["desiredState"] == "removed"
         assert app.state.managed_node_store.get_node(managed_node["id"])["desiredState"] == "deleted"
         assert employee_client.get("/auth/me").status_code == 401

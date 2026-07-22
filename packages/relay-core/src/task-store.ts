@@ -43,6 +43,8 @@ export interface RelayTask {
   occurrenceIds?: string[];
   assignedAgent?: AgentName;
   assignedAgentId?: string;
+  /** Named team responsible for dispatching this task through its lead agent. */
+  assignedTeamId?: string;
   dispatchClaim?: { id: string; claimedAt: string; expiresAt: string };
   dispatchOutcome?: {
     state: "started" | "queued" | "rejected";
@@ -101,6 +103,13 @@ export type RelayTaskEvent =
       timestamp: string;
       agent: AgentName;
       agentId?: string;
+    }
+  | {
+      id: string;
+      type: "task.assigned";
+      taskId: string;
+      timestamp: string;
+      teamId: string;
     }
   | {
       id: string;
@@ -384,16 +393,23 @@ export class LocalTaskStore implements TaskStore {
 export function relayTaskEvent<T extends RelayTaskEvent["type"]>(
   type: T,
   taskId: string,
-  payload: Omit<Extract<RelayTaskEvent, { type: T }>, "id" | "type" | "taskId" | "timestamp">,
+  payload: RelayTaskEventPayload<T>,
 ): Extract<RelayTaskEvent, { type: T }> {
   return {
     id: newRelayId("evt"),
     type,
     taskId,
     timestamp: nowIso(),
-    ...payload,
+    ...(payload as object),
   } as Extract<RelayTaskEvent, { type: T }>;
 }
+
+type RelayTaskEventPayload<T extends RelayTaskEvent["type"]> =
+  Extract<RelayTaskEvent, { type: T }> extends infer Event
+    ? Event extends RelayTaskEvent
+      ? Omit<Event, "id" | "type" | "taskId" | "timestamp">
+      : never
+    : never;
 
 export function materializeTaskEvents(events: RelayTaskEvent[]): RelayTask {
   const created = events.find((event): event is Extract<RelayTaskEvent, { type: "task.created" }> => event.type === "task.created");
@@ -437,12 +453,20 @@ export function materializeTaskEvents(events: RelayTaskEvent[]): RelayTask {
       }
       applyRoutineFields(task, event);
     } else if (event.type === "task.assigned") {
-      task.assignedAgent = event.agent;
-      if (event.agentId) task.assignedAgentId = event.agentId;
-      else delete task.assignedAgentId;
+      if ("teamId" in event) {
+        task.assignedTeamId = event.teamId;
+        delete task.assignedAgent;
+        delete task.assignedAgentId;
+      } else {
+        task.assignedAgent = event.agent;
+        if (event.agentId) task.assignedAgentId = event.agentId;
+        else delete task.assignedAgentId;
+        delete task.assignedTeamId;
+      }
     } else if (event.type === "task.unassigned") {
       delete task.assignedAgent;
       delete task.assignedAgentId;
+      delete task.assignedTeamId;
     } else if (event.type === "task.dispatch_claimed") {
       task.dispatchClaim = event.claim;
     } else if (event.type === "task.dispatch_released") {

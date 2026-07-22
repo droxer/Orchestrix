@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { agentReadyForTask, discussionAgentsForTask, dueTone, filterTasks, localDateKey, tasksByStatus, type BacklogFilters } from "../src/lib/backlog.js";
+import { agentReadyForTask, canDiscussTask, discussionAgentsForTask, dueTone, filterTasks, localDateKey, tasksByStatus, type BacklogFilters } from "../src/lib/backlog.js";
 import type { DaemonNodeMonitorRecord, EmployeeAgent, RelayTask } from "../src/types.js";
 
 const baseFilters: BacklogFilters = {
@@ -30,6 +30,7 @@ function task(input: Partial<RelayTask> & { id: string; title: string }): RelayT
     routineEnabled: input.routineEnabled ?? false,
     assignedAgent: input.assignedAgent,
     assignedAgentId: input.assignedAgentId,
+    assignedTeamId: input.assignedTeamId,
     linkedSessionIds: input.linkedSessionIds ?? [],
     activity: input.activity ?? [],
     createdAt: input.createdAt ?? "2026-06-01T00:00:00.000Z",
@@ -131,6 +132,12 @@ describe("agentReadyForTask", () => {
 });
 
 describe("discussionAgentsForTask", () => {
+  it("does not offer the implicit all-agent discussion for a named Team task", () => {
+    assert.equal(canDiscussTask(task({ id: "team", title: "Team work", assignedTeamId: "team_delivery" })), false);
+    assert.equal(canDiscussTask(task({ id: "agent", title: "Agent work", assignedAgentId: "agent_builder" })), true);
+    assert.equal(canDiscussTask(task({ id: "open", title: "Open discussion" })), true);
+  });
+
   it("uses ready logical agents without exposing their runtime nodes", () => {
     const backlogTask = task({ id: "a", title: "A", assigneeEmployeeId: "alice" });
     const base: Omit<EmployeeAgent, "id" | "displayName" | "executorKind"> = {

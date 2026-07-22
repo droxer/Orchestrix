@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 from fastapi import FastAPI
 from loguru import logger
 
-from .api import admin_routes, agent_routes, agent_workspace_routes, auth_routes, chat_routes, daemon_node_routes, managed_node_routes, node_workspace_routes, sandbox_routes, session_routes, task_routes, web_routes
+from .api import admin_routes, agent_routes, agent_workspace_routes, auth_routes, chat_routes, daemon_node_routes, managed_node_routes, node_workspace_routes, sandbox_routes, session_routes, task_routes, team_routes, web_routes
 from .core.environment import load_backend_env
 from .core.storage_config import database_url_from_env, use_postgres_storage
 from .persistence.stores import (
@@ -28,6 +28,7 @@ from .chat import DatabaseChatIntegrationStore, LocalChatIntegrationStore, probe
 from .tasks import TaskScheduler
 from .services.managed_nodes import LocalManagedNodeStore
 from .persistence.agent_store import DatabaseAgentStore, LocalAgentStore
+from .persistence.team_store import DatabaseTeamStore, LocalTeamStore
 from .persistence.agent_placement_store import DatabaseAgentPlacementStore, LocalAgentPlacementStore, reconcile_single_active_placement
 from .services.workspace_query import WorkspaceQueryBroker
 
@@ -48,6 +49,7 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     auth_store = auth_store_from_env(root_dir)
     managed_node_store = LocalManagedNodeStore(root_dir)
     agent_store = agent_store_from_env(root_dir)
+    team_store = team_store_from_env(root_dir)
     agent_placement_store = agent_placement_store_from_env(root_dir)
     # Heal any agent left with multiple active placements before the
     # one-agent-one-computer invariant (idempotent; a no-op once collapsed).
@@ -63,6 +65,7 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
         task_store=task_store,
         registry=registry,
         backend=backend,
+        team_store=team_store,
         managed_node_store=managed_node_store,
     )
 
@@ -89,6 +92,7 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     app.state.auth_store = auth_store
     app.state.managed_node_store = managed_node_store
     app.state.agent_store = agent_store
+    app.state.team_store = team_store
     app.state.employee_agent_store = agent_store  # compatibility for migrations still reading the old name
     app.state.agent_placement_store = agent_placement_store
     app.state.workspace_query_broker = WorkspaceQueryBroker()
@@ -118,6 +122,7 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
 
     app.include_router(auth_routes.router)
     app.include_router(agent_routes.router)
+    app.include_router(team_routes.router)
     app.include_router(agent_workspace_routes.router)
     app.include_router(node_workspace_routes.router)
     app.include_router(admin_routes.router)
@@ -146,6 +151,12 @@ def agent_store_from_env(root_dir: Path) -> Any:
     if not use_postgres_storage():
         return LocalAgentStore(root_dir)
     return DatabaseAgentStore(database_url_from_env(setting="RELAY_STORAGE=postgres"))
+
+
+def team_store_from_env(root_dir: Path) -> Any:
+    if not use_postgres_storage():
+        return LocalTeamStore(root_dir)
+    return DatabaseTeamStore(database_url_from_env(setting="RELAY_STORAGE=postgres"))
 
 
 def agent_placement_store_from_env(root_dir: Path) -> Any:
@@ -179,6 +190,7 @@ def task_scheduler_from_env(
     task_store: Any,
     registry: DaemonNodeRegistry,
     backend: ServerDaemonNodeBackend,
+    team_store: Any,
     managed_node_store: Any | None = None,
 ) -> TaskScheduler | None:
     enabled = os.environ.get("RELAY_TASK_SCHEDULER_ENABLED", "1").strip().lower()
@@ -188,6 +200,7 @@ def task_scheduler_from_env(
         task_store=task_store,
         registry=registry,
         backend=backend,
+        team_store=team_store,
         managed_node_store=managed_node_store,
         interval_seconds=float(os.environ.get("RELAY_TASK_SCHEDULER_INTERVAL_SECONDS", "10")),
         max_dispatches_per_tick=max(1, int(os.environ.get("RELAY_TASK_SCHEDULER_MAX_DISPATCHES", "5"))),

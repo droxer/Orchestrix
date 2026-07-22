@@ -270,12 +270,6 @@
   border-top: 1px solid var(--line-1);
 }
 
-.adm-form-actions [data-slot="button"] {
-  min-height: var(--control-h);
-  padding-inline: var(--sp-4);
-  font: var(--type-label-strong);
-}
-
 /* ── Drawer inline sections (placements, danger zone) ─────────────── */
 .adm-drawer-section {
   display: flex;
@@ -977,37 +971,9 @@
   }
 
   .adm-content-main { padding: var(--sp-4); }
-  .adm-emp-cols {
-    display: none;
-  }
 
-  .adm-emp-row {
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas:
-      "id delete"
-      "nodes nodes"
-      "metrics metrics";
-    gap: var(--sp-3);
-    align-items: start;
-  }
-
-  .adm-emp-id { grid-area: id; }
-  .adm-emp-nodes { grid-area: nodes; }
-  .adm-emp-metrics {
-    grid-area: metrics;
-    justify-content: flex-start;
-    padding-top: var(--sp-3);
-    border-top: 1px solid var(--line-2);
-  }
-
-  .adm-emp-metric {
-    align-items: flex-start;
-  }
-
-  .adm-emp-delete {
-    grid-area: delete;
-    justify-self: end;
-  }
+  /* Employee-row mobile layout lives with the row itself in
+     admin-v2-views.css (@media ≤720px) — one component, one breakpoint. */
 
   .adm-drawer { width: 100%; }
 }

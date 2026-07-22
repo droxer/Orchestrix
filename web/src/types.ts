@@ -89,6 +89,7 @@ export interface WorkspaceBriefSession {
   phase?: string;
   workspacePath?: string;
   ownerEmployeeId?: string;
+  teamId?: string;
   currentAgent?: AgentName;
   pendingDecision?: RelaySession["pendingDecision"];
   artifactCount: number;
@@ -106,6 +107,7 @@ export interface WorkspaceBriefTask {
   assigneeEmployeeId?: string;
   assignedAgent?: AgentName;
   assignedAgentId?: string;
+  assignedTeamId?: string;
   dueDate?: string;
   isRoutine: boolean;
   routineType?: TaskRoutineType;
@@ -119,6 +121,7 @@ export interface WorkspaceBriefTask {
 
 export interface WorkspaceBriefResponse {
   employeeId: string;
+  teamId?: string;
   workspacePath?: string;
   nodes: DaemonNodeMonitorRecord[];
   activeRuns: DaemonNodeMonitorRecord["activeRuns"];
@@ -355,6 +358,44 @@ export interface EmployeeAgentsResponse {
   agents: EmployeeAgent[];
 }
 
+export interface TeamMemberSummary {
+  id: string;
+  displayName: string;
+  executorKind: AgentName;
+  enabled: boolean;
+  availability: LogicalAgentAvailability;
+}
+
+export interface AgentTeam {
+  id: string;
+  ownerEmployeeId: string;
+  name: string;
+  leadAgentId?: string | null;
+  memberAgentIds: string[];
+  enabled: boolean;
+  members: TeamMemberSummary[];
+  lead?: TeamMemberSummary | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string;
+}
+
+export interface AgentTeamsResponse {
+  teams: AgentTeam[];
+}
+
+export interface TeamArtifactsResponse {
+  teamId: string;
+  artifacts: ArtifactIndexItem[];
+}
+
+export interface TeamMutationInput {
+  name: string;
+  leadAgentId: string;
+  memberAgentIds: string[];
+  enabled?: boolean;
+}
+
 export interface AgentRunInput {
   taskGoal: string;
   assignments: Array<{
@@ -412,6 +453,7 @@ export interface TaskMutationInput {
   routineNextRunDate?: string;
   routineEnabled?: boolean;
   assignedAgentId?: string | null;
+  assignedTeamId?: string | null;
 }
 
 export interface CreateTaskInput extends TaskMutationInput {

@@ -38,9 +38,6 @@
   --color-danger: var(--err);
   --color-warning: var(--warn);
   --color-info: var(--info);
-  --color-success-strong: var(--ok);
-  --color-danger-strong: var(--err);
-  --color-warning-strong: var(--warn);
   --color-brand-soft: var(--action-soft);
 
   /* Radii → rounded-* utilities. */

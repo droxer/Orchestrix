@@ -102,6 +102,7 @@ export const NavBacklog = withStandardStroke(ListTodo, "NavBacklog");
 export const NavChannels = withStandardStroke(Hash, "NavChannels");
 export const NavRoutine = withStandardStroke(CalendarClock, "NavRoutine");
 export const NavAgents = withStandardStroke(Bot, "NavAgents");
+export const NavTeams = withStandardStroke(Users, "NavTeams");
 export const NavPreferences = withStandardStroke(Settings, "NavPreferences");
 export const NavLogout = withStandardStroke(LogOut, "NavLogout");
 export const NavRefresh = withStandardStroke(RefreshCw, "NavRefresh");

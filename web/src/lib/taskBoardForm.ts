@@ -8,6 +8,7 @@ export type TaskBoardFormBase = {
   assigneeEmployeeId: string;
   assignedAgent: "" | AgentName;
   assignedAgentId?: string;
+  assignedTeamId?: string;
 };
 
 export type BacklogTaskFormState = TaskBoardFormBase & {
@@ -37,6 +38,7 @@ export function emptyBacklogForm(currentUser: CurrentUser): BacklogTaskFormState
     assigneeEmployeeId: currentUser.employeeId ?? currentUser.username,
     assignedAgent: "",
     assignedAgentId: "",
+    assignedTeamId: "",
   };
 }
 
@@ -49,6 +51,7 @@ export function emptyRoutineForm(currentUser: CurrentUser, date = new Date()): R
     assigneeEmployeeId: currentUser.employeeId ?? currentUser.username,
     assignedAgent: "",
     assignedAgentId: "",
+    assignedTeamId: "",
     routineType: "task",
     routineCadence: "weekly",
     routineNextRunDate: nextRoutineRunDate("weekly", date),
@@ -80,6 +83,7 @@ export function taskBoardFormsEqual(a: TaskBoardFormState, b: TaskBoardFormState
     || a.assigneeEmployeeId !== b.assigneeEmployeeId
     || a.assignedAgent !== b.assignedAgent
     || a.assignedAgentId !== b.assignedAgentId
+    || a.assignedTeamId !== b.assignedTeamId
   ) {
     return false;
   }
@@ -93,6 +97,38 @@ export function taskBoardFormsEqual(a: TaskBoardFormState, b: TaskBoardFormState
       && a.routineEnabled === b.routineEnabled;
   }
   return false;
+}
+
+export type TaskAssignmentSelection =
+  | { kind: "none" }
+  | { kind: "agent"; id: string }
+  | { kind: "team"; id: string };
+
+export function parseTaskAssignmentValue(value: string): TaskAssignmentSelection {
+  if (value.startsWith("team:") && value.length > 5) {
+    return { kind: "team", id: value.slice(5) };
+  }
+  if (value.startsWith("agent:") && value.length > 6) {
+    return { kind: "agent", id: value.slice(6) };
+  }
+  return { kind: "none" };
+}
+
+export function taskAssignmentValue(form: TaskBoardFormState): string {
+  if (form.assignedTeamId) return `team:${form.assignedTeamId}`;
+  if (form.assignedAgentId) return `agent:${form.assignedAgentId}`;
+  return "__none__";
+}
+
+export function teamAssignmentPatch(teamId: string): Pick<
+  TaskBoardFormBase,
+  "assignedAgent" | "assignedAgentId" | "assignedTeamId"
+> {
+  return {
+    assignedAgent: "",
+    assignedAgentId: "",
+    assignedTeamId: teamId,
+  };
 }
 
 function localDateKey(date: Date): string {

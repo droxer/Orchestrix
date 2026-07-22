@@ -147,6 +147,8 @@ def materialize_events(events: list[dict[str, Any]]) -> dict[str, Any]:
         session["ownerEmployeeId"] = created["ownerEmployeeId"]
     if created.get("ownerAgentId"):
         session["ownerAgentId"] = created["ownerAgentId"]
+    if created.get("teamId"):
+        session["teamId"] = created["teamId"]
     for event in events:
         session["events"].append(event)
         session["updatedAt"] = event["timestamp"]
@@ -195,6 +197,11 @@ def materialize_events(events: list[dict[str, Any]]) -> dict[str, Any]:
                         **(
                             {"agentVersion": event["agentVersion"]}
                             if event.get("agentVersion")
+                            else {}
+                        ),
+                        **(
+                            {"workspaceIdentity": event["workspaceIdentity"]}
+                            if event.get("workspaceIdentity")
                             else {}
                         ),
                     }
@@ -310,14 +317,21 @@ def materialize_task_events(events: list[dict[str, Any]]) -> dict[str, Any]:
                         task[key] = event[key]
             _apply_task_routine_fields(task, event)
         elif event_type == "task.assigned":
-            task["assignedAgent"] = event["agent"]
-            if event.get("agentId"):
-                task["assignedAgentId"] = event["agentId"]
-            else:
+            if event.get("teamId"):
+                task["assignedTeamId"] = event["teamId"]
+                task.pop("assignedAgent", None)
                 task.pop("assignedAgentId", None)
+            else:
+                task["assignedAgent"] = event["agent"]
+                if event.get("agentId"):
+                    task["assignedAgentId"] = event["agentId"]
+                else:
+                    task.pop("assignedAgentId", None)
+                task.pop("assignedTeamId", None)
         elif event_type == "task.unassigned":
             task.pop("assignedAgent", None)
             task.pop("assignedAgentId", None)
+            task.pop("assignedTeamId", None)
         elif event_type == "task.dispatch_claimed":
             task["dispatchClaim"] = event["claim"]
         elif event_type == "task.dispatch_released":

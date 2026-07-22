@@ -56,6 +56,8 @@ export interface RelaySession {
   workspacePath: string;
   /** Employee who owns this session; their agent runs the work on their behalf. */
   ownerEmployeeId?: string;
+  /** Named Team that originated this session, retained as immutable provenance. */
+  teamId?: string;
   /** Optional human-set label for the conversation; falls back to taskGoal when unset. */
   title?: string;
   taskGoal: string;
@@ -83,6 +85,7 @@ export type RelayEvent =
       timestamp: string;
       workspacePath: string;
       ownerEmployeeId?: string;
+      teamId?: string;
       taskGoal: string;
       participants: string[];
     }
@@ -193,6 +196,7 @@ export interface SessionStore {
   createSession(input: {
     workspacePath: string;
     ownerEmployeeId?: string;
+    teamId?: string;
     taskGoal: string;
     participants?: string[];
     status?: SessionStatus;
@@ -245,6 +249,7 @@ export class LocalSessionStore implements SessionStore {
   async createSession(input: {
     workspacePath: string;
     ownerEmployeeId?: string;
+    teamId?: string;
     taskGoal: string;
     participants?: string[];
     status?: SessionStatus;
@@ -256,6 +261,7 @@ export class LocalSessionStore implements SessionStore {
     const event = relayEvent("session.created", sessionId, {
       workspacePath: input.workspacePath,
       ...(input.ownerEmployeeId ? { ownerEmployeeId: input.ownerEmployeeId } : {}),
+      ...(input.teamId ? { teamId: input.teamId } : {}),
       taskGoal: input.taskGoal,
       participants: input.participants ?? ["human"],
     });
@@ -399,6 +405,7 @@ export function materializeEvents(events: RelayEvent[]): RelaySession {
     id: created.sessionId,
     workspacePath: created.workspacePath,
     ...(created.ownerEmployeeId ? { ownerEmployeeId: created.ownerEmployeeId } : {}),
+    ...(created.teamId ? { teamId: created.teamId } : {}),
     taskGoal: created.taskGoal,
     participants: created.participants,
     status: "running",

@@ -116,9 +116,9 @@ file copying.
 | `executorKind` | enum | `claude`, `pi`, `codex`, or `kimi`. |
 | `defaultRole` | enum | Existing Relay role vocabulary. |
 | `instructions` | string, nullable | Agent-specific control-plane instructions. |
-| `skillPolicy` | JSON | Allowed or required skill references. |
-| `toolPolicy` | JSON | MCP/tool allowlist and approval policy. |
-| `modelPolicy` | JSON | Optional model and reasoning constraints. |
+| `skillPolicy` | JSON | Reserved for a future enforced skill policy. Non-empty values are rejected and legacy values block dispatch. |
+| `toolPolicy` | JSON | Reserved for a future enforced tool policy. Non-empty values are rejected and legacy values block dispatch. |
+| `modelPolicy` | JSON | Reserved for a future enforced model policy. Non-empty values are rejected and legacy values block dispatch. |
 | `enabled` | boolean | Disabled agents cannot receive new work. |
 | `version` | integer | Incremented for placement-relevant configuration changes. |
 | `createdAt` / `updatedAt` | timestamp | Audit timestamps. |
@@ -145,7 +145,9 @@ not unique: an employee may own both `Researcher` and `Reviewer` using Claude.
 | `createdAt` / `updatedAt` | timestamp | Audit timestamps. |
 
 The initial implementation supports one placement for a logical agent. The
-schema permits several placements for failover and later horizontal capacity.
+schema permits several historical placement records, but moving an agent
+atomically removes its previous active placement. Multi-placement failover and
+horizontal capacity remain future work.
 
 ### Daemon runtime capability
 
@@ -195,8 +197,9 @@ owned by the session employee.
 - An employee may use agents they own or agents explicitly shared with them.
 - A non-admin cannot select an arbitrary daemon node or placement.
 - Placement selection occurs only after agent authorization succeeds.
-- Agent tool policy can further restrict employee permissions but cannot widen
-  them.
+- Non-empty agent policy fields are rejected until the daemon can enforce them,
+  and pre-existing non-empty policy metadata makes an agent undispatchable; the
+  API must never present stored policy metadata as an effective control.
 - Administrators manage placements and runtime nodes; employees manage only
   agent settings permitted by policy.
 - Audit events record the employee, logical agent, placement, daemon node,
@@ -319,8 +322,11 @@ presented as employee ownership.
 
 - Existing `AgentName` remains the executor-kind type until a later rename.
 - Existing sessions and tasks without `agentId` remain executable.
-- One compatibility agent is created per `(employeeId, executorKind)` observed
-  in existing assignments or assigned daemon capabilities.
+- One compatibility agent is created per
+  `(employeeId, daemonNodeId, executorKind)` observed in assigned daemon
+  capabilities. This preserves the current employee-facing model in which each
+  computer contributes its own agent entries while allowing custom logical
+  agents to move between computers without changing identity.
 - Existing node-level disabled-agent and role-default settings remain enforced
   until equivalent placement/agent policy is materialized.
 - Daemons can upgrade independently because the backend accepts both old

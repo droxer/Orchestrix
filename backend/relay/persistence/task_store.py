@@ -23,6 +23,7 @@ from sqlalchemy import (
     case,
     create_engine,
     insert,
+    or_,
     select,
     update,
 )
@@ -120,16 +121,25 @@ class LocalTaskStore:
                     },
                 )
             ]
-            if payload.get("assignedAgent"):
+            if payload.get("assignedAgent") or payload.get("assignedTeamId"):
                 events.append(
                     relay_task_event(
                         "task.assigned",
                         task_id,
                         {
-                            "agent": payload["assignedAgent"],
+                            **(
+                                {"agent": payload["assignedAgent"]}
+                                if payload.get("assignedAgent")
+                                else {}
+                            ),
                             **(
                                 {"agentId": payload["assignedAgentId"]}
                                 if payload.get("assignedAgentId")
+                                else {}
+                            ),
+                            **(
+                                {"teamId": payload["assignedTeamId"]}
+                                if payload.get("assignedTeamId")
                                 else {}
                             ),
                         },
@@ -207,7 +217,7 @@ class LocalTaskStore:
             for task in self.list_tasks()
             if task.get("status") == "assigned"
             and not task.get("isRoutine")
-            and task.get("assignedAgent")
+            and (task.get("assignedAgent") or task.get("assignedTeamId"))
         ]
         ordered = sorted(tasks, key=task_claim_sort_key)
         return ordered[:limit] if limit is not None else ordered
@@ -246,6 +256,7 @@ class LocalTaskStore:
             task
             for task in self.list_dispatchable_tasks()
             if task.get("assignedAgent") == agent
+            and not task.get("assignedTeamId")
             and (
                 not assignee_employee_id
                 or task.get("assigneeEmployeeId") == assignee_employee_id
@@ -333,7 +344,7 @@ class LocalTaskStore:
             if not routine_due_for_promotion(routine, today):
                 return None
             agent = routine.get("assignedAgent") or agent_override
-            if not agent:
+            if not agent and not routine.get("assignedTeamId"):
                 return None
             occurrence_events = routine_occurrence_events(routine, agent)
             occurrence = materialize_task_events(occurrence_events)
@@ -401,6 +412,15 @@ class LocalTaskStore:
             task_id, f"Assigned to logical agent {agent_id}.", {"agent": agent}
         )
 
+    def set_task_team_assignment(
+        self, task_id: str, team_id: str
+    ) -> dict[str, Any]:
+        self.append_event(
+            task_id,
+            relay_task_event("task.assigned", task_id, {"teamId": team_id}),
+        )
+        return self.record_activity(task_id, f"Assigned to team {team_id}.")
+
     def unassign_task(self, task_id: str) -> dict[str, Any]:
         self.append_event(task_id, relay_task_event("task.unassigned", task_id, {}))
         return self.record_activity(task_id, "Agent assignment cleared.")
@@ -465,6 +485,7 @@ class DatabaseTaskStore:
         Column("status", Text, nullable=False),
         Column("assigned_agent", Text, nullable=True),
         Column("assigned_agent_id", Text, nullable=True),
+        Column("assigned_team_id", Text, nullable=True),
         Column("owner_employee_id", Text, nullable=True),
         Column("assignee_employee_id", Text, nullable=True),
         Column("due_date", Date, nullable=True),
@@ -582,16 +603,25 @@ class DatabaseTaskStore:
                 },
             )
         ]
-        if payload.get("assignedAgent"):
+        if payload.get("assignedAgent") or payload.get("assignedTeamId"):
             events.append(
                 relay_task_event(
                     "task.assigned",
                     task_id,
                     {
-                        "agent": payload["assignedAgent"],
+                        **(
+                            {"agent": payload["assignedAgent"]}
+                            if payload.get("assignedAgent")
+                            else {}
+                        ),
                         **(
                             {"agentId": payload["assignedAgentId"]}
                             if payload.get("assignedAgentId")
+                            else {}
+                        ),
+                        **(
+                            {"teamId": payload["assignedTeamId"]}
+                            if payload.get("assignedTeamId")
                             else {}
                         ),
                     },
@@ -734,7 +764,12 @@ class DatabaseTaskStore:
         statement = (
             select(self.tasks.c.snapshot)
             .where(self.tasks.c.status == "assigned")
-            .where(self.tasks.c.assigned_agent.is_not(None))
+            .where(
+                or_(
+                    self.tasks.c.assigned_agent.is_not(None),
+                    self.tasks.c.assigned_team_id.is_not(None),
+                )
+            )
             .where(self.tasks.c.is_routine.is_(False))
             .order_by(
                 _priority_order_expression(),
@@ -784,6 +819,7 @@ class DatabaseTaskStore:
             task
             for task in self.list_dispatchable_tasks()
             if task.get("assignedAgent") == agent
+            and not task.get("assignedTeamId")
             and (
                 not assignee_employee_id
                 or task.get("assigneeEmployeeId") == assignee_employee_id
@@ -924,7 +960,7 @@ class DatabaseTaskStore:
             if not routine_due_for_promotion(routine, today):
                 return None
             agent = routine.get("assignedAgent") or agent_override
-            if not agent:
+            if not agent and not routine.get("assignedTeamId"):
                 return None
 
             occurrence_events = routine_occurrence_events(routine, agent)
@@ -1007,6 +1043,15 @@ class DatabaseTaskStore:
         return self.record_activity(
             task_id, f"Assigned to logical agent {agent_id}.", {"agent": agent}
         )
+
+    def set_task_team_assignment(
+        self, task_id: str, team_id: str
+    ) -> dict[str, Any]:
+        self.append_event(
+            task_id,
+            relay_task_event("task.assigned", task_id, {"teamId": team_id}),
+        )
+        return self.record_activity(task_id, f"Assigned to team {team_id}.")
 
     def unassign_task(self, task_id: str) -> dict[str, Any]:
         self.append_event(task_id, relay_task_event("task.unassigned", task_id, {}))
@@ -1104,6 +1149,7 @@ def task_to_row(
         "status": task["status"],
         "assigned_agent": task.get("assignedAgent"),
         "assigned_agent_id": task.get("assignedAgentId"),
+        "assigned_team_id": task.get("assignedTeamId"),
         "owner_employee_id": task.get("ownerEmployeeId"),
         "assignee_employee_id": task.get("assigneeEmployeeId"),
         "due_date": _parse_date(task.get("dueDate")),
@@ -1185,7 +1231,7 @@ def routine_due_for_promotion(routine: dict[str, Any], today: str) -> bool:
 
 
 def routine_occurrence_events(
-    routine: dict[str, Any], agent: AgentName
+    routine: dict[str, Any], agent: AgentName | None
 ) -> list[dict[str, Any]]:
     occurrence_id = new_relay_id("task")
     events = [
@@ -1217,10 +1263,15 @@ def routine_occurrence_events(
             "task.assigned",
             occurrence_id,
             {
-                "agent": agent,
+                **({"agent": agent} if agent else {}),
                 **(
                     {"agentId": routine["assignedAgentId"]}
                     if routine.get("assignedAgentId")
+                    else {}
+                ),
+                **(
+                    {"teamId": routine["assignedTeamId"]}
+                    if routine.get("assignedTeamId")
                     else {}
                 ),
             },
@@ -1235,7 +1286,7 @@ def routine_occurrence_events(
 def routine_promotion_events(
     routine_id: str,
     occurrence_id: str,
-    agent: AgentName,
+    agent: AgentName | None,
     scheduled_for: str,
     next_run_date: str | None,
 ) -> list[dict[str, Any]]:
@@ -1264,7 +1315,7 @@ def routine_promotion_events(
                     "id": new_relay_id("act"),
                     "createdAt": now_iso(),
                     "message": f"Routine occurrence created: {occurrence_id}.",
-                    "agent": agent,
+                    **({"agent": agent} if agent else {}),
                 }
             },
         ),

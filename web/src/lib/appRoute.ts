@@ -1,6 +1,6 @@
 import type { AppRoute, MobileView } from "./viewTypes.js";
 
-const WORK_ROUTES = new Set<AppRoute>(["backlog", "routine", "agents", "channels", "admin"]);
+const WORK_ROUTES = new Set<AppRoute>(["backlog", "routine", "agents", "teams", "channels", "admin"]);
 
 export type AppHashState = {
   route: AppRoute;

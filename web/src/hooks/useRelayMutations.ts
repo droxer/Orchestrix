@@ -7,6 +7,8 @@ import {
   assignTask,
   cancelRun,
   createTask,
+  createTeam,
+  deleteTeam,
   deleteTask,
   recordDecision,
   renameSession,
@@ -14,11 +16,13 @@ import {
   runLogicalAgents,
   startTask,
   updateTask,
+  updateTeam,
 } from "../api";
-import type { AgentRunInput, AgentTaskMode, CreateTaskInput, RelaySession, RunInput, TaskMutationInput } from "../types";
+import type { AgentRunInput, AgentTaskMode, CreateTaskInput, RelaySession, RunInput, TaskMutationInput, TeamMutationInput } from "../types";
 import { RELAY_QUERY_KEY } from "./useRelayData";
 import { useMutationError } from "./useMutationError";
 import { useDialogs } from "../components/ui/DialogProvider";
+import { TEAMS_QUERY_KEY } from "./useTeams";
 
 type TokenArg = { token?: string };
 
@@ -29,6 +33,7 @@ export function useRelayMutations() {
   const { reportMutationError } = useMutationError();
 
   const invalidateRelay = () => queryClient.invalidateQueries({ queryKey: RELAY_QUERY_KEY });
+  const invalidateTeams = () => queryClient.invalidateQueries({ queryKey: [TEAMS_QUERY_KEY] });
 
   const onRelayError = (context: string, messageKey: string) => (error: unknown) => {
     reportMutationError(context, error, t(messageKey));
@@ -128,6 +133,34 @@ export function useRelayMutations() {
     onError: onRelayError("Failed to start task", "errors.task_action"),
   });
 
+  const createTeamMutation = useMutation({
+    mutationFn: (input: TeamMutationInput) => createTeam(input),
+    onSuccess: () => {
+      void invalidateTeams();
+      void invalidateRelay();
+    },
+    onError: onRelayError("Failed to create team", "errors.save_team"),
+  });
+
+  const updateTeamMutation = useMutation({
+    mutationFn: ({ teamId, input }: { teamId: string; input: Partial<TeamMutationInput> }) =>
+      updateTeam(teamId, input),
+    onSuccess: () => {
+      void invalidateTeams();
+      void invalidateRelay();
+    },
+    onError: onRelayError("Failed to update team", "errors.save_team"),
+  });
+
+  const deleteTeamMutation = useMutation({
+    mutationFn: (teamId: string) => deleteTeam(teamId),
+    onSuccess: () => {
+      void invalidateTeams();
+      void invalidateRelay();
+    },
+    onError: onRelayError("Failed to delete team", "errors.delete_team"),
+  });
+
   return {
     renameSessionMutation,
     archiveSessionMutation,
@@ -140,6 +173,9 @@ export function useRelayMutations() {
     deleteTaskMutation,
     assignTaskMutation,
     startTaskMutation,
+    createTeamMutation,
+    updateTeamMutation,
+    deleteTeamMutation,
     invalidateRelay,
   };
 }

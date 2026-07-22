@@ -9,7 +9,7 @@ import type {
   CreateManagedNodeResponse,
   EmployeeRecord,
 } from "../../types";
-import { Drawer } from "./Drawer";
+import { Drawer } from "../ui/Drawer";
 import { ExecutionProfileField, type NodeLocation } from "./ExecutionProfileField";
 import { Button } from "@/components/ui/button";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
@@ -234,10 +234,10 @@ export function AddNodeDrawer({
         {error ? <div className="adm-form-error" role="alert">{error}</div> : null}
 
         <div className="adm-form-actions">
-          <Button type="button" variant="ghost" onClick={() => void requestClose()} disabled={isBusy}>
+          <Button size="cta" type="button" variant="ghost" onClick={() => void requestClose()} disabled={isBusy}>
             {t("admin.v2.cancel")}
           </Button>
-          <Button type="submit" disabled={isBusy || (isManaged && !employeeId) || (!isManaged && !workspacePath.trim())}>
+          <Button size="cta" type="submit" disabled={isBusy || (isManaged && !employeeId) || (!isManaged && !workspacePath.trim())}>
             {isBusy ? t("admin.creating") : t(isManaged ? "admin.v2.provision_node" : "admin.v2.generate_node")}
           </Button>
         </div>

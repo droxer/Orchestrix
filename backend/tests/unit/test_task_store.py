@@ -575,3 +575,44 @@ def test_database_task_store_delete_hides_task_everywhere() -> None:
         assert_store_delete_hides_task_everywhere(
             DatabaseTaskStore(f"sqlite:///{root}/relay.db", create_schema=True)
         )
+
+
+def assert_team_assignment_contract(store) -> None:
+    task = store.create_task(
+        {
+            "title": "Ship together",
+            "ownerEmployeeId": "alice",
+            "assigneeEmployeeId": "alice",
+            "assignedTeamId": "team_delivery",
+            "status": "assigned",
+        }
+    )
+
+    assert task["assignedTeamId"] == "team_delivery"
+    assert "assignedAgent" not in task
+    assert store.list_dispatchable_tasks()[0]["id"] == task["id"]
+    assert store.claim_next_task_for_agent("codex", "alice") is None
+
+    assigned = store.set_task_assignment(task["id"], "codex", "agent_builder")
+    assert assigned["assignedAgentId"] == "agent_builder"
+    assert "assignedTeamId" not in assigned
+
+    reassigned = store.set_task_team_assignment(task["id"], "team_delivery")
+    assert reassigned["assignedTeamId"] == "team_delivery"
+    assert "assignedAgentId" not in reassigned
+
+    cleared = store.unassign_task(task["id"])
+    assert "assignedTeamId" not in cleared
+    assert "assignedAgentId" not in cleared
+
+
+def test_local_task_store_team_assignment_contract() -> None:
+    with TemporaryDirectory() as root:
+        assert_team_assignment_contract(LocalTaskStore(root))
+
+
+def test_database_task_store_team_assignment_contract() -> None:
+    with TemporaryDirectory() as root:
+        assert_team_assignment_contract(
+            DatabaseTaskStore(f"sqlite:///{root}/team-tasks.db", create_schema=True)
+        )

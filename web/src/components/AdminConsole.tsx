@@ -381,7 +381,7 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
                 aria-atomic="true"
               >
                 <span className="adm-live-dot offline" aria-hidden="true" />
-                <span className="adm-command-status-text text-danger-strong">
+                <span className="adm-command-status-text text-danger">
                   {t("admin.fetch_error", { message: headerError })}
                 </span>
               </span>

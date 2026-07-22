@@ -123,6 +123,66 @@ def test_employee_cannot_route_another_employees_agent(tmp_path: Path) -> None:
     assert error.value.code == "agent_forbidden"
 
 
+def test_managed_capacity_does_not_replace_a_healthy_local_placement(
+    tmp_path: Path,
+) -> None:
+    agents = LocalAgentStore(tmp_path)
+    placements = LocalAgentPlacementStore(tmp_path)
+    agent = agents.create_agent(
+        "alice", {"displayName": "Builder", "executorKind": "codex"}
+    )
+    local_placement = placements.create_placement(agent, "node_local")
+    local_node = {**node("node_local", "codex"), "employeeId": "alice"}
+    managed_node = {
+        **node("node_managed", "codex"),
+        "employeeId": "alice",
+        "managedNodeId": "managed_alice",
+    }
+
+    [resolved] = resolve_agent_assignments(
+        [{"agentId": agent["id"], "mode": "action"}],
+        employee_id="alice",
+        is_admin=False,
+        agent_store=agents,
+        placement_store=placements,
+        daemon_nodes=[local_node, managed_node],
+    )
+
+    assert resolved["daemonNodeId"] == "node_local"
+    active = placements.list_placements(agent_id=agent["id"])
+    assert [placement["id"] for placement in active] == [local_placement["id"]]
+
+
+def test_legacy_nonempty_policy_blocks_dispatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    agents = LocalAgentStore(tmp_path)
+    placements = LocalAgentPlacementStore(tmp_path)
+    agent = agents.create_agent(
+        "alice", {"displayName": "Restricted", "executorKind": "codex"}
+    )
+    placements.create_placement(agent, "node_a")
+    get_agent = agents.get_agent
+
+    def legacy_agent(agent_id: str) -> dict | None:
+        current = get_agent(agent_id)
+        return {**current, "toolPolicy": {"allowedTools": ["read"]}} if current else None
+
+    monkeypatch.setattr(agents, "get_agent", legacy_agent)
+
+    with pytest.raises(AgentRoutingError) as error:
+        resolve_agent_assignments(
+            [{"agentId": agent["id"], "mode": "action"}],
+            employee_id="alice",
+            is_admin=False,
+            agent_store=agents,
+            placement_store=placements,
+            daemon_nodes=[node("node_a", "codex")],
+        )
+
+    assert error.value.code == "agent_policy_unsupported"
+
+
 def test_canonical_workspace_id_allows_different_node_paths(tmp_path: Path) -> None:
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
@@ -212,6 +272,163 @@ def test_different_workspace_ids_reject_cross_node_workflow(tmp_path: Path) -> N
         )
 
     assert error.value.code == "workspace_unavailable"
+
+
+def test_node_affine_session_rejects_followup_on_different_node(
+    tmp_path: Path,
+) -> None:
+    agents = LocalAgentStore(tmp_path)
+    placements = LocalAgentPlacementStore(tmp_path)
+    first = agents.create_agent(
+        "alice", {"displayName": "First", "executorKind": "claude"}
+    )
+    second = agents.create_agent(
+        "alice", {"displayName": "Second", "executorKind": "codex"}
+    )
+    first_placement = placements.create_placement(first, "node_a")
+    placements.create_placement(second, "node_b")
+    session = {
+        "id": "ses_existing",
+        "workspacePath": "/workspace/alice",
+        "agentRuns": [
+            {
+                "logicalAgentId": first["id"],
+                "placementId": first_placement["id"],
+                "daemonNodeId": "node_a",
+            }
+        ],
+    }
+
+    with pytest.raises(AgentRoutingError) as error:
+        resolve_agent_assignments(
+            [{"agentId": second["id"], "mode": "action"}],
+            employee_id="alice",
+            is_admin=False,
+            agent_store=agents,
+            placement_store=placements,
+            daemon_nodes=[
+                node("node_a", "claude", workspace_id="repo:relay"),
+                node("node_b", "codex", workspace_id="repo:relay"),
+            ],
+            session=session,
+        )
+
+    assert error.value.code == "workspace_unavailable"
+
+
+def test_session_without_prior_run_does_not_invent_node_affinity(
+    tmp_path: Path,
+) -> None:
+    agents = LocalAgentStore(tmp_path)
+    placements = LocalAgentPlacementStore(tmp_path)
+    agent = agents.create_agent(
+        "alice", {"displayName": "Builder", "executorKind": "codex"}
+    )
+    placements.create_placement(agent, "node_a")
+
+    resolved = resolve_agent_assignments(
+        [{"agentId": agent["id"], "mode": "action"}],
+        employee_id="alice",
+        is_admin=False,
+        agent_store=agents,
+        placement_store=placements,
+        daemon_nodes=[
+            node(
+                "node_a",
+                "codex",
+                workspace="/host/alice",
+                workspace_id="employee:alice:home",
+            )
+        ],
+        session={
+            "id": "ses_fresh",
+            "workspacePath": "/workspace",
+            "agentRuns": [],
+        },
+    )
+
+    assert resolved[0]["daemonNodeId"] == "node_a"
+
+
+def test_node_affine_session_rejects_workspace_drift_on_same_node_id(
+    tmp_path: Path,
+) -> None:
+    agents = LocalAgentStore(tmp_path)
+    placements = LocalAgentPlacementStore(tmp_path)
+    agent = agents.create_agent(
+        "alice", {"displayName": "Builder", "executorKind": "codex"}
+    )
+    placement = placements.create_placement(agent, "node_a")
+    session = {
+        "id": "ses_existing",
+        "workspacePath": "/workspace",
+        "agentRuns": [
+            {
+                "logicalAgentId": agent["id"],
+                "placementId": placement["id"],
+                "daemonNodeId": "node_a",
+                "workspaceIdentity": {"kind": "id", "value": "repo:original"},
+            }
+        ],
+    }
+
+    with pytest.raises(AgentRoutingError) as error:
+        resolve_agent_assignments(
+            [{"agentId": agent["id"], "mode": "action"}],
+            employee_id="alice",
+            is_admin=False,
+            agent_store=agents,
+            placement_store=placements,
+            daemon_nodes=[node("node_a", "codex", workspace_id="repo:replacement")],
+            session=session,
+        )
+
+    assert error.value.code == "workspace_unavailable"
+
+
+def test_shared_path_session_allows_followup_on_matching_workspace(
+    tmp_path: Path,
+) -> None:
+    agents = LocalAgentStore(tmp_path)
+    placements = LocalAgentPlacementStore(tmp_path)
+    first = agents.create_agent(
+        "alice", {"displayName": "First", "executorKind": "claude"}
+    )
+    second = agents.create_agent(
+        "alice", {"displayName": "Second", "executorKind": "codex"}
+    )
+    first_placement = placements.create_placement(
+        first, "node_a", {"workspacePolicy": {"kind": "shared-path"}}
+    )
+    placements.create_placement(
+        second, "node_b", {"workspacePolicy": {"kind": "shared-path"}}
+    )
+    session = {
+        "id": "ses_existing",
+        "workspacePath": "/workspace/alice",
+        "agentRuns": [
+            {
+                "logicalAgentId": first["id"],
+                "placementId": first_placement["id"],
+                "daemonNodeId": "node_a",
+            }
+        ],
+    }
+
+    resolved = resolve_agent_assignments(
+        [{"agentId": second["id"], "mode": "action"}],
+        employee_id="alice",
+        is_admin=False,
+        agent_store=agents,
+        placement_store=placements,
+        daemon_nodes=[
+            node("node_a", "claude", workspace_id="repo:relay"),
+            node("node_b", "codex", workspace_id="repo:relay"),
+        ],
+        session=session,
+    )
+
+    assert resolved[0]["daemonNodeId"] == "node_b"
 
 
 def test_offline_agent_returns_stable_reason(tmp_path: Path) -> None:

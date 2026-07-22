@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from relay.persistence.agent_placement_store import (
     DatabaseAgentPlacementStore,
     LocalAgentPlacementStore,
@@ -83,6 +85,60 @@ def test_database_store_moves_an_agent_between_computers(tmp_path: Path) -> None
     assert [placement["daemonNodeId"] for placement in active] == ["node_b"]
 
 
+def test_database_move_keeps_old_placement_when_insert_fails(tmp_path: Path) -> None:
+    database_url = f"sqlite:///{tmp_path}/atomic-move.db"
+    agents = DatabaseAgentStore(database_url, create_schema=True)
+    placements = DatabaseAgentPlacementStore(database_url, create_schema=True)
+    agent = agents.create_agent(
+        "alice", {"displayName": "Researcher", "executorKind": "claude"}
+    )
+    placements.create_placement(agent, "node_a")
+    with placements.engine.begin() as conn:
+        conn.exec_driver_sql(
+            """
+            CREATE TRIGGER reject_node_b
+            BEFORE INSERT ON agent_placements
+            WHEN NEW.daemon_node_public_id = 'node_b'
+            BEGIN
+                SELECT RAISE(ABORT, 'node_b rejected');
+            END
+            """
+        )
+
+    with pytest.raises(Exception, match="node_b rejected"):
+        placements.create_placement(agent, "node_b")
+
+    active = placements.list_placements(agent_id=agent["id"])
+    assert [placement["daemonNodeId"] for placement in active] == ["node_a"]
+
+
+def test_local_move_keeps_old_placement_when_create_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    agents = LocalAgentStore(tmp_path)
+    placements = LocalAgentPlacementStore(tmp_path)
+    agent = agents.create_agent(
+        "alice", {"displayName": "Researcher", "executorKind": "claude"}
+    )
+    placements.create_placement(agent, "node_a")
+    append = placements._append
+
+    def reject_new_placement(
+        placement_id: str, event_type: str, placement: dict
+    ) -> None:
+        if event_type == "placement.created" and placement["daemonNodeId"] == "node_b":
+            raise OSError("node_b rejected")
+        append(placement_id, event_type, placement)
+
+    monkeypatch.setattr(placements, "_append", reject_new_placement)
+
+    with pytest.raises(OSError, match="node_b rejected"):
+        placements.create_placement(agent, "node_b")
+
+    active = placements.list_placements(agent_id=agent["id"])
+    assert [placement["daemonNodeId"] for placement in active] == ["node_a"]
+
+
 def test_reconcile_collapses_pre_invariant_multi_placements(tmp_path: Path) -> None:
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
@@ -152,8 +208,30 @@ def test_placement_availability_is_derived_from_agent_and_node_health(
 
     updated_agent = agents.update_agent(agent["id"], {"instructions": "Use tests."})
     result = placement_status(placement, updated_agent, node)
-    assert result["status"] == "incompatible"
-    assert result["conditions"][0]["reason"] == "agent_configuration_pending"
+    assert result["status"] == "ready"
+    assert result["conditions"] == []
+
+
+@pytest.mark.parametrize("database", [False, True])
+def test_realized_agent_versions_never_move_backward(
+    tmp_path: Path, database: bool
+) -> None:
+    if database:
+        database_url = f"sqlite:///{tmp_path}/version.db"
+        agents = DatabaseAgentStore(database_url, create_schema=True)
+        placements = DatabaseAgentPlacementStore(database_url, create_schema=True)
+    else:
+        agents = LocalAgentStore(tmp_path)
+        placements = LocalAgentPlacementStore(tmp_path)
+    agent = agents.create_agent(
+        "alice", {"displayName": "Builder", "executorKind": "codex"}
+    )
+    placement = placements.create_placement(agent, "node_a")
+
+    placements.realize_agent_version(placement["id"], 3)
+    placements.realize_agent_version(placement["id"], 2)
+
+    assert placements.get_placement(placement["id"])["agentVersion"] == 3
 
 
 def test_database_agent_placement_store_matches_local_contract(tmp_path: Path) -> None:

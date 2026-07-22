@@ -14,7 +14,7 @@ import type { AgentName, ControlPanelDaemonNodeRecord } from "../../types";
 import { useDialogs } from "@/components/ui/DialogProvider";
 import { Button } from "@/components/ui/button";
 import { AgentMark } from "../AgentMark";
-import { Drawer } from "./Drawer";
+import { Drawer } from "../ui/Drawer";
 import { agentStatusTone } from "./helpers";
 import { NodeProfileBadges } from "./NodeProfileBadges";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
@@ -226,10 +226,10 @@ export function ManageAgentsDrawer({ open, onClose, node, onUpdated }: ManageAge
           <p className="adm-form-error" role="alert">{t("admin.v2.action_failed", { message: error })}</p>
         ) : null}
         <div className="adm-form-actions">
-          <Button type="button" variant="ghost" onClick={() => void requestClose()} disabled={saving}>
+          <Button size="cta" type="button" variant="ghost" onClick={() => void requestClose()} disabled={saving}>
             {t("admin.v2.cancel")}
           </Button>
-          <Button type="button" onClick={() => void handleSave()} disabled={saving || !dirty}>
+          <Button size="cta" type="button" onClick={() => void handleSave()} disabled={saving || !dirty}>
             {saving ? t("admin.v2.saving") : t("admin.v2.save_agent_settings")}
           </Button>
         </div>

@@ -6,25 +6,46 @@ const FOCUSABLE =
 /**
  * Wires the modal contract for a hand-rolled `role="dialog" aria-modal="true"`
  * panel: Escape-to-close, a Tab focus trap, autofocus on the first field,
- * return-focus to the trigger on unmount, and a body scroll lock. Attach the
- * returned ref to the panel element. Mirrors the behaviour in
- * `components/admin/Drawer.tsx` so the three drawers stay consistent.
+ * return-focus to the trigger, and a body scroll lock. Attach the returned ref
+ * to the panel element.
+ *
+ * `enabled` tracks visibility — scroll lock, focus capture, and focus return
+ * run when the overlay opens or closes for good. `active` tracks keyboard
+ * ownership (top of an overlay stack) — only the active layer listens for
+ * Escape/Tab, so stacked overlays don't all close on one Escape or fight over
+ * focus. `active` defaults to true for single-overlay callers.
  */
-export function useModalDrawer<T extends HTMLElement>(onClose: () => void, enabled = true) {
+export function useModalDrawer<T extends HTMLElement>(onClose: () => void, enabled = true, active = true) {
   const panelRef = useRef<T>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
 
-  // Hold onClose in a ref so the effect can depend on [] alone — callers pass a
-  // fresh inline arrow each render, and re-running the effect would yank focus
-  // back to the first field on every keystroke.
+  // Hold onClose in a ref so the effects don't re-run when callers pass a
+  // fresh inline arrow each render — re-running would yank focus back to the
+  // first field on every keystroke.
   const onCloseRef = useRef(onClose);
   useEffect(() => {
     onCloseRef.current = onClose;
   });
 
+  // Visibility lifecycle: scroll lock + trigger focus capture/return. Kept
+  // separate from keyboard ownership so a stacked overlay closing above this
+  // one doesn't overwrite (or prematurely restore) the trigger reference.
   useEffect(() => {
     if (!enabled) return;
     previouslyFocused.current = document.activeElement as HTMLElement | null;
+    const { body } = document;
+    const previousOverflow = body.style.overflow;
+    body.style.overflow = "hidden";
+    return () => {
+      body.style.overflow = previousOverflow;
+      previouslyFocused.current?.focus?.();
+      previouslyFocused.current = null;
+    };
+  }, [enabled]);
+
+  // Keyboard ownership: autofocus, Escape, Tab trap.
+  useEffect(() => {
+    if (!enabled || !active) return;
     const initial = panelRef.current?.querySelector<HTMLElement>(FOCUSABLE);
     (initial ?? panelRef.current)?.focus();
 
@@ -52,31 +73,24 @@ export function useModalDrawer<T extends HTMLElement>(onClose: () => void, enabl
       }
       const first = nodes[0];
       const last = nodes[nodes.length - 1];
-      const active = document.activeElement as HTMLElement | null;
+      const activeEl = document.activeElement as HTMLElement | null;
       if (event.shiftKey) {
-        if (active === first || !panelRef.current.contains(active)) {
+        if (activeEl === first || !panelRef.current.contains(activeEl)) {
           event.preventDefault();
           last.focus();
         }
-      } else if (active === last) {
+      } else if (activeEl === last) {
         event.preventDefault();
         first.focus();
-      } else if (!panelRef.current.contains(active)) {
+      } else if (!panelRef.current.contains(activeEl)) {
         event.preventDefault();
         first.focus();
       }
     }
 
     document.addEventListener("keydown", handleKey);
-    const { body } = document;
-    const previousOverflow = body.style.overflow;
-    body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", handleKey);
-      body.style.overflow = previousOverflow;
-      previouslyFocused.current?.focus?.();
-    };
-  }, [enabled]);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [enabled, active]);
 
   return panelRef;
 }

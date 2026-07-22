@@ -140,6 +140,19 @@ def test_routine_create_defaults_next_run_when_omitted(monkeypatch) -> None:
         assert task["routineNextRunDate"] == "2026-07-08"
         assert task["routineEnabled"] is False
 
+        disabled = client.post("/tasks", json={
+            "title": "Disabled weekly routine",
+            "ownerEmployeeId": "alice",
+            "assigneeEmployeeId": "alice",
+            "isRoutine": True,
+            "routineCadence": "weekly",
+            "routineEnabled": False,
+        })
+
+        assert disabled.status_code == 201
+        assert disabled.json()["routineNextRunDate"] == "2026-07-14"
+        assert disabled.json()["routineEnabled"] is False
+
         explicit_unscheduled = client.post("/tasks", json={
             "title": "Manual routine",
             "ownerEmployeeId": "alice",
@@ -483,6 +496,21 @@ def test_task_start_without_agent_runs_ready_team_discussion(monkeypatch) -> Non
         client = TestClient(app)
         _bootstrap_admin(client)
         _create_user(client, "alice", employee_id="alice")
+        # Simulate the control-plane provisioning record that authorizes this
+        # daemon to materialize Alice's compatibility agents.
+        app.state.registry.register(
+            {
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "nodeLocation": "employee-device",
+                "protocolVersion": 1,
+                "supportedAgents": [],
+                "status": "stopped",
+            },
+            "ui_token",
+        )
         registered = client.post("/daemon-nodes/register", json={
             "sandboxId": "sbx_alice",
             "employeeId": "alice",

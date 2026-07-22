@@ -657,4 +657,9 @@ def _policy(payload: dict[str, Any], field: str) -> dict[str, Any]:
         return {}
     if not isinstance(value, dict):
         raise ValueError(f"{field} must be an object.")
-    return value
+    if value:
+        raise ValueError(
+            f"{field} is reserved until runtime enforcement is available; "
+            "non-empty policies are not accepted."
+        )
+    return {}

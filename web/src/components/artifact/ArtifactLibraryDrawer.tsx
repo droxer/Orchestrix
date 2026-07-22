@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { RelayArtifact } from "relay-core";
-import { Drawer } from "../admin/Drawer";
+import { Drawer } from "../ui/Drawer";
 import { ArtifactBody } from "./ArtifactBody";
 import { ArtifactIndexStrip } from "./ArtifactIndexStrip";
 import { ArtifactPreviewHeader } from "./ArtifactPreviewHeader";

@@ -9,6 +9,32 @@ from sqlalchemy import text
 from relay.persistence.stores import DatabaseSessionStore, LocalSessionStore, relay_event
 
 
+def test_session_stores_preserve_team_provenance() -> None:
+    with TemporaryDirectory() as root:
+        stores = (
+            LocalSessionStore(Path(root) / "local"),
+            DatabaseSessionStore(
+                f"sqlite:///{root}/relay.db", create_schema=True
+            ),
+        )
+        for store in stores:
+            created = store.create_session(
+                {
+                    "workspacePath": "/workspace/alice",
+                    "ownerEmployeeId": "alice",
+                    "ownerAgentId": "agent_lead",
+                    "teamId": "team_delivery",
+                    "taskGoal": "ship the release",
+                    "participants": ["human", "codex"],
+                }
+            )
+
+            persisted = store.get_session(created["id"])
+            assert persisted["teamId"] == "team_delivery"
+            assert persisted["events"][0]["teamId"] == "team_delivery"
+            assert store.list_sessions()[0]["teamId"] == "team_delivery"
+
+
 def test_session_store_persists_events_and_artifacts() -> None:
     with TemporaryDirectory() as root:
         store = LocalSessionStore(root)

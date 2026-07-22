@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import {
   NavAdmin, NavAgents, NavBacklog, NavChannels, NavConversations, NavLogout, NavMore, NavPreferences,
+  NavTeams,
   NavRoutine, NavSidebarCollapse, NavSidebarExpand,
 } from "./icons";
 import { RelayMark } from "./RelayMark";
@@ -245,6 +246,9 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
             <NavRoutine size={18} />
             <span className="sidenav-label">{t("nav.routine")}</span>
           </a>
+        </div>
+        <div className="sidenav-group sidenav-group--separated" role="group" aria-label={t("nav.workforce")}>
+          <span className="sidenav-group-label" aria-hidden="true">{t("nav.workforce")}</span>
           <a
             className={`sidenav-btn ${route === "agents" ? "active" : ""}`}
             data-nav="agents"
@@ -260,9 +264,24 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
             <NavAgents size={18} />
             <span className="sidenav-label">{t("nav.agents")}</span>
           </a>
+          <a
+            className={`sidenav-btn ${route === "teams" ? "active" : ""}`}
+            data-nav="teams"
+            href={hrefForRoute("teams")}
+            aria-label={t("nav.teams_label")}
+            aria-current={route === "teams" ? "page" : undefined}
+            onClick={(event) => handleRouteClick(event, "teams")}
+            onMouseEnter={(event) => showNavTooltip(t("nav.teams"), event.currentTarget)}
+            onMouseLeave={hideNavTooltip}
+            onFocus={(event) => showNavTooltip(t("nav.teams"), event.currentTarget)}
+            onBlur={hideNavTooltip}
+          >
+            <NavTeams size={18} />
+            <span className="sidenav-label">{t("nav.teams")}</span>
+          </a>
         </div>
         {isAdmin ? (
-          <div className="sidenav-group sidenav-group--admin" role="group" aria-label={t("nav.manage")}>
+          <div className="sidenav-group sidenav-group--separated" role="group" aria-label={t("nav.manage")}>
             <span className="sidenav-group-label sidenav-overflow-item" aria-hidden="true">{t("nav.manage")}</span>
             <a
               className={`sidenav-btn sidenav-overflow-item ${route === "channels" ? "active" : ""}`}

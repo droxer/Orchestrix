@@ -3,13 +3,16 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
+from loguru import logger
 
 from ..security.auth import require_admin_session
 from ..persistence.agent_placement_store import placement_status
 from ..services.agent_routing import AgentRoutingError, resolve_agent_assignments
+from ..services.team_membership import remove_agent_from_teams
 from .deps import AppContextDep
 from .helpers import (
     agent_task_mode,
+    get_session_for_actor,
     json_body,
     request_actor,
     role_name,
@@ -75,7 +78,7 @@ async def update_agent(
             f"Unsupported agent field(s): {', '.join(sorted(unknown))}.",
         )
     try:
-        updated = ctx.agent_store.update_agent(agent_id, body)
+        updated = _update_agent_and_realize_placements(ctx, agent_id, body)
     except ValueError as error:
         raise HTTPException(
             409 if "already has" in str(error) else 400, str(error)
@@ -101,7 +104,11 @@ async def list_control_panel_agents(
     request: Request, ctx: AppContextDep
 ) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
-    employee_id = request.query_params.get("supervisorEmployeeId") or None
+    employee_id = (
+        request.query_params.get("employeeId")
+        or request.query_params.get("supervisorEmployeeId")
+        or None
+    )
     return {
         "agents": [
             _agent_with_placements(ctx, agent)
@@ -159,8 +166,8 @@ async def update_control_panel_agent(
     require_admin_session(request, ctx.auth_store)
     try:
         return {
-            "agent": ctx.agent_store.update_agent(
-                agent_id, await json_body(request)
+            "agent": _update_agent_and_realize_placements(
+                ctx, agent_id, await json_body(request)
             )
         }
     except KeyError as error:
@@ -176,8 +183,19 @@ async def delete_control_panel_agent(
     agent_id: str, request: Request, ctx: AppContextDep
 ) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
+    agent = ctx.agent_store.get_agent(agent_id)
+    if not agent or agent.get("deletedAt"):
+        raise HTTPException(404, "Agent not found.")
+    if _agent_has_active_run(ctx, agent_id):
+        raise HTTPException(
+            409, "Agent has active work. Wait for its runs to finish before deleting it."
+        )
     try:
-        return {"agent": ctx.agent_store.delete_agent(agent_id)}
+        deleted = ctx.agent_store.delete_agent(agent_id)
+        remove_agent_from_teams(
+            ctx.team_store, agent_id, agent["supervisorEmployeeId"]
+        )
+        return {"agent": deleted}
     except KeyError as error:
         raise HTTPException(404, "Agent not found.") from error
 
@@ -265,6 +283,14 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
         existing = ctx.backend.idempotent_run(idempotency_key, actor["employeeId"])
         if existing:
             return existing
+    session_id = string_field(body, "sessionId") or string_field(
+        body, "session_id"
+    )
+    session = (
+        get_session_for_actor(ctx.session_store, session_id, actor)
+        if session_id
+        else None
+    )
     assignments = []
     for item in raw_assignments:
         if (
@@ -293,6 +319,7 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
             agent_store=ctx.agent_store,
             placement_store=ctx.agent_placement_store,
             daemon_nodes=ctx.registry.monitor_nodes(),
+            session=session,
         )
         parsed: dict[str, Any] = {
             "taskGoal": task_goal,
@@ -301,7 +328,6 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
             "actorIsAdmin": actor["isAdmin"],
             "agentFirst": True,
         }
-        session_id = string_field(body, "sessionId") or string_field(body, "session_id")
         if session_id:
             parsed["sessionId"] = session_id
         user_message_id = string_field(body, "userMessageId") or string_field(
@@ -358,6 +384,38 @@ def _employee_exists(auth_store: Any, employee_id: str) -> bool:
         return False
     return any(
         user.get("employeeId") == employee_id for user in auth_store.list_users()
+    )
+
+
+def _update_agent_and_realize_placements(
+    ctx: AppContextDep, agent_id: str, patch: dict[str, Any]
+) -> dict[str, Any]:
+    previous = ctx.agent_store.get_agent(agent_id)
+    updated = ctx.agent_store.update_agent(agent_id, patch)
+    if previous and updated.get("version") != previous.get("version"):
+        for placement in ctx.agent_placement_store.list_placements(agent_id=agent_id):
+            try:
+                ctx.agent_placement_store.realize_agent_version(
+                    placement["id"], updated["version"]
+                )
+            except Exception as error:  # readiness does not depend on this audit field
+                logger.warning(
+                    "Agent placement version realization deferred",
+                    agent_id=agent_id,
+                    placement_id=placement["id"],
+                    agent_version=updated["version"],
+                    error=str(error),
+                )
+    return updated
+
+
+def _agent_has_active_run(ctx: AppContextDep, agent_id: str) -> bool:
+    return any(
+        any(
+            assignment.get("agentId") == agent_id
+            for assignment in request.get("assignments") or []
+        )
+        for request in ctx.registry.daemon_store.list_active_run_requests()
     )
 
 

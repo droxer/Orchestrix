@@ -22,6 +22,7 @@ from sqlalchemy import (
 
 from ..core.ids import new_database_id, new_relay_id, now_iso
 from ..core.models import AGENT_NAMES
+from .agent_store import DatabaseAgentStore
 from .store_common import (
     DEFAULT_RELAY_DATA_DIR,
     _append_jsonl,
@@ -60,10 +61,27 @@ class LocalAgentPlacementStore:
                     "Agent already has an active placement on this daemon node."
                 )
             # One agent lives on exactly one computer: assigning a different
-            # computer moves the agent by superseding its prior placement.
-            for existing in active:
-                self.update_placement(existing["id"], {"desiredState": "removed"})
+            # computer moves the agent by superseding its prior placement. Write
+            # the replacement first so a failed create cannot erase the working
+            # placement. The lock hides the temporary overlap from this process;
+            # rollback restores the old snapshots if superseding one fails.
             self._append(placement["id"], "placement.created", placement)
+            removed: list[dict[str, Any]] = []
+            try:
+                for existing in active:
+                    self.update_placement(
+                        existing["id"], {"desiredState": "removed"}
+                    )
+                    removed.append(existing)
+            except Exception:
+                for existing in removed:
+                    self.update_placement(
+                        existing["id"], {"desiredState": "active"}
+                    )
+                self.update_placement(
+                    placement["id"], {"desiredState": "removed"}
+                )
+                raise
             return placement
 
     def get_placement(self, placement_id: str) -> dict[str, Any] | None:
@@ -158,6 +176,20 @@ class LocalAgentPlacementStore:
     def events(self, placement_id: str) -> list[dict[str, Any]]:
         return _read_jsonl(self._events_path(placement_id))
 
+    def realize_agent_version(
+        self, placement_id: str, agent_version: int
+    ) -> dict[str, Any]:
+        """Advance the diagnostic realized version without allowing regressions."""
+        with self._lock:
+            current = self.get_placement(placement_id)
+            if not current:
+                raise KeyError(placement_id)
+            if int(current.get("agentVersion") or 0) >= agent_version:
+                return current
+            return self.update_placement(
+                placement_id, {"agentVersion": agent_version}
+            )
+
     def _append(
         self, placement_id: str, event_type: str, placement: dict[str, Any]
     ) -> None:
@@ -216,6 +248,7 @@ class DatabaseAgentPlacementStore:
 
     def __init__(self, database_url: str, *, create_schema: bool = False):
         self.engine = create_engine(database_url, future=True)
+        self._lock = RLock()
         if create_schema:
             self.metadata.create_all(self.engine)
 
@@ -226,17 +259,69 @@ class DatabaseAgentPlacementStore:
         payload: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         placement = _new_placement(agent, daemon_node_id, payload or {})
-        active = self.list_placements(agent_id=agent["id"])
-        if _has_active_placement(active, placement["daemonNodeId"]):
-            raise ValueError(
-                "Agent already has an active placement on this daemon node."
+        with self._lock, self.engine.begin() as conn:
+            # Lock the durable agent row so concurrent placement moves for the
+            # same agent serialize across backend replicas, including when the
+            # agent currently has no placement rows to lock.
+            conn.execute(
+                select(DatabaseAgentStore.agents.c.id)
+                .where(DatabaseAgentStore.agents.c.public_id == agent["id"])
+                .with_for_update()
+            ).first()
+            rows = (
+                conn.execute(
+                    select(
+                        self.placements.c.id,
+                        self.placements.c.snapshot,
+                        self.placements.c.supervisor_employee_public_id,
+                        self.placements.c.event_version,
+                    )
+                    .where(self.placements.c.agent_public_id == agent["id"])
+                    .where(self.placements.c.desired_state != "removed")
+                    .with_for_update()
+                )
+                .mappings()
+                .all()
             )
-        # One agent lives on exactly one computer: assigning a different computer
-        # moves the agent by superseding its prior placement.
-        for existing in active:
-            self.update_placement(existing["id"], {"desiredState": "removed"})
-        event = _placement_event(placement["id"], "placement.created", placement)
-        with self.engine.begin() as conn:
+            active = [
+                _normalized_placement_snapshot(
+                    row["snapshot"], row["supervisor_employee_public_id"]
+                )
+                for row in rows
+            ]
+            if _has_active_placement(active, placement["daemonNodeId"]):
+                raise ValueError(
+                    "Agent already has an active placement on this daemon node."
+                )
+            for row, existing in zip(rows, active, strict=True):
+                removed = {
+                    **existing,
+                    "desiredState": "removed",
+                    "updatedAt": now_iso(),
+                }
+                sequence = int(row["event_version"] or 0)
+                removed_event = _placement_event(
+                    existing["id"], "placement.removed", removed
+                )
+                conn.execute(
+                    insert(self.events_table).values(
+                        **_placement_event_row(row["id"], sequence, removed_event)
+                    )
+                )
+                conn.execute(
+                    update(self.placements)
+                    .where(self.placements.c.id == row["id"])
+                    .values(
+                        **_placement_row(
+                            removed,
+                            event_version=sequence + 1,
+                            database_id=row["id"],
+                        )
+                    )
+                )
+            event = _placement_event(
+                placement["id"], "placement.created", placement
+            )
             row = _placement_row(placement, event_version=1)
             conn.execute(insert(self.placements).values(**row))
             conn.execute(
@@ -408,6 +493,57 @@ class DatabaseAgentPlacementStore:
             for row in rows
         ]
 
+    def realize_agent_version(
+        self, placement_id: str, agent_version: int
+    ) -> dict[str, Any]:
+        """Advance the diagnostic realized version under the placement row lock."""
+        with self.engine.begin() as conn:
+            row = (
+                conn.execute(
+                    select(
+                        self.placements.c.id,
+                        self.placements.c.snapshot,
+                        self.placements.c.supervisor_employee_public_id,
+                        self.placements.c.event_version,
+                    )
+                    .where(self.placements.c.public_id == placement_id)
+                    .with_for_update()
+                )
+                .mappings()
+                .first()
+            )
+            if not row:
+                raise KeyError(placement_id)
+            current = _normalized_placement_snapshot(
+                row["snapshot"], row["supervisor_employee_public_id"]
+            )
+            if int(current.get("agentVersion") or 0) >= agent_version:
+                return current
+            updated = {
+                **current,
+                "agentVersion": agent_version,
+                "updatedAt": now_iso(),
+            }
+            sequence = int(row["event_version"] or 0)
+            event = _placement_event(placement_id, "placement.updated", updated)
+            conn.execute(
+                insert(self.events_table).values(
+                    **_placement_event_row(row["id"], sequence, event)
+                )
+            )
+            conn.execute(
+                update(self.placements)
+                .where(self.placements.c.id == row["id"])
+                .values(
+                    **_placement_row(
+                        updated,
+                        event_version=sequence + 1,
+                        database_id=row["id"],
+                    )
+                )
+            )
+            return updated
+
 
 def _has_active_placement(
     placements: list[dict[str, Any]], daemon_node_id: str
@@ -563,14 +699,6 @@ def placement_status(
             {
                 "reason": "agent_disabled",
                 "message": "Logical agent is disabled or deleted.",
-            }
-        )
-    elif placement.get("agentVersion") != agent.get("version"):
-        status = "incompatible"
-        conditions.append(
-            {
-                "reason": "agent_configuration_pending",
-                "message": "Placement has not realized the current agent configuration.",
             }
         )
     elif not daemon_node:

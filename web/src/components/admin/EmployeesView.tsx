@@ -234,14 +234,14 @@ export function EmployeesView({
           ))}
         </div>
       ) : (
-        <>
-          <div className="adm-emp-cols" aria-hidden="true">
-            <span className="adm-emp-col-label">{t("admin.col_employee")}</span>
-            <span className="adm-emp-col-label">{t("admin.col_agents")}</span>
-            <span className="adm-emp-col-label adm-emp-col-label--metrics">{t("admin.v2.col_metrics")}</span>
-            <span className="adm-emp-col-label adm-emp-col-label--metrics">{t("admin.v2.col_actions")}</span>
+        <div role="table" aria-label={t("admin.v2.nav_employees", { defaultValue: "Employees" })}>
+          <div className="adm-emp-cols" role="row">
+            <span className="adm-col-label" role="columnheader">{t("admin.col_employee")}</span>
+            <span className="adm-col-label" role="columnheader">{t("admin.col_agents")}</span>
+            <span className="adm-col-label adm-col-label--metrics" role="columnheader">{t("admin.v2.col_metrics")}</span>
+            <span className="adm-col-label adm-col-label--metrics" role="columnheader">{t("admin.v2.col_actions")}</span>
           </div>
-          <ul className="adm-emp-list">
+          <ul className="adm-emp-list" role="rowgroup">
             {filtered.map((member) => {
               const memberAgents = agents.filter((agent) => agent.employeeId === member.id && !agent.deletedAt);
               const highlight = highlightedEmployeeId === member.id;
@@ -251,8 +251,9 @@ export function EmployeesView({
                   key={member.id}
                   className={`adm-emp-row ${highlight ? "is-pulse" : ""}`}
                   data-employee={member.id}
+                  role="row"
                 >
-                  <div className="adm-emp-id">
+                  <div className="adm-emp-id" role="cell">
                     <div className="adm-emp-id-line">
                       <p className="adm-emp-name" translate="no">{member.displayName}</p>
                       <span className={`adm-status-pill tone-${tone}`}>
@@ -266,7 +267,7 @@ export function EmployeesView({
                       {member.departmentName ? <span>{member.departmentName}</span> : null}
                     </p>
                   </div>
-                  <div className="adm-emp-nodes">
+                  <div className="adm-emp-nodes" role="cell">
                     {memberAgents.length === 0 ? (
                       <span className="adm-emp-no-nodes">{t("admin.v2.no_agents_for_employee")}</span>
                     ) : (
@@ -286,6 +287,7 @@ export function EmployeesView({
                   </div>
                   <div
                     className="adm-emp-metrics"
+                    role="cell"
                     aria-label={t("admin.v2.emp_metrics_aria", {
                       running: member.runningCount,
                       ready: member.readyCount,
@@ -305,7 +307,7 @@ export function EmployeesView({
                       </span>
                     </div>
                   </div>
-                  <div className="adm-emp-actions">
+                  <div className="adm-emp-actions" role="cell">
                     {onDeleteEmployee ? (
                       <Button variant="ghost"
                         type="button"
@@ -323,7 +325,7 @@ export function EmployeesView({
               );
             })}
           </ul>
-        </>
+        </div>
       )}
     </div>
   );

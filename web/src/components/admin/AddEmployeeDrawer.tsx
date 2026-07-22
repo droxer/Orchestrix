@@ -8,7 +8,7 @@ import type {
   ControlPanelDaemonNodeRecord,
   CreateControlPanelEmployeeResponse,
 } from "../../types";
-import { Drawer } from "./Drawer";
+import { Drawer } from "../ui/Drawer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
@@ -183,7 +183,7 @@ export function AddEmployeeDrawer({
               aria-describedby={fieldErrors.employeeId ? "add-emp-employee-id-error" : undefined}
             />
             {fieldErrors.employeeId ? (
-              <span id="add-emp-employee-id-error" className="text-sm text-danger-strong" role="alert">
+              <span id="add-emp-employee-id-error" className="text-sm text-danger" role="alert">
                 {fieldErrors.employeeId}
               </span>
             ) : null}
@@ -249,7 +249,7 @@ export function AddEmployeeDrawer({
               aria-describedby={fieldErrors.username ? "add-emp-username-error" : undefined}
             />
             {fieldErrors.username ? (
-              <span id="add-emp-username-error" className="text-sm text-danger-strong" role="alert">
+              <span id="add-emp-username-error" className="text-sm text-danger" role="alert">
                 {fieldErrors.username}
               </span>
             ) : null}
@@ -275,7 +275,7 @@ export function AddEmployeeDrawer({
               aria-describedby={fieldErrors.password ? "add-emp-password-error" : undefined}
             />
             {fieldErrors.password ? (
-              <span id="add-emp-password-error" className="text-sm text-danger-strong" role="alert">
+              <span id="add-emp-password-error" className="text-sm text-danger" role="alert">
                 {fieldErrors.password}
               </span>
             ) : null}
@@ -317,10 +317,10 @@ export function AddEmployeeDrawer({
         {error ? <div className="adm-form-error" role="alert">{error}</div> : null}
 
         <div className="adm-form-actions">
-          <Button type="button" variant="ghost" onClick={() => void requestClose()} disabled={isBusy}>
+          <Button size="cta" type="button" variant="ghost" onClick={() => void requestClose()} disabled={isBusy}>
             {t("admin.v2.cancel")}
           </Button>
-          <Button type="submit" disabled={isBusy || !canSubmit}>
+          <Button size="cta" type="submit" disabled={isBusy || !canSubmit}>
             {isBusy ? t("admin.creating") : t("admin.v2.provision")}
           </Button>
         </div>

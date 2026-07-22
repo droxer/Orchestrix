@@ -6,7 +6,7 @@ sessions, daemon protocols, and managed-node operations.
 
 **Design:** [agent-first-runtime-design.md](agent-first-runtime-design.md)
 
-## Implementation status — 2026-07-10
+## Implementation status — 2026-07-22
 
 Implemented in the current vertical slice:
 
@@ -14,8 +14,9 @@ Implemented in the current vertical slice:
 - admin agent and placement APIs plus employee-visible `GET /agents`;
 - multiple same-executor agents per employee;
 - multiple dedicated managed nodes per employee;
-- distinct compatibility agents and placements materialized during legacy
-  dispatch, without mutating employee reads;
+- distinct compatibility agents and placements materialized from
+  administrator-assigned daemon capabilities or during legacy dispatch,
+  without mutating employee reads;
 - additive daemon executor-capability registration;
 - `POST /agent-runs` with ownership checks and stable routing errors;
 - placement selection and per-assignment runtime-node dispatch;
@@ -36,6 +37,15 @@ Implemented in the current vertical slice:
 - per-node capacity filtering plus agent/placement revalidation before every
   command enqueue;
 - database-enforced employee-scoped normalized agent-name uniqueness.
+- atomic single-placement moves, including database-backed stores;
+- compatibility-agent materialization for legacy task and routine assignments;
+- existing-session node affinity with explicit shared-workspace exceptions;
+- safe node removal that preserves custom and moved logical agents;
+- logical-agent deletion blocked until active runs have drained;
+- dispatch-time delivery of updated agent configuration, with monotonic
+  placement-version audit updates that never gate runtime readiness;
+- rejection of non-empty policy fields, including dispatch blocking for legacy
+  policy metadata, until daemon-side enforcement exists.
 
 Still pending:
 
@@ -92,8 +102,9 @@ Create durable employee-owned agents without changing dispatch.
   stores are enabled: `employee_agents`, `employee_agent_events`.
 - [x] Define events: `agent.created`, `agent.updated`, `agent.enabled`,
   `agent.disabled`, and `agent.deleted`.
-- [ ] Add models and validation for executor kind, role, instructions, skill
-  policy, tool policy, model policy, and version.
+- [x] Add models and validation for executor kind, role, instructions, and
+  version. Reserve policy fields but reject non-empty values until their
+  runtime enforcement contract is implemented.
 - [x] Enforce employee-scoped display-name uniqueness and permit duplicate
   executor kinds.
 - [x] Add admin CRUD routes and employee-visible `GET /agents`.
@@ -103,7 +114,8 @@ Create durable employee-owned agents without changing dispatch.
 ### Compatibility materialization
 
 - [x] Add a deterministic compatibility mapping for
-  `(employeeId, executorKind) -> agentId`.
+  `(employeeId, daemonNodeId, executorKind) -> agentId` so each registered
+  computer exposes its own compatibility agent.
 - [x] Lazily create compatibility agents for existing employees when an old
   assignment is first resolved.
 - [ ] Provide an idempotent migration command to pre-create compatibility
@@ -160,12 +172,13 @@ compatible.
 
 ### Initial placement policy
 
-- [ ] Materialize one placement for each compatibility agent on the employee's
-  current preferred node.
+- [x] Materialize one compatibility agent and placement for each supported
+  executor on each assigned computer.
 - [ ] Permit administrators to place different agents from one employee on
   different nodes.
-- [ ] Initially allow only one logical agent per executor kind per node unless
-  the daemon advertises isolated agent-home support.
+- [x] Allow one active placement per logical agent; moves atomically supersede
+  the previous placement. Several distinct agents may use the same executor
+  capability on a node, subject to runtime capacity.
 - [ ] Preserve node-level disabled-agent and role-default rules as additional
   placement constraints.
 
@@ -381,10 +394,12 @@ only after evidence shows it is safe.
 
 - [ ] Employee authorization is checked before placement discovery results are
   exposed.
-- [ ] Agent policy can only reduce the employee's effective authority.
+- [x] Reject non-empty agent policy fields until enforcement exists; once
+  implemented, policy may only reduce the employee's effective authority.
 - [ ] Placement mutation requires administrator authority.
-- [ ] Daemon registration cannot self-assign employee ownership or create a
-  logical agent.
+- [x] Daemon registration cannot self-assign employee ownership. The backend
+  may materialize compatibility agents only from a node ownership assignment
+  already authorized in the control plane.
 - [ ] Agent configuration secrets use server-side references and short-lived
   runtime delivery.
 - [ ] Run audit records preserve effective agent and policy versions.

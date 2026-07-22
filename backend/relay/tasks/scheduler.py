@@ -18,12 +18,18 @@ from ..services.agent_routing import (
     dispatch_reason_code,
     resolve_agent_assignments,
 )
+from ..services.team_dispatch import (
+    TeamDispatchError,
+    resolve_team_task_assignment,
+    task_execution_employee_id,
+)
 
 MAX_DISPATCH_BACKOFF_SECONDS = 3600.0
 PERMANENT_DISPATCH_CODES = {
     "agent_disabled",
     "agent_forbidden",
     "agent_not_found",
+    "agent_policy_unsupported",
     "executor_mismatch",
 }
 
@@ -37,6 +43,65 @@ def task_goal_text(task: dict[str, Any]) -> str:
         f"{task['title']}\n\n{task['description']}"
         if task.get("description")
         else task["title"]
+    )
+
+
+def materialize_legacy_agent_assignment(
+    task: dict[str, Any],
+    executor_kind: str,
+    *,
+    registry: Any,
+    agent_store: Any,
+    placement_store: Any,
+) -> dict[str, Any] | None:
+    employee_id = task_execution_employee_id(task)
+    if not employee_id:
+        return None
+    assignment = {"agent": executor_kind, "mode": "action"}
+    node = ready_node_for_task(registry, task, [assignment])
+    if not node:
+        return None
+    agent = agent_store.ensure_compatibility_agent(
+        employee_id,
+        executor_kind,
+        node["id"],
+        node_name=node.get("displayName") or node["id"],
+    )
+    placement = next(
+        (
+            item
+            for item in placement_store.list_placements(agent_id=agent["id"])
+            if item["daemonNodeId"] == node["id"]
+        ),
+        None,
+    )
+    if placement is None:
+        placement_store.create_placement(agent, node["id"])
+    return {"agent": executor_kind, "agentId": agent["id"]}
+
+
+def materialize_legacy_task_assignment(
+    task: dict[str, Any],
+    *,
+    task_store: Any,
+    registry: Any,
+    agent_store: Any,
+    placement_store: Any,
+) -> dict[str, Any] | None:
+    executor_kind = valid_agent(task.get("assignedAgent"))
+    if not executor_kind or task.get("assignedAgentId"):
+        return None
+    assignment = materialize_legacy_agent_assignment(
+        task,
+        executor_kind,
+        registry=registry,
+        agent_store=agent_store,
+        placement_store=placement_store,
+    )
+    if not assignment:
+        return None
+    return task_store.set_task_assignment(
+        task["id"], executor_kind, assignment["agentId"]
     )
 
 
@@ -54,6 +119,7 @@ class TaskScheduler:
         task_store: Any,
         registry: Any,
         backend: Any,
+        team_store: Any | None = None,
         managed_node_store: Any | None = None,
         interval_seconds: float = 10.0,
         max_dispatches_per_tick: int = 5,
@@ -62,6 +128,7 @@ class TaskScheduler:
         self.task_store = task_store
         self.registry = registry
         self.backend = backend
+        self.team_store = team_store
         self.managed_node_store = managed_node_store
         self.interval_seconds = interval_seconds
         self.max_dispatches_per_tick = max_dispatches_per_tick
@@ -115,8 +182,12 @@ class TaskScheduler:
         promoted = 0
         skipped = 0
         for routine in self._due_routines(today):
+            routine = self._materialize_legacy_assignment(routine) or routine
             agent = valid_agent(routine.get("assignedAgent"))
-            if not agent or not routine.get("assignedAgentId"):
+            if not (
+                (agent and routine.get("assignedAgentId"))
+                or routine.get("assignedTeamId")
+            ):
                 skipped += 1
                 self._record_routine_skip(routine)
                 continue
@@ -149,11 +220,15 @@ class TaskScheduler:
 
     async def _dispatch_assigned_tasks(self) -> tuple[int, int]:
         dispatched = 0
-        dispatchable = self._dispatchable_tasks()
+        dispatchable = [
+            self._materialize_legacy_assignment(task) or task
+            for task in self._dispatchable_tasks()
+        ]
         legacy = [
             task
             for task in dispatchable
             if valid_agent(task.get("assignedAgent")) and not task.get("assignedAgentId")
+            and not task.get("assignedTeamId")
         ]
         for task in legacy:
             self._record_dispatch_deferred(
@@ -167,7 +242,11 @@ class TaskScheduler:
         candidates = [
             task
             for task in dispatchable
-            if valid_agent(task.get("assignedAgent")) and task.get("assignedAgentId")
+            if (
+                valid_agent(task.get("assignedAgent"))
+                and task.get("assignedAgentId")
+            )
+            or bool(task.get("assignedTeamId"))
         ]
         candidate_ids = {task["id"] for task in candidates}
         self._dispatch_backoff = {
@@ -181,26 +260,47 @@ class TaskScheduler:
             if self._backoff_active(task["id"], now):
                 skipped += 1
                 continue
+            team_id = task.get("assignedTeamId")
             agent = valid_agent(task.get("assignedAgent"))
-            assignments = [
-                {
-                    "agent": agent,
-                    "mode": "action",
-                    "agentId": task["assignedAgentId"],
-                }
-            ]
+            assignments: list[dict[str, Any]]
             try:
-                assignments = resolve_agent_assignments(
-                    assignments,
-                    employee_id=task.get("ownerEmployeeId")
-                    or task.get("assigneeEmployeeId")
-                    or "",
-                    is_admin=False,
-                    agent_store=self.backend.agent_store,
-                    placement_store=self.backend.agent_placement_store,
-                    daemon_nodes=self.registry.monitor_nodes(),
-                )
+                employee_id = task_execution_employee_id(task)
+                daemon_nodes = self.registry.monitor_nodes()
+                if team_id:
+                    assignment = resolve_team_task_assignment(
+                        task,
+                        team_store=self.team_store,
+                        agent_store=self.backend.agent_store,
+                        placement_store=self.backend.agent_placement_store,
+                        daemon_nodes=daemon_nodes,
+                    )
+                    assignments = [assignment]
+                    agent = assignment["agent"]
+                else:
+                    assignments = [
+                        {
+                            "agent": agent,
+                            "mode": "action",
+                            "agentId": task["assignedAgentId"],
+                        }
+                    ]
+                    assignments = resolve_agent_assignments(
+                        assignments,
+                        employee_id=employee_id,
+                        is_admin=False,
+                        agent_store=self.backend.agent_store,
+                        placement_store=self.backend.agent_placement_store,
+                        daemon_nodes=daemon_nodes,
+                    )
                 node = self.registry.get(assignments[0]["daemonNodeId"])
+            except TeamDispatchError:
+                self._record_dispatch_deferred(
+                    task,
+                    "team_unavailable",
+                    "The team lead is not currently available.",
+                )
+                skipped += 1
+                continue
             except AgentRoutingError as error:
                 state = (
                     "rejected" if error.code in PERMANENT_DISPATCH_CODES else "queued"
@@ -222,13 +322,24 @@ class TaskScheduler:
                 continue
             attempts += 1
             if await self._dispatch_claimed_task(
-                claimed, agent, node["id"], assignments
+                claimed, agent, node["id"], assignments, team_id=team_id
             ):
                 dispatched += 1
                 self._dispatch_backoff.pop(task["id"], None)
             else:
                 self._register_dispatch_failure(task["id"])
         return dispatched, skipped
+
+    def _materialize_legacy_assignment(
+        self, task: dict[str, Any]
+    ) -> dict[str, Any] | None:
+        return materialize_legacy_task_assignment(
+            task,
+            task_store=self.task_store,
+            registry=self.registry,
+            agent_store=self.backend.agent_store,
+            placement_store=self.backend.agent_placement_store,
+        )
 
     def _record_dispatch_deferred(
         self,
@@ -264,6 +375,8 @@ class TaskScheduler:
         agent: AgentName,
         node_id: str,
         assignments: list[dict[str, Any]],
+        *,
+        team_id: str | None = None,
     ) -> bool:
         claim = task.get("dispatchClaim") or {}
         claim_id = claim.get("id")
@@ -276,6 +389,7 @@ class TaskScheduler:
                     "taskId": task["id"],
                     "actorIsAdmin": True,
                     "agentFirst": True,
+                    **({"teamId": team_id} if team_id else {}),
                     **({"idempotencyKey": claim_id} if claim_id else {}),
                 },
             )
@@ -354,7 +468,7 @@ class TaskScheduler:
             for task in self.task_store.list_tasks()
             if task.get("status") == "assigned"
             and not task.get("isRoutine")
-            and task.get("assignedAgent")
+            and (task.get("assignedAgent") or task.get("assignedTeamId"))
         ]
         return sorted(tasks, key=task_claim_sort_key)
 

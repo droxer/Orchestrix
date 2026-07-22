@@ -1,6 +1,8 @@
 import type { CSSProperties } from "react";
 import type { RelayTask } from "../types";
 import { AgentStateBadge } from "./AgentStateBadge";
+import { Badge } from "./ui/badge";
+import { useTranslation } from "react-i18next";
 
 /**
  * Identity chip for a task's assignee: a hue-derived monogram avatar, the
@@ -29,17 +31,19 @@ export function TaskAssignee({
   task,
   ready,
   unassignedLabel,
+  assigneeDisplayName,
   agentDisplayName,
   showAgent = true,
 }: {
   task: RelayTask;
   ready: boolean;
   unassignedLabel: string;
+  assigneeDisplayName?: string;
   agentDisplayName?: string;
   showAgent?: boolean;
 }) {
-  const assigned = Boolean(task.assignedAgentId && agentDisplayName);
-  const name = assigned ? agentDisplayName! : unassignedLabel;
+  const assigned = Boolean(assigneeDisplayName);
+  const name = assigneeDisplayName ?? unassignedLabel;
 
   return (
     <span className="task-assignee" translate="no" data-unassigned={assigned ? "false" : "true"}>
@@ -51,7 +55,28 @@ export function TaskAssignee({
         {assigned ? initialFor(name) : null}
       </span>
       <span className="task-assignee-name">{name}</span>
-      {showAgent ? <AgentStateBadge agent={task.assignedAgent} ready={ready} /> : null}
+      {showAgent ? <TaskExecutionBadge task={task} ready={ready} displayName={agentDisplayName} /> : null}
     </span>
   );
+}
+
+export function TaskExecutionBadge({
+  task,
+  ready,
+  displayName,
+}: {
+  task: RelayTask;
+  ready: boolean;
+  displayName?: string;
+}) {
+  const { t } = useTranslation();
+  if (task.assignedTeamId) {
+    const name = displayName ?? task.assignedTeamId;
+    return (
+      <Badge variant={ready ? "success" : "warning"} title={t("teams.assignment_badge", { name })}>
+        {t("teams.assignment_badge", { name })}
+      </Badge>
+    );
+  }
+  return <AgentStateBadge agent={task.assignedAgent} ready={ready} />;
 }

@@ -175,13 +175,13 @@ export function FleetView({ nodes, storedTokens, layout, onLayoutChange, onRevea
           ))}
         </div>
       ) : (
-        <>
-          <div className="adm-node-cols" aria-hidden="true">
-            <span className="adm-emp-col-label">{t("admin.v2.nav_fleet")}</span>
-            <span className="adm-emp-col-label">{t("admin.v2.node_runtimes")}</span>
-            <span className="adm-emp-col-label adm-emp-col-label--metrics">{t("admin.v2.col_actions")}</span>
+        <div role="table" aria-label={t("admin.v2.nav_fleet")}>
+          <div className="adm-node-cols" role="row">
+            <span className="adm-col-label" role="columnheader">{t("admin.v2.col_node")}</span>
+            <span className="adm-col-label" role="columnheader">{t("admin.v2.node_runtimes")}</span>
+            <span className="adm-col-label adm-col-label--metrics" role="columnheader">{t("admin.v2.col_actions")}</span>
           </div>
-          <ul className="adm-node-list">
+          <ul className="adm-node-list" role="rowgroup">
             {filtered.map((node) => (
               <NodeRow
                 key={node.id}
@@ -195,7 +195,7 @@ export function FleetView({ nodes, storedTokens, layout, onLayoutChange, onRevea
               />
             ))}
           </ul>
-        </>
+        </div>
       )}
     </div>
   );

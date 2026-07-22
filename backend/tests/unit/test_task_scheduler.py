@@ -10,6 +10,7 @@ from relay.persistence.session_store import LocalSessionStore
 from relay.persistence.task_store import LocalTaskStore
 from relay.persistence.employee_agent_store import LocalEmployeeAgentStore
 from relay.persistence.agent_placement_store import LocalAgentPlacementStore
+from relay.persistence.team_store import LocalTeamStore
 from relay.services.managed_nodes import LocalManagedNodeStore
 from relay.tasks import ROUTINE_SKIP_NO_AGENT_MESSAGE, TaskScheduler, next_routine_date
 
@@ -565,7 +566,97 @@ def test_scheduler_uses_targeted_task_queue_queries() -> None:
     asyncio.run(run_flow())
 
 
-def test_scheduler_rejects_legacy_and_cross_employee_assignments() -> None:
+def test_scheduler_materializes_and_dispatches_legacy_assignment() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            task_store = LocalTaskStore(root)
+            registry = DaemonNodeRegistry(
+                LocalSessionStore(root), LocalDaemonStore(root), task_store=task_store
+            )
+            registry.register(
+                {
+                    "sandboxId": "sbx_alice",
+                    "employeeId": "alice",
+                    "token": "node_token",
+                    "workspacePath": "/workspace/alice",
+                    "protocolVersion": 1,
+                    "supportedAgents": ["codex"],
+                    "status": "ready",
+                },
+                "ui_token",
+            )
+            backend, _agent = _logical_backend(root, registry, "sbx_alice")
+            legacy = task_store.create_task(
+                {
+                    "title": "Legacy executor task",
+                    "assignedAgent": "codex",
+                    "ownerEmployeeId": "requester",
+                    "assigneeEmployeeId": "alice",
+                    "status": "assigned",
+                }
+            )
+
+            result = await TaskScheduler(
+                task_store=task_store, registry=registry, backend=backend
+            ).tick()
+
+            assert result.dispatched == 1
+            updated = task_store.get_task(legacy["id"])
+            assert updated["assignedAgentId"]
+            materialized = backend.agent_store.get_agent(updated["assignedAgentId"])
+            assert materialized["compatibilityKey"] == "alice:sbx_alice:codex"
+            commands = registry.take_commands("sbx_alice", "node_token")
+            assert commands[0]["logicalAgentId"] == materialized["id"]
+
+    asyncio.run(run_flow())
+
+
+def test_scheduler_materializes_legacy_routine_before_promotion() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            task_store = LocalTaskStore(root)
+            registry = DaemonNodeRegistry(
+                LocalSessionStore(root), LocalDaemonStore(root), task_store=task_store
+            )
+            registry.register(
+                {
+                    "sandboxId": "sbx_alice",
+                    "employeeId": "alice",
+                    "token": "node_token",
+                    "workspacePath": "/workspace/alice",
+                    "protocolVersion": 1,
+                    "supportedAgents": ["codex"],
+                    "status": "ready",
+                },
+                "ui_token",
+            )
+            backend, _agent = _logical_backend(root, registry, "sbx_alice")
+            routine = task_store.create_task(
+                {
+                    "title": "Legacy executor routine",
+                    "assignedAgent": "codex",
+                    "assigneeEmployeeId": "alice",
+                    "isRoutine": True,
+                    "routineEnabled": True,
+                    "routineCadence": "daily",
+                    "routineNextRunDate": "2020-01-01",
+                }
+            )
+
+            result = await TaskScheduler(
+                task_store=task_store, registry=registry, backend=backend
+            ).tick()
+
+            assert result.promoted == 1
+            updated = task_store.get_task(routine["id"])
+            assert updated["assignedAgentId"]
+            occurrence = task_store.get_task(updated["occurrenceIds"][0])
+            assert occurrence["assignedAgentId"] == updated["assignedAgentId"]
+
+    asyncio.run(run_flow())
+
+
+def test_scheduler_routes_assignment_through_task_assignee() -> None:
     async def run_flow() -> None:
         with TemporaryDirectory() as root:
             task_store = LocalTaskStore(root)
@@ -585,28 +676,9 @@ def test_scheduler_rejects_legacy_and_cross_employee_assignments() -> None:
                 "ui_token",
             )
             backend, agent = _logical_backend(root, registry, "sbx_alice")
-            legacy = task_store.create_task(
+            delegated = task_store.create_task(
                 {
-                    "title": "Legacy executor task",
-                    "assignedAgent": "codex",
-                    "assigneeEmployeeId": "alice",
-                    "status": "assigned",
-                }
-            )
-            legacy_routine = task_store.create_task(
-                {
-                    "title": "Legacy executor routine",
-                    "assignedAgent": "codex",
-                    "assigneeEmployeeId": "alice",
-                    "isRoutine": True,
-                    "routineEnabled": True,
-                    "routineCadence": "daily",
-                    "routineNextRunDate": "2020-01-01",
-                }
-            )
-            crossed = task_store.create_task(
-                {
-                    "title": "Wrong owner",
+                    "title": "Delegated work",
                     "assignedAgent": "codex",
                     "assignedAgentId": agent["id"],
                     "ownerEmployeeId": "bob",
@@ -619,14 +691,13 @@ def test_scheduler_rejects_legacy_and_cross_employee_assignments() -> None:
                 task_store=task_store, registry=registry, backend=backend
             ).tick()
 
-            assert result.dispatched == 0
+            assert result.dispatched == 1
             assert result.promoted == 0
-            assert result.skipped == 3
-            assert task_store.get_task(legacy["id"])["dispatchOutcome"]["code"] == "agent_not_found"
-            assert task_store.get_task(crossed["id"])["dispatchOutcome"]["code"] == "agent_forbidden"
-            assert task_store.get_task(crossed["id"])["dispatchOutcome"]["state"] == "rejected"
-            assert task_store.get_task(legacy_routine["id"])["occurrenceIds"] == []
-            assert registry.take_commands("sbx_alice", "node_token") == []
+            assert result.skipped == 0
+            updated = task_store.get_task(delegated["id"])
+            assert updated["status"] == "running"
+            [command] = registry.take_commands("sbx_alice", "node_token")
+            assert command["logicalAgentId"] == agent["id"]
 
     asyncio.run(run_flow())
 
@@ -639,3 +710,288 @@ def test_next_routine_date_skips_past_missed_windows_and_handles_custom() -> Non
         2026, 2, 28
     )
     assert next_routine_date(date(2026, 6, 25), "custom", date(2026, 6, 25)) is None
+
+
+def test_scheduler_dispatches_only_team_lead() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            task_store = LocalTaskStore(root)
+            registry = DaemonNodeRegistry(
+                LocalSessionStore(root), LocalDaemonStore(root), task_store=task_store
+            )
+            registry.register(
+                {
+                    "sandboxId": "sbx_alice",
+                    "employeeId": "alice",
+                    "token": "node_token",
+                    "workspacePath": "/workspace/alice",
+                    "protocolVersion": 1,
+                    "supportedAgents": ["codex", "claude"],
+                    "status": "ready",
+                    "maxConcurrentRuns": 2,
+                },
+                "ui_token",
+            )
+            agent_store = LocalEmployeeAgentStore(root)
+            placements = LocalAgentPlacementStore(root)
+            lead = agent_store.create_agent(
+                "alice", {"displayName": "Lead", "executorKind": "codex"}
+            )
+            support = agent_store.create_agent(
+                "alice", {"displayName": "Support", "executorKind": "claude"}
+            )
+            placements.create_placement(lead, "sbx_alice")
+            placements.create_placement(support, "sbx_alice")
+            backend = ServerDaemonNodeBackend(
+                registry,
+                employee_agent_store=agent_store,
+                agent_placement_store=placements,
+            )
+            teams = LocalTeamStore(root)
+            team = teams.create_team(
+                "alice",
+                {
+                    "name": "Delivery",
+                    "leadAgentId": lead["id"],
+                    "memberAgentIds": [lead["id"], support["id"]],
+                },
+            )
+            first = task_store.create_task(
+                {
+                    "title": "Lead work",
+                    "assignedTeamId": team["id"],
+                    "ownerEmployeeId": "requester",
+                    "assigneeEmployeeId": "alice",
+                    "status": "assigned",
+                }
+            )
+            scheduler = TaskScheduler(
+                task_store=task_store,
+                registry=registry,
+                backend=backend,
+                team_store=teams,
+            )
+
+            result = await scheduler.tick()
+            assert result.dispatched == 1
+            [lead_command] = registry.take_commands("sbx_alice", "node_token")
+            assert lead_command["logicalAgentId"] == lead["id"]
+            assert task_store.get_task(first["id"])["status"] == "running"
+            registry.handle_event(
+                "sbx_alice",
+                {
+                    "type": "run.completed",
+                    "commandId": lead_command["id"],
+                    "sessionId": lead_command["sessionId"],
+                    "runId": lead_command["runId"],
+                    "agent": "codex",
+                    "mode": "action",
+                    "exitCode": 0,
+                    "agentLog": "done",
+                },
+                "node_token",
+            )
+
+            agent_store.update_agent(lead["id"], {"enabled": False})
+            second = task_store.create_task(
+                {
+                    "title": "Blocked lead work",
+                    "assignedTeamId": team["id"],
+                    "assigneeEmployeeId": "alice",
+                    "status": "assigned",
+                }
+            )
+            result = await scheduler.tick()
+            assert result.dispatched == 0
+            assert result.skipped == 1
+            assert registry.take_commands("sbx_alice", "node_token") == []
+            updated = task_store.get_task(second["id"])
+            assert updated["status"] == "assigned"
+            assert updated["dispatchOutcome"]["code"] == "team_unavailable"
+            assert (
+                updated["dispatchOutcome"]["message"]
+                == "The team lead is not currently available."
+            )
+
+    asyncio.run(run_flow())
+
+
+def test_scheduler_promotes_team_routine_into_team_owned_thread() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store = LocalSessionStore(root)
+            task_store = LocalTaskStore(root)
+            registry = DaemonNodeRegistry(
+                session_store, LocalDaemonStore(root), task_store=task_store
+            )
+            registry.register(
+                {
+                    "sandboxId": "sbx_alice",
+                    "employeeId": "alice",
+                    "token": "node_token",
+                    "workspacePath": "/workspace/alice",
+                    "protocolVersion": 1,
+                    "supportedAgents": ["codex"],
+                    "status": "ready",
+                },
+                "ui_token",
+            )
+            agent_store = LocalEmployeeAgentStore(root)
+            placements = LocalAgentPlacementStore(root)
+            lead = agent_store.create_agent(
+                "alice", {"displayName": "Lead", "executorKind": "codex"}
+            )
+            placements.create_placement(lead, "sbx_alice")
+            backend = ServerDaemonNodeBackend(
+                registry,
+                employee_agent_store=agent_store,
+                agent_placement_store=placements,
+            )
+            teams = LocalTeamStore(root)
+            team = teams.create_team(
+                "alice",
+                {
+                    "name": "Routine delivery",
+                    "leadAgentId": lead["id"],
+                    "memberAgentIds": [lead["id"]],
+                },
+            )
+            routine = task_store.create_task(
+                {
+                    "title": "Daily Team report",
+                    "ownerEmployeeId": "requester",
+                    "assigneeEmployeeId": "alice",
+                    "assignedTeamId": team["id"],
+                    "isRoutine": True,
+                    "routineType": "task",
+                    "routineCadence": "daily",
+                    "routineNextRunDate": "2026-07-23",
+                    "routineEnabled": True,
+                }
+            )
+
+            result = await TaskScheduler(
+                task_store=task_store,
+                registry=registry,
+                backend=backend,
+                team_store=teams,
+                today=lambda: date(2026, 7, 23),
+            ).tick()
+
+            assert result.promoted == 1
+            assert result.dispatched == 1
+            [occurrence_id] = task_store.get_task(routine["id"])["occurrenceIds"]
+            occurrence = task_store.get_task(occurrence_id)
+            assert occurrence["assignedTeamId"] == team["id"]
+            assert occurrence["sourceRoutineId"] == routine["id"]
+            [session_id] = occurrence["linkedSessionIds"]
+            session = session_store.get_session(session_id)
+            assert session["teamId"] == team["id"]
+            assert session["ownerEmployeeId"] == "alice"
+            assert session["ownerAgentId"] == lead["id"]
+
+    asyncio.run(run_flow())
+
+
+def test_scheduler_records_team_unavailable_without_claiming() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            task_store = LocalTaskStore(root)
+            registry = DaemonNodeRegistry(
+                LocalSessionStore(root), LocalDaemonStore(root), task_store=task_store
+            )
+            agent_store = LocalEmployeeAgentStore(root)
+            placements = LocalAgentPlacementStore(root)
+            member = agent_store.create_agent(
+                "alice",
+                {"displayName": "Unavailable", "executorKind": "codex", "enabled": False},
+            )
+            backend = ServerDaemonNodeBackend(
+                registry,
+                employee_agent_store=agent_store,
+                agent_placement_store=placements,
+            )
+            teams = LocalTeamStore(root)
+            team = teams.create_team(
+                "alice",
+                {
+                    "name": "Delivery",
+                    "leadAgentId": member["id"],
+                    "memberAgentIds": [member["id"]],
+                },
+            )
+            task = task_store.create_task(
+                {
+                    "title": "Wait for the team",
+                    "assignedTeamId": team["id"],
+                    "assigneeEmployeeId": "alice",
+                    "status": "assigned",
+                }
+            )
+
+            result = await TaskScheduler(
+                task_store=task_store,
+                registry=registry,
+                backend=backend,
+                team_store=teams,
+            ).tick()
+
+            updated = task_store.get_task(task["id"])
+            assert result.dispatched == 0
+            assert updated["dispatchOutcome"]["code"] == "team_unavailable"
+            assert "dispatchClaim" not in updated
+
+    asyncio.run(run_flow())
+
+
+def test_scheduler_requests_managed_capacity_for_unroutable_team_lead() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            task_store = LocalTaskStore(root)
+            registry = DaemonNodeRegistry(
+                LocalSessionStore(root), LocalDaemonStore(root), task_store=task_store
+            )
+            managed_nodes = LocalManagedNodeStore(root)
+            agent_store = LocalEmployeeAgentStore(root)
+            placements = LocalAgentPlacementStore(root)
+            lead = agent_store.create_agent(
+                "alice", {"displayName": "Lead", "executorKind": "codex"}
+            )
+            backend = ServerDaemonNodeBackend(
+                registry,
+                employee_agent_store=agent_store,
+                agent_placement_store=placements,
+            )
+            teams = LocalTeamStore(root)
+            team = teams.create_team(
+                "alice",
+                {
+                    "name": "Delivery",
+                    "leadAgentId": lead["id"],
+                    "memberAgentIds": [lead["id"]],
+                },
+            )
+            task_store.create_task(
+                {
+                    "title": "Provision for the Team lead",
+                    "assignedTeamId": team["id"],
+                    "assigneeEmployeeId": "alice",
+                    "status": "assigned",
+                }
+            )
+
+            result = await TaskScheduler(
+                task_store=task_store,
+                registry=registry,
+                backend=backend,
+                team_store=teams,
+                managed_node_store=managed_nodes,
+            ).tick()
+
+            assert result.dispatched == 0
+            assert result.skipped == 1
+            [managed] = managed_nodes.list_nodes()
+            assert managed["employeeId"] == "alice"
+            assert managed["desiredState"] == "running"
+
+    asyncio.run(run_flow())

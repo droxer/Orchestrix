@@ -157,8 +157,20 @@ async def register_daemon_node(request: Request, ctx: AppContextDep) -> dict[str
         body["token"] = bearer_token(request)
     try:
         registration = DaemonNodeRegistration.model_validate(body).relay_dump()
+        prior = ctx.registry.get(registration["sandboxId"])
         sandbox = ctx.registry.register(registration, bearer_token(request))
-        sync_node_agents(ctx, sandbox)
+        ownership_was_control_plane_authorized = bool(
+            prior
+            and prior.get("employeeId") == sandbox.get("employeeId")
+            and (
+                prior.get("managedNodeId")
+                or prior.get("provisioningAttemptId")
+                or prior.get("nodeLocation")
+                or prior.get("status") == "provisioning"
+            )
+        )
+        if ownership_was_control_plane_authorized:
+            sync_node_agents(ctx, sandbox)
         if sandbox.get("managedNodeId") and sandbox.get("status") in ("ready", "running"):
             ctx.managed_node_store.mark_ready(sandbox["id"])
         logger.info(

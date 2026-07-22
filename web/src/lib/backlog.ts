@@ -65,6 +65,10 @@ export function discussionAgentsForTask(
   return [...new Set(readyLogicalAgents.map((agent) => agent.executorKind))];
 }
 
+export function canDiscussTask(task: Pick<RelayTask, "assignedTeamId">): boolean {
+  return !task.assignedTeamId;
+}
+
 export function dueTone(task: RelayTask, today = isoToday()): "neutral" | "warn" | "bad" {
   if (!task.dueDate || task.status === "done") return "neutral";
   if (task.dueDate < today) return "bad";

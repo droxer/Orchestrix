@@ -49,11 +49,13 @@ const BacklogPage = lazy(() => import("./components/BacklogPage").then((m) => ({
 const ChannelsPage = lazy(() => import("./components/ChannelsPage").then((m) => ({ default: m.ChannelsPage })));
 const RoutinePage = lazy(() => import("./components/RoutinePage").then((m) => ({ default: m.RoutinePage })));
 const AgentsPage = lazy(() => import("./components/AgentsPage").then((m) => ({ default: m.AgentsPage })));
+const TeamsPage = lazy(() => import("./components/TeamsPage").then((m) => ({ default: m.TeamsPage })));
 
 const WORK_ROUTE_SKIP_IDS: Record<Exclude<AppRoute, "main">, string> = {
   backlog: "backlog-panel",
   routine: "routine-panel",
   agents: "agents-panel",
+  teams: "teams-panel",
   channels: "channels-panel",
   admin: "admin-panel",
 };
@@ -395,13 +397,6 @@ export function App() {
     }
   }
 
-  function startConversationWithAgent(agent: EmployeeAgent) {
-    setActiveLogicalAgentId(agent.id);
-    setActiveAgent(agent.executorKind);
-    startNewConversation();
-    navigateToRoute("main");
-  }
-
   function openArtifactsDrawer(artifact?: RelayArtifact) {
     if (!activeSession) return;
     setInitialArtifactId(artifact?.id ?? null);
@@ -731,6 +726,13 @@ export function App() {
             onRefresh={() => refresh()}
             onOpenConversation={openConversation}
           />
+        ) : route === "teams" ? (
+          <TeamsPage
+            currentUser={user}
+            isRefreshing={isRefreshing}
+            onRefresh={() => refresh()}
+            onOpenConversation={openConversation}
+          />
         ) : route === "agents" ? (
           <AgentsPage
             currentUser={user}
@@ -738,7 +740,6 @@ export function App() {
             onRefresh={() => refresh()}
             workspaceAgent={activeLogicalAgent?.id === agentWorkspaceId ? activeLogicalAgent ?? null : null}
             onOpenWorkspace={openAgentWorkspace}
-            onStartConversation={startConversationWithAgent}
             onOpenConversation={openConversation}
           />
         ) : (

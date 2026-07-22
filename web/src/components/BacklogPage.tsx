@@ -5,18 +5,19 @@ import { useTranslation } from "react-i18next";
 import { useRelayMutations } from "../hooks/useRelayMutations";
 import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
 import { useEmployeeAgents } from "../hooks/useEmployeeAgents";
-import { AgentStateBadge } from "./AgentStateBadge";
+import { useTeams } from "../hooks/useTeams";
 import { PriorityBadge } from "./PriorityBadge";
 import { cn } from "@/lib/utils";
 import { type CurrentUser, type DaemonNodeMonitorRecord, type EmployeeAgent, type RelaySession, type RelayTask, type TaskStatus } from "../types";
 import { ActionApprove, ActionCalendar, ActionStart, ActionStop, ModeAsk, NavConversations, NavRefresh, ViewBoard, ViewList } from "./icons";
-import { agentReadyForTask, discussionAgentsForTask, dueTone, filterTasks, TASK_PRIORITIES, TASK_STATUSES, tasksByStatus, type BacklogFilters } from "../lib/backlog";
+import { agentReadyForTask, canDiscussTask, discussionAgentsForTask, dueTone, filterTasks, TASK_PRIORITIES, TASK_STATUSES, tasksByStatus, type BacklogFilters } from "../lib/backlog";
 import { emptyBacklogForm, taskBoardFormsEqual, type BacklogTaskFormState } from "../lib/taskBoardForm";
 import { TaskDrawer } from "./task-board/TaskDrawer";
 import { PageHeader } from "./PageHeader";
 import { BoardEmpty } from "./BoardEmpty";
 import { TaskBoardHeaderActions } from "./TaskBoardHeaderActions";
-import { TaskAssignee } from "./TaskAssignee";
+import { TaskAssignee, TaskExecutionBadge } from "./TaskAssignee";
+import { taskAssigneeDisplayName, teamLeadReady } from "../lib/taskAssignment";
 import { readViewPreference, writeViewPreference } from "../lib/viewPreference";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { Button } from "./ui/button";
@@ -205,6 +206,7 @@ function BacklogTaskCard({
   task,
   session,
   ready,
+  assigneeDisplayName,
   agentDisplayName,
   canDiscuss,
   onEdit,
@@ -217,6 +219,7 @@ function BacklogTaskCard({
   task: RelayTask;
   session?: RelaySession;
   ready: boolean;
+  assigneeDisplayName?: string;
   agentDisplayName?: string;
   canDiscuss: boolean;
   onEdit: () => void;
@@ -233,12 +236,12 @@ function BacklogTaskCard({
     <article className="backlog-task group list-virtual" data-priority={task.priority}>
       <div className="backlog-task-badges">
         <PriorityBadge priority={task.priority} />
-        <AgentStateBadge agent={task.assignedAgent} ready={ready} />
+        <TaskExecutionBadge task={task} ready={ready} displayName={agentDisplayName} />
       </div>
       <Button variant="ghost" type="button" className="backlog-task-title" onClick={onEdit}>{task.title}</Button>
       {task.description ? <p className="backlog-description">{task.description}</p> : null}
       <div className="backlog-meta">
-        <TaskAssignee task={task} ready={ready} agentDisplayName={agentDisplayName} unassignedLabel={t("backlog.unassigned")} showAgent={false} />
+        <TaskAssignee task={task} ready={ready} assigneeDisplayName={assigneeDisplayName} agentDisplayName={agentDisplayName} unassignedLabel={t("backlog.unassigned")} showAgent={false} />
         <span className="backlog-meta-sep" aria-hidden="true">·</span>
         <span className={cn("backlog-due", tone !== "neutral" && tone)}>
           <ActionCalendar size={13} />
@@ -257,9 +260,9 @@ function BacklogTaskCard({
             type="button"
             className="backlog-action-primary backlog-action-icon"
             onClick={onStart}
-            disabled={(!task.assignedAgentId && !canDiscuss) || task.status === "running" || task.status === "done"}
-            aria-label={task.assignedAgentId ? t("backlog.start") : t("backlog.start_team")}
-            title={task.assignedAgentId ? t("backlog.start") : t("backlog.start_team")}
+            disabled={(!task.assignedAgentId && !task.assignedTeamId && !canDiscuss) || task.status === "running" || task.status === "done"}
+            aria-label={(task.assignedAgentId || task.assignedTeamId) ? t("backlog.start") : t("backlog.start_team")}
+            title={(task.assignedAgentId || task.assignedTeamId) ? t("backlog.start") : t("backlog.start_team")}
           >
             <ActionStart size={14} />
           </Button>
@@ -328,6 +331,7 @@ function BacklogTaskRow({
   task,
   session,
   ready,
+  assigneeDisplayName,
   agentDisplayName,
   canDiscuss,
   onEdit,
@@ -340,6 +344,7 @@ function BacklogTaskRow({
   task: RelayTask;
   session?: RelaySession;
   ready: boolean;
+  assigneeDisplayName?: string;
   agentDisplayName?: string;
   canDiscuss: boolean;
   onEdit: () => void;
@@ -353,31 +358,33 @@ function BacklogTaskRow({
   const tone = dueTone(task);
 
   return (
-    <article className="backlog-row group list-virtual" role="listitem" data-status={task.status} data-priority={task.priority}>
-      <div className="backlog-row-lead">
-        <span className="backlog-row-dot" aria-hidden="true" />
+    <article className="backlog-row group list-virtual" role="row" data-status={task.status} data-priority={task.priority}>
+      <span className="backlog-row-dot-cell" aria-hidden="true">
+        <span className="backlog-row-dot" />
+      </span>
+      <div className="backlog-row-lead" role="cell">
         <Button variant="ghost" type="button" className="backlog-row-title" onClick={onEdit}>{task.title}</Button>
       </div>
-      <span className="backlog-row-status">{t(`backlog.statuses.${task.status}`)}</span>
-      <div className="backlog-row-tags">
+      <span className="backlog-row-status" role="cell">{t(`backlog.statuses.${task.status}`)}</span>
+      <div className="backlog-row-tags" role="cell">
         <PriorityBadge priority={task.priority} />
       </div>
-      <span className="backlog-row-assignee">
-        <TaskAssignee task={task} ready={ready} agentDisplayName={agentDisplayName} unassignedLabel={t("backlog.unassigned")} />
+      <span className="backlog-row-assignee" role="cell">
+        <TaskAssignee task={task} ready={ready} assigneeDisplayName={assigneeDisplayName} agentDisplayName={agentDisplayName} unassignedLabel={t("backlog.unassigned")} />
       </span>
-      <span className={cn("backlog-row-due", tone !== "neutral" && tone)}>
+      <span className={cn("backlog-row-due", tone !== "neutral" && tone)} role="cell">
         <ActionCalendar size={13} />
         {task.dueDate ? formatDueDate(task.dueDate) : t("backlog.no_due")}
       </span>
-      <div className="backlog-row-actions" role="group" aria-label={t("backlog.actions")}>
+      <div className="backlog-row-actions" role="cell" aria-label={t("backlog.actions")}>
         <div className="backlog-action-group" aria-label={t("backlog.actions_dispatch")}>
           <Button variant="default"
             type="button"
             className="backlog-action-primary backlog-action-icon"
             onClick={onStart}
-            disabled={(!task.assignedAgentId && !canDiscuss) || task.status === "running" || task.status === "done"}
-            aria-label={task.assignedAgentId ? t("backlog.start") : t("backlog.start_team")}
-            title={task.assignedAgentId ? t("backlog.start") : t("backlog.start_team")}
+            disabled={(!task.assignedAgentId && !task.assignedTeamId && !canDiscuss) || task.status === "running" || task.status === "done"}
+            aria-label={(task.assignedAgentId || task.assignedTeamId) ? t("backlog.start") : t("backlog.start_team")}
+            title={(task.assignedAgentId || task.assignedTeamId) ? t("backlog.start") : t("backlog.start_team")}
           >
             <ActionStart size={14} />
           </Button>
@@ -432,6 +439,7 @@ function BacklogTaskRow({
 
 export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing, onRefresh, onOpenConversation }: BacklogPageProps) {
   const { agents: logicalAgents } = useEmployeeAgents(currentUser.employeeId);
+  const { teams } = useTeams(currentUser.employeeId);
   const { t } = useTranslation();
   const {
     startTaskMutation,
@@ -475,6 +483,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
       assigneeEmployeeId: task.assigneeEmployeeId ?? task.ownerEmployeeId ?? currentUser.employeeId ?? currentUser.username,
       assignedAgent: task.assignedAgent ?? "",
       assignedAgentId: task.assignedAgentId ?? "",
+      assignedTeamId: task.assignedTeamId ?? "",
     });
   }
 
@@ -490,6 +499,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
         status: form.status,
         dueDate: form.dueDate,
         assignedAgentId: form.assignedAgentId || null,
+        assignedTeamId: form.assignedTeamId || null,
       };
       if (form.id) await updateTaskMutation.mutateAsync({ taskId: form.id, input: payload });
       else await createTaskMutation.mutateAsync(payload);
@@ -507,6 +517,20 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
     return latest ? sessions.find((session) => session.id === latest) : undefined;
   }
 
+  function taskAssignmentDisplay(task: RelayTask): { name?: string; ready: boolean } {
+    const team = teams.find((candidate) => candidate.id === task.assignedTeamId);
+    if (team) {
+      return {
+        name: team.name,
+        ready: teamLeadReady(team),
+      };
+    }
+    return {
+      name: logicalAgents.find((agent) => agent.id === task.assignedAgentId)?.displayName,
+      ready: agentReadyForTask(task, nodes, logicalAgents),
+    };
+  }
+
   function changeView(next: BacklogView) {
     setView(next);
     writeViewPreference(VIEW_STORAGE_KEY, next);
@@ -520,26 +544,29 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
     return {
       onEdit: () => editTask(task),
       onStart: () => void startTaskMutation.mutate(
-        task.assignedAgentId
+        (task.assignedAgentId || task.assignedTeamId)
           ? { taskId: task.id }
           : { taskId: task.id, assignments: discussionAssignments },
         {
           onSuccess: (result) => {
-            if (!task.assignedAgentId && result.session) onOpenConversation(result.session.id);
+            if (!task.assignedAgentId && !task.assignedTeamId && result.session) onOpenConversation(result.session.id);
           },
         },
       ),
-      onDiscuss: () => void startTaskMutation.mutate(
-        {
-          taskId: task.id,
-          assignments: discussionAssignments,
-        },
-        {
-          onSuccess: (result) => {
-            if (result.session) onOpenConversation(result.session.id);
+      onDiscuss: () => {
+        if (!canDiscussTask(task)) return;
+        void startTaskMutation.mutate(
+          {
+            taskId: task.id,
+            assignments: discussionAssignments,
           },
-        },
-      ),
+          {
+            onSuccess: (result) => {
+              if (result.session) onOpenConversation(result.session.id);
+            },
+          },
+        );
+      },
       onOpenThread: () => session && onOpenConversation(session.id),
       onToggleBlock: () => void updateTaskMutation.mutate({
         taskId: task.id,
@@ -583,26 +610,29 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
           );
         })()
       ) : view === "list" ? (
-        <div className="backlog-rows" role="list" aria-label={t("backlog.title")}>
-          <div className="backlog-rows-head" aria-hidden="true">
-            <span className="backlog-rows-head-cell backlog-rows-head-lead">{t("backlog.col_task")}</span>
-            <span className="backlog-rows-head-cell backlog-rows-head-status">{t("backlog.status")}</span>
-            <span className="backlog-rows-head-cell backlog-rows-head-tags">{t("backlog.priority")}</span>
-            <span className="backlog-rows-head-cell backlog-rows-head-assignee">{t("backlog.assignee")}</span>
-            <span className="backlog-rows-head-cell backlog-rows-head-due">{t("backlog.due")}</span>
-            <span className="backlog-rows-head-cell backlog-rows-head-actions">{t("backlog.actions")}</span>
+        <div className="backlog-rows" role="table" aria-label={t("backlog.title")}>
+          <div className="backlog-rows-head" role="row">
+            <span className="backlog-rows-head-cell backlog-rows-head-dot" role="columnheader" />
+            <span className="backlog-rows-head-cell backlog-rows-head-lead" role="columnheader">{t("backlog.col_task")}</span>
+            <span className="backlog-rows-head-cell backlog-rows-head-status" role="columnheader">{t("backlog.status")}</span>
+            <span className="backlog-rows-head-cell backlog-rows-head-tags" role="columnheader">{t("backlog.priority")}</span>
+            <span className="backlog-rows-head-cell backlog-rows-head-assignee" role="columnheader">{t("backlog.assignee")}</span>
+            <span className="backlog-rows-head-cell backlog-rows-head-due" role="columnheader">{t("backlog.due")}</span>
+            <span className="backlog-rows-head-cell backlog-rows-head-actions" role="columnheader">{t("backlog.actions")}</span>
           </div>
           {filteredTasks.map((task) => {
             const session = linkedSession(task);
             const discussionAgents = discussionAgentsForTask(task, nodes, logicalAgents);
+            const assignment = taskAssignmentDisplay(task);
             return (
               <BacklogTaskRow
                 key={task.id}
                 task={task}
                 session={session}
-                agentDisplayName={logicalAgents.find((agent) => agent.id === task.assignedAgentId)?.displayName}
-                ready={agentReadyForTask(task, nodes, logicalAgents)}
-                canDiscuss={discussionAgents.length > 0}
+                assigneeDisplayName={taskAssigneeDisplayName(task, currentUser)}
+                agentDisplayName={assignment.name}
+                ready={assignment.ready}
+                canDiscuss={canDiscussTask(task) && discussionAgents.length > 0}
                 {...taskHandlers(task, session)}
               />
             );
@@ -622,14 +652,16 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
                 ) : grouped[status].map((task) => {
                   const session = linkedSession(task);
                   const discussionAgents = discussionAgentsForTask(task, nodes, logicalAgents);
+                  const assignment = taskAssignmentDisplay(task);
                   return (
                     <BacklogTaskCard
                       key={task.id}
                       task={task}
                       session={session}
-                      agentDisplayName={logicalAgents.find((agent) => agent.id === task.assignedAgentId)?.displayName}
-                      ready={agentReadyForTask(task, nodes, logicalAgents)}
-                      canDiscuss={discussionAgents.length > 0}
+                      assigneeDisplayName={taskAssigneeDisplayName(task, currentUser)}
+                      agentDisplayName={assignment.name}
+                      ready={assignment.ready}
+                      canDiscuss={canDiscussTask(task) && discussionAgents.length > 0}
                       {...taskHandlers(task, session)}
                     />
                   );
@@ -644,6 +676,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
         <TaskDrawer
           form={form}
           logicalAgents={logicalAgents}
+          teams={teams}
           saving={saving}
           title={form.id ? t("backlog.edit_task") : t("backlog.new_task")}
           subtitle={form.id ?? t("backlog.new_task_id")}

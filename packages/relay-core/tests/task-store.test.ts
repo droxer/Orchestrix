@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { LocalTaskStore, materializeTaskEvents } from "../src/index.js";
+import { LocalTaskStore, materializeTaskEvents, relayTaskEvent } from "../src/index.js";
 
 function tempStore(): LocalTaskStore {
   return new LocalTaskStore(mkdtempSync(join(tmpdir(), "relay-task-store-")));
@@ -43,5 +43,22 @@ describe("LocalTaskStore deletion", () => {
     const events = (await store.getTask(task.id)).events;
     const rebuilt = materializeTaskEvents(events);
     assert.ok(rebuilt.deletedAt);
+  });
+});
+
+describe("task team assignment events", () => {
+  it("materializes a team-only assignment and clears a prior agent assignment", async () => {
+    const store = tempStore();
+    const task = await store.createTask({ title: "Team task", description: "", priority: "normal" });
+    const assigned = await store.assignTask(task.id, "codex", "agent-1");
+
+    const rebuilt = materializeTaskEvents([
+      ...assigned.events,
+      relayTaskEvent("task.assigned", task.id, { teamId: "team-1" }),
+    ]);
+
+    assert.equal(rebuilt.assignedTeamId, "team-1");
+    assert.equal(rebuilt.assignedAgent, undefined);
+    assert.equal(rebuilt.assignedAgentId, undefined);
   });
 });

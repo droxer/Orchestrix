@@ -16,6 +16,11 @@ from loguru import logger
 from ..core.models import AGENT_NAMES
 from ..persistence.stores import valid_agent
 from ..sessions import SessionArchivedError, SessionController, SessionRunInFlightError
+from ..services.team_dispatch import (
+    TeamDispatchError,
+    task_thread_assignments,
+    task_thread_ownership,
+)
 from .deps import AppContextDep
 from .helpers import (
     artifact_index_item,
@@ -72,6 +77,7 @@ def session_brief_item(session: dict[str, Any]) -> dict[str, Any]:
         "phase": session.get("phase"),
         "workspacePath": session.get("workspacePath"),
         "ownerEmployeeId": session.get("ownerEmployeeId"),
+        "teamId": session.get("teamId"),
         "currentAgent": session.get("currentAgent"),
         "pendingDecision": session.get("pendingDecision"),
         "artifactCount": len(workspace_artifacts(session)),
@@ -90,6 +96,8 @@ def task_brief_item(task: dict[str, Any]) -> dict[str, Any]:
         "ownerEmployeeId": task.get("ownerEmployeeId"),
         "assigneeEmployeeId": task.get("assigneeEmployeeId"),
         "assignedAgent": task.get("assignedAgent"),
+        "assignedAgentId": task.get("assignedAgentId"),
+        "assignedTeamId": task.get("assignedTeamId"),
         "dueDate": task.get("dueDate"),
         "isRoutine": task.get("isRoutine", False),
         "routineType": task.get("routineType"),
@@ -186,20 +194,48 @@ async def list_artifacts(request: Request, ctx: AppContextDep) -> dict[str, Any]
 @router.get("/workspace/brief")
 async def workspace_brief(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
+    requested_team_id = (request.query_params.get("teamId") or "").strip()
+    if requested_team_id and request.query_params.get("agentId"):
+        raise HTTPException(400, "agentId and teamId cannot be combined.")
+    team = ctx.team_store.get_team(requested_team_id) if requested_team_id else None
+    if requested_team_id and (not team or team.get("deletedAt")):
+        raise HTTPException(404, "Team not found.")
+    if team and not actor["isAdmin"] and team.get("ownerEmployeeId") != actor["employeeId"]:
+        raise HTTPException(403, "Cannot read another employee's team workspace.")
+
     agent = agent_for_workspace(ctx, actor, request.query_params.get("agentId"))
-    employee_id = agent_supervisor_employee_id(agent) if agent else employee_for_workspace_brief(actor, request.query_params.get("employeeId"))
+    employee_id = (
+        team.get("ownerEmployeeId")
+        if team
+        else agent_supervisor_employee_id(agent)
+        if agent
+        else employee_for_workspace_brief(actor, request.query_params.get("employeeId"))
+    )
     if not employee_id:
         raise HTTPException(404, "Agent owner not found.")
 
+    sessions = [
+        session
+        for session in ctx.session_store.list_sessions()
+        if session.get("ownerEmployeeId") == employee_id
+        and (not agent or session_uses_agent(session, agent["id"]))
+        and (not team or session.get("teamId") == team["id"])
+    ]
     nodes = [node for node in ctx.registry.monitor_nodes() if node.get("employeeId") == employee_id]
-    active_runs = [run for node in nodes for run in node.get("activeRuns", []) if not agent or run.get("currentLogicalAgentId") == agent["id"]]
-
-    sessions = [session for session in ctx.session_store.list_sessions() if session.get("ownerEmployeeId") == employee_id and (not agent or session_uses_agent(session, agent["id"]))]
+    team_session_ids = {session["id"] for session in sessions} if team else set()
+    active_runs = [
+        run
+        for node in nodes
+        for run in node.get("activeRuns", [])
+        if (not agent or run.get("currentLogicalAgentId") == agent["id"])
+        and (not team or run.get("sessionId") in team_session_ids)
+    ]
     tasks = [
         task
         for task in ctx.task_store.list_tasks()
         if (task.get("ownerEmployeeId") == employee_id or task.get("assigneeEmployeeId") == employee_id)
         and (not agent or task.get("assignedAgentId") == agent["id"])
+        and (not team or task.get("assignedTeamId") == team["id"])
     ]
     artifacts = [
         artifact_index_item(session, artifact)
@@ -214,6 +250,7 @@ async def workspace_brief(request: Request, ctx: AppContextDep) -> dict[str, Any
     return {
         "employeeId": employee_id,
         **({"agentId": agent["id"]} if agent else {}),
+        **({"teamId": team["id"]} if team else {}),
         "nodes": nodes,
         "activeRuns": sorted(active_runs, key=lambda item: item.get("startedAt") or "", reverse=True),
         "sessions": [session_brief_item(session) for session in recent_sessions],
@@ -244,20 +281,38 @@ async def create_session(request: Request, ctx: AppContextDep) -> dict[str, Any]
     workspace_path = string_field(body, "workspacePath") or "/workspace"
     task_id = body.get("taskId") if isinstance(body.get("taskId"), str) else None
     task = get_task_for_actor(ctx.task_store, task_id, actor) if task_id else None
+    if task:
+        assignments = task_thread_assignments(
+            task,
+            assignments,
+            team_store=ctx.team_store,
+            agent_store=ctx.agent_store,
+        )
     owner = owner_employee_id_for_create(actor, body)
-    if task and task.get("ownerEmployeeId"):
+    thread_ownership = {
+        "owner_employee_id": owner,
+        **({"owner_agent_id": owner_agent_id} if owner_agent_id else {}),
+    }
+    if task:
+        try:
+            thread_ownership = task_thread_ownership(
+                task, team_store=ctx.team_store, agent_store=ctx.agent_store
+            )
+        except TeamDispatchError as error:
+            raise HTTPException(409, error.code) from error
+        expected_owner = thread_ownership.get("owner_employee_id")
         requested_owner = string_field(body, "ownerEmployeeId") or string_field(body, "employeeId")
-        if actor["isAdmin"] and not requested_owner:
-            owner = task["ownerEmployeeId"]
-        elif owner != task["ownerEmployeeId"]:
-            raise HTTPException(403, "Session owner must match the linked task owner.")
+        if requested_owner and requested_owner != expected_owner:
+            raise HTTPException(403, "Session owner must match the linked task assignee.")
+        owner = expected_owner or owner
+        if owner and "owner_employee_id" not in thread_ownership:
+            thread_ownership["owner_employee_id"] = owner
     controller = SessionController(
         ctx.session_store,
         task_store=ctx.task_store,
         task_id=task_id,
         workspace_path=workspace_path,
-        owner_employee_id=owner,
-        owner_agent_id=owner_agent_id,
+        **thread_ownership,
     )
     session = controller.create_session(
         task_goal,
@@ -389,7 +444,11 @@ async def handoff(session_id: str, request: Request, ctx: AppContextDep) -> dict
 # Session lifecycle states after which no further events are appended; the
 # stream flushes the backlog and closes when it sees one of these.
 TERMINAL_SESSION_STATUSES = frozenset({"completed", "failed", "cancelled"})
-_STREAM_POLL_SECONDS = 1.0
+# Agent subprocesses emit output in small chunks, but this tail loop is the
+# final hop before the browser. A one-second interval collects those chunks
+# into visible bursts; 100 ms keeps the transcript perceptibly continuous
+# without turning an open SSE connection into a busy loop.
+_STREAM_POLL_SECONDS = 0.1
 _STREAM_HEARTBEAT_SECONDS = 15.0
 _STREAM_MAX_SECONDS = 60 * 30
 

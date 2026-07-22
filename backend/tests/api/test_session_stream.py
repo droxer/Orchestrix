@@ -6,6 +6,7 @@ from tempfile import TemporaryDirectory
 from fastapi.testclient import TestClient
 
 from relay.app import create_app
+from relay.api.session_routes import _STREAM_POLL_SECONDS
 
 
 def _bootstrap_admin(client: TestClient, token: str = "admin_token") -> None:
@@ -32,6 +33,13 @@ def _parse_sse(body: str) -> list[tuple[str, str]]:
 
 def _message_payloads(body: str) -> list[dict[str, object]]:
     return [json.loads(data) for event, data in _parse_sse(body) if event == "message"]
+
+
+def test_session_event_tail_poll_has_interactive_streaming_latency() -> None:
+    # A one-second tail poll batches many agent.output events into a visible
+    # jump in the browser. Keep the worst-case server-side wait below the
+    # threshold where streamed text stops feeling continuous.
+    assert _STREAM_POLL_SECONDS <= 0.1
 
 
 def test_session_events_streams_backlog_then_closes_on_terminal(monkeypatch) -> None:

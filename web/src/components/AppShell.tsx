@@ -16,6 +16,7 @@ const WORK_ROUTE_LABEL_KEYS: Record<Exclude<AppRoute, "main">, string> = {
   backlog: "nav.backlog",
   routine: "nav.routine",
   agents: "nav.agents",
+  teams: "nav.teams",
   channels: "nav.channels",
   admin: "nav.admin",
 };

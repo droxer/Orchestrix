@@ -102,22 +102,25 @@
   min-width: 0;
 }
 
-.chat-active-agent {
-  display: none;
-  align-items: center;
-  gap: var(--sp-1);
-  min-height: 30px;
-  padding: 0 var(--sp-3);
-  border: 1px solid var(--line-1);
-  border-radius: var(--r-2);
-  color: var(--ink-3);
+.chat-agent-select {
   font: var(--type-label);
-  white-space: nowrap;
+  color: var(--ink-2);
 }
 
-.chat-active-agent-mark {
+.chat-agent-select-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-active-agent-mark,
+.chat-agent-option-mark {
   flex: 0 0 auto;
   opacity: 0.8;
+}
+
+.chat-agent-option-availability {
+  color: var(--ink-3);
+  font-size: var(--fs-1);
 }
 
 .chat-header .icon-button:disabled {
@@ -153,75 +156,6 @@
   line-height: 1;
 }
 
-.header-agent-tabs {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: var(--sp-1);
-  border-radius: var(--r-2);
-  background: var(--surface-2);
-}
-
-.header-agent-tabs button {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-1);
-  min-height: 30px;
-  padding: 0 var(--sp-3);
-  border: 1px solid transparent;
-  border-radius: var(--r-2);
-  color: var(--ink-2);
-  font: var(--type-label);
-  background: transparent;
-  white-space: nowrap;
-}
-
-.header-agent-tab-mark {
-  flex: 0 0 auto;
-  opacity: 0.85;
-  transition: opacity var(--t-fast) var(--ease);
-}
-
-/* Ghost-button's default hover fill (--muted) resolves to the same token as
-   this track's own background, so it paints invisibly here — use
-   surface-raised + a hairline instead so hover reads on a track that's
-   already elevated. */
-.header-agent-tabs button:hover {
-  color: var(--ink-1);
-  background: var(--surface-3);
-  border-color: var(--line-1);
-}
-
-.header-agent-tabs button:hover .header-agent-tab-mark,
-.header-agent-tabs button.active .header-agent-tab-mark {
-  opacity: 1;
-}
-
-.header-agent-tabs button.active {
-  background: var(--surface-0);
-  color: var(--ink-1);
-  border-color: var(--line-1);
-}
-
-.header-agent-tabs button.agent-tab-disabled,
-.header-agent-tabs button.agent-tab-disabled:hover {
-  color: var(--ink-3);
-  opacity: 0.55;
-  text-decoration: line-through;
-  text-decoration-thickness: 1px;
-  cursor: not-allowed;
-  background: transparent;
-  border-color: transparent;
-}
-
-.header-agent-tabs button.agent-tab-busy {
-  color: var(--ink-1);
-}
-
-.header-agent-tabs button.agent-tab-busy .header-agent-tab-mark {
-  opacity: 1;
-}
-
 .header-agent-busy-pip {
   flex: 0 0 auto;
   width: 6px;
@@ -248,15 +182,6 @@
   .header-agent-busy-pip {
     animation: none;
   }
-}
-
-.header-agent-tabs button.agent-tab-failed {
-  color: var(--err);
-}
-
-.header-agent-tabs button.agent-tab-not-ready {
-  color: var(--ink-3);
-  opacity: 0.72;
 }
 
 .transcript {

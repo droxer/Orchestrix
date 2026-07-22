@@ -53,8 +53,8 @@ export function NodeRow({ node, storedTokens, colocated, onReveal, onManageAgent
   const online = isNodeOnline(node);
 
   return (
-    <li className="adm-node-row" data-node={node.id} data-online={online ? "true" : "false"}>
-      <div className="adm-node-row-id">
+    <li className="adm-node-row" data-node={node.id} data-online={online ? "true" : "false"} role="row">
+      <div className="adm-node-row-id" role="cell">
         <span className="adm-node-avatar adm-node-avatar--machine" translate="no">
           <AdminNode size={16} aria-hidden="true" />
           <NodePresence node={node} t={t} className="adm-presence--corner" />
@@ -84,6 +84,7 @@ export function NodeRow({ node, storedTokens, colocated, onReveal, onManageAgent
 
       <div
         className="adm-node-row-agents"
+        role="cell"
         aria-label={t("admin.v2.node_runtimes")}
         title={t("admin.v2.node_runtimes")}
       >
@@ -111,7 +112,7 @@ export function NodeRow({ node, storedTokens, colocated, onReveal, onManageAgent
         )}
       </div>
 
-      <div className="adm-node-row-actions">
+      <div className="adm-node-row-actions" role="cell">
         <NodeActions
           node={node}
           onReveal={onReveal}

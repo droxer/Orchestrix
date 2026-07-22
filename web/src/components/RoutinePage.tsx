@@ -6,15 +6,16 @@ import { Input } from "@/components/ui/input";
 import { useRelayMutations } from "../hooks/useRelayMutations";
 import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
 import { useEmployeeAgents } from "../hooks/useEmployeeAgents";
+import { useTeams } from "../hooks/useTeams";
 import { useDialogs } from "@/components/ui/DialogProvider";
-import { AgentStateBadge } from "./AgentStateBadge";
 import { Badge } from "@/components/ui/badge";
 import { PriorityBadge } from "./PriorityBadge";
 import { cn } from "@/lib/utils";
 import { type CurrentUser, type DaemonNodeMonitorRecord, type EmployeeAgent, type RelaySession, type RelayTask } from "../types";
 import { ActionCalendar, ActionStart, NavConversations, ViewGrid, ViewList } from "./icons";
 import { agentReadyForTask } from "../lib/backlog";
-import { TaskAssignee } from "./TaskAssignee";
+import { TaskAssignee, TaskExecutionBadge } from "./TaskAssignee";
+import { taskAssigneeDisplayName, teamLeadReady } from "../lib/taskAssignment";
 import { readViewPreference, writeViewPreference } from "../lib/viewPreference";
 import { filterRoutineTasks, latestRoutineSession, routineDueTone, TASK_ROUTINE_CADENCES, TASK_ROUTINE_TYPES, type RoutineFilters } from "../lib/routine";
 import { emptyRoutineForm, taskBoardFormsEqual, type RoutineTaskFormState } from "../lib/taskBoardForm";
@@ -166,6 +167,7 @@ function RoutineCard({
   task,
   session,
   ready,
+  assigneeDisplayName,
   agentDisplayName,
   onEdit,
   onStart,
@@ -174,6 +176,7 @@ function RoutineCard({
   task: RelayTask;
   session?: RelaySession;
   ready: boolean;
+  assigneeDisplayName?: string;
   agentDisplayName?: string;
   onEdit: () => void;
   onStart: () => void;
@@ -187,14 +190,14 @@ function RoutineCard({
       <div className="backlog-task-badges">
         <Badge variant={task.routineEnabled ? "success" : "neutral"}>{task.routineEnabled ? t("routine.enabled") : t("routine.disabled")}</Badge>
         <PriorityBadge priority={task.priority} />
-        <AgentStateBadge agent={task.assignedAgent} ready={ready} />
+        <TaskExecutionBadge task={task} ready={ready} displayName={agentDisplayName} />
       </div>
       <Button variant="ghost" type="button" className="backlog-task-title" onClick={onEdit}>{task.title}</Button>
       {task.description ? <p className="backlog-description">{task.description}</p> : null}
       <div className="backlog-meta">
         <span>{t(`routine.types.${task.routineType ?? "task"}`)} · {t(`routine.cadences.${task.routineCadence ?? "weekly"}`)}</span>
         <span className="backlog-meta-sep" aria-hidden="true">·</span>
-        <TaskAssignee task={task} ready={ready} agentDisplayName={agentDisplayName} unassignedLabel={t("backlog.unassigned")} showAgent={false} />
+        <TaskAssignee task={task} ready={ready} assigneeDisplayName={assigneeDisplayName} agentDisplayName={agentDisplayName} unassignedLabel={t("backlog.unassigned")} showAgent={false} />
         <span className="backlog-meta-sep" aria-hidden="true">·</span>
         <span className={cn("backlog-due", tone !== "neutral" && tone)}>
           <ActionCalendar size={13} />
@@ -212,7 +215,7 @@ function RoutineCard({
           <Button variant="default"
             type="button"
             className="backlog-action-primary backlog-action-icon"
-            onClick={onStart} disabled={!task.assignedAgentId || !task.routineEnabled} aria-label={t("backlog.start")} title={t("backlog.start")}>
+            onClick={onStart} disabled={(!task.assignedAgentId && !task.assignedTeamId) || !task.routineEnabled} aria-label={t("backlog.start")} title={t("backlog.start")}>
             <ActionStart size={14} />
           </Button>
         </div>
@@ -260,6 +263,7 @@ function RoutineRow({
   task,
   session,
   ready,
+  assigneeDisplayName,
   agentDisplayName,
   onEdit,
   onStart,
@@ -268,6 +272,7 @@ function RoutineRow({
   task: RelayTask;
   session?: RelaySession;
   ready: boolean;
+  assigneeDisplayName?: string;
   agentDisplayName?: string;
   onEdit: () => void;
   onStart: () => void;
@@ -277,29 +282,31 @@ function RoutineRow({
   const tone = routineDueTone(task);
 
   return (
-    <article className="backlog-row group list-virtual" role="listitem" data-status={task.status} data-priority={task.priority}>
-      <div className="backlog-row-lead">
-        <span className="backlog-row-dot" aria-hidden="true" />
+    <article className="backlog-row group list-virtual" role="row" data-status={task.status} data-priority={task.priority}>
+      <span className="backlog-row-dot-cell" aria-hidden="true">
+        <span className="backlog-row-dot" />
+      </span>
+      <div className="backlog-row-lead" role="cell">
         <Button variant="ghost" type="button" className="backlog-row-title" onClick={onEdit}>{task.title}</Button>
       </div>
-      <span className="backlog-row-status">{task.routineEnabled ? t("routine.enabled") : t("routine.disabled")}</span>
-      <div className="backlog-row-tags">
+      <span className="backlog-row-status" role="cell">{task.routineEnabled ? t("routine.enabled") : t("routine.disabled")}</span>
+      <div className="backlog-row-tags" role="cell">
         <PriorityBadge priority={task.priority} />
       </div>
-      <span className="backlog-row-assignee">
-        <TaskAssignee task={task} ready={ready} agentDisplayName={agentDisplayName} unassignedLabel={t("backlog.unassigned")} />
+      <span className="backlog-row-assignee" role="cell">
+        <TaskAssignee task={task} ready={ready} assigneeDisplayName={assigneeDisplayName} agentDisplayName={agentDisplayName} unassignedLabel={t("backlog.unassigned")} />
       </span>
-      <span className={cn("backlog-row-due", tone !== "neutral" && tone)}>
+      <span className={cn("backlog-row-due", tone !== "neutral" && tone)} role="cell">
         <ActionCalendar size={13} />
         {task.routineNextRunDate ? formatNextRunDate(task.routineNextRunDate) : t("routine.no_next_run")}
       </span>
-      <div className="backlog-row-actions" role="group" aria-label={t("backlog.actions")}>
+      <div className="backlog-row-actions" role="cell" aria-label={t("backlog.actions")}>
         <div className="backlog-action-group" aria-label={t("backlog.actions_dispatch")}>
           <Button variant="default"
             type="button"
             className="backlog-action-primary backlog-action-icon"
             onClick={onStart}
-            disabled={!task.assignedAgentId || !task.routineEnabled}
+            disabled={(!task.assignedAgentId && !task.assignedTeamId) || !task.routineEnabled}
             aria-label={t("backlog.start")}
             title={t("backlog.start")}
           >
@@ -357,6 +364,7 @@ function RoutineDrawerMeta({
 
 export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing, onRefresh, onOpenConversation }: RoutinePageProps) {
   const { agents: logicalAgents } = useEmployeeAgents(currentUser.employeeId);
+  const { teams } = useTeams(currentUser.employeeId);
   const { t } = useTranslation();
   const { confirm } = useDialogs();
   const {
@@ -402,6 +410,7 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
       assigneeEmployeeId: task.assigneeEmployeeId ?? task.ownerEmployeeId ?? currentUser.employeeId ?? currentUser.username,
       assignedAgent: task.assignedAgent ?? "",
       assignedAgentId: task.assignedAgentId ?? "",
+      assignedTeamId: task.assignedTeamId ?? "",
       routineType: task.routineType ?? "task",
       routineCadence: task.routineCadence ?? "weekly",
       routineNextRunDate: task.routineNextRunDate ?? "",
@@ -426,6 +435,7 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
           ? { routineNextRunDate: form.routineNextRunDate }
           : {}),
         assignedAgentId: form.assignedAgentId || null,
+        assignedTeamId: form.assignedTeamId || null,
       };
       if (form.id) await updateTaskMutation.mutateAsync({ taskId: form.id, input: payload });
       else await createTaskMutation.mutateAsync(payload);
@@ -462,6 +472,20 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
 
   function linkedSession(task: RelayTask): RelaySession | undefined {
     return latestRoutineSession(task, tasks, sessions);
+  }
+
+  function taskAssignmentDisplay(task: RelayTask): { name?: string; ready: boolean } {
+    const team = teams.find((candidate) => candidate.id === task.assignedTeamId);
+    if (team) {
+      return {
+        name: team.name,
+        ready: teamLeadReady(team),
+      };
+    }
+    return {
+      name: logicalAgents.find((agent) => agent.id === task.assignedAgentId)?.displayName,
+      ready: agentReadyForTask(task, nodes, logicalAgents),
+    };
   }
 
   const editingTask = form?.id ? tasks.find((task) => task.id === form.id) : undefined;
@@ -504,24 +528,27 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
           onCreate={routineTasks.length === 0 ? () => openRoutineForm(emptyRoutineForm(currentUser)) : undefined}
         />
       ) : view === "list" ? (
-        <div className="backlog-rows" role="list" aria-label={t("routine.title")}>
-          <div className="backlog-rows-head" aria-hidden="true">
-            <span className="backlog-rows-head-cell backlog-rows-head-lead">{t("backlog.col_task")}</span>
-            <span className="backlog-rows-head-cell backlog-rows-head-status">{t("routine.state")}</span>
-            <span className="backlog-rows-head-cell backlog-rows-head-tags">{t("backlog.priority")}</span>
-            <span className="backlog-rows-head-cell backlog-rows-head-assignee">{t("backlog.assignee")}</span>
-            <span className="backlog-rows-head-cell backlog-rows-head-due">{t("routine.next_run")}</span>
-            <span className="backlog-rows-head-cell backlog-rows-head-actions">{t("backlog.actions")}</span>
+        <div className="backlog-rows" role="table" aria-label={t("routine.title")}>
+          <div className="backlog-rows-head" role="row">
+            <span className="backlog-rows-head-cell backlog-rows-head-dot" role="columnheader" />
+            <span className="backlog-rows-head-cell backlog-rows-head-lead" role="columnheader">{t("backlog.col_task")}</span>
+            <span className="backlog-rows-head-cell backlog-rows-head-status" role="columnheader">{t("routine.state")}</span>
+            <span className="backlog-rows-head-cell backlog-rows-head-tags" role="columnheader">{t("backlog.priority")}</span>
+            <span className="backlog-rows-head-cell backlog-rows-head-assignee" role="columnheader">{t("backlog.assignee")}</span>
+            <span className="backlog-rows-head-cell backlog-rows-head-due" role="columnheader">{t("routine.next_run")}</span>
+            <span className="backlog-rows-head-cell backlog-rows-head-actions" role="columnheader">{t("backlog.actions")}</span>
           </div>
           {filteredTasks.map((task) => {
             const session = linkedSession(task);
+            const assignment = taskAssignmentDisplay(task);
             return (
               <RoutineRow
                 key={task.id}
                 task={task}
                 session={session}
-                agentDisplayName={logicalAgents.find((agent) => agent.id === task.assignedAgentId)?.displayName}
-                ready={agentReadyForTask(task, nodes, logicalAgents)}
+                assigneeDisplayName={taskAssigneeDisplayName(task, currentUser)}
+                agentDisplayName={assignment.name}
+                ready={assignment.ready}
                 {...routineHandlers(task, session)}
               />
             );
@@ -531,13 +558,15 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
         <div className="routine-list">
           {filteredTasks.map((task) => {
             const session = linkedSession(task);
+            const assignment = taskAssignmentDisplay(task);
             return (
               <RoutineCard
                 key={task.id}
                 task={task}
                 session={session}
-                agentDisplayName={logicalAgents.find((agent) => agent.id === task.assignedAgentId)?.displayName}
-                ready={agentReadyForTask(task, nodes, logicalAgents)}
+                assigneeDisplayName={taskAssigneeDisplayName(task, currentUser)}
+                agentDisplayName={assignment.name}
+                ready={assignment.ready}
                 {...routineHandlers(task, session)}
               />
             );
@@ -549,6 +578,7 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
         <TaskDrawer
           form={form}
           logicalAgents={logicalAgents}
+          teams={teams}
           saving={saving}
           deleting={deleting}
           title={form.id ? t("routine.edit") : t("routine.new")}

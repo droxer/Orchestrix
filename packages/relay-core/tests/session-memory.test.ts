@@ -17,6 +17,22 @@ function tempStore(): LocalSessionStore {
 }
 
 describe("SessionController prompt memory", () => {
+  it("preserves the originating Team on the session event and snapshot", async () => {
+    const store = tempStore();
+    const session = await store.createSession({
+      workspacePath: "/workspace/alice",
+      ownerEmployeeId: "alice",
+      teamId: "team_delivery",
+      taskGoal: "ship the release",
+      participants: ["human", "codex"],
+    });
+
+    assert.equal(session.teamId, "team_delivery");
+    assert.equal(await store.getSession(session.id).then((value) => value.teamId), "team_delivery");
+    assert.equal(session.events[0]?.type, "session.created");
+    assert.equal(session.events[0]?.type === "session.created" ? session.events[0].teamId : undefined, "team_delivery");
+  });
+
   it("shares same-turn multi-agent output through the full handoff bridge", async () => {
     const store = tempStore();
     const commands: string[] = [];

@@ -5,8 +5,9 @@ import { useTranslation } from "react-i18next";
 import { useEmployeeAgents } from "../hooks/useEmployeeAgents";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import type { AgentName, CurrentUser, EmployeeAgent, LogicalAgentAvailability } from "../types";
-import { ActionSearch, NavConversations, StreamInfo } from "./icons";
+import { ActionSearch } from "./icons";
 import { AgentStateBadge } from "./AgentStateBadge";
+import { StatusPill } from "./StatusPill";
 import { AgentWorkspacePage, type WorkspacePageTab } from "./AgentWorkspacePage";
 import { RelayEmptyState } from "./RelayEmptyState";
 import { Badge } from "./ui/badge";
@@ -20,7 +21,6 @@ interface AgentsPageProps {
   /** The agent currently inspected in the detail pane, driven by the URL hash. */
   workspaceAgent: EmployeeAgent | null;
   onOpenWorkspace: (agent: EmployeeAgent, tab?: WorkspacePageTab) => void;
-  onStartConversation: (agent: EmployeeAgent) => void;
   onOpenConversation: (sessionId: string) => void;
 }
 
@@ -104,14 +104,10 @@ function RosterRow({
   agent,
   selected,
   onSelect,
-  onStartConversation,
-  onOpenProfile,
 }: {
   agent: EmployeeAgent;
   selected: boolean;
   onSelect: (agent: EmployeeAgent) => void;
-  onStartConversation: (agent: EmployeeAgent) => void;
-  onOpenProfile: (agent: EmployeeAgent) => void;
 }) {
   const { t } = useTranslation();
   const placements = activePlacements(agent);
@@ -119,7 +115,6 @@ function RosterRow({
   // One agent lives on exactly one computer.
   const computer = placementDescriptions[0] ?? null;
   const ready = agent.enabled && agent.availability === "ready";
-  const canChat = ready;
 
   return (
     <li className="list-virtual">
@@ -144,44 +139,22 @@ function RosterRow({
             </span>
             {/* The executor is carried by the AgentStateBadge glyph; the row's
                 one infra line is the computer the agent runs on. */}
-            {computer ? (
-              <span className="agents-roster-row-placements">
-                <AgentPlacementBadge description={computer} compact />
-              </span>
-            ) : (
-              <span className="agents-roster-row-meta">
+            <span className="agents-roster-row-meta">
+              {computer ? (
+                <AgentPlacementBadge description={computer} plain />
+              ) : (
                 <span className="mono">{t("agents_page.no_placements")}</span>
-              </span>
-            )}
+              )}
+            </span>
           </span>
+          {/* Explicit live status: the row accent + glyph pip carry the tone,
+              the pill names it (Ready / Busy / Pending / Offline). */}
+          {agent.enabled ? (
+            <span className="agents-roster-row-status">
+              <StatusPill value={agent.availability} />
+            </span>
+          ) : null}
         </button>
-        <span className="agents-roster-row-actions" role="group" aria-label={t("agents_page.actions")}>
-          <button
-            type="button"
-            className="agents-roster-row-action"
-            disabled={!canChat}
-            onClick={(event) => {
-              event.stopPropagation();
-              onStartConversation(agent);
-            }}
-            aria-label={t("agents_page.start_chat")}
-            title={t("agents_page.start_chat")}
-          >
-            <NavConversations size={13} />
-          </button>
-          <button
-            type="button"
-            className="agents-roster-row-action"
-            onClick={(event) => {
-              event.stopPropagation();
-              onOpenProfile(agent);
-            }}
-            aria-label={t("agents_page.view_profile_for", { name: agent.displayName })}
-            title={t("agents_page.view_profile_for", { name: agent.displayName })}
-          >
-            <StreamInfo size={13} />
-          </button>
-        </span>
       </article>
     </li>
   );
@@ -193,7 +166,6 @@ export function AgentsPage({
   onRefresh,
   workspaceAgent,
   onOpenWorkspace,
-  onStartConversation,
   onOpenConversation,
 }: AgentsPageProps) {
   const { t } = useTranslation();
@@ -206,7 +178,6 @@ export function AgentsPage({
     parseAvailabilityFilter,
     (value) => value === "all" ? null : value,
   );
-
   const activeAgents = useMemo(
     () => agents.filter((agent) => !agent.deletedAt),
     [agents],
@@ -275,8 +246,6 @@ export function AgentsPage({
                 agent={agent}
                 selected={workspaceAgent?.id === agent.id}
                 onSelect={onOpenWorkspace}
-                onStartConversation={onStartConversation}
-                onOpenProfile={(selected) => onOpenWorkspace(selected, "profile")}
               />
             ))}
           </ul>
@@ -302,7 +271,6 @@ export function AgentsPage({
           />
         )}
       </div>
-
     </section>
   );
 }

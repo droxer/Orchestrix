@@ -38,6 +38,7 @@ export interface SessionControllerOptions {
   taskId?: string;
   workspacePath?: string;
   ownerEmployeeId?: string;
+  teamId?: string;
   sink?: AgentOutputSink;
   signal?: AbortSignal;
   execStream?: AgentRunOptions["execStream"];
@@ -72,6 +73,7 @@ export class SessionController implements AgentEventSink {
     const session = await this.store.createSession({
       workspacePath: this.options.workspacePath ?? GUEST_WORKSPACE,
       ownerEmployeeId: this.options.ownerEmployeeId,
+      teamId: this.options.teamId,
       taskGoal,
       participants,
       status: "running",

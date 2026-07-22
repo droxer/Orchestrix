@@ -46,6 +46,50 @@
   gap: var(--sp-7);
 }
 
+.team-member-fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.team-member-fieldset legend {
+  margin-bottom: var(--sp-2);
+}
+
+.team-member-options {
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-1);
+  background: var(--line-1);
+}
+
+.team-member-option {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  background: var(--surface-0);
+  cursor: pointer;
+}
+
+.team-member-option:hover {
+  background: var(--surface-2);
+}
+
+/* Native checkboxes default to vendor blue; keep them on the ink action
+   token like the stream toolbar's inputs. */
+.team-member-option input[type="checkbox"] {
+  accent-color: var(--action);
+}
+
+.team-member-option small {
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+}
+
 .adm-employees-empty.relay-empty--fill {
   min-height: min(420px, 50vh);
 }
@@ -87,44 +131,51 @@
   padding: 0;
 }
 
-.adm-emp-cols {
+/* Column geometry is declared ONCE per table, shared by the header row and
+   the data rows — drift here is what silently misaligns headers from cells. */
+.adm-emp-cols,
+.adm-emp-row {
   display: grid;
   grid-template-columns: minmax(220px, 1.2fr) minmax(0, 2fr) auto auto;
   gap: var(--sp-6);
+}
+
+.adm-emp-cols {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface-0);
   padding: 0 0 var(--sp-3);
   border-bottom: 1px solid var(--line-1);
 }
 
-.adm-emp-col-label {
+.adm-col-label {
   font: var(--type-label-strong);
   letter-spacing: var(--track-caps);
   text-transform: uppercase;
   color: var(--ink-3);
 }
 
-.adm-emp-col-label--metrics {
+.adm-col-label--metrics {
   text-align: right;
 }
 
 .adm-emp-row {
-  display: grid;
-  grid-template-columns: minmax(220px, 1.2fr) minmax(0, 2fr) auto auto;
-  gap: var(--sp-6);
   align-items: center;
   padding: var(--sp-3) 0;
   border-bottom: 1px solid var(--line-2);
   position: relative;
-  transition: border-color var(--t-fast) var(--ease);
+  transition: background var(--t-fast) var(--ease);
 }
 
 .adm-emp-row:hover {
-  border-bottom-color: var(--ink-1);
+  background: color-mix(in srgb, var(--surface-1) 60%, transparent);
 }
 
 .adm-emp-row.is-pulse::after {
   content: "";
   position: absolute;
-  left: -16px;
+  left: calc(-1 * var(--sp-4));
   top: 0;
   bottom: 0;
   width: 2px;
@@ -477,10 +528,18 @@
 
 /* ── Node list (list view) — row geometry mirrors the employee list so
    both views share one table language. ────────────────────────────────── */
-.adm-node-cols {
+.adm-node-cols,
+.adm-node-row {
   display: grid;
   grid-template-columns: minmax(200px, 1.4fr) minmax(0, 2fr) auto;
   gap: var(--sp-6);
+}
+
+.adm-node-cols {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface-0);
   padding: 0 0 var(--sp-3);
   border-bottom: 1px solid var(--line-1);
 }
@@ -492,18 +551,15 @@
 }
 
 .adm-node-row {
-  display: grid;
-  grid-template-columns: minmax(200px, 1.4fr) minmax(0, 2fr) auto;
-  gap: var(--sp-6);
   align-items: center;
   padding: var(--sp-3) 0;
   border-bottom: 1px solid var(--line-2);
   position: relative;
-  transition: border-color var(--t-fast) var(--ease);
+  transition: background var(--t-fast) var(--ease);
 }
 
 .adm-node-row:hover {
-  border-bottom-color: var(--ink-1);
+  background: color-mix(in srgb, var(--surface-1) 60%, transparent);
 }
 
 .adm-node-row-id {
@@ -1024,7 +1080,7 @@
 .adm-agent-chip.tone-neutral .adm-agent-dot { background: var(--ink-4); }
 
 /* Official vendor glyph — identity, alongside the name label. Same
-   flex/opacity treatment as .header-agent-tab-mark / .chat-active-agent-mark. */
+   flex/opacity treatment as .chat-active-agent-mark. */
 .adm-agent-chip-mark {
   flex: 0 0 auto;
   display: inline-grid;

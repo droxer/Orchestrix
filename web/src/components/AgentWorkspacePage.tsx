@@ -21,6 +21,7 @@ import { AgentMark } from "./AgentMark";
 import { PageHeader } from "./PageHeader";
 import { Button } from "./ui/button";
 import { ArtifactBody } from "./artifact/ArtifactBody";
+import { ArtifactsEmpty } from "./artifact/ArtifactsEmpty";
 import { CodeView, isHtmlFile, isMarkdownFile, isRenderableFile, languageForFile } from "./CodeView";
 import { Markdown } from "./Markdown";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
@@ -179,9 +180,9 @@ function SnapshotBanner({ onDismiss }: { onDismiss: () => void }) {
   return (
     <div className="workspace-snapshot-banner" role="status">
       <p className="workspace-snapshot-banner-text">{t("workspace.snapshot_banner")}</p>
-      <button type="button" className="workspace-snapshot-banner-dismiss" onClick={onDismiss}>
+      <Button variant="ghost" type="button" className="workspace-snapshot-banner-dismiss h-auto" onClick={onDismiss}>
         {t("workspace.dismiss")}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -469,15 +470,23 @@ export function AgentWorkspacePage({
           id={`workspace-page-panel-${pageTab}`}
           aria-labelledby={`workspace-page-tab-${pageTab}`}
         >
-          {showBrowsePane ? (
+          {showBrowsePane && pageTab === "artifacts" && !artifacts.length ? (
+            /* No artifacts means nothing to preview — the empty state owns
+               the whole panel instead of sitting beside a dead preview pane. */
+            agentArtifactsQuery.isLoading ? (
+              <WorkspaceLoading label={t("workspace.loading")} />
+            ) : (
+              <ArtifactsEmpty
+                title={t("workspace.no_artifacts")}
+                hint={t("workspace.empty_artifacts_hint")}
+              />
+            )
+          ) : showBrowsePane ? (
             <div className="workspace-panes">
               <section className="workspace-pane workspace-pane-browse" aria-label={pageTab === "artifacts" ? t("workspace.artifacts") : t("workspace.tab_files")}>
                 {pageTab === "artifacts" ? (
                   <div className="workspace-pane-body">
-                    {agentArtifactsQuery.isLoading && !artifacts.length ? (
-                      <WorkspaceLoading label={t("workspace.loading")} />
-                    ) : artifacts.length ? (
-                      <ul className="workspace-pick-list">
+                    <ul className="workspace-pick-list">
                         {artifacts.map((artifact) => {
                           const active = selected?.type === "artifact" && selected.artifact.id === artifact.id;
                           return (
@@ -497,14 +506,7 @@ export function AgentWorkspacePage({
                             </li>
                           );
                         })}
-                      </ul>
-                    ) : (
-                      <WorkspaceEmpty
-                        title={t("workspace.no_artifacts")}
-                        hint={t("workspace.empty_artifacts_hint")}
-                        kind="artifacts"
-                      />
-                    )}
+                    </ul>
                   </div>
                 ) : (
                   <div className="workspace-tabpanel-files">
@@ -806,9 +808,9 @@ function FilesPane({
   return (
     <div className="workspace-pane-body">
       {path ? (
-        <button type="button" className="workspace-file-up" onClick={() => onOpenDirectory(parentPath(path))}>
+        <Button variant="ghost" type="button" className="workspace-file-up h-auto justify-start rounded-none" onClick={() => onOpenDirectory(parentPath(path))}>
           {t("workspace.parent_directory")}
-        </button>
+        </Button>
       ) : null}
 
       {isLoading ? (
@@ -1005,9 +1007,9 @@ function WorkspaceError({ message, onRetry }: { message: string; onRetry: () => 
       <div className="workspace-error" role="alert">
         <span className="workspace-eyebrow">{t("workspace.load_failed")}</span>
         <p>{message}</p>
-        <button type="button" className="workspace-error-action" onClick={onRetry}>
+        <Button variant="ghost" type="button" className="workspace-error-action h-auto" onClick={onRetry}>
           {t("workspace.retry")}
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -44,26 +44,15 @@
 
 /* Stacked drawers — every layer uses the one scrim; nested backdrops
    composite on top of each other, so depth darkens on its own. */
-.adm-drawer-backdrop--layer-1,
-.adm-drawer-backdrop--layer-2,
-.adm-drawer-backdrop--layer-3 { background: var(--scrim); }
 
+/* Close affordance: geometry (36px, rounded-full) comes from the Button
+   primitive via OverlayCloseButton; this class contributes only placement,
+   color, and the focus ring. Touch targets (44px) are bumped in a11y.css /
+   mobile-overlays.css. */
 .overlay-close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 36px;
-  height: 36px;
   margin-top: 4px;
-  border: none;
-  border-radius: var(--r-full);
-  background: transparent;
   color: var(--ink-3);
   cursor: pointer;
-  transition:
-    background var(--t-fast) var(--ease),
-    color var(--t-fast) var(--ease);
 }
 
 .overlay-close:hover {

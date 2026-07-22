@@ -90,9 +90,9 @@ export function AgentInstructionEditor({
           <div className="agent-instruction-editor-toolbar">
             <span>{t("agents_page.instructions_editor_label")}</span>
             {!draftValue ? (
-              <button type="button" onClick={useStarter} disabled={saving}>
+              <Button variant="ghost" type="button" className="h-auto" onClick={useStarter} disabled={saving}>
                 {t("agents_page.instructions_starter_action")}
-              </button>
+              </Button>
             ) : null}
           </div>
           <Textarea

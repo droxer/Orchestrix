@@ -42,6 +42,8 @@ const nextConfig = (phase: string): NextConfig => {
                 { source: "/workspace/:path*", destination: `${backendUrl}/workspace/:path*` },
                 { source: "/daemon-nodes/:path*", destination: `${backendUrl}/daemon-nodes/:path*` },
                 { source: "/tasks/:path*", destination: `${backendUrl}/tasks/:path*` },
+                { source: "/teams", destination: `${backendUrl}/teams` },
+                { source: "/teams/:path*", destination: `${backendUrl}/teams/:path*` },
               ],
             };
           },

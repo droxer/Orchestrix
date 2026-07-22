@@ -94,10 +94,7 @@
 .agents-roster-row[data-availability="offline"] { --row-accent: var(--ink-4); }
 
 .agents-roster-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
-  gap: var(--sp-2);
+  display: flex;
   width: 100%;
   min-width: 0;
   border-left: 2px solid transparent;
@@ -108,9 +105,10 @@
 
 .agents-roster-row-select {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: start;
   gap: var(--sp-2);
+  flex: 1;
   min-width: 0;
   border: 0;
   background: transparent;
@@ -168,6 +166,13 @@
   white-space: nowrap;
 }
 
+/* Status pill sits flush right, aligned with the title line; it must not
+   compress — the name column ellipsizes first. */
+.agents-roster-row-status {
+  flex: none;
+  align-self: center;
+}
+
 .agents-roster-row-meta {
   display: flex;
   min-width: 0;
@@ -179,12 +184,28 @@
   white-space: nowrap;
 }
 
-.agents-roster-row-placements {
-  display: flex;
-  flex-wrap: wrap;
+/* Quiet roster form of the placement badge: no chip box, no status dot —
+   availability already lives on the row accent and the glyph pip. The icon
+   keeps ownership legible; everything else waits in the tooltip. */
+.agent-placement-plain {
+  display: inline-flex;
+  align-items: center;
   gap: var(--sp-1);
   min-width: 0;
-  margin-top: var(--sp-1);
+  max-width: 100%;
+  color: var(--ink-3);
+}
+
+.agent-placement-plain > svg {
+  flex: none;
+}
+
+.agent-placement-plain-name {
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: var(--fs-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .agent-placement-badge {
@@ -202,10 +223,6 @@
   font-family: var(--font-mono);
   font-size: var(--fs-2);
   line-height: 1.35;
-}
-
-.agent-placement-badge.is-compact {
-  padding-block: 1px;
 }
 
 /* Same ownership mapping as .adm-node-profile-kind: managed = action tint,
@@ -266,48 +283,6 @@
   color: var(--ink-4);
 }
 
-.agents-roster-row-sep {
-  opacity: 0.6;
-}
-
-.agents-roster-row-actions {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-1);
-  opacity: 0;
-  transition: opacity var(--t-fast) var(--ease);
-}
-
-.agents-roster-row:hover .agents-roster-row-actions,
-.agents-roster-row:focus-within .agents-roster-row-actions,
-.agents-roster-row[data-selected="true"] .agents-roster-row-actions {
-  opacity: 1;
-}
-
-.agents-roster-row-action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border: 1px solid var(--line-1);
-  border-radius: var(--r-2);
-  background: var(--surface-2);
-  color: var(--ink-3);
-  cursor: pointer;
-  transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
-}
-
-.agents-roster-row-action:hover {
-  color: var(--ink-1);
-  border-color: color-mix(in srgb, var(--ink-1) 20%, var(--line-1));
-}
-
-.agents-roster-row-action:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
 /* ---- detail (right pane) --------------------------------------------- */
 
 .agents-detail {
@@ -342,17 +317,5 @@
   .agents-detail {
     min-height: 60vh;
     overflow: visible;
-  }
-}
-
-@media (pointer: coarse) {
-  .agents-roster-row-actions {
-    flex-direction: row;
-    opacity: 1;
-  }
-
-  .agents-roster-row-action {
-    width: 44px;
-    height: 44px;
   }
 }
