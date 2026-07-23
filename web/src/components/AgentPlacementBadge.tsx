@@ -3,6 +3,7 @@
 import { useTranslation } from "react-i18next";
 import {
   placementBadgeDetailLabels,
+  placementBadgeShowsSandbox,
   placementStatusTone,
   type AgentPlacementDescription,
   type PlacementOwnership,
@@ -32,12 +33,13 @@ export function AgentPlacementBadge({
   const sandboxLabel = t(`admin.v2.node_sandbox_${description.sandbox}`);
   const status = description.placement.status;
   const statusLabel = t(`admin.v2.placement_status.${status}`, { defaultValue: status });
+  const showsSandbox = placementBadgeShowsSandbox(description.sandbox, showSandbox);
   const detailTitle = placementBadgeDetailLabels({
     nodeName: description.nodeName,
     ownership: ownershipLabel,
-    sandbox: sandboxLabel,
+    sandboxLabel,
     status: statusLabel,
-  }, showSandbox).join(" · ");
+  }, showsSandbox).join(" · ");
 
   if (plain) {
     return (
@@ -65,7 +67,7 @@ export function AgentPlacementBadge({
         {description.nodeName}
       </span>
       <span className="agent-placement-badge-kind">{ownershipLabel}</span>
-      {showSandbox ? (
+      {showsSandbox ? (
         <span className="agent-placement-badge-sandbox">{sandboxLabel}</span>
       ) : null}
     </span>

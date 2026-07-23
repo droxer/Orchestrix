@@ -26,8 +26,15 @@ export interface AgentPlacementDescription {
 export interface PlacementBadgeLabels {
   nodeName: string;
   ownership: string;
-  sandbox: string;
+  sandboxLabel: string;
   status: string;
+}
+
+export function placementBadgeShowsSandbox(
+  sandbox: PlacementSandbox,
+  requested: boolean,
+): boolean {
+  return requested && sandbox !== "host";
 }
 
 export function placementBadgeDetailLabels(
@@ -37,7 +44,7 @@ export function placementBadgeDetailLabels(
   return [
     labels.nodeName,
     labels.ownership,
-    ...(includeSandbox ? [labels.sandbox] : []),
+    ...(includeSandbox ? [labels.sandboxLabel] : []),
     labels.status,
   ];
 }

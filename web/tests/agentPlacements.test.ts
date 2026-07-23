@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { describe, it } from "node:test";
 
 import {
   describeAgentPlacements,
   placementBadgeDetailLabels,
+  placementBadgeShowsSandbox,
 } from "../src/lib/agentPlacements.js";
 import type { AgentPlacement } from "../src/types.js";
 
@@ -73,11 +76,11 @@ describe("describeAgentPlacements", () => {
     ]);
   });
 
-  it("keeps host-process details out of employee placement labels", () => {
+  it("never exposes direct-runtime implementation details in placement labels", () => {
     const labels = {
       nodeName: "Alice’s MacBook",
       ownership: "Local computer",
-      sandbox: "Host process",
+      sandboxLabel: "Direct on computer",
       status: "Ready",
     };
 
@@ -86,12 +89,17 @@ describe("describeAgentPlacements", () => {
       "Local computer",
       "Ready",
     ]);
-    assert.deepEqual(placementBadgeDetailLabels(labels, true), [
+    assert.deepEqual(placementBadgeDetailLabels(
+      labels,
+      placementBadgeShowsSandbox("host", true),
+    ), [
       "Alice’s MacBook",
       "Local computer",
-      "Host process",
       "Ready",
     ]);
+    assert.equal(placementBadgeShowsSandbox("host", true), false);
+    assert.equal(placementBadgeShowsSandbox("boxlite", true), true);
+    assert.equal(placementBadgeShowsSandbox("boxlite", false), false);
   });
 
   it("does not describe draining placements as preferred routes", () => {
@@ -114,5 +122,24 @@ describe("describeAgentPlacements", () => {
       ["placement_draining", null],
       ["placement_ready", "preferred"],
     ]);
+  });
+});
+
+describe("placement wording", () => {
+  it("describes direct execution without process terminology", async () => {
+    const translation = JSON.parse(await readFile(
+      resolve("web/src/i18n/locales/en/translation.json"),
+      "utf8",
+    )) as { admin: { v2: Record<string, string> } };
+
+    assert.equal(translation.admin.v2.node_sandbox_host, "Direct on computer");
+    assert.equal(
+      translation.admin.v2.profile_local_desc,
+      "Agents run directly on this computer and reuse this user’s agent authentication.",
+    );
+    assert.equal(
+      translation.admin.v2.node_help_local,
+      "Agents run directly on this computer and reuse this user’s agent authentication.",
+    );
   });
 });

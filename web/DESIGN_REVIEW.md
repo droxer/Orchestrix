@@ -375,7 +375,7 @@ The node card's execution profile was a bare mono label with a 5px color dot —
 
 **Shipped:**
 
-- `NodeProfileBadges` renders a per-kind glyph before the label (`icons.tsx`: `NodeManaged` = Container/box for BoxLite VM, `NodeLocal` = Terminal for host processes, `NodePending` = CircleDashed for awaiting daemon), driven by an `EXECUTION_ICON` map keyed on `NodeExecutionProfile`.
+- `NodeProfileBadges` renders a per-kind glyph before the label (`icons.tsx`: `NodeManaged` = Container/box for BoxLite VM, `NodeLocal` = Terminal for direct execution, `NodePending` = CircleDashed for awaiting daemon), driven by an `EXECUTION_ICON` map keyed on `NodeExecutionProfile`.
 - `.adm-node-profile-kind` is now a tinted chip (padding + border + `color-mix` background) toned per `data-kind`: managed → info/blue, local → success/green, pending → muted outline. Icon inherits `currentColor`. Replaces the old `::before` dot.
 - Cue is triple-encoded (icon + tone + label) so it doesn't rely on color alone.
 - `NodeProfileBadges` gained `hideThisHost`; `NodeCard` passes it so the card drops the "This host" locality (the status pill already conveys liveness). CredentialsDrawer keeps the full locality set.

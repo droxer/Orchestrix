@@ -135,7 +135,7 @@ export const ViewGrid = withStandardStroke(LayoutGrid, "ViewGrid");
 export const ActionKey = withStandardStroke(KeyRound, "ActionKey");
 
 // Node execution profile glyphs — managed (BoxLite VM = a container/box),
-// local (host processes = a shell), pending (awaiting daemon = a dashed ring).
+// local (direct execution = a shell), pending (awaiting daemon = a dashed ring).
 export const NodeManaged = withStandardStroke(Container, "NodeManaged");
 export const NodeLocal = withStandardStroke(Terminal, "NodeLocal");
 export const NodePending = withStandardStroke(CircleDashed, "NodePending");

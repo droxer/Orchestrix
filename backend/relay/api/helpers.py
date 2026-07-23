@@ -107,7 +107,7 @@ def daemon_start_env(request: Request, node: dict[str, Any], sandbox_mode: str =
         "RELAY_SANDBOX_MODE": sandbox_mode,
     }
     # Reusing the host user's agent auth only makes sense when agents run as
-    # host processes; in boxlite mode guest provisioning handles agent auth.
+    # direct execution; in boxlite mode guest provisioning handles agent auth.
     if sandbox_mode == "none":
         env["RELAY_USE_LOCAL_AGENT_HOME"] = "1"
     if node.get("employeeId"):
