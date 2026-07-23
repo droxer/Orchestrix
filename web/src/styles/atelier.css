@@ -267,8 +267,7 @@ html[data-theme="dark"] .rail-node { background: var(--surface-3); }
    composer, creating a consistent transition from overview to editing. */
 .adm-drawer,
 .pref-modal,
-.artifact-library-drawer,
-.task-drawer {
+.artifact-library-drawer {
   border: 1px solid var(--line-1);
   background: var(--surface-3);
   box-shadow: var(--shadow-2);
@@ -337,8 +336,7 @@ html[data-theme="dark"] .workspace-pick[data-active="true"] {
 
 html[data-theme="dark"] .adm-drawer,
 html[data-theme="dark"] .pref-modal,
-html[data-theme="dark"] .artifact-library-drawer,
-html[data-theme="dark"] .task-drawer { background: var(--surface-3); }
+html[data-theme="dark"] .artifact-library-drawer { background: var(--surface-3); }
 
 html[data-theme="dark"] .adm-form-section,
 html[data-theme="dark"] .adm-assign-node,

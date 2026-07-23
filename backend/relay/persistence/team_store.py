@@ -94,7 +94,7 @@ class LocalTeamStore:
 
     def get_team(self, team_id: str) -> dict[str, Any] | None:
         path = self._snapshot_path(team_id)
-        return _read_json(path) if path.exists() else None
+        return _normalized_team_snapshot(_read_json(path)) if path.exists() else None
 
     def list_teams(
         self,
@@ -102,7 +102,10 @@ class LocalTeamStore:
         *,
         include_deleted: bool = False,
     ) -> list[dict[str, Any]]:
-        teams = [_read_json(path) for path in self.root.glob("*/snapshot.json")]
+        teams = [
+            _normalized_team_snapshot(_read_json(path))
+            for path in self.root.glob("*/snapshot.json")
+        ]
         if owner_employee_id is not None:
             teams = [
                 team
@@ -286,9 +289,23 @@ class DatabaseTeamStore:
 
     def get_team(self, team_id: str) -> dict[str, Any] | None:
         with self.engine.begin() as conn:
-            return conn.scalar(
-                select(self.teams.c.snapshot).where(self.teams.c.public_id == team_id)
+            row = (
+                conn.execute(
+                    select(
+                        self.teams.c.snapshot,
+                        self.teams.c.owner_employee_public_id,
+                    ).where(self.teams.c.public_id == team_id)
+                )
+                .mappings()
+                .first()
             )
+        return (
+            _normalized_team_snapshot(
+                row["snapshot"], row["owner_employee_public_id"]
+            )
+            if row
+            else None
+        )
 
     def list_teams(
         self,
@@ -296,7 +313,10 @@ class DatabaseTeamStore:
         *,
         include_deleted: bool = False,
     ) -> list[dict[str, Any]]:
-        statement = select(self.teams.c.snapshot)
+        statement = select(
+            self.teams.c.snapshot,
+            self.teams.c.owner_employee_public_id,
+        )
         if owner_employee_id is not None:
             statement = statement.where(
                 self.teams.c.owner_employee_public_id
@@ -305,7 +325,13 @@ class DatabaseTeamStore:
         if not include_deleted:
             statement = statement.where(self.teams.c.deleted_at.is_(None))
         with self.engine.begin() as conn:
-            teams = list(conn.scalars(statement).all())
+            rows = conn.execute(statement).mappings().all()
+        teams = [
+            _normalized_team_snapshot(
+                row["snapshot"], row["owner_employee_public_id"]
+            )
+            for row in rows
+        ]
         return sorted(
             teams,
             key=lambda team: (
@@ -420,6 +446,7 @@ class DatabaseTeamStore:
                             select(
                                 self.teams.c.id,
                                 self.teams.c.snapshot,
+                                self.teams.c.owner_employee_public_id,
                                 self.teams.c.event_version,
                             )
                             .where(self.teams.c.public_id == team_id)
@@ -430,7 +457,9 @@ class DatabaseTeamStore:
                     )
                     if not row:
                         raise KeyError(team_id)
-                    current = row["snapshot"] or {}
+                    current = _normalized_team_snapshot(
+                        row["snapshot"] or {}, row["owner_employee_public_id"]
+                    )
                     if current.get("deletedAt"):
                         raise KeyError(team_id)
                     mutation = mutate(current)
@@ -511,6 +540,24 @@ def _new_team(
         "createdAt": timestamp,
         "updatedAt": timestamp,
     }
+
+
+def _normalized_team_snapshot(
+    team: dict[str, Any], owner_employee_id: str | None = None
+) -> dict[str, Any]:
+    """Map pre-owner terminology onto the current team contract on read."""
+    owner = (
+        team.get("ownerEmployeeId")
+        or team.get("supervisorEmployeeId")
+        or team.get("employeeId")
+        or owner_employee_id
+    )
+    normalized = {
+        key: value
+        for key, value in team.items()
+        if key not in {"supervisorEmployeeId", "employeeId"}
+    }
+    return {**normalized, "ownerEmployeeId": owner} if owner else normalized
 
 
 def _normalize_team_patch(

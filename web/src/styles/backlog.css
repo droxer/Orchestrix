@@ -372,7 +372,15 @@
 
 .agent-state.tone-good::after { background: var(--ok); }
 .agent-state.tone-warn::after { background: var(--warn); }
-.agent-state.tone-bad::after { background: var(--err); }
+/* Offline drops out of the brightness race: a bright --err fill is
+   byte-identical to --action white and read as "primary/selected" rather
+   than "problem". The offline pip becomes a hollow ring instead — the same
+   "dark / no signal" shape the fleet presence + node status dots use, so the
+   agent list speaks the same status language as the computers. */
+.agent-state.tone-bad::after {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--err);
+}
 
 /* Unassigned slot — dashed placeholder, no readiness pip. */
 .agent-state--empty {
@@ -689,6 +697,220 @@
 
 .task-drawer-next-run {
   grid-column: 1 / -1;
+}
+
+.task-drawer-form-grid-full {
+  grid-column: 1 / -1;
+}
+
+/* Assignment is the decision that determines whether a task can run. Give it
+   the full drawer width and show the operational consequence immediately,
+   instead of hiding agent/team readiness in a narrow select. */
+.task-assignment-field {
+  grid-column: 1 / -1;
+}
+
+.task-assignment-field > label {
+  color: var(--ink-2);
+  font: var(--type-label);
+}
+
+.task-assignment-field > [data-slot="select-trigger"] {
+  min-height: 48px;
+  padding-block: var(--sp-1);
+}
+
+.task-assignment-option {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.task-assignment-option-mark {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-2);
+  background: color-mix(in srgb, var(--surface-2) 76%, transparent);
+  color: var(--ink-2);
+}
+
+.task-assignment-option.is-empty .task-assignment-option-mark {
+  border-style: dashed;
+  color: var(--ink-4);
+}
+
+.task-assignment-option-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.task-assignment-option-copy > span:first-child {
+  overflow: hidden;
+  color: var(--ink-1);
+  font: var(--type-label-strong);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-assignment-option-copy > span:last-child {
+  color: var(--ink-3);
+  font: var(--type-label);
+  text-transform: capitalize;
+}
+
+.task-assignment-summary {
+  position: relative;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: start;
+  gap: var(--sp-3);
+  min-height: 76px;
+  overflow: hidden;
+  padding: var(--sp-3);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-3);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--surface-2) 86%, transparent), transparent 62%),
+    var(--surface-1);
+  transition: border-color 160ms var(--ease), transform 160ms var(--ease);
+}
+
+.task-assignment-summary::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: var(--ink-2);
+  content: "";
+}
+
+.task-assignment-summary.is-empty {
+  align-items: center;
+  min-height: 66px;
+  border-style: dashed;
+  background: color-mix(in srgb, var(--surface-1) 78%, transparent);
+}
+
+.task-assignment-summary.is-empty::before {
+  display: none;
+}
+
+.task-assignment-summary-mark {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-2);
+  background: var(--surface-2);
+  color: var(--ink-1);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--ink-1) 7%, transparent);
+}
+
+/* Readiness pip — identity stays shape (the glyph), status is the corner
+   hue, matching the .agent-state indicator used on the boards. */
+.task-assignment-summary-mark::after {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--surface-1);
+  border-radius: var(--r-full);
+  background: var(--ink-4);
+  content: "";
+}
+
+.task-assignment-summary[data-tone="good"] .task-assignment-summary-mark::after { background: var(--ok); }
+.task-assignment-summary[data-tone="warn"] .task-assignment-summary-mark::after { background: var(--warn); }
+.task-assignment-summary[data-tone="bad"] .task-assignment-summary-mark::after {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--err);
+}
+
+.task-assignment-summary.is-empty .task-assignment-summary-mark {
+  border-style: dashed;
+  color: var(--ink-4);
+  box-shadow: none;
+}
+
+.task-assignment-summary.is-empty .task-assignment-summary-mark::after {
+  content: none;
+}
+
+.task-assignment-summary-copy,
+.task-assignment-summary-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.task-assignment-summary-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.task-assignment-summary-title {
+  overflow: hidden;
+  color: var(--ink-1);
+  font: var(--type-label-strong);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-assignment-summary-meta,
+.task-assignment-summary-hint {
+  color: var(--ink-3);
+  font: var(--type-body-sm);
+}
+
+.task-assignment-summary-hint {
+  margin-top: 2px;
+  color: var(--warn);
+}
+
+.task-assignment-roster {
+  display: flex;
+  align-items: center;
+  margin-top: var(--sp-1);
+  padding-left: 3px;
+}
+
+.task-assignment-member,
+.task-assignment-member-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-left: -3px;
+  border: 2px solid var(--surface-1);
+  border-radius: var(--r-full);
+  background: var(--surface-3);
+  color: var(--ink-2);
+}
+
+.task-assignment-member-more {
+  width: auto;
+  min-width: 22px;
+  padding-inline: 4px;
+  color: var(--ink-3);
+  font: var(--type-label);
 }
 
 @media (max-width: 480px) {

@@ -6,6 +6,7 @@ import { useRelayMutations } from "../hooks/useRelayMutations";
 import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
 import { useEmployeeAgents } from "../hooks/useEmployeeAgents";
 import { useTeams } from "../hooks/useTeams";
+import { useDialogs } from "@/components/ui/DialogProvider";
 import { PriorityBadge } from "./PriorityBadge";
 import { cn } from "@/lib/utils";
 import { type CurrentUser, type DaemonNodeMonitorRecord, type EmployeeAgent, type RelaySession, type RelayTask, type TaskStatus } from "../types";
@@ -441,18 +442,21 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
   const { agents: logicalAgents } = useEmployeeAgents(currentUser.employeeId);
   const { teams } = useTeams(currentUser.employeeId);
   const { t } = useTranslation();
+  const { confirm } = useDialogs();
   const {
     startTaskMutation,
     updateTaskMutation,
     createTaskMutation,
+    deleteTaskMutation,
   } = useRelayMutations();
   const [filters, setFilters] = useUrlSearchState("backlogFilters", initialFilters, parseBacklogFilters, serializeBacklogFilters);
   const [view, setView] = useUrlSearchState("backlogView", parseBacklogView(null), parseBacklogView, (value) => value);
   const [form, setForm] = useState<BacklogTaskFormState | null>(null);
   const [formBaseline, setFormBaseline] = useState<BacklogTaskFormState | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const formDirty = Boolean(form && formBaseline && !taskBoardFormsEqual(form, formBaseline));
-  const confirmDiscardChanges = useUnsavedChangesGuard(formDirty && !saving);
+  const confirmDiscardChanges = useUnsavedChangesGuard(formDirty && !saving && !deleting);
   const backlogTasks = useMemo(() => tasks.filter((task) => !task.isRoutine), [tasks]);
   const filteredTasks = useMemo(() => filterTasks(backlogTasks, filters), [backlogTasks, filters]);
   const grouped = useMemo(() => tasksByStatus(filteredTasks), [filteredTasks]);
@@ -465,7 +469,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
   }
 
   async function closeTaskForm() {
-    if (saving) return;
+    if (saving || deleting) return;
     if (!(await confirmDiscardChanges())) return;
     setForm(null);
     setFormBaseline(null);
@@ -508,6 +512,28 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
       // mutation onError surfaces a toast; keep the drawer open for retry.
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function deleteBacklog() {
+    if (!form?.id || deleting) return;
+    const confirmed = await confirm({
+      title: t("backlog.delete_title"),
+      message: t("backlog.delete_body", { title: form.title }),
+      confirmLabel: t("backlog.delete_task"),
+      cancelLabel: t("dialog.cancel"),
+      tone: "danger",
+    });
+    if (!confirmed) return;
+    setDeleting(true);
+    try {
+      await deleteTaskMutation.mutateAsync({ taskId: form.id });
+      setForm(null);
+      setFormBaseline(null);
+    } catch {
+      // mutation onError surfaces a toast; keep the drawer open for retry.
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -677,6 +703,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
           logicalAgents={logicalAgents}
           teams={teams}
           saving={saving}
+          deleting={deleting}
           title={form.id ? t("backlog.edit_task") : t("backlog.new_task")}
           subtitle={form.id ?? t("backlog.new_task_id")}
           onClose={() => { void closeTaskForm(); }}
@@ -684,6 +711,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
             if (next.variant === "backlog") setForm(next);
           }}
           onSubmit={(event) => void submitTask(event)}
+          onDelete={form.id ? () => { void deleteBacklog(); } : undefined}
         />
       ) : null}
     </section>

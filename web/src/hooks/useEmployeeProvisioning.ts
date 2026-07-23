@@ -28,7 +28,7 @@ export function useEmployeeProvisioning({ nodes, setSandboxes, refreshLocalDaemo
     preferredToken?: string,
   ): Promise<{ sandbox: SandboxRecord; token?: string }> {
     const token = preferredToken?.trim() || undefined;
-    const controlPanelNodes = await refreshLocalDaemonNodes();
+    const controlPanelNodes = (await refreshLocalDaemonNodes()) ?? [];
     const localNode = preferLocalControlPanelNode(employeeId, controlPanelNodes);
 
     const claimLocalNode = async () => {
@@ -66,7 +66,7 @@ export function useEmployeeProvisioning({ nodes, setSandboxes, refreshLocalDaemo
   }
 
   const adoptLocalDaemonNodes = useCallback(async () => {
-    const controlPanelNodes = await refreshLocalDaemonNodes();
+    const controlPanelNodes = (await refreshLocalDaemonNodes()) ?? [];
     const claimable = controlPanelNodes.filter((node) => shouldClaimLocalDaemonNode(node, nodes));
     if (claimable.length === 0) return;
 

@@ -118,6 +118,15 @@ export {
 } from "./daemon-node-token.js";
 
 export {
+  ensureMachineId,
+  machineIdPath,
+  newMachineId,
+  readMachineId,
+  type MachineIdResolution,
+  type MachineIdSource,
+} from "./machine-id.js";
+
+export {
   encodeBase64,
   codexCliConfigOverrides,
   agentCredentialEnv,

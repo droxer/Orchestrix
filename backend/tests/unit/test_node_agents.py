@@ -333,6 +333,51 @@ def test_managed_nodes_share_workspace_path_without_being_the_same_computer(tmp_
     assert not agents.get_agent(stale["id"]).get("deletedAt")
 
 
+def test_sync_retires_legacy_two_segment_agent_on_same_node(tmp_path: Path) -> None:
+    """A pre-node-scoped ``<employee>:<kind>`` agent placed on the same computer
+    as its node-scoped replacement is a duplicate and must be retired."""
+    node = {
+        "id": "node_local",
+        "employeeId": "alice",
+        "workspacePath": "/home/alice/proj",
+        "supportedAgents": ["claude"],
+        "agents": {"claude": "ready"},
+        "online": True,
+    }
+    ctx, agents, placements = _registry_ctx(tmp_path, [node])
+    legacy = agents.create_agent("alice", {"displayName": "Captain America", "executorKind": "claude"})
+    legacy = agents.update_agent(legacy["id"], {"compatibilityKey": "alice:claude"})
+    placements.create_placement(legacy, "node_local")
+
+    sync_node_agents(ctx, node)
+
+    survivors = agents.list_agents(supervisor_employee_id="alice")
+    assert {agent["compatibilityKey"] for agent in survivors} == {"alice:node_local:claude"}
+    assert agents.get_agent(legacy["id"]).get("deletedAt")
+
+
+def test_sync_keeps_legacy_agent_on_a_different_node(tmp_path: Path) -> None:
+    """A legacy agent placed on a different computer is not a duplicate of the
+    registering node's agent and must survive."""
+    other = {"id": "node_other", "employeeId": "alice", "workspacePath": "/home/alice/other", "online": True}
+    node = {
+        "id": "node_local",
+        "employeeId": "alice",
+        "workspacePath": "/home/alice/proj",
+        "supportedAgents": ["claude"],
+        "agents": {"claude": "ready"},
+        "online": True,
+    }
+    ctx, agents, placements = _registry_ctx(tmp_path, [other, node])
+    legacy = agents.create_agent("alice", {"displayName": "Captain America", "executorKind": "claude"})
+    legacy = agents.update_agent(legacy["id"], {"compatibilityKey": "alice:claude"})
+    placements.create_placement(legacy, "node_other")
+
+    sync_node_agents(ctx, node)
+
+    assert not agents.get_agent(legacy["id"]).get("deletedAt")
+
+
 def test_reprovisioned_managed_node_retires_old_agent(tmp_path: Path) -> None:
     old_node = {
         "id": "node_old",

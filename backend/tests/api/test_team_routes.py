@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from datetime import date
+from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from fastapi.testclient import TestClient
@@ -91,6 +93,41 @@ def test_admin_and_employee_manage_teams(monkeypatch) -> None:
         )
         assert renamed.status_code == 200
         assert renamed.json()["team"]["name"] == "Delivery crew"
+
+
+def test_legacy_supervisor_owned_team_can_be_assigned_to_task(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap(client)
+        _employee(client, "alice")
+        lead = _agent(client, "alice", "Lead", "codex")
+        team = client.post(
+            "/cp/teams",
+            json={
+                "ownerEmployeeId": "alice",
+                "name": "Legacy delivery",
+                "leadAgentId": lead["id"],
+                "memberAgentIds": [lead["id"]],
+            },
+        ).json()["team"]
+
+        snapshot_path = Path(root) / "teams" / team["id"] / "snapshot.json"
+        legacy = json.loads(snapshot_path.read_text(encoding="utf-8"))
+        legacy["supervisorEmployeeId"] = legacy.pop("ownerEmployeeId")
+        snapshot_path.write_text(json.dumps(legacy), encoding="utf-8")
+
+        created = client.post(
+            "/tasks",
+            json={
+                "title": "Legacy team task",
+                "assigneeEmployeeId": "alice",
+                "assignedTeamId": team["id"],
+            },
+        )
+
+        assert created.status_code == 201, created.json()
+        assert created.json()["assignedTeamId"] == team["id"]
 
 
 def test_employee_team_routes_cannot_access_another_employee_team(monkeypatch) -> None:

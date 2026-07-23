@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import json
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from threading import Barrier, Lock
 
 import pytest
+from sqlalchemy import update
 
 from relay.persistence.agent_store import LocalAgentStore
 from relay.persistence import team_store as team_store_module
@@ -46,6 +48,40 @@ def test_team_store_crud_and_events(team_store) -> None:
     assert deleted["deletedAt"]
     assert team_store.list_teams(owner_employee_id="alice") == []
     assert team_store.get_team(created["id"])["deletedAt"]
+
+
+def test_team_store_normalizes_legacy_supervisor_owner(team_store) -> None:
+    created = team_store.create_team(
+        "alice",
+        {
+            "name": "Legacy delivery",
+            "leadAgentId": "agent_lead",
+            "memberAgentIds": ["agent_lead"],
+        },
+    )
+    legacy = {
+        **{key: value for key, value in created.items() if key != "ownerEmployeeId"},
+        "supervisorEmployeeId": "alice",
+    }
+    if isinstance(team_store, DatabaseTeamStore):
+        with team_store.engine.begin() as conn:
+            conn.execute(
+                update(team_store.teams)
+                .where(team_store.teams.c.public_id == created["id"])
+                .values(snapshot=legacy)
+            )
+    else:
+        snapshot_path = team_store._snapshot_path(created["id"])
+        snapshot_path.write_text(json.dumps(legacy), encoding="utf-8")
+
+    loaded = team_store.get_team(created["id"])
+    assert loaded["ownerEmployeeId"] == "alice"
+    assert "supervisorEmployeeId" not in loaded
+    assert team_store.list_teams(owner_employee_id="alice") == [loaded]
+
+    updated = team_store.update_team(created["id"], {"name": "Legacy crew"})
+    assert updated["ownerEmployeeId"] == "alice"
+    assert "supervisorEmployeeId" not in updated
 
 
 def test_team_names_are_unique_per_owner(team_store) -> None:

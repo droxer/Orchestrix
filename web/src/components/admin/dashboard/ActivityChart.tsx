@@ -26,7 +26,7 @@ export function ActivityChart({ daily, ready, className }: ActivityChartProps) {
   const [lineLength, setLineLength] = useState(0);
 
   const { areaPath, linePath, gridLines, xTicks, yTicks, max } = useMemo(() => {
-    const points = daily.length > 0 ? daily : Array.from({ length: 14 }, (_, i) => ({
+    const points = (daily?.length ?? 0) > 0 ? daily! : Array.from({ length: 14 }, (_, i) => ({
       date: `d${i}`,
       count: 0,
       completed: 0,
@@ -144,7 +144,7 @@ export function ActivityChart({ daily, ready, className }: ActivityChartProps) {
           </text>
         ))}
       </svg>
-      {daily.length > 0 ? (
+      {(daily?.length ?? 0) > 0 ? (
         <ul className="sr-only">
           {daily.map((point) => (
             <li key={point.date}>

@@ -28,6 +28,7 @@ import {
   initialAgentState,
   mergeAgentState,
   ensureDaemonNodeToken,
+  ensureMachineId,
   GUEST_WORKSPACE,
   agentHomePath,
   DAEMON_CAPABILITY_GENERATED_FILES,
@@ -115,7 +116,14 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
   let configuredEmployeeId = options.employeeId ?? process.env.RELAY_EMPLOYEE_ID;
   const employeeId = configuredEmployeeId ?? process.env.USER ?? "local";
   const workspacePath = firstNonBlank(options.workspacePath, process.env.RELAY_WORKSPACE, process.env.WORKSPACE) ?? process.cwd();
-  const workspaceId = firstNonBlank(options.workspaceId, process.env.RELAY_WORKSPACE_ID);
+  // Identify the computer by a stable per-host machine id, not the working
+  // directory. Relaunching the daemon from a different path (or booting a fresh
+  // sandbox) must resolve to the same computer, otherwise every launch mints a
+  // duplicate compatibility agent. An explicit workspaceId/RELAY_WORKSPACE_ID
+  // still wins for callers that manage identity themselves.
+  const workspaceId =
+    firstNonBlank(options.workspaceId, process.env.RELAY_WORKSPACE_ID) ??
+    ensureMachineId().machineId;
   const enrollmentToken = options.enrollmentToken ?? process.env.RELAY_ENROLLMENT_TOKEN;
   let enrolledToken: string | undefined;
   let enrolledSandboxMode: string | undefined;

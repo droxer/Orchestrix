@@ -46,19 +46,27 @@ export function StatusPill({ value }: StatusPillProps) {
   const { t } = useTranslation();
   const tone = statusTone(value);
   const live = value === "running" || value === "busy";
+  // Bad states drop out of the brightness race: a bright --err fill is
+  // byte-identical to --action white and reads as "primary/selected" rather
+  // than "problem". Render a hollow ring instead — the same shape the fleet
+  // presence + node status dots use. Inline boxShadow (not a Tailwind ring
+  // utility) so it survives the unlayered-reset cascade.
+  const ringBad = tone === "bad";
   return (
     <Badge variant={TONE_VARIANT[tone]} className="before:content-none">
       <span
         aria-hidden="true"
         className={cn(
           "size-1.5 shrink-0 rounded-full",
-          DOT_TONE[tone],
+          ringBad ? "bg-transparent" : DOT_TONE[tone],
           live && "animate-[pulse-ring_1.6s_var(--ease)_infinite]",
         )}
         style={
-          live
-            ? ({ "--pulse-color": DOT_PULSE_COLOR[tone] } as CSSProperties)
-            : undefined
+          ringBad
+            ? { boxShadow: "inset 0 0 0 1.5px var(--err)" }
+            : live
+              ? ({ "--pulse-color": DOT_PULSE_COLOR[tone] } as CSSProperties)
+              : undefined
         }
       />
       {t(`status.${value}`, { defaultValue: value })}

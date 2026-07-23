@@ -24,11 +24,17 @@ export function useLocalDaemonNodes(enabled: boolean): {
   });
 
   const refreshLocalDaemonNodes = useCallback(
-    () => queryClient.fetchQuery({
-      queryKey: CONTROL_PANEL_NODES_KEY,
-      queryFn: ({ signal }) => fetchControlPanelNodes(signal),
-      staleTime: 0,
-    }),
+    async () => {
+      try {
+        return (await queryClient.fetchQuery({
+          queryKey: CONTROL_PANEL_NODES_KEY,
+          queryFn: ({ signal }) => fetchControlPanelNodes(signal),
+          staleTime: 0,
+        })) ?? [];
+      } catch {
+        return [];
+      }
+    },
     [queryClient],
   );
 

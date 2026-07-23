@@ -881,9 +881,29 @@
   background: var(--tone, var(--ink-4));
 }
 
+/* Failed/stale drop out of the brightness race. A bright --err fill is
+   byte-identical to --action white, so it read as "primary/selected" rather
+   than "problem". The bad dot becomes a hollow ring instead — the same
+   "dark / broken" shape the offline presence dot uses. Shape now carries the
+   alarm, not brightness. (inset shadow, not border, keeps the 6px box.) */
+.adm-status-pill.tone-bad .adm-status-dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--err);
+}
+
 /* Running/provisioning stay hue-free on the dot — the accent is reserved for
-   action, selection, and focus, never a passive status indicator. */
-.adm-status-pill.tone-info .adm-status-dot { background: var(--ink-4); }
+   action, selection, and focus, never a passive status indicator — but they
+   breathe: the same slow pulse-ring the presence dot uses, so live execution
+   reads as active at a glance without borrowing an accent hue. */
+.adm-status-pill.tone-info .adm-status-dot {
+  background: var(--ink-4);
+  --pulse-color: var(--ink-4);
+  animation: pulse-ring 2.6s var(--ease) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .adm-status-pill.tone-info .adm-status-dot { animation: none; }
+}
 
 /* ---- Computer presence (online / offline) --------------------------------
    Monochrome liveness cue reused on the fleet card, list row, and assign
@@ -1042,9 +1062,16 @@
   gap: var(--sp-1);
 }
 
+/* Binary by design: ready and neutral both read as the calm dim dot. The
+   old tone-good grey (--ok) sat one ink-step from neutral (--ink-4) — a
+   distinction the eye could not resolve at 6px, so it implied a difference
+   it never showed. Only failed differs, and it differs by SHAPE (a hollow
+   ring), not by a brightness step. */
 .adm-runtime-mark .adm-agent-dot { background: var(--ink-4); }
-.adm-runtime-mark.tone-good .adm-agent-dot { background: var(--ok); }
-.adm-runtime-mark.tone-bad .adm-agent-dot { background: var(--err); }
+.adm-runtime-mark.tone-bad .adm-agent-dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.25px var(--err);
+}
 
 .adm-runtime-mark.is-disabled {
   opacity: 0.4;
@@ -1091,16 +1118,24 @@
    ink/muted color regardless of tone. Only the dot carries the status hue,
    matching "agents are differentiated by shape, never by status/brand
    color" everywhere else in the app. */
+/* Status dots collapse to two deliberate tiers: presence is the loud
+   liveness cue (9px), every status/agent dot is the quiet tier (6px). */
 .adm-agent-dot {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
   flex: none;
   border-radius: var(--r-full);
   background: var(--ink-4);
 }
 
+/* Drawer status-word chips carry an explicit label, so ready keeps its calm
+   --ok fill here; failed still switches to the shared hollow-ring shape so the
+   "problem" language stays consistent with the fleet cards. */
 .adm-agent-chip.tone-good .adm-agent-dot { background: var(--ok); }
-.adm-agent-chip.tone-bad .adm-agent-dot { background: var(--err); }
+.adm-agent-chip.tone-bad .adm-agent-dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.25px var(--err);
+}
 .adm-agent-chip.tone-neutral .adm-agent-dot { background: var(--ink-4); }
 
 /* Official vendor glyph — identity, alongside the name label. Same
