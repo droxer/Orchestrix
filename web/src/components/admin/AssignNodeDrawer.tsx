@@ -243,7 +243,7 @@ export function AssignNodeDrawer({
                         }}
                       />
                       <span className={`adm-assign-node ${isSelected ? "selected" : ""}`}>
-                        <NodePresence node={node} t={t} />
+                        <NodePresence node={node} t={t} withLabel />
                         <span className="adm-assign-node-body">
                           <span className="adm-assign-node-id mono" translate="no">
                             {node.displayName || node.id}

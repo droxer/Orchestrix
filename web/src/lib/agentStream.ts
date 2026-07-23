@@ -91,7 +91,7 @@ export function parseAgentStderr(raw: string): AgentSegment[] {
   if (!raw) return [];
   const lines = stripAnsi(raw).split(/\r?\n/)
     .map((line) => line.trim())
-    .filter((line) => line && !isCodexStdinNotice(line))
+    .filter((line) => line && !isCodexStdinNotice(line) && !isClaudeConnectorNotice(line))
     .filter((line, index, all) => line !== all[index - 1]);
   const tail = lines.slice(-STDERR_TAIL_LINES);
   const omitted = lines.length - tail.length;
@@ -103,6 +103,14 @@ export function parseAgentStderr(raw: string): AgentSegment[] {
 
 function isCodexStdinNotice(line: string): boolean {
   return /^Reading additional input from stdin(?:\.{1,3}|…)?$/.test(line);
+}
+
+// Claude prints a claude.ai connectors notice when ANTHROPIC_API_KEY or another
+// auth source takes precedence over the claude.ai login. Relay provisions auth
+// deliberately, so the notice is informational, not a run warning.
+function isClaudeConnectorNotice(line: string): boolean {
+  return /claude\.ai connectors are disabled/.test(line)
+    || /Unset it to load your organization's connectors/.test(line);
 }
 
 function safeParse(line: string): Record<string, unknown> | null {
@@ -133,7 +141,7 @@ function streamRecords(raw: string): Array<{ kind: "json"; value: Record<string,
       const nextJson = raw.indexOf("{", i);
       const end = nextJson === -1 ? raw.length : nextJson;
       const text = raw.slice(i, end).trim();
-      if (text && !isLikelyProtocolFragment(text)) out.push({ kind: "text", text });
+      if (text && !isLikelyProtocolFragment(text) && !isClaudeConnectorNotice(text)) out.push({ kind: "text", text });
       i = end;
       continue;
     }

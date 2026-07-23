@@ -284,7 +284,11 @@ function TeamProfile({
                   const ready = member.enabled && member.availability === "ready";
                   return (
                     <li key={member.id} className="team-profile-member">
-                      <AgentStateBadge agent={member.executorKind} ready={ready} />
+                      <AgentStateBadge
+                        agent={member.executorKind}
+                        ready={ready}
+                        availability={member.enabled ? member.availability : undefined}
+                      />
                       <span className="team-profile-member-copy">
                         <strong>{member.displayName}</strong>
                         <small>{agentLabel(member.executorKind)} · {t(`admin.v2.placement_status.${member.availability}`, { defaultValue: member.availability })}</small>

@@ -92,9 +92,13 @@ export function TeamsPage({
                           <small className="teams-list-sub">{team.lead?.displayName ?? t("teams.unavailable")} · {memberNames || t("teams.no_members")}</small>
                         </span>
                         <span className="teams-list-status" role="cell">
-                          {team.enabled
-                            ? <StatusPill value={teamLeadAvailability(team)} />
-                            : <Badge variant="neutral">{t("teams.disabled")}</Badge>}
+                          {/* "ready" is the default healthy state and stays
+                              implicit; other lead states get named. */}
+                          {!team.enabled ? (
+                            <Badge variant="neutral">{t("teams.disabled")}</Badge>
+                          ) : teamLeadAvailability(team) !== "ready" ? (
+                            <StatusPill value={teamLeadAvailability(team)} />
+                          ) : null}
                         </span>
                       </button>
                     </li>

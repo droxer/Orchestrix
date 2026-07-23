@@ -51,23 +51,29 @@ export function NodeRow({ node, storedTokens, colocated, onReveal, onManageAgent
   const tone = statusTone(status);
   const statusLabel = t(`status.${status}`, { defaultValue: status });
   const online = isNodeOnline(node);
+  // The presence pill already says Online/Offline, so the status pill only
+  // renders when it adds state presence can't: running, provisioning,
+  // failed, stopped.
+  const showStatusPill = status !== "ready" && status !== "stale";
 
   return (
     <li className="adm-node-row" data-node={node.id} data-online={online ? "true" : "false"} role="row">
       <div className="adm-node-row-id" role="cell">
         <span className="adm-node-avatar adm-node-avatar--machine" translate="no">
           <AdminNode size={16} aria-hidden="true" />
-          <NodePresence node={node} t={t} className="adm-presence--corner" />
         </span>
         <span className="adm-node-row-identity">
           <span className="adm-node-row-nameline">
             <span className="adm-node-card-name" translate="no">
               {nodeName}
             </span>
-            <span className={`adm-status-pill tone-${tone}`}>
-              <i className="adm-status-dot" aria-hidden="true" />
-              {statusLabel}
-            </span>
+            <NodePresence node={node} t={t} withLabel />
+            {showStatusPill ? (
+              <span className={`adm-status-pill tone-${tone}`}>
+                <i className="adm-status-dot" aria-hidden="true" />
+                {statusLabel}
+              </span>
+            ) : null}
           </span>
           <span className="adm-node-card-handle mono" translate="no">{node.id}</span>
           <NodeProfileBadges

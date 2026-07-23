@@ -353,6 +353,7 @@
    readiness pip below is the ONLY thing allowed to carry status color —
    agent identity is shape, never hue. */
 .agent-state.tone-good,
+.agent-state.tone-warn,
 .agent-state.tone-bad {
   color: var(--ink-1);
 }
@@ -370,6 +371,7 @@
 }
 
 .agent-state.tone-good::after { background: var(--ok); }
+.agent-state.tone-warn::after { background: var(--warn); }
 .agent-state.tone-bad::after { background: var(--err); }
 
 /* Unassigned slot — dashed placeholder, no readiness pip. */

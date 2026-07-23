@@ -23,6 +23,8 @@ interface NodeProfileBadgesProps {
   colocated: boolean;
   t: TFunction;
   compact?: boolean;
+  /** Fleet cards show ownership only; runtime isolation belongs in drawers. */
+  card?: boolean;
   /** Drop the "This host" locality — redundant on the node card, where the
    *  status pill already conveys liveness. */
   hideThisHost?: boolean;
@@ -31,7 +33,7 @@ interface NodeProfileBadgesProps {
   hideSavedHere?: boolean;
 }
 
-export function NodeProfileBadges({ node, storedTokens, colocated, t, compact = false, hideThisHost = false, hideSavedHere = false }: NodeProfileBadgesProps) {
+export function NodeProfileBadges({ node, storedTokens, colocated, t, compact = false, card = false, hideThisHost = false, hideSavedHere = false }: NodeProfileBadgesProps) {
   const ownership = nodeOwnershipProfile(node);
   const sandbox = nodeSandboxProfile(node);
   const localities = nodeLocalityKinds(node, { storedTokens, colocated })
@@ -53,10 +55,12 @@ export function NodeProfileBadges({ node, storedTokens, colocated, t, compact = 
     <div
       className={`adm-node-profile${compact ? " is-compact" : ""}`}
       role="group"
-      aria-label={t("admin.v2.node_profile_label", {
-        ownership: ownershipLabel,
-        sandbox: sandboxLabel,
-      })}
+      aria-label={card
+        ? ownershipLabel
+        : t("admin.v2.node_profile_label", {
+            ownership: ownershipLabel,
+            sandbox: sandboxLabel,
+          })}
     >
       <span
         className="adm-node-profile-kind"
@@ -67,15 +71,19 @@ export function NodeProfileBadges({ node, storedTokens, colocated, t, compact = 
         <OwnershipIcon size={13} className="adm-node-profile-icon" aria-hidden="true" />
         {ownershipLabel}
       </span>
-      <span className="adm-node-profile-sep" aria-hidden="true">·</span>
-      <span
-        className="adm-node-profile-sandbox"
-        data-sandbox={sandbox}
-        title={sandboxHint}
-      >
-        {sandboxLabel}
-      </span>
-      {localityText ? (
+      {!card ? (
+        <>
+          <span className="adm-node-profile-sep" aria-hidden="true">·</span>
+          <span
+            className="adm-node-profile-sandbox"
+            data-sandbox={sandbox}
+            title={sandboxHint}
+          >
+            {sandboxLabel}
+          </span>
+        </>
+      ) : null}
+      {!card && localityText ? (
         <>
           <span className="adm-node-profile-sep" aria-hidden="true">·</span>
           <span className="adm-node-profile-locality" title={localityHint} translate="no">

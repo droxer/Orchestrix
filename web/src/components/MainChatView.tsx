@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { ArrowRightLeft, MessageCircleQuestion, Scan } from "lucide-react";
 import { RelayMark } from "./RelayMark";
 import type { AgentName, AgentTaskMode, EmployeeAgent, RelayArtifact, RelaySession } from "../types";
-import { buildExecutorDisplayNameMap, displayNameForExecutor, mentionableAgents, type MentionableAgent } from "../lib/agentDisplayNames";
+import { buildExecutorDisplayNameMap, displayNameForExecutor, mentionableAgents } from "../lib/agentDisplayNames";
 import type { ConversationItem } from "./ConversationRow";
 import { ThreadPanel } from "./ThreadPanel";
 import { ChatHeader } from "./ChatHeader";
@@ -59,7 +59,6 @@ export type MainChatViewProps = {
   setHandoffNote: Dispatch<SetStateAction<string>>;
   sendDecision: (kind: "approve" | "reject" | "rerun" | "mark_done") => Promise<void>;
   sendHandoff: () => Promise<void>;
-  onAgentPicked: (agent: MentionableAgent) => void;
   onSend: () => void;
   onCancelRun: () => void;
   onRetryAgent: (agent: AgentName, mode: AgentTaskMode) => void;
@@ -109,7 +108,6 @@ export function MainChatView({
   setHandoffNote,
   sendDecision,
   sendHandoff,
-  onAgentPicked,
   onSend,
   onCancelRun,
   onRetryAgent,
@@ -243,7 +241,6 @@ export function MainChatView({
           activeAgentDisplayName={activeAgentDisplayName}
           selectedEmployee={selectedEmployee}
           running={running}
-          onAgentPicked={onAgentPicked}
           onSend={onSend}
           onCancelRun={onCancelRun}
         />

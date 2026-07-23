@@ -18,6 +18,28 @@ describe("agent stream parsing", () => {
     ]);
   });
 
+  it("filters the Claude claude.ai connectors notice from stderr", () => {
+    const raw = [
+      "⚠ claude.ai connectors are disabled because ANTHROPIC_API_KEY or another auth source is set and takes precedence over your claude.ai login · Unset it to load your organization's connectors",
+      "real warning",
+    ].join("\n");
+
+    assert.deepEqual(parseAgentStderr(raw), [
+      { kind: "status", tone: "warn", text: "real warning" },
+    ]);
+  });
+
+  it("filters the Claude claude.ai connectors notice from stdout text lines", () => {
+    const raw = [
+      "⚠ claude.ai connectors are disabled because ANTHROPIC_API_KEY or another auth source is set",
+      JSON.stringify({ type: "result", is_error: false }),
+    ].join("\n");
+
+    assert.deepEqual(parseAgentStream("claude", raw), [
+      { kind: "narration", key: "agent_stream.claude_finished", params: { tone: "good" } },
+    ]);
+  });
+
   it("collapses long stderr to the tail behind an omitted-lines narration", () => {
     const raw = ["line 1", "line 2", "line 3", "line 4", "line 5"].join("\n");
 

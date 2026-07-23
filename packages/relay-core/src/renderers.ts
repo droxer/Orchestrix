@@ -165,6 +165,7 @@ export class StderrLineRenderer {
     if (isCodexStdinNotice(line)) return "";
     if (isCodexLegacyMultiAgentFallback(line)) return "";
     if (isKimiResumeNotice(line)) return "";
+    if (isClaudeConnectorNotice(line)) return "";
     return `${status("warn", line)}\n`;
   }
 }
@@ -184,6 +185,14 @@ function isCodexLegacyMultiAgentFallback(line: string): boolean {
 // non-interactive run; it is an interactive-resume hint, not a warning.
 function isKimiResumeNotice(line: string): boolean {
   return /resume this session\s*:/i.test(line) || /\bkimi\s+-(?:r|S|-session)\b/.test(line);
+}
+
+// Claude prints a claude.ai connectors notice when ANTHROPIC_API_KEY or another
+// auth source takes precedence over the claude.ai login. Relay provisions auth
+// deliberately, so the notice is informational, not a run warning.
+function isClaudeConnectorNotice(line: string): boolean {
+  return /claude\.ai connectors are disabled/.test(line)
+    || /Unset it to load your organization's connectors/.test(line);
 }
 
 export class JsonLineRenderer {
@@ -219,7 +228,10 @@ export class ClaudeStreamRenderer {
 
   private formatLine(line: string): string {
     const event = parseJsonObject(line);
-    if (!event) return this.text.feed(`${sanitizeUntrustedText(line)}\n`);
+    if (!event) {
+      if (isClaudeConnectorNotice(line)) return "";
+      return this.text.feed(`${sanitizeUntrustedText(line)}\n`);
+    }
 
     if (event.type === "stream_event") {
       const streamEvent = asRecord(event.event);

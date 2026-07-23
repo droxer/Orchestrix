@@ -3,6 +3,17 @@ import type { AgentName, ControlPanelDaemonNodeRecord, EmployeeRecord, LogicalAg
 
 export const ADMIN_AGENTS_KEY = ["admin", "agents"] as const;
 
+/** Stable display order for fleet surfaces; implemented independently of API order. */
+export function stableFleetNodeOrder(
+  nodes: readonly ControlPanelDaemonNodeRecord[],
+): ControlPanelDaemonNodeRecord[] {
+  const label = (node: ControlPanelDaemonNodeRecord) => node.displayName?.trim() || node.id;
+  return [...nodes].sort((left, right) => (
+    label(left).localeCompare(label(right), undefined, { sensitivity: "base", numeric: true })
+    || left.id.localeCompare(right.id, undefined, { sensitivity: "base", numeric: true })
+  ));
+}
+
 const DEFAULT_NODE_AGENT_NAMES: AgentName[] = ["claude", "codex", "kimi"];
 
 /** Agent executors shown on fleet/admin node surfaces (Pi only when the daemon reports it). */
@@ -86,7 +97,8 @@ export function agentAvailabilityTone(availability: LogicalAgentAvailability): T
   if (availability === "ready") return "good";
   if (availability === "busy") return "info";
   if (availability === "pending") return "warn";
-  return "neutral";
+  // Offline is the loud tier — same severity reading as the fleet presence dot.
+  return "bad";
 }
 
 export function agentStatusTone(agentStatus: string): "good" | "bad" | "neutral" {

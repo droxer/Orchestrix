@@ -60,13 +60,8 @@ describe("monochrome login palette", () => {
     assert.match(login, /--lg-steel:\s*#f2f4f6;/);
     assert.match(login, /--lg-steel-active:\s*#ffffff;/);
     assert.match(login, /--lg-on-steel:\s*#101214;/);
-    assert.match(login, /--lg-amber:\s*#99a0a8;/);
-    assert.match(login, /--lg-on-amber:\s*#101214;/);
-    assert.match(login, /--lg-up:\s*#f2f4f6;/);
-    assert.match(login, /--lg-down:\s*#6b727b;/);
     assert.match(login, /--lg-err:\s*#f2f4f6;/);
     assert.match(login, /\.login-error \{[^}]*var\(--lg-err\)/s);
-    assert.match(login, /color-mix\(in srgb, var\(--lg-steel\) 5%, transparent\)/);
   });
 
   it("drops steel-blue, amber, and status hues", () => {

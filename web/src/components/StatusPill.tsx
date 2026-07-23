@@ -7,8 +7,7 @@ import { cn } from "@/lib/utils";
 function statusTone(value: string): Tone {
   if (value === "ready" || value === "completed" || value === "done") return "good";
   if (value === "running" || value === "busy") return "info";
-  if (value === "failed" || value === "blocked" || value === "cancelled") return "bad";
-  if (value === "offline") return "neutral";
+  if (value === "failed" || value === "blocked" || value === "cancelled" || value === "offline") return "bad";
   return "warn";
 }
 

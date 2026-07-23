@@ -795,10 +795,6 @@
     "phase_handoff": "Handoff · {{mode}}"
   },
   "login": {
-    "headline_a": "Sign in to",
-    "headline_b": "Relay.",
-    "headline_bootstrap_a": "Create the",
-    "headline_bootstrap_b": "first admin.",
     "lede": "Manage nodes, daemons, and agent runs.",
     "lede_bootstrap": "Paste the RELAY_ADMIN_TOKEN from the backend startup log, then create an admin account.",
     "kicker_setup": "First-run setup",
@@ -814,12 +810,6 @@
     "no_bootstrap": "Bootstrap is not required. Sign in.",
     "go_bootstrap": "Create first admin",
     "go_login": "Back to sign in",
-    "system_backend": "backend",
-    "system_daemon": "daemon",
-    "system_sandbox": "node",
-    "system_state_ready": "ready",
-    "system_state_boxlite": "boxlite",
-    "system_state_pending": "awaiting credentials",
     "error_generic": "Something went wrong. Try again."
   },
   "status": {

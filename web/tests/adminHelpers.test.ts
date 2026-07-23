@@ -5,6 +5,7 @@ import {
   buildEmployeeSummaries,
   initialsOf,
   isStale,
+  stableFleetNodeOrder,
   statusTone,
   truncateId,
   visualStatus,
@@ -14,6 +15,7 @@ import type { ControlPanelDaemonNodeRecord, EmployeeRecord } from "../src/types.
 function node(input: Partial<ControlPanelDaemonNodeRecord> & { id: string }): ControlPanelDaemonNodeRecord {
   return {
     id: input.id,
+    displayName: input.displayName,
     employeeId: input.employeeId,
     status: input.status ?? "ready",
     online: input.online ?? true,
@@ -28,6 +30,19 @@ function node(input: Partial<ControlPanelDaemonNodeRecord> & { id: string }): Co
     agents: input.agents ?? { claude: "ready", pi: "ready", codex: "ready", kimi: "ready" },
   } as ControlPanelDaemonNodeRecord;
 }
+
+describe("stableFleetNodeOrder", () => {
+  it("keeps card order stable when polling returns the same nodes in a different order", () => {
+    const alpha = node({ id: "node-z", displayName: "Alpha" });
+    const zebra = node({ id: "node-a", displayName: "Zebra" });
+
+    const firstPoll = stableFleetNodeOrder([zebra, alpha]).map((item) => item.id);
+    const secondPoll = stableFleetNodeOrder([alpha, zebra]).map((item) => item.id);
+
+    assert.deepEqual(firstPoll, ["node-z", "node-a"]);
+    assert.deepEqual(secondPoll, firstPoll);
+  });
+});
 
 function employee(input: Partial<EmployeeRecord> & { id: string }): EmployeeRecord {
   return {

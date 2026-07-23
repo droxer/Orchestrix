@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import type { ControlPanelDaemonNodeRecord } from "../../types";
 import { AdminNode, ActionSearch, ICON_STROKE_LARGE } from "../icons";
 import { canUseLocalControlPanel } from "../../lib/controlPanel";
+import { stableFleetNodeOrder } from "../../lib/adminHelpers";
 import { useUrlSearchState } from "../../hooks/useUrlSearchState";
 import type { StoredNodeTokenMap } from "./helpers";
 import { visualStatus } from "./helpers";
@@ -92,7 +93,7 @@ export function FleetView({ nodes, storedTokens, layout, onLayoutChange, onRevea
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return nodes.filter((node) => {
+    return stableFleetNodeOrder(nodes).filter((node) => {
       if (!matchesFilter(node, filter)) return false;
       if (!q) return true;
       const haystack = [

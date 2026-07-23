@@ -75,29 +75,41 @@ export function NodeCard({
   const tone = statusTone(status);
   const statusLabel = t(`status.${status}`, { defaultValue: status });
   const online = isNodeOnline(node);
+  // The presence pill already says Online/Offline, so the status pill only
+  // renders when it adds state presence can't: running, provisioning,
+  // failed, stopped.
+  const showStatusPill = status !== "ready" && status !== "stale";
 
   return (
     <article className="adm-node-card" data-online={online ? "true" : "false"}>
       <header className="adm-node-card-head">
         <span className="adm-node-avatar adm-node-avatar--machine" translate="no">
           <AdminNode size={18} aria-hidden="true" />
-          <NodePresence node={node} t={t} className="adm-presence--corner" />
         </span>
         <div className="adm-node-card-identity">
+          <span className="adm-node-card-nameline">
+            <span
+              className={`adm-node-card-name${hasName ? "" : " mono"}`}
+              translate="no"
+            >
+              {nodeName}
+            </span>
+            <NodePresence node={node} t={t} withLabel />
+          </span>
           <span
-            className={`adm-node-card-name${hasName ? "" : " mono"}`}
+            className={`adm-node-card-handle mono${showHandle ? "" : " is-placeholder"}`}
+            aria-hidden={showHandle ? undefined : true}
             translate="no"
           >
-            {nodeName}
+            {showHandle ? node.id : "\u00a0"}
           </span>
-          {showHandle ? (
-            <span className="adm-node-card-handle mono" translate="no">{node.id}</span>
-          ) : null}
         </div>
-        <span className={`adm-status-pill tone-${tone}`}>
-          <i className="adm-status-dot" aria-hidden="true" />
-          {statusLabel}
-        </span>
+        {showStatusPill ? (
+          <span className={`adm-status-pill tone-${tone}`}>
+            <i className="adm-status-dot" aria-hidden="true" />
+            {statusLabel}
+          </span>
+        ) : null}
       </header>
 
       <NodeProfileBadges
@@ -105,6 +117,7 @@ export function NodeCard({
         storedTokens={storedTokens}
         colocated={colocated}
         t={t}
+        card
         hideThisHost
         hideSavedHere
       />
@@ -144,7 +157,7 @@ export function NodeCard({
         <div className="adm-node-card-actions">
           <Button variant="ghost"
             type="button"
-            className="icon-button icon-button--sm icon-button--tinted adm-node-card-icon-btn"
+            className="icon-button icon-button--sm icon-button--tinted adm-node-card-icon-btn adm-node-action--copy"
             onClick={() => void handleCopyId()}
             aria-label={copied ? t("admin.copied") : t("admin.copy_node_id")}
             title={node.id}

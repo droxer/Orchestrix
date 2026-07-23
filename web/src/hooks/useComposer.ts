@@ -4,11 +4,10 @@ import { resizeComposerTextarea } from "../lib/composerResize";
 
 // Composer text + @mention autocomplete state and behavior. The host wires the
 // returned handlers to the textarea and renders the popover from
-// filteredMentionAgents; picking a mention notifies onAgentPicked so the host
-// can route the active agent.
-export function useComposer({ mentionAgents, onAgentPicked }: {
+// filteredMentionAgents. The picked logical-agent id stays with the draft so
+// send routing does not depend on an asynchronous header-selection update.
+export function useComposer({ mentionAgents }: {
   mentionAgents: MentionableAgent[];
-  onAgentPicked: (agent: MentionableAgent) => void;
 }): {
   composerText: string;
   setComposerText: Dispatch<SetStateAction<string>>;
@@ -21,6 +20,8 @@ export function useComposer({ mentionAgents, onAgentPicked }: {
   filteredMentionAgents: MentionableAgent[];
   syncMentionState: (text: string, caret: number) => void;
   insertMention: (agent: MentionableAgent) => void;
+  getMentionedAgentId: () => string | null;
+  clearMentionedAgent: () => void;
   resizeTextarea: () => void;
 } {
   const [composerText, setComposerText] = useState("");
@@ -29,6 +30,7 @@ export function useComposer({ mentionAgents, onAgentPicked }: {
   const [mentionIndex, setMentionIndex] = useState(0);
   const [isComposing, setIsComposing] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const mentionedAgentIdRef = useRef<string | null>(null);
 
   const resizeTextarea = useCallback(() => {
     resizeComposerTextarea(textareaRef.current);
@@ -64,7 +66,8 @@ export function useComposer({ mentionAgents, onAgentPicked }: {
     const start = token?.start ?? caret;
     const inserted = `@${agent.displayName} `;
     setComposerText(`${composerText.slice(0, start)}${inserted}${composerText.slice(caret)}`);
-    setMentionOpen(false); setMentionQuery(""); setMentionIndex(0); onAgentPicked(agent);
+    mentionedAgentIdRef.current = agent.id;
+    setMentionOpen(false); setMentionQuery(""); setMentionIndex(0);
     requestAnimationFrame(() => {
       const node = textareaRef.current;
       if (!node) return;
@@ -88,6 +91,8 @@ export function useComposer({ mentionAgents, onAgentPicked }: {
     filteredMentionAgents,
     syncMentionState,
     insertMention,
+    getMentionedAgentId: () => mentionedAgentIdRef.current,
+    clearMentionedAgent: () => { mentionedAgentIdRef.current = null; },
     resizeTextarea,
   };
 }

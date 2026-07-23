@@ -15,7 +15,8 @@ import { useSessionEvents } from "./hooks/useSessionEvents";
 import { useLocalDaemonNodes } from "./hooks/useLocalDaemonNodes";
 import { mergeVisibleDaemonNodes } from "./lib/daemonNodes";
 import { formatDispatchError } from "./lib/agentReadiness";
-import { isLogicalAgentRoutable } from "./lib/agentDisplayNames";
+import { isLogicalAgentRoutable, mentionableAgents } from "./lib/agentDisplayNames";
+import { routeComposerMessage } from "./lib/messageRouting";
 import { applyTheme, readLanguage, readTheme, readTokens, selectedEmployeeKey, writeLanguage, writeTheme } from "./lib/appStorage";
 import { canUseLocalControlPanel } from "./lib/controlPanel";
 import { useRelayStore } from "./lib/store";
@@ -445,18 +446,34 @@ export function App() {
     if (!raw) return;
     if (!selectedEmployee) return;
     if (conversationRunning) return;
-    const goal = raw;
-    const routedAgent = activeAgent;
-    if (!goal) return;
-    const routedLogicalAgent = activeLogicalAgent && isLogicalAgentRoutable(activeLogicalAgent.availability)
+    const defaultLogicalAgent = activeLogicalAgent && isLogicalAgentRoutable(activeLogicalAgent.availability)
       ? activeLogicalAgent
-      : undefined;
+      : logicalAgents.find((agent) => isLogicalAgentRoutable(agent.availability));
+    if (!defaultLogicalAgent) {
+      reportMutationError("Agent not ready for dispatch", null, t("errors.agent_not_ready", { agent: activeAgent }));
+      return;
+    }
+    const routed = routeComposerMessage(
+      raw,
+      {
+        id: defaultLogicalAgent.id,
+        displayName: defaultLogicalAgent.displayName,
+        executorKind: defaultLogicalAgent.executorKind,
+        ready: true,
+      },
+      mentionableAgents(logicalAgents),
+      composerRef.current?.getMentionedAgentId(),
+    );
+    const goal = routed.goal;
+    const routedAgent = routed.agent;
+    if (!goal) return;
+    const routedLogicalAgent = logicalAgents.find(
+      (agent) => agent.id === routed.agentId && isLogicalAgentRoutable(agent.availability),
+    );
     if (!routedLogicalAgent) {
       reportMutationError("Agent not ready for dispatch", null, t("errors.agent_not_ready", { agent: routedAgent }));
       return;
     }
-    if (routedAgent !== activeAgent) setActiveAgent(routedAgent);
-    if (routedLogicalAgent) setActiveLogicalAgentId(routedLogicalAgent.id);
     // When staging a new conversation, always create; otherwise continue the
     // open one. composingNew forces a fresh owner-scoped session here.
     const action = composingNew ? { kind: "create" as const } : chooseSendAction({ activeSessionId: activeSession?.id ?? null, session: activeSession });
@@ -789,10 +806,6 @@ export function App() {
             setHandoffNote={setHandoffNote}
             sendDecision={sendDecision}
             sendHandoff={sendHandoff}
-            onAgentPicked={(agent) => {
-              setActiveLogicalAgentId(agent.id);
-              setActiveAgent(agent.executorKind);
-            }}
             onSend={handleComposerSend}
             onCancelRun={handleCancelRun}
             onRetryAgent={handleRetryAgent}

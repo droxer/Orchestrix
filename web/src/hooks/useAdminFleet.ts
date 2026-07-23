@@ -24,7 +24,6 @@ export function useAdminFleet(enabled: boolean, live: boolean = true): {
   employees: EmployeeRecord[];
   lastUpdated: Date | null;
   pollError: string | null;
-  isFetching: boolean;
   mergeFleet: (updater: (prev: AdminFleet) => AdminFleet) => void;
   refetch: () => Promise<unknown>;
 } {
@@ -51,7 +50,6 @@ export function useAdminFleet(enabled: boolean, live: boolean = true): {
   const nodes = nodesQuery.data ?? [];
   const employees = employeesQuery.data ?? [];
   const pollError = nodesQuery.error ?? employeesQuery.error;
-  const isFetching = nodesQuery.isFetching || employeesQuery.isFetching;
   const dataUpdatedAt = Math.max(nodesQuery.dataUpdatedAt, employeesQuery.dataUpdatedAt);
 
   const mergeFleet = useCallback(
@@ -79,7 +77,6 @@ export function useAdminFleet(enabled: boolean, live: boolean = true): {
     employees,
     lastUpdated: nodes.length > 0 || employees.length > 0 ? new Date(dataUpdatedAt) : null,
     pollError: pollError instanceof Error ? pollError.message : pollError ? String(pollError) : null,
-    isFetching,
     mergeFleet,
     refetch,
   };

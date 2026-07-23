@@ -1,21 +1,27 @@
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
-import type { AgentName } from "../types";
+import type { AgentName, LogicalAgentAvailability } from "../types";
 import { AgentMark } from "./AgentMark";
 
 /**
  * Visual agent-state indicator for a task. The agent glyph carries identity
- * and a readiness pip carries status (green = ready, red = not ready); the
- * full textual label ("claude · ready") moves to a tooltip + aria-label so
- * the board/list stay scannable without a text badge per row. An unassigned
- * task renders a dashed placeholder slot.
+ * and a readiness pip carries status; the full textual label moves to a
+ * tooltip + aria-label so the board/list stay scannable without a text badge
+ * per row. An unassigned task renders a dashed placeholder slot.
+ *
+ * The pip is tri-state: ready = green, busy/pending = amber (healthy, just
+ * occupied), offline = red. Pass `availability` for the tri-state readout;
+ * the boolean `ready` prop remains as a two-state fallback for callers that
+ * only know routability (e.g. the backlog).
  */
 export function AgentStateBadge({
   agent,
   ready,
+  availability,
 }: {
   agent: AgentName | null | undefined;
   ready: boolean;
+  availability?: LogicalAgentAvailability;
 }) {
   const { t } = useTranslation();
 
@@ -24,10 +30,24 @@ export function AgentStateBadge({
     return <span className="agent-state agent-state--empty" role="img" aria-label={label} title={label} />;
   }
 
-  const label = `${agent} · ${ready ? t("backlog.ready") : t("backlog.not_ready")}`;
+  const tone = availability
+    ? availability === "ready"
+      ? "tone-good"
+      : availability === "offline"
+        ? "tone-bad"
+        : "tone-warn"
+    : ready
+      ? "tone-good"
+      : "tone-bad";
+  const stateLabel = availability
+    ? t(`status.${availability}`, { defaultValue: availability })
+    : ready
+      ? t("backlog.ready")
+      : t("backlog.not_ready");
+  const label = `${agent} · ${stateLabel}`;
   return (
     <span
-      className={cn("agent-state", ready ? "tone-good" : "tone-bad")}
+      className={cn("agent-state", tone)}
       data-agent={agent}
       role="img"
       aria-label={label}

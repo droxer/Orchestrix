@@ -715,6 +715,24 @@ describe("agent stream rendering", () => {
     assert.equal(output, "");
   });
 
+  it("filters the Claude claude.ai connectors notice from stderr", () => {
+    const renderer = new StderrLineRenderer();
+    const output = renderer.feed(
+      "⚠ claude.ai connectors are disabled because ANTHROPIC_API_KEY or another auth source is set and takes precedence over your claude.ai login · Unset it to load your organization's connectors\n",
+    );
+
+    assert.equal(output, "");
+  });
+
+  it("filters the Claude claude.ai connectors notice from stdout text lines", () => {
+    const renderer = new ClaudeStreamRenderer();
+    const output = renderer.feed(
+      "⚠ claude.ai connectors are disabled because ANTHROPIC_API_KEY or another auth source is set\n",
+    );
+
+    assert.equal(output, "");
+  });
+
   it("builds the Kimi action command in stream-json mode", () => {
     const command = buildKimiActionCommand(state({ task_goal: "Do the thing" }));
 

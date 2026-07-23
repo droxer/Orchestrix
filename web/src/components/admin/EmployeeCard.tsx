@@ -50,10 +50,14 @@ export function EmployeeCard({
           <span className="adm-node-card-handle mono" translate="no">@{member.id}</span>
         </div>
         <div className="adm-node-card-meta-col">
-          <span className={`adm-status-pill tone-${tone}`}>
-            <i className="adm-status-dot" aria-hidden="true" />
-            {t(`admin.v2.emp_state_${key}`, { defaultValue: key })}
-          </span>
+          {/* "Ready" is the default healthy state — the good tone on the card
+              already carries it; only running / idle / no-nodes get named. */}
+          {key !== "ready" ? (
+            <span className={`adm-status-pill tone-${tone}`}>
+              <i className="adm-status-dot" aria-hidden="true" />
+              {t(`admin.v2.emp_state_${key}`, { defaultValue: key })}
+            </span>
+          ) : null}
           {member.departmentName ? (
             <span className="adm-emp-card-dept">{member.departmentName}</span>
           ) : null}

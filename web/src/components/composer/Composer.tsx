@@ -14,6 +14,7 @@ export type ComposerHandle = {
   clear: () => void;
   closeMentions: () => void;
   focus: () => void;
+  getMentionedAgentId: () => string | null;
   getText: () => string;
 };
 
@@ -27,15 +28,15 @@ const ComposerView = forwardRef<ComposerHandle, {
   activeAgentDisplayName: string;
   selectedEmployee: string;
   running: boolean;
-  onAgentPicked: (agent: MentionableAgent) => void;
   onSend: () => void;
   onCancelRun: () => void;
-}>(function Composer({ mentionAgents, composerMode, setComposerMode, activeAgentDisplayName, selectedEmployee, running, onAgentPicked, onSend, onCancelRun }, ref) {
+}>(function Composer({ mentionAgents, composerMode, setComposerMode, activeAgentDisplayName, selectedEmployee, running, onSend, onCancelRun }, ref) {
   const { t } = useTranslation();
-  const composer = useComposer({ mentionAgents, onAgentPicked });
+  const composer = useComposer({ mentionAgents });
   const {
     composerText, setComposerText, mentionOpen, setMentionOpen, mentionIndex, setMentionIndex,
     setIsComposing, textareaRef, filteredMentionAgents, syncMentionState, insertMention,
+    getMentionedAgentId, clearMentionedAgent,
   } = composer;
   const hasMentionOptions = mentionOpen && filteredMentionAgents.length > 0;
   const activeMentionIndex = boundedMentionIndex(mentionIndex, filteredMentionAgents.length);
@@ -48,11 +49,13 @@ const ComposerView = forwardRef<ComposerHandle, {
     clear: () => {
       setComposerText("");
       setMentionOpen(false);
+      clearMentionedAgent();
     },
     closeMentions: () => setMentionOpen(false),
     focus: () => textareaRef.current?.focus(),
+    getMentionedAgentId,
     getText: () => composerText,
-  }), [composerText, setComposerText, setMentionOpen, textareaRef]);
+  }), [clearMentionedAgent, composerText, getMentionedAgentId, setComposerText, setMentionOpen, textareaRef]);
 
   return (
     <form className="composer" onSubmit={(e) => { e.preventDefault(); if (!running) onSend(); }}>

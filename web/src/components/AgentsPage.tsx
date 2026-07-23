@@ -130,7 +130,11 @@ function RosterRow({
           onClick={() => onSelect(agent)}
         >
           <span className="agents-roster-row-badge">
-            <AgentStateBadge agent={agent.executorKind} ready={ready} />
+            <AgentStateBadge
+              agent={agent.executorKind}
+              ready={ready}
+              availability={agent.enabled ? agent.availability : undefined}
+            />
           </span>
           <span className="agents-roster-row-main">
             <span className="agents-roster-row-title">
@@ -147,9 +151,10 @@ function RosterRow({
               )}
             </span>
           </span>
-          {/* Explicit live status: the row accent + glyph pip carry the tone,
-              the pill names it (Ready / Busy / Pending / Offline). */}
-          {agent.enabled ? (
+          {/* Explicit live status only when it adds information — "ready" is
+              the default healthy state, already carried by the row accent and
+              the glyph pip. Busy / Pending / Offline still get named. */}
+          {agent.enabled && agent.availability !== "ready" ? (
             <span className="agents-roster-row-status">
               <StatusPill value={agent.availability} />
             </span>

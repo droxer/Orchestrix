@@ -656,10 +656,9 @@
   margin-bottom: var(--sp-3);
 }
 
-/* On the node card the profile is just the tinted execution chip (locality is
-   hidden), so the bordered container wraps a single badge and leaves a large
-   empty box. Drop the wrapper chrome there and let the chip stand alone; the
-   drawer usage (with locality text) keeps its box. */
+/* Node cards keep the profile compact and hide locality, so the bordered
+   drawer container would leave a large empty box. Drop that wrapper chrome;
+   drawer usage keeps the framed treatment and full labels. */
 .adm-node-card > .adm-node-profile {
   padding: 0;
   border: none;
@@ -819,6 +818,20 @@
   white-space: nowrap;
 }
 
+/* Name + presence pill share one line so the online/offline readout sits
+    directly beside the computer it describes. */
+.adm-node-card-nameline {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  max-width: 100%;
+  min-width: 0;
+}
+
+.adm-node-card-nameline .adm-node-card-name {
+  flex: 0 1 auto;
+}
+
 .adm-node-card-name.tone-muted {
   color: var(--ink-3);
   font-weight: 500;
@@ -832,6 +845,13 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Reserve the subtitle row even when the card title already is the node id.
+   Local and cloud headers then share identical internal geometry without
+   printing the same identifier twice. */
+.adm-node-card-handle.is-placeholder {
+  visibility: hidden;
 }
 
 /* Ink text on a quiet hairline pill; the leading dot carries the tone
@@ -895,40 +915,44 @@
   --presence: var(--ok);
 }
 
+/* Online fills in and breathes — reusing the app's shared pulse-ring
+   primitive (same expanding-ring motion as StatusPill and the chat/stream
+   live dots) at a slower cadence so presence reads as a heartbeat rather
+   than an alert. */
 .adm-presence[data-online="true"]::before {
   background: var(--presence);
   border-color: var(--presence);
-}
-
-/* Breathing halo — online only. A single expanding ring, slow and low-opacity,
-   so it reads as a heartbeat rather than an alert. */
-.adm-presence[data-online="true"]::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: var(--r-full);
-  background: var(--presence);
-  opacity: 0;
-  animation: adm-presence-pulse 2600ms var(--ease) infinite;
-}
-
-@keyframes adm-presence-pulse {
-  0% { opacity: 0.4; transform: scale(1); }
-  70%, 100% { opacity: 0; transform: scale(2.6); }
+  --pulse-color: var(--presence);
+  animation: pulse-ring 2.6s var(--ease) infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .adm-presence[data-online="true"]::after { animation: none; }
+  .adm-presence[data-online="true"]::before { animation: none; }
 }
 
-/* Corner badge — pinned to the machine avatar's lower-right, with a ring the
-   colour of the avatar fill so the dot separates cleanly from the glyph. */
-.adm-presence--corner {
-  position: absolute;
-  right: -3px;
-  bottom: -3px;
-  box-shadow: 0 0 0 2px var(--surface-2);
+/* Labeled presence pill — the explicit online/offline readout on the fleet
+   card. The same dot (hue + breathing halo when online) now sits beside an
+   uppercase label on a quiet hairline pill, so liveness is readable at a
+   glance without decoding the corner dot. Semantic hue stays on the dot;
+   the label is ink, muted when offline. */
+.adm-presence-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  height: 20px;
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--line-1);
   border-radius: var(--r-full);
+  font-size: var(--fs-1);
+  font-weight: 600;
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--ink-1);
+}
+
+.adm-presence-pill[data-online="false"] {
+  color: var(--ink-3);
 }
 
 /* Offline machines recede: the avatar glyph dims so a dark computer reads as
@@ -1298,15 +1322,22 @@
 
 .adm-node-card-queued { flex: none; }
 
-/* Quiet icon-led row actions — labels live in title/aria so three actions
-   plus the timestamp never overflow a narrow card. */
+/* Fixed semantic action slots keep shared controls aligned between local and
+   cloud cards. Cloud nodes leave the credentials slot empty rather than
+   shifting copy/manage/delete into different positions. */
 .adm-node-card-actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(4, 28px);
   align-items: center;
   gap: 2px;
   margin-left: auto;
   flex: none;
 }
+
+.adm-node-card-actions > .adm-node-action--copy { grid-column: 1; }
+.adm-node-card-actions > .adm-node-action--credentials { grid-column: 2; }
+.adm-node-card-actions > .adm-node-action--agents { grid-column: 3; }
+.adm-node-card-actions > .adm-node-action--delete { grid-column: 4; }
 
 /* Node card icon actions (reveal/manage/delete) share the .icon-button
    base (thread.css) at the --sm/--tinted modifiers instead of a bespoke

@@ -23,7 +23,7 @@ export function NodeActions({ node, onReveal, onManageAgents, onDelete, deletePe
         <Button
           variant="ghost"
           type="button"
-          className="icon-button icon-button--sm icon-button--tinted adm-node-card-icon-btn"
+          className="icon-button icon-button--sm icon-button--tinted adm-node-card-icon-btn adm-node-action--credentials"
           onClick={() => onReveal(node)}
           aria-label={t("admin.v2.reveal_credentials_for", { id: node.id })}
           title={t("admin.v2.reveal_credentials")}
@@ -35,7 +35,7 @@ export function NodeActions({ node, onReveal, onManageAgents, onDelete, deletePe
         <Button
           variant="ghost"
           type="button"
-          className="icon-button icon-button--sm icon-button--tinted adm-node-card-icon-btn"
+          className="icon-button icon-button--sm icon-button--tinted adm-node-card-icon-btn adm-node-action--agents"
           onClick={() => onManageAgents(node)}
           aria-label={t("admin.v2.manage_agents_for", { id: node.id })}
           title={t("admin.v2.manage_agents")}
@@ -47,7 +47,7 @@ export function NodeActions({ node, onReveal, onManageAgents, onDelete, deletePe
         <Button
           variant="ghost"
           type="button"
-          className="icon-button icon-button--sm icon-button--tinted adm-node-card-icon-btn danger"
+          className="icon-button icon-button--sm icon-button--tinted adm-node-card-icon-btn adm-node-action--delete danger"
           onClick={onDeleteRequest}
           disabled={deletePending}
           aria-label={t("admin.v2.delete_node_for", { id: node.id })}

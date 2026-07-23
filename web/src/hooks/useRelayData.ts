@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { listDaemonNodes, listSandboxes, listSessions, listTasks } from "../api";
@@ -32,6 +32,9 @@ export function useRelayData(
   enabled: boolean,
 ): RelayDataResult {
   const queryClient = useQueryClient();
+  // Background reconciliation must stay visually silent. Only a user/app
+  // initiated refresh drives page-level refresh chrome.
+  const [manualRefreshPending, setManualRefreshPending] = useState(false);
 
   // The token used by the next fetch. Held in a ref (not the query key) to
   // preserve the previous single-bucket behavior: the lists are one cache
@@ -86,7 +89,6 @@ export function useRelayData(
   const nodes = nodesQuery.data ?? [];
   const sessions = sessionsQuery.data ?? [];
   const tasks = tasksQuery.data ?? [];
-  const isRefreshing = results.some((result) => result.isFetching);
 
   // When disabled (e.g. logged out) drop cached rows so the UI clears at once,
   // matching the previous reset-to-empty behavior.
@@ -107,11 +109,13 @@ export function useRelayData(
   const refresh = useCallback(
     async (_signal?: AbortSignal, tokenOverride?: string) => {
       if (!enabled) return;
+      setManualRefreshPending(true);
       if (tokenOverride) overrideRef.current = tokenOverride;
       try {
         await queryClient.refetchQueries({ queryKey: RELAY_KEY });
       } finally {
         overrideRef.current = undefined;
+        setManualRefreshPending(false);
       }
     },
     [enabled, queryClient],
@@ -131,5 +135,13 @@ export function useRelayData(
     [queryClient],
   );
 
-  return { sandboxes, nodes, sessions, tasks, isRefreshing, refresh, setSandboxes };
+  return {
+    sandboxes,
+    nodes,
+    sessions,
+    tasks,
+    isRefreshing: manualRefreshPending,
+    refresh,
+    setSandboxes,
+  };
 }

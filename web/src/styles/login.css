@@ -1,18 +1,13 @@
 /* =====================================================================
    Login screen
 
-   Dark ops-room attach surface (no theme preference loaded yet). Agent
-   transit lanes pulse in the backdrop; backend/daemon/node rows resolve
-   one-by-one while credentials are entered.
-
-   Color is pinned via local --lg-* variables whose values are lifted
-   verbatim from the dark (default) register in tokens/palette.css
-   (graphite canvas, white action, mid-grey attention). Spacing,
-   type scale, and radii are theme-independent tokens and are used
-   directly. Documented stylelint exception — see web/.stylelintrc.json.
-
-   Bootstrap mode (data-mode="bootstrap") swings the accent from white
-   to mid grey: the plane is awaiting credentials, not ready.
+   Minimal centered sign-in card on a flat dark canvas (no theme
+   preference loaded yet). Color is pinned via local --lg-* variables
+   whose values are lifted verbatim from the dark (default) register in
+   tokens/palette.css (graphite canvas, white action, mid-grey
+   attention). Spacing, type scale, and radii are theme-independent
+   tokens and are used directly. Documented stylelint exception — see
+   web/.stylelintrc.json.
    ===================================================================== */
 
 .login-screen {
@@ -28,149 +23,41 @@
   --lg-steel: #f2f4f6;
   --lg-steel-active: #ffffff;
   --lg-on-steel: #101214; /* text-on-action (dark ink on the white fill) */
-  --lg-on-amber: #101214; /* text on the mid-grey bootstrap fill */
-  --lg-up: #f2f4f6;
-  --lg-amber: #99a0a8;
-  --lg-down: #6b727b;
   --lg-err: #f2f4f6; /* error is the loud/bright tier — dots stay calm */
-  /* Mode accent — white while attaching, mid grey during first-run setup. */
   --lg-accent: var(--lg-steel);
   /* Pin the action color to the pre-auth white so RelayMark's lead
      chevron stays neutral white even when the operator's saved theme is light. */
   --action: var(--lg-steel);
 
-  position: relative;
-  display: flex;
-  min-height: 100vh;
-  min-height: 100svh;
-  background:
-    radial-gradient(120% 90% at 12% 0%, color-mix(in srgb, var(--lg-steel) 5%, transparent), transparent 55%),
-    linear-gradient(to right, var(--lg-hairline-soft) 1px, transparent 1px) 0 0 / 56px 56px,
-    linear-gradient(to bottom, var(--lg-hairline-soft) 1px, transparent 1px) 0 0 / 56px 56px,
-    var(--lg-canvas);
-  color: var(--lg-ink);
-  font-family: var(--font-sans);
-  overflow: hidden;
-}
-
-.login-screen[data-mode="bootstrap"] {
-  --lg-accent: var(--lg-amber);
-}
-
-/* ---------- Backdrop: agent transit lanes -------------------------- */
-/* Four hairlines — claude / pi / codex / kimi — each carrying a pulse
-   that travels the lane on its own period. Decorative (aria-hidden);
-   hidden on narrow viewports and frozen under reduced motion. */
-
-.login-backdrop {
-  position: absolute;
-  inset: 0 0 0 clamp(480px, 46vw, 640px);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: clamp(56px, 9vh, 96px);
-  padding-right: clamp(var(--sp-6), 6vw, var(--sp-8));
-  pointer-events: none;
-  user-select: none;
-}
-
-.login-lane {
-  position: relative;
-  height: 1px;
-  background: var(--lg-hairline);
-}
-
-.login-lane-label {
-  position: absolute;
-  left: var(--sp-4);
-  bottom: var(--sp-2);
-  font-family: var(--font-mono);
-  font-size: var(--fs-2);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
-  color: var(--lg-muted);
-  opacity: 0.7;
-}
-
-/* Endpoint nodes anchor each hairline as a route between two points, so
-   the lane reads as an origin → destination path rather than a line that
-   trails off. Origin is lit (white); destination is a dim terminal. */
-.login-lane-node {
-  position: absolute;
-  top: 50%;
-  width: 5px;
-  height: 5px;
-  margin-top: -2.5px;
-  border-radius: var(--r-full);
-}
-
-.login-lane-node--origin {
-  left: 0;
-  transform: translateX(-50%);
-  background: var(--lg-steel);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lg-steel) 16%, transparent);
-}
-
-.login-lane-node--dest {
-  right: 0;
-  transform: translateX(50%);
-  background: color-mix(in srgb, var(--lg-ink) 22%, transparent);
-}
-
-/* The traveling packet: a short luminous dash with a soft tail, sweeping
-   the full lane from origin to destination (left/right are relative to the
-   lane, so the sweep is width-independent). */
-.login-lane::after {
-  content: "";
-  position: absolute;
-  top: -1px;
-  left: 0;
-  width: 72px;
-  height: 3px;
-  margin-left: -72px;
-  border-radius: var(--r-full);
-  background: linear-gradient(to right, transparent, var(--lg-steel));
-  opacity: 0;
-  animation: login-lane-travel calc(7s + var(--lane-index) * 1.4s) linear infinite;
-  animation-delay: calc(var(--lane-index) * -2.6s);
-}
-
-@keyframes login-lane-travel {
-  0% { left: 0; opacity: 0; }
-  6% { opacity: 1; }
-  88% { opacity: 1; }
-  100% { left: 100%; opacity: 0; }
-}
-
-/* ---------- The column --------------------------------------------- */
-
-.login-column {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  width: min(100%, 520px);
-  min-height: 100vh;
-  min-height: 100svh;
-  padding: var(--sp-7) clamp(var(--sp-6), 6vw, var(--sp-8));
-  background: color-mix(in srgb, var(--lg-canvas) 72%, transparent);
-  backdrop-filter: blur(2px);
-  border-right: 1px solid var(--lg-hairline-soft);
-}
-
-.login-masthead {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-4);
-  opacity: 0;
-  animation: login-rise var(--t-slow) var(--ease) forwards;
+  justify-content: center;
+  min-height: 100vh;
+  min-height: 100svh;
+  padding: var(--sp-6) var(--sp-4);
+  background: var(--lg-canvas);
+  color: var(--lg-ink);
+  font-family: var(--font-sans);
+}
+
+/* ---------- The card ------------------------------------------------- */
+
+.login-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  width: min(100%, 400px);
+  padding: var(--sp-7) var(--sp-6);
+  background: color-mix(in srgb, var(--lg-elevated) 35%, var(--lg-canvas));
+  border: 1px solid var(--lg-hairline-soft);
+  border-radius: var(--r-3);
+  animation: login-rise var(--t-slow) var(--ease);
 }
 
 .login-brand {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--sp-2);
   color: var(--lg-ink);
 }
@@ -182,142 +69,35 @@
   letter-spacing: var(--track-tight);
 }
 
-.login-kicker {
-  font-family: var(--font-mono);
-  font-size: var(--fs-2);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
-  color: var(--lg-accent);
-}
-
-.login-kicker::before {
-  content: "▸ ";
-  opacity: 0.7;
-}
-
-.login-body {
-  flex: 1 1 auto;
+.login-intro {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  padding-block: var(--sp-7);
+  gap: var(--sp-2);
+  text-align: center;
 }
 
 .login-headline {
-  margin: 0 0 var(--sp-4);
+  margin: 0;
   font-family: var(--font-sans);
-  font-size: clamp(30px, 3.8vw, 40px);
+  font-size: var(--fs-5);
   font-weight: 600;
-  line-height: 1.12;
   letter-spacing: var(--track-tight);
   color: var(--lg-ink);
-  opacity: 0;
-  animation: login-rise var(--t-slow) var(--ease) forwards;
-  animation-delay: 80ms;
-}
-
-.login-headline-break {
-  display: block;
-  color: var(--lg-muted);
 }
 
 .login-lede {
-  margin: 0 0 var(--sp-6);
-  max-width: 42ch;
-  font-size: var(--fs-3);
-  line-height: var(--leading-loose);
-  color: var(--lg-body);
-  opacity: 0;
-  animation: login-rise var(--t-slow) var(--ease) forwards;
-  animation-delay: 160ms;
-}
-
-/* ---------- Handshake block ---------------------------------------- */
-/* key ————————— state : each row's wire draws left-to-right, then the
-   state lights up — the plane reporting in, one subsystem at a time. */
-
-.login-handshake {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: var(--sp-2) var(--sp-3);
-  align-items: center;
-  margin: 0 0 var(--sp-7);
-  padding: var(--sp-4) 0;
-  border-top: 1px solid var(--lg-hairline-soft);
-  border-bottom: 1px solid var(--lg-hairline-soft);
-  font-family: var(--font-mono);
+  margin: 0;
   font-size: var(--fs-2);
-}
-
-.login-handshake-row {
-  display: contents;
-}
-
-.login-handshake-key {
+  line-height: var(--leading-loose);
   color: var(--lg-muted);
 }
 
-.login-handshake-wire {
-  margin: 0;
-  height: 1px;
-  background: var(--lg-hairline);
-  transform: scaleX(0);
-  transform-origin: left;
-  animation: login-wire-draw 420ms var(--ease) forwards;
-  animation-delay: calc(360ms + var(--row-index) * 260ms);
-}
-
-@keyframes login-wire-draw {
-  to { transform: scaleX(1); }
-}
-
-.login-handshake-state {
-  margin: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-1);
-  justify-self: end;
-  color: var(--lg-ink);
-  font-feature-settings: "tnum" 1;
-  opacity: 0;
-  animation: login-state-resolve 320ms var(--ease) forwards;
-  animation-delay: calc(700ms + var(--row-index) * 260ms);
-}
-
-@keyframes login-state-resolve {
-  from { opacity: 0; transform: translateX(-4px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
-.login-handshake-state::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: var(--r-full);
-  background: var(--lg-up);
-}
-
-.login-handshake-state[data-state="pending"] {
-  color: var(--lg-amber);
-}
-
-.login-handshake-state[data-state="pending"]::before {
-  background: var(--lg-amber);
-  animation: login-pulse 1.6s var(--ease) infinite;
-}
-
-/* ---------- Terminal form ------------------------------------------ */
-/* Numbered mono labels over underline-only inputs. The number ticks up
-   per field (bootstrap mode simply gains an 01 for the token). */
+/* ---------- Form ------------------------------------------------------ */
 
 .login-form {
-  counter-reset: login-field;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-6);
-  opacity: 0;
-  animation: login-rise var(--t-slow) var(--ease) forwards;
-  animation-delay: 240ms;
+  gap: var(--sp-4);
 }
 
 .login-field {
@@ -334,35 +114,27 @@
   color: var(--lg-muted);
 }
 
-.login-field-label::before {
-  counter-increment: login-field;
-  content: counter(login-field, decimal-leading-zero) " / ";
-  color: var(--lg-accent);
-}
-
 .login-input {
   width: 100%;
-  padding: var(--sp-2) 0;
-  border: none;
-  border-bottom: 1px solid var(--lg-hairline);
-  border-radius: 0;
-  background: transparent;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--lg-hairline);
+  border-radius: var(--r-2);
+  background: color-mix(in srgb, var(--lg-canvas) 70%, transparent);
   color: var(--lg-ink);
   font-family: var(--font-mono);
-  font-size: var(--fs-4);
+  font-size: var(--fs-3);
   caret-color: var(--lg-accent);
   touch-action: manipulation;
   transition: border-color var(--t-fast) var(--ease);
 }
 
 .login-input:hover {
-  border-bottom-color: color-mix(in srgb, var(--lg-ink) 30%, var(--lg-canvas));
+  border-color: color-mix(in srgb, var(--lg-ink) 30%, var(--lg-canvas));
 }
 
 .login-input:focus-visible {
   outline: none;
-  border-bottom-color: var(--lg-accent);
-  box-shadow: 0 1px 0 0 var(--lg-accent);
+  border-color: var(--lg-accent);
 }
 
 .login-input:-webkit-autofill {
@@ -375,6 +147,7 @@
   margin: 0;
   padding: var(--sp-3) var(--sp-4);
   border-left: 2px solid var(--lg-err);
+  border-radius: var(--r-1);
   background: color-mix(in srgb, var(--lg-err) 10%, var(--lg-canvas));
   color: var(--lg-err);
   font-family: var(--font-mono);
@@ -385,10 +158,9 @@
 .login-submit {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-3);
+  justify-content: center;
   width: 100%;
-  height: 48px;
+  height: 44px;
   padding-inline: var(--sp-4);
   border: none;
   border-radius: var(--r-2);
@@ -397,24 +169,11 @@
   font: var(--type-label-strong);
   cursor: pointer;
   touch-action: manipulation;
-  transition: background var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
-}
-
-.login-screen[data-mode="bootstrap"] .login-submit {
-  /* Mid-grey fill needs dark ink, same as the white on-action — keep it. */
-  color: var(--lg-on-amber);
+  transition: background var(--t-fast) var(--ease);
 }
 
 .login-submit:hover:not(:disabled) {
   background: var(--lg-steel-active);
-}
-
-.login-screen[data-mode="bootstrap"] .login-submit:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--lg-amber) 85%, white);
-}
-
-.login-submit:active:not(:disabled) {
-  transform: translateY(1px);
 }
 
 .login-submit:disabled {
@@ -434,52 +193,15 @@
   outline-offset: 2px;
 }
 
-.login-submit-arrow {
-  font-family: var(--font-mono);
-  transition: transform var(--t-fast) var(--ease);
-}
-
-.login-submit:hover:not(:disabled) .login-submit-arrow {
-  transform: translateX(3px);
-}
-
-/* ---------- Foot rail ----------------------------------------------- */
+/* ---------- Foot ------------------------------------------------------ */
 
 .login-foot {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-4);
+  gap: var(--sp-3);
   padding-top: var(--sp-4);
   border-top: 1px solid var(--lg-hairline-soft);
-  opacity: 0;
-  animation: login-rise var(--t-slow) var(--ease) forwards;
-  animation-delay: 320ms;
-}
-
-/* Mode switch — bracketed mono affordance, a command rather than a link. */
-.login-switch {
-  padding: var(--sp-1) 0;
-  border: none;
-  background: none;
-  color: var(--lg-body);
-  font-family: var(--font-mono);
-  font-size: var(--fs-2);
-  cursor: pointer;
-  touch-action: manipulation;
-  transition: color var(--t-fast) var(--ease);
-}
-
-.login-switch::before { content: "[ "; color: var(--lg-muted); }
-.login-switch::after { content: " ]"; color: var(--lg-muted); }
-
-.login-switch:hover {
-  color: var(--lg-steel-active);
-}
-
-.login-switch:focus-visible {
-  outline: 2px solid var(--lg-steel);
-  outline-offset: 2px;
 }
 
 .login-foot-meta {
@@ -525,7 +247,7 @@
 /* ---------- Motion --------------------------------------------------- */
 
 @keyframes login-rise {
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -536,78 +258,17 @@
 
 /* ---------- Responsive ----------------------------------------------- */
 
-@media (max-width: 879px) {
-  .login-backdrop {
-    display: none;
-  }
-
-  .login-column {
-    width: 100%;
-    min-height: 100svh;
-    border-right: none;
-    padding-top: max(env(safe-area-inset-top), var(--sp-6));
-    padding-bottom: max(env(safe-area-inset-bottom), var(--sp-6));
-    padding-inline: max(env(safe-area-inset-left), var(--sp-4)) max(env(safe-area-inset-right), var(--sp-4));
-  }
-
-  .login-body {
-    max-width: 440px;
-    width: 100%;
-    margin-inline: auto;
-  }
-
-  .login-masthead,
-  .login-foot {
-    max-width: 440px;
-    width: 100%;
-    margin-inline: auto;
-  }
-}
-
 @media (max-width: 480px) {
-  .login-foot {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--sp-2);
-  }
-
-  .login-switch {
-    min-height: 44px;
-    display: inline-flex;
-    align-items: center;
+  .login-card {
+    padding: var(--sp-6) var(--sp-4);
   }
 }
 
 /* ---------- Reduced motion ------------------------------------------- */
 
 @media (prefers-reduced-motion: reduce) {
-  .login-submit:active:not(:disabled) {
-    transform: none;
-  }
-
-  .login-masthead,
-  .login-headline,
-  .login-lede,
-  .login-form,
-  .login-foot,
-  .login-handshake-state {
-    animation: none;
-    opacity: 1;
-  }
-
-  .login-handshake-wire {
-    animation: none;
-    transform: scaleX(1);
-  }
-
-  .login-lane::after {
-    animation: none;
-    opacity: 0;
-  }
-
-  .login-handshake-state[data-state="pending"]::before,
+  .login-card,
   .login-checking-text {
     animation: none;
-    opacity: 1;
   }
 }

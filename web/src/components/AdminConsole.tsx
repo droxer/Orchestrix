@@ -70,10 +70,11 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
     (value) => (value === "list" ? "list" : "card"),
     (value) => (value === "card" ? null : value),
   );
-  const { nodes, employees, pollError, isFetching, mergeFleet, refetch } = useAdminFleet(
+  const { nodes, employees, pollError, mergeFleet, refetch } = useAdminFleet(
     Boolean(admin),
     view === "dashboard" || layout === "list",
   );
+  const [manualRefreshPending, setManualRefreshPending] = useState(false);
   const setAdminView = useRelayStore((state) => state.setAdminView);
   const [addEmployeeOpen, setAddEmployeeOpen] = useUrlSearchState(
     "adminAddEmployee",
@@ -325,6 +326,16 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
     }
   }
 
+  async function handleManualRefresh() {
+    if (manualRefreshPending) return;
+    setManualRefreshPending(true);
+    try {
+      await refetch();
+    } finally {
+      setManualRefreshPending(false);
+    }
+  }
+
   if (!authChecked) {
     return (
       <section className="admin-console adm-bare">
@@ -391,10 +402,11 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
               variant="outline"
               size="icon"
               aria-label={t("nav.refresh")}
-              disabled={isFetching}
-              onClick={() => void refetch()}
+              aria-busy={manualRefreshPending}
+              disabled={manualRefreshPending}
+              onClick={() => void handleManualRefresh()}
             >
-              <NavRefresh size={16} className={isFetching ? "spin" : undefined} />
+              <NavRefresh size={16} className={manualRefreshPending ? "spin" : undefined} />
             </Button>
             {view === "employees" ? (
               <Button
