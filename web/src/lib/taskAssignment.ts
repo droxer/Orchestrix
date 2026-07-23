@@ -1,16 +1,21 @@
 import type { AgentTeam, CurrentUser, LogicalAgentAvailability } from "../types.js";
 
-export function teamLeadReady(team: Pick<AgentTeam, "enabled" | "lead">): boolean {
-  return teamLeadAvailability(team) === "ready";
+export function teamReady(team: Pick<AgentTeam, "enabled" | "members">): boolean {
+  return teamAvailability(team) === "ready";
 }
 
-/** Named Teams dispatch only their configured lead, so roster availability
- *  must never be elevated by a ready supporter. */
-export function teamLeadAvailability(
-  team: Pick<AgentTeam, "enabled" | "lead">,
+/** Team dispatch is a lead-first pipeline across the full roster, so every
+ *  member must be enabled and ready before the team is dispatchable. */
+export function teamAvailability(
+  team: Pick<AgentTeam, "enabled" | "members">,
 ): LogicalAgentAvailability {
-  if (!team.enabled || !team.lead?.enabled) return "offline";
-  return team.lead.availability;
+  if (!team.enabled || team.members.length === 0) return "offline";
+  if (team.members.some((member) => !member.enabled || member.availability === "offline")) {
+    return "offline";
+  }
+  if (team.members.some((member) => member.availability === "pending")) return "pending";
+  if (team.members.some((member) => member.availability === "busy")) return "busy";
+  return "ready";
 }
 
 export function taskAssigneeDisplayName(

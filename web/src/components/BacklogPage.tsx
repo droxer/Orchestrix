@@ -11,13 +11,13 @@ import { cn } from "@/lib/utils";
 import { type CurrentUser, type DaemonNodeMonitorRecord, type EmployeeAgent, type RelaySession, type RelayTask, type TaskStatus } from "../types";
 import { ActionApprove, ActionCalendar, ActionStart, ActionStop, ModeAsk, NavConversations, NavRefresh, ViewBoard, ViewList } from "./icons";
 import { agentReadyForTask, canDiscussTask, discussionAgentsForTask, dueTone, filterTasks, TASK_PRIORITIES, TASK_STATUSES, tasksByStatus, type BacklogFilters } from "../lib/backlog";
-import { emptyBacklogForm, taskBoardFormsEqual, type BacklogTaskFormState } from "../lib/taskBoardForm";
+import { emptyBacklogForm, taskAssignmentMutationFields, taskBoardFormsEqual, type BacklogTaskFormState } from "../lib/taskBoardForm";
 import { TaskDrawer } from "./task-board/TaskDrawer";
 import { PageHeader } from "./PageHeader";
 import { BoardEmpty } from "./BoardEmpty";
 import { TaskBoardHeaderActions } from "./TaskBoardHeaderActions";
 import { TaskAssignee, TaskExecutionBadge } from "./TaskAssignee";
-import { taskAssigneeDisplayName, teamLeadReady } from "../lib/taskAssignment";
+import { taskAssigneeDisplayName, teamReady } from "../lib/taskAssignment";
 import { readViewPreference, writeViewPreference } from "../lib/viewPreference";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { Button } from "./ui/button";
@@ -498,8 +498,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
         priority: form.priority,
         status: form.status,
         dueDate: form.dueDate,
-        assignedAgentId: form.assignedAgentId || null,
-        assignedTeamId: form.assignedTeamId || null,
+        ...taskAssignmentMutationFields(form),
       };
       if (form.id) await updateTaskMutation.mutateAsync({ taskId: form.id, input: payload });
       else await createTaskMutation.mutateAsync(payload);
@@ -522,7 +521,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
     if (team) {
       return {
         name: team.name,
-        ready: teamLeadReady(team),
+        ready: teamReady(team),
       };
     }
     return {

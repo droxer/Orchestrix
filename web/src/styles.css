@@ -4,48 +4,68 @@
 /* =====================================================================
    Relay web — CSS orchestrator
 
-   Tailwind + tw-animate stay first. tokens.css defines primitives;
-   tailwind-bridge.css holds @theme / shadcn / @layer base so this file
-   can end with plain @imports only (Turbopack-safe). responsive.css and
-   a11y.css stay last to win source order.
+   Cascade model (this is load-bearing):
+   - Tailwind (`@import "tailwindcss"`) declares its own layers first:
+     theme → base → components → utilities.
+   - The Tailwind theme machinery — shadcn-bridge.css (@theme inline) and
+     tailwind-bridge.css (@theme / @custom-variant / @layer base) — MUST
+     stay UNLAYERED so Tailwind registers it. It only defines tokens
+     (--primary, --color-*, …) and @apply base, never app component rules.
+   - Everything else (palette/roles tokens, the element resets in base.css,
+     and every surface stylesheet) lives in ONE explicit `@layer relay`,
+     declared after Tailwind's `utilities`. So Relay CSS wins over Tailwind
+     utilities by DEFINED layer order — not by being unlayered and not by
+     @import source order. Source order *within* the layer is preserved, so
+     token overrides (login's --action, a11y's --focus-ring) resolve exactly
+     as before; responsive.css / a11y.css stay last to win intra-layer order.
+
+   To let a Tailwind utility win over an app rule (a deliberate per-component
+   override), move that rule out of `relay` or raise its specificity — it is
+   now an explicit act rather than an accident of source order.
    ===================================================================== */
 
-@import "./styles/tokens.css";
+/* ── Tailwind theme machinery — unlayered ─────────────────────────────── */
+@import "./styles/tokens/shadcn-bridge.css";
 @import "./styles/tailwind-bridge.css";
 
-@import "./styles/empty-state.css";
-@import "./styles/shell.css";
-@import "./styles/routes.css";
-@import "./styles/sidenav.css";
-@import "./styles/inputs.css";
+/* ── Relay application layer ──────────────────────────────────────────── */
+@import "./styles/tokens/palette.css" layer(relay);
+@import "./styles/tokens/roles.css" layer(relay);
+@import "./styles/tokens/base.css" layer(relay);
 
-@import "./styles/thread.css";
-@import "./styles/chat.css";
-@import "./styles/agent-stream.css";
-@import "./styles/syntax.css";
-@import "./styles/artifact.css";
-@import "./styles/handoff.css";
-@import "./styles/composer.css";
+@import "./styles/empty-state.css" layer(relay);
+@import "./styles/shell.css" layer(relay);
+@import "./styles/routes.css" layer(relay);
+@import "./styles/sidenav.css" layer(relay);
+@import "./styles/inputs.css" layer(relay);
 
-@import "./styles/pills.css";
+@import "./styles/thread.css" layer(relay);
+@import "./styles/chat.css" layer(relay);
+@import "./styles/agent-stream.css" layer(relay);
+@import "./styles/syntax.css" layer(relay);
+@import "./styles/artifact.css" layer(relay);
+@import "./styles/handoff.css" layer(relay);
+@import "./styles/composer.css" layer(relay);
 
-@import "./styles/login.css";
-@import "./styles/mcp.css";
-@import "./styles/skills.css";
-@import "./styles/workspace.css";
-@import "./styles/backlog.css";
-@import "./styles/agents.css";
-@import "./styles/teams.css";
-@import "./styles/overlay.css";
-@import "./styles/preferences.css";
-@import "./styles/dialog.css";
-@import "./styles/admin-v2-shell.css";
-@import "./styles/admin-v2-views.css";
-@import "./styles/admin-v2-drawers.css";
-@import "./styles/admin-v2-dashboard.css";
-@import "./styles/mobile-overlays.css";
+@import "./styles/pills.css" layer(relay);
 
-@import "./styles/atelier.css";
+@import "./styles/login.css" layer(relay);
+@import "./styles/mcp.css" layer(relay);
+@import "./styles/skills.css" layer(relay);
+@import "./styles/workspace.css" layer(relay);
+@import "./styles/backlog.css" layer(relay);
+@import "./styles/agents.css" layer(relay);
+@import "./styles/teams.css" layer(relay);
+@import "./styles/overlay.css" layer(relay);
+@import "./styles/preferences.css" layer(relay);
+@import "./styles/dialog.css" layer(relay);
+@import "./styles/admin-v2-shell.css" layer(relay);
+@import "./styles/admin-v2-views.css" layer(relay);
+@import "./styles/admin-v2-drawers.css" layer(relay);
+@import "./styles/admin-v2-dashboard.css" layer(relay);
+@import "./styles/mobile-overlays.css" layer(relay);
 
-@import "./styles/responsive.css";
-@import "./styles/a11y.css";
+@import "./styles/atelier.css" layer(relay);
+
+@import "./styles/responsive.css" layer(relay);
+@import "./styles/a11y.css" layer(relay);

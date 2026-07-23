@@ -1,16 +1,10 @@
 from __future__ import annotations
 
-import base64
 from collections import defaultdict
-import hashlib
-import hmac
-import mimetypes
 import os
-import secrets
 from datetime import datetime
 from threading import RLock
 import time
-from pathlib import Path, PurePosixPath
 from typing import Any, Callable
 
 from loguru import logger
@@ -19,7 +13,6 @@ from ..core.environment import load_backend_env
 from ..core.ids import new_relay_id, new_sandbox_id, now_iso
 from ..core.models import (
     AGENT_NAMES,
-    AGENT_ROLES,
     DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS,
 )
 from ..persistence.stores import (
@@ -33,6 +26,31 @@ from ..sessions import compute_prior_agent_bridge
 from ..sessions import compute_conversation_history
 from ..sessions import compute_prior_handoff_note
 from ..sessions import SessionController, initial_agent_state, merge_agent_state
+from .artifacts import (
+    daemon_reported_generated_files,
+    local_generated_file_item,
+    workspace_generated_file_snapshot,
+    workspace_generated_files,
+)
+from .credentials import (
+    daemon_node_token_matches,
+    hash_daemon_node_token,
+    new_daemon_node_token,
+    sandbox_node_auth_error as sandbox_node_auth_error,
+    sandbox_ui_auth_error as sandbox_ui_auth_error,
+    sandbox_ui_token_matches,
+)
+from .scheduling import (
+    AGENT_TASK_MODES,
+    effective_role_for_assignment,
+    node_accepts_run,
+    node_status_for_active_runs,
+    normalize_agent_role_map,
+    normalize_run_capacity,
+    workspace_identity as workspace_identity,
+    workspace_identity_record as workspace_identity_record,
+    workspace_paths_match,
+)
 
 load_backend_env()
 
@@ -53,69 +71,6 @@ DAEMON_TERMINAL_RECORD_LIMIT = int(
 )
 DAEMON_RECORD_PRUNE_INTERVAL_SECONDS = float(
     os.environ.get("RELAY_DAEMON_RECORD_PRUNE_INTERVAL_SECONDS", "60")
-)
-AGENT_TASK_MODES = ("action", "review", "ask")
-# ".key" is deliberately absent: it matches TLS/SSH private keys far more
-# often than Keynote decks, and indexed files become downloadable artifacts.
-GENERATED_ARTIFACT_EXTENSIONS = frozenset(
-    {
-        ".csv",
-        ".doc",
-        ".docx",
-        ".gif",
-        ".html",
-        ".jpeg",
-        ".jpg",
-        ".pdf",
-        ".png",
-        ".ppt",
-        ".pptx",
-        ".svg",
-        ".tsv",
-        ".webp",
-        ".xls",
-        ".xlsx",
-        ".zip",
-    }
-)
-OUTPUT_ARTIFACT_TEXT_EXTENSIONS = frozenset(
-    {
-        ".json",
-        ".log",
-        ".md",
-        ".txt",
-    }
-)
-GENERATED_ARTIFACT_EXCLUDED_DIRS = frozenset(
-    {
-        ".cache",
-        ".git",
-        ".gradle",
-        ".mypy_cache",
-        ".next",
-        ".oci",
-        ".relay",
-        ".pytest_cache",
-        ".ruff_cache",
-        ".tox",
-        ".turbo",
-        ".venv",
-        "__pycache__",
-        "coverage",
-        "dist",
-        "node_modules",
-        "out",
-        "target",
-        "venv",
-    }
-)
-GENERATED_ARTIFACT_LIMIT = 20
-# Bound the fallback workspace walk so a pathological tree cannot stall the
-# backend event loop; daemons that report generated files skip it entirely.
-GENERATED_ARTIFACT_WALK_MAX_ENTRIES = 50_000
-# Per-file cap for content snapshots kept alongside the artifact record.
-WORKSPACE_ARTIFACT_CONTENT_MAX_BYTES = int(
-    os.environ.get("RELAY_WORKSPACE_ARTIFACT_SNAPSHOT_MAX_BYTES", str(2 * 1024 * 1024))
 )
 ARTIFACT_SNAPSHOT_STATE_KEY = "_relay_artifact_snapshot"
 TERMINAL_EVENT_STATE_KEY = "_relay_terminal_event"
@@ -148,268 +103,6 @@ DAEMON_NODE_CAPABILITIES = frozenset(
 DAEMON_SANDBOX_MODES = frozenset({"none", "boxlite"})
 
 
-def _is_generated_artifact_path(relative_path: str) -> bool:
-    path = PurePosixPath(relative_path)
-    suffix = path.suffix.lower()
-    if suffix in GENERATED_ARTIFACT_EXTENSIONS:
-        return True
-    output_root = path.parts[0] if path.parts else ""
-    if (
-        len(path.parts) >= 3
-        and path.parts[0] == "agents"
-        and path.parts[1].startswith("agent-")
-    ):
-        output_root = path.parts[2]
-    return bool(output_root == "output" and suffix in OUTPUT_ARTIFACT_TEXT_EXTENSIONS)
-
-
-def hash_daemon_node_token(token: str | None) -> str | None:
-    if not token:
-        return None
-    return "sha256:" + hashlib.sha256(token.encode("utf-8")).hexdigest()
-
-
-def new_daemon_node_token() -> str:
-    return "tok_" + secrets.token_urlsafe(24).rstrip("=")
-
-
-def _hash_matches(expected: str | None, token: str | None) -> bool:
-    provided = hash_daemon_node_token(token)
-    return bool(
-        expected
-        and provided
-        and len(expected) == len(provided)
-        and hmac.compare_digest(expected, provided)
-    )
-
-
-def sandbox_ui_token_matches(sandbox: dict[str, Any], token: str | None) -> bool:
-    expected = _credential_hash(sandbox, "uiTokenHash")
-    return _hash_matches(expected, token)
-
-
-def daemon_node_token_matches(sandbox: dict[str, Any], token: str | None) -> bool:
-    expected = _credential_hash(sandbox, "nodeTokenHash")
-    return _hash_matches(expected, token)
-
-
-def _credential_hash(sandbox: dict[str, Any], field: str) -> str | None:
-    """Read a split credential hash, with one isolated legacy migration path."""
-    explicit = sandbox.get(field)
-    if isinstance(explicit, str) and explicit:
-        return explicit
-    legacy = sandbox.get("tokenHash")
-    if isinstance(legacy, str) and legacy:
-        return legacy
-    return hash_daemon_node_token(sandbox.get("token"))
-
-
-def sandbox_ui_auth_error(sandbox: dict[str, Any], token: str | None) -> str | None:
-    if (
-        not sandbox.get("uiTokenHash")
-        and not sandbox.get("tokenHash")
-        and not sandbox.get("token")
-    ):
-        return "Sandbox token is required." if sandbox.get("nodeTokenHash") else None
-    if not token:
-        return "Sandbox token is required."
-    if not sandbox_ui_token_matches(sandbox, token):
-        return "Invalid sandbox token."
-    return None
-
-
-def sandbox_node_auth_error(sandbox: dict[str, Any], token: str | None) -> str | None:
-    if (
-        not sandbox.get("nodeTokenHash")
-        and not sandbox.get("tokenHash")
-        and not sandbox.get("token")
-    ):
-        return None
-    if not token:
-        return "Daemon node token is required."
-    if not daemon_node_token_matches(sandbox, token):
-        return "Invalid daemon node token."
-    return None
-
-
-def _workspace_artifact_candidates(workspace_path: str | None) -> list[dict[str, Any]]:
-    if not workspace_path:
-        return []
-    root = Path(workspace_path)
-    if not root.exists() or not root.is_dir():
-        return []
-    root_resolved = root.resolve()
-    files: list[dict[str, Any]] = []
-    visited = 0
-    try:
-        for dirpath, dirnames, filenames in os.walk(root_resolved):
-            dirnames[:] = [
-                name
-                for name in dirnames
-                if name not in GENERATED_ARTIFACT_EXCLUDED_DIRS
-                and not (Path(dirpath) / name).is_symlink()
-            ]
-            visited += len(dirnames) + len(filenames)
-            if visited > GENERATED_ARTIFACT_WALK_MAX_ENTRIES:
-                logger.warning(
-                    "Workspace artifact walk truncated",
-                    workspace_path=str(root_resolved),
-                    max_entries=GENERATED_ARTIFACT_WALK_MAX_ENTRIES,
-                )
-                break
-            for filename in filenames:
-                path = Path(dirpath) / filename
-                if filename.startswith("~$") or path.is_symlink():
-                    continue
-                try:
-                    stat = path.stat()
-                    if not path.is_file():
-                        continue
-                    relative = path.relative_to(root_resolved)
-                except (OSError, ValueError):
-                    continue
-                if not _is_generated_artifact_path(relative.as_posix()):
-                    continue
-                content_type = (
-                    mimetypes.guess_type(path.name)[0] or "application/octet-stream"
-                )
-                files.append(
-                    {
-                        "path": str(path.resolve()),
-                        "relativePath": relative.as_posix(),
-                        "title": path.name,
-                        "bytes": stat.st_size,
-                        "mtime": stat.st_mtime,
-                        "contentType": content_type,
-                    }
-                )
-    except OSError:
-        return []
-    files.sort(key=lambda item: item["mtime"], reverse=True)
-    return files
-
-
-def _workspace_generated_file_snapshot(
-    workspace_path: str | None,
-) -> dict[str, dict[str, float | int]]:
-    return {
-        item["path"]: {"mtime": item["mtime"], "bytes": item["bytes"]}
-        for item in _workspace_artifact_candidates(workspace_path)
-    }
-
-
-def _workspace_generated_files(
-    workspace_path: str | None, before: dict[str, Any] | None
-) -> list[dict[str, Any]]:
-    before = before or {}
-    files: list[dict[str, Any]] = []
-    for item in _workspace_artifact_candidates(workspace_path):
-        previous = before.get(item["path"])
-        if (
-            previous
-            and previous.get("mtime") == item["mtime"]
-            and previous.get("bytes") == item["bytes"]
-        ):
-            continue
-        files.append(item)
-    return files[:GENERATED_ARTIFACT_LIMIT]
-
-
-def _local_generated_file_item(item: dict[str, Any]) -> dict[str, Any]:
-    """Attach a content snapshot to a walk-detected file when it is small enough."""
-    content: bytes | None = None
-    if (
-        isinstance(item.get("bytes"), int)
-        and item["bytes"] <= WORKSPACE_ARTIFACT_CONTENT_MAX_BYTES
-    ):
-        try:
-            content = Path(item["path"]).read_bytes()
-        except OSError:
-            content = None
-    return {**item, "content": content}
-
-
-def _clean_workspace_relative_path(value: Any) -> str | None:
-    """Validate a daemon-reported workspace-relative path (untrusted input)."""
-    if not isinstance(value, str) or not value.strip():
-        return None
-    relative = PurePosixPath(value.strip().replace("\\", "/"))
-    if relative.is_absolute():
-        return None
-    parts = relative.parts
-    if not parts or any(part in ("..", ".") for part in parts):
-        return None
-    return relative.as_posix()
-
-
-def _daemon_reported_generated_files(
-    workspace_path: str | None, raw_files: list[Any]
-) -> list[dict[str, Any]]:
-    """Sanitize the daemon's generated-file report into indexable items.
-
-    The daemon is authenticated but still an external process: paths must stay
-    inside its workspace and inline content must respect the snapshot cap.
-    """
-    items: list[dict[str, Any]] = []
-    for raw in raw_files:
-        if not isinstance(raw, dict):
-            continue
-        relative = _clean_workspace_relative_path(raw.get("relativePath"))
-        if not relative:
-            continue
-        # Gate on the actual file path, not the display title, so a report
-        # cannot smuggle e.g. a private key behind a document title.
-        if not _is_generated_artifact_path(relative):
-            continue
-        title = (
-            raw.get("title")
-            if isinstance(raw.get("title"), str) and raw.get("title", "").strip()
-            else PurePosixPath(relative).name
-        )
-        content: bytes | None = None
-        encoded = raw.get("contentBase64")
-        if isinstance(encoded, str) and encoded:
-            try:
-                decoded = base64.b64decode(encoded, validate=True)
-            except (ValueError, TypeError):
-                decoded = None
-            if (
-                decoded is not None
-                and len(decoded) <= WORKSPACE_ARTIFACT_CONTENT_MAX_BYTES
-            ):
-                content = decoded
-        size = raw.get("bytes")
-        bytes_count = (
-            len(content)
-            if content is not None
-            else size
-            if isinstance(size, int) and size >= 0
-            else 0
-        )
-        content_type = (
-            raw.get("contentType")
-            if isinstance(raw.get("contentType"), str) and raw.get("contentType")
-            else None
-        )
-        items.append(
-            {
-                "path": str(Path(workspace_path) / relative)
-                if workspace_path
-                else relative,
-                "relativePath": relative,
-                "title": title,
-                "bytes": bytes_count,
-                "contentType": content_type
-                or mimetypes.guess_type(title)[0]
-                or "application/octet-stream",
-                "content": content,
-            }
-        )
-        if len(items) >= GENERATED_ARTIFACT_LIMIT:
-            break
-    return items
-
-
 def public_sandbox_record(sandbox: dict[str, Any]) -> dict[str, Any]:
     return {
         k: v
@@ -424,112 +117,6 @@ def provisioned_sandbox_record(sandbox: dict[str, Any]) -> dict[str, Any]:
     if sandbox.get("token"):
         public["token"] = sandbox["token"]
     return public
-
-
-def normalize_agent_role_map(value: Any) -> dict[str, str]:
-    if not isinstance(value, dict):
-        raise ValueError("agent role map must be an object keyed by agent name.")
-    invalid_agents = [name for name in value if name not in AGENT_NAMES]
-    if invalid_agents:
-        raise ValueError(f"Unknown agent name(s): {', '.join(invalid_agents)}.")
-    invalid_roles = [role for role in value.values() if role not in AGENT_ROLES]
-    if invalid_roles:
-        raise ValueError(
-            f"Unknown agent role(s): {', '.join(str(role) for role in invalid_roles)}."
-        )
-    return {agent: value[agent] for agent in AGENT_NAMES if agent in value}
-
-
-def effective_role_for_assignment(
-    node: dict[str, Any], assignment: dict[str, Any], _mode: str
-) -> str | None:
-    explicit_role = assignment.get("role")
-    if explicit_role in AGENT_ROLES:
-        return explicit_role
-    agent = assignment.get("executorKind") or assignment["agent"]
-    overrides = (
-        node.get("agentRoleOverrides")
-        if isinstance(node.get("agentRoleOverrides"), dict)
-        else {}
-    )
-    defaults = (
-        node.get("agentRoleDefaults")
-        if isinstance(node.get("agentRoleDefaults"), dict)
-        else {}
-    )
-    return overrides.get(agent) or defaults.get(agent)
-
-
-def normalize_run_capacity(payload: dict[str, Any]) -> tuple[int, dict[str, int]]:
-    raw_by_mode = (
-        payload.get("runCapacityByMode")
-        if isinstance(payload.get("runCapacityByMode"), dict)
-        else {}
-    )
-    by_mode: dict[str, int] = {}
-    for mode in AGENT_TASK_MODES:
-        raw = raw_by_mode.get(mode)
-        by_mode[mode] = raw if isinstance(raw, int) and raw > 0 else 1
-    raw_max = payload.get("maxConcurrentRuns")
-    max_concurrent = (
-        raw_max if isinstance(raw_max, int) and raw_max > 0 else max(by_mode.values())
-    )
-    return max(1, max_concurrent), by_mode
-
-
-def node_accepts_run(
-    node: dict[str, Any],
-    *,
-    assignments: list[dict[str, Any]],
-    active_runs: list[dict[str, Any]],
-    session_id: str | None = None,
-) -> bool:
-    if node.get("retiredAt"):
-        return False
-    if session_id and any(run.get("sessionId") == session_id for run in active_runs):
-        return False
-    requested_modes = [assignment.get("mode") or "action" for assignment in assignments]
-    exclusive_request = any(mode != "ask" for mode in requested_modes)
-    active_exclusive = any(run.get("mode") != "ask" for run in active_runs)
-    if exclusive_request:
-        return len(active_runs) == 0
-    if active_exclusive:
-        return False
-    max_concurrent, by_mode = normalize_run_capacity(node)
-    active_ask = sum(1 for run in active_runs if run.get("mode") == "ask")
-    return len(active_runs) < max_concurrent and active_ask < by_mode.get("ask", 1)
-
-
-def node_status_for_active_runs(
-    node: dict[str, Any], active_runs: list[dict[str, Any]]
-) -> str:
-    if node.get("status") in ("stopped", "failed", "provisioning"):
-        return node["status"]
-    return "running" if active_runs else "ready"
-
-
-def workspace_paths_match(left: str | None, right: str | None) -> bool:
-    return bool(
-        left
-        and right
-        and os.path.normcase(os.path.abspath(left))
-        == os.path.normcase(os.path.abspath(right))
-    )
-
-
-def workspace_identity(node: dict[str, Any]) -> tuple[str, str] | None:
-    workspace_id = node.get("workspaceId")
-    if isinstance(workspace_id, str) and workspace_id.strip():
-        return ("id", workspace_id.strip())
-    workspace_path = node.get("workspacePath")
-    if isinstance(workspace_path, str) and workspace_path.strip():
-        return ("path", os.path.normcase(os.path.abspath(workspace_path)))
-    return None
-
-
-def workspace_identity_record(node: dict[str, Any]) -> dict[str, str] | None:
-    identity = workspace_identity(node)
-    return {"kind": identity[0], "value": identity[1]} if identity else None
 
 
 def _string_metadata(value: Any, limit: int = 500) -> str | None:
@@ -882,7 +469,15 @@ class DaemonNodeRegistry:
         return self.sandboxes.get(sandbox_id)
 
     def list_ready(self) -> list[dict[str, Any]]:
-        return sorted(self.sandboxes.values(), key=self._selection_key)
+        if not self.sandboxes:
+            return []
+        active_runs_by_node = self._active_runs_by_node()
+        return sorted(
+            self.sandboxes.values(),
+            key=lambda sandbox: self._selection_key(
+                sandbox, active_runs_by_node.get(sandbox["id"], [])
+            ),
+        )
 
     def update_status(self, sandbox_id: str, patch: dict[str, Any]) -> None:
         sandbox = self.sandboxes.get(sandbox_id)
@@ -906,9 +501,7 @@ class DaemonNodeRegistry:
 
     def monitor_nodes(self) -> list[dict[str, Any]]:
         self.reap_stale_runs(force=False)
-        active_runs_by_node: dict[str, list[dict[str, Any]]] = defaultdict(list)
-        for run in self.daemon_store.list_active_runs():
-            active_runs_by_node[run["nodeId"]].append(run)
+        active_runs_by_node = self._active_runs_by_node()
         queued_counts = self.daemon_store.queued_command_counts()
         nodes = []
         for sandbox in sorted(
@@ -1250,10 +843,22 @@ class DaemonNodeRegistry:
         ]
         if not matches:
             return None
-        return sorted(matches, key=self._selection_key)[0]
+        active_runs_by_node = self._active_runs_by_node()
+        return min(
+            matches,
+            key=lambda sandbox: self._selection_key(
+                sandbox, active_runs_by_node.get(sandbox["id"], [])
+            ),
+        )
+
+    def _active_runs_by_node(self) -> dict[str, list[dict[str, Any]]]:
+        active_runs_by_node: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        for run in self.daemon_store.list_active_runs():
+            active_runs_by_node[run["nodeId"]].append(run)
+        return active_runs_by_node
 
     def _selection_key(
-        self, sandbox: dict[str, Any], active_runs: list[dict[str, Any]] | None = None
+        self, sandbox: dict[str, Any], active_runs: list[dict[str, Any]]
     ) -> tuple[int, int, float, str]:
         liveness = self._liveness(sandbox)
         timestamp = (
@@ -1261,11 +866,6 @@ class DaemonNodeRegistry:
             or sandbox.get("updatedAt")
             or sandbox.get("createdAt")
             or ""
-        )
-        active_runs = (
-            active_runs
-            if active_runs is not None
-            else self.daemon_store.list_active_runs(sandbox["id"])
         )
         try:
             seen_at = datetime.fromisoformat(
@@ -1981,7 +1581,7 @@ class DaemonNodeRegistry:
         artifact_snapshot = (
             None
             if self._node_reports_generated_files(sandbox)
-            else _workspace_generated_file_snapshot(sandbox.get("workspacePath"))
+            else workspace_generated_file_snapshot(sandbox.get("workspacePath"))
         )
         command["_artifactSnapshot"] = artifact_snapshot
         dispatch_claim_id = new_relay_id("claim")
@@ -2269,7 +1869,7 @@ class DaemonNodeRegistry:
         session_id = run_request["sessionId"]
         workspace_path = sandbox.get("workspacePath")
         if isinstance(event.get("generatedFiles"), list):
-            items = _daemon_reported_generated_files(
+            items = daemon_reported_generated_files(
                 workspace_path, event["generatedFiles"]
             )
         elif self._node_reports_generated_files(sandbox):
@@ -2277,8 +1877,8 @@ class DaemonNodeRegistry:
             items = []
         else:
             items = [
-                _local_generated_file_item(item)
-                for item in _workspace_generated_files(
+                local_generated_file_item(item)
+                for item in workspace_generated_files(
                     workspace_path, artifact_snapshot
                 )
             ]
@@ -2559,9 +2159,8 @@ class DaemonNodeRegistry:
         nodes = self.daemon_store.list_nodes()
         if nodes:
             logger.info("Loaded persisted daemon nodes", count=len(nodes))
-        active_node_ids = {
-            run["nodeId"] for run in self.daemon_store.list_active_runs()
-        }
+        active_runs = self.daemon_store.list_active_runs()
+        active_node_ids = {run["nodeId"] for run in active_runs}
         for sandbox in nodes:
             node_location = infer_node_location(sandbox)
             waiting_status = (
@@ -2580,7 +2179,7 @@ class DaemonNodeRegistry:
                 "lastError": sandbox.get("lastError")
                 or "Waiting for daemon node registration.",
             }
-        for run in self.daemon_store.list_active_runs():
+        for run in active_runs:
             self.active_commands[run["commandId"]] = {**run, "sandboxId": run["nodeId"]}
 
     def _liveness(self, sandbox: dict[str, Any]) -> dict[str, Any]:

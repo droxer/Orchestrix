@@ -15,12 +15,18 @@ from relay.services.managed_nodes import LocalManagedNodeStore
 from relay.tasks import ROUTINE_SKIP_NO_AGENT_MESSAGE, TaskScheduler, next_routine_date
 
 
-def _logical_backend(root: str, registry, *node_ids: str):
+def _logical_backend(
+    root: str,
+    registry,
+    *node_ids: str,
+    instructions: str | None = None,
+):
     agent_store = LocalEmployeeAgentStore(root)
     placement_store = LocalAgentPlacementStore(root)
-    agent = agent_store.create_agent(
-        "alice", {"displayName": "Builder", "executorKind": "codex"}
-    )
+    payload = {"displayName": "Builder", "executorKind": "codex"}
+    if instructions:
+        payload["instructions"] = instructions
+    agent = agent_store.create_agent("alice", payload)
     for node_id in node_ids:
         placement_store.create_placement(agent, node_id)
     return (
@@ -53,7 +59,13 @@ def test_scheduler_dispatches_assigned_task_to_ready_node() -> None:
                 },
                 "ui_token",
             )
-            backend, agent = _logical_backend(root, registry, "sbx_alice")
+            personality = "Be a careful release engineer who verifies every change."
+            backend, agent = _logical_backend(
+                root,
+                registry,
+                "sbx_alice",
+                instructions=personality,
+            )
             task = task_store.create_task(
                 {
                     "title": "Ship scheduled backlog",
@@ -78,6 +90,7 @@ def test_scheduler_dispatches_assigned_task_to_ready_node() -> None:
             assert command["type"] == "run.start"
             assert command["agent"] == "codex"
             assert command["taskGoal"] == "Ship scheduled backlog\n\nRun automatically."
+            assert command["state"]["agent_instructions"] == personality
 
     asyncio.run(run_flow())
 
@@ -712,7 +725,7 @@ def test_next_routine_date_skips_past_missed_windows_and_handles_custom() -> Non
     assert next_routine_date(date(2026, 6, 25), "custom", date(2026, 6, 25)) is None
 
 
-def test_scheduler_dispatches_only_team_lead() -> None:
+def test_scheduler_dispatches_all_team_members_lead_first() -> None:
     async def run_flow() -> None:
         with TemporaryDirectory() as root:
             task_store = LocalTaskStore(root)
@@ -791,6 +804,23 @@ def test_scheduler_dispatches_only_team_lead() -> None:
                 },
                 "node_token",
             )
+            [support_command] = registry.take_commands("sbx_alice", "node_token")
+            assert support_command["logicalAgentId"] == support["id"]
+            assert support_command["agent"] == "claude"
+            registry.handle_event(
+                "sbx_alice",
+                {
+                    "type": "run.completed",
+                    "commandId": support_command["id"],
+                    "sessionId": support_command["sessionId"],
+                    "runId": support_command["runId"],
+                    "agent": "claude",
+                    "mode": "action",
+                    "exitCode": 0,
+                    "agentLog": "reviewed",
+                },
+                "node_token",
+            )
 
             agent_store.update_agent(lead["id"], {"enabled": False})
             second = task_store.create_task(
@@ -810,7 +840,7 @@ def test_scheduler_dispatches_only_team_lead() -> None:
             assert updated["dispatchOutcome"]["code"] == "team_unavailable"
             assert (
                 updated["dispatchOutcome"]["message"]
-                == "The team lead is not currently available."
+                == "The agent team is not currently available."
             )
 
     asyncio.run(run_flow())
@@ -831,7 +861,7 @@ def test_scheduler_promotes_team_routine_into_team_owned_thread() -> None:
                     "token": "node_token",
                     "workspacePath": "/workspace/alice",
                     "protocolVersion": 1,
-                    "supportedAgents": ["codex"],
+                    "supportedAgents": ["codex", "claude"],
                     "status": "ready",
                 },
                 "ui_token",
@@ -841,7 +871,11 @@ def test_scheduler_promotes_team_routine_into_team_owned_thread() -> None:
             lead = agent_store.create_agent(
                 "alice", {"displayName": "Lead", "executorKind": "codex"}
             )
+            support = agent_store.create_agent(
+                "alice", {"displayName": "Support", "executorKind": "claude"}
+            )
             placements.create_placement(lead, "sbx_alice")
+            placements.create_placement(support, "sbx_alice")
             backend = ServerDaemonNodeBackend(
                 registry,
                 employee_agent_store=agent_store,
@@ -853,7 +887,7 @@ def test_scheduler_promotes_team_routine_into_team_owned_thread() -> None:
                 {
                     "name": "Routine delivery",
                     "leadAgentId": lead["id"],
-                    "memberAgentIds": [lead["id"]],
+                    "memberAgentIds": [lead["id"], support["id"]],
                 },
             )
             routine = task_store.create_task(
@@ -889,6 +923,25 @@ def test_scheduler_promotes_team_routine_into_team_owned_thread() -> None:
             assert session["teamId"] == team["id"]
             assert session["ownerEmployeeId"] == "alice"
             assert session["ownerAgentId"] == lead["id"]
+            [lead_command] = registry.take_commands("sbx_alice", "node_token")
+            assert lead_command["logicalAgentId"] == lead["id"]
+            registry.handle_event(
+                "sbx_alice",
+                {
+                    "type": "run.completed",
+                    "commandId": lead_command["id"],
+                    "sessionId": lead_command["sessionId"],
+                    "runId": lead_command["runId"],
+                    "agent": "codex",
+                    "mode": "action",
+                    "exitCode": 0,
+                    "agentLog": "lead result",
+                },
+                "node_token",
+            )
+            [support_command] = registry.take_commands("sbx_alice", "node_token")
+            assert support_command["logicalAgentId"] == support["id"]
+            assert support_command["agent"] == "claude"
 
     asyncio.run(run_flow())
 

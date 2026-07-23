@@ -321,13 +321,6 @@ async def create_session(request: Request, ctx: AppContextDep) -> dict[str, Any]
     workspace_path = string_field(body, "workspacePath") or "/workspace"
     task_id = body.get("taskId") if isinstance(body.get("taskId"), str) else None
     task = get_task_for_actor(ctx.task_store, task_id, actor) if task_id else None
-    if task:
-        assignments = task_thread_assignments(
-            task,
-            assignments,
-            team_store=ctx.team_store,
-            agent_store=ctx.agent_store,
-        )
     owner = owner_employee_id_for_create(actor, body)
     thread_ownership = {
         "owner_employee_id": owner,
@@ -337,6 +330,12 @@ async def create_session(request: Request, ctx: AppContextDep) -> dict[str, Any]
         try:
             thread_ownership = task_thread_ownership(
                 task, team_store=ctx.team_store, agent_store=ctx.agent_store
+            )
+            assignments = task_thread_assignments(
+                task,
+                assignments,
+                team_store=ctx.team_store,
+                agent_store=ctx.agent_store,
             )
         except TeamDispatchError as error:
             raise HTTPException(409, error.code) from error

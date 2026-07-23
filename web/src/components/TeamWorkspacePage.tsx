@@ -8,14 +8,16 @@ import { useEmployeeAgents } from "../hooks/useEmployeeAgents";
 import { useRelayMutations } from "../hooks/useRelayMutations";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { agentLabel } from "../lib/plan";
-import { teamLeadReady } from "../lib/taskAssignment";
+import { teamReady } from "../lib/taskAssignment";
 import { teamMutationInput } from "../lib/teamForm";
+import { compactDate } from "../lib/workspaceFormat";
 import type { AgentTeam, ArtifactIndexItem, WorkspaceBriefResponse, WorkspaceBriefSession, WorkspaceBriefTask } from "../types";
 import { ActionEdit, AdminDelete, NavRefresh, NavTeams, ViewBoard } from "./icons";
 import { AgentStateBadge } from "./AgentStateBadge";
 import { PageHeader } from "./PageHeader";
 import { ArtifactBody } from "./artifact/ArtifactBody";
 import { ArtifactsEmpty } from "./artifact/ArtifactsEmpty";
+import { MetricItem, WorkspaceEmpty, WorkspaceLoading } from "./workspace/WorkspacePrimitives";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { useDialogs } from "./ui/DialogProvider";
@@ -31,54 +33,12 @@ function parseTeamTab(value: string | null): TeamPageTab {
   return TEAM_PAGE_TABS.includes(value as TeamPageTab) ? value as TeamPageTab : "activities";
 }
 
-function compactDate(value: string | undefined, locale: string): string {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat(locale || undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
-
-function WorkspaceEmpty({ title, hint, artifact = false }: { title: string; hint?: string; artifact?: boolean }) {
-  return (
-    <div className="workspace-empty-state">
-      <span className="workspace-empty-state-mark" aria-hidden="true">
-        {artifact ? <ViewBoard size={18} /> : <NavTeams size={18} />}
-      </span>
-      <p className="workspace-empty-state-title">{title}</p>
-      {hint ? <p className="workspace-empty-state-hint">{hint}</p> : null}
-    </div>
-  );
-}
-
-function WorkspaceLoading({ label }: { label: string }) {
-  return (
-    <div className="workspace-loading" role="status" aria-live="polite">
-      <div className="workspace-loading-bar" aria-hidden="true" />
-      <span>{label}</span>
-    </div>
-  );
-}
-
 function WorkspaceError({ message, onRetry }: { message: string; onRetry: () => void }) {
   const { t } = useTranslation();
   return (
     <div className="workspace-error" role="alert">
       <p>{message}</p>
       <Button type="button" variant="outline" size="sm" onClick={onRetry}>{t("workspace.retry")}</Button>
-    </div>
-  );
-}
-
-function MetricItem({ label, value, live = false }: { label: string; value: number; live?: boolean }) {
-  return (
-    <div className={`workspace-metric-item${live ? " is-emphasis is-live" : ""}${value === 0 ? " is-zero" : ""}`}>
-      <strong className="mono">{value}</strong>
-      <span>{label}</span>
     </div>
   );
 }
@@ -402,7 +362,7 @@ function TeamArtifacts({
                 <div className="artifact-viewer-body"><ArtifactBody artifact={selected} sessionId={selected.sessionId} /></div>
               </div>
             ) : (
-              <WorkspaceEmpty title={t("workspace.select_to_preview")} hint={t("workspace.empty_preview_hint")} artifact />
+              <WorkspaceEmpty title={t("workspace.select_to_preview")} hint={t("workspace.empty_preview_hint")} mark={<ViewBoard size={18} />} />
             )}
           </div>
         </section>
@@ -415,15 +375,15 @@ function TeamArtifacts({
 function TeamActivities({ team, brief, onOpenConversation }: { team: AgentTeam; brief: WorkspaceBriefResponse; onOpenConversation: (sessionId: string) => void }) {
   const { t, i18n } = useTranslation();
   const hasActivity = brief.activeRuns.length > 0 || brief.sessions.length > 0 || brief.tasks.length > 0;
-  const available = teamLeadReady(team);
+  const available = teamReady(team);
 
   return (
     <div className="workspace-inspect workspace-activities" role="tabpanel" id="team-page-panel-activities" aria-labelledby="team-page-tab-activities">
       <div className="workspace-metric-strip" aria-label={t("workspace.metrics")}>
-        <MetricItem label={t("workspace.metric_runs")} value={brief.metrics.activeRunCount} live={brief.metrics.activeRunCount > 0} />
-        <MetricItem label={t("workspace.metric_tasks")} value={brief.metrics.activeTaskCount} />
-        <MetricItem label={t("workspace.metric_sessions")} value={brief.metrics.sessionCount} />
-        <MetricItem label={t("workspace.metric_artifacts")} value={brief.metrics.artifactCount} />
+        <MetricItem label={t("workspace.metric_runs")} value={brief.metrics.activeRunCount} emphasis={brief.metrics.activeRunCount > 0} live={brief.metrics.activeRunCount > 0} />
+        <MetricItem label={t("workspace.metric_tasks")} value={brief.metrics.activeTaskCount} zero={brief.metrics.activeTaskCount === 0} />
+        <MetricItem label={t("workspace.metric_sessions")} value={brief.metrics.sessionCount} zero={brief.metrics.sessionCount === 0} />
+        <MetricItem label={t("workspace.metric_artifacts")} value={brief.metrics.artifactCount} zero={brief.metrics.artifactCount === 0} />
         <div className="workspace-metric-item workspace-metric-item--status">
           <span className={`workspace-status-pill tone-${available ? "good" : "neutral"}`}>{available ? t("teams.available") : t("teams.unavailable")}</span>
         </div>
@@ -486,7 +446,7 @@ function TeamActivities({ team, brief, onOpenConversation }: { team: AgentTeam; 
             </ul>
           </ActivitySection>
         ) : null}
-        {!hasActivity ? <WorkspaceEmpty title={t("workspace.no_activity")} hint={t("workspace.empty_activity_hint")} /> : null}
+        {!hasActivity ? <WorkspaceEmpty title={t("workspace.no_activity")} hint={t("workspace.empty_activity_hint")} mark={<NavTeams size={18} />} /> : null}
       </div>
     </div>
   );

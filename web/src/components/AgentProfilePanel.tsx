@@ -221,88 +221,83 @@ export function AgentProfilePanel({
         className="workspace-profile-panel workspace-profile-dossier"
         data-executor={agent.executorKind}
       >
-        <header className="workspace-dossier-hero">
+        <header className={`workspace-dossier-hero${embedInDrawer ? " is-embedded" : ""}`}>
           {!embedInDrawer ? (
             <span className="workspace-dossier-mark" aria-hidden="true">
               <AgentMark agent={agent.executorKind} size={20} />
             </span>
           ) : null}
-          <p className="workspace-dossier-blurb">{t(`agent.${agent.executorKind}.blurb`)}</p>
+          <div className="workspace-dossier-intro">
+            <span>{t("agents_page.profile_kicker")}</span>
+            <p className="workspace-dossier-blurb">{t("agents_page.profile_intro")}</p>
+          </div>
           <div className="workspace-dossier-status">
             <span className={`workspace-status-pill tone-${agentAvailabilityTone(agent.availability)}`}>
               {t(`admin.v2.placement_status.${agent.availability}`, { defaultValue: agent.availability })}
             </span>
-            {!embedInDrawer ? (
-              <span className="workspace-dossier-runtime mono" translate="no">{agentLabel(agent.executorKind)}</span>
-            ) : null}
+            <span className="workspace-dossier-runtime mono" translate="no">{agentLabel(agent.executorKind)}</span>
           </div>
         </header>
 
         {canEditProfile ? (
-          <section className="workspace-dossier-name" aria-labelledby="workspace-dossier-name-title">
-            {embedInDrawer && !renaming ? (
-              <DossierIconButton
-                onClick={startRename}
-                aria-label={t("admin.v2.edit_agent")}
-                title={t("admin.v2.edit_agent")}
-              >
-                <ActionEdit size={14} aria-hidden="true" />
-                <span>{t("admin.v2.edit_agent")}</span>
-              </DossierIconButton>
-            ) : (
+          <section className="workspace-identity-record" aria-labelledby="workspace-dossier-name-title">
+            <div className="workspace-dossier-instructions-head">
+              <div>
+                <span className="workspace-identity-kicker">{t("agents_page.identity_title")}</span>
+                <h2 id="workspace-dossier-name-title">{t("admin.v2.agent_name")}</h2>
+              </div>
+              {!renaming ? (
+                <DossierIconButton
+                  onClick={startRename}
+                  aria-label={t("admin.v2.edit_agent")}
+                  title={t("admin.v2.edit_agent")}
+                >
+                  <ActionEdit size={14} aria-hidden="true" />
+                  {embedInDrawer ? <span>{t("admin.v2.edit_agent")}</span> : null}
+                </DossierIconButton>
+              ) : null}
+            </div>
+            {renaming ? (
               <>
-                <div className="workspace-dossier-instructions-head">
-                  <h2 id="workspace-dossier-name-title">{t("admin.v2.agent_name")}</h2>
-                  {!renaming ? (
-                    <DossierIconButton
-                      onClick={startRename}
-                      aria-label={t("admin.v2.edit_agent")}
-                      title={t("admin.v2.edit_agent")}
-                    >
-                      <ActionEdit size={14} aria-hidden="true" />
-                    </DossierIconButton>
-                  ) : null}
+                <Input
+                  name="agent-display-name"
+                  type="text"
+                  aria-label={t("admin.v2.agent_name")}
+                  autoComplete="off"
+                  autoFocus
+                  value={nameDraft}
+                  onChange={(event) => setNameDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") void handleRenameSave();
+                    if (event.key === "Escape") setRenaming(false);
+                  }}
+                  disabled={saving}
+                />
+                <div className="adm-cred-inline-actions">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setRenaming(false)}
+                    disabled={saving}
+                  >
+                    {t("admin.v2.cancel")}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => void handleRenameSave()}
+                    disabled={saving}
+                  >
+                    {t("admin.v2.save")}
+                  </Button>
                 </div>
-                {renaming ? (
-                  <>
-                    <Input
-                      name="agent-display-name"
-                      type="text"
-                      aria-label={t("admin.v2.agent_name")}
-                      autoComplete="off"
-                      autoFocus
-                      value={nameDraft}
-                      onChange={(event) => setNameDraft(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") void handleRenameSave();
-                        if (event.key === "Escape") setRenaming(false);
-                      }}
-                      disabled={saving}
-                    />
-                    <div className="adm-cred-inline-actions">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setRenaming(false)}
-                        disabled={saving}
-                      >
-                        {t("admin.v2.cancel")}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={() => void handleRenameSave()}
-                        disabled={saving}
-                      >
-                        {t("admin.v2.save")}
-                      </Button>
-                    </div>
-                  </>
-                ) : (
-                  <p className="workspace-dossier-name-value" translate="no">{agent.displayName}</p>
-                )}
               </>
+            ) : (
+              <div className="workspace-identity-value">
+                <p className="workspace-dossier-name-value" translate="no">{agent.displayName}</p>
+                <span translate="no">@{agent.employeeId}</span>
+              </div>
             )}
           </section>
         ) : null}

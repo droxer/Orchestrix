@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useTeams } from "../hooks/useTeams";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { selectedTeamForWorkspace } from "../lib/teamWorkspace";
-import { teamLeadAvailability } from "../lib/taskAssignment";
+import { teamAvailability } from "../lib/taskAssignment";
 import { StatusPill } from "./StatusPill";
 import type { CurrentUser } from "../types";
 import { ActionAdd } from "./icons";
@@ -93,11 +93,11 @@ export function TeamsPage({
                         </span>
                         <span className="teams-list-status" role="cell">
                           {/* "ready" is the default healthy state and stays
-                              implicit; other lead states get named. */}
+                              implicit; other roster states get named. */}
                           {!team.enabled ? (
                             <Badge variant="neutral">{t("teams.disabled")}</Badge>
-                          ) : teamLeadAvailability(team) !== "ready" ? (
-                            <StatusPill value={teamLeadAvailability(team)} />
+                          ) : teamAvailability(team) !== "ready" ? (
+                            <StatusPill value={teamAvailability(team)} />
                           ) : null}
                         </span>
                       </button>

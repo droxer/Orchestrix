@@ -25,6 +25,8 @@ interface NodeProfileBadgesProps {
   compact?: boolean;
   /** Fleet cards show ownership only; runtime isolation belongs in drawers. */
   card?: boolean;
+  /** Drop the sandbox badge — fleet rows show ownership only, matching cards. */
+  hideSandbox?: boolean;
   /** Drop the "This host" locality — redundant on the node card, where the
    *  status pill already conveys liveness. */
   hideThisHost?: boolean;
@@ -33,7 +35,7 @@ interface NodeProfileBadgesProps {
   hideSavedHere?: boolean;
 }
 
-export function NodeProfileBadges({ node, storedTokens, colocated, t, compact = false, card = false, hideThisHost = false, hideSavedHere = false }: NodeProfileBadgesProps) {
+export function NodeProfileBadges({ node, storedTokens, colocated, t, compact = false, card = false, hideSandbox = false, hideThisHost = false, hideSavedHere = false }: NodeProfileBadgesProps) {
   const ownership = nodeOwnershipProfile(node);
   const sandbox = nodeSandboxProfile(node);
   const localities = nodeLocalityKinds(node, { storedTokens, colocated })
@@ -50,12 +52,13 @@ export function NodeProfileBadges({ node, storedTokens, colocated, t, compact = 
     .map((locality) => t(`admin.v2.node_locality_${locality}_hint`))
     .join(" · ");
   const OwnershipIcon = OWNERSHIP_ICON[ownership];
+  const showSandbox = !card && !hideSandbox;
 
   return (
     <div
       className={`adm-node-profile${compact ? " is-compact" : ""}`}
       role="group"
-      aria-label={card
+      aria-label={!showSandbox
         ? ownershipLabel
         : t("admin.v2.node_profile_label", {
             ownership: ownershipLabel,
@@ -71,7 +74,7 @@ export function NodeProfileBadges({ node, storedTokens, colocated, t, compact = 
         <OwnershipIcon size={13} className="adm-node-profile-icon" aria-hidden="true" />
         {ownershipLabel}
       </span>
-      {!card ? (
+      {showSandbox ? (
         <>
           <span className="adm-node-profile-sep" aria-hidden="true">·</span>
           <span

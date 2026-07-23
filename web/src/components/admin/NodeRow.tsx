@@ -82,6 +82,7 @@ export function NodeRow({ node, storedTokens, colocated, onReveal, onManageAgent
             colocated={colocated}
             t={t}
             compact
+            hideSandbox
             hideThisHost
             hideSavedHere
           />

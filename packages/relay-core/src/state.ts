@@ -25,7 +25,7 @@ export interface AgentState {
   prior_conversation?: string;
   /** Latest handoff note for the current turn, if any. */
   prior_handoff_note?: string;
-  /** Control-plane instructions for the selected logical agent identity. */
+  /** Durable personality profile for the selected logical agent identity. */
   agent_instructions?: string;
   /**
    * Personal home subdir (slash-separated, under the shared node workspace)

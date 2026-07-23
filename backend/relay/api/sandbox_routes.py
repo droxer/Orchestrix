@@ -11,7 +11,7 @@ from ..daemon_registry import (
     sandbox_ui_auth_error,
     sandbox_ui_token_matches,
 )
-from ..daemon_registry.registry import workspace_identity_record
+from ..daemon_registry.scheduling import workspace_identity_record
 from .deps import AppContextDep
 from .helpers import (
     actor_can_access_sandbox,

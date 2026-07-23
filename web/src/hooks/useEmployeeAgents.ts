@@ -1,7 +1,9 @@
 "use client";
 
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { listEmployeeAgents } from "../api";
+import { dedupeAgentsById } from "../lib/employeeAgents";
 import type { EmployeeAgent } from "../types";
 
 export const EMPLOYEE_AGENTS_QUERY_KEY = "employee-agents";
@@ -16,8 +18,9 @@ export function useEmployeeAgents(employeeId?: string): {
     enabled: Boolean(employeeId),
     refetchInterval: 10_000,
   });
+  const agents = useMemo(() => dedupeAgentsById(query.data?.agents ?? []), [query.data]);
   return {
-    agents: query.data?.agents ?? [],
+    agents,
     isFetching: query.isFetching,
   };
 }

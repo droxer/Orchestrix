@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { describe, it } from "node:test";
 
-import { taskAssigneeDisplayName, teamLeadAvailability, teamLeadReady } from "../src/lib/taskAssignment.js";
+import { taskAssigneeDisplayName, teamAvailability, teamReady } from "../src/lib/taskAssignment.js";
 import { teamMutationInput } from "../src/lib/teamForm.js";
 import { selectedTeamForWorkspace } from "../src/lib/teamWorkspace.js";
 
@@ -74,46 +74,64 @@ describe("Agent team management", () => {
     }, user), "employee-2");
   });
 
-  it("reports Team readiness from the lead rather than a ready supporter", () => {
-    assert.equal(teamLeadReady({
+  it("requires every Team member to be ready", () => {
+    assert.equal(teamReady({
       enabled: true,
-      lead: {
-        id: "lead",
-        displayName: "Lead",
-        executorKind: "codex",
-        enabled: false,
-        availability: "offline",
-      },
+      members: [
+        {
+          id: "lead",
+          displayName: "Lead",
+          executorKind: "codex",
+          enabled: true,
+          availability: "ready",
+        },
+        {
+          id: "support",
+          displayName: "Support",
+          executorKind: "claude",
+          enabled: false,
+          availability: "offline",
+        },
+      ],
     }), false);
-    assert.equal(teamLeadReady({
+    assert.equal(teamReady({
       enabled: true,
-      lead: {
-        id: "lead",
-        displayName: "Lead",
-        executorKind: "codex",
-        enabled: true,
-        availability: "ready",
-      },
+      members: [
+        {
+          id: "lead",
+          displayName: "Lead",
+          executorKind: "codex",
+          enabled: true,
+          availability: "ready",
+        },
+        {
+          id: "support",
+          displayName: "Support",
+          executorKind: "claude",
+          enabled: true,
+          availability: "ready",
+        },
+      ],
     }), true);
-    assert.equal(teamLeadAvailability({
+    assert.equal(teamAvailability({
       enabled: true,
-      lead: {
+      members: [{
         id: "lead",
         displayName: "Lead",
         executorKind: "codex",
         enabled: true,
         availability: "offline",
-      },
+      }],
     }), "offline");
-    assert.equal(teamLeadAvailability({
+    assert.equal(teamAvailability({
       enabled: true,
-      lead: {
+      members: [{
         id: "lead",
         displayName: "Lead",
         executorKind: "codex",
         enabled: true,
         availability: "busy",
-      },
+      }],
     }), "busy");
   });
 

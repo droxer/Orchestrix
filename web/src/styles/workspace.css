@@ -1017,9 +1017,16 @@
 }
 
 .workspace-dossier-hero {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-3);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--sp-4);
+  padding-bottom: var(--sp-5);
+  border-bottom: 1px solid var(--line-2);
+}
+
+.workspace-dossier-hero.is-embedded {
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .workspace-dossier-mark {
@@ -1038,12 +1045,29 @@
   color: var(--ink-2);
   font: var(--type-body-sm);
   line-height: 1.55;
+  text-wrap: pretty;
+}
+
+.workspace-dossier-intro {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.workspace-dossier-intro > span {
+  color: var(--action);
+  font: var(--type-micro);
+  font-weight: 650;
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
 }
 
 .workspace-dossier-status {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: var(--sp-3);
 }
 
@@ -1052,147 +1076,319 @@
   font: var(--type-label);
 }
 
-/* A durable agent brief, shown to employees and admins. */
-.agent-instruction-card {
+/* The profile's durable inner character. Its slightly editorial treatment
+   keeps identity separate from runtime configuration. */
+.agent-personality-card {
+  --personality-label-width: 5.25rem;
+
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-4);
-  padding: var(--sp-4);
-  border: 1px solid var(--line-2);
+  gap: var(--sp-5);
+  padding: var(--sp-6);
+  overflow: hidden;
+  border: 1px solid var(--line-1);
   border-radius: var(--r-2);
   background: var(--surface-1);
-  transition: border-color var(--t-fast) var(--ease);
+  transition:
+    border-color var(--t-fast) var(--ease),
+    background-color var(--t-fast) var(--ease);
 }
 
-.agent-instruction-card.is-editing {
+.agent-personality-card.is-editing {
   border-color: var(--line-1);
   background: var(--surface-2);
 }
 
-.agent-instruction-card-head {
+.agent-personality-card-head {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--sp-3);
+  gap: var(--sp-4);
 }
 
-.agent-instruction-card-heading {
+.agent-personality-heading {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: var(--sp-4);
+}
+
+.agent-personality-file {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--personality-label-width);
+  min-height: 27px;
+  padding: 0 var(--sp-2);
+  flex-shrink: 0;
+  border: 1px solid color-mix(in srgb, var(--action) 38%, var(--line-1));
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--action) 8%, var(--surface-2));
+  color: var(--action);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+}
+
+.agent-personality-title-block {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
 }
 
-.agent-instruction-card-title-row {
+.agent-personality-title-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--sp-2);
+  gap: var(--sp-3);
 }
 
-.agent-instruction-card-title-row h2 {
+.agent-personality-title-row h2 {
   margin: 0;
   color: var(--ink-1);
-  font: var(--type-label-strong);
+  font-size: var(--fs-5);
+  font-weight: 650;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
 }
 
-.agent-instruction-state {
+.agent-personality-state {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  height: 19px;
-  padding: 0 7px;
-  border: 1px solid var(--line-2);
-  border-radius: var(--r-full);
+  gap: 6px;
   color: var(--ink-3);
-  font: var(--type-label-strong);
+  font: var(--type-micro);
   letter-spacing: var(--track-caps);
   text-transform: uppercase;
 }
 
-.agent-instruction-state::before {
-  width: 5px;
-  height: 5px;
-  border-radius: var(--r-full);
+.agent-personality-state > span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
   background: var(--ink-4);
-  content: "";
 }
 
-.agent-instruction-state.is-custom {
-  border-color: color-mix(in srgb, var(--action) 28%, var(--line-1));
+.agent-personality-state.is-defined {
   color: var(--action);
 }
 
-.agent-instruction-state.is-custom::before {
+.agent-personality-state.is-defined > span {
   background: var(--action);
 }
 
-.agent-instruction-card-help {
-  max-width: 62ch;
+.agent-personality-help {
+  max-width: 48ch;
   color: var(--ink-3);
   font: var(--type-body-sm);
-  line-height: 1.45;
+  line-height: 1.5;
+  text-wrap: pretty;
 }
 
-.agent-instruction-edit-action {
-  align-self: center;
+.agent-personality-edit-action {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
   white-space: nowrap;
 }
 
-.agent-instruction-prose {
-  margin: 0;
-  padding-top: var(--sp-3);
+.agent-personality-document {
+  position: relative;
+  z-index: 1;
+  padding: var(--sp-5) 0 0 calc(var(--personality-label-width) + var(--sp-4));
   border-top: 1px solid var(--line-2);
   color: var(--ink-2);
   font: var(--type-body-sm);
-  line-height: 1.65;
+  line-height: 1.7;
   overflow-wrap: anywhere;
-  white-space: pre-wrap;
 }
 
-.agent-instruction-empty {
+.agent-personality-document > :first-child {
+  margin-top: 0;
+}
+
+.agent-personality-document > :last-child {
+  margin-bottom: 0;
+}
+
+.agent-personality-document h1,
+.agent-personality-document h2,
+.agent-personality-document h3 {
+  margin: var(--sp-5) 0 var(--sp-2);
+  color: var(--ink-1);
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+}
+
+.agent-personality-document h1 {
+  font-size: var(--fs-5);
+}
+
+.agent-personality-document h2 {
+  font-size: var(--fs-4);
+}
+
+.agent-personality-document h3 {
+  font-size: var(--fs-3);
+}
+
+.agent-personality-document p,
+.agent-personality-document ul,
+.agent-personality-document ol,
+.agent-personality-document blockquote {
+  margin: 0 0 var(--sp-3);
+}
+
+.agent-personality-document ul,
+.agent-personality-document ol {
+  padding-left: 1.15rem;
+}
+
+.agent-personality-document li + li {
+  margin-top: var(--sp-1);
+}
+
+.agent-personality-document blockquote {
+  padding-left: var(--sp-4);
+  border-left: 2px solid var(--action);
+  color: var(--ink-3);
+}
+
+.agent-personality-document code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+
+.agent-personality-empty {
+  position: relative;
+  z-index: 1;
+  padding-top: var(--sp-5);
+  border-top: 1px solid var(--line-2);
+}
+
+.agent-personality-empty > p,
+.agent-personality-empty > span {
+  display: block;
+  max-width: 50ch;
+  margin: 0;
+}
+
+.agent-personality-empty-lede {
+  color: var(--ink-1);
+  font-size: var(--fs-4);
+  font-weight: 550;
+  letter-spacing: -0.015em;
+  line-height: 1.35;
+  text-wrap: balance;
+}
+
+.agent-personality-empty > span {
+  margin-top: var(--sp-2);
+  color: var(--ink-3);
+  font: var(--type-body-sm);
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+.agent-personality-empty ol,
+.agent-personality-editor-guide ol {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin: var(--sp-6) 0 0;
+  padding: 0;
+  border-top: 1px solid var(--line-2);
+  list-style: none;
+}
+
+.agent-personality-empty li,
+.agent-personality-editor-guide li {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  align-items: start;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-3) var(--sp-3) 0;
+  border-bottom: 1px solid var(--line-2);
+}
+
+.agent-personality-empty li:nth-child(odd),
+.agent-personality-editor-guide li:nth-child(odd) {
+  margin-right: var(--sp-3);
+  border-right: 1px solid var(--line-2);
+}
+
+.agent-personality-empty li > span,
+.agent-personality-editor-guide li > span {
+  color: var(--action);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  line-height: 1.7;
+}
+
+.agent-personality-empty li > strong,
+.agent-personality-editor-guide li strong {
+  color: var(--ink-2);
+  font: var(--type-label-strong);
+}
+
+.agent-personality-editor {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding-top: var(--sp-5);
+  border-top: 1px solid var(--line-2);
+}
+
+.agent-personality-editor-guide {
+  padding: var(--sp-4);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-1);
+  background: color-mix(in srgb, var(--surface-1) 76%, transparent);
+}
+
+.agent-personality-editor-guide > p {
+  margin: 0;
+  color: var(--ink-2);
+  font: var(--type-body-sm);
+  line-height: 1.5;
+}
+
+.agent-personality-editor-guide ol {
+  margin-top: var(--sp-4);
+}
+
+.agent-personality-editor-guide li div {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding-top: var(--sp-3);
-  border-top: 1px solid var(--line-2);
 }
 
-.agent-instruction-empty p,
-.agent-instruction-empty span {
-  margin: 0;
-}
-
-.agent-instruction-empty p {
-  color: var(--ink-2);
-  font: var(--type-label-strong);
-}
-
-.agent-instruction-empty span {
-  margin-top: 2px;
+.agent-personality-editor-guide li small {
   color: var(--ink-3);
-  font: var(--type-body-sm);
+  font: var(--type-micro);
   line-height: 1.45;
 }
 
-.agent-instruction-editor {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
-}
-
-.agent-instruction-editor-toolbar {
+.agent-personality-editor-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 24px;
+  min-height: 28px;
   color: var(--ink-3);
-  font: var(--type-label-strong);
+  font: var(--type-micro);
   letter-spacing: var(--track-caps);
   text-transform: uppercase;
 }
 
-.agent-instruction-editor-toolbar button {
+.agent-personality-editor-toolbar button {
+  height: auto;
   padding: 2px 0;
   border: 0;
   background: transparent;
@@ -1203,56 +1399,95 @@
   cursor: pointer;
 }
 
-.agent-instruction-editor-toolbar button:hover {
+.agent-personality-editor-toolbar button:hover {
   color: var(--action-hover);
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 
-.agent-instruction-editor-toolbar button:focus-visible {
+.agent-personality-editor-toolbar button:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
 
-.agent-instruction-textarea {
-  min-height: 218px;
+.agent-personality-textarea {
+  min-height: 320px;
   resize: vertical;
   border-color: var(--line-1);
-  border-radius: var(--r-2);
-  background: var(--surface-2);
+  border-radius: var(--r-1);
+  background: var(--surface-0);
   font-size: var(--fs-3);
-  line-height: 1.65;
+  line-height: 1.7;
+  tab-size: 2;
 }
 
-.agent-instruction-editor-foot {
+.agent-personality-editor-foot {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: var(--sp-3);
 }
 
-.agent-instruction-count,
-.agent-instruction-save-hint {
+.agent-personality-count,
+.agent-personality-save-hint {
   color: var(--ink-3);
   font: var(--type-micro);
 }
 
-.agent-instruction-save-hint {
+.agent-personality-save-hint {
   text-align: right;
 }
 
-.agent-instruction-actions {
+.agent-personality-actions {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
 }
 
 @media (max-width: 700px) {
-  .agent-instruction-editor-foot {
+  .workspace-dossier-hero,
+  .workspace-dossier-hero.is-embedded {
+    grid-template-columns: auto 1fr;
+  }
+
+  .workspace-dossier-status {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+
+  .agent-personality-card {
+    padding: var(--sp-5);
+  }
+
+  .agent-personality-card-head {
+    flex-direction: column;
+  }
+
+  .agent-personality-edit-action {
+    align-self: flex-start;
+    margin-left: calc(var(--personality-label-width) + var(--sp-4));
+  }
+
+  .agent-personality-document {
+    padding-left: 0;
+  }
+
+  .agent-personality-empty ol,
+  .agent-personality-editor-guide ol {
+    grid-template-columns: 1fr;
+  }
+
+  .agent-personality-empty li:nth-child(odd),
+  .agent-personality-editor-guide li:nth-child(odd) {
+    margin-right: 0;
+    border-right: 0;
+  }
+
+  .agent-personality-editor-foot {
     grid-template-columns: 1fr auto;
   }
 
-  .agent-instruction-save-hint {
+  .agent-personality-save-hint {
     display: none;
   }
 }
@@ -1311,10 +1546,40 @@
   gap: var(--sp-3);
 }
 
+.workspace-identity-record {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-4) 0;
+}
+
+.workspace-identity-kicker {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--ink-3);
+  font: var(--type-micro);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+}
+
+.workspace-identity-value {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-4);
+}
+
+.workspace-identity-value > span {
+  color: var(--ink-3);
+  font: var(--type-label);
+}
+
 .workspace-dossier-name-value {
   margin: 0;
   color: var(--ink-1);
-  font: var(--type-label-strong);
+  font-size: var(--fs-4);
+  font-weight: 600;
+  letter-spacing: -0.015em;
 }
 
 .workspace-dossier-details {

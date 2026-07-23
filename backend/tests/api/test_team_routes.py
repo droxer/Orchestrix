@@ -511,7 +511,7 @@ def test_deleting_lead_agent_promotes_next_member(monkeypatch) -> None:
         assert updated["memberAgentIds"] == [support["id"]]
 
 
-def test_task_assigned_to_team_starts_only_the_lead_in_assignee_owned_thread(
+def test_task_assigned_to_team_starts_all_members_lead_first_in_assignee_thread(
     monkeypatch,
 ) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
@@ -574,6 +574,25 @@ def test_task_assigned_to_team_starts_only_the_lead_in_assignee_owned_thread(
         assert client.get(f"/sessions/{payload['session']['id']}").json()["teamId"] == team["id"]
         assert len(payload["session"]["agentRuns"]) == 1
         assert payload["session"]["agentRuns"][0]["logicalAgentId"] == lead["id"]
+        [lead_command] = app.state.registry.take_commands("node_alice", "node_token")
+        assert lead_command["logicalAgentId"] == lead["id"]
+        app.state.registry.handle_event(
+            "node_alice",
+            {
+                "type": "run.completed",
+                "commandId": lead_command["id"],
+                "sessionId": lead_command["sessionId"],
+                "runId": lead_command["runId"],
+                "agent": "codex",
+                "mode": "action",
+                "exitCode": 0,
+                "agentLog": "lead result",
+            },
+            "node_token",
+        )
+        [support_command] = app.state.registry.take_commands("node_alice", "node_token")
+        assert support_command["logicalAgentId"] == support["id"]
+        assert support_command["agent"] == "claude"
 
 
 def test_unroutable_team_start_requests_capacity_and_queues_scheduler_retry(
@@ -665,13 +684,14 @@ def test_team_task_create_session_uses_assignee_lead_and_team_ownership(
         _employee(client, "alice")
         _employee(client, "requester")
         lead = _agent(client, "alice", "Lead", "codex")
+        support = _agent(client, "alice", "Support", "claude")
         team = client.post(
             "/cp/teams",
             json={
                 "ownerEmployeeId": "alice",
                 "name": "Delivery",
                 "leadAgentId": lead["id"],
-                "memberAgentIds": [lead["id"]],
+                "memberAgentIds": [lead["id"], support["id"]],
             },
         ).json()["team"]
 
@@ -691,7 +711,7 @@ def test_team_task_create_session_uses_assignee_lead_and_team_ownership(
         assert session["teamId"] == team["id"]
         assert session["ownerEmployeeId"] == "alice"
         assert session["ownerAgentId"] == lead["id"]
-        assert session["participants"] == ["human", "codex"]
+        assert session["participants"] == ["human", "codex", "claude"]
 
 
 def test_linked_session_uses_team_task_assignee_lead_and_team_ownership(
@@ -704,13 +724,14 @@ def test_linked_session_uses_team_task_assignee_lead_and_team_ownership(
         _employee(client, "alice")
         _employee(client, "requester")
         lead = _agent(client, "alice", "Lead", "codex")
+        support = _agent(client, "alice", "Support", "claude")
         team = client.post(
             "/cp/teams",
             json={
                 "ownerEmployeeId": "alice",
                 "name": "Delivery",
                 "leadAgentId": lead["id"],
-                "memberAgentIds": [lead["id"]],
+                "memberAgentIds": [lead["id"], support["id"]],
             },
         ).json()["team"]
         task = client.post(
@@ -733,7 +754,7 @@ def test_linked_session_uses_team_task_assignee_lead_and_team_ownership(
         assert session["teamId"] == team["id"]
         assert session["ownerEmployeeId"] == "alice"
         assert session["ownerAgentId"] == lead["id"]
-        assert session["participants"] == ["human", "codex"]
+        assert session["participants"] == ["human", "codex", "claude"]
 
 
 def test_manual_team_routine_start_creates_retryable_team_occurrence(

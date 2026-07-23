@@ -53,9 +53,17 @@ export function describeAgentPlacements(
   placements: AgentPlacement[],
 ): AgentPlacementDescription[] {
   let activeIndex = 0;
+  // One computer per row: if an agent ever holds duplicate placements to the
+  // same node, keep the highest-priority one (the sort above runs first).
+  const seenNodes = new Set<string>();
   return placements
     .filter((placement) => placement.desiredState !== "removed")
     .sort((left, right) => left.priority - right.priority || left.id.localeCompare(right.id))
+    .filter((placement) => {
+      if (seenNodes.has(placement.daemonNodeId)) return false;
+      seenNodes.add(placement.daemonNodeId);
+      return true;
+    })
     .map((placement) => ({
       placement,
       nodeName: placement.nodeDisplayName || placement.daemonNodeId,

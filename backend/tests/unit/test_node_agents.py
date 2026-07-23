@@ -198,3 +198,163 @@ def test_removing_node_waits_for_active_agent_runs(tmp_path: Path) -> None:
 
     assert not agents.get_agent(agent["id"]).get("deletedAt")
     assert placements.get_placement(placement["id"])["desiredState"] == "active"
+
+
+def _registry_ctx(tmp_path: Path, nodes: list[dict], active_requests: list[dict] | None = None):
+    agents = LocalAgentStore(tmp_path)
+    placements = LocalAgentPlacementStore(tmp_path)
+    ctx = SimpleNamespace(
+        agent_store=agents,
+        agent_placement_store=placements,
+        registry=SimpleNamespace(
+            monitor_nodes=lambda: nodes,
+            dispatch_lock=None,
+            daemon_store=SimpleNamespace(
+                list_active_run_requests=lambda: active_requests or []
+            ),
+        ),
+    )
+    return ctx, agents, placements
+
+
+def test_reregistration_retires_superseded_compatibility_agent(tmp_path: Path) -> None:
+    old_node = {"id": "node_old", "employeeId": "alice", "workspacePath": "/home/alice/proj", "online": False}
+    new_node = {
+        "id": "node_new",
+        "employeeId": "alice",
+        "workspacePath": "/home/alice/proj",
+        "supportedAgents": ["claude"],
+        "agents": {"claude": "ready"},
+        "online": True,
+    }
+    ctx, agents, placements = _registry_ctx(tmp_path, [old_node, new_node])
+    stale = agents.ensure_compatibility_agent("alice", "claude", "node_old", node_name="Old")
+    placements.create_placement(stale, "node_old")
+
+    sync_node_agents(ctx, new_node)
+
+    survivors = agents.list_agents(supervisor_employee_id="alice")
+    assert {agent["compatibilityKey"] for agent in survivors} == {"alice:node_new:claude"}
+    assert agents.get_agent(stale["id"]).get("deletedAt")
+    assert placements.list_placements(daemon_node_id="node_old") == []
+    assert len(placements.list_placements(daemon_node_id="node_new")) == 1
+
+
+def test_sync_keeps_agent_on_a_different_computer(tmp_path: Path) -> None:
+    other_node = {"id": "node_other", "employeeId": "alice", "workspacePath": "/home/alice/other", "online": False}
+    new_node = {
+        "id": "node_new",
+        "employeeId": "alice",
+        "workspacePath": "/home/alice/proj",
+        "supportedAgents": ["claude"],
+        "agents": {"claude": "ready"},
+        "online": True,
+    }
+    ctx, agents, placements = _registry_ctx(tmp_path, [other_node, new_node])
+    other = agents.ensure_compatibility_agent("alice", "claude", "node_other", node_name="Other")
+    placements.create_placement(other, "node_other")
+
+    sync_node_agents(ctx, new_node)
+
+    survivors = agents.list_agents(supervisor_employee_id="alice")
+    assert {agent["compatibilityKey"] for agent in survivors} == {
+        "alice:node_new:claude",
+        "alice:node_other:claude",
+    }
+    assert not agents.get_agent(other["id"]).get("deletedAt")
+
+
+def test_sync_keeps_agent_while_the_old_node_is_online(tmp_path: Path) -> None:
+    old_node = {"id": "node_old", "employeeId": "alice", "workspacePath": "/home/alice/proj", "online": True}
+    new_node = {
+        "id": "node_new",
+        "employeeId": "alice",
+        "workspacePath": "/home/alice/proj",
+        "supportedAgents": ["claude"],
+        "agents": {"claude": "ready"},
+        "online": True,
+    }
+    ctx, agents, placements = _registry_ctx(tmp_path, [old_node, new_node])
+    stale = agents.ensure_compatibility_agent("alice", "claude", "node_old", node_name="Old")
+    placements.create_placement(stale, "node_old")
+
+    sync_node_agents(ctx, new_node)
+
+    assert not agents.get_agent(stale["id"]).get("deletedAt")
+    assert len(placements.list_placements(daemon_node_id="node_old")) == 1
+
+
+def test_sync_keeps_agent_when_old_node_has_active_work(tmp_path: Path) -> None:
+    old_node = {"id": "node_old", "employeeId": "alice", "workspacePath": "/home/alice/proj", "online": False}
+    new_node = {
+        "id": "node_new",
+        "employeeId": "alice",
+        "workspacePath": "/home/alice/proj",
+        "supportedAgents": ["claude"],
+        "agents": {"claude": "ready"},
+        "online": True,
+    }
+    ctx, agents, placements = _registry_ctx(
+        tmp_path,
+        [old_node, new_node],
+        active_requests=[{"nodeId": "node_old", "assignments": []}],
+    )
+    stale = agents.ensure_compatibility_agent("alice", "claude", "node_old", node_name="Old")
+    placements.create_placement(stale, "node_old")
+
+    sync_node_agents(ctx, new_node)
+
+    assert not agents.get_agent(stale["id"]).get("deletedAt")
+
+
+def test_managed_nodes_share_workspace_path_without_being_the_same_computer(tmp_path: Path) -> None:
+    old_node = {
+        "id": "node_old",
+        "employeeId": "alice",
+        "workspacePath": "/workspace",
+        "managedNodeId": "managed_old",
+        "online": False,
+    }
+    new_node = {
+        "id": "node_new",
+        "employeeId": "alice",
+        "workspacePath": "/workspace",
+        "managedNodeId": "managed_new",
+        "supportedAgents": ["claude"],
+        "agents": {"claude": "ready"},
+        "online": True,
+    }
+    ctx, agents, placements = _registry_ctx(tmp_path, [old_node, new_node])
+    stale = agents.ensure_compatibility_agent("alice", "claude", "node_old", node_name="Old")
+    placements.create_placement(stale, "node_old")
+
+    sync_node_agents(ctx, new_node)
+
+    assert not agents.get_agent(stale["id"]).get("deletedAt")
+
+
+def test_reprovisioned_managed_node_retires_old_agent(tmp_path: Path) -> None:
+    old_node = {
+        "id": "node_old",
+        "employeeId": "alice",
+        "workspacePath": "/workspace",
+        "managedNodeId": "managed_one",
+        "online": False,
+    }
+    new_node = {
+        "id": "node_new",
+        "employeeId": "alice",
+        "workspacePath": "/workspace",
+        "managedNodeId": "managed_one",
+        "supportedAgents": ["claude"],
+        "agents": {"claude": "ready"},
+        "online": True,
+    }
+    ctx, agents, placements = _registry_ctx(tmp_path, [old_node, new_node])
+    stale = agents.ensure_compatibility_agent("alice", "claude", "node_old", node_name="Old")
+    placements.create_placement(stale, "node_old")
+
+    sync_node_agents(ctx, new_node)
+
+    assert agents.get_agent(stale["id"]).get("deletedAt")
+    assert {agent["compatibilityKey"] for agent in agents.list_agents(supervisor_employee_id="alice")} == {"alice:node_new:claude"}

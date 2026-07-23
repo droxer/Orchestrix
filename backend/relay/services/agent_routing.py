@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..daemon_registry.registry import (
+from ..daemon_registry.scheduling import (
     node_accepts_run,
     workspace_identity,
     workspace_identity_record,
@@ -59,7 +59,9 @@ def select_workspace_node(
             continue
         if placement_status(placement, agent, node)["status"] in ("ready", "busy"):
             candidates.append((int(placement.get("priority") or 100), placement["id"], node))
-    return sorted(candidates, key=lambda item: (item[0], item[1]))[0][2] if candidates else None
+    if not candidates:
+        return None
+    return min(candidates, key=lambda item: (item[0], item[1]))[2]
 
 
 def resolve_agent_assignments(
@@ -154,7 +156,7 @@ def resolve_agent_assignments(
                 code,
                 f"Agent {agent['displayName']} has no eligible runtime placement ({code}).",
             )
-        placement, node = sorted(
+        placement, node = min(
             candidates,
             key=lambda item: (
                 0 if item[1].get("status") != "running" else 1,
@@ -165,7 +167,7 @@ def resolve_agent_assignments(
                 ),
                 item[0]["id"],
             ),
-        )[0]
+        )
         selected_node_ids.add(node["id"])
         selected_workspace = selected_workspace or workspace_identity(node)
         selected_workspace_policy = selected_workspace_policy or (
@@ -205,7 +207,7 @@ def _agent_placements_with_managed_capacity(
     ):
         return placements
     placed_node_ids = {placement["daemonNodeId"] for placement in placements}
-    managed_candidates = sorted(
+    managed_candidate = min(
         (
             node
             for node in nodes.values()
@@ -218,9 +220,10 @@ def _agent_placements_with_managed_capacity(
             and node["id"] not in placed_node_ids
         ),
         key=lambda node: node["id"],
+        default=None,
     )
-    if managed_candidates:
-        placement_store.create_placement(agent, managed_candidates[0]["id"])
+    if managed_candidate:
+        placement_store.create_placement(agent, managed_candidate["id"])
         return placement_store.list_placements(agent_id=agent["id"])
     return placements
 

@@ -4,6 +4,7 @@ from typing import Any
 
 from loguru import logger
 
+from ..daemon_registry.scheduling import workspace_identity
 from .team_membership import remove_agent_from_teams
 
 
@@ -46,6 +47,93 @@ def sync_node_agents(ctx: Any, node: dict[str, Any]) -> None:
             ctx.agent_placement_store.create_placement(agent, node["id"])
         elif placement.get("desiredState") == "removed":
             ctx.agent_placement_store.update_placement(placement["id"], {"desiredState": "active"})
+        try:
+            _retire_superseded_locked(ctx, node, employee_id, executor_kind)
+        except Exception as error:
+            logger.warning(
+                "Failed retiring superseded compatibility agents",
+                node_id=node.get("id"),
+                executor_kind=executor_kind,
+                error=str(error),
+            )
+
+
+def _retire_superseded_locked(ctx: Any, node: dict[str, Any], employee_id: str, executor_kind: str) -> list[str]:
+    registry = getattr(ctx, "registry", None)
+    dispatch_lock = getattr(registry, "dispatch_lock", None)
+    if dispatch_lock:
+        with dispatch_lock:
+            return retire_superseded_compatibility_agents(ctx, node, employee_id, executor_kind)
+    return retire_superseded_compatibility_agents(ctx, node, employee_id, executor_kind)
+
+
+def retire_superseded_compatibility_agents(ctx: Any, node: dict[str, Any], employee_id: str, executor_kind: str) -> list[str]:
+    """Retire duplicate compatibility agents left behind when this computer
+    re-registered under a new node id.
+
+    Re-provisioning a computer mints a new node id, and the compatibility key
+    embeds it, so the old agent would linger in the roster next to its
+    replacement. Only retire when the other node is provably the same computer
+    (same managed node, or — for employee devices — the same workspace
+    identity) and is no longer online, so a legitimately separate second
+    computer always keeps its agents.
+    """
+    registry = getattr(ctx, "registry", None)
+    if registry is None:
+        return []
+    identity = workspace_identity(node)
+    nodes_by_id = {item["id"]: item for item in registry.monitor_nodes()}
+    retired: list[str] = []
+    for agent in ctx.agent_store.list_agents(supervisor_employee_id=employee_id):
+        key = agent.get("compatibilityKey")
+        if not key or agent.get("deletedAt"):
+            continue
+        parts = key.rsplit(":", 2)
+        if len(parts) != 3:
+            continue
+        owner, node_id, kind = parts
+        if owner != employee_id or kind != executor_kind or node_id == node["id"]:
+            continue
+        other = nodes_by_id.get(node_id)
+        if other is None or other.get("online"):
+            continue
+        if node.get("managedNodeId") or other.get("managedNodeId"):
+            same_computer = bool(node.get("managedNodeId")) and node.get("managedNodeId") == other.get("managedNodeId")
+        else:
+            same_computer = identity is not None and workspace_identity(other) == identity
+        if not same_computer or _node_has_active_work(ctx, node_id):
+            continue
+        for placement in ctx.agent_placement_store.list_placements(agent_id=agent["id"]):
+            if placement.get("desiredState") != "removed":
+                ctx.agent_placement_store.update_placement(placement["id"], {"desiredState": "removed"})
+        if ctx.agent_placement_store.list_placements(agent_id=agent["id"]):
+            continue
+        ctx.agent_store.delete_agent(agent["id"])
+        if getattr(ctx, "team_store", None):
+            remove_agent_from_teams(ctx.team_store, agent["id"], employee_id)
+        retired.append(agent["id"])
+        logger.info(
+            "Retired superseded compatibility agent",
+            agent_id=agent["id"],
+            superseded_by=node["id"],
+            old_node_id=node_id,
+            executor_kind=executor_kind,
+        )
+    return retired
+
+
+def _node_has_active_work(ctx: Any, node_id: str) -> bool:
+    daemon_store = getattr(getattr(ctx, "registry", None), "daemon_store", None)
+    if not daemon_store:
+        return False
+    return any(
+        request.get("nodeId") == node_id
+        or any(
+            assignment.get("daemonNodeId") == node_id
+            for assignment in request.get("assignments") or []
+        )
+        for request in daemon_store.list_active_run_requests()
+    )
 
 
 def remove_node_agents(ctx: Any, node_id: str) -> list[str]:

@@ -4,6 +4,8 @@ from typing import Any
 
 from .agent_routing import resolve_agent_assignments
 
+TEAM_UNAVAILABLE_MESSAGE = "The agent team is not currently available."
+
 
 class TeamDispatchError(ValueError):
     def __init__(self, code: str = "team_unavailable"):
@@ -17,7 +19,7 @@ def task_execution_employee_id(task: dict[str, Any]) -> str:
 
 
 def task_thread_ownership(
-    task: dict[str, Any], *, team_store: Any, agent_store: Any | None = None
+    task: dict[str, Any], *, team_store: Any, agent_store: Any
 ) -> dict[str, str]:
     ownership: dict[str, str] = {}
     employee_id = task_execution_employee_id(task)
@@ -29,20 +31,10 @@ def task_thread_ownership(
     team_id = task.get("assignedTeamId")
     if isinstance(team_id, str) and team_id:
         ownership["team_id"] = team_id
-        team = team_store.get_team(team_id) if team_store else None
-        lead_id = team.get("leadAgentId") if team else None
-        members = set(team.get("memberAgentIds") or []) if team else set()
-        lead = agent_store.get_agent(lead_id) if agent_store and lead_id else None
-        if (
-            not team
-            or team.get("deletedAt")
-            or not team.get("enabled", True)
-            or not isinstance(lead_id, str)
-            or lead_id not in members
-            or (agent_store and (not lead or lead.get("deletedAt") or not lead.get("enabled", True)))
-        ):
-            raise TeamDispatchError()
-        ownership["owner_agent_id"] = lead_id
+        team, _agents = _task_team_agents(
+            task, team_store=team_store, agent_store=agent_store
+        )
+        ownership["owner_agent_id"] = team["leadAgentId"]
     return ownership
 
 
@@ -55,18 +47,10 @@ def task_thread_assignments(
 ) -> list[dict[str, Any]]:
     team_id = task.get("assignedTeamId")
     if isinstance(team_id, str) and team_id:
-        team = team_store.get_team(team_id) if team_store else None
-        lead_id = team.get("leadAgentId") if team else None
-        lead = agent_store.get_agent(lead_id) if agent_store and lead_id else None
-        if lead and not lead.get("deletedAt") and lead.get("enabled", True):
-            return [
-                {
-                    "agentId": lead["id"],
-                    "agent": lead["executorKind"],
-                    "mode": "action",
-                }
-            ]
-        return []
+        _team, agents = _task_team_agents(
+            task, team_store=team_store, agent_store=agent_store
+        )
+        return [_team_member_assignment(agent) for agent in agents]
     assigned_agent_id = task.get("assignedAgentId")
     assigned_agent = task.get("assignedAgent")
     if assigned_agent_id and assigned_agent:
@@ -80,33 +64,38 @@ def task_thread_assignments(
     return supplied_assignments
 
 
-def resolve_team_task_assignment(
+def resolve_team_task_assignments(
     task: dict[str, Any],
     *,
     team_store: Any,
     agent_store: Any,
     placement_store: Any,
     daemon_nodes: list[dict[str, Any]],
-) -> dict[str, Any]:
-    team_id = task.get("assignedTeamId")
-    team = team_store.get_team(team_id) if team_store and team_id else None
-    return resolve_team_lead_assignment(
-        team,
+) -> list[dict[str, Any]]:
+    _team, agents = _task_team_agents(
+        task,
+        team_store=team_store,
+        agent_store=agent_store,
+    )
+    return resolve_agent_assignments(
+        [_team_member_assignment(agent) for agent in agents],
         employee_id=task_execution_employee_id(task),
+        is_admin=False,
         agent_store=agent_store,
         placement_store=placement_store,
         daemon_nodes=daemon_nodes,
     )
 
 
-def resolve_team_lead_assignment(
-    team: dict[str, Any] | None,
+def _task_team_agents(
+    task: dict[str, Any],
     *,
-    employee_id: str,
+    team_store: Any,
     agent_store: Any,
-    placement_store: Any,
-    daemon_nodes: list[dict[str, Any]],
-) -> dict[str, Any]:
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    team_id = task.get("assignedTeamId")
+    team = team_store.get_team(team_id) if team_store and team_id else None
+    employee_id = task_execution_employee_id(task)
     if (
         not team
         or team.get("deletedAt")
@@ -118,19 +107,20 @@ def resolve_team_lead_assignment(
     lead = team.get("leadAgentId")
     if not isinstance(lead, str) or lead not in members:
         raise TeamDispatchError()
-    agent = agent_store.get_agent(lead)
-    if not agent or agent.get("deletedAt") or not agent.get("enabled", True):
+    ordered_member_ids = [lead, *(member for member in members if member != lead)]
+    agents = [agent_store.get_agent(member) for member in ordered_member_ids]
+    if any(
+        not agent or agent.get("deletedAt") or not agent.get("enabled", True)
+        for agent in agents
+    ):
         raise TeamDispatchError()
-    assignment = {
-        "agentId": lead,
+    return team, agents
+
+
+def _team_member_assignment(agent: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "agentId": agent["id"],
         "agent": agent["executorKind"],
         "mode": "action",
+        **({"role": agent["defaultRole"]} if agent.get("defaultRole") else {}),
     }
-    return resolve_agent_assignments(
-        [assignment],
-        employee_id=employee_id,
-        is_admin=False,
-        agent_store=agent_store,
-        placement_store=placement_store,
-        daemon_nodes=daemon_nodes,
-    )[0]

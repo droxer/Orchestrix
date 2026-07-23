@@ -15,10 +15,10 @@ import { type CurrentUser, type DaemonNodeMonitorRecord, type EmployeeAgent, typ
 import { ActionCalendar, ActionStart, NavConversations, ViewGrid, ViewList } from "./icons";
 import { agentReadyForTask } from "../lib/backlog";
 import { TaskAssignee, TaskExecutionBadge } from "./TaskAssignee";
-import { taskAssigneeDisplayName, teamLeadReady } from "../lib/taskAssignment";
+import { taskAssigneeDisplayName, teamReady } from "../lib/taskAssignment";
 import { readViewPreference, writeViewPreference } from "../lib/viewPreference";
 import { filterRoutineTasks, latestRoutineSession, routineDueTone, TASK_ROUTINE_CADENCES, TASK_ROUTINE_TYPES, type RoutineFilters } from "../lib/routine";
-import { emptyRoutineForm, taskBoardFormsEqual, type RoutineTaskFormState } from "../lib/taskBoardForm";
+import { emptyRoutineForm, taskAssignmentMutationFields, taskBoardFormsEqual, type RoutineTaskFormState } from "../lib/taskBoardForm";
 import { TaskDrawer } from "./task-board/TaskDrawer";
 import { PageHeader } from "./PageHeader";
 import { BoardEmpty } from "./BoardEmpty";
@@ -434,8 +434,7 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
         ...(form.routineCadence === "custom"
           ? { routineNextRunDate: form.routineNextRunDate }
           : {}),
-        assignedAgentId: form.assignedAgentId || null,
-        assignedTeamId: form.assignedTeamId || null,
+        ...taskAssignmentMutationFields(form),
       };
       if (form.id) await updateTaskMutation.mutateAsync({ taskId: form.id, input: payload });
       else await createTaskMutation.mutateAsync(payload);
@@ -479,7 +478,7 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
     if (team) {
       return {
         name: team.name,
-        ready: teamLeadReady(team),
+        ready: teamReady(team),
       };
     }
     return {

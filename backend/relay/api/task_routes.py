@@ -30,8 +30,9 @@ from ..services.agent_routing import (
     resolve_agent_assignments,
 )
 from ..services.team_dispatch import (
+    TEAM_UNAVAILABLE_MESSAGE,
     TeamDispatchError,
-    resolve_team_task_assignment,
+    resolve_team_task_assignments,
     task_execution_employee_id,
     task_thread_assignments,
     task_thread_ownership,
@@ -246,15 +247,13 @@ async def start_task_on_ready_node(
     team_assignment_resolved = False
     if task.get("assignedTeamId"):
         try:
-            run_assignments = [
-                resolve_team_task_assignment(
-                    task,
-                    team_store=ctx.team_store,
-                    agent_store=ctx.agent_store,
-                    placement_store=ctx.agent_placement_store,
-                    daemon_nodes=ctx.registry.monitor_nodes(),
-                )
-            ]
+            run_assignments = resolve_team_task_assignments(
+                task,
+                team_store=ctx.team_store,
+                agent_store=ctx.agent_store,
+                placement_store=ctx.agent_placement_store,
+                daemon_nodes=ctx.registry.monitor_nodes(),
+            )
             team_assignment_resolved = True
         except TeamDispatchError:
             if not record_pending:
@@ -265,7 +264,7 @@ async def start_task_on_ready_node(
                 task["id"],
                 "queued",
                 code="team_unavailable",
-                message="The team lead is not currently available.",
+                message=TEAM_UNAVAILABLE_MESSAGE,
             )
             return {
                 "task": updated,
@@ -273,7 +272,7 @@ async def start_task_on_ready_node(
                 "dispatch": {
                     "state": "queued",
                     "code": "team_unavailable",
-                    "message": "The team lead is not currently available.",
+                    "message": TEAM_UNAVAILABLE_MESSAGE,
                 },
             }
         except AgentRoutingError as error:

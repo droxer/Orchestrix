@@ -123,6 +123,32 @@ describe("describeAgentPlacements", () => {
       ["placement_ready", "preferred"],
     ]);
   });
+
+  it("dedupes placements pointing at the same computer, keeping the preferred route", () => {
+    const result = describeAgentPlacements([
+      placement({
+        id: "placement_stale",
+        daemonNodeId: "node_mac",
+        priority: 200,
+        status: "pending",
+      }),
+      placement({
+        id: "placement_preferred",
+        daemonNodeId: "node_mac",
+        priority: 100,
+      }),
+      placement({
+        id: "placement_other",
+        daemonNodeId: "node_other",
+        priority: 300,
+      }),
+    ]);
+
+    assert.deepEqual(result.map((item) => [item.placement.id, item.preference]), [
+      ["placement_preferred", "preferred"],
+      ["placement_other", "alternate"],
+    ]);
+  });
 });
 
 describe("placement wording", () => {

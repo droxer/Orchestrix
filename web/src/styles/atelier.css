@@ -290,9 +290,7 @@ html[data-theme="dark"] .rail-node { background: var(--surface-3); }
   background: var(--surface-1);
 }
 
-.adm-form-actions .button-primary,
-.adm-copy-pill,
-.pref-save {
+.adm-copy-pill {
   background: var(--action);
   color: var(--on-action);
 }

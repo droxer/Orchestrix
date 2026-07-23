@@ -9,16 +9,18 @@ async function source(path: string): Promise<string> {
 
 describe("node card profile layout", () => {
   it("keeps local and cloud card slots aligned without runtime details", async () => {
-    const [card, actions, badges, styles] = await Promise.all([
+    const [card, row, actions, badges, styles] = await Promise.all([
       source("web/src/components/admin/NodeCard.tsx"),
+      source("web/src/components/admin/NodeRow.tsx"),
       source("web/src/components/admin/NodeActions.tsx"),
       source("web/src/components/admin/NodeProfileBadges.tsx"),
       source("web/src/styles/admin-v2-views.css"),
     ]);
 
     assert.match(card, /<NodeProfileBadges[\s\S]*?\bcard\b[\s\S]*?\/>/);
-    assert.match(badges, /aria-label=\{card\s*\?\s*ownershipLabel/);
-    assert.match(badges, /\{!card\s*\?\s*\([\s\S]*?adm-node-profile-sandbox/);
+    assert.match(row, /<NodeProfileBadges[\s\S]*?\bhideSandbox\b[\s\S]*?\/>/);
+    assert.match(badges, /aria-label=\{!showSandbox\s*\?\s*ownershipLabel/);
+    assert.match(badges, /\{showSandbox\s*\?\s*\([\s\S]*?adm-node-profile-sandbox/);
     assert.match(card, /adm-node-card-handle mono\$\{showHandle \? "" : " is-placeholder"\}/);
     assert.match(card, /adm-node-action--copy/);
     assert.match(actions, /adm-node-action--credentials/);

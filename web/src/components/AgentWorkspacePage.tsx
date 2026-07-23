@@ -16,8 +16,10 @@ import type {
 } from "../types";
 import { agentLabel } from "../lib/plan";
 import { isWorkspaceRetryableError, workspaceFilesEmptyState, workspaceHomeStatus } from "../lib/workspaceHome";
-import { NavRefresh, ViewBoard, WorkspaceFile, WorkspaceFolder } from "./icons";
+import { NavRefresh, WorkspaceFile, WorkspaceFolder } from "./icons";
 import { AgentMark } from "./AgentMark";
+import { compactDate } from "../lib/workspaceFormat";
+import { MetricItem, WorkspaceEmpty, WorkspaceLoading } from "./workspace/WorkspacePrimitives";
 import { PageHeader } from "./PageHeader";
 import { Button } from "./ui/button";
 import { ArtifactBody } from "./artifact/ArtifactBody";
@@ -58,18 +60,6 @@ const parseFileScope = (value: string | null): WorkspaceFileScope => value === "
 
 const WORKSPACE_BRIEF_POLL_MS = 3000;
 
-function compactDate(value: string | undefined, locale: string): string {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat(locale || undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
-
 function parentPath(path: string): string {
   const parts = path.split("/").filter(Boolean);
   return parts.slice(0, -1).join("/");
@@ -90,33 +80,6 @@ function formatBytes(bytes: number | null | undefined, locale?: string): string 
   }).format(value)} ${unit}`;
 }
 
-function MetricItem({
-  label,
-  value,
-  emphasis = false,
-  live = false,
-  zero = false,
-}: {
-  label: string;
-  value: number;
-  emphasis?: boolean;
-  live?: boolean;
-  zero?: boolean;
-}) {
-  const classes = [
-    "workspace-metric-item",
-    emphasis ? "is-emphasis" : "",
-    live ? "is-live" : "",
-    zero ? "is-zero" : "",
-  ].filter(Boolean).join(" ");
-  return (
-    <div className={classes}>
-      <strong className="mono">{value}</strong>
-      <span>{label}</span>
-    </div>
-  );
-}
-
 function PaneHeader({
   title,
   count,
@@ -135,43 +98,6 @@ function PaneHeader({
       {meta ?? null}
       {actions ? <div className="workspace-pane-head-actions">{actions}</div> : null}
     </header>
-  );
-}
-
-function WorkspaceEmpty({
-  title,
-  hint,
-  kind = "generic",
-  executor,
-}: {
-  title: string;
-  hint?: string;
-  kind?: "generic" | "preview" | "artifacts" | "activity" | "files";
-  executor?: EmployeeAgent["executorKind"];
-}) {
-  return (
-    <div className="workspace-empty-state">
-      <span
-        className={`workspace-empty-state-mark${kind === "activity" ? " is-pulse" : ""}`}
-        aria-hidden="true"
-      >
-        {kind === "preview" && executor ? <AgentMark agent={executor} size={18} /> : null}
-        {kind === "artifacts" ? <ViewBoard size={18} /> : null}
-        {kind === "activity" ? null : null}
-        {(kind === "generic" || kind === "files") ? <WorkspaceFile size={18} /> : null}
-      </span>
-      <p className="workspace-empty-state-title">{title}</p>
-      {hint ? <p className="workspace-empty-state-hint">{hint}</p> : null}
-    </div>
-  );
-}
-
-function WorkspaceLoading({ label }: { label: string }) {
-  return (
-    <div className="workspace-loading" role="status" aria-live="polite">
-      <div className="workspace-loading-bar" aria-hidden="true" />
-      <span>{label}</span>
-    </div>
   );
 }
 
@@ -575,8 +501,7 @@ export function AgentWorkspacePage({
                     <WorkspaceEmpty
                       title={t("workspace.select_to_preview")}
                       hint={t("workspace.empty_preview_hint")}
-                      kind="preview"
-                      executor={agent.executorKind}
+                      mark={<AgentMark agent={agent.executorKind} size={18} />}
                     />
                   ) : selected.type === "artifact" ? (
                     <div className="workspace-preview-viewport workspace-preview-viewport--artifact">
@@ -731,7 +656,7 @@ function ActivitiesPane({
           <WorkspaceEmpty
             title={t("workspace.no_activity")}
             hint={t("workspace.empty_activity_hint")}
-            kind="activity"
+            pulse
           />
         ) : null}
       </div>
@@ -817,11 +742,11 @@ function FilesPane({
         <WorkspaceLoading label={t("workspace.loading_files")} />
       ) : message ? (
         <div className="workspace-file-error">
-          <WorkspaceEmpty title={message} />
+          <WorkspaceEmpty title={message} mark={<WorkspaceFile size={18} />} />
           {isWorkspaceRetryableError(error) ? <Button type="button" variant="outline" size="sm" onClick={onRetry}>{t("workspace.retry")}</Button> : null}
         </div>
       ) : data && !data.exists ? (
-        <WorkspaceEmpty title={t("workspace.files_unavailable")} />
+        <WorkspaceEmpty title={t("workspace.files_unavailable")} mark={<WorkspaceFile size={18} />} />
       ) : entries.length ? (
         <ul className="workspace-pick-list">
           {entries.map((entry) => (
@@ -840,7 +765,7 @@ function FilesPane({
         <WorkspaceEmpty
           title={t(emptyState.titleKey)}
           hint={emptyState.hintKey ? t(emptyState.hintKey) : undefined}
-          kind="files"
+          mark={<WorkspaceFile size={18} />}
         />
       )}
     </div>

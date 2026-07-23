@@ -120,6 +120,15 @@ export function taskAssignmentValue(form: TaskBoardFormState): string {
   return "__none__";
 }
 
+export function taskAssignmentMutationFields(
+  form: Pick<TaskBoardFormBase, "assignedAgentId" | "assignedTeamId">,
+): { assignedAgentId: string | null; assignedTeamId: string | null } {
+  return {
+    assignedAgentId: form.assignedAgentId || null,
+    assignedTeamId: form.assignedTeamId || null,
+  };
+}
+
 export function teamAssignmentPatch(teamId: string): Pick<
   TaskBoardFormBase,
   "assignedAgent" | "assignedAgentId" | "assignedTeamId"

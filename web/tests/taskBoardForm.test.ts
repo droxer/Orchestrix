@@ -6,6 +6,7 @@ import {
   nextRoutineRunDate,
   parseTaskAssignmentValue,
   teamAssignmentPatch,
+  taskAssignmentMutationFields,
   taskAssignmentValue,
   taskBoardFormsEqual,
   type BacklogTaskFormState,
@@ -63,6 +64,20 @@ describe("taskBoardForm", () => {
       assignedAgent: "",
       assignedAgentId: "",
       assignedTeamId: "team_delivery",
+    });
+  });
+
+  it("maps team assignments into backlog and routine API payload fields", () => {
+    const backlog = { ...emptyBacklogForm(user), ...teamAssignmentPatch("team_delivery") };
+    const routine = { ...emptyRoutineForm(user), ...teamAssignmentPatch("team_ops") };
+
+    assert.deepEqual(taskAssignmentMutationFields(backlog), {
+      assignedAgentId: null,
+      assignedTeamId: "team_delivery",
+    });
+    assert.deepEqual(taskAssignmentMutationFields(routine), {
+      assignedAgentId: null,
+      assignedTeamId: "team_ops",
     });
   });
 });

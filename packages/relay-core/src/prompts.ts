@@ -31,7 +31,15 @@ export function actionPrompt(state: AgentState): string {
 
 function promptPreludes(state: AgentState): string[] {
   const preludes: string[] = [];
-  if (state.agent_instructions) preludes.push(`[Agent instructions]\n${state.agent_instructions}`);
+  if (state.agent_instructions) {
+    preludes.push(
+      [
+        "[Agent personality]",
+        "Apply this personality consistently throughout the task.",
+        state.agent_instructions,
+      ].join("\n"),
+    );
+  }
   if (state.agent_home_subdir) {
     preludes.push(
       [

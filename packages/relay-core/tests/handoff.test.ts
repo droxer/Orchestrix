@@ -215,16 +215,39 @@ describe("review mode", () => {
 });
 
 describe("prompts", () => {
-  it("includes logical-agent instructions before the user task", () => {
+  it("applies the logical-agent personality to every runtime and task mode", () => {
     const logicalAgentState = state({
       task_goal: "Implement the endpoint",
       agent_instructions: "Act as the employee's security reviewer.",
     });
+    const builders = [
+      ["Claude action", buildClaudeActionCommand],
+      ["Claude ask", buildClaudeAskCommand],
+      ["Claude review", buildClaudeReviewCommand],
+      ["Codex action", buildCodexActionCommand],
+      ["Codex ask", buildCodexAskCommand],
+      ["Codex review", buildCodexReviewCommand],
+      ["Pi action", buildPiActionCommand],
+      ["Pi ask", buildPiAskCommand],
+      ["Pi review", buildPiReviewCommand],
+      ["Kimi action", buildKimiActionCommand],
+      ["Kimi ask", buildKimiAskCommand],
+      ["Kimi review", buildKimiReviewCommand],
+    ] as const;
 
-    const prompt = claudeTaskPrompt(logicalAgentState);
-
-    assert.match(prompt, /^\[Agent instructions\]\nAct as the employee's security reviewer\./);
-    assert.match(prompt, /\[User\]\nImplement the endpoint$/);
+    for (const [label, buildCommand] of builders) {
+      const command = buildCommand(logicalAgentState);
+      assert.match(
+        command,
+        /\[Agent personality\]\nApply this personality consistently throughout the task\./,
+        `${label} should explicitly apply the agent personality`,
+      );
+      assert.ok(
+        command.indexOf("Act as the employee's security reviewer.")
+          < command.indexOf("Implement the endpoint"),
+        `${label} should place the personality before the user task`,
+      );
+    }
   });
   it("describes the shared workspace and the agent's private home", () => {
     const sharedWorkspaceState = state({

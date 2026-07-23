@@ -3122,7 +3122,7 @@ def test_daemon_store_prunes_terminal_records_but_keeps_active_records(
         assert command["id"] == "cmd_active"
 
 
-def test_monitor_nodes_uses_grouped_store_queries() -> None:
+def test_node_monitoring_and_selection_use_grouped_store_queries() -> None:
     class CountingLocalDaemonStore(LocalDaemonStore):
         def __init__(self, root: str):
             super().__init__(root)
@@ -3181,6 +3181,14 @@ def test_monitor_nodes_uses_grouped_store_queries() -> None:
         assert daemon_store.active_run_calls == [None]
         assert daemon_store.queued_count_calls == 0
         assert daemon_store.queued_counts_calls == 1
+
+        daemon_store.active_run_calls = []
+        assert len(registry.list_ready()) == 2
+        assert daemon_store.active_run_calls == [None]
+
+        daemon_store.active_run_calls = []
+        assert registry.find_by_employee("alice")["id"] == "sbx_alice"
+        assert daemon_store.active_run_calls == [None]
 
 
 def test_backend_dispatch_loads_active_runs_once_for_all_assignments() -> None:

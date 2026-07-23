@@ -19,8 +19,9 @@ from ..services.agent_routing import (
     resolve_agent_assignments,
 )
 from ..services.team_dispatch import (
+    TEAM_UNAVAILABLE_MESSAGE,
     TeamDispatchError,
-    resolve_team_task_assignment,
+    resolve_team_task_assignments,
     task_execution_employee_id,
 )
 
@@ -267,15 +268,14 @@ class TaskScheduler:
                 employee_id = task_execution_employee_id(task)
                 daemon_nodes = self.registry.monitor_nodes()
                 if team_id:
-                    assignment = resolve_team_task_assignment(
+                    assignments = resolve_team_task_assignments(
                         task,
                         team_store=self.team_store,
                         agent_store=self.backend.agent_store,
                         placement_store=self.backend.agent_placement_store,
                         daemon_nodes=daemon_nodes,
                     )
-                    assignments = [assignment]
-                    agent = assignment["agent"]
+                    agent = assignments[0]["agent"]
                 else:
                     assignments = [
                         {
@@ -297,7 +297,7 @@ class TaskScheduler:
                 self._record_dispatch_deferred(
                     task,
                     "team_unavailable",
-                    "The team lead is not currently available.",
+                    TEAM_UNAVAILABLE_MESSAGE,
                 )
                 skipped += 1
                 continue
@@ -482,6 +482,9 @@ def ready_node_for_task(
         assignment.get("agent") for assignment in assignments if assignment.get("agent")
     ]
     employee_id = task.get("assigneeEmployeeId") or task.get("ownerEmployeeId")
+    active_runs_by_node: dict[str, list[dict[str, Any]]] = {}
+    for run in registry.daemon_store.list_active_runs():
+        active_runs_by_node.setdefault(run["nodeId"], []).append(run)
     for node in registry.list_ready():
         if employee_id and node.get("employeeId") != employee_id:
             continue
@@ -494,7 +497,7 @@ def ready_node_for_task(
         disabled = set(node.get("disabledAgents") or [])
         if any(agent in disabled for agent in requested_agents):
             continue
-        active_runs = registry.daemon_store.list_active_runs(node["id"])
+        active_runs = active_runs_by_node.get(node["id"], [])
         if all(
             node.get("agents", {}).get(agent) == "ready" for agent in requested_agents
         ) and node_accepts_run(
