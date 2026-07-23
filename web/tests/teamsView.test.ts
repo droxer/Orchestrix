@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { describe, it } from "node:test";
 
-import { taskAssigneeDisplayName, teamLeadReady } from "../src/lib/taskAssignment.js";
+import { taskAssigneeDisplayName, teamLeadAvailability, teamLeadReady } from "../src/lib/taskAssignment.js";
 import { teamMutationInput } from "../src/lib/teamForm.js";
 import { selectedTeamForWorkspace } from "../src/lib/teamWorkspace.js";
 
@@ -95,6 +95,26 @@ describe("Agent team management", () => {
         availability: "ready",
       },
     }), true);
+    assert.equal(teamLeadAvailability({
+      enabled: true,
+      lead: {
+        id: "lead",
+        displayName: "Lead",
+        executorKind: "codex",
+        enabled: true,
+        availability: "offline",
+      },
+    }), "offline");
+    assert.equal(teamLeadAvailability({
+      enabled: true,
+      lead: {
+        id: "lead",
+        displayName: "Lead",
+        executorKind: "codex",
+        enabled: true,
+        availability: "busy",
+      },
+    }), "busy");
   });
 
   it("shows the first team workspace when the Teams route has no explicit selection", () => {

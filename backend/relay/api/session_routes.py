@@ -77,6 +77,7 @@ def session_brief_item(session: dict[str, Any]) -> dict[str, Any]:
         "phase": session.get("phase"),
         "workspacePath": session.get("workspacePath"),
         "ownerEmployeeId": session.get("ownerEmployeeId"),
+        "ownerAgentId": session.get("ownerAgentId"),
         "teamId": session.get("teamId"),
         "currentAgent": session.get("currentAgent"),
         "pendingDecision": session.get("pendingDecision"),
@@ -143,7 +144,9 @@ def agent_for_workspace(ctx: Any, actor: dict[str, Any], requested_agent: str | 
 
 
 def session_uses_agent(session: dict[str, Any], agent_id: str) -> bool:
-    return any(run.get("logicalAgentId") == agent_id for run in session.get("agentRuns", []))
+    return session.get("ownerAgentId") == agent_id or any(
+        run.get("logicalAgentId") == agent_id for run in session.get("agentRuns", [])
+    )
 
 
 @router.get("/sessions")
@@ -221,8 +224,45 @@ async def workspace_brief(request: Request, ctx: AppContextDep) -> dict[str, Any
         and (not agent or session_uses_agent(session, agent["id"]))
         and (not team or session.get("teamId") == team["id"])
     ]
-    nodes = [node for node in ctx.registry.monitor_nodes() if node.get("employeeId") == employee_id]
     team_session_ids = {session["id"] for session in sessions} if team else set()
+    placement_node_ids: set[str] | None = None
+    if agent:
+        placement_node_ids = {
+            placement["daemonNodeId"]
+            for placement in ctx.agent_placement_store.list_placements(
+                agent_id=agent["id"]
+            )
+        }
+    elif team:
+        placement_node_ids = {
+            placement["daemonNodeId"]
+            for agent_id in team.get("memberAgentIds", [])
+            for placement in ctx.agent_placement_store.list_placements(
+                agent_id=agent_id
+            )
+        }
+    nodes = []
+    for node in ctx.registry.monitor_nodes():
+        active_node_runs = node.get("activeRuns", [])
+        has_authorized_run = (
+            any(
+                run.get("currentLogicalAgentId") == agent["id"]
+                for run in active_node_runs
+            )
+            if agent
+            else any(
+                run.get("sessionId") in team_session_ids for run in active_node_runs
+            )
+            if team
+            else False
+        )
+        include_node = (
+            node.get("employeeId") == employee_id
+            if placement_node_ids is None
+            else node["id"] in placement_node_ids or has_authorized_run
+        )
+        if include_node:
+            nodes.append(node)
     active_runs = [
         run
         for node in nodes

@@ -48,6 +48,30 @@ from .store_common import (
 )
 
 
+class _TaskWriteConflict(RuntimeError):
+    pass
+
+
+def _task_session_link_events(
+    task_id: str, session_id: str
+) -> list[dict[str, Any]]:
+    return [
+        relay_task_event("task.session_linked", task_id, {"sessionId": session_id}),
+        relay_task_event(
+            "task.activity",
+            task_id,
+            {
+                "activity": {
+                    "id": new_relay_id("act"),
+                    "createdAt": now_iso(),
+                    "message": f"Linked session {session_id}.",
+                    "sessionId": session_id,
+                }
+            },
+        ),
+    ]
+
+
 class LocalTaskStore:
     def __init__(self, root_dir: str | Path = DEFAULT_RELAY_DATA_DIR):
         self.root_dir = Path(root_dir)
@@ -162,19 +186,30 @@ class LocalTaskStore:
             return task
 
     def append_event(self, task_id: str, event: dict[str, Any]) -> dict[str, Any]:
+        return self.append_events(task_id, [event])
+
+    def append_events(
+        self,
+        task_id: str,
+        new_events: list[dict[str, Any]],
+        *,
+        skip_linked_session_id: str | None = None,
+    ) -> dict[str, Any]:
         with self._lock:
+            current = self.get_task(task_id)
+            if skip_linked_session_id and skip_linked_session_id in current.get(
+                "linkedSessionIds", []
+            ):
+                return current
             self._task_dir(task_id).mkdir(parents=True, exist_ok=True)
-            _append_jsonl(self._events_path(task_id), event)
+            for event in new_events:
+                _append_jsonl(self._events_path(task_id), event)
             logger.debug(
-                "Task event appended", task_id=task_id, event_type=event.get("type")
+                "Task events appended",
+                task_id=task_id,
+                event_types=[event.get("type") for event in new_events],
             )
-            if self._snapshot_path(task_id).exists():
-                events = [
-                    *_read_json(self._snapshot_path(task_id)).get("events", []),
-                    event,
-                ]
-            else:
-                events = _read_jsonl(self._events_path(task_id))
+            events = [*current.get("events", []), *new_events]
             task = materialize_task_events(events)
             _write_json(self._snapshot_path(task_id), task)
             return task
@@ -426,14 +461,13 @@ class LocalTaskStore:
         return self.record_activity(task_id, "Agent assignment cleared.")
 
     def link_session(self, task_id: str, session_id: str) -> dict[str, Any]:
-        task = self.append_event(
+        task = self.append_events(
             task_id,
-            relay_task_event("task.session_linked", task_id, {"sessionId": session_id}),
+            _task_session_link_events(task_id, session_id),
+            skip_linked_session_id=session_id,
         )
         logger.debug("Task linked to session", task_id=task_id, session_id=session_id)
-        return self.record_activity(
-            task["id"], f"Linked session {session_id}.", {"sessionId": session_id}
-        )
+        return task
 
     def record_activity(
         self, task_id: str, message: str, payload: dict[str, Any] | None = None
@@ -644,16 +678,35 @@ class DatabaseTaskStore:
         return task
 
     def append_event(self, task_id: str, event: dict[str, Any]) -> dict[str, Any]:
+        return self.append_events(task_id, [event])
+
+    def append_events(
+        self,
+        task_id: str,
+        events: list[dict[str, Any]],
+        *,
+        skip_linked_session_id: str | None = None,
+    ) -> dict[str, Any]:
         for attempt in range(3):
             try:
-                return self._append_event_once(task_id, event)
-            except IntegrityError:
+                return self._append_events_once(
+                    task_id,
+                    events,
+                    skip_linked_session_id=skip_linked_session_id,
+                )
+            except (IntegrityError, _TaskWriteConflict):
                 if attempt == 2:
                     raise
                 time.sleep(0.01 * (attempt + 1))
         raise RuntimeError("unreachable")
 
-    def _append_event_once(self, task_id: str, event: dict[str, Any]) -> dict[str, Any]:
+    def _append_events_once(
+        self,
+        task_id: str,
+        events: list[dict[str, Any]],
+        *,
+        skip_linked_session_id: str | None = None,
+    ) -> dict[str, Any]:
         with self.engine.begin() as conn:
             row = (
                 conn.execute(
@@ -668,27 +721,44 @@ class DatabaseTaskStore:
                 raise KeyError(task_id)
             task_pk = row["id"]
             sequence = int(row["version"] or 0)
-            conn.execute(
-                insert(self.events).values(
-                    **task_event_to_row(task_pk, sequence, event)
-                )
-            )
+            current = row["snapshot"] or {}
+            if skip_linked_session_id and skip_linked_session_id in current.get(
+                "linkedSessionIds", []
+            ):
+                return current
             task = materialize_task_events(
-                [*(row["snapshot"] or {}).get("events", []), event]
+                [*current.get("events", []), *events]
             )
-            conn.execute(
+            claimed = conn.execute(
                 update(self.tasks)
-                .where(self.tasks.c.id == task_pk)
-                .values(**task_to_row(task, version=sequence + 1, database_id=task_pk))
-            )
-            if event.get("type") == "task.session_linked":
-                self._ensure_task_session(
-                    conn, task_pk, event["sessionId"], event["timestamp"]
+                .where(
+                    self.tasks.c.id == task_pk,
+                    self.tasks.c.version == sequence,
                 )
+                .values(
+                    **task_to_row(
+                        task,
+                        version=sequence + len(events),
+                        database_id=task_pk,
+                    )
+                )
+            )
+            if claimed.rowcount != 1:
+                raise _TaskWriteConflict(task_id)
+            for offset, event in enumerate(events):
+                conn.execute(
+                    insert(self.events).values(
+                        **task_event_to_row(task_pk, sequence + offset, event)
+                    )
+                )
+                if event.get("type") == "task.session_linked":
+                    self._ensure_task_session(
+                        conn, task_pk, event["sessionId"], event["timestamp"]
+                    )
         logger.debug(
-            "Database task event appended",
+            "Database task events appended",
             task_id=task_id,
-            event_type=event.get("type"),
+            event_types=[event.get("type") for event in events],
         )
         return task
 
@@ -1058,16 +1128,17 @@ class DatabaseTaskStore:
         return self.record_activity(task_id, "Agent assignment cleared.")
 
     def link_session(self, task_id: str, session_id: str) -> dict[str, Any]:
-        task = self.append_event(
+        task = self.append_events(
             task_id,
-            relay_task_event("task.session_linked", task_id, {"sessionId": session_id}),
+            _task_session_link_events(task_id, session_id),
+            skip_linked_session_id=session_id,
         )
         logger.debug(
-            "Database task linked to session", task_id=task_id, session_id=session_id
+            "Database task linked to session",
+            task_id=task_id,
+            session_id=session_id,
         )
-        return self.record_activity(
-            task["id"], f"Linked session {session_id}.", {"sessionId": session_id}
-        )
+        return task
 
     def record_activity(
         self, task_id: str, message: str, payload: dict[str, Any] | None = None

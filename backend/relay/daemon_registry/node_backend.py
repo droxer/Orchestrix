@@ -159,12 +159,12 @@ class ServerDaemonNodeBackend:
                 "employeeId": payload["employeeId"],
                 "token": payload["nodeToken"],
                 "workspacePath": payload.get("workspacePath"),
-                "nodeLocation": "employee-device",
                 "protocolVersion": DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS[0],
                 "supportedAgents": [],
                 "status": "stopped",
             },
             payload["token"],
+            authorized_node_location="employee-device",
         )
         stored = self.registry.get(sandbox_id) or {}
         return {**sandbox, **stored, "token": payload["token"]}

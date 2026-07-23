@@ -510,6 +510,7 @@ def test_task_start_without_agent_runs_ready_team_discussion(monkeypatch) -> Non
                 "status": "stopped",
             },
             "ui_token",
+            authorized_node_location="employee-device",
         )
         registered = client.post("/daemon-nodes/register", json={
             "sandboxId": "sbx_alice",

@@ -26,6 +26,7 @@ from ..persistence.stores import (
     LocalDaemonStore,
     LocalSessionStore,
     LocalTaskStore,
+    infer_node_location,
     relay_event,
 )
 from ..sessions import compute_prior_agent_bridge
@@ -701,13 +702,25 @@ class DaemonNodeRegistry:
         self._load_persisted_state()
 
     def register(
-        self, payload: dict[str, Any], ui_token: str | None = None
+        self,
+        payload: dict[str, Any],
+        ui_token: str | None = None,
+        *,
+        authorized_node_location: str | None = None,
     ) -> dict[str, Any]:
         with self.dispatch_lock:
-            return self._register_unlocked(payload, ui_token)
+            return self._register_unlocked(
+                payload,
+                ui_token,
+                authorized_node_location=authorized_node_location,
+            )
 
     def _register_unlocked(
-        self, payload: dict[str, Any], ui_token: str | None
+        self,
+        payload: dict[str, Any],
+        ui_token: str | None,
+        *,
+        authorized_node_location: str | None = None,
     ) -> dict[str, Any]:
         if payload["protocolVersion"] not in DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS:
             raise ValueError(
@@ -808,10 +821,11 @@ class DaemonNodeRegistry:
             **({"sandboxMode": sandbox_mode} if sandbox_mode else {}),
             **(
                 {
-                    "nodeLocation": payload.get("nodeLocation")
-                    or (existing or {}).get("nodeLocation")
+                    "nodeLocation": (existing or {}).get("nodeLocation")
+                    or authorized_node_location
                 }
-                if payload.get("nodeLocation") or (existing or {}).get("nodeLocation")
+                if (existing or {}).get("nodeLocation")
+                or authorized_node_location
                 else {}
             ),
             **({"capabilities": capabilities} if capabilities else {}),
@@ -949,9 +963,9 @@ class DaemonNodeRegistry:
             raise KeyError(sandbox_id)
         if sandbox.get("employeeId"):
             raise ValueError("Daemon node is already assigned.")
-        updated = {**sandbox, "employeeId": employee_id, "updatedAt": now_iso()}
+        persisted = self.daemon_store.assign_node_employee(sandbox_id, employee_id)
+        updated = {**sandbox, **persisted}
         self.sandboxes[sandbox_id] = updated
-        self.daemon_store.assign_node_employee(sandbox_id, employee_id)
         logger.info(
             "Daemon node assigned", sandbox_id=sandbox_id, employee_id=employee_id
         )
@@ -2549,6 +2563,7 @@ class DaemonNodeRegistry:
             run["nodeId"] for run in self.daemon_store.list_active_runs()
         }
         for sandbox in nodes:
+            node_location = infer_node_location(sandbox)
             waiting_status = (
                 "running"
                 if sandbox["id"] in active_node_ids
@@ -2558,11 +2573,7 @@ class DaemonNodeRegistry:
             )
             self.sandboxes[sandbox["id"]] = {
                 **sandbox,
-                **(
-                    {"nodeLocation": sandbox.get("nodeLocation") or "managed"}
-                    if sandbox.get("nodeLocation") or sandbox.get("managedNodeId")
-                    else {}
-                ),
+                **({"nodeLocation": node_location} if node_location else {}),
                 "status": waiting_status,
                 "agents": {agent: "unknown" for agent in AGENT_NAMES},
                 "updatedAt": now_iso(),

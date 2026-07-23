@@ -23,6 +23,25 @@ export interface AgentPlacementDescription {
   preference: PlacementPreference | null;
 }
 
+export interface PlacementBadgeLabels {
+  nodeName: string;
+  ownership: string;
+  sandbox: string;
+  status: string;
+}
+
+export function placementBadgeDetailLabels(
+  labels: PlacementBadgeLabels,
+  includeSandbox: boolean,
+): string[] {
+  return [
+    labels.nodeName,
+    labels.ownership,
+    ...(includeSandbox ? [labels.sandbox] : []),
+    labels.status,
+  ];
+}
+
 export function describeAgentPlacements(
   placements: AgentPlacement[],
 ): AgentPlacementDescription[] {

@@ -89,6 +89,7 @@ export interface WorkspaceBriefSession {
   phase?: string;
   workspacePath?: string;
   ownerEmployeeId?: string;
+  ownerAgentId?: string;
   teamId?: string;
   currentAgent?: AgentName;
   pendingDecision?: RelaySession["pendingDecision"];

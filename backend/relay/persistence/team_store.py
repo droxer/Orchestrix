@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from threading import RLock
-from typing import Any
+from typing import Any, Callable
 
 from sqlalchemy import (
     BigInteger,
@@ -41,6 +41,10 @@ class TeamValidationError(ValueError):
     def __init__(self, code: str, message: str | None = None):
         self.code = code
         super().__init__(message or code)
+
+
+class _TeamWriteConflict(RuntimeError):
+    pass
 
 
 def validate_team_payload(
@@ -312,58 +316,56 @@ class DatabaseTeamStore:
         )
 
     def update_team(self, team_id: str, patch: dict[str, Any]) -> dict[str, Any]:
-        current = self._active_team(team_id)
-        normalized = _normalize_team_patch(patch, current=current)
-        if "name" in normalized:
-            self._ensure_unique_name(
-                current["ownerEmployeeId"],
-                normalized["name"],
-                exclude_id=team_id,
-            )
-        updated = {**current, **normalized, "updatedAt": now_iso()}
-        return self._append(
-            team_id,
-            "team.updated",
-            updated,
-            {"patch": normalized, "team": updated},
-        )
+        def update_snapshot(
+            current: dict[str, Any],
+        ) -> tuple[dict[str, Any], dict[str, Any]]:
+            normalized = _normalize_team_patch(patch, current=current)
+            updated = {**current, **normalized, "updatedAt": now_iso()}
+            return updated, {"patch": normalized, "team": updated}
+
+        return self._mutate(team_id, "team.updated", update_snapshot)
 
     def delete_team(self, team_id: str) -> dict[str, Any]:
-        current = self._active_team(team_id)
-        timestamp = now_iso()
-        deleted = {
-            **current,
-            "enabled": False,
-            "deletedAt": timestamp,
-            "updatedAt": timestamp,
-        }
-        return self._append(team_id, "team.deleted", deleted, {"team": deleted})
+        def delete_snapshot(
+            current: dict[str, Any],
+        ) -> tuple[dict[str, Any], dict[str, Any]]:
+            timestamp = now_iso()
+            deleted = {
+                **current,
+                "enabled": False,
+                "deletedAt": timestamp,
+                "updatedAt": timestamp,
+            }
+            return deleted, {"team": deleted}
+
+        return self._mutate(team_id, "team.deleted", delete_snapshot)
 
     def remove_member(self, team_id: str, agent_id: str) -> dict[str, Any]:
-        current = self._active_team(team_id)
-        members = [
-            member for member in current.get("memberAgentIds", []) if member != agent_id
-        ]
-        if members == current.get("memberAgentIds", []):
-            return current
-        lead = current.get("leadAgentId")
-        if lead == agent_id:
-            lead = members[0] if members else None
-        updated = {
-            **current,
-            "memberAgentIds": members,
-            "leadAgentId": lead,
-            "updatedAt": now_iso(),
-        }
-        return self._append(
-            team_id,
-            "team.updated",
-            updated,
-            {
+        def remove_from_snapshot(
+            current: dict[str, Any],
+        ) -> tuple[dict[str, Any], dict[str, Any]] | None:
+            members = [
+                member
+                for member in current.get("memberAgentIds", [])
+                if member != agent_id
+            ]
+            if members == current.get("memberAgentIds", []):
+                return None
+            lead = current.get("leadAgentId")
+            if lead == agent_id:
+                lead = members[0] if members else None
+            updated = {
+                **current,
+                "memberAgentIds": members,
+                "leadAgentId": lead,
+                "updatedAt": now_iso(),
+            }
+            return updated, {
                 "patch": {"memberAgentIds": members, "leadAgentId": lead},
                 "team": updated,
-            },
-        )
+            }
+
+        return self._mutate(team_id, "team.updated", remove_from_snapshot)
 
     def events(self, team_id: str) -> list[dict[str, Any]]:
         with self.engine.begin() as conn:
@@ -401,49 +403,72 @@ class DatabaseTeamStore:
             raise KeyError(team_id)
         return team
 
-    def _append(
+    def _mutate(
         self,
         team_id: str,
         event_type: str,
-        team: dict[str, Any],
-        payload: dict[str, Any],
+        mutate: Callable[
+            [dict[str, Any]],
+            tuple[dict[str, Any], dict[str, Any]] | None,
+        ],
     ) -> dict[str, Any]:
-        event = _team_event(team_id, event_type, payload)
-        try:
-            with self.engine.begin() as conn:
-                row = (
-                    conn.execute(
-                        select(self.teams.c.id, self.teams.c.event_version)
-                        .where(self.teams.c.public_id == team_id)
-                        .with_for_update()
+        for attempt in range(3):
+            try:
+                with self.engine.begin() as conn:
+                    row = (
+                        conn.execute(
+                            select(
+                                self.teams.c.id,
+                                self.teams.c.snapshot,
+                                self.teams.c.event_version,
+                            )
+                            .where(self.teams.c.public_id == team_id)
+                            .with_for_update()
+                        )
+                        .mappings()
+                        .first()
                     )
-                    .mappings()
-                    .first()
-                )
-                if not row:
-                    raise KeyError(team_id)
-                sequence = int(row["event_version"] or 0)
-                conn.execute(
-                    insert(self.events_table).values(
-                        **_team_event_row(row["id"], sequence, event)
-                    )
-                )
-                conn.execute(
-                    update(self.teams)
-                    .where(self.teams.c.id == row["id"])
-                    .values(
-                        **_team_row(
-                            team,
-                            event_version=sequence + 1,
-                            database_id=row["id"],
+                    if not row:
+                        raise KeyError(team_id)
+                    current = row["snapshot"] or {}
+                    if current.get("deletedAt"):
+                        raise KeyError(team_id)
+                    mutation = mutate(current)
+                    if mutation is None:
+                        return current
+                    team, payload = mutation
+                    sequence = int(row["event_version"] or 0)
+                    claimed = conn.execute(
+                        update(self.teams)
+                        .where(
+                            self.teams.c.id == row["id"],
+                            self.teams.c.event_version == sequence,
+                        )
+                        .values(
+                            **_team_row(
+                                team,
+                                event_version=sequence + 1,
+                                database_id=row["id"],
+                            )
                         )
                     )
-                )
-        except IntegrityError as error:
-            if _is_name_conflict(error):
-                raise TeamValidationError("team_name_taken") from error
-            raise
-        return team
+                    if claimed.rowcount != 1:
+                        raise _TeamWriteConflict(team_id)
+                    event = _team_event(team_id, event_type, payload)
+                    conn.execute(
+                        insert(self.events_table).values(
+                            **_team_event_row(row["id"], sequence, event)
+                        )
+                    )
+                return team
+            except _TeamWriteConflict:
+                if attempt == 2:
+                    raise
+            except IntegrityError as error:
+                if _is_name_conflict(error):
+                    raise TeamValidationError("team_name_taken") from error
+                raise
+        raise _TeamWriteConflict(team_id)
 
     def _ensure_unique_name(
         self,

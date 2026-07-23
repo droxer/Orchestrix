@@ -39,7 +39,7 @@ export function PlacementList({
             <span className="adm-placement-body">
               <AgentPlacementBadge
                 description={description}
-                showSandbox
+                showSandbox={canManage}
               />
               <span className="adm-placement-status-row">
                 <span className={`adm-placement-status tone-${tone}`}>

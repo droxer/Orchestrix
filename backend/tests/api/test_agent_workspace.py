@@ -161,3 +161,83 @@ def test_workspace_brief_accepts_legacy_agent_employee_id(monkeypatch, tmp_path)
 
     assert response.status_code == 200, response.text
     assert response.json()["employeeId"] == "alice"
+
+
+def test_agent_workspace_brief_includes_owned_session_before_first_run(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    app = create_app(tmp_path)
+    client = TestClient(app)
+    _bootstrap(client)
+    agent = _agent(client)
+    session = app.state.session_store.create_session(
+        {
+            "workspacePath": "/workspace",
+            "ownerEmployeeId": "alice",
+            "ownerAgentId": agent["id"],
+            "taskGoal": "queued work",
+        }
+    )
+
+    response = client.get(f"/workspace/brief?agentId={agent['id']}")
+
+    assert response.status_code == 200, response.text
+    sessions = response.json()["sessions"]
+    assert len(sessions) == 1
+    assert sessions[0]["id"] == session["id"]
+    assert sessions[0]["ownerEmployeeId"] == "alice"
+    assert sessions[0]["ownerAgentId"] == agent["id"]
+    assert sessions[0]["runCount"] == 0
+
+
+def test_agent_workspace_brief_uses_authorized_placements_for_employee(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    app = create_app(tmp_path)
+    admin = TestClient(app)
+    _bootstrap(admin)
+    agent = _agent(admin)
+    assert admin.post(
+        "/cp/users",
+        json={"username": "bob", "password": "userpass", "employeeId": "bob"},
+    ).status_code == 201
+    app.state.registry.register(
+        {
+            "sandboxId": "node_placed",
+            "employeeId": "bob",
+            "token": "placed_token",
+            "nodeLocation": "employee-device",
+            "protocolVersion": 1,
+            "supportedAgents": ["codex"],
+            "status": "ready",
+        }
+    )
+    app.state.registry.register(
+        {
+            "sandboxId": "node_same_employee_unplaced",
+            "employeeId": "alice",
+            "token": "unplaced_token",
+            "nodeLocation": "employee-device",
+            "protocolVersion": 1,
+            "supportedAgents": ["codex"],
+            "status": "ready",
+        }
+    )
+    app.state.agent_placement_store.create_placement(agent, "node_placed", {})
+
+    alice = TestClient(app)
+    assert alice.post(
+        "/auth/login", json={"username": "alice", "password": "userpass"}
+    ).status_code == 200
+    response = alice.get(f"/workspace/brief?agentId={agent['id']}")
+
+    assert response.status_code == 200, response.text
+    assert [node["id"] for node in response.json()["nodes"]] == ["node_placed"]
+
+    bob = TestClient(app)
+    assert bob.post(
+        "/auth/login", json={"username": "bob", "password": "userpass"}
+    ).status_code == 200
+    assert bob.get(f"/workspace/brief?agentId={agent['id']}").status_code == 403

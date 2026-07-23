@@ -1,7 +1,12 @@
 "use client";
 
 import { useTranslation } from "react-i18next";
-import { placementStatusTone, type AgentPlacementDescription, type PlacementOwnership } from "../lib/agentPlacements";
+import {
+  placementBadgeDetailLabels,
+  placementStatusTone,
+  type AgentPlacementDescription,
+  type PlacementOwnership,
+} from "../lib/agentPlacements";
 import { NodeLocal, NodeManaged, NodePending } from "./icons";
 
 const OWNERSHIP_ICON: Record<PlacementOwnership, typeof NodeManaged> = {
@@ -27,12 +32,18 @@ export function AgentPlacementBadge({
   const sandboxLabel = t(`admin.v2.node_sandbox_${description.sandbox}`);
   const status = description.placement.status;
   const statusLabel = t(`admin.v2.placement_status.${status}`, { defaultValue: status });
+  const detailTitle = placementBadgeDetailLabels({
+    nodeName: description.nodeName,
+    ownership: ownershipLabel,
+    sandbox: sandboxLabel,
+    status: statusLabel,
+  }, showSandbox).join(" · ");
 
   if (plain) {
     return (
       <span
         className="agent-placement-plain"
-        title={`${description.nodeName} · ${ownershipLabel} · ${sandboxLabel} · ${statusLabel}`}
+        title={detailTitle}
       >
         <OwnershipIcon size={12} aria-hidden="true" />
         <span className="agent-placement-plain-name" translate="no">
@@ -46,7 +57,7 @@ export function AgentPlacementBadge({
     <span
       className="agent-placement-badge"
       data-ownership={description.ownership}
-      title={`${description.nodeName} · ${ownershipLabel} · ${sandboxLabel} · ${statusLabel}`}
+      title={detailTitle}
     >
       <i className={`agent-placement-badge-dot tone-${placementStatusTone(status)}`} aria-hidden="true" />
       <OwnershipIcon size={13} aria-hidden="true" />

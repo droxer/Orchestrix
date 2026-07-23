@@ -88,9 +88,10 @@ def test_unprovisioned_daemon_registration_cannot_mint_logical_agents(
 ) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
-        client = TestClient(create_app(root))
-        _bootstrap_admin(client)
-        assert client.post(
+        app = create_app(root)
+        admin_client = TestClient(app)
+        _bootstrap_admin(admin_client)
+        assert admin_client.post(
             "/cp/employees",
             json={
                 "employeeId": "alice",
@@ -99,7 +100,8 @@ def test_unprovisioned_daemon_registration_cannot_mint_logical_agents(
             },
         ).status_code == 201
 
-        registered = client.post(
+        daemon_client = TestClient(app)
+        registered = daemon_client.post(
             "/daemon-nodes/register",
             headers={"Authorization": "Bearer untrusted_ui_token"},
             json={
@@ -107,6 +109,7 @@ def test_unprovisioned_daemon_registration_cannot_mint_logical_agents(
                 "employeeId": "alice",
                 "token": "node_token",
                 "workspacePath": "/workspace/alice",
+                "nodeLocation": "employee-device",
                 "protocolVersion": 1,
                 "supportedAgents": ["codex"],
                 "status": "stopped",
@@ -114,7 +117,10 @@ def test_unprovisioned_daemon_registration_cannot_mint_logical_agents(
         )
 
         assert registered.status_code == 200
-        heartbeat = client.post(
+        assert "employeeId" not in registered.json()
+        restarted_app = create_app(root)
+        restarted_daemon = TestClient(restarted_app)
+        heartbeat = restarted_daemon.post(
             "/daemon-nodes/register",
             headers={"Authorization": "Bearer untrusted_ui_token"},
             json={
@@ -122,13 +128,21 @@ def test_unprovisioned_daemon_registration_cannot_mint_logical_agents(
                 "employeeId": "alice",
                 "token": "node_token",
                 "workspacePath": "/workspace/alice",
+                "nodeLocation": "employee-device",
                 "protocolVersion": 1,
                 "supportedAgents": ["codex"],
                 "status": "ready",
             },
         )
         assert heartbeat.status_code == 200
-        assert client.get("/cp/agents?employeeId=alice").json()["agents"] == []
+        assert "employeeId" not in heartbeat.json()
+        assert "nodeLocation" not in heartbeat.json()
+        restarted_admin = TestClient(restarted_app)
+        assert restarted_admin.post(
+            "/auth/login",
+            json={"username": "admin", "password": "secret123"},
+        ).status_code == 200
+        assert restarted_admin.get("/cp/agents?employeeId=alice").json()["agents"] == []
 
 
 def test_control_plane_provisioned_node_materializes_compatibility_agents(

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Barrier, Lock
 
 import pytest
 
 from relay.persistence.agent_store import LocalAgentStore
+from relay.persistence import team_store as team_store_module
 from relay.persistence.team_store import DatabaseTeamStore, LocalTeamStore
 
 
@@ -77,6 +80,54 @@ def test_remove_member_promotes_the_first_remaining_member(team_store) -> None:
     assert promoted["memberAgentIds"] == ["agent_support", "agent_review"]
     assert emptied["leadAgentId"] is None
     assert emptied["memberAgentIds"] == []
+
+
+def test_database_team_updates_merge_from_the_locked_snapshot(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    database_url = f"sqlite:///{tmp_path}/teams.db"
+    first = DatabaseTeamStore(database_url, create_schema=True)
+    second = DatabaseTeamStore(database_url)
+    team = first.create_team(
+        "alice",
+        {
+            "name": "Delivery",
+            "leadAgentId": "agent_lead",
+            "memberAgentIds": ["agent_lead"],
+        },
+    )
+    stale_read_barrier = Barrier(2)
+    first_write_lock = Lock()
+    first_write_count = 0
+    original_team_row = team_store_module._team_row
+
+    def synchronize_first_writes(*args, **kwargs):
+        nonlocal first_write_count
+        with first_write_lock:
+            first_write_count += 1
+            should_wait = first_write_count <= 2
+        if should_wait:
+            stale_read_barrier.wait()
+        return original_team_row(*args, **kwargs)
+
+    monkeypatch.setattr(team_store_module, "_team_row", synchronize_first_writes)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        rename = executor.submit(first.update_team, team["id"], {"name": "Delivery crew"})
+        disable = executor.submit(second.update_team, team["id"], {"enabled": False})
+        rename.result()
+        disable.result()
+
+    updated = first.get_team(team["id"])
+    assert updated is not None
+    assert updated["name"] == "Delivery crew"
+    assert updated["enabled"] is False
+    updates = [
+        event["patch"]
+        for event in first.events(team["id"])
+        if event["type"] == "team.updated"
+    ]
+    assert {tuple(patch) for patch in updates} == {("name",), ("enabled",)}
 
 
 def test_validate_team_payload_checks_membership(tmp_path: Path) -> None:

@@ -45,6 +45,29 @@ def test_task_store_persists_assignment_status_activity_and_link() -> None:
         assert any("Assigned to codex" in item["message"] for item in task["activity"])
 
 
+def test_local_task_store_link_session_is_idempotent() -> None:
+    with TemporaryDirectory() as root:
+        store = LocalTaskStore(root)
+        task = store.create_task({"title": "Link once"})
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            list(
+                pool.map(
+                    lambda _: store.link_session(task["id"], "ses_test"), range(2)
+                )
+            )
+        linked = store.get_task(task["id"])
+
+        assert linked["linkedSessionIds"] == ["ses_test"]
+        assert sum(
+            event["type"] == "task.session_linked" for event in linked["events"]
+        ) == 1
+        assert sum(
+            activity["message"] == "Linked session ses_test."
+            for activity in linked["activity"]
+        ) == 1
+
+
 def test_local_task_store_serializes_concurrent_appends() -> None:
     with TemporaryDirectory() as root:
         store = LocalTaskStore(root)
@@ -117,6 +140,33 @@ def test_database_task_store_persists_assignment_status_activity_and_link() -> N
         assert task["status"] == "running"
         assert store.list_tasks()[0]["id"] == task["id"]
         assert any("Assigned to codex" in item["message"] for item in task["activity"])
+
+
+def test_database_task_store_link_session_is_idempotent() -> None:
+    with TemporaryDirectory() as root:
+        store = DatabaseTaskStore(f"sqlite:///{root}/relay.db", create_schema=True)
+        other_store = DatabaseTaskStore(f"sqlite:///{root}/relay.db")
+        task = store.create_task({"title": "Link once"})
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            list(
+                pool.map(
+                    lambda task_store: task_store.link_session(
+                        task["id"], "ses_test"
+                    ),
+                    (store, other_store),
+                )
+            )
+        linked = store.get_task(task["id"])
+
+        assert linked["linkedSessionIds"] == ["ses_test"]
+        assert sum(
+            event["type"] == "task.session_linked" for event in linked["events"]
+        ) == 1
+        assert sum(
+            activity["message"] == "Linked session ses_test."
+            for activity in linked["activity"]
+        ) == 1
 
 
 def test_task_claim_orders_by_priority_due_date_and_assignee() -> None:

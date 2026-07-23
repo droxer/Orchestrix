@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { describeAgentPlacements } from "../src/lib/agentPlacements.js";
+import {
+  describeAgentPlacements,
+  placementBadgeDetailLabels,
+} from "../src/lib/agentPlacements.js";
 import type { AgentPlacement } from "../src/types.js";
 
 function placement(input: Partial<AgentPlacement> & Pick<AgentPlacement, "id" | "daemonNodeId" | "priority">): AgentPlacement {
@@ -67,6 +70,27 @@ describe("describeAgentPlacements", () => {
         sandbox: "host",
         name: "Alice’s MacBook",
       },
+    ]);
+  });
+
+  it("keeps host-process details out of employee placement labels", () => {
+    const labels = {
+      nodeName: "Alice’s MacBook",
+      ownership: "Local computer",
+      sandbox: "Host process",
+      status: "Ready",
+    };
+
+    assert.deepEqual(placementBadgeDetailLabels(labels, false), [
+      "Alice’s MacBook",
+      "Local computer",
+      "Ready",
+    ]);
+    assert.deepEqual(placementBadgeDetailLabels(labels, true), [
+      "Alice’s MacBook",
+      "Local computer",
+      "Host process",
+      "Ready",
     ]);
   });
 

@@ -769,6 +769,27 @@ def test_admin_assigns_unassigned_node_to_existing_employee(monkeypatch) -> None
         assert body["employee"]["id"] == "alice"
         assert body["node"]["id"] == "node_unassigned"
         assert body["node"]["employeeId"] == "alice"
+        assert body["node"]["nodeLocation"] == "employee-device"
+
+        listing = client.get("/cp/daemon-nodes")
+        assert listing.status_code == 200
+        listed = next(
+            node
+            for node in listing.json()["nodes"]
+            if node["id"] == "node_unassigned"
+        )
+        assert listed["nodeLocation"] == "employee-device"
+
+        restarted = TestClient(create_app(root))
+        _login_admin(restarted)
+        restarted_listing = restarted.get("/cp/daemon-nodes")
+        assert restarted_listing.status_code == 200
+        restarted_node = next(
+            node
+            for node in restarted_listing.json()["nodes"]
+            if node["id"] == "node_unassigned"
+        )
+        assert restarted_node["nodeLocation"] == "employee-device"
 
         second = client.post("/cp/daemon-nodes/node_unassigned/assign", json={"employeeId": "alice"})
         assert second.status_code == 409

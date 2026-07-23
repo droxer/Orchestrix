@@ -158,15 +158,33 @@ async def register_daemon_node(request: Request, ctx: AppContextDep) -> dict[str
     try:
         registration = DaemonNodeRegistration.model_validate(body).relay_dump()
         prior = ctx.registry.get(registration["sandboxId"])
-        sandbox = ctx.registry.register(registration, bearer_token(request))
+        actor = request_actor_or_none(request, ctx.auth_store)
+        admin_authorized_ownership = bool(
+            not prior
+            and actor
+            and actor.get("isAdmin")
+            and registration.get("employeeId")
+        )
+        if not prior and not admin_authorized_ownership:
+            registration.pop("employeeId", None)
+        sandbox = ctx.registry.register(
+            registration,
+            bearer_token(request),
+            authorized_node_location=(
+                "employee-device" if admin_authorized_ownership else None
+            ),
+        )
         ownership_was_control_plane_authorized = bool(
-            prior
-            and prior.get("employeeId") == sandbox.get("employeeId")
-            and (
-                prior.get("managedNodeId")
-                or prior.get("provisioningAttemptId")
-                or prior.get("nodeLocation")
-                or prior.get("status") == "provisioning"
+            admin_authorized_ownership
+            or (
+                prior
+                and prior.get("employeeId") == sandbox.get("employeeId")
+                and (
+                    prior.get("managedNodeId")
+                    or prior.get("provisioningAttemptId")
+                    or prior.get("nodeLocation")
+                    or prior.get("status") == "provisioning"
+                )
             )
         )
         if ownership_was_control_plane_authorized:

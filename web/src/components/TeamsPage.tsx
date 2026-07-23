@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useTeams } from "../hooks/useTeams";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { selectedTeamForWorkspace } from "../lib/teamWorkspace";
-import { teamAvailability } from "../lib/taskAssignment";
+import { teamLeadAvailability } from "../lib/taskAssignment";
 import { StatusPill } from "./StatusPill";
 import type { CurrentUser } from "../types";
 import { ActionAdd } from "./icons";
@@ -93,7 +93,7 @@ export function TeamsPage({
                         </span>
                         <span className="teams-list-status" role="cell">
                           {team.enabled
-                            ? <StatusPill value={teamAvailability(team)} />
+                            ? <StatusPill value={teamLeadAvailability(team)} />
                             : <Badge variant="neutral">{t("teams.disabled")}</Badge>}
                         </span>
                       </button>

@@ -59,6 +59,25 @@ def _node_for_storage(node: dict[str, Any]) -> dict[str, Any]:
     return stored
 
 
+def infer_node_location(node: dict[str, Any]) -> str | None:
+    """Infer location only from explicit or managed control-plane state."""
+    explicit = node.get("nodeLocation")
+    if explicit:
+        return str(explicit)
+    if node.get("managedNodeId"):
+        return "managed"
+    return None
+
+
+def assigned_node_location(node: dict[str, Any]) -> str:
+    """Classify a node during an authorized control-plane assignment."""
+    if node.get("nodeLocation"):
+        return str(node["nodeLocation"])
+    if node.get("managedNodeId"):
+        return "managed"
+    return "employee-device"
+
+
 def _terminal_timestamp(record: dict[str, Any]) -> str:
     return (
         record.get("completedAt")
@@ -183,6 +202,7 @@ class LocalDaemonStore:
         if node.get("employeeId"):
             raise ValueError("Daemon node is already assigned.")
         updated = {**node, "employeeId": employee_id, "updatedAt": now_iso()}
+        updated["nodeLocation"] = assigned_node_location(updated)
         self._write_node(updated)
         self.append_daemon_event(
             daemon_event(
@@ -1163,6 +1183,7 @@ class DatabaseDaemonStore:
         if node.get("employeeId"):
             raise ValueError("Daemon node is already assigned.")
         updated = {**node, "employeeId": employee_id, "updatedAt": now_iso()}
+        updated["nodeLocation"] = assigned_node_location(updated)
         with self.engine.begin() as conn:
             node_pk = self._node_pk(conn, node_id)
             conn.execute(
