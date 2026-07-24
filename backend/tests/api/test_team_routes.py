@@ -548,6 +548,36 @@ def test_deleting_lead_agent_promotes_next_member(monkeypatch) -> None:
         assert updated["memberAgentIds"] == [support["id"]]
 
 
+def test_startup_repairs_team_members_deleted_by_an_older_runtime(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap(client)
+        _employee(client, "alice")
+        deleted_lead = _agent(client, "alice", "Deleted lead", "codex")
+        support = _agent(client, "alice", "Support", "claude")
+        team = client.post(
+            "/cp/teams",
+            json={
+                "ownerEmployeeId": "alice",
+                "name": "Legacy delivery",
+                "leadAgentId": deleted_lead["id"],
+                "memberAgentIds": [deleted_lead["id"], support["id"]],
+            },
+        ).json()["team"]
+
+        # Simulate historical data written by a runtime that deleted the agent
+        # without removing its Team membership.
+        app.state.agent_store.delete_agent(deleted_lead["id"])
+
+        restarted = create_app(root)
+        repaired = restarted.state.team_store.get_team(team["id"])
+
+        assert repaired["leadAgentId"] == support["id"]
+        assert repaired["memberAgentIds"] == [support["id"]]
+
+
 def test_task_assigned_to_team_starts_all_members_lead_first_in_assignee_thread(
     monkeypatch,
 ) -> None:

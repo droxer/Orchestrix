@@ -32,6 +32,7 @@ from .persistence.team_store import DatabaseTeamStore, LocalTeamStore
 from .persistence.profile_image_store import LocalProfileImageStore
 from .persistence.agent_placement_store import DatabaseAgentPlacementStore, LocalAgentPlacementStore, reconcile_single_active_placement
 from .services.workspace_query import WorkspaceQueryBroker
+from .services.team_membership import reconcile_team_memberships
 
 load_backend_env()
 
@@ -53,6 +54,9 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     team_store = team_store_from_env(root_dir)
     agent_placement_store = agent_placement_store_from_env(root_dir)
     profile_image_store = LocalProfileImageStore(root_dir)
+    # Older runtimes could retire an agent without updating Teams. Repair those
+    # dangling member references through Team events before serving requests.
+    reconcile_team_memberships(team_store, agent_store)
     # Heal any agent left with multiple active placements before the
     # one-agent-one-computer invariant (idempotent; a no-op once collapsed).
     reconcile_single_active_placement(agent_placement_store)
