@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
+import localFont from "next/font/local";
 import type { ReactNode } from "react";
-import { Geist, Geist_Mono } from "next/font/google";
 
 import "../styles.css";
 
@@ -12,24 +12,26 @@ import { Providers } from "./providers";
 // family switch. This one variable Geist instance backs --font-sans in
 // tokens/palette.css (via --font-app-sans). Geist Mono is reserved for
 // code-like content: tool/command lines, raw logs, code blocks, and IDs.
-// latin-ext widens coverage to accented European/Vietnamese names in
-// employee and sandbox labels.
+// The full local variable files include the extended Latin coverage needed
+// for accented European/Vietnamese names in employee and sandbox labels.
 //
 // CJK stays system-first (PingFang / YaHei / etc. in palette.css). We do
 // not load Noto Sans SC/TC through next/font — those unicode-range chunks
 // balloon Turbopack compile and only matter on bare Linux.
-const appSans = Geist({
-  subsets: ["latin", "latin-ext"],
+const appSans = localFont({
+  src: "./fonts/Geist-Variable.woff2",
   variable: "--font-app-sans",
   display: "swap",
-  weight: "variable",
+  weight: "100 900",
+  style: "normal",
 });
 
-const geistMono = Geist_Mono({
-  subsets: ["latin", "latin-ext"],
+const geistMono = localFont({
+  src: "./fonts/GeistMono-Variable.woff2",
   variable: "--font-geist-mono",
   display: "swap",
-  weight: "variable",
+  weight: "100 900",
+  style: "normal",
 });
 
 export const metadata: Metadata = {
