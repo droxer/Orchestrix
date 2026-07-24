@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { DashboardView } from "./admin/dashboard/DashboardView";
 import { useFleetMetrics } from "../hooks/useFleetMetrics";
 import { useTranslation } from "react-i18next";
 import { useMutationError } from "../hooks/useMutationError";
 import { Button } from "@/components/ui/button";
 import { ActionAddPerson, AdminNode, NavRefresh } from "./icons";
-import { deleteControlPanelDaemonNode, deleteControlPanelEmployee, deleteManagedNode, getAuthStatus, getMe, unassignControlPanelDaemonNode } from "../api";
+import { deleteControlPanelDaemonNode, deleteControlPanelEmployee, deleteManagedNode, getAuthStatus, getMe, listManagedNodes, permanentlyDeleteManagedNode, unassignControlPanelDaemonNode } from "../api";
 import type {
   AssignControlPanelDaemonNodeResponse,
   ControlPanelDaemonNodeRecord,
@@ -16,6 +17,7 @@ import type {
   CreateControlPanelEmployeeResponse,
   CurrentUser,
   EmployeeRecord,
+  ManagedNodeRecord,
 } from "../types";
 import { AgentProfileDrawer } from "./admin/AgentProfileDrawer";
 import { AssignNodeDrawer } from "./admin/AssignNodeDrawer";
@@ -23,6 +25,7 @@ import { BootstrapScreen, LoginScreen } from "./admin/AuthScreens";
 import { CredentialsDrawer } from "./admin/CredentialsDrawer";
 import { FleetView } from "./admin/FleetView";
 import { ManageAgentsDrawer } from "./admin/ManageAgentsDrawer";
+import { ManagedNodeHistory } from "./admin/ManagedNodeHistory";
 import { PageHeader } from "./PageHeader";
 import { AdminViewToggle, type AdminView } from "./admin/AdminViewToggle";
 import { AddEmployeeDrawer } from "./admin/AddEmployeeDrawer";
@@ -32,6 +35,7 @@ import type { AdminLayout } from "./admin/AdminLayoutToggle";
 import { useAdminFleet } from "../hooks/useAdminFleet";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { useRelayStore } from "../lib/store";
+import { CONTROL_PANEL_POLL_MS } from "../lib/controlPanelQueries";
 import {
   HIGHLIGHT_PULSE_MS,
   persistStoredNodeTokenMap,
@@ -74,6 +78,13 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
     Boolean(admin),
     view === "dashboard" || layout === "list",
   );
+  const managedNodesQuery = useQuery({
+    queryKey: ["admin", "managed-nodes"],
+    queryFn: ({ signal }) => listManagedNodes(signal),
+    enabled: Boolean(admin) && view === "fleet",
+    refetchInterval: CONTROL_PANEL_POLL_MS,
+  });
+  const managedNodes = managedNodesQuery.data?.nodes ?? [];
   const [manualRefreshPending, setManualRefreshPending] = useState(false);
   const setAdminView = useRelayStore((state) => state.setAdminView);
   const [addEmployeeOpen, setAddEmployeeOpen] = useUrlSearchState(
@@ -230,6 +241,16 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
     }
   }
 
+  async function handlePermanentlyDeleteManagedNode(node: ManagedNodeRecord) {
+    try {
+      await permanentlyDeleteManagedNode(node.id);
+      await managedNodesQuery.refetch();
+    } catch (error) {
+      reportMutationError("Failed to permanently delete managed-node record", error, t("errors.admin_delete_node"));
+      throw error;
+    }
+  }
+
   async function handleDeleteEmployee(employee: EmployeeRecord) {
     try {
       const result = await deleteControlPanelEmployee(employee.id);
@@ -330,7 +351,8 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
     if (manualRefreshPending) return;
     setManualRefreshPending(true);
     try {
-      await refetch();
+      if (view === "fleet") await Promise.all([refetch(), managedNodesQuery.refetch()]);
+      else await refetch();
     } finally {
       setManualRefreshPending(false);
     }
@@ -360,7 +382,12 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
     );
   }
 
-  const headerError = authError ?? pollError;
+  const managedNodesError = view === "fleet" && managedNodesQuery.error instanceof Error
+    ? managedNodesQuery.error.message
+    : view === "fleet" && managedNodesQuery.error
+      ? String(managedNodesQuery.error)
+      : null;
+  const headerError = authError ?? pollError ?? managedNodesError;
   const viewTitle = t(`admin.v2.title_${view}`);
   const headerCount = view === "employees"
     ? t("admin.employee_count", { count: employees.length })
@@ -452,16 +479,22 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
                   onSelectAgent={setAgentProfileId}
                 />
               ) : (
-                <FleetView
-                  nodes={nodes}
-                  storedTokens={storedTokens}
-                  layout={layout}
-                  onLayoutChange={setLayout}
-                  onRevealCredentials={handleRevealCredentials}
-                  onManageAgents={handleManageAgents}
-                  onDeleteNode={handleDeleteNode}
-                  onAddNode={() => setAddNodeOpen(true)}
-                />
+                <>
+                  <FleetView
+                    nodes={nodes}
+                    storedTokens={storedTokens}
+                    layout={layout}
+                    onLayoutChange={setLayout}
+                    onRevealCredentials={handleRevealCredentials}
+                    onManageAgents={handleManageAgents}
+                    onDeleteNode={handleDeleteNode}
+                    onAddNode={() => setAddNodeOpen(true)}
+                  />
+                  <ManagedNodeHistory
+                    nodes={managedNodes}
+                    onDeletePermanently={handlePermanentlyDeleteManagedNode}
+                  />
+                </>
               )}
             </div>
           </div>

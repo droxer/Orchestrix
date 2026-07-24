@@ -178,6 +178,38 @@ def test_legacy_managed_node_with_retired_policy_can_be_deleted(monkeypatch) -> 
         assert deleted.json()["node"]["desiredState"] == "deleted"
 
 
+def test_admin_can_permanently_delete_terminal_managed_node_record(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _login_admin(client)
+
+        created = client.post(
+            "/cp/managed-nodes",
+            json={"employeeId": "alice", "sandboxMode": "boxlite"},
+        ).json()["node"]
+
+        premature = client.delete(
+            f"/cp/managed-nodes/{created['id']}/permanent"
+        )
+        assert premature.status_code == 409
+        assert "finish deletion" in premature.json()["detail"]
+
+        app.state.managed_node_store.update_node(
+            created["id"], {"desiredState": "deleted"}
+        )
+        app.state.managed_node_store.update_node(created["id"], {"phase": "deleted"})
+
+        purged = client.delete(f"/cp/managed-nodes/{created['id']}/permanent")
+
+        assert purged.status_code == 204
+        assert client.get(f"/cp/managed-nodes/{created['id']}").status_code == 404
+
+
 def test_managed_node_runtime_cannot_be_drained_or_retired_during_active_run(
     monkeypatch,
 ) -> None:

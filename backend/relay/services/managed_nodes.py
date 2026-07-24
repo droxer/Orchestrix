@@ -227,6 +227,35 @@ class LocalManagedNodeStore:
         path = self.nodes_dir / f"{safe_name(node_id)}.json"
         return _read_json(path) if path.exists() else None
 
+    def purge_node(self, node_id: str) -> dict[str, Any]:
+        with self._lock:
+            node = self.get_node(node_id)
+            if not node:
+                raise KeyError(node_id)
+            if (
+                node.get("desiredState") != "deleted"
+                or node.get("phase") != "deleted"
+            ):
+                raise ValueError(
+                    "Managed node must finish deletion before it can be permanently deleted."
+                )
+            attempts = self.list_attempts(node_id)
+            if any(
+                attempt.get("status") not in TERMINAL_ATTEMPT_STATUSES
+                for attempt in attempts
+            ):
+                raise ValueError(
+                    "Managed node still has an active provisioning attempt."
+                )
+            attempt_ids = {attempt["id"] for attempt in attempts}
+            for path in self.grants_dir.glob("*.json"):
+                if _read_json(path).get("attemptId") in attempt_ids:
+                    path.unlink()
+            for attempt in attempts:
+                (self.attempts_dir / f"{safe_name(attempt['id'])}.json").unlink()
+            (self.nodes_dir / f"{safe_name(node_id)}.json").unlink()
+            return node
+
     def update_node(
         self,
         node_id: str,

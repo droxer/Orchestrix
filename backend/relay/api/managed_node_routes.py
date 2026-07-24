@@ -89,6 +89,27 @@ async def delete_managed_node(node_id: str, request: Request, ctx: AppContextDep
         raise _admin_error(error) from error
 
 
+@router.delete("/cp/managed-nodes/{node_id}/permanent", status_code=204)
+async def permanently_delete_managed_node(
+    node_id: str, request: Request, ctx: AppContextDep
+) -> Response:
+    require_admin_session(request, ctx.auth_store)
+    try:
+        with ctx.registry.dispatch_lock:
+            node = ctx.managed_node_store.get_node(node_id)
+            if not node:
+                raise KeyError(node_id)
+            daemon_node_id = node.get("activeDaemonNodeId")
+            if daemon_node_id and ctx.registry.get(daemon_node_id):
+                raise ValueError(
+                    "Managed node runtime must be retired before its record can be permanently deleted."
+                )
+            ctx.managed_node_store.purge_node(node_id)
+    except (KeyError, ValueError) as error:
+        raise _admin_error(error) from error
+    return Response(status_code=204)
+
+
 @router.get("/cp/managed-nodes/{node_id}/attempts")
 async def list_managed_node_attempts(node_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)

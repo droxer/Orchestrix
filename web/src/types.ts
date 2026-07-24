@@ -316,6 +316,10 @@ export interface CreateManagedNodeResponse {
   node: ManagedNodeRecord;
 }
 
+export interface ManagedNodesResponse {
+  nodes: ManagedNodeRecord[];
+}
+
 export type LogicalAgentAvailability = "ready" | "busy" | "pending" | "offline";
 
 export interface AgentPlacement {

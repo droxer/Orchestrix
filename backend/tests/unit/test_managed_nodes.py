@@ -23,6 +23,22 @@ def test_managed_node_attempt_uses_single_use_enrollment_grant(tmp_path: Path) -
         store.consume_enrollment_grant(credential)
 
 
+def test_purge_deleted_node_removes_its_history(tmp_path: Path) -> None:
+    store = LocalManagedNodeStore(tmp_path)
+    node = store.create_node({"employeeId": "alice"})
+    attempt, _credential = store.create_attempt(node["id"])
+    store.update_attempt(attempt["id"], {"status": "cancelled"})
+    store.update_node(node["id"], {"desiredState": "deleted"})
+    store.update_node(node["id"], {"phase": "deleted"})
+
+    purged = store.purge_node(node["id"])
+
+    assert purged["id"] == node["id"]
+    assert store.get_node(node["id"]) is None
+    assert store.list_attempts(node["id"]) == []
+    assert list(store.grants_dir.glob("*.json")) == []
+
+
 def test_provider_change_increments_generation_and_invalidates_old_grant(tmp_path: Path) -> None:
     store = LocalManagedNodeStore(tmp_path)
     node = store.create_node({"employeeId": "alice", "provider": "local-process"})

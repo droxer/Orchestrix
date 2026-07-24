@@ -14,6 +14,7 @@ import type {
   CreateControlPanelDaemonNodeResponse,
   CreateManagedNodeInput,
   CreateManagedNodeResponse,
+  ManagedNodesResponse,
   CreateSessionInput,
   CreateTaskInput,
   ControlPanelDaemonNodesResponse,
@@ -287,6 +288,16 @@ export function createManagedNode(input: CreateManagedNodeInput): Promise<Create
 
 export function deleteManagedNode(nodeId: string): Promise<CreateManagedNodeResponse> {
   return apiJson<CreateManagedNodeResponse>(`/cp/managed-nodes/${encodeURIComponent(nodeId)}`, {
+    method: "DELETE",
+  });
+}
+
+export function listManagedNodes(signal?: AbortSignal): Promise<ManagedNodesResponse> {
+  return apiJson<ManagedNodesResponse>("/cp/managed-nodes", { signal });
+}
+
+export function permanentlyDeleteManagedNode(nodeId: string): Promise<void> {
+  return apiJson<void>(`/cp/managed-nodes/${encodeURIComponent(nodeId)}/permanent`, {
     method: "DELETE",
   });
 }

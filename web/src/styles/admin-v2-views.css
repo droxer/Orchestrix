@@ -452,6 +452,119 @@
   gap: var(--sp-4);
 }
 
+.adm-node-history {
+  margin-top: var(--sp-8);
+  padding-top: var(--sp-6);
+  border-top: 1px solid var(--line-1);
+}
+
+.adm-node-history-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-4);
+}
+
+.adm-node-history-head h2 {
+  margin: 0;
+  font: var(--type-label-strong);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+}
+
+.adm-node-history-head p {
+  margin: var(--sp-1) 0 0;
+  color: var(--ink-3);
+  font: var(--type-label);
+}
+
+.adm-node-history-count {
+  min-width: 2rem;
+  padding: var(--sp-1) var(--sp-2);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-full);
+  color: var(--ink-3);
+  font: var(--type-micro);
+  text-align: center;
+}
+
+.adm-node-history-list {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 1px;
+  border-radius: var(--r-2);
+  background: var(--line-1);
+  list-style: none;
+  overflow: hidden;
+}
+
+.adm-node-history-row {
+  display: grid;
+  grid-template-columns: auto minmax(150px, 1.2fr) minmax(150px, 1fr) auto auto;
+  align-items: center;
+  gap: var(--sp-4);
+  min-width: 0;
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--surface-1);
+}
+
+.adm-node-history-icon {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-1);
+  color: var(--ink-3);
+  background: var(--surface-2);
+}
+
+.adm-node-history-identity {
+  display: grid;
+  min-width: 0;
+}
+
+.adm-node-history-identity strong,
+.adm-node-history-identity span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.adm-node-history-identity strong {
+  font: var(--type-label-strong);
+}
+
+.adm-node-history-identity span,
+.adm-node-history-meta,
+.adm-node-history-row time {
+  color: var(--ink-3);
+  font: var(--type-micro);
+}
+
+.adm-node-history-delete {
+  color: var(--err);
+}
+
+.adm-node-history-error {
+  margin: var(--sp-3) 0 0;
+  color: var(--err);
+  font: var(--type-label);
+}
+
+@media (max-width: 800px) {
+  .adm-node-history-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .adm-node-history-meta,
+  .adm-node-history-row time {
+    display: none;
+  }
+}
+
 /* ── Shared control row (filters/search on the left, card/list toggle on
    the right) — keeps the Employees and Nodes views chrome-aligned. ─────── */
 .adm-view-controls {

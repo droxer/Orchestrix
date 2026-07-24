@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { assignControlPanelDaemonNode, createControlPanelDaemonNode, createControlPanelEmployee, createManagedNode, deleteManagedNode } from "../src/api.js";
+import { assignControlPanelDaemonNode, createControlPanelDaemonNode, createControlPanelEmployee, createManagedNode, deleteManagedNode, listManagedNodes, permanentlyDeleteManagedNode } from "../src/api.js";
 import { conversationDaemonStatus } from "../src/lib/conversationStatus.js";
 import {
   mergeVisibleDaemonNodes,
@@ -315,6 +315,43 @@ describe("Relay web conversation status", () => {
     try {
       await deleteManagedNode("mnode_alice");
       assert.equal(requestPath, "/cp/managed-nodes/mnode_alice");
+      assert.equal(requestInit?.method, "DELETE");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("lists managed-node history through the control-panel endpoint", async () => {
+    const originalFetch = globalThis.fetch;
+    let requestPath = "";
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      requestPath = String(input);
+      return new Response(JSON.stringify({ nodes: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+    try {
+      const result = await listManagedNodes();
+      assert.equal(requestPath, "/cp/managed-nodes");
+      assert.deepEqual(result.nodes, []);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("permanently deletes a terminal managed-node record", async () => {
+    const originalFetch = globalThis.fetch;
+    let requestPath = "";
+    let requestInit: RequestInit | undefined;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      requestPath = String(input);
+      requestInit = init;
+      return new Response(null, { status: 204 });
+    }) as typeof fetch;
+    try {
+      await permanentlyDeleteManagedNode("mnode_old");
+      assert.equal(requestPath, "/cp/managed-nodes/mnode_old/permanent");
       assert.equal(requestInit?.method, "DELETE");
     } finally {
       globalThis.fetch = originalFetch;
