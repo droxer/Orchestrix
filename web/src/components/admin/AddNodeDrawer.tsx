@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { createControlPanelDaemonNode, createManagedNode } from "../../api";
 import { initialsOf } from "../../lib/adminHelpers";
@@ -48,7 +48,13 @@ export function AddNodeDrawer({
   const [workspacePath, setWorkspacePath] = useState("");
   const [employeeId, setEmployeeId] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{
+    employeeId?: string;
+    workspacePath?: string;
+  }>({});
   const [isBusy, setIsBusy] = useState(false);
+  const employeeTriggerRef = useRef<HTMLButtonElement>(null);
+  const workspacePathRef = useRef<HTMLInputElement>(null);
   const isManaged = nodeLocation === "managed";
   const hasUnsavedChanges = Boolean(employeeId || workspacePath || nodeLocation !== "managed");
   const confirmDiscardChanges = useUnsavedChangesGuard(open && hasUnsavedChanges && !isBusy);
@@ -65,19 +71,29 @@ export function AddNodeDrawer({
       setWorkspacePath("");
       setEmployeeId("");
       setError(null);
+      setFieldErrors({});
       setIsBusy(false);
     }
   }, [open]);
 
+  function clearFieldError(field: "employeeId" | "workspacePath") {
+    setFieldErrors((current) => (current[field] ? { ...current, [field]: undefined } : current));
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (isManaged && !employeeId) {
-      setError(t("admin.employee_required"));
-      return;
-    }
-    if (!isManaged && !workspacePath.trim()) {
-      setError(t("admin.v2.workspace_path_required"));
+    const nextFieldErrors: typeof fieldErrors = {};
+    if (isManaged && !employeeId) nextFieldErrors.employeeId = t("admin.employee_required");
+    if (!isManaged && !workspacePath.trim()) nextFieldErrors.workspacePath = t("admin.v2.workspace_path_required");
+    setFieldErrors(nextFieldErrors);
+    const firstInvalid = nextFieldErrors.employeeId
+      ? employeeTriggerRef
+      : nextFieldErrors.workspacePath
+        ? workspacePathRef
+        : null;
+    if (firstInvalid) {
+      firstInvalid.current?.focus();
       return;
     }
 
@@ -144,14 +160,32 @@ export function AddNodeDrawer({
             <>
               <label className="adm-field">
                 <span>{t("admin.v2.runtime_isolation")}</span>
-                <select value={sandboxMode} onChange={(event) => setSandboxMode(event.target.value as "boxlite" | "none")} disabled={isBusy}>
+                <select name="add-node-sandbox" value={sandboxMode} onChange={(event) => setSandboxMode(event.target.value as "boxlite" | "none")} disabled={isBusy}>
                   <option value="boxlite">{t("admin.v2.node_sandbox_boxlite")}</option>
                   <option value="none">{t("admin.v2.node_sandbox_host")}</option>
                 </select>
               </label>
               <label className="adm-field">
                 <span>{t("workspace_label")}</span>
-                <input value={workspacePath} onChange={(event) => setWorkspacePath(event.target.value)} placeholder="/Users/alice/project" disabled={isBusy} />
+                <input
+                  ref={workspacePathRef}
+                  name="add-node-workspace-path"
+                  autoComplete="off"
+                  value={workspacePath}
+                  onChange={(event) => {
+                    setWorkspacePath(event.target.value);
+                    clearFieldError("workspacePath");
+                  }}
+                  placeholder="/Users/alice/project"
+                  disabled={isBusy}
+                  aria-invalid={Boolean(fieldErrors.workspacePath) || undefined}
+                  aria-describedby={fieldErrors.workspacePath ? "add-node-workspace-path-error" : undefined}
+                />
+                {fieldErrors.workspacePath ? (
+                  <span id="add-node-workspace-path-error" className="text-sm text-danger" role="alert">
+                    {fieldErrors.workspacePath}
+                  </span>
+                ) : null}
               </label>
               <p className="adm-form-hint">{t("admin.v2.workspace_path_hint")}</p>
             </>
@@ -203,10 +237,19 @@ export function AddNodeDrawer({
             <span id={employeeLabelId}>{t("admin.employee")}</span>
             <Select
               value={employeeId || undefined}
-              onValueChange={(value) => setEmployeeId(value ?? "")}
+              onValueChange={(value) => {
+                setEmployeeId(value ?? "");
+                clearFieldError("employeeId");
+              }}
               disabled={employees.length === 0}
             >
-              <SelectTrigger className="w-full mono" aria-labelledby={employeeLabelId}>
+              <SelectTrigger
+                ref={employeeTriggerRef}
+                className="w-full mono"
+                aria-labelledby={employeeLabelId}
+                aria-invalid={Boolean(fieldErrors.employeeId) || undefined}
+                aria-describedby={fieldErrors.employeeId ? "add-node-employee-error" : undefined}
+              >
                 <SelectValue
                   placeholder={employees.length === 0 ? t("admin.no_employees") : t("admin.select_employee")}
                 />
@@ -222,6 +265,11 @@ export function AddNodeDrawer({
                 ))}
               </SelectContent>
             </Select>
+            {fieldErrors.employeeId ? (
+              <span id="add-node-employee-error" className="text-sm text-danger" role="alert">
+                {fieldErrors.employeeId}
+              </span>
+            ) : null}
           </div>
 
           {!selectedEmployee ? (

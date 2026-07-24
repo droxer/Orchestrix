@@ -11,6 +11,7 @@ import { Input } from "../ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { useDialogs } from "../ui/DialogProvider";
 import { Drawer } from "../ui/Drawer";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 
 export function TeamDrawer({
   open,
@@ -42,6 +43,18 @@ export function TeamDrawer({
     [employeeAgents],
   );
   const busy = createTeamMutation.isPending || updateTeamMutation.isPending || deleteTeamMutation.isPending;
+  const hasUnsavedChanges = open && (
+    name.trim() !== (team?.name ?? "").trim()
+    || leadId !== (team?.leadAgentId ?? "")
+    || memberIds.length !== (team?.memberAgentIds ?? []).length
+    || memberIds.some((id) => !(team?.memberAgentIds ?? []).includes(id))
+  );
+  const confirmDiscardChanges = useUnsavedChangesGuard(hasUnsavedChanges && !busy);
+
+  async function requestClose() {
+    if (busy) return;
+    if (await confirmDiscardChanges()) onClose();
+  }
 
   function toggleMember(agentId: string) {
     setMemberIds((current) => {
@@ -77,7 +90,7 @@ export function TeamDrawer({
   async function remove() {
     if (!team) return;
     if (!(await confirm({
-      title: t("teams.delete_title"),
+      title: t("teams.delete_title", { name: team.name }),
       message: t("teams.delete_message", { name: team.name }),
       confirmLabel: t("teams.delete"),
       tone: "danger",
@@ -91,11 +104,11 @@ export function TeamDrawer({
   }
 
   return (
-    <Drawer open={open} onClose={onClose} title={team ? t("teams.edit") : t("teams.add")} subtitle={t("teams.drawer_subtitle")} width={500} closeLabel={t("dialog.cancel")} bodyClassName="adm-drawer-body--column">
+    <Drawer open={open} onClose={() => { void requestClose(); }} title={team ? t("teams.edit") : t("teams.add")} subtitle={t("teams.drawer_subtitle")} width={500} closeLabel={t("dialog.cancel")} bodyClassName="adm-drawer-body--column">
       <form className="adm-form team-drawer-form" onSubmit={(event) => void submit(event)}>
         <label className="adm-field">
           <span>{t("teams.name")}</span>
-          <Input value={name} required onChange={(event) => setName(event.target.value)} />
+          <Input name="team-name" autoComplete="off" value={name} required onChange={(event) => setName(event.target.value)} />
         </label>
         <fieldset className="adm-field team-member-fieldset">
           <legend>{t("teams.members")}</legend>
@@ -125,7 +138,7 @@ export function TeamDrawer({
         </label>
         <div className="adm-form-actions">
           {team ? <Button size="cta" type="button" variant="destructive" className="adm-form-actions-leading" onClick={() => void remove()} disabled={busy}>{t("teams.delete")}</Button> : null}
-          <Button size="cta" type="button" variant="outline" onClick={onClose} disabled={busy}>{t("dialog.cancel")}</Button>
+          <Button size="cta" type="button" variant="outline" onClick={() => { void requestClose(); }} disabled={busy}>{t("dialog.cancel")}</Button>
           <Button size="cta" type="submit" disabled={busy || !name.trim() || !leadId || memberIds.length === 0}>{busy ? t("admin.saving") : team ? t("teams.save") : t("teams.create")}</Button>
         </div>
       </form>

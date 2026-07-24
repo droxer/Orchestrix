@@ -51,6 +51,7 @@ export function AgentPlacementBadge({
         <span className="agent-placement-plain-name" translate="no">
           {description.nodeName}
         </span>
+        <span className="sr-only">{statusLabel}</span>
       </span>
     );
   }
@@ -66,6 +67,7 @@ export function AgentPlacementBadge({
       <span className="agent-placement-badge-name" translate="no">
         {description.nodeName}
       </span>
+      <span className="sr-only">{statusLabel}</span>
       <span className="agent-placement-badge-kind">{ownershipLabel}</span>
       {showsSandbox ? (
         <span className="agent-placement-badge-sandbox">{sandboxLabel}</span>

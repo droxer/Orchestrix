@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { ActionAdd, ActionApprove, AdminInbox } from "../icons";
 import { assignControlPanelDaemonNode, createControlPanelDaemonNode, createManagedNode } from "../../api";
@@ -53,7 +53,15 @@ export function AssignNodeDrawer({
   const [sandboxMode, setSandboxMode] = useState<"boxlite" | "none">("boxlite");
   const [workspacePath, setWorkspacePath] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{
+    employeeId?: string;
+    nodeId?: string;
+    workspacePath?: string;
+  }>({});
   const [isBusy, setIsBusy] = useState(false);
+  const employeeTriggerRef = useRef<HTMLButtonElement>(null);
+  const nodeListRef = useRef<HTMLUListElement>(null);
+  const workspacePathRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) {
@@ -64,9 +72,14 @@ export function AssignNodeDrawer({
       setSandboxMode("boxlite");
       setWorkspacePath("");
       setError(null);
+      setFieldErrors({});
       setIsBusy(false);
     }
   }, [open, defaultEmployeeId]);
+
+  function clearFieldError(field: "employeeId" | "nodeId" | "workspacePath") {
+    setFieldErrors((current) => (current[field] ? { ...current, [field]: undefined } : current));
+  }
 
   const employeeLocked = Boolean(defaultEmployeeId);
   const selectedEmployee = useMemo(
@@ -81,9 +94,22 @@ export function AssignNodeDrawer({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextEmployeeId = employeeId.trim().replace(/^@/, "");
-    if (!nextEmployeeId) return setError(t("admin.employee_required"));
-    if (!creatingNode && !nodeId) return setError(t("admin.node_required"));
-    if (creatingNode && !isManaged && !workspacePath.trim()) return setError(t("admin.v2.workspace_path_required"));
+    const nextFieldErrors: typeof fieldErrors = {};
+    if (!nextEmployeeId) nextFieldErrors.employeeId = t("admin.employee_required");
+    if (!creatingNode && !nodeId) nextFieldErrors.nodeId = t("admin.node_required");
+    if (creatingNode && !isManaged && !workspacePath.trim()) nextFieldErrors.workspacePath = t("admin.v2.workspace_path_required");
+    setFieldErrors(nextFieldErrors);
+    const firstInvalid = nextFieldErrors.employeeId
+      ? employeeTriggerRef
+      : nextFieldErrors.nodeId
+        ? nodeListRef
+        : nextFieldErrors.workspacePath
+          ? workspacePathRef
+          : null;
+    if (firstInvalid) {
+      firstInvalid.current?.focus();
+      return;
+    }
 
     setIsBusy(true);
     setError(null);
@@ -182,10 +208,19 @@ export function AssignNodeDrawer({
               <span id={employeeLabelId}>{t("admin.employee")}</span>
               <Select
                 value={employeeId || undefined}
-                onValueChange={(value) => setEmployeeId(value ?? "")}
+                onValueChange={(value) => {
+                  setEmployeeId(value ?? "");
+                  clearFieldError("employeeId");
+                }}
                 disabled={employees.length === 0}
               >
-                <SelectTrigger className="w-full mono" aria-labelledby={employeeLabelId}>
+                <SelectTrigger
+                  ref={employeeTriggerRef}
+                  className="w-full mono"
+                  aria-labelledby={employeeLabelId}
+                  aria-invalid={Boolean(fieldErrors.employeeId) || undefined}
+                  aria-describedby={fieldErrors.employeeId ? "assign-node-employee-error" : undefined}
+                >
                   <SelectValue
                     placeholder={
                       employees.length === 0
@@ -205,6 +240,11 @@ export function AssignNodeDrawer({
                   ))}
                 </SelectContent>
               </Select>
+              {fieldErrors.employeeId ? (
+                <span id="assign-node-employee-error" className="text-sm text-danger" role="alert">
+                  {fieldErrors.employeeId}
+                </span>
+              ) : null}
             </div>
           </section>
         )}
@@ -221,8 +261,12 @@ export function AssignNodeDrawer({
 
           {hasNodes ? (
             <ul
+              ref={nodeListRef}
               className="adm-assign-node-list"
               aria-label={t("admin.assign_node")}
+              tabIndex={-1}
+              aria-invalid={Boolean(fieldErrors.nodeId) || undefined}
+              aria-describedby={fieldErrors.nodeId ? "assign-node-node-error" : undefined}
             >
               {unassignedNodes.map((node) => {
                 const status = visualStatus(node);
@@ -240,6 +284,7 @@ export function AssignNodeDrawer({
                         onChange={() => {
                           setNodeId(node.id);
                           setCreateNew(false);
+                          clearFieldError("nodeId");
                         }}
                       />
                       <span className={`adm-assign-node ${isSelected ? "selected" : ""}`}>
@@ -290,6 +335,7 @@ export function AssignNodeDrawer({
                     onChange={() => {
                       setCreateNew(true);
                       setNodeId("");
+                      clearFieldError("nodeId");
                     }}
                   />
                   <span className={`adm-assign-node ${createNew ? "selected" : ""}`}>
@@ -322,6 +368,11 @@ export function AssignNodeDrawer({
               </div>
             </div>
           )}
+          {fieldErrors.nodeId ? (
+            <span id="assign-node-node-error" className="text-sm text-danger" role="alert">
+              {fieldErrors.nodeId}
+            </span>
+          ) : null}
         </section>
 
         {creatingNode ? (
@@ -341,14 +392,32 @@ export function AssignNodeDrawer({
               <>
                 <label className="adm-field">
                   <span>{t("admin.v2.runtime_isolation")}</span>
-                  <select value={sandboxMode} onChange={(event) => setSandboxMode(event.target.value as "boxlite" | "none")} disabled={isBusy}>
+                  <select name="assign-node-sandbox" value={sandboxMode} onChange={(event) => setSandboxMode(event.target.value as "boxlite" | "none")} disabled={isBusy}>
                     <option value="boxlite">{t("admin.v2.node_sandbox_boxlite")}</option>
                     <option value="none">{t("admin.v2.node_sandbox_host")}</option>
                   </select>
                 </label>
                 <label className="adm-field">
                   <span>{t("workspace_label")}</span>
-                  <input value={workspacePath} onChange={(event) => setWorkspacePath(event.target.value)} placeholder="/Users/alice/project" disabled={isBusy} />
+                  <input
+                    ref={workspacePathRef}
+                    name="assign-node-workspace-path"
+                    autoComplete="off"
+                    value={workspacePath}
+                    onChange={(event) => {
+                      setWorkspacePath(event.target.value);
+                      clearFieldError("workspacePath");
+                    }}
+                    placeholder="/Users/alice/project"
+                    disabled={isBusy}
+                    aria-invalid={Boolean(fieldErrors.workspacePath) || undefined}
+                    aria-describedby={fieldErrors.workspacePath ? "assign-node-workspace-path-error" : undefined}
+                  />
+                  {fieldErrors.workspacePath ? (
+                    <span id="assign-node-workspace-path-error" className="text-sm text-danger" role="alert">
+                      {fieldErrors.workspacePath}
+                    </span>
+                  ) : null}
                 </label>
               </>
             ) : null}

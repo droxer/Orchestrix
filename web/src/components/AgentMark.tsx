@@ -40,7 +40,6 @@ export function AgentMark({ agent, size = 16, className }: AgentMarkProps) {
       width={size}
       height={size}
       className={className}
-      role="img"
       aria-hidden="true"
       fill="currentColor"
       fillRule="evenodd"

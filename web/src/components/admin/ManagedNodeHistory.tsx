@@ -45,11 +45,16 @@ export function ManagedNodeHistory({ nodes, onDeletePermanently }: ManagedNodeHi
   return (
     <section className="adm-node-history" aria-labelledby="managed-node-history-title">
       <header className="adm-node-history-head">
-        <div>
+        <div className="adm-node-history-title-row">
           <h2 id="managed-node-history-title">{t("admin.v2.history_title")}</h2>
-          <p>{t("admin.v2.history_description")}</p>
+          <span
+            className="adm-node-history-count mono"
+            aria-label={t("admin.v2.history_count", { count: historical.length })}
+          >
+            {historical.length}
+          </span>
         </div>
-        <span className="adm-node-history-count mono">{historical.length}</span>
+        <p>{t("admin.v2.history_description")}</p>
       </header>
 
       <ul className="adm-node-history-list">
@@ -69,9 +74,9 @@ export function ManagedNodeHistory({ nodes, onDeletePermanently }: ManagedNodeHi
               {t("admin.v2.history_deleted", { time: formatRelativeTime(node.updatedAt, t) })}
             </time>
             <Button
-              variant="ghost"
+              variant="destructive"
               type="button"
-              className="adm-node-history-delete danger"
+              className="adm-node-history-delete"
               disabled={pendingId === node.id}
               onClick={() => void handleDelete(node)}
             >

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ComponentProps } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
 import { ActionApprove, ActionEdit, ActionRemove, ActionToggle, AdminDelete } from "./icons";
 import {
   deleteAgentPlacement,
@@ -81,18 +82,44 @@ export function AgentProfilePanel({
   const [instructionsDraft, setInstructionsDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [renameError, setRenameError] = useState<string | null>(null);
+  const [instructionsError, setInstructionsError] = useState<string | null>(null);
   const [pendingPlacementId, setPendingPlacementId] = useState<string | null>(null);
+
+  const dirtyDraft = (renaming && nameDraft.trim() !== agent.displayName.trim())
+    || (editingInstructions && instructionsDraft.trim() !== (agent.instructions ?? "").trim());
+  const dirtyDraftRef = useRef(false);
+  dirtyDraftRef.current = dirtyDraft;
+  useUnsavedChangesGuard(dirtyDraft && !saving);
 
   const previousAgentIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (previousAgentIdRef.current === agent.id) return;
+    const hadDirtyDraft = dirtyDraftRef.current;
     previousAgentIdRef.current = agent.id;
-    setRenaming(false);
-    setEditingInstructions(false);
-    setError(null);
-    setSaving(false);
-    setPendingPlacementId(null);
-  }, [agent.id]);
+    const resetEditingState = () => {
+      setRenaming(false);
+      setEditingInstructions(false);
+      setError(null);
+      setRenameError(null);
+      setInstructionsError(null);
+      setSaving(false);
+      setPendingPlacementId(null);
+    };
+    // Hold the draft until the owner confirms the discard — switching rows
+    // must not silently drop unsaved rename/instruction edits.
+    if (!hadDirtyDraft) {
+      resetEditingState();
+      return;
+    }
+    void confirm({
+      title: t("unsaved.title"),
+      message: t("unsaved.message"),
+      confirmLabel: t("unsaved.confirm"),
+      cancelLabel: t("dialog.cancel"),
+      tone: "danger",
+    }).then(() => resetEditingState());
+  }, [agent.id, confirm, t]);
 
   async function patchAgent(patch: Parameters<typeof updateEmployeeAgent>[1]) {
     if (canManage) {

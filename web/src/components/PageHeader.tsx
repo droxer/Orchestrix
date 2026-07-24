@@ -49,7 +49,7 @@ export function PageHeader({
               "m-0 text-balance text-ink",
               titleVariant === "display"
                 ? "page-header-title--display"
-                : "text-lg font-semibold leading-[1.25]",
+                : "page-header-title--inline",
             )}
           >
             {title}

@@ -98,7 +98,7 @@
   .mobile-topbar-chat-tools {
     display: inline-flex;
     align-items: center;
-    gap: 2px;
+    gap: var(--sp-1);
     justify-self: end;
   }
 
@@ -116,7 +116,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 2px;
+    gap: var(--sp-1);
     min-width: 0;
     min-height: var(--touch-target);
     padding-inline: var(--sp-2);
@@ -226,8 +226,8 @@
     flex-direction: row;
     align-items: stretch;
     gap: 0;
-    min-height: 58px;
-    padding: 4px max(env(safe-area-inset-right), var(--sp-2)) max(env(safe-area-inset-bottom), 4px) max(env(safe-area-inset-left), var(--sp-2));
+    min-height: calc(var(--control-h) + var(--sp-4));
+    padding: var(--sp-1) max(env(safe-area-inset-right), var(--sp-2)) max(env(safe-area-inset-bottom), var(--sp-1)) max(env(safe-area-inset-left), var(--sp-2));
     border-top: 1px solid var(--line-1);
     border-right: 0;
     background: color-mix(in srgb, var(--surface-0) 94%, transparent);
@@ -255,7 +255,7 @@
     flex: 1 0 auto;
     flex-direction: row;
     align-items: stretch;
-    gap: 2px;
+    gap: var(--sp-1);
     min-width: max-content;
     width: 100%;
   }
@@ -270,15 +270,15 @@
     position: relative;
     /* Equal-width tabs that shrink to share the row, so all destinations stay
        visible without horizontal scroll on narrow phones (≤360px). Labels
-       ellipsize (below); the 50px height keeps a comfortable touch target. */
+       ellipsize (below); the height keeps a comfortable touch target. */
     width: auto;
     min-width: 0;
-    height: 50px;
+    height: calc(var(--control-h) + var(--sp-2));
     flex: 1 1 0;
     flex-direction: column;
     justify-content: center;
-    gap: 2px;
-    padding: 3px 2px;
+    gap: var(--sp-1);
+    padding: var(--sp-1);
     text-align: center;
     white-space: normal;
   }
@@ -288,7 +288,7 @@
     position: absolute;
     top: 0;
     left: 50%;
-    width: 20px;
+    width: var(--sp-5);
     height: 2px;
     border-radius: 0 0 var(--r-2) var(--r-2);
     background: var(--action);
@@ -315,13 +315,13 @@
     animation: relay-rise var(--t-fast) var(--ease) forwards;
   }
 
-  .messenger-shell .sidenav-nav .sidenav-btn:nth-child(1) { animation-delay: 40ms; }
-  .messenger-shell .sidenav-nav .sidenav-btn:nth-child(2) { animation-delay: 80ms; }
-  .messenger-shell .sidenav-nav .sidenav-btn:nth-child(3) { animation-delay: 120ms; }
-  .messenger-shell .sidenav-nav .sidenav-btn:nth-child(4) { animation-delay: 160ms; }
-  .messenger-shell .sidenav-nav .sidenav-btn:nth-child(5) { animation-delay: 200ms; }
-  .messenger-shell .sidenav-nav .sidenav-btn:nth-child(6) { animation-delay: 240ms; }
-  .messenger-shell .sidenav-nav .sidenav-btn:nth-child(7) { animation-delay: 280ms; }
+  .messenger-shell .sidenav-nav .sidenav-btn:nth-child(1) { animation-delay: calc(var(--t-fast) * 0.25); }
+  .messenger-shell .sidenav-nav .sidenav-btn:nth-child(2) { animation-delay: calc(var(--t-fast) * 0.5); }
+  .messenger-shell .sidenav-nav .sidenav-btn:nth-child(3) { animation-delay: calc(var(--t-fast) * 0.75); }
+  .messenger-shell .sidenav-nav .sidenav-btn:nth-child(4) { animation-delay: var(--t-fast); }
+  .messenger-shell .sidenav-nav .sidenav-btn:nth-child(5) { animation-delay: calc(var(--t-fast) * 1.25); }
+  .messenger-shell .sidenav-nav .sidenav-btn:nth-child(6) { animation-delay: calc(var(--t-fast) * 1.5); }
+  .messenger-shell .sidenav-nav .sidenav-btn:nth-child(7) { animation-delay: calc(var(--t-fast) * 1.75); }
 
   /* Admin Channels/Admin collapse into a More overflow so five primary tabs
      fit a 390pt phone without horizontal scroll. */
@@ -420,7 +420,7 @@
   }
 
   /* Keep the agent picker but drop the name — the mark alone identifies
-     the agent and leaves room for the title on narrow screens. */
+     the agent and keeps the composer footer compact on narrow screens. */
   .chat-agent-select .chat-agent-select-name {
     display: none;
   }

@@ -1,9 +1,12 @@
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { AgentTaskMode, EmployeeAgent } from "../../types";
 import { isLogicalAgentRoutable } from "../../lib/agentDisplayNames";
 import { ActionApprove, ActionHandoff, ActionRoute } from "../icons";
 import { Button } from "../ui/button";
 import { useDialogs } from "../ui/DialogProvider";
+
+type DecisionAction = "approve" | "reject" | "rerun" | "mark_done" | "handoff";
 
 export function DecisionBar({ logicalAgents, sendDecision, handoffOpen, setHandoffOpen, handoffAgentId, setHandoffAgentId, handoffMode, setHandoffMode, handoffNote, setHandoffNote, sendHandoff }: {
   logicalAgents: EmployeeAgent[];
@@ -16,10 +19,30 @@ export function DecisionBar({ logicalAgents, sendDecision, handoffOpen, setHando
 }) {
   const { t } = useTranslation();
   const { confirm } = useDialogs();
+  const approveRef = useRef<HTMLButtonElement>(null);
+  const [pendingAction, setPendingAction] = useState<DecisionAction | null>(null);
+  const pendingLabel = t("decision.pending", { defaultValue: "Working…" });
+
+  // The bar mounts when a turn starts awaiting a decision; move keyboard and
+  // screen-reader focus to its primary action so it is not missed.
+  useEffect(() => {
+    approveRef.current?.focus();
+  }, []);
+
+  const runAction = async (action: DecisionAction, run: () => Promise<void>) => {
+    if (pendingAction) return;
+    setPendingAction(action);
+    try {
+      await run();
+    } finally {
+      setPendingAction(null);
+    }
+  };
 
   // Reject discards the turn, so it confirms first — approve/rerun/mark_done
   // stay one-click since they are recoverable.
   const handleReject = async () => {
+    if (pendingAction) return;
     const ok = await confirm({
       title: t("decision.reject_confirm_title"),
       message: t("decision.reject_confirm_message"),
@@ -27,17 +50,19 @@ export function DecisionBar({ logicalAgents, sendDecision, handoffOpen, setHando
       tone: "danger",
     });
     if (!ok) return;
-    await sendDecision("reject");
+    await runAction("reject", () => sendDecision("reject"));
   };
+
+  const busy = pendingAction !== null;
 
   return (
     <>
       <div className="decision-bar">
-        <Button variant="ghost" type="button" onClick={() => void sendDecision("approve")}><ActionApprove size={14} /> {t("decision.approve")}</Button>
-        <Button variant="ghost" type="button" onClick={() => void sendDecision("rerun")}>{t("decision.rerun")}</Button>
-        <Button variant="ghost" type="button" onClick={() => void sendDecision("mark_done")}>{t("decision.mark_done")}</Button>
-        <Button variant="ghost" type="button" className="danger-soft" onClick={() => void handleReject()}>{t("decision.reject")}</Button>
-        <Button variant="ghost" type="button" className="primary" aria-controls={handoffOpen ? "handoff-panel" : undefined} aria-expanded={handoffOpen} onClick={() => setHandoffOpen(!handoffOpen)}>
+        <Button variant="default" type="button" ref={approveRef} disabled={busy} aria-busy={pendingAction === "approve" || undefined} onClick={() => void runAction("approve", () => sendDecision("approve"))}><ActionApprove size={14} /> {pendingAction === "approve" ? pendingLabel : t("decision.approve")}</Button>
+        <Button variant="ghost" type="button" disabled={busy} aria-busy={pendingAction === "rerun" || undefined} onClick={() => void runAction("rerun", () => sendDecision("rerun"))}>{pendingAction === "rerun" ? pendingLabel : t("decision.rerun")}</Button>
+        <Button variant="ghost" type="button" disabled={busy} aria-busy={pendingAction === "mark_done" || undefined} onClick={() => void runAction("mark_done", () => sendDecision("mark_done"))}>{pendingAction === "mark_done" ? pendingLabel : t("decision.mark_done")}</Button>
+        <Button variant="destructive" type="button" disabled={busy} aria-busy={pendingAction === "reject" || undefined} onClick={() => void handleReject()}>{pendingAction === "reject" ? pendingLabel : t("decision.reject")}</Button>
+        <Button variant="ghost" type="button" disabled={busy} aria-controls={handoffOpen ? "handoff-panel" : undefined} aria-expanded={handoffOpen} onClick={() => setHandoffOpen(!handoffOpen)}>
           <ActionHandoff size={14} /> {t("decision.handoff")}
         </Button>
       </div>
@@ -73,8 +98,8 @@ export function DecisionBar({ logicalAgents, sendDecision, handoffOpen, setHando
             <input id="handoff-note" name="handoff-note" autoComplete="off" placeholder={t("handoff.note_placeholder")} value={handoffNote} onChange={(e) => setHandoffNote(e.target.value)} />
           </div>
           <div className="handoff-actions">
-            <Button variant="ghost" type="button" onClick={() => setHandoffOpen(false)}>{t("handoff.cancel")}</Button>
-            <Button variant="ghost" type="button" className="primary" onClick={() => void sendHandoff()}>{t("handoff.send")}</Button>
+            <Button variant="ghost" type="button" disabled={busy} onClick={() => setHandoffOpen(false)}>{t("handoff.cancel")}</Button>
+            <Button variant="default" type="button" disabled={busy} aria-busy={pendingAction === "handoff" || undefined} onClick={() => void runAction("handoff", sendHandoff)}>{pendingAction === "handoff" ? pendingLabel : t("handoff.send")}</Button>
           </div>
         </div>
       ) : null}

@@ -89,6 +89,16 @@ export function Drawer({
     return () => registerDrawer(drawerId, layer, false);
   }, [drawerId, layer, visible, closing]);
 
+  // When a higher drawer opens, this panel becomes inert to AT — focus must
+  // not stay inside it. The new top drawer's useModalDrawer autofocus runs in
+  // the same commit, so release focus here only if it still points inside.
+  useEffect(() => {
+    if (!underlay) return;
+    const panel = panelRef.current;
+    const active = document.activeElement as HTMLElement | null;
+    if (panel && active && panel.contains(active)) active.blur();
+  }, [underlay, panelRef]);
+
   if (!visible || typeof document === "undefined") return null;
 
   const backdropClass = [

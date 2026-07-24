@@ -33,10 +33,25 @@
   flex: 1;
   border: 0;
   outline: 0;
+  border-radius: var(--r-1);
   background: transparent;
   color: var(--ink-1);
   font-family: var(--font-sans);
   font-size: var(--fs-3);
+}
+
+/* Standalone fallback: the wrapper normally carries the ring via
+   :focus-within, but an input used outside it still needs its own. The
+   :focus-within rules below strip it again when the wrapper is present so
+   the two rings never double up. */
+.relay-search input:focus-visible,
+.adm-search-input:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+
+.relay-search:focus-within input:focus-visible,
+.adm-search:focus-within .adm-search-input:focus-visible {
+  box-shadow: none;
 }
 
 .relay-search input::placeholder,
@@ -113,7 +128,12 @@
 
 .employee-avatar.tone-good::after    { background: var(--ok); }
 .employee-avatar.tone-info::after    { background: var(--info); }
-.employee-avatar.tone-bad::after     { background: var(--err); }
+/* Bad shares its brightness with --action/--ink-1; use the hollow-ring
+   shape (same as fleet presence + node status dots) instead of a fill. */
+.employee-avatar.tone-bad::after {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--err);
+}
 .employee-avatar.tone-warn::after    { background: var(--warn); }
 .employee-avatar.tone-neutral::after { background: var(--ink-4); }
 

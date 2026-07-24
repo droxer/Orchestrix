@@ -14,6 +14,7 @@ import { TriangleAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ActionRemove } from "../icons";
 
 // Promise-based confirm/prompt that replaces the native window.confirm /
 // window.prompt. Those drop OS chrome into a precision/monochrome product and
@@ -139,7 +140,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
       // Minimal focus trap — cycle Tab within the modal's focusables.
       if (event.key === "Tab") {
         const focusables = dialogRef.current?.querySelectorAll<HTMLElement>(
-          'button, input, select, textarea, [href], [tabindex]:not([tabindex="-1"])',
+          'input:not([disabled]), button:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
         );
         if (!focusables || focusables.length === 0) return;
         const first = focusables[0];
@@ -167,6 +168,11 @@ export function DialogProvider({ children }: { children: ReactNode }) {
     };
   }, [request, settle]);
 
+  const dismissAnnouncement = useCallback(() => {
+    setToastExiting(false);
+    setAnnouncement(null);
+  }, []);
+
   useEffect(() => {
     if (!announcement) return;
     const exitTimer = window.setTimeout(() => setToastExiting(true), TOAST_VISIBLE_MS - TOAST_EXIT_MS);
@@ -190,11 +196,20 @@ export function DialogProvider({ children }: { children: ReactNode }) {
           key={announcement.id}
           className={`dialog-toast${toastExiting ? " dialog-toast--exit" : ""}`}
           data-tone={announcement.tone}
-          role="status"
-          aria-live={announcement.tone === "error" ? "assertive" : "polite"}
+          role={announcement.tone === "error" ? "alert" : "status"}
+          aria-live={announcement.tone === "error" ? undefined : "polite"}
           aria-atomic="true"
         >
-          {announcement.message}
+          <span className="dialog-toast-message">{announcement.message}</span>
+          <button
+            type="button"
+            className="dialog-toast-close"
+            aria-label={t("toast.dismiss")}
+            title={t("toast.dismiss")}
+            onClick={dismissAnnouncement}
+          >
+            <ActionRemove size={14} aria-hidden="true" />
+          </button>
         </div>
       ) : null}
       {request && typeof document !== "undefined"
@@ -264,7 +279,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                   </Button>
                   {request.kind === "confirm" ? (
                     <Button
-                      variant="default"
+                      variant={request.opts.tone === "danger" ? "destructive" : "default"}
                       data-dialog-default={request.opts.tone === "danger" ? undefined : ""}
                       onClick={() => settle(true)}
                     >

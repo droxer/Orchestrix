@@ -1,3 +1,9 @@
+// Canonical theme-color surface hexes (single source; consumed by layout metadata + inline script).
+export const THEME_COLORS = {
+  light: "#f7f8f9",
+  dark: "#101214",
+} as const;
+
 export type Theme = "light" | "dark" | "system";
 export type ResolvedTheme = Exclude<Theme, "system">;
 
@@ -58,10 +64,7 @@ export function resolveTheme(theme: Theme): ResolvedTheme {
   return theme === "system" ? systemTheme() : theme;
 }
 
-const THEME_COLOR_BY_THEME: Record<ResolvedTheme, string> = {
-  light: "#f7f8f9",
-  dark: "#101214",
-};
+const THEME_COLOR_BY_THEME: Record<ResolvedTheme, string> = THEME_COLORS;
 
 export function themeColorForTheme(theme: Theme): string {
   return THEME_COLOR_BY_THEME[resolveTheme(theme)];
@@ -88,6 +91,5 @@ export function applyTheme(theme: Theme): void {
   if (typeof document === "undefined") return;
   const resolved = resolveTheme(theme);
   document.documentElement.setAttribute("data-theme", resolved);
-  document.documentElement.classList.toggle("dark", resolved === "dark");
   syncThemeColor(theme);
 }

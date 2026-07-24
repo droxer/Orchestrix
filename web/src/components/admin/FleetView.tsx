@@ -17,7 +17,7 @@ import { NodeRow } from "./NodeRow";
 import { NodeProfileBadges } from "./NodeProfileBadges";
 import { AdminLayoutToggle, type AdminLayout } from "./AdminLayoutToggle";
 
-type FleetFilter = "all" | "ready" | "running" | "provisioning" | "failed" | "unassigned";
+type FleetFilter = "all" | "ready" | "running" | "provisioning" | "failed" | "stopped" | "unassigned";
 
 interface FleetViewProps {
   nodes: ControlPanelDaemonNodeRecord[];
@@ -30,7 +30,7 @@ interface FleetViewProps {
   onAddNode?: () => void;
 }
 
-const FILTERS: FleetFilter[] = ["all", "ready", "running", "provisioning", "failed", "unassigned"];
+const FILTERS: FleetFilter[] = ["all", "ready", "running", "provisioning", "failed", "stopped", "unassigned"];
 
 function parseFleetFilter(value: string | null): FleetFilter {
   return FILTERS.includes(value as FleetFilter) ? value as FleetFilter : "all";
@@ -56,6 +56,7 @@ function matchesFilter(node: ControlPanelDaemonNodeRecord, filter: FleetFilter):
   if (filter === "ready") return status === "ready";
   if (filter === "running") return status === "running";
   if (filter === "provisioning") return status === "provisioning";
+  if (filter === "stopped") return status === "stopped";
   return false;
 }
 
@@ -79,6 +80,7 @@ export function FleetView({ nodes, storedTokens, layout, onLayoutChange, onRevea
       running: 0,
       provisioning: 0,
       failed: 0,
+      stopped: 0,
       unassigned: 0,
     };
     for (const node of nodes) {
@@ -86,6 +88,7 @@ export function FleetView({ nodes, storedTokens, layout, onLayoutChange, onRevea
       if (matchesFilter(node, "running")) result.running += 1;
       if (matchesFilter(node, "provisioning")) result.provisioning += 1;
       if (matchesFilter(node, "failed")) result.failed += 1;
+      if (matchesFilter(node, "stopped")) result.stopped += 1;
       if (!node.employeeId) result.unassigned += 1;
     }
     return result;

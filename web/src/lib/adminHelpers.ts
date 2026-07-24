@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import type { AgentName, ControlPanelDaemonNodeRecord, EmployeeRecord, LogicalAgentAvailability, Tone } from "../types.js";
+import type { AgentName, ControlPanelDaemonNodeRecord, EmployeeAgent, EmployeeRecord, LogicalAgentAvailability, Tone } from "../types.js";
 
 export const ADMIN_AGENTS_KEY = ["admin", "agents"] as const;
 
@@ -101,9 +101,14 @@ export function agentAvailabilityTone(availability: LogicalAgentAvailability): T
   return "bad";
 }
 
-export function agentStatusTone(agentStatus: string): "good" | "bad" | "neutral" {
+/** Runtime-mark tone for a node's agent. Unknown ("no signal yet") reads as
+    warn so it stays distinct from disabled — a deliberate operator choice
+    (calm neutral), passed via options.disabled by callers that know it. */
+export function agentStatusTone(agentStatus: string, options?: { disabled?: boolean }): Tone {
+  if (options?.disabled) return "neutral";
   if (agentStatus === "ready") return "good";
   if (agentStatus === "failed") return "bad";
+  if (agentStatus === "unknown") return "warn";
   return "neutral";
 }
 
@@ -133,6 +138,7 @@ export interface EmployeeNodeSummary {
   nodeCount: number;
   readyCount: number;
   runningCount: number;
+  failedCount: number;
   nodes: ControlPanelDaemonNodeRecord[];
 }
 
@@ -158,6 +164,10 @@ export function buildEmployeeSummaries(
     const employeeNodes = nodesByEmployee.get(id) ?? [];
     const readyCount = employeeNodes.filter((node) => visualStatus(node) === "ready").length;
     const runningCount = employeeNodes.filter((node) => !isStale(node) && node.status === "running").length;
+    const failedCount = employeeNodes.filter((node) => {
+      const status = visualStatus(node);
+      return status === "failed" || status === "stale";
+    }).length;
     return {
       id,
       displayName: employee?.displayName || id,
@@ -167,9 +177,30 @@ export function buildEmployeeSummaries(
       nodeCount: employeeNodes.length,
       readyCount,
       runningCount,
+      failedCount,
       nodes: employeeNodes,
     };
   });
+}
+
+// Agents are placed on computers, not owned by employees. An agent belongs to a
+// set of nodes when one of its live placements runs on one of them — this is the
+// only correct way to associate agents with an employee (via the employee's
+// nodes), never agent.employeeId.
+export function agentsOnNodes(nodeIds: Iterable<string>, agents: EmployeeAgent[]): EmployeeAgent[] {
+  const ids = new Set(nodeIds);
+  return agents.filter(
+    (agent) =>
+      !agent.deletedAt &&
+      agent.placements.some(
+        (placement) => placement.desiredState !== "removed" && ids.has(placement.daemonNodeId),
+      ),
+  );
+}
+
+/** Agents running on the computers a given employee owns. */
+export function agentsForEmployee(member: EmployeeNodeSummary, agents: EmployeeAgent[]): EmployeeAgent[] {
+  return agentsOnNodes(member.nodes.map((node) => node.id), agents);
 }
 
 export function readStoredNodeTokens(): StoredNodeTokenMap {

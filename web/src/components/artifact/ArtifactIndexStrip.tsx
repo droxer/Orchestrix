@@ -59,6 +59,13 @@ export function ArtifactIndexStrip({
 
   const handleMouseEnter = useCallback(() => onExpandedChange(true), [onExpandedChange]);
   const handleMouseLeave = useCallback(() => onExpandedChange(false), [onExpandedChange]);
+  const handleFocus = useCallback(() => onExpandedChange(true), [onExpandedChange]);
+  const handleBlur = useCallback(
+    (event: React.FocusEvent<HTMLElement>) => {
+      if (!event.currentTarget.contains(event.relatedTarget as Node | null)) onExpandedChange(false);
+    },
+    [onExpandedChange],
+  );
 
   return (
     <nav
@@ -66,9 +73,21 @@ export function ArtifactIndexStrip({
       aria-label={t("artifact.strip_label")}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
     >
       {/* Collapsed: icon buttons only */}
       <div className="artifact-index-strip-icons">
+        <Button variant="ghost"
+          type="button"
+          className={`artifact-index-btn${expanded ? " is-active" : ""}`}
+          aria-label={t("artifact.search_label")}
+          aria-expanded={expanded}
+          title={t("artifact.search_label")}
+          onClick={() => onExpandedChange(!expanded)}
+        >
+          <ActionSearch size={16} />
+        </Button>
         {artifacts.map((a) => (
           <Button variant="ghost"
             key={a.id}
@@ -77,7 +96,7 @@ export function ArtifactIndexStrip({
             data-kind={a.kind}
             title={a.title}
             aria-label={a.title}
-            aria-pressed={a.id === selectedId}
+            aria-current={a.id === selectedId || undefined}
             onClick={() => onSelect(a.id)}
           >
             <ArtifactKindIcon kind={a.kind} size={16} />
@@ -104,6 +123,7 @@ export function ArtifactIndexStrip({
             <Button variant="ghost"
               type="button"
               className={`artifact-index-filter-btn${kindFilter === "all" ? " is-active" : ""}`}
+              aria-pressed={kindFilter === "all"}
               onClick={() => setKindFilter("all")}
             >
               {t("artifact.filter_all")}
@@ -113,6 +133,7 @@ export function ArtifactIndexStrip({
                 key={k}
                 type="button"
                 className={`artifact-index-filter-btn${kindFilter === k ? " is-active" : ""}`}
+                aria-pressed={kindFilter === k}
                 onClick={() => setKindFilter(k)}
               >
                 {t(`artifact.kind.${k}`, { defaultValue: k })}
@@ -130,7 +151,7 @@ export function ArtifactIndexStrip({
                 type="button"
                 className={`artifact-index-row${a.id === selectedId ? " is-active" : ""}`}
                 data-kind={a.kind}
-                aria-pressed={a.id === selectedId}
+                aria-current={a.id === selectedId || undefined}
                 onClick={() => onSelect(a.id)}
               >
                 <span className="artifact-index-row-icon" aria-hidden="true">

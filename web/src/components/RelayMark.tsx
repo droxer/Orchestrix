@@ -16,7 +16,6 @@ export function RelayMark({ className, width = 32, height = 32 }: RelayMarkProps
       aria-label="Relay"
       shapeRendering="geometricPrecision"
     >
-      <title>Relay</title>
       <g
         fill="none"
         strokeWidth="7"

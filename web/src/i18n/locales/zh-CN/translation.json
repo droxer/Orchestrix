@@ -89,8 +89,7 @@
     "group_idle": "空闲",
     "statuses": {
       "waiting_for_human": "等待人工"
-    },
-    "no_agents": "没有就绪的智能体"
+    }
   },
   "conversation": {
     "agent_working": "{{agent}} 正在工作",
@@ -235,7 +234,10 @@
       "low": "低"
     },
     "delete_task": "删除",
-    "deleting": "正在删除…"
+    "deleting": "正在删除…",
+    "delete_title": "删除任务？",
+    "delete_body": "“{{title}}”将从待办中移除，关联的话题和运行历史仍会保留。",
+    "toast_deleted": "任务已删除。"
   },
   "workspace": {
     "title": "工作区",
@@ -322,8 +324,9 @@
     "save": "保存团队",
     "edit": "编辑团队",
     "delete": "删除团队",
-    "delete_title": "删除团队？",
-    "delete_message": "“{{name}}”将被移除。已分配任务会保留团队引用，直到重新分配。",
+    "deleting": "删除中…",
+    "delete_title": "删除“{{name}}”？",
+    "delete_message": "此团队将无法再被分配任务。团队中的智能体和工作记录会保留，已分配任务也会保留团队引用，直到重新分配。",
     "drawer_subtitle": "选择有序成员并指定一名派发负责人。",
     "name": "团队名称",
     "members": "成员",
@@ -398,7 +401,8 @@
     "next_run_hint": "例行任务会在当天开始时运行，请选择今天或之后的日期。",
     "enabled_hint": "关闭后计划将暂停，不会再派发运行。",
     "delete_title": "删除例行任务？",
-    "delete_body": "将删除“{{title}}”及其计划，历史运行记录会保留。"
+    "delete_body": "将删除“{{title}}”及其计划，当前和过去的运行记录仍会保留在话题中。",
+    "toast_deleted": "例行任务已删除。"
   },
   "admin": {
     "title": "管理",
@@ -705,6 +709,7 @@
       "history_title": "历史记录",
       "history_description": "为审计和配置历史保留的已删除托管电脑。",
       "history_deleted": "删除于 {{time}}",
+      "history_count": "{{count}} 台已删除的电脑",
       "history_delete_action": "永久删除",
       "history_deleting": "正在删除…",
       "history_delete_confirm": "永久删除 {{name}}（{{id}}）？",
@@ -792,7 +797,6 @@
       "deleting": "删除中…",
       "save_agent_settings": "保存执行器设置",
       "selected_employee": "已选员工",
-      "dash_spark_summary": "最小 {{min}}，最大 {{max}}，最新 {{latest}}",
       "chat_delete_link_confirm": "删除 {{id}} 的身份关联？",
       "chat_delete_allow_confirm": "删除允许的会话 {{id}}？"
     },

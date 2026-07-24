@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 
-import { apiJson, getTeamArtifacts, getWorkspaceBrief, listAgentWorkspaceFiles, listArtifacts, listEmployeeAgents, listTaskArtifacts, readAgentWorkspaceFile, RelayApiError, runLogicalAgents, updateOwnEmployeeAgent } from "../src/api.js";
+import { apiJson, deleteTask, getTeamArtifacts, getWorkspaceBrief, listAgentWorkspaceFiles, listArtifacts, listEmployeeAgents, listTaskArtifacts, readAgentWorkspaceFile, RelayApiError, runLogicalAgents, updateOwnEmployeeAgent } from "../src/api.js";
 
 const originalFetch = globalThis.fetch;
 
@@ -161,6 +161,29 @@ describe("apiJson", () => {
     assert.equal(result.artifacts.length, 1);
     assert.equal(result.artifacts[0].title, "deck.pptx");
     assert.equal(result.artifacts[0].sessionId, "ses_1");
+  });
+
+  it("deletes a task through the task resource", async () => {
+    let requestedUrl = "";
+    let requestedMethod = "";
+    globalThis.fetch = (async (input, init) => {
+      requestedUrl = String(input);
+      requestedMethod = init?.method ?? "GET";
+      return new Response(JSON.stringify({
+        id: "task 1",
+        title: "Retire old task",
+        deletedAt: "2026-07-24T00:00:00Z",
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    const result = await deleteTask("task 1");
+
+    assert.equal(requestedUrl, "/tasks/task%201");
+    assert.equal(requestedMethod, "DELETE");
+    assert.equal(result.deletedAt, "2026-07-24T00:00:00Z");
   });
 
   it("fetches a workspace brief for a specific employee", async () => {

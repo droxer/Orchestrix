@@ -156,3 +156,41 @@
     transition: none;
   }
 }
+
+/* Coarse pointers: grow the remove button to the touch-target hit area
+   without moving the 24px visual — the disc is redrawn as a centered
+   ::before so the picker layout and offsets stay untouched. */
+@media (pointer: coarse) {
+  .profile-image-picker-remove {
+    top: -17px;
+    right: -17px;
+    width: var(--touch-target);
+    height: var(--touch-target);
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .profile-image-picker-remove::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 24px;
+    height: 24px;
+    transform: translate(-50%, -50%);
+    border: 1px solid var(--line-1);
+    border-radius: var(--r-full);
+    background: var(--surface-0);
+    box-shadow: var(--shadow-1);
+    transition: border-color var(--t-fast) var(--ease);
+  }
+
+  .profile-image-picker-remove:hover::before {
+    border-color: color-mix(in srgb, var(--err) 45%, var(--line-1));
+  }
+
+  .profile-image-picker-remove > svg {
+    position: relative;
+  }
+}

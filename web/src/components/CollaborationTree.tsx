@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { CollaborationTreeNode } from "../lib/collaborationTree";
@@ -23,9 +24,20 @@ function CollaborationNode({ node }: { node: CollaborationTreeNode }) {
     : node.status === "errored" || node.status === "notFound"
       ? "bad"
       : node.status === "interrupted" ? "warn" : "info";
+  // Open by default while the subagent is live, but once the user toggles the
+  // node their choice wins — status changes must not reopen a collapsed node.
+  const [open, setOpen] = useState(active);
+  const userToggledRef = useRef(false);
+  useEffect(() => {
+    if (active && !userToggledRef.current) setOpen(true);
+  }, [active]);
   return (
-    <details className={`collaboration-node tone-${tone}`} open={active || undefined}>
-      <summary>
+    <details
+      className={`collaboration-node tone-${tone}`}
+      open={open || undefined}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
+      <summary onClick={() => { userToggledRef.current = true; }}>
         <span className="collaboration-branch" aria-hidden="true" />
         <span className={`collaboration-status-dot tone-${tone}`} aria-hidden="true" />
         <span className="collaboration-label" title={node.prompt ?? undefined}>{node.label}</span>

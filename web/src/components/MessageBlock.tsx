@@ -1,4 +1,5 @@
 import { StreamAttachment } from "./icons";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { UserRound } from "lucide-react";
@@ -18,12 +19,12 @@ import { Button } from "./ui/button";
 export { isGroupedContinuation, projectMessages } from "../lib/projectMessages";
 export type { DerivedMessage } from "../lib/projectMessages";
 
-function formatTime(value: string): string {
+function formatTime(value: string, locale: string | undefined): string {
   const date = new Date(value);
   // A malformed event timestamp must not throw mid-render and take the whole
   // transcript down with it.
   if (Number.isNaN(date.getTime())) return "";
-  return new Intl.DateTimeFormat(document.documentElement.lang || undefined, {
+  return new Intl.DateTimeFormat(locale, {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
@@ -33,12 +34,13 @@ function formatTime(value: string): string {
 // A malformed timestamp formats to "", so render no <time> at all rather than
 // an empty element with a bogus dateTime.
 function MsgTime({ value }: { value: string }) {
-  const formatted = formatTime(value);
+  const { i18n } = useTranslation();
+  const formatted = useMemo(() => formatTime(value, i18n.language || undefined), [value, i18n.language]);
   if (!formatted) return null;
   return <time className="msg-time mono" dateTime={value}>{formatted}</time>;
 }
 
-function formatArtifactSize(bytes: number | undefined, t: TFunction): string {
+function formatArtifactSize(bytes: number | undefined, t: TFunction, locale: string | undefined): string {
   if (typeof bytes !== "number" || Number.isNaN(bytes)) return t("artifact.size_unknown");
   const units = [
     { key: "mb", value: 1024 * 1024 },
@@ -46,13 +48,13 @@ function formatArtifactSize(bytes: number | undefined, t: TFunction): string {
   ] as const;
   const unit = units.find((item) => bytes >= item.value);
   if (unit) {
-    const value = new Intl.NumberFormat(document.documentElement.lang || undefined, {
+    const value = new Intl.NumberFormat(locale, {
       maximumFractionDigits: bytes >= unit.value * 10 ? 0 : 1,
     }).format(bytes / unit.value);
     return t(`artifact.size_${unit.key}`, { count: value });
   }
   return t("artifact.size_bytes", {
-    count: new Intl.NumberFormat(document.documentElement.lang || undefined).format(bytes),
+    count: new Intl.NumberFormat(locale).format(bytes),
   });
 }
 
@@ -77,13 +79,20 @@ function PlanSummary({ steps, agentDisplayNames }: { steps: PlanStep[]; agentDis
 // Plan artifacts render inline as a human-readable step summary; they carry a
 // short JSON assignment list rather than a body worth opening in the viewer.
 function PlanCard({ artifact, sessionId, agentDisplayNames }: { artifact: RelayArtifact; sessionId: string; agentDisplayNames?: Partial<Record<AgentName, string>> }) {
+  const { t } = useTranslation();
   const body = useArtifactBody(sessionId, artifact.id);
   const planSteps = body.isSuccess ? parsePlanSteps(body.data ?? "", AGENT_NAMES) : null;
 
   // Until the body resolves, render a compact placeholder so the common
   // single-step case never flashes wider chrome.
   if (!planSteps) {
-    return <div className="artifact-plan-note artifact-plan-note-loading">{artifact.title}</div>;
+    return (
+      <div className="artifact-plan-note artifact-plan-note-loading">
+        <span className="artifact-plan-note-label">{artifact.title}</span>
+        <span className="workspace-skeleton artifact-plan-skeleton" aria-hidden="true" />
+        <span className="sr-only" role="status">{t("artifact.plan_loading", { defaultValue: "Loading…" })}</span>
+      </div>
+    );
   }
   return (
     <div className="artifact-plan-note">
@@ -105,8 +114,9 @@ function ArtifactCard({ artifact, sessionId, allArtifacts, onOpenArtifact, agent
 const ARTIFACT_STAT_FETCH_MAX_BYTES = 256 * 1024;
 
 function ArtifactChip({ artifact, sessionId, allArtifacts, onOpenArtifact }: { artifact: RelayArtifact; sessionId: string; allArtifacts?: RelayArtifact[]; onOpenArtifact?: (artifact: RelayArtifact) => void }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const viewer = useArtifactViewer();
+  const locale = i18n.language || undefined;
   const shouldLoadBody =
     artifact.kind !== "workspace_file" &&
     (artifact.bytes === undefined || artifact.bytes <= ARTIFACT_STAT_FETCH_MAX_BYTES);
@@ -116,7 +126,7 @@ function ArtifactChip({ artifact, sessionId, allArtifacts, onOpenArtifact }: { a
   const body = useArtifactBody(sessionId, artifact.id, { enabled: shouldLoadBody });
   const stat = shouldLoadBody && body.isSuccess ? summarizeArtifact(artifact.kind, body.data ?? "") : null;
   const kindLabel = t(`artifact.kind.${artifact.kind}`, { defaultValue: artifact.kind });
-  const createdTime = formatTime(artifact.createdAt);
+  const createdTime = formatTime(artifact.createdAt, locale);
 
   return (
     <article className="artifact-chip" data-kind={artifact.kind}>
@@ -138,7 +148,7 @@ function ArtifactChip({ artifact, sessionId, allArtifacts, onOpenArtifact }: { a
             {stat ? (
               <span className={`artifact-stat tone-${stat.tone}`}>{t(`artifact.stat.${stat.key}`, stat.vars)}</span>
             ) : (
-              <span className="artifact-stat tone-neutral">{formatArtifactSize(artifact.bytes, t)}</span>
+              <span className="artifact-stat tone-neutral">{formatArtifactSize(artifact.bytes, t, locale)}</span>
             )}
             <span aria-hidden="true">·</span>
             {createdTime ? <time dateTime={artifact.createdAt}>{createdTime}</time> : null}

@@ -7,6 +7,7 @@ import { deleteTeamProfileImage, getTeamArtifacts, getWorkspaceBrief, updateTeam
 import { useEmployeeAgents } from "../hooks/useEmployeeAgents";
 import { useRelayMutations } from "../hooks/useRelayMutations";
 import { TEAMS_QUERY_KEY } from "../hooks/useTeams";
+import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { agentLabel } from "../lib/plan";
 import { teamReady } from "../lib/taskAssignment";
@@ -104,6 +105,11 @@ function TeamProfile({
   const [imageSaving, setImageSaving] = useState(false);
   const readyMembers = team.members.filter((member) => member.enabled && member.availability === "ready").length;
   const busy = updateTeamMutation.isPending || deleteTeamMutation.isPending || imageSaving;
+  const draftDirty = name.trim() !== team.name.trim()
+    || leadId !== (team.leadAgentId ?? "")
+    || memberIds.length !== team.memberAgentIds.length
+    || memberIds.some((id) => !team.memberAgentIds.includes(id));
+  const confirmDiscardChanges = useUnsavedChangesGuard(editing && draftDirty && !busy);
 
   function applyTeamUpdate(updated: AgentTeam) {
     queryClient.setQueriesData<{ teams: AgentTeam[] }>(
@@ -145,7 +151,8 @@ function TeamProfile({
     setEditing(true);
   }
 
-  function cancelEditing() {
+  async function cancelEditing() {
+    if (!(await confirmDiscardChanges())) return;
     resetDraft();
     setEditing(false);
   }
@@ -184,7 +191,7 @@ function TeamProfile({
 
   async function remove() {
     if (!(await confirm({
-      title: t("teams.delete_title"),
+      title: t("teams.delete_title", { name: team.name }),
       message: t("teams.delete_message", { name: team.name }),
       confirmLabel: t("teams.delete"),
       tone: "danger",
@@ -251,7 +258,7 @@ function TeamProfile({
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 onKeyDown={(event) => {
-                  if (event.key === "Escape") cancelEditing();
+                  if (event.key === "Escape") void cancelEditing();
                 }}
                 disabled={busy}
               />
@@ -325,12 +332,8 @@ function TeamProfile({
                 </Select>
               </label>
               <div className="team-profile-inline-actions">
-                <Button type="button" variant="destructive" onClick={() => void remove()} disabled={busy}>
-                  <AdminDelete size={14} aria-hidden="true" />
-                  {t("teams.delete")}
-                </Button>
                 <span className="team-profile-inline-actions-spacer" />
-                <Button type="button" variant="ghost" onClick={cancelEditing} disabled={busy}>
+                <Button type="button" variant="ghost" onClick={() => void cancelEditing()} disabled={busy}>
                   {t("dialog.cancel")}
                 </Button>
                 <Button type="submit" disabled={busy || !name.trim() || memberIds.length === 0 || !leadId}>
@@ -340,6 +343,16 @@ function TeamProfile({
             </>
           ) : null}
         </form>
+
+        <section className="adm-drawer-section" aria-labelledby="team-profile-danger-title">
+          <p id="team-profile-danger-title" className="workspace-dossier-section-title">
+            {t("admin.v2.danger_zone")}
+          </p>
+          <Button type="button" variant="destructive" onClick={() => void remove()} disabled={busy}>
+            <AdminDelete size={14} aria-hidden="true" />
+            {deleteTeamMutation.isPending ? t("teams.deleting") : t("teams.delete")}
+          </Button>
+        </section>
       </div>
     </div>
   );

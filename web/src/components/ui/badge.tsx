@@ -28,7 +28,7 @@ const badgeVariants = cva(
         info:
           "border-info/30 bg-background text-info before:content-[''] before:size-1.5 before:rounded-full before:bg-info",
         warning:
-          "border-hairline bg-background text-muted-foreground before:content-[''] before:size-1.5 before:rounded-full before:bg-warning",
+          "border-warning/30 bg-background text-warning before:content-[''] before:size-1.5 before:rounded-full before:bg-warning",
         danger:
           "border-danger/35 bg-background text-danger before:content-[''] before:size-1.5 before:rounded-full before:bg-danger",
       },

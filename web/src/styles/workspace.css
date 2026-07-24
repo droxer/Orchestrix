@@ -1147,7 +1147,7 @@
   background: color-mix(in srgb, var(--action) 8%, var(--surface-2));
   color: var(--action);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--fs-1);
   font-weight: 650;
   letter-spacing: 0.04em;
 }
@@ -1344,7 +1344,7 @@
 .agent-personality-editor-guide li > span {
   color: var(--action);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--fs-1);
   line-height: 1.7;
 }
 

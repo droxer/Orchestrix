@@ -33,3 +33,15 @@ export function taskAssigneeDisplayName(
   }
   return employeeId;
 }
+
+/** True when the task's owning employee is the viewer. Personal views
+ *  (backlog/routine) suppress the redundant self chip and let the executor
+ *  glyph stand in as the assignee. */
+export function isTaskAssigneeCurrentUser(
+  task: { assigneeEmployeeId?: string; ownerEmployeeId?: string },
+  currentUser: CurrentUser,
+): boolean {
+  const employeeId = task.assigneeEmployeeId ?? task.ownerEmployeeId;
+  if (!employeeId) return false;
+  return employeeId === currentUser.employeeId || employeeId === currentUser.id;
+}

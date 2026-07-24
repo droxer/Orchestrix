@@ -18,6 +18,7 @@
   position: relative;
   width: min(640px, 100%);
   height: min(440px, 90dvh);
+  min-height: 280px;
   display: flex;
   flex-direction: column;
   background: var(--surface-3);
@@ -144,6 +145,13 @@
   min-width: 0;
   padding: var(--sp-4) var(--sp-6) var(--sp-6);
   overflow-y: auto;
+}
+
+.pref-fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
 }
 
 .pref-group-label {

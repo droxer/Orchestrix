@@ -24,7 +24,7 @@ describe("monochrome palette tokens", () => {
 
   it("dark register status is a grey brightness hierarchy (loud = bright)", () => {
     assert.match(darkRegister, /--err:\s*#f2f4f6;/);
-    assert.match(darkRegister, /--warn:\s*#99a0a8;/);
+    assert.match(darkRegister, /--warn:\s*#b2b9c1;/);
     assert.match(darkRegister, /--ok:\s*#7d848d;/);
   });
 
@@ -34,7 +34,7 @@ describe("monochrome palette tokens", () => {
     assert.match(lightRegister, /--on-action:\s*#ffffff;/);
     assert.match(lightRegister, /--action-soft:\s*color-mix\(in srgb, #16181b 7%, transparent\);/);
     assert.match(lightRegister, /--err:\s*#16181b;/);
-    assert.match(lightRegister, /--warn:\s*#5c636b;/);
+    assert.match(lightRegister, /--warn:\s*#484f57;/);
     assert.match(lightRegister, /--ok:\s*#6b727b;/);
   });
 

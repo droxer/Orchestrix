@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ActionAdd,
@@ -26,9 +26,12 @@ import {
   deleteChatIdentityLink,
   listChatIntegrations,
   listControlPanelAgents,
+  listControlPanelDaemonNodes,
   rotateTelegramWebhookSecret,
   updateChatIntegration,
 } from "../../api";
+import { agentsOnNodes } from "../../lib/adminHelpers";
+import { useUrlSearchState } from "../../hooks/useUrlSearchState";
 import type { ChatIntegration, ChatProvider } from "../../types";
 
 const CHAT_INTEGRATIONS_KEY = ["admin", "chat-integrations"] as const;
@@ -121,6 +124,10 @@ function ChannelCreateForm({
   publicBaseUrl,
   credentials,
   busy,
+  fieldErrors,
+  displayNameRef,
+  publicBaseUrlRef,
+  credentialRef,
   onDisplayNameChange,
   onTenantIdChange,
   onPublicBaseUrlChange,
@@ -134,6 +141,10 @@ function ChannelCreateForm({
   publicBaseUrl: string;
   credentials: Record<string, string>;
   busy: boolean;
+  fieldErrors: { displayName?: string; publicBaseUrl?: string; credential?: string };
+  displayNameRef: RefObject<HTMLInputElement | null>;
+  publicBaseUrlRef: RefObject<HTMLInputElement | null>;
+  credentialRef: RefObject<HTMLInputElement | null>;
   onDisplayNameChange: (value: string) => void;
   onTenantIdChange: (value: string) => void;
   onPublicBaseUrlChange: (value: string) => void;
@@ -150,25 +161,29 @@ function ChannelCreateForm({
         event.preventDefault();
         onSubmit();
       }}
+      noValidate
     >
       <label>
         <span>{t("admin.v2.chat_provider")}</span>
-        <select name={`${idPrefix}-provider`} defaultValue="telegram">
-          <option value="telegram">Telegram</option>
-          <option value="discord" disabled>
-            {t("admin.v2.chat_provider_coming_soon", { provider: "Discord" })}
-          </option>
-        </select>
+        <span className="adm-chat-provider-static">Telegram</span>
       </label>
       <label>
         <span>{t("admin.v2.chat_display_name")}</span>
         <input
+          ref={displayNameRef}
           name={`${idPrefix}-display-name`}
           autoComplete="organization"
           value={displayName}
           onChange={(event) => onDisplayNameChange(event.target.value)}
           placeholder="Telegram Bot…"
+          aria-invalid={Boolean(fieldErrors.displayName) || undefined}
+          aria-describedby={fieldErrors.displayName ? `${idPrefix}-display-name-error` : undefined}
         />
+        {fieldErrors.displayName ? (
+          <span id={`${idPrefix}-display-name-error`} className="text-sm text-danger" role="alert">
+            {fieldErrors.displayName}
+          </span>
+        ) : null}
       </label>
       <label>
         <span>
@@ -187,19 +202,29 @@ function ChannelCreateForm({
       <label>
         <span>{t("admin.v2.chat_public_url")}</span>
         <input
+          ref={publicBaseUrlRef}
           name={`${idPrefix}-public-base-url`}
+          type="url"
           autoComplete="url"
           spellCheck={false}
           value={publicBaseUrl}
           onChange={(event) => onPublicBaseUrlChange(event.target.value)}
           placeholder="https://relay.example.com…"
+          aria-invalid={Boolean(fieldErrors.publicBaseUrl) || undefined}
+          aria-describedby={fieldErrors.publicBaseUrl ? `${idPrefix}-public-base-url-error` : undefined}
         />
+        {fieldErrors.publicBaseUrl ? (
+          <span id={`${idPrefix}-public-base-url-error`} className="text-sm text-danger" role="alert">
+            {fieldErrors.publicBaseUrl}
+          </span>
+        ) : null}
         <small>{t("admin.v2.chat_public_url_help")}</small>
       </label>
       {TELEGRAM_CREDENTIAL_FIELDS.map((field) => (
         <label key={field.key}>
           <span>{t(field.labelKey)}</span>
           <input
+            ref={credentialRef}
             name={`${idPrefix}-${field.key}`}
             autoComplete={field.secret ? "new-password" : "off"}
             spellCheck={false}
@@ -207,7 +232,14 @@ function ChannelCreateForm({
             onChange={(event) => onCredentialChange(field.key, event.target.value)}
             type={field.secret ? "password" : "text"}
             placeholder={`${t(field.labelKey)}…`}
+            aria-invalid={Boolean(fieldErrors.credential) || undefined}
+            aria-describedby={fieldErrors.credential ? `${idPrefix}-${field.key}-error` : undefined}
           />
+          {fieldErrors.credential ? (
+            <span id={`${idPrefix}-${field.key}-error`} className="text-sm text-danger" role="alert">
+              {fieldErrors.credential}
+            </span>
+          ) : null}
         </label>
       ))}
       <small>{t("admin.v2.chat_telegram_secret_generated")}</small>
@@ -264,7 +296,20 @@ export function ChatIntegrationsView({
   const [credentials, setCredentials] = useState<Record<string, string>>({});
   const [editPublicBaseUrl, setEditPublicBaseUrl] = useState("");
   const [editCredentials, setEditCredentials] = useState<Record<string, string>>({});
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useUrlSearchState<string | null>(
+    "channel",
+    null,
+    (value) => value,
+    (value) => value,
+  );
+  const [createFieldErrors, setCreateFieldErrors] = useState<{
+    displayName?: string;
+    publicBaseUrl?: string;
+    credential?: string;
+  }>({});
+  const createDisplayNameRef = useRef<HTMLInputElement>(null);
+  const createPublicBaseUrlRef = useRef<HTMLInputElement>(null);
+  const createCredentialRef = useRef<HTMLInputElement>(null);
   const [identityForm, setIdentityForm] = useState({
     externalUserId: "",
     employeeId: "",
@@ -297,6 +342,23 @@ export function ChatIntegrationsView({
     queryKey: ["admin", "agents"],
     queryFn: ({ signal }) => listControlPanelAgents(undefined, signal),
   });
+  const nodesQuery = useQuery({
+    queryKey: ["admin", "daemon-nodes"],
+    queryFn: ({ signal }) => listControlPanelDaemonNodes(signal),
+  });
+
+  // Agents aren't owned by employees — the default agent for a chat identity is
+  // resolved through the selected employee's computers (their nodes), matching
+  // the Employees view. With no employee typed, any agent is a candidate.
+  const identityAgentOptions = useMemo(() => {
+    const agents = (agentsQuery.data?.agents ?? []).filter((agent) => !agent.deletedAt);
+    const employeeId = identityForm.employeeId.trim();
+    if (!employeeId) return agents;
+    const nodeIds = (nodesQuery.data?.nodes ?? [])
+      .filter((node) => node.employeeId === employeeId)
+      .map((node) => node.id);
+    return agentsOnNodes(nodeIds, agents);
+  }, [agentsQuery.data, nodesQuery.data, identityForm.employeeId]);
 
   const integrations = (query.data ?? []).filter((integration) => integration.provider === "telegram");
   const selected = useMemo(
@@ -348,8 +410,10 @@ export function ChatIntegrationsView({
     try {
       const result = await action();
       mergeIntegration(result.integration);
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+      return false;
     } finally {
       setBusy(null);
     }
@@ -373,20 +437,30 @@ export function ChatIntegrationsView({
     }
   }
 
+  function clearCreateFieldError(field: "displayName" | "publicBaseUrl" | "credential") {
+    setCreateFieldErrors((current) => (current[field] ? { ...current, [field]: undefined } : current));
+  }
+
   async function handleCreate() {
-    if (!displayName.trim()) {
-      setError(t("admin.v2.chat_error_name_required"));
-      return;
-    }
+    const nextFieldErrors: typeof createFieldErrors = {};
+    if (!displayName.trim()) nextFieldErrors.displayName = t("admin.v2.chat_error_name_required");
     const normalizedPublicBaseUrl = normalizePublicBaseUrl(publicBaseUrl.trim());
-    if (!normalizedPublicBaseUrl) {
-      setError(t("admin.v2.chat_error_public_url"));
-      return;
-    }
+    if (!normalizedPublicBaseUrl) nextFieldErrors.publicBaseUrl = t("admin.v2.chat_error_public_url");
     const fields = TELEGRAM_CREDENTIAL_FIELDS;
     const missing = fields.find((field) => !credentials[field.key]?.trim());
     if (missing) {
-      setError(t("admin.v2.chat_error_field_required", { field: t(missing.labelKey) }));
+      nextFieldErrors.credential = t("admin.v2.chat_error_field_required", { field: t(missing.labelKey) });
+    }
+    setCreateFieldErrors(nextFieldErrors);
+    const firstInvalid = nextFieldErrors.displayName
+      ? createDisplayNameRef
+      : nextFieldErrors.publicBaseUrl
+        ? createPublicBaseUrlRef
+        : nextFieldErrors.credential
+          ? createCredentialRef
+          : null;
+    if (firstInvalid) {
+      firstInvalid.current?.focus();
       return;
     }
     const config = Object.fromEntries(
@@ -395,7 +469,7 @@ export function ChatIntegrationsView({
     const secrets = Object.fromEntries(
       fields.filter((field) => field.secret).map((field) => [field.key, credentials[field.key].trim()]),
     );
-    await mutate("create", () => createChatIntegration({
+    const created = await mutate("create", () => createChatIntegration({
       provider: "telegram",
       displayName: displayName.trim(),
       tenantId: tenantId.trim() || undefined,
@@ -406,6 +480,7 @@ export function ChatIntegrationsView({
         ...config,
       },
     }));
+    if (!created) return;
     setCredentials({});
     setCreateOpen(false);
   }
@@ -497,17 +572,42 @@ export function ChatIntegrationsView({
     ));
   }
 
+  async function handleRotateWebhookSecret() {
+    if (!selected) return;
+    const ok = await confirm({
+      title: t("admin.v2.chat_rotate_confirm", {
+        defaultValue: "Rotate the webhook secret? The current secret stops working immediately.",
+      }),
+      confirmLabel: t("admin.v2.chat_rotate_webhook_secret"),
+      tone: "danger",
+    });
+    if (!ok) return;
+    await provision("rotate-secret", () => rotateTelegramWebhookSecret(selected.id));
+  }
+
   const createFormProps = {
     displayName,
     tenantId,
     publicBaseUrl,
     credentials,
     busy: busy !== null,
-    onDisplayNameChange: setDisplayName,
+    fieldErrors: createFieldErrors,
+    displayNameRef: createDisplayNameRef,
+    publicBaseUrlRef: createPublicBaseUrlRef,
+    credentialRef: createCredentialRef,
+    onDisplayNameChange: (value: string) => {
+      setDisplayName(value);
+      clearCreateFieldError("displayName");
+    },
     onTenantIdChange: setTenantId,
-    onPublicBaseUrlChange: setPublicBaseUrl,
-    onCredentialChange: (key: string, value: string) =>
-      setCredentials((current) => ({ ...current, [key]: value })),
+    onPublicBaseUrlChange: (value: string) => {
+      setPublicBaseUrl(value);
+      clearCreateFieldError("publicBaseUrl");
+    },
+    onCredentialChange: (key: string, value: string) => {
+      setCredentials((current) => ({ ...current, [key]: value }));
+      clearCreateFieldError("credential");
+    },
     onSubmit: () => void handleCreate(),
     submitLabel: t("admin.v2.chat_create"),
   };
@@ -537,11 +637,25 @@ export function ChatIntegrationsView({
 
   if (query.isLoading) {
     return (
-      <div className="adm-view adm-chat">
+      <div className="adm-view adm-chat" role="status" aria-busy="true">
+        <span className="sr-only">{t("admin.v2.dash_loading")}</span>
         {alerts}
-        <p className="adm-empty-body relay-enter">{t("admin.v2.dash_loading")}</p>
+        <div className="workspace-skeleton-pane" aria-hidden="true">
+          {Array.from({ length: 3 }, (_, index) => (
+            <div
+              key={index}
+              className={`workspace-skeleton workspace-skeleton-line${index === 2 ? " short" : ""}`}
+            />
+          ))}
+        </div>
       </div>
     );
+  }
+
+  // Failed load with nothing cached: show only the error + retry, never the
+  // zeroed stats and empty master/detail scaffold on top of the failure.
+  if (query.error && !hasChannels) {
+    return <div className="adm-view adm-chat">{alerts}</div>;
   }
 
   if (!query.error && !hasChannels) {
@@ -671,6 +785,7 @@ export function ChatIntegrationsView({
                       <span>{t("admin.v2.chat_public_url")}</span>
                       <input
                         name="chat-edit-public-base-url"
+                        type="url"
                         autoComplete="url"
                         spellCheck={false}
                         value={editPublicBaseUrl}
@@ -707,7 +822,7 @@ export function ChatIntegrationsView({
                       <Button
                         type="button"
                         variant="secondary"
-                        onClick={() => void provision("rotate-secret", () => rotateTelegramWebhookSecret(selected.id))}
+                        onClick={() => void handleRotateWebhookSecret()}
                         disabled={busy !== null}
                       >
                         {t("admin.v2.chat_rotate_webhook_secret")}
@@ -784,11 +899,7 @@ export function ChatIntegrationsView({
                       }
                     >
                       <option value="">{t("admin.v2.chat_agent_placeholder")}</option>
-                      {(agentsQuery.data?.agents ?? [])
-                        .filter((agent) =>
-                          !agent.deletedAt
-                          && (!identityForm.employeeId || agent.employeeId === identityForm.employeeId),
-                        )
+                      {identityAgentOptions
                         .map((agent) => (
                           <option key={agent.id} value={agent.id}>
                             {agent.displayName} · {agent.executorKind}

@@ -107,11 +107,6 @@
 .adm-dash-delta.tone-down { color: var(--err); }
 .adm-dash-delta.tone-flat { color: var(--ink-3); }
 
-.adm-dash-spark {
-  color: var(--info);
-  display: block;
-}
-
 /* ── Layout ──────────────────────────────────────────────────────────
    KPIs → belt (threads chart spans 2 cols + fleet / people / tokens)
    → activity stream. */
@@ -586,7 +581,4 @@
   .adm-dash-tile--nodes { border-right: 1px solid var(--line-1); border-bottom: 1px solid var(--line-1); }
   .adm-dash-tile--employees { border-right: none; border-bottom: 1px solid var(--line-1); }
   .adm-dash-tile--tokens { grid-column: 1 / -1; border-right: none; }
-  /* Half-width tiles can't fit hint + sparkline on one line — the line then
-     draws across the wrapped caption. Drop the decorative spark here. */
-  .adm-dash-spark { display: none; }
 }

@@ -29,7 +29,7 @@
   font-style: italic;
 }
 
-/* Numeric and symbolic literals: the warm code-number accent. */
+/* Numeric and symbolic literals: running-text tone, plain weight. */
 .hljs-number,
 .hljs-symbol,
 .hljs-bullet,

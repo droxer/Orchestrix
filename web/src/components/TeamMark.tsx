@@ -22,16 +22,16 @@ export function TeamMark({ size = 16, className }: TeamMarkProps) {
       focusable="false"
       fill="none"
     >
-      <path d="M12 2.25 16.25 6.25 12 10.25 7.75 6.25 12 2.25Z" fill="currentColor" />
+      <path d="M12 1.5 17 6.5 12 11.5 7 6.5 12 1.5Z" fill="currentColor" />
       <path
-        d="M12 10.25v2.5m0 0H6.25v2.1m5.75-2.1h5.75v2.1"
+        d="M12 11.5v2m0 0H6v2m6-2h6v2"
         stroke="currentColor"
-        strokeWidth="1.75"
+        strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <rect x="3.25" y="14.75" width="6" height="6" rx="1.75" stroke="currentColor" strokeWidth="1.75" />
-      <rect x="14.75" y="14.75" width="6" height="6" rx="1.75" stroke="currentColor" strokeWidth="1.75" />
+      <rect x="2.5" y="15.5" width="7" height="7" rx="2" stroke="currentColor" strokeWidth="2" />
+      <rect x="14.5" y="15.5" width="7" height="7" rx="2" stroke="currentColor" strokeWidth="2" />
     </svg>
   );
 }

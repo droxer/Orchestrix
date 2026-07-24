@@ -23,13 +23,13 @@
      never a family switch. Mono is code, IDs, logs. */
   --type-display:      600 var(--fs-6)/1.15 var(--font-sans);
   --type-title:        600 var(--fs-5)/1.2  var(--font-sans);
-  --type-heading:      600 1.1429rem/1.3  var(--font-sans);
+  --type-heading:      600 var(--fs-heading)/1.3  var(--font-sans);
   --type-body:         400 var(--fs-4)/1.5  var(--font-sans);
   --type-body-sm:      400 var(--fs-3)/1.5  var(--font-sans);
   --type-label:        500 var(--fs-2)/1.4  var(--font-sans);
   --type-label-strong: 600 var(--fs-2)/1.4  var(--font-sans);
   --type-micro:        500 var(--fs-1)/1.4  var(--font-sans); /* + uppercase + --track-caps */
-  --type-number:       600 1.3571rem/1.4  var(--font-sans); /* + tabular-nums */
+  --type-number:       600 var(--fs-number)/1.4  var(--font-sans); /* + tabular-nums */
   --type-code:         400 var(--fs-2)/1.5  var(--font-mono);
 }
 

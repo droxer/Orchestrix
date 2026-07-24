@@ -140,10 +140,6 @@ export function MainChatView({
 
       <section id="chat-panel" className="chat-panel" aria-label={t("nav.conversations")} tabIndex={-1}>
         <ChatHeader
-          activeAgent={activeAgent}
-          logicalAgents={logicalAgents}
-          activeLogicalAgentId={activeLogicalAgentId}
-          onLogicalAgentPicked={onLogicalAgentPicked}
           activeSession={activeSession}
           runningAgent={runningAgent}
           runningAgentDisplayName={runningAgentDisplayName}
@@ -154,7 +150,7 @@ export function MainChatView({
           onBackToThreads={onBackToThreads}
         />
 
-        <div className="transcript" ref={transcriptRef} onScroll={onTranscriptScroll}>
+        <div className="transcript" ref={transcriptRef} onScroll={onTranscriptScroll} role="log" aria-live="polite" aria-atomic="false">
           <div className="transcript-inner">
             {activeSession || pendingUserMessage ? (
               <>
@@ -238,6 +234,10 @@ export function MainChatView({
           mentionAgents={mentionAgents}
           composerMode={composerMode}
           setComposerMode={setComposerMode}
+          activeAgent={activeAgent}
+          logicalAgents={logicalAgents}
+          activeLogicalAgentId={activeLogicalAgentId}
+          onLogicalAgentPicked={onLogicalAgentPicked}
           activeAgentDisplayName={activeAgentDisplayName}
           selectedEmployee={selectedEmployee}
           running={running}

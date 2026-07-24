@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActionCopy, ActionRetry, CheckIcon } from "./icons";
 import type { AgentName, AgentTaskMode } from "../types";
@@ -34,11 +34,17 @@ export function MessageTurnActions({
     if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
   }, []);
 
+  // The parser scans the full accumulated stdout; parse once per content
+  // change and share the result between the copy handler and canCopy.
+  const plainText = useMemo(
+    () => agentMessagePlainText(agent, stdout, stderr, t, streaming),
+    [agent, stdout, stderr, t, streaming],
+  );
+
   const handleCopy = useCallback(async () => {
-    const text = agentMessagePlainText(agent, stdout, stderr, t, streaming);
-    if (!text) return;
+    if (!plainText) return;
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(plainText);
       setCopied(true);
       if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
       resetTimerRef.current = setTimeout(() => setCopied(false), 1800);
@@ -47,14 +53,14 @@ export function MessageTurnActions({
       // user and give them the manual fallback.
       announce({ message: t("errors.copy_message"), tone: "error" });
     }
-  }, [agent, stdout, stderr, streaming, t, announce]);
+  }, [plainText, t, announce]);
 
   const handleRetry = useCallback(() => {
     if (retryDisabled || streaming || !onRetry) return;
     onRetry(agent, mode);
   }, [agent, mode, onRetry, retryDisabled, streaming]);
 
-  const canCopy = Boolean(agentMessagePlainText(agent, stdout, stderr, t, streaming));
+  const canCopy = Boolean(plainText);
   const showRetry = Boolean(onRetry) && !streaming;
 
   if (!canCopy && !showRetry) return null;

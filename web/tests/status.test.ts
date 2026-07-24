@@ -46,7 +46,7 @@ function controlPanelNode(
 }
 
 describe("Relay web conversation status", () => {
-  it("shows an active daemon run as running even when the heartbeat is stale", () => {
+  it("shows a stale node as stale even when a daemon run is active", () => {
     const activeRun = {
       commandId: "cmd_1",
       sessionId: "ses_1",
@@ -71,7 +71,7 @@ describe("Relay web conversation status", () => {
         stale: true,
       },
       sandbox: { status: "provisioning" },
-    }), "running");
+    }), "stale");
   });
 
   it("falls back to stale only when no daemon run is active", () => {

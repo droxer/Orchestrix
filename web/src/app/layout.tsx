@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 
 import "../styles.css";
 
+import { THEME_COLORS } from "@/lib/appStorage";
 import { Providers } from "./providers";
 
 // One crisp precision grotesk carries display, chrome, AND body text —
@@ -47,8 +48,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f7f8f9" },
-    { media: "(prefers-color-scheme: dark)", color: "#101214" },
+    { media: "(prefers-color-scheme: light)", color: THEME_COLORS.light },
+    { media: "(prefers-color-scheme: dark)", color: THEME_COLORS.dark },
   ],
 };
 
@@ -66,11 +67,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         {/* Set data-theme before first paint so dark/system users never
             flash the light canvas. Mirrors applyTheme() in appStorage.ts:
             "system" is the default and resolves via matchMedia, otherwise
-            honor the pin. */}
+            honor the pin. The theme-color meta is owned by viewport.themeColor
+            above (no duplicate injection here). */}
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "(function(){try{var t=localStorage.getItem('relay-web.theme')||'system';if(t==='contrast'||t==='contrast-dark'){t='system';localStorage.setItem('relay-web.theme','system');}var d=matchMedia('(prefers-color-scheme: dark)').matches;var dk=t==='dark'||(t!=='light'&&d);var r=dk?'dark':'light';document.documentElement.setAttribute('data-theme',r);document.documentElement.classList.toggle('dark',dk);var c={light:'#f7f8f9',dark:'#101214'}[r]||'#101214';var m=document.querySelector('meta[name=\"theme-color\"][data-relay-theme-color]');if(!m){m=document.createElement('meta');m.setAttribute('name','theme-color');m.setAttribute('data-relay-theme-color','');document.head.appendChild(m);}m.removeAttribute('media');m.setAttribute('content',c);}catch(e){}})();",
+              "(function(){try{var t=localStorage.getItem('relay-web.theme')||'system';if(t==='contrast'||t==='contrast-dark'){t='system';localStorage.setItem('relay-web.theme','system');}var d=matchMedia('(prefers-color-scheme: dark)').matches;var r=(t==='dark'||(t!=='light'&&d))?'dark':'light';document.documentElement.setAttribute('data-theme',r);}catch(e){}})();",
           }}
         />
       </head>

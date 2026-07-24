@@ -131,6 +131,11 @@
   cursor: pointer;
 }
 
+.conversation-row-inner:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 .conversation-row:hover {
   background: var(--surface-1);
 }
@@ -226,6 +231,8 @@
 
 .conversation-row:hover .conversation-rename-btn,
 .conversation-row:hover .conversation-remove-btn,
+.conversation-row:focus-within .conversation-rename-btn,
+.conversation-row:focus-within .conversation-remove-btn,
 .conversation-rename-btn:focus-visible,
 .conversation-remove-btn:focus-visible {
   opacity: 1;

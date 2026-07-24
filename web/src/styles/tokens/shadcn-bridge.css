@@ -46,9 +46,9 @@
   --radius-md: var(--r-2);
   --radius-lg: var(--r-3);
   --radius-xl: var(--r-3);
-  --radius-2xl: var(--r-3);
-  --radius-3xl: var(--r-3);
-  --radius-4xl: var(--r-3);
+  --radius-2xl: var(--r-4);
+  --radius-3xl: var(--r-4);
+  --radius-4xl: var(--r-4);
   --radius-full: var(--r-full);
 
   /* Spacing → p-md, gap-sm, … (named keys coexist with numeric p-4). */
@@ -68,10 +68,10 @@
   --text-sm: var(--fs-3);
   --text-base: var(--fs-3);
   --text-md: var(--fs-4);
-  --text-lg: var(--fs-5);
-  --text-xl: var(--fs-5);
+  --text-lg: var(--fs-heading);
+  --text-xl: var(--fs-number);
   --text-2xl: var(--fs-5);
-  --text-3xl: var(--fs-5);
+  --text-3xl: var(--fs-6);
   --text-4xl: var(--fs-6);
 
   /* Leading → leading-tight / leading-loose. */

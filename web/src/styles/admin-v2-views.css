@@ -201,6 +201,9 @@
   margin: 0;
   font: var(--type-title);
   color: var(--ink-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .adm-emp-meta {
@@ -459,11 +462,14 @@
 }
 
 .adm-node-history-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--sp-4);
   margin-bottom: var(--sp-4);
+}
+
+/* Count sits beside the heading it describes, not floated to the far edge. */
+.adm-node-history-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
 }
 
 .adm-node-history-head h2 {
@@ -544,8 +550,13 @@
   font: var(--type-micro);
 }
 
-.adm-node-history-delete {
-  color: var(--err);
+/* Meta truncates so a long employee id can't wrap and break row rhythm.
+   The delete button's danger ink comes from the destructive Button variant. */
+.adm-node-history-meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .adm-node-history-error {
@@ -599,6 +610,9 @@
   font: var(--type-label-strong);
   letter-spacing: var(--track-caps);
   text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--ink-3);
   text-align: right;
 }
@@ -1181,6 +1195,8 @@
    it never showed. Only failed differs, and it differs by SHAPE (a hollow
    ring), not by a brightness step. */
 .adm-runtime-mark .adm-agent-dot { background: var(--ink-4); }
+.adm-runtime-mark.tone-info .adm-agent-dot { background: var(--info); }
+.adm-runtime-mark.tone-warn .adm-agent-dot { background: var(--warn); }
 .adm-runtime-mark.tone-bad .adm-agent-dot {
   background: transparent;
   box-shadow: inset 0 0 0 1.25px var(--err);
@@ -1245,6 +1261,8 @@
    --ok fill here; failed still switches to the shared hollow-ring shape so the
    "problem" language stays consistent with the fleet cards. */
 .adm-agent-chip.tone-good .adm-agent-dot { background: var(--ok); }
+.adm-agent-chip.tone-info .adm-agent-dot { background: var(--info); }
+.adm-agent-chip.tone-warn .adm-agent-dot { background: var(--warn); }
 .adm-agent-chip.tone-bad .adm-agent-dot {
   background: transparent;
   box-shadow: inset 0 0 0 1.25px var(--err);

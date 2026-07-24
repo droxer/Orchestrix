@@ -15,6 +15,7 @@ import { ADMIN_AGENTS_KEY } from "../../lib/adminHelpers";
 import { useUrlSearchState } from "../../hooks/useUrlSearchState";
 import {
   buildEmployeeSummaries,
+  agentsForEmployee,
   agentAvailabilityTone,
   type EmployeeNodeSummary,
 } from "./helpers";
@@ -32,9 +33,9 @@ interface EmployeesViewProps {
   onSelectAgent?: (agentId: string) => void;
 }
 
-type EmployeeFilter = "all" | "running" | "ready" | "idle" | "unassigned";
+type EmployeeFilter = "all" | "running" | "ready" | "idle" | "failed" | "unassigned";
 
-const FILTERS: EmployeeFilter[] = ["all", "running", "ready", "idle", "unassigned"];
+const FILTERS: EmployeeFilter[] = ["all", "running", "ready", "idle", "failed", "unassigned"];
 
 function parseEmployeeFilter(value: string | null): EmployeeFilter {
   return FILTERS.includes(value as EmployeeFilter) ? (value as EmployeeFilter) : "all";
@@ -53,19 +54,28 @@ function serializeSearchQuery(value: string): string | null {
 }
 
 // Employee activity slices mirror the Nodes status chips (and the card status
-// pill). running/ready overlap by design — an employee can own one running and
-// one ready node — so counts are per-predicate membership, like the Fleet view.
+// pill). running/ready/failed overlap by design — an employee can own one
+// running and one failed node — so counts are per-predicate membership, like
+// the Fleet view. "idle" is the quiet remainder: has nodes, but none are
+// running, ready, or failed (e.g. provisioning/stopped), so a broken node
+// surfaces under "failed" instead of hiding as idle.
 function matchesEmployeeFilter(member: EmployeeNodeSummary, filter: EmployeeFilter): boolean {
   if (filter === "all") return true;
   if (filter === "running") return member.runningCount > 0;
   if (filter === "ready") return member.readyCount > 0;
-  if (filter === "idle") return member.nodeCount > 0 && member.runningCount === 0 && member.readyCount === 0;
+  if (filter === "failed") return member.failedCount > 0;
+  if (filter === "idle") {
+    return member.nodeCount > 0 && member.runningCount === 0 && member.readyCount === 0 && member.failedCount === 0;
+  }
   return member.nodeCount === 0;
 }
 
 function filterLabel(filter: EmployeeFilter, t: TFunction): string {
   if (filter === "all") return t("admin.v2.filter_all");
-  if (filter === "unassigned") return t("admin.unassigned");
+  // "unassigned" here means the employee owns no computer — distinct from the
+  // Fleet view, where it means a node has no employee. Use dedicated copy.
+  if (filter === "unassigned") return t("admin.v2.emp_state_no_nodes");
+  if (filter === "failed") return t("admin.v2.filter_failed");
   return t(`admin.v2.emp_state_${filter}`, { defaultValue: filter });
 }
 
@@ -122,11 +132,12 @@ export function EmployeesView({
   const summaries = useMemo(() => buildEmployeeSummaries(employees, nodes), [employees, nodes]);
 
   const counts = useMemo(() => {
-    const result: Record<EmployeeFilter, number> = { all: summaries.length, running: 0, ready: 0, idle: 0, unassigned: 0 };
+    const result: Record<EmployeeFilter, number> = { all: summaries.length, running: 0, ready: 0, idle: 0, failed: 0, unassigned: 0 };
     for (const member of summaries) {
       if (matchesEmployeeFilter(member, "running")) result.running += 1;
       if (matchesEmployeeFilter(member, "ready")) result.ready += 1;
       if (matchesEmployeeFilter(member, "idle")) result.idle += 1;
+      if (matchesEmployeeFilter(member, "failed")) result.failed += 1;
       if (matchesEmployeeFilter(member, "unassigned")) result.unassigned += 1;
     }
     return result;
@@ -142,7 +153,7 @@ export function EmployeesView({
         item.displayName,
         item.email ?? "",
         item.departmentName ?? "",
-        ...agents.filter((agent) => agent.employeeId === item.id).map((agent) => `${agent.displayName} ${agent.executorKind}`),
+        ...agentsForEmployee(item, agents).map((agent) => `${agent.displayName} ${agent.executorKind}`),
       ]
         .join(" ")
         .toLowerCase();
@@ -224,7 +235,7 @@ export function EmployeesView({
             <EmployeeCard
               key={member.id}
               member={member}
-              agents={agents.filter((agent) => agent.employeeId === member.id && !agent.deletedAt)}
+              agents={agentsForEmployee(member, agents)}
               highlight={highlightedEmployeeId === member.id}
               onSelectAgent={onSelectAgent}
               onDelete={onDeleteEmployee ? (id) => void handleDeleteEmployee(id) : undefined}
@@ -243,7 +254,7 @@ export function EmployeesView({
           </div>
           <ul className="adm-emp-list" role="rowgroup">
             {filtered.map((member) => {
-              const memberAgents = agents.filter((agent) => agent.employeeId === member.id && !agent.deletedAt);
+              const memberAgents = agentsForEmployee(member, agents);
               const highlight = highlightedEmployeeId === member.id;
               const { tone, key } = summaryTone(member);
               return (

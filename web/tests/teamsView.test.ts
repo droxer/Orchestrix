@@ -34,7 +34,7 @@ describe("Agent team management", () => {
     assert.match(teamWorkspaceSource, /updateTeamMutation\.mutateAsync/);
     assert.match(teamWorkspaceSource, /deleteTeamMutation\.mutateAsync/);
     assert.match(teamMarkSource, /Relay's default team identity mark/);
-    assert.match(teamMarkSource, /M12 2\.25 16\.25 6\.25/);
+    assert.match(teamMarkSource, /M12 1\.5 17 6\.5/);
     assert.match(teamsSource, /className="teams-list-mark"/);
     assert.match(teamWorkspaceSource, /<TeamMark/);
     assert.match(pickerSource, /<TeamMark/);

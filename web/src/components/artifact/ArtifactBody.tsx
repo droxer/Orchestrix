@@ -19,9 +19,10 @@ function classifyDiffLine(line: string): DiffLineKind {
 
 /** Unified diff with per-line add/delete coloring and a gutter. */
 function DiffView({ text }: { text: string }) {
+  const { t } = useTranslation();
   const lines = useMemo(() => text.split(/\r?\n/), [text]);
   return (
-    <div className="artifact-diff" role="img" aria-label="diff">
+    <div className="artifact-diff" role="group" aria-label={t("artifact.kind.diff")}>
       {lines.map((line, index) => {
         const kind = classifyDiffLine(line);
         const sign = kind === "add" ? "+" : kind === "del" ? "-" : " ";
@@ -80,7 +81,7 @@ function WorkspaceFileBody({ artifact, sessionId }: { artifact: RelayArtifact; s
   if (mode === "image") {
     return (
       <div className="artifact-viewer-body">
-        <img className="artifact-image-preview" src={rawHref} alt={artifact.title} width={1600} height={900} loading="lazy" decoding="async" />
+        <img className="artifact-image-preview" src={rawHref} alt={artifact.title} loading="lazy" decoding="async" />
       </div>
     );
   }
@@ -93,7 +94,7 @@ function WorkspaceFileBody({ artifact, sessionId }: { artifact: RelayArtifact; s
   }
   if (wantsText) {
     if (query.isLoading) {
-      return <p className="artifact-viewer-status">{t("artifact.loading_preview")}</p>;
+      return <p className="artifact-viewer-status" role="status">{t("artifact.loading_preview")}</p>;
     }
     if (query.isSuccess && query.data?.trim()) {
       return (
@@ -110,7 +111,7 @@ function WorkspaceFileBody({ artifact, sessionId }: { artifact: RelayArtifact; s
   }
   return (
     <div className="artifact-viewer-body">
-      <p className="artifact-viewer-status">{t("artifact.workspace_file_preview")}</p>
+      <p className="artifact-viewer-status" role="status">{t("artifact.workspace_file_preview")}</p>
       {path ? <pre className="artifact-plain">{path}</pre> : null}
     </div>
   );
@@ -126,7 +127,7 @@ export function ArtifactBody({ artifact, sessionId }: { artifact: RelayArtifact;
   }
 
   if (query.isLoading) {
-    return <p className="artifact-viewer-status">{t("artifact.loading_preview")}</p>;
+    return <p className="artifact-viewer-status" role="status">{t("artifact.loading_preview")}</p>;
   }
   if (query.isError) {
     const message = query.error instanceof Error ? query.error.message : String(query.error);
@@ -138,7 +139,7 @@ export function ArtifactBody({ artifact, sessionId }: { artifact: RelayArtifact;
   }
   const text = query.data ?? "";
   if (!text.trim()) {
-    return <p className="artifact-viewer-status">{t("artifact.preview_empty")}</p>;
+    return <p className="artifact-viewer-status" role="status">{t("artifact.preview_empty")}</p>;
   }
   return <div className="artifact-viewer-body">{renderBody(artifact.kind, text)}</div>;
 }

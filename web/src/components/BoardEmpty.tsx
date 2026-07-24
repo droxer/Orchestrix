@@ -17,8 +17,8 @@ export function BoardEmpty({
   onCreate?: () => void;
 }) {
   return (
-    <div className="backlog-board-empty" role="status">
-      <p className="backlog-board-empty-title">{title}</p>
+    <div className="backlog-board-empty">
+      <h2 className="backlog-board-empty-title">{title}</h2>
       <p className="backlog-board-empty-body">{body}</p>
       {onCreate && createLabel ? (
         <Button size="sm" onClick={onCreate}>

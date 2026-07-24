@@ -9,7 +9,16 @@
   overflow: hidden;
   background: var(--surface-0);
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  /* The grid track owns the collapse motion — .sidenav-panel has no explicit
+     width (the track sizes it), so a width transition there would be a no-op
+     double-animation. */
   transition: grid-template-columns var(--t-fast) var(--ease);
+}
+
+/* display:contents keeps route panels as direct grid items while the <main>
+   landmark stays a sibling of the SideNav <nav>. */
+.messenger-shell > main {
+  display: contents;
 }
 
 .messenger-shell[data-sidenav="open"] {
@@ -40,5 +49,12 @@
    agent-workspace headers read as oversized serif headlines. */
 .page-header-title--display {
   font: var(--type-title);
+  letter-spacing: var(--track-tight);
+}
+
+/* Inline (non-display) route titles — role-token type instead of arbitrary
+   size/weight/leading utilities. */
+.page-header-title--inline {
+  font: var(--type-heading);
   letter-spacing: var(--track-tight);
 }

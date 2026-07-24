@@ -176,10 +176,10 @@ export function AppShell({
         onLogout={onLogout}
       />
 
-      {/* display:contents keeps the route panels as direct grid items of
-          .messenger-shell while the <main> landmark stays a sibling of the
-          SideNav <nav> instead of wrapping it. */}
-      <main style={{ display: "contents" }}>
+      {/* display:contents (owned by shell.css, .messenger-shell > main) keeps
+          the route panels as direct grid items of .messenger-shell while the
+          <main> landmark stays a sibling of the SideNav <nav>. */}
+      <main>
         {children}
       </main>
 

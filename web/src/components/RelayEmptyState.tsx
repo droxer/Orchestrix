@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useId, type ElementType, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 type RelayEmptyStateProps = {
@@ -9,6 +9,8 @@ type RelayEmptyStateProps = {
   actions?: ReactNode;
   className?: string;
   titleId?: string;
+  /** Heading level for the title (default 2). */
+  headingLevel?: 1 | 2 | 3 | 4 | 5 | 6;
   mark?: boolean;
   fill?: boolean;
   animate?: boolean;
@@ -21,11 +23,15 @@ export function RelayEmptyState({
   illustration,
   actions,
   className,
-  titleId = "relay-empty-title",
+  titleId,
+  headingLevel = 2,
   mark = false,
   fill = false,
   animate = true,
 }: RelayEmptyStateProps) {
+  const generatedTitleId = useId();
+  const resolvedTitleId = titleId ?? generatedTitleId;
+  const TitleTag = `h${headingLevel}` as ElementType;
   const enter = (step: 1 | 2 | 3 | 4) =>
     animate ? `relay-enter relay-enter-delay-${step}` : "";
 
@@ -36,7 +42,7 @@ export function RelayEmptyState({
         fill && "relay-empty--fill",
         className,
       )}
-      aria-labelledby={titleId}
+      aria-labelledby={resolvedTitleId}
     >
       {mark ? (
         <span className="relay-bleed-mark" aria-hidden="true">R</span>
@@ -46,12 +52,12 @@ export function RelayEmptyState({
           {illustration}
         </div>
       ) : null}
-      <h2
-        id={titleId}
+      <TitleTag
+        id={resolvedTitleId}
         className={cn("relay-empty-title", enter(illustration ? 2 : 1))}
       >
         {title}
-      </h2>
+      </TitleTag>
       {body ? (
         <p className={cn("relay-empty-body", enter(2))}>{body}</p>
       ) : null}

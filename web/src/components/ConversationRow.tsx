@@ -60,7 +60,7 @@ export function ConversationRow({ item, selected, onSelect, onRename, onClose }:
         className="conversation-row-inner"
         type="button"
         aria-label={rowLabel}
-        aria-pressed={selected}
+        aria-current={selected ? "true" : undefined}
         onClick={() => onSelect(session.id)}
       >
         <span className="conversation-copy">

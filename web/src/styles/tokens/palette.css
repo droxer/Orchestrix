@@ -32,10 +32,14 @@
   --on-action: #101214;
 
   /* Status — a grey brightness hierarchy: loud = bright, calm = dim.
-     Dot/border/text only, never fills, never actions.
-     Warn/err are AA-safe as small text; ok is the decorative-calm tier. */
+      Dot/border/text only, never fills, never actions.
+      Each tone owns a distinct step: err #f2f4f6 > warn #b2b9c1 >
+      info (--ink-3) #99a0a8 > ok #7d848d. Warn/err are AA-safe as small
+      text; ok is the decorative-calm tier. Because err shares its
+      brightness with --action/--ink-1, the bad tone is also encoded by
+      shape (hollow ring) — see StatusPill. */
   --ok: #7d848d;
-  --warn: #99a0a8;
+  --warn: #b2b9c1;
   --err: #f2f4f6;
 
   /* Always-dark register — surfaces that never flip (diff viewer,
@@ -53,10 +57,11 @@
 
   /* ----- Register-invariant scales ----- */
 
-  /* Radii — chips 4, controls 6, cards/drawers/modals 10. */
+  /* Radii — chips 4, controls 6, cards/drawers/modals 10, hero/sheets 14. */
   --r-1: 4px;
   --r-2: 6px;
   --r-3: 10px;
+  --r-4: 14px;
   --r-full: 9999px;
 
   /* Spacing — 4px base. */
@@ -92,6 +97,8 @@
   --fs-2: 0.9286rem; /* 13px */
   --fs-3: 1rem;      /* 14px */
   --fs-4: 1.0714rem; /* 15px */
+  --fs-heading: 1.1429rem; /* 16px — section headings */
+  --fs-number: 1.3571rem;  /* 19px — KPI numerals */
   --fs-5: 1.5714rem; /* 22px */
   --fs-6: 2.2857rem; /* 32px */
 
@@ -135,8 +142,10 @@ html[data-theme="light"] {
   --action-soft: color-mix(in srgb, #16181b 7%, transparent);
   --on-action: #ffffff;
 
+  /* Light status — loud = dark. Steps mirror the dark register:
+     err #16181b > warn #484f57 > info (--ink-3) #5c636b > ok #6b727b. */
   --ok: #6b727b;
-  --warn: #5c636b;
+  --warn: #484f57;
   --err: #16181b;
 
   --scrim: rgba(12, 14, 16, 0.55);

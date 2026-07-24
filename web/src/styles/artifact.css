@@ -201,12 +201,16 @@
   color: inherit;
 }
 
-/* Inline previews for generated workspace files. */
+/* Inline previews for generated workspace files. The 16/9 ratio only acts as
+   a pre-load placeholder (aspect-ratio: auto <ratio> defers to the image's
+   natural ratio once known), so space is reserved against CLS without
+   letterboxing loaded images. */
 .artifact-image-preview {
   display: block;
   width: min(100%, 960px);
+  height: auto;
   max-height: min(70vh, 720px);
-  aspect-ratio: 16 / 9;
+  aspect-ratio: auto 16 / 9;
   object-fit: contain;
   border-radius: var(--r-2);
   background: var(--surface-2);
@@ -223,6 +227,9 @@
 
 /* ── Unified artifact library drawer ─────────────────────────────────── */
 
+/* The strip column never changes size — expansion is an overlay panel that
+   slides over the preview with transform/opacity only, so no layout
+   properties animate. */
 .artifact-library-shell {
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr);
@@ -231,22 +238,18 @@
   overflow: hidden;
   background: var(--surface-0);
   color: var(--ink-1);
-  transition: grid-template-columns var(--t-fast) var(--ease);
-}
-
-.artifact-library-shell.strip-expanded {
-  grid-template-columns: 280px minmax(0, 1fr);
 }
 
 /* Index strip */
 
 .artifact-index-strip {
+  position: relative;
+  z-index: 2;
   min-height: 0;
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--line-1);
   background: var(--surface-1);
-  overflow: hidden;
 }
 
 .artifact-index-strip-icons {
@@ -287,35 +290,39 @@
   box-shadow: var(--focus-ring);
 }
 
-/* Expanded list panel (shown when .strip-expanded) */
-
+/* Expanded list panel — always rendered, parked off-canvas to the left and
+   revealed with transform/opacity (never layout) on expand. */
 .artifact-index-panel {
-  display: none;
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  width: 280px;
+  display: flex;
   flex-direction: column;
-  height: 100%;
   min-height: 0;
   overflow: hidden;
-}
-
-.artifact-library-shell.strip-expanded .artifact-index-strip {
-  width: 280px;
-}
-
-.artifact-library-shell.strip-expanded .artifact-index-strip-icons {
-  display: none;
-}
-
-.artifact-library-shell.strip-expanded .artifact-index-panel {
-  display: flex;
-}
-
-/* Support .is-expanded class on .artifact-index-strip for direct control */
-.artifact-index-strip.is-expanded .artifact-index-strip-icons {
-  display: none;
+  border-right: 1px solid var(--line-1);
+  background: var(--surface-1);
+  box-shadow: var(--shadow-2);
+  transform: translateX(-105%);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    transform var(--t-fast) var(--ease),
+    opacity var(--t-fast) var(--ease),
+    visibility 0s var(--t-fast);
 }
 
 .artifact-index-strip.is-expanded .artifact-index-panel {
-  display: flex;
+  transform: none;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition:
+    transform var(--t-fast) var(--ease),
+    opacity var(--t-fast) var(--ease),
+    visibility 0s;
 }
 
 .artifact-index-search {
@@ -547,23 +554,30 @@
     grid-template-rows: auto minmax(0, 1fr);
   }
 
-  .artifact-library-shell.strip-expanded {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .artifact-library-shell:not(.strip-expanded) .artifact-index-strip-icons {
-    display: none;
-  }
-
-  .artifact-library-shell:not(.strip-expanded) .artifact-index-panel {
-    display: flex;
-  }
-
-  .artifact-library-shell.strip-expanded .artifact-index-strip {
+  /* Mobile keeps the strip as a static top row: no icon rail, no overlay —
+     the panel is simply laid out in flow. */
+  .artifact-index-strip {
     width: 100%;
     max-height: min(38vh, 280px);
     border-right: 0;
     border-bottom: 1px solid var(--line-1);
+  }
+
+  .artifact-index-strip-icons {
+    display: none;
+  }
+
+  .artifact-index-panel {
+    position: static;
+    width: 100%;
+    height: 100%;
+    border-right: 0;
+    box-shadow: none;
+    transform: none;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: none;
   }
 
   .artifact-preview-pane {
@@ -572,7 +586,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .artifact-library-shell,
+  .artifact-index-panel,
   .artifact-index-btn,
   .artifact-index-row,
   .artifact-preview-action-btn {

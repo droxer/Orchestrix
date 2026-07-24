@@ -19,8 +19,7 @@ describe("Admin channel setup navigation", () => {
     assert.match(setupSource, /\$\{idPrefix\}-public-base-url/);
     assert.match(setupSource, /chat-edit-public-base-url/);
     assert.match(setupSource, /updateChatIntegration/);
-    assert.match(setupSource, /value="discord" disabled/);
-    assert.match(setupSource, /chat_provider_coming_soon/);
+    assert.match(setupSource, /adm-chat-provider-static/);
     assert.match(setupSource, /adm-chat-stage/);
     assert.match(setupSource, /adm-chat-section/);
     assert.match(setupSource, /Drawer/);

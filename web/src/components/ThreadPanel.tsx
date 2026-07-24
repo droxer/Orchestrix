@@ -1,8 +1,9 @@
-import { type Dispatch, type SetStateAction } from "react";
+import { useEffect, type Dispatch, type SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 import { ActionCompose, ActionSearch } from "./icons";
 import { ConversationRow, type ConversationItem } from "./ConversationRow";
 import { groupConversations } from "../lib/conversationGroups";
+import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import type { RelaySession } from "../types";
 import { Button } from "./ui/button";
 
@@ -29,6 +30,21 @@ export function ThreadPanel({
   onCloseConversation: (sessionId: string) => void;
 }) {
   const { t } = useTranslation();
+
+  // The filter is owned by the parent (it also filters the conversation
+  // list), but mirrored to the URL so a refresh or shared link restores it.
+  const [urlQuery, setUrlQuery] = useUrlSearchState(
+    "threadQuery",
+    "",
+    (value) => value ?? "",
+    (value) => value || null,
+  );
+  useEffect(() => {
+    if (urlQuery !== query) setQuery(urlQuery);
+  }, [urlQuery, query, setQuery]);
+  useEffect(() => {
+    if (query !== urlQuery) setUrlQuery(query);
+  }, [query, urlQuery, setUrlQuery]);
 
   const groups = groupConversations(conversations);
   const sections = [

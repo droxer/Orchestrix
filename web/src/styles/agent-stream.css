@@ -410,8 +410,7 @@
 
 .agent-status-good    { color: var(--ok); }
 .agent-status-bad { color: var(--err); }
-.agent-status-warn  { color: var(--ink-3); }
-.agent-status-warn  > svg { color: var(--warn); }
+.agent-status-warn  { color: var(--warn); }
 .agent-status-info  { color: var(--ink-2); }
 .agent-status-info  > svg { color: var(--info); }
 
@@ -432,10 +431,11 @@
 /* The caret rides whatever block the streamed text currently ends in — plain
    paragraph, heading, list item, blockquote, or code fence — so a turn that
    is mid-list or mid-fence still shows liveness in the body. */
-.agent-stream.streaming .agent-text:last-child .agent-prose > :last-child:is(p, h1, h2, h3, h4, h5, h6)::after,
+.agent-stream.streaming .agent-text:last-child .agent-prose > :last-child:is(p, h1, h2, h3, h4, h5, h6, div, span)::after,
 .agent-stream.streaming .agent-text:last-child .agent-prose > :last-child:is(ul, ol) li:last-child::after,
 .agent-stream.streaming .agent-text:last-child .agent-prose > blockquote:last-child p:last-child::after,
 .agent-stream.streaming .agent-text:last-child .agent-prose > pre:last-child > code::after,
+.agent-stream.streaming .agent-text:last-child .agent-prose > table:last-child tbody tr:last-child td:last-child::after,
 .agent-stream.streaming .agent-thinking:last-child .agent-thinking-body p:last-child::after {
   content: "";
   display: inline-block;
@@ -448,10 +448,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .agent-stream.streaming .agent-text:last-child .agent-prose > :last-child:is(p, h1, h2, h3, h4, h5, h6)::after,
+  .agent-stream.streaming .agent-text:last-child .agent-prose > :last-child:is(p, h1, h2, h3, h4, h5, h6, div, span)::after,
   .agent-stream.streaming .agent-text:last-child .agent-prose > :last-child:is(ul, ol) li:last-child::after,
   .agent-stream.streaming .agent-text:last-child .agent-prose > blockquote:last-child p:last-child::after,
   .agent-stream.streaming .agent-text:last-child .agent-prose > pre:last-child > code::after,
+  .agent-stream.streaming .agent-text:last-child .agent-prose > table:last-child tbody tr:last-child td:last-child::after,
   .agent-stream.streaming .agent-thinking:last-child .agent-thinking-body p:last-child::after {
     animation: none;
   }
@@ -509,6 +510,11 @@
 
 .artifact-plan-note-loading {
   opacity: 0.6;
+}
+
+.artifact-plan-skeleton {
+  width: 120px;
+  height: 14px;
 }
 
 .artifact-plan-note .artifact-plan-summary {

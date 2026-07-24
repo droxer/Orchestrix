@@ -80,7 +80,7 @@
   .adm-form-actions [data-slot="button"],
   .adm-form-actions button {
     flex: 1 1 calc(50% - var(--sp-3));
-    min-height: 44px;
+    min-height: var(--touch-target);
   }
 
   .adm-form-actions [data-slot="button"]:last-child:nth-child(odd),
@@ -90,8 +90,8 @@
 
   .overlay-close,
   .adm-drawer-close {
-    width: 44px;
-    height: 44px;
+    width: var(--touch-target);
+    height: var(--touch-target);
   }
 
   /* ── Preferences modal ─────────────────────────────────────────── */
@@ -142,8 +142,8 @@
   }
 
   .dialog-input {
-    min-height: 44px;
-    height: 44px;
+    min-height: var(--touch-target);
+    height: var(--touch-target);
     font-size: var(--fs-4);
   }
 
@@ -156,7 +156,7 @@
 
   .dialog-actions [data-slot="button"] {
     width: 100%;
-    min-height: 44px;
+    min-height: var(--touch-target);
   }
 
   /* ── Composer popovers — fixed lower sheet, clear of bottom nav ── */
@@ -165,7 +165,7 @@
     position: fixed;
     left: var(--sp-4);
     right: var(--sp-4);
-    bottom: calc(58px + max(env(safe-area-inset-bottom), 4px) + 7.5rem);
+    bottom: calc(var(--control-h) + var(--sp-4) + max(env(safe-area-inset-bottom), var(--sp-1)) + 7.5rem);
     width: auto;
     max-height: min(38dvh, 300px);
     overflow-y: auto;
@@ -177,7 +177,7 @@
   }
 
   .mention-popover {
-    bottom: calc(58px + max(env(safe-area-inset-bottom), 4px) + 8.5rem);
+    bottom: calc(var(--control-h) + var(--sp-4) + max(env(safe-area-inset-bottom), var(--sp-1)) + 8.5rem);
   }
 
   /* ── Inline handoff expando ────────────────────────────────────── */
@@ -194,7 +194,7 @@
 
   .handoff-actions button {
     width: 100%;
-    min-height: 44px;
+    min-height: var(--touch-target);
   }
 
   /* ── Artifact library drawer chrome ────────────────────────────── */

@@ -43,8 +43,11 @@ const NO_AGENT = "__none__";
 // indicator), never by a text label. Map availability onto the shared
 // `.agent-state` tone classes so agents and teams read the same status
 // language as the backlog/routine boards.
-function availabilityTone(availability: LogicalAgentAvailability): "tone-good" | "tone-warn" | "tone-bad" {
-  return availability === "ready" ? "tone-good" : availability === "offline" ? "tone-bad" : "tone-warn";
+function availabilityTone(availability: LogicalAgentAvailability): "tone-good" | "tone-info" | "tone-warn" | "tone-bad" {
+  if (availability === "ready") return "tone-good";
+  if (availability === "busy") return "tone-info";
+  if (availability === "offline") return "tone-bad";
+  return "tone-warn";
 }
 
 // The picker only reads a handful of fields off an agent/team, so accept a

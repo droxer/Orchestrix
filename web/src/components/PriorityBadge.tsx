@@ -5,8 +5,9 @@ import type { TaskPriority } from "../types";
  * Priority is a rank, not a status — so it gets its own visual language:
  * three ascending signal bars filled to the level (low = 1, normal = 2,
  * high = 3) instead of the leading status dot the generic Badge uses. The
- * accent escalates low → normal → high (muted → ink → danger), matching the
- * card's left rail, and the textual label doubles as the tooltip.
+ * accent escalates low → normal → high (muted → ink → warn) — warn, not the
+ * bad tier: priority is a rank, never failure severity. The textual label
+ * doubles as the tooltip.
  */
 export function PriorityBadge({ priority }: { priority: TaskPriority }) {
   const { t } = useTranslation();

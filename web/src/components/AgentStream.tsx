@@ -18,11 +18,22 @@ import { CollaborationTree } from "./CollaborationTree";
 
 function StreamActivity({ label }: { label: string }) {
   return (
-    <div className="agent-stream-activity" aria-live="polite">
+    <div className="agent-stream-activity" role="status">
       <span className="agent-stream-pulse" aria-hidden="true" />
       <span>{label}</span>
     </div>
   );
+}
+
+// Segments carry no ids; stream order is append-mostly, so kind + per-kind
+// occurrence is a cheap stable key for React's reconciliation.
+function keyedSegments(segments: AgentSegment[]): Array<{ key: string; segment: AgentSegment }> {
+  const counts = new Map<string, number>();
+  return segments.map((segment) => {
+    const seen = counts.get(segment.kind) ?? 0;
+    counts.set(segment.kind, seen + 1);
+    return { key: `${segment.kind}-${seen}`, segment };
+  });
 }
 
 type AgentStreamProps = {
@@ -55,8 +66,8 @@ export function AgentStream({ agent, stdout, stderr, streaming, collaborations }
       return (
         <div className={`agent-stream ${streaming ? "streaming" : ""}`}>
           <CollaborationTree nodes={collaborationNodes} />
-          {emptySegments.map((segment, i) => (
-            <SegmentView key={i} segment={segment} />
+          {keyedSegments(emptySegments).map(({ key, segment }) => (
+            <SegmentView key={key} segment={segment} />
           ))}
           {showActivity ? <StreamActivity label={workingLabel} /> : null}
         </div>
@@ -83,8 +94,8 @@ export function AgentStream({ agent, stdout, stderr, streaming, collaborations }
   return (
     <div className={`agent-stream ${streaming ? "streaming" : ""}`}>
       <CollaborationTree nodes={collaborationNodes} />
-      {segments.map((segment, i) => (
-        <SegmentView key={i} segment={segment} />
+      {keyedSegments(segments).map(({ key, segment }) => (
+        <SegmentView key={key} segment={segment} />
       ))}
       {showActivity ? <StreamActivity label={workingLabel} /> : null}
     </div>

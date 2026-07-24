@@ -10,6 +10,9 @@
   background: var(--surface-1);
 }
 
+/* Layout only — per-button chrome comes from the shadcn <Button> variants
+   (base.css) so the bar uses the same system as the backlog actions:
+   Approve/Send = default (filled), Reject = destructive, the rest = ghost. */
 .decision-bar button,
 .handoff-actions button {
   display: inline-flex;
@@ -18,45 +21,25 @@
   gap: var(--sp-1);
   min-height: var(--control-h);
   padding: 0 var(--sp-4);
-  border: 1px solid var(--line-1);
   border-radius: var(--r-2);
-  background: var(--surface-2);
-  color: var(--ink-1);
   font: var(--type-label-strong);
   transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
 }
 
-.decision-bar button:hover,
-.handoff-actions button:hover {
+/* Ghost secondaries keep the quiet grey fill; the variant system leaves ghost
+   transparent, and in this dense bar a soft fill reads better than bare text. */
+.decision-bar button[data-variant="ghost"],
+.handoff-actions button[data-variant="ghost"] {
+  border: 1px solid var(--line-1);
+  background: var(--surface-2);
+  color: var(--ink-1);
+}
+
+.decision-bar button[data-variant="ghost"]:hover:not(:disabled),
+.handoff-actions button[data-variant="ghost"]:hover:not(:disabled) {
   border-color: var(--action);
   background: var(--surface-0);
   color: var(--action);
-}
-
-.decision-bar .primary,
-.handoff-actions .primary {
-  border-color: var(--action);
-  background: var(--action);
-  color: var(--on-action);
-}
-
-.decision-bar .primary:hover,
-.handoff-actions .primary:hover {
-  border-color: var(--action-hover);
-  background: var(--action-hover);
-  color: var(--on-action);
-}
-
-.decision-bar .danger-soft {
-  color: var(--err);
-  border-color: color-mix(in srgb, var(--err) 32%, transparent);
-  background: var(--surface-0);
-}
-
-.decision-bar .danger-soft:hover {
-  color: var(--err);
-  border-color: var(--err);
-  background: var(--surface-0);
 }
 
 .handoff-panel {

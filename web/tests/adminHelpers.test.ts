@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  agentsForEmployee,
   buildEmployeeSummaries,
   initialsOf,
   isStale,
@@ -10,7 +11,7 @@ import {
   truncateId,
   visualStatus,
 } from "../src/lib/adminHelpers.js";
-import type { ControlPanelDaemonNodeRecord, EmployeeRecord } from "../src/types.js";
+import type { AgentPlacement, ControlPanelDaemonNodeRecord, EmployeeAgent, EmployeeRecord } from "../src/types.js";
 
 function node(input: Partial<ControlPanelDaemonNodeRecord> & { id: string }): ControlPanelDaemonNodeRecord {
   return {
@@ -115,8 +116,24 @@ describe("buildEmployeeSummaries", () => {
     assert.equal(alice.nodeCount, 2);
     assert.equal(alice.readyCount, 1);
     assert.equal(alice.runningCount, 1);
+    assert.equal(alice.failedCount, 0);
     assert.ok(bob);
     assert.equal(bob.nodeCount, 1);
+  });
+
+  it("counts failed and stale nodes so they don't hide as idle", () => {
+    const nodes = [
+      node({ id: "n1", employeeId: "alice", status: "failed" }),
+      node({ id: "n2", employeeId: "alice", status: "ready", stale: true }),
+      node({ id: "n3", employeeId: "alice", status: "stopped" }),
+    ];
+    const summaries = buildEmployeeSummaries([employee({ id: "alice" })], nodes);
+    const alice = summaries.find((s) => s.id === "alice");
+    assert.ok(alice, "alice summary missing");
+    // failed + stale count; the stopped node is neither active nor failed.
+    assert.equal(alice.failedCount, 2);
+    assert.equal(alice.readyCount, 0);
+    assert.equal(alice.runningCount, 0);
   });
 
   it("includes employees that have no nodes", () => {
@@ -131,6 +148,70 @@ describe("buildEmployeeSummaries", () => {
     assert.ok(phantom, "phantom missing");
     assert.equal(phantom.displayName, "phantom");
     assert.equal(phantom.nodeCount, 1);
+  });
+});
+
+function placement(input: Partial<AgentPlacement> & Pick<AgentPlacement, "id" | "daemonNodeId">): AgentPlacement {
+  return {
+    agentId: "agent",
+    employeeId: "someone",
+    nodeDisplayName: undefined,
+    executorKind: "claude",
+    desiredState: "active",
+    status: "ready",
+    priority: 0,
+    agentVersion: 1,
+    workspacePolicy: {},
+    conditions: [],
+    createdAt: "",
+    updatedAt: "",
+    ...input,
+  };
+}
+
+function agent(input: Partial<EmployeeAgent> & Pick<EmployeeAgent, "id">): EmployeeAgent {
+  return {
+    employeeId: "someone",
+    displayName: input.id,
+    executorKind: "claude",
+    skillPolicy: {},
+    toolPolicy: {},
+    modelPolicy: {},
+    enabled: true,
+    version: 1,
+    availability: "ready",
+    placements: [],
+    createdAt: "",
+    updatedAt: "",
+    ...input,
+  };
+}
+
+describe("agentsForEmployee", () => {
+  const alice = buildEmployeeSummaries(
+    [employee({ id: "alice" })],
+    [node({ id: "n1", employeeId: "alice" }), node({ id: "n2", employeeId: "alice" })],
+  )[0];
+
+  it("resolves agents through the employee's nodes, not agent.employeeId", () => {
+    const agents = [
+      // Placed on one of alice's nodes → hers, even though employeeId points elsewhere.
+      agent({ id: "on-node", employeeId: "bob", placements: [placement({ id: "p1", daemonNodeId: "n2" })] }),
+      // employeeId says alice but placed on a foreign node → not shown.
+      agent({ id: "elsewhere", employeeId: "alice", placements: [placement({ id: "p2", daemonNodeId: "other" })] }),
+      // No placements at all → not shown.
+      agent({ id: "unplaced", employeeId: "alice", placements: [] }),
+    ];
+    assert.deepEqual(agentsForEmployee(alice, agents).map((a) => a.id), ["on-node"]);
+  });
+
+  it("ignores removed placements and deleted agents", () => {
+    const agents = [
+      agent({ id: "removed-placement", placements: [placement({ id: "p1", daemonNodeId: "n1", desiredState: "removed" })] }),
+      agent({ id: "deleted", deletedAt: "2026-01-01", placements: [placement({ id: "p2", daemonNodeId: "n1" })] }),
+      agent({ id: "live", placements: [placement({ id: "p3", daemonNodeId: "n1" })] }),
+    ];
+    assert.deepEqual(agentsForEmployee(alice, agents).map((a) => a.id), ["live"]);
   });
 });
 

@@ -89,8 +89,7 @@
     "group_idle": "閒置",
     "statuses": {
       "waiting_for_human": "等待人工"
-    },
-    "no_agents": "沒有就緒的智能體"
+    }
   },
   "conversation": {
     "agent_working": "{{agent}} 正在運作",
@@ -235,7 +234,10 @@
       "low": "低"
     },
     "delete_task": "刪除",
-    "deleting": "正在刪除…"
+    "deleting": "正在刪除…",
+    "delete_title": "刪除任務？",
+    "delete_body": "「{{title}}」將從待辦中移除，關聯的話題與執行歷史仍會保留。",
+    "toast_deleted": "任務已刪除。"
   },
   "workspace": {
     "title": "工作區",
@@ -322,8 +324,9 @@
     "save": "儲存團隊",
     "edit": "編輯團隊",
     "delete": "刪除團隊",
-    "delete_title": "刪除團隊？",
-    "delete_message": "「{{name}}」將被移除。已指派任務會保留團隊參照，直到重新指派。",
+    "deleting": "刪除中…",
+    "delete_title": "刪除「{{name}}」？",
+    "delete_message": "此團隊將無法再被指派任務。團隊中的智慧體和工作記錄會保留，已指派任務也會保留團隊參照，直到重新指派。",
     "drawer_subtitle": "選擇有序成員並指定一名派發負責人。",
     "name": "團隊名稱",
     "members": "成員",
@@ -398,7 +401,8 @@
     "next_run_hint": "例行任務會在當天開始時執行，請選擇今天或之後的日期。",
     "enabled_hint": "關閉後排程將暫停，不會再派發執行。",
     "delete_title": "刪除例行任務？",
-    "delete_body": "將刪除「{{title}}」及其排程，歷史執行紀錄會保留。"
+    "delete_body": "將刪除「{{title}}」及其排程，目前與過去的執行紀錄仍會保留在話題中。",
+    "toast_deleted": "例行任務已刪除。"
   },
   "admin": {
     "title": "管理",
@@ -705,6 +709,7 @@
       "history_title": "歷史記錄",
       "history_description": "為稽核和佈建歷史保留的已刪除受管電腦。",
       "history_deleted": "刪除於 {{time}}",
+      "history_count": "{{count}} 台已刪除的電腦",
       "history_delete_action": "永久刪除",
       "history_deleting": "正在刪除…",
       "history_delete_confirm": "永久刪除 {{name}}（{{id}}）？",
@@ -792,7 +797,6 @@
       "deleting": "刪除中…",
       "save_agent_settings": "儲存執行器設定",
       "selected_employee": "已選員工",
-      "dash_spark_summary": "最小 {{min}}，最大 {{max}}，最新 {{latest}}",
       "chat_delete_link_confirm": "刪除 {{id}} 的身分連結？",
       "chat_delete_allow_confirm": "刪除允許的對話 {{id}}？"
     },

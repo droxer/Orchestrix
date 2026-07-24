@@ -12,10 +12,10 @@ import { Badge } from "@/components/ui/badge";
 import { PriorityBadge } from "./PriorityBadge";
 import { cn } from "@/lib/utils";
 import { type CurrentUser, type DaemonNodeMonitorRecord, type EmployeeAgent, type RelaySession, type RelayTask } from "../types";
-import { ActionCalendar, ActionStart, NavConversations, ViewGrid, ViewList } from "./icons";
+import { ActionCalendar, ActionStart, ViewGrid, ViewList } from "./icons";
 import { agentReadyForTask } from "../lib/backlog";
 import { TaskAssignee, TaskExecutionBadge } from "./TaskAssignee";
-import { taskAssigneeDisplayName, teamReady } from "../lib/taskAssignment";
+import { isTaskAssigneeCurrentUser, taskAssigneeDisplayName, teamReady } from "../lib/taskAssignment";
 import { readViewPreference, writeViewPreference } from "../lib/viewPreference";
 import { filterRoutineTasks, latestRoutineSession, routineDueTone, TASK_ROUTINE_CADENCES, TASK_ROUTINE_TYPES, type RoutineFilters } from "../lib/routine";
 import { emptyRoutineForm, taskAssignmentMutationFields, taskBoardFormsEqual, type RoutineTaskFormState } from "../lib/taskBoardForm";
@@ -163,27 +163,52 @@ function RoutineFiltersBar({ filters, agents, onChange }: { filters: RoutineFilt
   );
 }
 
+function RoutineStartButton({
+  disabled,
+  onStart,
+}: {
+  disabled: boolean;
+  onStart: () => void;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <Button
+      variant="ghost"
+      type="button"
+      className="icon-button icon-button--sm icon-button--tinted backlog-action-icon"
+      onClick={onStart}
+      disabled={disabled}
+      aria-label={t("backlog.start")}
+      title={t("backlog.start")}
+    >
+      <ActionStart size={14} />
+    </Button>
+  );
+}
+
 function RoutineCard({
   task,
   session,
   ready,
   assigneeDisplayName,
+  assigneeIsSelf,
   agentDisplayName,
   onEdit,
   onStart,
-  onOpenThread,
 }: {
   task: RelayTask;
   session?: RelaySession;
   ready: boolean;
   assigneeDisplayName?: string;
+  assigneeIsSelf?: boolean;
   agentDisplayName?: string;
   onEdit: () => void;
   onStart: () => void;
-  onOpenThread: () => void;
 }) {
   const { t } = useTranslation();
   const tone = routineDueTone(task);
+  const startDisabled = (!task.assignedAgentId && !task.assignedTeamId) || !task.routineEnabled;
 
   return (
     <article className="routine-card backlog-task list-virtual" data-priority={task.priority} data-status={task.status}>
@@ -197,8 +222,12 @@ function RoutineCard({
       <div className="backlog-meta">
         <span>{t(`routine.types.${task.routineType ?? "task"}`)} · {t(`routine.cadences.${task.routineCadence ?? "weekly"}`)}</span>
         <span className="backlog-meta-sep" aria-hidden="true">·</span>
-        <TaskAssignee task={task} ready={ready} assigneeDisplayName={assigneeDisplayName} agentDisplayName={agentDisplayName} unassignedLabel={t("backlog.unassigned")} showAgent={false} />
-        <span className="backlog-meta-sep" aria-hidden="true">·</span>
+        {assigneeIsSelf ? null : (
+          <>
+            <TaskAssignee task={task} ready={ready} assigneeDisplayName={assigneeDisplayName} agentDisplayName={agentDisplayName} unassignedLabel={t("backlog.unassigned")} showAgent={false} />
+            <span className="backlog-meta-sep" aria-hidden="true">·</span>
+          </>
+        )}
         <span className={cn("backlog-due", tone !== "neutral" && tone)}>
           <ActionCalendar size={13} />
           {task.routineNextRunDate ? formatNextRunDate(task.routineNextRunDate) : t("routine.no_next_run")}
@@ -212,18 +241,8 @@ function RoutineCard({
       </div>
       <div className="backlog-task-actions" role="group" aria-label={t("backlog.actions")}>
         <div className="backlog-action-group" aria-label={t("backlog.actions_dispatch")}>
-          <Button variant="default"
-            type="button"
-            className="backlog-action-primary backlog-action-icon"
-            onClick={onStart} disabled={(!task.assignedAgentId && !task.assignedTeamId) || !task.routineEnabled} aria-label={t("backlog.start")} title={t("backlog.start")}>
-            <ActionStart size={14} />
-          </Button>
+          <RoutineStartButton disabled={startDisabled} onStart={onStart} />
         </div>
-        {session ? (
-          <div className="backlog-action-group">
-            <Button variant="ghost" type="button" onClick={onOpenThread}>{t("backlog.open_thread")}</Button>
-          </div>
-        ) : null}
       </div>
     </article>
   );
@@ -264,22 +283,23 @@ function RoutineRow({
   session,
   ready,
   assigneeDisplayName,
+  assigneeIsSelf,
   agentDisplayName,
   onEdit,
   onStart,
-  onOpenThread,
 }: {
   task: RelayTask;
   session?: RelaySession;
   ready: boolean;
   assigneeDisplayName?: string;
+  assigneeIsSelf?: boolean;
   agentDisplayName?: string;
   onEdit: () => void;
   onStart: () => void;
-  onOpenThread: () => void;
 }) {
   const { t } = useTranslation();
   const tone = routineDueTone(task);
+  const startDisabled = (!task.assignedAgentId && !task.assignedTeamId) || !task.routineEnabled;
 
   return (
     <article className="backlog-row group list-virtual" role="row" data-status={task.status} data-priority={task.priority}>
@@ -294,7 +314,7 @@ function RoutineRow({
         <PriorityBadge priority={task.priority} />
       </div>
       <span className="backlog-row-assignee" role="cell">
-        <TaskAssignee task={task} ready={ready} assigneeDisplayName={assigneeDisplayName} agentDisplayName={agentDisplayName} unassignedLabel={t("backlog.unassigned")} />
+        <TaskAssignee task={task} ready={ready} assigneeDisplayName={assigneeDisplayName} assigneeIsSelf={assigneeIsSelf} agentDisplayName={agentDisplayName} unassignedLabel={t("backlog.unassigned")} />
       </span>
       <span className={cn("backlog-row-due", tone !== "neutral" && tone)} role="cell">
         <ActionCalendar size={13} />
@@ -302,30 +322,8 @@ function RoutineRow({
       </span>
       <div className="backlog-row-actions" role="cell" aria-label={t("backlog.actions")}>
         <div className="backlog-action-group" aria-label={t("backlog.actions_dispatch")}>
-          <Button variant="default"
-            type="button"
-            className="backlog-action-primary backlog-action-icon"
-            onClick={onStart}
-            disabled={(!task.assignedAgentId && !task.assignedTeamId) || !task.routineEnabled}
-            aria-label={t("backlog.start")}
-            title={t("backlog.start")}
-          >
-            <ActionStart size={14} />
-          </Button>
+          <RoutineStartButton disabled={startDisabled} onStart={onStart} />
         </div>
-        {session ? (
-          <div className="backlog-action-group">
-            <Button variant="ghost"
-              type="button"
-              className="backlog-action-icon"
-              onClick={onOpenThread}
-              aria-label={t("backlog.open_thread")}
-              title={t("backlog.open_thread")}
-            >
-              <NavConversations size={14} />
-            </Button>
-          </div>
-        ) : null}
       </div>
     </article>
   );
@@ -366,7 +364,7 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
   const { agents: logicalAgents } = useEmployeeAgents(currentUser.employeeId);
   const { teams } = useTeams(currentUser.employeeId);
   const { t } = useTranslation();
-  const { confirm } = useDialogs();
+  const { announce, confirm } = useDialogs();
   const {
     startTaskMutation,
     updateTaskMutation,
@@ -462,6 +460,7 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
       await deleteTaskMutation.mutateAsync({ taskId: form.id });
       setForm(null);
       setFormBaseline(null);
+      announce({ message: t("routine.toast_deleted"), tone: "success" });
     } catch {
       // mutation onError surfaces a toast; keep the drawer open for retry.
     } finally {
@@ -490,11 +489,10 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
   const editingTask = form?.id ? tasks.find((task) => task.id === form.id) : undefined;
   const editingSession = editingTask ? linkedSession(editingTask) : undefined;
 
-  function routineHandlers(task: RelayTask, session?: RelaySession) {
+  function routineHandlers(task: RelayTask) {
     return {
       onEdit: () => editTask(task),
       onStart: () => void startTaskMutation.mutate({ taskId: task.id }),
-      onOpenThread: () => session && onOpenConversation(session.id),
     };
   }
 
@@ -546,9 +544,10 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
                 task={task}
                 session={session}
                 assigneeDisplayName={taskAssigneeDisplayName(task, currentUser)}
+                assigneeIsSelf={isTaskAssigneeCurrentUser(task, currentUser)}
                 agentDisplayName={assignment.name}
                 ready={assignment.ready}
-                {...routineHandlers(task, session)}
+                {...routineHandlers(task)}
               />
             );
           })}
@@ -564,9 +563,10 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
                 task={task}
                 session={session}
                 assigneeDisplayName={taskAssigneeDisplayName(task, currentUser)}
+                assigneeIsSelf={isTaskAssigneeCurrentUser(task, currentUser)}
                 agentDisplayName={assignment.name}
                 ready={assignment.ready}
-                {...routineHandlers(task, session)}
+                {...routineHandlers(task)}
               />
             );
           })}

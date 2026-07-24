@@ -45,10 +45,17 @@ export function userVisibleAgentSegments(segments: AgentSegment[]): AgentSegment
   );
 }
 
-/** While a run is live, surface tool/command lines so long silent stretches still read as activity. */
+/**
+ * While a run is live, surface tool/command lines so long silent stretches
+ * still read as activity. After settle they stay too — the settled transcript
+ * keeps the tool log instead of collapsing to prose only.
+ */
 export function displayAgentSegments(segments: AgentSegment[], streaming: boolean): AgentSegment[] {
-  if (!streaming) return userVisibleAgentSegments(segments);
-  return segments.filter((segment) => segment.kind !== "thinking");
+  if (streaming) return segments.filter((segment) => segment.kind !== "thinking");
+  const visible = new Set(userVisibleAgentSegments(segments));
+  return segments.filter(
+    (segment) => segment.kind === "tool" || segment.kind === "command" || visible.has(segment),
+  );
 }
 
 export function hasStreamingTextCaret(segments: AgentSegment[]): boolean {

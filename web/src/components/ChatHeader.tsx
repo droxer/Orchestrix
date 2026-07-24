@@ -1,16 +1,13 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import type { AgentName, EmployeeAgent, RelaySession } from "../types";
+import type { AgentName, RelaySession } from "../types";
 import { NavConversations } from "./icons";
-import { AgentMark } from "./AgentMark";
 import { ArtifactNavButton } from "./ArtifactNavButton";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import {
   conversationActivity,
   type ConversationActivityKind,
 } from "../lib/conversationActivity";
-import { isLogicalAgentRoutable } from "../lib/agentDisplayNames";
 import { formatCompactTokens } from "../lib/tokenUsage";
 import { Button } from "./ui/button";
 
@@ -25,12 +22,9 @@ const ACTIVITY_BADGE: Record<
   neutral: "neutral",
 };
 
-// Chat-panel header: session identity, status, agent picker, and refresh.
-export function ChatHeader({ activeAgent, logicalAgents, activeLogicalAgentId, onLogicalAgentPicked, activeSession, runningAgent, runningAgentDisplayName, isRefreshing, artifactCount, onOpenArtifacts, onRefresh, onBackToThreads }: {
-  activeAgent: AgentName;
-  logicalAgents: EmployeeAgent[];
-  activeLogicalAgentId: string | null;
-  onLogicalAgentPicked: (agent: EmployeeAgent) => void;
+// Chat-panel header: session identity, status, and refresh. The agent picker
+// lives in the composer footer.
+export function ChatHeader({ activeSession, runningAgent, runningAgentDisplayName, isRefreshing, artifactCount, onOpenArtifacts, onRefresh, onBackToThreads }: {
   activeSession: RelaySession | undefined;
   runningAgent?: AgentName;
   runningAgentDisplayName?: string;
@@ -53,14 +47,10 @@ export function ChatHeader({ activeAgent, logicalAgents, activeLogicalAgentId, o
   const activityRaw = activeSession
     ? conversationActivity(activeSession.status, runningAgent)
     : null;
-  // "Completed" is settled noise in the chat header; keep working / waiting / failed / cancelled.
-  const activity = activityRaw?.kind === "good" ? null : activityRaw;
+  // Completion is a positive cue — a settled "completed" badge — not the
+  // absence of any status.
+  const activity = activityRaw;
   const showMeta = Boolean(activity || tokenUsage);
-  const activeLogicalAgent = logicalAgents.find((agent) => agent.id === activeLogicalAgentId);
-  const handleAgentSelected = (value: string | null) => {
-    const next = logicalAgents.find((agent) => agent.id === value);
-    if (next && isLogicalAgentRoutable(next.availability)) onLogicalAgentPicked(next);
-  };
   return (
     <header className="chat-header">
       <div className="chat-title">
@@ -92,54 +82,6 @@ export function ChatHeader({ activeAgent, logicalAgents, activeLogicalAgentId, o
         </div>
       </div>
       <div className="chat-tools">
-        {logicalAgents.length > 0 ? (
-          <Select value={activeLogicalAgentId} onValueChange={handleAgentSelected}>
-            <SelectTrigger size="sm" className="chat-agent-select" aria-label={t("thread.talk_to_agent")}>
-              <AgentMark
-                agent={activeLogicalAgent?.executorKind ?? activeAgent}
-                size={16}
-                className="chat-active-agent-mark"
-              />
-              <span className="chat-agent-select-name" translate="no">
-                {activeLogicalAgent?.displayName ?? activeAgent}
-              </span>
-              {activeLogicalAgent?.availability === "busy" ? (
-                <span className="header-agent-busy-pip" aria-hidden="true" />
-              ) : null}
-            </SelectTrigger>
-            <SelectContent align="end" alignItemWithTrigger={false}>
-              {logicalAgents.map((logicalAgent) => {
-                const isRoutable = isLogicalAgentRoutable(logicalAgent.availability);
-                const isBusy = logicalAgent.availability === "busy";
-                // Non-routable agents stay listed (disabled) with their
-                // availability spelled out so users can see why an agent
-                // cannot take the conversation.
-                const availabilityLabel = !isRoutable
-                  ? t(`admin.v2.placement_status.${logicalAgent.availability}`, {
-                      defaultValue: logicalAgent.availability,
-                    })
-                  : null;
-                return (
-                  <SelectItem
-                    key={logicalAgent.id}
-                    value={logicalAgent.id}
-                    disabled={!isRoutable}
-                    data-availability={logicalAgent.availability}
-                  >
-                    <AgentMark agent={logicalAgent.executorKind} size={16} className="chat-agent-option-mark" />
-                    <span translate="no">{logicalAgent.displayName}</span>
-                    {availabilityLabel ? (
-                      <span className="chat-agent-option-availability">{availabilityLabel}</span>
-                    ) : null}
-                    {isBusy ? <span className="header-agent-busy-pip" aria-hidden="true" /> : null}
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
-        ) : (
-          <span className="text-muted-foreground">{t("thread.no_agents")}</span>
-        )}
         <ArtifactNavButton
           artifactCount={artifactCount}
           hasSession={Boolean(activeSession)}

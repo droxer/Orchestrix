@@ -371,6 +371,7 @@
 }
 
 .agent-state.tone-good::after { background: var(--ok); }
+.agent-state.tone-info::after { background: var(--info); }
 .agent-state.tone-warn::after { background: var(--warn); }
 /* Offline drops out of the brightness race: a bright --err fill is
    byte-identical to --action white and read as "primary/selected" rather
@@ -425,9 +426,9 @@
 }
 
 .priority-badge[data-priority="high"] {
-  --prio-accent: var(--err);
-  border-color: color-mix(in srgb, var(--err) 30%, var(--line-1));
-  color: var(--err);
+  --prio-accent: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 30%, var(--line-1));
+  color: var(--warn);
 }
 
 .priority-bars {
@@ -599,7 +600,7 @@
 }
 
 .backlog-task-actions select,
-.backlog-task-actions button {
+.backlog-task-actions button:not(.icon-button) {
   min-height: 28px;
   border: 1px solid var(--line-1);
   border-radius: var(--r-2);
@@ -616,7 +617,7 @@
   max-width: 96px;
 }
 
-.backlog-task-actions button:hover:not(:disabled) {
+.backlog-task-actions button:not(.icon-button):hover:not(:disabled) {
   background: var(--surface-1);
   border-color: color-mix(in srgb, var(--ink-1) 14%, var(--line-1));
 }
@@ -626,7 +627,9 @@
   cursor: not-allowed;
 }
 
-.backlog-task-actions .backlog-action-primary {
+/* Filled only while actionable; a disabled start recedes to a ghost icon so
+   Done/running rows don't scatter faded action blocks. */
+.backlog-task-actions .backlog-action-primary:not(:disabled) {
   background: var(--action);
   border-color: var(--action);
   color: var(--on-action);
@@ -1491,8 +1494,21 @@
   gap: var(--sp-1);
 }
 
-.backlog-row-actions button {
+/* Routine rows carry only the Start action, but the list shares the backlog
+   header/columns. Reserve the width of backlog's Block+Done state group (two
+   28px icons + their gap + the divider) so the play button lands in the same
+   column position on both lists. Keep in sync with `.backlog-action-group +
+   .backlog-action-group` (margin --sp-1 + padding --sp-2+--sp-1 + 1px border)
+   and the row gap (--sp-1). */
+.routine-page .backlog-row-actions {
+  padding-right: calc(2 * 28px + 4 * var(--sp-1) + var(--sp-2) + 1px);
+}
+
+.backlog-row-actions button:not(.icon-button) {
   min-height: 28px;
+  /* Square the icon buttons (width is pinned to 28px) instead of stretching to
+     the 40px control height — a lone action (routine) looked tall/narrow. */
+  height: 28px;
   border: 1px solid var(--line-1);
   border-radius: var(--r-2);
   background: var(--surface-0);
@@ -1504,7 +1520,7 @@
   transition: background var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
 }
 
-.backlog-row-actions button:hover:not(:disabled) {
+.backlog-row-actions button:not(.icon-button):hover:not(:disabled) {
   background: var(--surface-1);
   border-color: color-mix(in srgb, var(--ink-1) 14%, var(--line-1));
 }
@@ -1518,6 +1534,10 @@
   display: inline-flex;
   align-items: center;
   gap: var(--sp-1);
+}
+
+/* Filled only while actionable; a disabled start recedes to a ghost icon. */
+.backlog-row-actions .backlog-action-primary:not(:disabled) {
   background: var(--action);
   border-color: var(--action);
   color: var(--on-action);
@@ -1593,18 +1613,23 @@
     justify-content: flex-start;
   }
 
-  .backlog-row-actions button,
-  .backlog-row-actions .backlog-action-icon {
+  .backlog-row-actions button:not(.icon-button),
+  .backlog-row-actions .backlog-action-icon:not(.icon-button) {
     min-height: 36px;
     min-width: 36px;
     border-radius: var(--r-2);
+  }
+
+  .backlog-row-actions .icon-button {
+    width: 36px;
+    height: 36px;
   }
 
   /* Give every secondary action a visible chip surface. On the dark canvas the
      ghost buttons (with a faint hairline) all but vanished — worse when
      disabled — so they read as neither present nor tappable. The green primary
      (Start) keeps its own fill. */
-  .backlog-row-actions button:not(.backlog-action-primary) {
+  .backlog-row-actions button:not(.backlog-action-primary, .icon-button) {
     background: var(--surface-1);
   }
 

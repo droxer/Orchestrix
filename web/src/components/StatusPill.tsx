@@ -1,14 +1,36 @@
 import { useTranslation } from "react-i18next";
 import type { CSSProperties } from "react";
 import type { Tone } from "../types";
+import type { StatusValue } from "../lib/conversationStatus";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
-function statusTone(value: string): Tone {
-  if (value === "ready" || value === "completed" || value === "done") return "good";
-  if (value === "running" || value === "busy") return "info";
-  if (value === "failed" || value === "blocked" || value === "cancelled" || value === "offline") return "bad";
-  return "warn";
+// Canonical status → tone mapping: live work (running/busy/provisioning) is
+// info, queued/paused (pending/stopped) is warn, and every failure or
+// unreachable state is bad. Truly unknown values fall through to neutral so
+// a new backend state never silently masquerades as a warning.
+function statusTone(value: StatusValue): Tone {
+  switch (value) {
+    case "ready":
+    case "completed":
+    case "done":
+      return "good";
+    case "running":
+    case "busy":
+    case "provisioning":
+      return "info";
+    case "pending":
+    case "stopped":
+      return "warn";
+    case "failed":
+    case "blocked":
+    case "cancelled":
+    case "offline":
+    case "stale":
+      return "bad";
+    default:
+      return "neutral";
+  }
 }
 
 export { statusTone };
@@ -40,7 +62,7 @@ const DOT_PULSE_COLOR: Record<Tone, string> = {
   neutral: "var(--ink-4)",
 };
 
-type StatusPillProps = { value: string };
+type StatusPillProps = { value: StatusValue };
 
 export function StatusPill({ value }: StatusPillProps) {
   const { t } = useTranslation();

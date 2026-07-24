@@ -25,6 +25,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
 }) {
   const { t } = useTranslation();
   const [navTooltip, setNavTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
+  const tooltipSuppressRef = useRef<HTMLElement | null>(null);
   const [settingsMenu, setSettingsMenu] = useState<{ x: number; y: number } | null>(null);
   const [moreMenu, setMoreMenu] = useState<{ x: number; y: number } | null>(null);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
@@ -120,12 +121,27 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
     };
   }, [moreMenu]);
 
+  useEffect(() => {
+    if (!navTooltip) return;
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      tooltipSuppressRef.current = document.activeElement as HTMLElement | null;
+      setNavTooltip(null);
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [navTooltip]);
+
   function showNavTooltip(text: string, el: HTMLElement) {
     if (sidenavExpanded) return;
+    if (tooltipSuppressRef.current === el) return;
     const rect = el.getBoundingClientRect();
     setNavTooltip({ text, x: rect.right + 12, y: rect.top + rect.height / 2 });
   }
-  function hideNavTooltip() { setNavTooltip(null); }
+  function hideNavTooltip() {
+    tooltipSuppressRef.current = null;
+    setNavTooltip(null);
+  }
   function toggleSettingsMenu(el: HTMLElement) {
     hideNavTooltip();
     setMoreMenu(null);
@@ -173,13 +189,13 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
   const moreActive = route === "channels" || route === "admin";
 
   return (
-    <aside className="sidenav-panel" aria-label="Relay" data-expanded={sidenavExpanded ? "true" : "false"}>
+    <aside className="sidenav-panel" aria-label={t("nav.brand", { defaultValue: "Relay" })} data-expanded={sidenavExpanded ? "true" : "false"}>
       <div className="sidenav-brand-row">
         <div className="sidenav-brand" aria-hidden="true">
           <span className="sidenav-brand-mark"><RelayMark width={24} height={24} /></span>
           <span className="sidenav-brand-copy">
-            <span className="sidenav-brand-word">Relay</span>
-            <span className="sidenav-brand-meta">{t("nav.workspace")}</span>
+            <span className="sidenav-brand-word sr-only">Relay</span>
+            <span className="sidenav-brand-meta sr-only">{t("nav.workspace")}</span>
           </span>
         </div>
         <Button
@@ -195,12 +211,12 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
           onBlur={hideNavTooltip}
         >
           {sidenavExpanded ? <NavSidebarCollapse size={16} /> : <NavSidebarExpand size={16} />}
-          <span className="sidenav-toggle-label">{sidenavExpanded ? t("nav.collapse") : t("nav.expand")}</span>
+          <span className="sidenav-toggle-label sr-only">{sidenavExpanded ? t("nav.collapse") : t("nav.expand")}</span>
         </Button>
       </div>
       <nav className="sidenav-nav" aria-label={t("nav.workspace_label")}>
         <div className="sidenav-group" role="group" aria-label={t("nav.workspace")}>
-          <span className="sidenav-group-label" aria-hidden="true">{t("nav.workspace")}</span>
+          <span className="sidenav-group-label sr-only" aria-hidden="true">{t("nav.workspace")}</span>
           <a
             className={`sidenav-btn ${route === "main" ? "active" : ""}`}
             data-nav="conversations"
@@ -214,7 +230,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
             onBlur={hideNavTooltip}
           >
             <NavConversations size={18} />
-            <span className="sidenav-label">{t("nav.conversations")}</span>
+            <span className="sidenav-label sr-only">{t("nav.conversations")}</span>
           </a>
           <a
             className={`sidenav-btn ${route === "backlog" ? "active" : ""}`}
@@ -229,7 +245,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
             onBlur={hideNavTooltip}
           >
             <NavBacklog size={18} />
-            <span className="sidenav-label">{t("nav.backlog")}</span>
+            <span className="sidenav-label sr-only">{t("nav.backlog")}</span>
           </a>
           <a
             className={`sidenav-btn ${route === "routine" ? "active" : ""}`}
@@ -244,11 +260,11 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
             onBlur={hideNavTooltip}
           >
             <NavRoutine size={18} />
-            <span className="sidenav-label">{t("nav.routine")}</span>
+            <span className="sidenav-label sr-only">{t("nav.routine")}</span>
           </a>
         </div>
         <div className="sidenav-group sidenav-group--separated" role="group" aria-label={t("nav.workforce")}>
-          <span className="sidenav-group-label" aria-hidden="true">{t("nav.workforce")}</span>
+          <span className="sidenav-group-label sr-only" aria-hidden="true">{t("nav.workforce")}</span>
           <a
             className={`sidenav-btn ${route === "agents" ? "active" : ""}`}
             data-nav="agents"
@@ -262,7 +278,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
             onBlur={hideNavTooltip}
           >
             <NavAgents size={18} />
-            <span className="sidenav-label">{t("nav.agents")}</span>
+            <span className="sidenav-label sr-only">{t("nav.agents")}</span>
           </a>
           <a
             className={`sidenav-btn ${route === "teams" ? "active" : ""}`}
@@ -277,12 +293,12 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
             onBlur={hideNavTooltip}
           >
             <NavTeams size={18} />
-            <span className="sidenav-label">{t("nav.teams")}</span>
+            <span className="sidenav-label sr-only">{t("nav.teams")}</span>
           </a>
         </div>
         {isAdmin ? (
           <div className="sidenav-group sidenav-group--separated" role="group" aria-label={t("nav.manage")}>
-            <span className="sidenav-group-label sidenav-overflow-item" aria-hidden="true">{t("nav.manage")}</span>
+            <span className="sidenav-group-label sidenav-overflow-item sr-only" aria-hidden="true">{t("nav.manage")}</span>
             <a
               className={`sidenav-btn sidenav-overflow-item ${route === "channels" ? "active" : ""}`}
               data-nav="channels"
@@ -296,7 +312,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
               onBlur={hideNavTooltip}
             >
               <NavChannels size={18} />
-              <span className="sidenav-label">{t("nav.channels")}</span>
+              <span className="sidenav-label sr-only">{t("nav.channels")}</span>
             </a>
             <a
               className={`sidenav-btn sidenav-overflow-item ${route === "admin" ? "active" : ""}`}
@@ -311,7 +327,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
               onBlur={hideNavTooltip}
             >
               <NavAdmin size={18} />
-              <span className="sidenav-label">{t("nav.admin")}</span>
+              <span className="sidenav-label sr-only">{t("nav.admin")}</span>
             </a>
             <Button
               ref={moreButtonRef}
@@ -323,9 +339,13 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
               aria-haspopup="menu"
               aria-expanded={Boolean(moreMenu)}
               onClick={(event) => toggleMoreMenu(event.currentTarget)}
+              onMouseEnter={(e) => showNavTooltip(t("nav.more"), e.currentTarget)}
+              onMouseLeave={hideNavTooltip}
+              onFocus={(e) => showNavTooltip(t("nav.more"), e.currentTarget)}
+              onBlur={hideNavTooltip}
             >
               <NavMore size={18} />
-              <span className="sidenav-label">{t("nav.more")}</span>
+              <span className="sidenav-label sr-only">{t("nav.more")}</span>
             </Button>
           </div>
         ) : null}
@@ -347,7 +367,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
           onBlur={hideNavTooltip}
         >
           <NavPreferences size={18} />
-          <span className="sidenav-label">{t("nav.settings")}</span>
+          <span className="sidenav-label sr-only">{t("nav.settings")}</span>
         </Button>
       </div>
       {/* Portaled to <body>: the mobile bottom bar has a backdrop-filter,

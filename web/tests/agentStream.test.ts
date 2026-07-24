@@ -203,7 +203,7 @@ describe("agent stream parsing", () => {
     ]);
   });
 
-  it("shows tool and command lines only while a run is streaming", () => {
+  it("keeps tool and command lines in the settled transcript", () => {
     const segments: AgentSegment[] = [
       { kind: "text", text: "Planning." },
       { kind: "tool", name: "Read", target: "src/app.ts" },
@@ -216,8 +216,11 @@ describe("agent stream parsing", () => {
       { kind: "tool", name: "Read", target: "src/app.ts" },
       { kind: "command", command: "npm test" },
     ]);
+    // Settling must not erase the tool log — only internal reasoning drops.
     assert.deepEqual(displayAgentSegments(segments, false), [
       { kind: "text", text: "Planning." },
+      { kind: "tool", name: "Read", target: "src/app.ts" },
+      { kind: "command", command: "npm test" },
     ]);
   });
 

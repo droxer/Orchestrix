@@ -32,8 +32,6 @@ export function DashboardView({ nodes, employees, metrics }: DashboardViewProps)
   const dash = "—";
   const showTokens = tokens.available;
 
-  const fleetSpark = sparkFromCounts([metrics.failed, metrics.running, metrics.ready]);
-
   const last24h = sessions.last24h;
   const prior24h = clampNonNeg(sessions.last7d - last24h) / 6;
   const trend = compareTrend(last24h, prior24h);
@@ -73,7 +71,6 @@ export function DashboardView({ nodes, employees, metrics }: DashboardViewProps)
                 ? t("admin.v2.dash_kpi_nodes_hint", { ready: metrics.ready, failed: metrics.failed })
                 : undefined
             }
-            spark={fleetReady && fleetSpark.length > 1 ? fleetSpark : undefined}
           />
           <KpiTile
             slot="employees"
@@ -136,11 +133,6 @@ function compareTrend(current: number, prior: number): Trend {
     direction: diff > 0 ? "up" : "down",
     label: `${pct > 0 ? "+" : ""}${pct}%`,
   };
-}
-
-function sparkFromCounts(values: number[]): number[] {
-  if (values.every((v) => v === 0)) return [];
-  return values;
 }
 
 function formatCompact(value: number, locale: string): string {

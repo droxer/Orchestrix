@@ -6,6 +6,7 @@ import { login, RelayApiError } from "../api";
 import type { CurrentUser } from "../types";
 import { RelayMark } from "./RelayMark";
 import { Button } from "./ui/button";
+import { NavRefresh } from "./icons";
 
 interface LoginScreenProps {
   onAuthenticated: (user: CurrentUser) => void;
@@ -65,7 +66,11 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
               value={username}
               onChange={(event) => setUsername(event.target.value)}
               autoComplete="username"
+              autoCapitalize="none"
+              autoCorrect="off"
               spellCheck={false}
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? "login-error" : undefined}
             />
           </label>
           <label className="login-field">
@@ -77,16 +82,19 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               autoComplete="current-password"
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? "login-error" : undefined}
             />
           </label>
 
           {error && (
-            <p className="login-error" role="alert">
+            <p className="login-error" id="login-error" role="alert">
               {error}
             </p>
           )}
 
           <Button variant="default" type="submit" className="login-submit" disabled={isLoading || !canSubmit}>
+            {isLoading ? <NavRefresh size={14} className="spin" aria-hidden="true" /> : null}
             {isLoading ? t("login.loading") : t("login.sign_in")}
           </Button>
         </form>

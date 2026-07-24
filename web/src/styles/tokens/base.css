@@ -94,11 +94,18 @@ button:disabled {
 }
 
 button:not(:disabled):active {
-  transform: translateY(1px);
+  /* `translate` (not `transform`) so component-level transforms survive. */
+  translate: 0 1px;
 }
 
-/* Focus — single ring contract. */
-:where(button, a, input, textarea, select):focus-visible {
+/* Focus — single ring contract. Element+pseudo selectors (not :where) so
+   the ring outranks component box-shadows; forced-colors gets a real
+   outline because box-shadow is dropped there. */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -107,6 +114,19 @@ button:not(:disabled):active {
   outline: none;
   box-shadow: var(--focus-ring);
   outline-offset: 0;
+}
+
+@media (forced-colors: active) {
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible,
+  .chat-panel:focus-visible {
+    outline: 2px solid CanvasText;
+    outline-offset: 2px;
+    box-shadow: none;
+  }
 }
 
 /* Button primitive fills — the unlayered element resets above (`background:

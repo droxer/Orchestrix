@@ -45,8 +45,8 @@ function PrefSelectedCheck() {
   return (
     <span className="pref-option-check" aria-hidden="true">
       <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-        <circle cx="7" cy="7" r="7" fill="var(--color-primary)" />
-        <path d="M4 7l2 2 4-4" stroke="var(--color-on-primary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx="7" cy="7" r="7" fill="var(--action)" />
+        <path d="M4 7l2 2 4-4" stroke="var(--on-action)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     </span>
   );
@@ -107,13 +107,13 @@ function AppearanceSection({
   const refs = useRef<Map<Theme, HTMLButtonElement | null>>(new Map());
   const registerRef = (value: Theme, el: HTMLButtonElement | null) => { refs.current.set(value, el); };
   return (
-    <div
-      role="radiogroup"
-      aria-label={t("pref.theme.group")}
-      onKeyDown={(e) => moveRadioSelection(e, THEME_VALUES, theme, refs, onThemeChange)}
-    >
-      <p className="pref-group-label">{t("pref.theme.group")}</p>
-      <div className="pref-option-list">
+    <fieldset className="pref-fieldset">
+      <legend className="pref-group-label">{t("pref.theme.group")}</legend>
+      <div
+        role="radiogroup"
+        className="pref-option-list"
+        onKeyDown={(e) => moveRadioSelection(e, THEME_VALUES, theme, refs, onThemeChange)}
+      >
         {THEME_VALUES.map((value) => (
           <ThemeOption
             key={value}
@@ -124,7 +124,7 @@ function AppearanceSection({
           />
         ))}
       </div>
-    </div>
+    </fieldset>
   );
 }
 
