@@ -21,6 +21,7 @@ class AppContext:
     agent_store: Any
     team_store: Any
     agent_placement_store: Any
+    profile_image_store: Any
     workspace_query_broker: Any
 
 
@@ -37,6 +38,7 @@ def app_context(request: Request) -> AppContext:
         agent_store=request.app.state.agent_store,
         team_store=request.app.state.team_store,
         agent_placement_store=request.app.state.agent_placement_store,
+        profile_image_store=request.app.state.profile_image_store,
         workspace_query_broker=request.app.state.workspace_query_broker,
     )
 

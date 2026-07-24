@@ -28,6 +28,7 @@ import { CodeView, isHtmlFile, isMarkdownFile, isRenderableFile, languageForFile
 import { Markdown } from "./Markdown";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { AgentProfilePanel } from "./AgentProfilePanel";
+import { ProfileImage } from "./ProfileImagePicker";
 import { agentAvailabilityTone } from "../lib/adminHelpers";
 
 export type WorkspacePageTab = "profile" | "workspace" | "artifacts" | "activities";
@@ -316,7 +317,11 @@ export function AgentWorkspacePage({
         title={(
           <span className="workspace-header-title">
             <span className="workspace-header-mark" aria-hidden="true">
-              <AgentMark agent={agent.executorKind} size={14} />
+              <ProfileImage
+                src={agent.profileImageUrl}
+                alt=""
+                fallback={<AgentMark agent={agent.executorKind} size={14} />}
+              />
             </span>
             {displayName}
           </span>

@@ -4,7 +4,15 @@ import { useEffect, useRef, useState, type ComponentProps } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { ActionApprove, ActionEdit, ActionRemove, ActionToggle, AdminDelete } from "./icons";
-import { deleteAgentPlacement, deleteEmployeeAgent, getControlPanelAgent, updateEmployeeAgent, updateOwnEmployeeAgent } from "../api";
+import {
+  deleteAgentPlacement,
+  deleteAgentProfileImage,
+  deleteEmployeeAgent,
+  getControlPanelAgent,
+  updateAgentProfileImage,
+  updateEmployeeAgent,
+  updateOwnEmployeeAgent,
+} from "../api";
 import { agentLabel } from "../lib/plan";
 import type { AgentPlacement, ControlPanelDaemonNodeRecord, EmployeeAgent, EmployeeRecord } from "../types";
 import { useDialogs } from "@/components/ui/DialogProvider";
@@ -17,6 +25,7 @@ import { AgentMark } from "./AgentMark";
 import { AgentInstructionEditor } from "./AgentInstructionEditor";
 import { PlacementList } from "./PlacementList";
 import { describeAgentPlacements } from "../lib/agentPlacements";
+import { ProfileImagePicker } from "./ProfileImagePicker";
 
 export interface AgentProfilePanelProps {
   agent: EmployeeAgent;
@@ -168,6 +177,34 @@ export function AgentProfilePanel({
     }
   }
 
+  async function handleImageUpload(dataUrl: string) {
+    setSaving(true);
+    setError(null);
+    try {
+      const result = await updateAgentProfileImage(agent.id, dataUrl);
+      applyAgentUpdate(result.agent);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      throw err;
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleImageRemove() {
+    setSaving(true);
+    setError(null);
+    try {
+      const result = await deleteAgentProfileImage(agent.id);
+      applyAgentUpdate(result.agent);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      throw err;
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function handleDeleteAgent() {
     const ok = await confirm({
       title: t("admin.v2.delete_agent_confirm", { name: agent.displayName }),
@@ -222,19 +259,26 @@ export function AgentProfilePanel({
         data-executor={agent.executorKind}
       >
         <header className={`workspace-dossier-hero${embedInDrawer ? " is-embedded" : ""}`}>
-          {!embedInDrawer ? (
-            <span className="workspace-dossier-mark" aria-hidden="true">
-              <AgentMark agent={agent.executorKind} size={20} />
-            </span>
-          ) : null}
+          <ProfileImagePicker
+            imageUrl={agent.profileImageUrl}
+            name={agent.displayName}
+            fallback={<AgentMark agent={agent.executorKind} size={23} />}
+            editable={canEditProfile}
+            disabled={saving}
+            onUpload={handleImageUpload}
+            onRemove={handleImageRemove}
+          />
           <div className="workspace-dossier-intro">
             <span>{t("agents_page.profile_kicker")}</span>
             <p className="workspace-dossier-blurb">{t("agents_page.profile_intro")}</p>
           </div>
           <div className="workspace-dossier-status">
-            <span className={`workspace-status-pill tone-${agentAvailabilityTone(agent.availability)}`}>
-              {t(`admin.v2.placement_status.${agent.availability}`, { defaultValue: agent.availability })}
-            </span>
+            <span
+              className={`workspace-status-pip tone-${agentAvailabilityTone(agent.availability)}`}
+              role="img"
+              aria-label={t(`admin.v2.placement_status.${agent.availability}`, { defaultValue: agent.availability })}
+              title={t(`admin.v2.placement_status.${agent.availability}`, { defaultValue: agent.availability })}
+            />
             <span className="workspace-dossier-runtime mono" translate="no">{agentLabel(agent.executorKind)}</span>
           </div>
         </header>

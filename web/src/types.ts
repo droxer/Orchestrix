@@ -341,6 +341,7 @@ export interface EmployeeAgent {
   id: string;
   employeeId: string;
   displayName: string;
+  profileImageUrl?: string | null;
   executorKind: AgentName;
   instructions?: string;
   skillPolicy: Record<string, unknown>;
@@ -362,6 +363,7 @@ export interface EmployeeAgentsResponse {
 export interface TeamMemberSummary {
   id: string;
   displayName: string;
+  profileImageUrl?: string | null;
   executorKind: AgentName;
   enabled: boolean;
   availability: LogicalAgentAvailability;
@@ -371,6 +373,7 @@ export interface AgentTeam {
   id: string;
   ownerEmployeeId: string;
   name: string;
+  profileImageUrl?: string | null;
   leadAgentId?: string | null;
   memberAgentIds: string[];
   enabled: boolean;

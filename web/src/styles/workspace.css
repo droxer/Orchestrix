@@ -422,11 +422,29 @@
 .workspace-status-pill {
   display: inline-flex;
   align-items: center;
+  gap: var(--sp-2);
   min-height: 22px;
   border-radius: var(--r-2);
   padding: 0 var(--sp-3);
   font: var(--type-label-strong);
 }
+
+/* Readiness pip: a standalone toned dot that carries availability at a glance.
+   The status text moves to the element's title/aria-label so the hero stays
+   uncluttered. */
+.workspace-status-pip {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.workspace-status-pip.tone-good { color: var(--ok); }
+.workspace-status-pip.tone-info { color: var(--action); }
+.workspace-status-pip.tone-warn { color: var(--warn); }
+.workspace-status-pip.tone-bad { color: var(--err); }
+.workspace-status-pip.tone-neutral { color: var(--ink-3); }
 
 .workspace-status-pill.tone-good { color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); }
 .workspace-status-pill.tone-info { color: var(--action); background: color-mix(in srgb, var(--action) 12%, transparent); }
@@ -1018,7 +1036,7 @@
 
 .workspace-dossier-hero {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--sp-4);
   padding-bottom: var(--sp-5);
@@ -1026,7 +1044,7 @@
 }
 
 .workspace-dossier-hero.is-embedded {
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
 }
 
 .workspace-dossier-mark {

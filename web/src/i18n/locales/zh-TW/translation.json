@@ -299,6 +299,15 @@
     "session_artifacts": "{{count}} 個產物",
     "task_due": "截止 {{date}}"
   },
+  "profile_image": {
+    "alt": "{{name}}的頭像",
+    "choose": "選擇頭像",
+    "change": "更換頭像",
+    "remove": "移除頭像",
+    "unsupported": "請選擇 PNG、JPEG 或 WebP 圖片。",
+    "too_large": "請選擇小於 2 MB 的圖片。",
+    "failed": "無法更新頭像。"
+  },
   "teams": {
     "title": "團隊",
     "manage_title": "任務團隊",

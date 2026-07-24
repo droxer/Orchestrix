@@ -24,6 +24,7 @@ import {
   Forward,
   Hash,
   Inbox,
+  ImagePlus,
   Play,
   Info,
   KeyRound,
@@ -133,6 +134,7 @@ export const ViewBoard = withStandardStroke(Columns3, "ViewBoard");
 export const ViewList = withStandardStroke(Rows3, "ViewList");
 export const ViewGrid = withStandardStroke(LayoutGrid, "ViewGrid");
 export const ActionKey = withStandardStroke(KeyRound, "ActionKey");
+export const ActionImage = withStandardStroke(ImagePlus, "ActionImage");
 
 // Node execution profile glyphs — managed (BoxLite VM = a container/box),
 // local (direct execution = a shell), pending (awaiting daemon = a dashed ring).

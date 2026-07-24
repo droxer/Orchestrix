@@ -11,6 +11,8 @@ import type { CurrentUser } from "../types";
 import { ActionAdd } from "./icons";
 import { PageHeader } from "./PageHeader";
 import { RelayEmptyState } from "./RelayEmptyState";
+import { TeamMark } from "./TeamMark";
+import { ProfileImage } from "./ProfileImagePicker";
 import { TeamDrawer } from "./admin/TeamDrawer";
 import { TeamWorkspacePage } from "./TeamWorkspacePage";
 import { Badge } from "./ui/badge";
@@ -87,6 +89,13 @@ export function TeamsPage({
                         aria-current={team.id === selectedTeam?.id ? "page" : undefined}
                         onClick={() => setTeamId(team.id)}
                       >
+                        <span className="teams-list-mark" aria-hidden="true">
+                          <ProfileImage
+                            src={team.profileImageUrl}
+                            alt=""
+                            fallback={<TeamMark size={16} />}
+                          />
+                        </span>
                         <span className="teams-list-identity" role="cell">
                           <span className="teams-list-title">{team.name}</span>
                           <small className="teams-list-sub">{team.lead?.displayName ?? t("teams.unavailable")} · {memberNames || t("teams.no_members")}</small>

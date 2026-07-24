@@ -299,6 +299,15 @@
     "session_artifacts": "{{count}} artifacts",
     "task_due": "Due {{date}}"
   },
+  "profile_image": {
+    "alt": "{{name}} profile image",
+    "choose": "Choose profile image",
+    "change": "Change profile image",
+    "remove": "Remove profile image",
+    "unsupported": "Choose a PNG, JPEG, or WebP image.",
+    "too_large": "Choose an image smaller than 2 MB.",
+    "failed": "Could not update the profile image."
+  },
   "teams": {
     "title": "Teams",
     "manage_title": "Task teams",

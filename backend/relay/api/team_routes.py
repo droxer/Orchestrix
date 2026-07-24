@@ -46,6 +46,7 @@ def _team_view(ctx: AppContextDep, team: dict[str, Any]) -> dict[str, Any]:
                 {
                     "id": view["id"],
                     "displayName": view["displayName"],
+                    "profileImageUrl": view.get("profileImageUrl"),
                     "executorKind": view["executorKind"],
                     "enabled": view.get("enabled", True),
                     "availability": view.get("availability", "offline"),
@@ -141,7 +142,9 @@ async def delete_team(
 ) -> dict[str, Any]:
     actor = request_actor(request, ctx.auth_store)
     _owned_team(ctx, team_id, actor["employeeId"])
-    return {"team": _team_view(ctx, ctx.team_store.delete_team(team_id))}
+    deleted = ctx.team_store.delete_team(team_id)
+    ctx.profile_image_store.delete("teams", team_id)
+    return {"team": _team_view(ctx, deleted)}
 
 
 @router.get("/cp/teams")
@@ -226,4 +229,6 @@ async def delete_control_panel_team(
 ) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     _active_team(ctx, team_id)
-    return {"team": _team_view(ctx, ctx.team_store.delete_team(team_id))}
+    deleted = ctx.team_store.delete_team(team_id)
+    ctx.profile_image_store.delete("teams", team_id)
+    return {"team": _team_view(ctx, deleted)}

@@ -14,6 +14,7 @@ describe("Agent team management", () => {
     const agentsSource = await readFile(resolve("web/src/components/AgentsPage.tsx"), "utf8");
     const teamsSource = await readFile(resolve("web/src/components/TeamsPage.tsx"), "utf8");
     const teamWorkspaceSource = await readFile(resolve("web/src/components/TeamWorkspacePage.tsx"), "utf8");
+    const teamMarkSource = await readFile(resolve("web/src/components/TeamMark.tsx"), "utf8");
     const sideNavSource = await readFile(resolve("web/src/components/SideNav.tsx"), "utf8");
     const drawerSource = await readFile(resolve("web/src/components/admin/TeamDrawer.tsx"), "utf8");
     const pickerSource = await readFile(resolve("web/src/components/task-board/TaskDrawer.tsx"), "utf8");
@@ -32,6 +33,11 @@ describe("Agent team management", () => {
     assert.match(teamWorkspaceSource, /className="team-profile-inline-form"/);
     assert.match(teamWorkspaceSource, /updateTeamMutation\.mutateAsync/);
     assert.match(teamWorkspaceSource, /deleteTeamMutation\.mutateAsync/);
+    assert.match(teamMarkSource, /Relay's default team identity mark/);
+    assert.match(teamMarkSource, /M12 2\.25 16\.25 6\.25/);
+    assert.match(teamsSource, /className="teams-list-mark"/);
+    assert.match(teamWorkspaceSource, /<TeamMark/);
+    assert.match(pickerSource, /<TeamMark/);
     assert.match(sideNavSource, /data-nav="teams"/);
     assert.match(sideNavSource, /handleRouteClick\(event, "teams"\)/);
     assert.match(drawerSource, /memberAgentIds/);

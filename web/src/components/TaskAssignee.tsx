@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import type { RelayTask } from "../types";
 import { AgentStateBadge } from "./AgentStateBadge";
+import { TeamMark } from "./TeamMark";
 import { Badge } from "./ui/badge";
 import { useTranslation } from "react-i18next";
 
@@ -74,6 +75,7 @@ export function TaskExecutionBadge({
     const name = displayName ?? task.assignedTeamId;
     return (
       <Badge variant={ready ? "success" : "warning"} title={t("teams.assignment_badge", { name })}>
+        <TeamMark size={12} />
         {t("teams.assignment_badge", { name })}
       </Badge>
     );

@@ -179,6 +179,44 @@ export function deleteEmployeeAgent(agentId: string): Promise<{ agent: EmployeeA
   });
 }
 
+export function updateAgentProfileImage(
+  agentId: string,
+  dataUrl: string,
+): Promise<{ agent: EmployeeAgent }> {
+  return apiJson<{ agent: EmployeeAgent }>(
+    `/profile-images/agents/${encodeURIComponent(agentId)}`,
+    { method: "PUT", body: { dataUrl } },
+  );
+}
+
+export function deleteAgentProfileImage(
+  agentId: string,
+): Promise<{ agent: EmployeeAgent }> {
+  return apiJson<{ agent: EmployeeAgent }>(
+    `/profile-images/agents/${encodeURIComponent(agentId)}`,
+    { method: "DELETE" },
+  );
+}
+
+export function updateTeamProfileImage(
+  teamId: string,
+  dataUrl: string,
+): Promise<{ team: AgentTeam }> {
+  return apiJson<{ team: AgentTeam }>(
+    `/profile-images/teams/${encodeURIComponent(teamId)}`,
+    { method: "PUT", body: { dataUrl } },
+  );
+}
+
+export function deleteTeamProfileImage(
+  teamId: string,
+): Promise<{ team: AgentTeam }> {
+  return apiJson<{ team: AgentTeam }>(
+    `/profile-images/teams/${encodeURIComponent(teamId)}`,
+    { method: "DELETE" },
+  );
+}
+
 export function deleteAgentPlacement(placementId: string): Promise<{ placement: AgentPlacement }> {
   return apiJson<{ placement: AgentPlacement }>(`/cp/agent-placements/${encodeURIComponent(placementId)}`, {
     method: "DELETE",

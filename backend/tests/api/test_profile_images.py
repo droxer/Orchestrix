@@ -1,0 +1,124 @@
+from __future__ import annotations
+
+import base64
+from tempfile import TemporaryDirectory
+
+from fastapi.testclient import TestClient
+
+from relay.app import create_app
+
+
+PNG_BYTES = b"\x89PNG\r\n\x1a\nrelay-profile"
+PNG_DATA_URL = (
+    "data:image/png;base64," + base64.b64encode(PNG_BYTES).decode("ascii")
+)
+
+
+def bootstrap(client: TestClient) -> None:
+    assert client.post(
+        "/auth/bootstrap",
+        json={"token": "admin_token", "username": "admin", "password": "secret123"},
+    ).status_code == 200
+
+
+def employee(client: TestClient, employee_id: str) -> None:
+    assert client.post(
+        "/cp/employees",
+        json={
+            "employeeId": employee_id,
+            "username": employee_id,
+            "password": "userpass",
+            "displayName": employee_id.title(),
+        },
+    ).status_code == 201
+
+
+def test_employee_updates_and_removes_agent_and_team_profile_images(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        bootstrap(client)
+        employee(client, "alice")
+        agent = client.post(
+            "/cp/employees/alice/agents",
+            json={"displayName": "Builder", "executorKind": "codex"},
+        ).json()["agent"]
+        team = client.post(
+            "/cp/teams",
+            json={
+                "ownerEmployeeId": "alice",
+                "name": "Delivery",
+                "leadAgentId": agent["id"],
+                "memberAgentIds": [agent["id"]],
+            },
+        ).json()["team"]
+        assert client.post("/auth/logout").status_code == 200
+        assert client.post(
+            "/auth/login", json={"username": "alice", "password": "userpass"}
+        ).status_code == 200
+
+        agent_update = client.put(
+            f"/profile-images/agents/{agent['id']}", json={"dataUrl": PNG_DATA_URL}
+        )
+        team_update = client.put(
+            f"/profile-images/teams/{team['id']}", json={"dataUrl": PNG_DATA_URL}
+        )
+
+        assert agent_update.status_code == 200
+        assert team_update.status_code == 200
+        agent_url = agent_update.json()["agent"]["profileImageUrl"]
+        team_url = team_update.json()["team"]["profileImageUrl"]
+        assert agent_url.startswith(f"/profile-images/agents/{agent['id']}?v=")
+        assert team_url.startswith(f"/profile-images/teams/{team['id']}?v=")
+        assert client.get(agent_url).content == PNG_BYTES
+        assert client.get(team_url).headers["content-type"] == "image/png"
+        assert client.get("/agents").json()["agents"][0]["profileImageUrl"] == agent_url
+        assert client.get("/teams").json()["teams"][0]["profileImageUrl"] == team_url
+
+        removed = client.delete(f"/profile-images/agents/{agent['id']}")
+        assert removed.status_code == 200
+        assert removed.json()["agent"]["profileImageUrl"] is None
+        assert client.get(agent_url).status_code == 404
+
+
+def test_employee_cannot_update_another_employees_profile_image(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        bootstrap(client)
+        employee(client, "alice")
+        employee(client, "bob")
+        agent = client.post(
+            "/cp/employees/bob/agents",
+            json={"displayName": "Builder", "executorKind": "codex"},
+        ).json()["agent"]
+        assert client.post("/auth/logout").status_code == 200
+        assert client.post(
+            "/auth/login", json={"username": "alice", "password": "userpass"}
+        ).status_code == 200
+
+        response = client.put(
+            f"/profile-images/agents/{agent['id']}", json={"dataUrl": PNG_DATA_URL}
+        )
+
+        assert response.status_code == 403
+
+
+def test_profile_image_endpoint_rejects_unsupported_data(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        bootstrap(client)
+        employee(client, "alice")
+        agent = client.post(
+            "/cp/employees/alice/agents",
+            json={"displayName": "Builder", "executorKind": "codex"},
+        ).json()["agent"]
+
+        response = client.put(
+            f"/profile-images/agents/{agent['id']}",
+            json={"dataUrl": "data:image/gif;base64,R0lGODlhAQABAIAAAAUEBA=="},
+        )
+
+        assert response.status_code == 400
+        assert response.json()["detail"] == "profile_image_type"

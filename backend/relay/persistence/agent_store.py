@@ -101,6 +101,7 @@ class LocalAgentStore:
     def update_agent(self, agent_id: str, patch: dict[str, Any]) -> dict[str, Any]:
         allowed = {
             "displayName",
+            "profileImageUrl",
             "defaultRole",
             "instructions",
             "skillPolicy",
@@ -125,6 +126,14 @@ class LocalAgentStore:
                     current["supervisorEmployeeId"], display_name, exclude_id=agent_id
                 )
                 normalized["displayName"] = display_name
+            if "profileImageUrl" in patch:
+                image_url = patch["profileImageUrl"]
+                if image_url is not None and (
+                    not isinstance(image_url, str)
+                    or not image_url.startswith(f"/profile-images/agents/{agent_id}?v=")
+                ):
+                    raise ValueError("profileImageUrl is invalid.")
+                normalized["profileImageUrl"] = image_url
             if "defaultRole" in patch:
                 role = _required_string(patch, "defaultRole")
                 if role not in AGENT_ROLES:
@@ -356,6 +365,7 @@ class DatabaseAgentStore:
     def update_agent(self, agent_id: str, patch: dict[str, Any]) -> dict[str, Any]:
         allowed = {
             "displayName",
+            "profileImageUrl",
             "defaultRole",
             "instructions",
             "skillPolicy",
@@ -379,6 +389,14 @@ class DatabaseAgentStore:
                 current["supervisorEmployeeId"], display_name, exclude_id=agent_id
             )
             normalized["displayName"] = display_name
+        if "profileImageUrl" in patch:
+            image_url = patch["profileImageUrl"]
+            if image_url is not None and (
+                not isinstance(image_url, str)
+                or not image_url.startswith(f"/profile-images/agents/{agent_id}?v=")
+            ):
+                raise ValueError("profileImageUrl is invalid.")
+            normalized["profileImageUrl"] = image_url
         if "defaultRole" in patch:
             role = _required_string(patch, "defaultRole")
             if role not in AGENT_ROLES:

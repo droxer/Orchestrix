@@ -7,6 +7,7 @@ import { agentLabel } from "../../lib/plan";
 import type { ControlPanelDaemonNodeRecord, EmployeeAgent, EmployeeRecord } from "../../types";
 import { AgentMark } from "../AgentMark";
 import { AgentProfilePanel } from "../AgentProfilePanel";
+import { ProfileImage } from "../ProfileImagePicker";
 import { Drawer } from "../ui/Drawer";
 
 interface AgentProfileDrawerProps {
@@ -80,7 +81,12 @@ export function AgentProfileDrawer({
       onClose={onClose}
       title={
         <span className="adm-drawer-title-row">
-          <AgentMark agent={agent.executorKind} size={22} className="adm-drawer-title-mark" />
+          <ProfileImage
+            src={agent.profileImageUrl}
+            alt=""
+            fallback={<AgentMark agent={agent.executorKind} size={22} />}
+            className="adm-drawer-title-profile-image"
+          />
           <span translate="no">{agent.displayName}</span>
         </span>
       }

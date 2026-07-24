@@ -563,13 +563,23 @@ def _normalized_team_snapshot(
 def _normalize_team_patch(
     patch: dict[str, Any], *, current: dict[str, Any]
 ) -> dict[str, Any]:
-    allowed = {"name", "leadAgentId", "memberAgentIds", "enabled"}
+    allowed = {"name", "profileImageUrl", "leadAgentId", "memberAgentIds", "enabled"}
     unknown = set(patch) - allowed
     if unknown:
         raise ValueError(f"Unsupported team field(s): {', '.join(sorted(unknown))}.")
     normalized: dict[str, Any] = {}
     if "name" in patch:
         normalized["name"] = _required_name(patch["name"])
+    if "profileImageUrl" in patch:
+        image_url = patch["profileImageUrl"]
+        if image_url is not None and (
+            not isinstance(image_url, str)
+            or not image_url.startswith(
+                f"/profile-images/teams/{current['id']}?v="
+            )
+        ):
+            raise ValueError("profileImageUrl is invalid.")
+        normalized["profileImageUrl"] = image_url
     if "memberAgentIds" in patch:
         members = patch["memberAgentIds"]
         if not isinstance(members, list) or not members:

@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import type { AgentName, LogicalAgentAvailability } from "../types";
 import { AgentMark } from "./AgentMark";
+import { ProfileImage } from "./ProfileImagePicker";
 
 /**
  * Visual agent-state indicator for a task. The agent glyph carries identity
@@ -18,10 +19,12 @@ export function AgentStateBadge({
   agent,
   ready,
   availability,
+  imageUrl,
 }: {
   agent: AgentName | null | undefined;
   ready: boolean;
   availability?: LogicalAgentAvailability;
+  imageUrl?: string | null;
 }) {
   const { t } = useTranslation();
 
@@ -53,7 +56,11 @@ export function AgentStateBadge({
       aria-label={label}
       title={label}
     >
-      <AgentMark agent={agent} size={14} />
+      {imageUrl ? (
+        <ProfileImage src={imageUrl} alt="" fallback={null} />
+      ) : (
+        <AgentMark agent={agent} size={14} />
+      )}
     </span>
   );
 }

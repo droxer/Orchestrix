@@ -192,6 +192,7 @@ async def delete_control_panel_agent(
         )
     try:
         deleted = ctx.agent_store.delete_agent(agent_id)
+        ctx.profile_image_store.delete("agents", agent_id)
         remove_agent_from_teams(
             ctx.team_store, agent_id, agent["supervisorEmployeeId"]
         )

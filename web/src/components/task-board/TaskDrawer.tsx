@@ -32,7 +32,9 @@ import { Drawer } from "../ui/Drawer";
 import { TaskDrawerArtifacts } from "./TaskDrawerArtifacts";
 import { AgentMark } from "../AgentMark";
 import { AgentStateBadge } from "../AgentStateBadge";
-import { NavAgents, NavTeams } from "../icons";
+import { NavAgents } from "../icons";
+import { TeamMark } from "../TeamMark";
+import { ProfileImage } from "../ProfileImagePicker";
 import { cn } from "@/lib/utils";
 
 const NO_AGENT = "__none__";
@@ -49,8 +51,8 @@ function availabilityTone(availability: LogicalAgentAvailability): "tone-good" |
 // narrowed view. This lets us synthesize a placeholder for an assignment that
 // references an agent/team no longer present in the fetched roster (deleted or
 // scoped out) instead of leaking a raw `agent:<id>` value into the UI.
-type AgentView = Pick<EmployeeAgent, "displayName" | "executorKind" | "enabled" | "availability">;
-type TeamView = Pick<AgentTeam, "name" | "members" | "lead" | "enabled">;
+type AgentView = Pick<EmployeeAgent, "displayName" | "profileImageUrl" | "executorKind" | "enabled" | "availability">;
+type TeamView = Pick<AgentTeam, "name" | "profileImageUrl" | "members" | "lead" | "enabled">;
 
 function effectiveAgentAvailability(agent: Pick<EmployeeAgent, "enabled" | "availability">): LogicalAgentAvailability {
   return agent.enabled ? agent.availability : "offline";
@@ -68,7 +70,12 @@ function AssignmentOption({
     const availability = effectiveAgentAvailability(agent);
     return (
       <span className="task-assignment-option">
-        <AgentStateBadge agent={agent.executorKind} ready={availability === "ready"} availability={availability} />
+        <AgentStateBadge
+          agent={agent.executorKind}
+          ready={availability === "ready"}
+          availability={availability}
+          imageUrl={agent.profileImageUrl}
+        />
         <span className="task-assignment-option-copy">
           <span>{agent.displayName}</span>
           <span>{agent.executorKind}</span>
@@ -83,7 +90,7 @@ function AssignmentOption({
   return (
     <span className="task-assignment-option">
       <span className={cn("agent-state", availabilityTone(availability))} role="img" aria-label={stateLabel} title={stateLabel}>
-        <NavTeams size={14} />
+        <ProfileImage src={team.profileImageUrl} alt="" fallback={<TeamMark size={14} />} />
       </span>
       <span className="task-assignment-option-copy">
         <span>{team.name}</span>
@@ -139,7 +146,15 @@ function AssignmentSummary({
       aria-live="polite"
     >
       <span className="task-assignment-summary-mark" role="img" aria-label={`${name} · ${statusLabel}`}>
-        {agent ? <AgentMark agent={agent.executorKind} size={18} /> : <NavTeams size={18} />}
+        {agent ? (
+          <ProfileImage
+            src={agent.profileImageUrl}
+            alt=""
+            fallback={<AgentMark agent={agent.executorKind} size={18} />}
+          />
+        ) : (
+          <ProfileImage src={team?.profileImageUrl} alt="" fallback={<TeamMark size={20} />} />
+        )}
       </span>
       <span className="task-assignment-summary-body">
         <span className="task-assignment-summary-head">

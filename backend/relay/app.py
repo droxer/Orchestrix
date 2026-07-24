@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 from fastapi import FastAPI
 from loguru import logger
 
-from .api import admin_routes, agent_routes, agent_workspace_routes, auth_routes, chat_routes, daemon_node_routes, managed_node_routes, node_workspace_routes, sandbox_routes, session_routes, task_routes, team_routes, web_routes
+from .api import admin_routes, agent_routes, agent_workspace_routes, auth_routes, chat_routes, daemon_node_routes, managed_node_routes, node_workspace_routes, profile_image_routes, sandbox_routes, session_routes, task_routes, team_routes, web_routes
 from .core.environment import load_backend_env
 from .core.storage_config import database_url_from_env, use_postgres_storage
 from .persistence.stores import (
@@ -29,6 +29,7 @@ from .tasks import TaskScheduler
 from .services.managed_nodes import LocalManagedNodeStore
 from .persistence.agent_store import DatabaseAgentStore, LocalAgentStore
 from .persistence.team_store import DatabaseTeamStore, LocalTeamStore
+from .persistence.profile_image_store import LocalProfileImageStore
 from .persistence.agent_placement_store import DatabaseAgentPlacementStore, LocalAgentPlacementStore, reconcile_single_active_placement
 from .services.workspace_query import WorkspaceQueryBroker
 
@@ -51,6 +52,7 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     agent_store = agent_store_from_env(root_dir)
     team_store = team_store_from_env(root_dir)
     agent_placement_store = agent_placement_store_from_env(root_dir)
+    profile_image_store = LocalProfileImageStore(root_dir)
     # Heal any agent left with multiple active placements before the
     # one-agent-one-computer invariant (idempotent; a no-op once collapsed).
     reconcile_single_active_placement(agent_placement_store)
@@ -95,6 +97,7 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     app.state.team_store = team_store
     app.state.employee_agent_store = agent_store  # compatibility for migrations still reading the old name
     app.state.agent_placement_store = agent_placement_store
+    app.state.profile_image_store = profile_image_store
     app.state.workspace_query_broker = WorkspaceQueryBroker()
     app.state.task_scheduler = scheduler
     app.state.control_panel_version = CONTROL_PANEL_VERSION
@@ -123,6 +126,7 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     app.include_router(auth_routes.router)
     app.include_router(agent_routes.router)
     app.include_router(team_routes.router)
+    app.include_router(profile_image_routes.router)
     app.include_router(agent_workspace_routes.router)
     app.include_router(node_workspace_routes.router)
     app.include_router(admin_routes.router)

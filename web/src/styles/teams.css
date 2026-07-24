@@ -85,7 +85,7 @@
 .teams-list-row-select {
   display: grid;
   grid-column: 1 / -1;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--sp-3);
   width: 100%;
@@ -96,6 +96,25 @@
   color: inherit;
   cursor: pointer;
   text-align: left;
+}
+
+.teams-list-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-2);
+  background: var(--surface-2);
+  color: var(--ink-1);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+  transition:
+    background var(--t-fast) var(--ease),
+    box-shadow var(--t-fast) var(--ease);
+}
+
+.teams-list-row[data-selected="true"] .teams-list-mark {
+  background: color-mix(in srgb, var(--action) 14%, var(--surface-2));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--action) 28%, var(--line-1));
 }
 
 .teams-list-row:hover {

@@ -1,20 +1,23 @@
 "use client";
 
 import { useMemo, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { getTeamArtifacts, getWorkspaceBrief } from "../api";
+import { deleteTeamProfileImage, getTeamArtifacts, getWorkspaceBrief, updateTeamProfileImage } from "../api";
 import { useEmployeeAgents } from "../hooks/useEmployeeAgents";
 import { useRelayMutations } from "../hooks/useRelayMutations";
+import { TEAMS_QUERY_KEY } from "../hooks/useTeams";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { agentLabel } from "../lib/plan";
 import { teamReady } from "../lib/taskAssignment";
 import { teamMutationInput } from "../lib/teamForm";
 import { compactDate } from "../lib/workspaceFormat";
 import type { AgentTeam, ArtifactIndexItem, WorkspaceBriefResponse, WorkspaceBriefSession, WorkspaceBriefTask } from "../types";
-import { ActionEdit, AdminDelete, NavRefresh, NavTeams, ViewBoard } from "./icons";
+import { ActionEdit, AdminDelete, NavRefresh, ViewBoard } from "./icons";
 import { AgentStateBadge } from "./AgentStateBadge";
 import { PageHeader } from "./PageHeader";
+import { TeamMark } from "./TeamMark";
+import { ProfileImage, ProfileImagePicker } from "./ProfileImagePicker";
 import { ArtifactBody } from "./artifact/ArtifactBody";
 import { ArtifactsEmpty } from "./artifact/ArtifactsEmpty";
 import { MetricItem, WorkspaceEmpty, WorkspaceLoading } from "./workspace/WorkspacePrimitives";
@@ -87,6 +90,7 @@ function TeamProfile({
 }) {
   const { t } = useTranslation();
   const { confirm } = useDialogs();
+  const queryClient = useQueryClient();
   const { updateTeamMutation, deleteTeamMutation } = useRelayMutations();
   const { agents: employeeAgents } = useEmployeeAgents(employeeId);
   const agents = useMemo(
@@ -97,8 +101,38 @@ function TeamProfile({
   const [name, setName] = useState(team.name);
   const [memberIds, setMemberIds] = useState<string[]>(team.memberAgentIds);
   const [leadId, setLeadId] = useState(team.leadAgentId ?? "");
+  const [imageSaving, setImageSaving] = useState(false);
   const readyMembers = team.members.filter((member) => member.enabled && member.availability === "ready").length;
-  const busy = updateTeamMutation.isPending || deleteTeamMutation.isPending;
+  const busy = updateTeamMutation.isPending || deleteTeamMutation.isPending || imageSaving;
+
+  function applyTeamUpdate(updated: AgentTeam) {
+    queryClient.setQueriesData<{ teams: AgentTeam[] }>(
+      { queryKey: [TEAMS_QUERY_KEY] },
+      (current) => current
+        ? { teams: current.teams.map((item) => item.id === updated.id ? updated : item) }
+        : current,
+    );
+  }
+
+  async function uploadImage(dataUrl: string) {
+    setImageSaving(true);
+    try {
+      const result = await updateTeamProfileImage(team.id, dataUrl);
+      applyTeamUpdate(result.team);
+    } finally {
+      setImageSaving(false);
+    }
+  }
+
+  async function removeImage() {
+    setImageSaving(true);
+    try {
+      const result = await deleteTeamProfileImage(team.id);
+      applyTeamUpdate(result.team);
+    } finally {
+      setImageSaving(false);
+    }
+  }
 
   function resetDraft() {
     setName(team.name);
@@ -167,12 +201,23 @@ function TeamProfile({
     <div className="workspace-profile" role="tabpanel" id="team-page-panel-profile" aria-labelledby="team-page-tab-profile">
       <div className="workspace-profile-panel workspace-profile-dossier team-profile-dossier">
         <header className="workspace-dossier-hero">
-          <span className="workspace-dossier-mark" aria-hidden="true"><NavTeams size={20} /></span>
+          <ProfileImagePicker
+            imageUrl={team.profileImageUrl}
+            name={team.name}
+            fallback={<TeamMark size={23} />}
+            editable
+            disabled={busy}
+            onUpload={uploadImage}
+            onRemove={removeImage}
+          />
           <p className="workspace-dossier-blurb">{t("teams.profile_blurb")}</p>
           <div className="workspace-dossier-status">
-            <Badge variant={team.enabled ? "success" : "neutral"}>
-              {team.enabled ? t("teams.enabled") : t("teams.disabled")}
-            </Badge>
+            <span
+              className={`workspace-status-pip tone-${team.enabled ? "good" : "neutral"}`}
+              role="img"
+              aria-label={team.enabled ? t("teams.enabled") : t("teams.disabled")}
+              title={team.enabled ? t("teams.enabled") : t("teams.disabled")}
+            />
             <span className="workspace-dossier-runtime mono">
               {t("teams.ready_members", { ready: readyMembers, count: team.members.length })}
             </span>
@@ -248,10 +293,11 @@ function TeamProfile({
                         agent={member.executorKind}
                         ready={ready}
                         availability={member.enabled ? member.availability : undefined}
+                        imageUrl={member.profileImageUrl}
                       />
                       <span className="team-profile-member-copy">
                         <strong>{member.displayName}</strong>
-                        <small>{agentLabel(member.executorKind)} · {t(`admin.v2.placement_status.${member.availability}`, { defaultValue: member.availability })}</small>
+                        <small>{agentLabel(member.executorKind)}</small>
                       </span>
                       {member.id === team.leadAgentId ? <Badge variant="outline">{t("teams.lead_badge")}</Badge> : null}
                     </li>
@@ -446,7 +492,7 @@ function TeamActivities({ team, brief, onOpenConversation }: { team: AgentTeam; 
             </ul>
           </ActivitySection>
         ) : null}
-        {!hasActivity ? <WorkspaceEmpty title={t("workspace.no_activity")} hint={t("workspace.empty_activity_hint")} mark={<NavTeams size={18} />} /> : null}
+        {!hasActivity ? <WorkspaceEmpty title={t("workspace.no_activity")} hint={t("workspace.empty_activity_hint")} mark={<TeamMark size={18} />} /> : null}
       </div>
     </div>
   );
@@ -505,7 +551,18 @@ export function TeamWorkspacePage({
     <section className="workspace-page team-workspace-page" aria-label={t("teams.profile_title", { name: team.name })}>
       <PageHeader
         kicker={t("teams.title")}
-        title={<span className="workspace-header-title"><span className="workspace-header-mark" aria-hidden="true"><NavTeams size={14} /></span>{team.name}</span>}
+        title={(
+          <span className="workspace-header-title">
+            <span className="workspace-header-mark" aria-hidden="true">
+              <ProfileImage
+                src={team.profileImageUrl}
+                alt=""
+                fallback={<TeamMark size={15} />}
+              />
+            </span>
+            {team.name}
+          </span>
+        )}
         subtitle={t("teams.profile_sub", { count: team.members.length })}
         titleVariant="display"
         layout="stacked"
