@@ -537,7 +537,7 @@ export function App() {
 
   const handleComposerSend = useStableEvent(() => { void sendMessage(); });
   const handleCancelRun = useStableEvent(() => { void cancelActiveRun(); });
-  const handleRetryAgent = useStableEvent((agent: AgentName, mode: AgentTaskMode) => { void retryAgentMessage(agent, mode); });
+  const handleRetryAgent = useStableEvent((agent: AgentName, mode: AgentTaskMode, agentId?: string) => { void retryAgentMessage(agent, mode, agentId); });
 
   async function sendDecision(kind: "approve" | "reject" | "rerun" | "mark_done") {
     if (!activeSession) return;
@@ -547,7 +547,11 @@ export function App() {
       setIsRunning(true);
       try {
         const assignment = rerunAssignmentForSession(activeSession, activeAgent, composerMode);
+        // The last run's own agent first; its executor kind is only a fallback
+        // for legacy runs that recorded no logical agent.
         const logicalAgent = logicalAgents.find(
+          (agent) => agent.id === assignment.agentId && isEmployeeAgentRoutable(agent),
+        ) ?? logicalAgents.find(
           (agent) => agent.executorKind === assignment.agent && isEmployeeAgentRoutable(agent),
         );
         if (!logicalAgent) {
@@ -558,7 +562,8 @@ export function App() {
           );
           return;
         }
-        setActiveAgent(assignment.agent);
+        setActiveAgent(logicalAgent.executorKind);
+        setActiveLogicalAgentId(logicalAgent.id);
         setSelectedSessionId(activeSession.id);
         navigateToRoute("main");
         atBottomRef.current = true;
@@ -595,20 +600,25 @@ export function App() {
     }
   }
 
-  async function retryAgentMessage(agent: AgentName, mode: AgentTaskMode) {
+  async function retryAgentMessage(agent: AgentName, mode: AgentTaskMode, agentId?: string) {
     if (!activeSession) return;
     if (!selectedEmployee) return;
     if (threadRunning) return;
     setIsRunning(true);
     try {
+      // Retry means "this agent again", so prefer the turn's own logical agent;
+      // the executor-kind lookup is only for turns that carry no agent id.
       const logicalAgent = logicalAgents.find(
+        (candidate) => candidate.id === agentId && isEmployeeAgentRoutable(candidate),
+      ) ?? logicalAgents.find(
         (candidate) => candidate.executorKind === agent && isEmployeeAgentRoutable(candidate),
       );
       if (!logicalAgent) {
         reportMutationError("Agent not ready for retry", null, t("errors.agent_not_ready", { agent }));
         return;
       }
-      setActiveAgent(agent);
+      setActiveAgent(logicalAgent.executorKind);
+      setActiveLogicalAgentId(logicalAgent.id);
       setComposerMode(mode);
       setSelectedSessionId(activeSession.id);
       navigateToRoute("main");

@@ -54,6 +54,7 @@ export function applySessionEvent(session: RelaySession, event: RelayEvent): Rel
           {
             id: event.runId,
             agent: event.agent,
+            ...(event.logicalAgentId ? { logicalAgentId: event.logicalAgentId } : {}),
             role: event.role,
             mode: event.mode,
             status: "running",

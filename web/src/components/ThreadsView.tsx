@@ -5,7 +5,12 @@ import { useTranslation } from "react-i18next";
 import { ArrowRightLeft, MessageCircleQuestion, Scan } from "lucide-react";
 import { RelayMark } from "./RelayMark";
 import type { AgentName, AgentTaskMode, EmployeeAgent, RelayArtifact, RelaySession } from "../types";
-import { buildExecutorDisplayNameMap, displayNameForExecutor } from "../lib/agentDisplayNames";
+import {
+  buildExecutorDisplayNameMap,
+  buildLogicalAgentNameMap,
+  displayNameForExecutor,
+  labelForAgentRun,
+} from "../lib/agentDisplayNames";
 import type { ThreadItem } from "./ThreadRow";
 import { ThreadListPanel } from "./ThreadListPanel";
 import { ThreadHeader } from "./ThreadHeader";
@@ -61,7 +66,7 @@ export type ThreadsViewProps = {
   sendHandoff: () => Promise<void>;
   onSend: () => void;
   onCancelRun: () => void;
-  onRetryAgent: (agent: AgentName, mode: AgentTaskMode) => void;
+  onRetryAgent: (agent: AgentName, mode: AgentTaskMode, agentId?: string) => void;
   running: boolean;
 };
 
@@ -115,14 +120,23 @@ export function ThreadsView({
 }: ThreadsViewProps) {
   const { t } = useTranslation();
   const agentDisplayNames = useMemo(() => buildExecutorDisplayNameMap(logicalAgents), [logicalAgents]);
+  const logicalAgentNames = useMemo(() => buildLogicalAgentNameMap(logicalAgents), [logicalAgents]);
   const activeAgentDisplayName = useMemo(() => {
     const logical = logicalAgents.find((agent) => agent.id === activeLogicalAgentId && !agent.deletedAt);
     return logical?.displayName ?? displayNameForExecutor(activeAgent, logicalAgents);
   }, [activeAgent, activeLogicalAgentId, logicalAgents]);
-  const runningAgentDisplayName = useMemo(
-    () => (runningAgent ? displayNameForExecutor(runningAgent, logicalAgents) : undefined),
-    [logicalAgents, runningAgent],
-  );
+  // Name the agent actually running this thread. The in-flight run carries the
+  // logical agent id; without it the executor kind would name whichever agent
+  // happens to share that kind.
+  const runningAgentDisplayName = useMemo(() => {
+    if (!runningAgent) return undefined;
+    const runningRun = activeSession?.agentRuns.find((run) => run.status === "running");
+    return labelForAgentRun(
+      { agent: runningAgent, agentId: runningRun?.logicalAgentId },
+      logicalAgentNames,
+      agentDisplayNames,
+    );
+  }, [activeSession, agentDisplayNames, logicalAgentNames, runningAgent]);
 
   return (
     <>
@@ -194,6 +208,7 @@ export function ThreadsView({
                         sessionId={activeSession?.id ?? ""}
                         grouped={isGroupedContinuation(displayMessages, i)}
                         agentDisplayNames={agentDisplayNames}
+                        logicalAgentNames={logicalAgentNames}
                         onOpenArtifact={onOpenArtifacts}
                         onRetryAgent={onRetryAgent}
                         retryDisabled={running}

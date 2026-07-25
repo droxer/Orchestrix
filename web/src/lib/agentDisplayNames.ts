@@ -68,3 +68,27 @@ export function labelForExecutor(
 ): string {
   return agentDisplayNames?.[executorKind] ?? fallbackExecutorLabel(executorKind);
 }
+
+/** Display name per logical agent id — the only way to tell two named agents
+ * that share an executor kind apart. */
+export function buildLogicalAgentNameMap(
+  logicalAgents: readonly EmployeeAgent[],
+): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const agent of logicalAgents) {
+    map[agent.id] = agent.displayName;
+  }
+  return map;
+}
+
+/** Name the agent behind one run. The run's logical agent id wins; the
+ * per-executor map is the fallback for runs that carry no logical identity
+ * (legacy sessions, TUI/workflow dispatches) or whose agent no longer exists. */
+export function labelForAgentRun(
+  run: { agent: AgentName; agentId?: string },
+  logicalAgentNames?: Record<string, string>,
+  agentDisplayNames?: Partial<Record<AgentName, string>>,
+): string {
+  const named = run.agentId ? logicalAgentNames?.[run.agentId] : undefined;
+  return named ?? labelForExecutor(run.agent, agentDisplayNames);
+}
