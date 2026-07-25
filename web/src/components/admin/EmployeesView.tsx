@@ -56,7 +56,7 @@ function serializeSearchQuery(value: string): string | null {
 // Employee activity slices mirror the Nodes status chips (and the card status
 // pill). running/ready/failed overlap by design — an employee can own one
 // running and one failed node — so counts are per-predicate membership, like
-// the Fleet view. "idle" is the quiet remainder: has nodes, but none are
+// the Nodes view. "idle" is the quiet remainder: has nodes, but none are
 // running, ready, or failed (e.g. provisioning/stopped), so a broken node
 // surfaces under "failed" instead of hiding as idle.
 function matchesEmployeeFilter(member: EmployeeNodeSummary, filter: EmployeeFilter): boolean {
@@ -73,7 +73,7 @@ function matchesEmployeeFilter(member: EmployeeNodeSummary, filter: EmployeeFilt
 function filterLabel(filter: EmployeeFilter, t: TFunction): string {
   if (filter === "all") return t("admin.v2.filter_all");
   // "unassigned" here means the employee owns no computer — distinct from the
-  // Fleet view, where it means a node has no employee. Use dedicated copy.
+  // Nodes view, where it means a node has no employee. Use dedicated copy.
   if (filter === "unassigned") return t("admin.v2.emp_state_no_nodes");
   if (filter === "failed") return t("admin.v2.filter_failed");
   return t(`admin.v2.emp_state_${filter}`, { defaultValue: filter });

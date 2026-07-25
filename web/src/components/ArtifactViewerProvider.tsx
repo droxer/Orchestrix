@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import type { RelayArtifact } from "relay-core";
-import { ArtifactLibraryDrawer } from "./artifact/ArtifactLibraryDrawer";
+import { ArtifactsDrawer } from "./artifact/ArtifactsDrawer";
 
 interface ArtifactTarget {
   artifact: RelayArtifact;
@@ -32,7 +32,7 @@ export function ArtifactViewerProvider({ children }: { children: ReactNode }) {
   return (
     <ArtifactViewerContext.Provider value={value}>
       {children}
-      <ArtifactLibraryDrawer
+      <ArtifactsDrawer
         open={target !== null}
         onClose={close}
         artifacts={target?.allArtifacts ?? []}

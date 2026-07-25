@@ -39,7 +39,7 @@ interface AgentWorkspacePageProps {
   agent: EmployeeAgent;
   isRefreshing: boolean;
   onRefresh: () => Promise<void>;
-  onOpenConversation: (sessionId: string) => void;
+  onOpenThread: (sessionId: string) => void;
   canEditMeta?: boolean;
 }
 
@@ -160,7 +160,7 @@ export function AgentWorkspacePage({
   agent,
   isRefreshing,
   onRefresh,
-  onOpenConversation,
+  onOpenThread,
   canEditMeta = false,
 }: AgentWorkspacePageProps) {
   const { t, i18n } = useTranslation();
@@ -391,7 +391,7 @@ export function AgentWorkspacePage({
           <ActivitiesPane
             agent={agent}
             brief={brief}
-            onOpenConversation={onOpenConversation}
+            onOpenThread={onOpenThread}
           />
         )
       ) : (
@@ -493,7 +493,7 @@ export function AgentWorkspacePage({
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => onOpenConversation(selected.artifact.sessionId)}
+                      onClick={() => onOpenThread(selected.artifact.sessionId)}
                     >
                       {t("workspace.open_thread")}
                     </Button>
@@ -551,11 +551,11 @@ function sessionStatusLabel(
 function ActivitiesPane({
   agent,
   brief,
-  onOpenConversation,
+  onOpenThread,
 }: {
   agent: EmployeeAgent;
   brief?: WorkspaceBriefResponse;
-  onOpenConversation: (sessionId: string) => void;
+  onOpenThread: (sessionId: string) => void;
 }) {
   const { t, i18n } = useTranslation();
   const metrics = brief?.metrics;
@@ -601,7 +601,7 @@ function ActivitiesPane({
                       t(`mode.${run.mode}`, { defaultValue: run.mode }),
                       compactDate(run.startedAt, i18n.language),
                     ].filter(Boolean).join(" · ")}
-                    onClick={() => onOpenConversation(run.sessionId)}
+                    onClick={() => onOpenThread(run.sessionId)}
                   />
                 </li>
               ))}
@@ -622,7 +622,7 @@ function ActivitiesPane({
                       session.artifactCount ? t("workspace.session_artifacts", { count: session.artifactCount }) : "",
                       compactDate(session.updatedAt, i18n.language),
                     ].filter(Boolean).join(" · ")}
-                    onClick={() => onOpenConversation(session.id)}
+                    onClick={() => onOpenThread(session.id)}
                   />
                 </li>
               ))}
@@ -648,7 +648,7 @@ function ActivitiesPane({
                         task.dueDate ? t("workspace.task_due", { date: compactDate(task.dueDate, i18n.language) }) : "",
                         compactDate(task.updatedAt, i18n.language),
                       ].filter(Boolean).join(" · ")}
-                      onClick={linkedSessionId ? () => onOpenConversation(linkedSessionId) : undefined}
+                      onClick={linkedSessionId ? () => onOpenThread(linkedSessionId) : undefined}
                     />
                   </li>
                 );

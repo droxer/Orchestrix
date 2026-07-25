@@ -2,7 +2,7 @@
 
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
-import { NavConversations, NavPreferences } from "./icons";
+import { NavPreferences, NavThreads } from "./icons";
 import { PreferencesDialog } from "./PreferencesDialog";
 import type { Theme, Language } from "./PreferencesPanel";
 import { SideNav } from "./SideNav";
@@ -40,7 +40,7 @@ type AppShellProps = {
   prefsOpen: boolean;
   setPrefsOpen: Dispatch<SetStateAction<boolean>>;
   skipLinkHref: string;
-  activeConversationLabel: string;
+  activeThreadLabel: string;
   mobileChatChrome: MobileChatChrome;
   user: CurrentUser;
   onLogout: () => void;
@@ -51,14 +51,14 @@ type AppShellProps = {
   onLanguageChange: (language: Language) => void;
 };
 
-function MobileSettingsButton({ prefsOpen, setPrefsOpen }: { prefsOpen: boolean; setPrefsOpen: Dispatch<SetStateAction<boolean>> }) {
+function PreferencesButton({ prefsOpen, setPrefsOpen }: { prefsOpen: boolean; setPrefsOpen: Dispatch<SetStateAction<boolean>> }) {
   const { t } = useTranslation();
   return (
     <Button
       variant="ghost"
       type="button"
       className={`mobile-settings ${prefsOpen ? "active" : ""}`}
-      aria-label={t("nav.settings")}
+      aria-label={t("nav.preferences")}
       aria-haspopup="dialog"
       aria-expanded={prefsOpen}
       onClick={() => setPrefsOpen((v) => !v)}
@@ -79,7 +79,7 @@ export function AppShell({
   prefsOpen,
   setPrefsOpen,
   skipLinkHref,
-  activeConversationLabel,
+  activeThreadLabel,
   mobileChatChrome,
   user,
   onLogout,
@@ -94,7 +94,7 @@ export function AppShell({
   const mobileRouteTitle = route === "admin"
     ? t(`admin.v2.title_${adminView}`)
     : route === "main"
-      ? t("nav.conversations")
+      ? t("nav.threads")
       : t(WORK_ROUTE_LABEL_KEYS[route]);
   const isMobileChat = route === "main" && mobileView === "chat";
 
@@ -112,13 +112,13 @@ export function AppShell({
                 variant="ghost"
                 type="button"
                 className="mobile-topbar-back"
-                aria-label={t("nav.conversations")}
+                aria-label={t("nav.threads")}
                 onClick={() => onMobileViewChange("threads")}
               >
-                <NavConversations size={16} />
+                <NavThreads size={16} />
               </Button>
-              <div className="mobile-topbar-chat-title" title={activeConversationLabel}>
-                <span className="mobile-topbar-title">{activeConversationLabel}</span>
+              <div className="mobile-topbar-chat-title" title={activeThreadLabel}>
+                <span className="mobile-topbar-title">{activeThreadLabel}</span>
               </div>
               <div className="mobile-topbar-chat-tools">
                 <ArtifactNavButton
@@ -128,7 +128,7 @@ export function AppShell({
                   onOpenArtifacts={mobileChatChrome.onOpenArtifacts}
                   onRefresh={mobileChatChrome.onRefresh}
                 />
-                <MobileSettingsButton prefsOpen={prefsOpen} setPrefsOpen={setPrefsOpen} />
+                <PreferencesButton prefsOpen={prefsOpen} setPrefsOpen={setPrefsOpen} />
               </div>
             </>
           ) : (
@@ -136,11 +136,11 @@ export function AppShell({
               <Button variant="ghost"
                 type="button"
                 className={mobileView === "threads" ? "active" : ""}
-                aria-label={t("nav.conversations")}
+                aria-label={t("nav.threads")}
                 aria-pressed={mobileView === "threads"}
                 onClick={() => onMobileViewChange("threads")}
               >
-                <NavConversations size={16} /><span>{t("nav.chats")}</span>
+                <NavThreads size={16} /><span>{t("nav.threads")}</span>
               </Button>
               <Button variant="ghost"
                 type="button"
@@ -148,9 +148,9 @@ export function AppShell({
                 aria-pressed={mobileView === "chat"}
                 onClick={() => onMobileViewChange("chat")}
               >
-                <span>{activeConversationLabel}</span>
+                <span>{activeThreadLabel}</span>
               </Button>
-              <MobileSettingsButton prefsOpen={prefsOpen} setPrefsOpen={setPrefsOpen} />
+              <PreferencesButton prefsOpen={prefsOpen} setPrefsOpen={setPrefsOpen} />
             </>
           )
         ) : (
@@ -159,7 +159,7 @@ export function AppShell({
               <span className="mobile-topbar-eyebrow">{route === "admin" ? t("nav.admin") : t("nav.mobile_section")}</span>
               <span className="mobile-topbar-title">{mobileRouteTitle}</span>
             </div>
-            <MobileSettingsButton prefsOpen={prefsOpen} setPrefsOpen={setPrefsOpen} />
+            <PreferencesButton prefsOpen={prefsOpen} setPrefsOpen={setPrefsOpen} />
           </>
         )}
       </div>

@@ -1,37 +1,37 @@
 import { useEffect, type Dispatch, type SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 import { ActionCompose, ActionSearch } from "./icons";
-import { ConversationRow, type ConversationItem } from "./ConversationRow";
-import { groupConversations } from "../lib/conversationGroups";
+import { ThreadRow, type ThreadItem } from "./ThreadRow";
+import { groupThreads } from "../lib/threadGroups";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import type { RelaySession } from "../types";
 import { Button } from "./ui/button";
 
-// The logged-in employee's own conversations. Each row is a session; the list
+// The logged-in employee's own threads. Each row is a session; the list
 // is owner-scoped by the backend, so it only ever shows the current employee's
-// work. "+ New conversation" starts a fresh thread without archiving the rest.
-export function ThreadPanel({
-  conversations,
+// work. “New thread” starts a fresh thread without archiving the rest.
+export function ThreadListPanel({
+  threads,
   query,
   setQuery,
   selectedSessionId,
-  onSelectConversation,
-  onNewConversation,
-  onRenameConversation,
-  onCloseConversation,
+  onSelectThread,
+  onNewThread,
+  onRenameThread,
+  onCloseThread,
 }: {
-  conversations: ConversationItem[];
+  threads: ThreadItem[];
   query: string;
   setQuery: Dispatch<SetStateAction<string>>;
   selectedSessionId: string | undefined;
-  onSelectConversation: (sessionId: string) => void;
-  onNewConversation: () => void;
-  onRenameConversation: (session: RelaySession) => void;
-  onCloseConversation: (sessionId: string) => void;
+  onSelectThread: (sessionId: string) => void;
+  onNewThread: () => void;
+  onRenameThread: (session: RelaySession) => void;
+  onCloseThread: (sessionId: string) => void;
 }) {
   const { t } = useTranslation();
 
-  // The filter is owned by the parent (it also filters the conversation
+  // The filter is owned by the parent (it also filters the thread
   // list), but mirrored to the URL so a refresh or shared link restores it.
   const [urlQuery, setUrlQuery] = useUrlSearchState(
     "threadQuery",
@@ -46,7 +46,7 @@ export function ThreadPanel({
     if (query !== urlQuery) setUrlQuery(query);
   }, [query, urlQuery, setUrlQuery]);
 
-  const groups = groupConversations(conversations);
+  const groups = groupThreads(threads);
   const sections = [
     { key: "needsYou", tone: "attn", label: t("thread.group_needs_you"), items: groups.needsYou },
     { key: "running", tone: "run", label: t("thread.group_running"), items: groups.running },
@@ -54,23 +54,23 @@ export function ThreadPanel({
   ] as const;
 
   return (
-    <aside id="thread-panel" className="thread-panel" aria-label={t("nav.conversations")} tabIndex={-1}>
+    <aside id="thread-panel" className="thread-panel" aria-label={t("nav.threads")} tabIndex={-1}>
       <div className="conversation-header">
         <div className="conversation-heading">
-          <span className="conversation-heading-eyebrow">{t("nav.conversations")}</span>
+          <span className="conversation-heading-eyebrow">{t("nav.threads")}</span>
           <h1>
-            {t("thread.messages")}
+            {t("nav.threads")}
             <small className="mono conversation-heading-count">
-              {conversations.length}
+              {threads.length}
             </small>
           </h1>
         </div>
         <Button variant="ghost"
           type="button"
           className="conversation-new-btn"
-          aria-label={t("thread.new_conversation")}
-          title={t("thread.new_conversation")}
-          onClick={onNewConversation}
+          aria-label={t("thread.new_thread")}
+          title={t("thread.new_thread")}
+          onClick={onNewThread}
         >
           <ActionCompose size={16} />
         </Button>
@@ -79,7 +79,7 @@ export function ThreadPanel({
         <ActionSearch size={16} />
         <input
           aria-label={t("thread.search_label")}
-          name="conversation-search"
+          name="thread-search"
           autoComplete="off"
           spellCheck={false}
           placeholder={t("thread.search_placeholder")}
@@ -87,7 +87,7 @@ export function ThreadPanel({
           onChange={(e) => setQuery(e.target.value)}
         />
       </form>
-      <section className="conversation-list" aria-label={t("nav.conversations")}>
+      <section className="conversation-list" aria-label={t("nav.threads")}>
         {sections.map((section) =>
           section.items.length > 0 ? (
             <div key={section.key} className="conversation-group" data-tone={section.tone}>
@@ -96,21 +96,21 @@ export function ThreadPanel({
                 <span className="conversation-group-count mono">{section.items.length}</span>
               </div>
               {section.items.map((item) => (
-                <ConversationRow
+                <ThreadRow
                   key={item.session.id}
                   item={item}
                   selected={selectedSessionId === item.session.id}
-                  onSelect={onSelectConversation}
-                  onRename={onRenameConversation}
-                  onClose={onCloseConversation}
+                  onSelect={onSelectThread}
+                  onRename={onRenameThread}
+                  onClose={onCloseThread}
                 />
               ))}
             </div>
           ) : null,
         )}
-        {conversations.length === 0 ? (
+        {threads.length === 0 ? (
           <p className="conversation-empty">
-            {query.trim() ? t("thread.no_matches") : t("thread.no_conversations")}
+            {query.trim() ? t("thread.no_matches") : t("thread.no_threads")}
           </p>
         ) : null}
       </section>

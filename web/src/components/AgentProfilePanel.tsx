@@ -23,7 +23,7 @@ import { ADMIN_AGENTS_KEY } from "../lib/adminHelpers";
 import { EMPLOYEE_AGENTS_QUERY_KEY } from "../hooks/useEmployeeAgents";
 import { formatRelativeTime, truncateId, agentAvailabilityTone } from "./admin/helpers";
 import { AgentMark } from "./AgentMark";
-import { AgentInstructionEditor } from "./AgentInstructionEditor";
+import { AgentPersonalityEditor } from "./AgentPersonalityEditor";
 import { PlacementList } from "./PlacementList";
 import { describeAgentPlacements } from "../lib/agentPlacements";
 import { ProfileImagePicker } from "./ProfileImagePicker";
@@ -78,16 +78,14 @@ export function AgentProfilePanel({
 
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
-  const [editingInstructions, setEditingInstructions] = useState(false);
-  const [instructionsDraft, setInstructionsDraft] = useState("");
+  const [editingPersonality, setEditingPersonality] = useState(false);
+  const [personalityDraft, setPersonalityDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [renameError, setRenameError] = useState<string | null>(null);
-  const [instructionsError, setInstructionsError] = useState<string | null>(null);
   const [pendingPlacementId, setPendingPlacementId] = useState<string | null>(null);
 
   const dirtyDraft = (renaming && nameDraft.trim() !== agent.displayName.trim())
-    || (editingInstructions && instructionsDraft.trim() !== (agent.instructions ?? "").trim());
+    || (editingPersonality && personalityDraft.trim() !== (agent.instructions ?? "").trim());
   const dirtyDraftRef = useRef(false);
   dirtyDraftRef.current = dirtyDraft;
   useUnsavedChangesGuard(dirtyDraft && !saving);
@@ -99,15 +97,13 @@ export function AgentProfilePanel({
     previousAgentIdRef.current = agent.id;
     const resetEditingState = () => {
       setRenaming(false);
-      setEditingInstructions(false);
+      setEditingPersonality(false);
       setError(null);
-      setRenameError(null);
-      setInstructionsError(null);
       setSaving(false);
       setPendingPlacementId(null);
     };
     // Hold the draft until the owner confirms the discard — switching rows
-    // must not silently drop unsaved rename/instruction edits.
+    // must not silently drop unsaved rename/personality edits.
     if (!hadDirtyDraft) {
       resetEditingState();
       return;
@@ -164,16 +160,16 @@ export function AgentProfilePanel({
     }
   }
 
-  function startEditInstructions() {
-    setInstructionsDraft(agent.instructions ?? "");
-    setEditingInstructions(true);
+  function startEditPersonality() {
+    setPersonalityDraft(agent.instructions ?? "");
+    setEditingPersonality(true);
     setError(null);
   }
 
-  async function handleInstructionsSave() {
-    const trimmed = instructionsDraft.trim();
+  async function handlePersonalitySave() {
+    const trimmed = personalityDraft.trim();
     if (trimmed === (agent.instructions ?? "").trim()) {
-      setEditingInstructions(false);
+      setEditingPersonality(false);
       return;
     }
     setSaving(true);
@@ -182,7 +178,7 @@ export function AgentProfilePanel({
       const result = await patchAgent({ instructions: trimmed });
       if (!result) return;
       applyAgentUpdate(result.agent);
-      setEditingInstructions(false);
+      setEditingPersonality(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -373,16 +369,16 @@ export function AgentProfilePanel({
           </section>
         ) : null}
 
-        <AgentInstructionEditor
+        <AgentPersonalityEditor
           value={agent.instructions ?? ""}
-          draft={instructionsDraft}
-          editing={editingInstructions}
+          draft={personalityDraft}
+          editing={editingPersonality}
           editable={canEditProfile}
           saving={saving}
-          onStartEdit={startEditInstructions}
-          onDraftChange={setInstructionsDraft}
-          onCancel={() => setEditingInstructions(false)}
-          onSave={() => void handleInstructionsSave()}
+          onStartEdit={startEditPersonality}
+          onDraftChange={setPersonalityDraft}
+          onCancel={() => setEditingPersonality(false)}
+          onSave={() => void handlePersonalitySave()}
         />
 
         <details className="workspace-dossier-details">
@@ -528,16 +524,16 @@ export function AgentProfilePanel({
         )}
       </div>
 
-      <AgentInstructionEditor
+      <AgentPersonalityEditor
         value={agent.instructions ?? ""}
-        draft={instructionsDraft}
-        editing={editingInstructions}
+        draft={personalityDraft}
+        editing={editingPersonality}
         editable={canEditProfile}
         saving={saving}
-        onStartEdit={startEditInstructions}
-        onDraftChange={setInstructionsDraft}
-        onCancel={() => setEditingInstructions(false)}
-        onSave={() => void handleInstructionsSave()}
+        onStartEdit={startEditPersonality}
+        onDraftChange={setPersonalityDraft}
+        onCancel={() => setEditingPersonality(false)}
+        onSave={() => void handlePersonalitySave()}
       />
 
       <div className="adm-cred-row">

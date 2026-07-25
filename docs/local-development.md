@@ -252,7 +252,7 @@ make web
 
 The web dev server reads `web/.env.local`; set `RELAY_BACKEND_URL` there to
 change the backend proxy target. The exported UI at `/web` includes chat,
-backlog, routines, MCP, skills, channels, and the admin console. You can also
+backlog, routines, MCP, skills, channels, and the admin page. You can also
 override the backend URL for one run:
 
 ```bash
@@ -467,7 +467,7 @@ packages/relay-daemon/src/sandbox-session.ts  sandbox session lifecycle and agen
 packages/relay-tui/src/cli.ts                 TUI binary entrypoint
 packages/relay-tui/src/tui.tsx                Ink TUI and human commands
 web/src/components/BacklogPage.tsx            web task backlog view
-web/src/components/RoutinePage.tsx            web recurring routine view
+web/src/components/RoutinesPage.tsx           web recurring routines view
 web/                                          Next.js web frontend
 ```
 

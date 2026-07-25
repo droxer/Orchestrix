@@ -19,11 +19,11 @@ interface NodePresenceProps {
 export function NodePresence({ node, t, className, withLabel = false }: NodePresenceProps) {
   const online = isNodeOnline(node);
   const label = online
-    ? t("fleet.presence_online")
-    : t("fleet.presence_offline");
+    ? t("nodes.presence_online")
+    : t("nodes.presence_offline");
   const title = online
-    ? t("fleet.presence_online_title")
-    : t("fleet.presence_offline_title", { time: formatRelativeTime(node.lastSeenAt, t) });
+    ? t("nodes.presence_online_title")
+    : t("nodes.presence_offline_title", { time: formatRelativeTime(node.lastSeenAt, t) });
   const dataOnline = online ? "true" : "false";
   if (withLabel) {
     return (

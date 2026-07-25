@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { writeTokens, type TokenMap } from "./appStorage";
 
-export type AdminConsoleView = "dashboard" | "employees" | "fleet";
+export type AdminPageView = "dashboard" | "employees" | "nodes";
 
 // Cross-cutting client state for the main app shell: which employee/session is
 // open and the per-employee/sandbox auth tokens. Server state stays in TanStack
@@ -11,13 +11,13 @@ interface RelayClientStore {
   selectedEmployee: string;
   selectedSessionId: string | undefined;
   tokens: TokenMap;
-  adminView: AdminConsoleView;
+  adminView: AdminPageView;
 
   setSelectedEmployee: (id: string) => void;
   setSelectedSessionId: (id: string | undefined) => void;
   // Persists to localStorage so callers no longer pair set + write by hand.
   setTokens: (tokens: TokenMap) => void;
-  setAdminView: (view: AdminConsoleView) => void;
+  setAdminView: (view: AdminPageView) => void;
 }
 
 export const useRelayStore = create<RelayClientStore>((set) => ({

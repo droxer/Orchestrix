@@ -2,22 +2,22 @@
 
 import { useTranslation } from "react-i18next";
 
-export type NodeLocation = "managed" | "employee-device";
+export type RunLocation = "managed" | "employee-device";
 
-interface ExecutionProfileFieldProps {
-  value: NodeLocation;
-  onChange: (location: NodeLocation) => void;
+interface RunModeFieldProps {
+  value: RunLocation;
+  onChange: (location: RunLocation) => void;
   /** Distinguishes radio groups when two drawers render the field. */
   name: string;
   disabled?: boolean;
 }
 
-const PROFILE_OPTIONS: Array<{ location: NodeLocation; kind: "managed" | "local" }> = [
+const RUN_MODE_OPTIONS: Array<{ location: RunLocation; kind: "managed" | "local" }> = [
   { location: "managed", kind: "managed" },
   { location: "employee-device", kind: "local" },
 ];
 
-export function ExecutionProfileField({ value, onChange, name, disabled }: ExecutionProfileFieldProps) {
+export function RunModeField({ value, onChange, name, disabled }: RunModeFieldProps) {
   const { t } = useTranslation();
   const activeKind = value === "managed" ? "managed" : "local";
 
@@ -26,9 +26,9 @@ export function ExecutionProfileField({ value, onChange, name, disabled }: Execu
       <div
         className="adm-profile-segment"
         role="radiogroup"
-        aria-label={t("admin.v2.section_execution_profile")}
+        aria-label={t("admin.v2.run_mode")}
       >
-        {PROFILE_OPTIONS.map(({ location, kind }) => {
+        {RUN_MODE_OPTIONS.map(({ location, kind }) => {
           const selected = value === location;
           return (
             <label key={location} className="adm-profile-segment-option">

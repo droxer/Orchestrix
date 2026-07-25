@@ -4,11 +4,11 @@ import { useTranslation } from "react-i18next";
 import { useDashboardActivity } from "../../../hooks/useDashboardActivity";
 import { useDashboardSessions } from "../../../hooks/useDashboardSessions";
 import { useTokenUsage } from "../../../hooks/useTokenUsage";
-import type { FleetMetrics } from "../../../hooks/useFleetMetrics";
+import type { NodeMetrics } from "../../../hooks/useNodeMetrics";
 import type { ControlPanelDaemonNodeRecord, EmployeeRecord } from "../../../types";
 import { ActivityChart } from "./ActivityChart";
 import { ActivityFeed } from "./ActivityFeed";
-import { FleetHealthCard } from "./FleetHealthCard";
+import { NodeStatusCard } from "./NodeStatusCard";
 import { KpiTile } from "./KpiTile";
 import { TokenUsageChart } from "./TokenUsageChart";
 import { TopEmployees } from "./TopEmployees";
@@ -16,7 +16,7 @@ import { TopEmployees } from "./TopEmployees";
 interface DashboardViewProps {
   nodes: ControlPanelDaemonNodeRecord[];
   employees: EmployeeRecord[];
-  metrics: FleetMetrics;
+  metrics: NodeMetrics;
 }
 
 export function DashboardView({ nodes, employees, metrics }: DashboardViewProps) {
@@ -27,7 +27,7 @@ export function DashboardView({ nodes, employees, metrics }: DashboardViewProps)
 
   const sessionsReady = !sessionsQuery.isLoading;
   const sessions = sessionsQuery.data;
-  const fleetReady = nodes.length > 0 || employees.length > 0;
+  const nodesReady = nodes.length > 0 || employees.length > 0;
 
   const dash = "—";
   const showTokens = tokens.available;
@@ -65,9 +65,9 @@ export function DashboardView({ nodes, employees, metrics }: DashboardViewProps)
             slot="nodes"
             enterIndex={1}
             eyebrow={t("admin.v2.dash_kpi_nodes")}
-            value={fleetReady ? formatCompact(metrics.total, i18n.language) : dash}
+            value={nodesReady ? formatCompact(metrics.total, i18n.language) : dash}
             hint={
-              fleetReady
+              nodesReady
                 ? t("admin.v2.dash_kpi_nodes_hint", { ready: metrics.ready, failed: metrics.failed })
                 : undefined
             }
@@ -76,8 +76,8 @@ export function DashboardView({ nodes, employees, metrics }: DashboardViewProps)
             slot="employees"
             enterIndex={2}
             eyebrow={t("admin.v2.dash_kpi_employees")}
-            value={fleetReady ? formatCompact(metrics.employeeTotal, i18n.language) : dash}
-            hint={fleetReady ? t("admin.v2.dash_kpi_employees_hint", { count: employees.length }) : undefined}
+            value={nodesReady ? formatCompact(metrics.employeeTotal, i18n.language) : dash}
+            hint={nodesReady ? t("admin.v2.dash_kpi_employees_hint", { count: employees.length }) : undefined}
           />
           {showTokens ? (
             <KpiTile
@@ -97,7 +97,7 @@ export function DashboardView({ nodes, employees, metrics }: DashboardViewProps)
           ready={sessionsReady}
           className="relay-enter relay-enter-delay-5"
         />
-        <FleetHealthCard nodes={nodes} className="relay-enter relay-enter-delay-6" />
+        <NodeStatusCard nodes={nodes} className="relay-enter relay-enter-delay-6" />
         <TopEmployees
           employees={employees}
           nodes={nodes}

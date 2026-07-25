@@ -3,7 +3,7 @@ import type { AgentName } from "../types.js";
 /**
  * Decide whether the drawer should reload its baseline from `node`.
  *
- * The admin fleet poll replaces the `node` reference every couple seconds,
+ * The admin node poll replaces the `node` reference every couple seconds,
  * so we must NOT re-snapshot just because `node.disabledAgents` is a fresh
  * array. We only re-snapshot when the drawer first opens or the user
  * actually targets a different node.

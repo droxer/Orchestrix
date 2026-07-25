@@ -273,7 +273,7 @@ function ChannelSection({
   );
 }
 
-export function ChatIntegrationsView({
+export function ChannelsView({
   createOpen: createOpenProp,
   onCreateOpenChange,
   onHasChannelsChange,
@@ -690,7 +690,7 @@ export function ChatIntegrationsView({
       <div className="adm-chat-toolbar relay-enter">
         <div className="adm-chat-metrics" role="group" aria-label={t("admin.v2.chat_metrics_label")}>
           <span className="adm-chat-metric">
-            <span className="adm-chat-metric-label">{t("admin.v2.chat_metric_integrations")}</span>
+            <span className="adm-chat-metric-label">{t("admin.v2.chat_metric_channels")}</span>
             <strong className="adm-chat-metric-value">{integrations.length}</strong>
           </span>
           <span className="adm-chat-metric">

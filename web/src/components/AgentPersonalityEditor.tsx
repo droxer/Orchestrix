@@ -8,7 +8,7 @@ import { ActionEdit } from "./icons";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 
-interface AgentInstructionEditorProps {
+interface AgentPersonalityEditorProps {
   value: string;
   draft: string;
   editing: boolean;
@@ -20,7 +20,7 @@ interface AgentInstructionEditorProps {
   onSave: () => void;
 }
 
-export function AgentInstructionEditor({
+export function AgentPersonalityEditor({
   value,
   draft,
   editing,
@@ -30,12 +30,12 @@ export function AgentInstructionEditor({
   onDraftChange,
   onCancel,
   onSave,
-}: AgentInstructionEditorProps) {
+}: AgentPersonalityEditorProps) {
   const { t } = useTranslation();
   const savedValue = value.trim();
   const draftValue = draft.trim();
   const dirty = draftValue !== savedValue;
-  const hasCustomInstruction = savedValue.length > 0;
+  const hasCustomPersonality = savedValue.length > 0;
   const titleId = useId();
   const helpId = useId();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -61,9 +61,9 @@ export function AgentInstructionEditor({
           <div className="agent-personality-title-block">
             <div className="agent-personality-title-row">
               <h2 id={titleId}>{t("agents_page.personality_title")}</h2>
-              <span className={`agent-personality-state${hasCustomInstruction ? " is-defined" : ""}`}>
+              <span className={`agent-personality-state${hasCustomPersonality ? " is-defined" : ""}`}>
                 <span aria-hidden="true" />
-                {hasCustomInstruction
+                {hasCustomPersonality
                   ? t("agents_page.personality_defined")
                   : t("agents_page.personality_default")}
               </span>
@@ -76,13 +76,13 @@ export function AgentInstructionEditor({
         {editable && !editing ? (
           <Button
             type="button"
-            variant={hasCustomInstruction ? "outline" : "default"}
+            variant={hasCustomPersonality ? "outline" : "default"}
             size="sm"
             className="agent-personality-edit-action"
             onClick={onStartEdit}
           >
             <ActionEdit size={13} aria-hidden="true" />
-            {hasCustomInstruction
+            {hasCustomPersonality
               ? t("agents_page.edit_personality")
               : t("agents_page.write_personality")}
           </Button>
@@ -135,7 +135,7 @@ export function AgentInstructionEditor({
           <Textarea
             ref={textareaRef}
             className="agent-personality-textarea mono"
-            name="agent-instructions"
+            name="agent-personality"
             aria-label={t("agents_page.personality_title")}
             aria-describedby={helpId}
             rows={14}
@@ -155,10 +155,10 @@ export function AgentInstructionEditor({
           />
           <div className="agent-personality-editor-foot">
             <span className="agent-personality-count mono">
-              {t("agents_page.instructions_characters", { count: draft.length })}
+              {t("agents_page.personality_characters", { count: draft.length })}
             </span>
             <span className="agent-personality-save-hint">
-              {t("agents_page.instructions_save_hint")}
+              {t("agents_page.personality_save_hint")}
             </span>
             <div className="agent-personality-actions">
               <Button
@@ -181,7 +181,7 @@ export function AgentInstructionEditor({
             </div>
           </div>
         </div>
-      ) : hasCustomInstruction ? (
+      ) : hasCustomPersonality ? (
         <article className="agent-personality-document">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{savedValue}</ReactMarkdown>
         </article>

@@ -6,20 +6,20 @@ import { ArrowRightLeft, MessageCircleQuestion, Scan } from "lucide-react";
 import { RelayMark } from "./RelayMark";
 import type { AgentName, AgentTaskMode, EmployeeAgent, RelayArtifact, RelaySession } from "../types";
 import { buildExecutorDisplayNameMap, displayNameForExecutor } from "../lib/agentDisplayNames";
-import type { ConversationItem } from "./ConversationRow";
-import { ThreadPanel } from "./ThreadPanel";
-import { ChatHeader } from "./ChatHeader";
+import type { ThreadItem } from "./ThreadRow";
+import { ThreadListPanel } from "./ThreadListPanel";
+import { ThreadHeader } from "./ThreadHeader";
 import { TranscriptEmpty } from "./TranscriptEmpty";
 import { MessageBlock, isGroupedContinuation, type DerivedMessage } from "./MessageBlock";
 import { phaseDividerLabel } from "../lib/projectMessages";
 import { DecisionBar } from "./composer/DecisionBar";
 import { Composer, type ComposerHandle } from "./composer/Composer";
-import { ArtifactLibraryDrawer } from "./artifact/ArtifactLibraryDrawer";
+import { ArtifactsDrawer } from "./artifact/ArtifactsDrawer";
 
-export type MainChatViewProps = {
-  filteredConversations: ConversationItem[];
-  employeeQuery: string;
-  setEmployeeQuery: Dispatch<SetStateAction<string>>;
+export type ThreadsViewProps = {
+  filteredThreads: ThreadItem[];
+  threadQuery: string;
+  setThreadQuery: Dispatch<SetStateAction<string>>;
   activeSession: RelaySession | undefined;
   pendingUserMessage: { id: string; text: string } | null;
   displayMessages: DerivedMessage[];
@@ -27,10 +27,10 @@ export type MainChatViewProps = {
   transcriptRef: RefObject<HTMLDivElement | null>;
   composerRef: RefObject<ComposerHandle | null>;
   onTranscriptScroll: () => void;
-  onSelectConversation: (sessionId: string) => void;
-  onNewConversation: () => void;
-  onRenameConversation: (session: RelaySession) => void;
-  onCloseConversation: (sessionId: string) => void;
+  onSelectThread: (sessionId: string) => void;
+  onNewThread: () => void;
+  onRenameThread: (session: RelaySession) => void;
+  onCloseThread: (sessionId: string) => void;
   activeAgent: AgentName;
   logicalAgents: EmployeeAgent[];
   activeLogicalAgentId: string | null;
@@ -65,10 +65,10 @@ export type MainChatViewProps = {
   running: boolean;
 };
 
-export function MainChatView({
-  filteredConversations,
-  employeeQuery,
-  setEmployeeQuery,
+export function ThreadsView({
+  filteredThreads,
+  threadQuery,
+  setThreadQuery,
   activeSession,
   pendingUserMessage,
   displayMessages,
@@ -76,10 +76,10 @@ export function MainChatView({
   transcriptRef,
   composerRef,
   onTranscriptScroll,
-  onSelectConversation,
-  onNewConversation,
-  onRenameConversation,
-  onCloseConversation,
+  onSelectThread,
+  onNewThread,
+  onRenameThread,
+  onCloseThread,
   activeAgent,
   logicalAgents,
   activeLogicalAgentId,
@@ -112,7 +112,7 @@ export function MainChatView({
   onCancelRun,
   onRetryAgent,
   running,
-}: MainChatViewProps) {
+}: ThreadsViewProps) {
   const { t } = useTranslation();
   const agentDisplayNames = useMemo(() => buildExecutorDisplayNameMap(logicalAgents), [logicalAgents]);
   const activeAgentDisplayName = useMemo(() => {
@@ -126,19 +126,19 @@ export function MainChatView({
 
   return (
     <>
-      <ThreadPanel
-        conversations={filteredConversations}
-        query={employeeQuery}
-        setQuery={setEmployeeQuery}
+      <ThreadListPanel
+        threads={filteredThreads}
+        query={threadQuery}
+        setQuery={setThreadQuery}
         selectedSessionId={activeSession?.id}
-        onSelectConversation={onSelectConversation}
-        onNewConversation={onNewConversation}
-        onRenameConversation={onRenameConversation}
-        onCloseConversation={onCloseConversation}
+        onSelectThread={onSelectThread}
+        onNewThread={onNewThread}
+        onRenameThread={onRenameThread}
+        onCloseThread={onCloseThread}
       />
 
-      <section id="chat-panel" className="chat-panel" aria-label={t("nav.conversations")} tabIndex={-1}>
-        <ChatHeader
+      <section id="chat-panel" className="chat-panel" aria-label={t("nav.threads")} tabIndex={-1}>
+        <ThreadHeader
           activeSession={activeSession}
           runningAgent={runningAgent}
           runningAgentDisplayName={runningAgentDisplayName}
@@ -244,7 +244,7 @@ export function MainChatView({
         />
       </section>
 
-      <ArtifactLibraryDrawer
+      <ArtifactsDrawer
         open={artifactsDrawerOpen}
         onClose={onCloseArtifactsDrawer}
         sessionId={activeSession?.id ?? ""}

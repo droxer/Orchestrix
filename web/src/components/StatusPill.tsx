@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import type { CSSProperties } from "react";
 import type { Tone } from "../types";
-import type { StatusValue } from "../lib/conversationStatus";
+import type { StatusValue } from "../lib/threadStatus";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -70,7 +70,7 @@ export function StatusPill({ value }: StatusPillProps) {
   const live = value === "running" || value === "busy";
   // Bad states drop out of the brightness race: a bright --err fill is
   // byte-identical to --action white and reads as "primary/selected" rather
-  // than "problem". Render a hollow ring instead — the same shape the fleet
+  // than "problem". Render a hollow ring instead — the same shape the node
   // presence + node status dots use. Inline boxShadow (not a Tailwind ring
   // utility) so it survives the unlayered-reset cascade.
   const ringBad = tone === "bad";

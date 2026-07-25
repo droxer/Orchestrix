@@ -363,13 +363,13 @@ function TeamArtifacts({
   selected,
   isLoading,
   onSelect,
-  onOpenConversation,
+  onOpenThread,
 }: {
   artifacts: ArtifactIndexItem[];
   selected?: ArtifactIndexItem;
   isLoading: boolean;
   onSelect: (artifact: ArtifactIndexItem) => void;
-  onOpenConversation: (sessionId: string) => void;
+  onOpenThread: (sessionId: string) => void;
 }) {
   const { t, i18n } = useTranslation();
   return (
@@ -409,7 +409,7 @@ function TeamArtifacts({
             <h2>{selected?.title ?? t("workspace.preview")}</h2>
             {selected ? (
               <div className="workspace-pane-head-actions">
-                <Button type="button" variant="outline" size="sm" onClick={() => onOpenConversation(selected.sessionId)}>
+                <Button type="button" variant="outline" size="sm" onClick={() => onOpenThread(selected.sessionId)}>
                   {t("workspace.open_thread")}
                 </Button>
               </div>
@@ -431,7 +431,7 @@ function TeamArtifacts({
   );
 }
 
-function TeamActivities({ team, brief, onOpenConversation }: { team: AgentTeam; brief: WorkspaceBriefResponse; onOpenConversation: (sessionId: string) => void }) {
+function TeamActivities({ team, brief, onOpenThread }: { team: AgentTeam; brief: WorkspaceBriefResponse; onOpenThread: (sessionId: string) => void }) {
   const { t, i18n } = useTranslation();
   const hasActivity = brief.activeRuns.length > 0 || brief.sessions.length > 0 || brief.tasks.length > 0;
   const available = teamReady(team);
@@ -456,7 +456,7 @@ function TeamActivities({ team, brief, onOpenConversation }: { team: AgentTeam; 
                   <ActivityRow
                     title={run.taskGoal}
                     meta={[agentLabel(run.agent), t(`mode.${run.mode}`, { defaultValue: run.mode }), compactDate(run.startedAt, i18n.language)].filter(Boolean).join(" · ")}
-                    onClick={() => onOpenConversation(run.sessionId)}
+                    onClick={() => onOpenThread(run.sessionId)}
                   />
                 </li>
               ))}
@@ -476,7 +476,7 @@ function TeamActivities({ team, brief, onOpenConversation }: { team: AgentTeam; 
                       session.artifactCount ? t("workspace.session_artifacts", { count: session.artifactCount }) : "",
                       compactDate(session.updatedAt, i18n.language),
                     ].filter(Boolean).join(" · ")}
-                    onClick={() => onOpenConversation(session.id)}
+                    onClick={() => onOpenThread(session.id)}
                   />
                 </li>
               ))}
@@ -497,7 +497,7 @@ function TeamActivities({ team, brief, onOpenConversation }: { team: AgentTeam; 
                         task.dueDate ? t("workspace.task_due", { date: compactDate(task.dueDate, i18n.language) }) : "",
                         compactDate(task.updatedAt, i18n.language),
                       ].filter(Boolean).join(" · ")}
-                      onClick={sessionId ? () => onOpenConversation(sessionId) : undefined}
+                      onClick={sessionId ? () => onOpenThread(sessionId) : undefined}
                     />
                   </li>
                 );
@@ -516,14 +516,14 @@ export function TeamWorkspacePage({
   employeeId,
   isRefreshing,
   onRefresh,
-  onOpenConversation,
+  onOpenThread,
   onDeleted,
 }: {
   team: AgentTeam;
   employeeId?: string;
   isRefreshing: boolean;
   onRefresh: () => Promise<void>;
-  onOpenConversation: (sessionId: string) => void;
+  onOpenThread: (sessionId: string) => void;
   onDeleted: () => void;
 }) {
   const { t } = useTranslation();
@@ -610,13 +610,13 @@ export function TeamWorkspacePage({
       {pageTab === "profile" ? (
         <TeamProfile team={team} employeeId={employeeId} onDeleted={onDeleted} />
       ) : pageTab === "artifacts" ? (
-        <TeamArtifacts artifacts={artifacts} selected={selectedArtifact} isLoading={artifactsQuery.isLoading} onSelect={(artifact) => setSelectedArtifactId(artifact.id)} onOpenConversation={onOpenConversation} />
+        <TeamArtifacts artifacts={artifacts} selected={selectedArtifact} isLoading={artifactsQuery.isLoading} onSelect={(artifact) => setSelectedArtifactId(artifact.id)} onOpenThread={onOpenThread} />
       ) : briefQuery.isLoading && !briefQuery.data ? (
         <WorkspaceLoading label={t("workspace.loading")} />
       ) : error || !briefQuery.data ? (
         <WorkspaceError message={error || t("workspace.load_failed")} onRetry={() => void briefQuery.refetch()} />
       ) : (
-        <TeamActivities team={team} brief={briefQuery.data} onOpenConversation={onOpenConversation} />
+        <TeamActivities team={team} brief={briefQuery.data} onOpenThread={onOpenThread} />
       )}
     </section>
   );

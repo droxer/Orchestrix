@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { DashboardView } from "./admin/dashboard/DashboardView";
-import { useFleetMetrics } from "../hooks/useFleetMetrics";
+import { useNodeMetrics } from "../hooks/useNodeMetrics";
 import { useTranslation } from "react-i18next";
 import { useMutationError } from "../hooks/useMutationError";
 import { Button } from "@/components/ui/button";
@@ -21,10 +21,10 @@ import type {
 } from "../types";
 import { AgentProfileDrawer } from "./admin/AgentProfileDrawer";
 import { AssignNodeDrawer } from "./admin/AssignNodeDrawer";
-import { BootstrapScreen, LoginScreen } from "./admin/AuthScreens";
+import { AdminLoginScreen, FirstAdminSetupScreen } from "./admin/AdminAuthScreens";
 import { CredentialsDrawer } from "./admin/CredentialsDrawer";
-import { FleetView } from "./admin/FleetView";
-import { ManageAgentsDrawer } from "./admin/ManageAgentsDrawer";
+import { NodesView } from "./admin/NodesView";
+import { ManageExecutorsDrawer } from "./admin/ManageExecutorsDrawer";
 import { ManagedNodeHistory } from "./admin/ManagedNodeHistory";
 import { PageHeader } from "./PageHeader";
 import { AdminViewToggle, type AdminView } from "./admin/AdminViewToggle";
@@ -32,7 +32,7 @@ import { AddEmployeeDrawer } from "./admin/AddEmployeeDrawer";
 import { AddNodeDrawer, type AddNodeDrawerSuccess } from "./admin/AddNodeDrawer";
 import { EmployeesView } from "./admin/EmployeesView";
 import type { AdminLayout } from "./admin/AdminLayoutToggle";
-import { useAdminFleet } from "../hooks/useAdminFleet";
+import { useAdminNodes } from "../hooks/useAdminNodes";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { useRelayStore } from "../lib/store";
 import { CONTROL_PANEL_POLL_MS } from "../lib/controlPanelQueries";
@@ -46,13 +46,14 @@ import {
 } from "./admin/helpers";
 
 type AuthScreen = "login" | "bootstrap";
-const ADMIN_VIEWS: AdminView[] = ["dashboard", "employees", "fleet"];
+const ADMIN_VIEWS: AdminView[] = ["dashboard", "employees", "nodes"];
 
 function parseAdminView(value: string | null): AdminView {
+  if (value === "fleet") return "nodes";
   return ADMIN_VIEWS.includes(value as AdminView) ? value as AdminView : "dashboard";
 }
 
-export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null }) {
+export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null }) {
   const { t } = useTranslation();
   const { reportMutationError } = useMutationError();
 
@@ -74,14 +75,14 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
     (value) => (value === "list" ? "list" : "card"),
     (value) => (value === "card" ? null : value),
   );
-  const { nodes, employees, pollError, mergeFleet, refetch } = useAdminFleet(
+  const { nodes, employees, pollError, mergeNodes, refetch } = useAdminNodes(
     Boolean(admin),
     view === "dashboard" || layout === "list",
   );
   const managedNodesQuery = useQuery({
     queryKey: ["admin", "managed-nodes"],
     queryFn: ({ signal }) => listManagedNodes(signal),
-    enabled: Boolean(admin) && view === "fleet",
+    enabled: Boolean(admin) && view === "nodes",
     refetchInterval: CONTROL_PANEL_POLL_MS,
   });
   const managedNodes = managedNodesQuery.data?.nodes ?? [];
@@ -111,7 +112,7 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
     (value) => value,
     (value) => value,
   );
-  const [manageAgentsNodeId, setManageAgentsNodeId] = useUrlSearchState<string | null>(
+  const [manageExecutorsNodeId, setManageExecutorsNodeId] = useUrlSearchState<string | null>(
     "adminManageAgents",
     null,
     (value) => value,
@@ -160,7 +161,7 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // The fleet poll lives in useAdminFleet; a failure that looks like an expired
+  // The node poll lives in useAdminNodes; a failure that looks like an expired
   // session drops us back to the login screen (the query disables once admin
   // clears).
   useEffect(() => {
@@ -173,16 +174,16 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
     setAdminView(view);
   }, [setAdminView, view]);
 
-  const metrics = useFleetMetrics(nodes, employees);
+  const metrics = useNodeMetrics(nodes, employees);
 
   const unassignedNodes = useMemo(() => nodes.filter((node) => !node.employeeId), [nodes]);
   const credentialsNode = useMemo(
     () => (credentialsNodeId ? nodes.find((node) => node.id === credentialsNodeId) ?? null : null),
     [credentialsNodeId, nodes],
   );
-  const manageAgentsNode = useMemo(
-    () => (manageAgentsNodeId ? nodes.find((node) => node.id === manageAgentsNodeId) ?? null : null),
-    [manageAgentsNodeId, nodes],
+  const manageExecutorsNode = useMemo(
+    () => (manageExecutorsNodeId ? nodes.find((node) => node.id === manageExecutorsNodeId) ?? null : null),
+    [manageExecutorsNodeId, nodes],
   );
 
   useEffect(() => {
@@ -198,12 +199,12 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
     setCredentialsNodeId(node.id);
   }
 
-  function handleManageAgents(node: ControlPanelDaemonNodeRecord) {
-    setManageAgentsNodeId(node.id);
+  function handleManageExecutors(node: ControlPanelDaemonNodeRecord) {
+    setManageExecutorsNodeId(node.id);
   }
 
   function handleNodeUpdated(updated: ControlPanelDaemonNodeRecord) {
-    mergeFleet((prev) => ({
+    mergeNodes((prev) => ({
       ...prev,
       nodes: prev.nodes.map((current) => (current.id === updated.id ? updated : current)),
     }));
@@ -212,7 +213,7 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
   async function handleUnassignNode(node: ControlPanelDaemonNodeRecord) {
     try {
       const result = await unassignControlPanelDaemonNode(node.id);
-      mergeFleet((prev) => ({
+      mergeNodes((prev) => ({
         ...prev,
         nodes: prev.nodes.map((current) => (current.id === result.node.id ? result.node : current)),
       }));
@@ -226,7 +227,7 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
     try {
       if (node.managedNodeId) await deleteManagedNode(node.managedNodeId);
       else await deleteControlPanelDaemonNode(node.id);
-      mergeFleet((prev) => ({
+      mergeNodes((prev) => ({
         ...prev,
         nodes: prev.nodes.filter((current) => (
           node.managedNodeId
@@ -255,7 +256,7 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
     try {
       const result = await deleteControlPanelEmployee(employee.id);
       const unassignedSet = new Set(result.unassignedNodes);
-      mergeFleet((prev) => ({
+      mergeNodes((prev) => ({
         employees: prev.employees.filter((current) => current.id !== employee.id),
         nodes: prev.nodes.map((current) =>
           unassignedSet.has(current.id) ? (({ employeeId: _ignored, ...rest }) => rest)(current) : current,
@@ -269,7 +270,7 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
 
   function handleAddEmployeeSuccess(result: CreateControlPanelEmployeeResponse) {
     const { node } = result;
-    mergeFleet((prev) => ({
+    mergeNodes((prev) => ({
       nodes: node ? [node, ...prev.nodes.filter((current) => current.id !== node.id)] : prev.nodes,
       employees: [result.employee, ...prev.employees.filter((employee) => employee.id !== result.employee.id)],
     }));
@@ -294,7 +295,7 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
   }
 
   function handleAssignSuccess(result: AssignControlPanelDaemonNodeResponse) {
-    mergeFleet((prev) => ({
+    mergeNodes((prev) => ({
       nodes: [result.node, ...prev.nodes.filter((node) => node.id !== result.node.id)],
       employees: [result.employee, ...prev.employees.filter((employee) => employee.id !== result.employee.id)],
     }));
@@ -310,15 +311,15 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
     window.setTimeout(() => setHighlightedEmployeeId((prev) => (prev === node.employeeId ? null : prev)), HIGHLIGHT_PULSE_MS);
     setAddNodeOpen(false);
     setAssignTarget(null);
-    setView("fleet");
+    setView("nodes");
     // Managed provisioning is asynchronous. The supervisor enrolls the daemon,
-    // and the existing fleet poll displays it once registration succeeds.
+    // and the existing node poll displays it once registration succeeds.
     void refetch();
   }
 
   function handleCreateManualNodeSuccess(result: CreateControlPanelDaemonNodeResponse) {
     const { node } = result;
-    mergeFleet((prev) => ({
+    mergeNodes((prev) => ({
       ...prev,
       nodes: [node, ...prev.nodes.filter((current) => current.id !== node.id)],
     }));
@@ -335,7 +336,7 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
     window.setTimeout(() => setHighlightedEmployeeId((prev) => (prev === node.employeeId ? null : prev)), HIGHLIGHT_PULSE_MS);
     setAddNodeOpen(false);
     setAssignTarget(null);
-    setView("fleet");
+    setView("nodes");
     setCredentialsNodeId(node.id);
   }
 
@@ -351,7 +352,7 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
     if (manualRefreshPending) return;
     setManualRefreshPending(true);
     try {
-      if (view === "fleet") await Promise.all([refetch(), managedNodesQuery.refetch()]);
+      if (view === "nodes") await Promise.all([refetch(), managedNodesQuery.refetch()]);
       else await refetch();
     } finally {
       setManualRefreshPending(false);
@@ -370,9 +371,9 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
     return (
       <section className="admin-console adm-bare">
         {authScreen === "bootstrap" || needsBootstrap ? (
-          <BootstrapScreen onBootstrapped={() => void checkAuth()} onSwitchToLogin={() => setAuthScreen("login")} />
+          <FirstAdminSetupScreen onBootstrapped={() => void checkAuth()} onSwitchToLogin={() => setAuthScreen("login")} />
         ) : (
-          <LoginScreen
+          <AdminLoginScreen
             onLogin={() => void checkAuth()}
             needsBootstrap={needsBootstrap}
             onSwitchToBootstrap={() => setAuthScreen("bootstrap")}
@@ -382,16 +383,16 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
     );
   }
 
-  const managedNodesError = view === "fleet" && managedNodesQuery.error instanceof Error
+  const managedNodesError = view === "nodes" && managedNodesQuery.error instanceof Error
     ? managedNodesQuery.error.message
-    : view === "fleet" && managedNodesQuery.error
+    : view === "nodes" && managedNodesQuery.error
       ? String(managedNodesQuery.error)
       : null;
   const headerError = authError ?? pollError ?? managedNodesError;
   const viewTitle = t(`admin.v2.title_${view}`);
   const headerCount = view === "employees"
     ? t("admin.employee_count", { count: employees.length })
-    : view === "fleet"
+    : view === "nodes"
       ? t("admin.node_count", { count: nodes.length })
       : undefined;
 
@@ -446,7 +447,7 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
                 <span className="adm-command-onboard-label">{t("admin.v2.add_employee_cta")}</span>
               </Button>
             ) : null}
-            {view === "fleet" ? (
+            {view === "nodes" ? (
               <Button
                 type="button"
                 className="adm-command-onboard"
@@ -480,13 +481,13 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
                 />
               ) : (
                 <>
-                  <FleetView
+                  <NodesView
                     nodes={nodes}
                     storedTokens={storedTokens}
                     layout={layout}
                     onLayoutChange={setLayout}
                     onRevealCredentials={handleRevealCredentials}
-                    onManageAgents={handleManageAgents}
+                    onManageExecutors={handleManageExecutors}
                     onDeleteNode={handleDeleteNode}
                     onAddNode={() => setAddNodeOpen(true)}
                   />
@@ -530,10 +531,10 @@ export function AdminConsole({ currentUser }: { currentUser?: CurrentUser | null
         onUnassign={handleUnassignNode}
         onDelete={handleDeleteNode}
       />
-      <ManageAgentsDrawer
-        open={manageAgentsNodeId !== null}
-        onClose={() => setManageAgentsNodeId(null)}
-        node={manageAgentsNode}
+      <ManageExecutorsDrawer
+        open={manageExecutorsNodeId !== null}
+        onClose={() => setManageExecutorsNodeId(null)}
+        node={manageExecutorsNode}
         onUpdated={handleNodeUpdated}
       />
       <AgentProfileDrawer

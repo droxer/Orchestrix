@@ -368,7 +368,7 @@
 /* Same pin, scoped to the identity-chip usage only (NodeCard's per-node
    agent chip, marked by the vendor glyph below) — the agent name
    (CLAUDE/CODEX/...) is identity, never status; only .adm-agent-dot
-   carries tone. ManageAgentsDrawer reuses .adm-agent-chip for a plain
+   carries tone. ManageExecutorsDrawer reuses .adm-agent-chip for a plain
    status-word chip (no glyph, no dot) where the tone-colored text IS the
    intended content, so :has() scopes this pin away from that case. */
 .adm-agent-chip:has(.adm-agent-chip-mark).tone-good,

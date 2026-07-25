@@ -30,7 +30,7 @@ function agentTitle(node: ControlPanelDaemonNodeRecord, agent: AgentName, t: TFu
   const statusLabel = t(`status.${agentStatus}`, { defaultValue: agentStatus });
   const detail = node.agentDetails?.[agent];
   const parts = [
-    t("fleet.agent_status_title", { agent, status: statusLabel }),
+    t("nodes.agent_status_title", { agent, status: statusLabel }),
     detail?.version,
     detail?.detail,
     isAgentDisabled(node, agent) ? t("admin.v2.agent_disabled") : null,
@@ -43,7 +43,7 @@ interface NodeCardProps {
   storedTokens?: StoredNodeTokenMap;
   colocated?: boolean;
   onReveal: (node: ControlPanelDaemonNodeRecord) => void;
-  onManageAgents: (node: ControlPanelDaemonNodeRecord) => void;
+  onManageExecutors: (node: ControlPanelDaemonNodeRecord) => void;
   onDelete?: (node: ControlPanelDaemonNodeRecord) => Promise<void>;
   t: TFunction;
 }
@@ -53,7 +53,7 @@ export function NodeCard({
   storedTokens = {},
   colocated = false,
   onReveal,
-  onManageAgents,
+  onManageExecutors,
   onDelete,
   t,
 }: NodeCardProps) {
@@ -167,7 +167,7 @@ export function NodeCard({
           <NodeActions
             node={node}
             onReveal={onReveal}
-            onManageAgents={onManageAgents}
+            onManageExecutors={onManageExecutors}
             onDelete={onDelete}
             deletePending={deletePending}
             onDeleteRequest={() => void handleDelete()}

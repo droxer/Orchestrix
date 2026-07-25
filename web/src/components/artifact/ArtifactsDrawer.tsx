@@ -10,7 +10,7 @@ function resolveSessionId(artifact: RelayArtifact, fallback: string): string {
   return (artifact as unknown as { sessionId?: string }).sessionId ?? fallback;
 }
 
-export function ArtifactLibraryDrawer({
+export function ArtifactsDrawer({
   open,
   onClose,
   artifacts,

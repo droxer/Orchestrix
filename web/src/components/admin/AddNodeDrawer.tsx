@@ -10,7 +10,7 @@ import type {
   EmployeeRecord,
 } from "../../types";
 import { Drawer } from "../ui/Drawer";
-import { ExecutionProfileField, type NodeLocation } from "./ExecutionProfileField";
+import { RunModeField, type RunLocation } from "./RunModeField";
 import { Button } from "@/components/ui/button";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import {
@@ -43,7 +43,7 @@ export function AddNodeDrawer({
   const assignmentHeadingId = useId();
   const employeeLabelId = useId();
 
-  const [nodeLocation, setNodeLocation] = useState<NodeLocation>("managed");
+  const [nodeLocation, setNodeLocation] = useState<RunLocation>("managed");
   const [sandboxMode, setSandboxMode] = useState<"boxlite" | "none">("boxlite");
   const [workspacePath, setWorkspacePath] = useState("");
   const [employeeId, setEmployeeId] = useState("");
@@ -143,10 +143,10 @@ export function AddNodeDrawer({
         <section className="adm-provision-section" aria-labelledby={profileHeadingId}>
           <header className="adm-provision-section-head">
             <h3 id={profileHeadingId} className="adm-provision-section-title">
-              {t("admin.v2.section_execution_profile")}
+              {t("admin.v2.run_mode")}
             </h3>
           </header>
-          <ExecutionProfileField
+          <RunModeField
             value={nodeLocation}
             onChange={(location) => {
               setNodeLocation(location);

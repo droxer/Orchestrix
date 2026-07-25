@@ -1,6 +1,6 @@
 import type { DaemonNodeMonitorRecord, SandboxRecord } from "../types.js";
 
-/** Every status value the conversation surfaces can hand to StatusPill:
+/** Every status value the thread surface can hand to StatusPill:
     LogicalAgentAvailability plus the daemon/sandbox lifecycle states. */
 export type StatusValue =
   | "ready"
@@ -17,13 +17,13 @@ export type StatusValue =
   | "completed"
   | "done";
 
-type ConversationDaemonSource = {
+type ThreadDaemonSource = {
   node?: DaemonNodeMonitorRecord;
   sandbox?: Pick<SandboxRecord, "status">;
   activeRun?: DaemonNodeMonitorRecord["activeRuns"][number];
 };
 
-export function conversationDaemonStatus(source: ConversationDaemonSource): StatusValue {
+export function threadDaemonStatus(source: ThreadDaemonSource): StatusValue {
   if (source.node) {
     // A stale heartbeat overrides liveness: a node we cannot reach must
     // never render the live "running" pulse.

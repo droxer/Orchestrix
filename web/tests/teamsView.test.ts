@@ -9,7 +9,7 @@ import { selectedTeamForWorkspace } from "../src/lib/teamWorkspace.js";
 
 describe("Agent team management", () => {
   it("keeps teams in employee agent management instead of standalone admin navigation", async () => {
-    const consoleSource = await readFile(resolve("web/src/components/AdminConsole.tsx"), "utf8");
+    const adminPageSource = await readFile(resolve("web/src/components/AdminPage.tsx"), "utf8");
     const appSource = await readFile(resolve("web/src/App.tsx"), "utf8");
     const agentsSource = await readFile(resolve("web/src/components/AgentsPage.tsx"), "utf8");
     const teamsSource = await readFile(resolve("web/src/components/TeamsPage.tsx"), "utf8");
@@ -19,7 +19,7 @@ describe("Agent team management", () => {
     const drawerSource = await readFile(resolve("web/src/components/admin/TeamDrawer.tsx"), "utf8");
     const pickerSource = await readFile(resolve("web/src/components/task-board/TaskDrawer.tsx"), "utf8");
 
-    assert.doesNotMatch(consoleSource, /adminTeam|adminAddTeam|<TeamsView/);
+    assert.doesNotMatch(adminPageSource, /adminTeam|adminAddTeam|<TeamsView/);
     assert.doesNotMatch(agentsSource, /agentsView|managementView|<TeamDrawer|useTeams/);
     assert.match(appSource, /route === "teams" \? \(\s*<TeamsPage/s);
     assert.match(teamsSource, /className="teams-list"/);

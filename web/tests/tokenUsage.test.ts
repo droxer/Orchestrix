@@ -16,7 +16,7 @@ describe("web token usage helpers", () => {
     assert.equal(mergeTokenUsage([undefined]), undefined);
   });
 
-  it("formats compact token counts for conversation rows", () => {
+  it("formats compact token counts for thread rows", () => {
     assert.equal(formatCompactTokens(999), "999");
     assert.equal(formatCompactTokens(1_250), "1.3K");
     assert.equal(formatCompactTokens(1_250_000), "1.3M");

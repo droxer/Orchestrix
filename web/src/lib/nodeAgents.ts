@@ -2,7 +2,7 @@ import type { AgentPlacement, EmployeeAgent } from "../types.js";
 
 /**
  * A logical agent hosted on a computer, derived from its non-removed
- * placement on that node. The computer is infrastructure: fleet surfaces
+ * placement on that node. The computer is infrastructure: node surfaces
  * lead with the agents it hosts, not with executor readiness chips.
  */
 export interface HostedAgent {

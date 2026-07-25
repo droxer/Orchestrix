@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import type { ControlPanelDaemonNodeRecord } from "../../types";
 import { AdminNode, ActionSearch, ICON_STROKE_LARGE } from "../icons";
 import { canUseLocalControlPanel } from "../../lib/controlPanel";
-import { stableFleetNodeOrder } from "../../lib/adminHelpers";
+import { stableNodeOrder } from "../../lib/adminHelpers";
 import { useUrlSearchState } from "../../hooks/useUrlSearchState";
 import type { StoredNodeTokenMap } from "./helpers";
 import { visualStatus } from "./helpers";
@@ -17,26 +17,26 @@ import { NodeRow } from "./NodeRow";
 import { NodeProfileBadges } from "./NodeProfileBadges";
 import { AdminLayoutToggle, type AdminLayout } from "./AdminLayoutToggle";
 
-type FleetFilter = "all" | "ready" | "running" | "provisioning" | "failed" | "stopped" | "unassigned";
+type NodeFilter = "all" | "ready" | "running" | "provisioning" | "failed" | "stopped" | "unassigned";
 
-interface FleetViewProps {
+interface NodesViewProps {
   nodes: ControlPanelDaemonNodeRecord[];
   storedTokens: StoredNodeTokenMap;
   layout: AdminLayout;
   onLayoutChange: (next: AdminLayout) => void;
   onRevealCredentials: (node: ControlPanelDaemonNodeRecord) => void;
-  onManageAgents: (node: ControlPanelDaemonNodeRecord) => void;
+  onManageExecutors: (node: ControlPanelDaemonNodeRecord) => void;
   onDeleteNode?: (node: ControlPanelDaemonNodeRecord) => Promise<void>;
   onAddNode?: () => void;
 }
 
-const FILTERS: FleetFilter[] = ["all", "ready", "running", "provisioning", "failed", "stopped", "unassigned"];
+const FILTERS: NodeFilter[] = ["all", "ready", "running", "provisioning", "failed", "stopped", "unassigned"];
 
-function parseFleetFilter(value: string | null): FleetFilter {
-  return FILTERS.includes(value as FleetFilter) ? value as FleetFilter : "all";
+function parseNodeFilter(value: string | null): NodeFilter {
+  return FILTERS.includes(value as NodeFilter) ? value as NodeFilter : "all";
 }
 
-function serializeFleetFilter(value: FleetFilter): string | null {
+function serializeNodeFilter(value: NodeFilter): string | null {
   return value === "all" ? null : value;
 }
 
@@ -48,7 +48,7 @@ function serializeSearchQuery(value: string): string | null {
   return value.trim() === "" ? null : value;
 }
 
-function matchesFilter(node: ControlPanelDaemonNodeRecord, filter: FleetFilter): boolean {
+function matchesFilter(node: ControlPanelDaemonNodeRecord, filter: NodeFilter): boolean {
   if (filter === "all") return true;
   if (filter === "unassigned") return !node.employeeId;
   const status = visualStatus(node);
@@ -60,21 +60,21 @@ function matchesFilter(node: ControlPanelDaemonNodeRecord, filter: FleetFilter):
   return false;
 }
 
-function filterLabel(filter: FleetFilter, t: TFunction): string {
+function filterLabel(filter: NodeFilter, t: TFunction): string {
   if (filter === "all") return t("admin.v2.filter_all");
   if (filter === "unassigned") return t("admin.unassigned");
   if (filter === "failed") return t("admin.v2.filter_failed");
   return t(`status.${filter}`, { defaultValue: filter });
 }
 
-export function FleetView({ nodes, storedTokens, layout, onLayoutChange, onRevealCredentials, onManageAgents, onDeleteNode, onAddNode }: FleetViewProps) {
+export function NodesView({ nodes, storedTokens, layout, onLayoutChange, onRevealCredentials, onManageExecutors, onDeleteNode, onAddNode }: NodesViewProps) {
   const { t } = useTranslation();
-  const [filter, setFilter] = useUrlSearchState("fleetFilter", "all" as FleetFilter, parseFleetFilter, serializeFleetFilter);
+  const [filter, setFilter] = useUrlSearchState("fleetFilter", "all" as NodeFilter, parseNodeFilter, serializeNodeFilter);
   const [query, setQuery] = useUrlSearchState("fleetQuery", "", parseSearchQuery, serializeSearchQuery);
   const colocated = canUseLocalControlPanel();
 
   const counts = useMemo(() => {
-    const result: Record<FleetFilter, number> = {
+    const result: Record<NodeFilter, number> = {
       all: nodes.length,
       ready: 0,
       running: 0,
@@ -96,7 +96,7 @@ export function FleetView({ nodes, storedTokens, layout, onLayoutChange, onRevea
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return stableFleetNodeOrder(nodes).filter((node) => {
+    return stableNodeOrder(nodes).filter((node) => {
       if (!matchesFilter(node, filter)) return false;
       if (!q) return true;
       const haystack = [
@@ -172,14 +172,14 @@ export function FleetView({ nodes, storedTokens, layout, onLayoutChange, onRevea
               storedTokens={storedTokens}
               colocated={colocated}
               onReveal={onRevealCredentials}
-              onManageAgents={onManageAgents}
+              onManageExecutors={onManageExecutors}
               onDelete={onDeleteNode}
               t={t}
             />
           ))}
         </div>
       ) : (
-        <div role="table" aria-label={t("admin.v2.nav_fleet")}>
+        <div role="table" aria-label={t("admin.v2.nav_nodes")}>
           <div className="adm-node-cols" role="row">
             <span className="adm-col-label" role="columnheader">{t("admin.v2.col_node")}</span>
             <span className="adm-col-label" role="columnheader">{t("admin.v2.node_runtimes")}</span>
@@ -193,7 +193,7 @@ export function FleetView({ nodes, storedTokens, layout, onLayoutChange, onRevea
                 storedTokens={storedTokens}
                 colocated={colocated}
                 onReveal={onRevealCredentials}
-                onManageAgents={onManageAgents}
+                onManageExecutors={onManageExecutors}
                 onDelete={onDeleteNode}
                 t={t}
               />

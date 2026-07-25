@@ -7,13 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { RelayMark } from "../RelayMark";
 
-interface LoginScreenProps {
+interface AdminLoginScreenProps {
   onLogin: () => void;
   needsBootstrap: boolean;
   onSwitchToBootstrap: () => void;
 }
 
-interface BootstrapScreenProps {
+interface FirstAdminSetupScreenProps {
   onBootstrapped: () => void;
   onSwitchToLogin: () => void;
 }
@@ -32,7 +32,7 @@ function AuthShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function LoginScreen({ onLogin, needsBootstrap, onSwitchToBootstrap }: LoginScreenProps) {
+export function AdminLoginScreen({ onLogin, needsBootstrap, onSwitchToBootstrap }: AdminLoginScreenProps) {
   const { t } = useTranslation();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -105,7 +105,7 @@ export function LoginScreen({ onLogin, needsBootstrap, onSwitchToBootstrap }: Lo
   );
 }
 
-export function BootstrapScreen({ onBootstrapped, onSwitchToLogin }: BootstrapScreenProps) {
+export function FirstAdminSetupScreen({ onBootstrapped, onSwitchToLogin }: FirstAdminSetupScreenProps) {
   const { t } = useTranslation();
   const [token, setToken] = useState("");
   const [username, setUsername] = useState("");

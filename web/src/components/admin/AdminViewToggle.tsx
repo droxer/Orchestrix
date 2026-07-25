@@ -1,11 +1,11 @@
 "use client";
 
 import { useTranslation } from "react-i18next";
-import type { AdminConsoleView } from "../../lib/store";
+import type { AdminPageView } from "../../lib/store";
 import { Button } from "../ui/button";
 import { AdminDashboard, AdminEmployees, AdminNode } from "../icons";
 
-export type AdminView = AdminConsoleView;
+export type AdminView = AdminPageView;
 
 interface AdminViewToggleProps {
   view: AdminView;
@@ -19,7 +19,7 @@ export function AdminViewToggle({ view, onChange }: AdminViewToggleProps) {
   const items: Array<{ id: AdminView; label: string; icon: typeof AdminEmployees }> = [
     { id: "dashboard", label: t("admin.v2.nav_dashboard"), icon: AdminDashboard },
     { id: "employees", label: t("admin.v2.nav_employees"), icon: AdminEmployees },
-    { id: "fleet", label: t("admin.v2.nav_fleet"), icon: AdminNode },
+    { id: "nodes", label: t("admin.v2.nav_nodes"), icon: AdminNode },
   ];
 
   return (

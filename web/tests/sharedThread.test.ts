@@ -29,7 +29,7 @@ describe("chooseSendAction", () => {
     assert.deepEqual(action, { kind: "create" });
   });
 
-  it("suppresses the prior active transcript while a new conversation is pending", () => {
+  it("suppresses the prior active transcript while a new thread is pending", () => {
     assert.equal(suppressActiveSessionDuringPendingSend({ kind: "create" }), true);
     assert.equal(suppressActiveSessionDuringPendingSend({ kind: "append", sessionId: "s1" }), false);
   });

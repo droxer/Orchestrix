@@ -1,12 +1,12 @@
 /* =====================================================================
-   Admin Console v2  (adm-* namespace)
+   Admin Page v2  (adm-* namespace)
    Operational control plane: white canvas, hairline grids, sans-tabular
    numerals, ink action color. Shares PageHeader + view-toggle chrome
    with Backlog and Routine; pulse strip and attention rail are admin-only.
    ===================================================================== */
 
 /* Outer shell columns for the admin route: collapse the thread pane so the
-   admin console fills the space beside the sidenav. (Relocated from the
+   admin page fills the space beside the sidenav. (Relocated from the
    retired v1 admin.css; the attribute selector out-specifies the default
    .messenger-shell grid regardless of load order.) */
 .messenger-shell[data-route="admin"] {
