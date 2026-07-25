@@ -24,6 +24,19 @@ export function myThreadSessions(
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
+// Merge a session returned by a mutation into the cached list, replacing any
+// record with the same id. Creating a thread resolves with the new
+// session long before the list refetch lands, so the caller seeds it here to
+// keep the selection resolvable — otherwise pickActiveThreadSession
+// cannot find the selected id and falls back to the most recent thread.
+export function upsertThreadSession(
+  sessions: readonly RelaySession[],
+  session: RelaySession,
+): RelaySession[] {
+  const others = sessions.filter((candidate) => candidate.id !== session.id);
+  return [session, ...others].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
 export function pickActiveThreadSession(input: {
   threads: readonly RelaySession[];
   selectedSessionId?: string;

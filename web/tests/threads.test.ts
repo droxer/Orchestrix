@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { matchesThreadQuery, myThreadSessions, pickActiveThreadSession, sessionAgents, threadLabel } from "../src/lib/threads.js";
+import { matchesThreadQuery, myThreadSessions, pickActiveThreadSession, sessionAgents, threadLabel, upsertThreadSession } from "../src/lib/threads.js";
 import { isAwaitingFeedbackDecision, rerunAssignmentForSession } from "../src/lib/workflow.js";
 import type { RelaySession } from "../src/types.js";
 
@@ -115,6 +115,23 @@ describe("web thread helpers", () => {
       activeSessionId: "active",
       composingNew: true,
     }), undefined);
+  });
+
+  // Creating a thread returns the new session before the list refetch
+  // lands. Without seeding it into the cached list the selection points at an
+  // id nobody can find, so the fallback lands on threads[0] — the
+  // previous thread — and the transcript flashes it before jumping.
+  it("opens the freshly created thread instead of the previous thread", () => {
+    const previous = session({ id: "previous", ownerEmployeeId: "alice", updatedAt: "2026-06-20T03:00:00.000Z" });
+    const created = session({ id: "created", ownerEmployeeId: "alice", updatedAt: "2026-06-20T04:00:00.000Z" });
+
+    const threads = upsertThreadSession([previous], created);
+    assert.equal(pickActiveThreadSession({
+      threads,
+      selectedSessionId: created.id,
+      activeSessionId: created.id,
+      composingNew: false,
+    })?.id, "created");
   });
 
   it("shows recovery decisions only for explicit feedback waits", () => {

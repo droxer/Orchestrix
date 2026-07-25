@@ -4,8 +4,10 @@ import { describe, it } from "node:test";
 import {
   buildExecutorDisplayNameMap,
   displayNameForExecutor,
+  isEmployeeAgentRoutable,
   isLogicalAgentRoutable,
   labelForExecutor,
+  preferredRoutableAgent,
 } from "../src/lib/agentDisplayNames.js";
 import type { EmployeeAgent } from "../src/types.js";
 
@@ -47,6 +49,26 @@ describe("agentDisplayNames", () => {
     assert.equal(isLogicalAgentRoutable("busy"), true);
     assert.equal(isLogicalAgentRoutable("pending"), false);
     assert.equal(isLogicalAgentRoutable("offline"), false);
+  });
+
+  it("does not select an inactive or offline agent for work", () => {
+    const logicalAgents = [
+      agent({ id: "offline", displayName: "Offline", executorKind: "claude", availability: "offline" }),
+      agent({ id: "inactive", displayName: "Inactive", executorKind: "codex", enabled: false }),
+    ];
+
+    assert.equal(isEmployeeAgentRoutable(logicalAgents[0]), false);
+    assert.equal(isEmployeeAgentRoutable(logicalAgents[1]), false);
+    assert.equal(preferredRoutableAgent(logicalAgents, "offline"), undefined);
+  });
+
+  it("moves selection to a routable agent when the preferred agent goes offline", () => {
+    const logicalAgents = [
+      agent({ id: "offline", displayName: "Offline", executorKind: "claude", availability: "offline" }),
+      agent({ id: "ready", displayName: "Ready", executorKind: "codex" }),
+    ];
+
+    assert.equal(preferredRoutableAgent(logicalAgents, "offline")?.id, "ready");
   });
 
   it("prefers ready over busy when resolving shared executor labels", () => {
