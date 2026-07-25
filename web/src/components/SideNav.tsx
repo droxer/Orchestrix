@@ -215,8 +215,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
         </Button>
       </div>
       <nav className="sidenav-nav" aria-label={t("nav.workspace_label")}>
-        <div className="sidenav-group" role="group" aria-label={t("nav.workspace")}>
-          <span className="sidenav-group-label sr-only" aria-hidden="true">{t("nav.workspace")}</span>
+        <div className="sidenav-group" role="group">
           <a
             className={`sidenav-btn ${route === "main" ? "active" : ""}`}
             data-nav="threads"
@@ -232,6 +231,9 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
             <NavThreads size={18} />
             <span className="sidenav-label sr-only">{t("nav.threads")}</span>
           </a>
+        </div>
+        <div className="sidenav-group sidenav-group--separated" role="group" aria-label={t("nav.workspace")}>
+          <span className="sidenav-group-label sr-only" aria-hidden="true">{t("nav.workspace")}</span>
           <a
             className={`sidenav-btn ${route === "backlog" ? "active" : ""}`}
             data-nav="backlog"
