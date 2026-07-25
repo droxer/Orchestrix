@@ -159,27 +159,6 @@
     min-height: var(--touch-target);
   }
 
-  /* ── Composer popovers — fixed lower sheet, clear of bottom nav ── */
-  .agent-picker,
-  .mention-popover {
-    position: fixed;
-    left: var(--sp-4);
-    right: var(--sp-4);
-    bottom: calc(var(--control-h) + var(--sp-4) + max(env(safe-area-inset-bottom), var(--sp-1)) + 7.5rem);
-    width: auto;
-    max-height: min(38dvh, 300px);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
-    /* Rendered as fixed lower sheets on mobile — sit on the sheet layer,
-       above the bottom bar and the FAB (--z-sheet's documented beat). */
-    z-index: var(--z-sheet);
-  }
-
-  .mention-popover {
-    bottom: calc(var(--control-h) + var(--sp-4) + max(env(safe-area-inset-bottom), var(--sp-1)) + 8.5rem);
-  }
-
   /* ── Inline handoff expando ────────────────────────────────────── */
   .handoff-panel {
     width: 100%;

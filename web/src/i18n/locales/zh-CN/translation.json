@@ -107,7 +107,7 @@
     "close_confirm": "关闭对话“{{name}}”？"
   },
   "composer": {
-    "placeholder": "给智能体发消息。输入 @ 切换…",
+    "placeholder": "给智能体发消息…",
     "aria_label": "写信给 {{employee}} 的 {{agent}}",
     "placeholder_no_employee": "请先选择员工工作区…",
     "aria_label_no_employee": "请先选择员工工作区再向 {{agent}} 写信",
@@ -115,7 +115,6 @@
     "cancel_run": "取消运行",
     "choose_agent": "选择 Agent",
     "choose_mode": "选择模式",
-    "address_agent": "提及智能体",
     "send_shortcut": "{{shortcut}} 发送",
     "mode_toggle_label": "模式：{{mode}}——切换到{{next}}"
   },
@@ -826,7 +825,7 @@
     "new_session": "新会话",
     "ready_for": "发送消息以开始。",
     "ready_no_employee": "为 {{agent}} 选择员工工作区。",
-    "hint_mention": "输入 @ 切换 Agent",
+    "hint_agent_picker": "使用 Agent 菜单切换 Agent",
     "awaiting_first": "等待首条消息",
     "phase_agent": "{{mode}}",
     "phase_handoff": "移交 · {{mode}}"

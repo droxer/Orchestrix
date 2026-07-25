@@ -25,6 +25,8 @@ export interface AgentState {
   prior_conversation?: string;
   /** Latest handoff note for the current turn, if any. */
   prior_handoff_note?: string;
+  /** Display name of the selected logical agent identity. */
+  agent_display_name?: string;
   /** Durable personality profile for the selected logical agent identity. */
   agent_instructions?: string;
   /**

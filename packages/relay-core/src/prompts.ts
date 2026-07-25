@@ -31,6 +31,11 @@ export function actionPrompt(state: AgentState): string {
 
 function promptPreludes(state: AgentState): string[] {
   const preludes: string[] = [];
+  if (state.agent_display_name) {
+    preludes.push(
+      ["[Agent identity]", `Your name is ${state.agent_display_name}.`].join("\n"),
+    );
+  }
   if (state.agent_instructions) {
     preludes.push(
       [

@@ -107,7 +107,7 @@
     "close_confirm": "Close thread “{{name}}”?"
   },
   "composer": {
-    "placeholder": "Message the agent. Type @ to switch…",
+    "placeholder": "Message the agent…",
     "aria_label": "Write to {{employee}}'s {{agent}}",
     "placeholder_no_employee": "Select an employee workspace first…",
     "aria_label_no_employee": "Select an employee workspace before writing to {{agent}}",
@@ -115,7 +115,6 @@
     "cancel_run": "Cancel run",
     "choose_agent": "Choose agent",
     "choose_mode": "Choose mode",
-    "address_agent": "Mention an agent",
     "send_shortcut": "{{shortcut}} to send",
     "mode_toggle_label": "Mode: {{mode}}, switch to {{next}}"
   },
@@ -826,7 +825,7 @@
     "new_session": "New session",
     "ready_for": "Send a message to start.",
     "ready_no_employee": "Select an employee workspace for {{agent}}.",
-    "hint_mention": "Type @ to switch agents",
+    "hint_agent_picker": "Use the agent menu to switch agents",
     "awaiting_first": "waiting for first message",
     "phase_agent": "{{mode}}",
     "phase_handoff": "Handoff · {{mode}}"

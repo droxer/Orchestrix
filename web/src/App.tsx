@@ -15,7 +15,7 @@ import { useSessionEvents } from "./hooks/useSessionEvents";
 import { useLocalDaemonNodes } from "./hooks/useLocalDaemonNodes";
 import { mergeVisibleDaemonNodes } from "./lib/daemonNodes";
 import { formatDispatchError } from "./lib/agentReadiness";
-import { isLogicalAgentRoutable, mentionableAgents } from "./lib/agentDisplayNames";
+import { isLogicalAgentRoutable } from "./lib/agentDisplayNames";
 import { routeComposerMessage } from "./lib/messageRouting";
 import { applyTheme, readLanguage, readTheme, readTokens, selectedEmployeeKey, writeLanguage, writeTheme } from "./lib/appStorage";
 import { canUseLocalControlPanel } from "./lib/controlPanel";
@@ -457,12 +457,8 @@ export function App() {
       raw,
       {
         id: defaultLogicalAgent.id,
-        displayName: defaultLogicalAgent.displayName,
         executorKind: defaultLogicalAgent.executorKind,
-        ready: true,
       },
-      mentionableAgents(logicalAgents),
-      composerRef.current?.getMentionedAgentId(),
     );
     const goal = routed.goal;
     const routedAgent = routed.agent;

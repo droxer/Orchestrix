@@ -67,6 +67,10 @@ def test_resolves_each_logical_agent_to_its_own_runtime_node(tmp_path: Path) -> 
 
     assert [item["daemonNodeId"] for item in resolved] == ["node_a", "node_b"]
     assert [item["executorKind"] for item in resolved] == ["claude", "codex"]
+    assert [item["agentDisplayName"] for item in resolved] == [
+        "Researcher",
+        "Builder",
+    ]
     assert resolved[0]["agentInstructions"] == "Compare sources before answering."
 
 

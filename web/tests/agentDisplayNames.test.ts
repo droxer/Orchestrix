@@ -6,7 +6,6 @@ import {
   displayNameForExecutor,
   isLogicalAgentRoutable,
   labelForExecutor,
-  mentionableAgents,
 } from "../src/lib/agentDisplayNames.js";
 import type { EmployeeAgent } from "../src/types.js";
 
@@ -41,19 +40,6 @@ describe("agentDisplayNames", () => {
       claude: "Researcher",
       codex: "Builder",
     });
-  });
-
-  it("lists enabled logical agents for mention autocomplete", () => {
-    const logicalAgents = [
-      agent({ id: "a1", displayName: "Researcher", executorKind: "claude" }),
-      agent({ id: "a2", displayName: "Disabled", executorKind: "pi", enabled: false }),
-      agent({ id: "a3", displayName: "Builder", executorKind: "codex", availability: "busy" }),
-    ];
-
-    assert.deepEqual(mentionableAgents(logicalAgents), [
-      { id: "a1", displayName: "Researcher", executorKind: "claude", ready: true },
-      { id: "a3", displayName: "Builder", executorKind: "codex", ready: true },
-    ]);
   });
 
   it("treats busy agents as routable like the backend", () => {

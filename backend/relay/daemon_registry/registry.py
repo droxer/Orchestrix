@@ -1537,6 +1537,8 @@ class DaemonNodeRegistry:
         )
         if handoff_note:
             state["prior_handoff_note"] = handoff_note
+        if assignment.get("agentDisplayName"):
+            state["agent_display_name"] = assignment["agentDisplayName"]
         if assignment.get("agentInstructions"):
             state["agent_instructions"] = assignment["agentInstructions"]
         command = {

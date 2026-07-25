@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { ArrowRightLeft, MessageCircleQuestion, Scan } from "lucide-react";
 import { RelayMark } from "./RelayMark";
 import type { AgentName, AgentTaskMode, EmployeeAgent, RelayArtifact, RelaySession } from "../types";
-import { buildExecutorDisplayNameMap, displayNameForExecutor, mentionableAgents } from "../lib/agentDisplayNames";
+import { buildExecutorDisplayNameMap, displayNameForExecutor } from "../lib/agentDisplayNames";
 import type { ConversationItem } from "./ConversationRow";
 import { ThreadPanel } from "./ThreadPanel";
 import { ChatHeader } from "./ChatHeader";
@@ -114,7 +114,6 @@ export function MainChatView({
   running,
 }: MainChatViewProps) {
   const { t } = useTranslation();
-  const mentionAgents = useMemo(() => mentionableAgents(logicalAgents), [logicalAgents]);
   const agentDisplayNames = useMemo(() => buildExecutorDisplayNameMap(logicalAgents), [logicalAgents]);
   const activeAgentDisplayName = useMemo(() => {
     const logical = logicalAgents.find((agent) => agent.id === activeLogicalAgentId && !agent.deletedAt);
@@ -231,7 +230,6 @@ export function MainChatView({
 
         <Composer
           ref={composerRef}
-          mentionAgents={mentionAgents}
           composerMode={composerMode}
           setComposerMode={setComposerMode}
           activeAgent={activeAgent}

@@ -593,6 +593,7 @@ def test_employee_dispatches_work_by_logical_agent_id(monkeypatch) -> None:
         assert len(commands) == 1
         command = commands[0]["command"]
         assert command["logicalAgentId"] == agent["id"]
+        assert command["state"]["agent_display_name"] == "Builder"
         assert command["state"]["agent_instructions"] == (
             "Use the repository tests as evidence."
         )

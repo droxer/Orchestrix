@@ -215,9 +215,10 @@ describe("review mode", () => {
 });
 
 describe("prompts", () => {
-  it("applies the logical-agent personality to every runtime and task mode", () => {
+  it("applies the logical-agent identity and personality to every runtime and task mode", () => {
     const logicalAgentState = state({
       task_goal: "Implement the endpoint",
+      agent_display_name: "Sentinel",
       agent_instructions: "Act as the employee's security reviewer.",
     });
     const builders = [
@@ -239,11 +240,21 @@ describe("prompts", () => {
       const command = buildCommand(logicalAgentState);
       assert.match(
         command,
+        /\[Agent identity\]\nYour name is Sentinel\./,
+        `${label} should identify the logical agent by its display name`,
+      );
+      assert.match(
+        command,
         /\[Agent personality\]\nApply this personality consistently throughout the task\./,
         `${label} should explicitly apply the agent personality`,
       );
       assert.ok(
-        command.indexOf("Act as the employee's security reviewer.")
+        command.indexOf("[Agent identity]")
+          < command.indexOf("[Agent personality]"),
+        `${label} should place the identity before the personality`,
+      );
+      assert.ok(
+        command.indexOf("[Agent personality]")
           < command.indexOf("Implement the endpoint"),
         `${label} should place the personality before the user task`,
       );

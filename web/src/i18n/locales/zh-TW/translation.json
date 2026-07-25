@@ -107,7 +107,7 @@
     "close_confirm": "關閉對話「{{name}}」？"
   },
   "composer": {
-    "placeholder": "傳送訊息給智能體。輸入 @ 切換…",
+    "placeholder": "傳送訊息給智能體…",
     "aria_label": "寫信給 {{employee}} 的 {{agent}}",
     "placeholder_no_employee": "請先選擇員工工作區…",
     "aria_label_no_employee": "請先選擇員工工作區再向 {{agent}} 寫信",
@@ -115,7 +115,6 @@
     "cancel_run": "取消執行",
     "choose_agent": "選擇 Agent",
     "choose_mode": "選擇模式",
-    "address_agent": "提及智能體",
     "send_shortcut": "{{shortcut}} 傳送",
     "mode_toggle_label": "模式：{{mode}}——切換到{{next}}"
   },
@@ -826,7 +825,7 @@
     "new_session": "新工作階段",
     "ready_for": "傳送訊息以開始。",
     "ready_no_employee": "為 {{agent}} 選擇員工工作區。",
-    "hint_mention": "輸入 @ 切換 Agent",
+    "hint_agent_picker": "使用 Agent 選單切換 Agent",
     "awaiting_first": "等待首則訊息",
     "phase_agent": "{{mode}}",
     "phase_handoff": "移交 · {{mode}}"

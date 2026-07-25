@@ -4,13 +4,6 @@ function fallbackExecutorLabel(agent: AgentName): string {
   return agent.charAt(0).toUpperCase() + agent.slice(1);
 }
 
-export type MentionableAgent = {
-  id: string;
-  displayName: string;
-  executorKind: AgentName;
-  ready: boolean;
-};
-
 /** Matches backend agent routing: ready and busy placements can take work. */
 export function isLogicalAgentRoutable(
   availability: LogicalAgentAvailability,
@@ -51,19 +44,6 @@ export function buildExecutorDisplayNameMap(
     }
   }
   return map;
-}
-
-export function mentionableAgents(
-  logicalAgents: readonly EmployeeAgent[],
-): MentionableAgent[] {
-  return logicalAgents
-    .filter((agent) => !agent.deletedAt && agent.enabled)
-    .map((agent) => ({
-      id: agent.id,
-      displayName: agent.displayName,
-      executorKind: agent.executorKind,
-      ready: isLogicalAgentRoutable(agent.availability),
-    }));
 }
 
 export function labelForExecutor(
