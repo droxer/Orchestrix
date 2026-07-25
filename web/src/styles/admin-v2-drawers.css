@@ -636,7 +636,7 @@
   color: var(--ink-3);
 }
 
-/* ── Execution profile segmented control ──────────────────────────── */
+/* ── Run mode segmented control ───────────────────────────────────── */
 .adm-profile-field {
   display: flex;
   flex-direction: column;

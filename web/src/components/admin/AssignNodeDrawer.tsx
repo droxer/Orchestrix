@@ -11,7 +11,7 @@ import type {
 } from "../../types";
 import type { AddNodeDrawerSuccess } from "./AddNodeDrawer";
 import { Drawer } from "../ui/Drawer";
-import { ExecutionProfileField, type NodeLocation } from "./ExecutionProfileField";
+import { RunModeField, type RunLocation } from "./RunModeField";
 import { initialsOf, statusTone, visualStatus } from "./helpers";
 import { Button } from "@/components/ui/button";
 import { NodeProfileBadges } from "./NodeProfileBadges";
@@ -49,7 +49,7 @@ export function AssignNodeDrawer({
   const [employeeId, setEmployeeId] = useState("");
   const [nodeId, setNodeId] = useState("");
   const [createNew, setCreateNew] = useState(false);
-  const [nodeLocation, setNodeLocation] = useState<NodeLocation>("managed");
+  const [nodeLocation, setNodeLocation] = useState<RunLocation>("managed");
   const [sandboxMode, setSandboxMode] = useState<"boxlite" | "none">("boxlite");
   const [workspacePath, setWorkspacePath] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -378,7 +378,7 @@ export function AssignNodeDrawer({
         {creatingNode ? (
           <fieldset className="adm-form-section">
             <legend className="adm-form-legend">{t("admin.v2.section_node")}</legend>
-            <ExecutionProfileField
+            <RunModeField
               value={nodeLocation}
               onChange={(location) => {
                 setNodeLocation(location);

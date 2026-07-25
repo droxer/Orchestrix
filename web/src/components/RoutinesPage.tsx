@@ -27,14 +27,14 @@ import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { Button } from "./ui/button";
 import { FiltersBar } from "./FiltersBar";
 
-interface RoutinePageProps {
+interface RoutinesPageProps {
   tasks: RelayTask[];
   sessions: RelaySession[];
   nodes: DaemonNodeMonitorRecord[];
   currentUser: CurrentUser;
   isRefreshing: boolean;
   onRefresh: () => Promise<void>;
-  onOpenConversation: (sessionId: string) => void;
+  onOpenThread: (sessionId: string) => void;
 }
 
 const initialFilters: RoutineFilters = {
@@ -360,7 +360,7 @@ function RoutineDrawerMeta({
   );
 }
 
-export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing, onRefresh, onOpenConversation }: RoutinePageProps) {
+export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing, onRefresh, onOpenThread }: RoutinesPageProps) {
   const { agents: logicalAgents } = useEmployeeAgents(currentUser.employeeId);
   const { teams } = useTeams(currentUser.employeeId);
   const { t } = useTranslation();
@@ -588,7 +588,7 @@ export function RoutinePage({ tasks, sessions, nodes, currentUser, isRefreshing,
             <RoutineDrawerMeta
               task={editingTask}
               session={editingSession}
-              onOpenThread={onOpenConversation}
+              onOpenThread={onOpenThread}
             />
           ) : undefined}
           onClose={() => { void closeRoutineForm(); }}

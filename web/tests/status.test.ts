@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { assignControlPanelDaemonNode, createControlPanelDaemonNode, createControlPanelEmployee, createManagedNode, deleteManagedNode, listManagedNodes, permanentlyDeleteManagedNode } from "../src/api.js";
-import { conversationDaemonStatus } from "../src/lib/conversationStatus.js";
+import { threadDaemonStatus } from "../src/lib/threadStatus.js";
 import {
   mergeVisibleDaemonNodes,
   shouldClaimLocalDaemonNode,
@@ -45,7 +45,7 @@ function controlPanelNode(
   };
 }
 
-describe("Relay web conversation status", () => {
+describe("Relay web thread status", () => {
   it("shows a stale node as stale even when a daemon run is active", () => {
     const activeRun = {
       commandId: "cmd_1",
@@ -57,7 +57,7 @@ describe("Relay web conversation status", () => {
       startedAt: "2026-06-12T00:00:00.000Z",
     } as const;
 
-    assert.equal(conversationDaemonStatus({
+    assert.equal(threadDaemonStatus({
       node: {
         id: "sbx_alice",
         employeeId: "alice",
@@ -75,7 +75,7 @@ describe("Relay web conversation status", () => {
   });
 
   it("falls back to stale only when no daemon run is active", () => {
-    assert.equal(conversationDaemonStatus({
+    assert.equal(threadDaemonStatus({
       node: {
         id: "sbx_alice",
         employeeId: "alice",
@@ -114,7 +114,7 @@ describe("Relay web conversation status", () => {
     assert.equal(visibleNode.id, "sbx_alice_live");
     assert.equal(visibleNode.online, true);
     assert.equal(visibleNode.agentDetails?.kimi?.detail, "Kimi is not logged in.");
-    assert.equal(conversationDaemonStatus({ node: visibleNode }), "ready");
+    assert.equal(threadDaemonStatus({ node: visibleNode }), "ready");
     assert.equal("nodeToken" in visibleNode, false);
   });
 

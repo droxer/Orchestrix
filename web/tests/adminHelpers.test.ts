@@ -6,7 +6,7 @@ import {
   buildEmployeeSummaries,
   initialsOf,
   isStale,
-  stableFleetNodeOrder,
+  stableNodeOrder,
   statusTone,
   truncateId,
   visualStatus,
@@ -32,13 +32,13 @@ function node(input: Partial<ControlPanelDaemonNodeRecord> & { id: string }): Co
   } as ControlPanelDaemonNodeRecord;
 }
 
-describe("stableFleetNodeOrder", () => {
+describe("stableNodeOrder", () => {
   it("keeps card order stable when polling returns the same nodes in a different order", () => {
     const alpha = node({ id: "node-z", displayName: "Alpha" });
     const zebra = node({ id: "node-a", displayName: "Zebra" });
 
-    const firstPoll = stableFleetNodeOrder([zebra, alpha]).map((item) => item.id);
-    const secondPoll = stableFleetNodeOrder([alpha, zebra]).map((item) => item.id);
+    const firstPoll = stableNodeOrder([zebra, alpha]).map((item) => item.id);
+    const secondPoll = stableNodeOrder([alpha, zebra]).map((item) => item.id);
 
     assert.deepEqual(firstPoll, ["node-z", "node-a"]);
     assert.deepEqual(secondPoll, firstPoll);

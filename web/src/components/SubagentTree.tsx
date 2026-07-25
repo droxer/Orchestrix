@@ -3,20 +3,20 @@ import { useTranslation } from "react-i18next";
 
 import type { CollaborationTreeNode } from "../lib/collaborationTree";
 
-export function CollaborationTree({ nodes }: { nodes: CollaborationTreeNode[] }) {
+export function SubagentTree({ nodes }: { nodes: CollaborationTreeNode[] }) {
   const { t } = useTranslation();
   if (nodes.length === 0) return null;
   return (
     <section className="collaboration-tree" aria-label={t("agent_stream.subagents_title")}>
       <div className="collaboration-tree-title">{t("agent_stream.subagents_title")}</div>
       <div className="collaboration-tree-roots">
-        {nodes.map((node) => <CollaborationNode key={node.threadId} node={node} />)}
+        {nodes.map((node) => <SubagentNode key={node.threadId} node={node} />)}
       </div>
     </section>
   );
 }
 
-function CollaborationNode({ node }: { node: CollaborationTreeNode }) {
+function SubagentNode({ node }: { node: CollaborationTreeNode }) {
   const { t } = useTranslation();
   const active = node.status === "pendingInit" || node.status === "running";
   const tone = node.status === "completed" || node.status === "shutdown"
@@ -50,7 +50,7 @@ function CollaborationNode({ node }: { node: CollaborationTreeNode }) {
             {node.model}{node.reasoningEffort ? ` · ${node.reasoningEffort}` : ""}
           </span>
         ) : null}
-        {node.children.map((child) => <CollaborationNode key={child.threadId} node={child} />)}
+        {node.children.map((child) => <SubagentNode key={child.threadId} node={child} />)}
       </div>
     </details>
   );

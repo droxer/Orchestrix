@@ -26,7 +26,7 @@ function agentTitle(node: ControlPanelDaemonNodeRecord, agent: AgentName, t: TFu
   const statusLabel = t(`status.${agentStatus}`, { defaultValue: agentStatus });
   const detail = node.agentDetails?.[agent];
   const parts = [
-    t("fleet.agent_status_title", { agent, status: statusLabel }),
+    t("nodes.agent_status_title", { agent, status: statusLabel }),
     detail?.version,
     detail?.detail,
     isAgentDisabled(node, agent) ? t("admin.v2.agent_disabled") : null,
@@ -39,12 +39,12 @@ interface NodeRowProps {
   storedTokens: StoredNodeTokenMap;
   colocated: boolean;
   onReveal: (node: ControlPanelDaemonNodeRecord) => void;
-  onManageAgents: (node: ControlPanelDaemonNodeRecord) => void;
+  onManageExecutors: (node: ControlPanelDaemonNodeRecord) => void;
   onDelete?: (node: ControlPanelDaemonNodeRecord) => Promise<void>;
   t: TFunction;
 }
 
-export function NodeRow({ node, storedTokens, colocated, onReveal, onManageAgents, onDelete, t }: NodeRowProps) {
+export function NodeRow({ node, storedTokens, colocated, onReveal, onManageExecutors, onDelete, t }: NodeRowProps) {
   const { deletePending, deleteError, handleDelete } = useNodeDelete(node, onDelete, t);
   const nodeName = node.displayName || node.id;
   const status = visualStatus(node);
@@ -123,7 +123,7 @@ export function NodeRow({ node, storedTokens, colocated, onReveal, onManageAgent
         <NodeActions
           node={node}
           onReveal={onReveal}
-          onManageAgents={onManageAgents}
+          onManageExecutors={onManageExecutors}
           onDelete={onDelete}
           deletePending={deletePending}
           onDeleteRequest={() => void handleDelete()}

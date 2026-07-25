@@ -1,12 +1,12 @@
 import type { AgentName, SessionStatus } from "../types.js";
 
-// The kind of a conversation row's one-line activity signal. Maps to a leading
+// The kind of a thread row's one-line activity signal. Maps to a leading
 // indicator (a slate pulse for a live run, a status pip otherwise) and, for
 // the settled states, whether the line reads muted.
-export type ConversationActivityKind = "working" | "warn" | "bad" | "good" | "neutral";
+export type ThreadActivityKind = "working" | "warn" | "bad" | "good" | "neutral";
 
-export type ConversationActivity = {
-  kind: ConversationActivityKind;
+export type ThreadActivity = {
+  kind: ThreadActivityKind;
   /** i18n key for the label. For "working" the caller interpolates the agent. */
   labelKey: string;
 } | null;
@@ -15,12 +15,12 @@ export type ConversationActivity = {
 // in-flight agent. A running agent always wins (the live pulse); settled
 // statuses map to a status word; states with nothing worth a second line
 // return null so the row stays a single title row.
-export function conversationActivity(
+export function threadActivity(
   status: SessionStatus,
   runningAgent: AgentName | undefined,
-): ConversationActivity {
+): ThreadActivity {
   if (runningAgent) {
-    return { kind: "working", labelKey: "conversation.agent_working" };
+    return { kind: "working", labelKey: "thread.agent_working" };
   }
   switch (status) {
     case "waiting_for_human":

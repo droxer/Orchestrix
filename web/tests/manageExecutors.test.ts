@@ -8,7 +8,7 @@ import {
   newlyDisabledReadyAgents,
   normalizeDisabledAgentsPayload,
   shouldSnapshotDisabledAgents,
-} from "../src/lib/manageAgents.js";
+} from "../src/lib/manageExecutors.js";
 import type { AgentName } from "../src/types.js";
 
 describe("shouldSnapshotDisabledAgents", () => {

@@ -7,7 +7,7 @@ import { AdminDelete, AdminEmployees } from "../icons";
 import { agentAvailabilityTone, type EmployeeNodeSummary } from "./helpers";
 import type { EmployeeAgent } from "../../types";
 
-// Employee fleet state, collapsed to the same tone vocabulary the node status
+// Employee node state, collapsed to the same tone vocabulary the node status
 // pill uses so the two cards read as one system.
 export function summaryTone(member: EmployeeNodeSummary): { tone: string; key: string } {
   if (member.runningCount > 0) return { tone: "info", key: "running" };

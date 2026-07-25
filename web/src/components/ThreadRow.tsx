@@ -2,10 +2,10 @@ import { ActionEdit, ActionRemove } from "./icons";
 import { useTranslation } from "react-i18next";
 import { useDialogs } from "./ui/DialogProvider";
 import type { RelaySession } from "../types";
-import { conversationLabel, type ConversationItem } from "../lib/conversations";
+import { threadLabel, type ThreadItem } from "../lib/threads";
 import { Button } from "./ui/button";
 
-export type { ConversationItem };
+export type { ThreadItem };
 
 function relativeTime(iso: string | undefined, locale: string): string {
   if (!iso) return "";
@@ -28,27 +28,27 @@ function relativeTime(iso: string | undefined, locale: string): string {
   return formatter.format(-Math.round(day / 365), "year");
 }
 
-type ConversationRowProps = {
-  item: ConversationItem;
+type ThreadRowProps = {
+  item: ThreadItem;
   selected: boolean;
   onSelect: (sessionId: string) => void;
   onRename?: (session: RelaySession) => void;
   onClose?: (sessionId: string) => void;
 };
 
-export function ConversationRow({ item, selected, onSelect, onRename, onClose }: ConversationRowProps) {
+export function ThreadRow({ item, selected, onSelect, onRename, onClose }: ThreadRowProps) {
   const { t, i18n } = useTranslation();
   const { confirm } = useDialogs();
   const { session } = item;
-  const label = conversationLabel(session);
+  const label = threadLabel(session);
   const stamp = relativeTime(session.updatedAt, i18n.language);
   const rowLabel = [label, stamp].filter(Boolean).join(" · ");
 
   async function handleClose() {
     if (!onClose) return;
     const ok = await confirm({
-      title: t("conversation.close_confirm", { name: label }),
-      confirmLabel: t("conversation.close"),
+      title: t("thread.close_confirm", { name: label }),
+      confirmLabel: t("thread.close"),
       tone: "danger",
     });
     if (ok) onClose(session.id);
@@ -81,8 +81,8 @@ export function ConversationRow({ item, selected, onSelect, onRename, onClose }:
           <Button variant="ghost"
             className="conversation-rename-btn"
             type="button"
-            aria-label={t("conversation.rename")}
-            title={t("conversation.rename")}
+            aria-label={t("thread.rename")}
+            title={t("thread.rename")}
             onClick={() => onRename(session)}
           >
             <ActionEdit size={11} />
@@ -92,8 +92,8 @@ export function ConversationRow({ item, selected, onSelect, onRename, onClose }:
           <Button variant="ghost"
             className="conversation-remove-btn"
             type="button"
-            aria-label={t("conversation.close")}
-            title={t("conversation.close")}
+            aria-label={t("thread.close")}
+            title={t("thread.close")}
             onClick={handleClose}
           >
             <ActionRemove size={11} />

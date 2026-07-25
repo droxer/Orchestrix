@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
-  canCancelConversationRun,
-  conversationCancelNodeId,
+  canCancelThreadRun,
   findActiveRunOwnerForSession,
   findActiveRunForSession,
-  isConversationRunInFlight,
-} from "../src/lib/conversationRunning.js";
+  isThreadRunInFlight,
+  threadCancelNodeId,
+} from "../src/lib/threadRunning.js";
 import type { DaemonNodeMonitorRecord, RelaySession } from "../src/types.js";
 
 const activeRun = {
@@ -37,7 +37,7 @@ function session(status: RelaySession["status"]): Pick<RelaySession, "id" | "sta
   return { id: "ses_1", status };
 }
 
-describe("conversationRunning", () => {
+describe("threadRunning", () => {
   it("finds the active run for the open session", () => {
     assert.deepEqual(findActiveRunForSession(node, "ses_1"), activeRun);
     assert.equal(findActiveRunForSession(node, "ses_other"), undefined);
@@ -54,13 +54,13 @@ describe("conversationRunning", () => {
   });
 
   it("treats a pending or dispatching send as in flight", () => {
-    assert.equal(isConversationRunInFlight({
+    assert.equal(isThreadRunInFlight({
       activeRun: undefined,
       session: session("waiting_for_human"),
       pendingSend: true,
       dispatchingRun: false,
     }), true);
-    assert.equal(isConversationRunInFlight({
+    assert.equal(isThreadRunInFlight({
       activeRun: undefined,
       session: session("waiting_for_human"),
       pendingSend: false,
@@ -69,7 +69,7 @@ describe("conversationRunning", () => {
   });
 
   it("treats a running session as in flight even before activeRuns refresh", () => {
-    assert.equal(isConversationRunInFlight({
+    assert.equal(isThreadRunInFlight({
       activeRun: undefined,
       session: session("running"),
       pendingSend: false,
@@ -78,7 +78,7 @@ describe("conversationRunning", () => {
   });
 
   it("allows sends while waiting for human feedback", () => {
-    assert.equal(isConversationRunInFlight({
+    assert.equal(isThreadRunInFlight({
       activeRun: undefined,
       session: session("waiting_for_human"),
       pendingSend: false,
@@ -87,21 +87,21 @@ describe("conversationRunning", () => {
   });
 
   it("offers cancel when the session is running without a visible active run", () => {
-    assert.equal(canCancelConversationRun({
+    assert.equal(canCancelThreadRun({
       activeRun: undefined,
       session: session("running"),
     }), true);
   });
 
   it("targets the visible daemon node before the sandbox snapshot when cancelling", () => {
-    assert.equal(conversationCancelNodeId({
+    assert.equal(threadCancelNodeId({
       node,
       sandbox: { id: "sbx_stale_snapshot" },
     }), "sbx_alice");
   });
 
   it("falls back to the sandbox snapshot when no visible daemon node exists", () => {
-    assert.equal(conversationCancelNodeId({
+    assert.equal(threadCancelNodeId({
       node: undefined,
       sandbox: { id: "sbx_alice" },
     }), "sbx_alice");

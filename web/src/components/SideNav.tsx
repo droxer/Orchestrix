@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type Dispatch, type MouseEvent, type SetSt
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import {
-  NavAdmin, NavAgents, NavBacklog, NavChannels, NavConversations, NavLogout, NavMore, NavPreferences,
+  NavAdmin, NavAgents, NavBacklog, NavChannels, NavLogout, NavMore, NavPreferences, NavThreads,
   NavTeams,
   NavRoutine, NavSidebarCollapse, NavSidebarExpand,
 } from "./icons";
@@ -26,28 +26,28 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
   const { t } = useTranslation();
   const [navTooltip, setNavTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
   const tooltipSuppressRef = useRef<HTMLElement | null>(null);
-  const [settingsMenu, setSettingsMenu] = useState<{ x: number; y: number } | null>(null);
+  const [preferencesMenu, setPreferencesMenu] = useState<{ x: number; y: number } | null>(null);
   const [moreMenu, setMoreMenu] = useState<{ x: number; y: number } | null>(null);
-  const settingsButtonRef = useRef<HTMLButtonElement>(null);
-  const settingsMenuRef = useRef<HTMLDivElement>(null);
+  const preferencesButtonRef = useRef<HTMLButtonElement>(null);
+  const preferencesMenuRef = useRef<HTMLDivElement>(null);
   const moreButtonRef = useRef<HTMLButtonElement>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!settingsMenu) return;
+    if (!preferencesMenu) return;
 
-    const firstMenuItem = settingsMenuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]');
+    const firstMenuItem = preferencesMenuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]');
     firstMenuItem?.focus();
 
     function closeMenu(returnFocus: boolean) {
-      setSettingsMenu(null);
-      if (returnFocus) settingsButtonRef.current?.focus();
+      setPreferencesMenu(null);
+      if (returnFocus) preferencesButtonRef.current?.focus();
     }
 
     function handlePointerDown(event: PointerEvent) {
       const target = event.target as Node | null;
       if (!target) return;
-      if (settingsMenuRef.current?.contains(target) || settingsButtonRef.current?.contains(target)) return;
+      if (preferencesMenuRef.current?.contains(target) || preferencesButtonRef.current?.contains(target)) return;
       closeMenu(false);
     }
 
@@ -58,7 +58,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
         return;
       }
       if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-      const items = Array.from(settingsMenuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? []);
+      const items = Array.from(preferencesMenuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? []);
       if (items.length === 0) return;
       event.preventDefault();
       const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
@@ -75,7 +75,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [settingsMenu]);
+  }, [preferencesMenu]);
 
   useEffect(() => {
     if (!moreMenu) return;
@@ -142,10 +142,10 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
     tooltipSuppressRef.current = null;
     setNavTooltip(null);
   }
-  function toggleSettingsMenu(el: HTMLElement) {
+  function togglePreferencesMenu(el: HTMLElement) {
     hideNavTooltip();
     setMoreMenu(null);
-    setSettingsMenu((current) => {
+    setPreferencesMenu((current) => {
       if (current) return null;
       const rect = el.getBoundingClientRect();
       // Collapsed: fly out to the right of the icon (like the nav tooltips).
@@ -159,7 +159,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
   }
   function toggleMoreMenu(el: HTMLElement) {
     hideNavTooltip();
-    setSettingsMenu(null);
+    setPreferencesMenu(null);
     setMoreMenu((current) => {
       if (current) return null;
       const rect = el.getBoundingClientRect();
@@ -172,11 +172,11 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
     });
   }
   function openPreferences() {
-    setSettingsMenu(null);
+    setPreferencesMenu(null);
     setPrefsOpen(true);
   }
   function handleLogout() {
-    setSettingsMenu(null);
+    setPreferencesMenu(null);
     onLogout();
   }
   function handleRouteClick(event: MouseEvent<HTMLAnchorElement>, nextRoute: AppRoute) {
@@ -219,24 +219,24 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
           <span className="sidenav-group-label sr-only" aria-hidden="true">{t("nav.workspace")}</span>
           <a
             className={`sidenav-btn ${route === "main" ? "active" : ""}`}
-            data-nav="conversations"
+            data-nav="threads"
             href={hrefForRoute("main")}
-            aria-label={t("nav.conversations")}
+            aria-label={t("nav.threads")}
             aria-current={route === "main" ? "page" : undefined}
             onClick={(event) => handleRouteClick(event, "main")}
-            onMouseEnter={(e) => showNavTooltip(t("nav.conversations"), e.currentTarget)}
+            onMouseEnter={(e) => showNavTooltip(t("nav.threads"), e.currentTarget)}
             onMouseLeave={hideNavTooltip}
-            onFocus={(e) => showNavTooltip(t("nav.conversations"), e.currentTarget)}
+            onFocus={(e) => showNavTooltip(t("nav.threads"), e.currentTarget)}
             onBlur={hideNavTooltip}
           >
-            <NavConversations size={18} />
-            <span className="sidenav-label sr-only">{t("nav.conversations")}</span>
+            <NavThreads size={18} />
+            <span className="sidenav-label sr-only">{t("nav.threads")}</span>
           </a>
           <a
             className={`sidenav-btn ${route === "backlog" ? "active" : ""}`}
             data-nav="backlog"
             href={hrefForRoute("backlog")}
-            aria-label={t("nav.backlog_label")}
+            aria-label={t("nav.backlog")}
             aria-current={route === "backlog" ? "page" : undefined}
             onClick={(event) => handleRouteClick(event, "backlog")}
             onMouseEnter={(e) => showNavTooltip(t("nav.backlog"), e.currentTarget)}
@@ -251,7 +251,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
             className={`sidenav-btn ${route === "routine" ? "active" : ""}`}
             data-nav="routine"
             href={hrefForRoute("routine")}
-            aria-label={t("nav.routine_label")}
+            aria-label={t("nav.routine")}
             aria-current={route === "routine" ? "page" : undefined}
             onClick={(event) => handleRouteClick(event, "routine")}
             onMouseEnter={(e) => showNavTooltip(t("nav.routine"), e.currentTarget)}
@@ -269,7 +269,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
             className={`sidenav-btn ${route === "agents" ? "active" : ""}`}
             data-nav="agents"
             href={hrefForRoute("agents")}
-            aria-label={t("nav.agents_label")}
+            aria-label={t("nav.agents")}
             aria-current={route === "agents" ? "page" : undefined}
             onClick={(event) => handleRouteClick(event, "agents")}
             onMouseEnter={(e) => showNavTooltip(t("nav.agents"), e.currentTarget)}
@@ -284,7 +284,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
             className={`sidenav-btn ${route === "teams" ? "active" : ""}`}
             data-nav="teams"
             href={hrefForRoute("teams")}
-            aria-label={t("nav.teams_label")}
+            aria-label={t("nav.teams")}
             aria-current={route === "teams" ? "page" : undefined}
             onClick={(event) => handleRouteClick(event, "teams")}
             onMouseEnter={(event) => showNavTooltip(t("nav.teams"), event.currentTarget)}
@@ -303,7 +303,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
               className={`sidenav-btn sidenav-overflow-item ${route === "channels" ? "active" : ""}`}
               data-nav="channels"
               href={hrefForRoute("channels")}
-              aria-label={t("nav.channels_label")}
+              aria-label={t("nav.channels")}
               aria-current={route === "channels" ? "page" : undefined}
               onClick={(event) => handleRouteClick(event, "channels")}
               onMouseEnter={(e) => showNavTooltip(t("nav.channels"), e.currentTarget)}
@@ -318,7 +318,7 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
               className={`sidenav-btn sidenav-overflow-item ${route === "admin" ? "active" : ""}`}
               data-nav="admin"
               href={hrefForRoute("admin")}
-              aria-label={t("nav.admin_label")}
+              aria-label={t("nav.admin")}
               aria-current={route === "admin" ? "page" : undefined}
               onClick={(event) => handleRouteClick(event, "admin")}
               onMouseEnter={(e) => showNavTooltip(t("nav.admin"), e.currentTarget)}
@@ -352,35 +352,35 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
       </nav>
       <div className="sidenav-bottom">
         <Button
-          ref={settingsButtonRef}
+          ref={preferencesButtonRef}
           variant="ghost"
-          className={`sidenav-btn ${prefsOpen || settingsMenu ? "active" : ""}`}
+          className={`sidenav-btn ${prefsOpen || preferencesMenu ? "active" : ""}`}
           data-nav="settings"
           type="button"
           aria-haspopup="menu"
-          aria-expanded={Boolean(settingsMenu)}
-          aria-label={t("nav.settings")}
-          onClick={(event) => toggleSettingsMenu(event.currentTarget)}
-          onMouseEnter={(e) => showNavTooltip(t("nav.settings"), e.currentTarget)}
+          aria-expanded={Boolean(preferencesMenu)}
+          aria-label={t("nav.preferences")}
+          onClick={(event) => togglePreferencesMenu(event.currentTarget)}
+          onMouseEnter={(e) => showNavTooltip(t("nav.preferences"), e.currentTarget)}
           onMouseLeave={hideNavTooltip}
-          onFocus={(e) => showNavTooltip(t("nav.settings"), e.currentTarget)}
+          onFocus={(e) => showNavTooltip(t("nav.preferences"), e.currentTarget)}
           onBlur={hideNavTooltip}
         >
           <NavPreferences size={18} />
-          <span className="sidenav-label sr-only">{t("nav.settings")}</span>
+          <span className="sidenav-label sr-only">{t("nav.preferences")}</span>
         </Button>
       </div>
       {/* Portaled to <body>: the mobile bottom bar has a backdrop-filter,
           which makes the panel the containing block for position:fixed —
           rendering these viewport-coordinate overlays inside it would
           mis-place them and scroll the tab row. */}
-      {settingsMenu ? createPortal(
+      {preferencesMenu ? createPortal(
         <div
-          ref={settingsMenuRef}
+          ref={preferencesMenuRef}
           className="sidenav-settings-menu"
           role="menu"
-          aria-label={t("nav.settings")}
-          style={{ top: settingsMenu.y, left: settingsMenu.x }}
+          aria-label={t("nav.preferences")}
+          style={{ top: preferencesMenu.y, left: preferencesMenu.x }}
         >
           <Button type="button" variant="ghost" role="menuitem" onClick={openPreferences}>
             <NavPreferences size={16} />

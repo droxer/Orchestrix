@@ -51,7 +51,7 @@ describe("pickInitialActiveSessionId", () => {
 });
 
 describe("shouldDeriveActiveSession", () => {
-  it("derives the opening conversation once the first load has landed", () => {
+  it("derives the opening thread once the first load has landed", () => {
     assert.equal(shouldDeriveActiveSession({ employeeId: "alice", derivedFor: null, sessionCount: 2 }), true);
   });
 
@@ -61,7 +61,7 @@ describe("shouldDeriveActiveSession", () => {
 
   // The regression guard: re-deriving on every poll tick / streamed update
   // drags the selection back to the most recent thread, undoing an explicit
-  // "new conversation" (which clears both the selection and its stored id).
+  // "new thread" (which clears both the selection and its stored id).
   it("does not re-derive when the session list changes for the same employee", () => {
     assert.equal(shouldDeriveActiveSession({ employeeId: "alice", derivedFor: "alice", sessionCount: 3 }), false);
   });

@@ -21,7 +21,7 @@ export function findActiveRunOwnerForSession(
 }
 
 /** True when the UI should show the stop control and block new sends. */
-export function isConversationRunInFlight(input: {
+export function isThreadRunInFlight(input: {
   activeRun: DaemonNodeMonitorRecord["activeRuns"][number] | undefined;
   session: Pick<RelaySession, "status"> | undefined;
   pendingSend: boolean;
@@ -32,15 +32,15 @@ export function isConversationRunInFlight(input: {
   return session?.status === "running";
 }
 
-/** True when cancel should be offered for the open conversation. */
-export function canCancelConversationRun(input: {
+/** True when cancel should be offered for the open thread. */
+export function canCancelThreadRun(input: {
   activeRun: DaemonNodeMonitorRecord["activeRuns"][number] | undefined;
   session: Pick<RelaySession, "id" | "status"> | undefined;
 }): boolean {
   return Boolean(input.activeRun || input.session?.status === "running");
 }
 
-export function conversationCancelNodeId(input: {
+export function threadCancelNodeId(input: {
   node: Pick<DaemonNodeMonitorRecord, "id"> | undefined;
   sandbox: { id: string } | undefined;
 }): string | undefined {

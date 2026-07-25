@@ -8,7 +8,7 @@ import {
 } from "../lib/controlPanelQueries";
 
 // Admin-only discovery of daemon nodes registered with a co-located control
-// panel. Shares CONTROL_PANEL_NODES_KEY with useAdminFleet so chat + admin do
+// panel. Shares CONTROL_PANEL_NODES_KEY with useAdminNodes so threads + admin do
 // not double-poll /cp/daemon-nodes on localhost.
 export function useLocalDaemonNodes(enabled: boolean): {
   localNodes: ControlPanelDaemonNodeRecord[];

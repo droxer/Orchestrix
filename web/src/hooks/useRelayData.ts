@@ -3,7 +3,7 @@ import type { Dispatch, SetStateAction } from "react";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { listDaemonNodes, listSandboxes, listSessions, listTasks } from "../api";
 import type { DaemonNodeMonitorRecord, RelaySession, RelayTask, SandboxRecord } from "../types";
-import { upsertConversationSession } from "../lib/conversations";
+import { upsertThreadSession } from "../lib/threads";
 
 export const RELAY_QUERY_KEY = ["relay"] as const;
 const RELAY_KEY = RELAY_QUERY_KEY;
@@ -142,7 +142,7 @@ export function useRelayData(
   const upsertSession = useCallback(
     (session: RelaySession) => {
       queryClient.setQueryData<RelaySession[]>(SESSIONS_KEY, (current) =>
-        upsertConversationSession(current ?? [], session),
+        upsertThreadSession(current ?? [], session),
       );
     },
     [queryClient],

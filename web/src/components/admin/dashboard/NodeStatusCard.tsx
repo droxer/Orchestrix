@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { visualStatus } from "../../../lib/adminHelpers";
 import type { ControlPanelDaemonNodeRecord } from "../../../types";
 
-interface FleetHealthCardProps {
+interface NodeStatusCardProps {
   nodes: ControlPanelDaemonNodeRecord[];
   className?: string;
 }
@@ -21,7 +21,7 @@ const ORDER: Array<{ key: string; tone: Tone }> = [
   { key: "unknown", tone: "muted" },
 ];
 
-export function FleetHealthCard({ nodes, className }: FleetHealthCardProps) {
+export function NodeStatusCard({ nodes, className }: NodeStatusCardProps) {
   const { t } = useTranslation();
 
   const { slots, total } = useMemo(() => {

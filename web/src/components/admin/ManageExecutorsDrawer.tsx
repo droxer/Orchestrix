@@ -8,7 +8,7 @@ import {
   newlyDisabledReadyAgents,
   normalizeDisabledAgentsPayload,
   shouldSnapshotDisabledAgents,
-} from "../../lib/manageAgents";
+} from "../../lib/manageExecutors";
 import { AGENT_NAMES } from "../../types";
 import type { AgentName, ControlPanelDaemonNodeRecord } from "../../types";
 import { useDialogs } from "@/components/ui/DialogProvider";
@@ -19,14 +19,14 @@ import { agentStatusTone } from "./helpers";
 import { NodeProfileBadges } from "./NodeProfileBadges";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 
-interface ManageAgentsDrawerProps {
+interface ManageExecutorsDrawerProps {
   open: boolean;
   onClose: () => void;
   node: ControlPanelDaemonNodeRecord | null;
   onUpdated: (node: ControlPanelDaemonNodeRecord) => void;
 }
 
-export function ManageAgentsDrawer({ open, onClose, node, onUpdated }: ManageAgentsDrawerProps) {
+export function ManageExecutorsDrawer({ open, onClose, node, onUpdated }: ManageExecutorsDrawerProps) {
   const { t } = useTranslation();
   const { confirm } = useDialogs();
   const [initialDisabled, setInitialDisabled] = useState<Set<AgentName>>(() => new Set());
@@ -36,7 +36,7 @@ export function ManageAgentsDrawer({ open, onClose, node, onUpdated }: ManageAge
 
   // Snapshot the saved state when the drawer opens or the target node changes.
   // Intentionally NOT depending on node.disabledAgents identity — the admin
-  // fleet poll replaces the array every 2s, which would wipe pending toggles.
+  // node poll replaces the array every 2s, which would wipe pending toggles.
   const nodeId = node?.id ?? null;
   const previousNodeIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -79,7 +79,7 @@ export function ManageAgentsDrawer({ open, onClose, node, onUpdated }: ManageAge
     );
     if (newlyDisabledReady.length > 0) {
       const ok = await confirm({
-        title: t("admin.v2.manage_agents_disable_confirm", {
+        title: t("admin.v2.manage_executors_disable_confirm", {
           agents: newlyDisabledReady.join(", "),
         }),
         tone: "danger",
@@ -111,9 +111,9 @@ export function ManageAgentsDrawer({ open, onClose, node, onUpdated }: ManageAge
       <Drawer
         open={open}
         onClose={onClose}
-        title={t("admin.v2.manage_agents_title")}
+        title={t("admin.v2.manage_executors_title")}
         closeLabel={t("admin.v2.close_drawer")}
-        ariaLabel={t("admin.v2.manage_agents_title")}
+        ariaLabel={t("admin.v2.manage_executors_title")}
         layer={1}
       >
         <p className="adm-cred-empty">{t("admin.v2.no_node_selected")}</p>
@@ -125,14 +125,14 @@ export function ManageAgentsDrawer({ open, onClose, node, onUpdated }: ManageAge
     <Drawer
       open={open}
       onClose={() => { void requestClose(); }}
-      title={t("admin.v2.manage_agents_title")}
+      title={t("admin.v2.manage_executors_title")}
       subtitle={
         <span className="mono" translate="no">
           {node.employeeId ? `@${node.employeeId}` : t("admin.unassigned")} · {node.id}
         </span>
       }
       closeLabel={t("admin.v2.close_drawer")}
-      ariaLabel={t("admin.v2.manage_agents_title")}
+      ariaLabel={t("admin.v2.manage_executors_title")}
       layer={1}
       width={520}
       bodyClassName="adm-drawer-body--column"
@@ -145,7 +145,7 @@ export function ManageAgentsDrawer({ open, onClose, node, onUpdated }: ManageAge
           t={t}
           compact
         />
-        <p className="adm-cred-note adm-agent-drawer-note">{t("admin.v2.manage_agents_help")}</p>
+        <p className="adm-cred-note adm-agent-drawer-note">{t("admin.v2.manage_executors_help")}</p>
         <ul className="adm-agent-toggle-list">
         {AGENT_NAMES.map((agent) => {
           const agentStatus = node.agents[agent] ?? "unknown";

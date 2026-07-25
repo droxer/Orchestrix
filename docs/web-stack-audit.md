@@ -39,7 +39,7 @@ Two hard constraints still hold and remove whole categories of "default" advice:
 | Components | shadcn/ui (`new-york`) + Radix, `cva`/`clsx`/`tailwind-merge` | `components.json`, `src/components/ui/*` |
 | i18n | i18next / react-i18next (en, zh-CN, zh-TW) | `src/i18n/*` |
 | State | Raw hooks; `App.tsx` 1,005 lines, 56 hook calls, no store, prop-drilled | `src/App.tsx` |
-| Server state | Hand-rolled `fetch` + `setInterval` (1s/2s/3s) + `Promise.allSettled` | `api.ts`, `useRelayData.ts`, `AdminConsole.tsx` |
+| Server state | Hand-rolled `fetch` + `setInterval` (1s/2s/3s) + `Promise.allSettled` | `api.ts`, `useRelayData.ts`, `AdminPage.tsx` |
 | Streaming | Custom JSONL parser, delivered by polling (no SSE/WS) | `src/lib/agentStream.ts` |
 | Forms / validation | Manual controlled inputs, no schema validation | `src/components/*` |
 | Testing | `node:test`, 2 unit files; no component/E2E | `web/tests/*` |
@@ -71,7 +71,7 @@ Each item below earns its place by improving **both** axes or removing more code
   refetches; adds request dedup, caching, cancellation, and backoff. Fewer requests, less main-
   thread churn.
 - _Maintenance:_ deletes the bespoke `AbortController` + `Promise.allSettled` + `isRefreshing`
-  plumbing in `useRelayData.ts`/`AdminConsole.tsx` and centralizes invalidation. One stable,
+  plumbing in `useRelayData.ts`/`AdminPage.tsx` and centralizes invalidation. One stable,
   boring dependency that *removes* code. Keep `api.ts` as the typed fetch layer underneath.
 - _Net:_ highest-leverage change on the board. This is the keystone.
 

@@ -21,7 +21,7 @@ interface AgentsPageProps {
   /** The agent currently inspected in the detail pane, driven by the URL hash. */
   workspaceAgent: EmployeeAgent | null;
   onOpenWorkspace: (agent: EmployeeAgent, tab?: WorkspacePageTab) => void;
-  onOpenConversation: (sessionId: string) => void;
+  onOpenThread: (sessionId: string) => void;
 }
 
 type AvailabilityFilter = "all" | LogicalAgentAvailability;
@@ -172,7 +172,7 @@ export function AgentsPage({
   onRefresh,
   workspaceAgent,
   onOpenWorkspace,
-  onOpenConversation,
+  onOpenThread,
 }: AgentsPageProps) {
   const { t } = useTranslation();
   const { agents, isFetching } = useEmployeeAgents(currentUser.employeeId);
@@ -265,7 +265,7 @@ export function AgentsPage({
             agent={workspaceAgent}
             isRefreshing={isRefreshing}
             onRefresh={onRefresh}
-            onOpenConversation={onOpenConversation}
+            onOpenThread={onOpenThread}
             canEditMeta
           />
         ) : (

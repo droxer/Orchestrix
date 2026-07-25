@@ -19,11 +19,11 @@ export function pickInitialActiveSessionId(
   return eligible[0]?.id ?? null;
 }
 
-// Whether the effect below should pick an opening conversation. The pick is
+// Whether the effect below should pick an opening thread. The pick is
 // per-employee and one-shot: the session list changes on every poll tick and
 // every streamed update, and re-deriving on each of those would drag the
 // selection back to the most recent thread — undoing an explicit "new
-// conversation", which deliberately clears both the selection and its stored
+// thread", which deliberately clears both the selection and its stored
 // id. An empty list means the first load has not landed yet, so wait.
 export function shouldDeriveActiveSession(input: {
   employeeId: string;

@@ -6,7 +6,7 @@ import { logout } from "./api";
 import type { AgentName, AgentTaskMode, CurrentUser, DaemonNodeMonitorRecord, EmployeeAgent, RelayArtifact, RelaySession } from "./types";
 import { LoginScreen } from "./components/LoginScreen";
 import { type Theme, type Language } from "./components/PreferencesPanel";
-import type { ConversationItem } from "./components/ConversationRow";
+import type { ThreadItem } from "./components/ThreadRow";
 import { useRelayData } from "./hooks/useRelayData";
 import { useRelayMutations } from "./hooks/useRelayMutations";
 import { useMutationError } from "./hooks/useMutationError";
@@ -25,30 +25,30 @@ import { useClientMounted } from "./hooks/useClientMounted";
 import { useActiveSession } from "./hooks/useActiveSession";
 import type { WorkspacePageTab } from "./components/AgentWorkspacePage";
 import { chooseSendAction, suppressActiveSessionDuringPendingSend } from "./lib/sendAction";
-import { myConversationSessions, matchesConversationQuery, pickActiveConversationSession } from "./lib/conversations";
+import { matchesThreadQuery, myThreadSessions, pickActiveThreadSession } from "./lib/threads";
 import { shouldTailSessionEvents } from "./lib/sessionEventStream";
 import { useEmployeeProvisioning } from "./hooks/useEmployeeProvisioning";
 import { useEmployeeAgents } from "./hooks/useEmployeeAgents";
 import { isAwaitingFeedbackDecision, rerunAssignmentForSession } from "./lib/workflow";
 import { useDialogs } from "./components/ui/DialogProvider";
 import { AppShell, RouteFallback } from "./components/AppShell";
-import { MainChatView } from "./components/MainChatView";
+import { ThreadsView } from "./components/ThreadsView";
 import type { ComposerHandle } from "./components/composer/Composer";
 import type { DerivedMessage } from "./components/MessageBlock";
 import { projectMessages } from "./components/MessageBlock";
 import type { AppRoute } from "./lib/viewTypes";
-import { visibleConversationArtifacts } from "./lib/conversationArtifacts";
+import { visibleThreadArtifacts } from "./lib/threadArtifacts";
 import {
-  canCancelConversationRun,
-  conversationCancelNodeId,
+  canCancelThreadRun,
   findActiveRunOwnerForSession,
-  isConversationRunInFlight,
-} from "./lib/conversationRunning";
+  isThreadRunInFlight,
+  threadCancelNodeId,
+} from "./lib/threadRunning";
 
-const AdminConsole = lazy(() => import("./components/AdminConsole").then((m) => ({ default: m.AdminConsole })));
+const AdminPage = lazy(() => import("./components/AdminPage").then((m) => ({ default: m.AdminPage })));
 const BacklogPage = lazy(() => import("./components/BacklogPage").then((m) => ({ default: m.BacklogPage })));
 const ChannelsPage = lazy(() => import("./components/ChannelsPage").then((m) => ({ default: m.ChannelsPage })));
-const RoutinePage = lazy(() => import("./components/RoutinePage").then((m) => ({ default: m.RoutinePage })));
+const RoutinesPage = lazy(() => import("./components/RoutinesPage").then((m) => ({ default: m.RoutinesPage })));
 const AgentsPage = lazy(() => import("./components/AgentsPage").then((m) => ({ default: m.AgentsPage })));
 const TeamsPage = lazy(() => import("./components/TeamsPage").then((m) => ({ default: m.TeamsPage })));
 
@@ -93,7 +93,7 @@ export function App() {
   const [activeAgent, setActiveAgent] = useState<AgentName>("claude");
   const [activeLogicalAgentId, setActiveLogicalAgentId] = useState<string | null>(null);
   const [composerMode, setComposerMode] = useState<AgentTaskMode>("action");
-  const [employeeQuery, setEmployeeQuery] = useState("");
+  const [threadQuery, setThreadQuery] = useState("");
   const [prefsOpen, setPrefsOpen] = useState(false);
   const [sidenavExpanded, setSidenavExpanded] = useState(true);
   const [theme, setTheme] = useState<Theme>("system");
@@ -105,7 +105,7 @@ export function App() {
   const [handoffMode, setHandoffMode] = useState<AgentTaskMode>("action");
   const [handoffNote, setHandoffNote] = useState("");
   const [isRunning, setIsRunning] = useState(false);
-  // True while the composer is staging a brand-new conversation: suppresses the
+  // True while the composer is staging a brand-new thread: suppresses the
   // fall-back to the most-recent session so the transcript shows the empty state
   // and the next send creates a fresh owner-scoped session.
   const [composingNew, setComposingNew] = useState(false);
@@ -140,24 +140,24 @@ export function App() {
     codex: { blurb: t("agent.codex.blurb") },
     kimi: { blurb: t("agent.kimi.blurb") },
   }), [t]);
-  // The logged-in user is themselves an employee; their conversations are the
+  // The logged-in user is themselves an employee; their threads are the
   // sessions they own. The backend already owner-scopes /sessions, so this is
   // just the non-archived sessions sorted most-recent first.
-  const myConversations = useMemo(
-    () => myConversationSessions(sessions, selectedEmployee),
+  const myThreads = useMemo(
+    () => myThreadSessions(sessions, selectedEmployee),
     [sessions, selectedEmployee],
   );
-  const { activeSessionId, setActiveSessionId } = useActiveSession(selectedEmployee, myConversations);
+  const { activeSessionId, setActiveSessionId } = useActiveSession(selectedEmployee, myThreads);
   const activeSession = useMemo(
-    () => pickActiveConversationSession({
-      conversations: myConversations,
+    () => pickActiveThreadSession({
+      threads: myThreads,
       selectedSessionId,
       activeSessionId,
       composingNew,
     }),
-    [activeSessionId, composingNew, myConversations, selectedSessionId],
+    [activeSessionId, composingNew, myThreads, selectedSessionId],
   );
-  const visibleArtifacts = useMemo(() => visibleConversationArtifacts(activeSession), [activeSession]);
+  const visibleArtifacts = useMemo(() => visibleThreadArtifacts(activeSession), [activeSession]);
 
   const applySessionFromHash = useCallback((sessionId: string) => {
     setComposingNew(false);
@@ -194,7 +194,7 @@ export function App() {
     setActiveAgent(workspaceAgent.executorKind);
   }, [agentWorkspaceId, logicalAgents]);
 
-  // Live SSE tail of the open conversation; merges new events into the
+  // Live SSE tail of the open thread; merges new events into the
   // sessions cache so the active thread updates at push latency.
   useSessionEvents(activeSession?.id, Boolean(user) && shouldTailSessionEvents(activeSession?.status));
 
@@ -204,7 +204,7 @@ export function App() {
     [visibleNodes, activeSession?.id],
   );
   const activeRun = activeRunOwner?.run;
-  const conversationRunning = isConversationRunInFlight({
+  const threadRunning = isThreadRunInFlight({
     activeRun,
     session: activeSession,
     pendingSend: pendingUserMessage !== null,
@@ -230,9 +230,9 @@ export function App() {
     if (present) setPendingUserMessage(null);
   }, [messages, pendingUserMessage]);
 
-  const activeConversationLabel = activeSession
+  const activeThreadLabel = activeSession
     ? (activeSession.title?.trim() || activeSession.taskGoal)
-    : t("thread.new_conversation");
+    : t("thread.new_thread");
 
   const skipLinkHref = useMemo(() => {
     if (route === "main") return mobileView === "threads" ? "#thread-panel" : "#chat-panel";
@@ -242,13 +242,13 @@ export function App() {
 
   const awaitingDecision = useMemo(() => isAwaitingFeedbackDecision(activeSession), [activeSession]);
 
-  const conversations = useMemo<ConversationItem[]>(() => {
+  const threadItems = useMemo<ThreadItem[]>(() => {
     const runningBy = new Map(visibleNodes.flatMap((node) => node.activeRuns.map((run) => [run.sessionId, run.agent] as const)));
-    return myConversations.map((session) => ({ session, runningAgent: runningBy.get(session.id) }));
-  }, [myConversations, visibleNodes]);
-  const filteredConversations = useMemo(
-    () => conversations.filter((c) => matchesConversationQuery(c.session, employeeQuery)),
-    [conversations, employeeQuery],
+    return myThreads.map((session) => ({ session, runningAgent: runningBy.get(session.id) }));
+  }, [myThreads, visibleNodes]);
+  const filteredThreads = useMemo(
+    () => threadItems.filter((item) => matchesThreadQuery(item.session, threadQuery)),
+    [threadItems, threadQuery],
   );
 
   const refreshWithToken = useCallback(async (tokenOverride?: string) => {
@@ -271,7 +271,7 @@ export function App() {
   useEffect(() => {
     if (!authChecked) return;
     setTokens(readTokens());
-    // The logged-in user is their own employee; their conversations are the
+    // The logged-in user is their own employee; their threads are the
     // sessions they own. Pin the selection to self so the chat view always
     // shows the current employee's own work (never another employee's).
     const myEmployeeId = user?.employeeId ?? user?.username ?? "";
@@ -316,7 +316,7 @@ export function App() {
 
   // The effect above only fires when a block is added or the session changes.
   // A single agent turn streaming a long response grows one block's height
-  // without changing the count, so in a conversation tall enough to overflow
+  // without changing the count, so in a thread tall enough to overflow
   // the transcript the new output scrolls below the fold and the view freezes
   // at the start of the response. Observe the content height and keep the
   // transcript pinned to the newest output whenever the user is at the bottom.
@@ -366,7 +366,7 @@ export function App() {
     if (el) atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
   }
 
-  function openConversation(sessionId: string, replace = false) {
+  function openThread(sessionId: string, replace = false) {
     setComposingNew(false);
     setPendingUserMessage(null);
     setSelectedSessionId(sessionId);
@@ -374,7 +374,7 @@ export function App() {
     syncChatHash(sessionId, replace);
   }
 
-  function startNewConversation() {
+  function startNewThread() {
     setComposingNew(true);
     setPendingUserMessage(null);
     setSelectedSessionId(undefined);
@@ -402,12 +402,12 @@ export function App() {
     setArtifactsDrawerOpen(true);
   }
 
-  async function renameConversation(session: RelaySession) {
+  async function renameThread(session: RelaySession) {
     const current = session.title?.trim() || session.taskGoal;
     const result = await prompt({
-      title: t("conversation.rename_prompt"),
+      title: t("thread.rename_prompt"),
       defaultValue: current,
-      confirmLabel: t("conversation.rename"),
+      confirmLabel: t("thread.rename"),
     });
     const next = result?.trim();
     if (!next || next === current) return;
@@ -418,12 +418,12 @@ export function App() {
     }
   }
 
-  async function closeConversation(sessionId: string) {
-    const session = myConversations.find((s) => s.id === sessionId);
+  async function closeThread(sessionId: string) {
+    const session = myThreads.find((s) => s.id === sessionId);
     const label = session ? (session.title?.trim() || session.taskGoal) : sessionId;
     const ok = await confirm({
-      title: t("conversation.close_confirm", { name: label }),
-      confirmLabel: t("conversation.close"),
+      title: t("thread.close_confirm", { name: label }),
+      confirmLabel: t("thread.close"),
       tone: "danger",
     });
     if (!ok) return;
@@ -443,7 +443,7 @@ export function App() {
     const raw = composerRef.current?.getText().trim() ?? "";
     if (!raw) return;
     if (!selectedEmployee) return;
-    if (conversationRunning) return;
+    if (threadRunning) return;
     const defaultLogicalAgent = activeLogicalAgent && isEmployeeAgentRoutable(activeLogicalAgent)
       ? activeLogicalAgent
       : logicalAgents.find(isEmployeeAgentRoutable);
@@ -468,7 +468,7 @@ export function App() {
       reportMutationError("Agent not ready for dispatch", null, t("errors.agent_not_ready", { agent: routedAgent }));
       return;
     }
-    // When staging a new conversation, always create; otherwise continue the
+    // When staging a new thread, always create; otherwise continue the
     // open one. composingNew forces a fresh owner-scoped session here.
     const action = composingNew ? { kind: "create" as const } : chooseSendAction({ activeSessionId: activeSession?.id ?? null, session: activeSession });
     const sessionId = action.kind === "append" ? action.sessionId : undefined;
@@ -476,7 +476,7 @@ export function App() {
     // Echo the turn immediately. For a continued session we mint the message id
     // here and hand it to the backend so the persisted event reconciles by id.
     const userMessageId = `evt_${crypto.randomUUID()}`;
-    // While creating a fresh conversation, keep suppressing the previous active
+    // While creating a fresh thread, keep suppressing the previous active
     // thread so the optimistic user turn does not appear in the wrong transcript.
     if (!creatingSession) setComposingNew(false);
     // Route synchronization clears any pending message when it reapplies an
@@ -498,7 +498,7 @@ export function App() {
       // at it. The invalidation refetch is still in flight here, so without
       // this the selected id resolves to nothing and the transcript falls back
       // to the most recent existing thread — showing the just-sent message in
-      // the previous conversation until the refetch lands.
+      // the previous thread until the refetch lands.
       upsertSession(done);
       setActiveSessionId(done.id);
       setSelectedSessionId(done.id);
@@ -517,8 +517,8 @@ export function App() {
 
   async function cancelActiveRun() {
     if (!activeSession) return;
-    if (!canCancelConversationRun({ activeRun, session: activeSession })) return;
-    const cancelNodeId = conversationCancelNodeId({ node: activeRunOwner?.node ?? selectedNode, sandbox: selectedSandbox });
+    if (!canCancelThreadRun({ activeRun, session: activeSession })) return;
+    const cancelNodeId = threadCancelNodeId({ node: activeRunOwner?.node ?? selectedNode, sandbox: selectedSandbox });
     if (!cancelNodeId) return;
     try {
       const session = await cancelRunMutation.mutateAsync({
@@ -542,7 +542,7 @@ export function App() {
     if (!activeSession) return;
     if (kind === "rerun") {
       if (!selectedEmployee) return;
-      if (conversationRunning) return;
+      if (threadRunning) return;
       setIsRunning(true);
       try {
         const assignment = rerunAssignmentForSession(activeSession, activeAgent, composerMode);
@@ -597,7 +597,7 @@ export function App() {
   async function retryAgentMessage(agent: AgentName, mode: AgentTaskMode) {
     if (!activeSession) return;
     if (!selectedEmployee) return;
-    if (conversationRunning) return;
+    if (threadRunning) return;
     setIsRunning(true);
     try {
       const logicalAgent = logicalAgents.find(
@@ -635,7 +635,7 @@ export function App() {
   async function sendHandoff() {
     if (!activeSession) return;
     if (!selectedEmployee) return;
-    if (conversationRunning) return;
+    if (threadRunning) return;
     const logicalAgent = logicalAgents.find(
       (agent) => agent.id === handoffAgentId && isEmployeeAgentRoutable(agent),
     );
@@ -707,7 +707,7 @@ export function App() {
       prefsOpen={prefsOpen}
       setPrefsOpen={setPrefsOpen}
       skipLinkHref={skipLinkHref}
-      activeConversationLabel={activeConversationLabel}
+      activeThreadLabel={activeThreadLabel}
       mobileChatChrome={{
         artifactCount: visibleArtifacts.length,
         hasSession: Boolean(activeSession),
@@ -723,7 +723,7 @@ export function App() {
       onLanguageChange={setLanguage}
     >
       <Suspense fallback={<RouteFallback />}>
-        {route === "admin" ? <AdminConsole currentUser={user} /> : route === "channels" ? <ChannelsPage /> : route === "backlog" ? (
+        {route === "admin" ? <AdminPage currentUser={user} /> : route === "channels" ? <ChannelsPage /> : route === "backlog" ? (
           <BacklogPage
             tasks={tasks}
             sessions={sessions}
@@ -731,24 +731,24 @@ export function App() {
             currentUser={user}
             isRefreshing={isRefreshing}
             onRefresh={() => refresh()}
-            onOpenConversation={openConversation}
+            onOpenThread={openThread}
           />
         ) : route === "routine" ? (
-          <RoutinePage
+          <RoutinesPage
             tasks={tasks}
             sessions={sessions}
             nodes={visibleNodes}
             currentUser={user}
             isRefreshing={isRefreshing}
             onRefresh={() => refresh()}
-            onOpenConversation={openConversation}
+            onOpenThread={openThread}
           />
         ) : route === "teams" ? (
           <TeamsPage
             currentUser={user}
             isRefreshing={isRefreshing}
             onRefresh={() => refresh()}
-            onOpenConversation={openConversation}
+            onOpenThread={openThread}
           />
         ) : route === "agents" ? (
           <AgentsPage
@@ -757,13 +757,13 @@ export function App() {
             onRefresh={() => refresh()}
             workspaceAgent={activeLogicalAgent?.id === agentWorkspaceId ? activeLogicalAgent ?? null : null}
             onOpenWorkspace={openAgentWorkspace}
-            onOpenConversation={openConversation}
+            onOpenThread={openThread}
           />
         ) : (
-          <MainChatView
-            filteredConversations={filteredConversations}
-            employeeQuery={employeeQuery}
-            setEmployeeQuery={setEmployeeQuery}
+          <ThreadsView
+            filteredThreads={filteredThreads}
+            threadQuery={threadQuery}
+            setThreadQuery={setThreadQuery}
             activeSession={activeSession}
             pendingUserMessage={pendingUserMessage}
             displayMessages={displayMessages}
@@ -771,10 +771,10 @@ export function App() {
             transcriptRef={transcriptRef}
             composerRef={composerRef}
             onTranscriptScroll={handleTranscriptScroll}
-            onSelectConversation={openConversation}
-            onNewConversation={startNewConversation}
-            onRenameConversation={(session) => void renameConversation(session)}
-            onCloseConversation={(id) => void closeConversation(id)}
+            onSelectThread={openThread}
+            onNewThread={startNewThread}
+            onRenameThread={(session) => void renameThread(session)}
+            onCloseThread={(id) => void closeThread(id)}
             activeAgent={activeAgent}
             logicalAgents={logicalAgents}
             activeLogicalAgentId={activeLogicalAgentId}
@@ -809,7 +809,7 @@ export function App() {
             onSend={handleComposerSend}
             onCancelRun={handleCancelRun}
             onRetryAgent={handleRetryAgent}
-            running={conversationRunning}
+            running={threadRunning}
           />
         )}
       </Suspense>

@@ -30,7 +30,7 @@ describe("task deletion", () => {
 
   it("keeps deletion behind each edit drawer and a danger confirmation", async () => {
     const backlogSource = await readFile(resolve("web/src/components/BacklogPage.tsx"), "utf8");
-    const routineSource = await readFile(resolve("web/src/components/RoutinePage.tsx"), "utf8");
+    const routineSource = await readFile(resolve("web/src/components/RoutinesPage.tsx"), "utf8");
     const drawerSource = await readFile(resolve("web/src/components/task-board/TaskDrawer.tsx"), "utf8");
 
     for (const source of [backlogSource, routineSource]) {

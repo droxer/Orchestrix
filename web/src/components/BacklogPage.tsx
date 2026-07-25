@@ -31,7 +31,7 @@ interface BacklogPageProps {
   currentUser: CurrentUser;
   isRefreshing: boolean;
   onRefresh: () => Promise<void>;
-  onOpenConversation: (sessionId: string) => void;
+  onOpenThread: (sessionId: string) => void;
 }
 
 const initialFilters: BacklogFilters = {
@@ -407,7 +407,7 @@ function BacklogTaskRow({
   );
 }
 
-export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing, onRefresh, onOpenConversation }: BacklogPageProps) {
+export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing, onRefresh, onOpenThread }: BacklogPageProps) {
   const { agents: logicalAgents } = useEmployeeAgents(currentUser.employeeId);
   const { teams } = useTeams(currentUser.employeeId);
   const { t } = useTranslation();
@@ -544,7 +544,7 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
           : { taskId: task.id, assignments: discussionAssignments },
         {
           onSuccess: (result) => {
-            if (!task.assignedAgentId && !task.assignedTeamId && result.session) onOpenConversation(result.session.id);
+            if (!task.assignedAgentId && !task.assignedTeamId && result.session) onOpenThread(result.session.id);
           },
         },
       ),

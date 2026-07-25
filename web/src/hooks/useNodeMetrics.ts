@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { isStale, visualStatus } from "../lib/adminHelpers";
 import type { ControlPanelDaemonNodeRecord, EmployeeRecord } from "../types";
 
-export interface FleetMetrics {
+export interface NodeMetrics {
   total: number;
   ready: number;
   running: number;
@@ -11,10 +11,10 @@ export interface FleetMetrics {
   employeeTotal: number;
 }
 
-export function useFleetMetrics(
+export function useNodeMetrics(
   nodes: ControlPanelDaemonNodeRecord[],
   employees: EmployeeRecord[],
-): FleetMetrics {
+): NodeMetrics {
   return useMemo(() => {
     const total = nodes.length;
     const ready = nodes.filter((node) => visualStatus(node) === "ready").length;

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { conversationLabel, matchesConversationQuery, myConversationSessions, pickActiveConversationSession, sessionAgents, upsertConversationSession } from "../src/lib/conversations.js";
+import { matchesThreadQuery, myThreadSessions, pickActiveThreadSession, sessionAgents, threadLabel, upsertThreadSession } from "../src/lib/threads.js";
 import { isAwaitingFeedbackDecision, rerunAssignmentForSession } from "../src/lib/workflow.js";
 import type { RelaySession } from "../src/types.js";
 
@@ -46,7 +46,7 @@ describe("sessionAgents", () => {
   });
 });
 
-describe("web conversation helpers", () => {
+describe("web thread helpers", () => {
   it("lists only the employee's own non-archived sessions, newest first", () => {
     const sessions = [
       session({ id: "a", ownerEmployeeId: "alice", updatedAt: "2026-06-20T01:00:00.000Z" }),
@@ -54,80 +54,80 @@ describe("web conversation helpers", () => {
       session({ id: "c", ownerEmployeeId: "alice", archived: true, updatedAt: "2026-06-20T09:00:00.000Z" }),
       session({ id: "d", ownerEmployeeId: "alice", updatedAt: "2026-06-20T03:00:00.000Z" }),
     ];
-    const mine = myConversationSessions(sessions, "alice");
+    const mine = myThreadSessions(sessions, "alice");
     assert.deepEqual(mine.map((s) => s.id), ["d", "a"]);
   });
 
   it("keeps ownerless legacy sessions for the current employee", () => {
     const sessions = [session({ id: "legacy", ownerEmployeeId: undefined })];
-    assert.deepEqual(myConversationSessions(sessions, "alice").map((s) => s.id), ["legacy"]);
+    assert.deepEqual(myThreadSessions(sessions, "alice").map((s) => s.id), ["legacy"]);
   });
 
   it("labels by title when set, falling back to the task goal", () => {
-    assert.equal(conversationLabel(session({ title: "Auth bug", taskGoal: "fix auth" })), "Auth bug");
-    assert.equal(conversationLabel(session({ title: "   ", taskGoal: "fix auth" })), "fix auth");
-    assert.equal(conversationLabel(session({ taskGoal: "fix auth" })), "fix auth");
+    assert.equal(threadLabel(session({ title: "Auth bug", taskGoal: "fix auth" })), "Auth bug");
+    assert.equal(threadLabel(session({ title: "   ", taskGoal: "fix auth" })), "fix auth");
+    assert.equal(threadLabel(session({ taskGoal: "fix auth" })), "fix auth");
   });
 
   it("matches the search query against title and task goal", () => {
     const s = session({ title: "Auth bug", taskGoal: "fix the redirect" });
-    assert.equal(matchesConversationQuery(s, ""), true);
-    assert.equal(matchesConversationQuery(s, "auth"), true);
-    assert.equal(matchesConversationQuery(s, "redirect"), true);
-    assert.equal(matchesConversationQuery(s, "deploy"), false);
+    assert.equal(matchesThreadQuery(s, ""), true);
+    assert.equal(matchesThreadQuery(s, "auth"), true);
+    assert.equal(matchesThreadQuery(s, "redirect"), true);
+    assert.equal(matchesThreadQuery(s, "deploy"), false);
   });
 
-  it("picks the selected active conversation only from visible conversations", () => {
+  it("picks the selected active thread only from visible threads", () => {
     const visible = session({ id: "visible", ownerEmployeeId: "alice", updatedAt: "2026-06-20T03:00:00.000Z" });
     const selected = session({ id: "selected", ownerEmployeeId: "alice", updatedAt: "2026-06-20T01:00:00.000Z" });
 
-    assert.equal(pickActiveConversationSession({
-      conversations: [visible, selected],
+    assert.equal(pickActiveThreadSession({
+      threads: [visible, selected],
       selectedSessionId: "selected",
       activeSessionId: "visible",
       composingNew: false,
     })?.id, "selected");
   });
 
-  it("falls back when selected conversation is stale, archived, or out of scope", () => {
+  it("falls back when the selected thread is stale, archived, or out of scope", () => {
     const sessions = [
       session({ id: "archived", ownerEmployeeId: "alice", archived: true, updatedAt: "2026-06-20T09:00:00.000Z" }),
       session({ id: "bob", ownerEmployeeId: "bob", updatedAt: "2026-06-20T08:00:00.000Z" }),
       session({ id: "active", ownerEmployeeId: "alice", updatedAt: "2026-06-20T03:00:00.000Z" }),
     ];
-    const conversations = myConversationSessions(sessions, "alice");
+    const threads = myThreadSessions(sessions, "alice");
 
-    assert.deepEqual(conversations.map((item) => item.id), ["active"]);
-    assert.equal(pickActiveConversationSession({
-      conversations,
+    assert.deepEqual(threads.map((item) => item.id), ["active"]);
+    assert.equal(pickActiveThreadSession({
+      threads,
       selectedSessionId: "archived",
       activeSessionId: null,
       composingNew: false,
     })?.id, "active");
   });
 
-  it("suppresses all active conversation fallback while composing a new thread", () => {
-    const conversations = [session({ id: "active", ownerEmployeeId: "alice" })];
+  it("suppresses all active thread fallback while composing a new thread", () => {
+    const threads = [session({ id: "active", ownerEmployeeId: "alice" })];
 
-    assert.equal(pickActiveConversationSession({
-      conversations,
+    assert.equal(pickActiveThreadSession({
+      threads,
       selectedSessionId: "active",
       activeSessionId: "active",
       composingNew: true,
     }), undefined);
   });
 
-  // Creating a conversation returns the new session before the list refetch
+  // Creating a thread returns the new session before the list refetch
   // lands. Without seeding it into the cached list the selection points at an
-  // id nobody can find, so the fallback lands on conversations[0] — the
+  // id nobody can find, so the fallback lands on threads[0] — the
   // previous thread — and the transcript flashes it before jumping.
-  it("opens the freshly created conversation instead of the previous thread", () => {
+  it("opens the freshly created thread instead of the previous thread", () => {
     const previous = session({ id: "previous", ownerEmployeeId: "alice", updatedAt: "2026-06-20T03:00:00.000Z" });
     const created = session({ id: "created", ownerEmployeeId: "alice", updatedAt: "2026-06-20T04:00:00.000Z" });
 
-    const conversations = upsertConversationSession([previous], created);
-    assert.equal(pickActiveConversationSession({
-      conversations,
+    const threads = upsertThreadSession([previous], created);
+    assert.equal(pickActiveThreadSession({
+      threads,
       selectedSessionId: created.id,
       activeSessionId: created.id,
       composingNew: false,

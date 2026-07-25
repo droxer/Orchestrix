@@ -4,10 +4,10 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActionAdd } from "./icons";
 import { PageHeader } from "./PageHeader";
-import { ChatIntegrationsView } from "./admin/ChatIntegrationsView";
+import { ChannelsView } from "./admin/ChannelsView";
 import { Button } from "@/components/ui/button";
 
-// Channels is a standard route, not part of the admin console; it shares the
+// Channels is a standard route, not part of the admin page; it shares the
 // same shell + PageHeader chrome as the other top-level work pages.
 export function ChannelsPage() {
   const { t } = useTranslation();
@@ -22,8 +22,8 @@ export function ChannelsPage() {
     >
       <PageHeader
         kicker={t("nav.channels")}
-        title={t("admin.v2.title_integrations")}
-        subtitle={t("admin.v2.sub_integrations")}
+        title={t("admin.v2.title_channels")}
+        subtitle={t("admin.v2.sub_channels")}
         titleVariant="display"
         layout="stacked"
         actions={
@@ -36,7 +36,7 @@ export function ChannelsPage() {
         }
       />
       <div className="min-h-0 flex-1 overflow-y-auto p-xl max-[820px]:p-base">
-        <ChatIntegrationsView
+        <ChannelsView
           createOpen={createOpen}
           onCreateOpenChange={setCreateOpen}
           onHasChannelsChange={setHasChannels}

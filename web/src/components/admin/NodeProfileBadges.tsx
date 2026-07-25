@@ -23,15 +23,15 @@ interface NodeProfileBadgesProps {
   colocated: boolean;
   t: TFunction;
   compact?: boolean;
-  /** Fleet cards show ownership only; runtime isolation belongs in drawers. */
+  /** Node cards show ownership only; runtime isolation belongs in drawers. */
   card?: boolean;
-  /** Drop the sandbox badge — fleet rows show ownership only, matching cards. */
+  /** Drop the sandbox badge — node rows show ownership only, matching cards. */
   hideSandbox?: boolean;
   /** Drop the "This host" locality — redundant on the node card, where the
    *  status pill already conveys liveness. */
   hideThisHost?: boolean;
   /** Drop the "Saved here" locality on the node card; credential state is
-   *  noise in the fleet overview. */
+   *  noise in the node overview. */
   hideSavedHere?: boolean;
 }
 

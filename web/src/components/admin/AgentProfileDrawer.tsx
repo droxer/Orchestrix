@@ -21,7 +21,7 @@ interface AgentProfileDrawerProps {
   employees?: EmployeeRecord[];
   nodes?: ControlPanelDaemonNodeRecord[];
   /** Hides rename/enable-disable/delete/remove-placement actions. Defaults to
-   *  true (admin console usage). */
+   *  true (admin page usage). */
   canManage?: boolean;
   /** Allows the owning employee to edit display name and instructions on the
    *  agents page without full admin privileges. */

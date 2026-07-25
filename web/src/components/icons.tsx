@@ -96,7 +96,7 @@ function withStandardStroke(Icon: LucideIcon, displayName: string) {
 
 // Semantic exports. Anywhere we want to swap the underlying glyph, do it
 // here — no caller in the app has to know which lucide picture we chose.
-export const NavConversations = withStandardStroke(MessagesSquare, "NavConversations");
+export const NavThreads = withStandardStroke(MessagesSquare, "NavThreads");
 export const NavWorkspace = withStandardStroke(Terminal, "NavWorkspace");
 export const NavAdmin = withStandardStroke(UserCog, "NavAdmin");
 export const NavBacklog = withStandardStroke(ListTodo, "NavBacklog");
@@ -111,7 +111,7 @@ export const NavSidebarCollapse = withStandardStroke(PanelLeftClose, "NavSidebar
 export const NavSidebarExpand = withStandardStroke(PanelLeftOpen, "NavSidebarExpand");
 export const NavMore = withStandardStroke(MoreHorizontal, "NavMore");
 export const NavNewThread = withStandardStroke(Plus, "NavNewThread");
-// Compose a new conversation (pencil-in-square), the messaging-app convention.
+// Compose a new thread (pencil-in-square), the messaging-app convention.
 export const ActionCompose = withStandardStroke(SquarePen, "ActionCompose");
 
 export const ActionCopy = withStandardStroke(Copy, "ActionCopy");
@@ -136,7 +136,7 @@ export const ViewGrid = withStandardStroke(LayoutGrid, "ViewGrid");
 export const ActionKey = withStandardStroke(KeyRound, "ActionKey");
 export const ActionImage = withStandardStroke(ImagePlus, "ActionImage");
 
-// Node execution profile glyphs — managed (BoxLite VM = a container/box),
+// Node run mode glyphs — managed (BoxLite VM = a container/box),
 // local (direct execution = a shell), pending (awaiting daemon = a dashed ring).
 export const NodeManaged = withStandardStroke(Container, "NodeManaged");
 export const NodeLocal = withStandardStroke(Terminal, "NodeLocal");
@@ -187,9 +187,9 @@ export const ActionAdd = withStandardStroke(Plus, "ActionAdd");
 export const ActionEdit = withStandardStroke(Pencil, "ActionEdit");
 export const ActionToggle = withStandardStroke(Power, "ActionToggle");
 
-// Admin console glyphs — fleet/employee management, channel setup.
+// Admin page glyphs — node/employee management and channel setup.
 export const AdminNode = withStandardStroke(Server, "AdminNode");
-export const AdminManageAgents = withStandardStroke(Settings2, "AdminManageAgents");
+export const AdminManageExecutors = withStandardStroke(Settings2, "AdminManageExecutors");
 export const AdminDelete = withStandardStroke(Trash2, "AdminDelete");
 export const AdminDashboard = withStandardStroke(LayoutDashboard, "AdminDashboard");
 export const AdminEmployees = withStandardStroke(Users, "AdminEmployees");

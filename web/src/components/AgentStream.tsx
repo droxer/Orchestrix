@@ -14,7 +14,7 @@ import {
 } from "../lib/agentStream";
 import { Markdown } from "./Markdown";
 import { buildCollaborationTree } from "../lib/collaborationTree";
-import { CollaborationTree } from "./CollaborationTree";
+import { SubagentTree } from "./SubagentTree";
 
 function StreamActivity({ label }: { label: string }) {
   return (
@@ -67,7 +67,7 @@ export function AgentStream({ agent, stdout, stderr, streaming, collaborations }
     if (emptySegments.length > 0) {
       return (
         <div className={`agent-stream ${streaming ? "streaming" : ""}`}>
-          <CollaborationTree nodes={collaborationNodes} />
+          <SubagentTree nodes={collaborationNodes} />
           {keyedSegments(emptySegments).map(({ key, segment }) => (
             <SegmentView key={key} segment={segment} />
           ))}
@@ -78,7 +78,7 @@ export function AgentStream({ agent, stdout, stderr, streaming, collaborations }
     if (streaming) {
       return (
         <div className="agent-stream streaming">
-          <CollaborationTree nodes={collaborationNodes} />
+          <SubagentTree nodes={collaborationNodes} />
           <StreamActivity label={workingLabel} />
         </div>
       );
@@ -86,7 +86,7 @@ export function AgentStream({ agent, stdout, stderr, streaming, collaborations }
     if (collaborationNodes.length > 0) {
       return (
         <div className="agent-stream">
-          <CollaborationTree nodes={collaborationNodes} />
+          <SubagentTree nodes={collaborationNodes} />
         </div>
       );
     }
@@ -95,7 +95,7 @@ export function AgentStream({ agent, stdout, stderr, streaming, collaborations }
 
   return (
     <div className={`agent-stream ${streaming ? "streaming" : ""}`}>
-      <CollaborationTree nodes={collaborationNodes} />
+      <SubagentTree nodes={collaborationNodes} />
       {keyedSegments(segments).map(({ key, segment }) => (
         <SegmentView key={key} segment={segment} />
       ))}

@@ -27,7 +27,7 @@ Gave the two chat voices a designed, matched-but-distinct identity, moved the Re
 **Shipped:**
 
 - **Speaker avatars — circle vs square.** The human "You" turn is now a **round** solid action-green avatar (`.rail-node.rail-node-user`, `radius-full`, `UserRound` glyph at the app's 1.75 stroke); the agent turn keeps its **square** light product tile (`radius-sm`, raised surface, faint action-tinted border) carrying the **specific** executor's vendor glyph (`AgentMark` — Claude/Kimi/etc.). Circle-vs-square, not colour, is the fast human-vs-machine tell. Selectors are scoped one level deep (`.msg-user .rail-node.rail-node-user`) so the fill wins over atelier's `html[data-theme="dark"] .rail-node` background override (specificity 0,3,0 > 0,2,1) in both themes.
-- **Product mark on the agent-phase divider.** The generic `AGENT` phase eyebrow swapped its lucide `Bot` for the `RelayMark` chevron (`MainChatView`) — "the agent" as one product. Ask/Review/Handoff phase icons keep their semantic lucide glyphs. Per-turn headers deliberately keep the vendor mark + agent name (the "which agent ran" signal).
+- **Product mark on the agent-phase divider.** The generic `AGENT` phase eyebrow swapped its lucide `Bot` for the `RelayMark` chevron (`ThreadsView`) — "the agent" as one product. Ask/Review/Handoff phase icons keep their semantic lucide glyphs. Per-turn headers deliberately keep the vendor mark + agent name (the "which agent ran" signal).
 - **Compact user bubble.** `.msg-user .turn-body` went from a full-width soft card that dwarfed short messages to a `fit-content`, `max-width: 42rem` bubble with a hairline, tighter padding, `leading-normal`, and a subtle top-left notch (`radius-xs`) pointing at the avatar. The redundant `YOU` eyebrow was dropped (the green avatar already attributes it; preserved as an `aria-label` on the article). `.msg-user .turn-who` deleted.
 - **Ask mode = quiet slate outline.** `.mode-chip[data-mode="ask"]` now carries a slate (`--color-semantic-info`) icon + inset slate ring on a neutral raised surface, vs the Agent chip's green fill — the filled-vs-outlined asymmetry reads as "does work" vs "just asks" (respects the palette rule: status colours as icon/border, never fills).
 - **Handoff panel header.** Added an action-tinted route-icon chip (`ActionRoute` = `ArrowRightLeft`, new in `icons.tsx`) + "Hand off this turn" title + hairline divider (`.handoff-panel-head`), so the drawer reads as a deliberate affordance. New i18n `handoff.title` in en/zh-CN/zh-TW.
@@ -56,7 +56,7 @@ Findings are grouped by the four review axes and tagged **P1 (do soon) / P2 / P3
 
 ## Consistency & tokens
 
-- **P1 — Dead v1 admin stylesheet (~755 lines).** `src/styles/admin.css` is still `@import`ed (`src/styles.css:51`) but the app runs entirely on the v2 `adm-*` system. Its `.ac-*` selectors (the whole v1 admin console) have **zero references** in any component. Only three rules are still live — `.messenger-shell[data-route="admin"]` (`admin.css:7,11`) and the `.admin-console` base (`admin.css:16`). **Action:** relocate those three live rules into `shell.css` / `admin-v2-shell.css`, then delete `admin.css` and its import. Removes ~16 raw `font-size` + 17 `font:` declarations and a large dead surface. _(Touches the admin route — verify visually after.)_
+- **P1 — Dead v1 admin stylesheet (~755 lines).** `src/styles/admin.css` is still `@import`ed (`src/styles.css:51`) but the app runs entirely on the v2 `adm-*` system. Its `.ac-*` selectors (the whole v1 admin page) have **zero references** in any component. Only three rules are still live — `.messenger-shell[data-route="admin"]` (`admin.css:7,11`) and the `.admin-console` base (`admin.css:16`). **Action:** relocate those three live rules into `shell.css` / `admin-v2-shell.css`, then delete `admin.css` and its import. Removes ~16 raw `font-size` + 17 `font:` declarations and a large dead surface. _(Touches the admin route — verify visually after.)_
 - **~~P2 — Raw `font-size` drift in admin.~~ RETRACTED — false finding.** On inspection the `font-size:` declarations in `admin-v2-views/drawers/dashboard.css` and `agent-stream.css` are already `font-size: var(--text-*)`; the earlier "29/22/16/13" counts were tokenized usages miscounted by a raw grep. The only non-token `font-size` values in the whole stylesheet are 8 intentional `clamp()` fluid-type rules and one relative `1.6em` — all legitimate. **Token discipline for typography is effectively complete; no action needed.**
 - **P3 — Redundant rule.** `.header-agent-tabs { display: none }` is set at both the 900px and 820px breakpoints (`responsive.css:22` and `responsive.css:138`); the 820px copy is dead since the element is already hidden by 900px. Collapse. _(Zero visual risk.)_
 
@@ -91,9 +91,9 @@ Verification: `npm run build -w web` ✓, `make web-test` ✓ (11/11), login re-
 1. ~~P2 admin font-size → tokens~~ — **closed: retracted as a false finding** (see Consistency & tokens above; typography is already fully tokenized).
 2. ~~Authenticated visual pass across all gated surfaces~~ — **closed in the Warm Precision pass below** with local admin screenshots across chat, backlog, routine, admin dashboard, and drawer states.
 
-## Admin console elevation (2026-07-03)
+## Admin page elevation (2026-07-03)
 
-Scoped visual pass on the v2 `adm-*` admin console — dashboard signature moment, operational continuity, fleet accents, activity timeline. No font or palette changes; stays within the precision design language.
+Scoped visual pass on the v2 `adm-*` admin page — dashboard signature moment, operational continuity, node accents, activity timeline. No font or palette changes; stays within the precision design language.
 
 **Shipped:**
 
@@ -188,7 +188,7 @@ Full implementation of the mobile UX review plan — P1 blockers, P2 polish, and
 
 - **Chat header density** — hide token count and active-agent pill below 820px; title wraps cleanly.
 - **Composer padding** — `composer-input-wrap` uses `--space-base` inline padding on mobile; softer shadow.
-- **Artifact library drawer** — vertical stack at 820px; opens with expanded index list on mobile (`ArtifactLibraryDrawer` + `artifact.css`).
+- **Artifacts drawer** — vertical stack at 820px; opens with expanded index list on mobile (`ArtifactsDrawer` + `artifact.css`).
 - **Dynamic skip link** — `#thread-panel` / `#chat-panel` / work-route panel ids (`#backlog-panel`, etc.) with `tabIndex={-1}` on targets; i18n `skip_to_content`.
 - **Task board create** — icon-only create button below 820px (visually hidden label, `aria-label` preserved).
 
@@ -342,16 +342,16 @@ User report: the admin "More" overflow appeared on desktop alongside the primary
 
 **Verify:** desktop 1440 (expanded + collapsed), 1000, 860 — Channels/Admin in rail, no More; mobile 390 — More tab opens the menu fully on-screen above the tab bar. Full web suite 241 pass.
 
-## Admin console Channels tab removed (2026-07-18)
+## Admin page Channels tab removed (2026-07-18)
 
-The admin console's fourth segment ("Channels") rendered the exact same `ChatIntegrationsView` as the top-level `#/channels` route in the sidebar Manage group — a leftover from before channels config was promoted to its own route. Duplicate entry point removed; the console tightens to Dashboard / Employees / Nodes.
+The admin page's fourth segment ("Channels") rendered the exact same `ChannelsView` as the top-level `#/channels` route in the sidebar Manage group — a leftover from before channels config was promoted to its own route. Duplicate entry point removed; the page tightens to Dashboard / Employees / Nodes.
 
 **Shipped:**
 
-- `AdminConsoleView` (store) and `ADMIN_VIEWS` drop `"integrations"`; old `?adminView=integrations` deep links fall back to Dashboard via `parseAdminView`.
-- `AdminViewToggle` drops the fourth segment (and the now-unused `AdminChannel` icon import); `AdminConsole` drops the `ChatIntegrationsView` import/branch.
+- `AdminPageView` (store) and `ADMIN_VIEWS` drop `"integrations"`; old `?adminView=integrations` deep links fall back to Dashboard via `parseAdminView`.
+- `AdminViewToggle` drops the fourth segment (and the now-unused `AdminChannel` icon import); `AdminPage` drops the `ChannelsView` import/branch.
 - `admin.v2.nav_integrations` removed from en/zh-CN/zh-TW (`title_integrations`/`sub_integrations` stay — `ChannelsPage` uses them).
-- `adminChannels.test.ts` inverted: it now pins that the admin console does NOT embed the integrations view and that `#/channels` is the only home.
+- `adminChannels.test.ts` inverted: it now pins that the admin page does NOT embed the channels view and that `#/channels` is the only home.
 
 **Verify:** admin toggle shows 3 segments; `#/admin?adminView=integrations` lands on Dashboard with hash normalized to `#/admin`; `#/channels` still renders the Telegram setup stage. Full web suite 241 pass.
 
@@ -361,7 +361,7 @@ The Employees view was list-only (department-grouped rows) and Nodes was card-on
 
 **Shipped:**
 
-- `AdminLayoutToggle` (new) — `card`/`list` switch reusing `backlog-view-toggle`/`backlog-view-btn` (ViewGrid / ViewList icons). Layout state is lifted to `AdminConsole`, URL-persisted as `?adminLayout` (default `card`, omitted when card) and shared across both views so the preference is consistent.
+- `AdminLayoutToggle` (new) — `card`/`list` switch reusing `backlog-view-toggle`/`backlog-view-btn` (ViewGrid / ViewList icons). Layout state is lifted to `AdminPage`, URL-persisted as `?adminLayout` (default `card`, omitted when card) and shared across both views so the preference is consistent.
 - Both views gain a `.adm-view-controls` row: filters (Nodes) / search (Employees) on the left, layout toggle on the right.
 - **Employees card view** (`EmployeeCard`, new) reuses the `.adm-node-card` frame — avatar initials, name, `@handle`, a status pill (`emp_state_running|ready|idle|no_nodes`), department eyebrow, email, agent chips, and a running / ready·total metric footer with delete. Flat responsive grid (`.adm-fleet-grid`), no department sections — matching Nodes. List view keeps the grouped rows.
 - **Nodes list view** (`NodeRow`, new) — column header (`.adm-node-cols`) + `.adm-node-list` rows sharing the employee-list table language: avatar + identity, agent chips, status pill, last-seen, action icons. Card view unchanged.
@@ -389,7 +389,7 @@ Authenticated screenshot pass (mocked-API Playwright, light/dark/mobile) across 
 **Shipped:**
 
 - **Employees ↔ Nodes list alignment.** The Employees list carried a **red-at-rest** trash crammed into the metrics cell with no `ACTIONS` column, while the Nodes list used quiet neutral action icons in a dedicated column. Employees list now has its own `ACTIONS` column (4-col grid) with the same `icon-button--sm --tinted danger` glyph (neutral, tints red only on hover) the card and Nodes list already use. `.adm-emp-delete` deleted.
-- **List status parity.** Card views showed state (employee `IDLE` pill, node managed/local chip) that the list views dropped. Employees list rows now carry the `adm-status-pill` beside the name (via exported `summaryTone`); Nodes list rows render the standalone execution-profile chip under the handle (`NodeRow` gains `storedTokens`/`colocated`, threaded from `FleetView`).
+- **List status parity.** Card views showed state (employee `IDLE` pill, node managed/local chip) that the list views dropped. Employees list rows now carry the `adm-status-pill` beside the name (via exported `summaryTone`); Nodes list rows render the standalone run-mode chip under the handle (`NodeRow` gains `storedTokens`/`colocated`, threaded from `NodesView`).
 - **Node card profile box.** With locality hidden on the card, the tinted execution chip sat alone inside a full-width bordered box (large dead space). Dropped the wrapper chrome on `.adm-node-card > .adm-node-profile` (and the list's `.adm-node-row-identity .adm-node-profile`); the drawer usage with locality text keeps its box.
 - **Channels stat tiles → flush strip.** The `Channels / Active / Links` counters were raised white cards (number-over-label) — the one surface still using a boxier grammar than the flush hairline metric strips on Backlog/Routine. Re-cast `.adm-chat-metrics` as an inline `eyebrow · value` strip mirroring `.backlog-stats` (markup reordered label-first).
 - **Mobile KPI sparkline collision.** On the ≤900px 2-col dashboard KPI grid the Nodes tile's sparkline drew a diagonal line across the wrapped "N ready · N failed" caption. Hidden `.adm-dash-spark` at that breakpoint.

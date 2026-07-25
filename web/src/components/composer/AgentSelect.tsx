@@ -5,9 +5,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/u
 import { isEmployeeAgentRoutable } from "../../lib/agentDisplayNames";
 
 // Agent picker for the composer footer: selects which logical (employee) agent
-// the conversation talks to. Non-routable agents stay listed (disabled) with
+// the thread talks to. Non-routable agents stay listed (disabled) with
 // their availability spelled out so users can see why an agent cannot take
-// the conversation.
+// the thread.
 export function AgentSelect({ activeAgent, logicalAgents, activeLogicalAgentId, onLogicalAgentPicked }: {
   activeAgent: AgentName;
   logicalAgents: EmployeeAgent[];

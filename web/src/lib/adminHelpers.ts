@@ -3,8 +3,8 @@ import type { AgentName, ControlPanelDaemonNodeRecord, EmployeeAgent, EmployeeRe
 
 export const ADMIN_AGENTS_KEY = ["admin", "agents"] as const;
 
-/** Stable display order for fleet surfaces; implemented independently of API order. */
-export function stableFleetNodeOrder(
+/** Stable display order for node surfaces; implemented independently of API order. */
+export function stableNodeOrder(
   nodes: readonly ControlPanelDaemonNodeRecord[],
 ): ControlPanelDaemonNodeRecord[] {
   const label = (node: ControlPanelDaemonNodeRecord) => node.displayName?.trim() || node.id;
@@ -16,7 +16,7 @@ export function stableFleetNodeOrder(
 
 const DEFAULT_NODE_AGENT_NAMES: AgentName[] = ["claude", "codex", "kimi"];
 
-/** Agent executors shown on fleet/admin node surfaces (Pi only when the daemon reports it). */
+/** Agent executors shown on admin node surfaces (Pi only when the daemon reports it). */
 export function visibleNodeAgentNames(node: Pick<ControlPanelDaemonNodeRecord, "agents">): AgentName[] {
   const names: AgentName[] = [...DEFAULT_NODE_AGENT_NAMES];
   if (node.agents.pi && node.agents.pi !== "unknown") names.push("pi");
@@ -97,7 +97,7 @@ export function agentAvailabilityTone(availability: LogicalAgentAvailability): T
   if (availability === "ready") return "good";
   if (availability === "busy") return "info";
   if (availability === "pending") return "warn";
-  // Offline is the loud tier — same severity reading as the fleet presence dot.
+  // Offline is the loud tier — same severity reading as the node presence dot.
   return "bad";
 }
 

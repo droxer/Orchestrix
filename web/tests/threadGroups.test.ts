@@ -1,15 +1,15 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { groupConversations } from "../src/lib/conversationGroups.js";
-import type { ConversationItem } from "../src/lib/conversations.js";
+import { groupThreads } from "../src/lib/threadGroups.js";
+import type { ThreadItem } from "../src/lib/threads.js";
 import type { AgentName, RelaySession } from "../src/types.js";
 
 function item(
   id: string,
   status: RelaySession["status"],
   runningAgent?: AgentName,
-): ConversationItem {
+): ThreadItem {
   const session = {
     id,
     workspacePath: "/workspace",
@@ -28,26 +28,26 @@ function item(
   return { session, runningAgent };
 }
 
-describe("groupConversations", () => {
+describe("groupThreads", () => {
   it("routes waiting_for_human to needsYou", () => {
-    const { needsYou, running, idle } = groupConversations([item("a", "waiting_for_human")]);
+    const { needsYou, running, idle } = groupThreads([item("a", "waiting_for_human")]);
     assert.deepEqual(needsYou.map((c) => c.session.id), ["a"]);
     assert.equal(running.length, 0);
     assert.equal(idle.length, 0);
   });
 
   it("routes running status to running", () => {
-    const { running } = groupConversations([item("a", "running")]);
+    const { running } = groupThreads([item("a", "running")]);
     assert.deepEqual(running.map((c) => c.session.id), ["a"]);
   });
 
   it("treats a live runningAgent as running even when status is not running", () => {
-    const { running } = groupConversations([item("a", "completed", "claude")]);
+    const { running } = groupThreads([item("a", "completed", "claude")]);
     assert.deepEqual(running.map((c) => c.session.id), ["a"]);
   });
 
   it("routes completed/failed/cancelled to idle", () => {
-    const { idle } = groupConversations([
+    const { idle } = groupThreads([
       item("a", "completed"),
       item("b", "failed"),
       item("c", "cancelled"),
@@ -56,7 +56,7 @@ describe("groupConversations", () => {
   });
 
   it("preserves input order within each group", () => {
-    const { needsYou } = groupConversations([
+    const { needsYou } = groupThreads([
       item("x", "waiting_for_human"),
       item("y", "running"),
       item("z", "waiting_for_human"),

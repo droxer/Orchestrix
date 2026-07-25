@@ -3,12 +3,12 @@
 import type { TFunction } from "i18next";
 import type { ControlPanelDaemonNodeRecord } from "../../types";
 import { Button } from "../ui/button";
-import { ActionKey, AdminDelete, AdminManageAgents } from "../icons";
+import { ActionKey, AdminDelete, AdminManageExecutors } from "../icons";
 
 interface NodeActionsProps {
   node: ControlPanelDaemonNodeRecord;
   onReveal: (node: ControlPanelDaemonNodeRecord) => void;
-  onManageAgents: (node: ControlPanelDaemonNodeRecord) => void;
+  onManageExecutors: (node: ControlPanelDaemonNodeRecord) => void;
   onDelete?: (node: ControlPanelDaemonNodeRecord) => Promise<void>;
   deletePending: boolean;
   onDeleteRequest: () => void;
@@ -16,7 +16,7 @@ interface NodeActionsProps {
 }
 
 /** Shared reveal/manage/delete icon-button trio for node surfaces (NodeRow, NodeCard). */
-export function NodeActions({ node, onReveal, onManageAgents, onDelete, deletePending, onDeleteRequest, t }: NodeActionsProps) {
+export function NodeActions({ node, onReveal, onManageExecutors, onDelete, deletePending, onDeleteRequest, t }: NodeActionsProps) {
   return (
     <>
       {node.managedNodeId ? null : (
@@ -36,11 +36,11 @@ export function NodeActions({ node, onReveal, onManageAgents, onDelete, deletePe
           variant="ghost"
           type="button"
           className="icon-button icon-button--sm icon-button--tinted adm-node-card-icon-btn adm-node-action--agents"
-          onClick={() => onManageAgents(node)}
-          aria-label={t("admin.v2.manage_agents_for", { id: node.id })}
-          title={t("admin.v2.manage_agents")}
+          onClick={() => onManageExecutors(node)}
+          aria-label={t("admin.v2.manage_executors_for", { id: node.id })}
+          title={t("admin.v2.manage_executors")}
         >
-          <AdminManageAgents size={14} aria-hidden="true" />
+          <AdminManageExecutors size={14} aria-hidden="true" />
         </Button>
       ) : null}
       {onDelete ? (

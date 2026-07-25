@@ -10,21 +10,21 @@ import {
 
 const ADMIN_EMPLOYEES_KEY = ["admin", "employees"] as const;
 
-export interface AdminFleet {
+export interface AdminNodes {
   nodes: ControlPanelDaemonNodeRecord[];
   employees: EmployeeRecord[];
 }
 
-// Admin console fleet snapshot (daemon nodes + employees). Node polling shares
+// Admin page node snapshot (daemon nodes + employees). Node polling shares
 // CONTROL_PANEL_NODES_KEY with useLocalDaemonNodes so localhost chat + admin
 // reuse one /cp/daemon-nodes poll instead of two timers. When `live` is false the
 // data is fetched once and not refreshed, which keeps the admin card view stable.
-export function useAdminFleet(enabled: boolean, live: boolean = true): {
+export function useAdminNodes(enabled: boolean, live: boolean = true): {
   nodes: ControlPanelDaemonNodeRecord[];
   employees: EmployeeRecord[];
   lastUpdated: Date | null;
   pollError: string | null;
-  mergeFleet: (updater: (prev: AdminFleet) => AdminFleet) => void;
+  mergeNodes: (updater: (prev: AdminNodes) => AdminNodes) => void;
   refetch: () => Promise<unknown>;
 } {
   const queryClient = useQueryClient();
@@ -52,8 +52,8 @@ export function useAdminFleet(enabled: boolean, live: boolean = true): {
   const pollError = nodesQuery.error ?? employeesQuery.error;
   const dataUpdatedAt = Math.max(nodesQuery.dataUpdatedAt, employeesQuery.dataUpdatedAt);
 
-  const mergeFleet = useCallback(
-    (updater: (prev: AdminFleet) => AdminFleet) => {
+  const mergeNodes = useCallback(
+    (updater: (prev: AdminNodes) => AdminNodes) => {
       queryClient.setQueryData<ControlPanelDaemonNodeRecord[]>(CONTROL_PANEL_NODES_KEY, (prevNodes) => {
         const prevEmployees = queryClient.getQueryData<EmployeeRecord[]>(ADMIN_EMPLOYEES_KEY) ?? [];
         const next = updater({ nodes: prevNodes ?? [], employees: prevEmployees });
@@ -77,7 +77,7 @@ export function useAdminFleet(enabled: boolean, live: boolean = true): {
     employees,
     lastUpdated: nodes.length > 0 || employees.length > 0 ? new Date(dataUpdatedAt) : null,
     pollError: pollError instanceof Error ? pollError.message : pollError ? String(pollError) : null,
-    mergeFleet,
+    mergeNodes,
     refetch,
   };
 }

@@ -22,12 +22,12 @@ export function TeamsPage({
   currentUser,
   isRefreshing,
   onRefresh,
-  onOpenConversation,
+  onOpenThread,
 }: {
   currentUser: CurrentUser;
   isRefreshing: boolean;
   onRefresh: () => Promise<void>;
-  onOpenConversation: (sessionId: string) => void;
+  onOpenThread: (sessionId: string) => void;
 }) {
   const { t } = useTranslation();
   const { teams, isFetching } = useTeams(currentUser.employeeId);
@@ -127,7 +127,7 @@ export function TeamsPage({
             employeeId={currentUser.employeeId}
             isRefreshing={isRefreshing}
             onRefresh={onRefresh}
-            onOpenConversation={onOpenConversation}
+            onOpenThread={onOpenThread}
             onDeleted={() => setTeamId(null)}
           />
         ) : (

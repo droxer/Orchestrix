@@ -43,13 +43,13 @@ export function useRelayMutations() {
     mutationFn: ({ sessionId, title, token }: { sessionId: string; title: string } & TokenArg) =>
       renameSession(sessionId, title, token),
     onSuccess: () => void invalidateRelay(),
-    onError: onRelayError("Failed to rename conversation", "errors.rename_conversation"),
+    onError: onRelayError("Failed to rename thread", "errors.rename_thread"),
   });
 
   const archiveSessionMutation = useMutation({
     mutationFn: ({ sessionId, token }: { sessionId: string } & TokenArg) => archiveSession(sessionId, token),
     onSuccess: () => void invalidateRelay(),
-    onError: onRelayError("Failed to archive conversation", "errors.archive_conversation"),
+    onError: onRelayError("Failed to close thread", "errors.close_thread"),
   });
 
   const cancelRunMutation = useMutation({
