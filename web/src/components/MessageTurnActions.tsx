@@ -34,10 +34,11 @@ export function MessageTurnActions({
     if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
   }, []);
 
-  // The parser scans the full accumulated stdout; parse once per content
-  // change and share the result between the copy handler and canCopy.
+  // Copy/retry actions are hidden while output streams, so defer the full
+  // plain-text projection until the run settles instead of reparsing every
+  // accumulated SSE update.
   const plainText = useMemo(
-    () => agentMessagePlainText(agent, stdout, stderr, t, streaming),
+    () => streaming ? "" : agentMessagePlainText(agent, stdout, stderr, t),
     [agent, stdout, stderr, t, streaming],
   );
 

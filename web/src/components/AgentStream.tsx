@@ -5,11 +5,11 @@ import type { CodexCollaborationEvent } from "relay-core";
 
 import type { AgentName } from "../types";
 import {
+  AgentStreamAccumulator,
   displayAgentSegments,
   emptyAgentStreamSegments,
   hasStreamingTextCaret,
   parseAgentStderr,
-  parseAgentStream,
   type AgentSegment,
 } from "../lib/agentStream";
 import { Markdown } from "./Markdown";
@@ -46,12 +46,14 @@ type AgentStreamProps = {
 
 export function AgentStream({ agent, stdout, stderr, streaming, collaborations }: AgentStreamProps) {
   const { t } = useTranslation();
-  // The parser scans the whole accumulated stdout char-by-char; without
-  // memoization every streamed delta would re-parse the full string from
-  // scratch (O(n²) over a run). Key the parse on its raw inputs only.
+  // Settling can append a completed-log fallback that overlaps live output;
+  // rebuild once at that boundary so the final transcript is canonical.
+  const accumulator = useMemo(() => new AgentStreamAccumulator(agent), [agent, streaming]);
+  // Completed turns stay checkpointed in the accumulator; only the unfinished
+  // suffix is reparsed as new SSE output arrives.
   const segments = useMemo(
-    () => displayAgentSegments([...parseAgentStream(agent, stdout), ...parseAgentStderr(stderr)], streaming),
-    [agent, stdout, stderr, streaming],
+    () => displayAgentSegments([...accumulator.update(stdout), ...parseAgentStderr(stderr)], streaming),
+    [accumulator, stdout, stderr, streaming],
   );
   const workingLabel = t("agent_stream.empty_working");
   const showActivity = streaming && !hasStreamingTextCaret(segments);

@@ -521,7 +521,11 @@ async def session_events(session_id: str, request: Request, ctx: AppContextDep) 
         # active conversation update at push latency instead of the list poll's
         # cadence. The store rewrites the snapshot on every append, and
         # get_session reads it fresh, so new events are visible here.
-        after_event_id = request.query_params.get("after") or request.headers.get("last-event-id")
+        # EventSource keeps the original URL across automatic reconnects but
+        # advances Last-Event-ID as frames arrive. Prefer that live cursor over
+        # the URL's initial `after` value so a reconnect does not replay the
+        # entire stream window.
+        after_event_id = request.headers.get("last-event-id") or request.query_params.get("after")
         sent: int | None = None
         start = time.monotonic()
         last_heartbeat = start

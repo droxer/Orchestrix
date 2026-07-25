@@ -97,6 +97,29 @@ def test_session_events_cursor_skips_already_cached_history(monkeypatch) -> None
         assert _parse_sse(after_latest.text)[-1][0] == "done"
 
 
+def test_session_events_reconnect_header_overrides_initial_query_cursor(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+
+        created = client.post("/sessions", json={"taskGoal": "ship it", "assignments": [{"agent": "claude"}]})
+        assert created.status_code == 201
+        session_id = created.json()["id"]
+        done = client.post(f"/sessions/{session_id}/decisions", json={"kind": "mark_done"})
+        assert done.status_code == 200
+        events = done.json()["events"]
+
+        response = client.get(
+            f"/sessions/{session_id}/events?after={events[0]['id']}",
+            headers={"Last-Event-ID": events[-1]["id"]},
+        )
+
+        assert response.status_code == 200
+        assert _message_payloads(response.text) == []
+        assert _parse_sse(response.text)[-1][0] == "done"
+
+
 def test_session_events_cursor_falls_back_to_backlog_for_unknown_event(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:

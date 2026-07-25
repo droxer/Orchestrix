@@ -27,6 +27,47 @@ export function parseAgentStream(agent: AgentName, raw: string): AgentSegment[] 
   return parsePlain(raw);
 }
 
+/**
+ * Keeps completed agent turns as parsed checkpoints and reparses only the
+ * unfinished suffix while stdout grows. Replacing or truncating stdout resets
+ * the cache, so completed-log fallback and run reuse remain correct.
+ */
+export class AgentStreamAccumulator {
+  private raw = "";
+  private stableOffset = 0;
+  private stableSegments: AgentSegment[] = [];
+  private segments: AgentSegment[] = [];
+  private seenCheckpointIds = new Set<string>();
+
+  constructor(private readonly agent: AgentName) {}
+
+  update(raw: string): AgentSegment[] {
+    if (raw === this.raw) return this.segments;
+    if (!raw.startsWith(this.raw)) {
+      this.stableOffset = 0;
+      this.stableSegments = [];
+      this.seenCheckpointIds.clear();
+    }
+    this.raw = raw;
+
+    let sliceStart = this.stableOffset;
+    for (const checkpoint of agentCheckpoints(this.agent, raw, this.stableOffset)) {
+      const checkpointId = agentCheckpointId(this.agent, checkpoint.value);
+      if (!checkpointId || !this.seenCheckpointIds.has(checkpointId)) {
+        this.stableSegments.push(...parseAgentStream(this.agent, raw.slice(sliceStart, checkpoint.end)));
+      }
+      if (checkpointId) this.seenCheckpointIds.add(checkpointId);
+      sliceStart = checkpoint.end;
+      this.stableOffset = checkpoint.end;
+    }
+    this.segments = [
+      ...this.stableSegments,
+      ...parseAgentStream(this.agent, raw.slice(this.stableOffset)),
+    ];
+    return this.segments;
+  }
+}
+
 export function userVisibleAgentSegments(segments: AgentSegment[]): AgentSegment[] {
   const visible = segments.filter(
     (segment) => segment.kind === "text" || segment.kind === "status" || segment.kind === "narration",
@@ -133,8 +174,19 @@ function isLikelyProtocolFragment(text: string): boolean {
   return /"type"\s*:|"session_id"\s*:|stream_event|content_block_|parent_tool_use_id|uuid/.test(text);
 }
 
-function streamRecords(raw: string): Array<{ kind: "json"; value: Record<string, unknown> } | { kind: "text"; text: string }> {
-  const out: Array<{ kind: "json"; value: Record<string, unknown> } | { kind: "text"; text: string }> = [];
+type StreamRecord =
+  | { kind: "json"; value: Record<string, unknown>; end: number }
+  | { kind: "text"; text: string; end: number };
+
+const AGENT_CHECKPOINT_TYPES: Record<AgentName, "each" | ReadonlySet<unknown>> = {
+  claude: new Set(["assistant", "result"]),
+  codex: "each",
+  pi: new Set(["turn_end"]),
+  kimi: "each",
+};
+
+function streamRecords(raw: string): StreamRecord[] {
+  const out: StreamRecord[] = [];
   let i = 0;
 
   while (i < raw.length) {
@@ -148,7 +200,7 @@ function streamRecords(raw: string): Array<{ kind: "json"; value: Record<string,
       const nextJson = raw.indexOf("{", i);
       const end = nextJson === -1 ? raw.length : nextJson;
       const text = raw.slice(i, end).trim();
-      if (text && !isLikelyProtocolFragment(text) && !isClaudeConnectorNotice(text)) out.push({ kind: "text", text });
+      if (text && !isLikelyProtocolFragment(text) && !isClaudeConnectorNotice(text)) out.push({ kind: "text", text, end });
       i = end;
       continue;
     }
@@ -192,12 +244,32 @@ function streamRecords(raw: string): Array<{ kind: "json"; value: Record<string,
 
     const jsonText = raw.slice(i, end);
     const parsed = safeParse(jsonText);
-    if (parsed) out.push({ kind: "json", value: parsed });
-    else if (!isLikelyProtocolFragment(jsonText)) out.push({ kind: "text", text: stripAnsi(jsonText) });
+    if (parsed) out.push({ kind: "json", value: parsed, end });
+    else if (!isLikelyProtocolFragment(jsonText)) out.push({ kind: "text", text: stripAnsi(jsonText), end });
     i = end;
   }
 
   return out;
+}
+
+type AgentCheckpoint = { end: number; value: Record<string, unknown> };
+
+function agentCheckpoints(agent: AgentName, raw: string, offset: number): AgentCheckpoint[] {
+  const checkpoints: AgentCheckpoint[] = [];
+  const policy = AGENT_CHECKPOINT_TYPES[agent];
+  for (const record of streamRecords(raw.slice(offset))) {
+    if (record.kind !== "json") continue;
+    if (policy === "each" || policy.has(record.value.type)) {
+      checkpoints.push({ end: offset + record.end, value: record.value });
+    }
+  }
+  return checkpoints;
+}
+
+function agentCheckpointId(agent: AgentName, event: Record<string, unknown>): string | undefined {
+  if (agent !== "claude" || event.type !== "assistant") return undefined;
+  const messageId = asRecord(event.message).id;
+  return typeof messageId === "string" && messageId ? `assistant:${messageId}` : undefined;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -221,11 +293,6 @@ const TOOL_TARGET_KEYS = [
   "description",
 ] as const;
 
-function hasSegmentText(out: AgentSegment[], kind: "text" | "thinking", text: string): boolean {
-  const normalized = text.trim();
-  return out.some((segment) => segment.kind === kind && segment.text.trim() === normalized);
-}
-
 function toolTarget(input: Record<string, unknown>): string | undefined {
   for (const key of TOOL_TARGET_KEYS) {
     const value = input[key];
@@ -237,6 +304,37 @@ function toolTarget(input: Record<string, unknown>): string | undefined {
   return undefined;
 }
 
+function codexToolSegment(item: Record<string, unknown>): AgentSegment | null {
+  if (item.type === "mcp_tool_call") {
+    const server = typeof item.server === "string" ? item.server : "mcp";
+    const tool = typeof item.tool === "string" ? item.tool : String(item.name ?? "tool");
+    return { kind: "tool", name: `${server}.${tool}`, target: toolTarget(asRecord(item.arguments ?? item.input)) };
+  }
+  if (item.type === "web_search") {
+    return { kind: "tool", name: "web_search", target: toolTarget(item) };
+  }
+  if (item.type === "dynamic_tool_call" || item.type === "tool_call") {
+    return {
+      kind: "tool",
+      name: String(item.tool ?? item.name ?? "tool"),
+      target: toolTarget(asRecord(item.arguments ?? item.input)),
+    };
+  }
+  if (
+    typeof item.type === "string"
+    && item.type.endsWith("_tool_call")
+    && item.type !== "collab_tool_call"
+    && item.type !== "collab_agent_tool_call"
+  ) {
+    return {
+      kind: "tool",
+      name: String(item.tool ?? item.name ?? item.type.slice(0, -"_tool_call".length)),
+      target: toolTarget(asRecord(item.arguments ?? item.input)),
+    };
+  }
+  return null;
+}
+
 class TextBuffer {
   private value = "";
 
@@ -244,10 +342,16 @@ class TextBuffer {
     this.value += chunk;
   }
 
-  flush(out: AgentSegment[], kind: "text" | "thinking"): void {
+  drain(): string {
     const trimmed = this.value.trimEnd();
-    if (trimmed && !hasSegmentText(out, kind, trimmed)) out.push({ kind, text: trimmed });
     this.value = "";
+    return trimmed;
+  }
+
+  flush(out: AgentSegment[], kind: "text" | "thinking"): string {
+    const trimmed = this.drain();
+    if (trimmed) out.push({ kind, text: trimmed });
+    return trimmed;
   }
 }
 
@@ -263,6 +367,34 @@ function parseClaude(raw: string): AgentSegment[] {
   const out: AgentSegment[] = [];
   const text = new TextBuffer();
   const thinking = new TextBuffer();
+  const streamedTextBlocks: string[] = [];
+  const streamedTextByIndex = new Map<number, string>();
+  const streamedTextWithoutIndex = new Set<string>();
+  const toolSegmentById = new Map<string, number>();
+  const seenAssistantMessageIds = new Set<string>();
+  let activeTextIndex: number | undefined;
+  let turnStartIndex = 0;
+
+  const flushStreamedText = (index = activeTextIndex): void => {
+    const blockText = text.drain();
+    activeTextIndex = undefined;
+    if (!blockText) return;
+    const replayed = index === undefined
+      ? streamedTextWithoutIndex.has(blockText)
+      : streamedTextByIndex.get(index) === blockText;
+    if (replayed) return;
+    if (index === undefined) streamedTextWithoutIndex.add(blockText);
+    else streamedTextByIndex.set(index, blockText);
+    streamedTextBlocks.push(blockText);
+    out.push({ kind: "text", text: blockText });
+  };
+  const resetTurnState = (): void => {
+    streamedTextBlocks.length = 0;
+    streamedTextByIndex.clear();
+    streamedTextWithoutIndex.clear();
+    toolSegmentById.clear();
+  };
+
   for (const record of streamRecords(raw)) {
     if (record.kind === "text") {
       text.push(`${stripAnsi(record.text)}\n`);
@@ -275,45 +407,65 @@ function parseClaude(raw: string): AgentSegment[] {
       const block = asRecord(streamEvent.content_block);
       if (streamEvent.type === "content_block_start") {
         if (block.type === "tool_use") {
-          text.flush(out, "text");
+          flushStreamedText();
           thinking.flush(out, "thinking");
-          out.push({ kind: "tool", name: String(block.name ?? "tool"), target: toolTarget(asRecord(block.input)) });
+          const segment: AgentSegment = { kind: "tool", name: String(block.name ?? "tool"), target: toolTarget(asRecord(block.input)) };
+          out.push(segment);
+          if (typeof block.id === "string") toolSegmentById.set(block.id, out.length - 1);
+        } else if (block.type === "text") {
+          activeTextIndex = typeof streamEvent.index === "number" ? streamEvent.index : undefined;
         }
         continue;
       }
       if (streamEvent.type === "content_block_stop") {
-        text.flush(out, "text");
+        flushStreamedText(typeof streamEvent.index === "number" ? streamEvent.index : activeTextIndex);
         thinking.flush(out, "thinking");
         continue;
       }
       if (delta.type === "text_delta") {
         thinking.flush(out, "thinking");
+        if (typeof streamEvent.index === "number") activeTextIndex = streamEvent.index;
         text.push(String(delta.text ?? ""));
       } else if (delta.type === "thinking_delta") {
-        text.flush(out, "text");
+        flushStreamedText();
         thinking.push(String(delta.thinking ?? ""));
       }
       continue;
     }
     if (event.type === "assistant") {
       const message = asRecord(event.message);
+      const messageId = typeof message.id === "string" ? message.id : undefined;
+      if (messageId && seenAssistantMessageIds.has(messageId)) {
+        out.splice(turnStartIndex);
+        resetTurnState();
+        continue;
+      }
+      if (messageId) seenAssistantMessageIds.add(messageId);
       const content = Array.isArray(message.content) ? message.content : [];
       for (const item of content) {
         const block = asRecord(item);
         if (block.type === "text") {
           const blockText = String(block.text ?? "");
           thinking.flush(out, "thinking");
-          if (blockText && !hasSegmentText(out, "text", blockText)) text.push(blockText);
+          flushStreamedText();
+          const replayIndex = streamedTextBlocks.indexOf(blockText.trimEnd());
+          if (replayIndex >= 0) streamedTextBlocks.splice(replayIndex, 1);
+          else if (blockText) out.push({ kind: "text", text: blockText.trimEnd() });
         } else if (block.type === "tool_use") {
-          text.flush(out, "text");
+          flushStreamedText();
           thinking.flush(out, "thinking");
-          out.push({ kind: "tool", name: String(block.name ?? "tool"), target: toolTarget(asRecord(block.input)) });
+          const segment: AgentSegment = { kind: "tool", name: String(block.name ?? "tool"), target: toolTarget(asRecord(block.input)) };
+          const existing = typeof block.id === "string" ? toolSegmentById.get(block.id) : undefined;
+          if (existing === undefined) out.push(segment);
+          else out[existing] = segment;
         }
       }
+      resetTurnState();
+      turnStartIndex = out.length;
       continue;
     }
     if (event.type === "result") {
-      text.flush(out, "text");
+      flushStreamedText();
       thinking.flush(out, "thinking");
       if (event.is_error) {
         const message = String(event.result ?? "");
@@ -332,7 +484,7 @@ function parseClaude(raw: string): AgentSegment[] {
       }, "warn"));
     }
   }
-  text.flush(out, "text");
+  flushStreamedText();
   thinking.flush(out, "thinking");
   return out;
 }
@@ -383,6 +535,13 @@ function parseCodex(raw: string): AgentSegment[] {
         out.push({ kind: "command", command: String(item.command ?? "command") });
         continue;
       }
+      if (event.type === "item.started") {
+        const tool = codexToolSegment(item);
+        if (tool) {
+          out.push(tool);
+          continue;
+        }
+      }
       if (item.type === "file_change" && event.type === "item.completed") {
         out.push(narration("agent_stream.codex_changed_files", undefined, "info"));
       }
@@ -402,6 +561,7 @@ function parsePi(raw: string): AgentSegment[] {
   const thinkingBuffer = new TextBuffer();
   let sawAssistantTextInTurn = false;
   let sawAssistantThinkingInTurn = false;
+  const toolSegmentById = new Map<string, number>();
   for (const record of streamRecords(raw)) {
     if (record.kind === "text") {
       const text = stripAnsi(record.text).trim();
@@ -414,6 +574,7 @@ function parsePi(raw: string): AgentSegment[] {
       thinkingBuffer.flush(out, "thinking");
       sawAssistantTextInTurn = false;
       sawAssistantThinkingInTurn = false;
+      toolSegmentById.clear();
       continue;
     }
     const delta = piAssistantDelta(event, "text_delta");
@@ -446,20 +607,39 @@ function parsePi(raw: string): AgentSegment[] {
       sawAssistantThinkingInTurn = true;
       continue;
     }
-    const text = piAssistantText(event).trim();
-    if (text) {
+    const tool = piTool(event);
+    if (tool) {
+      const streamedText = textBuffer.flush(out, "text");
+      if (streamedText) sawAssistantTextInTurn = true;
+      thinkingBuffer.flush(out, "thinking");
+      if (!sawAssistantTextInTurn) {
+        const accumulatedText = piAssistantText(event).trim();
+        if (accumulatedText) {
+          out.push({ kind: "text", text: accumulatedText });
+          sawAssistantTextInTurn = true;
+        }
+      }
+      const existing = tool.id ? toolSegmentById.get(tool.id) : undefined;
+      const segment: AgentSegment = {
+        kind: "tool",
+        name: tool.name,
+        ...(tool.target ? { target: tool.target } : {}),
+      };
+      if (existing === undefined) {
+        out.push(segment);
+        if (tool.id) toolSegmentById.set(tool.id, out.length - 1);
+      } else {
+        out[existing] = segment;
+      }
+      continue;
+    }
+    const assistantText = piAssistantText(event).trim();
+    if (assistantText) {
       textBuffer.flush(out, "text");
       thinkingBuffer.flush(out, "thinking");
       if (sawAssistantTextInTurn && (event.type === "message_end" || event.type === "turn_end")) continue;
       sawAssistantTextInTurn = true;
-      out.push({ kind: "text", text });
-      continue;
-    }
-    const toolName = piToolName(event);
-    if (toolName) {
-      textBuffer.flush(out, "text");
-      thinkingBuffer.flush(out, "thinking");
-      out.push({ kind: "tool", name: toolName });
+      out.push({ kind: "text", text: assistantText });
       continue;
     }
     if (event.type === "error") {
@@ -544,15 +724,26 @@ function piAssistantEndedContent(event: Record<string, unknown>, type: "text_end
   return "";
 }
 
-function piToolName(event: Record<string, unknown>): string {
-  if (event.type === "tool_execution_start" && typeof event.toolName === "string") return event.toolName;
-  if (event.type !== "message_update") return "";
+function piTool(event: Record<string, unknown>): { id?: string; name: string; target?: string } | null {
+  if (event.type === "tool_execution_start" && typeof event.toolName === "string") {
+    return {
+      id: typeof event.toolCallId === "string" ? event.toolCallId : undefined,
+      name: event.toolName,
+      target: toolTarget(asRecord(event.args)),
+    };
+  }
+  if (event.type !== "message_update") return null;
   const message = asRecord(event.message);
-  if (message.role !== "assistant") return "";
+  if (message.role !== "assistant") return null;
   const assistantEvent = asRecord(event.assistantMessageEvent);
-  if (assistantEvent.type !== "toolcall_end") return "";
+  if (assistantEvent.type !== "toolcall_end") return null;
   const toolCall = asRecord(assistantEvent.toolCall);
-  return typeof toolCall.name === "string" ? toolCall.name : "";
+  if (typeof toolCall.name !== "string") return null;
+  return {
+    id: typeof toolCall.id === "string" ? toolCall.id : undefined,
+    name: toolCall.name,
+    target: toolTarget(asRecord(toolCall.arguments ?? toolCall.args)),
+  };
 }
 
 function piStatusSegment(event: Record<string, unknown>): AgentSegment | null {

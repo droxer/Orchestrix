@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { TFunction } from "i18next";
 
-import { displayAgentSegments, emptyAgentStreamSegments, hasStreamingTextCaret, parseAgentStderr, parseAgentStream, userVisibleAgentSegments, agentMessagePlainText, type AgentSegment } from "../src/lib/agentStream.js";
+import { AgentStreamAccumulator, displayAgentSegments, emptyAgentStreamSegments, hasStreamingTextCaret, parseAgentStderr, parseAgentStream, userVisibleAgentSegments, agentMessagePlainText, type AgentSegment } from "../src/lib/agentStream.js";
 
 describe("agent stream parsing", () => {
   it("filters Codex stdin notice from stderr", () => {
@@ -161,6 +161,54 @@ describe("agent stream parsing", () => {
     assert.deepEqual(parseAgentStream("pi", raw), [
       { kind: "thinking", text: "Checking files." },
       { kind: "tool", name: "read" },
+      { kind: "tool", name: "bash", target: "npm test" },
+    ]);
+  });
+
+  it("renders a Pi toolcall_end once when the event carries accumulated assistant text", () => {
+    const raw = [
+      JSON.stringify({ type: "turn_start" }),
+      JSON.stringify({
+        type: "message_update",
+        message: {
+          role: "assistant",
+          content: [
+            { type: "text", text: "Checking files." },
+            { type: "toolCall", name: "read", arguments: { path: "src/app.ts" } },
+          ],
+        },
+        assistantMessageEvent: {
+          type: "toolcall_end",
+          contentIndex: 1,
+          toolCall: { id: "call_1", type: "toolCall", name: "read", arguments: { path: "src/app.ts" } },
+        },
+      }),
+    ].join("\n");
+
+    assert.deepEqual(parseAgentStream("pi", raw), [
+      { kind: "text", text: "Checking files." },
+      { kind: "tool", name: "read", target: "src/app.ts" },
+    ]);
+  });
+
+  it("keeps reused Pi tool ids distinct across turns", () => {
+    const toolEvent = (name: string) => JSON.stringify({
+      type: "message_update",
+      message: { role: "assistant", content: [] },
+      assistantMessageEvent: {
+        type: "toolcall_end",
+        toolCall: { id: "call_1", type: "toolCall", name, arguments: {} },
+      },
+    });
+    const raw = [
+      JSON.stringify({ type: "turn_start" }),
+      toolEvent("read"),
+      JSON.stringify({ type: "turn_start" }),
+      toolEvent("bash"),
+    ].join("\n");
+
+    assert.deepEqual(parseAgentStream("pi", raw), [
+      { kind: "tool", name: "read" },
       { kind: "tool", name: "bash" },
     ]);
   });
@@ -188,6 +236,35 @@ describe("agent stream parsing", () => {
       { kind: "narration", key: "agent_stream.codex_started", params: { tone: "info" } },
       { kind: "text", text: "Here is the answer." },
       { kind: "narration", key: "agent_stream.codex_finished", params: { tone: "good" } },
+    ]);
+  });
+
+  it("renders Codex MCP and web-search item starts as tool calls", () => {
+    const raw = [
+      JSON.stringify({
+        type: "item.started",
+        item: {
+          id: "mcp_1",
+          type: "mcp_tool_call",
+          server: "context7",
+          tool: "query-docs",
+          arguments: { query: "current docs" },
+        },
+      }),
+      JSON.stringify({
+        type: "item.started",
+        item: { id: "web_1", type: "web_search", query: "Relay SSE rendering" },
+      }),
+      JSON.stringify({
+        type: "item.started",
+        item: { id: "db_1", type: "database_tool_call", tool: "lookup", arguments: { query: "session events" } },
+      }),
+    ].join("\n");
+
+    assert.deepEqual(parseAgentStream("codex", raw), [
+      { kind: "tool", name: "context7.query-docs", target: "current docs" },
+      { kind: "tool", name: "web_search", target: "Relay SSE rendering" },
+      { kind: "tool", name: "lookup", target: "session events" },
     ]);
   });
 
@@ -292,6 +369,58 @@ describe("agent stream parsing", () => {
     ]);
   });
 
+  it("merges Claude partial and completed events for the same tool call", () => {
+    const raw = [
+      JSON.stringify({
+        type: "stream_event",
+        event: {
+          type: "content_block_start",
+          index: 0,
+          content_block: { type: "tool_use", id: "tool_1", name: "Read", input: {} },
+        },
+      }),
+      JSON.stringify({
+        type: "stream_event",
+        event: { type: "content_block_stop", index: 0 },
+      }),
+      JSON.stringify({
+        type: "assistant",
+        message: {
+          role: "assistant",
+          content: [
+            { type: "tool_use", id: "tool_1", name: "Read", input: { file_path: "src/app.ts" } },
+          ],
+        },
+      }),
+    ].join("\n");
+
+    assert.deepEqual(parseAgentStream("claude", raw), [
+      { kind: "tool", name: "Read", target: "src/app.ts" },
+    ]);
+  });
+
+  it("preserves identical Claude text in distinct indexed content blocks", () => {
+    const block = (index: number) => [
+      JSON.stringify({
+        type: "stream_event",
+        event: { type: "content_block_start", index, content_block: { type: "text" } },
+      }),
+      JSON.stringify({
+        type: "stream_event",
+        event: { type: "content_block_delta", index, delta: { type: "text_delta", text: "Same text." } },
+      }),
+      JSON.stringify({
+        type: "stream_event",
+        event: { type: "content_block_stop", index },
+      }),
+    ];
+
+    assert.deepEqual(parseAgentStream("claude", [...block(0), ...block(1)].join("\n")), [
+      { kind: "text", text: "Same text." },
+      { kind: "text", text: "Same text." },
+    ]);
+  });
+
   it("does not duplicate Claude assistant text after streamed deltas", () => {
     const raw = [
       JSON.stringify({
@@ -338,6 +467,27 @@ describe("agent stream parsing", () => {
     ]);
   });
 
+  it("does not duplicate replayed Claude turns with the same assistant message id", () => {
+    const turn = [
+      JSON.stringify({
+        type: "stream_event",
+        event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "Replayed turn." } },
+      }),
+      JSON.stringify({
+        type: "stream_event",
+        event: { type: "content_block_stop", index: 0 },
+      }),
+      JSON.stringify({
+        type: "assistant",
+        message: { id: "msg_1", role: "assistant", content: [{ type: "text", text: "Replayed turn." }] },
+      }),
+    ].join("\n");
+
+    assert.deepEqual(parseAgentStream("claude", `${turn}\n${turn}`), [
+      { kind: "text", text: "Replayed turn." },
+    ]);
+  });
+
   it("keeps Claude assistant text when no streamed delta was emitted", () => {
     const raw = JSON.stringify({
       type: "assistant",
@@ -347,6 +497,57 @@ describe("agent stream parsing", () => {
     assert.deepEqual(parseAgentStream("claude", raw), [
       { kind: "text", text: "Fallback Claude answer." },
     ]);
+  });
+
+  it("incrementally renders only the unfinished Claude turn without changing visible output", () => {
+    const accumulator = new AgentStreamAccumulator("claude");
+    const streamed = [
+      JSON.stringify({
+        type: "stream_event",
+        event: { type: "content_block_start", index: 0, content_block: { type: "text" } },
+      }),
+      JSON.stringify({
+        type: "stream_event",
+        event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "First answer." } },
+      }),
+      JSON.stringify({
+        type: "stream_event",
+        event: { type: "content_block_stop", index: 0 },
+      }),
+    ].join("\n");
+    const completed = `${streamed}\n${JSON.stringify({
+      type: "assistant",
+      message: { role: "assistant", content: [{ type: "text", text: "First answer." }] },
+    })}`;
+    const nextTurn = `${completed}\n${JSON.stringify({
+      type: "stream_event",
+      event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "Second" } },
+    })}`;
+
+    assert.deepEqual(accumulator.update(streamed), [{ kind: "text", text: "First answer." }]);
+    assert.deepEqual(accumulator.update(completed), [{ kind: "text", text: "First answer." }]);
+    assert.deepEqual(accumulator.update(nextTurn), [
+      { kind: "text", text: "First answer." },
+      { kind: "text", text: "Second" },
+    ]);
+    assert.deepEqual(accumulator.update("plain replacement"), [{ kind: "text", text: "plain replacement" }]);
+  });
+
+  it("does not re-append a replayed Claude checkpoint", () => {
+    const turn = [
+      JSON.stringify({
+        type: "stream_event",
+        event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "One answer." } },
+      }),
+      JSON.stringify({
+        type: "assistant",
+        message: { id: "msg_1", role: "assistant", content: [{ type: "text", text: "One answer." }] },
+      }),
+    ].join("\n");
+    const accumulator = new AgentStreamAccumulator("claude");
+
+    assert.deepEqual(accumulator.update(turn), [{ kind: "text", text: "One answer." }]);
+    assert.deepEqual(accumulator.update(`${turn}\n${turn}`), [{ kind: "text", text: "One answer." }]);
   });
 
   it("ignores Pi JSON empty assistant lifecycle events", () => {
