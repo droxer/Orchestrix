@@ -58,6 +58,16 @@ export class RelayApiError extends Error {
   }
 }
 
+function apiErrorMessage(value: unknown): string | undefined {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (value && typeof value === "object" && "message" in value && typeof value.message === "string") {
+    return value.message;
+  }
+  return undefined;
+}
+
 export async function apiJson<T>(
   path: string,
   options: { method?: string; body?: unknown; token?: string; signal?: AbortSignal; credentials?: RequestCredentials } = {},
@@ -91,11 +101,9 @@ export async function apiJson<T>(
   if (!response.ok) {
     const detail = parsed && typeof parsed === "object" && "detail" in parsed ? parsed.detail : undefined;
     const error = parsed && typeof parsed === "object" && "error" in parsed ? parsed.error : undefined;
-    const message = typeof detail === "string"
-      ? detail
-      : typeof error === "string"
-        ? error
-        : text.trim() || response.statusText;
+    const message = apiErrorMessage(detail)
+      ?? apiErrorMessage(error)
+      ?? (text.trim() || response.statusText);
     throw new RelayApiError(message, response.status);
   }
   return parsed as T;

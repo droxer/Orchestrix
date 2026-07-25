@@ -17,6 +17,7 @@
     "close_thread": "無法關閉對話。請檢查連線後重試。",
     "send_message": "無法傳送訊息。請檢查 daemon 連線後重試。",
     "agent_not_ready": "{{agent}} 未就緒。請選擇其他智能體或稍後再試。",
+    "workspace_unavailable": "{{agent}} 無法加入此對話，因為其執行環境未共享該對話的工作區。請使用此智能體建立新對話，或將其部署到相容節點。",
     "agent_disabled_on_node": "該智能體已在此節點停用。",
     "cancel_run": "無法取消執行。請重新整理對話後重試。",
     "rerun_assignment": "無法重新執行任務。請檢查 daemon 連線後重試。",

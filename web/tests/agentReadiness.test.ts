@@ -32,4 +32,15 @@ describe("Relay web agent readiness", () => {
     );
     assert.equal(message, "errors.agent_not_ready:claude");
   });
+
+  it("formats workspace placement errors with the affected agent", () => {
+    const message = formatDispatchError(
+      new RelayApiError(
+        "Agent Hawkeye has no eligible runtime placement (workspace_unavailable).",
+        409,
+      ),
+      ((key: string, vars?: { agent?: string }) => `${key}:${vars?.agent ?? ""}`) as never,
+    );
+    assert.equal(message, "errors.workspace_unavailable:Hawkeye");
+  });
 });

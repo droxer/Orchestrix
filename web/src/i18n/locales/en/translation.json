@@ -17,6 +17,7 @@
     "close_thread": "Couldn't close the thread. Check the connection and try again.",
     "send_message": "Couldn't send the message. Check the daemon connection and try again.",
     "agent_not_ready": "{{agent}} isn't ready. Pick another agent or try later.",
+    "workspace_unavailable": "{{agent}} can't join this thread because its runtime doesn't share the thread's workspace. Start a new thread with this agent or place it on a compatible node.",
     "agent_disabled_on_node": "That agent is disabled on this node.",
     "cancel_run": "Couldn't cancel the run. Refresh the thread and try again.",
     "rerun_assignment": "Couldn't rerun the assignment. Check the daemon connection and try again.",

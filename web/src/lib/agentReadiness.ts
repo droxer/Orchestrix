@@ -49,6 +49,7 @@ export function dispatchReadyAgents(node: NodeAgentState, agentNames: AgentName[
 }
 
 const NOT_READY_AGENTS_RE = /does not have ready agent\(s\): ([^.]+)/i;
+const WORKSPACE_UNAVAILABLE_RE = /^Agent (.+?) has no eligible runtime placement \(workspace_unavailable\)\.?$/i;
 
 export function formatDispatchError(error: unknown, t: TFunction): string | undefined {
   const message = errorMessage(error);
@@ -59,6 +60,10 @@ export function formatDispatchError(error: unknown, t: TFunction): string | unde
   }
   if (/disabled agent\(s\)/i.test(message)) {
     return t("errors.agent_disabled_on_node");
+  }
+  const workspaceUnavailable = message.match(WORKSPACE_UNAVAILABLE_RE);
+  if (workspaceUnavailable) {
+    return t("errors.workspace_unavailable", { agent: workspaceUnavailable[1].trim() });
   }
   return undefined;
 }
