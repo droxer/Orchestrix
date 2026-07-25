@@ -1,12 +1,27 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-// Tests run from dist/web/tests/, so the repo root is three levels up.
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
-const readStyle = (rel: string) => readFileSync(path.join(repoRoot, "web", "src", "styles", rel), "utf8");
+const STYLES_DIR = path.join("web", "src", "styles");
+const MARKER = path.join(STYLES_DIR, "tokens", "palette.css");
+
+// This file runs both from the source tree (web/tests/) and from the built
+// output (dist/web/tests/), so the repo root sits at different depths. Walk up
+// from wherever this module lives until the styles we read come into view.
+function findRepoRoot(): string {
+  let dir = path.dirname(fileURLToPath(import.meta.url));
+  for (;;) {
+    if (existsSync(path.join(dir, MARKER))) return dir;
+    const parent = path.dirname(dir);
+    if (parent === dir) throw new Error(`unable to locate ${MARKER} above ${path.dirname(fileURLToPath(import.meta.url))}`);
+    dir = parent;
+  }
+}
+
+const repoRoot = findRepoRoot();
+const readStyle = (rel: string) => readFileSync(path.join(repoRoot, STYLES_DIR, rel), "utf8");
 
 const palette = readStyle("tokens/palette.css");
 const lightMarker = 'html[data-theme="light"]';
