@@ -11,7 +11,11 @@ import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { agentLabel } from "../lib/plan";
 import { teamReady } from "../lib/taskAssignment";
-import { teamMutationInput } from "../lib/teamForm";
+import {
+  canAddAgentToNodeScopedTeam,
+  nodeScopedTeamIssue,
+  teamMutationInput,
+} from "../lib/teamForm";
 import { compactDate } from "../lib/workspaceFormat";
 import type { AgentTeam, ArtifactIndexItem, WorkspaceBriefResponse, WorkspaceBriefSession, WorkspaceBriefTask } from "../types";
 import { ActionEdit, AdminDelete, NavRefresh, ViewBoard } from "./icons";
@@ -104,11 +108,17 @@ function TeamProfile({
   const [memberIds, setMemberIds] = useState<string[]>(team.memberAgentIds);
   const [leadId, setLeadId] = useState(team.leadAgentId ?? "");
   const [imageSaving, setImageSaving] = useState(false);
-  const [validationError, setValidationError] = useState<"members" | "lead" | null>(null);
+  const [validationError, setValidationError] = useState<
+    "members" | "lead" | "unplaced" | "different-nodes" | null
+  >(null);
   const nameRef = useRef<HTMLInputElement>(null);
   const membersRef = useRef<HTMLFieldSetElement>(null);
   const leadRef = useRef<HTMLButtonElement>(null);
   const readyMembers = team.members.filter((member) => member.enabled && member.availability === "ready").length;
+  const selectedAgents = useMemo(
+    () => agents.filter((agent) => memberIds.includes(agent.id)),
+    [agents, memberIds],
+  );
   const busy = updateTeamMutation.isPending || deleteTeamMutation.isPending || imageSaving;
   const draftDirty = name.trim() !== team.name.trim()
     || leadId !== (team.leadAgentId ?? "")
@@ -185,6 +195,12 @@ function TeamProfile({
     }
     if (memberIds.length === 0) {
       setValidationError("members");
+      membersRef.current?.focus();
+      return;
+    }
+    const nodeIssue = nodeScopedTeamIssue(agents, memberIds);
+    if (nodeIssue) {
+      setValidationError(nodeIssue);
       membersRef.current?.focus();
       return;
     }
@@ -301,25 +317,42 @@ function TeamProfile({
                 className="team-profile-member-fieldset"
                 aria-label={t("teams.members")}
                 tabIndex={-1}
-                aria-invalid={validationError === "members" || undefined}
-                aria-describedby={validationError === "members" ? "team-profile-members-error" : undefined}
+                aria-invalid={validationError && validationError !== "lead" ? true : undefined}
+                aria-describedby={validationError && validationError !== "lead" ? "team-profile-members-error" : undefined}
               >
                 <div className="team-member-options team-profile-member-options">
-                  {agents.map((agent) => (
-                    <label key={agent.id} className="team-member-option">
-                      <input
-                        type="checkbox"
-                        checked={memberIds.includes(agent.id)}
-                        onChange={() => toggleMember(agent.id)}
-                        disabled={busy}
-                      />
-                      <span>{agent.displayName}</span>
-                      <small>{agentLabel(agent.executorKind)}</small>
-                    </label>
-                  ))}
+                  {agents.map((agent) => {
+                    const selected = memberIds.includes(agent.id);
+                    const incompatible = !selected
+                      && !canAddAgentToNodeScopedTeam(agent, selectedAgents);
+                    return (
+                      <label
+                        key={agent.id}
+                        className="team-member-option"
+                        title={incompatible ? t("teams.node_scope_required") : undefined}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() => toggleMember(agent.id)}
+                          disabled={busy || incompatible}
+                        />
+                        <span>{agent.displayName}</span>
+                        <small>{agentLabel(agent.executorKind)}</small>
+                      </label>
+                    );
+                  })}
                 </div>
                 {agents.length === 0 ? <span className="adm-form-hint">{t("teams.no_agents")}</span> : null}
-                {validationError === "members" ? <span id="team-profile-members-error" className="text-sm text-danger" role="alert">{t("teams.members_required")}</span> : null}
+                {validationError && validationError !== "lead" ? (
+                  <span id="team-profile-members-error" className="text-sm text-danger" role="alert">
+                    {validationError === "members"
+                      ? t("teams.members_required")
+                      : validationError === "unplaced"
+                        ? t("teams.members_unplaced")
+                        : t("teams.members_different_nodes")}
+                  </span>
+                ) : null}
               </fieldset>
             ) : (
               <ul className="team-profile-members">

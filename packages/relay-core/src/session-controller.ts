@@ -37,6 +37,7 @@ export interface SessionControllerOptions {
   taskStore?: TaskStore;
   taskId?: string;
   workspacePath?: string;
+  daemonNodeId?: string;
   ownerEmployeeId?: string;
   teamId?: string;
   sink?: AgentOutputSink;
@@ -72,6 +73,7 @@ export class SessionController implements AgentEventSink {
   async createSession(taskGoal: string, participants: string[] = ["human"]): Promise<RelaySession> {
     const session = await this.store.createSession({
       workspacePath: this.options.workspacePath ?? GUEST_WORKSPACE,
+      daemonNodeId: this.options.daemonNodeId,
       ownerEmployeeId: this.options.ownerEmployeeId,
       teamId: this.options.teamId,
       taskGoal,

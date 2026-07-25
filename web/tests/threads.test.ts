@@ -2,6 +2,12 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { matchesThreadQuery, myThreadSessions, pickActiveThreadSession, sessionAgents, threadLabel, upsertThreadSession } from "../src/lib/threads.js";
+import {
+  agentsForThreadNode,
+  threadNeedsRuntimeSelection,
+  selectableThreadComputers,
+  threadRuntimeNodeId,
+} from "../src/lib/threadRuntime.js";
 import { isAwaitingFeedbackDecision, rerunAssignmentForSession } from "../src/lib/workflow.js";
 import type { RelaySession } from "../src/types.js";
 
@@ -47,6 +53,47 @@ describe("sessionAgents", () => {
 });
 
 describe("web thread helpers", () => {
+  it("selects a computer first and exposes only agents placed on it", () => {
+    const nodes = [
+      { id: "node_a", employeeId: "alice", online: true, stale: false, status: "ready" },
+      { id: "node_b", employeeId: "alice", online: true, stale: false, status: "running" },
+      { id: "node_bob", employeeId: "bob", online: true, stale: false, status: "ready" },
+      { id: "node_stale", employeeId: "alice", online: true, stale: true, status: "ready" },
+    ];
+    const agents = [
+      { id: "agent_a", placements: [{ daemonNodeId: "node_a", desiredState: "active" }] },
+      { id: "agent_b", placements: [{ daemonNodeId: "node_b", desiredState: "active" }] },
+      { id: "agent_removed", placements: [{ daemonNodeId: "node_a", desiredState: "removed" }] },
+    ];
+
+    assert.deepEqual(
+      selectableThreadComputers(nodes, "alice").map((node) => node.id),
+      ["node_a", "node_b"],
+    );
+    assert.deepEqual(
+      agentsForThreadNode(agents, "node_a").map((agent) => agent.id),
+      ["agent_a"],
+    );
+    assert.equal(threadRuntimeNodeId(session({ daemonNodeId: "node_a" })), "node_a");
+    assert.equal(threadNeedsRuntimeSelection(session({ daemonNodeId: "node_a" }), false), false);
+    assert.equal(threadNeedsRuntimeSelection(session({}), false), true);
+    assert.equal(threadNeedsRuntimeSelection(session({ daemonNodeId: "node_a" }), true), true);
+    assert.equal(
+      threadRuntimeNodeId(session({
+        agentRuns: [{
+          id: "run_b",
+          agent: "codex",
+          mode: "action",
+          status: "completed",
+          startedAt: "2026-06-20T00:00:00.000Z",
+          artifactIds: [],
+          daemonNodeId: "node_b",
+        } as AgentRuns[number]],
+      })),
+      "node_b",
+    );
+  });
+
   it("lists only the employee's own non-archived sessions, newest first", () => {
     const sessions = [
       session({ id: "a", ownerEmployeeId: "alice", updatedAt: "2026-06-20T01:00:00.000Z" }),

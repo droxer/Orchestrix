@@ -45,6 +45,7 @@ class LocalSessionStore:
                 **({"ownerEmployeeId": payload["ownerEmployeeId"]} if payload.get("ownerEmployeeId") else {}),
                 **({"ownerAgentId": payload["ownerAgentId"]} if payload.get("ownerAgentId") else {}),
                 **({"teamId": payload["teamId"]} if payload.get("teamId") else {}),
+                **({"daemonNodeId": payload["daemonNodeId"]} if payload.get("daemonNodeId") else {}),
                 "taskGoal": payload["taskGoal"],
                 "participants": payload.get("participants", ["human"]),
             })
@@ -266,6 +267,7 @@ class DatabaseSessionStore:
             **({"ownerEmployeeId": payload["ownerEmployeeId"]} if payload.get("ownerEmployeeId") else {}),
             **({"ownerAgentId": payload["ownerAgentId"]} if payload.get("ownerAgentId") else {}),
             **({"teamId": payload["teamId"]} if payload.get("teamId") else {}),
+            **({"daemonNodeId": payload["daemonNodeId"]} if payload.get("daemonNodeId") else {}),
             "taskGoal": payload["taskGoal"],
             "participants": payload.get("participants", ["human"]),
         })]

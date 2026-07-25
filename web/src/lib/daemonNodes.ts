@@ -39,6 +39,27 @@ export function mergeVisibleDaemonNodes(
   return [...byEmployee.values()].sort((a, b) => (a.employeeId ?? "").localeCompare(b.employeeId ?? ""));
 }
 
+/** Preserve each physical computer for runtime selection while coalescing the
+ * authenticated and local-control views of the same daemon node. */
+export function mergeThreadRuntimeNodes(
+  authenticatedNodes: DaemonNodeMonitorRecord[],
+  controlPanelNodes: ControlPanelDaemonNodeRecord[],
+): DaemonNodeMonitorRecord[] {
+  const byId = new Map<string, DaemonNodeMonitorRecord>();
+  for (const candidate of [
+    ...authenticatedNodes,
+    ...controlPanelNodes.map(stripControlPanelToken),
+  ]) {
+    if (!candidate.employeeId) continue;
+    const existing = byId.get(candidate.id);
+    byId.set(candidate.id, existing ? preferDaemonNode(existing, candidate) : candidate);
+  }
+  return [...byId.values()].sort((a, b) => (
+    (a.employeeId ?? "").localeCompare(b.employeeId ?? "")
+      || a.id.localeCompare(b.id)
+  ));
+}
+
 export function shouldClaimLocalDaemonNode(
   controlPanelNode: ControlPanelDaemonNodeRecord,
   authenticatedNodes: DaemonNodeMonitorRecord[],

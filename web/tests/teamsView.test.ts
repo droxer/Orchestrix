@@ -4,7 +4,11 @@ import { resolve } from "node:path";
 import { describe, it } from "node:test";
 
 import { taskAssigneeDisplayName, teamAvailability, teamReady } from "../src/lib/taskAssignment.js";
-import { teamMutationInput } from "../src/lib/teamForm.js";
+import {
+  canAddAgentToNodeScopedTeam,
+  nodeScopedTeamIssue,
+  teamMutationInput,
+} from "../src/lib/teamForm.js";
 import { selectedTeamForWorkspace } from "../src/lib/teamWorkspace.js";
 
 describe("Agent team management", () => {
@@ -60,6 +64,29 @@ describe("Agent team management", () => {
       memberAgentIds: ["agent_lead"],
       enabled: true,
     });
+  });
+
+  it("only assembles agents with active placements on one node", () => {
+    const lead = {
+      id: "agent_lead",
+      placements: [{ daemonNodeId: "node_a", desiredState: "active" }],
+    };
+    const colocated = {
+      id: "agent_support",
+      placements: [{ daemonNodeId: "node_a", desiredState: "active" }],
+    };
+    const remote = {
+      id: "agent_remote",
+      placements: [{ daemonNodeId: "node_b", desiredState: "active" }],
+    };
+    const unplaced = { id: "agent_unplaced", placements: [] };
+
+    assert.equal(canAddAgentToNodeScopedTeam(colocated, [lead]), true);
+    assert.equal(canAddAgentToNodeScopedTeam(remote, [lead]), false);
+    assert.equal(canAddAgentToNodeScopedTeam(unplaced, [lead]), false);
+    assert.equal(nodeScopedTeamIssue([lead, unplaced], ["agent_lead", "agent_unplaced"]), "unplaced");
+    assert.equal(nodeScopedTeamIssue([lead, remote], ["agent_lead", "agent_remote"]), "different-nodes");
+    assert.equal(nodeScopedTeamIssue([lead, colocated], ["agent_lead", "agent_support"]), null);
   });
 
   it("keeps the employee as assignee when a team executes the task", () => {

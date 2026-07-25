@@ -1,5 +1,23 @@
 # Relay Web — Design Review
 
+## New-thread running environment (2026-07-26)
+
+New-thread initialization now uses a compact setup rail above the composer,
+referencing the supplied Codex new-task screenshot's clear hierarchy without
+copying its visual system. The rail shows “New thread” and a single computer
+selector; it stays attached to the larger prompt surface so runtime choice
+reads as setup for the conversation rather than a global preference.
+
+- Only online, non-stale computers owned by the employee are selectable.
+- Selecting a computer immediately filters the agent picker to active
+  placements on that node.
+- Send remains disabled until a computer is selected.
+- Once the first run creates the thread, the setup rail disappears and the
+  persisted thread runtime becomes immutable routing affinity.
+- The treatment uses Graphite surfaces, hairlines, type roles, and existing
+  select primitives; at 640px the redundant “New thread” label collapses while
+  the computer selector remains available.
+
 ## Graphite — new identity + token system rebuild (2026-07-19)
 
 Replaced the Sleek Forest identity (warm near-black + forest green + Instrument Serif) and its bloated 4-tier token system with **Graphite**: true-neutral canvas, one steel-blue action color, status-only chroma, two registers designed side by side. Spec: `docs/superpowers/specs/2026-07-19-graphite-tokens-design.md`; living specimen: `docs/design-system-preview.html`; reference: `docs/design-system.md` (fully rewritten).
@@ -439,7 +457,7 @@ Cloud computer and local computer are both infrastructure an agent runs on, not 
 
 ### Computers host agents — shared root + personal homes (2026-07-20)
 
-Model decision, full-stack: a **computer (daemon node) is infrastructure for agents** — it hosts them; an employee can have several computers and several agents; and **agents on the same computer collaborate through the shared node workspace root**, each keeping a private home (`agents/agent-<b64>/`) for personal state. Runs now intentionally execute at the shared root (they already did de facto — the daemon's `runAsAgent` cd wins over the exec cwd), the agent prompt gains a `[Workspace]` prelude naming its private directory, generated-file scanning covers the shared root while excluding sibling homes (a concurrent sibling's private output is never cross-attributed; root-level files are shared-attribution, bounded by the per-run mtime/bytes diff), and routing prefers co-locating a multi-agent run on the already-selected computer.
+Model decision, full-stack: a **computer (daemon node) is infrastructure for agents** — it hosts them; an employee can have several computers and several agents; and **agents on the same computer collaborate through the shared node workspace root**, each keeping a private home (`agents/agent-<b64>/`) for personal state. Runs now intentionally execute at the shared root (they already did de facto — the daemon's `runAsAgent` cd wins over the exec cwd), the agent prompt gains a `[Workspace]` prelude naming its private directory, generated-file scanning covers the shared root while excluding sibling homes (a concurrent sibling's private output is never cross-attributed; root-level files are shared-attribution, bounded by the per-run mtime/bytes diff), and team assembly plus multi-agent routing require every participating agent to be placed on the same computer.
 
 **Shipped (web):**
 

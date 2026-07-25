@@ -73,6 +73,7 @@ def resolve_agent_assignments(
     placement_store: Any,
     daemon_nodes: list[dict[str, Any]],
     session: dict[str, Any] | None = None,
+    required_node_id: str | None = None,
 ) -> list[dict[str, Any]]:
     nodes = {node["id"]: node for node in daemon_nodes}
     resolved: list[dict[str, Any]] = []
@@ -81,6 +82,19 @@ def resolve_agent_assignments(
         selected_workspace,
         selected_workspace_policy,
     ) = _session_affinity(session, placement_store, nodes)
+    if required_node_id:
+        required_node = nodes.get(required_node_id)
+        if not required_node:
+            raise AgentRoutingError(
+                "node_offline", "Selected thread computer is not available."
+            )
+        if selected_node_ids and required_node_id not in selected_node_ids:
+            raise AgentRoutingError(
+                "workspace_unavailable",
+                "Selected computer does not match the thread runtime.",
+            )
+        selected_node_ids.add(required_node_id)
+        selected_workspace = selected_workspace or workspace_identity(required_node)
     for assignment in assignments:
         agent_id = assignment.get("agentId")
         if not isinstance(agent_id, str) or not agent_id:
@@ -269,22 +283,14 @@ def validate_session_workspace_assignments(
 
 def _workspace_candidate_allowed(
     node: dict[str, Any],
-    workspace_policy: dict[str, Any],
+    _workspace_policy: dict[str, Any],
     selected_node_ids: set[str],
     selected_workspace: tuple[str, str] | None,
-    selected_workspace_policy: str | None,
+    _selected_workspace_policy: str | None,
 ) -> bool:
     node_workspace = workspace_identity(node)
-    if node["id"] in selected_node_ids:
-        return selected_workspace is None or node_workspace == selected_workspace
-    if not selected_node_ids and selected_workspace == node_workspace:
-        return True
-    return bool(
-        selected_workspace_policy == "shared-path"
-        and workspace_policy.get("kind") == "shared-path"
-        and selected_workspace is not None
-        and selected_workspace[0] == "id"
-        and node_workspace == selected_workspace
+    return node["id"] in selected_node_ids and (
+        selected_workspace is None or node_workspace == selected_workspace
     )
 
 
@@ -295,6 +301,7 @@ def _session_affinity(
 ) -> tuple[set[str], tuple[str, str] | None, str | None]:
     if not session:
         return set(), None, None
+    session_node_id = session.get("daemonNodeId")
     prior_run = next(
         (
             run
@@ -304,12 +311,20 @@ def _session_affinity(
         None,
     )
     if not prior_run:
-        # A session acquires runtime affinity only after its first agent run.
-        # Session workspacePath is the in-guest working directory and is not a
-        # canonical daemon workspace identity, so comparing it with a node's
-        # host path or workspaceId would reject otherwise valid first runs.
+        if isinstance(session_node_id, str) and session_node_id:
+            node = nodes.get(session_node_id)
+            return (
+                {session_node_id},
+                workspace_identity(node)
+                if node
+                else workspace_identity(
+                    {"workspacePath": session.get("workspacePath")}
+                ),
+                "node-affine",
+            )
+        # Legacy sessions acquire runtime affinity after their first agent run.
         return set(), None, None
-    node_id = prior_run["daemonNodeId"]
+    node_id = session_node_id or prior_run["daemonNodeId"]
     node = nodes.get(node_id)
     recorded_workspace = prior_run.get("workspaceIdentity")
     workspace = (

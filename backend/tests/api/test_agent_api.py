@@ -732,7 +732,9 @@ def test_logical_agent_handoff_records_the_target_agent_id(monkeypatch) -> None:
         assert response.json()["decisions"][-1]["targetAgentId"] == reviewer["id"]
 
 
-def test_employee_dispatches_a_team_across_shared_workspace_nodes(monkeypatch) -> None:
+def test_employee_cannot_dispatch_a_team_across_shared_workspace_nodes(
+    monkeypatch,
+) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
         app = create_app(root)
@@ -798,13 +800,124 @@ def test_employee_dispatches_a_team_across_shared_workspace_nodes(monkeypatch) -
             },
         )
 
-        assert response.status_code == 202, response.text
-        queued = next(
-            item
-            for item in app.state.daemon_store.take_queued_commands("node_a")
-            if item["command"]["sessionId"] == response.json()["id"]
+        assert response.status_code == 409, response.text
+        assert response.json()["detail"]["code"] == "workspace_unavailable"
+
+
+def test_new_thread_runs_on_the_selected_computer(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        assert client.post(
+            "/cp/employees",
+            json={
+                "employeeId": "alice",
+                "username": "alice",
+                "password": "userpass",
+            },
+        ).status_code == 201
+        for node_id in ("node_a", "node_b"):
+            app.state.registry.register(
+                {
+                    "sandboxId": node_id,
+                    "employeeId": "alice",
+                    "token": f"token_{node_id}",
+                    "workspacePath": f"/workspace/{node_id}",
+                    "protocolVersion": 1,
+                    "supportedAgents": ["codex"],
+                    "status": "ready",
+                }
+            )
+        builder = app.state.agent_store.create_agent(
+            "alice", {"displayName": "Builder", "executorKind": "codex"}
         )
-        assert queued["command"]["logicalAgentId"] == planner["id"]
+        app.state.agent_placement_store.create_placement(builder, "node_b")
+        assert client.post("/auth/logout").status_code == 200
+        assert client.post(
+            "/auth/login", json={"username": "alice", "password": "userpass"}
+        ).status_code == 200
+
+        response = client.post(
+            "/agent-runs",
+            json={
+                "taskGoal": "Build on computer B",
+                "daemonNodeId": "node_b",
+                "assignments": [{"agentId": builder["id"], "mode": "action"}],
+            },
+        )
+
+        assert response.status_code == 202, response.text
+        session = response.json()
+        assert session["daemonNodeId"] == "node_b"
+        created = next(
+            event for event in session["events"] if event["type"] == "session.created"
+        )
+        assert created["daemonNodeId"] == "node_b"
+
+        conflicting = client.post(
+            "/agent-runs",
+            json={
+                "taskGoal": "Try to move the existing thread",
+                "sessionId": session["id"],
+                "daemonNodeId": "node_a",
+                "assignments": [{"agentId": builder["id"], "mode": "action"}],
+            },
+        )
+
+        assert conflicting.status_code == 409, conflicting.text
+        assert conflicting.json()["detail"]["code"] == "workspace_unavailable"
+
+
+def test_new_thread_rejects_an_agent_outside_the_selected_computer(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        assert client.post(
+            "/cp/employees",
+            json={
+                "employeeId": "alice",
+                "username": "alice",
+                "password": "userpass",
+            },
+        ).status_code == 201
+        for node_id in ("node_a", "node_b"):
+            app.state.registry.register(
+                {
+                    "sandboxId": node_id,
+                    "employeeId": "alice",
+                    "token": f"token_{node_id}",
+                    "workspacePath": f"/workspace/{node_id}",
+                    "protocolVersion": 1,
+                    "supportedAgents": ["codex"],
+                    "status": "ready",
+                }
+            )
+        builder = app.state.agent_store.create_agent(
+            "alice", {"displayName": "Builder", "executorKind": "codex"}
+        )
+        app.state.agent_placement_store.create_placement(builder, "node_b")
+        assert client.post("/auth/logout").status_code == 200
+        assert client.post(
+            "/auth/login", json={"username": "alice", "password": "userpass"}
+        ).status_code == 200
+
+        response = client.post(
+            "/agent-runs",
+            json={
+                "taskGoal": "Build on computer A",
+                "daemonNodeId": "node_a",
+                "assignments": [{"agentId": builder["id"], "mode": "action"}],
+            },
+        )
+
+        assert response.status_code == 409
+        assert response.json()["detail"]["code"] == "workspace_unavailable"
 
 
 def test_employee_cannot_list_or_dispatch_another_employees_agent(monkeypatch) -> None:

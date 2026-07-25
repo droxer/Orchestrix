@@ -4,7 +4,7 @@ import { useMemo, type Dispatch, RefObject, SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowRightLeft, MessageCircleQuestion, Scan } from "lucide-react";
 import { RelayMark } from "./RelayMark";
-import type { AgentName, AgentTaskMode, EmployeeAgent, RelayArtifact, RelaySession } from "../types";
+import type { AgentName, AgentTaskMode, DaemonNodeMonitorRecord, EmployeeAgent, RelayArtifact, RelaySession } from "../types";
 import {
   buildExecutorDisplayNameMap,
   buildLogicalAgentNameMap,
@@ -38,6 +38,7 @@ export type ThreadsViewProps = {
   onCloseThread: (sessionId: string) => void;
   activeAgent: AgentName;
   logicalAgents: EmployeeAgent[];
+  selectableLogicalAgents: EmployeeAgent[];
   activeLogicalAgentId: string | null;
   onLogicalAgentPicked: (agent: EmployeeAgent) => void;
   runningAgent: AgentName | undefined;
@@ -51,6 +52,10 @@ export type ThreadsViewProps = {
   onRefresh: () => void;
   onBackToThreads: () => void;
   selectedEmployee: string;
+  initializingThread: boolean;
+  runtimeNodes: DaemonNodeMonitorRecord[];
+  runtimeNodeId: string | null;
+  onRuntimeNodeChange: (nodeId: string) => void;
   agentDescriptors: Record<AgentName, { blurb: string }>;
   composerMode: AgentTaskMode;
   setComposerMode: Dispatch<SetStateAction<AgentTaskMode>>;
@@ -87,6 +92,7 @@ export function ThreadsView({
   onCloseThread,
   activeAgent,
   logicalAgents,
+  selectableLogicalAgents,
   activeLogicalAgentId,
   onLogicalAgentPicked,
   runningAgent,
@@ -100,6 +106,10 @@ export function ThreadsView({
   onRefresh,
   onBackToThreads,
   selectedEmployee,
+  initializingThread,
+  runtimeNodes,
+  runtimeNodeId,
+  onRuntimeNodeChange,
   agentDescriptors,
   composerMode,
   setComposerMode,
@@ -218,7 +228,7 @@ export function ThreadsView({
                 })}
                 {awaitingDecision ? (
                   <DecisionBar
-                    logicalAgents={logicalAgents}
+                    logicalAgents={selectableLogicalAgents}
                     sendDecision={sendDecision}
                     handoffOpen={handoffOpen}
                     setHandoffOpen={setHandoffOpen}
@@ -248,11 +258,15 @@ export function ThreadsView({
           composerMode={composerMode}
           setComposerMode={setComposerMode}
           activeAgent={activeAgent}
-          logicalAgents={logicalAgents}
+          logicalAgents={selectableLogicalAgents}
           activeLogicalAgentId={activeLogicalAgentId}
           onLogicalAgentPicked={onLogicalAgentPicked}
           activeAgentDisplayName={activeAgentDisplayName}
           selectedEmployee={selectedEmployee}
+          initializingThread={initializingThread}
+          runtimeNodes={runtimeNodes}
+          runtimeNodeId={runtimeNodeId}
+          onRuntimeNodeChange={onRuntimeNodeChange}
           running={running}
           onSend={onSend}
           onCancelRun={onCancelRun}

@@ -17,6 +17,8 @@ export interface AgentRun {
   /** Logical (employee) agent that ran this step. `agent` is only its executor
    * kind, which several named agents can share — this is the identity. */
   logicalAgentId?: string;
+  /** Computer that executed this run; retained for legacy thread affinity. */
+  daemonNodeId?: string;
   role?: AgentRole;
   mode: AgentTaskMode;
   status: "running" | "completed" | "failed" | "cancelled";
@@ -57,6 +59,8 @@ export interface HumanDecision {
 export interface RelaySession {
   id: string;
   workspacePath: string;
+  /** Daemon node selected as this thread's immutable runtime boundary. */
+  daemonNodeId?: string;
   /** Employee who owns this session; their agent runs the work on their behalf. */
   ownerEmployeeId?: string;
   /** Named Team that originated this session, retained as immutable provenance. */
@@ -87,6 +91,7 @@ export type RelayEvent =
       sessionId: string;
       timestamp: string;
       workspacePath: string;
+      daemonNodeId?: string;
       ownerEmployeeId?: string;
       teamId?: string;
       taskGoal: string;
@@ -201,6 +206,7 @@ export type RelayEvent =
 export interface SessionStore {
   createSession(input: {
     workspacePath: string;
+    daemonNodeId?: string;
     ownerEmployeeId?: string;
     teamId?: string;
     taskGoal: string;
@@ -254,6 +260,7 @@ export class LocalSessionStore implements SessionStore {
 
   async createSession(input: {
     workspacePath: string;
+    daemonNodeId?: string;
     ownerEmployeeId?: string;
     teamId?: string;
     taskGoal: string;
@@ -266,6 +273,7 @@ export class LocalSessionStore implements SessionStore {
     mkdirSync(join(dir, "artifacts"), { recursive: true });
     const event = relayEvent("session.created", sessionId, {
       workspacePath: input.workspacePath,
+      ...(input.daemonNodeId ? { daemonNodeId: input.daemonNodeId } : {}),
       ...(input.ownerEmployeeId ? { ownerEmployeeId: input.ownerEmployeeId } : {}),
       ...(input.teamId ? { teamId: input.teamId } : {}),
       taskGoal: input.taskGoal,
@@ -410,6 +418,7 @@ export function materializeEvents(events: RelayEvent[]): RelaySession {
   const session: RelaySession = {
     id: created.sessionId,
     workspacePath: created.workspacePath,
+    ...(created.daemonNodeId ? { daemonNodeId: created.daemonNodeId } : {}),
     ...(created.ownerEmployeeId ? { ownerEmployeeId: created.ownerEmployeeId } : {}),
     ...(created.teamId ? { teamId: created.teamId } : {}),
     taskGoal: created.taskGoal,

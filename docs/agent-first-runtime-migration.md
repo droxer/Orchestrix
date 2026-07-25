@@ -19,8 +19,7 @@ Implemented in the current vertical slice:
   without mutating employee reads;
 - additive daemon executor-capability registration;
 - `POST /agent-runs` with ownership checks and stable routing errors;
-- placement selection and per-assignment runtime-node dispatch;
-- shared-path guard for workflows spanning several nodes;
+- placement selection and node-scoped multi-assignment dispatch;
 - logical agent, placement, node, executor, and version in run audit state;
 - logical-agent instructions in executor prompts;
 - named-agent selection in employee chat with legacy fallback;
@@ -29,9 +28,8 @@ Implemented in the current vertical slice:
 - durable task and routine assignment by logical `agentId`;
 - scheduler resolution of task assignments through live placements;
 - canonical daemon `workspaceId` registration and persistence;
-- cross-node workflows when placements advertise the same workspace ID, even
-  when their host paths differ, and every placement explicitly opts into
-  `shared-path` policy;
+- hard rejection of multi-agent workflows whose placements span nodes,
+  regardless of workspace ID or `shared-path` metadata;
 - managed-node supervisors derive stable employee-home workspace IDs or pass
   an explicit `workspacePolicy.workspaceId` to launched daemons;
 - per-node capacity filtering plus agent/placement revalidation before every
@@ -39,7 +37,7 @@ Implemented in the current vertical slice:
 - database-enforced employee-scoped normalized agent-name uniqueness.
 - atomic single-placement moves, including database-backed stores;
 - compatibility-agent materialization for legacy task and routine assignments;
-- existing-session node affinity with explicit shared-workspace exceptions;
+- existing-session node affinity without shared-workspace exceptions;
 - safe node removal that preserves custom and moved logical agents;
 - logical-agent deletion blocked until active runs have drained;
 - dispatch-time delivery of updated agent configuration, with monotonic
@@ -259,25 +257,26 @@ Route new work by logical agent rather than by employee node.
 - Every new run is attributable to logical agent, placement, and node.
 - Existing clients still dispatch successfully.
 
-## Phase 4 — Workspace-safe cross-node workflows
+## Phase 4 — Node-scoped collaborative workflows
+
+> Superseded direction: ADR-011 rejects shared-path cross-node collaboration.
+> Canonical workspace identity remains for continuity and drift detection.
 
 ### Objective
 
-Allow agents on different nodes to collaborate without assuming shared local
-files.
+Require every agent in one collaborative workflow to execute on the same node.
 
-### Workspace identity
+### Session affinity
 
 - [x] Introduce canonical `workspaceId` separate from host and guest paths.
 - [x] Add workspace identity reports to daemon registration.
-- [ ] Add session workspace policy: `node-affine`, `shared-path`, or
-  `artifact-handoff`.
-- [ ] Default migrated sessions to `node-affine`.
+- [x] Keep sessions node-affine once their first run selects a node.
+- [x] Reject a later assignment whose placement resolves to another node.
 
-### Shared-path mode
+### Workspace identity
 
-- [x] Require placements to advertise the same canonical workspace ID.
-- [ ] Verify mount/path compatibility during daemon readiness checks.
+- [x] Treat canonical workspace identity as continuity metadata.
+- [x] Do not treat a matching workspace ID as proof of agent co-location.
 - [ ] Reject rather than silently dispatch when compatibility is uncertain.
 
 ### Artifact-handoff mode
@@ -291,15 +290,15 @@ files.
 
 ### Tests
 
-- [x] Cross-node shared-workspace success and mismatch rejection.
+- [x] Cross-node rejection even when workspace IDs and policies match.
 - [ ] Artifact transfer integrity, authorization, size-limit, and cleanup
   tests.
 - [ ] Handoff recovery after either node or backend restart.
 
 ### Exit criteria
 
-- Cross-node workflows cannot observe stale or unintended workspaces.
-- Failures identify the incompatible workspace or missing artifact clearly.
+- Multi-agent workflows cannot span daemon nodes.
+- Failures identify the node-scope violation clearly.
 
 ## Phase 5 — Employee and admin experience cutover
 
@@ -383,7 +382,7 @@ only after evidence shows it is safe.
 
 - [ ] Metrics: logical agents by state, placements by state/reason, placement
   selection latency, candidates rejected by reason, runs by agent/placement,
-  cross-node handoffs, and legacy-resolution count.
+  node-scope rejections, and legacy-resolution count.
 - [ ] Logs: agent ID, placement ID, node ID, session ID, task ID, and run ID;
   never log instructions containing secrets or raw credentials.
 - [ ] Admin activity events for agent and placement mutations.
@@ -409,7 +408,8 @@ only after evidence shows it is safe.
 
 - [ ] Alice owns `Researcher` (Claude), `Builder` (Codex), and `Reviewer`
   (Claude).
-- [ ] The three agents are placed on three different runtime nodes.
+- [ ] The three agents are placed on one runtime node before being assembled
+  into a team.
 - [ ] Alice selects agents by name and completes a three-step workflow without
   selecting a node.
 - [ ] One Claude node fails; only its placement becomes unavailable, and the
@@ -419,5 +419,5 @@ only after evidence shows it is safe.
 - [ ] Bob cannot discover or invoke Alice's agents or placements.
 - [ ] An old client using `{agent: "codex"}` still resolves to Alice's
   compatibility agent during the migration window.
-- [ ] A cross-node workflow with incompatible workspaces is rejected before
-  command enqueue with an actionable error.
+- [ ] A cross-node workflow is rejected before command enqueue with an
+  actionable error even when workspace identities match.

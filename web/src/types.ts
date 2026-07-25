@@ -87,6 +87,7 @@ export interface WorkspaceBriefSession {
   taskGoal?: string;
   status?: RelaySession["status"];
   phase?: string;
+  daemonNodeId?: string;
   workspacePath?: string;
   ownerEmployeeId?: string;
   ownerAgentId?: string;
@@ -406,6 +407,8 @@ export interface TeamMutationInput {
 
 export interface AgentRunInput {
   taskGoal: string;
+  /** Computer selected as the immutable runtime for a new thread. */
+  daemonNodeId?: string;
   assignments: Array<{
     agentId: string;
     mode: AgentTaskMode;
@@ -444,6 +447,8 @@ export interface RunInput {
 
 export interface CreateSessionInput {
   taskGoal: string;
+  /** Computer selected as the immutable runtime for the thread. */
+  daemonNodeId?: string;
   assignments: RunInput["assignments"];
   workspacePath?: string;
   ownerEmployeeId?: string;

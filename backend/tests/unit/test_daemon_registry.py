@@ -2831,7 +2831,7 @@ def test_daemon_store_persists_canonical_workspace_id(store_factory) -> None:
         assert node["workspaceId"] == "repo:relay"
 
 
-def test_multi_node_workflow_accepts_shared_workspace_id_with_different_paths() -> None:
+def test_multi_node_workflow_is_rejected_even_with_shared_workspace_id() -> None:
     async def run_flow() -> None:
         with TemporaryDirectory() as root:
             registry = DaemonNodeRegistry(
@@ -2856,41 +2856,38 @@ def test_multi_node_workflow_accepts_shared_workspace_id_with_different_paths() 
                     f"ui_{node_id}",
                 )
 
-            session = await backend.run(
-                "node_a",
-                {
-                    "taskGoal": "research then implement",
-                    "agentFirst": True,
-                    "actorEmployeeId": "alice",
-                    "assignments": [
-                        {"agent": "claude", "mode": "ask", "daemonNodeId": "node_a"},
-                        {"agent": "codex", "mode": "action", "daemonNodeId": "node_b"},
-                    ],
-                },
-            )
+            with pytest.raises(
+                ValueError,
+                match="collaboration requires every agent to run on the same node",
+            ):
+                await backend.run(
+                    "node_a",
+                    {
+                        "taskGoal": "research then implement",
+                        "agentFirst": True,
+                        "actorEmployeeId": "alice",
+                        "assignments": [
+                            {
+                                "agent": "claude",
+                                "mode": "ask",
+                                "daemonNodeId": "node_a",
+                            },
+                            {
+                                "agent": "codex",
+                                "mode": "action",
+                                "daemonNodeId": "node_b",
+                            },
+                        ],
+                    },
+                )
 
-            [first] = registry.take_commands("node_a", "token_node_a")
-            registry.handle_event(
-                "node_a",
-                {
-                    "type": "run.completed",
-                    "commandId": first["id"],
-                    "sessionId": session["id"],
-                    "runId": first["runId"],
-                    "agent": "claude",
-                    "mode": "ask",
-                    "exitCode": 0,
-                    "agentLog": "findings",
-                },
-                "token_node_a",
-            )
-            [second] = registry.take_commands("node_b", "token_node_b")
-            assert second["workspacePath"] == "D:/work/relay"
+            assert registry.take_commands("node_a", "token_node_a") == []
+            assert registry.take_commands("node_b", "token_node_b") == []
 
     asyncio.run(run_flow())
 
 
-def test_multi_node_workflow_revalidates_placement_before_next_enqueue() -> None:
+def test_same_node_workflow_revalidates_placement_before_next_enqueue() -> None:
     async def run_flow() -> None:
         with TemporaryDirectory() as root:
             session_store = LocalSessionStore(root)
@@ -2915,23 +2912,22 @@ def test_multi_node_workflow_revalidates_placement_before_next_enqueue() -> None
             )
             second_placement = placements.create_placement(
                 builder,
-                "node_b",
+                "node_a",
                 {"workspacePolicy": {"kind": "shared-path"}},
             )
-            for node_id, executor in (("node_a", "claude"), ("node_b", "codex")):
-                registry.register(
-                    {
-                        "sandboxId": node_id,
-                        "employeeId": "alice",
-                        "token": f"token_{node_id}",
-                        "workspacePath": f"/work/{node_id}",
-                        "workspaceId": "repo:relay",
-                        "protocolVersion": 1,
-                        "supportedAgents": [executor],
-                        "status": "ready",
-                    },
-                    f"ui_{node_id}",
-                )
+            registry.register(
+                {
+                    "sandboxId": "node_a",
+                    "employeeId": "alice",
+                    "token": "token_node_a",
+                    "workspacePath": "/work/node_a",
+                    "workspaceId": "repo:relay",
+                    "protocolVersion": 1,
+                    "supportedAgents": ["claude", "codex"],
+                    "status": "ready",
+                },
+                "ui_node_a",
+            )
 
             session = await backend.run(
                 "node_a",
@@ -2954,7 +2950,7 @@ def test_multi_node_workflow_revalidates_placement_before_next_enqueue() -> None
                             "agent": "codex",
                             "agentVersion": builder["version"],
                             "placementId": second_placement["id"],
-                            "daemonNodeId": "node_b",
+                            "daemonNodeId": "node_a",
                             "workspacePolicy": {"kind": "shared-path"},
                             "mode": "action",
                         },
@@ -2980,7 +2976,7 @@ def test_multi_node_workflow_revalidates_placement_before_next_enqueue() -> None
                 "token_node_a",
             )
 
-            assert registry.take_commands("node_b", "token_node_b") == []
+            assert registry.take_commands("node_a", "token_node_a") == []
             assert session_store.get_session(session["id"])["status"] == "failed"
 
     asyncio.run(run_flow())

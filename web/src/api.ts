@@ -685,6 +685,7 @@ export function createSession(input: CreateSessionInput, token?: string): Promis
     token,
     body: {
       taskGoal: input.taskGoal,
+      ...(input.daemonNodeId ? { daemonNodeId: input.daemonNodeId } : {}),
       assignments: input.assignments,
       workspacePath: input.workspacePath,
       ...(input.ownerEmployeeId ? { ownerEmployeeId: input.ownerEmployeeId } : {}),

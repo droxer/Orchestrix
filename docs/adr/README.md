@@ -12,3 +12,4 @@ sync with [`docs/implementation-plan.md`](../implementation-plan.md).
 | [ADR-008](008-boxlite-lightweight-execution.md) | BoxLite-first lightweight execution boundary |
 | [ADR-009](009-control-plane-outside-sandbox.md) | Durable control plane remains outside sandbox |
 | [ADR-010](010-leased-agent-node-delivery.md) | Explicit leased, at-least-once agent-node delivery |
+| [ADR-011](011-node-scoped-agent-collaboration.md) | Node-scoped agent collaboration and immutable thread runtime |

@@ -42,9 +42,9 @@ separate workspace entity.
   are the durable record**. On re-placement the agent starts with an empty
   home; everything indexed as a `workspace_file` artifact (the backend keeps
   content snapshots) remains browsable forever through the snapshot fallback.
-- The node-level `workspaceId`/`workspacePath` identity and the
-  `node-affine`/`shared-path` scheduling constraint remain, but they are pure
-  infrastructure vocabulary and are never surfaced in the product UI.
+- The node-level `workspaceId`/`workspacePath` identity and placement workspace
+  policy remain infrastructure vocabulary and are never surfaced in the
+  product UI. A matching identity never authorizes cross-node team execution.
 
 ## 2. Read path — workspace as a daemon capability
 
