@@ -268,6 +268,165 @@ describe("agent stream parsing", () => {
     ]);
   });
 
+  it("renders a Codex tool call when only its completed lifecycle event is available", () => {
+    const raw = JSON.stringify({
+      type: "item.completed",
+      item: {
+        id: "mcp_1",
+        type: "mcp_tool_call",
+        server: "context7",
+        tool: "query-docs",
+        arguments: { query: "current docs" },
+      },
+    });
+
+    assert.deepEqual(parseAgentStream("codex", raw), [
+      { kind: "tool", name: "context7.query-docs", target: "current docs" },
+    ]);
+  });
+
+  it("merges Codex started and completed events for the same tool call", () => {
+    const raw = [
+      JSON.stringify({
+        type: "item.started",
+        item: {
+          id: "mcp_1",
+          type: "mcp_tool_call",
+          server: "context7",
+          tool: "query-docs",
+          arguments: {},
+        },
+      }),
+      JSON.stringify({
+        type: "item.completed",
+        item: {
+          id: "mcp_1",
+          type: "mcp_tool_call",
+          server: "context7",
+          tool: "query-docs",
+          arguments: { query: "current docs" },
+        },
+      }),
+    ].join("\n");
+
+    assert.deepEqual(parseAgentStream("codex", raw), [
+      { kind: "tool", name: "context7.query-docs", target: "current docs" },
+    ]);
+  });
+
+  it("preserves the Codex tool target when its completed event is sparse", () => {
+    const raw = [
+      JSON.stringify({
+        type: "item.started",
+        item: {
+          id: "mcp_1",
+          type: "mcp_tool_call",
+          server: "context7",
+          tool: "query-docs",
+          arguments: { query: "current docs" },
+        },
+      }),
+      JSON.stringify({
+        type: "item.completed",
+        item: {
+          id: "mcp_1",
+          type: "mcp_tool_call",
+        },
+      }),
+    ].join("\n");
+
+    assert.deepEqual(parseAgentStream("codex", raw), [
+      { kind: "tool", name: "context7.query-docs", target: "current docs" },
+    ]);
+  });
+
+  it("keeps one Codex tool line while its lifecycle advances incrementally", () => {
+    const started = JSON.stringify({
+      type: "item.started",
+      item: {
+        id: "mcp_1",
+        type: "mcp_tool_call",
+        server: "context7",
+        tool: "query-docs",
+        arguments: {},
+      },
+    });
+    const completed = JSON.stringify({
+      type: "item.completed",
+      item: {
+        id: "mcp_1",
+        type: "mcp_tool_call",
+        server: "context7",
+        tool: "query-docs",
+        arguments: { query: "current docs" },
+      },
+    });
+    const accumulator = new AgentStreamAccumulator("codex");
+
+    assert.deepEqual(accumulator.update(started), [
+      { kind: "tool", name: "context7.query-docs", target: undefined },
+    ]);
+    assert.deepEqual(accumulator.update(`${started}\n${completed}`), [
+      { kind: "tool", name: "context7.query-docs", target: "current docs" },
+    ]);
+  });
+
+  it("keeps reused Codex tool ids distinct across turns", () => {
+    const raw = [
+      JSON.stringify({ type: "turn.started" }),
+      JSON.stringify({
+        type: "item.started",
+        item: { id: "tool_1", type: "tool_call", name: "read", arguments: { path: "one.ts" } },
+      }),
+      JSON.stringify({ type: "turn.completed" }),
+      JSON.stringify({ type: "turn.started" }),
+      JSON.stringify({
+        type: "item.started",
+        item: { id: "tool_1", type: "tool_call", name: "write", arguments: { path: "two.ts" } },
+      }),
+    ].join("\n");
+
+    assert.deepEqual(parseAgentStream("codex", raw), [
+      { kind: "narration", key: "agent_stream.codex_started", params: { tone: "info" } },
+      { kind: "tool", name: "read", target: "one.ts" },
+      { kind: "narration", key: "agent_stream.codex_finished", params: { tone: "good" } },
+      { kind: "narration", key: "agent_stream.codex_started", params: { tone: "info" } },
+      { kind: "tool", name: "write", target: "two.ts" },
+    ]);
+  });
+
+  it("renders a Codex command when only its completed lifecycle event is available", () => {
+    const raw = JSON.stringify({
+      type: "item.completed",
+      item: {
+        id: "cmd_1",
+        type: "command_execution",
+        command: "npm test",
+      },
+    });
+
+    assert.deepEqual(parseAgentStream("codex", raw), [
+      { kind: "command", command: "npm test" },
+    ]);
+  });
+
+  it("merges Codex command lifecycle events without losing the command text", () => {
+    const raw = [
+      JSON.stringify({
+        type: "item.started",
+        item: { id: "cmd_1", type: "command_execution", command: "npm test" },
+      }),
+      JSON.stringify({
+        type: "item.completed",
+        item: { id: "cmd_1", type: "command_execution" },
+      }),
+    ].join("\n");
+
+    assert.deepEqual(parseAgentStream("codex", raw), [
+      { kind: "command", command: "npm test" },
+    ]);
+  });
+
   it("recovers Codex agent_message objects from truncated completed-log tails", () => {
     const raw = "leted\",\"item\":" + JSON.stringify({
       id: "item_0",
@@ -327,6 +486,21 @@ describe("agent stream parsing", () => {
     assert.deepEqual(parseAgentStream("kimi", raw), [
       { kind: "text", text: "Searching the web." },
       { kind: "tool", name: "web_search" },
+    ]);
+  });
+
+  it("renders a Kimi tool target from JSON-string function arguments", () => {
+    const raw = JSON.stringify({
+      role: "assistant",
+      content: [],
+      tool_calls: [{
+        id: "call_1",
+        function: { name: "web_search", arguments: JSON.stringify({ query: "Relay SSE rendering" }) },
+      }],
+    });
+
+    assert.deepEqual(parseAgentStream("kimi", raw), [
+      { kind: "tool", name: "web_search", target: "Relay SSE rendering" },
     ]);
   });
 

@@ -10,6 +10,8 @@ export type AgentSegment =
   | { kind: "narration"; key: string; params?: Record<string, string | number> }
   | { kind: "raw"; text: string };
 
+type ToolSegment = Extract<AgentSegment, { kind: "tool" }>;
+
 type StatusTone = Exclude<Tone, "neutral">;
 
 const ANSI_PATTERN = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g;
@@ -180,7 +182,7 @@ type StreamRecord =
 
 const AGENT_CHECKPOINT_TYPES: Record<AgentName, "each" | ReadonlySet<unknown>> = {
   claude: new Set(["assistant", "result"]),
-  codex: "each",
+  codex: new Set(["turn.completed", "turn.failed"]),
   pi: new Set(["turn_end"]),
   kimi: "each",
 };
@@ -276,6 +278,11 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
 }
 
+function toolInput(value: unknown): Record<string, unknown> {
+  if (typeof value === "string") return safeParse(value) ?? {};
+  return asRecord(value);
+}
+
 // A concise, single-line target for a tool call — the file it touched or the
 // command it ran — pulled from the tool_use input so the transcript shows
 // "Read backend/app.py" instead of a bare "Read". Best-effort: returns
@@ -304,11 +311,33 @@ function toolTarget(input: Record<string, unknown>): string | undefined {
   return undefined;
 }
 
-function codexToolSegment(item: Record<string, unknown>): AgentSegment | null {
+function upsertSegmentById(
+  out: AgentSegment[],
+  segmentById: Map<string, number>,
+  id: string | undefined,
+  segment: AgentSegment,
+): void {
+  const existing = id ? segmentById.get(id) : undefined;
+  if (existing !== undefined) {
+    out[existing] = mergeLifecycleSegment(out[existing], segment);
+    return;
+  }
+  out.push(segment);
+  if (id) segmentById.set(id, out.length - 1);
+}
+
+function mergeLifecycleSegment(previous: AgentSegment | undefined, next: AgentSegment): AgentSegment {
+  if (previous?.kind === "tool" && next.kind === "tool" && !next.target && previous.target) {
+    return { ...next, target: previous.target };
+  }
+  return next;
+}
+
+function codexToolSegment(item: Record<string, unknown>): ToolSegment | null {
   if (item.type === "mcp_tool_call") {
     const server = typeof item.server === "string" ? item.server : "mcp";
     const tool = typeof item.tool === "string" ? item.tool : String(item.name ?? "tool");
-    return { kind: "tool", name: `${server}.${tool}`, target: toolTarget(asRecord(item.arguments ?? item.input)) };
+    return { kind: "tool", name: `${server}.${tool}`, target: toolTarget(toolInput(item.arguments ?? item.input)) };
   }
   if (item.type === "web_search") {
     return { kind: "tool", name: "web_search", target: toolTarget(item) };
@@ -317,7 +346,7 @@ function codexToolSegment(item: Record<string, unknown>): AgentSegment | null {
     return {
       kind: "tool",
       name: String(item.tool ?? item.name ?? "tool"),
-      target: toolTarget(asRecord(item.arguments ?? item.input)),
+      target: toolTarget(toolInput(item.arguments ?? item.input)),
     };
   }
   if (
@@ -329,7 +358,7 @@ function codexToolSegment(item: Record<string, unknown>): AgentSegment | null {
     return {
       kind: "tool",
       name: String(item.tool ?? item.name ?? item.type.slice(0, -"_tool_call".length)),
-      target: toolTarget(asRecord(item.arguments ?? item.input)),
+      target: toolTarget(toolInput(item.arguments ?? item.input)),
     };
   }
   return null;
@@ -410,8 +439,7 @@ function parseClaude(raw: string): AgentSegment[] {
           flushStreamedText();
           thinking.flush(out, "thinking");
           const segment: AgentSegment = { kind: "tool", name: String(block.name ?? "tool"), target: toolTarget(asRecord(block.input)) };
-          out.push(segment);
-          if (typeof block.id === "string") toolSegmentById.set(block.id, out.length - 1);
+          upsertSegmentById(out, toolSegmentById, typeof block.id === "string" ? block.id : undefined, segment);
         } else if (block.type === "text") {
           activeTextIndex = typeof streamEvent.index === "number" ? streamEvent.index : undefined;
         }
@@ -455,9 +483,7 @@ function parseClaude(raw: string): AgentSegment[] {
           flushStreamedText();
           thinking.flush(out, "thinking");
           const segment: AgentSegment = { kind: "tool", name: String(block.name ?? "tool"), target: toolTarget(asRecord(block.input)) };
-          const existing = typeof block.id === "string" ? toolSegmentById.get(block.id) : undefined;
-          if (existing === undefined) out.push(segment);
-          else out[existing] = segment;
+          upsertSegmentById(out, toolSegmentById, typeof block.id === "string" ? block.id : undefined, segment);
         }
       }
       resetTurnState();
@@ -491,6 +517,9 @@ function parseClaude(raw: string): AgentSegment[] {
 
 function parseCodex(raw: string): AgentSegment[] {
   const out: AgentSegment[] = [];
+  const toolSegmentById = new Map<string, number>();
+  const toolItemById = new Map<string, Record<string, unknown>>();
+  const commandSegmentById = new Map<string, number>();
   for (const record of streamRecords(raw)) {
     if (record.kind === "text") {
       out.push({ kind: "raw", text: stripAnsi(record.text) });
@@ -498,6 +527,9 @@ function parseCodex(raw: string): AgentSegment[] {
     }
     const event = record.value;
     if (event.type === "turn.started") {
+      toolSegmentById.clear();
+      toolItemById.clear();
+      commandSegmentById.clear();
       out.push(narration("agent_stream.codex_started", undefined, "info"));
       continue;
     }
@@ -531,14 +563,30 @@ function parseCodex(raw: string): AgentSegment[] {
         if (text) out.push({ kind: "thinking", text });
         continue;
       }
-      if (item.type === "command_execution" && event.type === "item.started") {
-        out.push({ kind: "command", command: String(item.command ?? "command") });
+      if (
+        item.type === "command_execution"
+        && (event.type === "item.started" || event.type === "item.completed")
+      ) {
+        const id = typeof item.id === "string" ? item.id : undefined;
+        const existing = id ? commandSegmentById.get(id) : undefined;
+        const previous = existing === undefined ? undefined : out[existing];
+        let command = "command";
+        if (typeof item.command === "string") command = item.command;
+        else if (previous?.kind === "command") command = previous.command;
+        upsertSegmentById(out, commandSegmentById, id, {
+          kind: "command",
+          command,
+        });
         continue;
       }
-      if (event.type === "item.started") {
-        const tool = codexToolSegment(item);
+      if (event.type === "item.started" || event.type === "item.completed") {
+        const id = typeof item.id === "string" ? item.id : undefined;
+        const previousItem = id ? toolItemById.get(id) : undefined;
+        const mergedItem = previousItem ? { ...previousItem, ...item } : item;
+        const tool = codexToolSegment(mergedItem);
         if (tool) {
-          out.push(tool);
+          if (id) toolItemById.set(id, mergedItem);
+          upsertSegmentById(out, toolSegmentById, id, tool);
           continue;
         }
       }
@@ -619,18 +667,12 @@ function parsePi(raw: string): AgentSegment[] {
           sawAssistantTextInTurn = true;
         }
       }
-      const existing = tool.id ? toolSegmentById.get(tool.id) : undefined;
       const segment: AgentSegment = {
         kind: "tool",
         name: tool.name,
         ...(tool.target ? { target: tool.target } : {}),
       };
-      if (existing === undefined) {
-        out.push(segment);
-        if (tool.id) toolSegmentById.set(tool.id, out.length - 1);
-      } else {
-        out[existing] = segment;
-      }
+      upsertSegmentById(out, toolSegmentById, tool.id, segment);
       continue;
     }
     const assistantText = piAssistantText(event).trim();
@@ -685,7 +727,12 @@ function parseKimi(raw: string): AgentSegment[] {
     for (const call of toolCalls) {
       const callRecord = asRecord(call);
       const fn = asRecord(callRecord.function);
-      out.push({ kind: "tool", name: String(fn.name ?? callRecord.name ?? "tool") });
+      const target = toolTarget(toolInput(fn.arguments ?? callRecord.arguments));
+      out.push({
+        kind: "tool",
+        name: String(fn.name ?? callRecord.name ?? "tool"),
+        ...(target ? { target } : {}),
+      });
     }
   }
   return out;
@@ -729,7 +776,7 @@ function piTool(event: Record<string, unknown>): { id?: string; name: string; ta
     return {
       id: typeof event.toolCallId === "string" ? event.toolCallId : undefined,
       name: event.toolName,
-      target: toolTarget(asRecord(event.args)),
+      target: toolTarget(toolInput(event.args)),
     };
   }
   if (event.type !== "message_update") return null;
@@ -742,7 +789,7 @@ function piTool(event: Record<string, unknown>): { id?: string; name: string; ta
   return {
     id: typeof toolCall.id === "string" ? toolCall.id : undefined,
     name: toolCall.name,
-    target: toolTarget(asRecord(toolCall.arguments ?? toolCall.args)),
+    target: toolTarget(toolInput(toolCall.arguments ?? toolCall.args)),
   };
 }
 
