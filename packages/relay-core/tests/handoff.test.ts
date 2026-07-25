@@ -1399,6 +1399,36 @@ describe("token usage accounting", () => {
     assert.deepEqual(usage, { input: 10, output: 4, cache: 5, total: 19, source: "claude" });
   });
 
+  it("uses Claude's cumulative result usage instead of summing repeated stream snapshots", () => {
+    const repeatedAssistant = {
+      type: "assistant",
+      message: {
+        id: "msg_1",
+        usage: {
+          input_tokens: 3,
+          output_tokens: 3,
+          cache_creation_input_tokens: 100,
+          cache_read_input_tokens: 0,
+        },
+      },
+    };
+    const usage = extractTokenUsageFromJsonl([
+      JSON.stringify(repeatedAssistant),
+      JSON.stringify(repeatedAssistant),
+      JSON.stringify({
+        type: "result",
+        usage: {
+          input_tokens: 3,
+          output_tokens: 3,
+          cache_creation_input_tokens: 100,
+          cache_read_input_tokens: 0,
+        },
+      }),
+    ].join("\n"), "claude");
+
+    assert.deepEqual(usage, { input: 3, output: 3, cache: 100, total: 106, source: "claude" });
+  });
+
   it("extracts Codex/OpenAI-style usage from the final JSON event", () => {
     const usage = extractTokenUsageFromJsonl([
       JSON.stringify({ type: "turn.started" }),
@@ -1415,6 +1445,19 @@ describe("token usage accounting", () => {
     assert.deepEqual(usage, { input: 6, output: 8, cache: 6, total: 20, source: "codex" });
   });
 
+  it("separates Codex cached_input_tokens from uncached input", () => {
+    const usage = extractTokenUsageFromJsonl(JSON.stringify({
+      type: "turn.completed",
+      usage: {
+        input_tokens: 100,
+        cached_input_tokens: 80,
+        output_tokens: 10,
+      },
+    }), "codex");
+
+    assert.deepEqual(usage, { input: 20, output: 10, cache: 80, total: 110, source: "codex" });
+  });
+
   it("sums usage across multiple reported model calls", () => {
     const usage = extractTokenUsageFromJsonl([
       JSON.stringify({ type: "turn.completed", usage: { prompt_tokens: 10, completion_tokens: 4 } }),
@@ -1422,6 +1465,27 @@ describe("token usage accounting", () => {
     ].join("\n"), "codex");
 
     assert.deepEqual(usage, { input: 18, output: 7, cache: 0, total: 25, source: "codex" });
+  });
+
+  it("counts each finalized Pi message once and includes cache reads and writes", () => {
+    const message = {
+      role: "assistant",
+      usage: {
+        input: 10,
+        output: 5,
+        cacheRead: 20,
+        cacheWrite: 4,
+        totalTokens: 39,
+      },
+    };
+    const usage = extractTokenUsageFromJsonl([
+      JSON.stringify({ type: "message_start", message }),
+      JSON.stringify({ type: "message_update", message }),
+      JSON.stringify({ type: "message_end", message }),
+      JSON.stringify({ type: "turn_end", message }),
+    ].join("\n"), "pi");
+
+    assert.deepEqual(usage, { input: 10, output: 5, cache: 24, total: 39, source: "pi" });
   });
 
   it("does not estimate usage when JSONL has no reported counts", () => {

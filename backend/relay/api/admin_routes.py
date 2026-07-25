@@ -641,6 +641,7 @@ async def list_chat_integration_audit(integration_id: str, request: Request, ctx
 # counts on their session events.
 
 _DAY_WINDOW = 14
+_TOKEN_USAGE_UNSUPPORTED_AGENTS = ("kimi",)
 
 
 def _parse_timestamp(value: Any) -> datetime | None:
@@ -790,13 +791,15 @@ async def dashboard_tokens(request: Request, ctx: AppContextDep) -> dict[str, An
     }
     totals = {"input": 0, "output": 0, "cache": 0, "total": 0}
     by_employee: dict[str, dict[str, Any]] = {}
-    recent_sessions: list[dict[str, Any]] = []
+    employee_sessions: dict[str, set[str]] = {}
+    recent_by_session: dict[str, dict[str, Any]] = {}
 
     for row in usage_rows:
         usage = _token_usage(row)
         if not usage:
             continue
-        timestamp = _parse_timestamp(row.get("updatedAt"))
+        usage_timestamp = row.get("completedAt") or row.get("updatedAt")
+        timestamp = _parse_timestamp(usage_timestamp)
         in_summary_window = False
         if timestamp:
             day_key = timestamp.date().isoformat()
@@ -814,15 +817,28 @@ async def dashboard_tokens(request: Request, ctx: AppContextDep) -> dict[str, An
             )
             for key in ("input", "output", "cache", "total"):
                 employee[key] += usage[key]
-            employee["sessionCount"] += 1
-        recent_sessions.append({
+            session_id = str(row.get("sessionId") or "")
+            if session_id:
+                employee_sessions.setdefault(employee_id, set()).add(session_id)
+        session_id = str(row.get("sessionId") or row.get("runId") or "unknown")
+        recent = recent_by_session.setdefault(session_id, {
             "sessionId": row.get("sessionId"),
             "employeeId": row.get("ownerEmployeeId"),
             "taskGoal": row.get("taskGoal"),
-            "updatedAt": row.get("updatedAt"),
-            **usage,
+            "updatedAt": usage_timestamp,
+            "input": 0,
+            "output": 0,
+            "cache": 0,
+            "total": 0,
         })
+        for key in ("input", "output", "cache", "total"):
+            recent[key] += usage[key]
+        if str(usage_timestamp or "") > str(recent.get("updatedAt") or ""):
+            recent["updatedAt"] = usage_timestamp
 
+    for employee_id, employee in by_employee.items():
+        employee["sessionCount"] = len(employee_sessions.get(employee_id, set()))
+    recent_sessions = list(recent_by_session.values())
     recent_sessions.sort(key=lambda item: item.get("updatedAt") or "", reverse=True)
     ranked_employees = sorted(by_employee.values(), key=lambda item: item["total"], reverse=True)
     return {
@@ -831,6 +847,7 @@ async def dashboard_tokens(request: Request, ctx: AppContextDep) -> dict[str, An
         "totalOutput": totals["output"],
         "totalCache": totals["cache"],
         "total": totals["total"],
+        "unsupportedAgents": list(_TOKEN_USAGE_UNSUPPORTED_AGENTS),
         "daily": [{"date": day, **stats} for day, stats in buckets.items()],
         "byEmployee": ranked_employees,
         "recentSessions": recent_sessions[:10],

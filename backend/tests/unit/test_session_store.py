@@ -155,12 +155,16 @@ def test_database_session_store_persists_events_and_artifacts() -> None:
             "role": "fixer",
             "mode": "action",
         }))
-        store.append_event(session["id"], relay_event("agent.completed", session["id"], {
+        completed_event = relay_event("agent.completed", session["id"], {
             "runId": "run_1",
             "agent": "codex",
             "status": "completed",
             "exitCode": 0,
             "tokenUsage": {"input": 4, "output": 5, "cache": 1, "total": 10, "source": "codex"},
+        })
+        store.append_event(session["id"], completed_event)
+        store.append_event(session["id"], relay_event("human.decision", session["id"], {
+            "decision": {"id": "dec_after_usage", "kind": "approve", "createdAt": "2026-06-05T00:01:00.000Z"}
         }))
 
         assert updated["events"][0]["type"] == "session.created"
@@ -173,10 +177,13 @@ def test_database_session_store_persists_events_and_artifacts() -> None:
         assert content == "Looks good."
         usage = store.list_token_usage()[0]
         assert usage["taskGoal"] == "fix auth"
+        assert usage["runId"] == "run_1"
+        assert usage["completedAt"] == completed_event["timestamp"]
         assert usage["total"] == 10
         with store.engine.begin() as conn:
-            row = conn.execute(text("select session_public_id, total_tokens from session_token_usage")).mappings().one()
+            row = conn.execute(text("select session_public_id, run_id, total_tokens from session_run_token_usage")).mappings().one()
         assert row["session_public_id"] == session["id"]
+        assert row["run_id"] == "run_1"
         assert row["total_tokens"] == 10
 
 

@@ -62,6 +62,12 @@ interface TokenUsageChartProps {
 export function TokenUsageChart({ snapshot, compact, className }: TokenUsageChartProps) {
   const { t, i18n } = useTranslation();
   const numberFormat = new Intl.NumberFormat(i18n.language || undefined);
+  const unsupportedAgents = (snapshot.unsupportedAgents ?? [])
+    .map((agent) => agent.charAt(0).toUpperCase() + agent.slice(1))
+    .join(", ");
+  const coverageNote = unsupportedAgents
+    ? t("admin.v2.dash_tokens_unsupported", { agents: unsupportedAgents })
+    : null;
 
   if (!snapshot.available || snapshot.daily.length === 0) {
     return (
@@ -74,6 +80,7 @@ export function TokenUsageChart({ snapshot, compact, className }: TokenUsageChar
           <div className="adm-dash-empty-overlay">
             <span className="adm-dash-empty-tag mono">{t("admin.v2.dash_coming_soon_tag")}</span>
             <p className="adm-dash-empty-copy">{t("admin.v2.dash_tokens_empty")}</p>
+            {coverageNote ? <p className="adm-dash-empty-copy">{coverageNote}</p> : null}
           </div>
         </div>
       </section>
@@ -159,6 +166,7 @@ export function TokenUsageChart({ snapshot, compact, className }: TokenUsageChar
         <span><i className="adm-token-dot adm-token-dot--output" aria-hidden="true" />{t("admin.v2.dash_tokens_output")}</span>
         <span><i className="adm-token-dot adm-token-dot--cache" aria-hidden="true" />{t("admin.v2.dash_tokens_cache")}</span>
       </div>
+      {coverageNote ? <p className="adm-dash-card-hint">{coverageNote}</p> : null}
     </section>
   );
 }

@@ -16,8 +16,10 @@ const ADDITIVE_CACHE_KEYS = [
   "cache_creation_input_tokens",
   "cacheReadInputTokens",
   "cache_read_input_tokens",
+  "cacheRead",
+  "cacheWrite",
 ];
-const INCLUDED_CACHE_KEYS = ["cachedTokens", "cached_tokens"];
+const INCLUDED_CACHE_KEYS = ["cachedTokens", "cached_tokens", "cachedInputTokens", "cached_input_tokens"];
 
 export function normalizeTokenUsage(value: unknown, source?: string): TokenUsage | undefined {
   const record = asRecord(value);
@@ -53,6 +55,7 @@ export function mergeTokenUsage(values: Array<TokenUsage | undefined>): TokenUsa
 
 export function extractTokenUsageFromJsonl(text: string, source?: string): TokenUsage | undefined {
   const values: TokenUsage[] = [];
+  let terminalClaudeUsage: TokenUsage | undefined;
   for (const line of text.split(/\r?\n/)) {
     const trimmed = line.trim();
     if (!trimmed) continue;
@@ -62,9 +65,15 @@ export function extractTokenUsageFromJsonl(text: string, source?: string): Token
     } catch {
       continue;
     }
+    const eventRecord = asRecord(event);
+    if (source === "claude" && eventRecord?.type === "result") {
+      terminalClaudeUsage = normalizeTokenUsage(eventRecord.usage, source) ?? terminalClaudeUsage;
+    }
+    if (source === "pi" && eventRecord?.type !== "message_end") continue;
     const usage = usageFromEvent(event, source);
     if (usage) values.push(usage);
   }
+  if (terminalClaudeUsage) return terminalClaudeUsage;
   const merged = mergeTokenUsage(values);
   return merged ? { ...merged, ...(source ? { source } : {}) } : undefined;
 }

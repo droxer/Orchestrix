@@ -550,6 +550,7 @@ export interface TokenUsageSnapshot {
   totalOutput: number;
   totalCache: number;
   total: number;
+  unsupportedAgents: string[];
   daily: Array<{ date: string; input: number; output: number; cache: number; total: number }>;
   byEmployee: Array<{ employeeId: string; input: number; output: number; cache: number; total: number; sessionCount: number }>;
   recentSessions: Array<{ sessionId: string; employeeId?: string | null; taskGoal?: string; updatedAt?: string; input: number; output: number; cache: number; total: number }>;

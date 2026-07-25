@@ -93,6 +93,7 @@ def test_dashboard_tokens_returns_reported_usage(monkeypatch) -> None:
         assert body["totalOutput"] == 5
         assert body["totalCache"] == 2
         assert body["total"] == 17
+        assert body["unsupportedAgents"] == ["kimi"]
         assert len(body["daily"]) == 14
         assert body["recentSessions"][0]["sessionId"] == session_id
         assert body["recentSessions"][0]["taskGoal"] == "demo"
@@ -148,3 +149,78 @@ def test_dashboard_tokens_totals_only_cover_last_seven_days(monkeypatch) -> None
         assert body["totalCache"] == 2
         assert body["total"] == 17
         assert {item["sessionId"] for item in body["recentSessions"]} == {current_session_id, old_session_id}
+
+
+def test_dashboard_tokens_do_not_redate_old_usage_after_unrelated_session_activity(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap(client)
+        session_id = _create_session(client)
+        old_timestamp = (datetime.now(timezone.utc) - timedelta(days=20)).isoformat()
+        started = relay_event("agent.started", session_id, {
+            "runId": "run_old",
+            "agent": "codex",
+            "role": "fixer",
+            "mode": "action",
+        })
+        completed = relay_event("agent.completed", session_id, {
+            "runId": "run_old",
+            "agent": "codex",
+            "status": "completed",
+            "exitCode": 0,
+            "tokenUsage": {"input": 100, "output": 50, "cache": 25, "total": 175, "source": "codex"},
+        })
+        started["timestamp"] = old_timestamp
+        completed["timestamp"] = old_timestamp
+        app.state.session_store.append_event(session_id, started)
+        app.state.session_store.append_event(session_id, completed)
+        app.state.session_store.append_event(session_id, relay_event("human.decision", session_id, {
+            "decision": {"id": "dec_recent", "kind": "approve", "createdAt": datetime.now(timezone.utc).isoformat()},
+        }))
+
+        response = client.get("/cp/dashboard/tokens")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["available"] is False
+        assert body["total"] == 0
+        assert all(day["total"] == 0 for day in body["daily"])
+
+
+def test_dashboard_tokens_aggregate_runs_without_double_counting_sessions(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap(client)
+        session_id = _create_session(client)
+        for index, usage in enumerate((
+            {"input": 10, "output": 5, "cache": 2, "total": 17, "source": "codex"},
+            {"input": 20, "output": 7, "cache": 3, "total": 30, "source": "codex"},
+        ), start=1):
+            run_id = f"run_{index}"
+            app.state.session_store.append_event(session_id, relay_event("agent.started", session_id, {
+                "runId": run_id,
+                "agent": "codex",
+                "role": "fixer",
+                "mode": "action",
+            }))
+            app.state.session_store.append_event(session_id, relay_event("agent.completed", session_id, {
+                "runId": run_id,
+                "agent": "codex",
+                "status": "completed",
+                "exitCode": 0,
+                "tokenUsage": usage,
+            }))
+
+        response = client.get("/cp/dashboard/tokens")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["total"] == 47
+        assert body["byEmployee"][0]["sessionCount"] == 1
+        assert len(body["recentSessions"]) == 1
+        assert body["recentSessions"][0]["sessionId"] == session_id
+        assert body["recentSessions"][0]["total"] == 47

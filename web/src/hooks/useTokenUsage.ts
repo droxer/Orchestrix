@@ -18,6 +18,7 @@ export function useTokenUsage(): TokenUsageSnapshot {
     totalOutput: 0,
     totalCache: 0,
     total: 0,
+    unsupportedAgents: ["kimi"],
     daily: [],
     byEmployee: [],
     recentSessions: [],
