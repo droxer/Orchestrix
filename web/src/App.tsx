@@ -123,7 +123,7 @@ export function App() {
   const atBottomRef = useRef(true);
 
   const selectedEmployeeToken = tokens[selectedEmployee];
-  const { sandboxes, nodes, sessions, tasks, isRefreshing, refresh, setSandboxes } = useRelayData(selectedEmployeeToken, Boolean(user));
+  const { sandboxes, nodes, sessions, tasks, isRefreshing, refresh, setSandboxes, upsertSession } = useRelayData(selectedEmployeeToken, Boolean(user));
   const { localNodes, refreshLocalDaemonNodes } = useLocalDaemonNodes(
     hydrated && user?.role === "admin" && canUseLocalControlPanel(),
   );
@@ -500,6 +500,12 @@ export function App() {
         sessionId,
         ...(sessionId ? { userMessageId } : {}),
       });
+      // Seed the created session into the cache before pointing the selection
+      // at it. The invalidation refetch is still in flight here, so without
+      // this the selected id resolves to nothing and the transcript falls back
+      // to the most recent existing thread — showing the just-sent message in
+      // the previous conversation until the refetch lands.
+      upsertSession(done);
       setActiveSessionId(done.id);
       setSelectedSessionId(done.id);
       setComposingNew(false);

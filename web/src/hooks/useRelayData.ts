@@ -3,6 +3,7 @@ import type { Dispatch, SetStateAction } from "react";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { listDaemonNodes, listSandboxes, listSessions, listTasks } from "../api";
 import type { DaemonNodeMonitorRecord, RelaySession, RelayTask, SandboxRecord } from "../types";
+import { upsertConversationSession } from "../lib/conversations";
 
 export const RELAY_QUERY_KEY = ["relay"] as const;
 const RELAY_KEY = RELAY_QUERY_KEY;
@@ -20,6 +21,7 @@ type RelayDataResult = {
   isRefreshing: boolean;
   refresh: (signal?: AbortSignal, tokenOverride?: string) => Promise<void>;
   setSandboxes: Dispatch<SetStateAction<SandboxRecord[]>>;
+  upsertSession: (session: RelaySession) => void;
 };
 
 // Server state for the control-plane console, owned by TanStack Query. The
@@ -135,6 +137,17 @@ export function useRelayData(
     [queryClient],
   );
 
+  // Seed a session a mutation just returned straight into the cache so the UI
+  // can select it before the invalidation refetch lands.
+  const upsertSession = useCallback(
+    (session: RelaySession) => {
+      queryClient.setQueryData<RelaySession[]>(SESSIONS_KEY, (current) =>
+        upsertConversationSession(current ?? [], session),
+      );
+    },
+    [queryClient],
+  );
+
   return {
     sandboxes,
     nodes,
@@ -143,5 +156,6 @@ export function useRelayData(
     isRefreshing: manualRefreshPending,
     refresh,
     setSandboxes,
+    upsertSession,
   };
 }

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { conversationLabel, matchesConversationQuery, myConversationSessions, pickActiveConversationSession, sessionAgents } from "../src/lib/conversations.js";
+import { conversationLabel, matchesConversationQuery, myConversationSessions, pickActiveConversationSession, sessionAgents, upsertConversationSession } from "../src/lib/conversations.js";
 import { isAwaitingFeedbackDecision, rerunAssignmentForSession } from "../src/lib/workflow.js";
 import type { RelaySession } from "../src/types.js";
 
@@ -115,6 +115,23 @@ describe("web conversation helpers", () => {
       activeSessionId: "active",
       composingNew: true,
     }), undefined);
+  });
+
+  // Creating a conversation returns the new session before the list refetch
+  // lands. Without seeding it into the cached list the selection points at an
+  // id nobody can find, so the fallback lands on conversations[0] — the
+  // previous thread — and the transcript flashes it before jumping.
+  it("opens the freshly created conversation instead of the previous thread", () => {
+    const previous = session({ id: "previous", ownerEmployeeId: "alice", updatedAt: "2026-06-20T03:00:00.000Z" });
+    const created = session({ id: "created", ownerEmployeeId: "alice", updatedAt: "2026-06-20T04:00:00.000Z" });
+
+    const conversations = upsertConversationSession([previous], created);
+    assert.equal(pickActiveConversationSession({
+      conversations,
+      selectedSessionId: created.id,
+      activeSessionId: created.id,
+      composingNew: false,
+    })?.id, "created");
   });
 
   it("shows recovery decisions only for explicit feedback waits", () => {
