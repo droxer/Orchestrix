@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { TFunction } from "i18next";
 
-import { AgentStreamAccumulator, displayAgentSegments, emptyAgentStreamSegments, hasStreamingTextCaret, parseAgentStderr, parseAgentStream, userVisibleAgentSegments, agentMessagePlainText, type AgentSegment } from "../src/lib/agentStream.js";
+import { AgentStreamAccumulator, displayAgentSegments, emptyAgentStreamSegments, hasStreamingTextCaret, hasTerminalOutcome, parseAgentStderr, parseAgentStream, userVisibleAgentSegments, agentMessagePlainText, type AgentSegment } from "../src/lib/agentStream.js";
 
 describe("agent stream parsing", () => {
   it("filters Codex stdin notice from stderr", () => {
@@ -463,6 +463,50 @@ describe("agent stream parsing", () => {
   it("detects when the streaming caret should attach to text", () => {
     assert.equal(hasStreamingTextCaret([{ kind: "tool", name: "Read" }]), false);
     assert.equal(hasStreamingTextCaret([{ kind: "text", text: "Still typing" }]), true);
+  });
+
+  it("treats an agent's own end-of-turn frame as a terminal outcome", () => {
+    for (const agent of ["claude", "codex"] as const) {
+      const raw = agent === "claude"
+        ? JSON.stringify({ type: "result", subtype: "success", is_error: false })
+        : JSON.stringify({ type: "turn.completed" });
+      assert.equal(hasTerminalOutcome(parseAgentStream(agent, raw)), true, `${agent} finished`);
+    }
+  });
+
+  it("treats a failed turn as a terminal outcome for every agent", () => {
+    const failures: Array<[Parameters<typeof parseAgentStream>[0], string]> = [
+      ["claude", JSON.stringify({ type: "result", is_error: true, result: "API error: 529 overloaded" })],
+      ["codex", JSON.stringify({ type: "turn.failed", error: { message: "sandbox denied write" } })],
+      ["pi", JSON.stringify({ type: "error", message: "model unavailable" })],
+      ["kimi", JSON.stringify({ type: "error", message: "context length exceeded" })],
+    ];
+    for (const [agent, raw] of failures) {
+      assert.equal(hasTerminalOutcome(parseAgentStream(agent, raw)), true, `${agent} failed`);
+    }
+  });
+
+  // The pulse must survive the long silences mid-run: a start narration, a
+  // retry, and stderr chatter all mean the agent is still working.
+  it("does not treat start, retry, or stderr segments as a terminal outcome", () => {
+    assert.equal(hasTerminalOutcome(parseAgentStream("codex", JSON.stringify({ type: "turn.started" }))), false);
+    assert.equal(
+      hasTerminalOutcome(parseAgentStream("claude", JSON.stringify({ type: "system", subtype: "api_retry", attempt: 2, max_retries: 5 }))),
+      false,
+    );
+    assert.equal(hasTerminalOutcome(parseAgentStderr("warning: cache directory not writable")), false);
+    assert.equal(hasTerminalOutcome([{ kind: "text", text: "Still typing" }, { kind: "tool", name: "Read" }]), false);
+  });
+
+  // stderr segments are appended after stdout, so the terminal frame is not
+  // necessarily the last segment in the list.
+  it("detects a terminal outcome even when stderr rows trail it", () => {
+    const segments = [
+      ...parseAgentStream("claude", JSON.stringify({ type: "result", subtype: "success", is_error: false })),
+      ...parseAgentStderr("warning: deprecated flag\nerror: upstream connect timeout"),
+    ];
+
+    assert.equal(hasTerminalOutcome(segments), true);
   });
 
   it("renders Kimi assistant text without raw JSON", () => {

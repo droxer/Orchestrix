@@ -105,6 +105,36 @@ export function hasStreamingTextCaret(segments: AgentSegment[]): boolean {
   return segments[segments.length - 1]?.kind === "text";
 }
 
+// The two end-of-turn narrations that report success. Failure is recognised by
+// tone instead, so every agent's error shape is covered without enumerating it.
+const TERMINAL_SUCCESS_KEYS: ReadonlySet<string> = new Set([
+  "agent_stream.claude_finished",
+  "agent_stream.codex_finished",
+]);
+
+function segmentTone(segment: AgentSegment): string | undefined {
+  if (segment.kind === "status") return segment.tone;
+  if (segment.kind === "narration" && typeof segment.params?.tone === "string") return segment.params.tone;
+  return undefined;
+}
+
+/**
+ * True once the agent's own stream has reported the turn is over — Claude's
+ * `result`, Codex's `turn.completed`/`turn.failed`, or any agent's error frame.
+ *
+ * The run stays `streaming` until the daemon posts `agent.completed`, so
+ * without this the transcript keeps a "Working…" pulse under a line that
+ * already says the agent finished. Only `bad` tones count as terminal: `info`
+ * belongs to start/progress narrations and `warn` to retries and stderr
+ * chatter, all of which happen mid-run while the agent really is still working.
+ */
+export function hasTerminalOutcome(segments: AgentSegment[]): boolean {
+  return segments.some(
+    (segment) =>
+      (segment.kind === "narration" && TERMINAL_SUCCESS_KEYS.has(segment.key)) || segmentTone(segment) === "bad",
+  );
+}
+
 export function emptyAgentStreamSegments(_agent: AgentName, _streaming: boolean, _t: TFunction): AgentSegment[] {
   return [];
 }
