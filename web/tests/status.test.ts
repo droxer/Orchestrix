@@ -5,6 +5,7 @@ import { assignControlPanelDaemonNode, createControlPanelDaemonNode, createContr
 import { threadDaemonStatus } from "../src/lib/threadStatus.js";
 import {
   mergeVisibleDaemonNodes,
+  mergeThreadRuntimeNodes,
   shouldClaimLocalDaemonNode,
 } from "../src/lib/daemonNodes.js";
 import {
@@ -158,6 +159,16 @@ describe("Relay web thread status", () => {
 
     assert.deepEqual(visibleNodes.map((node) => node.id), ["sbx_alice"]);
     assert.equal(shouldClaimLocalDaemonNode(unassignedNode, []), false);
+  });
+
+  it("keeps distinct computers for one employee in the thread runtime picker", () => {
+    const first = daemonNode({ id: "node_a", employeeId: "alice" });
+    const second = controlPanelNode({ id: "node_b", employeeId: "alice" });
+
+    const runtimeNodes = mergeThreadRuntimeNodes([first], [second]);
+
+    assert.deepEqual(runtimeNodes.map((node) => node.id), ["node_a", "node_b"]);
+    assert.equal(runtimeNodes.every((node) => !("nodeToken" in node)), true);
   });
 
   it("posts employee creation with the selected unassigned node", async () => {

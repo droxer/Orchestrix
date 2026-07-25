@@ -47,6 +47,7 @@ export interface CancelSandboxRunInput {
 
 export interface CreateSessionInput {
   taskGoal: string;
+  daemonNodeId?: string;
   assignments?: SandboxRunAssignment[];
   workspacePath?: string;
   signal?: AbortSignal;
@@ -98,6 +99,7 @@ export class RelayDaemonClient {
       signal: input.signal,
       body: {
         taskGoal: input.taskGoal,
+        ...(input.daemonNodeId ? { daemonNodeId: input.daemonNodeId } : {}),
         assignments: input.assignments,
         workspacePath: input.workspacePath,
       },

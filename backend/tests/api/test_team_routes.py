@@ -31,13 +31,25 @@ def _employee(client: TestClient, employee_id: str) -> None:
     ).status_code == 201
 
 
-def _agent(client: TestClient, employee_id: str, name: str, executor: str) -> dict:
+def _agent(
+    client: TestClient,
+    employee_id: str,
+    name: str,
+    executor: str,
+    *,
+    place: bool = True,
+) -> dict:
     response = client.post(
         f"/cp/employees/{employee_id}/agents",
         json={"displayName": name, "executorKind": executor},
     )
     assert response.status_code == 201
-    return response.json()["agent"]
+    agent = response.json()["agent"]
+    if place:
+        client.app.state.agent_placement_store.create_placement(
+            agent, f"test_node_{employee_id}"
+        )
+    return agent
 
 
 def test_admin_and_employee_manage_teams(monkeypatch) -> None:
@@ -93,6 +105,37 @@ def test_admin_and_employee_manage_teams(monkeypatch) -> None:
         )
         assert renamed.status_code == 200
         assert renamed.json()["team"]["name"] == "Delivery crew"
+
+
+def test_team_assembly_requires_active_placements_on_one_node(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap(client)
+        _employee(client, "alice")
+        lead = _agent(client, "alice", "Lead", "codex", place=False)
+        support = _agent(client, "alice", "Support", "claude", place=False)
+        payload = {
+            "ownerEmployeeId": "alice",
+            "name": "Delivery",
+            "leadAgentId": lead["id"],
+            "memberAgentIds": [lead["id"], support["id"]],
+        }
+
+        unplaced = client.post("/cp/teams", json=payload)
+        assert unplaced.status_code == 400
+        assert unplaced.json()["detail"] == "team_member_unplaced"
+
+        placements = client.app.state.agent_placement_store
+        placements.create_placement(lead, "node_a")
+        placements.create_placement(support, "node_b")
+        cross_node = client.post("/cp/teams", json=payload)
+        assert cross_node.status_code == 400
+        assert cross_node.json()["detail"] == "team_members_different_nodes"
+
+        placements.create_placement(support, "node_a")
+        assembled = client.post("/cp/teams", json=payload)
+        assert assembled.status_code == 201
 
 
 def test_legacy_supervisor_owned_team_can_be_assigned_to_task(monkeypatch) -> None:

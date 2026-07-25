@@ -292,6 +292,30 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
         if session_id
         else None
     )
+    requested_node_id = string_field(body, "daemonNodeId") or string_field(
+        body, "daemon_node_id"
+    )
+    session_node_id = (
+        session.get("daemonNodeId")
+        if session and isinstance(session.get("daemonNodeId"), str)
+        else None
+    )
+    if (
+        session_node_id
+        and requested_node_id
+        and requested_node_id != session_node_id
+    ):
+        raise HTTPException(
+            409,
+            {
+                "code": "workspace_unavailable",
+                "message": (
+                    "This thread already runs on another computer. "
+                    "Start a new thread to use the selected computer."
+                ),
+            },
+        )
+    required_node_id = session_node_id or requested_node_id
     assignments = []
     for item in raw_assignments:
         if (
@@ -321,6 +345,7 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
             placement_store=ctx.agent_placement_store,
             daemon_nodes=ctx.registry.monitor_nodes(),
             session=session,
+            required_node_id=required_node_id,
         )
         parsed: dict[str, Any] = {
             "taskGoal": task_goal,
@@ -328,6 +353,7 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
             "actorEmployeeId": actor["employeeId"],
             "actorIsAdmin": actor["isAdmin"],
             "agentFirst": True,
+            "daemonNodeId": required_node_id or resolved[0]["daemonNodeId"],
         }
         if session_id:
             parsed["sessionId"] = session_id

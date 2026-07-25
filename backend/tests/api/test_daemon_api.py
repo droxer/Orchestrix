@@ -1517,6 +1517,10 @@ def test_admin_can_soft_delete_employee_and_unassign_nodes(monkeypatch) -> None:
             "/cp/employees/alice/agents",
             json={"displayName": "Builder", "executorKind": "codex"},
         ).json()["agent"]
+        placement = client.post(
+            f"/cp/agents/{agent['id']}/placements",
+            json={"daemonNodeId": node_id},
+        ).json()["placement"]
         team = client.post(
             "/cp/teams",
             json={
@@ -1526,10 +1530,6 @@ def test_admin_can_soft_delete_employee_and_unassign_nodes(monkeypatch) -> None:
                 "memberAgentIds": [agent["id"]],
             },
         ).json()["team"]
-        placement = client.post(
-            f"/cp/agents/{agent['id']}/placements",
-            json={"daemonNodeId": node_id},
-        ).json()["placement"]
         managed_node = client.post(
             "/cp/managed-nodes",
             json={

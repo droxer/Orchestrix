@@ -65,3 +65,38 @@ def test_session_assignment_and_handoff_preserve_ask_mode(monkeypatch) -> None:
             if artifact["title"] == "Assignment plan"
         ][-1:]
         assert '"mode": "ask"' in app.state.session_store.read_artifact(session_id, latest_plan["id"])
+
+
+def test_session_creation_persists_the_selected_computer(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        response = client.post(
+            "/auth/bootstrap",
+            json={
+                "token": "admin_token",
+                "username": "admin",
+                "password": "secret123",
+            },
+        )
+        assert response.status_code == 200
+        app.state.registry.register(
+            {
+                "sandboxId": "node_a",
+                "employeeId": "admin",
+                "token": "node_token",
+                "workspacePath": "/workspace/admin",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }
+        )
+
+        created = client.post(
+            "/sessions",
+            json={"taskGoal": "Start here", "daemonNodeId": "node_a"},
+        )
+
+        assert created.status_code == 201, created.text
+        assert created.json()["daemonNodeId"] == "node_a"

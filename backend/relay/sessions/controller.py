@@ -54,6 +54,7 @@ class SessionController:
         owner_employee_id: str | None = None,
         owner_agent_id: str | None = None,
         team_id: str | None = None,
+        daemon_node_id: str | None = None,
     ):
         self.store = store or LocalSessionStore()
         self.task_store = task_store
@@ -62,6 +63,7 @@ class SessionController:
         self.owner_employee_id = owner_employee_id
         self.owner_agent_id = owner_agent_id
         self.team_id = team_id
+        self.daemon_node_id = daemon_node_id
         self.active_session_id = ""
 
     def create_session(self, task_goal: str, participants: list[str] | None = None, pending_start: bool = False) -> dict[str, Any]:
@@ -70,6 +72,7 @@ class SessionController:
             **({"ownerEmployeeId": self.owner_employee_id} if self.owner_employee_id else {}),
             **({"ownerAgentId": self.owner_agent_id} if self.owner_agent_id else {}),
             **({"teamId": self.team_id} if self.team_id else {}),
+            **({"daemonNodeId": self.daemon_node_id} if self.daemon_node_id else {}),
             "taskGoal": task_goal,
             "participants": participants or ["human"],
             "status": "running",

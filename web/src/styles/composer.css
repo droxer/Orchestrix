@@ -30,6 +30,82 @@
   pointer-events: none;
 }
 
+/* New-thread runtime rail: environment is chosen before the conversation is
+   allowed to start. It borrows the reference's compact setup bar while staying
+   inside Relay's restrained operational palette. */
+.thread-runtime-rail {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: min(calc(100% - var(--sp-8)), 880px);
+  min-height: 46px;
+  margin: 0 auto -5px;
+  padding: 0 var(--sp-4) 5px;
+  border: 1px solid var(--line-1);
+  border-bottom: 0;
+  border-radius: var(--r-3) var(--r-3) 0 0;
+  background: var(--surface-2);
+  color: var(--ink-2);
+  box-shadow: var(--shadow-1);
+}
+
+.thread-runtime-context {
+  color: var(--ink-3);
+  font: var(--type-label-strong);
+  letter-spacing: var(--track-0);
+  white-space: nowrap;
+}
+
+.thread-runtime-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--line-1);
+}
+
+.thread-runtime-select {
+  max-width: min(360px, 60vw);
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink-1);
+  font: var(--type-label-strong);
+}
+
+.thread-runtime-select:hover:not(:disabled) {
+  background: var(--surface-3);
+}
+
+.thread-runtime-select-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.thread-runtime-option-id {
+  margin-left: auto;
+  color: var(--ink-3);
+  font: var(--type-code);
+}
+
+.thread-runtime-rail + .composer-input-wrap {
+  z-index: 2;
+}
+
+@media (max-width: 640px) {
+  .thread-runtime-rail {
+    width: calc(100% - var(--sp-4));
+    gap: var(--sp-2);
+  }
+
+  .thread-runtime-context,
+  .thread-runtime-divider {
+    display: none;
+  }
+
+  .thread-runtime-select { max-width: 100%; }
+}
+
 .mode-chip {
   display: inline-flex;
   align-items: center;

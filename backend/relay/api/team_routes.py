@@ -103,7 +103,10 @@ async def create_team(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     body = await json_body(request)
     try:
         lead, members = validate_team_payload(
-            actor["employeeId"], body, ctx.agent_store
+            actor["employeeId"],
+            body,
+            ctx.agent_store,
+            placement_store=ctx.agent_placement_store,
         )
         team = ctx.team_store.create_team(
             actor["employeeId"],
@@ -123,7 +126,11 @@ async def update_team(
     body = await json_body(request)
     try:
         lead, members = validate_team_payload(
-            actor["employeeId"], body, ctx.agent_store, current=current
+            actor["employeeId"],
+            body,
+            ctx.agent_store,
+            placement_store=ctx.agent_placement_store,
+            current=current,
         )
         patch = dict(body)
         if "leadAgentId" in body:
@@ -174,7 +181,10 @@ async def create_control_panel_team(
         raise HTTPException(404, "Employee not found.")
     try:
         lead, members = validate_team_payload(
-            owner_employee_id, body, ctx.agent_store
+            owner_employee_id,
+            body,
+            ctx.agent_store,
+            placement_store=ctx.agent_placement_store,
         )
         team = ctx.team_store.create_team(
             owner_employee_id,
@@ -210,6 +220,7 @@ async def update_control_panel_team(
             current["ownerEmployeeId"],
             body,
             ctx.agent_store,
+            placement_store=ctx.agent_placement_store,
             current=current,
         )
         patch = dict(body)

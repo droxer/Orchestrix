@@ -75,6 +75,7 @@ def session_brief_item(session: dict[str, Any]) -> dict[str, Any]:
         "taskGoal": session.get("taskGoal"),
         "status": session.get("status"),
         "phase": session.get("phase"),
+        "daemonNodeId": session.get("daemonNodeId"),
         "workspacePath": session.get("workspacePath"),
         "ownerEmployeeId": session.get("ownerEmployeeId"),
         "ownerAgentId": session.get("ownerAgentId"),
@@ -319,6 +320,9 @@ async def create_session(request: Request, ctx: AppContextDep) -> dict[str, Any]
     assignments = assignment_list(body.get("assignments"))
     owner_agent_id = next((assignment.get("agentId") for assignment in assignments if assignment.get("agentId")), None)
     workspace_path = string_field(body, "workspacePath") or "/workspace"
+    daemon_node_id = string_field(body, "daemonNodeId") or string_field(
+        body, "daemon_node_id"
+    )
     task_id = body.get("taskId") if isinstance(body.get("taskId"), str) else None
     task = get_task_for_actor(ctx.task_store, task_id, actor) if task_id else None
     owner = owner_employee_id_for_create(actor, body)
@@ -346,11 +350,31 @@ async def create_session(request: Request, ctx: AppContextDep) -> dict[str, Any]
         owner = expected_owner or owner
         if owner and "owner_employee_id" not in thread_ownership:
             thread_ownership["owner_employee_id"] = owner
+    if daemon_node_id:
+        node = next(
+            (
+                item
+                for item in ctx.registry.monitor_nodes()
+                if item.get("id") == daemon_node_id
+            ),
+            None,
+        )
+        if not node or not node.get("online") or node.get("stale"):
+            raise HTTPException(
+                409,
+                {
+                    "code": "node_offline",
+                    "message": "The selected computer is not available.",
+                },
+            )
+        if owner and node.get("employeeId") != owner:
+            raise HTTPException(403, "The selected computer belongs to another employee.")
     controller = SessionController(
         ctx.session_store,
         task_store=ctx.task_store,
         task_id=task_id,
         workspace_path=workspace_path,
+        daemon_node_id=daemon_node_id,
         **thread_ownership,
     )
     session = controller.create_session(

@@ -43,6 +43,9 @@ def test_employee_updates_and_removes_agent_and_team_profile_images(monkeypatch)
             "/cp/employees/alice/agents",
             json={"displayName": "Builder", "executorKind": "codex"},
         ).json()["agent"]
+        client.app.state.agent_placement_store.create_placement(
+            agent, "test_node_alice"
+        )
         team = client.post(
             "/cp/teams",
             json={

@@ -29,7 +29,9 @@ def node(
     }
 
 
-def test_resolves_each_logical_agent_to_its_own_runtime_node(tmp_path: Path) -> None:
+def test_rejects_collaboration_across_nodes_even_with_shared_workspace(
+    tmp_path: Path,
+) -> None:
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     researcher = agents.create_agent(
@@ -50,28 +52,23 @@ def test_resolves_each_logical_agent_to_its_own_runtime_node(tmp_path: Path) -> 
         builder, "node_b", {"workspacePolicy": {"kind": "shared-path"}}
     )
 
-    resolved = resolve_agent_assignments(
-        [
-            {"agentId": researcher["id"], "mode": "ask"},
-            {"agentId": builder["id"], "mode": "action"},
-        ],
-        employee_id="alice",
-        is_admin=False,
-        agent_store=agents,
-        placement_store=placements,
-        daemon_nodes=[
-            node("node_a", "claude", workspace_id="repo:relay"),
-            node("node_b", "codex", workspace_id="repo:relay"),
-        ],
-    )
+    with pytest.raises(AgentRoutingError) as error:
+        resolve_agent_assignments(
+            [
+                {"agentId": researcher["id"], "mode": "ask"},
+                {"agentId": builder["id"], "mode": "action"},
+            ],
+            employee_id="alice",
+            is_admin=False,
+            agent_store=agents,
+            placement_store=placements,
+            daemon_nodes=[
+                node("node_a", "claude", workspace_id="repo:relay"),
+                node("node_b", "codex", workspace_id="repo:relay"),
+            ],
+        )
 
-    assert [item["daemonNodeId"] for item in resolved] == ["node_a", "node_b"]
-    assert [item["executorKind"] for item in resolved] == ["claude", "codex"]
-    assert [item["agentDisplayName"] for item in resolved] == [
-        "Researcher",
-        "Builder",
-    ]
-    assert resolved[0]["agentInstructions"] == "Compare sources before answering."
+    assert error.value.code == "workspace_unavailable"
 
 
 def test_agents_on_same_computer_resolve_together(tmp_path: Path) -> None:
@@ -187,7 +184,7 @@ def test_legacy_nonempty_policy_blocks_dispatch(
     assert error.value.code == "agent_policy_unsupported"
 
 
-def test_canonical_workspace_id_allows_different_node_paths(tmp_path: Path) -> None:
+def test_canonical_workspace_id_does_not_override_node_scope(tmp_path: Path) -> None:
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     researcher = agents.create_agent(
@@ -203,23 +200,30 @@ def test_canonical_workspace_id_allows_different_node_paths(tmp_path: Path) -> N
         builder, "node_b", {"workspacePolicy": {"kind": "shared-path"}}
     )
 
-    resolved = resolve_agent_assignments(
-        [{"agentId": researcher["id"]}, {"agentId": builder["id"]}],
-        employee_id="alice",
-        is_admin=False,
-        agent_store=agents,
-        placement_store=placements,
-        daemon_nodes=[
-            node(
-                "node_a", "claude", workspace="/mnt/a/relay", workspace_id="repo:relay"
-            ),
-            node(
-                "node_b", "codex", workspace="D:/work/relay", workspace_id="repo:relay"
-            ),
-        ],
-    )
+    with pytest.raises(AgentRoutingError) as error:
+        resolve_agent_assignments(
+            [{"agentId": researcher["id"]}, {"agentId": builder["id"]}],
+            employee_id="alice",
+            is_admin=False,
+            agent_store=agents,
+            placement_store=placements,
+            daemon_nodes=[
+                node(
+                    "node_a",
+                    "claude",
+                    workspace="/mnt/a/relay",
+                    workspace_id="repo:relay",
+                ),
+                node(
+                    "node_b",
+                    "codex",
+                    workspace="D:/work/relay",
+                    workspace_id="repo:relay",
+                ),
+            ],
+        )
 
-    assert [item["daemonNodeId"] for item in resolved] == ["node_a", "node_b"]
+    assert error.value.code == "workspace_unavailable"
 
 
 def test_node_affine_placements_reject_cross_node_workflow(tmp_path: Path) -> None:
@@ -390,7 +394,7 @@ def test_node_affine_session_rejects_workspace_drift_on_same_node_id(
     assert error.value.code == "workspace_unavailable"
 
 
-def test_shared_path_session_allows_followup_on_matching_workspace(
+def test_shared_path_session_rejects_followup_on_different_node(
     tmp_path: Path,
 ) -> None:
     agents = LocalAgentStore(tmp_path)
@@ -419,20 +423,21 @@ def test_shared_path_session_allows_followup_on_matching_workspace(
         ],
     }
 
-    resolved = resolve_agent_assignments(
-        [{"agentId": second["id"], "mode": "action"}],
-        employee_id="alice",
-        is_admin=False,
-        agent_store=agents,
-        placement_store=placements,
-        daemon_nodes=[
-            node("node_a", "claude", workspace_id="repo:relay"),
-            node("node_b", "codex", workspace_id="repo:relay"),
-        ],
-        session=session,
-    )
+    with pytest.raises(AgentRoutingError) as error:
+        resolve_agent_assignments(
+            [{"agentId": second["id"], "mode": "action"}],
+            employee_id="alice",
+            is_admin=False,
+            agent_store=agents,
+            placement_store=placements,
+            daemon_nodes=[
+                node("node_a", "claude", workspace_id="repo:relay"),
+                node("node_b", "codex", workspace_id="repo:relay"),
+            ],
+            session=session,
+        )
 
-    assert resolved[0]["daemonNodeId"] == "node_b"
+    assert error.value.code == "workspace_unavailable"
 
 
 def test_offline_agent_returns_stable_reason(tmp_path: Path) -> None:

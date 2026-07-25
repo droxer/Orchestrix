@@ -17,6 +17,30 @@ function tempStore(): LocalSessionStore {
 }
 
 describe("SessionController prompt memory", () => {
+  it("preserves the selected thread computer on the session event and snapshot", async () => {
+    const store = tempStore();
+    const session = await store.createSession({
+      workspacePath: "/workspace/alice",
+      daemonNodeId: "node_alice",
+      ownerEmployeeId: "alice",
+      taskGoal: "ship the release",
+      participants: ["human", "codex"],
+    });
+
+    assert.equal(session.daemonNodeId, "node_alice");
+    assert.equal(
+      await store.getSession(session.id).then((value) => value.daemonNodeId),
+      "node_alice",
+    );
+    assert.equal(session.events[0]?.type, "session.created");
+    assert.equal(
+      session.events[0]?.type === "session.created"
+        ? session.events[0].daemonNodeId
+        : undefined,
+      "node_alice",
+    );
+  });
+
   it("preserves the originating Team on the session event and snapshot", async () => {
     const store = tempStore();
     const session = await store.createSession({

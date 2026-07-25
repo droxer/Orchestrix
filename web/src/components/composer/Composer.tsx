@@ -1,11 +1,12 @@
 import { forwardRef, memo, useEffect, useImperativeHandle, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
-import type { AgentName, AgentTaskMode, EmployeeAgent } from "../../types";
+import type { AgentName, AgentTaskMode, DaemonNodeMonitorRecord, EmployeeAgent } from "../../types";
 import { sendShortcutLabel } from "../../lib/sendShortcut";
 import { ActionSend, ActionStop } from "../icons";
 import { ModeToggle } from "./ModeToggle";
 import { AgentSelect } from "./AgentSelect";
 import { useComposer } from "../../hooks/useComposer";
+import { ThreadRuntimeSelect } from "./ThreadRuntimeSelect";
 
 
 export type ComposerHandle = {
@@ -26,10 +27,14 @@ const ComposerView = forwardRef<ComposerHandle, {
   onLogicalAgentPicked: (agent: EmployeeAgent) => void;
   activeAgentDisplayName: string;
   selectedEmployee: string;
+  initializingThread: boolean;
+  runtimeNodes: DaemonNodeMonitorRecord[];
+  runtimeNodeId: string | null;
+  onRuntimeNodeChange: (nodeId: string) => void;
   running: boolean;
   onSend: () => void;
   onCancelRun: () => void;
-}>(function Composer({ composerMode, setComposerMode, activeAgent, logicalAgents, activeLogicalAgentId, onLogicalAgentPicked, activeAgentDisplayName, selectedEmployee, running, onSend, onCancelRun }, ref) {
+}>(function Composer({ composerMode, setComposerMode, activeAgent, logicalAgents, activeLogicalAgentId, onLogicalAgentPicked, activeAgentDisplayName, selectedEmployee, initializingThread, runtimeNodes, runtimeNodeId, onRuntimeNodeChange, running, onSend, onCancelRun }, ref) {
   const { t } = useTranslation();
   const composer = useComposer();
   const {
@@ -69,6 +74,13 @@ const ComposerView = forwardRef<ComposerHandle, {
 
   return (
     <form className="composer" onSubmit={(e) => { e.preventDefault(); triggerSend(); }}>
+      {initializingThread ? (
+        <ThreadRuntimeSelect
+          nodes={runtimeNodes}
+          value={runtimeNodeId}
+          onValueChange={onRuntimeNodeChange}
+        />
+      ) : null}
       <div className="composer-input-wrap" data-running={running || undefined}>
         <div className="composer-input">
           <textarea
@@ -104,7 +116,11 @@ const ComposerView = forwardRef<ComposerHandle, {
               <button
                 type={running ? "button" : "submit"}
                 className={running ? "send-button send-button-cancel" : "send-button"}
-                disabled={!running && (sendPending || !composerText.trim())}
+                disabled={!running && (
+                  sendPending
+                  || !composerText.trim()
+                  || (initializingThread && !runtimeNodeId)
+                )}
                 onClick={running ? onCancelRun : undefined}
                 aria-busy={sendPending || undefined}
                 aria-label={running ? t("composer.cancel_run") : sendPending ? t("composer.sending", { defaultValue: "Sending…" }) : t("composer.send")}

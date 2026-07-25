@@ -13,7 +13,6 @@ from .credentials import sandbox_node_auth_error, sandbox_ui_auth_error
 from .registry import DaemonNodeRegistry
 from .scheduling import (
     node_accepts_run,
-    workspace_identity,
     workspace_identity_record,
 )
 
@@ -237,32 +236,13 @@ class ServerDaemonNodeBackend:
                 assignment.get("daemonNodeId") or sandbox_id
                 for assignment in request["assignments"]
             }
+            if len(assignment_nodes) > 1:
+                raise ValueError(
+                    "workspace_unavailable: collaboration requires every agent to run on the same node."
+                )
             runtime_nodes = [self.registry.get(node_id) for node_id in assignment_nodes]
             if any(node is None for node in runtime_nodes):
                 raise ValueError("An assigned runtime node is no longer registered.")
-            workspace_keys = {
-                workspace_identity(node) for node in runtime_nodes if node
-            }
-            if len(assignment_nodes) > 1 and (
-                None in workspace_keys or len(workspace_keys) != 1
-            ):
-                raise ValueError(
-                    "workspace_unavailable: selected agent placements do not advertise one shared workspace identity."
-                )
-            if (
-                len(assignment_nodes) > 1
-                and all(
-                    assignment.get("agentId") for assignment in request["assignments"]
-                )
-                and any(
-                    (assignment.get("workspacePolicy") or {}).get("kind")
-                    != "shared-path"
-                    for assignment in request["assignments"]
-                )
-            ):
-                raise ValueError(
-                    "workspace_unavailable: cross-node agent placements require shared-path policy."
-                )
             existing_session = (
                 self.registry.store.get_session(request["sessionId"])
                 if request.get("sessionId")
@@ -361,6 +341,7 @@ class ServerDaemonNodeBackend:
                     and request.get("teamId")
                     else None
                 ),
+                daemon_node_id=sandbox_id,
             )
             decision = (
                 request.get("decision")

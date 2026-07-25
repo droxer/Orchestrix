@@ -4,7 +4,11 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { useEmployeeAgents } from "../../hooks/useEmployeeAgents";
 import { useRelayMutations } from "../../hooks/useRelayMutations";
-import { teamMutationInput } from "../../lib/teamForm";
+import {
+  canAddAgentToNodeScopedTeam,
+  nodeScopedTeamIssue,
+  teamMutationInput,
+} from "../../lib/teamForm";
 import type { AgentTeam } from "../../types";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -30,7 +34,9 @@ export function TeamDrawer({
   const [name, setName] = useState("");
   const [memberIds, setMemberIds] = useState<string[]>([]);
   const [leadId, setLeadId] = useState("");
-  const [validationError, setValidationError] = useState<"members" | "lead" | null>(null);
+  const [validationError, setValidationError] = useState<
+    "members" | "lead" | "unplaced" | "different-nodes" | null
+  >(null);
   const nameRef = useRef<HTMLInputElement>(null);
   const membersRef = useRef<HTMLFieldSetElement>(null);
   const leadRef = useRef<HTMLButtonElement>(null);
@@ -46,6 +52,10 @@ export function TeamDrawer({
   const agents = useMemo(
     () => employeeAgents.filter((agent) => !agent.deletedAt),
     [employeeAgents],
+  );
+  const selectedAgents = useMemo(
+    () => agents.filter((agent) => memberIds.includes(agent.id)),
+    [agents, memberIds],
   );
   const busy = createTeamMutation.isPending || updateTeamMutation.isPending || deleteTeamMutation.isPending;
   const saving = createTeamMutation.isPending || updateTeamMutation.isPending;
@@ -84,6 +94,12 @@ export function TeamDrawer({
     }
     if (memberIds.length === 0) {
       setValidationError("members");
+      membersRef.current?.focus();
+      return;
+    }
+    const nodeIssue = nodeScopedTeamIssue(agents, memberIds);
+    if (nodeIssue) {
+      setValidationError(nodeIssue);
       membersRef.current?.focus();
       return;
     }
@@ -143,21 +159,43 @@ export function TeamDrawer({
           ref={membersRef}
           className="adm-field team-member-fieldset"
           tabIndex={-1}
-          aria-invalid={validationError === "members" || undefined}
-          aria-describedby={validationError === "members" ? "team-members-error" : undefined}
+          aria-invalid={validationError && validationError !== "lead" ? true : undefined}
+          aria-describedby={validationError && validationError !== "lead" ? "team-members-error" : undefined}
         >
           <legend>{t("teams.members")}</legend>
           <div className="team-member-options">
-            {agents.map((agent) => (
-              <label key={agent.id} className="team-member-option">
-                <input type="checkbox" checked={memberIds.includes(agent.id)} onChange={() => toggleMember(agent.id)} />
-                <span>{agent.displayName}</span>
-                <small>{agent.executorKind}</small>
-              </label>
-            ))}
+            {agents.map((agent) => {
+              const selected = memberIds.includes(agent.id);
+              const incompatible = !selected
+                && !canAddAgentToNodeScopedTeam(agent, selectedAgents);
+              return (
+                <label
+                  key={agent.id}
+                  className="team-member-option"
+                  title={incompatible ? t("teams.node_scope_required") : undefined}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selected}
+                    disabled={incompatible}
+                    onChange={() => toggleMember(agent.id)}
+                  />
+                  <span>{agent.displayName}</span>
+                  <small>{agent.executorKind}</small>
+                </label>
+              );
+            })}
           </div>
           {agents.length === 0 ? <span className="adm-form-hint">{t("teams.no_agents")}</span> : null}
-          {validationError === "members" ? <span id="team-members-error" className="text-sm text-danger" role="alert">{t("teams.members_required")}</span> : null}
+          {validationError && validationError !== "lead" ? (
+            <span id="team-members-error" className="text-sm text-danger" role="alert">
+              {validationError === "members"
+                ? t("teams.members_required")
+                : validationError === "unplaced"
+                  ? t("teams.members_unplaced")
+                  : t("teams.members_different_nodes")}
+            </span>
+          ) : null}
         </fieldset>
         <label className="adm-field">
           <span>{t("teams.lead")}</span>

@@ -21,8 +21,8 @@ Options:
                         --token for the first start.
   --workspace <path>    Host workspace to expose to local agent CLIs
                         (also RELAY_WORKSPACE or WORKSPACE).
-  --workspace-id <id>   Canonical shared-workspace identity. Nodes may use
-                        different local paths when this ID matches
+  --workspace-id <id>   Stable workspace identity for continuity and drift
+                        detection on this daemon node
                         (also RELAY_WORKSPACE_ID).
   --sandbox <mode>      Sandbox mode: "boxlite" boots a BoxLite VM and runs
                         agents inside it; "none" runs agents as local

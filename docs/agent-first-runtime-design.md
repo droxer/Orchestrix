@@ -9,9 +9,9 @@ per-assignment node placement, run audit identity, logical-agent instructions,
 employee chat selection, and an admin Agents view.
 
 PostgreSQL-backed agent/placement stores, durable task and routine assignment
-by logical agent, and canonical shared-workspace identity are also implemented.
-Artifact transfer, placement reconciliation, broader named-agent clients, and
-compatibility retirement remain rollout work.
+by logical agent, canonical workspace identity, and node-scoped team dispatch
+are also implemented. Artifact transfer, placement reconciliation, broader
+named-agent clients, and compatibility retirement remain rollout work.
 
 Implementation is staged in
 [agent-first-runtime-migration.md](agent-first-runtime-migration.md).
@@ -36,7 +36,8 @@ employee -> logical agent -> placement -> daemon node
 ```
 
 This permits one employee to own several agents, including multiple agents of
-the same executor kind, while those agents may run on different nodes.
+the same executor kind. Independent agents may live on different nodes, while
+agents assembled into one team must share a node.
 
 ## Goals
 
@@ -226,16 +227,18 @@ Selection must return structured rejection reasons so the UI can distinguish
 
 ### Multi-agent workflows
 
-Each assignment is placed independently:
+The first assignment selects a node. Every later assignment in the same
+multi-agent workflow must have an eligible placement on that node:
 
 ```text
 Researcher (Claude) @ node-a
-    -> Builder (Codex) @ node-b
-    -> Reviewer (Claude) @ node-c
+    -> Builder (Codex) @ node-a
+    -> Reviewer (Claude) @ node-a
 ```
 
 The session remains the durable workflow authority. Handoff data is carried by
-session events and artifacts, not by node-local process memory.
+session events and artifacts, while the shared node workspace provides the
+collaboration boundary.
 
 ## Workspace policy
 
@@ -244,12 +247,12 @@ The first release defines three explicit workspace compatibility modes:
 | Mode | Behavior |
 | :- | :- |
 | `node-affine` | Session remains on placements attached to the original workspace/node. |
-| `shared-path` | Placements may run when they advertise the same canonical shared workspace ID. |
-| `artifact-handoff` | Cross-node steps receive declared input artifacts and publish output artifacts; arbitrary untracked files are not assumed. |
+| `shared-path` | Legacy infrastructure metadata for a canonical workspace identity; it does not authorize cross-node collaboration. |
+| `artifact-handoff` | Reserved for a future explicit cross-node protocol; it is not a team scheduling mode. |
 
-`node-affine` is the safe compatibility default. `shared-path` may be enabled
-for verified shared storage. `artifact-handoff` is introduced after artifact
-transfer integrity and size limits are implemented.
+All current multi-agent workflows are node-scoped. Workspace identity still
+detects continuity and drift on that node. See
+[ADR-011](adr/011-node-scoped-agent-collaboration.md).
 
 ## Managed-node relationship
 
