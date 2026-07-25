@@ -39,6 +39,26 @@ describe("apiJson", () => {
     );
   });
 
+  it("surfaces structured JSON detail messages without stringifying the payload", async () => {
+    globalThis.fetch = (async () => new Response(JSON.stringify({
+      detail: {
+        code: "workspace_unavailable",
+        message: "Agent Hawkeye has no eligible runtime placement (workspace_unavailable).",
+      },
+    }), {
+      status: 409,
+      statusText: "Conflict",
+      headers: { "Content-Type": "application/json" },
+    })) as typeof fetch;
+
+    await assert.rejects(
+      () => apiJson("/agent-runs"),
+      (error) => error instanceof RelayApiError
+        && error.status === 409
+        && error.message === "Agent Hawkeye has no eligible runtime placement (workspace_unavailable).",
+    );
+  });
+
   it("surfaces plain-text errors as RelayApiError instead of JSON parse failures", async () => {
     globalThis.fetch = (async () => new Response("upstream gateway failed", {
       status: 502,
