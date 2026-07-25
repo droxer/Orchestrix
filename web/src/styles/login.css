@@ -2,28 +2,26 @@
    Login screen
 
    Minimal centered sign-in card on a flat dark canvas (no theme
-   preference loaded yet). Color is pinned via local --lg-* variables
-   whose values are lifted verbatim from the dark (default) register in
-   tokens/palette.css (graphite canvas, white action, mid-grey
-   attention). Spacing, type scale, and radii are theme-independent
-   tokens and are used directly. Documented stylelint exception — see
-   web/.stylelintrc.json.
+   preference loaded yet). Color is pinned: the local --lg-* names alias
+   the always-dark register in tokens/palette.css so the screen stays dark
+   whatever theme the operator has saved. Spacing, type scale, and radii
+   are theme-independent tokens and are used directly.
    ===================================================================== */
 
 .login-screen {
-  /* Pinned dark ramp — mirrors the default (dark) register in tokens/palette.css. */
-  --lg-canvas: #101214;
-  --lg-elevated: #22262b;
-  --lg-ink: #f2f4f6;
-  --lg-body: #c9ced4;
-  --lg-muted: #99a0a8;
-  --lg-hairline: color-mix(in srgb, #f2f4f6 14%, #101214);
-  --lg-hairline-soft: color-mix(in srgb, #f2f4f6 8%, #101214);
+  /* Pinned dark ramp — aliases of the --dark-* register in palette.css. */
+  --lg-canvas: var(--dark-canvas);
+  --lg-elevated: var(--dark-elevated);
+  --lg-ink: var(--dark-ink);
+  --lg-body: var(--dark-body);
+  --lg-muted: var(--dark-ink-soft);
+  --lg-hairline: var(--dark-line);
+  --lg-hairline-soft: var(--dark-line-soft);
   /* Names --lg-steel/--lg-amber are historical; the values are neutral now. */
-  --lg-steel: #f2f4f6;
-  --lg-steel-active: #ffffff;
-  --lg-on-steel: #101214; /* text-on-action (dark ink on the white fill) */
-  --lg-err: #f2f4f6; /* error is the loud/bright tier — dots stay calm */
+  --lg-steel: var(--dark-ink);
+  --lg-steel-active: var(--dark-ink-strong);
+  --lg-on-steel: var(--dark-canvas); /* text-on-action (dark ink on the white fill) */
+  --lg-err: var(--dark-ink); /* error is the loud/bright tier — dots stay calm */
   --lg-accent: var(--lg-steel);
   /* Pin the action color to the pre-auth white so RelayMark's lead
      chevron stays neutral white even when the operator's saved theme is light. */
@@ -51,7 +49,7 @@
   background: color-mix(in srgb, var(--lg-elevated) 35%, var(--lg-canvas));
   border: 1px solid var(--lg-hairline-soft);
   border-radius: var(--r-3);
-  animation: login-rise var(--t-slow) var(--ease);
+  animation: rise var(--t-slow) var(--ease);
 }
 
 .login-brand {
@@ -255,24 +253,19 @@
   margin: 0;
   font-family: var(--font-mono);
   font-size: var(--fs-3);
-  animation: login-pulse 1.6s var(--ease) infinite;
+  animation: login-pulse var(--t-pulse) var(--ease) infinite;
 }
 
 .login-checking-text::after {
   content: "▌";
   margin-left: var(--sp-1);
-  /* Pre-mount caret on the pinned dark canvas — matches --lg-ink. The var
-     isn't in scope before .login-screen mounts, so the literal fallback
-     carries the value until it is. */
-  color: var(--lg-ink, #f2f4f6);
+  /* Pre-mount caret on the pinned dark canvas — matches --lg-ink. That var
+     isn't in scope before .login-screen mounts, so fall back to the
+     root-level register token it aliases. */
+  color: var(--lg-ink, var(--dark-ink));
 }
 
 /* ---------- Motion --------------------------------------------------- */
-
-@keyframes login-rise {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
 
 @keyframes login-pulse {
   0%, 100% { opacity: 0.55; }

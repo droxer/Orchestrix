@@ -155,7 +155,7 @@
   align-items: center;
   min-width: 18px;
   justify-content: center;
-  padding: 2px var(--sp-2);
+  padding: var(--sp-0-5) var(--sp-2);
   border: 1px solid var(--line-1);
   border-radius: var(--r-2);
   background: transparent;
@@ -412,7 +412,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--sp-1);
-  padding: 2px var(--sp-2) 2px 6px;
+  padding: var(--sp-0-5) var(--sp-2) var(--sp-0-5) var(--sp-1-5);
   border: 1px solid var(--line-1);
   border-radius: var(--r-2);
   background: var(--surface-0);
@@ -503,7 +503,7 @@
   transform: translateY(-50%);
   border-radius: var(--r-full);
   border: 2px solid color-mix(in srgb, var(--status-accent) 8%, transparent);
-  animation: task-status-pulse 1.6s var(--ease) infinite;
+  animation: task-status-pulse var(--t-pulse) var(--ease) infinite;
   pointer-events: none;
 }
 
@@ -782,9 +782,7 @@
   padding: var(--sp-3);
   border: 1px solid var(--line-1);
   border-radius: var(--r-3);
-  background:
-    linear-gradient(135deg, color-mix(in srgb, var(--surface-2) 86%, transparent), transparent 62%),
-    var(--surface-1);
+  background: var(--surface-1);
   transition: border-color 160ms var(--ease), transform 160ms var(--ease);
 }
 
@@ -818,7 +816,6 @@
   border-radius: var(--r-2);
   background: var(--surface-2);
   color: var(--ink-1);
-  box-shadow: 0 8px 20px color-mix(in srgb, var(--ink-1) 7%, transparent);
 }
 
 /* Readiness pip — identity stays shape (the glyph), status is the corner
@@ -857,7 +854,7 @@
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--sp-0-5);
   min-width: 0;
 }
 
@@ -883,7 +880,7 @@
 }
 
 .task-assignment-summary-hint {
-  margin-top: 2px;
+  margin-top: var(--sp-0-5);
   color: var(--warn);
 }
 
@@ -911,7 +908,7 @@
 .task-assignment-member-more {
   width: auto;
   min-width: 22px;
-  padding-inline: 4px;
+  padding-inline: var(--sp-1);
   color: var(--ink-3);
   font: var(--type-label);
 }
@@ -1226,7 +1223,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0;
-  padding: 2px;
+  padding: var(--sp-0-5);
   border: 1px solid var(--line-1);
   border-radius: var(--r-2);
   background: var(--surface-1);
@@ -1380,7 +1377,7 @@
   inset: -5px;
   border-radius: var(--r-full);
   border: 2px solid color-mix(in srgb, var(--row-accent) 8%, transparent);
-  animation: backlog-row-pulse 1.6s var(--ease) infinite;
+  animation: task-status-pulse var(--t-pulse) var(--ease) infinite;
   pointer-events: none;
 }
 
@@ -1675,11 +1672,8 @@
 
 .routine-page {
   --backlog-lane-w: 300px;
-  /* A single soft top wash — the former 28px vertical hairline grid never
-     aligned to the minmax(320px) card track, so it read as noise. */
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--surface-1) 62%, transparent), transparent 220px),
-    var(--surface-0);
+  /* Flat canvas — no top wash; the board reads as a single plane. */
+  background: var(--surface-0);
 }
 
 .routine-list {
@@ -1715,7 +1709,7 @@
 .routine-toggle-text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--sp-0-5);
   min-width: 0;
 }
 

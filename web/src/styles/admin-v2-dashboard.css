@@ -251,7 +251,7 @@
 .adm-token-legend span {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--sp-1-5);
 }
 
 .adm-token-dot {
@@ -293,7 +293,7 @@
   letter-spacing: var(--track-caps);
   text-transform: uppercase;
   color: var(--action);
-  padding: 2px var(--sp-2);
+  padding: var(--sp-0-5) var(--sp-2);
   border: 1px solid var(--line-1);
   border-radius: var(--r-2);
   background: var(--surface-0);
@@ -366,14 +366,14 @@
 .adm-dash-stat {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--sp-0-5);
   min-width: 0;
 }
 
 .adm-dash-stat-label {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--sp-1-5);
   font-size: var(--fs-2);
   text-transform: uppercase;
   letter-spacing: var(--track-caps);
@@ -430,7 +430,7 @@
 .adm-dash-top-meta {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--sp-0-5);
   min-width: 0;
 }
 
@@ -523,7 +523,7 @@
 .adm-dash-feed-body {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--sp-0-5);
   min-width: 0;
 }
 
@@ -550,7 +550,7 @@
   color: var(--ink-3);
   letter-spacing: var(--track-caps);
   white-space: nowrap;
-  padding-top: 2px;
+  padding-top: var(--sp-0-5);
   font-variant-numeric: tabular-nums;
 }
 

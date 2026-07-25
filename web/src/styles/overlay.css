@@ -50,7 +50,7 @@
    color, and the focus ring. Touch targets (44px) are bumped in a11y.css /
    mobile-overlays.css. */
 .overlay-close {
-  margin-top: 4px;
+  margin-top: var(--sp-1);
   color: var(--ink-3);
   cursor: pointer;
 }

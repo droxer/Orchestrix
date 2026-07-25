@@ -45,7 +45,7 @@
 .pref-header-text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--sp-0-5);
 }
 
 .pref-header-text h2 {
@@ -270,39 +270,37 @@
   height: 2px;
 }
 
-/* Swatches preview the light/dark canvas + action color regardless of the
-   currently active theme, so — unlike the rest of this file — they must
-   use literal values rather than var() (which would only ever reflect
-   whichever theme is active right now). Keep these in sync with the
-   --action / --surface-0 values in tokens/palette.css (dark/default
-   register) and their html[data-theme="light"] overrides.
-   Documented stylelint exception — see web/.stylelintrc.json. */
+/* Swatches preview the light/dark canvas + action color regardless of which
+   theme is active, so — unlike the rest of this file — they can't use the
+   register-varying --surface-0/--action. They read the pinned --dark-* /
+   --light-* register tokens in palette.css instead, which resolve to the
+   same values both registers use and stay in sync with them by definition. */
 .pref-theme-swatch[data-tone="light"] {
-  background: #f7f8f9;
+  background: var(--light-canvas);
 }
 
 .pref-theme-swatch[data-tone="light"]::after {
-  background: #16181b; /* light register's black action */
+  background: var(--light-ink); /* light register's black action */
 }
 
 .pref-theme-swatch[data-tone="dark"] {
-  background: #101214;
-  border-color: color-mix(in srgb, #f2f4f6 14%, transparent);
+  background: var(--dark-canvas);
+  border-color: var(--dark-line);
 }
 
 .pref-theme-swatch[data-tone="dark"]::after {
-  background: #f2f4f6; /* dark register's white action */
+  background: var(--dark-ink); /* dark register's white action */
 }
 
 .pref-theme-swatch[data-tone="system"] {
-  background: linear-gradient(135deg, #f7f8f9 0 50%, #101214 50% 100%);
+  background: linear-gradient(135deg, var(--light-canvas) 0 50%, var(--dark-canvas) 50% 100%);
   border-color: color-mix(in srgb, var(--ink-1) 10%, transparent);
 }
 
 .pref-theme-swatch[data-tone="system"]::after {
   /* The action color is register-varying (black on light / white on
      dark), so the split-gradient dot shows both, half per register. */
-  background: linear-gradient(90deg, #16181b 0 50%, #f2f4f6 50% 100%);
+  background: linear-gradient(90deg, var(--light-ink) 0 50%, var(--dark-ink) 50% 100%);
 }
 
 /* ── Language badges ──────────────────────────────────────────────────────── */

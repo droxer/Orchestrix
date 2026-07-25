@@ -311,8 +311,10 @@
   }
 
   .messenger-shell .sidenav-btn {
+    --rise-from: var(--rise-sm);
+
     opacity: 0;
-    animation: relay-rise var(--t-fast) var(--ease) forwards;
+    animation: rise var(--t-fast) var(--ease) forwards;
   }
 
   .messenger-shell .sidenav-nav .sidenav-btn:nth-child(1) { animation-delay: calc(var(--t-fast) * 0.25); }

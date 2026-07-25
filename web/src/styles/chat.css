@@ -87,7 +87,6 @@
   flex: 1 1 auto;
   color: var(--ink-1);
   font: var(--type-title);
-  font-size: var(--fs-5);
   line-height: var(--leading-normal);
   letter-spacing: var(--track-0);
   overflow: hidden;
@@ -146,7 +145,7 @@
   height: 18px;
   display: grid;
   place-items: center;
-  padding: 0 4px;
+  padding: 0 var(--sp-1);
   border: 1px solid var(--surface-0);
   border-radius: var(--r-full);
   background: var(--ink-1);
@@ -163,7 +162,7 @@
   border-radius: var(--r-full);
   background: var(--info);
   box-shadow: 0 0 0 0 color-mix(in srgb, var(--info) 55%, transparent);
-  animation: header-agent-busy-pulse 1.6s var(--ease) infinite;
+  animation: header-agent-busy-pulse var(--t-pulse) var(--ease) infinite;
 }
 
 @keyframes header-agent-busy-pulse {
@@ -201,15 +200,10 @@
   gap: var(--sp-5);
 }
 
-/* Active transcript — container spine, subtle left-edge warmth. */
+/* Active transcript — container spine. Flat: the left edge is carried by
+   the ::before spine alone, no directional wash. */
 .transcript-inner:not(:has(.transcript-empty)) {
   position: relative;
-  background:
-    linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--action-soft) 28%, transparent) 0%,
-      transparent 140px
-    );
 }
 
 .transcript-inner:not(:has(.transcript-empty))::before {
@@ -251,7 +245,7 @@
 .transcript-phase-node {
   width: 8px;
   height: 8px;
-  margin-left: 6px;
+  margin-left: var(--sp-1-5);
   border-radius: var(--r-full);
   background: var(--line-1);
   box-shadow: 0 0 0 2px var(--surface-0);
@@ -297,42 +291,40 @@
   contain-intrinsic-size: auto 160px;
 }
 
-/* Staggered reveal — first dozen turns fade-rise on mount. */
+/* Staggered reveal — first dozen turns fade-rise on mount, at the row tier
+   of the shared `rise` keyframe (tokens/base.css). */
+.transcript-inner > .transcript-turn {
+  --rise-from: var(--rise-sm);
+}
+
 .transcript-inner > .transcript-turn:nth-child(1) .msg,
-.transcript-inner > .transcript-turn:nth-child(1) .transcript-phase { animation: message-in var(--t-fast) var(--ease) both; animation-delay: 30ms; }
+.transcript-inner > .transcript-turn:nth-child(1) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: 30ms; }
 .transcript-inner > .transcript-turn:nth-child(2) .msg,
-.transcript-inner > .transcript-turn:nth-child(2) .transcript-phase { animation: message-in var(--t-fast) var(--ease) both; animation-delay: 60ms; }
+.transcript-inner > .transcript-turn:nth-child(2) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: 60ms; }
 .transcript-inner > .transcript-turn:nth-child(3) .msg,
-.transcript-inner > .transcript-turn:nth-child(3) .transcript-phase { animation: message-in var(--t-fast) var(--ease) both; animation-delay: 90ms; }
+.transcript-inner > .transcript-turn:nth-child(3) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: 90ms; }
 .transcript-inner > .transcript-turn:nth-child(4) .msg,
-.transcript-inner > .transcript-turn:nth-child(4) .transcript-phase { animation: message-in var(--t-fast) var(--ease) both; animation-delay: 120ms; }
+.transcript-inner > .transcript-turn:nth-child(4) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: 120ms; }
 .transcript-inner > .transcript-turn:nth-child(5) .msg,
-.transcript-inner > .transcript-turn:nth-child(5) .transcript-phase { animation: message-in var(--t-fast) var(--ease) both; animation-delay: 150ms; }
+.transcript-inner > .transcript-turn:nth-child(5) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: 150ms; }
 .transcript-inner > .transcript-turn:nth-child(6) .msg,
-.transcript-inner > .transcript-turn:nth-child(6) .transcript-phase { animation: message-in var(--t-fast) var(--ease) both; animation-delay: 180ms; }
+.transcript-inner > .transcript-turn:nth-child(6) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: 180ms; }
 .transcript-inner > .transcript-turn:nth-child(7) .msg,
-.transcript-inner > .transcript-turn:nth-child(7) .transcript-phase { animation: message-in var(--t-fast) var(--ease) both; animation-delay: 210ms; }
+.transcript-inner > .transcript-turn:nth-child(7) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: 210ms; }
 .transcript-inner > .transcript-turn:nth-child(8) .msg,
-.transcript-inner > .transcript-turn:nth-child(8) .transcript-phase { animation: message-in var(--t-fast) var(--ease) both; animation-delay: 240ms; }
+.transcript-inner > .transcript-turn:nth-child(8) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: 240ms; }
 .transcript-inner > .transcript-turn:nth-child(9) .msg,
-.transcript-inner > .transcript-turn:nth-child(9) .transcript-phase { animation: message-in var(--t-fast) var(--ease) both; animation-delay: 270ms; }
+.transcript-inner > .transcript-turn:nth-child(9) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: 270ms; }
 .transcript-inner > .transcript-turn:nth-child(10) .msg,
-.transcript-inner > .transcript-turn:nth-child(10) .transcript-phase { animation: message-in var(--t-fast) var(--ease) both; animation-delay: 300ms; }
+.transcript-inner > .transcript-turn:nth-child(10) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: 300ms; }
 .transcript-inner > .transcript-turn:nth-child(11) .msg,
-.transcript-inner > .transcript-turn:nth-child(11) .transcript-phase { animation: message-in var(--t-fast) var(--ease) both; animation-delay: 330ms; }
+.transcript-inner > .transcript-turn:nth-child(11) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: 330ms; }
 .transcript-inner > .transcript-turn:nth-child(12) .msg,
-.transcript-inner > .transcript-turn:nth-child(12) .transcript-phase { animation: message-in var(--t-fast) var(--ease) both; animation-delay: 360ms; }
+.transcript-inner > .transcript-turn:nth-child(12) .transcript-phase { animation: rise var(--t-fast) var(--ease) both; animation-delay: 360ms; }
 
 @media (prefers-reduced-motion: reduce) {
   .transcript-inner > .transcript-turn .msg,
   .transcript-inner > .transcript-turn .transcript-phase { animation: none; }
-}
-
-@keyframes message-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
 }
 
 .rail-node {
@@ -378,25 +370,16 @@
 .msg-user .rail-node.rail-node-user {
   border-radius: var(--r-full);
   border-color: transparent;
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--on-action) 22%, var(--action)),
-      var(--action)
-    );
+  background: var(--action);
   color: var(--on-action);
-  box-shadow:
-    0 0 0 2px var(--surface-0),
-    inset 0 1px 0 color-mix(in srgb, var(--on-action) 30%, transparent);
+  box-shadow: 0 0 0 2px var(--surface-0);
 }
 
 .msg-agent .rail-node.rail-node-agent {
   border-radius: var(--r-2);
   background: var(--surface-3);
   border-color: color-mix(in srgb, var(--action) 32%, var(--line-1));
-  box-shadow:
-    0 0 0 2px var(--surface-0),
-    0 1px 2px color-mix(in srgb, var(--ink-1) 8%, transparent);
+  box-shadow: 0 0 0 2px var(--surface-0);
 }
 
 /* The vendor glyph paints in ink against the light tile. */
@@ -518,7 +501,7 @@
   border-radius: var(--r-full);
   background: var(--info);
   box-shadow: 0 0 0 0 color-mix(in srgb, var(--info) 40%, transparent);
-  animation: pulse-ring 1.4s var(--ease) infinite;
+  animation: pulse-ring var(--t-pulse) var(--ease) infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -532,7 +515,7 @@
     border-color: var(--info);
     animation:
       node-in var(--t-fast) var(--ease) both,
-      agent-rail-pulse 1.4s var(--ease) infinite;
+      agent-rail-pulse var(--t-pulse) var(--ease) infinite;
   }
 }
 
@@ -584,7 +567,7 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 2px;
+  gap: var(--sp-0-5);
   margin-top: var(--sp-1);
 }
 

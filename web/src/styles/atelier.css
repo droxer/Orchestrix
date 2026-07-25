@@ -52,8 +52,8 @@
 .adm-view-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  padding: 2px;
+  gap: var(--sp-0-5);
+  padding: var(--sp-0-5);
   border: 1px solid var(--line-2);
   border-radius: var(--r-2);
   background: var(--surface-1);
@@ -120,12 +120,27 @@ body {
 .sidenav-brand { color: var(--ink-1); }
 .sidenav-btn { width: var(--touch-target); height: var(--touch-target); border-radius: var(--r-3); color: var(--ink-3); }
 .sidenav-btn:hover { background: var(--surface-3); border-color: transparent; color: var(--ink-1); }
+/* Active route reads as selected the same way a conversation row does: a
+   soft wash + full-strength ink + a 2px left accent bar. Reserving the solid
+   --action plate for true primary actions (Add employee, Send) keeps one
+   flat hierarchy — selection is calm, action is loud. */
 .sidenav-btn.active,
 .sidenav-btn.active:hover {
-  background: var(--action);
+  background: var(--action-soft);
   border-color: transparent;
-  color: var(--on-action);
+  color: var(--ink-1);
   box-shadow: none;
+}
+.sidenav-btn.active::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 2px;
+  height: 18px;
+  transform: translateY(-50%);
+  border-radius: calc(var(--r-1) / 2);
+  background: var(--action);
 }
 .sidenav-separator, .sidenav-bottom { border-color: var(--line-1); background-color: var(--line-1); }
 .sidenav-toggle { color: var(--ink-3); }
@@ -134,8 +149,8 @@ body {
 
 .thread-panel { padding-top: var(--sp-4); background: var(--surface-0); border-right-color: var(--line-1); }
 .conversation-heading-eyebrow { color: var(--ink-3); font-weight: 500; letter-spacing: var(--track-caps); }
-.conversation-heading h1 { font-family: var(--font-sans); font-size: var(--fs-5); font-weight: 600; }
-.conversation-list { border-top: 0; gap: 2px; padding: var(--sp-1) var(--sp-2) var(--sp-4); }
+.conversation-heading h1 { font-family: var(--font-sans); font-size: var(--fs-title); font-weight: 600; }
+.conversation-list { border-top: 0; gap: var(--sp-0-5); padding: var(--sp-1) var(--sp-2) var(--sp-4); }
 .conversation-row { border: 0; border-radius: var(--r-2); overflow: hidden; }
 .conversation-row-inner { min-height: 64px; padding-inline: var(--sp-3); border-radius: inherit; }
 .conversation-row:hover { background: var(--surface-3); }

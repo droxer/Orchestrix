@@ -192,7 +192,7 @@
 .adm-field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--sp-1-5);
 }
 
 .adm-field > span {
@@ -339,7 +339,7 @@
 .adm-assign-operator-text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--sp-0-5);
   min-width: 0;
 }
 
@@ -441,7 +441,7 @@
 .adm-assign-node-body {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--sp-0-5);
   min-width: 0;
 }
 
@@ -505,7 +505,7 @@
   color: var(--ink-3);
 }
 
-.adm-assign-empty > svg { margin-top: 2px; flex-shrink: 0; opacity: 0.7; }
+.adm-assign-empty > svg { margin-top: var(--sp-0-5); flex-shrink: 0; opacity: 0.7; }
 
 .adm-assign-empty-title {
   margin: 0 0 var(--sp-1);
@@ -579,7 +579,7 @@
 .adm-provision-preview-text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--sp-0-5);
   min-width: 0;
 }
 
@@ -646,8 +646,8 @@
 .adm-profile-segment {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 2px;
-  padding: 2px;
+  gap: var(--sp-0-5);
+  padding: var(--sp-0-5);
   border-radius: var(--r-2);
   background: var(--surface-1);
   border: 1px solid var(--line-2);
@@ -766,7 +766,7 @@
 .adm-placement-body {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--sp-0-5);
   min-width: 0;
 }
 

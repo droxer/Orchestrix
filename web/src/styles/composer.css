@@ -30,42 +30,6 @@
   pointer-events: none;
 }
 
-.agent-picker {
-  position: absolute;
-  bottom: calc(100% + var(--sp-2));
-  left: 0;
-  z-index: var(--z-popover);
-  width: 200px;
-  display: grid;
-  gap: 2px;
-  padding: var(--sp-1);
-  border: 0;
-  border-radius: var(--r-3);
-  background: var(--surface-3);
-  box-shadow: var(--shadow-2);
-}
-
-.agent-picker button,
-.agent-picker [role="option"] {
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
-  align-items: center;
-  gap: var(--sp-2);
-  min-height: var(--control-h);
-  padding: var(--sp-2);
-  border-radius: var(--r-2);
-  text-align: left;
-  color: var(--ink-1);
-  font: var(--type-label-strong);
-}
-
-.agent-picker button:hover,
-.agent-picker button.active,
-.agent-picker [role="option"]:hover,
-.agent-picker [role="option"].active {
-  background: var(--surface-2);
-}
-
 .mode-chip {
   display: inline-flex;
   align-items: center;
@@ -171,36 +135,6 @@
   box-shadow: none;
 }
 
-.mention-popover {
-  position: absolute;
-  bottom: calc(100% + 10px);
-  left: 0;
-  right: auto;
-  z-index: var(--z-popover);
-  width: min(320px, 100%);
-}
-
-.mention-popover [role="option"] {
-  grid-template-columns: 28px minmax(0, 1fr) auto;
-  gap: var(--sp-3);
-  cursor: pointer;
-}
-
-.mention-popover .agent-avatar {
-  width: 28px;
-  height: 28px;
-  font-size: var(--fs-2);
-}
-
-.mention-role {
-  color: var(--ink-3);
-  font: var(--type-label);
-}
-
-.mention-popover [role="option"].active .mention-role {
-  color: var(--ink-1);
-}
-
 .composer-input textarea {
   min-width: 0;
   min-height: 56px;
@@ -210,7 +144,7 @@
   border: 0;
   outline: 0;
   background: transparent;
-  padding: var(--sp-4) var(--composer-inline) 6px;
+  padding: var(--sp-4) var(--composer-inline) var(--sp-1-5);
   color: var(--ink-1);
   font: var(--type-body);
 }
@@ -233,7 +167,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-3);
-  padding: 4px var(--sp-3) 10px var(--composer-inline);
+  padding: var(--sp-1) var(--sp-3) 10px var(--composer-inline);
 }
 
 .composer-footer-left,

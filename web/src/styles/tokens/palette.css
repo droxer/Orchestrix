@@ -42,18 +42,33 @@
   --warn: #b2b9c1;
   --err: #f2f4f6;
 
-  /* Always-dark register — surfaces that never flip (diff viewer,
-     ink-fill chrome). Same values as the dark register above. */
+  /* ----- Pinned registers -----
+     Surfaces that must NOT follow the active theme: the pre-auth login
+     ramp (no theme loaded yet), the theme-picker swatches (must show both
+     registers at once), the diff viewer, and ink-fill chrome. Values are
+     the same ones the two registers use above — declared once here so no
+     component ever hand-copies a hex. Consumers: login.css (--lg-*),
+     preferences.css (swatches), workspace.css, artifact.css, a11y.css. */
+  --dark-canvas: #101214;
   --dark-surface: #16181b;
   --dark-surface-2: #1c1f23;
+  --dark-elevated: #22262b;
   --dark-ink: #f2f4f6;
+  --dark-ink-strong: #ffffff;
+  --dark-body: #c9ced4;
   --dark-ink-soft: #99a0a8;
   --dark-line: color-mix(in srgb, #f2f4f6 14%, transparent);
+  --dark-line-soft: color-mix(in srgb, #f2f4f6 8%, transparent);
+
+  --light-canvas: #f7f8f9;
+  --light-surface: #ffffff;
+  --light-ink: #16181b;
+
+  /* Document paper — artifact/file previews assume a white page in every
+     register, matching how the document would print. */
+  --paper: #ffffff;
 
   --scrim: rgba(0, 0, 0, 0.66);
-  --shadow-tint: rgba(0, 0, 0, 0.5);
-  --shadow-tint-wide: rgba(0, 0, 0, 0.45);
-  --shadow-edge: rgba(255, 255, 255, 0.06);
 
   /* ----- Register-invariant scales ----- */
 
@@ -64,8 +79,13 @@
   --r-4: 14px;
   --r-full: 9999px;
 
-  /* Spacing — 4px base. */
+  /* Spacing — 4px base, plus a micro tier below it. --sp-0-5/--sp-1-5 are
+     the *only* sanctioned sub-4px gaps: they bind glyph-tight pairs (dot ↔
+     label, icon ↔ text, stacked meta lines) where a full 4px step reads as
+     a separation rather than a pairing. Anything larger uses the 4px scale. */
+  --sp-0-5: 2px;
   --sp-1: 4px;
+  --sp-1-5: 6px;
   --sp-2: 8px;
   --sp-3: 12px;
   --sp-4: 16px;
@@ -99,6 +119,7 @@
   --fs-4: 1.0714rem; /* 15px */
   --fs-heading: 1.1429rem; /* 16px — section headings */
   --fs-number: 1.3571rem;  /* 19px — KPI numerals */
+  --fs-title: 1.4286rem;   /* 20px — conversation / pane titles */
   --fs-5: 1.5714rem; /* 22px */
   --fs-6: 2.2857rem; /* 32px */
 
@@ -116,10 +137,25 @@
   --font-sans: var(--font-app-sans), "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   --font-mono: var(--font-geist-mono), "Geist Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
 
-  /* Motion — one ease, two speeds, no overshoot. */
+  /* Motion — one ease, two speeds, no overshoot.
+     --t-fast: state change under the pointer (hover, press, menu open).
+     --t-slow: entrances that cross real distance (sheets, first paint). */
   --ease: cubic-bezier(0.2, 0, 0, 1);
   --t-fast: 120ms;
   --t-slow: 320ms;
+
+  /* Ambient loops — "something is running". Two cadences only, so the same
+     liveness reads at the same tempo on every surface.
+     --t-pulse: active work (streaming agent, running task, busy header).
+     --t-pulse-calm: passive presence (online dot, idle node) — slow enough
+     to sit in peripheral vision without pulling focus. */
+  --t-pulse: 1.6s;
+  --t-pulse-calm: 2.6s;
+
+  /* Rise distance — the single travel for fade-and-rise entrances.
+     --rise-sm for rows inside a scroller, --rise for panes and views. */
+  --rise-sm: 4px;
+  --rise: 8px;
 }
 
 /* Light register — designed alongside dark, not derived from it. */
@@ -127,7 +163,7 @@ html[data-theme="light"] {
   --surface-0: #f7f8f9;
   --surface-1: #ffffff;
   --surface-2: #eef0f2;
-  --surface-3: #ffffff; /* + --shadow-1 carries the lift */
+  --surface-3: #ffffff; /* separated by hairline, not lift (flat) */
 
   --ink-1: #16181b;
   --ink-2: #3f444b;
@@ -149,9 +185,6 @@ html[data-theme="light"] {
   --err: #16181b;
 
   --scrim: rgba(12, 14, 16, 0.55);
-  --shadow-tint: rgba(12, 14, 16, 0.06);
-  --shadow-tint-wide: rgba(12, 14, 16, 0.1);
-  --shadow-edge: rgba(12, 14, 16, 0.05);
 }
 
 /* CJK — Geist has no Han glyphs; system CJK faces fall in behind it.

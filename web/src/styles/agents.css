@@ -140,13 +140,13 @@
 .agents-roster-row-badge {
   display: flex;
   align-items: center;
-  padding-top: 2px;
+  padding-top: var(--sp-0-5);
 }
 
 .agents-roster-row-main {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--sp-0-5);
   min-width: 0;
 }
 
@@ -215,7 +215,7 @@
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
-  padding: 2px var(--sp-2);
+  padding: var(--sp-0-5) var(--sp-2);
   border: 1px solid var(--line-1);
   border-radius: var(--r-1);
   background: var(--surface-1);

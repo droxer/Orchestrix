@@ -136,7 +136,7 @@
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--sp-0-5);
 }
 
 /* Row's primary action — mirrors .backlog-row-title. Geometry/background here
@@ -251,7 +251,7 @@
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--sp-0-5);
 }
 
 .team-profile-member-copy strong,

@@ -156,12 +156,15 @@
   margin-top: 0;
 }
 
-.agent-prose h1 { font-size: var(--fs-5); }
-.agent-prose h2 { font-size: var(--fs-4); }
-.agent-prose h3 { font-size: var(--fs-3); }
+/* In-message heading ladder stays under the 22px conversation title so a
+   content heading never visually rivals the page title. Smooth steps down to
+   the 14px body: 18 / 16 / 15 / 14. */
+.agent-prose h1 { font-size: 1.2857rem; } /* 18px */
+.agent-prose h2 { font-size: var(--fs-heading); } /* 16px */
+.agent-prose h3 { font-size: var(--fs-4); } /* 15px */
 .agent-prose h4,
 .agent-prose h5,
-.agent-prose h6 { font-size: var(--fs-3); }
+.agent-prose h6 { font-size: var(--fs-3); } /* 14px */
 
 .agent-prose ul,
 .agent-prose ol {
@@ -476,7 +479,7 @@
   border-radius: var(--r-full);
   background: var(--info);
   box-shadow: 0 0 0 0 color-mix(in srgb, var(--info) 40%, transparent);
-  animation: pulse-ring 1.4s var(--ease) infinite;
+  animation: pulse-ring var(--t-pulse) var(--ease) infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -540,7 +543,7 @@
 .artifact-plan-step {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--sp-1-5);
   padding: 3px var(--sp-2);
   border-radius: var(--r-2);
   background: var(--surface-1);
@@ -567,7 +570,7 @@
   grid-template-columns: 20px minmax(0, 1fr) auto;
   column-gap: var(--sp-3);
   align-items: baseline;
-  padding: 2px 0;
+  padding: var(--sp-0-5) 0;
   color: var(--ink-3);
 }
 

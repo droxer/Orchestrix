@@ -18,18 +18,7 @@
 }
 
 .adm-view-stage {
-  animation: adm-view-enter var(--t-fast) var(--ease) both;
-}
-
-@keyframes adm-view-enter {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  animation: rise var(--t-fast) var(--ease) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -61,7 +50,7 @@
   gap: 1px;
   overflow: hidden;
   border: 1px solid var(--line-1);
-  border-radius: var(--radius-1);
+  border-radius: var(--r-2);
   background: var(--line-1);
 }
 
@@ -881,7 +870,7 @@
    pushes it to the edge. Never let the label shrink or wrap. */
 .adm-node-card-head .adm-status-pill {
   flex: none;
-  margin-top: 2px;
+  margin-top: var(--sp-0-5);
 }
 
 /* Neutral owner monogram — the identity anchor. Node health is carried
@@ -924,7 +913,7 @@
   flex: 1;
   flex-direction: column;
   align-items: flex-start;
-  gap: 2px;
+  gap: var(--sp-0-5);
   min-width: 0;
 }
 
@@ -1025,7 +1014,7 @@
 .adm-status-pill.tone-info .adm-status-dot {
   background: var(--ink-4);
   --pulse-color: var(--ink-4);
-  animation: pulse-ring 2.6s var(--ease) infinite;
+  animation: pulse-ring var(--t-pulse-calm) var(--ease) infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1070,7 +1059,7 @@
   background: var(--presence);
   border-color: var(--presence);
   --pulse-color: var(--presence);
-  animation: pulse-ring 2.6s var(--ease) infinite;
+  animation: pulse-ring var(--t-pulse-calm) var(--ease) infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1085,7 +1074,7 @@
 .adm-presence-pill {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--sp-1-5);
   flex: none;
   height: 20px;
   padding: 0 var(--sp-2);
@@ -1130,7 +1119,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--sp-1);
-  padding: 2px var(--sp-1);
+  padding: var(--sp-0-5) var(--sp-1);
   border: none;
   background: transparent;
   color: var(--ink-3);
@@ -1367,7 +1356,7 @@
 .adm-agent-inventory-pill {
   font-family: var(--font-mono);
   font-size: var(--fs-2);
-  padding: 1px 6px;
+  padding: 1px var(--sp-1-5);
   border-radius: var(--r-1);
   border: 1px solid var(--line-1);
   color: var(--ink-1);
@@ -1436,7 +1425,7 @@
   height: 14px;
   border-radius: var(--r-full);
   background: var(--surface-0);
-  box-shadow: 0 1px 2px color-mix(in srgb, var(--ink-1) 12%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink-1) 14%, transparent);
   transition: transform var(--t-fast) var(--ease);
 }
 
@@ -1495,7 +1484,7 @@
   display: grid;
   grid-template-columns: repeat(4, 28px);
   align-items: center;
-  gap: 2px;
+  gap: var(--sp-0-5);
   margin-left: auto;
   flex: none;
 }
@@ -1695,7 +1684,7 @@
 
 .adm-chat-panel-head > svg {
   color: var(--action);
-  margin-top: 2px;
+  margin-top: var(--sp-0-5);
 }
 
 .adm-chat-panel-head--detail {
@@ -1887,7 +1876,7 @@
   flex: 1;
   flex-direction: column;
   min-width: 0;
-  gap: 2px;
+  gap: var(--sp-0-5);
 }
 
 .adm-chat-integration-main strong {

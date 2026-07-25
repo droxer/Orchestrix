@@ -150,7 +150,7 @@
   opacity: 0.35;
   z-index: 1;
   --pulse-color: var(--warn);
-  animation: pulse-ring 1.8s var(--ease) infinite;
+  animation: pulse-ring var(--t-pulse) var(--ease) infinite;
 }
 
 .employee-avatar.running::after {

@@ -28,35 +28,6 @@
         "color-no-hex": null,
         "function-disallowed-list": null
       }
-    },
-    {
-      "comment": "login.css pins its own pre-auth dark ramp (--lg-*) independent of the authenticated theme — documented exception, mirrors tokens/palette.css's dark register verbatim.",
-      "files": [
-        "src/styles/login.css"
-      ],
-      "rules": {
-        "color-no-hex": null,
-        "function-disallowed-list": null
-      }
-    },
-    {
-      "comment": "preferences.css theme swatches must show both light and dark simultaneously, so they can't resolve a single var() — documented exception.",
-      "files": [
-        "src/styles/preferences.css"
-      ],
-      "rules": {
-        "color-no-hex": null,
-        "function-disallowed-list": null
-      }
-    },
-    {
-      "comment": "artifact.css's frame-preview background is a literal white document page in every theme — documented single-use exception (see inline comment).",
-      "files": [
-        "src/styles/artifact.css"
-      ],
-      "rules": {
-        "color-no-hex": null
-      }
     }
   ]
 }

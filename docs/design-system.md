@@ -19,7 +19,7 @@ colors:
   surface-2: "#1c1f23"
   surface-3: "#22262b"
   ok: "#7d848d"
-  warn: "#99a0a8"
+  warn: "#b2b9c1"
   err: "#f2f4f6"
   info: "#99a0a8"
 
@@ -89,10 +89,13 @@ rounded:
   r-1: 4px
   r-2: 6px
   r-3: 10px
+  r-4: 14px
   full: 9999px
 
 spacing:
+  sp-0-5: 2px
   sp-1: 4px
+  sp-1-5: 6px
   sp-2: 8px
   sp-3: 12px
   sp-4: 16px
@@ -295,16 +298,20 @@ loosen leading — all in `palette.css` (+ the two reading roles restated in
 ## Geometry, elevation, motion
 
 - **Radii:** `--r-1` 4px (chips, tags) · `--r-2` 6px (buttons, inputs, all
-  controls) · `--r-3` 10px (cards, drawers, modals) · `--r-full` (dots,
-  avatars, pills).
+  controls) · `--r-3` 10px (cards, drawers, modals) · `--r-4` 14px (hero
+  plates, sheets) · `--r-full` (dots, avatars, pills).
 - **Spacing:** 4px base — `--sp-1` 4 · `--sp-2` 8 · `--sp-3` 12 · `--sp-4`
   16 · `--sp-5` 20 · `--sp-6` 24 · `--sp-7` 32 · `--sp-8` 48 · `--sp-9` 64.
+  Below the base sit exactly two micro steps, `--sp-0-5` 2 and `--sp-1-5` 6,
+  for glyph-tight pairs (dot ↔ label, icon ↔ text, stacked meta lines) where
+  a full 4px step would read as separation rather than pairing. They are the
+  only sanctioned sub-4px gaps — do not introduce 3px or 5px one-offs.
   `--sp-row` (12px, compact 8px via `[data-density="compact"]`) sets row
   rhythm; `--control-h` (40px) is the standard control height.
-- **Elevation:** `--shadow-1` — soft drop for surfaces that already carry a
-  hairline; `--shadow-2` — ring + drop for borderless floating chrome
-  (drawers, dialogs, composer, tooltips). Pick by the surface, not by
-  intuition.
+- **Elevation:** the system is flat — planes separate by hairline, not lift.
+  `--shadow-1` is `none` (bordered surfaces carry no drop); `--shadow-2`
+  resolves to a single 1px ring so borderless floating chrome (drawers,
+  dialogs, composer, tooltips) keeps a crisp edge without faux depth.
 - **Focus:** `--focus-ring` — 2px solid action ring + 22% halo (WCAG
   1.4.11); destructive controls use `--focus-ring-danger`.
 - **Z layers:** `--z-popover` 20 · `--z-drawer` 30 · `--z-sheet` 50 ·
@@ -312,6 +319,14 @@ loosen leading — all in `palette.css` (+ the two reading roles restated in
 - **Motion:** `--ease` `cubic-bezier(0.2, 0, 0, 1)`; `--t-fast` 120ms for
   interaction feedback, `--t-slow` 320ms for entrances. No spring, no
   overshoot.
+- **Ambient loops:** two cadences only, so the same liveness reads at the
+  same tempo everywhere — `--t-pulse` 1.6s for active work (streaming agent,
+  running task, busy header) and `--t-pulse-calm` 2.6s for passive presence
+  (online dot, idle node). Never hand-pick a loop duration.
+- **Entrances:** one shared `rise` keyframe (`tokens/base.css`) — fade plus
+  a translateY read from `--rise-from`. Two travel tiers: `--rise-sm` 4px
+  for rows inside a scroller, `--rise` 8px (the default) for panes and
+  views. Do not add another fade-and-rise keyframe; set the tier instead.
 
 ## Do's and Don'ts
 

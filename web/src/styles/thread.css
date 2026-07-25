@@ -20,7 +20,7 @@
 .conversation-heading {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--sp-0-5);
 }
 
 .conversation-heading-eyebrow {
@@ -90,7 +90,9 @@
   background: transparent;
   color: var(--ink-1);
   transition: background var(--t-fast) var(--ease);
-  animation: thread-row-in var(--t-slow) var(--ease) both;
+  --rise-from: var(--rise-sm);
+
+  animation: rise var(--t-slow) var(--ease) both;
 }
 
 /* Staggered reveal — first 8 rows fade-rise on mount. Cheap delight; the
@@ -103,11 +105,6 @@
 .conversation-row:nth-child(6) { animation-delay: 240ms; }
 .conversation-row:nth-child(7) { animation-delay: 280ms; }
 .conversation-row:nth-child(8) { animation-delay: 320ms; }
-
-@keyframes thread-row-in {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
 
 @media (prefers-reduced-motion: reduce) {
   .conversation-row { animation: none; }
@@ -195,7 +192,7 @@
   align-items: center;
   align-self: center;
   flex-shrink: 0;
-  gap: 2px;
+  gap: var(--sp-0-5);
   padding-right: var(--sp-3);
 }
 

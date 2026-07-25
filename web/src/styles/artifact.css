@@ -59,14 +59,14 @@
 .artifact-chip-copy {
   min-width: 0;
   display: grid;
-  gap: 2px;
+  gap: var(--sp-0-5);
 }
 
 .artifact-chip-kicker {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--sp-1-5);
   color: var(--ink-3);
   font: var(--type-label-strong);
   overflow: hidden;
@@ -222,7 +222,7 @@
   min-height: 480px;
   border: 0;
   border-radius: var(--r-2);
-  background: white; /* document paper — previews assume a white page in every theme */
+  background: var(--paper); /* document paper — previews assume a white page in every theme */
 }
 
 /* ── Unified artifact library drawer ─────────────────────────────────── */
@@ -255,7 +255,7 @@
 .artifact-index-strip-icons {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--sp-1);
   padding: var(--sp-2);
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -362,7 +362,7 @@
 }
 
 .artifact-index-filter-btn {
-  padding: 2px var(--sp-3);
+  padding: var(--sp-0-5) var(--sp-3);
   border: 1px solid var(--line-1);
   border-radius: var(--r-2);
   background: transparent;
@@ -386,7 +386,7 @@
   display: flex;
   flex-direction: column;
   padding: var(--sp-2);
-  gap: 2px;
+  gap: var(--sp-0-5);
 }
 
 .artifact-index-row {
@@ -431,7 +431,7 @@
 .artifact-index-row-copy {
   min-width: 0;
   display: grid;
-  gap: 2px;
+  gap: var(--sp-0-5);
 }
 
 .artifact-index-row-title {
@@ -491,7 +491,7 @@
 .artifact-preview-action-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--sp-1);
   height: 28px;
   padding: 0 var(--sp-3);
   border: 1px solid var(--line-1);

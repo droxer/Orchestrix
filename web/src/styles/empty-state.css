@@ -2,24 +2,14 @@
    Relay empty states + shared enter motion
 
    One visual language for transcript, board, and setup zero-data surfaces.
-   Login reuses the same relay-rise keyframes (see login.css).
+   Motion is the shared `rise` keyframe from tokens/base.css at the pane
+   tier — login and the admin view stage ride the same one.
    ===================================================================== */
-
-@keyframes relay-rise {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
 
 /* Staggered reveal — pair with delay utilities below. */
 .relay-enter {
   opacity: 0;
-  animation: relay-rise var(--t-slow) var(--ease) forwards;
+  animation: rise var(--t-slow) var(--ease) forwards;
 }
 
 .relay-enter-delay-1 { animation-delay: 60ms; }

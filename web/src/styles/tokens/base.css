@@ -224,6 +224,22 @@ button[data-slot="button"][data-variant="link"] {
   100% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--pulse-color, var(--info)) 0%, transparent); }
 }
 
+/* Fade-and-rise entrance — the one pattern behind every view, pane, card,
+   and row reveal. Travel is read from --rise-from so a caller can pick the
+   row tier (--rise-sm) or the pane tier (--rise) without a new keyframe;
+   it defaults to the pane tier. Elements that must also settle a transform
+   of their own (tooltips, anchored menus) keep a local keyframe. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(var(--rise-from, var(--rise)));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Long-list render skip — the browser reserves a representative 72px row
    height for off-screen items to prevent scroll jumps. */
 .list-virtual {

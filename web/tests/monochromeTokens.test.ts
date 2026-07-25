@@ -38,6 +38,19 @@ describe("monochrome palette tokens", () => {
     assert.match(lightRegister, /--ok:\s*#6b727b;/);
   });
 
+  it("pins both registers as tokens so nothing hand-copies a hex", () => {
+    // Surfaces that must not follow the active theme (pre-auth login, theme
+    // swatches, diff chrome) read these instead of re-declaring literals.
+    assert.match(darkRegister, /--dark-canvas:\s*#101214;/);
+    assert.match(darkRegister, /--dark-elevated:\s*#22262b;/);
+    assert.match(darkRegister, /--dark-ink:\s*#f2f4f6;/);
+    assert.match(darkRegister, /--dark-ink-strong:\s*#ffffff;/);
+    assert.match(darkRegister, /--dark-body:\s*#c9ced4;/);
+    assert.match(darkRegister, /--dark-ink-soft:\s*#99a0a8;/);
+    assert.match(darkRegister, /--light-canvas:\s*#f7f8f9;/);
+    assert.match(darkRegister, /--light-ink:\s*#16181b;/);
+  });
+
   it("no chromatic graphite-era values remain in palette.css", () => {
     const dead = [
       "#6ba1d4", "#84b3e0", "#33689e", "#2a5786", // steel blues
@@ -56,12 +69,18 @@ describe("monochrome palette tokens", () => {
 const login = readStyle("login.css");
 
 describe("monochrome login palette", () => {
-  it("pins neutral pre-auth accents", () => {
-    assert.match(login, /--lg-steel:\s*#f2f4f6;/);
-    assert.match(login, /--lg-steel-active:\s*#ffffff;/);
-    assert.match(login, /--lg-on-steel:\s*#101214;/);
-    assert.match(login, /--lg-err:\s*#f2f4f6;/);
+  it("pins neutral pre-auth accents via the always-dark register tokens", () => {
+    // The --lg-* names alias palette.css's pinned register rather than
+    // re-declaring its hexes, so the two can never drift apart.
+    assert.match(login, /--lg-steel:\s*var\(--dark-ink\);/);
+    assert.match(login, /--lg-steel-active:\s*var\(--dark-ink-strong\);/);
+    assert.match(login, /--lg-on-steel:\s*var\(--dark-canvas\);/);
+    assert.match(login, /--lg-err:\s*var\(--dark-ink\);/);
     assert.match(login, /\.login-error \{[^}]*var\(--lg-err\)/s);
+  });
+
+  it("originates no color of its own", () => {
+    assert.ok(!/#[0-9a-fA-F]{3,8}\b/.test(login), "login.css must not contain a raw hex color");
   });
 
   it("drops steel-blue, amber, and status hues", () => {
@@ -75,10 +94,23 @@ describe("monochrome login palette", () => {
 const preferences = readStyle("preferences.css");
 
 describe("monochrome theme-picker swatches", () => {
-  it("mirrors the monochrome registers", () => {
-    assert.match(preferences, /\.pref-theme-swatch\[data-tone="light"\]::after \{\s*background: #16181b;/);
-    assert.match(preferences, /\.pref-theme-swatch\[data-tone="dark"\]::after \{\s*background: #f2f4f6;/);
-    assert.match(preferences, /linear-gradient\(90deg, #16181b 0 50%, #f2f4f6 50% 100%\)/);
+  it("mirrors the monochrome registers through the pinned tokens", () => {
+    // Swatches must show both registers at once, so they can't use the
+    // theme-varying --action/--surface-0 — they read the pinned tokens,
+    // which stay in sync with the registers by construction.
+    assert.match(preferences, /\.pref-theme-swatch\[data-tone="light"\]::after \{\s*background: var\(--light-ink\);/);
+    assert.match(preferences, /\.pref-theme-swatch\[data-tone="dark"\]::after \{\s*background: var\(--dark-ink\);/);
+    assert.match(
+      preferences,
+      /linear-gradient\(90deg, var\(--light-ink\) 0 50%, var\(--dark-ink\) 50% 100%\)/,
+    );
+  });
+
+  it("originates no color of its own", () => {
+    assert.ok(
+      !/#[0-9a-fA-F]{3,8}\b/.test(preferences),
+      "preferences.css must not contain a raw hex color",
+    );
   });
 
   it("drops the steel-blue swatch accents", () => {

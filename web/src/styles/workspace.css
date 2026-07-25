@@ -69,9 +69,9 @@
 .workspace-page .workspace-page-tabs {
   display: inline-flex;
   align-items: stretch;
-  gap: 2px;
+  gap: var(--sp-0-5);
   max-width: 100%;
-  padding: 2px;
+  padding: var(--sp-0-5);
   border: 1px solid var(--line-2);
   border-radius: var(--r-2);
   background: var(--surface-1);
@@ -177,7 +177,7 @@
   height: 7px;
   border-radius: var(--r-full);
   background: var(--ok);
-  animation: workspace-metric-pulse 2s var(--ease) infinite;
+  animation: workspace-metric-pulse var(--t-pulse-calm) var(--ease) infinite;
 }
 
 @keyframes workspace-metric-pulse {
@@ -291,23 +291,12 @@
 .workspace-activity-section {
   border-bottom: 1px solid var(--line-1);
   opacity: 0;
-  animation: workspace-section-rise var(--t-slow) var(--ease) forwards;
+  animation: rise var(--t-slow) var(--ease) forwards;
 }
 
 .workspace-activity-section:nth-child(1) { animation-delay: 40ms; }
 .workspace-activity-section:nth-child(2) { animation-delay: 120ms; }
 .workspace-activity-section:nth-child(3) { animation-delay: 200ms; }
-
-@keyframes workspace-section-rise {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
 
 .workspace-activity-section:last-child {
   border-bottom: 0;
@@ -539,7 +528,7 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 2px;
+  gap: var(--sp-0-5);
   min-width: 0;
   margin: 0;
   padding: 0;
@@ -549,7 +538,7 @@
 .workspace-path-crumb li {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: var(--sp-0-5);
   min-width: 0;
 }
 
@@ -562,7 +551,7 @@
 .workspace-path-segment {
   border: 0;
   background: transparent;
-  padding: 2px 4px;
+  padding: var(--sp-0-5) var(--sp-1);
   border-radius: var(--r-2);
   color: var(--ink-3);
   cursor: pointer;
@@ -930,7 +919,9 @@
   gap: var(--sp-3);
   padding: var(--sp-3) var(--sp-2);
   border-bottom: 1px dashed var(--line-1);
-  animation: artifacts-ghost-in var(--t-slow) var(--ease) backwards;
+  --rise-from: var(--rise-sm);
+
+  animation: rise var(--t-slow) var(--ease) backwards;
 }
 
 /* Downward fade: the top row is nearly real, the last almost gone — the
@@ -967,13 +958,6 @@
   font-size: var(--fs-2);
 }
 
-@keyframes artifacts-ghost-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-}
-
 .workspace-empty-state-mark.is-pulse {
   background: color-mix(in srgb, var(--ok) 14%, var(--surface-2));
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok) 24%, var(--line-2));
@@ -985,7 +969,7 @@
   height: 8px;
   border-radius: var(--r-full);
   background: var(--ok);
-  animation: workspace-metric-pulse 2s var(--ease) infinite;
+  animation: workspace-metric-pulse var(--t-pulse-calm) var(--ease) infinite;
 }
 
 .workspace-loading {
@@ -1070,7 +1054,7 @@
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--sp-1);
 }
 
 .workspace-dossier-intro > span {
@@ -1178,7 +1162,7 @@
 .agent-personality-state {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--sp-1-5);
   color: var(--ink-3);
   font: var(--type-micro);
   letter-spacing: var(--track-caps);
@@ -1385,7 +1369,7 @@
 .agent-personality-editor-guide li div {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--sp-0-5);
 }
 
 .agent-personality-editor-guide li small {
@@ -1407,7 +1391,7 @@
 
 .agent-personality-editor-toolbar button {
   height: auto;
-  padding: 2px 0;
+  padding: var(--sp-0-5) 0;
   border: 0;
   background: transparent;
   color: var(--action);
