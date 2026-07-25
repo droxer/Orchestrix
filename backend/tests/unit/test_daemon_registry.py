@@ -15,6 +15,7 @@ import pytest
 from relay.daemon_registry import (
     DaemonNodeRegistry,
     ServerDaemonNodeBackend,
+    daemon_active_run,
     effective_role_for_assignment,
     sandbox_ui_token_matches,
     workspace_paths_match,
@@ -3078,6 +3079,29 @@ def test_database_daemon_store_preserves_artifact_snapshot_state() -> None:
         assert store.run_request_for_command("cmd_1")["state"][
             "_relay_artifact_snapshot"
         ]
+
+
+@pytest.mark.parametrize("store_factory", DAEMON_STORE_FACTORIES)
+def test_active_runs_carry_logical_agent_and_placement(store_factory) -> None:
+    with TemporaryDirectory() as root:
+        store = store_factory(root)
+        store.register_node(store_node_payload())
+        store.enqueue_command(
+            "sbx_alice",
+            {
+                **run_start_command("cmd_1", "run_1"),
+                "logicalAgentId": "agent_builder",
+                "placementId": "placement_1",
+            },
+        )
+
+        run = store.list_active_runs("sbx_alice")[0]
+        assert run["logicalAgentId"] == "agent_builder"
+        assert run["placementId"] == "placement_1"
+
+        projected = daemon_active_run(run)
+        assert projected["logicalAgentId"] == "agent_builder"
+        assert projected["placementId"] == "placement_1"
 
 
 @pytest.mark.parametrize("store_factory", DAEMON_STORE_FACTORIES)

@@ -1058,6 +1058,8 @@ class DatabaseDaemonStore:
         Column("command_public_id", Text, nullable=True),
         Column("session_public_id", Text, nullable=False),
         Column("agent", Text, nullable=False),
+        Column("logical_agent_id", Text, nullable=True),
+        Column("placement_id", Text, nullable=True),
         Column("mode", Text, nullable=False),
         Column("task_goal", Text, nullable=False),
         Column("workspace_path", Text, nullable=True),
@@ -2459,6 +2461,8 @@ def run_to_row(
         "command_public_id": run.get("commandId"),
         "session_public_id": run["sessionId"],
         "agent": run["agent"],
+        "logical_agent_id": run.get("logicalAgentId"),
+        "placement_id": run.get("placementId"),
         "mode": run["mode"],
         "task_goal": run["taskGoal"],
         "workspace_path": run.get("workspacePath"),
@@ -2488,6 +2492,12 @@ def row_to_run(row: Any, *, include_database: bool = False) -> dict[str, Any]:
         "sessionId": row["session_public_id"],
         "runId": row["public_id"],
         "agent": row["agent"],
+        **(
+            {"logicalAgentId": row["logical_agent_id"]}
+            if row.get("logical_agent_id")
+            else {}
+        ),
+        **({"placementId": row["placement_id"]} if row.get("placement_id") else {}),
         "mode": row["mode"],
         "taskGoal": row["task_goal"],
         **(

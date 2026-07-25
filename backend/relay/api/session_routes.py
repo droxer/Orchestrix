@@ -246,7 +246,7 @@ async def workspace_brief(request: Request, ctx: AppContextDep) -> dict[str, Any
         active_node_runs = node.get("activeRuns", [])
         has_authorized_run = (
             any(
-                run.get("currentLogicalAgentId") == agent["id"]
+                run.get("logicalAgentId") == agent["id"]
                 for run in active_node_runs
             )
             if agent
@@ -267,7 +267,7 @@ async def workspace_brief(request: Request, ctx: AppContextDep) -> dict[str, Any
         run
         for node in nodes
         for run in node.get("activeRuns", [])
-        if (not agent or run.get("currentLogicalAgentId") == agent["id"])
+        if (not agent or run.get("logicalAgentId") == agent["id"])
         and (not team or run.get("sessionId") in team_session_ids)
     ]
     tasks = [

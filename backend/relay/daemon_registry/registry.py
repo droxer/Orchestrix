@@ -1675,8 +1675,6 @@ class DaemonNodeRegistry:
             "currentRunId": command["runId"],
             "currentAgent": command["agent"],
             "currentMode": command["mode"],
-            "currentLogicalAgentId": command.get("logicalAgentId"),
-            "currentPlacementId": command.get("placementId"),
             "currentStartedAt": now_iso(),
             "state": state,
         }
@@ -2218,7 +2216,8 @@ def daemon_active_run(run: dict[str, Any]) -> dict[str, Any]:
             "taskGoal",
             "workspacePath",
             "startedAt",
-            "currentLogicalAgentId",
+            "logicalAgentId",
+            "placementId",
         )
         if key in run
     }

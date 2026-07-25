@@ -542,12 +542,11 @@ def test_employee_dispatches_work_by_logical_agent_id(monkeypatch) -> None:
                 "executorKind": "codex",
             },
         ).json()["agent"]
-        assert (
-            client.post(
-                f"/cp/agents/{agent['id']}/placements", json={"daemonNodeId": "node_a"}
-            ).status_code
-            == 201
+        placement_response = client.post(
+            f"/cp/agents/{agent['id']}/placements", json={"daemonNodeId": "node_a"}
         )
+        assert placement_response.status_code == 201
+        placement = placement_response.json()["placement"]
 
         assert client.post("/auth/logout").status_code == 200
         assert (
@@ -589,6 +588,18 @@ def test_employee_dispatches_work_by_logical_agent_id(monkeypatch) -> None:
             "kind": "path",
             "value": "/workspace/alice",
         }
+        monitor_node = next(
+            node
+            for node in client.get("/daemon-nodes").json()["nodes"]
+            if node["id"] == "node_a"
+        )
+        active_run = next(
+            active
+            for active in monitor_node["activeRuns"]
+            if active["runId"] == run["id"]
+        )
+        assert active_run["logicalAgentId"] == agent["id"]
+        assert active_run["placementId"] == placement["id"]
         commands = app.state.daemon_store.take_queued_commands("node_a")
         assert len(commands) == 1
         command = commands[0]["command"]
