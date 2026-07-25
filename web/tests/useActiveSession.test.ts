@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { pickInitialActiveSessionId } from "../src/hooks/useActiveSession.js";
+import { pickInitialActiveSessionId, shouldDeriveActiveSession } from "../src/hooks/useActiveSession.js";
 
 describe("pickInitialActiveSessionId", () => {
   it("returns stored id when session exists and is not archived", () => {
@@ -47,5 +47,30 @@ describe("pickInitialActiveSessionId", () => {
   it("falls back to newest non-archived when stored id is missing from list", () => {
     const sessions = [{ id: "s1", archived: false, createdAt: "2026-06-01" }];
     assert.equal(pickInitialActiveSessionId("ghost", sessions), "s1");
+  });
+});
+
+describe("shouldDeriveActiveSession", () => {
+  it("derives the opening conversation once the first load has landed", () => {
+    assert.equal(shouldDeriveActiveSession({ employeeId: "alice", derivedFor: null, sessionCount: 2 }), true);
+  });
+
+  it("waits for the first load instead of deriving from an empty list", () => {
+    assert.equal(shouldDeriveActiveSession({ employeeId: "alice", derivedFor: null, sessionCount: 0 }), false);
+  });
+
+  // The regression guard: re-deriving on every poll tick / streamed update
+  // drags the selection back to the most recent thread, undoing an explicit
+  // "new conversation" (which clears both the selection and its stored id).
+  it("does not re-derive when the session list changes for the same employee", () => {
+    assert.equal(shouldDeriveActiveSession({ employeeId: "alice", derivedFor: "alice", sessionCount: 3 }), false);
+  });
+
+  it("derives again after switching employee", () => {
+    assert.equal(shouldDeriveActiveSession({ employeeId: "bob", derivedFor: "alice", sessionCount: 3 }), true);
+  });
+
+  it("never derives without an employee", () => {
+    assert.equal(shouldDeriveActiveSession({ employeeId: "", derivedFor: null, sessionCount: 3 }), false);
   });
 });

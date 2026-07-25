@@ -24,6 +24,19 @@ export function myConversationSessions(
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
+// Merge a session returned by a mutation into the cached list, replacing any
+// record with the same id. Creating a conversation resolves with the new
+// session long before the list refetch lands, so the caller seeds it here to
+// keep the selection resolvable — otherwise pickActiveConversationSession
+// cannot find the selected id and falls back to the most recent thread.
+export function upsertConversationSession(
+  sessions: readonly RelaySession[],
+  session: RelaySession,
+): RelaySession[] {
+  const others = sessions.filter((candidate) => candidate.id !== session.id);
+  return [session, ...others].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
 export function pickActiveConversationSession(input: {
   conversations: readonly RelaySession[];
   selectedSessionId?: string;
