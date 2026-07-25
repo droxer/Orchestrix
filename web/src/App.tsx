@@ -15,7 +15,7 @@ import { useSessionEvents } from "./hooks/useSessionEvents";
 import { useLocalDaemonNodes } from "./hooks/useLocalDaemonNodes";
 import { mergeVisibleDaemonNodes } from "./lib/daemonNodes";
 import { formatDispatchError } from "./lib/agentReadiness";
-import { isLogicalAgentRoutable } from "./lib/agentDisplayNames";
+import { isEmployeeAgentRoutable, preferredRoutableAgent } from "./lib/agentDisplayNames";
 import { routeComposerMessage } from "./lib/messageRouting";
 import { applyTheme, readLanguage, readTheme, readTokens, selectedEmployeeKey, writeLanguage, writeTheme } from "./lib/appStorage";
 import { canUseLocalControlPanel } from "./lib/controlPanel";
@@ -297,13 +297,11 @@ export function App() {
       setActiveLogicalAgentId(null);
       return;
     }
-    const selected = logicalAgents.find((agent) => agent.id === activeLogicalAgentId && isLogicalAgentRoutable(agent.availability))
-      ?? logicalAgents.find((agent) => isLogicalAgentRoutable(agent.availability))
-      ?? logicalAgents[0];
-    setActiveLogicalAgentId(selected.id);
-    setActiveAgent(selected.executorKind);
-    if (!logicalAgents.some((agent) => agent.id === handoffAgentId && isLogicalAgentRoutable(agent.availability))) {
-      setHandoffAgentId(logicalAgents.find((agent) => isLogicalAgentRoutable(agent.availability))?.id ?? "");
+    const selected = preferredRoutableAgent(logicalAgents, activeLogicalAgentId);
+    setActiveLogicalAgentId(selected?.id ?? null);
+    if (selected) setActiveAgent(selected.executorKind);
+    if (!logicalAgents.some((agent) => agent.id === handoffAgentId && isEmployeeAgentRoutable(agent))) {
+      setHandoffAgentId(logicalAgents.find(isEmployeeAgentRoutable)?.id ?? "");
     }
   }, [activeLogicalAgentId, handoffAgentId, logicalAgents]);
   useEffect(() => {
@@ -446,9 +444,9 @@ export function App() {
     if (!raw) return;
     if (!selectedEmployee) return;
     if (conversationRunning) return;
-    const defaultLogicalAgent = activeLogicalAgent && isLogicalAgentRoutable(activeLogicalAgent.availability)
+    const defaultLogicalAgent = activeLogicalAgent && isEmployeeAgentRoutable(activeLogicalAgent)
       ? activeLogicalAgent
-      : logicalAgents.find((agent) => isLogicalAgentRoutable(agent.availability));
+      : logicalAgents.find(isEmployeeAgentRoutable);
     if (!defaultLogicalAgent) {
       reportMutationError("Agent not ready for dispatch", null, t("errors.agent_not_ready", { agent: activeAgent }));
       return;
@@ -464,7 +462,7 @@ export function App() {
     const routedAgent = routed.agent;
     if (!goal) return;
     const routedLogicalAgent = logicalAgents.find(
-      (agent) => agent.id === routed.agentId && isLogicalAgentRoutable(agent.availability),
+      (agent) => agent.id === routed.agentId && isEmployeeAgentRoutable(agent),
     );
     if (!routedLogicalAgent) {
       reportMutationError("Agent not ready for dispatch", null, t("errors.agent_not_ready", { agent: routedAgent }));
@@ -543,7 +541,7 @@ export function App() {
       try {
         const assignment = rerunAssignmentForSession(activeSession, activeAgent, composerMode);
         const logicalAgent = logicalAgents.find(
-          (agent) => agent.executorKind === assignment.agent && isLogicalAgentRoutable(agent.availability),
+          (agent) => agent.executorKind === assignment.agent && isEmployeeAgentRoutable(agent),
         );
         if (!logicalAgent) {
           reportMutationError(
@@ -597,7 +595,7 @@ export function App() {
     setIsRunning(true);
     try {
       const logicalAgent = logicalAgents.find(
-        (candidate) => candidate.executorKind === agent && isLogicalAgentRoutable(candidate.availability),
+        (candidate) => candidate.executorKind === agent && isEmployeeAgentRoutable(candidate),
       );
       if (!logicalAgent) {
         reportMutationError("Agent not ready for retry", null, t("errors.agent_not_ready", { agent }));
@@ -633,7 +631,7 @@ export function App() {
     if (!selectedEmployee) return;
     if (conversationRunning) return;
     const logicalAgent = logicalAgents.find(
-      (agent) => agent.id === handoffAgentId && isLogicalAgentRoutable(agent.availability),
+      (agent) => agent.id === handoffAgentId && isEmployeeAgentRoutable(agent),
     );
     if (!logicalAgent) {
       reportMutationError("Agent not ready for handoff", null, t("errors.agent_not_ready", { agent: handoffAgentId }));

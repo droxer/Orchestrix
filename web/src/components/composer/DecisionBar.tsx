@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { AgentTaskMode, EmployeeAgent } from "../../types";
-import { isLogicalAgentRoutable } from "../../lib/agentDisplayNames";
+import { isEmployeeAgentRoutable } from "../../lib/agentDisplayNames";
 import { ActionApprove, ActionHandoff, ActionRoute } from "../icons";
 import { Button } from "../ui/button";
 import { useDialogs } from "../ui/DialogProvider";
@@ -76,7 +76,7 @@ export function DecisionBar({ logicalAgents, sendDecision, handoffOpen, setHando
             <label htmlFor="handoff-agent">{t("handoff.route_to")}</label>
             <select id="handoff-agent" name="handoff-agent" value={handoffAgentId} onChange={(e) => setHandoffAgentId(e.target.value)}>
               {logicalAgents.map((agent) => {
-                const isDisabled = !isLogicalAgentRoutable(agent.availability);
+                const isDisabled = !isEmployeeAgentRoutable(agent);
                 return (
                   <option key={agent.id} value={agent.id} disabled={isDisabled}>
                     {isDisabled ? t("thread.agent_disabled_option", { agent: agent.displayName }) : agent.displayName}
