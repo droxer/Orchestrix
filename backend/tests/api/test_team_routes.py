@@ -225,7 +225,7 @@ def test_employee_reads_team_profile_artifacts_and_activity(monkeypatch) -> None
                         {
                             "runId": "run_team",
                             "sessionId": session["id"],
-                            "currentLogicalAgentId": lead["id"],
+                            "logicalAgentId": lead["id"],
                             "taskGoal": "Ship together",
                             "agent": "codex",
                             "mode": "action",
@@ -234,7 +234,7 @@ def test_employee_reads_team_profile_artifacts_and_activity(monkeypatch) -> None
                         {
                             "runId": "run_individual",
                             "sessionId": unrelated_session["id"],
-                            "currentLogicalAgentId": lead["id"],
+                            "logicalAgentId": lead["id"],
                             "taskGoal": "Work alone",
                             "agent": "codex",
                             "mode": "action",
