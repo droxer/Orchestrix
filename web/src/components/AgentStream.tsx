@@ -9,6 +9,7 @@ import {
   displayAgentSegments,
   emptyAgentStreamSegments,
   hasStreamingTextCaret,
+  hasTerminalOutcome,
   parseAgentStderr,
   type AgentSegment,
 } from "../lib/agentStream";
@@ -56,7 +57,10 @@ export function AgentStream({ agent, stdout, stderr, streaming, collaborations }
     [accumulator, stdout, stderr, streaming],
   );
   const workingLabel = t("agent_stream.empty_working");
-  const showActivity = streaming && !hasStreamingTextCaret(segments);
+  // The run stays `streaming` until the daemon posts `agent.completed`, which
+  // lands after the CLI's own end-of-turn frame — don't keep pulsing "Working…"
+  // beneath a line that already says the agent finished.
+  const showActivity = streaming && !hasStreamingTextCaret(segments) && !hasTerminalOutcome(segments);
   const collaborationNodes = useMemo(
     () => buildCollaborationTree(collaborations, { settled: !streaming }),
     [collaborations, streaming],
