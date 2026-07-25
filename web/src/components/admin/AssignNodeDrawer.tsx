@@ -148,9 +148,6 @@ export function AssignNodeDrawer({
     }
   }
 
-  const canSubmit = creatingNode
-    ? Boolean(employeeId.trim()) && (isManaged || Boolean(workspacePath.trim()))
-    : Boolean(employeeId && nodeId);
   const displayHandle = selectedEmployee
     ? `@${selectedEmployee.id}`
     : employeeId
@@ -216,6 +213,7 @@ export function AssignNodeDrawer({
               >
                 <SelectTrigger
                   ref={employeeTriggerRef}
+                  data-modal-initial-focus
                   className="w-full mono"
                   aria-labelledby={employeeLabelId}
                   aria-invalid={Boolean(fieldErrors.employeeId) || undefined}
@@ -438,7 +436,7 @@ export function AssignNodeDrawer({
           >
             {t("admin.v2.cancel")}
           </Button>
-          <Button size="cta" type="submit" disabled={isBusy || !canSubmit}>
+          <Button size="cta" type="submit" loading={isBusy}>
             {isBusy
               ? creatingNode ? t("admin.creating") : t("admin.assigning")
               : creatingNode

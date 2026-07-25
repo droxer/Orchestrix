@@ -11,14 +11,29 @@
   to { opacity: 1; }
 }
 
+@keyframes overlay-backdrop-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
 @keyframes overlay-panel-in {
   from { opacity: 0; transform: translateY(-8px) scale(0.97); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+@keyframes overlay-panel-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(-6px) scale(0.98); }
+}
+
 @keyframes overlay-sheet-in {
   from { opacity: 0.72; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes overlay-sheet-out {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0.72; transform: translateY(12px); }
 }
 
 @keyframes overlay-toast-in {
@@ -40,6 +55,10 @@
   -webkit-backdrop-filter: blur(2px);
   overscroll-behavior: contain;
   animation: overlay-backdrop-in var(--t-fast) var(--ease) both;
+}
+
+.overlay-backdrop.is-closing {
+  animation: overlay-backdrop-out var(--t-fast) var(--ease) forwards;
 }
 
 /* Stacked drawers — every layer uses the one scrim; nested backdrops

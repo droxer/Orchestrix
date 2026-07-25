@@ -6,7 +6,6 @@ import { login, RelayApiError } from "../api";
 import type { CurrentUser } from "../types";
 import { RelayMark } from "./RelayMark";
 import { Button } from "./ui/button";
-import { NavRefresh } from "./icons";
 
 interface LoginScreenProps {
   onAuthenticated: (user: CurrentUser) => void;
@@ -40,8 +39,6 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
     }
   }
 
-  const canSubmit = Boolean(username.trim() && password);
-
   return (
     <main className="login-screen" data-mode="login">
       <section className="login-card" aria-labelledby="login-headline">
@@ -69,6 +66,7 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
               autoCapitalize="none"
               autoCorrect="off"
               spellCheck={false}
+              required
               aria-invalid={error ? true : undefined}
               aria-describedby={error ? "login-error" : undefined}
             />
@@ -82,6 +80,7 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               autoComplete="current-password"
+              required
               aria-invalid={error ? true : undefined}
               aria-describedby={error ? "login-error" : undefined}
             />
@@ -93,9 +92,8 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
             </p>
           )}
 
-          <Button variant="default" type="submit" className="login-submit" disabled={isLoading || !canSubmit}>
-            {isLoading ? <NavRefresh size={14} className="spin" aria-hidden="true" /> : null}
-            {isLoading ? t("login.loading") : t("login.sign_in")}
+          <Button variant="default" type="submit" className="login-submit" loading={isLoading} loadingLabel={t("login.loading")}>
+            {t("login.sign_in")}
           </Button>
         </form>
 

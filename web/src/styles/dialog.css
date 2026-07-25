@@ -33,6 +33,14 @@
   outline: none;
 }
 
+.dialog-modal:focus-visible {
+  box-shadow: var(--shadow-2), var(--focus-ring);
+}
+
+.dialog-modal.is-closing {
+  animation: overlay-panel-out var(--t-fast) var(--ease) forwards;
+}
+
 .dialog-modal[data-tone="danger"] {
   border-left: 3px solid var(--err);
   padding-left: calc(var(--sp-6) - 2px);
@@ -60,8 +68,10 @@
 
 .dialog-title {
   margin: 0;
+  min-width: 0;
   font: var(--type-title);
   color: var(--ink-1);
+  overflow-wrap: anywhere;
 }
 
 .dialog-modal[data-tone="danger"] .dialog-title {
@@ -72,6 +82,7 @@
   margin: 0;
   font: var(--type-body-sm);
   color: var(--ink-2);
+  overflow-wrap: anywhere;
 }
 
 .dialog-form {
@@ -109,7 +120,10 @@
   bottom: calc(var(--sp-6) + env(safe-area-inset-bottom));
   z-index: calc(var(--z-dialog) + 1);
   width: min(420px, calc(100vw - var(--sp-6) * 2));
-  padding: var(--sp-3) var(--sp-4);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-4);
   border: 1px solid var(--line-1);
   border-left: 3px solid var(--info);
   border-radius: var(--r-2);
@@ -119,6 +133,33 @@
   font: var(--type-body-sm);
   line-height: 1.45;
   animation: overlay-toast-in var(--t-fast) var(--ease) both;
+}
+
+.dialog-toast-message {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.dialog-toast-close {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin: calc(-1 * var(--sp-1));
+  padding: 0;
+  border-radius: var(--r-full);
+  color: var(--ink-3);
+}
+
+.dialog-toast-close:hover {
+  background: var(--surface-2);
+  color: var(--ink-1);
+}
+
+.dialog-toast-close:focus-visible {
+  box-shadow: var(--focus-ring);
 }
 
 .dialog-toast.dialog-toast--exit {

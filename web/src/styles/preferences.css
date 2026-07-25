@@ -31,6 +31,10 @@
   outline: none;
 }
 
+.pref-modal.is-closing {
+  animation: overlay-panel-out var(--t-fast) var(--ease) forwards;
+}
+
 /* Header */
 .pref-header {
   display: flex;

@@ -386,6 +386,7 @@ export function TaskDrawer({
         <label className="adm-field">
           <span>{t("backlog.title_field")}</span>
           <Input
+            data-modal-initial-focus
             name={`${fieldPrefix}-title`}
             required
             value={form.title}
@@ -542,14 +543,15 @@ export function TaskDrawer({
               className="adm-form-actions-leading"
               onClick={onDelete}
               disabled={busy}
+              loading={deleting}
             >
               {deleting ? t("backlog.deleting") : t("backlog.delete_task")}
             </Button>
           ) : null}
-          <Button type="button" variant="outline" size="cta" onClick={onClose} disabled={busy}>
+          <Button type="button" variant="ghost" size="cta" onClick={onClose} disabled={busy}>
             {t("dialog.cancel")}
           </Button>
-          <Button type="submit" variant="default" size="cta" disabled={busy || !form.title.trim()}>
+          <Button type="submit" variant="default" size="cta" loading={saving} disabled={deleting}>
             {saving ? t("admin.saving") : t("dialog.confirm")}
           </Button>
         </div>

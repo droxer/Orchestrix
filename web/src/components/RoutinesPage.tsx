@@ -24,8 +24,9 @@ import { PageHeader } from "./PageHeader";
 import { BoardEmpty } from "./BoardEmpty";
 import { TaskBoardHeaderActions } from "./TaskBoardHeaderActions";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
-import { Button } from "./ui/button";
+import { Button, buttonVariants } from "./ui/button";
 import { FiltersBar } from "./FiltersBar";
+import { hrefForRoute } from "../lib/appRoute";
 
 interface RoutinesPageProps {
   tasks: RelayTask[];
@@ -348,9 +349,18 @@ function RoutineDrawerMeta({
           {task.routineEnabled ? t("routine.enabled") : t("routine.disabled")}
         </Badge>
         {session ? (
-          <Button variant="ghost" size="sm" type="button" onClick={() => onOpenThread(session.id)}>
+          <a
+            data-slot="link-button"
+            href={hrefForRoute("main", session.id)}
+            className={buttonVariants({ variant: "ghost", size: "sm" })}
+            onClick={(event) => {
+              if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.altKey || event.ctrlKey || event.shiftKey) return;
+              event.preventDefault();
+              onOpenThread(session.id);
+            }}
+          >
             {t("backlog.open_thread")}
-          </Button>
+          </a>
         ) : null}
       </div>
       <p className="task-drawer-meta-activity">

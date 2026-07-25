@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
+import { useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { deleteTeamProfileImage, getTeamArtifacts, getWorkspaceBrief, updateTeamProfileImage } from "../api";
@@ -23,10 +23,11 @@ import { ArtifactBody } from "./artifact/ArtifactBody";
 import { ArtifactsEmpty } from "./artifact/ArtifactsEmpty";
 import { MetricItem, WorkspaceEmpty, WorkspaceLoading } from "./workspace/WorkspacePrimitives";
 import { Badge } from "./ui/badge";
-import { Button } from "./ui/button";
+import { Button, buttonVariants } from "./ui/button";
 import { useDialogs } from "./ui/DialogProvider";
 import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { hrefForRoute } from "../lib/appRoute";
 
 type TeamPageTab = "profile" | "artifacts" | "activities";
 
@@ -103,6 +104,10 @@ function TeamProfile({
   const [memberIds, setMemberIds] = useState<string[]>(team.memberAgentIds);
   const [leadId, setLeadId] = useState(team.leadAgentId ?? "");
   const [imageSaving, setImageSaving] = useState(false);
+  const [validationError, setValidationError] = useState<"members" | "lead" | null>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
+  const membersRef = useRef<HTMLFieldSetElement>(null);
+  const leadRef = useRef<HTMLButtonElement>(null);
   const readyMembers = team.members.filter((member) => member.enabled && member.availability === "ready").length;
   const busy = updateTeamMutation.isPending || deleteTeamMutation.isPending || imageSaving;
   const draftDirty = name.trim() !== team.name.trim()
@@ -144,6 +149,7 @@ function TeamProfile({
     setName(team.name);
     setMemberIds(team.memberAgentIds);
     setLeadId(team.leadAgentId ?? "");
+    setValidationError(null);
   }
 
   function startEditing() {
@@ -158,6 +164,7 @@ function TeamProfile({
   }
 
   function toggleMember(agentId: string) {
+    setValidationError(null);
     setMemberIds((current) => {
       if (current.includes(agentId)) {
         const next = current.filter((id) => id !== agentId);
@@ -172,7 +179,21 @@ function TeamProfile({
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!name.trim() || memberIds.length === 0 || !leadId) return;
+    if (!name.trim()) {
+      nameRef.current?.focus();
+      return;
+    }
+    if (memberIds.length === 0) {
+      setValidationError("members");
+      membersRef.current?.focus();
+      return;
+    }
+    if (!leadId) {
+      setValidationError("lead");
+      leadRef.current?.focus();
+      return;
+    }
+    setValidationError(null);
     try {
       await updateTeamMutation.mutateAsync({
         teamId: team.id,
@@ -250,11 +271,13 @@ function TeamProfile({
             </div>
             {editing ? (
               <Input
+                ref={nameRef}
                 name="team-name"
                 type="text"
                 aria-label={t("teams.name")}
                 autoComplete="off"
                 autoFocus
+                required
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 onKeyDown={(event) => {
@@ -273,7 +296,14 @@ function TeamProfile({
               <span className="mono">{editing ? memberIds.length : team.members.length}</span>
             </div>
             {editing ? (
-              <fieldset className="team-profile-member-fieldset" aria-label={t("teams.members")}>
+              <fieldset
+                ref={membersRef}
+                className="team-profile-member-fieldset"
+                aria-label={t("teams.members")}
+                tabIndex={-1}
+                aria-invalid={validationError === "members" || undefined}
+                aria-describedby={validationError === "members" ? "team-profile-members-error" : undefined}
+              >
                 <div className="team-member-options team-profile-member-options">
                   {agents.map((agent) => (
                     <label key={agent.id} className="team-member-option">
@@ -289,6 +319,7 @@ function TeamProfile({
                   ))}
                 </div>
                 {agents.length === 0 ? <span className="adm-form-hint">{t("teams.no_agents")}</span> : null}
+                {validationError === "members" ? <span id="team-profile-members-error" className="text-sm text-danger" role="alert">{t("teams.members_required")}</span> : null}
               </fieldset>
             ) : (
               <ul className="team-profile-members">
@@ -318,8 +349,16 @@ function TeamProfile({
             <>
               <label className="adm-field team-profile-lead-field">
                 <span>{t("teams.lead")}</span>
-                <Select value={leadId} disabled={busy || memberIds.length === 0} onValueChange={(value) => value && setLeadId(value)}>
-                  <SelectTrigger className="w-full">
+                <Select value={leadId} disabled={busy || memberIds.length === 0} onValueChange={(value) => {
+                  if (value) setLeadId(value);
+                  setValidationError(null);
+                }}>
+                  <SelectTrigger
+                    ref={leadRef}
+                    className="w-full"
+                    aria-invalid={validationError === "lead" || undefined}
+                    aria-describedby={validationError === "lead" ? "team-profile-lead-error" : undefined}
+                  >
                     <SelectValue>
                       {(value: string) => agents.find((agent) => agent.id === value)?.displayName ?? value}
                     </SelectValue>
@@ -330,14 +369,15 @@ function TeamProfile({
                     ))}
                   </SelectContent>
                 </Select>
+                {validationError === "lead" ? <span id="team-profile-lead-error" className="text-sm text-danger" role="alert">{t("teams.lead_required")}</span> : null}
               </label>
               <div className="team-profile-inline-actions">
                 <span className="team-profile-inline-actions-spacer" />
                 <Button type="button" variant="ghost" onClick={() => void cancelEditing()} disabled={busy}>
                   {t("dialog.cancel")}
                 </Button>
-                <Button type="submit" disabled={busy || !name.trim() || memberIds.length === 0 || !leadId}>
-                  {busy ? t("admin.saving") : t("teams.save")}
+                <Button type="submit" loading={updateTeamMutation.isPending} loadingLabel={t("admin.saving")} disabled={deleteTeamMutation.isPending || imageSaving}>
+                  {t("teams.save")}
                 </Button>
               </div>
             </>
@@ -348,9 +388,9 @@ function TeamProfile({
           <p id="team-profile-danger-title" className="workspace-dossier-section-title">
             {t("admin.v2.danger_zone")}
           </p>
-          <Button type="button" variant="destructive" onClick={() => void remove()} disabled={busy}>
+          <Button type="button" variant="destructive" onClick={() => void remove()} loading={deleteTeamMutation.isPending} loadingLabel={t("teams.deleting")} disabled={updateTeamMutation.isPending || imageSaving}>
             <AdminDelete size={14} aria-hidden="true" />
-            {deleteTeamMutation.isPending ? t("teams.deleting") : t("teams.delete")}
+            {t("teams.delete")}
           </Button>
         </section>
       </div>
@@ -409,9 +449,18 @@ function TeamArtifacts({
             <h2>{selected?.title ?? t("workspace.preview")}</h2>
             {selected ? (
               <div className="workspace-pane-head-actions">
-                <Button type="button" variant="outline" size="sm" onClick={() => onOpenThread(selected.sessionId)}>
+                <a
+                  data-slot="link-button"
+                  href={hrefForRoute("main", selected.sessionId)}
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                  onClick={(event) => {
+                    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.altKey || event.ctrlKey || event.shiftKey) return;
+                    event.preventDefault();
+                    onOpenThread(selected.sessionId);
+                  }}
+                >
                   {t("workspace.open_thread")}
-                </Button>
+                </a>
               </div>
             ) : null}
           </header>

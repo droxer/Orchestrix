@@ -58,10 +58,10 @@ export function DecisionBar({ logicalAgents, sendDecision, handoffOpen, setHando
   return (
     <>
       <div className="decision-bar">
-        <Button variant="default" type="button" ref={approveRef} disabled={busy} aria-busy={pendingAction === "approve" || undefined} onClick={() => void runAction("approve", () => sendDecision("approve"))}><ActionApprove size={14} /> {pendingAction === "approve" ? pendingLabel : t("decision.approve")}</Button>
-        <Button variant="ghost" type="button" disabled={busy} aria-busy={pendingAction === "rerun" || undefined} onClick={() => void runAction("rerun", () => sendDecision("rerun"))}>{pendingAction === "rerun" ? pendingLabel : t("decision.rerun")}</Button>
-        <Button variant="ghost" type="button" disabled={busy} aria-busy={pendingAction === "mark_done" || undefined} onClick={() => void runAction("mark_done", () => sendDecision("mark_done"))}>{pendingAction === "mark_done" ? pendingLabel : t("decision.mark_done")}</Button>
-        <Button variant="destructive" type="button" disabled={busy} aria-busy={pendingAction === "reject" || undefined} onClick={() => void handleReject()}>{pendingAction === "reject" ? pendingLabel : t("decision.reject")}</Button>
+        <Button variant="default" type="button" ref={approveRef} disabled={busy} loading={pendingAction === "approve"} loadingLabel={pendingLabel} onClick={() => void runAction("approve", () => sendDecision("approve"))}><ActionApprove size={14} /> {t("decision.approve")}</Button>
+        <Button variant="ghost" type="button" disabled={busy} loading={pendingAction === "rerun"} loadingLabel={pendingLabel} onClick={() => void runAction("rerun", () => sendDecision("rerun"))}>{t("decision.rerun")}</Button>
+        <Button variant="ghost" type="button" disabled={busy} loading={pendingAction === "mark_done"} loadingLabel={pendingLabel} onClick={() => void runAction("mark_done", () => sendDecision("mark_done"))}>{t("decision.mark_done")}</Button>
+        <Button variant="destructive" type="button" disabled={busy} loading={pendingAction === "reject"} loadingLabel={pendingLabel} onClick={() => void handleReject()}>{t("decision.reject")}</Button>
         <Button variant="ghost" type="button" disabled={busy} aria-controls={handoffOpen ? "handoff-panel" : undefined} aria-expanded={handoffOpen} onClick={() => setHandoffOpen(!handoffOpen)}>
           <ActionHandoff size={14} /> {t("decision.handoff")}
         </Button>
@@ -99,7 +99,7 @@ export function DecisionBar({ logicalAgents, sendDecision, handoffOpen, setHando
           </div>
           <div className="handoff-actions">
             <Button variant="ghost" type="button" disabled={busy} onClick={() => setHandoffOpen(false)}>{t("handoff.cancel")}</Button>
-            <Button variant="default" type="button" disabled={busy} aria-busy={pendingAction === "handoff" || undefined} onClick={() => void runAction("handoff", sendHandoff)}>{pendingAction === "handoff" ? pendingLabel : t("handoff.send")}</Button>
+            <Button variant="default" type="button" disabled={busy} loading={pendingAction === "handoff"} loadingLabel={pendingLabel} onClick={() => void runAction("handoff", sendHandoff)}>{t("handoff.send")}</Button>
           </div>
         </div>
       ) : null}

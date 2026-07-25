@@ -126,8 +126,6 @@ export function AddEmployeeDrawer({
     if (await confirmDiscardChanges()) onClose();
   }
 
-  const canSubmit = Boolean(employeeId.trim() && username.trim() && password);
-
   return (
     <Drawer
       open={open}
@@ -169,6 +167,7 @@ export function AddEmployeeDrawer({
             </span>
             <Input
               ref={employeeIdRef}
+              data-modal-initial-focus
               name="employee-id"
               className="mono"
               value={employeeId}
@@ -320,7 +319,7 @@ export function AddEmployeeDrawer({
           <Button size="cta" type="button" variant="ghost" onClick={() => void requestClose()} disabled={isBusy}>
             {t("admin.v2.cancel")}
           </Button>
-          <Button size="cta" type="submit" disabled={isBusy || !canSubmit}>
+          <Button size="cta" type="submit" loading={isBusy}>
             {isBusy ? t("admin.creating") : t("admin.v2.provision")}
           </Button>
         </div>

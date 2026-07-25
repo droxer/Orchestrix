@@ -14,6 +14,7 @@ import { TriangleAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { readAnimationDurationMs } from "@/lib/animationDuration";
 import { ActionRemove } from "../icons";
 
 // Promise-based confirm/prompt that replaces the native window.confirm /
@@ -77,26 +78,39 @@ export function useDialogs(): DialogApi {
 export function DialogProvider({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const [request, setRequest] = useState<Request | null>(null);
+  const [dialogClosing, setDialogClosing] = useState(false);
   const [announcement, setAnnouncement] = useState<Announcement | null>(null);
   const [toastExiting, setToastExiting] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const dialogRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
   const announcementId = useRef(0);
+  const requestRef = useRef<Request | null>(null);
+  const requestQueue = useRef<Request[]>([]);
+  const dialogClosingRef = useRef(false);
+  const dialogCloseTimer = useRef<number | null>(null);
+
+  const enqueueRequest = useCallback((next: Request) => {
+    if (requestRef.current) {
+      requestQueue.current.push(next);
+      return;
+    }
+    requestRef.current = next;
+    setRequest(next);
+  }, []);
 
   const confirm = useCallback(
     (opts: ConfirmOptions) =>
-      new Promise<boolean>((resolve) => setRequest({ kind: "confirm", opts, resolve })),
-    [],
+      new Promise<boolean>((resolve) => enqueueRequest({ kind: "confirm", opts, resolve })),
+    [enqueueRequest],
   );
 
   const prompt = useCallback(
     (opts: PromptOptions) =>
       new Promise<string | null>((resolve) => {
-        setInputValue(opts.defaultValue ?? "");
-        setRequest({ kind: "prompt", opts, resolve });
+        enqueueRequest({ kind: "prompt", opts, resolve });
       }),
-    [],
+    [enqueueRequest],
   );
 
   const announce = useCallback((opts: AnnouncementOptions | string) => {
@@ -113,19 +127,44 @@ export function DialogProvider({ children }: { children: ReactNode }) {
   // Resolve the pending promise and tear down. `cancelled` carries the
   // negative result (false / null); a positive result passes the value.
   const settle = useCallback((result: boolean | string | null) => {
-    setRequest((current) => {
-      if (!current) return null;
-      if (current.kind === "confirm") current.resolve(result === true);
-      else current.resolve(typeof result === "string" ? result : null);
-      return null;
-    });
+    const current = requestRef.current;
+    if (!current || dialogClosingRef.current) return;
+    if (current.kind === "confirm") current.resolve(result === true);
+    else current.resolve(typeof result === "string" ? result : null);
+
+    dialogClosingRef.current = true;
+    setDialogClosing(true);
+    dialogCloseTimer.current = window.setTimeout(() => {
+      const next = requestQueue.current.shift() ?? null;
+      requestRef.current = next;
+      setRequest(next);
+      dialogClosingRef.current = false;
+      setDialogClosing(false);
+      dialogCloseTimer.current = null;
+    }, readAnimationDurationMs(dialogRef.current));
   }, []);
 
   const cancelValue = (req: Request): boolean | null => (req.kind === "confirm" ? false : null);
 
+  const dialogOpen = Boolean(request);
+
   useEffect(() => {
-    if (!request) return;
+    if (!dialogOpen) return;
     previouslyFocused.current = document.activeElement as HTMLElement | null;
+    const { body } = document;
+    const previousOverflow = body.style.overflow;
+    body.style.overflow = "hidden";
+
+    return () => {
+      body.style.overflow = previousOverflow;
+      previouslyFocused.current?.focus?.();
+      previouslyFocused.current = null;
+    };
+  }, [dialogOpen]);
+
+  useEffect(() => {
+    if (!request || dialogClosing) return;
+    if (request.kind === "prompt") setInputValue(request.opts.defaultValue ?? "");
     const focusTarget = dialogRef.current?.querySelector<HTMLElement>("[data-dialog-default]");
     focusTarget?.focus();
     if (focusTarget instanceof HTMLInputElement) focusTarget.select();
@@ -145,11 +184,14 @@ export function DialogProvider({ children }: { children: ReactNode }) {
         if (!focusables || focusables.length === 0) return;
         const first = focusables[0];
         const last = focusables[focusables.length - 1];
-        const active = document.activeElement;
-        if (event.shiftKey && active === first) {
-          event.preventDefault();
-          last.focus();
-        } else if (!event.shiftKey && active === last) {
+        const active = document.activeElement as HTMLElement | null;
+        const focusInside = active ? dialogRef.current?.contains(active) : false;
+        if (event.shiftKey) {
+          if (active === first || !focusInside) {
+            event.preventDefault();
+            last.focus();
+          }
+        } else if (active === last || !focusInside) {
           event.preventDefault();
           first.focus();
         }
@@ -157,16 +199,12 @@ export function DialogProvider({ children }: { children: ReactNode }) {
     }
 
     document.addEventListener("keydown", handleKeyDown);
-    const { body } = document;
-    const previousOverflow = body.style.overflow;
-    body.style.overflow = "hidden";
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [dialogClosing, request, settle]);
 
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      body.style.overflow = previousOverflow;
-      previouslyFocused.current?.focus?.();
-    };
-  }, [request, settle]);
+  useEffect(() => () => {
+    if (dialogCloseTimer.current !== null) window.clearTimeout(dialogCloseTimer.current);
+  }, []);
 
   const dismissAnnouncement = useCallback(() => {
     setToastExiting(false);
@@ -215,10 +253,10 @@ export function DialogProvider({ children }: { children: ReactNode }) {
       {request && typeof document !== "undefined"
         ? createPortal(
             <div
-              className="overlay-backdrop dialog-backdrop"
+              className={`overlay-backdrop dialog-backdrop${dialogClosing ? " is-closing" : ""}`}
               role="presentation"
               onMouseDown={(event) => {
-                if (event.target === event.currentTarget) settle(cancelValue(request));
+                if (!dialogClosing && event.target === event.currentTarget) settle(cancelValue(request));
               }}
             >
               <div
@@ -228,8 +266,9 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                 aria-labelledby="dialog-title"
                 aria-describedby={request.opts.message ? "dialog-desc" : undefined}
                 tabIndex={-1}
-                className="dialog-modal"
+                className={`dialog-modal${dialogClosing ? " is-closing" : ""}`}
                 data-tone={isDangerConfirm ? "danger" : undefined}
+                inert={dialogClosing || undefined}
               >
                 {isDangerConfirm ? (
                   <p className="dialog-kicker">{t("dialog.danger_kicker")}</p>
@@ -271,22 +310,26 @@ export function DialogProvider({ children }: { children: ReactNode }) {
 
                 <div className="dialog-actions">
                   <Button
+                    type="button"
                     variant="secondary"
                     data-dialog-default={request.kind === "confirm" && request.opts.tone === "danger" ? "" : undefined}
+                    disabled={dialogClosing}
                     onClick={() => settle(cancelValue(request))}
                   >
                     {request.opts.cancelLabel ?? t("dialog.cancel")}
                   </Button>
                   {request.kind === "confirm" ? (
                     <Button
+                      type="button"
                       variant={request.opts.tone === "danger" ? "destructive" : "default"}
                       data-dialog-default={request.opts.tone === "danger" ? undefined : ""}
+                      disabled={dialogClosing}
                       onClick={() => settle(true)}
                     >
                       {request.opts.confirmLabel ?? t("dialog.confirm")}
                     </Button>
                   ) : (
-                    <Button onClick={() => settle(inputValue.trim())}>
+                    <Button type="button" disabled={dialogClosing} onClick={() => settle(inputValue.trim())}>
                       {request.opts.confirmLabel ?? t("dialog.confirm")}
                     </Button>
                   )}

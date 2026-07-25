@@ -4,24 +4,11 @@ import { useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNod
 import { createPortal } from "react-dom";
 import { OverlayCloseButton } from "@/components/ui/OverlayCloseButton";
 import { useModalDrawer } from "@/hooks/useModalDrawer";
+import { readAnimationDurationMs } from "@/lib/animationDuration";
 import { isDrawerTop, isDrawerUnderlay, registerDrawer, subscribeDrawerStack } from "@/lib/drawerStack";
 
 /** Fallback exit duration when the panel's animation duration can't be read. */
 const FALLBACK_CLOSE_MS = 150;
-
-/** The CSS owns the exit duration (`.adm-drawer.is-closing`); read it back so
- *  the unmount timer can never drift from the animation. An explicit `0s`
- *  (e.g. prefers-reduced-motion) unmounts immediately. */
-function readCloseDurationMs(panel: HTMLElement | null): number {
-  if (!panel) return FALLBACK_CLOSE_MS;
-  const raw = getComputedStyle(panel).animationDuration.split(",")[0]?.trim() ?? "";
-  const ms = raw.endsWith("ms")
-    ? Number.parseFloat(raw)
-    : raw.endsWith("s")
-      ? Number.parseFloat(raw) * 1000
-      : Number.NaN;
-  return Number.isFinite(ms) ? ms : FALLBACK_CLOSE_MS;
-}
 
 export interface DrawerProps {
   open: boolean;
@@ -55,6 +42,7 @@ export function Drawer({
 }: DrawerProps) {
   const drawerId = useRef(Symbol("drawer")).current;
   const titleId = useId();
+  const subtitleId = useId();
   const [visible, setVisible] = useState(false);
   const [closing, setClosing] = useState(false);
 
@@ -67,7 +55,7 @@ export function Drawer({
     () => false,
   );
 
-  const panelRef = useModalDrawer<HTMLElement>(onClose, visible && !closing, top);
+  const panelRef = useModalDrawer<HTMLElement>(onClose, visible, top && !closing);
 
   useEffect(() => {
     if (open) {
@@ -80,14 +68,14 @@ export function Drawer({
     const timer = window.setTimeout(() => {
       setVisible(false);
       setClosing(false);
-    }, readCloseDurationMs(panelRef.current));
+    }, readAnimationDurationMs(panelRef.current, FALLBACK_CLOSE_MS));
     return () => window.clearTimeout(timer);
   }, [open, visible, panelRef]);
 
   useEffect(() => {
-    registerDrawer(drawerId, layer, visible && !closing);
+    registerDrawer(drawerId, layer, visible);
     return () => registerDrawer(drawerId, layer, false);
-  }, [drawerId, layer, visible, closing]);
+  }, [drawerId, layer, visible]);
 
   // When a higher drawer opens, this panel becomes inert to AT — focus must
   // not stay inside it. The new top drawer's useModalDrawer autofocus runs in
@@ -118,16 +106,18 @@ export function Drawer({
       style={{ zIndex: `calc(var(--z-drawer) + ${layer})` }}
       role="presentation"
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !closing) onClose();
+        if (event.target === event.currentTarget && !closing && !underlay) onClose();
       }}
     >
       <aside
         ref={panelRef}
         role="dialog"
-        aria-modal={underlay ? undefined : true}
-        aria-hidden={underlay || undefined}
+        aria-modal={underlay || closing ? undefined : true}
+        aria-hidden={underlay || closing || undefined}
+        inert={underlay || closing || undefined}
         aria-label={ariaLabel}
         aria-labelledby={ariaLabel ? undefined : titleId}
+        aria-describedby={subtitle ? subtitleId : undefined}
         tabIndex={-1}
         className={panelClass}
         style={{ "--adm-drawer-w": `${width}px` } as React.CSSProperties}
@@ -136,7 +126,7 @@ export function Drawer({
           <div className="adm-drawer-head-text">
             {kicker ? <p className="adm-drawer-kicker">{kicker}</p> : null}
             <h2 id={titleId} className="adm-drawer-title">{title}</h2>
-            {subtitle ? <p className="adm-drawer-sub">{subtitle}</p> : null}
+            {subtitle ? <p id={subtitleId} className="adm-drawer-sub">{subtitle}</p> : null}
           </div>
           <OverlayCloseButton
             label={closeLabel}

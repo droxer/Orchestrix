@@ -91,6 +91,7 @@
    (last in source order) so it wins the equal-specificity tie. */
 @media (pointer: coarse) {
   [data-slot="button"],
+  [data-slot="link-button"],
   .decision-bar button,
   .handoff-actions button,
   .dialog-actions [data-slot="button"],
@@ -118,6 +119,17 @@
   .adm-node-card-icon-btn,
   .msg-turn-action {
     min-height: var(--touch-target);
+  }
+
+  [data-slot="button"],
+  [data-slot="link-button"] {
+    min-width: var(--touch-target);
+  }
+
+  .dialog-toast-close,
+  .profile-image-picker-remove {
+    width: var(--touch-target);
+    height: var(--touch-target);
   }
 
   .sidenav-btn {

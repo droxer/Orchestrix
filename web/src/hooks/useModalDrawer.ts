@@ -46,8 +46,12 @@ export function useModalDrawer<T extends HTMLElement>(onClose: () => void, enabl
   // Keyboard ownership: autofocus, Escape, Tab trap.
   useEffect(() => {
     if (!enabled || !active) return;
-    const initial = panelRef.current?.querySelector<HTMLElement>(FOCUSABLE);
-    (initial ?? panelRef.current)?.focus();
+    const panel = panelRef.current;
+    const preferContainer = window.matchMedia("(pointer: coarse)").matches;
+    const preferred = preferContainer
+      ? null
+      : panel?.querySelector<HTMLElement>("[data-modal-initial-focus]");
+    (preferred ?? panel)?.focus();
 
     function handleKey(event: KeyboardEvent) {
       // Confirm/prompt dialogs and portalled Radix overlays own the keyboard while open; defer.

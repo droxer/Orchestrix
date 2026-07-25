@@ -17,7 +17,7 @@ import {
 import { agentLabel } from "../lib/plan";
 import type { AgentPlacement, ControlPanelDaemonNodeRecord, EmployeeAgent, EmployeeRecord } from "../types";
 import { useDialogs } from "@/components/ui/DialogProvider";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ADMIN_AGENTS_KEY } from "../lib/adminHelpers";
 import { EMPLOYEE_AGENTS_QUERY_KEY } from "../hooks/useEmployeeAgents";
@@ -27,6 +27,7 @@ import { AgentPersonalityEditor } from "./AgentPersonalityEditor";
 import { PlacementList } from "./PlacementList";
 import { describeAgentPlacements } from "../lib/agentPlacements";
 import { ProfileImagePicker } from "./ProfileImagePicker";
+import { hashForAppState } from "../lib/appRoute";
 
 export interface AgentProfilePanelProps {
   agent: EmployeeAgent;
@@ -231,6 +232,7 @@ export function AgentProfilePanel({
   async function handleDeleteAgent() {
     const ok = await confirm({
       title: t("admin.v2.delete_agent_confirm", { name: agent.displayName }),
+      message: t("admin.v2.delete_agent_message"),
       confirmLabel: t("admin.v2.delete_agent"),
       tone: "danger",
     });
@@ -253,6 +255,7 @@ export function AgentProfilePanel({
       title: t("admin.v2.remove_placement_confirm", {
         node: node?.displayName || placement.nodeDisplayName || placement.daemonNodeId,
       }),
+      message: t("admin.v2.remove_placement_message"),
       confirmLabel: t("admin.v2.remove_placement"),
       tone: "danger",
     });
@@ -414,9 +417,18 @@ export function AgentProfilePanel({
               </Button>
             ) : null}
             {onOpenWorkspace ? (
-              <Button type="button" variant="outline" onClick={() => onOpenWorkspace(agent)}>
+              <a
+                data-slot="link-button"
+                href={hashForAppState({ route: "agents", mobileView: "chat", sessionId: null, agentWorkspaceId: agent.id })}
+                className={buttonVariants({ variant: "outline" })}
+                onClick={(event) => {
+                  if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.altKey || event.ctrlKey || event.shiftKey) return;
+                  event.preventDefault();
+                  onOpenWorkspace(agent);
+                }}
+              >
                 {t("agents_page.open_workspace")}
-              </Button>
+              </a>
             ) : null}
           </div>
         ) : null}
@@ -576,9 +588,18 @@ export function AgentProfilePanel({
             </Button>
           ) : null}
           {onOpenWorkspace ? (
-            <Button type="button" variant="outline" onClick={() => onOpenWorkspace(agent)}>
+            <a
+              data-slot="link-button"
+              href={hashForAppState({ route: "agents", mobileView: "chat", sessionId: null, agentWorkspaceId: agent.id })}
+              className={buttonVariants({ variant: "outline" })}
+              onClick={(event) => {
+                if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.altKey || event.ctrlKey || event.shiftKey) return;
+                event.preventDefault();
+                onOpenWorkspace(agent);
+              }}
+            >
               {t("agents_page.open_workspace")}
-            </Button>
+            </a>
           ) : null}
         </div>
       ) : null}

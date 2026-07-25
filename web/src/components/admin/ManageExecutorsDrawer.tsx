@@ -82,6 +82,8 @@ export function ManageExecutorsDrawer({ open, onClose, node, onUpdated }: Manage
         title: t("admin.v2.manage_executors_disable_confirm", {
           agents: newlyDisabledReady.join(", "),
         }),
+        message: t("admin.v2.manage_executors_disable_message"),
+        confirmLabel: t("admin.v2.save_agent_settings"),
         tone: "danger",
       });
       if (!ok) return;
@@ -229,7 +231,7 @@ export function ManageExecutorsDrawer({ open, onClose, node, onUpdated }: Manage
           <Button size="cta" type="button" variant="ghost" onClick={() => void requestClose()} disabled={saving}>
             {t("admin.v2.cancel")}
           </Button>
-          <Button size="cta" type="button" onClick={() => void handleSave()} disabled={saving || !dirty}>
+          <Button size="cta" type="button" onClick={() => void handleSave()} loading={saving} disabled={!dirty}>
             {saving ? t("admin.v2.saving") : t("admin.v2.save_agent_settings")}
           </Button>
         </div>

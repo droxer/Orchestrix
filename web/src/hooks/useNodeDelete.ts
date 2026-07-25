@@ -19,6 +19,7 @@ export function useNodeDelete(
     if (!onDelete) return;
     const ok = await confirm({
       title: t("admin.v2.delete_confirm", { id: node.id }),
+      message: t("admin.v2.delete_message"),
       confirmLabel: t("admin.v2.delete_action"),
       tone: "danger",
     });

@@ -243,9 +243,9 @@ function ChannelCreateForm({
         </label>
       ))}
       <small>{t("admin.v2.chat_telegram_secret_generated")}</small>
-      <Button type="submit" disabled={busy} aria-busy={busy || undefined}>
+      <Button type="submit" loading={busy} loadingLabel={t("admin.creating")}>
         <AdminConnect size={16} aria-hidden="true" />
-        <span>{busy ? t("admin.creating") : submitLabel}</span>
+        <span>{submitLabel}</span>
       </Button>
     </form>
   );
@@ -514,6 +514,7 @@ export function ChannelsView({
     if (!selected) return;
     const ok = await confirm({
       title: t("admin.v2.chat_delete_link_confirm", { id: link.externalUserId }),
+      message: t("admin.v2.chat_delete_link_message"),
       confirmLabel: t("admin.v2.chat_delete_link"),
       tone: "danger",
     });
@@ -525,6 +526,7 @@ export function ChannelsView({
     if (!selected) return;
     const ok = await confirm({
       title: t("admin.v2.chat_delete_allow_confirm", { id: conversation.conversationId }),
+      message: t("admin.v2.chat_delete_allow_message"),
       confirmLabel: t("admin.v2.chat_delete_allow"),
       tone: "danger",
     });
@@ -578,6 +580,7 @@ export function ChannelsView({
       title: t("admin.v2.chat_rotate_confirm", {
         defaultValue: "Rotate the webhook secret? The current secret stops working immediately.",
       }),
+      message: t("admin.v2.chat_rotate_message"),
       confirmLabel: t("admin.v2.chat_rotate_webhook_secret"),
       tone: "danger",
     });

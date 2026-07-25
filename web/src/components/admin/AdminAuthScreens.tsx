@@ -62,7 +62,7 @@ export function AdminLoginScreen({ onLogin, needsBootstrap, onSwitchToBootstrap 
           {needsBootstrap ? t("admin.no_admins") : t("admin.login_sub")}
         </p>
       </header>
-      <form className="adm-form" onSubmit={(event) => void handleSubmit(event)} noValidate>
+      <form className="adm-form" onSubmit={(event) => void handleSubmit(event)}>
         <label className="adm-field">
           <span>{t("admin.username")}</span>
           <Input
@@ -91,9 +91,10 @@ export function AdminLoginScreen({ onLogin, needsBootstrap, onSwitchToBootstrap 
         <Button
           type="submit"
           className="w-full"
-          disabled={isLoading || !username.trim() || !password}
+          loading={isLoading}
+          loadingLabel={t("admin.signing_in")}
         >
-          {isLoading ? t("admin.signing_in") : t("admin.sign_in")}
+          {t("admin.sign_in")}
         </Button>
         {needsBootstrap ? (
           <Button type="button" variant="ghost" className="w-full" onClick={onSwitchToBootstrap}>
@@ -134,7 +135,7 @@ export function FirstAdminSetupScreen({ onBootstrapped, onSwitchToLogin }: First
         <h1 className="adm-auth-title">{t("admin.bootstrap")}</h1>
         <p className="adm-auth-sub">{t("admin.bootstrap_sub")}</p>
       </header>
-      <form className="adm-form" onSubmit={(event) => void handleSubmit(event)} noValidate>
+      <form className="adm-form" onSubmit={(event) => void handleSubmit(event)}>
         <label className="adm-field">
           <span>{t("admin.bootstrap_token")}</span>
           <Input
@@ -176,9 +177,10 @@ export function FirstAdminSetupScreen({ onBootstrapped, onSwitchToLogin }: First
         <Button
           type="submit"
           className="w-full"
-          disabled={isLoading || !token.trim() || !username.trim() || !password}
+          loading={isLoading}
+          loadingLabel={t("admin.creating")}
         >
-          {isLoading ? t("admin.creating") : t("admin.create_admin")}
+          {t("admin.create_admin")}
         </Button>
         <Button type="button" variant="ghost" className="w-full" onClick={onSwitchToLogin}>
           {t("login.go_login")}

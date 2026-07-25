@@ -174,9 +174,11 @@ export function AgentPersonalityEditor({
                 type="button"
                 size="sm"
                 onClick={onSave}
-                disabled={saving || !dirty}
+                disabled={!dirty}
+                loading={saving}
+                loadingLabel={t("admin.v2.saving")}
               >
-                {saving ? t("admin.v2.saving") : t("agents_page.save_personality")}
+                {t("agents_page.save_personality")}
               </Button>
             </div>
           </div>

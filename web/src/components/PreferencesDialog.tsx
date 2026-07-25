@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { OverlayCloseButton } from "@/components/ui/OverlayCloseButton";
+import { readAnimationDurationMs } from "@/lib/animationDuration";
 import { PreferencesPanel, type PreferencesPanelProps } from "./PreferencesPanel";
 import { useModalDrawer } from "../hooks/useModalDrawer";
 
@@ -14,16 +16,33 @@ export type PreferencesDialogProps = {
 
 export function PreferencesDialog({ open, onClose, preferences }: PreferencesDialogProps) {
   const { t } = useTranslation();
-  const dialogRef = useModalDrawer<HTMLDivElement>(onClose, open);
+  const [visible, setVisible] = useState(open);
+  const [closing, setClosing] = useState(false);
+  const dialogRef = useModalDrawer<HTMLDivElement>(onClose, visible, !closing);
 
-  if (!open || typeof document === "undefined") return null;
+  useEffect(() => {
+    if (open) {
+      setVisible(true);
+      setClosing(false);
+      return;
+    }
+    if (!visible) return;
+    setClosing(true);
+    const timer = window.setTimeout(() => {
+      setVisible(false);
+      setClosing(false);
+    }, readAnimationDurationMs(dialogRef.current));
+    return () => window.clearTimeout(timer);
+  }, [open, visible]);
+
+  if (!visible || typeof document === "undefined") return null;
 
   return createPortal(
     <div
-      className="overlay-backdrop pref-backdrop"
+      className={`overlay-backdrop pref-backdrop${closing ? " is-closing" : ""}`}
       role="presentation"
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        if (!closing && event.target === event.currentTarget) onClose();
       }}
     >
       <div
@@ -33,7 +52,8 @@ export function PreferencesDialog({ open, onClose, preferences }: PreferencesDia
         aria-labelledby="pref-dialog-title"
         aria-describedby="pref-dialog-sub"
         tabIndex={-1}
-        className="pref-modal"
+        className={`pref-modal${closing ? " is-closing" : ""}`}
+        inert={closing || undefined}
       >
         <header className="pref-header">
           <div className="pref-header-text">

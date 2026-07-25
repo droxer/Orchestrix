@@ -261,6 +261,7 @@ export function PreferencesPanel({
             aria-selected={active === id}
             aria-controls={`pref-panel-${id}`}
             tabIndex={active === id ? 0 : -1}
+            data-modal-initial-focus={active === id ? "" : undefined}
             onClick={() => setActive(id)}
           >
             <Icon size={14} />

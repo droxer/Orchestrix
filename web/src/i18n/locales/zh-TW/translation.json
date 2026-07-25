@@ -92,6 +92,7 @@
     "rename_prompt": "重新命名對話",
     "close": "關閉",
     "close_confirm": "關閉對話「{{name}}」？",
+    "close_message": "此對話將移出活動清單，但其歷史記錄仍會保留。",
     "statuses": {
       "waiting_for_human": "等待人工"
     }
@@ -320,6 +321,8 @@
     "name": "團隊名稱",
     "members": "成員",
     "lead": "負責人智能體",
+    "members_required": "請至少新增 1 名團隊成員。",
+    "lead_required": "請選擇負責人智能體。",
     "lead_badge": "負責人",
     "col_status": "狀態",
     "no_members": "暫無成員",
@@ -569,6 +572,7 @@
       "place_agent": "部署",
       "remove_placement": "移除位置",
       "remove_placement_confirm": "從 {{node}} 移除此智能體？",
+      "remove_placement_message": "重新部署前，此智能體將停止在該節點上執行。",
       "agent_owner_label": "擁有者",
       "agent_availability_label": "可用性",
       "agent_meta_version": "版本 {{version}}",
@@ -580,6 +584,7 @@
       "edit_agent": "編輯代理",
       "delete_agent": "刪除代理",
       "delete_agent_confirm": "刪除 {{name}}？",
+      "delete_agent_message": "此代理將無法再被指派，且此操作無法復原。",
       "no_agents_for_employee": "尚未指派代理。",
       "add_agent_for": "為 @{{id}} 新增代理",
       "agent_name": "代理名稱",
@@ -694,8 +699,10 @@
       "add_node_disabled_hint": "尚無可指派的節點。請先新增節點。",
       "unassign_action": "解除員工綁定",
       "unassign_confirm": "確定要將 {{id}} 與 @{{employee}} 解除綁定嗎？",
+      "unassign_message": "節點記錄會保留，但該員工將不再擁有或管理此節點。",
       "delete_action": "刪除節點",
       "delete_confirm": "刪除節點 {{id}}？",
+      "delete_message": "這將永久刪除節點記錄及其儲存的憑證，且無法復原。",
       "history_title": "歷史記錄",
       "history_description": "為稽核和佈建歷史保留的已刪除受管電腦。",
       "history_deleted": "刪除於 {{time}}",
@@ -708,6 +715,7 @@
       "action_failed": "操作失敗：{{message}}",
       "delete_employee_action": "刪除員工",
       "delete_employee_confirm": "刪除 {{name}}（@{{id}}）？其節點將取消指派。",
+      "delete_employee_message": "該員工將失去存取權限，其節點會取消指派。此操作無法復原。",
       "manage_executors": "管理執行器",
       "manage_executors_for": "管理 {{id}} 的執行器",
       "manage_executors_title": "管理執行器",
@@ -773,6 +781,7 @@
       "chat_load_error": "無法載入頻道。請檢查連線後重試。",
       "manage_executors_help": "停用後，該執行器不再接收此節點的工作。健康狀態仍會回報。",
       "manage_executors_disable_confirm": "在此節點停用 {{agents}}？",
+      "manage_executors_disable_message": "依賴這些執行器的工作可能會停止，直到您重新啟用它們。",
       "agent_enabled": "已啟用",
       "agent_disabled": "已停用",
       "enable_agent": "在此節點啟用 {{agent}}",
@@ -788,7 +797,10 @@
       "save_agent_settings": "儲存執行器設定",
       "selected_employee": "已選員工",
       "chat_delete_link_confirm": "刪除 {{id}} 的身分連結？",
-      "chat_delete_allow_confirm": "刪除允許的對話 {{id}}？"
+      "chat_delete_link_message": "來自此身分的訊息將不再路由到連結的員工。",
+      "chat_delete_allow_confirm": "刪除允許的對話 {{id}}？",
+      "chat_delete_allow_message": "此對話將無法再使用該整合。",
+      "chat_rotate_message": "目前的 Webhook 密鑰將立即失效。"
     },
     "signing_in": "登入中…"
   },

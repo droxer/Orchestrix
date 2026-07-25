@@ -82,6 +82,8 @@ export function CredentialsDrawer({ open, onClose, node, storedToken, onUnassign
     const employee = node.employeeId ?? "";
     const ok = await confirm({
       title: t("admin.v2.unassign_confirm", { employee, id: node.id }),
+      message: t("admin.v2.unassign_message"),
+      confirmLabel: t("admin.v2.unassign_action"),
       tone: "danger",
     });
     if (!ok) return;
@@ -92,6 +94,7 @@ export function CredentialsDrawer({ open, onClose, node, storedToken, onUnassign
     if (!node || !onDelete) return;
     const ok = await confirm({
       title: t("admin.v2.delete_confirm", { id: node.id }),
+      message: t("admin.v2.delete_message"),
       confirmLabel: t("admin.v2.delete_action"),
       tone: "danger",
     });
@@ -215,6 +218,7 @@ export function CredentialsDrawer({ open, onClose, node, storedToken, onUnassign
                     variant="outline"
                     onClick={handleUnassign}
                     disabled={actionPending !== null}
+                    loading={actionPending === "unassign"}
                   >
                     {actionPending === "unassign" ? t("admin.v2.unassigning") : t("admin.v2.unassign_action")}
                   </Button>
@@ -225,6 +229,7 @@ export function CredentialsDrawer({ open, onClose, node, storedToken, onUnassign
                     variant="destructive"
                     onClick={handleDelete}
                     disabled={actionPending !== null}
+                    loading={actionPending === "delete"}
                   >
                     {actionPending === "delete" ? t("admin.v2.deleting") : t("admin.v2.delete_action")}
                   </Button>

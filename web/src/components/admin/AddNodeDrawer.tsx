@@ -245,6 +245,7 @@ export function AddNodeDrawer({
             >
               <SelectTrigger
                 ref={employeeTriggerRef}
+                data-modal-initial-focus
                 className="w-full mono"
                 aria-labelledby={employeeLabelId}
                 aria-invalid={Boolean(fieldErrors.employeeId) || undefined}
@@ -285,7 +286,7 @@ export function AddNodeDrawer({
           <Button size="cta" type="button" variant="ghost" onClick={() => void requestClose()} disabled={isBusy}>
             {t("admin.v2.cancel")}
           </Button>
-          <Button size="cta" type="submit" disabled={isBusy || (isManaged && !employeeId) || (!isManaged && !workspacePath.trim())}>
+          <Button size="cta" type="submit" loading={isBusy}>
             {isBusy ? t("admin.creating") : t(isManaged ? "admin.v2.provision_node" : "admin.v2.generate_node")}
           </Button>
         </div>

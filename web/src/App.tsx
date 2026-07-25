@@ -423,6 +423,7 @@ export function App() {
     const label = session ? (session.title?.trim() || session.taskGoal) : sessionId;
     const ok = await confirm({
       title: t("thread.close_confirm", { name: label }),
+      message: t("thread.close_message"),
       confirmLabel: t("thread.close"),
       tone: "danger",
     });

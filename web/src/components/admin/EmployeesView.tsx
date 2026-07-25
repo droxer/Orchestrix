@@ -114,6 +114,7 @@ export function EmployeesView({
     if (!employee) return;
     const ok = await confirm({
       title: t("admin.v2.delete_employee_confirm", { name: employee.displayName ?? employee.id, id: employee.id }),
+      message: t("admin.v2.delete_employee_message"),
       confirmLabel: t("admin.v2.delete_employee_action"),
       tone: "danger",
     });
