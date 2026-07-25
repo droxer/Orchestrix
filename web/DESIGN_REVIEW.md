@@ -245,11 +245,11 @@ Audit of every overlay surface at ≤820px — drawers, modals, sheets, and comp
 | **Preferences** (`PreferencesDialog`) | Bottom-anchored sheet (`92dvh`); horizontal nav at 820px; theme cards single-column |
 | **Confirm/prompt** (`DialogProvider`) | Full-width card; stacked action buttons (destructive/primary last); 44px inputs |
 | **Attention rail** (`AttentionRail`) | Full-width bottom sheet; `78dvh` max; safe-area padding |
-| **Agent picker / @mention** | Fixed lower panel above bottom nav + composer (no longer clipped off-screen) |
+| **Composer agent picker** | Opens above the composer and bottom navigation without clipping |
 | **Handoff panel** | Full-width; stacked action buttons |
 | **Artifact library drawer** | Inherits drawer takeover + existing vertical index stack |
 
-**Verify manually:** open task drawer, preferences, rename confirm dialog, @mention popover, admin attention sheet, artifact drawer at 390px with keyboard up.
+**Verify manually:** open task drawer, preferences, rename confirm dialog, composer agent picker, admin attention sheet, artifact drawer at 390px with keyboard up.
 
 ## Clarity pass (2026-07-12)
 
