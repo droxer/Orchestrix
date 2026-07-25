@@ -2,7 +2,13 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { TFunction } from "i18next";
 
-import { phaseDividerLabel, projectMessages } from "../src/lib/projectMessages.js";
+import { isGroupedContinuation, phaseDividerLabel, projectMessages } from "../src/lib/projectMessages.js";
+import {
+  buildExecutorDisplayNameMap,
+  buildLogicalAgentNameMap,
+  labelForAgentRun,
+} from "../src/lib/agentDisplayNames.js";
+import { rerunAssignmentForSession } from "../src/lib/workflow.js";
 import type { RelaySession } from "../src/types.js";
 
 const timestamp = "2026-06-19T12:00:00.000Z";
@@ -431,5 +437,159 @@ describe("phaseDividerLabel", () => {
       (message) => message.kind === "agent" && message.agent === "codex",
     );
     assert.equal(phaseDividerLabel(messages, codexIndex, t), "Handoff · review");
+  });
+});
+
+describe("logical agent identity in the transcript", () => {
+  const agents = [
+    {
+      id: "agt_ada",
+      employeeId: "alice",
+      displayName: "Ada",
+      executorKind: "claude" as const,
+      skillPolicy: {},
+      toolPolicy: {},
+      modelPolicy: {},
+      enabled: true,
+      version: 1,
+      availability: "ready" as const,
+      placements: [],
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    },
+    {
+      id: "agt_zoe",
+      employeeId: "alice",
+      displayName: "Zoe",
+      executorKind: "claude" as const,
+      skillPolicy: {},
+      toolPolicy: {},
+      modelPolicy: {},
+      enabled: true,
+      version: 1,
+      availability: "ready" as const,
+      placements: [],
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    },
+  ];
+
+  it("carries the logical agent that ran onto the derived turn", () => {
+    const messages = projectMessages(session([
+      {
+        id: "ev_run",
+        type: "agent.started",
+        sessionId: "ses_1",
+        timestamp,
+        runId: "run_1",
+        agent: "claude",
+        mode: "action",
+        logicalAgentId: "agt_zoe",
+      },
+    ]), t);
+
+    const agent = messages.find((message) => message.kind === "agent");
+    assert.ok(agent && agent.kind === "agent");
+    assert.equal(agent.agentId, "agt_zoe");
+  });
+
+  it("keeps the logical agent when output arrives before agent.started", () => {
+    const messages = projectMessages(session([
+      {
+        id: "ev_output",
+        type: "agent.output",
+        sessionId: "ses_1",
+        timestamp,
+        runId: "run_1",
+        agent: "claude",
+        stream: "stdout",
+        text: "working\n",
+      },
+      {
+        id: "ev_run",
+        type: "agent.started",
+        sessionId: "ses_1",
+        timestamp,
+        runId: "run_1",
+        agent: "claude",
+        mode: "action",
+        logicalAgentId: "agt_zoe",
+      },
+    ]), t);
+
+    const agent = messages.find((message) => message.kind === "agent");
+    assert.ok(agent && agent.kind === "agent");
+    assert.equal(agent.agentId, "agt_zoe");
+  });
+
+  it("labels a turn with the agent that ran, not the first agent on that executor", () => {
+    const names = buildLogicalAgentNameMap(agents);
+    const executorNames = buildExecutorDisplayNameMap(agents);
+    assert.equal(
+      labelForAgentRun({ agent: "claude", agentId: "agt_zoe" }, names, executorNames),
+      "Zoe",
+    );
+  });
+
+  it("falls back to the executor label for runs with no logical agent", () => {
+    const names = buildLogicalAgentNameMap(agents);
+    const executorNames = buildExecutorDisplayNameMap(agents);
+    assert.equal(labelForAgentRun({ agent: "codex" }, names, executorNames), "Codex");
+    assert.equal(
+      labelForAgentRun({ agent: "claude", agentId: "agt_deleted" }, names, executorNames),
+      "Ada",
+    );
+  });
+
+  it("treats two agents on the same executor as separate turns", () => {
+    const messages = projectMessages(session([
+      {
+        id: "ev_run_a",
+        type: "agent.started",
+        sessionId: "ses_1",
+        timestamp,
+        runId: "run_a",
+        agent: "claude",
+        mode: "action",
+        logicalAgentId: "agt_ada",
+      },
+      {
+        id: "ev_run_b",
+        type: "agent.started",
+        sessionId: "ses_1",
+        timestamp,
+        runId: "run_b",
+        agent: "claude",
+        mode: "action",
+        logicalAgentId: "agt_zoe",
+      },
+    ]), t);
+
+    const zoeIndex = messages.findIndex(
+      (message) => message.kind === "agent" && message.agentId === "agt_zoe",
+    );
+    assert.equal(isGroupedContinuation(messages, zoeIndex), false);
+    assert.equal(phaseDividerLabel(messages, zoeIndex, t), "Handoff · action");
+  });
+
+  it("reruns the logical agent that produced the last turn", () => {
+    const rerun = rerunAssignmentForSession(
+      {
+        ...session([]),
+        agentRuns: [
+          {
+            id: "run_1",
+            agent: "claude",
+            mode: "action",
+            status: "completed",
+            startedAt: timestamp,
+            artifactIds: [],
+            logicalAgentId: "agt_zoe",
+          },
+        ],
+      },
+      "codex",
+    );
+    assert.deepEqual(rerun, { agent: "claude", agentId: "agt_zoe", mode: "action" });
   });
 });

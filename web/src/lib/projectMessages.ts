@@ -14,6 +14,9 @@ export type DerivedMessage =
       id: string;
       timestamp: string;
       agent: AgentName;
+      /** Logical (employee) agent that produced the turn. `agent` is only the
+       * executor kind, which several named agents can share. */
+      agentId?: string;
       mode: AgentTaskMode;
       runId: string;
       streaming: boolean;
@@ -35,13 +38,23 @@ export type DerivedMessage =
       artifact?: RelayArtifact;
     };
 
+type AgentTurn = Extract<DerivedMessage, { kind: "agent" }>;
+
+/** Same speaker across two turns. Named agents are compared by logical id when
+ * both turns carry one — two agents can share an executor kind — and by
+ * executor kind otherwise, so legacy runs still group as before. */
+export function isSameAgentTurn(left: AgentTurn, right: AgentTurn): boolean {
+  if (left.agentId && right.agentId) return left.agentId === right.agentId;
+  return left.agent === right.agent;
+}
+
 export function isGroupedContinuation(messages: DerivedMessage[], index: number): boolean {
   const message = messages[index];
   if (message.kind !== "agent") return false;
   for (let i = index - 1; i >= 0; i -= 1) {
     const prev = messages[i];
     if (prev.kind === "system") continue;
-    return prev.kind === "agent" && prev.agent === message.agent;
+    return prev.kind === "agent" && isSameAgentTurn(prev, message);
   }
   return false;
 }
@@ -67,7 +80,7 @@ export function phaseDividerLabel(
   if (!prev) return null;
 
   const mode = t(`mode.${message.mode}`);
-  if (prev.kind === "agent" && prev.agent !== message.agent) {
+  if (prev.kind === "agent" && !isSameAgentTurn(prev, message)) {
     return t("transcript.phase_handoff", { mode });
   }
   if (prev.kind === "user") {
@@ -239,11 +252,16 @@ export function projectMessages(session: RelaySession | undefined, t: TFunction)
       }
       case "agent.started": {
         const index = ensureRun(event.runId, event.agent, event.timestamp, event.mode);
-        // The run can be created by an out-of-order agent.output first (default
-        // mode); agent.started carries the authoritative mode — reconcile it.
+        // The run can be created by an out-of-order agent.output first (which
+        // carries neither mode nor logical agent); agent.started is the
+        // authoritative source for both — reconcile them.
         const block = out[index];
-        if (block.kind === "agent" && block.mode !== event.mode) {
-          out[index] = { ...block, mode: event.mode };
+        if (block.kind === "agent" && (block.mode !== event.mode || block.agentId !== event.logicalAgentId)) {
+          out[index] = {
+            ...block,
+            mode: event.mode,
+            ...(event.logicalAgentId ? { agentId: event.logicalAgentId } : {}),
+          };
         }
         break;
       }

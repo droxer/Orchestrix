@@ -8,7 +8,7 @@ import { AgentStream } from "./AgentStream";
 import { MessageTurnActions } from "./MessageTurnActions";
 import type { AgentName, AgentTaskMode } from "../types";
 import { AGENT_NAMES } from "../types";
-import { labelForExecutor } from "../lib/agentDisplayNames";
+import { labelForAgentRun, labelForExecutor } from "../lib/agentDisplayNames";
 import { parsePlanSteps, type PlanStep } from "../lib/plan";
 import type { RelayArtifact } from "relay-core";
 import { useArtifactBody } from "../lib/useArtifactBody";
@@ -166,8 +166,11 @@ type MessageBlockProps = {
   sessionId: string;
   grouped?: boolean;
   agentDisplayNames?: Partial<Record<AgentName, string>>;
+  /** Display name per logical agent id, so a turn is attributed to the agent
+   * that ran it rather than to whichever agent shares its executor kind. */
+  logicalAgentNames?: Record<string, string>;
   onOpenArtifact?: (artifact: RelayArtifact) => void;
-  onRetryAgent?: (agent: AgentName, mode: AgentTaskMode) => void;
+  onRetryAgent?: (agent: AgentName, mode: AgentTaskMode, agentId?: string) => void;
   retryDisabled?: boolean;
 };
 
@@ -176,6 +179,7 @@ export function MessageBlock({
   sessionId,
   grouped = false,
   agentDisplayNames,
+  logicalAgentNames,
   onOpenArtifact,
   onRetryAgent,
   retryDisabled = false,
@@ -196,7 +200,7 @@ export function MessageBlock({
   }
 
   if (message.kind === "agent") {
-    const agentName = labelForExecutor(message.agent, agentDisplayNames);
+    const agentName = labelForAgentRun(message, logicalAgentNames, agentDisplayNames);
     return (
       <article
         className={`msg msg-agent ${message.streaming ? "streaming" : ""} ${grouped ? "grouped" : ""}`}
@@ -230,6 +234,7 @@ export function MessageBlock({
           ) : null}
           <MessageTurnActions
             agent={message.agent}
+            agentId={message.agentId}
             mode={message.mode}
             stdout={message.stdout}
             stderr={message.stderr}

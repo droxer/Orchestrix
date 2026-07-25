@@ -14,6 +14,9 @@ export type HumanDecisionKind = "approve" | "reject" | "cancel" | "rerun" | "han
 export interface AgentRun {
   id: string;
   agent: AgentName;
+  /** Logical (employee) agent that ran this step. `agent` is only its executor
+   * kind, which several named agents can share — this is the identity. */
+  logicalAgentId?: string;
   role?: AgentRole;
   mode: AgentTaskMode;
   status: "running" | "completed" | "failed" | "cancelled";
@@ -113,6 +116,9 @@ export type RelayEvent =
       timestamp: string;
       runId: string;
       agent: AgentName;
+      /** Logical (employee) agent dispatched for this run; absent on legacy
+       * runs and on TUI/workflow dispatches that name only an executor kind. */
+      logicalAgentId?: string;
       role?: AgentRole;
       mode: AgentTaskMode;
     }

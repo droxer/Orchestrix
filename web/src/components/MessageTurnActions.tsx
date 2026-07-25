@@ -8,16 +8,19 @@ import { useDialogs } from "./ui/DialogProvider";
 
 type MessageTurnActionsProps = {
   agent: AgentName;
+  /** Logical agent that produced the turn, so a retry goes back to it. */
+  agentId?: string;
   mode: AgentTaskMode;
   stdout: string;
   stderr: string;
   streaming: boolean;
   retryDisabled?: boolean;
-  onRetry?: (agent: AgentName, mode: AgentTaskMode) => void;
+  onRetry?: (agent: AgentName, mode: AgentTaskMode, agentId?: string) => void;
 };
 
 export function MessageTurnActions({
   agent,
+  agentId,
   mode,
   stdout,
   stderr,
@@ -58,8 +61,8 @@ export function MessageTurnActions({
 
   const handleRetry = useCallback(() => {
     if (retryDisabled || streaming || !onRetry) return;
-    onRetry(agent, mode);
-  }, [agent, mode, onRetry, retryDisabled, streaming]);
+    onRetry(agent, mode, agentId);
+  }, [agent, agentId, mode, onRetry, retryDisabled, streaming]);
 
   const canCopy = Boolean(plainText);
   const showRetry = Boolean(onRetry) && !streaming;
