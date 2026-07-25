@@ -106,9 +106,27 @@
   color: var(--ink-2);
 }
 
+.chat-agent-select[data-availability="unavailable"] {
+  border-color: color-mix(in srgb, var(--err) 32%, var(--line-1));
+  background: color-mix(in srgb, var(--err) 6%, var(--surface-3));
+  color: var(--err);
+  opacity: 1;
+}
+
+.chat-agent-select-content {
+  min-width: min(280px, calc(100vw - var(--sp-6)));
+}
+
 .chat-agent-select-name {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.chat-agent-select-unavailable {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font: var(--type-label-strong);
 }
 
 .chat-active-agent-mark,
@@ -118,8 +136,56 @@
 }
 
 .chat-agent-option-availability {
-  color: var(--ink-3);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin-left: auto;
+  padding: 2px var(--sp-1-5);
+  border: 1px solid currentColor;
+  border-radius: var(--r-full);
   font-size: var(--fs-1);
+  font-weight: 650;
+  line-height: 1.25;
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+}
+
+/* Disabled rows stay fully legible: status is communicated by label and
+   shape, while the disabled interaction is still enforced by Base UI. */
+.chat-agent-option[data-disabled] {
+  opacity: 1;
+  color: var(--ink-3);
+}
+
+.chat-agent-option-availability[data-availability="pending"] {
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 8%, transparent);
+}
+
+.chat-agent-option-availability[data-availability="offline"],
+.chat-agent-option-availability[data-availability="inactive"] {
+  color: var(--err);
+  background: color-mix(in srgb, var(--err) 7%, transparent);
+}
+
+.chat-agent-state-pip {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: var(--r-full);
+  background: var(--ink-4);
+}
+
+.chat-agent-state-pip[data-availability="pending"] {
+  background: var(--warn);
+}
+
+/* A hollow red ring is visually distinct even without color perception and
+   mirrors the offline shape used by task and fleet status indicators. */
+.chat-agent-state-pip[data-availability="offline"],
+.chat-agent-state-pip[data-availability="inactive"] {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--err);
 }
 
 .chat-header .icon-button:disabled {

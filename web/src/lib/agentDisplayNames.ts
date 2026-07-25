@@ -11,6 +11,22 @@ export function isLogicalAgentRoutable(
   return availability === "ready" || availability === "busy";
 }
 
+/** An employee agent must be active as well as backed by a routable placement. */
+export function isEmployeeAgentRoutable(agent: EmployeeAgent): boolean {
+  return agent.enabled && !agent.deletedAt && isLogicalAgentRoutable(agent.availability);
+}
+
+/** Keep the current selection when possible, otherwise choose the first agent
+ * that can actually accept work. Never fall back to an unavailable agent. */
+export function preferredRoutableAgent(
+  logicalAgents: readonly EmployeeAgent[],
+  preferredAgentId: string | null,
+): EmployeeAgent | undefined {
+  return logicalAgents.find(
+    (agent) => agent.id === preferredAgentId && isEmployeeAgentRoutable(agent),
+  ) ?? logicalAgents.find(isEmployeeAgentRoutable);
+}
+
 function routableScore(agent: EmployeeAgent): number {
   if (agent.availability === "ready") return 0;
   if (agent.availability === "busy") return 1;

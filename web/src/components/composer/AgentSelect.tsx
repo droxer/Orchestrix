@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import type { AgentName, EmployeeAgent } from "../../types";
 import { AgentMark } from "../AgentMark";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
-import { isLogicalAgentRoutable } from "../../lib/agentDisplayNames";
+import { isEmployeeAgentRoutable } from "../../lib/agentDisplayNames";
 
 // Agent picker for the composer footer: selects which logical (employee) agent
 // the conversation talks to. Non-routable agents stay listed (disabled) with
@@ -15,23 +15,39 @@ export function AgentSelect({ activeAgent, logicalAgents, activeLogicalAgentId, 
   onLogicalAgentPicked: (agent: EmployeeAgent) => void;
 }) {
   const { t } = useTranslation();
-  const activeLogicalAgent = logicalAgents.find((agent) => agent.id === activeLogicalAgentId);
+  const activeLogicalAgent = logicalAgents.find(
+    (agent) => agent.id === activeLogicalAgentId && isEmployeeAgentRoutable(agent),
+  );
   const handleAgentSelected = (value: string | null) => {
     const next = logicalAgents.find((agent) => agent.id === value);
-    if (next && isLogicalAgentRoutable(next.availability)) onLogicalAgentPicked(next);
+    if (next && isEmployeeAgentRoutable(next)) onLogicalAgentPicked(next);
   };
-  if (logicalAgents.length === 0) return null;
   return (
-    <Select value={activeLogicalAgentId} onValueChange={handleAgentSelected}>
-      <SelectTrigger size="sm" className="chat-agent-select" aria-label={t("thread.talk_to_agent")}>
-        <AgentMark
-          agent={activeLogicalAgent?.executorKind ?? activeAgent}
-          size={16}
-          className="chat-active-agent-mark"
-        />
-        <span className="chat-agent-select-name" translate="no">
-          {activeLogicalAgent?.displayName ?? activeAgent}
-        </span>
+    <Select value={activeLogicalAgent?.id ?? null} onValueChange={handleAgentSelected}>
+      <SelectTrigger
+        size="sm"
+        className="chat-agent-select"
+        disabled={logicalAgents.length === 0}
+        data-availability={activeLogicalAgent ? activeLogicalAgent.availability : "unavailable"}
+        aria-label={t("thread.talk_to_agent")}
+      >
+        {activeLogicalAgent ? (
+          <>
+            <AgentMark
+              agent={activeLogicalAgent.executorKind ?? activeAgent}
+              size={16}
+              className="chat-active-agent-mark"
+            />
+            <span className="chat-agent-select-name" translate="no">
+              {activeLogicalAgent.displayName}
+            </span>
+          </>
+        ) : (
+          <span className="chat-agent-select-unavailable">
+            <span className="chat-agent-state-pip" data-availability="offline" aria-hidden="true" />
+            {t("thread.no_available_agent")}
+          </span>
+        )}
         {activeLogicalAgent?.availability === "busy" ? (
           <>
             <span className="header-agent-busy-pip" aria-hidden="true" />
@@ -39,26 +55,32 @@ export function AgentSelect({ activeAgent, logicalAgents, activeLogicalAgentId, 
           </>
         ) : null}
       </SelectTrigger>
-      <SelectContent align="start" alignItemWithTrigger={false} side="top">
+      <SelectContent className="chat-agent-select-content" align="start" alignItemWithTrigger={false} side="top">
         {logicalAgents.map((logicalAgent) => {
-          const isRoutable = isLogicalAgentRoutable(logicalAgent.availability);
+          const isInactive = !logicalAgent.enabled || Boolean(logicalAgent.deletedAt);
+          const isRoutable = isEmployeeAgentRoutable(logicalAgent);
           const isBusy = logicalAgent.availability === "busy";
+          const visualAvailability = isInactive ? "inactive" : logicalAgent.availability;
           const availabilityLabel = !isRoutable
-            ? t(`admin.v2.placement_status.${logicalAgent.availability}`, {
-                defaultValue: logicalAgent.availability,
+            ? t(`status.${visualAvailability}`, {
+                defaultValue: visualAvailability,
               })
             : null;
           return (
             <SelectItem
               key={logicalAgent.id}
               value={logicalAgent.id}
+              className="chat-agent-option"
               disabled={!isRoutable}
-              data-availability={logicalAgent.availability}
+              data-availability={visualAvailability}
             >
               <AgentMark agent={logicalAgent.executorKind} size={16} className="chat-agent-option-mark" />
               <span translate="no">{logicalAgent.displayName}</span>
               {availabilityLabel ? (
-                <span className="chat-agent-option-availability">{availabilityLabel}</span>
+                <span className="chat-agent-option-availability" data-availability={visualAvailability}>
+                  <span className="chat-agent-state-pip" data-availability={visualAvailability} aria-hidden="true" />
+                  {availabilityLabel}
+                </span>
               ) : null}
               {isBusy ? (
                 <>
