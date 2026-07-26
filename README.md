@@ -4,128 +4,178 @@
   <img src="assets/brand/relay-logo.svg" alt="Relay logo" width="380">
 </p>
 
-Every Employee. Amplified.
+<p align="center"><strong>Every Employee. Amplified.</strong></p>
+
+Relay is a local-first control plane for AI work. Employees can start threads,
+assign durable tasks, schedule routines, and coordinate named AI agents and
+teams. Relay keeps identity, policy, approvals, history, and computer placement
+in one place while Claude Code, Codex, Pi, and Kimi execute through daemon
+processes.
 
 <p align="center">
-  <img src="docs/images/relay.png" alt="Relay — AI Workforce Intelligence Platform UI" width="900">
+  <img src="docs/images/relay.png" alt="Relay thread composer with agent and computer selection" width="960">
 </p>
 
-Relay is an AI Workforce Intelligence Platform. The long-term product direction
-is to give every employee an AI partner that connects organizational knowledge,
-business workflows, tools, and agent execution.
+This repository contains the developer MVP: a Python/FastAPI control plane,
+TypeScript daemons and clients, a Next.js web app, optional PostgreSQL storage,
+and BoxLite-backed execution. Relay can also run an agent on an employee's
+existing computer without BoxLite.
 
-This repository contains the current local-first developer MVP. It has a
-Python/FastAPI backend control plane, TypeScript daemon and TUI clients, a
-Next.js web UI, local event-sourced state under `.relay/`, and BoxLite-backed
-agent execution.
+## What works today
 
-## Current MVP
+- Threaded chat with explicit agent, computer, and Ask, Action, or Review mode.
+- A task backlog and recurring routines with assignment, scheduling, dispatch,
+  and event history.
+- Named agents and teams with profiles, files, generated artifacts, and recent
+  activity.
+- Local computers and managed computers with durable names, agent placement,
+  health, command leases, and restart-safe enrollment.
+- Daemon execution for Claude Code, Codex, Pi, and Kimi, including streamed tool
+  output and normalized token usage.
+- Human approval, cancellation, retry, and handoff flows in the TUI.
+- A provider-neutral chat gateway with Discord, Telegram, and Lark adapters.
+- Admin views for employees, computers, fleet health, activity, and token usage.
+- File-backed event stores for local development and PostgreSQL-backed control
+  plane storage for deployments.
 
-- Durable tasks, sessions, events, snapshots, and artifacts under `.relay/`.
-- Task backlog and recurring routines in the web UI, with backend scheduler
-  promotion and dispatch to ready daemon nodes.
-- Human approval and handoff flows through the TUI.
-- Daemon-based execution for Claude, Pi, Codex, and Kimi agent CLIs.
-- Readable rendering for Claude stream JSON and Codex JSONL output.
-- Token usage tracking across sessions and agents.
-- Local HTTP APIs for tasks, sessions, daemon nodes, sandboxes, chat
-  integrations, the control panel, and the exported web UI.
-- Web UI with chat, backlog, routines, MCP, skills, channels, and an admin
-  console (dashboard KPI tiles, fleet health, token usage charts, activity
-  feed), node management, and user/department CRUD.
-- Provider-neutral chat gateway (`relay-chat`) with Discord, Telegram, and
-  Lark adapters.
+The backend never runs an agent CLI. It records state and queues commands. A
+daemon claims each command, executes it in BoxLite or a configured local
+environment, and streams ordered events back to the control plane.
 
-Relay is control-plane-first: the backend owns task identity, workflow state,
-approval gates, audit trails, daemon coordination, and policy boundaries. Agent
-CLIs remain execution engines and run through daemons, not inside the backend.
+## Product snapshots
 
-## Quick Start
+### Plan and dispatch work
+
+The backlog keeps priority, assignee, due date, status, and dispatch controls in
+one view.
+
+<p align="center">
+  <img src="docs/images/relay-backlog.png" alt="Relay task backlog" width="960">
+</p>
+
+### Coordinate agent teams
+
+Team workspaces collect active tasks, threads, artifacts, and member activity.
+
+<p align="center">
+  <img src="docs/images/relay-teams.png" alt="Relay team workspace" width="960">
+</p>
+
+## Quick start
+
+### Prerequisites
+
+- Node.js 22.19 or newer
+- npm
+- Python 3.12 or newer
+- [uv](https://docs.astral.sh/uv/)
+- Docker and hardware virtualization when using BoxLite
+- Credentials or local login state for the agent CLIs you want to run
+
+Install the workspace and run the test suite:
 
 ```bash
 npm install
 npm test
-make run
 ```
 
-Common commands:
+Configure authentication, storage, and agent credentials as described in
+[Local Development](docs/local-development.md). Then start the services in
+separate terminals:
 
 ```bash
-make backend        # Python backend on port 8790
-make daemon         # TypeScript daemon connected to the backend
-make run            # local TUI flow
-make web            # Next.js web UI in dev mode
-make serve          # backend/server mode on port 8787
-make backend-migrate  # run Alembic database migrations
-make stop           # stop backend, daemon, TUI, and BoxLite processes
+make backend                     # FastAPI control plane on 127.0.0.1:8790
+make daemon SANDBOX_ID=node_dev  # execution node connected to the backend
+make web                         # Next.js app on 127.0.0.1:5000
 ```
 
-For full setup, environment variables, BoxLite devbox export, local API routes,
-data layout, and test organization, see
-[Local Development](docs/local-development.md).
+Open <http://127.0.0.1:5000>. Run `make run` in another terminal if you also
+want the Ink TUI.
+
+Useful commands:
+
+```bash
+make supervisor         # reconcile requested managed computers
+make backend-migrate    # apply Alembic migrations
+make pre-commit-run     # run repository checks
+make stop               # stop Relay, daemon, supervisor, TUI, and BoxLite
+```
+
+Rebuild the BoxLite devbox with `make run-fresh` only after changing
+`dockerfile` or the image contents.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    Clients["Web, TUI, and chat adapters"] --> API["FastAPI control plane"]
+    API --> State["Event stores, auth, scheduler"]
+    API --> Queue["Leased daemon command queue"]
+    Queue --> Daemon["Relay daemon"]
+    Daemon --> Runtime["BoxLite or local environment"]
+    Runtime --> CLIs["Claude Code, Codex, Pi, Kimi"]
+    Daemon -->|"ordered run events"| API
+    Supervisor["Managed-computer supervisor"] --> Daemon
+```
+
+The control plane owns sessions, tasks, agent and team identity, computer
+placement, policy, and audit history. Daemons own execution and workspace
+access. The supervisor reconciles requested managed computers into daemon
+processes; its current provider runs local processes, with a command-template
+provider available for external infrastructure.
+
+### Repository map
+
+- `backend/`: FastAPI application, auth, event stores, task scheduler, agent and
+  team services, managed-computer state, and HTTP routes.
+- `packages/relay-core/`: shared protocol, command builders, prompts, renderers,
+  token accounting, and client helpers.
+- `packages/relay-chat/`: chat gateway plus Discord, Telegram, and Lark
+  adapters.
+- `packages/relay-daemon/`: computer registration, leased command polling,
+  workspace access, BoxLite lifecycle, and agent execution.
+- `packages/relay-supervisor/`: managed-computer reconciliation and provider
+  lifecycle.
+- `packages/relay-tui/`: Ink terminal interface and approval, retry, cancel, and
+  handoff commands.
+- `web/`: Next.js interface for threads, backlog, routines, agents, teams,
+  channels, and administration.
+
+## State and storage
+
+Local development stores generated state under `.relay/`. Session and task
+event logs remain authoritative; JSON snapshots provide materialized views.
+Agent workspace views use live daemon reads when a computer is online and fall
+back to generated-file snapshots when possible.
+
+Set `RELAY_STORAGE=postgres` and configure `RELAY_DATABASE_URL` to store control
+plane records in PostgreSQL. Artifact bodies remain on disk.
 
 ## Documentation
 
-- [Local Development](docs/local-development.md): setup, commands, environment,
-  local services, data layout, source map, and tests.
-- [Product Design](docs/product.md): product strategy, users, scenarios,
-  positioning, roadmap, and business model.
-- [Architecture Design](docs/system-architecture.md): target architecture,
-  planes, runtime layers, sandbox strategy, MCP gateway, memory, and governance.
-- [Technical Implementation Design](docs/implementation-plan.md): deployable
-  components, data model, APIs, runtime flows, security, observability,
-  implementation phases, and current local implementation map.
-- [Chat Integrations](docs/chat-integrations.md): Discord, Telegram, and Lark
-  adapter architecture, identity mapping, commands, security, and rollout.
-- [Architecture Decision Records](docs/adr/README.md): accepted technical
-  decisions for governance, sandboxing, and control-plane boundaries.
-- [Visual Design](docs/design-system.md): marketing/UI design language and
-  visual system direction.
-- [Brand Assets](assets/brand/README.md): logo files, usage notes, and color
-  tokens.
+- [Local Development](docs/local-development.md): setup, environment, service
+  commands, data layout, and tests.
+- [Product Design](docs/product.md): product direction, users, scenarios, and
+  roadmap.
+- [Architecture Design](docs/system-architecture.md): target planes, sandbox
+  strategy, MCP gateway, memory, and governance.
+- [Technical Implementation Design](docs/implementation-plan.md): components,
+  data model, APIs, security, and rollout phases.
+- [Chat Integrations](docs/chat-integrations.md): provider adapters, identity
+  mapping, commands, and security.
+- [Architecture Decisions](docs/adr/README.md): accepted decisions for
+  governance, sandboxing, and control-plane boundaries.
+- [Visual Design](docs/design-system.md): product and brand design system.
+- [Brand Assets](assets/brand/README.md): logo files and color tokens.
 
-## Architecture Snapshot
-
-Relay is split into a control plane and an execution plane.
-
-- `backend/`: Python/FastAPI backend split into `core/` (models, env, ids),
-  `persistence/` (event-sourced session/task/daemon stores),
-  `security/` (auth), `services/` (controller, daemon registry, task
-  scheduler, chat integrations), and `api/` HTTP routes. Top-level modules
-  such as `controller.py` and `daemon.py` are compatibility re-exports.
-  Alembic migrations live under `backend/migrations/`.
-- `packages/relay-core/`: shared TypeScript protocol, command builders,
-  prompts, renderers, token-usage normalization, and compatibility client
-  exports.
-- `packages/relay-chat/`: provider-neutral chat gateway; Discord, Telegram,
-  and Lark adapters.
-- `packages/relay-daemon/`: TypeScript daemon runtime, BoxLite integration, and
-  agent process execution.
-- `packages/relay-tui/`: Ink-based terminal UI.
-- `web/`: Next.js web UI served at `/web` — chat, backlog, routines, MCP,
-  skills, channels, and the admin console/dashboard.
-
-The current local MVP keeps persistence file-backed under `.relay/`, but the
-event model is intended to map cleanly to durable database-backed storage.
-
-## Test Layout
-
-- `backend/tests/`: Python backend unit and API tests (including task scheduler
-  and routine promotion).
-- `packages/*/tests/`: TypeScript package tests next to the owning package.
-- `web/tests/`: web UI tests next to the Next.js app.
-
-Run the active suite with:
+## Verification
 
 ```bash
+npm run build
+npm run test:ts
+npm run test:py
 npm test
 ```
 
-## Roadmap
-
-The broader implementation roadmap remains in
-[docs/implementation-plan.md](docs/implementation-plan.md). Recent MVP additions
-include task backlogs, recurring routines with backend scheduler dispatch, and
-web UI design-system refresh. Next major work areas are contract test coverage,
-storage parity, daemon/backend integration tests, and enterprise control-plane
-hardening.
+Use focused tests while developing, then run `npm test` before handing off a
+behavior change.
