@@ -171,6 +171,27 @@ describe("Relay web thread status", () => {
     assert.equal(runtimeNodes.every((node) => !("nodeToken" in node)), true);
   });
 
+  it("keeps the computer's display name when the authenticated record wins the merge", () => {
+    const lastSeenAt = "2026-06-12T00:00:03.000Z";
+    const authenticated = daemonNode({ id: "sbx_alice", employeeId: "alice", lastSeenAt });
+    const controlPanel = controlPanelNode({
+      id: "sbx_alice",
+      employeeId: "alice",
+      lastSeenAt,
+      displayName: "Alice's MacBook",
+    });
+
+    const [tied] = mergeThreadRuntimeNodes([authenticated], [controlPanel]);
+    assert.equal("displayName" in tied ? tied.displayName : undefined, "Alice's MacBook");
+
+    const [fresherAuthenticated] = mergeThreadRuntimeNodes(
+      [daemonNode({ id: "sbx_alice", employeeId: "alice", lastSeenAt: "2026-06-12T00:00:05.000Z" })],
+      [controlPanel],
+    );
+    assert.equal("displayName" in fresherAuthenticated ? fresherAuthenticated.displayName : undefined, "Alice's MacBook");
+    assert.equal(fresherAuthenticated.lastSeenAt, "2026-06-12T00:00:05.000Z");
+  });
+
   it("posts employee creation with the selected unassigned node", async () => {
     const originalFetch = globalThis.fetch;
     let requestPath = "";

@@ -13,11 +13,29 @@ function nodeRank(node: DaemonNodeMonitorRecord): number {
   return 0;
 }
 
+function mergedDisplayName(
+  winner: DaemonNodeMonitorRecord,
+  loser: DaemonNodeMonitorRecord,
+): string | undefined {
+  const named = [winner, loser].find(
+    (node) => "displayName" in node && typeof node.displayName === "string" && node.displayName.trim(),
+  );
+  return named && "displayName" in named && typeof named.displayName === "string"
+    ? named.displayName
+    : undefined;
+}
+
 function preferDaemonNode(a: DaemonNodeMonitorRecord, b: DaemonNodeMonitorRecord): DaemonNodeMonitorRecord {
   const rankDelta = nodeRank(b) - nodeRank(a);
-  if (rankDelta > 0) return b;
-  if (rankDelta < 0) return a;
-  return (b.lastSeenAt ?? "").localeCompare(a.lastSeenAt ?? "") > 0 ? b : a;
+  const winner = rankDelta > 0
+    ? b
+    : rankDelta < 0
+      ? a
+      : (b.lastSeenAt ?? "").localeCompare(a.lastSeenAt ?? "") > 0 ? b : a;
+  const displayName = mergedDisplayName(winner, winner === a ? b : a);
+  if (displayName === undefined) return winner;
+  const merged: DaemonNodeMonitorRecord & { displayName?: string } = { ...winner, displayName };
+  return merged;
 }
 
 export function mergeVisibleDaemonNodes(
