@@ -278,8 +278,12 @@ export function App() {
     if (myEmployeeId) setSelectedEmployee(myEmployeeId);
     setHydrated(true);
   }, [authChecked, user]);
+  // Adoption reads /cp/daemon-nodes, which is admin-only: running it for every
+  // signed-in user meant a 403 on each load whose failure was swallowed. Gate
+  // it exactly like the query it depends on (useLocalDaemonNodes above).
   useEffect(() => {
-    if (!hydrated || !user || localNodeAdoptionStartedRef.current) return;
+    if (!hydrated || user?.role !== "admin" || !canUseLocalControlPanel()) return;
+    if (localNodeAdoptionStartedRef.current) return;
     localNodeAdoptionStartedRef.current = true;
     void adoptLocalDaemonNodes();
   }, [adoptLocalDaemonNodes, hydrated, user]);
@@ -508,6 +512,10 @@ export function App() {
       await refresh();
     } catch (error) {
       setPendingUserMessage(null);
+      // The composer was cleared optimistically; a rejected dispatch (busy
+      // node, offline runtime) is retryable, so hand the text back — exactly
+      // as typed, mention included — instead of making the author retype it.
+      if (!composerRef.current?.getText().trim()) composerRef.current?.setText(raw);
       reportMutationError(
         "Failed to send message",
         error,
@@ -520,7 +528,13 @@ export function App() {
     if (!activeSession) return;
     if (!canCancelThreadRun({ activeRun, session: activeSession })) return;
     const cancelNodeId = threadCancelNodeId({ node: activeRunOwner?.node ?? selectedNode, sandbox: selectedSandbox });
-    if (!cancelNodeId) return;
+    // The stop control is offered off the session status alone, so it can be
+    // pressed before the node list has resolved. Say so rather than swallowing
+    // the click and leaving the run looking uncancellable.
+    if (!cancelNodeId) {
+      reportMutationError("Failed to cancel run", null, t("errors.cancel_run_no_node"));
+      return;
+    }
     try {
       const session = await cancelRunMutation.mutateAsync({
         sandboxId: cancelNodeId,

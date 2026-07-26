@@ -12,9 +12,10 @@ export type ThreadActivity = {
 } | null;
 
 // Pure derivation of a row's activity signal from its session status and any
-// in-flight agent. A running agent always wins (the live pulse); settled
-// statuses map to a status word; states with nothing worth a second line
-// return null so the row stays a single title row.
+// in-flight agent. A running agent always wins (the live pulse, named); a
+// running session with no visible run still reads as working, because node
+// activeRuns are not visible to every client; settled statuses map to a status
+// word; anything else returns null so the row stays a single title row.
 export function threadActivity(
   status: SessionStatus,
   runningAgent: AgentName | undefined,
@@ -23,6 +24,8 @@ export function threadActivity(
     return { kind: "working", labelKey: "thread.agent_working" };
   }
   switch (status) {
+    case "running":
+      return { kind: "working", labelKey: "status.running" };
     case "waiting_for_human":
       return { kind: "warn", labelKey: "thread.statuses.waiting_for_human" };
     case "failed":

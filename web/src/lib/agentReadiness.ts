@@ -49,7 +49,20 @@ export function dispatchReadyAgents(node: NodeAgentState, agentNames: AgentName[
 }
 
 const NOT_READY_AGENTS_RE = /does not have ready agent\(s\): ([^.]+)/i;
-const WORKSPACE_UNAVAILABLE_RE = /^Agent (.+?) has no eligible runtime placement \(workspace_unavailable\)\.?$/i;
+const NO_PLACEMENT_RE = /^Agent (.+?) has no eligible runtime placement \(([a-z_]+)\)\.?$/i;
+
+// Every placement rejection reaches the client as the same sentence with a
+// different code (see _best_rejection_code in the backend's agent_routing).
+// Each one sends the reader somewhere different — a busy node is healthy and
+// needs waiting out, an offline one needs the daemon restarted — so they must
+// not collapse into one generic "check the connection".
+const PLACEMENT_REJECTION_KEYS: Record<string, string> = {
+  workspace_unavailable: "errors.workspace_unavailable",
+  capacity_exhausted: "errors.capacity_exhausted",
+  node_offline: "errors.node_offline",
+  executor_not_ready: "errors.executor_not_ready",
+  agent_configuration_pending: "errors.agent_configuration_pending",
+};
 
 export function formatDispatchError(error: unknown, t: TFunction): string | undefined {
   const message = errorMessage(error);
@@ -61,9 +74,12 @@ export function formatDispatchError(error: unknown, t: TFunction): string | unde
   if (/disabled agent\(s\)/i.test(message)) {
     return t("errors.agent_disabled_on_node");
   }
-  const workspaceUnavailable = message.match(WORKSPACE_UNAVAILABLE_RE);
-  if (workspaceUnavailable) {
-    return t("errors.workspace_unavailable", { agent: workspaceUnavailable[1].trim() });
+  const noPlacement = message.match(NO_PLACEMENT_RE);
+  if (noPlacement) {
+    // An unrecognized code falls through to the caller's generic message
+    // rather than naming a cause we cannot describe.
+    const key = PLACEMENT_REJECTION_KEYS[noPlacement[2].toLowerCase()];
+    if (key) return t(key, { agent: noPlacement[1].trim() });
   }
   return undefined;
 }

@@ -26,7 +26,17 @@ describe("threadActivity", () => {
     assert.deepEqual(threadActivity("cancelled", undefined), { kind: "neutral", labelKey: "status.cancelled" });
   });
 
-  it("returns null for a plain running thread with no agent, so the row stays single-line", () => {
-    assert.equal(threadActivity("running", undefined), null);
+  // The live-run pulse used to be the only source of a "working" signal, so a
+  // client that cannot see node activeRuns (no sandbox token) showed a running
+  // thread with no status at all. The session status is the fallback.
+  it("still reports working for a running thread when no live run is visible", () => {
+    assert.deepEqual(threadActivity("running", undefined), {
+      kind: "working",
+      labelKey: "status.running",
+    });
+  });
+
+  it("returns null for a status it does not recognize", () => {
+    assert.equal(threadActivity("archived" as SessionStatus, undefined), null);
   });
 });

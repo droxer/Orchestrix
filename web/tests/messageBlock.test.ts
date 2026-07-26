@@ -345,6 +345,74 @@ describe("projectMessages artifact projection", () => {
     assert.match(agent.stderr, /Reading additional input/);
   });
 
+  // A daemon that reports an agent log without the stdout:/stderr: markers
+  // used to have every line filed as stderr, turning a clean run into a wall
+  // of warn rows. Stream JSONL is agent output whether or not it is labelled.
+  it("treats an unlabelled stream-json agent log as stdout", () => {
+    const frame = `${JSON.stringify({
+      type: "assistant",
+      message: { id: "msg_1", content: [{ type: "text", text: "Unlabelled but streamed." }] },
+    })}\n`;
+    const messages = projectMessages(session([
+      {
+        id: "ev_run",
+        type: "agent.started",
+        sessionId: "ses_1",
+        timestamp,
+        runId: "run_1",
+        agent: "claude",
+        role: "implementer",
+        mode: "action",
+      },
+      {
+        id: "ev_completed",
+        type: "agent.completed",
+        sessionId: "ses_1",
+        timestamp,
+        runId: "run_1",
+        agent: "claude",
+        status: "completed",
+        exitCode: 0,
+        agentLog: frame,
+      },
+    ]), t);
+
+    const agent = messages.find((message) => message.kind === "agent");
+    assert.ok(agent && agent.kind === "agent");
+    assert.match(agent.stdout, /Unlabelled but streamed/);
+    assert.equal(agent.stderr, "");
+  });
+
+  it("keeps an unlabelled non-stream agent log on stderr", () => {
+    const messages = projectMessages(session([
+      {
+        id: "ev_run",
+        type: "agent.started",
+        sessionId: "ses_1",
+        timestamp,
+        runId: "run_1",
+        agent: "claude",
+        role: "implementer",
+        mode: "action",
+      },
+      {
+        id: "ev_completed",
+        type: "agent.completed",
+        sessionId: "ses_1",
+        timestamp,
+        runId: "run_1",
+        agent: "claude",
+        status: "failed",
+        exitCode: 1,
+        agentLog: "command not found: claude",
+      },
+    ]), t);
+
+    const agent = messages.find((message) => message.kind === "agent");
+    assert.ok(agent && agent.kind === "agent");
+    assert.match(agent.stderr, /command not found/);
+  });
+
   it("does not duplicate completed log output that was already streamed", () => {
     const finalFrame = `${JSON.stringify({
       type: "item.completed",
