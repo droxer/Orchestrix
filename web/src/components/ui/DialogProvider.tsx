@@ -15,6 +15,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { readAnimationDurationMs } from "@/lib/animationDuration";
+import { acquireBodyScrollLock } from "@/lib/bodyScrollLock";
 import { ActionRemove } from "../icons";
 
 // Promise-based confirm/prompt that replaces the native window.confirm /
@@ -151,12 +152,10 @@ export function DialogProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!dialogOpen) return;
     previouslyFocused.current = document.activeElement as HTMLElement | null;
-    const { body } = document;
-    const previousOverflow = body.style.overflow;
-    body.style.overflow = "hidden";
+    const releaseScrollLock = acquireBodyScrollLock();
 
     return () => {
-      body.style.overflow = previousOverflow;
+      releaseScrollLock();
       previouslyFocused.current?.focus?.();
       previouslyFocused.current = null;
     };

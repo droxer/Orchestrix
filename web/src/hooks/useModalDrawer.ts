@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { acquireBodyScrollLock } from "@/lib/bodyScrollLock";
 
 const FOCUSABLE =
   'input:not([disabled]), button:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
@@ -33,11 +34,9 @@ export function useModalDrawer<T extends HTMLElement>(onClose: () => void, enabl
   useEffect(() => {
     if (!enabled) return;
     previouslyFocused.current = document.activeElement as HTMLElement | null;
-    const { body } = document;
-    const previousOverflow = body.style.overflow;
-    body.style.overflow = "hidden";
+    const releaseScrollLock = acquireBodyScrollLock();
     return () => {
-      body.style.overflow = previousOverflow;
+      releaseScrollLock();
       previouslyFocused.current?.focus?.();
       previouslyFocused.current = null;
     };

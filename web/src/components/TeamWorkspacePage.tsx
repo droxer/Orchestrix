@@ -588,7 +588,7 @@ function TeamActivities({ team, brief, onOpenThread }: { team: AgentTeam; brief:
             </ul>
           </ActivitySection>
         ) : null}
-        {!hasActivity ? <WorkspaceEmpty title={t("workspace.no_activity")} hint={t("workspace.empty_activity_hint")} mark={<TeamMark size={18} />} /> : null}
+        {!hasActivity ? <WorkspaceEmpty title={t("workspace.no_activity")} hint={t("workspace.empty_activity_hint")} mark={<TeamMark size={18} />} announce /> : null}
       </div>
     </div>
   );

@@ -92,6 +92,15 @@
 @media (pointer: coarse) {
   [data-slot="button"],
   [data-slot="link-button"],
+  [data-slot="input"],
+  [data-slot="textarea"],
+  [data-slot="select-trigger"],
+  [data-slot="select-item"],
+  [data-slot="select-scroll-up-button"],
+  [data-slot="select-scroll-down-button"],
+  input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+  select,
+  textarea,
   .decision-bar button,
   .handoff-actions button,
   .dialog-actions [data-slot="button"],
@@ -124,6 +133,18 @@
   [data-slot="button"],
   [data-slot="link-button"] {
     min-width: var(--touch-target);
+  }
+
+  /* iOS zooms focused form controls below 16px. Relay's compact desktop type
+     remains unchanged; coarse pointers get a readable, zoom-safe field size. */
+  [data-slot="input"],
+  [data-slot="textarea"],
+  [data-slot="select-trigger"],
+  [data-slot="select-item"],
+  input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+  select,
+  textarea {
+    font-size: 16px;
   }
 
   .dialog-toast-close,
