@@ -1,11 +1,10 @@
 "use client";
 
 import type { TFunction } from "i18next";
-import { AgentMark } from "../AgentMark";
 import { Button } from "../ui/button";
 import { AdminDelete, AdminEmployees } from "../icons";
-import { agentAvailabilityTone, type EmployeeNodeSummary } from "./helpers";
-import type { EmployeeAgent } from "../../types";
+import { type EmployeeNodeSummary } from "./helpers";
+import { EmployeeComputers } from "./EmployeeComputers";
 
 // Employee node state, collapsed to the same tone vocabulary the node status
 // pill uses so the two cards read as one system.
@@ -18,9 +17,7 @@ export function summaryTone(member: EmployeeNodeSummary): { tone: string; key: s
 
 interface EmployeeCardProps {
   member: EmployeeNodeSummary;
-  agents: EmployeeAgent[];
   highlight: boolean;
-  onSelectAgent?: (agentId: string) => void;
   onDelete?: (employeeId: string) => void;
   deletePending: boolean;
   t: TFunction;
@@ -28,9 +25,7 @@ interface EmployeeCardProps {
 
 export function EmployeeCard({
   member,
-  agents,
   highlight,
-  onSelectAgent,
   onDelete,
   deletePending,
   t,
@@ -69,23 +64,7 @@ export function EmployeeCard({
           <p className="adm-emp-card-email mono tone-muted" translate="no">{member.email}</p>
         ) : null}
         <div className="adm-agents adm-emp-nodes">
-          {agents.length === 0 ? (
-            <span className="adm-emp-no-nodes">{t("admin.v2.no_agents_for_employee")}</span>
-          ) : (
-            agents.map((agent) => (
-              <Button
-                variant="ghost"
-                key={agent.id}
-                type="button"
-                className={`adm-node-chip adm-node-chip--button tone-${agentAvailabilityTone(agent.availability)}`}
-                onClick={() => onSelectAgent?.(agent.id)}
-                disabled={!onSelectAgent}
-              >
-                <AgentMark agent={agent.executorKind} size={12} className="adm-node-chip-mark" />
-                <span translate="no">{agent.displayName}</span>
-              </Button>
-            ))
-          )}
+          <EmployeeComputers nodes={member.nodes} t={t} />
         </div>
       </div>
 

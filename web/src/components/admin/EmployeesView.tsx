@@ -1,25 +1,20 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { ActionSearch, AdminDelete, AdminEmployees, ICON_STROKE_LARGE } from "../icons";
 import { Button } from "@/components/ui/button";
 import { useDialogs } from "@/components/ui/DialogProvider";
 import { RelayEmptyState } from "@/components/RelayEmptyState";
-import { AgentMark } from "../AgentMark";
 import type { ControlPanelDaemonNodeRecord } from "../../types";
-import { listControlPanelAgents } from "../../api";
-import { ADMIN_AGENTS_KEY } from "../../lib/adminHelpers";
 import { useUrlSearchState } from "../../hooks/useUrlSearchState";
 import {
   buildEmployeeSummaries,
-  agentsForEmployee,
-  agentAvailabilityTone,
   type EmployeeNodeSummary,
 } from "./helpers";
 import { EmployeeCard, summaryTone } from "./EmployeeCard";
+import { EmployeeComputers } from "./EmployeeComputers";
 import { AdminLayoutToggle, type AdminLayout } from "./AdminLayoutToggle";
 
 interface EmployeesViewProps {
@@ -30,7 +25,6 @@ interface EmployeesViewProps {
   onAddEmployee: () => void;
   onDeleteEmployee?: (employee: import("../../types").EmployeeRecord) => Promise<void>;
   highlightedEmployeeId: string | null;
-  onSelectAgent?: (agentId: string) => void;
 }
 
 type EmployeeFilter = "all" | "running" | "ready" | "idle" | "failed" | "unassigned";
@@ -87,7 +81,6 @@ export function EmployeesView({
   onAddEmployee,
   onDeleteEmployee,
   highlightedEmployeeId,
-  onSelectAgent,
 }: EmployeesViewProps) {
   const { t } = useTranslation();
   const { confirm } = useDialogs();
@@ -100,11 +93,6 @@ export function EmployeesView({
   );
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const agentsQuery = useQuery({
-    queryKey: ADMIN_AGENTS_KEY,
-    queryFn: ({ signal }) => listControlPanelAgents(undefined, signal),
-  });
-  const agents = agentsQuery.data?.agents ?? [];
 
   const employeesById = useMemo(() => new Map(employees.map((employee) => [employee.id, employee])), [employees]);
 
@@ -149,18 +137,20 @@ export function EmployeesView({
     return summaries.filter((item) => {
       if (!matchesEmployeeFilter(item, filter)) return false;
       if (!q) return true;
+      // Computers are what the row shows, so they are what search matches —
+      // both the display name and the node id, since either can be on screen.
       const haystack = [
         item.id,
         item.displayName,
         item.email ?? "",
         item.departmentName ?? "",
-        ...agentsForEmployee(item, agents).map((agent) => `${agent.displayName} ${agent.executorKind}`),
+        ...item.nodes.map((node) => `${node.displayName ?? ""} ${node.id}`),
       ]
         .join(" ")
         .toLowerCase();
       return haystack.includes(q);
     });
-  }, [agents, summaries, query, filter]);
+  }, [summaries, query, filter]);
 
   if (summaries.length === 0) {
     return (
@@ -221,12 +211,6 @@ export function EmployeesView({
       {deleteError ? (
         <p className="adm-view-error" role="alert">{t("admin.v2.action_failed", { message: deleteError })}</p>
       ) : null}
-      {agentsQuery.error ? (
-        <p className="adm-view-error" role="alert">
-          {t("admin.v2.agents_load_error")}{" "}
-          <Button variant="ghost" type="button" onClick={() => void agentsQuery.refetch()}>{t("admin.v2.retry")}</Button>
-        </p>
-      ) : null}
 
       {filtered.length === 0 ? (
         <p className="adm-empty-body">{t("admin.v2.no_match")}</p>
@@ -236,9 +220,7 @@ export function EmployeesView({
             <EmployeeCard
               key={member.id}
               member={member}
-              agents={agentsForEmployee(member, agents)}
               highlight={highlightedEmployeeId === member.id}
-              onSelectAgent={onSelectAgent}
               onDelete={onDeleteEmployee ? (id) => void handleDeleteEmployee(id) : undefined}
               deletePending={pendingDelete !== null}
               t={t}
@@ -249,13 +231,12 @@ export function EmployeesView({
         <div role="table" aria-label={t("admin.v2.nav_employees", { defaultValue: "Employees" })}>
           <div className="adm-emp-cols" role="row">
             <span className="adm-col-label" role="columnheader">{t("admin.col_employee")}</span>
-            <span className="adm-col-label" role="columnheader">{t("admin.col_agents")}</span>
+            <span className="adm-col-label" role="columnheader">{t("admin.v2.col_computers")}</span>
             <span className="adm-col-label adm-col-label--metrics" role="columnheader">{t("admin.v2.col_metrics")}</span>
             <span className="adm-col-label adm-col-label--metrics" role="columnheader">{t("admin.v2.col_actions")}</span>
           </div>
           <ul className="adm-emp-list" role="rowgroup">
             {filtered.map((member) => {
-              const memberAgents = agentsForEmployee(member, agents);
               const highlight = highlightedEmployeeId === member.id;
               const { tone, key } = summaryTone(member);
               return (
@@ -280,22 +261,7 @@ export function EmployeesView({
                     </p>
                   </div>
                   <div className="adm-emp-nodes" role="cell">
-                    {memberAgents.length === 0 ? (
-                      <span className="adm-emp-no-nodes">{t("admin.v2.no_agents_for_employee")}</span>
-                    ) : (
-                      memberAgents.map((agent) => (
-                        <Button variant="ghost"
-                          key={agent.id}
-                          type="button"
-                          className={`adm-node-chip adm-node-chip--button tone-${agentAvailabilityTone(agent.availability)}`}
-                          onClick={() => onSelectAgent?.(agent.id)}
-                          disabled={!onSelectAgent}
-                        >
-                          <AgentMark agent={agent.executorKind} size={12} className="adm-node-chip-mark" />
-                          <span translate="no">{agent.displayName}</span>
-                        </Button>
-                      ))
-                    )}
+                    <EmployeeComputers nodes={member.nodes} t={t} />
                   </div>
                   <div
                     className="adm-emp-metrics"

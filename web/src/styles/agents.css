@@ -184,30 +184,6 @@
   white-space: nowrap;
 }
 
-/* Quiet roster form of the placement badge: no chip box, no status dot —
-   availability already lives on the row accent and the glyph pip. The icon
-   keeps ownership legible; everything else waits in the tooltip. */
-.agent-placement-plain {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-1);
-  min-width: 0;
-  max-width: 100%;
-  color: var(--ink-3);
-}
-
-.agent-placement-plain > svg {
-  flex: none;
-}
-
-.agent-placement-plain-name {
-  overflow: hidden;
-  font-family: var(--font-mono);
-  font-size: var(--fs-2);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .agent-placement-badge {
   display: inline-flex;
   align-items: center;
@@ -225,14 +201,15 @@
   line-height: 1.35;
 }
 
-/* Same ownership mapping as .adm-node-profile-kind: managed = action tint,
-   local = neutral hairline (green/red stay reserved for health). */
-.agent-placement-badge[data-ownership="managed"] {
-  border-color: color-mix(in srgb, var(--action) 35%, var(--line-1));
-}
-
 .agent-placement-badge > svg {
   flex: none;
+}
+
+/* Same ownership mapping as .adm-node-profile-kind: the cloud mark carries the
+   action tint and the chip itself stays a neutral hairline, so ownership never
+   competes with the status dot (green/red stay reserved for health). */
+.agent-placement-badge[data-ownership="managed"] > svg {
+  color: var(--action);
 }
 
 /* Status hue lives only on the dot (tone-* sets --tone in base.css), matching

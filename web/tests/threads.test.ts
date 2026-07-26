@@ -5,7 +5,9 @@ import { matchesThreadQuery, myThreadSessions, pickActiveThreadSession, sessionA
 import {
   agentsForThreadNode,
   threadNeedsRuntimeSelection,
+  resolveNewThreadComputer,
   selectableThreadComputers,
+  threadComputerSignature,
   threadRuntimeNodeId,
 } from "../src/lib/threadRuntime.js";
 import { isAwaitingFeedbackDecision, rerunAssignmentForSession } from "../src/lib/workflow.js";
@@ -210,5 +212,40 @@ describe("web thread helpers", () => {
       }],
     }), "claude", "action");
     assert.deepEqual(assignment, { agent: "codex", mode: "review" });
+  });
+});
+
+describe("new-thread computer selection", () => {
+  const ready = (id: string, over: Record<string, unknown> = {}) => ({
+    id, employeeId: "alice", online: true, stale: false, status: "ready", ...over,
+  });
+
+  it("keeps the picked computer when a poll reports it briefly unselectable", () => {
+    const picked = ready("node_b");
+    const known = [ready("node_a"), { ...picked, stale: true }];
+    const selectable = selectableThreadComputers(known, "alice");
+
+    assert.deepEqual(selectable.map((node) => node.id), ["node_a"]);
+    assert.equal(resolveNewThreadComputer("node_b", selectable, known), "node_b");
+  });
+
+  it("falls back to the first selectable computer only once the pick is gone", () => {
+    const known = [ready("node_a"), ready("node_c")];
+    const selectable = selectableThreadComputers(known, "alice");
+
+    assert.equal(resolveNewThreadComputer("node_b", selectable, known), "node_a");
+    assert.equal(resolveNewThreadComputer(null, selectable, known), "node_a");
+    assert.equal(resolveNewThreadComputer("node_b", [], []), null);
+  });
+
+  it("ignores heartbeat churn when keying the computer list", () => {
+    const first = [ready("node_a", { lastSeenAt: "2026-07-26T10:00:00Z", lastSeenAgeMs: 900 })];
+    const second = [ready("node_a", { lastSeenAt: "2026-07-26T10:00:03Z", lastSeenAgeMs: 120 })];
+
+    assert.equal(threadComputerSignature(first), threadComputerSignature(second));
+    assert.notEqual(
+      threadComputerSignature(first),
+      threadComputerSignature([ready("node_a"), ready("node_b")]),
+    );
   });
 });
