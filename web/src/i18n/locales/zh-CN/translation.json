@@ -15,6 +15,7 @@
   "errors": {
     "rename_thread": "无法重命名对话。请刷新对话列表后重试。",
     "rename_computer": "无法重命名电脑。请检查连接后重试。",
+    "save_preferences": "无法保存偏好设置。请检查连接后重试。",
     "delete_thread": "无法删除对话。请检查连接后重试。",
     "send_message": "无法发送消息。请检查 daemon 连接后重试。",
     "thread_computer_required": "请先选择一台运行中的电脑，再开始此对话。",

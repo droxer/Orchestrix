@@ -5,9 +5,13 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from fastapi.testclient import TestClient
-
 from relay.app import create_app
-from relay.persistence.stores import DatabaseDaemonStore, DatabaseSessionStore, DatabaseTaskStore, relay_event
+from relay.persistence.stores import (
+    DatabaseDaemonStore,
+    DatabaseSessionStore,
+    DatabaseTaskStore,
+    relay_event,
+)
 from relay.security.auth import DatabaseUserAuthStore
 
 
@@ -116,6 +120,29 @@ def test_bootstrap_only_once(monkeypatch) -> None:
             "password": "secret123",
         })
         assert response.status_code == 409
+
+
+def test_user_preferences_persist_across_login_sessions(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        client = TestClient(create_app(root))
+        _bootstrap_admin(client)
+
+        response = client.patch("/auth/preferences", json={
+            "theme": "dark",
+            "language": "zh-CN",
+        })
+
+        assert response.status_code == 200
+        assert response.json()["user"]["theme"] == "dark"
+        assert response.json()["user"]["language"] == "zh-CN"
+
+        assert client.post("/auth/logout").status_code == 200
+        _login(client, "admin", "secret123")
+        current = client.get("/auth/me")
+        assert current.status_code == 200
+        assert current.json()["user"]["theme"] == "dark"
+        assert current.json()["user"]["language"] == "zh-CN"
 
 
 def test_login_and_session_cookie(monkeypatch) -> None:

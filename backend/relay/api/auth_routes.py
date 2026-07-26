@@ -28,6 +28,25 @@ async def auth_me(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     return {"authenticated": True, "user": ctx.auth_store._public_user(user)}
 
 
+@router.patch("/auth/preferences")
+async def update_auth_preferences(request: Request, ctx: AppContextDep) -> dict[str, Any]:
+    user = require_user_session(request, ctx.auth_store)
+    body = await json_body(request)
+    theme = string_field(body, "theme") if "theme" in body else None
+    language = string_field(body, "language") if "language" in body else None
+    if theme is None and language is None:
+        raise HTTPException(400, "theme or language is required.")
+    try:
+        updated = ctx.auth_store.update_user_preferences(
+            user["id"],
+            theme=theme,
+            language=language,
+        )
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from error
+    return {"user": updated}
+
+
 @router.post("/auth/bootstrap")
 async def auth_bootstrap(request: Request, response: Response, ctx: AppContextDep) -> dict[str, Any]:
     body = await json_body(request)

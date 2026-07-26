@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 
-import { apiJson, deleteTask, getTeamArtifacts, getWorkspaceBrief, listAgentWorkspaceFiles, listArtifacts, listEmployeeAgents, listTaskArtifacts, readAgentWorkspaceFile, RelayApiError, runLogicalAgents, updateComputerDisplayName, updateOwnEmployeeAgent } from "../src/api.js";
+import { apiJson, deleteTask, getTeamArtifacts, getWorkspaceBrief, listAgentWorkspaceFiles, listArtifacts, listEmployeeAgents, listTaskArtifacts, readAgentWorkspaceFile, RelayApiError, runLogicalAgents, updateComputerDisplayName, updateOwnEmployeeAgent, updateUserPreferences } from "../src/api.js";
 
 const originalFetch = globalThis.fetch;
 
@@ -38,6 +38,31 @@ describe("apiJson", () => {
     assert.equal(requestInit?.method, "PATCH");
     assert.deepEqual(JSON.parse(String(requestInit?.body)), { displayName: "Office Mac" });
     assert.equal(result.node.displayName, "Office Mac");
+  });
+
+  it("persists a changed user preference without resending the other setting", async () => {
+    let requestPath = "";
+    let requestInit: RequestInit | undefined;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      requestPath = String(input);
+      requestInit = init;
+      return new Response(JSON.stringify({
+        user: {
+          id: "usr_alice",
+          username: "alice",
+          role: "user",
+          theme: "dark",
+          language: "en",
+        },
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }) as typeof fetch;
+
+    const result = await updateUserPreferences({ theme: "dark" });
+
+    assert.equal(requestPath, "/auth/preferences");
+    assert.equal(requestInit?.method, "PATCH");
+    assert.deepEqual(JSON.parse(String(requestInit?.body)), { theme: "dark" });
+    assert.equal(result.user.theme, "dark");
   });
 
   it("reports an HTML fallback response instead of attempting to parse it as JSON", async () => {
