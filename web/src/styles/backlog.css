@@ -1388,6 +1388,15 @@
 
 .backlog-row-title {
   min-width: 0;
+  /* Two Button base utilities have to be undone for the title to truncate.
+     `shrink-0` pins the box at its intrinsic width, so a long title overflows
+     the lead cell and paints over the status column. `inline-flex` then makes
+     the label an anonymous flex item, and text-overflow never applies to one —
+     the text just gets clipped at both ends with no ellipsis. Both must be
+     declared: nothing overrides a utility the rule doesn't mention. The button
+     wraps a bare text node, so `block` costs nothing. */
+  flex-shrink: 1;
+  display: block;
   margin: 0;
   padding: 0;
   border: 0;

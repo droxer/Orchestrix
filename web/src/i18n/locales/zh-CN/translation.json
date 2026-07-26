@@ -109,7 +109,11 @@
     "delete_confirm": "删除对话“{{name}}”？",
     "delete_message": "这将永久删除该对话及其历史记录，且无法撤销。",
     "statuses": {
-      "waiting_for_human": "等待人工"
+      "running": "运行中",
+      "waiting_for_human": "等待人工",
+      "completed": "已完成",
+      "failed": "已失败",
+      "cancelled": "已取消"
     }
   },
   "composer": {
@@ -523,7 +527,7 @@
       "dash_kpi_employees": "员工",
       "dash_kpi_employees_hint": "{{count}} 名员工。",
       "dash_kpi_nodes": "节点",
-      "dash_kpi_nodes_hint": "{{ready}} 就绪 · {{failed}} 失败",
+      "dash_kpi_nodes_hint": "{{ready}} 就绪 · {{failed}} 失败 / 离线",
       "dash_kpi_sessions": "对话",
       "dash_kpi_sessions_delta": "近 24 小时 {{count}} · 较前 {{diff}}",
       "dash_loading": "加载中…",

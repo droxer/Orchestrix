@@ -18,6 +18,9 @@ export function teamAvailability(
   return "ready";
 }
 
+/** Human label for a task's assignee. `employeeNames` is the resolved employee
+ *  directory (see useEmployeeNames); without it, everyone but the viewer falls
+ *  back to the raw employee id, which is what the Assignee column used to show. */
 export function taskAssigneeDisplayName(
   task: {
     assigneeEmployeeId?: string;
@@ -25,13 +28,14 @@ export function taskAssigneeDisplayName(
     assignedTeamId?: string;
   },
   currentUser: CurrentUser,
+  employeeNames?: ReadonlyMap<string, string>,
 ): string | undefined {
   const employeeId = task.assigneeEmployeeId ?? task.ownerEmployeeId;
   if (!employeeId) return undefined;
   if (employeeId === currentUser.employeeId || employeeId === currentUser.id) {
     return currentUser.displayName?.trim() || currentUser.username;
   }
-  return employeeId;
+  return employeeNames?.get(employeeId) ?? employeeId;
 }
 
 /** True when the task's owning employee is the viewer. Personal views

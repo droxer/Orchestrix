@@ -18,7 +18,7 @@ import { agentLabel } from "../lib/plan";
 import { isWorkspaceRetryableError, workspaceFilesEmptyState, workspaceHomeStatus } from "../lib/workspaceHome";
 import { NavRefresh, WorkspaceFile, WorkspaceFolder } from "./icons";
 import { AgentMark } from "./AgentMark";
-import { compactDate } from "../lib/workspaceFormat";
+import { compactDate, compactDueDate } from "../lib/workspaceFormat";
 import { MetricItem, WorkspaceEmpty, WorkspaceLoading } from "./workspace/WorkspacePrimitives";
 import { PageHeader } from "./PageHeader";
 import { Button } from "./ui/button";
@@ -540,12 +540,15 @@ function taskTitle(task: WorkspaceBriefTask): string {
   return task.title?.trim() || task.id;
 }
 
+/** Sessions carry `SessionStatus`, not `TaskStatus` — `completed`, `failed`,
+ *  and `cancelled` have no `backlog.statuses.*` key and used to fall through
+ *  to the raw lowercase enum. Label them from the thread vocabulary. */
 function sessionStatusLabel(
   status: WorkspaceBriefSession["status"] | undefined,
   t: (key: string, options?: Record<string, unknown>) => string,
 ): string {
   if (!status) return "";
-  return t(`backlog.statuses.${status}`, { defaultValue: status });
+  return t(`thread.statuses.${status}`, { defaultValue: status });
 }
 
 function ActivitiesPane({
@@ -645,7 +648,7 @@ function ActivitiesPane({
                       title={taskTitle(task)}
                       meta={[
                         task.status ? t(`backlog.statuses.${task.status}`, { defaultValue: task.status }) : "",
-                        task.dueDate ? t("workspace.task_due", { date: compactDate(task.dueDate, i18n.language) }) : "",
+                        task.dueDate ? t("workspace.task_due", { date: compactDueDate(task.dueDate, i18n.language) }) : "",
                         compactDate(task.updatedAt, i18n.language),
                       ].filter(Boolean).join(" · ")}
                       onClick={linkedSessionId ? () => onOpenThread(linkedSessionId) : undefined}

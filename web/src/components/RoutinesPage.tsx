@@ -16,6 +16,7 @@ import { ActionCalendar, ActionStart, ViewGrid, ViewList } from "./icons";
 import { agentReadyForTask } from "../lib/backlog";
 import { TaskAssignee, TaskExecutionBadge } from "./TaskAssignee";
 import { isTaskAssigneeCurrentUser, taskAssigneeDisplayName, teamReady } from "../lib/taskAssignment";
+import { useEmployeeNames } from "../hooks/useEmployeeNames";
 import { readViewPreference, writeViewPreference } from "../lib/viewPreference";
 import { filterRoutineTasks, latestRoutineSession, routineDueTone, TASK_ROUTINE_CADENCES, TASK_ROUTINE_TYPES, type RoutineFilters } from "../lib/routine";
 import { emptyRoutineForm, taskAssignmentMutationFields, taskBoardFormsEqual, type RoutineTaskFormState } from "../lib/taskBoardForm";
@@ -373,6 +374,7 @@ function RoutineDrawerMeta({
 export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing, onRefresh, onOpenThread }: RoutinesPageProps) {
   const { agents: logicalAgents } = useEmployeeAgents(currentUser.employeeId);
   const { teams } = useTeams(currentUser.employeeId);
+  const employeeNames = useEmployeeNames(currentUser);
   const { t } = useTranslation();
   const { announce, confirm } = useDialogs();
   const {
@@ -553,7 +555,7 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
                 key={task.id}
                 task={task}
                 session={session}
-                assigneeDisplayName={taskAssigneeDisplayName(task, currentUser)}
+                assigneeDisplayName={taskAssigneeDisplayName(task, currentUser, employeeNames)}
                 assigneeIsSelf={isTaskAssigneeCurrentUser(task, currentUser)}
                 agentDisplayName={assignment.name}
                 ready={assignment.ready}
@@ -572,7 +574,7 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
                 key={task.id}
                 task={task}
                 session={session}
-                assigneeDisplayName={taskAssigneeDisplayName(task, currentUser)}
+                assigneeDisplayName={taskAssigneeDisplayName(task, currentUser, employeeNames)}
                 assigneeIsSelf={isTaskAssigneeCurrentUser(task, currentUser)}
                 agentDisplayName={assignment.name}
                 ready={assignment.ready}
