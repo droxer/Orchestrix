@@ -4,7 +4,7 @@ from tempfile import TemporaryDirectory
 
 import pytest
 
-from relay.api.helpers import daemon_node_event
+from relay.api.helpers import daemon_node_event, token_usage_field
 from relay.app import create_app
 from relay.core.models import DaemonNodeRegistration
 from relay.daemon_registry import DaemonNodeRegistry, ServerDaemonNodeBackend
@@ -116,13 +116,23 @@ def test_daemon_node_event_parser_keeps_error_messages_and_raw_logs() -> None:
     })
     assert parsed_with_usage["tokenUsage"] == {"input": 10, "output": 5, "cache": 3, "total": 18, "source": "codex"}
 
+    # Token usage is telemetry hanging off a terminal event. Rejecting the
+    # whole event over it would strand the run: the daemon drops the report,
+    # the session stays "running", and — runs being exclusive — the node
+    # refuses every later dispatch until the run timeout reaps it. Drop the
+    # unusable counts and let the run finish.
+    parsed_bad_usage = daemon_node_event({
+        "type": "run.completed",
+        "commandId": "cmd_1",
+        "sessionId": "ses_1",
+        "runId": "run_1",
+        "agent": "codex",
+        "exitCode": 0,
+        "agentLog": raw_log,
+        "tokenUsage": {"input": 1, "output": 1, "cache": 0, "total": 9},
+    })
+    assert "tokenUsage" not in parsed_bad_usage
+    assert parsed_bad_usage["agentLog"] == raw_log
+
     with pytest.raises(ValueError, match="tokenUsage total"):
-        daemon_node_event({
-            "type": "run.completed",
-            "commandId": "cmd_1",
-            "sessionId": "ses_1",
-            "runId": "run_1",
-            "agent": "codex",
-            "exitCode": 0,
-            "tokenUsage": {"input": 1, "output": 1, "cache": 0, "total": 9},
-        })
+        token_usage_field({"tokenUsage": {"input": 1, "output": 1, "cache": 0, "total": 9}})

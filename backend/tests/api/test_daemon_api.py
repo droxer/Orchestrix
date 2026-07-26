@@ -453,6 +453,63 @@ def test_output_event_does_not_replace_explicit_lease_heartbeat(monkeypatch) -> 
         assert redelivered["attempt"] == 2
 
 
+def test_run_completed_finalizes_even_when_token_usage_is_unusable(monkeypatch) -> None:
+    """A malformed usage report must not strand the run.
+
+    The daemon posts its terminal event once and drops it on rejection. If the
+    backend 400s the whole event over telemetry, the session stays "running"
+    and — runs being exclusive per node — every later dispatch is refused until
+    the run timeout reaps it. The counts are dropped; the run completes.
+    """
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _login_admin(client)
+        assert client.post("/daemon-nodes/register", json={
+            "sandboxId": "sbx_alice",
+            "employeeId": "alice",
+            "token": "node_token",
+            "workspacePath": "/workspace/alice",
+            "protocolVersion": 1,
+            "supportedAgents": ["codex"],
+            "status": "ready",
+        }, headers={"Authorization": "Bearer ui_token"}).status_code == 200
+        run = client.post("/sandboxes/sbx_alice/runs", json={
+            "taskGoal": "report broken usage",
+            "assignments": [{"agent": "codex", "mode": "action"}],
+        }, headers={"Authorization": "Bearer ui_token"})
+        assert run.status_code == 202
+        session_id = run.json()["id"]
+        [command] = client.get(
+            "/daemon-nodes/sbx_alice/commands?leaseMode=explicit&leaseSeconds=90",
+            headers={"Authorization": "Bearer node_token"},
+        ).json()["commands"]
+
+        completed = client.post("/daemon-nodes/sbx_alice/events", json={
+            "type": "run.completed",
+            "commandId": command["id"],
+            "leaseId": command["leaseId"],
+            "sessionId": command["sessionId"],
+            "runId": command["runId"],
+            "agent": command["agent"],
+            "mode": command["mode"],
+            "exitCode": 0,
+            "agentLog": "[Codex Action Exit 0]",
+            "tokenUsage": {"input": 1, "output": 1, "cache": 0, "total": 9},
+        }, headers={"Authorization": "Bearer node_token"})
+        assert completed.status_code == 202
+
+        session = client.get(f"/sessions/{session_id}").json()
+        assert session["status"] == "completed"
+        assert session.get("tokenUsage") is None
+        node = next(
+            item for item in client.get("/daemon-nodes").json()["nodes"] if item["id"] == "sbx_alice"
+        )
+        assert node["activeRuns"] == []
+
+
 def test_daemon_delivery_output_reaches_the_canonical_session_stream(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
