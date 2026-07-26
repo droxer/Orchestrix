@@ -38,6 +38,7 @@ class FakeManagedBackend implements ManagedNodeBackend {
   readonly updates: Array<Record<string, unknown>> = [];
   readonly managedUpdates: Array<Record<string, unknown>> = [];
   retiredRuntimes = 0;
+  runtimeRetirementError?: Error & { status?: number };
   constructor(
     readonly nodes: ManagedNodeRecord[],
     readonly daemonNodes: ControlPanelDaemonNodeRecord[] = [],
@@ -53,7 +54,10 @@ class FakeManagedBackend implements ManagedNodeBackend {
     Object.assign(current, patch);
     return current;
   }
-  async retireManagedNodeRuntime(): Promise<void> { this.retiredRuntimes += 1; }
+  async retireManagedNodeRuntime(): Promise<void> {
+    this.retiredRuntimes += 1;
+    if (this.runtimeRetirementError) throw this.runtimeRetirementError;
+  }
   async createProvisioningAttempt(nodeId: string): Promise<{ attempt: ProvisioningAttemptRecord; enrollmentCredential: string }> {
     return {
       attempt: {
@@ -265,6 +269,41 @@ test("managed reconciler keeps an online busy daemon running", async () => {
 
   assert.deepEqual(await reconciler.reconcileOnce(), { nodes: 1, started: 0, skipped: 1, failed: 0 });
   assert.equal(provider.calls.length, 0);
+});
+
+test("managed reconciler retries blocked runtime retirement without failing the cycle", async () => {
+  const ready = { ...managedNode(), phase: "ready" as const, activeDaemonNodeId: "node_alice" };
+  const backend = new FakeManagedBackend([ready], [{
+    id: "node_alice",
+    managedNodeId: ready.id,
+    status: "busy",
+    agents: { claude: "unknown", pi: "unknown", codex: "ready", kimi: "unknown" },
+    createdAt: ready.createdAt,
+    updatedAt: ready.updatedAt,
+    queuedCommandCount: 0,
+    activeRuns: [],
+    online: false,
+    stale: true,
+  }]);
+  backend.runtimeRetirementError = Object.assign(
+    new Error("Daemon node has active agent work."),
+    { status: 409 },
+  );
+  const reconciler = new ManagedNodeReconciler({
+    backend,
+    providers: [new FakeProvider()],
+    backendUrl: "http://backend.test",
+    workspacePathForNode: () => "/workspaces/alice",
+  });
+
+  assert.deepEqual(await reconciler.reconcileOnce(), {
+    nodes: 1,
+    started: 0,
+    skipped: 1,
+    failed: 0,
+  });
+  assert.equal(ready.phase, "ready");
+  assert.equal(backend.retiredRuntimes, 1);
 });
 
 test("managed reconciler finalizes deleted provider cleanup once", async () => {

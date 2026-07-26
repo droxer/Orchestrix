@@ -195,7 +195,6 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
           <span className="sidenav-brand-mark"><RelayMark width={24} height={24} /></span>
           <span className="sidenav-brand-copy">
             <span className="sidenav-brand-word sr-only">Relay</span>
-            <span className="sidenav-brand-meta sr-only">{t("nav.workspace")}</span>
           </span>
         </div>
         <Button

@@ -103,7 +103,10 @@ export class ManagedNodeReconciler {
           }
         }
         if (node.activeDaemonNodeId) {
-          await this.backend.retireManagedNodeRuntime(node.id);
+          if (!await this.retireRuntimeWhenDrained(node)) {
+            skipped += 1;
+            continue;
+          }
         }
         this.instances.delete(node.id);
         await this.backend.updateManagedNode(node.id, { phase: terminalPhase });
@@ -122,7 +125,10 @@ export class ManagedNodeReconciler {
           await provider.stop(instanceId);
         }
         if (node.activeDaemonNodeId) {
-          await this.backend.retireManagedNodeRuntime(node.id);
+          if (!await this.retireRuntimeWhenDrained(node)) {
+            skipped += 1;
+            continue;
+          }
         }
         this.instances.delete(node.id);
         await this.backend.updateManagedNode(node.id, { phase: "requested" });
@@ -187,9 +193,31 @@ export class ManagedNodeReconciler {
     return { nodes: nodes.length, started, skipped, failed };
   }
 
+  private async retireRuntimeWhenDrained(node: ManagedNodeRecord): Promise<boolean> {
+    try {
+      await this.backend.retireManagedNodeRuntime(node.id);
+      return true;
+    } catch (error) {
+      if (!isConflictResponse(error)) throw error;
+      this.logger?.warn("managed node runtime retirement blocked", {
+        nodeId: node.id,
+        daemonNodeId: node.activeDaemonNodeId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return false;
+    }
+  }
+
   async stop(): Promise<void> {
     const instances = [...this.instances.values()];
     this.instances.clear();
     await Promise.allSettled(instances.map(({ provider, instance }) => provider.stop(instance.id)));
   }
+}
+
+function isConflictResponse(error: unknown): error is { status: 409 } {
+  return typeof error === "object"
+    && error !== null
+    && "status" in error
+    && error.status === 409;
 }

@@ -2544,6 +2544,70 @@ def test_terminal_event_retry_recovers_after_handler_crash() -> None:
     asyncio.run(run_flow())
 
 
+def test_terminal_event_retry_fails_orphaned_run_when_session_was_deleted() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            session_store = LocalSessionStore(root)
+            daemon_store = LocalDaemonStore(root)
+            registry = DaemonNodeRegistry(session_store, daemon_store)
+            registry.register(
+                {
+                    "sandboxId": "sbx_alice",
+                    "employeeId": "alice",
+                    "token": "node_token",
+                    "workspacePath": "/workspace/alice",
+                    "protocolVersion": 1,
+                    "supportedAgents": ["codex"],
+                    "status": "ready",
+                },
+                "ui_token",
+            )
+            session = await ServerDaemonNodeBackend(registry).run(
+                "sbx_alice",
+                {
+                    "taskGoal": "finish after deletion",
+                    "assignments": [{"agent": "codex", "mode": "action"}],
+                },
+            )
+            [command] = registry.take_commands("sbx_alice", "node_token")
+            event = {
+                "type": "run.completed",
+                "commandId": command["id"],
+                "sessionId": command["sessionId"],
+                "runId": command["runId"],
+                "agent": "codex",
+                "mode": "action",
+                "exitCode": 1,
+                "agentLog": "agent failed",
+            }
+            assert daemon_store.mark_command_completed("sbx_alice", event)
+            claimed = daemon_store.claim_terminal_run_request(
+                command["id"], event, "claim_crashed", 60
+            )
+            assert claimed and claimed["status"] == "finalizing"
+            claimed = daemon_store.update_run_request(
+                claimed["id"],
+                {
+                    "state": {
+                        **claimed["state"],
+                        "_relay_terminal_claim_expires_at": "2020-01-01T00:00:00.000Z",
+                    }
+                },
+            )
+            session_store.delete_session(session["id"])
+
+            registry.reap_stale_runs()
+
+            assert daemon_store.list_active_run_requests("sbx_alice") == []
+            recovered = daemon_store.get_run_request(claimed["id"])
+            assert recovered and recovered["status"] == "failed"
+            assert recovered["error"] == (
+                f"Session {session['id']} disappeared before run finalization."
+            )
+
+    asyncio.run(run_flow())
+
+
 def test_terminal_event_replay_is_claimed_by_only_one_backend_replica() -> None:
     async def run_flow() -> None:
         with TemporaryDirectory() as root:

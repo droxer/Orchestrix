@@ -195,8 +195,9 @@ class SessionController:
         logger.info("Session archived", session_id=session_id)
         return self.store.get_session(session_id)
 
-    def delete_session(self, session_id: str) -> None:
-        snapshot = self.store.get_session(session_id)
+    def delete_session(self, session_id: str, snapshot: dict[str, Any] | None = None) -> None:
+        if snapshot is None:
+            snapshot = self.store.get_session(session_id)
         if any(run.get("status") == "running" for run in snapshot.get("agentRuns", [])):
             raise SessionRunInFlightError(session_id)
         self.store.delete_session(session_id)

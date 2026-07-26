@@ -7,6 +7,18 @@ export interface SupervisorBackendClientOptions {
   fetchFn?: typeof fetch;
 }
 
+export class SupervisorBackendRequestError extends Error {
+  constructor(
+    readonly method: string,
+    readonly path: string,
+    readonly status: number,
+    readonly responseBody: string,
+  ) {
+    super(`${method} ${path} failed: ${status} ${responseBody}`);
+    this.name = "SupervisorBackendRequestError";
+  }
+}
+
 export class SupervisorBackendClient implements SupervisorBackend, ManagedNodeBackend {
   private readonly backendUrl: string;
   private readonly adminToken?: string;
@@ -77,7 +89,12 @@ export class SupervisorBackendClient implements SupervisorBackend, ManagedNodeBa
       headers,
     });
     if (!response.ok) {
-      throw new Error(`${init.method ?? "GET"} ${path} failed: ${response.status} ${await response.text()}`);
+      throw new SupervisorBackendRequestError(
+        init.method ?? "GET",
+        path,
+        response.status,
+        await response.text(),
+      );
     }
     if (response.status === 204) return undefined as T;
     return await response.json() as T;

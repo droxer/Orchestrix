@@ -10,6 +10,7 @@ const RELAY_KEY = RELAY_QUERY_KEY;
 const SANDBOXES_KEY = ["relay", "sandboxes"] as const;
 const NODES_KEY = ["relay", "daemon-nodes"] as const;
 const SESSIONS_KEY = ["relay", "sessions"] as const;
+export const SESSIONS_QUERY_KEY = SESSIONS_KEY;
 const TASKS_KEY = ["relay", "tasks"] as const;
 const POLL_INTERVAL_MS = 3000;
 

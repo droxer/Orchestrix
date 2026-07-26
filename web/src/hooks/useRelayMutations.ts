@@ -19,7 +19,7 @@ import {
   updateTeam,
 } from "../api";
 import type { AgentRunInput, AgentTaskMode, CreateTaskInput, RelaySession, RunInput, TaskMutationInput, TeamMutationInput } from "../types";
-import { RELAY_QUERY_KEY } from "./useRelayData";
+import { RELAY_QUERY_KEY, SESSIONS_QUERY_KEY } from "./useRelayData";
 import { useMutationError } from "./useMutationError";
 import { useDialogs } from "../components/ui/DialogProvider";
 import { TEAMS_QUERY_KEY } from "./useTeams";
@@ -48,8 +48,20 @@ export function useRelayMutations() {
 
   const deleteSessionMutation = useMutation({
     mutationFn: ({ sessionId, token }: { sessionId: string } & TokenArg) => deleteSession(sessionId, token),
-    onSuccess: () => void invalidateRelay(),
-    onError: onRelayError("Failed to delete thread", "errors.delete_thread"),
+    onMutate: async ({ sessionId }) => {
+      await queryClient.cancelQueries({ queryKey: SESSIONS_QUERY_KEY });
+      const previous = queryClient.getQueryData<RelaySession[]>(SESSIONS_QUERY_KEY);
+      queryClient.setQueryData<RelaySession[]>(SESSIONS_QUERY_KEY, (current) =>
+        (current ?? []).filter((session) => session.id !== sessionId),
+      );
+      return { previous };
+    },
+    onError: (error, _input, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(SESSIONS_QUERY_KEY, context.previous);
+      }
+      onRelayError("Failed to delete thread", "errors.delete_thread")(error);
+    },
   });
 
   const cancelRunMutation = useMutation({

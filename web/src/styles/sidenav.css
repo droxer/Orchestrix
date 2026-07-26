@@ -78,12 +78,6 @@
   transition: opacity var(--t-fast) var(--ease) calc(var(--t-fast) * 0.75);
 }
 
-.sidenav-brand-meta {
-  color: var(--ink-3);
-  font: var(--type-body-sm);
-  opacity: 0;
-}
-
 .sidenav-panel[data-expanded="true"] .sidenav-brand-word {
   position: static;
   width: auto;
@@ -102,16 +96,6 @@
   flex-direction: column;
   justify-content: center;
   line-height: 1.1;
-}
-
-.sidenav-panel[data-expanded="true"] .sidenav-brand-meta {
-  position: static;
-  width: auto;
-  height: auto;
-  margin: 0;
-  overflow: visible;
-  clip-path: none;
-  opacity: 1;
 }
 
 .sidenav-nav {

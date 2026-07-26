@@ -52,3 +52,27 @@ def test_delete_requires_known_session(monkeypatch) -> None:
 
         response = client.delete("/sessions/sess_unknown")
         assert response.status_code == 404
+
+
+def test_delete_rejects_session_with_active_daemon_run_request(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap(client)
+        session_id = _create_session(client)
+        app.state.registry.daemon_store.create_run_request(
+            {
+                "nodeId": "sbx_alice",
+                "sessionId": session_id,
+                "taskGoal": "still finalizing",
+                "assignments": [],
+                "state": {},
+            }
+        )
+
+        response = client.delete(f"/sessions/{session_id}")
+
+        assert response.status_code == 409
+        assert response.json()["detail"] == "Session has a run in flight."
+        assert client.get(f"/sessions/{session_id}").status_code == 200

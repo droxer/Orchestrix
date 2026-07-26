@@ -450,14 +450,19 @@ async def archive_session(session_id: str, request: Request, ctx: AppContextDep)
 @router.delete("/sessions/{session_id}")
 async def delete_session(session_id: str, request: Request, ctx: AppContextDep) -> Response:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
-    get_session_for_actor(ctx.session_store, session_id, actor)
     controller = SessionController(
         ctx.session_store,
         task_store=ctx.task_store,
         owner_employee_id=actor["employeeId"],
     )
     try:
-        controller.delete_session(session_id)
+        with ctx.registry.dispatch_lock:
+            snapshot = get_session_for_actor(ctx.session_store, session_id, actor)
+            if ctx.registry.daemon_store.active_run_request_for_session_any_node(
+                session_id
+            ):
+                raise SessionRunInFlightError(session_id)
+            controller.delete_session(session_id, snapshot=snapshot)
     except SessionRunInFlightError:
         raise HTTPException(409, "Session has a run in flight.")
     return Response(status_code=204)

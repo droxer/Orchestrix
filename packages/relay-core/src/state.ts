@@ -3,7 +3,7 @@ import type { TokenUsage } from "./token-usage.js";
 import type { CodexCollaborationEvent } from "./codex-collaboration.js";
 
 export type AgentName = "claude" | "pi" | "codex" | "kimi";
-// "action" runs the agent with write access (UI label: "Agent"); "ask" is a
+// "action" runs the agent with write access (UI label: "Action"); "ask" is a
 // read-only Q&A pass enforced via each CLI's read-only flag; "review" is the
 // default-workflow Codex review pass and is not user-selectable in the composer.
 export type AgentTaskMode = "action" | "review" | "ask";

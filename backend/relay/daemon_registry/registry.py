@@ -1769,7 +1769,31 @@ class DaemonNodeRegistry:
             self.clear_run_output(event["runId"])
             return
         controller = self._controller_for_sandbox(sandbox, run_request.get("taskId"))
-        session_before = self.store.get_session(run_request["sessionId"])
+        try:
+            session_before = self.store.get_session(run_request["sessionId"])
+        except KeyError:
+            outcome = (
+                f"Session {run_request['sessionId']} disappeared before run finalization."
+            )
+            state = dict(run_request.get("state") or {})
+            state.pop(TERMINAL_EVENT_STATE_KEY, None)
+            state.pop(TERMINAL_CLAIM_ID_STATE_KEY, None)
+            state.pop(TERMINAL_CLAIM_EXPIRES_STATE_KEY, None)
+            self.clear_run_output(event["runId"])
+            self.active_commands.pop(event["commandId"], None)
+            self.daemon_store.mark_cancel_commands_completed(
+                run_request["nodeId"], event["commandId"]
+            )
+            self.daemon_store.update_run_request_if_claimed(
+                run_request["id"],
+                TERMINAL_CLAIM_ID_STATE_KEY,
+                terminal_claim_id,
+                {"status": "failed", "state": state, "error": outcome},
+            )
+            self.update_status(
+                run_request["nodeId"], {"status": "ready", "lastError": outcome}
+            )
+            return
         existing_completion = next(
             (
                 item

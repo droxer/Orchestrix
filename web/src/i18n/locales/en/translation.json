@@ -891,7 +891,7 @@
     "unknown": "Unknown"
   },
   "mode": {
-    "action": "Agent",
+    "action": "Action",
     "ask": "Ask",
     "review": "Review"
   },

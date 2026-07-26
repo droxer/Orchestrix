@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import type { AgentTaskMode } from "../../types";
 import { ModeAction, ModeAsk } from "../icons";
 
-// The composer toggles between "Ask" (read-only Q&A) and "Agent" (does work,
+// The composer toggles between "Ask" (read-only Q&A) and "Action" (does work,
 // stored as the "action" mode). "review" is a workflow-internal mode and is
 // not user-selectable here. State is announced via aria-pressed; the label
 // names the current and next modes.
