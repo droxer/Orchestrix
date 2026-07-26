@@ -66,7 +66,6 @@ def materialize_legacy_agent_assignment(
         employee_id,
         executor_kind,
         node["id"],
-        node_name=node.get("displayName") or node["id"],
     )
     placement = next(
         (

@@ -53,16 +53,16 @@ class LocalAgentStore:
             self._append(agent["id"], "agent.created", {"agent": agent})
             return agent
 
-    def ensure_compatibility_agent(self, supervisor_employee_id: str, executor_kind: str, daemon_node_id: str, *, node_name: str | None = None) -> dict[str, Any]:
+    def ensure_compatibility_agent(self, supervisor_employee_id: str, executor_kind: str, daemon_node_id: str) -> dict[str, Any]:
         if executor_kind not in AGENT_NAMES:
             raise ValueError(f"executorKind must be one of: {', '.join(AGENT_NAMES)}.")
         key = _compatibility_key(supervisor_employee_id, daemon_node_id, executor_kind)
         with self._lock:
             existing = next((agent for agent in self.list_agents(supervisor_employee_id=supervisor_employee_id) if agent.get("compatibilityKey") == key), None)
             if existing:
-                return existing
+                return _migrate_compatibility_display_name(self, existing, supervisor_employee_id, executor_kind)
             agent = self.create_agent(supervisor_employee_id, {
-                "displayName": _compatibility_display_name(self.list_agents(supervisor_employee_id=supervisor_employee_id), executor_kind, node_name or daemon_node_id),
+                "displayName": _compatibility_display_name(self.list_agents(supervisor_employee_id=supervisor_employee_id), executor_kind),
                 "executorKind": executor_kind,
             })
             return self.update_agent(agent["id"], {"compatibilityKey": key})
@@ -300,15 +300,15 @@ class DatabaseAgentStore:
             ) from error
         return agent
 
-    def ensure_compatibility_agent(self, supervisor_employee_id: str, executor_kind: str, daemon_node_id: str, *, node_name: str | None = None) -> dict[str, Any]:
+    def ensure_compatibility_agent(self, supervisor_employee_id: str, executor_kind: str, daemon_node_id: str) -> dict[str, Any]:
         if executor_kind not in AGENT_NAMES:
             raise ValueError(f"executorKind must be one of: {', '.join(AGENT_NAMES)}.")
         key = _compatibility_key(supervisor_employee_id, daemon_node_id, executor_kind)
         existing = next((agent for agent in self.list_agents(supervisor_employee_id=supervisor_employee_id) if agent.get("compatibilityKey") == key), None)
         if existing:
-            return existing
+            return _migrate_compatibility_display_name(self, existing, supervisor_employee_id, executor_kind)
         agent = self.create_agent(supervisor_employee_id, {
-            "displayName": _compatibility_display_name(self.list_agents(supervisor_employee_id=supervisor_employee_id), executor_kind, node_name or daemon_node_id),
+            "displayName": _compatibility_display_name(self.list_agents(supervisor_employee_id=supervisor_employee_id), executor_kind),
             "executorKind": executor_kind,
         })
         return self.update_agent(agent["id"], {"compatibilityKey": key})
@@ -594,9 +594,21 @@ def _compatibility_key(supervisor_employee_id: str, daemon_node_id: str, executo
     return f"{supervisor_employee_id}:{daemon_node_id}:{executor_kind}"
 
 
-def _compatibility_display_name(agents: list[dict[str, Any]], executor_kind: str, node_label: str) -> str:
+def _migrate_compatibility_display_name(store: Any, agent: dict[str, Any], supervisor_employee_id: str, executor_kind: str) -> dict[str, Any]:
+    legacy_prefix = f"{executor_kind.capitalize()} · "
+    if not agent.get("displayName", "").startswith(legacy_prefix):
+        return agent
+    others = [
+        item
+        for item in store.list_agents(supervisor_employee_id=supervisor_employee_id)
+        if item["id"] != agent["id"]
+    ]
+    return store.update_agent(agent["id"], {"displayName": _compatibility_display_name(others, executor_kind)})
+
+
+def _compatibility_display_name(agents: list[dict[str, Any]], executor_kind: str) -> str:
     existing_names = {agent.get("displayName", "").casefold() for agent in agents}
-    base = f"{executor_kind.capitalize()} · {node_label}"
+    base = executor_kind.capitalize()
     if base.casefold() not in existing_names:
         return base
     suffix = 2

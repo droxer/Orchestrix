@@ -12,7 +12,6 @@ from ..daemon_registry import (
     sandbox_ui_token_matches,
 )
 from ..daemon_registry.scheduling import workspace_identity_record
-from ..services.computer_names import computer_display_name
 from .deps import AppContextDep
 from .helpers import (
     actor_can_access_sandbox,
@@ -196,8 +195,7 @@ def _resolve_legacy_assignment(
     assignment: dict[str, Any],
 ) -> dict[str, Any]:
     node = ctx.registry.get(sandbox_id)
-    node_name = computer_display_name(ctx, node) if node else sandbox_id
-    agent = ctx.agent_store.ensure_compatibility_agent(employee_id, assignment["agent"], sandbox_id, node_name=node_name)
+    agent = ctx.agent_store.ensure_compatibility_agent(employee_id, assignment["agent"], sandbox_id)
     placement = next((item for item in ctx.agent_placement_store.list_placements(agent_id=agent["id"]) if item["daemonNodeId"] == sandbox_id), None)
     if placement is None:
         placement = ctx.agent_placement_store.create_placement(agent, sandbox_id)

@@ -49,6 +49,28 @@ def test_each_computer_gets_its_own_compatibility_agents(tmp_path: Path) -> None
         assert len(agent_placements) == 1
 
 
+def test_existing_legacy_named_agent_is_renamed_to_runtime_name(tmp_path: Path) -> None:
+    agents = LocalAgentStore(tmp_path)
+    placements = LocalAgentPlacementStore(tmp_path)
+    ctx = SimpleNamespace(agent_store=agents, agent_placement_store=placements)
+    legacy = agents.create_agent("alice", {"displayName": "Codex · node_alice", "executorKind": "codex"})
+    legacy = agents.update_agent(legacy["id"], {"compatibilityKey": "alice:node_alice:codex"})
+    renamed = agents.create_agent("alice", {"displayName": "Renamed By User", "executorKind": "claude"})
+    renamed = agents.update_agent(renamed["id"], {"compatibilityKey": "alice:node_alice:claude"})
+    node = {
+        "id": "node_alice",
+        "employeeId": "alice",
+        "supportedAgents": ["claude", "codex"],
+        "agents": {"claude": "ready", "codex": "ready"},
+    }
+
+    sync_node_agents(ctx, node)
+
+    assert agents.get_agent(legacy["id"])["displayName"] == "Codex"
+    # A user-renamed agent keeps its custom name.
+    assert agents.get_agent(renamed["id"])["displayName"] == "Renamed By User"
+
+
 def test_deleting_a_computer_removes_only_its_agents(tmp_path: Path) -> None:
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
@@ -153,7 +175,7 @@ def test_removing_old_node_keeps_compatibility_agent_moved_elsewhere(
         agent_placement_store=placements,
     )
     agent = agents.ensure_compatibility_agent(
-        "alice", "codex", "node_old", node_name="Old computer"
+        "alice", "codex", "node_old"
     )
     old_placement = placements.create_placement(agent, "node_old")
     new_placement = placements.create_placement(agent, "node_new")
@@ -228,7 +250,7 @@ def test_reregistration_retires_superseded_compatibility_agent(tmp_path: Path) -
         "online": True,
     }
     ctx, agents, placements = _registry_ctx(tmp_path, [old_node, new_node])
-    stale = agents.ensure_compatibility_agent("alice", "claude", "node_old", node_name="Old")
+    stale = agents.ensure_compatibility_agent("alice", "claude", "node_old")
     placements.create_placement(stale, "node_old")
 
     sync_node_agents(ctx, new_node)
@@ -251,7 +273,7 @@ def test_sync_keeps_agent_on_a_different_computer(tmp_path: Path) -> None:
         "online": True,
     }
     ctx, agents, placements = _registry_ctx(tmp_path, [other_node, new_node])
-    other = agents.ensure_compatibility_agent("alice", "claude", "node_other", node_name="Other")
+    other = agents.ensure_compatibility_agent("alice", "claude", "node_other")
     placements.create_placement(other, "node_other")
 
     sync_node_agents(ctx, new_node)
@@ -275,7 +297,7 @@ def test_sync_keeps_agent_while_the_old_node_is_online(tmp_path: Path) -> None:
         "online": True,
     }
     ctx, agents, placements = _registry_ctx(tmp_path, [old_node, new_node])
-    stale = agents.ensure_compatibility_agent("alice", "claude", "node_old", node_name="Old")
+    stale = agents.ensure_compatibility_agent("alice", "claude", "node_old")
     placements.create_placement(stale, "node_old")
 
     sync_node_agents(ctx, new_node)
@@ -299,7 +321,7 @@ def test_sync_keeps_agent_when_old_node_has_active_work(tmp_path: Path) -> None:
         [old_node, new_node],
         active_requests=[{"nodeId": "node_old", "assignments": []}],
     )
-    stale = agents.ensure_compatibility_agent("alice", "claude", "node_old", node_name="Old")
+    stale = agents.ensure_compatibility_agent("alice", "claude", "node_old")
     placements.create_placement(stale, "node_old")
 
     sync_node_agents(ctx, new_node)
@@ -325,7 +347,7 @@ def test_managed_nodes_share_workspace_path_without_being_the_same_computer(tmp_
         "online": True,
     }
     ctx, agents, placements = _registry_ctx(tmp_path, [old_node, new_node])
-    stale = agents.ensure_compatibility_agent("alice", "claude", "node_old", node_name="Old")
+    stale = agents.ensure_compatibility_agent("alice", "claude", "node_old")
     placements.create_placement(stale, "node_old")
 
     sync_node_agents(ctx, new_node)
@@ -396,7 +418,7 @@ def test_reprovisioned_managed_node_retires_old_agent(tmp_path: Path) -> None:
         "online": True,
     }
     ctx, agents, placements = _registry_ctx(tmp_path, [old_node, new_node])
-    stale = agents.ensure_compatibility_agent("alice", "claude", "node_old", node_name="Old")
+    stale = agents.ensure_compatibility_agent("alice", "claude", "node_old")
     placements.create_placement(stale, "node_old")
 
     sync_node_agents(ctx, new_node)

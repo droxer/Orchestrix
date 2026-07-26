@@ -1077,7 +1077,7 @@ def test_compatibility_agent_drops_from_roster_when_its_computer_is_gone(monkeyp
         before = client.get("/agents").json()["agents"]
         names = {agent["displayName"] for agent in before}
         assert "Freelancer" in names
-        assert any(name.endswith("· node_a") for name in names)
+        assert "Codex" in names
 
         # Unassigning the computer retires the placement; the per-computer agent
         # must leave the roster while the placement-less custom agent remains.
@@ -1135,7 +1135,7 @@ def test_compatibility_agent_drops_when_its_computer_is_deregistered(monkeypatch
             "/auth/login", json={"username": "alice", "password": "userpass"}
         ).status_code == 200
         assert any(
-            agent["displayName"].endswith("· node_a")
+            agent["displayName"] == "Codex"
             for agent in client.get("/agents").json()["agents"]
         )
 
