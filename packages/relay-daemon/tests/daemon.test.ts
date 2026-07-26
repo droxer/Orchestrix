@@ -1026,6 +1026,156 @@ test("relay daemon exits polling sleep after external stop", async () => {
   assert.equal(closeCount, 1);
 });
 
+test("relay daemon immediately renews a completed long poll by default", async () => {
+  const stop = new AbortController();
+  let commandPolls = 0;
+  const timeout = setTimeout(() => stop.abort(), 250);
+  const daemon = runRelayDaemon({
+    backendUrl: "http://relay.test",
+    sandboxId: "sbx_test",
+    employeeId: "alice",
+    workspacePath: process.cwd(),
+    token: "node_token",
+    commandPollWaitMs: 20,
+    shutdownGraceMs: 50,
+    logger: testLogger(),
+    signal: stop.signal,
+    preflight: false,
+    environment: fakeEnvironment(),
+    fetchFn: async (url) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/daemon-nodes/register") return jsonResponse({ ok: true });
+      if (path.endsWith("/commands")) {
+        commandPolls += 1;
+        if (commandPolls === 1) {
+          await new Promise((resolve) => setTimeout(resolve, 25));
+        }
+        if (commandPolls === 2) stop.abort();
+        return jsonResponse({ commands: [] });
+      }
+      throw new Error(`unexpected URL ${url}`);
+    },
+  });
+
+  try {
+    await daemon;
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  assert.equal(commandPolls, 2);
+});
+
+test("relay daemon retains the default delay after a rejected command poll", async () => {
+  const stop = new AbortController();
+  let commandPolls = 0;
+  const timeout = setTimeout(() => stop.abort(), 100);
+  const daemon = runRelayDaemon({
+    backendUrl: "http://relay.test",
+    sandboxId: "sbx_test",
+    employeeId: "alice",
+    workspacePath: process.cwd(),
+    token: "node_token",
+    shutdownGraceMs: 50,
+    logger: testLogger(),
+    signal: stop.signal,
+    preflight: false,
+    environment: fakeEnvironment(),
+    fetchFn: async (url) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/daemon-nodes/register") return jsonResponse({ ok: true });
+      if (path.endsWith("/commands")) {
+        commandPolls += 1;
+        if (commandPolls === 2) stop.abort();
+        return new Response("rejected", { status: 401 });
+      }
+      throw new Error(`unexpected URL ${url}`);
+    },
+  });
+
+  try {
+    await daemon;
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  assert.equal(commandPolls, 1);
+});
+
+test("relay daemon retains the default delay when long polling is disabled", async () => {
+  const stop = new AbortController();
+  let commandPolls = 0;
+  const timeout = setTimeout(() => stop.abort(), 100);
+  const daemon = runRelayDaemon({
+    backendUrl: "http://relay.test",
+    sandboxId: "sbx_test",
+    employeeId: "alice",
+    workspacePath: process.cwd(),
+    token: "node_token",
+    commandPollWaitMs: 0,
+    shutdownGraceMs: 50,
+    logger: testLogger(),
+    signal: stop.signal,
+    preflight: false,
+    environment: fakeEnvironment(),
+    fetchFn: async (url) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/daemon-nodes/register") return jsonResponse({ ok: true });
+      if (path.endsWith("/commands")) {
+        commandPolls += 1;
+        if (commandPolls === 2) stop.abort();
+        return jsonResponse({ commands: [] });
+      }
+      throw new Error(`unexpected URL ${url}`);
+    },
+  });
+
+  try {
+    await daemon;
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  assert.equal(commandPolls, 1);
+});
+
+test("relay daemon retains the default delay when an empty long poll returns early", async () => {
+  const stop = new AbortController();
+  let commandPolls = 0;
+  const timeout = setTimeout(() => stop.abort(), 100);
+  const daemon = runRelayDaemon({
+    backendUrl: "http://relay.test",
+    sandboxId: "sbx_test",
+    employeeId: "alice",
+    workspacePath: process.cwd(),
+    token: "node_token",
+    commandPollWaitMs: 25_000,
+    shutdownGraceMs: 50,
+    logger: testLogger(),
+    signal: stop.signal,
+    preflight: false,
+    environment: fakeEnvironment(),
+    fetchFn: async (url) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/daemon-nodes/register") return jsonResponse({ ok: true });
+      if (path.endsWith("/commands")) {
+        commandPolls += 1;
+        if (commandPolls === 2) stop.abort();
+        return jsonResponse({ commands: [] });
+      }
+      throw new Error(`unexpected URL ${url}`);
+    },
+  });
+
+  try {
+    await daemon;
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  assert.equal(commandPolls, 1);
+});
+
 test("relay daemon bounds stopped registration during shutdown", async () => {
   const stop = new AbortController();
   let closeCount = 0;

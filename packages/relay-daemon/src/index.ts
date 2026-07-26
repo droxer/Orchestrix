@@ -300,6 +300,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
     const cancellationTerminalEventSignal = (): AbortSignal | undefined =>
       stopping ? AbortSignal.timeout(SHUTDOWN_TERMINAL_EVENT_TIMEOUT_MS) : undefined;
     while (!stopping) {
+      let completedEmptyLongPoll = false;
       const body = await withBackendReconnect(async () => {
         if (stopping) return { commands: [] };
         // Heartbeat re-registration keeps a restarted backend current on this
@@ -313,6 +314,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
           await register();
           lastRegisteredAt = Date.now();
         }
+        const commandPollStartedAt = performance.now();
         const response = await getJson(
           fetchFn,
           daemonCommandsUrl(backendUrl, sandboxId, {
@@ -336,7 +338,11 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
           logger.info("daemon re-registered", { sandboxId });
           return { commands: [] };
         }
-        return await response.json() as { commands?: DaemonNodeCommand[] };
+        const parsed = await response.json() as { commands?: DaemonNodeCommand[] };
+        completedEmptyLongPoll = commandPollWaitMs > 0
+          && (parsed.commands?.length ?? 0) === 0
+          && performance.now() - commandPollStartedAt >= commandPollWaitMs;
+        return parsed;
       }, logger, { sandboxId, what: "command poll" }, reconnectControl);
       if (stopping) break;
       for (const command of body.commands ?? []) {
@@ -442,7 +448,11 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
           });
         }
       }
-      await delay(pollIntervalMs, runtimeSignal);
+      // A successful long-poll already supplied the idle wait. Preserve an
+      // explicit caller delay and the default throttle for rejected polls.
+      if (!completedEmptyLongPoll || options.pollIntervalMs !== undefined) {
+        await delay(pollIntervalMs, runtimeSignal);
+      }
     }
     await shutdownPromise;
   } catch (error) {
