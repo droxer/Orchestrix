@@ -2,13 +2,14 @@ import { StreamAttachment } from "./icons";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
-import { UserRound } from "lucide-react";
+import { UserRound, Coins } from "lucide-react";
 import { AgentMark } from "./AgentMark";
 import { AgentStream } from "./AgentStream";
 import { MessageTurnActions } from "./MessageTurnActions";
 import type { AgentName, AgentTaskMode } from "../types";
 import { AGENT_NAMES } from "../types";
 import { labelForAgentRun, labelForExecutor } from "../lib/agentDisplayNames";
+import { formatCompactTokens } from "../lib/tokenUsage";
 import { parsePlanSteps, type PlanStep } from "../lib/plan";
 import type { RelayArtifact } from "relay-core";
 import { useArtifactBody } from "../lib/useArtifactBody";
@@ -184,7 +185,8 @@ export function MessageBlock({
   onRetryAgent,
   retryDisabled = false,
 }: MessageBlockProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const numberFormat = useMemo(() => new Intl.NumberFormat(i18n.language || undefined), [i18n.language]);
   if (message.kind === "user") {
     return (
       <article className="msg msg-user" aria-label={t("message.user_label")}>
@@ -232,16 +234,38 @@ export function MessageBlock({
               ))}
             </div>
           ) : null}
-          <MessageTurnActions
-            agent={message.agent}
-            agentId={message.agentId}
-            mode={message.mode}
-            stdout={message.stdout}
-            stderr={message.stderr}
-            streaming={message.streaming}
-            retryDisabled={retryDisabled}
-            onRetry={onRetryAgent}
-          />
+          <footer className="msg-turn-foot">
+            {message.tokenUsage ? (
+              <span
+                className="msg-tokens"
+                title={t("thread.token_usage_title", {
+                  input: numberFormat.format(message.tokenUsage.input),
+                  output: numberFormat.format(message.tokenUsage.output),
+                  cache: numberFormat.format(message.tokenUsage.cache),
+                })}
+                aria-label={t("thread.token_usage_title", {
+                  input: numberFormat.format(message.tokenUsage.input),
+                  output: numberFormat.format(message.tokenUsage.output),
+                  cache: numberFormat.format(message.tokenUsage.cache),
+                })}
+              >
+                <Coins size={14} aria-hidden="true" />
+                <span className="msg-turn-action-label">
+                  {formatCompactTokens(message.tokenUsage.total, i18n.language)} {t("thread.tokens_short")}
+                </span>
+              </span>
+            ) : null}
+            <MessageTurnActions
+              agent={message.agent}
+              agentId={message.agentId}
+              mode={message.mode}
+              stdout={message.stdout}
+              stderr={message.stderr}
+              streaming={message.streaming}
+              retryDisabled={retryDisabled}
+              onRetry={onRetryAgent}
+            />
+          </footer>
         </div>
         <MsgTime value={message.timestamp} />
       </article>

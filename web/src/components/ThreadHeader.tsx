@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { AgentName, RelaySession } from "../types";
 import { NavThreads } from "./icons";
@@ -8,7 +7,6 @@ import {
   threadActivity,
   type ThreadActivityKind,
 } from "../lib/threadActivity";
-import { formatCompactTokens } from "../lib/tokenUsage";
 import { Button } from "./ui/button";
 
 const ACTIVITY_BADGE: Record<
@@ -34,23 +32,14 @@ export function ThreadHeader({ activeSession, runningAgent, runningAgentDisplayN
   onRefresh: () => void;
   onBackToThreads: () => void;
 }) {
-  const { t, i18n } = useTranslation();
-  const numberFormat = useMemo(() => new Intl.NumberFormat(i18n.language || undefined), [i18n.language]);
-  const tokenUsage = activeSession?.tokenUsage;
-  const tokenUsageTitle = tokenUsage
-    ? t("thread.token_usage_title", {
-        input: numberFormat.format(tokenUsage.input),
-        output: numberFormat.format(tokenUsage.output),
-        cache: numberFormat.format(tokenUsage.cache),
-      })
-    : "";
+  const { t } = useTranslation();
   const activityRaw = activeSession
     ? threadActivity(activeSession.status, runningAgent)
     : null;
-  // Completion is a positive cue — a settled "completed" badge — not the
-  // absence of any status.
-  const activity = activityRaw;
-  const showMeta = Boolean(activity || tokenUsage);
+  // The settled "completed" badge is noise under the title — the transcript
+  // itself shows the run finished. Live and attention states stay.
+  const activity = activityRaw && activityRaw.kind !== "good" ? activityRaw : null;
+  const showMeta = Boolean(activity);
   return (
     <header className="chat-header">
       <div className="chat-title">
@@ -67,15 +56,6 @@ export function ThreadHeader({ activeSession, runningAgent, runningAgentDisplayN
                     ? t(activity.labelKey, { agent: runningAgentDisplayName ?? runningAgent })
                     : t(activity.labelKey)}
                 </Badge>
-              ) : null}
-              {tokenUsage ? (
-                <span
-                  className="chat-title-tokens mono"
-                  title={tokenUsageTitle}
-                  aria-label={tokenUsageTitle}
-                >
-                  {formatCompactTokens(tokenUsage.total, i18n.language)} {t("thread.tokens_short")}
-                </span>
               ) : null}
             </div>
           ) : null}

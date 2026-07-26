@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 import type { CodexCollaborationEvent, RelayArtifact } from "relay-core";
-import type { AgentName, AgentTaskMode, RelaySession, Tone } from "../types.js";
+import type { AgentName, AgentTaskMode, RelaySession, TokenUsage, Tone } from "../types.js";
 
 export type DerivedMessage =
   | {
@@ -24,6 +24,9 @@ export type DerivedMessage =
       stderr: string;
       collaborations: CodexCollaborationEvent[];
       attachments: RelayArtifact[];
+      /** Token usage reported by the run on completion; shown at the foot of
+       * the agent turn. */
+      tokenUsage?: TokenUsage;
     }
   | {
       kind: "system";
@@ -366,6 +369,7 @@ export function projectMessages(session: RelaySession | undefined, t: TFunction)
               streaming: false,
               stdout: state.stdout,
               stderr: state.stderr,
+              ...(event.tokenUsage ? { tokenUsage: event.tokenUsage } : {}),
             };
           }
         }

@@ -61,26 +61,6 @@
   text-transform: none;
 }
 
-/* The token chip is the first thing to give way when the header runs out of
-   room: it shrinks and ellipsizes inside its own border instead of painting
-   past the title column under the agent tabs. Not a flex container —
-   text-overflow needs a block box. */
-.chat-title-tokens {
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  padding: 1px var(--sp-2);
-  border: 1px solid var(--line-1);
-  border-radius: var(--r-2);
-  background: transparent;
-  color: var(--ink-3);
-  font: var(--type-micro);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
-}
-
 .chat-title h2 {
   min-width: 0;
   margin: 0;
@@ -530,7 +510,7 @@
     grid-template-columns: 20px minmax(0, 1fr) auto;
   }
 
-  .msg-time {
+.msg-time {
     font-size: var(--fs-2);
   }
 }
@@ -623,10 +603,41 @@
   font: var(--type-label);
 }
 
-/* Per-turn actions — compact ghost icon pills pinned to the bottom of each
-   agent turn so copy and retry stay one click away. */
+/* Per-turn footer — token usage and the copy/retry pills share one
+   right-aligned row at the bottom of each agent turn. */
 .msg-agent .turn-body {
   position: relative;
+}
+
+.msg-turn-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+  margin-top: var(--sp-1);
+}
+
+/* Streaming turns render an empty footer until actions or usage appear. */
+.msg-turn-foot:empty {
+  display: none;
+}
+
+/* Token usage rides as a non-interactive twin of the copy/retry pills — same
+   height, padding, fill, and type so the three read as one footer group. */
+.msg-tokens {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 var(--sp-3);
+  border: 1px solid transparent;
+  border-radius: var(--r-2);
+  background: var(--surface-3);
+  color: var(--ink-3);
+  font: var(--type-label);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: default;
 }
 
 .msg-turn-actions {
@@ -634,7 +645,6 @@
   align-items: center;
   justify-content: flex-end;
   gap: var(--sp-0-5);
-  margin-top: var(--sp-1);
 }
 
 .msg-turn-action {
