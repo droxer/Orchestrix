@@ -1513,6 +1513,73 @@ def test_daemon_heartbeat_renews_command_dispatched_by_another_backend_replica()
     asyncio.run(run_flow())
 
 
+def test_active_run_survives_heartbeat_seen_by_another_backend_replica() -> None:
+    async def run_flow() -> None:
+        with TemporaryDirectory() as root:
+            database_url = f"sqlite:///{root}/daemon.db"
+            session_store = LocalSessionStore(root)
+            first = DaemonNodeRegistry(
+                session_store,
+                DatabaseDaemonStore(database_url, create_schema=True),
+            )
+            first.register(
+                {
+                    "sandboxId": "sbx_alice",
+                    "employeeId": "alice",
+                    "token": "node_token",
+                    "workspacePath": "/workspace/alice",
+                    "protocolVersion": 1,
+                    "supportedAgents": ["codex"],
+                    "status": "ready",
+                },
+                "ui_token",
+            )
+            second = DaemonNodeRegistry(
+                session_store,
+                DatabaseDaemonStore(database_url),
+            )
+
+            session = await ServerDaemonNodeBackend(first).run(
+                "sbx_alice",
+                {
+                    "taskGoal": "survive backend load balancing",
+                    "assignments": [{"agent": "codex", "mode": "action"}],
+                },
+            )
+            [command] = first.take_commands(
+                "sbx_alice",
+                "node_token",
+                renew_known_active=False,
+            )
+
+            first.sandboxes["sbx_alice"]["lastSeenAt"] = "2020-01-01T00:00:00.000Z"
+            second.renew_active_command_leases(
+                "sbx_alice",
+                "node_token",
+                [(command["id"], command["leaseId"])],
+                lease_seconds=10,
+            )
+
+            [request] = first.daemon_store.list_active_run_requests()
+            assert request["nodeId"] == "sbx_alice"
+            assert second.sandboxes["sbx_alice"]["lastSeenAt"] != (
+                "2020-01-01T00:00:00.000Z"
+            )
+            assert first.daemon_store.get_node("sbx_alice")["lastSeenAt"] != (
+                "2020-01-01T00:00:00.000Z"
+            )
+
+            first.reap_stale_runs()
+
+            active = session_store.get_session(session["id"])
+            assert active.get("finalOutcome") != (
+                "Daemon node heartbeat expired while run was active."
+            )
+            assert active["status"] == "running"
+
+    asyncio.run(run_flow())
+
+
 def test_daemon_cancel_finds_run_dispatched_by_another_backend_replica() -> None:
     async def run_flow() -> None:
         with TemporaryDirectory() as root:

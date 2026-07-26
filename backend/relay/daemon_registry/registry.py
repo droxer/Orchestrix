@@ -1492,6 +1492,9 @@ class DaemonNodeRegistry:
                     request, f"Daemon node {request['nodeId']} disappeared."
                 )
                 continue
+            # A node heartbeat can land on a different backend replica from
+            # this reaper. Command leases are the durable ownership signal,
+            # so replica-local liveness must not make the run terminal.
             current_started_at = request.get("currentStartedAt")
             if (
                 current_started_at
@@ -1502,10 +1505,6 @@ class DaemonNodeRegistry:
                 )
                 self._fail_run_request(request, "Daemon run timed out.")
                 continue
-            if not self._liveness(sandbox)["online"]:
-                self._fail_run_request(
-                    request, "Daemon node heartbeat expired while run was active."
-                )
 
     def _maybe_prune_terminal_records(self, monotonic_now: float) -> None:
         if not hasattr(self.daemon_store, "prune_terminal_records"):
