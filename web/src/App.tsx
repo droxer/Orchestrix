@@ -46,10 +46,13 @@ import {
 } from "./lib/threadRunning";
 import {
   agentsForThreadNode,
+  resolveNewThreadComputer,
   selectableThreadComputers,
+  threadComputerSignature,
   threadNeedsRuntimeSelection,
   threadRuntimeNodeId,
 } from "./lib/threadRuntime";
+import { useStableValue } from "./hooks/useStableValue";
 
 const AdminPage = lazy(() => import("./components/AdminPage").then((m) => ({ default: m.AdminPage })));
 const BacklogPage = lazy(() => import("./components/BacklogPage").then((m) => ({ default: m.BacklogPage })));
@@ -168,15 +171,46 @@ export function App() {
     }),
     [activeSessionId, composingNew, myThreads, selectedSessionId],
   );
-  const threadComputers = useMemo(
+  const selectableComputers = useMemo(
     () => selectableThreadComputers(runtimeNodes, selectedEmployee),
     [runtimeNodes, selectedEmployee],
+  );
+  // Held stable across polls: the picker only reads ids and display names, so
+  // a heartbeat that merely refreshed `lastSeenAt` must not hand it a new
+  // array and re-render the composer every few seconds.
+  const threadComputers = useStableValue(
+    selectableComputers,
+    threadComputerSignature(selectableComputers),
   );
   const activeThreadNodeId = threadRuntimeNodeId(activeSession);
   const initializingThread = threadNeedsRuntimeSelection(activeSession, composingNew);
   const selectedThreadNodeId = initializingThread
     ? newThreadNodeId
     : activeThreadNodeId ?? null;
+  // Resolved from the unfiltered runtime list, not `threadComputers`: a thread
+  // stays pinned to its computer even after that machine goes busy or offline,
+  // and those are exactly the moments the readout has to keep naming it.
+  const activeRuntimeNode = useMemo(
+    () => (initializingThread || !activeThreadNodeId
+      ? null
+      : runtimeNodes.find((node) => node.id === activeThreadNodeId) ?? null),
+    [activeThreadNodeId, initializingThread, runtimeNodes],
+  );
+  // Same resolution for the pick on a not-yet-started thread, so the trigger
+  // keeps naming the chosen computer through a poll that drops it from the
+  // selectable set. Held stable so the memoized picker ignores heartbeats.
+  const selectedThreadComputer = useMemo(
+    () => (initializingThread && selectedThreadNodeId
+      ? runtimeNodes.find((node) => node.id === selectedThreadNodeId) ?? null
+      : null),
+    [initializingThread, runtimeNodes, selectedThreadNodeId],
+  );
+  const stableSelectedThreadComputer = useStableValue(
+    selectedThreadComputer,
+    selectedThreadComputer
+      ? threadComputerSignature([selectedThreadComputer])
+      : "",
+  );
   const selectableLogicalAgents = useMemo(
     () => agentsForThreadNode(logicalAgents, selectedThreadNodeId),
     [logicalAgents, selectedThreadNodeId],
@@ -185,9 +219,11 @@ export function App() {
 
   useEffect(() => {
     if (!initializingThread) return;
-    if (threadComputers.some((node) => node.id === newThreadNodeId)) return;
-    setNewThreadNodeId(threadComputers[0]?.id ?? null);
-  }, [initializingThread, newThreadNodeId, threadComputers]);
+    setNewThreadNodeId((previous) => {
+      const next = resolveNewThreadComputer(previous, threadComputers, runtimeNodes);
+      return next === previous ? previous : next;
+    });
+  }, [initializingThread, runtimeNodes, threadComputers]);
 
   const applySessionFromHash = useCallback((sessionId: string) => {
     setComposingNew(false);
@@ -864,6 +900,8 @@ export function App() {
             initializingThread={initializingThread}
             runtimeNodes={threadComputers}
             runtimeNodeId={selectedThreadNodeId}
+            selectedRuntimeNode={stableSelectedThreadComputer}
+            activeRuntimeNode={activeRuntimeNode}
             onRuntimeNodeChange={setNewThreadNodeId}
             agentDescriptors={agentDescriptors}
             composerMode={composerMode}

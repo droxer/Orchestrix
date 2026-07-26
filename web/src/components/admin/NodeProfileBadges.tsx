@@ -17,6 +17,12 @@ const OWNERSHIP_ICON: Record<NodeOwnershipProfile, typeof NodeManaged> = {
   pending: NodePending,
 };
 
+/** The card/row avatar is a computer's logo, so it carries the ownership
+ *  glyph rather than one generic server rack for every machine. */
+export function nodeOwnershipIcon(ownership: NodeOwnershipProfile): typeof NodeManaged {
+  return OWNERSHIP_ICON[ownership];
+}
+
 interface NodeProfileBadgesProps {
   node: ControlPanelDaemonNodeRecord;
   storedTokens: StoredNodeTokenMap;

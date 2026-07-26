@@ -55,6 +55,8 @@ export type ThreadsViewProps = {
   initializingThread: boolean;
   runtimeNodes: DaemonNodeMonitorRecord[];
   runtimeNodeId: string | null;
+  selectedRuntimeNode: DaemonNodeMonitorRecord | null;
+  activeRuntimeNode: DaemonNodeMonitorRecord | null;
   onRuntimeNodeChange: (nodeId: string) => void;
   agentDescriptors: Record<AgentName, { blurb: string }>;
   composerMode: AgentTaskMode;
@@ -109,6 +111,8 @@ export function ThreadsView({
   initializingThread,
   runtimeNodes,
   runtimeNodeId,
+  selectedRuntimeNode,
+  activeRuntimeNode,
   onRuntimeNodeChange,
   agentDescriptors,
   composerMode,
@@ -266,6 +270,8 @@ export function ThreadsView({
           initializingThread={initializingThread}
           runtimeNodes={runtimeNodes}
           runtimeNodeId={runtimeNodeId}
+          selectedRuntimeNode={selectedRuntimeNode}
+          activeRuntimeNode={activeRuntimeNode}
           onRuntimeNodeChange={onRuntimeNodeChange}
           running={running}
           onSend={onSend}

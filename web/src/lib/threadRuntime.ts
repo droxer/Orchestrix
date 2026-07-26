@@ -31,6 +31,41 @@ export function selectableThreadComputers<T extends ThreadComputer>(
   );
 }
 
+/**
+ * Content key for a computer list, covering only what the picker renders and
+ * routes on.
+ *
+ * The node poll runs every few seconds and every response carries fresh
+ * `lastSeenAt` / `lastSeenAgeMs` / `activeRuns` values, so a naive
+ * `useMemo([nodes])` hands the composer a new array on every tick and
+ * re-renders the picker forever. Keying on this signature means a poll that
+ * changed nothing the picker can see produces no work at all.
+ */
+export function threadComputerSignature(
+  nodes: readonly (ThreadComputer & { displayName?: string })[],
+): string {
+  return nodes.map((node) => `${node.id}:${node.displayName ?? ""}`).join("|");
+}
+
+/**
+ * Which computer a new thread should target, given the previous choice.
+ *
+ * Returns the previous choice whenever that computer still exists, even if the
+ * latest poll reports it unselectable. Staleness is a time threshold the daemon
+ * heartbeat crosses and re-crosses, so a node flapping out of the selectable
+ * set for one poll used to silently reassign the user's thread to whichever
+ * computer happened to sort first. A pick only moves when its computer is gone
+ * from the fleet entirely.
+ */
+export function resolveNewThreadComputer(
+  previousId: string | null,
+  selectable: readonly ThreadComputer[],
+  known: readonly ThreadComputer[],
+): string | null {
+  if (previousId && known.some((node) => node.id === previousId)) return previousId;
+  return selectable[0]?.id ?? null;
+}
+
 export function agentsForThreadNode<T extends ThreadAgent>(
   agents: readonly T[],
   daemonNodeId: string | null | undefined,
