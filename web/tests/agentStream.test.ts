@@ -717,6 +717,40 @@ describe("agent stream parsing", () => {
     ]);
   });
 
+  it("renders a Claude result-only response from a cloud computer", () => {
+    const raw = JSON.stringify({
+      type: "result",
+      subtype: "success",
+      is_error: false,
+      result: "Final response from cloud Claude.",
+    });
+
+    assert.deepEqual(parseAgentStream("claude", raw), [
+      { kind: "text", text: "Final response from cloud Claude." },
+      { kind: "narration", key: "agent_stream.claude_finished", params: { tone: "good" } },
+    ]);
+  });
+
+  it("does not duplicate Claude result text already carried by an assistant event", () => {
+    const raw = [
+      JSON.stringify({
+        type: "assistant",
+        message: { role: "assistant", content: [{ type: "text", text: "One final response." }] },
+      }),
+      JSON.stringify({
+        type: "result",
+        subtype: "success",
+        is_error: false,
+        result: "One final response.",
+      }),
+    ].join("\n");
+
+    assert.deepEqual(parseAgentStream("claude", raw), [
+      { kind: "text", text: "One final response." },
+      { kind: "narration", key: "agent_stream.claude_finished", params: { tone: "good" } },
+    ]);
+  });
+
   it("incrementally renders only the unfinished Claude turn without changing visible output", () => {
     const accumulator = new AgentStreamAccumulator("claude");
     const streamed = [

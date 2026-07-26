@@ -383,6 +383,44 @@ describe("projectMessages artifact projection", () => {
     assert.equal(agent.stderr, "");
   });
 
+  it("keeps a Claude result-only completed log for the chat panel", () => {
+    const frame = `${JSON.stringify({
+      type: "result",
+      subtype: "success",
+      is_error: false,
+      result: "Final response from cloud Claude.",
+    })}\n`;
+    const messages = projectMessages(session([
+      {
+        id: "ev_run",
+        type: "agent.started",
+        sessionId: "ses_1",
+        timestamp,
+        runId: "run_1",
+        agent: "claude",
+        role: "implementer",
+        mode: "action",
+      },
+      {
+        id: "ev_completed",
+        type: "agent.completed",
+        sessionId: "ses_1",
+        timestamp,
+        runId: "run_1",
+        agent: "claude",
+        status: "completed",
+        exitCode: 0,
+        agentLog: `stdout:\n${frame}`,
+      },
+    ]), t);
+
+    const agent = messages.find((message) => message.kind === "agent");
+    assert.ok(agent && agent.kind === "agent");
+    assert.equal(agent.streaming, false);
+    assert.equal(agent.stdout, frame);
+    assert.equal(agent.stderr, "");
+  });
+
   it("keeps an unlabelled non-stream agent log on stderr", () => {
     const messages = projectMessages(session([
       {
