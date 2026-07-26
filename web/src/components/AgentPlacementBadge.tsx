@@ -19,13 +19,9 @@ const OWNERSHIP_ICON: Record<PlacementOwnership, typeof NodeManaged> = {
 export function AgentPlacementBadge({
   description,
   showSandbox = false,
-  plain = false,
 }: {
   description: AgentPlacementDescription;
   showSandbox?: boolean;
-  /** Quiet single-line form for roster rows: ownership icon + node name only,
-      with the full ownership/sandbox/status detail folded into the tooltip. */
-  plain?: boolean;
 }) {
   const { t } = useTranslation();
   const OwnershipIcon = OWNERSHIP_ICON[description.ownership];
@@ -40,21 +36,6 @@ export function AgentPlacementBadge({
     sandboxLabel,
     status: statusLabel,
   }, showsSandbox).join(" · ");
-
-  if (plain) {
-    return (
-      <span
-        className="agent-placement-plain"
-        title={detailTitle}
-      >
-        <OwnershipIcon size={12} aria-hidden="true" />
-        <span className="agent-placement-plain-name" translate="no">
-          {description.nodeName}
-        </span>
-        <span className="sr-only">{statusLabel}</span>
-      </span>
-    );
-  }
 
   return (
     <span

@@ -15,8 +15,8 @@ import {
   Copy,
   CalendarClock,
   CalendarDays,
+  Cloud,
   Columns3,
-  Container,
   CircleDashed,
   FileText,
   FolderClosed,
@@ -29,6 +29,7 @@ import {
   Info,
   KeyRound,
   Languages,
+  Laptop,
   LayoutDashboard,
   LayoutGrid,
   Link2,
@@ -136,10 +137,14 @@ export const ViewGrid = withStandardStroke(LayoutGrid, "ViewGrid");
 export const ActionKey = withStandardStroke(KeyRound, "ActionKey");
 export const ActionImage = withStandardStroke(ImagePlus, "ActionImage");
 
-// Node run mode glyphs — managed (BoxLite VM = a container/box),
-// local (direct execution = a shell), pending (awaiting daemon = a dashed ring).
-export const NodeManaged = withStandardStroke(Container, "NodeManaged");
-export const NodeLocal = withStandardStroke(Terminal, "NodeLocal");
+// Computer ownership glyphs. These answer "whose machine is this?", not "how
+// does the daemon sandbox a run?" — sandbox mode stays a text-only badge. A
+// cloud computer Relay provisions is a cloud; a local computer is a person's
+// own machine (a laptop, the shape everyone reads as "my computer"); pending
+// ownership is an unresolved ring. The earlier container/terminal pair
+// pictured the runtime instead and read as "box" and "shell".
+export const NodeManaged = withStandardStroke(Cloud, "NodeManaged");
+export const NodeLocal = withStandardStroke(Laptop, "NodeLocal");
 export const NodePending = withStandardStroke(CircleDashed, "NodePending");
 
 // Agent mode (智能体): a zap glyph reads as "execute work" without reusing

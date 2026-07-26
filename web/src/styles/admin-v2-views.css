@@ -241,6 +241,41 @@
   opacity: 0.8;
 }
 
+/* Computer chip on the employee card/row — a readout, not a control: the
+   machine's actions live on its own node card, so no pointer and no hover
+   affordance. Anatomy mirrors the node card: presence dot, ownership mark,
+   name. */
+.adm-computer-chip {
+  cursor: default;
+  gap: var(--sp-2);
+}
+
+.adm-computer-chip:hover {
+  border-color: var(--line-1);
+}
+
+.adm-computer-chip .adm-node-chip-mark {
+  opacity: 1;
+  color: var(--ink-3);
+}
+
+.adm-computer-chip[data-ownership="managed"] .adm-node-chip-mark {
+  color: var(--action);
+}
+
+.adm-computer-chip-name {
+  font-family: var(--font-mono);
+}
+
+/* A dark machine recedes, matching the node card's offline treatment. */
+.adm-computer-chip[data-online="false"] {
+  color: var(--ink-3);
+}
+
+.adm-computer-chip[data-online="false"] .adm-node-chip-mark {
+  color: var(--ink-4);
+}
+
 .adm-node-chip--button {
   font-family: inherit;
 }
@@ -784,9 +819,11 @@
 
 /* Ownership badge — identity, never status. Micro-caps + icon set the badge
    apart from agent chips (vendor mark + lowercase name) and status pills
-   (tone dot + word). Managed carries the action tint ("Relay runs this");
-   a local computer is a person's machine and stays deliberately un-tinted,
-   keeping green/red reserved for health. */
+   (tone dot + word). Both computer kinds share one hairline chip: the avatar
+   mark above already tints "Relay runs this", so a second filled slab here
+   only competed with the status pill for the loudest thing on the card.
+   Ownership now separates by glyph and by icon ink, and green/red stay
+   reserved for health. */
 .adm-node-profile-kind {
   display: inline-flex;
   align-items: center;
@@ -803,19 +840,21 @@
 
 .adm-node-profile-icon {
   flex-shrink: 0;
-  opacity: 0.9;
+  /* Full opacity — the glyph is the ownership signal now, not decoration. */
+  opacity: 1;
 }
 
-.adm-node-profile-kind[data-kind="managed"] {
-  color: var(--action);
-  border-color: color-mix(in srgb, var(--action) 35%, transparent);
-  background: color-mix(in srgb, var(--action) 10%, transparent);
-}
-
+.adm-node-profile-kind[data-kind="managed"],
 .adm-node-profile-kind[data-kind="local"] {
   color: var(--ink-2);
   border-color: var(--line-1);
   background: var(--surface-2);
+}
+
+/* Cloud ownership reads through the mark: achromatic action ink on the glyph
+   only, so the chip stays as quiet as a local computer's. */
+.adm-node-profile-kind[data-kind="managed"] .adm-node-profile-icon {
+  color: var(--action);
 }
 
 .adm-node-profile-kind[data-kind="pending"] {
@@ -902,10 +941,25 @@
 }
 
 /* Node cards represent machines: keep the technical square container and
-   mute the icon so the status pill carries health meaning. */
+   mute the icon so the status pill carries health meaning. The glyph inside
+   is the ownership mark (cloud / laptop / pending ring), so the avatar is
+   where a machine's kind reads first — the badge below only confirms it. */
 .adm-node-avatar.adm-node-avatar--machine {
   color: var(--ink-3);
   background: var(--surface-2);
+}
+
+/* Ownership tint lives on the mark, not on a fill: a Relay-run cloud computer
+   gets the achromatic action ink so it separates from a person's own machine
+   at a glance, while health hues stay reserved for the status dot. */
+.adm-node-avatar--machine[data-ownership="managed"] {
+  color: var(--action);
+  border-color: color-mix(in srgb, var(--action) 28%, var(--line-1));
+}
+
+.adm-node-avatar--machine[data-ownership="pending"] {
+  color: var(--ink-4);
+  border-style: dashed;
 }
 
 .adm-node-card-identity {

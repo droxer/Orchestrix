@@ -11,7 +11,6 @@ import { StatusPill } from "./StatusPill";
 import { AgentWorkspacePage, type WorkspacePageTab } from "./AgentWorkspacePage";
 import { RelayEmptyState } from "./RelayEmptyState";
 import { Badge } from "./ui/badge";
-import { AgentPlacementBadge } from "./AgentPlacementBadge";
 import { describeAgentPlacements } from "../lib/agentPlacements";
 
 interface AgentsPageProps {
@@ -142,15 +141,16 @@ function RosterRow({
               <span className="agents-roster-row-name">{agent.displayName}</span>
               {!agent.enabled ? <Badge variant="neutral">{t("agents_page.disabled")}</Badge> : null}
             </span>
-            {/* The executor is carried by the AgentStateBadge glyph; the row's
-                one infra line is the computer the agent runs on. */}
-            <span className="agents-roster-row-meta">
-              {computer ? (
-                <AgentPlacementBadge description={computer} plain />
-              ) : (
+            {/* No computer line here: the selected agent's Profile tab names
+                its computer in the Placements section, and this pane sits
+                beside that one — the roster was printing the same fact twice
+                on one screen. An agent with nowhere to run still says so,
+                because that is a defect rather than a repeat. */}
+            {computer ? null : (
+              <span className="agents-roster-row-meta">
                 <span className="mono">{t("agents_page.no_placements")}</span>
-              )}
-            </span>
+              </span>
+            )}
           </span>
           {/* Explicit live status only when it adds information — "ready" is
               the default healthy state, already carried by the row accent and

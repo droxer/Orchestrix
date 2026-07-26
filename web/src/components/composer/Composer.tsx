@@ -6,13 +6,15 @@ import { ActionSend, ActionStop } from "../icons";
 import { ModeToggle } from "./ModeToggle";
 import { AgentSelect } from "./AgentSelect";
 import { useComposer } from "../../hooks/useComposer";
-import { ThreadRuntimeSelect } from "./ThreadRuntimeSelect";
+import { ThreadRuntimeReadout, ThreadRuntimeSelect } from "./ThreadRuntimeSelect";
 
 
 export type ComposerHandle = {
   clear: () => void;
   focus: () => void;
   getText: () => string;
+  /** Put text back in the box — used to return a message a failed send ate. */
+  setText: (text: string) => void;
 };
 
 // Message composer: textarea, agent and mode controls, and the send/cancel
@@ -30,12 +32,17 @@ const ComposerView = forwardRef<ComposerHandle, {
   initializingThread: boolean;
   runtimeNodes: DaemonNodeMonitorRecord[];
   runtimeNodeId: string | null;
+  /** The picked computer resolved against the whole fleet, not just the
+   *  currently-selectable subset. */
+  selectedRuntimeNode: DaemonNodeMonitorRecord | null;
+  /** The computer an already-started thread is pinned to, shown read-only. */
+  activeRuntimeNode: DaemonNodeMonitorRecord | null;
   onRuntimeNodeChange: (nodeId: string) => void;
   onRenameComputer: (node: DaemonNodeMonitorRecord) => void;
   running: boolean;
   onSend: () => void;
   onCancelRun: () => void;
-}>(function Composer({ composerMode, setComposerMode, activeAgent, logicalAgents, activeLogicalAgentId, onLogicalAgentPicked, activeAgentDisplayName, selectedEmployee, initializingThread, runtimeNodes, runtimeNodeId, onRuntimeNodeChange, onRenameComputer, running, onSend, onCancelRun }, ref) {
+}>(function Composer({ composerMode, setComposerMode, activeAgent, logicalAgents, activeLogicalAgentId, onLogicalAgentPicked, activeAgentDisplayName, selectedEmployee, initializingThread, runtimeNodes, runtimeNodeId, selectedRuntimeNode, activeRuntimeNode, onRuntimeNodeChange, onRenameComputer, running, onSend, onCancelRun }, ref) {
   const { t } = useTranslation();
   const composer = useComposer();
   const {
@@ -71,17 +78,24 @@ const ComposerView = forwardRef<ComposerHandle, {
     clear: () => setComposerText(""),
     focus: () => textareaRef.current?.focus(),
     getText: () => composerText,
+    setText: (text: string) => setComposerText(text),
   }), [composerText, setComposerText, textareaRef]);
 
   return (
     <form className="composer" onSubmit={(e) => { e.preventDefault(); triggerSend(); }}>
+      {/* A new thread picks its computer; a started one is pinned to the
+          computer it dispatched on, so the rail stays put and turns into a
+          readout instead of disappearing. */}
       {initializingThread ? (
         <ThreadRuntimeSelect
           nodes={runtimeNodes}
           value={runtimeNodeId}
+          selectedNode={selectedRuntimeNode}
           onValueChange={onRuntimeNodeChange}
           onRename={onRenameComputer}
         />
+      ) : activeRuntimeNode ? (
+        <ThreadRuntimeReadout node={activeRuntimeNode} />
       ) : null}
       <div className="composer-input-wrap" data-running={running || undefined}>
         <div className="composer-input">

@@ -15,11 +15,11 @@ import {
   type StoredNodeTokenMap,
 } from "./helpers";
 import { NodeActions } from "./NodeActions";
-import { NodeProfileBadges } from "./NodeProfileBadges";
+import { NodeProfileBadges, nodeOwnershipIcon } from "./NodeProfileBadges";
 import { NodePresence } from "./NodePresence";
 import { Button } from "../ui/button";
-import { ActionApprove, ActionCopy, AdminNode } from "../icons";
-import { isNodeOnline } from "../../lib/adminHelpers";
+import { ActionApprove, ActionCopy } from "../icons";
+import { isNodeOnline, nodeOwnershipProfile } from "../../lib/adminHelpers";
 
 function isAgentDisabled(node: ControlPanelDaemonNodeRecord, agent: AgentName): boolean {
   return Boolean(node.disabledAgents?.includes(agent));
@@ -81,12 +81,18 @@ export function NodeCard({
   // renders when it adds state presence can't: running, provisioning,
   // failed, stopped.
   const showStatusPill = status !== "ready" && status !== "stale";
+  const ownership = nodeOwnershipProfile(node);
+  const OwnershipMark = nodeOwnershipIcon(ownership);
 
   return (
     <article className="adm-node-card" data-online={online ? "true" : "false"}>
       <header className="adm-node-card-head">
-        <span className="adm-node-avatar adm-node-avatar--machine" translate="no">
-          <AdminNode size={18} aria-hidden="true" />
+        <span
+          className="adm-node-avatar adm-node-avatar--machine"
+          data-ownership={ownership}
+          translate="no"
+        >
+          <OwnershipMark size={18} aria-hidden="true" />
         </span>
         <div className="adm-node-card-identity">
           <span className="adm-node-card-nameline">

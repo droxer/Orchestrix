@@ -65,10 +65,12 @@ export function useRelayData(
         queryKey: NODES_KEY,
         enabled,
         refetchInterval: POLL_INTERVAL_MS,
-        queryFn: async ({ signal }: { signal: AbortSignal }): Promise<DaemonNodeMonitorRecord[]> => {
-          const tk = fetchToken();
-          return tk ? (await listDaemonNodes(tk, signal)).nodes : [];
-        },
+        // Nodes are readable with the session cookie alone — the backend
+        // scopes /daemon-nodes to what the actor owns. Skipping the fetch
+        // without a sandbox token left every tokenless client blind to live
+        // runs: no working badge, and a cancel button with no node to talk to.
+        queryFn: async ({ signal }: { signal: AbortSignal }): Promise<DaemonNodeMonitorRecord[]> =>
+          (await listDaemonNodes(fetchToken(), signal)).nodes,
       },
       {
         queryKey: SESSIONS_KEY,

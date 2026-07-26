@@ -519,7 +519,6 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
                   onAddEmployee={() => setAddEmployeeOpen(true)}
                   onDeleteEmployee={handleDeleteEmployee}
                   highlightedEmployeeId={highlightedEmployeeId}
-                  onSelectAgent={setAgentProfileId}
                 />
               ) : (
                 <>

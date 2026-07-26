@@ -96,10 +96,120 @@
   color: var(--ink-1);
 }
 
-.thread-runtime-option-id {
-  margin-left: auto;
+/* Ownership reads on the mark, matching the fleet badges: a cloud computer
+   Relay runs takes the achromatic action ink, a person's own machine stays
+   neutral. */
+.thread-runtime-select[data-ownership="managed"] > svg {
+  color: var(--action);
+}
+
+/* Read-only twin of the trigger, for a thread already pinned to its computer.
+   It deliberately does NOT borrow the trigger's chrome (no plate, no hover, no
+   chevron) — same rail, same anatomy, but nothing that invites a click. The
+   presence dot leads because a pinned computer can go dark mid-thread. */
+.thread-runtime-readout {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  color: var(--ink-1);
+  font: var(--type-label-strong);
+}
+
+.thread-runtime-readout > svg {
+  flex: none;
   color: var(--ink-3);
-  font: var(--type-code);
+}
+
+.thread-runtime-readout[data-ownership="managed"] > svg {
+  color: var(--action);
+}
+
+.thread-runtime-readout-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Kind as a quiet trailing caption — present for orientation, never competing
+   with the machine's name. */
+.thread-runtime-readout-kind {
+  flex: none;
+  color: var(--ink-3);
+  font: var(--type-micro);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+}
+
+.thread-runtime-readout-kind::before {
+  content: "·";
+  margin-right: var(--sp-2);
+  color: var(--ink-4);
+}
+
+/* An offline computer recedes to muted ink, matching the fleet cards — the
+   name stays readable, the row stops looking live. */
+.thread-runtime-readout[data-online="false"] {
+  color: var(--ink-3);
+}
+
+.thread-runtime-readout[data-online="false"] > svg {
+  color: var(--ink-4);
+}
+
+/* The Select popup defaults to the trigger's width (--anchor-width). The
+   trigger is only as wide as a machine name, which clipped the node id
+   mid-word; give the list its own comfortable measure instead. */
+.thread-runtime-content {
+  width: auto;
+  min-width: min(304px, calc(100vw - var(--sp-8)));
+  max-width: min(420px, calc(100vw - var(--sp-6)));
+}
+
+/* Two-line option: name, then kind · id. The primitive keeps items on one
+   nowrap row, so the body opts back into a column. */
+.thread-runtime-option {
+  align-items: flex-start;
+  padding-top: var(--sp-2);
+  padding-bottom: var(--sp-2);
+}
+
+.thread-runtime-option > svg {
+  margin-top: 1px;
+}
+
+.thread-runtime-option[data-ownership="managed"] > svg {
+  color: var(--action);
+}
+
+.thread-runtime-option-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.thread-runtime-option-name {
+  overflow: hidden;
+  font: var(--type-label-strong);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.thread-runtime-option-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+  color: var(--ink-3);
+  font-size: var(--fs-1);
+}
+
+.thread-runtime-option-id {
+  overflow: hidden;
+  font-family: var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .thread-runtime-rail + .composer-input-wrap {
@@ -118,6 +228,11 @@
   }
 
   .thread-runtime-select { max-width: 100%; }
+
+  /* The kind caption is fixed-width and would starve the machine name, which
+     is the part that identifies the computer. Drop it; the mark still says
+     cloud vs local and the title carries the words. */
+  .thread-runtime-readout-kind { display: none; }
 }
 
 .mode-chip {
