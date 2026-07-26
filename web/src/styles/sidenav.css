@@ -428,6 +428,70 @@
   border-color: var(--line-1);
 }
 
+/* "Coming soon" marker (Channels): a micro-caps pill beside the label when
+   the rail is expanded, a corner dot on the icon when collapsed, and the same
+   pill trailing the item inside the mobile More overflow. Decorative only —
+   the state also rides on the link's aria-label and collapsed tooltip. */
+.sidenav-btn[aria-disabled="true"],
+.sidenav-more-item[aria-disabled="true"] {
+  cursor: default;
+}
+
+.sidenav-btn[aria-disabled="true"]:hover,
+.sidenav-more-item[aria-disabled="true"]:hover {
+  background: transparent;
+  border-color: transparent;
+  color: var(--ink-3);
+}
+
+.sidenav-badge {
+  display: none;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: 1px var(--sp-2);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-full);
+  background: var(--surface-1);
+  color: var(--ink-3);
+  font: var(--type-micro);
+  text-transform: uppercase;
+  letter-spacing: var(--track-caps);
+  white-space: nowrap;
+}
+
+.sidenav-badge::before {
+  content: "";
+  width: 4px;
+  height: 4px;
+  border-radius: var(--r-full);
+  background: var(--warn);
+}
+
+.sidenav-panel[data-expanded="true"] .sidenav-btn .sidenav-badge,
+.sidenav-more-item .sidenav-badge {
+  display: inline-flex;
+}
+
+.sidenav-more-item .sidenav-badge {
+  margin-left: auto;
+}
+
+.sidenav-badge-dot {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-full);
+  background: var(--warn);
+  /* Cutout ring against the rail so the dot reads over any icon stroke. */
+  box-shadow: 0 0 0 2px var(--surface-2);
+}
+
+.sidenav-panel[data-expanded="true"] .sidenav-badge-dot {
+  display: none;
+}
+
 /* Mobile-only More overflow trigger (Channels / Admin) — hidden on desktop
    where those destinations stay as primary rail items. Last in this file at
    3-class specificity so it outranks every `.sidenav-btn` display rule above

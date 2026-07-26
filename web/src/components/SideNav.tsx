@@ -186,7 +186,8 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
     onNavigateRoute(nextRoute);
   }
 
-  const moreActive = route === "channels" || route === "admin";
+  const moreActive = route === "admin";
+  const channelsHint = `${t("nav.channels")} · ${t("nav.coming_soon")}`;
 
   return (
     <aside className="sidenav-panel" aria-label={t("nav.brand", { defaultValue: "Relay" })} data-expanded={sidenavExpanded ? "true" : "false"}>
@@ -300,21 +301,20 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
         {isAdmin ? (
           <div className="sidenav-group sidenav-group--separated" role="group" aria-label={t("nav.manage")}>
             <span className="sidenav-group-label sidenav-overflow-item sr-only" aria-hidden="true">{t("nav.manage")}</span>
-            <a
-              className={`sidenav-btn sidenav-overflow-item ${route === "channels" ? "active" : ""}`}
+            <span
+              className="sidenav-btn sidenav-overflow-item"
               data-nav="channels"
-              href={hrefForRoute("channels")}
-              aria-label={t("nav.channels")}
-              aria-current={route === "channels" ? "page" : undefined}
-              onClick={(event) => handleRouteClick(event, "channels")}
-              onMouseEnter={(e) => showNavTooltip(t("nav.channels"), e.currentTarget)}
+              data-coming-soon="true"
+              aria-disabled="true"
+              aria-label={channelsHint}
+              onMouseEnter={(e) => showNavTooltip(channelsHint, e.currentTarget)}
               onMouseLeave={hideNavTooltip}
-              onFocus={(e) => showNavTooltip(t("nav.channels"), e.currentTarget)}
-              onBlur={hideNavTooltip}
             >
               <NavChannels size={18} />
               <span className="sidenav-label sr-only">{t("nav.channels")}</span>
-            </a>
+              <span className="sidenav-badge" aria-hidden="true">{t("nav.coming_soon_short")}</span>
+              <span className="sidenav-badge-dot" aria-hidden="true" />
+            </span>
             <a
               className={`sidenav-btn sidenav-overflow-item ${route === "admin" ? "active" : ""}`}
               data-nav="admin"
@@ -402,16 +402,11 @@ export function SideNav({ sidenavExpanded, setSidenavExpanded, route, onNavigate
           aria-label={t("nav.more_label")}
           style={{ top: moreMenu.y, left: moreMenu.x }}
         >
-          <a
-            className={`sidenav-more-item ${route === "channels" ? "active" : ""}`}
-            role="menuitem"
-            href={hrefForRoute("channels")}
-            aria-current={route === "channels" ? "page" : undefined}
-            onClick={(event) => handleRouteClick(event, "channels")}
-          >
+          <span className="sidenav-more-item" aria-disabled="true">
             <NavChannels size={16} />
             <span>{t("nav.channels")}</span>
-          </a>
+            <span className="sidenav-badge" aria-hidden="true">{t("nav.coming_soon_short")}</span>
+          </span>
           <a
             className={`sidenav-more-item ${route === "admin" ? "active" : ""}`}
             role="menuitem"

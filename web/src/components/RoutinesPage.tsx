@@ -69,7 +69,7 @@ function serializeRoutineFilters(value: RoutineFilters): string | null {
 function parseRoutineView(value: string | null): RoutineView {
   return ROUTINE_VIEWS.includes(value as RoutineView)
     ? value as RoutineView
-    : readViewPreference(ROUTINE_VIEW_STORAGE_KEY, "list", ROUTINE_VIEWS);
+    : readViewPreference(ROUTINE_VIEW_STORAGE_KEY, "card", ROUTINE_VIEWS);
 }
 
 function activeFilterCount(filters: RoutineFilters): number {

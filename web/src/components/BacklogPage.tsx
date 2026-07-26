@@ -65,7 +65,7 @@ function serializeBacklogFilters(value: BacklogFilters): string | null {
 function parseBacklogView(value: string | null): BacklogView {
   return BACKLOG_VIEWS.includes(value as BacklogView)
     ? value as BacklogView
-    : readViewPreference(VIEW_STORAGE_KEY, "list", BACKLOG_VIEWS);
+    : readViewPreference(VIEW_STORAGE_KEY, "board", BACKLOG_VIEWS);
 }
 
 const ACTIVE_STATUSES: TaskStatus[] = ["assigned", "running", "waiting_for_human", "review"];

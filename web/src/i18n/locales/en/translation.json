@@ -58,6 +58,8 @@
     "teams": "Teams",
     "admin": "Admin",
     "channels": "Channels",
+    "coming_soon": "Coming soon",
+    "coming_soon_short": "Soon",
     "refresh": "Refresh",
     "preferences": "Preferences",
     "logout": "Logout",
