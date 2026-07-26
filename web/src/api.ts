@@ -50,6 +50,7 @@ import type {
   NodeWorkspaceFileResponse,
   WorkspaceScope,
 } from "./types.js";
+import type { Language, Theme } from "./lib/appStorage.js";
 
 export class RelayApiError extends Error {
   constructor(
@@ -393,6 +394,13 @@ export function getAuthStatus(signal?: AbortSignal): Promise<{ requiresBootstrap
 
 export function getMe(signal?: AbortSignal): Promise<{ authenticated: boolean; user?: CurrentUser }> {
   return apiJson<{ authenticated: boolean; user?: CurrentUser }>("/auth/me", { signal });
+}
+
+export function updateUserPreferences(input: { theme?: Theme; language?: Language }): Promise<{ user: CurrentUser }> {
+  return apiJson<{ user: CurrentUser }>("/auth/preferences", {
+    method: "PATCH",
+    body: input,
+  });
 }
 
 export function bootstrapUser(input: { token: string; username: string; password: string }): Promise<{ user: CurrentUser }> {

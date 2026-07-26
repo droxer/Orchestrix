@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from tempfile import TemporaryDirectory
 
-from sqlalchemy import create_engine, text
-
 from relay.security.auth import DatabaseUserAuthStore, hash_session_token
+from sqlalchemy import create_engine, text
 
 
 def test_database_auth_store_persists_users_and_hashes_session_tokens() -> None:
@@ -46,3 +45,25 @@ def test_database_auth_store_enforces_unique_normalized_usernames() -> None:
             assert str(error) == "username already exists."
         else:
             raise AssertionError("Expected duplicate normalized username to be rejected.")
+
+
+def test_database_auth_store_persists_user_preferences() -> None:
+    with TemporaryDirectory() as root:
+        database_url = f"sqlite:///{root}/auth.db"
+        store = DatabaseUserAuthStore(database_url, create_schema=True)
+        user = store.create_user("alice", "secret123")
+
+        updated = store.update_user_preferences(
+            user["id"],
+            theme="dark",
+            language="zh-TW",
+        )
+
+        assert updated["theme"] == "dark"
+        assert updated["language"] == "zh-TW"
+
+        reopened = DatabaseUserAuthStore(database_url)
+        persisted = reopened.get_user_by_id(user["id"])
+        assert persisted is not None
+        assert persisted["theme"] == "dark"
+        assert persisted["language"] == "zh-TW"

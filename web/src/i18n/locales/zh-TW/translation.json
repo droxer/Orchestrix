@@ -15,6 +15,7 @@
   "errors": {
     "rename_thread": "無法重新命名對話。請重新整理對話列表後重試。",
     "rename_computer": "無法重新命名電腦。請檢查連線後再試一次。",
+    "save_preferences": "無法儲存偏好設定。請檢查連線後再試一次。",
     "delete_thread": "無法刪除對話。請檢查連線後重試。",
     "send_message": "無法傳送訊息。請檢查 daemon 連線後重試。",
     "thread_computer_required": "請先選擇一台執行中的電腦，再開始此對話。",

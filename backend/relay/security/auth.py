@@ -9,7 +9,21 @@ from typing import Any, Literal
 
 from fastapi import HTTPException, Request
 from loguru import logger
-from sqlalchemy import CheckConstraint, Column, DateTime, ForeignKey, MetaData, Table, Text, Uuid, create_engine, delete, insert, select, update
+from sqlalchemy import (
+    CheckConstraint,
+    Column,
+    DateTime,
+    ForeignKey,
+    MetaData,
+    Table,
+    Text,
+    Uuid,
+    create_engine,
+    delete,
+    insert,
+    select,
+    update,
+)
 from sqlalchemy.exc import IntegrityError
 
 from ..core.ids import new_database_id, new_relay_id, now_iso
@@ -20,6 +34,12 @@ USER_COOKIE_NAME = "relay_session"
 PW_HASH_ALGORITHM = "pbkdf2_sha256"
 PW_HASH_ITERATIONS = 600_000
 UserRole = Literal["admin", "user"]
+UserTheme = Literal["light", "dark", "system"]
+UserLanguage = Literal["en", "zh-CN", "zh-TW"]
+USER_THEMES: tuple[UserTheme, ...] = ("light", "dark", "system")
+USER_LANGUAGES: tuple[UserLanguage, ...] = ("en", "zh-CN", "zh-TW")
+DEFAULT_USER_THEME: UserTheme = "system"
+DEFAULT_USER_LANGUAGE: UserLanguage = "en"
 
 
 def database_id_column() -> Column[Any]:
@@ -157,6 +177,8 @@ class UserAuthStore:
             "displayName": display_name.strip() if display_name else None,
             "departmentId": department_id.strip() if department_id else None,
             "departmentName": department_name.strip() if department_name else None,
+            "theme": DEFAULT_USER_THEME,
+            "language": DEFAULT_USER_LANGUAGE,
             "passwordHash": hash_password(password),
             "createdAt": now_iso(),
             "updatedAt": now_iso(),
@@ -167,6 +189,26 @@ class UserAuthStore:
             entries = [entry for entry in _read_json(self.deleted_employees_path) if entry.get("id") != user["employeeId"]]
             _write_json(self.deleted_employees_path, entries)
         logger.info("User created", user_id=user["id"], username=username, role=role)
+        return self._public_user(user)
+
+    def update_user_preferences(
+        self,
+        user_id: str,
+        *,
+        theme: UserTheme | None = None,
+        language: UserLanguage | None = None,
+    ) -> dict[str, Any]:
+        _validate_user_preferences(theme=theme, language=language)
+        users = self._read_users()
+        user = next((entry for entry in users if entry["id"] == user_id), None)
+        if not user:
+            raise KeyError(user_id)
+        if theme is not None:
+            user["theme"] = theme
+        if language is not None:
+            user["language"] = language
+        user["updatedAt"] = now_iso()
+        self._write_users(users)
         return self._public_user(user)
 
     def authenticate(self, username: str, password: str) -> dict[str, Any] | None:
@@ -264,6 +306,8 @@ class UserAuthStore:
             "role": user["role"],
             "employeeId": user.get("employeeId"),
             "displayName": user.get("displayName"),
+            "theme": user.get("theme", DEFAULT_USER_THEME),
+            "language": user.get("language", DEFAULT_USER_LANGUAGE),
             "createdAt": user["createdAt"],
         }
 
@@ -305,6 +349,8 @@ class DatabaseUserAuthStore:
         Column("role", Text, nullable=False),
         Column("employee_id", Uuid(as_uuid=False), ForeignKey("employees.id", ondelete="SET NULL"), nullable=True),
         Column("employee_public_id", Text, nullable=True),
+        Column("theme", Text, nullable=False, server_default=DEFAULT_USER_THEME),
+        Column("language", Text, nullable=False, server_default=DEFAULT_USER_LANGUAGE),
         Column("password_hash", Text, nullable=False),
         Column("created_at", DateTime(timezone=True), nullable=False),
         Column("updated_at", DateTime(timezone=True), nullable=False),
@@ -369,6 +415,8 @@ class DatabaseUserAuthStore:
             "email": email,
             "role": role,
             "employeeId": employee_id,
+            "theme": DEFAULT_USER_THEME,
+            "language": DEFAULT_USER_LANGUAGE,
             "passwordHash": hash_password(password),
             "createdAt": _format_iso(now),
             "updatedAt": _format_iso(now),
@@ -381,6 +429,32 @@ class DatabaseUserAuthStore:
             raise ValueError("username already exists.") from error
         logger.info("User created", user_id=user["id"], username=username, role=role)
         return UserAuthStore._public_user(user)
+
+    def update_user_preferences(
+        self,
+        user_id: str,
+        *,
+        theme: UserTheme | None = None,
+        language: UserLanguage | None = None,
+    ) -> dict[str, Any]:
+        _validate_user_preferences(theme=theme, language=language)
+        patch: dict[str, Any] = {"updated_at": datetime.now(timezone.utc)}
+        if theme is not None:
+            patch["theme"] = theme
+        if language is not None:
+            patch["language"] = language
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                update(self.users)
+                .where(self.users.c.public_id == user_id)
+                .values(**patch)
+            )
+            if result.rowcount == 0:
+                raise KeyError(user_id)
+            row = conn.execute(
+                select(self.users).where(self.users.c.public_id == user_id)
+            ).mappings().one()
+        return UserAuthStore._public_user(row_to_database_user(row))
 
     def ensure_department(self, department_id: str, *, name: str | None = None, parent_department_id: str | None = None) -> dict[str, Any]:
         department_id = department_id.strip()
@@ -654,6 +728,8 @@ def database_user_to_row(user: dict[str, Any], *, employee_pk: str | None = None
         "role": user["role"],
         "employee_id": employee_pk,
         "employee_public_id": user.get("employeeId"),
+        "theme": user.get("theme", DEFAULT_USER_THEME),
+        "language": user.get("language", DEFAULT_USER_LANGUAGE),
         "password_hash": user["passwordHash"],
         "created_at": _parse_iso(user["createdAt"]),
         "updated_at": _parse_iso(user["updatedAt"]),
@@ -720,10 +796,23 @@ def row_to_database_user(row: Any) -> dict[str, Any]:
         "email": row["email"],
         "role": row["role"],
         "employeeId": row["employee_public_id"],
+        "theme": row["theme"],
+        "language": row["language"],
         "passwordHash": row["password_hash"],
         "createdAt": _format_iso(row["created_at"]),
         "updatedAt": _format_iso(row["updated_at"]),
     }
+
+
+def _validate_user_preferences(
+    *,
+    theme: UserTheme | None,
+    language: UserLanguage | None,
+) -> None:
+    if theme is not None and theme not in USER_THEMES:
+        raise ValueError("theme must be light, dark, or system.")
+    if language is not None and language not in USER_LANGUAGES:
+        raise ValueError("language must be en, zh-CN, or zh-TW.")
 
 
 def database_session_to_row(session: dict[str, Any], *, user_pk: str) -> dict[str, Any]:

@@ -2,7 +2,7 @@
 
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { logout, updateComputerDisplayName } from "./api";
+import { logout, updateComputerDisplayName, updateUserPreferences } from "./api";
 import type { AgentName, AgentTaskMode, CurrentUser, DaemonNodeMonitorRecord, EmployeeAgent, RelayArtifact, RelaySession } from "./types";
 import { LoginScreen } from "./components/LoginScreen";
 import { type Theme, type Language } from "./components/PreferencesPanel";
@@ -78,6 +78,16 @@ function useStableEvent<TArgs extends unknown[], TResult>(handler: (...args: TAr
   return useCallback((...args: TArgs) => handlerRef.current(...args), []);
 }
 
+interface PreferenceRequestState {
+  generation: number;
+  latestRequestId: number;
+  queue: Promise<void>;
+}
+
+function newPreferenceRequestState(generation = 0): PreferenceRequestState {
+  return { generation, latestRequestId: 0, queue: Promise.resolve() };
+}
+
 // ── App ───────────────────────────────────────────────────────────────────────
 
 export function App() {
@@ -128,6 +138,10 @@ export function App() {
   const mounted = useClientMounted();
   const { agents: logicalAgents } = useEmployeeAgents(user?.employeeId);
   const localNodeAdoptionStartedRef = useRef(false);
+  const [preferencesUserId, setPreferencesUserId] = useState<string | null>(null);
+  const authenticatedUserIdRef = useRef<string | null>(null);
+  const themePreferenceRequestRef = useRef<PreferenceRequestState>(newPreferenceRequestState());
+  const languagePreferenceRequestRef = useRef<PreferenceRequestState>(newPreferenceRequestState());
   const composerRef = useRef<ComposerHandle>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
@@ -335,6 +349,32 @@ export function App() {
   }, [mounted]);
 
   useEffect(() => {
+    invalidatePreferenceRequests(user?.id ?? null);
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    if (!user) {
+      setPreferencesUserId(null);
+      return;
+    }
+    if (preferencesUserId === user.id) return;
+
+    const nextTheme = user.theme ?? "system";
+    const nextLanguage = user.language ?? "en";
+    setTheme(nextTheme);
+    setLanguage(nextLanguage);
+    applyTheme(nextTheme);
+    document.documentElement.lang = nextLanguage;
+    const languageChange = i18n.language === nextLanguage
+      ? Promise.resolve()
+      : i18n.changeLanguage(nextLanguage);
+    void languageChange
+      .catch(() => undefined)
+      .finally(() => setPreferencesUserId(user.id));
+  }, [i18n, mounted, preferencesUserId, user]);
+
+  useEffect(() => {
     if (!authChecked) return;
     setTokens(readTokens());
     // The logged-in user is their own employee; their threads are the
@@ -423,13 +463,77 @@ export function App() {
   }, [mounted, theme]);
 
   useEffect(() => {
+    if (!mounted) return;
     writeLanguage(language);
     document.documentElement.lang = language;
     document.title = i18n.t("app.title");
     if (i18n.language !== language) {
       void i18n.changeLanguage(language);
     }
-  }, [i18n, language]);
+  }, [i18n, language, mounted]);
+
+  function handleThemeChange(nextTheme: Theme): void {
+    if (nextTheme === theme) return;
+    const previousTheme = theme;
+    setTheme(nextTheme);
+    persistPreference(
+      { theme: nextTheme },
+      themePreferenceRequestRef,
+      () => setTheme(previousTheme),
+      "Failed to save theme preference",
+    );
+  }
+
+  function handleLanguageChange(nextLanguage: Language): void {
+    if (nextLanguage === language) return;
+    const previousLanguage = language;
+    setLanguage(nextLanguage);
+    persistPreference(
+      { language: nextLanguage },
+      languagePreferenceRequestRef,
+      () => setLanguage(previousLanguage),
+      "Failed to save language preference",
+    );
+  }
+
+  function persistPreference(
+    patch: { theme: Theme } | { language: Language },
+    requestRef: { current: PreferenceRequestState },
+    rollback: () => void,
+    context: string,
+  ): void {
+    const originatingUserId = authenticatedUserIdRef.current;
+    if (!originatingUserId) return;
+    const generation = requestRef.current.generation;
+    const requestId = ++requestRef.current.latestRequestId;
+    const isCurrentRequest = () => (
+      generation === requestRef.current.generation
+      && requestId === requestRef.current.latestRequestId
+      && originatingUserId === authenticatedUserIdRef.current
+    );
+    const queued = requestRef.current.queue.then(async () => {
+      if (!isCurrentRequest()) return;
+      try {
+        const { user: updatedUser } = await updateUserPreferences(patch);
+        if (isCurrentRequest()) setUser(updatedUser);
+      } catch (error) {
+        if (!isCurrentRequest()) return;
+        rollback();
+        reportMutationError(context, error, t("errors.save_preferences"));
+      }
+    });
+    requestRef.current.queue = queued;
+  }
+
+  function invalidatePreferenceRequests(nextUserId: string | null): void {
+    authenticatedUserIdRef.current = nextUserId;
+    themePreferenceRequestRef.current = newPreferenceRequestState(
+      themePreferenceRequestRef.current.generation + 1,
+    );
+    languagePreferenceRequestRef.current = newPreferenceRequestState(
+      languagePreferenceRequestRef.current.generation + 1,
+    );
+  }
 
   function handleTranscriptScroll(): void {
     const el = transcriptRef.current;
@@ -800,6 +904,7 @@ export function App() {
 
 
   async function handleLogout() {
+    invalidatePreferenceRequests(null);
     try {
       await logout();
     } catch {
@@ -810,7 +915,7 @@ export function App() {
     syncChatHash(null, true);
   }
 
-  if (!mounted || !authChecked) {
+  if (!mounted || !authChecked || (user && preferencesUserId !== user.id)) {
     return (
       <main className="login-checking" aria-busy="true">
         <p className="login-checking-text">
@@ -847,9 +952,9 @@ export function App() {
       user={user}
       onLogout={() => void handleLogout()}
       theme={theme}
-      onThemeChange={setTheme}
+      onThemeChange={handleThemeChange}
       language={language}
-      onLanguageChange={setLanguage}
+      onLanguageChange={handleLanguageChange}
     >
       <Suspense fallback={<RouteFallback />}>
         {route === "admin" ? <AdminPage currentUser={user} /> : route === "channels" ? <ChannelsPage /> : route === "backlog" ? (

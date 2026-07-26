@@ -19,6 +19,7 @@ import type {
   TaskStatus,
   TokenUsage,
 } from "relay-core";
+import type { Language, Theme } from "./lib/appStorage.js";
 
 export type {
   AgentName,
@@ -498,6 +499,8 @@ export interface CurrentUser {
   role: UserRole;
   employeeId?: string;
   displayName?: string;
+  theme?: Theme;
+  language?: Language;
 }
 
 export type ChatProvider = "discord" | "telegram" | "lark";

@@ -15,6 +15,7 @@
   "errors": {
     "rename_thread": "Couldn't rename the thread. Refresh the thread list and try again.",
     "rename_computer": "Couldn't rename the computer. Check the connection and try again.",
+    "save_preferences": "Couldn't save your preferences. Check the connection and try again.",
     "delete_thread": "Couldn't delete the thread. Check the connection and try again.",
     "send_message": "Couldn't send the message. Check the daemon connection and try again.",
     "thread_computer_required": "Choose a running computer before starting this thread.",
