@@ -665,6 +665,7 @@ function ActivitiesPane({
             title={t("workspace.no_activity")}
             hint={t("workspace.empty_activity_hint")}
             pulse
+            announce
           />
         ) : null}
       </div>
@@ -750,11 +751,11 @@ function FilesPane({
         <WorkspaceLoading label={t("workspace.loading_files")} />
       ) : message ? (
         <div className="workspace-file-error">
-          <WorkspaceEmpty title={message} mark={<WorkspaceFile size={18} />} />
+          <WorkspaceEmpty title={message} mark={<WorkspaceFile size={18} />} announce />
           {isWorkspaceRetryableError(error) ? <Button type="button" variant="outline" size="sm" onClick={onRetry}>{t("workspace.retry")}</Button> : null}
         </div>
       ) : data && !data.exists ? (
-        <WorkspaceEmpty title={t("workspace.files_unavailable")} mark={<WorkspaceFile size={18} />} />
+        <WorkspaceEmpty title={t("workspace.files_unavailable")} mark={<WorkspaceFile size={18} />} announce />
       ) : entries.length ? (
         <ul className="workspace-pick-list">
           {entries.map((entry) => (
@@ -774,6 +775,7 @@ function FilesPane({
           title={t(emptyState.titleKey)}
           hint={emptyState.hintKey ? t(emptyState.hintKey) : undefined}
           mark={<WorkspaceFile size={18} />}
+          announce
         />
       )}
     </div>

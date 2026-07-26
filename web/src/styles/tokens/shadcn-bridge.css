@@ -102,6 +102,6 @@
   --accent-foreground: var(--ink-1);
   --destructive: var(--err);
   --border: var(--line-1);
-  --input: var(--line-1);
+  --input: var(--control-border);
   --ring: var(--action);
 }

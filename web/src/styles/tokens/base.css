@@ -83,18 +83,24 @@ select {
 }
 
 button {
-  border: 0;
-  background: none;
   cursor: pointer;
 }
 
+/* Surface-specific native buttons still start unpainted. The shadcn Button
+   primitive owns its chrome through buttonVariants(), so exclude it from this
+   reset and let Tailwind's utility layer remain the single source of truth. */
+button:not([data-slot="button"]) {
+  border: 0;
+  background: none;
+}
+
 /* Disabled is opacity — there is no disabled hex in the palette. */
-button:disabled {
+button:not([data-slot="button"]):disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }
 
-button:not(:disabled):active {
+button:not([data-slot="button"]):not(:disabled):active {
   /* `translate` (not `transform`) so component-level transforms survive. */
   translate: 0 1px;
 }
@@ -128,62 +134,6 @@ select:focus-visible {
     outline-offset: 2px;
     box-shadow: none;
   }
-}
-
-/* Button primitive fills — the unlayered element resets above (`background:
-   none`, `border: 0`, `color: inherit`) sit in the same unlayered context and
-   thus outrank Tailwind's layered variant utilities (layer precedence beats
-   specificity). Rather than depend on utilities that any reset can silently
-   kill, the shadcn <Button> variants paint here, keyed off the data-variant
-   attribute the component emits. This is the single source of truth for the
-   primitive's chrome; keep it in sync with buttonVariants() in ui/button.tsx. */
-button[data-slot="button"][data-variant="default"] {
-  background: var(--action);
-  color: var(--on-action);
-}
-
-button[data-slot="button"][data-variant="default"]:hover:not(:disabled) {
-  background: var(--action-hover);
-}
-
-/* Secondary — quiet grey fill (matches the .backlog-filter-chip voice). */
-button[data-slot="button"][data-variant="secondary"] {
-  background: var(--surface-2);
-  color: var(--ink-1);
-}
-
-button[data-slot="button"][data-variant="secondary"]:hover:not(:disabled) {
-  background: var(--surface-3);
-}
-
-/* Outline — hairline-bordered, transparent so it reads on any surface (the
-   reset's `border: 0` would otherwise erase the utility border). */
-button[data-slot="button"][data-variant="outline"] {
-  border: 1px solid var(--line-1);
-  background: transparent;
-  color: var(--ink-1);
-}
-
-button[data-slot="button"][data-variant="outline"]:hover:not(:disabled) {
-  border-color: var(--ink-3);
-  background: var(--surface-2);
-}
-
-/* Destructive — low-tint danger wash with danger ink (danger is a grey tier
-   in the monochrome system; red is never used for fills). */
-button[data-slot="button"][data-variant="destructive"] {
-  background: color-mix(in srgb, var(--err) 10%, transparent);
-  color: var(--err);
-}
-
-button[data-slot="button"][data-variant="destructive"]:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--err) 18%, transparent);
-}
-
-/* Link — action-colored inline text; the `color: inherit` reset would flatten
-   it to body ink otherwise. */
-button[data-slot="button"][data-variant="link"] {
-  color: var(--action);
 }
 
 /* Tabular numerals in the sans; elements that must stay monospace

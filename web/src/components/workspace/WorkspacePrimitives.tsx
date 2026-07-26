@@ -13,14 +13,22 @@ export function WorkspaceEmpty({
   hint,
   mark,
   pulse = false,
+  announce = false,
 }: {
   title: string;
   hint?: string;
   mark?: ReactNode;
   pulse?: boolean;
+  /** Announce async empty/error results that replace a loading status. */
+  announce?: boolean;
 }) {
   return (
-    <div className="workspace-empty-state">
+    <div
+      className="workspace-empty-state"
+      role={announce ? "status" : undefined}
+      aria-live={announce ? "polite" : undefined}
+      aria-atomic={announce || undefined}
+    >
       {mark || pulse ? (
         <span
           className={`workspace-empty-state-mark${pulse ? " is-pulse" : ""}`}

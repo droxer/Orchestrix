@@ -13,6 +13,11 @@
   --shadow-1: none;
   --shadow-2: 0 0 0 1px var(--line-1);
 
+  /* Interactive control boundary / unchecked track. Unlike structural
+     hairlines, this role must remain at least 3:1 against every surface so an
+     unfocused field or switch state is still perceivable (WCAG 1.4.11). */
+  --control-border: var(--ink-4);
+
   /* Focus — 2px solid ring (WCAG 1.4.11) + soft halo. */
   --focus-ring:
     0 0 0 2px var(--action),
