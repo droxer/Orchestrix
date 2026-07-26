@@ -89,10 +89,32 @@ export function phaseDividerLabel(
   return null;
 }
 
+// A JSONL line carrying an agent-protocol envelope. Used to place an agent log
+// that arrived without stream markers: stream records are the agent's own
+// output, so filing them as stderr would render a healthy run as a wall of
+// warnings.
+function looksLikeAgentStream(text: string): boolean {
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("{")) continue;
+    try {
+      const value = JSON.parse(trimmed) as unknown;
+      if (value && typeof value === "object" && "type" in (value as Record<string, unknown>)) return true;
+    } catch {
+      // Not a complete JSON line; keep looking.
+    }
+  }
+  return false;
+}
+
 function streamsFromAgentLog(agentLog: string): { stdout: string; stderr: string } {
   if (!agentLog.trim()) return { stdout: "", stderr: "" };
   const matches = Array.from(agentLog.matchAll(/(?:^|\n)(stdout|stderr):\n/g));
-  if (matches.length === 0) return { stdout: "", stderr: agentLog };
+  if (matches.length === 0) {
+    return looksLikeAgentStream(agentLog)
+      ? { stdout: agentLog, stderr: "" }
+      : { stdout: "", stderr: agentLog };
+  }
 
   const streams = { stdout: "", stderr: "" };
   for (let i = 0; i < matches.length; i += 1) {

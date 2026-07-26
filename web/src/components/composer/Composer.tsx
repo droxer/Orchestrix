@@ -13,6 +13,8 @@ export type ComposerHandle = {
   clear: () => void;
   focus: () => void;
   getText: () => string;
+  /** Put text back in the box — used to return a message a failed send ate. */
+  setText: (text: string) => void;
 };
 
 // Message composer: textarea, agent and mode controls, and the send/cancel
@@ -70,6 +72,7 @@ const ComposerView = forwardRef<ComposerHandle, {
     clear: () => setComposerText(""),
     focus: () => textareaRef.current?.focus(),
     getText: () => composerText,
+    setText: (text: string) => setComposerText(text),
   }), [composerText, setComposerText, textareaRef]);
 
   return (

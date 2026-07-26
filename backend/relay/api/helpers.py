@@ -12,6 +12,7 @@ from typing import Any
 
 from fastapi import HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse
+from loguru import logger
 
 from ..core.models import AGENT_NAMES
 from ..daemon_registry import DaemonNodeRegistry, daemon_node_token_matches, sandbox_ui_token_matches, workspace_paths_match
@@ -481,7 +482,21 @@ def daemon_node_event(value: dict[str, Any]) -> dict[str, Any]:
     if event_type == "run.completed":
         if not isinstance(value.get("exitCode"), (int, float)):
             raise ValueError("daemon node run.completed exitCode must be a finite number.")
-        token_usage = token_usage_field(value)
+        # Usage counts are telemetry riding along on the one terminal event a
+        # daemon sends. Rejecting the event over them strands the run: the
+        # daemon drops the report, the session stays "running", and — runs
+        # being exclusive per node — the node refuses every later dispatch
+        # until the run timeout reaps it. Drop the counts, keep the run.
+        try:
+            token_usage = token_usage_field(value)
+        except ValueError as error:
+            logger.warning(
+                "Discarded unusable daemon token usage",
+                session_id=session_id,
+                run_id=run_id,
+                error=str(error),
+            )
+            token_usage = None
         # Passed through raw; the registry sanitizes each entry (path
         # confinement, extension allowlist, content caps) before indexing.
         generated_files = value.get("generatedFiles")
