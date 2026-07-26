@@ -409,15 +409,16 @@
   transform: none;
 }
 
+/* Stop state keeps the same solid plate as send — the send↔stop transition
+   is only a glyph swap, so the composer's primary control never changes
+   silhouette. The solid square alone carries the "stop" meaning. */
 .send-button.send-button-cancel {
-  background: var(--surface-0);
-  border-color: color-mix(in srgb, var(--err) 32%, transparent);
-  color: var(--err);
+  background: var(--action);
+  color: var(--on-action);
 }
 
 .send-button.send-button-cancel:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--err) 6%, var(--surface-0));
-  border-color: var(--err);
+  background: var(--action-hover);
 }
 
 .send-button.send-button-cancel:focus-visible {

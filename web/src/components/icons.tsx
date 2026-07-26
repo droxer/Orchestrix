@@ -53,6 +53,7 @@ import {
   Search,
   Server,
   Settings,
+  Square,
   Settings2,
   ShieldCheck,
   Sparkles,
@@ -125,6 +126,13 @@ export const ActionHandoff = withStandardStroke(Forward, "ActionHandoff");
 export const ActionRoute = withStandardStroke(ArrowRightLeft, "ActionRoute");
 export const ActionStart = withStandardStroke(Play, "ActionStart");
 export const ActionStop = withStandardStroke(CircleStop, "ActionStop");
+// Composer stop glyph — a solid square reads as "stop" instantly at small
+// sizes, where the outline circle-stop collapses into a fuzzy ring. Solid
+// fill, no stroke, so it sits cleanly on the filled plate.
+export const ComposerStop = forwardRef<SVGSVGElement, LucideProps>((props, ref) => (
+  <Square ref={ref} fill="currentColor" stroke="none" strokeWidth={0} aria-hidden="true" {...props} />
+));
+ComposerStop.displayName = "ComposerStop";
 export const ActionAddPerson = withStandardStroke(UserPlus, "ActionAddPerson");
 export const ActionRemove = withStandardStroke(X, "ActionRemove");
 export const ActionSearch = withStandardStroke(Search, "ActionSearch");

@@ -2,7 +2,7 @@ import { forwardRef, memo, useEffect, useImperativeHandle, useMemo, useState, ty
 import { useTranslation } from "react-i18next";
 import type { AgentName, AgentTaskMode, DaemonNodeMonitorRecord, EmployeeAgent } from "../../types";
 import { sendShortcutLabel } from "../../lib/sendShortcut";
-import { ActionSend, ActionStop } from "../icons";
+import { ActionSend, ComposerStop } from "../icons";
 import { ModeToggle } from "./ModeToggle";
 import { AgentSelect } from "./AgentSelect";
 import { useComposer } from "../../hooks/useComposer";
@@ -143,7 +143,7 @@ const ComposerView = forwardRef<ComposerHandle, {
                 title={running ? t("composer.cancel_run") : sendShortcutTitle}
               >
                 <span className="send-button-icon" key={running ? "stop" : "send"}>
-                  {running ? <ActionStop size={16} /> : <ActionSend size={16} />}
+                  {running ? <ComposerStop size={13} /> : <ActionSend size={16} />}
                 </span>
               </button>
             </div>
