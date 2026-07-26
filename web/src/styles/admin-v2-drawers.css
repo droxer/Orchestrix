@@ -7,23 +7,24 @@
 }
 
 /* ── Drawers ──────────────────────────────────────────────────────── */
+/* Backdrop positioning/scrim/entrance come from .overlay-backdrop (always
+   paired in Drawer.tsx); this class only right-aligns the panel and layers it. */
 .adm-drawer-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-drawer);
-  display: flex;
   justify-content: flex-end;
+  z-index: var(--z-drawer);
 }
 
 .adm-drawer {
-  width: var(--adm-drawer-w, 520px);
+  width: min(var(--adm-drawer-w, 520px), 92vw);
   max-width: 100vw;
   height: 100%;
   display: flex;
   flex-direction: column;
   background: var(--surface-3);
   border-left: 1px solid var(--line-1);
-  animation: adm-slide-in var(--t-fast) var(--ease);
+  /* Entrances cross real distance → --t-slow (see palette.css motion note);
+     the underlay recess is a state change → stays --t-fast. */
+  animation: adm-slide-in var(--t-slow) var(--ease);
   overflow: hidden;
   transition:
     transform var(--t-fast) var(--ease),
@@ -36,21 +37,19 @@
 }
 
 .adm-drawer.is-closing {
-  animation: adm-slide-out var(--t-fast) var(--ease) forwards;
-}
-
-.adm-drawer-backdrop.is-closing {
-  animation: overlay-backdrop-out var(--t-fast) var(--ease) forwards;
+  animation: adm-slide-out var(--t-slow) var(--ease) forwards;
 }
 
 @keyframes adm-slide-in {
-  from { transform: translateX(24px); opacity: 0.4; }
+  from { transform: translateX(32px); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }
 }
 
+/* Exit: less travel than the entrance so dismissals read as a settle, not
+   a re-launch. */
 @keyframes adm-slide-out {
   from { transform: translateX(0); opacity: 1; }
-  to { transform: translateX(24px); opacity: 0.4; }
+  to { transform: translateX(16px); opacity: 0; }
 }
 
 .adm-drawer-head {
@@ -72,8 +71,9 @@
 .adm-drawer-kicker {
   margin: 0 0 var(--sp-1);
   font: var(--type-micro);
-  letter-spacing: var(--track-0);
-  color: var(--action);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--ink-3);
 }
 
 .adm-drawer-title {
@@ -90,9 +90,14 @@
 .adm-drawer-sub {
   margin: 0;
   font-size: var(--fs-3);
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   color: var(--ink-3);
   overflow-wrap: anywhere;
+}
+
+/* Opt-in for ID/handle subtitles (mono is code, IDs, logs — roles.css). */
+.adm-drawer-sub--mono {
+  font-family: var(--font-mono);
 }
 
 .adm-drawer-title-row {
@@ -970,14 +975,4 @@
   .adm-drawer { width: 100%; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .adm-drawer,
-  .adm-drawer.is-closing,
-  .adm-drawer-backdrop.is-closing {
-    animation: none;
-  }
-
-  .adm-drawer-backdrop.is-underlay .adm-drawer {
-    transition: none;
-  }
-}
+/* Reduced motion: covered by the global reset in a11y.css (loads last, wins). */

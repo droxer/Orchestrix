@@ -376,6 +376,7 @@ export function TaskDrawer({
       }}
       title={title}
       subtitle={subtitle}
+      subtitleMono={form.variant === "backlog" && Boolean(form.id)}
       width={form.variant === "routine" ? 600 : 560}
       closeLabel={t("dialog.cancel")}
       ariaLabel={title}

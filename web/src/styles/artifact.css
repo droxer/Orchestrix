@@ -585,14 +585,7 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .artifact-index-panel,
-  .artifact-index-btn,
-  .artifact-index-row,
-  .artifact-preview-action-btn {
-    transition: none;
-  }
-}
+/* Reduced motion: covered by the global reset in a11y.css (loads last, wins). */
 
 .artifact-library-drawer-body {
   padding: 0;

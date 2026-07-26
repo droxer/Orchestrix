@@ -15,6 +15,8 @@ export interface DrawerProps {
   onClose: () => void;
   title: ReactNode;
   subtitle?: ReactNode;
+  /** Render the subtitle in the mono face — for ID/handle subtitles. */
+  subtitleMono?: boolean;
   kicker?: ReactNode;
   width?: number;
   children: ReactNode;
@@ -32,6 +34,7 @@ export function Drawer({
   onClose,
   title,
   subtitle,
+  subtitleMono = false,
   kicker,
   width = 520,
   children,
@@ -126,7 +129,11 @@ export function Drawer({
           <div className="adm-drawer-head-text">
             {kicker ? <p className="adm-drawer-kicker">{kicker}</p> : null}
             <h2 id={titleId} className="adm-drawer-title">{title}</h2>
-            {subtitle ? <p id={subtitleId} className="adm-drawer-sub">{subtitle}</p> : null}
+            {subtitle ? (
+              <p id={subtitleId} className={`adm-drawer-sub${subtitleMono ? " adm-drawer-sub--mono" : ""}`}>
+                {subtitle}
+              </p>
+            ) : null}
           </div>
           <OverlayCloseButton
             label={closeLabel}
