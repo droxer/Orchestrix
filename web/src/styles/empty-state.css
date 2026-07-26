@@ -36,7 +36,7 @@
   right: -0.12em;
   bottom: -0.28em;
   z-index: -1;
-  font-family: var(--font-sans);
+  font-family: var(--font-display);
   font-size: clamp(160px, 24vw, 320px);
   font-weight: 400;
   line-height: 1;
@@ -121,8 +121,7 @@ html[data-theme="dark"] .relay-bleed-mark {
 .relay-empty-hint {
   margin: var(--sp-1) 0 0;
   font: var(--type-label);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
+  letter-spacing: var(--track-0);
   color: var(--ink-3);
 }
 

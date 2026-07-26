@@ -49,8 +49,7 @@
 .dialog-kicker {
   margin: 0;
   font: var(--type-micro);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
+  letter-spacing: var(--track-0);
   color: var(--err);
 }
 

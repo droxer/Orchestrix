@@ -22,6 +22,7 @@ function findRepoRoot(): string {
 
 const repoRoot = findRepoRoot();
 const readStyle = (rel: string) => readFileSync(path.join(repoRoot, STYLES_DIR, rel), "utf8");
+const readWebSource = (rel: string) => readFileSync(path.join(repoRoot, "web", "src", rel), "utf8");
 
 const palette = readStyle("tokens/palette.css");
 const lightMarker = 'html[data-theme="light"]';
@@ -131,5 +132,39 @@ describe("monochrome theme-picker swatches", () => {
   it("drops the steel-blue swatch accents", () => {
     assert.ok(!preferences.includes("#33689e"), "preferences.css still contains #33689e");
     assert.ok(!preferences.includes("#6ba1d4"), "preferences.css still contains #6ba1d4");
+  });
+});
+
+describe("theme color ownership", () => {
+  const appStorage = readWebSource("lib/appStorage.ts");
+  const layout = readWebSource("app/layout.tsx");
+
+  it("derives browser chrome from the active canvas token", () => {
+    assert.match(appStorage, /getPropertyValue\(["']--surface-0["']\)/);
+    assert.match(layout, /getPropertyValue\(["']--surface-0["']\)/);
+  });
+
+  it("does not duplicate palette hexes in theme runtime code", () => {
+    assert.ok(!/#[0-9a-fA-F]{3,8}\b/.test(appStorage), "appStorage.ts must not contain raw theme colors");
+    assert.ok(!/#[0-9a-fA-F]{3,8}\b/.test(layout), "layout.tsx must not contain raw theme colors");
+    assert.doesNotMatch(layout, /themeColor\s*:/);
+  });
+});
+
+describe("workspace status colors", () => {
+  const workspace = readStyle("workspace.css");
+
+  it("uses the neutral info token instead of the action token", () => {
+    assert.match(workspace, /\.workspace-status-pip\.tone-info\s*\{\s*color:\s*var\(--info\);\s*\}/);
+    assert.match(workspace, /\.workspace-status-pill\.tone-info\s*\{\s*color:\s*var\(--info\);\s*\}/);
+  });
+
+  it("renders status pills as outlined labels without tinted fills", () => {
+    assert.match(workspace, /\.workspace-status-pill\s*\{[^}]*border:\s*1px solid currentColor;[^}]*background:\s*transparent;/s);
+    for (const tone of ["good", "info", "warn", "bad", "neutral"]) {
+      const rule = workspace.match(new RegExp(`\\.workspace-status-pill\\.tone-${tone}\\s*\\{([^}]*)\\}`));
+      assert.ok(rule, `missing ${tone} workspace status rule`);
+      assert.ok(!rule[1].includes("background"), `${tone} workspace status must not use a tinted fill`);
+    }
   });
 });

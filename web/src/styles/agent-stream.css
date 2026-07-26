@@ -20,8 +20,7 @@
   color: var(--ink-3);
   font-size: var(--fs-2);
   font-weight: 600;
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
+  letter-spacing: var(--track-0);
 }
 
 .collaboration-node {

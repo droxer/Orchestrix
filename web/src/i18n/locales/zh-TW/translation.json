@@ -853,9 +853,8 @@
   },
   "transcript": {
     "new_session": "新工作階段",
-    "ready_for": "傳送訊息以開始。",
+    "ready_for": "傳送訊息。",
     "ready_no_employee": "為 {{agent}} 選擇員工工作區。",
-    "hint_agent_picker": "使用 Agent 選單切換 Agent",
     "awaiting_first": "等待首則訊息",
     "phase_agent": "{{mode}}",
     "phase_handoff": "移交 · {{mode}}"

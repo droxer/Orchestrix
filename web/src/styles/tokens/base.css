@@ -6,6 +6,7 @@
   background: var(--surface-0);
   color: var(--ink-1);
   font-family: var(--font-sans);
+  font-optical-sizing: auto;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -198,8 +199,7 @@ button[data-slot="button"][data-variant="link"] {
   margin: 0;
   color: var(--ink-3);
   font: var(--type-micro);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
+  letter-spacing: var(--track-0);
 }
 
 /* Status tone driver — tone classes only set the variable; consumers

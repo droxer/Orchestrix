@@ -57,7 +57,6 @@ export function ThreadListPanel({
     <aside id="thread-panel" className="thread-panel" aria-label={t("nav.threads")} tabIndex={-1}>
       <div className="conversation-header">
         <div className="conversation-heading">
-          <span className="conversation-heading-eyebrow">{t("nav.threads")}</span>
           <h1>
             {t("nav.threads")}
             <small className="mono conversation-heading-count">

@@ -161,8 +161,7 @@
 .pref-group-label {
   margin: 0 0 var(--sp-3);
   font: var(--type-micro);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
+  letter-spacing: var(--track-0);
   color: var(--ink-3);
 }
 

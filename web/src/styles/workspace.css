@@ -413,7 +413,9 @@
   align-items: center;
   gap: var(--sp-2);
   min-height: 22px;
+  border: 1px solid currentColor;
   border-radius: var(--r-2);
+  background: transparent;
   padding: 0 var(--sp-3);
   font: var(--type-label-strong);
 }
@@ -430,16 +432,16 @@
 }
 
 .workspace-status-pip.tone-good { color: var(--ok); }
-.workspace-status-pip.tone-info { color: var(--action); }
+.workspace-status-pip.tone-info { color: var(--info); }
 .workspace-status-pip.tone-warn { color: var(--warn); }
 .workspace-status-pip.tone-bad { color: var(--err); }
 .workspace-status-pip.tone-neutral { color: var(--ink-3); }
 
-.workspace-status-pill.tone-good { color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); }
-.workspace-status-pill.tone-info { color: var(--action); background: color-mix(in srgb, var(--action) 12%, transparent); }
-.workspace-status-pill.tone-warn { color: var(--warn); background: color-mix(in srgb, var(--warn) 12%, transparent); }
-.workspace-status-pill.tone-bad { color: var(--err); background: color-mix(in srgb, var(--err) 12%, transparent); }
-.workspace-status-pill.tone-neutral { color: var(--ink-3); background: color-mix(in srgb, var(--ink-3) 10%, transparent); }
+.workspace-status-pill.tone-good { color: var(--ok); }
+.workspace-status-pill.tone-info { color: var(--info); }
+.workspace-status-pill.tone-warn { color: var(--warn); }
+.workspace-status-pill.tone-bad { color: var(--err); }
+.workspace-status-pill.tone-neutral { color: var(--ink-3); }
 
 /* ---- browse pane: files + snapshot banner --------------------------- */
 
@@ -872,9 +874,9 @@
 .workspace-empty-state-title {
   margin: 0;
   color: var(--ink-1);
-  font-family: var(--font-sans);
+  font-family: var(--font-display);
   font-size: var(--fs-5);
-  font-weight: 500;
+  font-weight: 550;
   letter-spacing: var(--track-tight);
   line-height: 1.2;
 }
@@ -1060,9 +1062,8 @@
 .workspace-dossier-intro > span {
   color: var(--action);
   font: var(--type-micro);
-  font-weight: 650;
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: var(--track-0);
 }
 
 .workspace-dossier-status {
@@ -1560,8 +1561,7 @@
   margin-bottom: 3px;
   color: var(--ink-3);
   font: var(--type-micro);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
+  letter-spacing: var(--track-0);
 }
 
 .workspace-identity-value {
@@ -1612,8 +1612,7 @@
   margin: 0 0 var(--sp-3);
   color: var(--ink-3);
   font: var(--type-micro);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
+  letter-spacing: var(--track-0);
 }
 
 /* ---- loading skeleton + error -------------------------------------- */
@@ -1662,8 +1661,7 @@
   margin-bottom: var(--sp-2);
   color: var(--ink-3);
   font: var(--type-micro);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
+  letter-spacing: var(--track-0);
 }
 
 .workspace-error p {

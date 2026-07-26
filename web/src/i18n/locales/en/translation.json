@@ -853,9 +853,8 @@
   },
   "transcript": {
     "new_session": "New session",
-    "ready_for": "Send a message to start.",
+    "ready_for": "Send a message.",
     "ready_no_employee": "Select an employee workspace for {{agent}}.",
-    "hint_agent_picker": "Use the agent menu to switch agents",
     "awaiting_first": "waiting for first message",
     "phase_agent": "{{mode}}",
     "phase_handoff": "Handoff · {{mode}}"

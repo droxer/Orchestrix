@@ -3,7 +3,7 @@
 .thread-panel {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
-  gap: var(--sp-4);
+  gap: var(--sp-3);
   padding: var(--sp-4) 0 0;
   border-right: 1px solid var(--line-1);
   background: var(--surface-0);
@@ -19,16 +19,7 @@
 
 .conversation-heading {
   display: flex;
-  flex-direction: column;
-  gap: var(--sp-0-5);
-}
-
-.conversation-heading-eyebrow {
-  font: var(--type-micro);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
-  color: var(--ink-3);
-  line-height: 1;
+  align-items: center;
 }
 
 .conversation-heading h1 {
@@ -118,7 +109,7 @@
   gap: var(--sp-3);
   flex: 1;
   min-width: 0;
-  min-height: 68px;
+  min-height: 60px;
   padding: var(--sp-row) var(--sp-4);
   border: 0;
   border-radius: 0;
@@ -188,12 +179,13 @@
 }
 
 .conversation-row-actions {
+  position: absolute;
+  top: 50%;
+  right: var(--sp-2);
+  transform: translateY(-50%);
   display: flex;
   align-items: center;
-  align-self: center;
-  flex-shrink: 0;
   gap: var(--sp-0-5);
-  padding-right: var(--sp-3);
 }
 
 .conversation-rename-btn,
@@ -233,6 +225,15 @@
 .conversation-rename-btn:focus-visible,
 .conversation-remove-btn:focus-visible {
   opacity: 1;
+}
+
+.conversation-stamp {
+  transition: opacity var(--t-fast) var(--ease);
+}
+
+.conversation-row:hover .conversation-stamp,
+.conversation-row:focus-within .conversation-stamp {
+  opacity: 0;
 }
 
 /* No hover on touch — the row actions stay visible instead of hiding
@@ -356,8 +357,7 @@
   gap: var(--sp-2);
   padding: var(--sp-2) var(--sp-4) var(--sp-1);
   font: var(--type-label);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
+  letter-spacing: var(--track-0);
   color: var(--ink-3);
 }
 
