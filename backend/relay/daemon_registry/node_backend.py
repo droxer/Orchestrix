@@ -179,6 +179,7 @@ class ServerDaemonNodeBackend:
             payload.get("workspacePath"),
             payload.get("sandboxMode") or "boxlite",
             payload.get("nodeLocation"),
+            payload.get("displayName"),
         )
         return {
             **sandbox,

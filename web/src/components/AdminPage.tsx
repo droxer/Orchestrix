@@ -8,7 +8,7 @@ import { useTranslation } from "react-i18next";
 import { useMutationError } from "../hooks/useMutationError";
 import { Button } from "@/components/ui/button";
 import { ActionAddPerson, AdminNode, NavRefresh } from "./icons";
-import { deleteControlPanelDaemonNode, deleteControlPanelEmployee, deleteManagedNode, getAuthStatus, getMe, listManagedNodes, permanentlyDeleteManagedNode, unassignControlPanelDaemonNode } from "../api";
+import { deleteControlPanelDaemonNode, deleteControlPanelEmployee, deleteManagedNode, getAuthStatus, getMe, listManagedNodes, permanentlyDeleteManagedNode, unassignControlPanelDaemonNode, updateComputerDisplayName, updateManagedNodeDisplayName } from "../api";
 import type {
   AssignControlPanelDaemonNodeResponse,
   ControlPanelDaemonNodeRecord,
@@ -36,6 +36,7 @@ import { useAdminNodes } from "../hooks/useAdminNodes";
 import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { useRelayStore } from "../lib/store";
 import { CONTROL_PANEL_POLL_MS } from "../lib/controlPanelQueries";
+import { useDialogs } from "./ui/DialogProvider";
 import {
   HIGHLIGHT_PULSE_MS,
   persistStoredNodeTokenMap,
@@ -55,6 +56,7 @@ function parseAdminView(value: string | null): AdminView {
 
 export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null }) {
   const { t } = useTranslation();
+  const { prompt } = useDialogs();
   const { reportMutationError } = useMutationError();
 
   // App only mounts this component for an authenticated admin, so seed the auth
@@ -208,6 +210,46 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
       ...prev,
       nodes: prev.nodes.map((current) => (current.id === updated.id ? updated : current)),
     }));
+  }
+
+  async function handleRenameNode(node: ControlPanelDaemonNodeRecord) {
+    const current = node.displayName?.trim() && node.displayName !== node.id
+      ? node.displayName.trim()
+      : "";
+    const result = await prompt({
+      title: t("thread.rename_computer"),
+      message: t("thread.rename_computer_message", { id: node.id }),
+      defaultValue: current,
+      placeholder: t("thread.computer_name_placeholder"),
+      confirmLabel: t("thread.rename"),
+    });
+    if (result === null) return;
+    const displayName = result.trim();
+    if (displayName === current) return;
+    try {
+      if (node.managedNodeId) {
+        const updated = await updateManagedNodeDisplayName(
+          node.managedNodeId,
+          displayName || null,
+        );
+        handleNodeUpdated({
+          ...node,
+          displayName: updated.node.displayName || node.id,
+        });
+      } else {
+        const updated = await updateComputerDisplayName(
+          node.id,
+          displayName || null,
+        );
+        handleNodeUpdated({ ...node, ...updated.node });
+      }
+    } catch (error) {
+      reportMutationError(
+        "Failed to rename computer",
+        error,
+        t("errors.rename_computer"),
+      );
+    }
   }
 
   async function handleUnassignNode(node: ControlPanelDaemonNodeRecord) {
@@ -486,6 +528,7 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
                     layout={layout}
                     onLayoutChange={setLayout}
                     onRevealCredentials={handleRevealCredentials}
+                    onRenameNode={(node) => void handleRenameNode(node)}
                     onManageExecutors={handleManageExecutors}
                     onDeleteNode={handleDeleteNode}
                     onAddNode={() => setAddNodeOpen(true)}

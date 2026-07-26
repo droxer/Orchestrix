@@ -1,6 +1,8 @@
 import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import type { DaemonNodeMonitorRecord } from "../../types";
+import { ActionEdit } from "../icons";
+import { Button } from "../ui/button";
 import { nodeOwnershipProfile } from "../../lib/adminHelpers";
 import { nodeOwnershipIcon } from "../admin/NodeProfileBadges";
 import {
@@ -71,6 +73,7 @@ export const ThreadRuntimeSelect = memo(function ThreadRuntimeSelect({
   value,
   selectedNode,
   onValueChange,
+  onRename,
 }: {
   nodes: DaemonNodeMonitorRecord[];
   value: string | null;
@@ -83,6 +86,7 @@ export const ThreadRuntimeSelect = memo(function ThreadRuntimeSelect({
    */
   selectedNode: DaemonNodeMonitorRecord | null;
   onValueChange: (nodeId: string) => void;
+  onRename: (node: DaemonNodeMonitorRecord) => void;
 }) {
   const { t } = useTranslation();
   const selected = nodes.find((node) => node.id === value) ?? selectedNode ?? undefined;
@@ -146,6 +150,19 @@ export const ThreadRuntimeSelect = memo(function ThreadRuntimeSelect({
           })}
         </SelectContent>
       </Select>
+      <Button
+        type="button"
+        variant="ghost"
+        className="thread-runtime-rename"
+        disabled={!selected}
+        aria-label={t("thread.rename_computer")}
+        title={t("thread.rename_computer")}
+        onClick={() => {
+          if (selected) onRename(selected);
+        }}
+      >
+        <ActionEdit size={13} aria-hidden="true" />
+      </Button>
     </div>
   );
 });

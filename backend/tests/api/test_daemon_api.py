@@ -1105,6 +1105,7 @@ def test_control_panel_creates_local_mode_daemon_node(monkeypatch) -> None:
 
         response = client.post("/cp/daemon-nodes", json={
             "employeeId": "alice",
+            "displayName": "Alice's MacBook",
             "workspacePath": "/workspace/alice",
             "sandboxMode": "none",
             "nodeLocation": "employee-device",
@@ -1114,6 +1115,7 @@ def test_control_panel_creates_local_mode_daemon_node(monkeypatch) -> None:
         body = response.json()
         assert body["node"]["sandboxMode"] == "none"
         assert body["node"]["nodeLocation"] == "employee-device"
+        assert body["node"]["displayName"] == "Alice's MacBook"
         assert "--sandbox none" in body["daemonCommand"]
         assert "--use-local-agent-home" in body["daemonCommand"]
         assert body["nodeToken"] not in body["daemonCommand"]
@@ -1192,13 +1194,18 @@ def test_employee_can_create_own_device_enrollment(monkeypatch) -> None:
 
         response = client.post(
             "/daemon-nodes/local-enrollment",
-            json={"workspacePath": "/Users/alice/project", "sandboxMode": "boxlite"},
+            json={
+                "displayName": "Travel Laptop",
+                "workspacePath": "/Users/alice/project",
+                "sandboxMode": "boxlite",
+            },
         )
 
         assert response.status_code == 201
         body = response.json()
         assert body["node"]["employeeId"] == "alice"
         assert body["node"]["nodeLocation"] == "employee-device"
+        assert body["node"]["displayName"] == "Travel Laptop"
         assert body["node"]["workspacePath"] == "/Users/alice/project"
         assert body["nodeToken"] not in body["daemonCommand"]
 
@@ -1414,6 +1421,251 @@ def test_employee_can_ask_assigned_daemon_node_without_daemon_node_token(monkeyp
             "reason": "not alice's session",
         })
         assert alice_cancel_bob.status_code == 400
+
+
+def test_employee_can_name_owned_computer_and_name_survives_heartbeat(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        admin_client = TestClient(app)
+        _bootstrap_admin(admin_client)
+        _login_admin(admin_client)
+        _create_user(admin_client, "alice", employee_id="alice")
+
+        registered = admin_client.post(
+            "/daemon-nodes/register",
+            json={
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "workspaceId": "mch_alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            },
+            headers={"Authorization": "Bearer ui_token"},
+        )
+        assert registered.status_code == 200
+
+        alice_client = TestClient(app)
+        _login(alice_client, "alice", "userpass")
+        renamed = alice_client.patch(
+            "/daemon-nodes/sbx_alice",
+            json={"displayName": "  Office Mac Studio  "},
+        )
+
+        assert renamed.status_code == 200
+        renamed_node = renamed.json()["node"]
+        assert renamed_node["displayName"] == "Office Mac Studio"
+        assert renamed_node["online"] is True
+        assert renamed_node["activeRuns"] == []
+        assert renamed_node["queuedCommandCount"] == 0
+        for secret_field in (
+            "token",
+            "tokenHash",
+            "uiTokenHash",
+            "nodeToken",
+            "nodeTokenHash",
+        ):
+            assert secret_field not in renamed_node
+        assert alice_client.get("/daemon-nodes").json()["nodes"][0]["displayName"] == "Office Mac Studio"
+        assert "displayName" not in TestClient(app).get("/daemon-nodes").json()["nodes"][0]
+        assert "displayName" not in TestClient(app).get("/sandboxes").json()["sandboxes"][0]
+
+        heartbeat = admin_client.post(
+            "/daemon-nodes/register",
+            json={
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "workspaceId": "mch_alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            },
+            headers={"Authorization": "Bearer ui_token"},
+        )
+        assert heartbeat.status_code == 200
+        assert heartbeat.json()["displayName"] == "Office Mac Studio"
+
+        replacement = admin_client.post(
+            "/daemon-nodes/register",
+            json={
+                "sandboxId": "sbx_alice_replacement",
+                "employeeId": "alice",
+                "token": "replacement_node_token",
+                "workspacePath": "/workspace/another-project",
+                "workspaceId": "mch_alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            },
+            headers={"Authorization": "Bearer replacement_ui_token"},
+        )
+        assert replacement.status_code == 200
+        assert replacement.json()["displayName"] == "Office Mac Studio"
+
+        restarted = TestClient(create_app(root))
+        _login(restarted, "alice", "userpass")
+        assert restarted.get("/daemon-nodes").json()["nodes"][0]["displayName"] == "Office Mac Studio"
+
+
+def test_computer_naming_enforces_ownership_and_validates_names(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        admin_client = TestClient(app)
+        _bootstrap_admin(admin_client)
+        _login_admin(admin_client)
+        _create_user(admin_client, "alice", employee_id="alice")
+        _create_user(admin_client, "bob", employee_id="bob")
+        for employee_id in ("alice", "bob"):
+            response = admin_client.post(
+                "/daemon-nodes/register",
+                json={
+                    "sandboxId": f"sbx_{employee_id}",
+                    "employeeId": employee_id,
+                    "token": f"{employee_id}_node_token",
+                    "protocolVersion": 1,
+                    "supportedAgents": ["codex"],
+                    "status": "ready",
+                },
+                headers={"Authorization": f"Bearer {employee_id}_ui_token"},
+            )
+            assert response.status_code == 200
+
+        alice_client = TestClient(app)
+        _login(alice_client, "alice", "userpass")
+        assert alice_client.patch(
+            "/daemon-nodes/sbx_bob", json={"displayName": "Not mine"}
+        ).status_code == 403
+        assert {
+            node["id"] for node in alice_client.get("/sandboxes").json()["sandboxes"]
+        } == {"sbx_alice"}
+        assert alice_client.patch(
+            "/daemon-nodes/sbx_alice", json={"displayName": "   "}
+        ).status_code == 400
+        assert alice_client.patch(
+            "/daemon-nodes/sbx_alice", json={"displayName": "Line\nbreak"}
+        ).status_code == 400
+        assert alice_client.patch(
+            "/daemon-nodes/sbx_alice", json={"displayName": "x" * 65}
+        ).status_code == 400
+        assert alice_client.patch(
+            "/daemon-nodes/sbx_alice",
+            json={"displayName": "Laptop", "employeeId": "bob"},
+        ).status_code == 400
+
+        daemon_client = TestClient(app)
+        assert daemon_client.patch(
+            "/daemon-nodes/sbx_alice",
+            json={"displayName": "Daemon controlled"},
+            headers={"Authorization": "Bearer alice_node_token"},
+        ).status_code == 401
+
+        renamed_by_admin = admin_client.patch(
+            "/daemon-nodes/sbx_bob", json={"displayName": "Bob's laptop"}
+        )
+        assert renamed_by_admin.status_code == 200
+        assert renamed_by_admin.json()["node"]["displayName"] == "Bob's laptop"
+
+        assert alice_client.patch(
+            "/daemon-nodes/sbx_alice", json={"displayName": "Alice's laptop"}
+        ).status_code == 200
+        reset = alice_client.patch(
+            "/daemon-nodes/sbx_alice", json={"displayName": None}
+        )
+        assert reset.status_code == 200
+        assert reset.json()["node"]["displayName"] == "sbx_alice"
+        heartbeat_after_reset = admin_client.post(
+            "/daemon-nodes/register",
+            json={
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "alice_node_token",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            },
+            headers={"Authorization": "Bearer alice_ui_token"},
+        )
+        assert heartbeat_after_reset.status_code == 200
+        assert "displayName" not in heartbeat_after_reset.json()
+
+
+def test_employee_renames_managed_computer_through_runtime_identity(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        admin_client = TestClient(app)
+        _bootstrap_admin(admin_client)
+        _login_admin(admin_client)
+        _create_user(admin_client, "alice", employee_id="alice")
+        managed = admin_client.post(
+            "/cp/managed-nodes",
+            json={"employeeId": "alice", "sandboxMode": "boxlite"},
+        ).json()["node"]
+        assert admin_client.patch(
+            f"/cp/managed-nodes/{managed['id']}",
+            json={"displayName": "   "},
+        ).status_code == 400
+        attempt = admin_client.post(
+            f"/cp/managed-nodes/{managed['id']}/attempts"
+        ).json()
+        enrolled = admin_client.post(
+            "/daemon-enroll",
+            json={"workspacePath": "/workspace/alice"},
+            headers={
+                "Authorization": f"Enrollment {attempt['enrollmentCredential']}"
+            },
+        ).json()
+        registered = admin_client.post(
+            "/daemon-nodes/register",
+            json={
+                "sandboxId": enrolled["sandboxId"],
+                "token": enrolled["token"],
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            },
+        )
+        assert registered.status_code == 200
+
+        alice_client = TestClient(app)
+        _login(alice_client, "alice", "userpass")
+        renamed = alice_client.patch(
+            f"/daemon-nodes/{enrolled['sandboxId']}",
+            json={"displayName": "Relay Cloud"},
+        )
+
+        assert renamed.status_code == 200
+        assert renamed.json()["node"]["displayName"] == "Relay Cloud"
+        assert app.state.managed_node_store.get_node(managed["id"])["displayName"] == "Relay Cloud"
+        assert alice_client.get("/daemon-nodes").json()["nodes"][0]["displayName"] == "Relay Cloud"
+        assert admin_client.get("/cp/daemon-nodes").json()["nodes"][0]["displayName"] == "Relay Cloud"
+
+        reset = alice_client.patch(
+            f"/daemon-nodes/{enrolled['sandboxId']}",
+            json={"displayName": None},
+        )
+        assert reset.status_code == 200
+        assert reset.json()["node"]["displayName"] == managed["id"]
+        assert app.state.managed_node_store.get_node(managed["id"])["displayName"] == managed["id"]
+
+        renamed_again = admin_client.patch(
+            f"/cp/managed-nodes/{managed['id']}",
+            json={"displayName": "Cloud workstation"},
+        )
+        assert renamed_again.status_code == 200
+        direct_reset = admin_client.patch(
+            f"/cp/managed-nodes/{managed['id']}",
+            json={"displayName": None},
+        )
+        assert direct_reset.status_code == 200
+        assert direct_reset.json()["node"]["displayName"] == managed["id"]
 
 
 def test_sandbox_run_accepts_decision_metadata(monkeypatch) -> None:

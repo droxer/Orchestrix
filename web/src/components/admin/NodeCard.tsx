@@ -43,6 +43,7 @@ interface NodeCardProps {
   storedTokens?: StoredNodeTokenMap;
   colocated?: boolean;
   onReveal: (node: ControlPanelDaemonNodeRecord) => void;
+  onRename: (node: ControlPanelDaemonNodeRecord) => void;
   onManageExecutors: (node: ControlPanelDaemonNodeRecord) => void;
   onDelete?: (node: ControlPanelDaemonNodeRecord) => Promise<void>;
   t: TFunction;
@@ -53,6 +54,7 @@ export function NodeCard({
   storedTokens = {},
   colocated = false,
   onReveal,
+  onRename,
   onManageExecutors,
   onDelete,
   t,
@@ -173,6 +175,7 @@ export function NodeCard({
           <NodeActions
             node={node}
             onReveal={onReveal}
+            onRename={onRename}
             onManageExecutors={onManageExecutors}
             onDelete={onDelete}
             deletePending={deletePending}

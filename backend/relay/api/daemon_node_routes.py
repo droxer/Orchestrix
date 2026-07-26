@@ -10,9 +10,26 @@ from loguru import logger
 
 from ..core.models import DaemonNodeRegistration
 from ..daemon_registry import public_sandbox_record
+from ..services.computer_names import (
+    normalize_computer_display_name,
+    present_computer,
+    rename_computer_for_actor,
+)
 from ..services.node_agents import sync_node_agents
 from .deps import AppContextDep
-from .helpers import actor_can_access_sandbox, authorized_sandbox_for_token, bearer_token, daemon_node_event, daemon_start_command, daemon_start_env, json_body, request_actor, request_actor_or_none, string_field, valid_employee_workspace_path
+from .helpers import (
+    actor_can_access_sandbox,
+    authorized_sandbox_for_token,
+    bearer_token,
+    daemon_node_event,
+    daemon_start_command,
+    daemon_start_env,
+    json_body,
+    request_actor,
+    request_actor_or_none,
+    string_field,
+    valid_employee_workspace_path,
+)
 
 router = APIRouter()
 WORKSPACE_EVENT_TYPES = frozenset({"workspace.listing", "workspace.file", "workspace.error"})
@@ -78,13 +95,44 @@ async def list_daemon_nodes(request: Request, ctx: AppContextDep) -> dict[str, A
     if token:
         nodes = ctx.registry.monitor_nodes_for_token(token)
         if nodes is not None:
-            return {"nodes": nodes}
+            return {"nodes": [present_computer(ctx, node) for node in nodes]}
     actor = request_actor_or_none(request, ctx.auth_store)
     if actor:
         nodes = [node for node in ctx.registry.monitor_nodes() if actor_can_access_sandbox(actor, node)]
-    else:
-        nodes = ctx.registry.monitor_nodes()
-    return {"nodes": nodes}
+        return {"nodes": [present_computer(ctx, node) for node in nodes]}
+    return {
+        "nodes": [
+            {key: value for key, value in node.items() if key != "displayName"}
+            for node in ctx.registry.monitor_nodes()
+        ]
+    }
+
+
+@router.patch("/daemon-nodes/{sandbox_id}")
+async def update_daemon_node(
+    sandbox_id: str, request: Request, ctx: AppContextDep
+) -> dict[str, Any]:
+    actor = request_actor(request, ctx.auth_store)
+    if not actor.get("user"):
+        raise HTTPException(401, "Authentication required.")
+    body = await json_body(request)
+    if set(body) != {"displayName"}:
+        raise HTTPException(400, "Only displayName can be updated.")
+    try:
+        updated = rename_computer_for_actor(
+            ctx, actor, sandbox_id, body.get("displayName")
+        )
+    except KeyError as error:
+        raise HTTPException(404, "Daemon node not found.") from error
+    except PermissionError as error:
+        raise HTTPException(403, "Daemon node access denied.") from error
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from error
+    monitor_node = next(
+        (node for node in ctx.registry.monitor_nodes() if node["id"] == sandbox_id),
+        public_sandbox_record(updated),
+    )
+    return {"node": present_computer(ctx, monitor_node)}
 
 
 @router.post("/daemon-nodes/local-enrollment", status_code=201)
@@ -95,6 +143,10 @@ async def create_local_device_enrollment(
     body = await json_body(request)
     workspace_path = string_field(body, "workspacePath")
     sandbox_mode = string_field(body, "sandboxMode") or "boxlite"
+    try:
+        display_name = normalize_computer_display_name(body.get("displayName"))
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from error
     if not valid_employee_workspace_path(workspace_path):
         raise HTTPException(
             400, "An absolute workspacePath on the employee device is required."
@@ -104,13 +156,16 @@ async def create_local_device_enrollment(
     node = ctx.backend.provision_daemon_node(
         {
             "employeeId": actor["employeeId"],
+            **({"displayName": display_name} if display_name else {}),
             "workspacePath": workspace_path,
             "sandboxMode": sandbox_mode,
             "nodeLocation": "employee-device",
         }
     )
     response: dict[str, Any] = {
-        "node": public_sandbox_record(ctx.registry.get(node["id"]) or node),
+        "node": present_computer(
+            ctx, public_sandbox_record(ctx.registry.get(node["id"]) or node)
+        ),
         "daemonEnv": daemon_start_env(request, node, sandbox_mode),
     }
     if node.get("sandboxToken"):

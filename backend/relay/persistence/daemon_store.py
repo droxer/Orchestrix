@@ -234,6 +234,26 @@ class LocalDaemonStore:
         )
         return updated
 
+    def update_node_display_name(
+        self, node_id: str, display_name: str | None
+    ) -> dict[str, Any]:
+        node = self.get_node(node_id)
+        if not node:
+            raise KeyError(node_id)
+        updated = {**node, "updatedAt": now_iso()}
+        if display_name:
+            updated["displayName"] = display_name
+        else:
+            updated.pop("displayName", None)
+        self._write_node(updated)
+        self.append_daemon_event(
+            daemon_event(
+                "daemon.node.display_name_updated",
+                {"nodeId": node_id, "displayName": display_name},
+            )
+        )
+        return updated
+
     def update_node_agent_role_defaults(
         self, node_id: str, role_defaults: dict[str, str]
     ) -> dict[str, Any]:
@@ -987,6 +1007,7 @@ class DatabaseDaemonStore:
         database_id_column(),
         Column("public_id", Text, nullable=False, unique=True),
         Column("employee_id", Text, nullable=True),
+        Column("display_name", Text, nullable=True),
         Column("workspace_path", Text, nullable=True),
         Column("workspace_id", Text, nullable=True),
         Column("sandbox_mode", Text, nullable=True),
@@ -1228,6 +1249,33 @@ class DatabaseDaemonStore:
                         "nodeId": node_id,
                         "disabledAgents": list(disabled_agents),
                     },
+                ),
+            )
+        return updated
+
+    def update_node_display_name(
+        self, node_id: str, display_name: str | None
+    ) -> dict[str, Any]:
+        node = self.get_node(node_id)
+        if not node:
+            raise KeyError(node_id)
+        updated = {**node, "updatedAt": now_iso()}
+        if display_name:
+            updated["displayName"] = display_name
+        else:
+            updated.pop("displayName", None)
+        with self.engine.begin() as conn:
+            node_pk = self._node_pk(conn, node_id)
+            conn.execute(
+                update(self.nodes)
+                .where(self.nodes.c.id == node_pk)
+                .values(**node_to_row(updated, database_id=node_pk))
+            )
+            self._append_daemon_event(
+                conn,
+                daemon_event(
+                    "daemon.node.display_name_updated",
+                    {"nodeId": node_id, "displayName": display_name},
                 ),
             )
         return updated
@@ -2275,6 +2323,7 @@ def node_to_row(
         "id": database_id or new_database_id(),
         "public_id": node["id"],
         "employee_id": node.get("employeeId"),
+        "display_name": node.get("displayName"),
         "workspace_path": node.get("workspacePath"),
         "workspace_id": node.get("workspaceId"),
         "sandbox_mode": node.get("sandboxMode"),
@@ -2308,6 +2357,7 @@ def row_to_node(row: Any) -> dict[str, Any]:
     return {
         "id": row["public_id"],
         **({"employeeId": row["employee_id"]} if row.get("employee_id") else {}),
+        **({"displayName": row["display_name"]} if row.get("display_name") else {}),
         **(
             {"workspacePath": row["workspace_path"]}
             if row.get("workspace_path")

@@ -7,6 +7,7 @@ export type DaemonNodeLocation = "employee-device" | "managed";
 
 export interface SandboxRecord {
   id: string;
+  displayName?: string;
   employeeId?: string;
   workspacePath?: string;
   sandboxMode?: DaemonNodeSandboxMode;
@@ -68,7 +69,6 @@ export interface DaemonNodeMonitorRecord extends Omit<SandboxRecord, "token" | "
 }
 
 export interface ControlPanelDaemonNodeRecord extends DaemonNodeMonitorRecord {
-  displayName?: string;
   provisioningPlaceholder?: boolean;
   nodeToken?: string;
 }

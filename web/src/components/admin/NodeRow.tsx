@@ -39,12 +39,13 @@ interface NodeRowProps {
   storedTokens: StoredNodeTokenMap;
   colocated: boolean;
   onReveal: (node: ControlPanelDaemonNodeRecord) => void;
+  onRename: (node: ControlPanelDaemonNodeRecord) => void;
   onManageExecutors: (node: ControlPanelDaemonNodeRecord) => void;
   onDelete?: (node: ControlPanelDaemonNodeRecord) => Promise<void>;
   t: TFunction;
 }
 
-export function NodeRow({ node, storedTokens, colocated, onReveal, onManageExecutors, onDelete, t }: NodeRowProps) {
+export function NodeRow({ node, storedTokens, colocated, onReveal, onRename, onManageExecutors, onDelete, t }: NodeRowProps) {
   const { deletePending, deleteError, handleDelete } = useNodeDelete(node, onDelete, t);
   const nodeName = node.displayName || node.id;
   const status = visualStatus(node);
@@ -129,6 +130,7 @@ export function NodeRow({ node, storedTokens, colocated, onReveal, onManageExecu
         <NodeActions
           node={node}
           onReveal={onReveal}
+          onRename={onRename}
           onManageExecutors={onManageExecutors}
           onDelete={onDelete}
           deletePending={deletePending}

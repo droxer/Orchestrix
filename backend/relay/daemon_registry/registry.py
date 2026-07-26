@@ -345,6 +345,9 @@ class DaemonNodeRegistry:
         prior_disabled = list((existing or {}).get("disabledAgents") or [])
         prior_role_defaults = dict((existing or {}).get("agentRoleDefaults") or {})
         prior_role_overrides = dict((existing or {}).get("agentRoleOverrides") or {})
+        prior_display_name = self._registration_display_name(
+            payload, employee_id, existing
+        )
         retired_at = (existing or {}).get("retiredAt")
         capacity_input = {
             **(
@@ -431,6 +434,7 @@ class DaemonNodeRegistry:
             ),
             **({"agentDetails": agent_details} if agent_details else {}),
             **({"agentInventory": agent_inventory} if agent_inventory else {}),
+            **({"displayName": prior_display_name} if prior_display_name else {}),
             **({"disabledAgents": prior_disabled} if prior_disabled else {}),
             **(
                 {"agentRoleDefaults": prior_role_defaults}
@@ -464,6 +468,35 @@ class DaemonNodeRegistry:
             agents={agent: status for agent, status in sandbox["agents"].items()},
         )
         return sandbox
+
+    def _registration_display_name(
+        self,
+        payload: dict[str, Any],
+        employee_id: str | None,
+        existing: dict[str, Any] | None,
+    ) -> str | None:
+        if existing is not None:
+            display_name = existing.get("displayName")
+            return str(display_name) if display_name else None
+        workspace_id = payload.get("workspaceId")
+        if not employee_id or not workspace_id:
+            return None
+        matches = [
+            node
+            for node in self.sandboxes.values()
+            if node["id"] != payload["sandboxId"]
+            and node.get("employeeId") == employee_id
+            and node.get("workspaceId") == workspace_id
+            and not node.get("managedNodeId")
+        ]
+        if not matches:
+            return None
+        matches.sort(
+            key=lambda node: node.get("updatedAt") or node.get("createdAt") or "",
+            reverse=True,
+        )
+        display_name = matches[0].get("displayName")
+        return str(display_name) if display_name else None
 
     def get(self, sandbox_id: str) -> dict[str, Any] | None:
         return self.sandboxes.get(sandbox_id)
@@ -616,6 +649,26 @@ class DaemonNodeRegistry:
         )
         return updated
 
+    def set_display_name(
+        self, sandbox_id: str, display_name: str | None
+    ) -> dict[str, Any]:
+        sandbox = self.sandboxes.get(sandbox_id)
+        if not sandbox:
+            raise KeyError(sandbox_id)
+        updated = {**sandbox, "updatedAt": now_iso()}
+        if display_name:
+            updated["displayName"] = display_name
+        else:
+            updated.pop("displayName", None)
+        self.sandboxes[sandbox_id] = updated
+        self.daemon_store.update_node_display_name(sandbox_id, display_name)
+        logger.info(
+            "Daemon node display name updated",
+            sandbox_id=sandbox_id,
+            display_name=display_name,
+        )
+        return updated
+
     def fence_managed_node(self, sandbox_id: str) -> dict[str, Any]:
         sandbox = self.sandboxes.get(sandbox_id)
         if not sandbox:
@@ -699,6 +752,7 @@ class DaemonNodeRegistry:
         workspace_path: str | None = None,
         sandbox_mode: str = "boxlite",
         node_location: str | None = "employee-device",
+        display_name: str | None = None,
     ) -> tuple[dict[str, Any], str | None, str | None]:
         if sandbox_mode not in DAEMON_SANDBOX_MODES:
             sandbox_mode = "boxlite"
@@ -711,6 +765,8 @@ class DaemonNodeRegistry:
                     updates["sandboxMode"] = sandbox_mode
                 if not existing.get("nodeLocation") and node_location:
                     updates["nodeLocation"] = node_location
+                if display_name and display_name != existing.get("displayName"):
+                    updates["displayName"] = display_name
                 if updates:
                     existing = {
                         **existing,
@@ -749,6 +805,7 @@ class DaemonNodeRegistry:
             "id": sandbox_id,
             **({"employeeId": employee_id} if employee_id else {}),
             **({"workspacePath": workspace_path} if workspace_path else {}),
+            **({"displayName": display_name} if display_name else {}),
             "sandboxMode": sandbox_mode,
             **({"nodeLocation": node_location} if node_location else {}),
             "status": "provisioning",

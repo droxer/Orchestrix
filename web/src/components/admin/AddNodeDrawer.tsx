@@ -44,6 +44,7 @@ export function AddNodeDrawer({
   const employeeLabelId = useId();
 
   const [nodeLocation, setNodeLocation] = useState<RunLocation>("managed");
+  const [displayName, setDisplayName] = useState("");
   const [sandboxMode, setSandboxMode] = useState<"boxlite" | "none">("boxlite");
   const [workspacePath, setWorkspacePath] = useState("");
   const [employeeId, setEmployeeId] = useState("");
@@ -56,7 +57,7 @@ export function AddNodeDrawer({
   const employeeTriggerRef = useRef<HTMLButtonElement>(null);
   const workspacePathRef = useRef<HTMLInputElement>(null);
   const isManaged = nodeLocation === "managed";
-  const hasUnsavedChanges = Boolean(employeeId || workspacePath || nodeLocation !== "managed");
+  const hasUnsavedChanges = Boolean(displayName || employeeId || workspacePath || nodeLocation !== "managed");
   const confirmDiscardChanges = useUnsavedChangesGuard(open && hasUnsavedChanges && !isBusy);
 
   const selectedEmployee = useMemo(
@@ -67,6 +68,7 @@ export function AddNodeDrawer({
   useEffect(() => {
     if (!open) {
       setNodeLocation("managed");
+      setDisplayName("");
       setSandboxMode("boxlite");
       setWorkspacePath("");
       setEmployeeId("");
@@ -103,12 +105,14 @@ export function AddNodeDrawer({
       if (isManaged) {
         const result = await createManagedNode({
           employeeId,
+          displayName: displayName.trim() || undefined,
           sandboxMode: "boxlite",
         });
         onSuccess({ kind: "managed", result });
       } else {
         const result = await createControlPanelDaemonNode({
           employeeId: employeeId || undefined,
+          displayName: displayName.trim() || undefined,
           workspacePath: workspacePath.trim(),
           sandboxMode,
           nodeLocation: "employee-device",
@@ -146,6 +150,19 @@ export function AddNodeDrawer({
               {t("admin.v2.run_mode")}
             </h3>
           </header>
+          <label className="adm-field">
+            <span>{t("admin.v2.computer_name")}</span>
+            <input
+              name="add-node-display-name"
+              autoComplete="off"
+              value={displayName}
+              onChange={(event) => setDisplayName(event.target.value)}
+              placeholder={t("admin.v2.computer_name_placeholder")}
+              maxLength={64}
+              disabled={isBusy}
+            />
+          </label>
+          <p className="adm-form-hint">{t("admin.v2.computer_name_hint")}</p>
           <RunModeField
             value={nodeLocation}
             onChange={(location) => {

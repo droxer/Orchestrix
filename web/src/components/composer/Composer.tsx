@@ -38,10 +38,11 @@ const ComposerView = forwardRef<ComposerHandle, {
   /** The computer an already-started thread is pinned to, shown read-only. */
   activeRuntimeNode: DaemonNodeMonitorRecord | null;
   onRuntimeNodeChange: (nodeId: string) => void;
+  onRenameComputer: (node: DaemonNodeMonitorRecord) => void;
   running: boolean;
   onSend: () => void;
   onCancelRun: () => void;
-}>(function Composer({ composerMode, setComposerMode, activeAgent, logicalAgents, activeLogicalAgentId, onLogicalAgentPicked, activeAgentDisplayName, selectedEmployee, initializingThread, runtimeNodes, runtimeNodeId, selectedRuntimeNode, activeRuntimeNode, onRuntimeNodeChange, running, onSend, onCancelRun }, ref) {
+}>(function Composer({ composerMode, setComposerMode, activeAgent, logicalAgents, activeLogicalAgentId, onLogicalAgentPicked, activeAgentDisplayName, selectedEmployee, initializingThread, runtimeNodes, runtimeNodeId, selectedRuntimeNode, activeRuntimeNode, onRuntimeNodeChange, onRenameComputer, running, onSend, onCancelRun }, ref) {
   const { t } = useTranslation();
   const composer = useComposer();
   const {
@@ -91,6 +92,7 @@ const ComposerView = forwardRef<ComposerHandle, {
           value={runtimeNodeId}
           selectedNode={selectedRuntimeNode}
           onValueChange={onRuntimeNodeChange}
+          onRename={onRenameComputer}
         />
       ) : activeRuntimeNode ? (
         <ThreadRuntimeReadout node={activeRuntimeNode} />

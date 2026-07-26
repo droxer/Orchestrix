@@ -5,6 +5,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request, Response
 
 from ..security.auth import require_admin_session
+from ..services.computer_names import normalize_computer_display_name
 from ..services.node_agents import assert_node_agent_runs_drained, remove_node_agents
 from .deps import AppContextDep
 from .helpers import json_body
@@ -24,8 +25,15 @@ def _admin_error(error: Exception) -> HTTPException:
 async def create_managed_node(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     try:
-        return {"node": ctx.managed_node_store.create_node(await json_body(request))}
+        payload = await json_body(request)
+        if "displayName" in payload:
+            payload["displayName"] = normalize_computer_display_name(
+                payload["displayName"]
+            )
+        return {"node": ctx.managed_node_store.create_node(payload)}
     except (KeyError, ValueError) as error:
+        if isinstance(error, ValueError) and "displayName" in str(error):
+            raise HTTPException(400, str(error)) from error
         raise _admin_error(error) from error
 
 
@@ -51,6 +59,12 @@ async def update_managed_node(node_id: str, request: Request, ctx: AppContextDep
     require_admin_session(request, ctx.auth_store)
     try:
         patch = await json_body(request)
+        if "displayName" in patch:
+            try:
+                display_name = normalize_computer_display_name(patch["displayName"])
+                patch["displayName"] = display_name or node_id
+            except ValueError as error:
+                raise HTTPException(400, str(error)) from error
         with ctx.registry.dispatch_lock:
             if patch.get("desiredState") in ("stopped", "deleted"):
                 existing = ctx.managed_node_store.get_node(node_id)

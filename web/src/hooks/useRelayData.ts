@@ -21,6 +21,7 @@ type RelayDataResult = {
   isRefreshing: boolean;
   refresh: (signal?: AbortSignal, tokenOverride?: string) => Promise<void>;
   setSandboxes: Dispatch<SetStateAction<SandboxRecord[]>>;
+  upsertNode: (node: DaemonNodeMonitorRecord) => void;
   upsertSession: (session: RelaySession) => void;
 };
 
@@ -150,6 +151,18 @@ export function useRelayData(
     [queryClient],
   );
 
+  const upsertNode = useCallback(
+    (node: DaemonNodeMonitorRecord) => {
+      queryClient.setQueryData<DaemonNodeMonitorRecord[]>(NODES_KEY, (current) => {
+        const nodes = current ?? [];
+        return nodes.some((candidate) => candidate.id === node.id)
+          ? nodes.map((candidate) => (candidate.id === node.id ? node : candidate))
+          : [...nodes, node];
+      });
+    },
+    [queryClient],
+  );
+
   return {
     sandboxes,
     nodes,
@@ -158,6 +171,7 @@ export function useRelayData(
     isRefreshing: manualRefreshPending,
     refresh,
     setSandboxes,
+    upsertNode,
     upsertSession,
   };
 }
