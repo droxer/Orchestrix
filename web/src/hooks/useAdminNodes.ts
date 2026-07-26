@@ -3,12 +3,11 @@ import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { listControlPanelEmployees } from "../api";
 import type { ControlPanelDaemonNodeRecord, EmployeeRecord } from "../types";
 import {
+  ADMIN_EMPLOYEES_KEY,
   CONTROL_PANEL_NODES_KEY,
   CONTROL_PANEL_POLL_MS,
   fetchControlPanelNodes,
 } from "../lib/controlPanelQueries";
-
-const ADMIN_EMPLOYEES_KEY = ["admin", "employees"] as const;
 
 export interface AdminNodes {
   nodes: ControlPanelDaemonNodeRecord[];

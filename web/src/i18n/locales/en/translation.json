@@ -110,7 +110,11 @@
     "delete_confirm": "Delete thread “{{name}}”?",
     "delete_message": "This permanently removes the thread and its history. This cannot be undone.",
     "statuses": {
-      "waiting_for_human": "Needs human"
+      "running": "Running",
+      "waiting_for_human": "Needs human",
+      "completed": "Completed",
+      "failed": "Failed",
+      "cancelled": "Cancelled"
     }
   },
   "composer": {
@@ -524,7 +528,7 @@
       "dash_kpi_employees": "Employees",
       "dash_kpi_employees_hint": "{{count}} employees.",
       "dash_kpi_nodes": "Nodes",
-      "dash_kpi_nodes_hint": "{{ready}} ready · {{failed}} failed",
+      "dash_kpi_nodes_hint": "{{ready}} ready · {{failed}} failed / stale",
       "dash_kpi_sessions": "Threads",
       "dash_kpi_sessions_delta": "{{count}} in 24h · {{diff}} vs prior",
       "dash_loading": "Loading…",

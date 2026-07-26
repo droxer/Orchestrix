@@ -124,7 +124,7 @@ export function ActivityChart({ daily, ready, className }: ActivityChartProps) {
             y={tick.y + 3}
             fontSize={10}
             textAnchor="end"
-            fill="var(--color-muted)"
+            fill="var(--color-muted-foreground)"
             fontFamily="var(--font-sans)"
           >
             {tick.value}
@@ -137,7 +137,7 @@ export function ActivityChart({ daily, ready, className }: ActivityChartProps) {
             y={HEIGHT - 8}
             fontSize={10}
             textAnchor="middle"
-            fill="var(--color-muted)"
+            fill="var(--color-muted-foreground)"
             fontFamily="var(--font-sans)"
           >
             {tick.label}

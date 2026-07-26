@@ -16,7 +16,7 @@ import {
   nodeScopedTeamIssue,
   teamMutationInput,
 } from "../lib/teamForm";
-import { compactDate } from "../lib/workspaceFormat";
+import { compactDate, compactDueDate } from "../lib/workspaceFormat";
 import type { AgentTeam, ArtifactIndexItem, WorkspaceBriefResponse, WorkspaceBriefSession, WorkspaceBriefTask } from "../types";
 import { ActionEdit, AdminDelete, NavRefresh, ViewBoard } from "./icons";
 import { AgentStateBadge } from "./AgentStateBadge";
@@ -553,7 +553,8 @@ function TeamActivities({ team, brief, onOpenThread }: { team: AgentTeam; brief:
                   <ActivityRow
                     title={sessionTitle(session)}
                     meta={[
-                      session.status ? t(`backlog.statuses.${session.status}`, { defaultValue: session.status }) : "",
+                      // Sessions carry SessionStatus — see sessionStatusLabel in AgentWorkspacePage.
+                      session.status ? t(`thread.statuses.${session.status}`, { defaultValue: session.status }) : "",
                       session.runCount ? t("workspace.session_runs", { count: session.runCount }) : "",
                       session.artifactCount ? t("workspace.session_artifacts", { count: session.artifactCount }) : "",
                       compactDate(session.updatedAt, i18n.language),
@@ -576,7 +577,7 @@ function TeamActivities({ team, brief, onOpenThread }: { team: AgentTeam; brief:
                       title={taskTitle(task)}
                       meta={[
                         task.status ? t(`backlog.statuses.${task.status}`, { defaultValue: task.status }) : "",
-                        task.dueDate ? t("workspace.task_due", { date: compactDate(task.dueDate, i18n.language) }) : "",
+                        task.dueDate ? t("workspace.task_due", { date: compactDueDate(task.dueDate, i18n.language) }) : "",
                         compactDate(task.updatedAt, i18n.language),
                       ].filter(Boolean).join(" · ")}
                       onClick={sessionId ? () => onOpenThread(sessionId) : undefined}
