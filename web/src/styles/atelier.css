@@ -36,14 +36,13 @@
   color: var(--ink-3);
   font: var(--type-micro);
   font-weight: 500;
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
+  letter-spacing: var(--track-0);
 }
 
 .chat-title h2,
 .adm-drawer-title {
-  font-family: var(--font-sans);
-  font-weight: 500;
+  font-family: var(--font-display);
+  font-weight: 550;
   letter-spacing: var(--track-tight);
   line-height: 1.1;
 }
@@ -142,14 +141,12 @@ body {
   border-radius: calc(var(--r-1) / 2);
   background: var(--action);
 }
-.sidenav-separator, .sidenav-bottom { border-color: var(--line-1); background-color: var(--line-1); }
 .sidenav-toggle { color: var(--ink-3); }
 .sidenav-panel[data-expanded="true"] .sidenav-btn { justify-content: flex-start; width: 100%; padding-inline: var(--sp-3); gap: var(--sp-3); }
 .sidenav-panel[data-expanded="true"] .sidenav-brand { padding-left: var(--sp-2); }
 
 .thread-panel { padding-top: var(--sp-4); background: var(--surface-0); border-right-color: var(--line-1); }
-.conversation-heading-eyebrow { color: var(--ink-3); font-weight: 500; letter-spacing: var(--track-caps); }
-.conversation-heading h1 { font-family: var(--font-sans); font-size: var(--fs-title); font-weight: 600; }
+.conversation-heading h1 { font-family: var(--font-display); font-size: var(--fs-title); font-weight: 550; }
 .conversation-list { border-top: 0; gap: var(--sp-0-5); padding: var(--sp-1) var(--sp-2) var(--sp-4); }
 .conversation-row { border: 0; border-radius: var(--r-2); overflow: hidden; }
 .conversation-row-inner { min-height: 64px; padding-inline: var(--sp-3); border-radius: inherit; }
@@ -225,8 +222,8 @@ html[data-theme="dark"] .rail-node { background: var(--surface-3); }
 
 .backlog-stat-value,
 .workspace-metric-item strong {
-  font-family: var(--font-sans);
-  font-weight: 500;
+  font-family: var(--font-display);
+  font-weight: 550;
   letter-spacing: var(--track-tight);
 }
 
@@ -320,8 +317,8 @@ html[data-theme="dark"] .rail-node { background: var(--surface-3); }
   }
 
   .mobile-topbar-title {
-    font-family: var(--font-sans);
-    font-weight: 500;
+    font-family: var(--font-display);
+    font-weight: 550;
     letter-spacing: var(--track-tight);
   }
 

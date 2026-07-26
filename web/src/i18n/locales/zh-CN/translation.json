@@ -853,9 +853,8 @@
   },
   "transcript": {
     "new_session": "新会话",
-    "ready_for": "发送消息以开始。",
+    "ready_for": "发送消息。",
     "ready_no_employee": "为 {{agent}} 选择员工工作区。",
-    "hint_agent_picker": "使用 Agent 菜单切换 Agent",
     "awaiting_first": "等待首条消息",
     "phase_agent": "{{mode}}",
     "phase_handoff": "移交 · {{mode}}"

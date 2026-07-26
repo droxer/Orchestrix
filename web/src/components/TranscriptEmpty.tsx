@@ -30,7 +30,6 @@ export function TranscriptEmpty({
       titleId="transcript-empty-headline"
       title={headline}
       body={descriptor.blurb}
-      hint={selectedEmployee ? t("transcript.hint_agent_picker") : undefined}
       illustration={(
         <span className="relay-empty-avatar agent-avatar" data-agent={activeAgent} aria-hidden="true">
           <AgentMark agent={activeAgent} size={28} />

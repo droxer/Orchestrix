@@ -44,9 +44,8 @@
   margin-top: var(--sp-3);
 }
 
-/* Stacked route titles — Geist --type-title.
-   is reserved for login/empty heroes; using it here made admin/channels/
-   agent-workspace headers read as oversized serif headlines. */
+/* Stacked route titles use the restrained Mona display tier rather than a
+   hero scale, keeping dense workspace headers compact. */
 .page-header-title--display {
   font: var(--type-title);
   letter-spacing: var(--track-tight);

@@ -30,30 +30,24 @@
   pointer-events: none;
 }
 
-/* New-thread runtime rail: environment is chosen before the conversation is
-   allowed to start. It borrows the reference's compact setup bar while staying
-   inside Relay's restrained operational palette. */
+/* Runtime control: environment stays visible beside agent and mode. Keeping
+   it in the footer removes a second floating card above the composer. */
 .thread-runtime-rail {
-  position: relative;
-  z-index: 1;
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
-  width: min(calc(100% - var(--sp-8)), 880px);
-  min-height: 46px;
-  margin: 0 auto -5px;
-  padding: 0 var(--sp-4) 5px;
+  gap: var(--sp-2);
+  min-width: 0;
+  min-height: 32px;
+  padding: 0 var(--sp-2);
   border: 1px solid var(--line-1);
-  border-bottom: 0;
-  border-radius: var(--r-3) var(--r-3) 0 0;
+  border-radius: var(--r-2);
   background: var(--surface-2);
   color: var(--ink-2);
-  box-shadow: var(--shadow-1);
 }
 
 .thread-runtime-context {
   color: var(--ink-3);
-  font: var(--type-label-strong);
+  font: var(--type-label);
   letter-spacing: var(--track-0);
   white-space: nowrap;
 }
@@ -65,7 +59,9 @@
 }
 
 .thread-runtime-select {
-  max-width: min(360px, 60vw);
+  max-width: min(240px, 34vw);
+  height: 28px;
+  padding-inline: var(--sp-1);
   border-color: transparent;
   background: transparent;
   color: var(--ink-1);
@@ -84,8 +80,8 @@
 
 .thread-runtime-rename {
   flex: 0 0 auto;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border-radius: var(--r-2);
   color: var(--ink-3);
@@ -196,13 +192,8 @@
   white-space: nowrap;
 }
 
-.thread-runtime-rail + .composer-input-wrap {
-  z-index: 2;
-}
-
 @media (max-width: 640px) {
   .thread-runtime-rail {
-    width: calc(100% - var(--sp-4));
     gap: var(--sp-2);
   }
 

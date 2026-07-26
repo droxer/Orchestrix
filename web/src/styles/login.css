@@ -61,7 +61,7 @@
 }
 
 .login-wordmark {
-  font-family: var(--font-sans);
+  font-family: var(--font-display);
   font-size: var(--fs-4);
   font-weight: 600;
   letter-spacing: var(--track-tight);
@@ -76,9 +76,9 @@
 
 .login-headline {
   margin: 0;
-  font-family: var(--font-sans);
+  font-family: var(--font-display);
   font-size: var(--fs-5);
-  font-weight: 600;
+  font-weight: 550;
   letter-spacing: var(--track-tight);
   color: var(--lg-ink);
 }

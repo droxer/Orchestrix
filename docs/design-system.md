@@ -1,7 +1,7 @@
 ---
 version: 1.0
 name: Relay-Graphite
-description: Graphite — a true-neutral, dual-register design system for an agent-orchestration control plane. A neutral graphite canvas (#101214 dark / #f7f8f9 light) with a four-step surface ladder carries the chrome; the ACTION color is pure monochrome, Linear-style — white (#f2f4f6) on dark, black (#16181b) on light — brand mark, primary CTA, focus ring, link emphasis. There are no chromatic accent colors at all: status is a grey brightness hierarchy (loud = bright, calm = dim) carried as dots, borders, and text — never fills, never actions; "info" is neutral ink. Both registers are designed side by side — neither derives from the other. One crisp grotesk (Geist) carries every text role with weight doing the differentiating; Geist Mono is reserved for code, IDs, and logs. Geometry is tight — 4px chips, 6px controls, 10px cards — and depth comes from hairline borders, not shadows. Motion is one ease, two speeds, no overshoot. The result reads as serious infrastructure software — a dense, calm control plane for AI agents.
+description: Graphite — a true-neutral, dual-register design system for an agent-orchestration control plane. A neutral graphite canvas (#101214 dark / #f7f8f9 light) with a four-step surface ladder carries the chrome; the ACTION color is pure monochrome, Linear-style — white (#f2f4f6) on dark, black (#16181b) on light — brand mark, primary CTA, focus ring, link emphasis. There are no chromatic accent colors at all: status is a grey brightness hierarchy (loud = bright, calm = dim) carried as dots, borders, and text — never fills, never actions; "info" is neutral ink. Both registers are designed side by side — neither derives from the other. Mona Sans gives display roles a precise technical voice, Geist carries dense UI and reading roles, and Geist Mono is reserved for code, IDs, and logs. Geometry is tight — 4px chips, 6px controls, 10px cards — and depth comes from hairline borders, not shadows. Motion is one ease, two speeds, no overshoot. The result reads as serious infrastructure software — a dense, calm control plane for AI agents.
 
 colors:
   action: "#f2f4f6"
@@ -25,21 +25,21 @@ colors:
 
 typography:
   display:
-    fontFamily: "var(--font-app-sans), 'Geist', sans-serif"
+    fontFamily: "var(--font-app-display), 'Mona Sans', sans-serif"
     fontSize: 32px
     fontWeight: 600
     lineHeight: 1.15
-    letterSpacing: -0.02em
+    letterSpacing: 0
   title:
-    fontFamily: "var(--font-app-sans), 'Geist', sans-serif"
-    fontSize: 22px
-    fontWeight: 600
+    fontFamily: "var(--font-app-display), 'Mona Sans', sans-serif"
+    fontSize: 20px
+    fontWeight: 550
     lineHeight: 1.2
-    letterSpacing: -0.02em
+    letterSpacing: 0
   heading:
-    fontFamily: "'Geist', sans-serif"
+    fontFamily: "var(--font-app-display), 'Mona Sans', sans-serif"
     fontSize: 16px
-    fontWeight: 600
+    fontWeight: 550
     lineHeight: 1.3
     letterSpacing: 0
   body:
@@ -71,9 +71,9 @@ typography:
     fontSize: 11px
     fontWeight: 500
     lineHeight: 1.4
-    letterSpacing: 0.05em
+    letterSpacing: 0.03em
   number:
-    fontFamily: "'Geist', sans-serif"
+    fontFamily: "var(--font-app-display), 'Mona Sans', sans-serif"
     fontSize: 19px
     fontWeight: 600
     lineHeight: 1.4
@@ -267,19 +267,20 @@ mono kind label, not by hue. The old per-kind rainbow is retired.
 
 ## Typography
 
-**Geist** (`--font-sans`) carries every text role; **Geist Mono**
-(`--font-mono`) is reserved for code-like content. Ten roles:
+**Mona Sans** (`--font-display`) carries display, title, heading, and metric
+roles. **Geist** (`--font-sans`) carries reading and control text; **Geist
+Mono** (`--font-mono`) is reserved for code-like content. Ten roles:
 
 | Role | Spec | Use |
 |---|---|---|
 | `--type-display` | 600 32/1.15 | hero headline, admin metric values |
-| `--type-title` | 600 22/1.2 | page + chat titles |
-| `--type-heading` | 600 16/1.3 | section heads, list labels |
+| `--type-title` | 550 20/1.2 | page + chat titles |
+| `--type-heading` | 550 16/1.3 | section heads, list labels |
 | `--type-body` | 400 15/1.5 | prose, message bodies, inputs |
 | `--type-body-sm` | 400 14/1.5 | dense prose, captions |
 | `--type-label` | 500 13/1.4 | chrome labels, nav, metadata |
 | `--type-label-strong` | 600 13/1.4 | bold chrome, button labels |
-| `--type-micro` | 500 11/1.4 | eyebrows (uppercase + `--track-caps`) |
+| `--type-micro` | 500 11/1.4 | eyebrows and compact metadata |
 | `--type-number` | 600 19/1.4 | metrics (tabular-nums) |
 | `--type-code` | 400 13/1.5 mono | commands, logs, IDs |
 
@@ -287,13 +288,14 @@ Raw sizes (`--fs-1`…`--fs-6`, rem): 11 / 13 / 14 / 15 / 22 / 32. The root
 font-size is pinned to 87.5% so the browser's font-size preference scales
 the whole UI (WCAG 1.4.4).
 
-Tracking is three tokens: `--track-tight` (−0.02em, display ≥22px),
-`--track-0`, `--track-caps` (0.05em, uppercase labels).
+Tracking is three tokens: `--track-tight` and `--track-0` both resolve to zero
+so Mona Sans can use optical sizing; `--track-caps` is a restrained 0.03em and
+is limited to statuses, badges, and table headers that intentionally use caps.
 
-**CJK:** `html:lang(zh-CN)` / `html:lang(zh-TW)` reorder the font stacks
-onto system CJK faces, zero the display tracking, narrow caps tracking, and
-loosen leading — all in `palette.css` (+ the two reading roles restated in
-`roles.css`).
+**CJK:** `html:lang(zh-CN)` / `html:lang(zh-TW)` put a system CJK family first
+for both Latin and Han glyphs, keeping mixed-script labels internally coherent.
+Display roles join that same stack, caps tracking narrows to 0.02em, and reading
+leading loosens in `roles.css`.
 
 ## Geometry, elevation, motion
 

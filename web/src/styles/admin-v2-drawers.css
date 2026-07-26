@@ -72,16 +72,15 @@
 .adm-drawer-kicker {
   margin: 0 0 var(--sp-1);
   font: var(--type-micro);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
+  letter-spacing: var(--track-0);
   color: var(--action);
 }
 
 .adm-drawer-title {
   margin: 0;
-  font-family: var(--font-sans);
+  font-family: var(--font-display);
   font-size: var(--fs-5);
-  font-weight: 500;
+  font-weight: 550;
   letter-spacing: var(--track-tight);
   line-height: 1.1;
   color: var(--ink-1);
@@ -178,8 +177,7 @@
 
 .adm-form-legend {
   font: var(--type-label-strong);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
+  letter-spacing: var(--track-0);
   color: var(--ink-3);
   padding: 0;
   margin-bottom: var(--sp-1);
@@ -281,8 +279,7 @@
 .adm-drawer-section-title {
   margin: 0;
   font: var(--type-label-strong);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
+  letter-spacing: var(--track-0);
   color: var(--ink-3);
 }
 
@@ -298,8 +295,7 @@
 .adm-assign-section-eyebrow,
 .adm-assign-operator-eyebrow {
   font: var(--type-label-strong);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
+  letter-spacing: var(--track-0);
   color: var(--ink-3);
 }
 
@@ -541,15 +537,13 @@
 .adm-provision-section-title {
   margin: 0;
   font: var(--type-label-strong);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
+  letter-spacing: var(--track-0);
   color: var(--ink-3);
 }
 
 .adm-provision-section-meta {
   font: var(--type-label-strong);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
+  letter-spacing: var(--track-0);
   color: var(--ink-4);
 }
 

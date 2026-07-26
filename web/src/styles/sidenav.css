@@ -140,15 +140,15 @@
   color: var(--ink-3);
   font: var(--type-micro);
   font-size: var(--fs-1);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
+  letter-spacing: var(--track-0);
 }
 
 .sidenav-separator {
   width: var(--sp-6);
   height: 1px;
   margin: var(--sp-2) 0;
-  /* fill color owned by atelier.css (hairline) */
+  border-color: var(--line-1);
+  background-color: var(--line-1);
   flex-shrink: 0;
 }
 
@@ -163,11 +163,13 @@
   align-items: center;
   gap: var(--sp-2);
   width: 100%;
-  padding: var(--sp-2);
-  /* border color + background owned by atelier.css */
-  border-width: 1px;
+  padding: var(--sp-3) 0 0;
+  /* The footer stays part of the rail instead of reading as a card. */
+  border-width: 1px 0 0;
   border-style: solid;
-  border-radius: var(--r-2);
+  border-color: var(--line-1);
+  border-radius: 0;
+  background: transparent;
 }
 
 .sidenav-panel[data-expanded="true"] .sidenav-bottom {

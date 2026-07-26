@@ -83,20 +83,6 @@ const ComposerView = forwardRef<ComposerHandle, {
 
   return (
     <form className="composer" onSubmit={(e) => { e.preventDefault(); triggerSend(); }}>
-      {/* A new thread picks its computer; a started one is pinned to the
-          computer it dispatched on, so the rail stays put and turns into a
-          readout instead of disappearing. */}
-      {initializingThread ? (
-        <ThreadRuntimeSelect
-          nodes={runtimeNodes}
-          value={runtimeNodeId}
-          selectedNode={selectedRuntimeNode}
-          onValueChange={onRuntimeNodeChange}
-          onRename={onRenameComputer}
-        />
-      ) : activeRuntimeNode ? (
-        <ThreadRuntimeReadout node={activeRuntimeNode} />
-      ) : null}
       <div className="composer-input-wrap" data-running={running || undefined}>
         <div className="composer-input">
           <textarea
@@ -118,6 +104,19 @@ const ComposerView = forwardRef<ComposerHandle, {
           />
           <div className="composer-footer">
             <div className="composer-footer-left">
+              {/* A new thread picks its computer; a started one keeps a
+                  compact readout beside the agent controls. */}
+              {initializingThread ? (
+                <ThreadRuntimeSelect
+                  nodes={runtimeNodes}
+                  value={runtimeNodeId}
+                  selectedNode={selectedRuntimeNode}
+                  onValueChange={onRuntimeNodeChange}
+                  onRename={onRenameComputer}
+                />
+              ) : activeRuntimeNode ? (
+                <ThreadRuntimeReadout node={activeRuntimeNode} />
+              ) : null}
               <AgentSelect
                 activeAgent={activeAgent}
                 logicalAgents={logicalAgents}

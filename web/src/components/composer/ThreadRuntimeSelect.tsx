@@ -93,7 +93,7 @@ export const ThreadRuntimeSelect = memo(function ThreadRuntimeSelect({
   const SelectedMark = selectedOwnership ? nodeOwnershipIcon(selectedOwnership) : null;
   return (
     <div className="thread-runtime-rail" aria-label={t("thread.runtime_label")}>
-      <span className="thread-runtime-context">{t("thread.new_thread")}</span>
+      <span className="thread-runtime-context">{t("thread.runs_on")}</span>
       <span className="thread-runtime-divider" aria-hidden="true" />
       <Select value={selected?.id ?? null} onValueChange={(nodeId) => {
         if (nodeId) onValueChange(nodeId);

@@ -62,8 +62,7 @@
 
 .adm-dash-tile-eyebrow {
   font: var(--type-micro);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
+  letter-spacing: var(--track-0);
   color: var(--ink-3);
 }
 
@@ -74,7 +73,7 @@
 }
 
 .adm-dash-tile--hero .adm-dash-tile-value {
-  font-family: var(--font-sans);
+  font-family: var(--font-display);
   font-size: clamp(2.5rem, 4vw, 3.25rem);
   font-weight: 500;
   line-height: 1;
@@ -375,8 +374,7 @@
   align-items: center;
   gap: var(--sp-1-5);
   font-size: var(--fs-2);
-  text-transform: uppercase;
-  letter-spacing: var(--track-caps);
+  letter-spacing: var(--track-0);
   color: var(--ink-3);
   margin: 0;
 }
@@ -395,9 +393,9 @@
 
 .adm-dash-stat-value {
   margin: 0;
-  font-family: var(--font-sans);
+  font-family: var(--font-display);
   font-size: var(--fs-5);
-  font-weight: 500;
+  font-weight: 550;
   line-height: 1.0;
   letter-spacing: var(--track-tight);
   color: var(--ink-1);
