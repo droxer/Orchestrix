@@ -263,6 +263,7 @@ export interface UnassignControlPanelDaemonNodeResponse {
 
 export interface CreateControlPanelDaemonNodeInput {
   employeeId?: string;
+  displayName?: string;
   workspacePath?: string;
   nodeLocation?: "employee-device";
   /** Runtime isolation only; management ownership is represented by managedNodeId. */
@@ -310,6 +311,7 @@ export interface ManagedNodeRecord {
 
 export interface CreateManagedNodeInput {
   employeeId: string;
+  displayName?: string;
   sandboxMode: "boxlite";
 }
 

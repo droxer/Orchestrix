@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import secrets
 from collections import Counter
 from datetime import datetime, timedelta, timezone
-import secrets
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response
@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from ..core.models import AGENT_NAMES
 from ..daemon_registry import public_sandbox_record
 from ..security.auth import require_admin_session
+from ..services.computer_names import normalize_computer_display_name, present_computer
 from ..services.node_agents import (
     assert_node_agent_runs_drained,
     remove_node_agents,
@@ -18,21 +19,20 @@ from ..services.node_agents import (
 )
 from ..services.team_membership import remove_agent_from_teams
 from .deps import AppContextDep
-from .helpers import daemon_start_command, daemon_start_env, employee_record, json_body, string_field, valid_employee_workspace_path
+from .helpers import (
+    daemon_start_command,
+    daemon_start_env,
+    employee_record,
+    json_body,
+    string_field,
+    valid_employee_workspace_path,
+)
 
 router = APIRouter()
 
 
 def _with_node_display_name(ctx: AppContextDep, node: dict[str, Any]) -> dict[str, Any]:
-    managed_node = (
-        ctx.managed_node_store.get_node(node["managedNodeId"])
-        if node.get("managedNodeId")
-        else None
-    )
-    return {
-        **node,
-        "displayName": (managed_node or {}).get("displayName") or node["id"],
-    }
+    return present_computer(ctx, node)
 
 
 def _public_control_panel_node(ctx: AppContextDep, node: dict[str, Any]) -> dict[str, Any]:
@@ -400,6 +400,10 @@ async def create_control_panel_daemon_node(request: Request, ctx: AppContextDep)
     if sandbox_mode not in ("boxlite", "none"):
         raise HTTPException(400, 'sandboxMode must be "boxlite" or "none".')
     workspace_path = string_field(body, "workspacePath") or None
+    try:
+        display_name = normalize_computer_display_name(body.get("displayName"))
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from error
     if requested_location not in (None, "employee-device"):
         raise HTTPException(400, 'nodeLocation must be "employee-device".')
     if requested_location == "employee-device" and not valid_employee_workspace_path(workspace_path):
@@ -411,6 +415,7 @@ async def create_control_panel_daemon_node(request: Request, ctx: AppContextDep)
             ctx.auth_store.ensure_employee(employee_id)
     node = ctx.backend.provision_daemon_node({
         **({"employeeId": employee_id} if employee_id else {}),
+        **({"displayName": display_name} if display_name else {}),
         "workspacePath": workspace_path,
         "sandboxMode": sandbox_mode,
         **({"nodeLocation": "employee-device"} if requested_location else {}),

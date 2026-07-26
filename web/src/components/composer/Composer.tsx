@@ -31,10 +31,11 @@ const ComposerView = forwardRef<ComposerHandle, {
   runtimeNodes: DaemonNodeMonitorRecord[];
   runtimeNodeId: string | null;
   onRuntimeNodeChange: (nodeId: string) => void;
+  onRenameComputer: (node: DaemonNodeMonitorRecord) => void;
   running: boolean;
   onSend: () => void;
   onCancelRun: () => void;
-}>(function Composer({ composerMode, setComposerMode, activeAgent, logicalAgents, activeLogicalAgentId, onLogicalAgentPicked, activeAgentDisplayName, selectedEmployee, initializingThread, runtimeNodes, runtimeNodeId, onRuntimeNodeChange, running, onSend, onCancelRun }, ref) {
+}>(function Composer({ composerMode, setComposerMode, activeAgent, logicalAgents, activeLogicalAgentId, onLogicalAgentPicked, activeAgentDisplayName, selectedEmployee, initializingThread, runtimeNodes, runtimeNodeId, onRuntimeNodeChange, onRenameComputer, running, onSend, onCancelRun }, ref) {
   const { t } = useTranslation();
   const composer = useComposer();
   const {
@@ -79,6 +80,7 @@ const ComposerView = forwardRef<ComposerHandle, {
           nodes={runtimeNodes}
           value={runtimeNodeId}
           onValueChange={onRuntimeNodeChange}
+          onRename={onRenameComputer}
         />
       ) : null}
       <div className="composer-input-wrap" data-running={running || undefined}>

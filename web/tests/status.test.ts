@@ -247,12 +247,14 @@ describe("Relay web thread status", () => {
     }) as typeof fetch;
     try {
       const result = await createControlPanelDaemonNode({
+        displayName: "Lab computer",
         workspacePath: "/workspace/shared",
       });
 
       assert.equal(requestPath, "/cp/daemon-nodes");
       assert.equal(requestInit?.method, "POST");
       assert.deepEqual(JSON.parse(String(requestInit?.body)), {
+        displayName: "Lab computer",
         workspacePath: "/workspace/shared",
       });
       assert.equal(result.node.employeeId, undefined);
@@ -291,12 +293,17 @@ describe("Relay web thread status", () => {
       });
     }) as typeof fetch;
     try {
-      const result = await createManagedNode({ employeeId: "alice", sandboxMode: "boxlite" });
+      const result = await createManagedNode({
+        employeeId: "alice",
+        displayName: "Alice cloud",
+        sandboxMode: "boxlite",
+      });
 
       assert.equal(requestPath, "/cp/managed-nodes");
       assert.equal(requestInit?.method, "POST");
       assert.deepEqual(JSON.parse(String(requestInit?.body)), {
         employeeId: "alice",
+        displayName: "Alice cloud",
         assignmentMode: "dedicated",
         provider: "local-process",
         profile: "standard",

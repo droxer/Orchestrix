@@ -3,11 +3,12 @@
 import type { TFunction } from "i18next";
 import type { ControlPanelDaemonNodeRecord } from "../../types";
 import { Button } from "../ui/button";
-import { ActionKey, AdminDelete, AdminManageExecutors } from "../icons";
+import { ActionEdit, ActionKey, AdminDelete, AdminManageExecutors } from "../icons";
 
 interface NodeActionsProps {
   node: ControlPanelDaemonNodeRecord;
   onReveal: (node: ControlPanelDaemonNodeRecord) => void;
+  onRename: (node: ControlPanelDaemonNodeRecord) => void;
   onManageExecutors: (node: ControlPanelDaemonNodeRecord) => void;
   onDelete?: (node: ControlPanelDaemonNodeRecord) => Promise<void>;
   deletePending: boolean;
@@ -16,9 +17,19 @@ interface NodeActionsProps {
 }
 
 /** Shared reveal/manage/delete icon-button trio for node surfaces (NodeRow, NodeCard). */
-export function NodeActions({ node, onReveal, onManageExecutors, onDelete, deletePending, onDeleteRequest, t }: NodeActionsProps) {
+export function NodeActions({ node, onReveal, onRename, onManageExecutors, onDelete, deletePending, onDeleteRequest, t }: NodeActionsProps) {
   return (
     <>
+      <Button
+        variant="ghost"
+        type="button"
+        className="icon-button icon-button--sm icon-button--tinted adm-node-card-icon-btn adm-node-action--rename"
+        onClick={() => onRename(node)}
+        aria-label={t("admin.v2.rename_computer_for", { id: node.id })}
+        title={t("thread.rename_computer")}
+      >
+        <ActionEdit size={14} aria-hidden="true" />
+      </Button>
       {node.managedNodeId ? null : (
         <Button
           variant="ghost"

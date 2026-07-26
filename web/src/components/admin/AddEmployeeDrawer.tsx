@@ -304,7 +304,10 @@ export function AddEmployeeDrawer({
                 <SelectContent>
                   {unassignedNodes.map((node) => (
                     <SelectItem key={node.id} value={node.id}>
-                      {node.id}{node.workspacePath ? ` / ${node.workspacePath}` : ""}
+                      {node.displayName && node.displayName !== node.id
+                        ? `${node.displayName} / ${node.id}`
+                        : node.id}
+                      {node.workspacePath ? ` / ${node.workspacePath}` : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>

@@ -489,6 +489,10 @@ def test_agent_placements_describe_managed_and_local_runtime_nodes(monkeypatch) 
             f"/cp/agents/{local_agent['id']}/placements",
             json={"daemonNodeId": local_node_id, "priority": 200},
         ).status_code == 201
+        assert client.patch(
+            f"/daemon-nodes/{local_node_id}",
+            json={"displayName": "Alice's MacBook"},
+        ).status_code == 200
 
         listed = {
             item["id"]: item
@@ -502,7 +506,7 @@ def test_agent_placements_describe_managed_and_local_runtime_nodes(monkeypatch) 
         assert managed_placement["nodeDisplayName"] == "Alice managed node"
         assert managed_placement["nodeOwnership"] == "managed"
         assert managed_placement["nodeSandboxMode"] == "boxlite"
-        assert local_placement["nodeDisplayName"] == local_node_id
+        assert local_placement["nodeDisplayName"] == "Alice's MacBook"
         assert local_placement["nodeOwnership"] == "employee-device"
         assert local_placement["nodeSandboxMode"] == "none"
 

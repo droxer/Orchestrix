@@ -2788,6 +2788,31 @@ def test_registry_restart_does_not_recover_plaintext_node_token(store_factory) -
         assert "nodeToken" not in restarted.control_panel_nodes()[0]
 
 
+@pytest.mark.parametrize("store_factory", DAEMON_STORE_FACTORIES)
+def test_registry_persists_computer_display_name(store_factory) -> None:
+    with TemporaryDirectory() as root:
+        registry = DaemonNodeRegistry(LocalSessionStore(root), store_factory(root))
+        registry.register(
+            {
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspaceId": "mch_alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            },
+            "ui_token",
+        )
+
+        registry.set_display_name("sbx_alice", "Office Mac")
+
+        restarted = DaemonNodeRegistry(
+            LocalSessionStore(root), store_factory(root)
+        )
+        assert restarted.get("sbx_alice")["displayName"] == "Office Mac"
+
+
 @pytest.mark.parametrize(
     "store_factory",
     [

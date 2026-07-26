@@ -15,12 +15,14 @@ import type {
   CreateManagedNodeInput,
   CreateManagedNodeResponse,
   ManagedNodesResponse,
+  ManagedNodeRecord,
   CreateSessionInput,
   CreateTaskInput,
   ControlPanelDaemonNodesResponse,
   ControlPanelEmployeesResponse,
   CurrentUser,
   UnassignControlPanelDaemonNodeResponse,
+  DaemonNodeMonitorRecord,
   DaemonNodesResponse,
   EmployeeAgentsResponse,
   EmployeeAgent,
@@ -115,6 +117,16 @@ export function listSandboxes(token?: string, signal?: AbortSignal): Promise<San
 
 export function listDaemonNodes(token?: string, signal?: AbortSignal): Promise<DaemonNodesResponse> {
   return apiJson<DaemonNodesResponse>("/daemon-nodes", { token, signal });
+}
+
+export function updateComputerDisplayName(
+  nodeId: string,
+  displayName: string | null,
+): Promise<{ node: DaemonNodeMonitorRecord }> {
+  return apiJson<{ node: DaemonNodeMonitorRecord }>(
+    `/daemon-nodes/${encodeURIComponent(nodeId)}`,
+    { method: "PATCH", body: { displayName } },
+  );
 }
 
 export function listEmployeeAgents(signal?: AbortSignal): Promise<EmployeeAgentsResponse> {
@@ -272,6 +284,7 @@ export function createControlPanelDaemonNode(
     method: "POST",
     body: {
       ...(input.employeeId ? { employeeId: input.employeeId } : {}),
+      ...(input.displayName ? { displayName: input.displayName } : {}),
       ...(input.workspacePath ? { workspacePath: input.workspacePath } : {}),
       ...(input.sandboxMode ? { sandboxMode: input.sandboxMode } : {}),
       ...(input.nodeLocation ? { nodeLocation: input.nodeLocation } : {}),
@@ -284,6 +297,7 @@ export function createManagedNode(input: CreateManagedNodeInput): Promise<Create
     method: "POST",
     body: {
       employeeId: input.employeeId,
+      ...(input.displayName ? { displayName: input.displayName } : {}),
       assignmentMode: "dedicated",
       provider: "local-process",
       profile: "standard",
@@ -292,6 +306,16 @@ export function createManagedNode(input: CreateManagedNodeInput): Promise<Create
       desiredState: "running",
     },
   });
+}
+
+export function updateManagedNodeDisplayName(
+  nodeId: string,
+  displayName: string | null,
+): Promise<{ node: ManagedNodeRecord }> {
+  return apiJson<{ node: ManagedNodeRecord }>(
+    `/cp/managed-nodes/${encodeURIComponent(nodeId)}`,
+    { method: "PATCH", body: { displayName } },
+  );
 }
 
 export function deleteManagedNode(nodeId: string): Promise<CreateManagedNodeResponse> {

@@ -25,6 +25,7 @@ interface NodesViewProps {
   layout: AdminLayout;
   onLayoutChange: (next: AdminLayout) => void;
   onRevealCredentials: (node: ControlPanelDaemonNodeRecord) => void;
+  onRenameNode: (node: ControlPanelDaemonNodeRecord) => void;
   onManageExecutors: (node: ControlPanelDaemonNodeRecord) => void;
   onDeleteNode?: (node: ControlPanelDaemonNodeRecord) => Promise<void>;
   onAddNode?: () => void;
@@ -67,7 +68,7 @@ function filterLabel(filter: NodeFilter, t: TFunction): string {
   return t(`status.${filter}`, { defaultValue: filter });
 }
 
-export function NodesView({ nodes, storedTokens, layout, onLayoutChange, onRevealCredentials, onManageExecutors, onDeleteNode, onAddNode }: NodesViewProps) {
+export function NodesView({ nodes, storedTokens, layout, onLayoutChange, onRevealCredentials, onRenameNode, onManageExecutors, onDeleteNode, onAddNode }: NodesViewProps) {
   const { t } = useTranslation();
   const [filter, setFilter] = useUrlSearchState("fleetFilter", "all" as NodeFilter, parseNodeFilter, serializeNodeFilter);
   const [query, setQuery] = useUrlSearchState("fleetQuery", "", parseSearchQuery, serializeSearchQuery);
@@ -172,6 +173,7 @@ export function NodesView({ nodes, storedTokens, layout, onLayoutChange, onRevea
               storedTokens={storedTokens}
               colocated={colocated}
               onReveal={onRevealCredentials}
+              onRename={onRenameNode}
               onManageExecutors={onManageExecutors}
               onDelete={onDeleteNode}
               t={t}
@@ -193,6 +195,7 @@ export function NodesView({ nodes, storedTokens, layout, onLayoutChange, onRevea
                 storedTokens={storedTokens}
                 colocated={colocated}
                 onReveal={onRevealCredentials}
+                onRename={onRenameNode}
                 onManageExecutors={onManageExecutors}
                 onDelete={onDeleteNode}
                 t={t}

@@ -82,6 +82,20 @@
   white-space: nowrap;
 }
 
+.thread-runtime-rename {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: var(--r-2);
+  color: var(--ink-3);
+}
+
+.thread-runtime-rename:hover:not(:disabled) {
+  background: var(--surface-3);
+  color: var(--ink-1);
+}
+
 .thread-runtime-option-id {
   margin-left: auto;
   color: var(--ink-3);

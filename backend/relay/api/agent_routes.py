@@ -5,19 +5,20 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
 
-from ..security.auth import require_admin_session
 from ..persistence.agent_placement_store import placement_status
+from ..security.auth import require_admin_session
 from ..services.agent_routing import AgentRoutingError, resolve_agent_assignments
+from ..services.computer_names import computer_display_name
 from ..services.team_membership import remove_agent_from_teams
 from .deps import AppContextDep
 from .helpers import (
     agent_task_mode,
     get_session_for_actor,
     json_body,
+    newest_agent_workspace_artifacts,
     request_actor,
     role_name,
     string_field,
-    newest_agent_workspace_artifacts,
 )
 
 router = APIRouter()
@@ -475,14 +476,9 @@ def _placement_view(ctx: AppContextDep, placement: dict[str, Any]) -> dict[str, 
     view = placement_status(placement, agent, node)
     if not node:
         return {**view, "nodeOwnership": "unknown"}
-    managed_node = (
-        ctx.managed_node_store.get_node(node["managedNodeId"])
-        if node.get("managedNodeId")
-        else None
-    )
     return {
         **view,
-        "nodeDisplayName": (managed_node or {}).get("displayName") or node["id"],
+        "nodeDisplayName": computer_display_name(ctx, node),
         "nodeOwnership": node.get("nodeLocation") or "unknown",
         **(
             {"nodeSandboxMode": node["sandboxMode"]}

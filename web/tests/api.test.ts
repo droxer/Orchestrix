@@ -1,13 +1,43 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 
-import { apiJson, deleteTask, getTeamArtifacts, getWorkspaceBrief, listAgentWorkspaceFiles, listArtifacts, listEmployeeAgents, listTaskArtifacts, readAgentWorkspaceFile, RelayApiError, runLogicalAgents, updateOwnEmployeeAgent } from "../src/api.js";
+import { apiJson, deleteTask, getTeamArtifacts, getWorkspaceBrief, listAgentWorkspaceFiles, listArtifacts, listEmployeeAgents, listTaskArtifacts, readAgentWorkspaceFile, RelayApiError, runLogicalAgents, updateComputerDisplayName, updateOwnEmployeeAgent } from "../src/api.js";
 
 const originalFetch = globalThis.fetch;
 
 describe("apiJson", () => {
   afterEach(() => {
     globalThis.fetch = originalFetch;
+  });
+
+  it("renames a computer through the owner-facing daemon-node resource", async () => {
+    let requestPath = "";
+    let requestInit: RequestInit | undefined;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      requestPath = String(input);
+      requestInit = init;
+      return new Response(JSON.stringify({
+        node: {
+          id: "sbx_alice",
+          displayName: "Office Mac",
+          status: "ready",
+          agents: {},
+          createdAt: "2026-07-26T00:00:00Z",
+          updatedAt: "2026-07-26T00:00:00Z",
+          queuedCommandCount: 0,
+          activeRuns: [],
+          online: true,
+          stale: false,
+        },
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }) as typeof fetch;
+
+    const result = await updateComputerDisplayName("sbx_alice", "Office Mac");
+
+    assert.equal(requestPath, "/daemon-nodes/sbx_alice");
+    assert.equal(requestInit?.method, "PATCH");
+    assert.deepEqual(JSON.parse(String(requestInit?.body)), { displayName: "Office Mac" });
+    assert.equal(result.node.displayName, "Office Mac");
   });
 
   it("reports an HTML fallback response instead of attempting to parse it as JSON", async () => {
