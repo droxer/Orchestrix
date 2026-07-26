@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import shutil
 import time
 from threading import RLock
 from pathlib import Path
@@ -79,6 +80,13 @@ class LocalSessionStore:
             if self._snapshot_path(session_id).exists():
                 return _read_json(self._snapshot_path(session_id))
             return materialize_events(_read_jsonl(self._events_path(session_id)))
+
+    def delete_session(self, session_id: str) -> None:
+        with self._lock:
+            session_dir = self._session_dir(session_id)
+            if not session_dir.is_dir():
+                raise KeyError(session_id)
+            shutil.rmtree(session_dir)
 
     def list_sessions(self) -> list[dict[str, Any]]:
         if not self.sessions_dir.exists():
@@ -320,6 +328,14 @@ class DatabaseSessionStore:
             if not row:
                 raise KeyError(session_id)
         return row["snapshot"]
+
+    def delete_session(self, session_id: str) -> None:
+        with self.engine.begin() as conn:
+            session_pk = self._session_pk(conn, session_id, lock=True)
+            conn.execute(delete(self.run_token_usage).where(self.run_token_usage.c.session_id == session_pk))
+            conn.execute(delete(self.artifacts).where(self.artifacts.c.session_id == session_pk))
+            conn.execute(delete(self.events).where(self.events.c.session_id == session_pk))
+            conn.execute(delete(self.sessions).where(self.sessions.c.id == session_pk))
 
     def list_sessions(self) -> list[dict[str, Any]]:
         with self.engine.begin() as conn:

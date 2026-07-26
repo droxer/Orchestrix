@@ -50,8 +50,7 @@ export function ThreadRuntimeReadout({ node }: { node: DaemonNodeMonitorRecord }
         <span className="adm-presence" data-online={online ? "true" : "false"} aria-hidden="true" />
         <OwnershipMark size={16} aria-hidden="true" />
         <span className="thread-runtime-readout-name" translate="no">{name}</span>
-        <span className="thread-runtime-readout-kind">{ownershipLabel}</span>
-        <span className="sr-only">{presenceLabel}</span>
+        <span className="sr-only">{ownershipLabel} · {presenceLabel}</span>
       </span>
     </div>
   );
@@ -63,10 +62,10 @@ export function ThreadRuntimeReadout({ node }: { node: DaemonNodeMonitorRecord }
  * Every option is already a live computer — `selectableThreadComputers` filters
  * to online, non-stale, ready/running nodes — so the rows carry no status cue.
  * What actually differs between two live machines is whose they are, so each
- * row leads with the ownership mark (cloud / laptop) and names the kind
- * underneath. The node id shares that second line: it only disambiguates two
- * computers with the same display name, and on the first line it fought the
- * name for width the popup does not have (it used to clip mid-word).
+ * row leads with the ownership mark (cloud / laptop). The node id sits on a
+ * second line: it only disambiguates two computers with the same display
+ * name, and on the first line it fought the name for width the popup does not
+ * have (it used to clip mid-word).
  */
 export const ThreadRuntimeSelect = memo(function ThreadRuntimeSelect({
   nodes,
@@ -135,15 +134,11 @@ export const ThreadRuntimeSelect = memo(function ThreadRuntimeSelect({
                 <OwnershipMark size={16} aria-hidden="true" />
                 <span className="thread-runtime-option-body">
                   <span className="thread-runtime-option-name" translate="no">{name}</span>
-                  <span className="thread-runtime-option-meta">
-                    <span>{t(`admin.v2.node_ownership_${ownership}`)}</span>
-                    {name === node.id ? null : (
-                      <>
-                        <span aria-hidden="true">·</span>
-                        <span className="thread-runtime-option-id" translate="no">{node.id}</span>
-                      </>
-                    )}
-                  </span>
+                  {name === node.id ? null : (
+                    <span className="thread-runtime-option-meta">
+                      <span className="thread-runtime-option-id" translate="no">{node.id}</span>
+                    </span>
+                  )}
                 </span>
               </SelectItem>
             );

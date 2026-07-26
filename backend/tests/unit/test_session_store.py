@@ -35,6 +35,36 @@ def test_session_stores_preserve_team_provenance() -> None:
             assert store.list_sessions()[0]["teamId"] == "team_delivery"
 
 
+def test_session_stores_delete_session() -> None:
+    with TemporaryDirectory() as root:
+        stores = (
+            LocalSessionStore(Path(root) / "local"),
+            DatabaseSessionStore(
+                f"sqlite:///{root}/relay.db", create_schema=True
+            ),
+        )
+        for store in stores:
+            created = store.create_session(
+                {
+                    "workspacePath": "/workspace/alice",
+                    "ownerEmployeeId": "alice",
+                    "taskGoal": "ship the release",
+                    "participants": ["human"],
+                }
+            )
+            store.append_event(created["id"], relay_event("session.archived", created["id"], {}))
+
+            store.delete_session(created["id"])
+
+            assert all(item["id"] != created["id"] for item in store.list_sessions())
+            try:
+                store.get_session(created["id"])
+            except KeyError:
+                pass
+            else:
+                raise AssertionError("deleted session should raise KeyError")
+
+
 def test_session_store_persists_events_and_artifacts() -> None:
     with TemporaryDirectory() as root:
         store = LocalSessionStore(root)

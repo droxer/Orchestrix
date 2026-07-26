@@ -1,6 +1,5 @@
 import { ActionEdit, ActionRemove } from "./icons";
 import { useTranslation } from "react-i18next";
-import { useDialogs } from "./ui/DialogProvider";
 import type { RelaySession } from "../types";
 import { threadLabel, type ThreadItem } from "../lib/threads";
 import { Button } from "./ui/button";
@@ -38,21 +37,13 @@ type ThreadRowProps = {
 
 export function ThreadRow({ item, selected, onSelect, onRename, onClose }: ThreadRowProps) {
   const { t, i18n } = useTranslation();
-  const { confirm } = useDialogs();
   const { session } = item;
   const label = threadLabel(session);
   const stamp = relativeTime(session.updatedAt, i18n.language);
   const rowLabel = [label, stamp].filter(Boolean).join(" · ");
 
-  async function handleClose() {
-    if (!onClose) return;
-    const ok = await confirm({
-      title: t("thread.close_confirm", { name: label }),
-      message: t("thread.close_message"),
-      confirmLabel: t("thread.close"),
-      tone: "danger",
-    });
-    if (ok) onClose(session.id);
+  function handleClose() {
+    onClose?.(session.id);
   }
 
   return (
@@ -93,8 +84,8 @@ export function ThreadRow({ item, selected, onSelect, onRename, onClose }: Threa
           <Button variant="ghost"
             className="conversation-remove-btn"
             type="button"
-            aria-label={t("thread.close")}
-            title={t("thread.close")}
+            aria-label={t("thread.delete")}
+            title={t("thread.delete")}
             onClick={handleClose}
           >
             <ActionRemove size={11} />

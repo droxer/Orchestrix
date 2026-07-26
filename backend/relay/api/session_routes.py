@@ -447,6 +447,22 @@ async def archive_session(session_id: str, request: Request, ctx: AppContextDep)
     return controller.archive_session(session_id)
 
 
+@router.delete("/sessions/{session_id}")
+async def delete_session(session_id: str, request: Request, ctx: AppContextDep) -> Response:
+    actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
+    get_session_for_actor(ctx.session_store, session_id, actor)
+    controller = SessionController(
+        ctx.session_store,
+        task_store=ctx.task_store,
+        owner_employee_id=actor["employeeId"],
+    )
+    try:
+        controller.delete_session(session_id)
+    except SessionRunInFlightError:
+        raise HTTPException(409, "Session has a run in flight.")
+    return Response(status_code=204)
+
+
 @router.post("/sessions/{session_id}/title")
 async def rename_session(session_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)

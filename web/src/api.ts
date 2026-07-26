@@ -785,6 +785,13 @@ export function archiveSession(sessionId: string, token?: string): Promise<Relay
   });
 }
 
+export function deleteSession(sessionId: string, token?: string): Promise<void> {
+  return apiJson<void>(`/sessions/${encodeURIComponent(sessionId)}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
 export function renameSession(sessionId: string, title: string, token?: string): Promise<RelaySession> {
   return apiJson<RelaySession>(`/sessions/${encodeURIComponent(sessionId)}/title`, {
     method: "POST",

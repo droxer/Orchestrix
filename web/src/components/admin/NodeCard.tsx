@@ -160,7 +160,7 @@ export function NodeCard({
 
       <footer className="adm-node-card-foot">
         {node.queuedCommandCount > 0 ? (
-          <span className="adm-node-card-queued mono tone-info">{node.queuedCommandCount} {t("admin.queued")}</span>
+          <span className="adm-node-card-queued mono">{node.queuedCommandCount} {t("admin.queued")}</span>
         ) : null}
         <div className="adm-node-card-actions">
           <Button variant="ghost"

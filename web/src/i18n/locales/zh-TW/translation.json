@@ -15,7 +15,7 @@
   "errors": {
     "rename_thread": "無法重新命名對話。請重新整理對話列表後重試。",
     "rename_computer": "無法重新命名電腦。請檢查連線後再試一次。",
-    "close_thread": "無法關閉對話。請檢查連線後重試。",
+    "delete_thread": "無法刪除對話。請檢查連線後重試。",
     "send_message": "無法傳送訊息。請檢查 daemon 連線後重試。",
     "thread_computer_required": "請先選擇一台執行中的電腦，再開始此對話。",
     "agent_not_ready": "{{agent}} 未就緒。請選擇其他智能體或稍後再試。",
@@ -105,9 +105,9 @@
     "rename_computer": "重新命名電腦",
     "rename_computer_message": "為這台電腦設定一個容易記住的名稱。技術 ID：{{id}}",
     "computer_name_placeholder": "辦公室 Mac Studio",
-    "close": "關閉",
-    "close_confirm": "關閉對話「{{name}}」？",
-    "close_message": "此對話將移出活動清單，但其歷史記錄仍會保留。",
+    "delete": "刪除",
+    "delete_confirm": "刪除對話「{{name}}」？",
+    "delete_message": "這將永久刪除此對話及其歷史記錄，且無法復原。",
     "statuses": {
       "waiting_for_human": "等待人工"
     }

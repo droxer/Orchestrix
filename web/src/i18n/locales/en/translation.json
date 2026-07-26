@@ -15,7 +15,7 @@
   "errors": {
     "rename_thread": "Couldn't rename the thread. Refresh the thread list and try again.",
     "rename_computer": "Couldn't rename the computer. Check the connection and try again.",
-    "close_thread": "Couldn't close the thread. Check the connection and try again.",
+    "delete_thread": "Couldn't delete the thread. Check the connection and try again.",
     "send_message": "Couldn't send the message. Check the daemon connection and try again.",
     "thread_computer_required": "Choose a running computer before starting this thread.",
     "agent_not_ready": "{{agent}} isn't ready. Pick another agent or try later.",
@@ -105,9 +105,9 @@
     "rename_computer": "Rename computer",
     "rename_computer_message": "Give this computer a memorable name. Technical ID: {{id}}",
     "computer_name_placeholder": "Office Mac Studio",
-    "close": "Close",
-    "close_confirm": "Close thread “{{name}}”?",
-    "close_message": "The thread will leave the active list, but its history will remain available.",
+    "delete": "Delete",
+    "delete_confirm": "Delete thread “{{name}}”?",
+    "delete_message": "This permanently removes the thread and its history. This cannot be undone.",
     "statuses": {
       "waiting_for_human": "Needs human"
     }

@@ -3,11 +3,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import {
-  archiveSession,
   assignTask,
   cancelRun,
   createTask,
   createTeam,
+  deleteSession,
   deleteTeam,
   deleteTask,
   recordDecision,
@@ -46,10 +46,10 @@ export function useRelayMutations() {
     onError: onRelayError("Failed to rename thread", "errors.rename_thread"),
   });
 
-  const archiveSessionMutation = useMutation({
-    mutationFn: ({ sessionId, token }: { sessionId: string } & TokenArg) => archiveSession(sessionId, token),
+  const deleteSessionMutation = useMutation({
+    mutationFn: ({ sessionId, token }: { sessionId: string } & TokenArg) => deleteSession(sessionId, token),
     onSuccess: () => void invalidateRelay(),
-    onError: onRelayError("Failed to close thread", "errors.close_thread"),
+    onError: onRelayError("Failed to delete thread", "errors.delete_thread"),
   });
 
   const cancelRunMutation = useMutation({
@@ -163,7 +163,7 @@ export function useRelayMutations() {
 
   return {
     renameSessionMutation,
-    archiveSessionMutation,
+    deleteSessionMutation,
     cancelRunMutation,
     recordDecisionMutation,
     runSandboxMutation,

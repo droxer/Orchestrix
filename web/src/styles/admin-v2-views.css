@@ -1529,14 +1529,21 @@
   white-space: nowrap;
 }
 
-.adm-node-card-queued { flex: none; }
+/* Queued-commands count is secondary meta, so it sits at the muted ink tier
+   like the node handle above it. */
+.adm-node-card-queued {
+  flex: none;
+  color: var(--ink-3);
+}
 
 /* Fixed semantic action slots keep shared controls aligned between local and
    cloud cards. Cloud nodes leave the credentials slot empty rather than
-   shifting copy/manage/delete into different positions. */
+   shifting copy/rename/manage/delete into different positions. Every action
+   needs an explicit slot — an unslotted button auto-places and can push the
+   slotted ones onto a second row. */
 .adm-node-card-actions {
   display: grid;
-  grid-template-columns: repeat(4, 28px);
+  grid-template-columns: repeat(5, 28px);
   align-items: center;
   gap: var(--sp-0-5);
   margin-left: auto;
@@ -1544,9 +1551,10 @@
 }
 
 .adm-node-card-actions > .adm-node-action--copy { grid-column: 1; }
-.adm-node-card-actions > .adm-node-action--credentials { grid-column: 2; }
-.adm-node-card-actions > .adm-node-action--agents { grid-column: 3; }
-.adm-node-card-actions > .adm-node-action--delete { grid-column: 4; }
+.adm-node-card-actions > .adm-node-action--rename { grid-column: 2; }
+.adm-node-card-actions > .adm-node-action--credentials { grid-column: 3; }
+.adm-node-card-actions > .adm-node-action--agents { grid-column: 4; }
+.adm-node-card-actions > .adm-node-action--delete { grid-column: 5; }
 
 /* Node card icon actions (reveal/manage/delete) share the .icon-button
    base (thread.css) at the --sm/--tinted modifiers instead of a bespoke
@@ -1554,7 +1562,8 @@
 .adm-node-card-icon-btn:disabled { cursor: progress; }
 
 .adm-node-card-error {
-  margin: var(--sp-2) 0 0;
+  /* The card's flex gap already separates the error from the footer. */
+  margin: 0;
   font-size: var(--fs-2);
   color: var(--err);
 }

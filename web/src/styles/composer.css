@@ -131,22 +131,6 @@
   white-space: nowrap;
 }
 
-/* Kind as a quiet trailing caption — present for orientation, never competing
-   with the machine's name. */
-.thread-runtime-readout-kind {
-  flex: none;
-  color: var(--ink-3);
-  font: var(--type-micro);
-  letter-spacing: var(--track-caps);
-  text-transform: uppercase;
-}
-
-.thread-runtime-readout-kind::before {
-  content: "·";
-  margin-right: var(--sp-2);
-  color: var(--ink-4);
-}
-
 /* An offline computer recedes to muted ink, matching the fleet cards — the
    name stays readable, the row stops looking live. */
 .thread-runtime-readout[data-online="false"] {
@@ -228,11 +212,6 @@
   }
 
   .thread-runtime-select { max-width: 100%; }
-
-  /* The kind caption is fixed-width and would starve the machine name, which
-     is the part that identifies the computer. Drop it; the mark still says
-     cloud vs local and the title carries the words. */
-  .thread-runtime-readout-kind { display: none; }
 }
 
 .mode-chip {

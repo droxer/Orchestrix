@@ -15,7 +15,7 @@
   "errors": {
     "rename_thread": "无法重命名对话。请刷新对话列表后重试。",
     "rename_computer": "无法重命名电脑。请检查连接后重试。",
-    "close_thread": "无法关闭对话。请检查连接后重试。",
+    "delete_thread": "无法删除对话。请检查连接后重试。",
     "send_message": "无法发送消息。请检查 daemon 连接后重试。",
     "thread_computer_required": "请先选择一台运行中的电脑，再开始此对话。",
     "agent_not_ready": "{{agent}} 未就绪。请选择其他智能体或稍后再试。",
@@ -105,9 +105,9 @@
     "rename_computer": "重命名电脑",
     "rename_computer_message": "为这台电脑设置一个容易记住的名称。技术 ID：{{id}}",
     "computer_name_placeholder": "办公室 Mac Studio",
-    "close": "关闭",
-    "close_confirm": "关闭对话“{{name}}”？",
-    "close_message": "该对话将移出活动列表，但其历史记录仍会保留。",
+    "delete": "删除",
+    "delete_confirm": "删除对话“{{name}}”？",
+    "delete_message": "这将永久删除该对话及其历史记录，且无法撤销。",
     "statuses": {
       "waiting_for_human": "等待人工"
     }

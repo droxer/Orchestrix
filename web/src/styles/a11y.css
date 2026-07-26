@@ -205,6 +205,12 @@
     width: var(--touch-target);
     height: var(--touch-target);
   }
+
+  /* The card action grid pins 28px slots on fine pointers; the boosted 44px
+     buttons would overflow their columns and overlap without matching tracks. */
+  .adm-node-card-actions {
+    grid-template-columns: repeat(5, var(--touch-target));
+  }
 }
 
 /* OS “increase contrast” — boost hairlines and body copy. */

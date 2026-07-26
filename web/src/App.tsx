@@ -86,7 +86,7 @@ export function App() {
   const { reportMutationError } = useMutationError();
   const {
     renameSessionMutation,
-    archiveSessionMutation,
+    deleteSessionMutation,
     cancelRunMutation,
     recordDecisionMutation,
     runLogicalAgentsMutation,
@@ -519,18 +519,18 @@ export function App() {
     }
   }
 
-  async function closeThread(sessionId: string) {
+  async function deleteThread(sessionId: string) {
     const session = myThreads.find((s) => s.id === sessionId);
     const label = session ? (session.title?.trim() || session.taskGoal) : sessionId;
     const ok = await confirm({
-      title: t("thread.close_confirm", { name: label }),
-      message: t("thread.close_message"),
-      confirmLabel: t("thread.close"),
+      title: t("thread.delete_confirm", { name: label }),
+      message: t("thread.delete_message"),
+      confirmLabel: t("thread.delete"),
       tone: "danger",
     });
     if (!ok) return;
     try {
-      await archiveSessionMutation.mutateAsync({ sessionId, token: selectedToken });
+      await deleteSessionMutation.mutateAsync({ sessionId, token: selectedToken });
       if (activeSession?.id === sessionId) {
         setSelectedSessionId(undefined);
         setActiveSessionId(null);
@@ -903,7 +903,7 @@ export function App() {
             onSelectThread={openThread}
             onNewThread={startNewThread}
             onRenameThread={(session) => void renameThread(session)}
-            onCloseThread={(id) => void closeThread(id)}
+            onCloseThread={(id) => void deleteThread(id)}
             activeAgent={activeAgent}
             logicalAgents={logicalAgents}
             selectableLogicalAgents={selectableLogicalAgents}

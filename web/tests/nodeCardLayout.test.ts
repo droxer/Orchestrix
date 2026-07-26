@@ -23,9 +23,13 @@ describe("node card profile layout", () => {
     assert.match(badges, /\{showSandbox\s*\?\s*\([\s\S]*?adm-node-profile-sandbox/);
     assert.match(card, /adm-node-card-handle mono\$\{showHandle \? "" : " is-placeholder"\}/);
     assert.match(card, /adm-node-action--copy/);
+    assert.match(actions, /adm-node-action--rename/);
     assert.match(actions, /adm-node-action--credentials/);
     assert.match(actions, /adm-node-action--agents/);
     assert.match(actions, /adm-node-action--delete/);
-    assert.match(styles, /\.adm-node-card-actions\s*\{[^}]*grid-template-columns:\s*repeat\(4, 28px\);/s);
+    assert.match(styles, /\.adm-node-card-actions\s*\{[^}]*grid-template-columns:\s*repeat\(5, 28px\);/s);
+    for (const [action, column] of [["copy", 1], ["rename", 2], ["credentials", 3], ["agents", 4], ["delete", 5]] as const) {
+      assert.match(styles, new RegExp(`\\.adm-node-action--${action}\\s*\\{\\s*grid-column:\\s*${column};`), `slot ${column} = ${action}`);
+    }
   });
 });
