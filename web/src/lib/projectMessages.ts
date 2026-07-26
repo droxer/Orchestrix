@@ -186,6 +186,14 @@ function visibleLogText(stdout: string, stderr: string): string {
       if (messageText) text.push(messageText);
       continue;
     }
+    // Claude's terminal result frame can be the only record carrying the
+    // response. Count it as visible so completed-log fallback preserves the
+    // frame for AgentStream instead of treating the run as empty.
+    if (event.type === "result") {
+      const resultText = typeof event.result === "string" ? event.result.trim() : "";
+      if (resultText) text.push(resultText);
+      continue;
+    }
     if (event.type === "message" || event.type === "assistant_message" || event.role === "assistant") {
       const message = event.message && typeof event.message === "object" ? event.message : event;
       const messageText = recordText(message).trim();

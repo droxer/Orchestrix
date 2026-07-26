@@ -529,6 +529,15 @@ function parseClaude(raw: string): AgentSegment[] {
           ? { kind: "status", tone: "bad", text: message }
           : narration("agent_stream.claude_error", undefined, "bad"));
       } else {
+        // Some Claude Code builds (including the cloud-computer image) emit
+        // the final response only on the result envelope. Prefer the richer
+        // assistant/stream events when present, but never discard the sole
+        // copy of a successful answer.
+        const resultText = typeof event.result === "string" ? event.result.trimEnd() : "";
+        const alreadyRendered = resultText
+          ? out.some((segment) => segment.kind === "text" && segment.text.trimEnd() === resultText)
+          : false;
+        if (resultText && !alreadyRendered) out.push({ kind: "text", text: resultText });
         out.push(narration("agent_stream.claude_finished", undefined, "good"));
       }
       continue;
