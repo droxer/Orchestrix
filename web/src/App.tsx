@@ -713,18 +713,10 @@ export function App() {
       node: activeRunOwner?.node ?? activeRuntimeNode ?? undefined,
       sandbox: selectedSandbox,
     });
-    // The stop control is offered off the session status alone, so it can be
-    // pressed before the node list has resolved. Say so rather than swallowing
-    // the click and leaving the run looking uncancellable.
-    if (!cancelNodeId) {
-      reportMutationError("Failed to cancel run", null, t("errors.cancel_run_no_node"));
-      return;
-    }
     try {
       const session = await cancelRunMutation.mutateAsync({
-        sandboxId: cancelNodeId,
         sessionId: activeRun?.sessionId ?? activeSession.id,
-        token: tokens[cancelNodeId] ?? selectedToken,
+        token: (cancelNodeId ? tokens[cancelNodeId] : undefined) ?? selectedToken,
         reason: t("cancel.reason"),
       });
       setSelectedSessionId(session.id);

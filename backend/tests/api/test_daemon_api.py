@@ -677,6 +677,57 @@ def test_cancel_command_is_redelivered_until_run_termination_confirms_it(monkeyp
         assert after_terminal.json() == {"commands": []}
 
 
+def test_session_cancel_uses_durable_run_when_node_monitor_is_stale(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _login_admin(client)
+        response = client.post("/daemon-nodes/register", json={
+            "sandboxId": "sbx_alice",
+            "employeeId": "alice",
+            "token": "node_token",
+            "workspacePath": "/workspace/alice",
+            "protocolVersion": 1,
+            "supportedAgents": ["codex"],
+            "status": "ready",
+        }, headers={"Authorization": "Bearer ui_token"})
+        assert response.status_code == 200
+
+        run = client.post("/sandboxes/sbx_alice/runs", json={
+            "taskGoal": "stop while the monitor snapshot is stale",
+            "assignments": [{"agent": "codex", "mode": "action"}],
+        }, headers={"Authorization": "Bearer ui_token"})
+        assert run.status_code == 202
+        session_id = run.json()["id"]
+        [start] = client.get(
+            "/daemon-nodes/sbx_alice/commands?leaseMode=explicit&leaseSeconds=10",
+            headers={"Authorization": "Bearer node_token"},
+        ).json()["commands"]
+
+        monitored = app.state.registry.monitor_nodes
+        monkeypatch.setattr(
+            app.state.registry,
+            "monitor_nodes",
+            lambda: [{**node, "activeRuns": []} for node in monitored()],
+        )
+
+        cancel = client.post(
+            f"/sessions/{session_id}/cancel",
+            json={"reason": "stop clicked"},
+        )
+
+        assert cancel.status_code == 200
+        [command] = client.get(
+            "/daemon-nodes/sbx_alice/commands"
+            f"?leaseMode=explicit&leaseSeconds=10&activeCommandLease={start['id']}:{start['leaseId']}",
+            headers={"Authorization": "Bearer node_token"},
+        ).json()["commands"]
+        assert command["type"] == "run.cancel"
+        assert command["sessionId"] == session_id
+
+
 def test_cancel_returns_terminal_session_when_run_finishes_before_request(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
