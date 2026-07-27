@@ -1,5 +1,6 @@
 import type { ChatConversationRef, ChatIdentity, ChatIdentityResolver, ChatProvider } from "./types.js";
 import { normalizeBaseUrl } from "./relay-client.js";
+import { relayApiUrl } from "relay-core";
 
 export interface StaticChatIdentityRecord extends ChatIdentity {
   provider: ChatProvider;
@@ -44,7 +45,7 @@ export class RelayChatIdentityResolver implements ChatIdentityResolver {
   }
 
   async resolve(ref: ChatConversationRef): Promise<ChatIdentity | undefined> {
-    const response = await this.fetchFn(`${this.baseUrl}/chat/identity/resolve`, {
+    const response = await this.fetchFn(relayApiUrl(this.baseUrl, "/internal/chat/identity/resolve"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

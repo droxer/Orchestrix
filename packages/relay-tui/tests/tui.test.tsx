@@ -277,10 +277,10 @@ describe("TUI daemon runner", () => {
       baseUrl: "http://daemon.local",
       fetchFn: (async (input, init) => {
         const url = new URL(String(input));
-        if (init?.method === "POST" && url.pathname === "/sandboxes/sbx_alice/runs") {
+        if (init?.method === "POST" && url.pathname === "/api/v1/sandboxes/sbx_alice/runs") {
           return new Response(JSON.stringify(runningSession), { status: 200, headers: { "Content-Type": "application/json" } });
         }
-        if (url.pathname === "/sessions/ses_poll_cleanup") {
+        if (url.pathname === "/api/v1/threads/ses_poll_cleanup") {
           sessionReads += 1;
           return new Response(JSON.stringify(sessionReads === 1 ? runningSession : completedSession), {
             status: 200,
@@ -422,7 +422,7 @@ describe("TUI daemon runner", () => {
       },
     });
 
-    const runCall = calls.find((call) => call.url === "http://daemon.local/sandboxes/sbx_alice/runs");
+    const runCall = calls.find((call) => call.url === "http://daemon.local/api/v1/sandboxes/sbx_alice/runs");
     assert.ok(runCall);
     assert.equal(runCall.init.method, "POST");
     assert.deepEqual(JSON.parse(String(runCall.init.body)), {
@@ -508,13 +508,13 @@ describe("TUI daemon runner", () => {
       finalOutcome: "Another Relay orchestrator is already running.",
     };
     const fetchFn = async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
-      if (String(url) === "http://daemon.local/sandboxes/sbx_alice/runs" && init?.method === "POST") {
+      if (String(url) === "http://daemon.local/api/v1/sandboxes/sbx_alice/runs" && init?.method === "POST") {
         return new Response(JSON.stringify({ ...failedSession, events: [] }), {
           status: 202,
           headers: { "Content-Type": "application/json" },
         });
       }
-      if (String(url) === "http://daemon.local/sessions/ses_failed") {
+      if (String(url) === "http://daemon.local/api/v1/threads/ses_failed") {
         return new Response(JSON.stringify(failedSession), {
           status: 200,
           headers: { "Content-Type": "application/json" },
@@ -615,13 +615,13 @@ describe("TUI daemon runner", () => {
       finalOutcome: failureMessage,
     };
     const fetchFn = async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
-      if (String(url) === "http://daemon.local/sandboxes/sbx_alice/runs" && init?.method === "POST") {
+      if (String(url) === "http://daemon.local/api/v1/sandboxes/sbx_alice/runs" && init?.method === "POST") {
         return new Response(JSON.stringify({ ...failedSession, events: [] }), {
           status: 202,
           headers: { "Content-Type": "application/json" },
         });
       }
-      if (String(url) === "http://daemon.local/sessions/ses_boxlite_busy") {
+      if (String(url) === "http://daemon.local/api/v1/threads/ses_boxlite_busy") {
         return new Response(JSON.stringify(failedSession), {
           status: 200,
           headers: { "Content-Type": "application/json" },
@@ -689,13 +689,13 @@ describe("TUI daemon runner", () => {
     };
     const fetchFn = async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
       calls.push(String(url));
-      if (String(url) === "http://daemon.local/sessions" && init?.method === "POST") {
+      if (String(url) === "http://daemon.local/api/v1/threads" && init?.method === "POST") {
         return new Response(JSON.stringify({ ...session, events: [] }), {
           status: 201,
           headers: { "Content-Type": "application/json" },
         });
       }
-      if (String(url) === "http://daemon.local/sessions/ses_poll") {
+      if (String(url) === "http://daemon.local/api/v1/threads/ses_poll") {
         return new Response(JSON.stringify(session), {
           status: 200,
           headers: { "Content-Type": "application/json" },
@@ -720,8 +720,8 @@ describe("TUI daemon runner", () => {
       },
     });
 
-    assert.ok(calls.includes("http://daemon.local/sessions"));
-    assert.ok(calls.includes("http://daemon.local/sessions/ses_poll"));
+    assert.ok(calls.includes("http://daemon.local/api/v1/threads"));
+    assert.ok(calls.includes("http://daemon.local/api/v1/threads/ses_poll"));
     assert.match(log, /Polled Codex output/);
   });
 
@@ -756,13 +756,13 @@ describe("TUI daemon runner", () => {
     const fetchFn = async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
       const body = init?.body ? JSON.parse(String(init.body)) : undefined;
       calls.push({ url: String(url), body });
-      if (String(url) === "http://daemon.local/sessions" && init?.method === "POST") {
+      if (String(url) === "http://daemon.local/api/v1/threads" && init?.method === "POST") {
         return new Response(JSON.stringify(session), { status: 201, headers: { "Content-Type": "application/json" } });
       }
-      if (String(url) === "http://daemon.local/sessions/ses_cancel") {
+      if (String(url) === "http://daemon.local/api/v1/threads/ses_cancel") {
         return new Response(JSON.stringify(cancelSeen ? cancelledSession : session), { status: 200, headers: { "Content-Type": "application/json" } });
       }
-      if (String(url) === "http://daemon.local/sandboxes/sbx_alice/runs/ses_cancel/cancel") {
+      if (String(url) === "http://daemon.local/api/v1/threads/ses_cancel/cancellations") {
         cancelSeen = true;
         resolveRun?.();
         return new Response(JSON.stringify(cancelledSession), { status: 202, headers: { "Content-Type": "application/json" } });
@@ -794,7 +794,7 @@ describe("TUI daemon runner", () => {
     assert.equal(cancelSeen, true);
     assert.equal(updatedStatus, "cancelled");
     assert.ok(calls.some((call) =>
-      call.url === "http://daemon.local/sandboxes/sbx_alice/runs/ses_cancel/cancel" &&
+      call.url === "http://daemon.local/api/v1/threads/ses_cancel/cancellations" &&
       typeof call.body === "object" &&
       call.body !== null &&
       (call.body as { reason?: string }).reason === "Cancelled by human."
@@ -2083,7 +2083,7 @@ describe("RelayTui component", () => {
     globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
       if (init?.body) bodies.push(JSON.parse(String(init.body)));
       authorizationHeaders.push(String(new Headers(init?.headers).get("authorization") ?? ""));
-      if (String(url) === "http://127.0.0.1:8790/sandboxes" && init?.method === "POST") {
+      if (String(url) === "http://127.0.0.1:8790/api/v1/sandboxes" && init?.method === "POST") {
         provisionCalls += 1;
         if (provisionCalls === 1) {
           return new Response(JSON.stringify({
@@ -2168,7 +2168,7 @@ describe("RelayTui component", () => {
     globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
       if (init?.body) bodies.push(JSON.parse(String(init.body)));
       authorizationHeaders.push(String(new Headers(init?.headers).get("authorization") ?? ""));
-      if (String(url) === "http://127.0.0.1:8790/daemon-nodes") {
+      if (String(url) === "http://127.0.0.1:8790/api/v1/daemon-nodes") {
         return new Response(JSON.stringify({
           nodes: [{
             id: "sbx_alice_live",
@@ -2187,7 +2187,7 @@ describe("RelayTui component", () => {
           }],
         }), { status: 200, headers: { "Content-Type": "application/json" } });
       }
-      if (String(url) === "http://127.0.0.1:8790/sandboxes" && init?.method === "POST") {
+      if (String(url) === "http://127.0.0.1:8790/api/v1/sandboxes" && init?.method === "POST") {
         return new Response(JSON.stringify({
           id: "sbx_alice_live",
           employeeId: "alice",
@@ -2260,10 +2260,10 @@ describe("RelayTui component", () => {
     globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
       if (init?.body) bodies.push(JSON.parse(String(init.body)));
       authorizationHeaders.push(String(new Headers(init?.headers).get("authorization") ?? ""));
-      if (String(url) === "http://127.0.0.1:8790/daemon-nodes") {
+      if (String(url) === "http://127.0.0.1:8790/api/v1/daemon-nodes") {
         return new Response(JSON.stringify({ nodes: [] }), { status: 200, headers: { "Content-Type": "application/json" } });
       }
-      if (String(url) === "http://127.0.0.1:8790/sandboxes" && init?.method === "POST") {
+      if (String(url) === "http://127.0.0.1:8790/api/v1/sandboxes" && init?.method === "POST") {
         return new Response(JSON.stringify({
           id: "sbx_bob",
           employeeId: "bob",

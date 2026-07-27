@@ -3,7 +3,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { hostWorkspacePath, loadPackageEnv, normalizeBaseUrl } from "relay-core";
+import { hostWorkspacePath, loadPackageEnv, normalizeBaseUrl, relayApiUrl } from "relay-core";
 import { ensureDaemonNodeToken } from "relay-core";
 
 loadPackageEnv("relay-tui");
@@ -205,7 +205,7 @@ export async function liveDaemonExists(
   sandboxId?: string,
 ): Promise<boolean> {
   try {
-    const response = await fetch(`${backendUrl}/daemon-nodes`, { signal: AbortSignal.timeout(1000) });
+    const response = await fetch(relayApiUrl(backendUrl, "/daemon-nodes"), { signal: AbortSignal.timeout(1000) });
     if (!response.ok) return false;
     const body = await response.json() as { nodes?: Array<{ id?: string; employeeId?: string; online?: boolean; stale?: boolean; workspacePath?: string }> };
     return (body.nodes ?? []).some((node) =>

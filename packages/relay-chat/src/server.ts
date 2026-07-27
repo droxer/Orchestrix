@@ -2,6 +2,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { relayApiUrl } from "relay-core";
 import { RelayChatGateway } from "./gateway.js";
 import { RelayChatIdentityResolver } from "./identity.js";
 import { RelayChatClient } from "./relay-client.js";
@@ -130,7 +131,7 @@ async function runtimeIntegration(
 }
 
 async function runtimeIntegrations(options: RelayChatServerOptions, fetchFn: typeof fetch): Promise<RuntimeIntegration[]> {
-  const response = await fetchFn(`${options.backendUrl.replace(/\/$/, "")}/chat/integrations/runtime`, {
+  const response = await fetchFn(relayApiUrl(options.backendUrl, "/internal/chat/integrations/runtime"), {
     headers: { Authorization: `Bearer ${options.chatToken}` },
   });
   if (!response.ok) throw new Error("Relay runtime integration lookup failed.");
