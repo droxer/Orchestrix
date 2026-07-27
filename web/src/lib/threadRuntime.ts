@@ -8,7 +8,7 @@ type ThreadComputer = {
 
 type ThreadRuntimeSession = {
   daemonNodeId?: string;
-  agentRuns: ReadonlyArray<{ agent: string; daemonNodeId?: string }>;
+  agentRuns: ReadonlyArray<{ agent: string; daemonNodeId?: string; logicalAgentId?: string }>;
 };
 
 type ThreadAgent = {
@@ -79,17 +79,28 @@ export function agentsForThreadNode<T extends ThreadAgent>(
 
 export function threadRuntimeNodeId(
   session: ThreadRuntimeSession | undefined,
+  agents: readonly ThreadAgent[] = [],
 ): string | undefined {
   if (session?.daemonNodeId) return session.daemonNodeId;
-  return [...(session?.agentRuns ?? [])]
-    .reverse()
-    .find((run) => run.daemonNodeId)
-    ?.daemonNodeId;
+  const runs = [...(session?.agentRuns ?? [])].reverse();
+  const stamped = runs.find((run) => run.daemonNodeId)?.daemonNodeId;
+  if (stamped) return stamped;
+  // Threads that predate node stamping name no computer anywhere — but the
+  // agent that ran still has an active placement, which is where the work
+  // happened. Infer the pinned computer from the latest such run.
+  for (const run of runs) {
+    if (!run.logicalAgentId) continue;
+    const agent = agents.find((item) => item.id === run.logicalAgentId);
+    const placement = agent?.placements.find((item) => item.desiredState === "active");
+    if (placement) return placement.daemonNodeId;
+  }
+  return undefined;
 }
 
 export function threadNeedsRuntimeSelection(
   session: ThreadRuntimeSession | undefined,
   composingNew: boolean,
+  agents: readonly ThreadAgent[] = [],
 ): boolean {
-  return composingNew || !threadRuntimeNodeId(session);
+  return composingNew || !threadRuntimeNodeId(session, agents);
 }

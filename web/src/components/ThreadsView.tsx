@@ -58,7 +58,6 @@ export type ThreadsViewProps = {
   selectedRuntimeNode: DaemonNodeMonitorRecord | null;
   activeRuntimeNode: DaemonNodeMonitorRecord | null;
   onRuntimeNodeChange: (nodeId: string) => void;
-  onRenameComputer: (node: DaemonNodeMonitorRecord) => void;
   agentDescriptors: Record<AgentName, { blurb: string }>;
   composerMode: AgentTaskMode;
   setComposerMode: Dispatch<SetStateAction<AgentTaskMode>>;
@@ -115,7 +114,6 @@ export function ThreadsView({
   selectedRuntimeNode,
   activeRuntimeNode,
   onRuntimeNodeChange,
-  onRenameComputer,
   agentDescriptors,
   composerMode,
   setComposerMode,
@@ -275,7 +273,6 @@ export function ThreadsView({
           selectedRuntimeNode={selectedRuntimeNode}
           activeRuntimeNode={activeRuntimeNode}
           onRuntimeNodeChange={onRuntimeNodeChange}
-          onRenameComputer={onRenameComputer}
           running={running}
           onSend={onSend}
           onCancelRun={onCancelRun}

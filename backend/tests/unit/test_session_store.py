@@ -265,6 +265,40 @@ def test_session_store_clears_pending_decision_on_cancel_decision() -> None:
         assert "pendingDecision" not in cancelled
 
 
+def test_agent_started_backfills_session_daemon_node() -> None:
+    with TemporaryDirectory() as root:
+        stores = (
+            LocalSessionStore(Path(root) / "local"),
+            DatabaseSessionStore(
+                f"sqlite:///{root}/relay.db", create_schema=True
+            ),
+        )
+        for store in stores:
+            created = store.create_session({
+                "workspacePath": "/workspace",
+                "taskGoal": "fix auth",
+                "participants": ["human", "claude"],
+            })
+            assert "daemonNodeId" not in created
+
+            pinned = store.append_event(created["id"], relay_event("agent.started", created["id"], {
+                "runId": "run_1",
+                "agent": "claude",
+                "mode": "action",
+                "daemonNodeId": "node_a",
+            }))
+            assert pinned["daemonNodeId"] == "node_a"
+            assert pinned["agentRuns"][0]["daemonNodeId"] == "node_a"
+
+            moved = store.append_event(created["id"], relay_event("agent.started", created["id"], {
+                "runId": "run_2",
+                "agent": "claude",
+                "mode": "action",
+                "daemonNodeId": "node_b",
+            }))
+            assert moved["daemonNodeId"] == "node_a"
+
+
 def test_database_session_store_persists_events_and_artifacts() -> None:
     with TemporaryDirectory() as root:
         store = DatabaseSessionStore(f"sqlite:///{root}/relay.db", create_schema=True)

@@ -41,6 +41,36 @@ describe("SessionController prompt memory", () => {
     );
   });
 
+  it("adopts the computer of a stamped agent run when the session was never pinned", async () => {
+    const store = tempStore();
+    const session = await store.createSession({
+      workspacePath: "/workspace/alice",
+      ownerEmployeeId: "alice",
+      taskGoal: "legacy thread",
+      participants: ["human", "claude"],
+    });
+    assert.equal(session.daemonNodeId, undefined);
+
+    const pinned = await store.appendEvent(session.id, relayEvent("agent.started", session.id, {
+      runId: "run_1",
+      agent: "claude",
+      logicalAgentId: "agent_panther",
+      daemonNodeId: "node_a",
+      mode: "action",
+    }));
+    assert.equal(pinned.daemonNodeId, "node_a");
+    assert.equal(pinned.agentRuns[0]?.daemonNodeId, "node_a");
+    assert.equal(pinned.agentRuns[0]?.logicalAgentId, "agent_panther");
+
+    const moved = await store.appendEvent(session.id, relayEvent("agent.started", session.id, {
+      runId: "run_2",
+      agent: "claude",
+      daemonNodeId: "node_b",
+      mode: "action",
+    }));
+    assert.equal(moved.daemonNodeId, "node_a");
+  });
+
   it("preserves the originating Team on the session event and snapshot", async () => {
     const store = tempStore();
     const session = await store.createSession({

@@ -96,6 +96,45 @@ describe("web thread helpers", () => {
     );
   });
 
+  it("infers the pinned computer from the running agent's placement on legacy threads", () => {
+    const agents = [
+      { id: "agent_a", placements: [{ daemonNodeId: "node_a", desiredState: "active" }] },
+      { id: "agent_b", placements: [{ daemonNodeId: "node_b", desiredState: "active" }] },
+      { id: "agent_gone", placements: [{ daemonNodeId: "node_c", desiredState: "removed" }] },
+    ];
+    const legacyRun = (logicalAgentId: string) => ({
+      id: `run_${logicalAgentId}`,
+      agent: "claude",
+      logicalAgentId,
+      mode: "action",
+      status: "completed",
+      startedAt: "2026-06-20T00:00:00.000Z",
+      artifactIds: [],
+    } as AgentRuns[number]);
+
+    // Latest run with a resolvable placement wins.
+    assert.equal(
+      threadRuntimeNodeId(session({ agentRuns: [legacyRun("agent_a"), legacyRun("agent_b")] }), agents),
+      "node_b",
+    );
+    // Removed placements don't count; fall through to an earlier run.
+    assert.equal(
+      threadRuntimeNodeId(session({ agentRuns: [legacyRun("agent_a"), legacyRun("agent_gone")] }), agents),
+      "node_a",
+    );
+    // A stamped session or run still wins over the inference.
+    assert.equal(
+      threadRuntimeNodeId(session({ daemonNodeId: "node_z", agentRuns: [legacyRun("agent_a")] }), agents),
+      "node_z",
+    );
+    // No agents resolved: the thread still needs a selection.
+    assert.equal(threadRuntimeNodeId(session({ agentRuns: [legacyRun("agent_a")] })), undefined);
+    assert.equal(
+      threadNeedsRuntimeSelection(session({ agentRuns: [legacyRun("agent_a")] }), false, agents),
+      false,
+    );
+  });
+
   it("lists only the employee's own non-archived sessions, newest first", () => {
     const sessions = [
       session({ id: "a", ownerEmployeeId: "alice", updatedAt: "2026-06-20T01:00:00.000Z" }),

@@ -451,12 +451,17 @@ export function materializeEvents(events: RelayEvent[]): RelaySession {
       if (!event.pendingDecision) delete session.pendingDecision;
       if (event.status !== "completed" && event.status !== "failed") delete session.finalOutcome;
     } else if (event.type === "agent.started") {
+      // Threads created before node pinning adopt the computer their first
+      // stamped run executed on.
+      if (event.daemonNodeId && !session.daemonNodeId) session.daemonNodeId = event.daemonNodeId;
       session.status = "running";
       session.phase = `${event.agent}:${event.mode}`;
       session.currentAgent = event.agent;
       session.agentRuns.push({
         id: event.runId,
         agent: event.agent,
+        ...(event.logicalAgentId ? { logicalAgentId: event.logicalAgentId } : {}),
+        ...(event.daemonNodeId ? { daemonNodeId: event.daemonNodeId } : {}),
         ...(event.role ? { role: event.role } : {}),
         ...(event.logicalAgentId ? { logicalAgentId: event.logicalAgentId } : {}),
         ...(event.placementId ? { placementId: event.placementId } : {}),

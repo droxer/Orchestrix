@@ -2,7 +2,7 @@
 
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { logout, updateComputerDisplayName, updateUserPreferences } from "./api";
+import { logout, updateUserPreferences } from "./api";
 import type { AgentName, AgentTaskMode, CurrentUser, DaemonNodeMonitorRecord, EmployeeAgent, RelayArtifact, RelaySession } from "./types";
 import { LoginScreen } from "./components/LoginScreen";
 import { type Theme, type Language } from "./components/PreferencesPanel";
@@ -147,7 +147,7 @@ export function App() {
   const atBottomRef = useRef(true);
 
   const selectedEmployeeToken = tokens[selectedEmployee];
-  const { sandboxes, nodes, sessions, tasks, isRefreshing, refresh, setSandboxes, upsertNode, upsertSession } = useRelayData(selectedEmployeeToken, Boolean(user));
+  const { sandboxes, nodes, sessions, tasks, isRefreshing, refresh, setSandboxes, upsertSession } = useRelayData(selectedEmployeeToken, Boolean(user));
   const { localNodes, refreshLocalDaemonNodes } = useLocalDaemonNodes(
     hydrated && user?.role === "admin" && canUseLocalControlPanel(),
   );
@@ -196,8 +196,8 @@ export function App() {
     selectableComputers,
     threadComputerSignature(selectableComputers),
   );
-  const activeThreadNodeId = threadRuntimeNodeId(activeSession);
-  const initializingThread = threadNeedsRuntimeSelection(activeSession, composingNew);
+  const activeThreadNodeId = threadRuntimeNodeId(activeSession, logicalAgents);
+  const initializingThread = threadNeedsRuntimeSelection(activeSession, composingNew, logicalAgents);
   const selectedThreadNodeId = initializingThread
     ? newThreadNodeId
     : activeThreadNodeId ?? null;
@@ -594,32 +594,6 @@ export function App() {
       await renameSessionMutation.mutateAsync({ sessionId: session.id, title: next, token: selectedToken });
     } catch {
       // mutation onError surfaces a toast.
-    }
-  }
-
-  async function renameComputer(node: DaemonNodeMonitorRecord) {
-    const current = node.displayName?.trim() && node.displayName !== node.id
-      ? node.displayName.trim()
-      : "";
-    const result = await prompt({
-      title: t("thread.rename_computer"),
-      message: t("thread.rename_computer_message", { id: node.id }),
-      defaultValue: current,
-      placeholder: t("thread.computer_name_placeholder"),
-      confirmLabel: t("thread.rename"),
-    });
-    if (result === null) return;
-    const next = result.trim();
-    if (next === current) return;
-    try {
-      const renamed = await updateComputerDisplayName(node.id, next || null);
-      upsertNode(renamed.node);
-    } catch (error) {
-      reportMutationError(
-        "Failed to rename computer",
-        error,
-        t("errors.rename_computer"),
-      );
     }
   }
 
@@ -1037,7 +1011,6 @@ export function App() {
             selectedRuntimeNode={stableSelectedThreadComputer}
             activeRuntimeNode={activeRuntimeNode}
             onRuntimeNodeChange={setNewThreadNodeId}
-            onRenameComputer={(node) => void renameComputer(node)}
             agentDescriptors={agentDescriptors}
             composerMode={composerMode}
             setComposerMode={setComposerMode}

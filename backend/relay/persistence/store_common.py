@@ -168,6 +168,11 @@ def materialize_events(events: list[dict[str, Any]]) -> dict[str, Any]:
             # A staged daemon command can be recovered by another backend
             # replica. Replaying its start must not duplicate the run or move a
             # terminal session back to running.
+            if event.get("daemonNodeId") and not session.get("daemonNodeId"):
+                # Threads created before node pinning (or via paths that never
+                # stamped session.created) adopt the computer their first
+                # stamped run executed on.
+                session["daemonNodeId"] = event["daemonNodeId"]
             if not any(run["id"] == event["runId"] for run in session["agentRuns"]):
                 session["status"] = "running"
                 session["phase"] = f"{event['agent']}:{event['mode']}"
