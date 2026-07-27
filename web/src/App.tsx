@@ -10,7 +10,7 @@ import type { ThreadItem } from "./components/ThreadRow";
 import { useRelayData } from "./hooks/useRelayData";
 import { useRelayMutations } from "./hooks/useRelayMutations";
 import { useMutationError } from "./hooks/useMutationError";
-import { useAppHash } from "./hooks/useAppHash";
+import { useAppRouter } from "./hooks/useAppRouter";
 import { useSessionEvents } from "./hooks/useSessionEvents";
 import { useLocalDaemonNodes } from "./hooks/useLocalDaemonNodes";
 import { mergeThreadRuntimeNodes, mergeVisibleDaemonNodes } from "./lib/daemonNodes";
@@ -53,6 +53,7 @@ import {
   threadRuntimeNodeId,
 } from "./lib/threadRuntime";
 import { useStableValue } from "./hooks/useStableValue";
+import { validatedReturnTo } from "./lib/appRoute";
 
 const AdminPage = lazy(() => import("./components/AdminPage").then((m) => ({ default: m.AdminPage })));
 const BacklogPage = lazy(() => import("./components/BacklogPage").then((m) => ({ default: m.BacklogPage })));
@@ -245,6 +246,13 @@ export function App() {
     setActiveSessionId(sessionId);
   }, [setActiveSessionId, setSelectedSessionId]);
 
+  const setComposingNewFromPath = useCallback((next: boolean) => {
+    setComposingNew(next);
+    if (!next) return;
+    setSelectedSessionId(undefined);
+    setActiveSessionId(null);
+  }, [setActiveSessionId, setSelectedSessionId]);
+
   const clearPendingMessage = useCallback(() => {
     setPendingUserMessage(null);
   }, []);
@@ -253,19 +261,42 @@ export function App() {
     route,
     mobileView,
     agentWorkspaceId,
+    teamWorkspaceId,
+    notFound,
+    isLoginPath,
     navigateToRoute,
     navigateToMobileView,
     hrefForSideNavRoute,
-    syncChatHash,
+    syncThreadUrl,
     navigateToAgentWorkspace,
-  } = useAppHash({
+    navigateToTeamWorkspace,
+    navigateToLogin,
+  } = useAppRouter({
     composingNew,
     activeSessionId,
     selectedSessionId,
     activeSession,
-    onApplySessionFromHash: applySessionFromHash,
+    onApplySessionFromPath: applySessionFromHash,
+    onSetComposingNewFromPath: setComposingNewFromPath,
     onClearPendingMessage: clearPendingMessage,
   });
+
+  useEffect(() => {
+    if (!mounted || !authChecked || typeof window === "undefined") return;
+    const current = `${window.location.pathname}${window.location.search}`;
+    if (!user && window.location.pathname !== "/login") {
+      const returnTo = validatedReturnTo(current, window.location.origin);
+      const loginUrl = `/login?returnTo=${encodeURIComponent(returnTo)}`;
+      window.history.replaceState(window.history.state, "", loginUrl);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+      return;
+    }
+    if (user && isLoginPath) {
+      const returnTo = validatedReturnTo(new URL(window.location.href).searchParams.get("returnTo"), window.location.origin);
+      window.history.replaceState(window.history.state, "", returnTo);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    }
+  }, [authChecked, isLoginPath, mounted, user]);
 
   useEffect(() => {
     const workspaceAgent = logicalAgents.find((agent) => agent.id === agentWorkspaceId);
@@ -545,7 +576,7 @@ export function App() {
     setPendingUserMessage(null);
     setSelectedSessionId(sessionId);
     setActiveSessionId(sessionId);
-    syncChatHash(sessionId, replace);
+    syncThreadUrl(sessionId, replace);
   }
 
   function startNewThread() {
@@ -560,7 +591,7 @@ export function App() {
     ));
     composerRef.current?.clear();
     atBottomRef.current = true;
-    syncChatHash(null);
+    syncThreadUrl(null);
   }
 
   function openAgentWorkspace(agent: EmployeeAgent, tab?: WorkspacePageTab) {
@@ -569,8 +600,8 @@ export function App() {
     navigateToAgentWorkspace(agent.id);
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
-      if (tab && tab !== "activities") url.searchParams.set("workspaceTab", tab);
-      else url.searchParams.delete("workspaceTab");
+      if (tab && tab !== "activities") url.searchParams.set("tab", tab);
+      else url.searchParams.delete("tab");
       window.history.replaceState(window.history.state, "", url);
     }
   }
@@ -612,7 +643,7 @@ export function App() {
       if (activeSession?.id === sessionId) {
         setSelectedSessionId(undefined);
         setActiveSessionId(null);
-        syncChatHash(null, true);
+        navigateToRoute("main");
       }
     } catch {
       // mutation onError surfaces a toast.
@@ -690,7 +721,7 @@ export function App() {
       setActiveSessionId(done.id);
       setSelectedSessionId(done.id);
       setComposingNew(false);
-      syncChatHash(done.id, true);
+      syncThreadUrl(done.id, true);
       await refresh();
     } catch (error) {
       setPendingUserMessage(null);
@@ -728,7 +759,7 @@ export function App() {
         reason: t("cancel.reason"),
       });
       setSelectedSessionId(session.id);
-      syncChatHash(session.id, true);
+      syncThreadUrl(session.id, true);
     } catch {
       // mutation onError surfaces a toast.
     }
@@ -773,7 +804,7 @@ export function App() {
             decision: { kind: "rerun", targetAgent: assignment.agent },
           });
         setSelectedSessionId(done.id);
-        syncChatHash(done.id, true);
+        syncThreadUrl(done.id, true);
         await refresh();
       } catch (error) {
         reportMutationError(
@@ -793,7 +824,7 @@ export function App() {
         token: selectedToken,
       });
       setSelectedSessionId(session.id);
-      syncChatHash(session.id, true);
+      syncThreadUrl(session.id, true);
     } catch {
       // mutation onError surfaces a toast.
     }
@@ -829,7 +860,7 @@ export function App() {
           decision: { kind: "rerun", targetAgent: agent },
         });
       setSelectedSessionId(done.id);
-      syncChatHash(done.id, true);
+      syncThreadUrl(done.id, true);
       await refresh();
     } catch (error) {
       reportMutationError(
@@ -868,7 +899,7 @@ export function App() {
           },
         });
       setSelectedSessionId(done.id); setHandoffNote(""); setHandoffMode("action"); setHandoffOpen(false); setActiveAgent(logicalAgent.executorKind); setActiveLogicalAgentId(logicalAgent.id);
-      syncChatHash(done.id, true);
+      syncThreadUrl(done.id, true);
       await refresh();
     } catch (error) {
       reportMutationError(
@@ -888,8 +919,7 @@ export function App() {
       // ignore
     }
     setUser(null);
-    navigateToRoute("main");
-    syncChatHash(null, true);
+    navigateToLogin(true);
   }
 
   if (!mounted || !authChecked || (user && preferencesUserId !== user.id)) {
@@ -934,7 +964,12 @@ export function App() {
       onLanguageChange={handleLanguageChange}
     >
       <Suspense fallback={<RouteFallback />}>
-        {route === "admin" ? <AdminPage currentUser={user} /> : route === "channels" ? <ChannelsPage /> : route === "backlog" ? (
+        {notFound ? (
+          <section className="route-loading" role="status">
+            <h1>Page not found</h1>
+            <p>The requested Relay page does not exist.</p>
+          </section>
+        ) : route === "admin" ? <AdminPage currentUser={user} /> : route === "channels" ? <ChannelsPage /> : route === "backlog" ? (
           <BacklogPage
             tasks={tasks}
             sessions={sessions}
@@ -960,6 +995,8 @@ export function App() {
             isRefreshing={isRefreshing}
             onRefresh={() => refresh()}
             onOpenThread={openThread}
+            teamId={teamWorkspaceId}
+            onSelectTeam={navigateToTeamWorkspace}
           />
         ) : route === "agents" ? (
           <AgentsPage

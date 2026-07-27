@@ -1,4 +1,4 @@
-import { relayApiPath } from "relay-core";
+import { relayApiPath } from "relay-core/api-url";
 
 /** Raw download/streaming URL for an artifact body. */
 export function artifactRawHref(sessionId: string, artifactId: string): string {

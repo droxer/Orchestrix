@@ -177,9 +177,9 @@ export function AgentsPage({
   const { t } = useTranslation();
   const { agents, isFetching } = useEmployeeAgents(currentUser.employeeId);
   const descriptors = useMemo(() => agentDescriptors(t), [t]);
-  const [query, setQuery] = useUrlSearchState("agentsQ", "", (value) => value ?? "", (value) => value || null);
+  const [query, setQuery] = useUrlSearchState("q", "", (value) => value ?? "", (value) => value || null);
   const [availability, setAvailability] = useUrlSearchState(
-    "agentsFilter",
+    "availability",
     "all" as AvailabilityFilter,
     parseAvailabilityFilter,
     (value) => value === "all" ? null : value,

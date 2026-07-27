@@ -1,12 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { APP_NAVIGATION_EVENT } from "../lib/appRoute";
 
 export function useUrlSearchState<T>(
   key: string,
   fallback: T,
   parse: (value: string | null) => T,
   serialize: (value: T) => string | null,
+  historyMode: "replace" | "push" = "replace",
 ): [T, (value: T | ((current: T) => T)) => void] {
   const read = useCallback(() => {
     if (typeof window === "undefined") return fallback;
@@ -17,7 +19,11 @@ export function useUrlSearchState<T>(
   useEffect(() => {
     const sync = () => setValue(read());
     window.addEventListener("popstate", sync);
-    return () => window.removeEventListener("popstate", sync);
+    window.addEventListener(APP_NAVIGATION_EVENT, sync);
+    return () => {
+      window.removeEventListener("popstate", sync);
+      window.removeEventListener(APP_NAVIGATION_EVENT, sync);
+    };
   }, [read]);
 
   const update = useCallback((nextValue: T | ((current: T) => T)) => {
@@ -29,10 +35,10 @@ export function useUrlSearchState<T>(
       const encoded = serialize(next);
       if (encoded === null) url.searchParams.delete(key);
       else url.searchParams.set(key, encoded);
-      window.history.replaceState(window.history.state, "", url);
+      window.history[historyMode === "push" ? "pushState" : "replaceState"](window.history.state, "", url);
       return next;
     });
-  }, [key, serialize]);
+  }, [historyMode, key, serialize]);
 
   return [value, update];
 }

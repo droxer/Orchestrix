@@ -27,7 +27,7 @@ import { AgentPersonalityEditor } from "./AgentPersonalityEditor";
 import { PlacementList } from "./PlacementList";
 import { describeAgentPlacements } from "../lib/agentPlacements";
 import { ProfileImagePicker } from "./ProfileImagePicker";
-import { hashForAppState } from "../lib/appRoute";
+import { pathForAppState } from "../lib/appRoute";
 
 export interface AgentProfilePanelProps {
   agent: EmployeeAgent;
@@ -419,7 +419,7 @@ export function AgentProfilePanel({
             {onOpenWorkspace ? (
               <a
                 data-slot="link-button"
-                href={hashForAppState({ route: "agents", mobileView: "chat", sessionId: null, agentWorkspaceId: agent.id })}
+                href={pathForAppState({ route: "agents", mobileView: "chat", sessionId: null, agentWorkspaceId: agent.id })}
                 className={buttonVariants({ variant: "outline" })}
                 onClick={(event) => {
                   if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.altKey || event.ctrlKey || event.shiftKey) return;
@@ -590,7 +590,7 @@ export function AgentProfilePanel({
           {onOpenWorkspace ? (
             <a
               data-slot="link-button"
-              href={hashForAppState({ route: "agents", mobileView: "chat", sessionId: null, agentWorkspaceId: agent.id })}
+              href={pathForAppState({ route: "agents", mobileView: "chat", sessionId: null, agentWorkspaceId: agent.id })}
               className={buttonVariants({ variant: "outline" })}
               onClick={(event) => {
                 if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.altKey || event.ctrlKey || event.shiftKey) return;

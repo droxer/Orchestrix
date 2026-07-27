@@ -23,25 +23,23 @@ export function TeamsPage({
   isRefreshing,
   onRefresh,
   onOpenThread,
+  teamId,
+  onSelectTeam,
 }: {
   currentUser: CurrentUser;
   isRefreshing: boolean;
   onRefresh: () => Promise<void>;
   onOpenThread: (sessionId: string) => void;
+  teamId: string | null;
+  onSelectTeam: (teamId: string | null) => void;
 }) {
   const { t } = useTranslation();
   const { teams, isFetching } = useTeams(currentUser.employeeId);
-  const [teamId, setTeamId] = useUrlSearchState<string | null>(
-    "team",
-    null,
-    (value) => value,
-    (value) => value,
-  );
   const [addTeam, setAddTeam] = useUrlSearchState(
-    "addTeam",
+    "dialog",
     false,
-    (value) => value === "1",
-    (value) => value ? "1" : null,
+    (value) => value === "create",
+    (value) => value ? "create" : null,
   );
   const sortedTeams = useMemo(
     () => [...teams].sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: "base" })),
@@ -87,7 +85,7 @@ export function TeamsPage({
                         type="button"
                         className="teams-list-row-select"
                         aria-current={team.id === selectedTeam?.id ? "page" : undefined}
-                        onClick={() => setTeamId(team.id)}
+                        onClick={() => onSelectTeam(team.id)}
                       >
                         <span className="teams-list-mark" aria-hidden="true">
                           <ProfileImage
@@ -128,7 +126,7 @@ export function TeamsPage({
             isRefreshing={isRefreshing}
             onRefresh={onRefresh}
             onOpenThread={onOpenThread}
-            onDeleted={() => setTeamId(null)}
+            onDeleted={() => onSelectTeam(null)}
           />
         ) : (
           <RelayEmptyState fill mark title={t("teams.select_title")} body={t("teams.select_body")} />

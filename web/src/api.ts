@@ -1,4 +1,4 @@
-import { relayApiPath } from "relay-core";
+import { relayApiPath } from "relay-core/api-url";
 import type {
   AgentArtifactsResponse,
   AgentName,

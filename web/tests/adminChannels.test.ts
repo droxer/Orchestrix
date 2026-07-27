@@ -5,7 +5,7 @@ import { describe, it } from "node:test";
 
 describe("Admin channel setup navigation", () => {
   it("renders Channels setup only on the top-level route, not on the admin page", async () => {
-    // Channels lives at #/channels (sidebar Manage group); the admin page
+    // Channels lives at /channels (sidebar Manage group); the admin page
     // must NOT embed a duplicate integrations view or toggle segment.
     const storeSource = await readFile(resolve("web/src/lib/store.ts"), "utf8");
     const adminPageSource = await readFile(resolve("web/src/components/AdminPage.tsx"), "utf8");
