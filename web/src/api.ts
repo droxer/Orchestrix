@@ -753,8 +753,8 @@ export function runLogicalAgents(input: AgentRunInput): Promise<RelaySession> {
   });
 }
 
-export function cancelRun(sandboxId: string, sessionId: string, token?: string, reason?: string): Promise<RelaySession> {
-  return apiJson<RelaySession>(`/sandboxes/${encodeURIComponent(sandboxId)}/runs/${encodeURIComponent(sessionId)}/cancel`, {
+export function cancelRun(sessionId: string, token?: string, reason?: string): Promise<RelaySession> {
+  return apiJson<RelaySession>(`/sessions/${encodeURIComponent(sessionId)}/cancel`, {
     method: "POST",
     token,
     body: { reason: reason ?? "Cancelled from Relay Web UI." },
