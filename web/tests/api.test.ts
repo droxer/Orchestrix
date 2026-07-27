@@ -176,6 +176,7 @@ describe("apiJson", () => {
 
     await runLogicalAgents({
       taskGoal: "Build it",
+      daemonNodeId: "node_selected",
       assignments: [{ agentId: "agent_builder", mode: "action" }],
       sessionId: "ses_existing",
       userMessageId: "evt_user",
@@ -185,6 +186,7 @@ describe("apiJson", () => {
     assert.equal(requestUrl, "/agent-runs");
     assert.deepEqual(requestBody, {
       taskGoal: "Build it",
+      daemonNodeId: "node_selected",
       assignments: [{ agentId: "agent_builder", mode: "action" }],
       sessionId: "ses_existing",
       userMessageId: "evt_user",

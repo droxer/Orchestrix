@@ -1516,6 +1516,11 @@ describe("token usage accounting", () => {
         agent: "codex",
         role: "fixer",
         mode: "action",
+        logicalAgentId: "agent_builder",
+        placementId: "placement_1",
+        daemonNodeId: "node_1",
+        agentVersion: 7,
+        workspaceIdentity: { workspacePath: "/workspace" },
       }),
       relayEvent("agent.completed", sessionId, {
         runId: "run_1",
@@ -1529,6 +1534,11 @@ describe("token usage accounting", () => {
     const session = materializeEvents(events);
 
     assert.deepEqual(session.agentRuns[0].tokenUsage, { input: 5, output: 7, cache: 3, total: 15, source: "codex" });
+    assert.equal(session.agentRuns[0].logicalAgentId, "agent_builder");
+    assert.equal(session.agentRuns[0].placementId, "placement_1");
+    assert.equal(session.agentRuns[0].daemonNodeId, "node_1");
+    assert.equal(session.agentRuns[0].agentVersion, 7);
+    assert.deepEqual(session.agentRuns[0].workspaceIdentity, { workspacePath: "/workspace" });
     assert.deepEqual(session.tokenUsage, { input: 5, output: 7, cache: 3, total: 15 });
   });
 

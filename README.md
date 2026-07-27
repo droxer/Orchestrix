@@ -17,9 +17,9 @@ processes.
 </p>
 
 This repository contains the developer MVP: a Python/FastAPI control plane,
-TypeScript daemons and clients, a Next.js web app, optional PostgreSQL storage,
-and BoxLite-backed execution. Relay can also run an agent on an employee's
-existing computer without BoxLite.
+TypeScript daemons and clients, a Next.js web app, database-backed thread and
+task storage, and BoxLite-backed execution. Relay can also run an agent on an
+employee's existing computer without BoxLite.
 
 ## What works today
 
@@ -35,8 +35,8 @@ existing computer without BoxLite.
 - Human approval, cancellation, retry, and handoff flows in the TUI.
 - A provider-neutral chat gateway with Discord, Telegram, and Lark adapters.
 - Admin views for employees, computers, fleet health, activity, and token usage.
-- File-backed event stores for local development and PostgreSQL-backed control
-  plane storage for deployments.
+- Database-backed thread and task event stores, with optional file-backed
+  development stores only for non-thread operational state.
 
 The backend never runs an agent CLI. It records state and queues commands. A
 daemon claims each command, executes it in BoxLite or a configured local
@@ -143,13 +143,16 @@ provider available for external infrastructure.
 
 ## State and storage
 
-Local development stores generated state under `.relay/`. Session and task
-event logs remain authoritative; JSON snapshots provide materialized views.
+Thread/session state is always stored in the configured database. Local
+development may still store non-thread generated state under `.relay/`.
 Agent workspace views use live daemon reads when a computer is online and fall
 back to generated-file snapshots when possible.
 
-Set `RELAY_STORAGE=postgres` and configure `RELAY_DATABASE_URL` to store control
-plane records in PostgreSQL. Artifact bodies remain on disk.
+Configure `RELAY_DATABASE_URL` (or `DATABASE_URL`) before starting the backend;
+threads, ordered events, artifact snapshots, token usage, tasks, and thread-task
+links are database-only.
+Set `RELAY_STORAGE=postgres` to place the remaining control-plane records in
+PostgreSQL as well.
 
 ## Documentation
 

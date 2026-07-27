@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from tempfile import TemporaryDirectory
 
+import pytest
+from relay.persistence.session_store import DatabaseSessionStore
 from relay.persistence.store_common import relay_task_event
-from relay.persistence.stores import DatabaseTaskStore, LocalTaskStore
+from relay.persistence.task_store import DatabaseTaskStore, LocalTaskStore
+from sqlalchemy import text
 
 
 def test_task_store_persists_assignment_status_activity_and_link() -> None:
@@ -52,20 +56,22 @@ def test_local_task_store_link_session_is_idempotent() -> None:
 
         with ThreadPoolExecutor(max_workers=2) as pool:
             list(
-                pool.map(
-                    lambda _: store.link_session(task["id"], "ses_test"), range(2)
-                )
+                pool.map(lambda _: store.link_session(task["id"], "ses_test"), range(2))
             )
         linked = store.get_task(task["id"])
 
         assert linked["linkedSessionIds"] == ["ses_test"]
-        assert sum(
-            event["type"] == "task.session_linked" for event in linked["events"]
-        ) == 1
-        assert sum(
-            activity["message"] == "Linked session ses_test."
-            for activity in linked["activity"]
-        ) == 1
+        assert (
+            sum(event["type"] == "task.session_linked" for event in linked["events"])
+            == 1
+        )
+        assert (
+            sum(
+                activity["message"] == "Linked session ses_test."
+                for activity in linked["activity"]
+            )
+            == 1
+        )
 
 
 def test_local_task_store_serializes_concurrent_appends() -> None:
@@ -105,7 +111,16 @@ def test_local_task_store_serializes_concurrent_appends() -> None:
 
 def test_database_task_store_persists_assignment_status_activity_and_link() -> None:
     with TemporaryDirectory() as root:
-        store = DatabaseTaskStore(f"sqlite:///{root}/relay.db", create_schema=True)
+        database_url = f"sqlite:///{root}/relay.db"
+        session_store = DatabaseSessionStore(database_url, create_schema=True)
+        store = DatabaseTaskStore(database_url, create_schema=True)
+        session = session_store.create_session(
+            {
+                "workspacePath": "/workspace",
+                "taskGoal": "linked task",
+                "participants": ["human"],
+            }
+        )
         task = store.create_task(
             {
                 "title": "Add Kanban board",
@@ -124,7 +139,7 @@ def test_database_task_store_persists_assignment_status_activity_and_link() -> N
         task = store.update_task(
             task["id"], {"routineNextRunDate": "2026-07-25", "routineEnabled": False}
         )
-        task = store.link_session(task["id"], "ses_test")
+        task = store.link_session(task["id"], session["id"])
         task = store.update_task(task["id"], {"status": "running"})
 
         assert task["assigneeEmployeeId"] == "alice"
@@ -136,7 +151,7 @@ def test_database_task_store_persists_assignment_status_activity_and_link() -> N
         assert task["routineEnabled"] is False
         assert task["assignedAgent"] == "codex"
         assert task["assignedAgentId"] == "agent_builder"
-        assert task["linkedSessionIds"] == ["ses_test"]
+        assert task["linkedSessionIds"] == [session["id"]]
         assert task["status"] == "running"
         assert store.list_tasks()[0]["id"] == task["id"]
         assert any("Assigned to codex" in item["message"] for item in task["activity"])
@@ -144,29 +159,42 @@ def test_database_task_store_persists_assignment_status_activity_and_link() -> N
 
 def test_database_task_store_link_session_is_idempotent() -> None:
     with TemporaryDirectory() as root:
-        store = DatabaseTaskStore(f"sqlite:///{root}/relay.db", create_schema=True)
-        other_store = DatabaseTaskStore(f"sqlite:///{root}/relay.db")
+        database_url = f"sqlite:///{root}/relay.db"
+        session_store = DatabaseSessionStore(database_url, create_schema=True)
+        store = DatabaseTaskStore(database_url, create_schema=True)
+        other_store = DatabaseTaskStore(database_url)
+        session = session_store.create_session(
+            {
+                "workspacePath": "/workspace",
+                "taskGoal": "link once",
+                "participants": ["human"],
+            }
+        )
         task = store.create_task({"title": "Link once"})
 
         with ThreadPoolExecutor(max_workers=2) as pool:
             list(
                 pool.map(
                     lambda task_store: task_store.link_session(
-                        task["id"], "ses_test"
+                        task["id"], session["id"]
                     ),
                     (store, other_store),
                 )
             )
         linked = store.get_task(task["id"])
 
-        assert linked["linkedSessionIds"] == ["ses_test"]
-        assert sum(
-            event["type"] == "task.session_linked" for event in linked["events"]
-        ) == 1
-        assert sum(
-            activity["message"] == "Linked session ses_test."
-            for activity in linked["activity"]
-        ) == 1
+        assert linked["linkedSessionIds"] == [session["id"]]
+        assert (
+            sum(event["type"] == "task.session_linked" for event in linked["events"])
+            == 1
+        )
+        assert (
+            sum(
+                activity["message"] == f"Linked session {session['id']}."
+                for activity in linked["activity"]
+            )
+            == 1
+        )
 
 
 def test_task_claim_orders_by_priority_due_date_and_assignee() -> None:
@@ -529,7 +557,9 @@ def test_local_task_store_supports_canonical_assignment_and_dispatch_leases() ->
         )
 
 
-def test_database_task_store_supports_canonical_assignment_and_dispatch_leases() -> None:
+def test_database_task_store_supports_canonical_assignment_and_dispatch_leases() -> (
+    None
+):
     with TemporaryDirectory() as root:
         assert_store_supports_canonical_assignment_and_dispatch_leases(
             DatabaseTaskStore(f"sqlite:///{root}/relay.db", create_schema=True)
@@ -551,9 +581,7 @@ def assert_store_records_routine_occurrence_lineage(store) -> None:
         }
     )
 
-    occurrence = store.promote_due_routine(
-        routine["id"], "2026-06-25", "2026-07-02"
-    )
+    occurrence = store.promote_due_routine(routine["id"], "2026-06-25", "2026-07-02")
 
     assert occurrence is not None
     assert occurrence["sourceRoutineId"] == routine["id"]
@@ -666,3 +694,67 @@ def test_database_task_store_team_assignment_contract() -> None:
         assert_team_assignment_contract(
             DatabaseTaskStore(f"sqlite:///{root}/team-tasks.db", create_schema=True)
         )
+
+
+def test_database_task_store_unlinks_session() -> None:
+    with TemporaryDirectory() as root:
+        database_url = f"sqlite:///{root}/unlink.db"
+        session_store = DatabaseSessionStore(database_url, create_schema=True)
+        store = DatabaseTaskStore(database_url, create_schema=True)
+        session = session_store.create_session(
+            {
+                "workspacePath": "/workspace",
+                "taskGoal": "unlink deleted thread",
+                "participants": ["human"],
+            }
+        )
+        task = store.create_task({"title": "Unlink deleted thread"})
+        store.link_session(task["id"], session["id"])
+
+        updated = store.unlink_session(task["id"], session["id"])
+        repeated = store.unlink_session(task["id"], session["id"])
+
+        assert updated["linkedSessionIds"] == []
+        assert repeated["linkedSessionIds"] == []
+        assert (
+            sum(
+                event["type"] == "task.session_unlinked" for event in repeated["events"]
+            )
+            == 1
+        )
+
+
+def test_database_task_store_rejects_link_to_unknown_session(tmp_path: Path) -> None:
+    database_url = f"sqlite:///{tmp_path}/relay.db"
+    DatabaseSessionStore(database_url, create_schema=True)
+    store = DatabaseTaskStore(database_url, create_schema=True)
+    task = store.create_task({"title": "Reject dangling link"})
+
+    with pytest.raises(KeyError, match="Unknown session"):
+        store.link_session(task["id"], "ses_missing")
+
+    assert store.get_task(task["id"])["linkedSessionIds"] == []
+
+
+def test_database_task_store_verify_schema_rejects_missing_constraint(
+    tmp_path: Path,
+) -> None:
+    database_url = f"sqlite:///{tmp_path}/tasks.db"
+    store = DatabaseTaskStore(database_url, create_schema=True)
+    with store.engine.begin() as conn:
+        conn.execute(text("DROP TABLE task_sessions"))
+        conn.execute(
+            text(
+                """
+                CREATE TABLE task_sessions (
+                    id TEXT PRIMARY KEY,
+                    task_id TEXT NOT NULL,
+                    session_public_id TEXT NOT NULL,
+                    created_at DATETIME NOT NULL
+                )
+                """
+            )
+        )
+
+    with pytest.raises(RuntimeError, match="task_id, session_public_id"):
+        store.verify_schema()

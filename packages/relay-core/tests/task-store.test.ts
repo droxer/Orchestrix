@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { LocalTaskStore, materializeTaskEvents, relayTaskEvent } from "../src/index.js";
+import { materializeTaskEvents, relayTaskEvent } from "../src/index.js";
+import { LocalTaskStore } from "../src/task-store.js";
 
 function tempStore(): LocalTaskStore {
   return new LocalTaskStore(mkdtempSync(join(tmpdir(), "relay-task-store-")));

@@ -161,17 +161,36 @@ RELAY_DATABASE_URL=postgresql+psycopg://relay:relay@localhost:5432/relay \
 placeholder URL in `backend/alembic.ini`. Values from the shell take precedence over
 values loaded from `backend/.env`.
 
-Set `RELAY_STORAGE=postgres` to store backend operational state in PostgreSQL:
-sessions, session events, task state, task events, daemon nodes, daemon commands,
-daemon runs, daemon events, auth users, browser sessions, and employees. Session
+`RELAY_DATABASE_URL` is mandatory because sessions, session events, retained
+artifact content, token usage, tasks, task events, and thread-task links are
+database-only. Set
+`RELAY_STORAGE=postgres` to store the remaining operational state in PostgreSQL:
+daemon nodes, daemon commands, daemon runs, daemon events, auth users, browser
+sessions, and employees. Session
 tokens and daemon node tokens are stored as hashes; raw tokens are returned only
-once when created. Artifact file bodies still live on disk, with metadata stored
-in the database.
+once when created.
 
-Without `RELAY_STORAGE=postgres`, the backend keeps using local `.relay/*.json`
-files for development. The older `RELAY_AUTH_STORE=database` and
+Without `RELAY_STORAGE=postgres`, non-thread stores may still use local
+`.relay/*.json` files for development; sessions and tasks never do. The older
+`RELAY_AUTH_STORE=database` and
 `RELAY_DAEMON_STORE=database` switches still work for targeted compatibility,
 but new product deployments should use `RELAY_STORAGE=postgres`.
+
+### Importing legacy thread files
+
+Stop the backend, back up both PostgreSQL and `.relay`, then validate the
+legacy event logs without writing database rows:
+
+```bash
+RELAY_DATABASE_URL=postgresql+psycopg://relay:relay@localhost:5432/relay \
+  uv run --project backend relay migrate-local-sessions \
+  --data-dir .relay --dry-run
+```
+
+Remove `--dry-run` to import. The command is idempotent when the database has
+the identical ordered event history and fails on divergent session IDs. It
+never edits or deletes the source directory. Keep the legacy directory
+read-only through the rollback window; the running backend does not read it.
 
 ## BoxLite Devbox
 

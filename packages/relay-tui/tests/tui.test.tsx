@@ -19,7 +19,8 @@ import {
   type RunRequest,
 } from "../src/tui.js";
 import { backendArgs, daemonArgs, liveDaemonExists, resolveLocalRunConfig, resolveRepoRootFromDist } from "../src/local-run.js";
-import { LocalSessionStore, type RelayDaemonClient, type RelaySession } from "../../relay-core/src/index.js";
+import { type RelayDaemonClient, type RelaySession } from "../../relay-core/src/index.js";
+import { LocalSessionStore } from "../../relay-core/src/session-store.js";
 
 function testSessionStore(): LocalSessionStore {
   return new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-tui-")));

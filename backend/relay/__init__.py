@@ -10,8 +10,6 @@ __all__ = [
     "DatabaseTaskStore",
     "DatabaseUserAuthStore",
     "LocalDaemonStore",
-    "LocalSessionStore",
-    "LocalTaskStore",
     "ServerDaemonNodeBackend",
     "SessionController",
     "create_app",
@@ -37,8 +35,6 @@ def __getattr__(name: str) -> Any:
         "DatabaseSessionStore",
         "DatabaseTaskStore",
         "LocalDaemonStore",
-        "LocalSessionStore",
-        "LocalTaskStore",
     }:
         from .persistence.stores import (
             DEFAULT_RELAY_DATA_DIR,
@@ -46,8 +42,6 @@ def __getattr__(name: str) -> Any:
             DatabaseSessionStore,
             DatabaseTaskStore,
             LocalDaemonStore,
-            LocalSessionStore,
-            LocalTaskStore,
         )
 
         return {
@@ -56,8 +50,6 @@ def __getattr__(name: str) -> Any:
             "DatabaseSessionStore": DatabaseSessionStore,
             "DatabaseTaskStore": DatabaseTaskStore,
             "LocalDaemonStore": LocalDaemonStore,
-            "LocalSessionStore": LocalSessionStore,
-            "LocalTaskStore": LocalTaskStore,
         }[name]
     if name == "DatabaseUserAuthStore":
         from .security.auth import DatabaseUserAuthStore

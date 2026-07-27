@@ -207,8 +207,6 @@ export {
 } from "./nodes.js";
 
 export {
-  LocalSessionStore,
-  DEFAULT_RELAY_DATA_DIR,
   materializeEvents,
   newRelayId,
   nowIso,
@@ -226,7 +224,6 @@ export {
 } from "./session-store.js";
 
 export {
-  LocalTaskStore,
   materializeTaskEvents,
   relayTaskEvent,
   taskPriority,

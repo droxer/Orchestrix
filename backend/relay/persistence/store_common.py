@@ -352,6 +352,12 @@ def materialize_task_events(events: list[dict[str, Any]]) -> dict[str, Any]:
         elif event_type == "task.session_linked":
             if event["sessionId"] not in task["linkedSessionIds"]:
                 task["linkedSessionIds"].append(event["sessionId"])
+        elif event_type == "task.session_unlinked":
+            task["linkedSessionIds"] = [
+                session_id
+                for session_id in task["linkedSessionIds"]
+                if session_id != event["sessionId"]
+            ]
         elif event_type == "task.activity":
             task["activity"].append(event["activity"])
     return task

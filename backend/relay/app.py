@@ -1,38 +1,61 @@
 from __future__ import annotations
 
+import os
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from datetime import date, datetime
-import os
 from pathlib import Path
-from typing import Any, AsyncIterator, Callable
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI
 from loguru import logger
 
-from .api import admin_routes, agent_routes, agent_workspace_routes, auth_routes, chat_routes, daemon_node_routes, managed_node_routes, node_workspace_routes, profile_image_routes, sandbox_routes, session_routes, task_routes, team_routes, web_routes
+from .api import (
+    admin_routes,
+    agent_routes,
+    agent_workspace_routes,
+    auth_routes,
+    chat_routes,
+    daemon_node_routes,
+    managed_node_routes,
+    node_workspace_routes,
+    profile_image_routes,
+    sandbox_routes,
+    session_routes,
+    task_routes,
+    team_routes,
+    web_routes,
+)
+from .chat import (
+    DatabaseChatIntegrationStore,
+    LocalChatIntegrationStore,
+    probe_chat_integration,
+    provision_chat_integration,
+)
 from .core.environment import load_backend_env
 from .core.storage_config import database_url_from_env, use_postgres_storage
+from .daemon_registry import DaemonNodeRegistry, ServerDaemonNodeBackend
+from .persistence.agent_placement_store import (
+    DatabaseAgentPlacementStore,
+    LocalAgentPlacementStore,
+    reconcile_single_active_placement,
+)
+from .persistence.agent_store import DatabaseAgentStore, LocalAgentStore
+from .persistence.profile_image_store import LocalProfileImageStore
 from .persistence.stores import (
     DEFAULT_RELAY_DATA_DIR,
     DatabaseDaemonStore,
     DatabaseSessionStore,
     DatabaseTaskStore,
     LocalDaemonStore,
-    LocalSessionStore,
-    LocalTaskStore,
 )
-from .daemon_registry import DaemonNodeRegistry, ServerDaemonNodeBackend
-from .security.auth import auth_store_from_env
-from .chat import DatabaseChatIntegrationStore, LocalChatIntegrationStore, probe_chat_integration, provision_chat_integration
-from .tasks import TaskScheduler
-from .services.managed_nodes import LocalManagedNodeStore
-from .persistence.agent_store import DatabaseAgentStore, LocalAgentStore
 from .persistence.team_store import DatabaseTeamStore, LocalTeamStore
-from .persistence.profile_image_store import LocalProfileImageStore
-from .persistence.agent_placement_store import DatabaseAgentPlacementStore, LocalAgentPlacementStore, reconcile_single_active_placement
-from .services.workspace_query import WorkspaceQueryBroker
+from .security.auth import auth_store_from_env
+from .services.managed_nodes import LocalManagedNodeStore
 from .services.team_membership import reconcile_team_memberships
+from .services.workspace_query import WorkspaceQueryBroker
+from .tasks import TaskScheduler
 
 load_backend_env()
 
@@ -99,7 +122,9 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     app.state.managed_node_store = managed_node_store
     app.state.agent_store = agent_store
     app.state.team_store = team_store
-    app.state.employee_agent_store = agent_store  # compatibility for migrations still reading the old name
+    app.state.employee_agent_store = (
+        agent_store  # compatibility for migrations still reading the old name
+    )
     app.state.agent_placement_store = agent_placement_store
     app.state.profile_image_store = profile_image_store
     app.state.workspace_query_broker = WorkspaceQueryBroker()
@@ -150,7 +175,11 @@ def daemon_store_from_env(root_dir: Path) -> Any:
     daemon_store = os.environ.get("RELAY_DAEMON_STORE", "").strip().lower()
     if daemon_store != "database" and not use_postgres_storage():
         return LocalDaemonStore(root_dir)
-    setting = "RELAY_DAEMON_STORE=database" if daemon_store == "database" else "RELAY_STORAGE=postgres"
+    setting = (
+        "RELAY_DAEMON_STORE=database"
+        if daemon_store == "database"
+        else "RELAY_STORAGE=postgres"
+    )
     database_url = database_url_from_env(setting=setting)
     return DatabaseDaemonStore(database_url)
 
@@ -170,26 +199,40 @@ def team_store_from_env(root_dir: Path) -> Any:
 def agent_placement_store_from_env(root_dir: Path) -> Any:
     if not use_postgres_storage():
         return LocalAgentPlacementStore(root_dir)
-    return DatabaseAgentPlacementStore(database_url_from_env(setting="RELAY_STORAGE=postgres"))
+    return DatabaseAgentPlacementStore(
+        database_url_from_env(setting="RELAY_STORAGE=postgres")
+    )
 
 
 def session_store_from_env(root_dir: Path) -> Any:
-    if not use_postgres_storage():
-        return LocalSessionStore(root_dir)
-    return DatabaseSessionStore(database_url_from_env())
+    database_url = database_url_from_env(setting="database-only thread storage")
+    store = DatabaseSessionStore(
+        database_url,
+        create_schema=database_url.startswith("sqlite"),
+    )
+    store.verify_schema()
+    return store
 
 
 def task_store_from_env(root_dir: Path) -> Any:
-    if not use_postgres_storage():
-        return LocalTaskStore(root_dir)
-    return DatabaseTaskStore(database_url_from_env())
+    database_url = database_url_from_env(setting="database-only thread storage")
+    store = DatabaseTaskStore(
+        database_url,
+        create_schema=database_url.startswith("sqlite"),
+    )
+    store.verify_schema()
+    return store
 
 
 def chat_store_from_env(root_dir: Path) -> Any:
     chat_store = os.environ.get("RELAY_CHAT_STORE", "").strip().lower()
     if chat_store != "database" and not use_postgres_storage():
         return LocalChatIntegrationStore(root_dir)
-    setting = "RELAY_CHAT_STORE=database" if chat_store == "database" else "RELAY_STORAGE=postgres"
+    setting = (
+        "RELAY_CHAT_STORE=database"
+        if chat_store == "database"
+        else "RELAY_STORAGE=postgres"
+    )
     return DatabaseChatIntegrationStore(database_url_from_env(setting=setting))
 
 
@@ -210,8 +253,12 @@ def task_scheduler_from_env(
         backend=backend,
         team_store=team_store,
         managed_node_store=managed_node_store,
-        interval_seconds=float(os.environ.get("RELAY_TASK_SCHEDULER_INTERVAL_SECONDS", "10")),
-        max_dispatches_per_tick=max(1, int(os.environ.get("RELAY_TASK_SCHEDULER_MAX_DISPATCHES", "5"))),
+        interval_seconds=float(
+            os.environ.get("RELAY_TASK_SCHEDULER_INTERVAL_SECONDS", "10")
+        ),
+        max_dispatches_per_tick=max(
+            1, int(os.environ.get("RELAY_TASK_SCHEDULER_MAX_DISPATCHES", "5"))
+        ),
         today=scheduler_today_from_env(),
     )
 

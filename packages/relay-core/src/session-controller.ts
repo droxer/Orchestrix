@@ -12,7 +12,6 @@ import {
 } from "./state.js";
 import type { AgentOutputSink } from "./format.js";
 import {
-  LocalSessionStore,
   newRelayId,
   relayEvent,
   type AgentEventSink,
@@ -33,7 +32,6 @@ export interface WorkflowStep {
 }
 
 export interface SessionControllerOptions {
-  store?: SessionStore;
   taskStore?: TaskStore;
   taskId?: string;
   workspacePath?: string;
@@ -66,8 +64,8 @@ export class SessionController implements AgentEventSink {
   private readonly pendingOutputWrites = new Set<Promise<void>>();
 
   constructor(
-    public readonly store: SessionStore = new LocalSessionStore(),
-    private readonly options: Omit<SessionControllerOptions, "store"> = {},
+    public readonly store: SessionStore,
+    private readonly options: SessionControllerOptions = {},
   ) {}
 
   async createSession(taskGoal: string, participants: string[] = ["human"]): Promise<RelaySession> {

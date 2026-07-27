@@ -735,7 +735,10 @@ export function App() {
   async function cancelActiveRun() {
     if (!activeSession) return;
     if (!canCancelThreadRun({ activeRun, session: activeSession })) return;
-    const cancelNodeId = threadCancelNodeId({ node: activeRunOwner?.node ?? selectedNode, sandbox: selectedSandbox });
+    const cancelNodeId = threadCancelNodeId({
+      node: activeRunOwner?.node ?? activeRuntimeNode ?? undefined,
+      sandbox: selectedSandbox,
+    });
     // The stop control is offered off the session status alone, so it can be
     // pressed before the node list has resolved. Say so rather than swallowing
     // the click and leaving the run looking uncancellable.
