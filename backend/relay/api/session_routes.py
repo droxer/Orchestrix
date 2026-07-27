@@ -393,6 +393,36 @@ async def get_session(session_id: str, request: Request, ctx: AppContextDep) -> 
     return get_session_for_actor(ctx.session_store, session_id, actor)
 
 
+async def update_session(
+    session_id: str, request: Request, ctx: AppContextDep
+) -> dict[str, Any]:
+    actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
+    get_session_for_actor(ctx.session_store, session_id, actor)
+    body = await json_body(request)
+    unknown = set(body) - {"title", "archived"}
+    if unknown or not body:
+        fields = ", ".join(sorted(unknown)) if unknown else "none"
+        raise HTTPException(400, f"Unsupported thread field(s): {fields}.")
+    controller = SessionController(
+        ctx.session_store,
+        task_store=ctx.task_store,
+        owner_employee_id=actor["employeeId"],
+    )
+    result = ctx.session_store.get_session(session_id)
+    if "title" in body:
+        title = string_field(body, "title").strip()
+        if not title:
+            raise HTTPException(400, "title is required.")
+        if len(title) > 200:
+            raise HTTPException(400, "title must be 200 characters or fewer.")
+        result = controller.rename_session(session_id, title)
+    if "archived" in body:
+        if body["archived"] is not True:
+            raise HTTPException(400, "archived currently supports only true.")
+        result = controller.archive_session(session_id)
+    return result
+
+
 @router.post("/sessions/{session_id}/cancel")
 async def cancel_session_run(session_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)

@@ -136,6 +136,14 @@ async def list_managed_node_attempts(node_id: str, request: Request, ctx: AppCon
 async def create_managed_node_attempt(node_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     try:
+        body = await json_body(request)
+        if body.get("replaceActive") is True:
+            active = ctx.managed_node_store.active_attempt(node_id)
+            if active:
+                ctx.managed_node_store.update_attempt(
+                    active["id"],
+                    {"status": "cancelled", "errorCode": "admin_retry"},
+                )
         attempt, enrollment_credential = ctx.managed_node_store.create_attempt(node_id)
         return {"attempt": attempt, "enrollmentCredential": enrollment_credential}
     except (KeyError, ValueError) as error:

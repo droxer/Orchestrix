@@ -540,6 +540,11 @@ def daemon_node_event(value: dict[str, Any]) -> dict[str, Any]:
     raise ValueError(f"unknown daemon node event type {event_type}.")
 
 
+WEB_UI_ROUTE_ROOTS = frozenset(
+    {"admin", "agents", "backlog", "channels", "login", "routines", "teams", "threads"}
+)
+
+
 def web_ui_asset_response(asset_path: str) -> Response:
     candidates = [
         os.environ.get("RELAY_WEB_UI_DIST_DIR"),
@@ -551,7 +556,11 @@ def web_ui_asset_response(asset_path: str) -> Response:
         return HTMLResponse("Relay web UI has not been built. Run `npm run build -w web`.\n", status_code=404)
     requested = asset_path or "index.html"
     asset = (dist / requested).resolve()
-    if not str(asset).startswith(str(dist.resolve())) or not asset.exists() or not asset.is_file():
+    confined = str(asset).startswith(str(dist.resolve()))
+    if not confined or not asset.exists() or not asset.is_file():
+        root = asset_path.split("/", 1)[0]
+        if root not in WEB_UI_ROUTE_ROOTS:
+            return JSONResponse({"detail": "Not found."}, status_code=404)
         asset = dist / "index.html"
     if not asset.exists():
         return JSONResponse({"error": "Web UI asset not found."}, status_code=404)
