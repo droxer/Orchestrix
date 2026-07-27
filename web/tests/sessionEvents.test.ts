@@ -23,6 +23,29 @@ function session(partial: Partial<RelaySession> = {}): RelaySession {
 }
 
 describe("applySessionEvent", () => {
+  it("preserves runtime affinity from streamed run starts", () => {
+    const workspaceIdentity = { kind: "host", workspacePath: "/workspace" };
+    const updated = applySessionEvent(session(), {
+      id: "evt_started",
+      type: "agent.started",
+      sessionId: "ses_1",
+      timestamp: "2026-06-20T00:00:01.000Z",
+      runId: "run_1",
+      agent: "codex",
+      mode: "action",
+      logicalAgentId: "agent_1",
+      placementId: "placement_1",
+      daemonNodeId: "node_1",
+      agentVersion: 3,
+      workspaceIdentity,
+    });
+
+    assert.equal(updated.agentRuns[0]?.daemonNodeId, "node_1");
+    assert.equal(updated.agentRuns[0]?.placementId, "placement_1");
+    assert.equal(updated.agentRuns[0]?.agentVersion, 3);
+    assert.deepEqual(updated.agentRuns[0]?.workspaceIdentity, workspaceIdentity);
+  });
+
   it("materializes streamed feedback waits before the list poll catches up", () => {
     const updated = applySessionEvent(session(), {
       id: "evt_wait",

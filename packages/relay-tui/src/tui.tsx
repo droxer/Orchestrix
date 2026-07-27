@@ -10,7 +10,6 @@ import {
   type SessionController,
   type SessionStore,
   GUEST_WORKSPACE,
-  LocalSessionStore,
   RelayDaemonClient,
   SessionController as RelaySessionController,
   StderrLineRenderer,
@@ -176,12 +175,10 @@ export async function runAssignments(request: RunRequest): Promise<void> {
   if (request.assignments.length === 0) {
     throw new Error(`Assign the task with ${AGENT_MENTION_HINT}.`);
   }
-  const controller = request.controller ?? new RelaySessionController(undefined, {
-    workspacePath: request.workspacePath,
-    sink: request.log,
-    signal: request.signal,
-    onUpdate: request.onSessionUpdate,
-  });
+  const controller = request.controller;
+  if (!controller) {
+    throw new Error("A database-backed session controller is required.");
+  }
   const sessionId = request.sessionId ?? (await controller.createSession(request.task)).id;
   let state = initialAgentState(request.task);
   let terminalRecorded = false;
@@ -796,8 +793,8 @@ export function RelayTui({
   ready = true,
   disabledMessage = "Starting Relay...",
   bootLogLines = [],
-  sessionStore = new LocalSessionStore(),
-  localSessionControl = true,
+  sessionStore,
+  localSessionControl = sessionStore !== undefined,
   remoteSessionControl,
 }: RelayTuiProps): React.ReactElement {
   const { exit } = useApp();
@@ -825,7 +822,9 @@ export function RelayTui({
   runnerRef.current = runner;
   const mountedRef = useRef(true);
   const abortRef = useRef<AbortController | null>(null);
-  const controllerRef = useRef<SessionController>(new RelaySessionController(sessionStore));
+  const controllerRef = useRef<SessionController | undefined>(
+    sessionStore ? new RelaySessionController(sessionStore) : undefined,
+  );
   useEffect(() => () => {
     mountedRef.current = false;
     abortRef.current?.abort();
@@ -859,6 +858,9 @@ export function RelayTui({
   const startParsedTaskAsync = async (parsed: ParsedTask): Promise<void> => {
     let sessionId: string | undefined;
     if (localSessionControl) {
+      if (!sessionStore) {
+        throw new Error("Local session control requires an explicit session store.");
+      }
       const controller = new RelaySessionController(sessionStore, {
         workspacePath: workspace,
         onUpdate: setActiveSession,
@@ -878,7 +880,7 @@ export function RelayTui({
     setIsRunning(true);
     setCurrentAgent(parsed.assignments[0] ? formatAssignmentLabel(parsed.assignments[0]) : "starting");
     setMessage("");
-    void runnerRef.current({
+      void runnerRef.current({
       assignments: parsed.assignments,
       task: parsed.task,
       log: appendLog,
@@ -1028,6 +1030,10 @@ export function RelayTui({
         });
         return;
       }
+      if (!sessionStore) {
+        setMessage("Session listing is unavailable without a session store.");
+        return;
+      }
       void sessionStore.listSessions().then((items) => {
         const sessions = items.slice(0, 6);
         appendLog(`\n${sessions.map((item) => `${item.id}  ${item.status}  ${item.title ?? item.taskGoal}`).join("\n") || "No sessions yet."}\n`);
@@ -1058,6 +1064,10 @@ export function RelayTui({
       }
       if (!detail) {
         setMessage("Usage: /open <session-id>");
+        return;
+      }
+      if (!sessionStore) {
+        setMessage("Session opening is unavailable without a session store.");
         return;
       }
       void sessionStore.getSession(detail).then((opened) => {
@@ -1099,7 +1109,12 @@ export function RelayTui({
         return;
       }
       if (localSessionControl) {
-        void controllerRef.current.renameSession(current.id, title).then((updated) => {
+        const controller = controllerRef.current;
+        if (!controller) {
+          setMessage("Renaming is unavailable without a session store.");
+          return;
+        }
+        void controller.renameSession(current.id, title).then((updated) => {
           setActiveSession(updated);
           setMessage(`Renamed to ${updated.title ?? title}.`);
         }).catch((error: unknown) => {
@@ -1156,7 +1171,12 @@ export function RelayTui({
         return;
       }
       if (localSessionControl) {
-        void controllerRef.current.recordDecision(current.id, "reject", detail || "Rejected by human.").then(setActiveSession);
+        const controller = controllerRef.current;
+        if (!controller) {
+          setMessage("Feedback is unavailable without a session store.");
+          return;
+        }
+        void controller.recordDecision(current.id, "reject", detail || "Rejected by human.").then(setActiveSession);
       } else {
         void runRemoteDecision("reject", detail || "Rejected by human.");
       }
@@ -1167,7 +1187,12 @@ export function RelayTui({
       abortRef.current?.abort();
       if (current) {
         if (localSessionControl) {
-          void controllerRef.current.recordDecision(current.id, "cancel", "Cancelled by human.").then(setActiveSession);
+          const controller = controllerRef.current;
+          if (!controller) {
+            setMessage("Cancellation is unavailable without a session store.");
+            return;
+          }
+          void controller.recordDecision(current.id, "cancel", "Cancelled by human.").then(setActiveSession);
         } else {
           void runRemoteDecision("cancel", "Cancelled by human.");
         }
@@ -1183,7 +1208,9 @@ export function RelayTui({
       }
       void (async () => {
         if (localSessionControl) {
-          const updated = await controllerRef.current.recordDecision(current.id, "rerun", "Rerun requested.", agent);
+          const controller = controllerRef.current;
+          if (!controller) throw new Error("Rerun requires a session store.");
+          const updated = await controller.recordDecision(current.id, "rerun", "Rerun requested.", agent);
           setActiveSession(updated);
         } else if (remoteSessionControl) {
           const updated = await runRemoteDecision("rerun", "Rerun requested.", agent);
@@ -1212,7 +1239,9 @@ export function RelayTui({
       const defaultAssignment = { agent, mode };
       void (async () => {
         if (localSessionControl) {
-          const updated = await controllerRef.current.handoffSession(
+          const controller = controllerRef.current;
+          if (!controller) throw new Error("Handoff requires a session store.");
+          const updated = await controller.handoffSession(
             current.id,
             agent,
             [assignment],

@@ -19,6 +19,9 @@ export interface AgentRun {
   logicalAgentId?: string;
   /** Computer that executed this run; retained for legacy thread affinity. */
   daemonNodeId?: string;
+  placementId?: string;
+  agentVersion?: number;
+  workspaceIdentity?: Record<string, unknown>;
   role?: AgentRole;
   mode: AgentTaskMode;
   status: "running" | "completed" | "failed" | "cancelled";
@@ -124,6 +127,10 @@ export type RelayEvent =
       /** Logical (employee) agent dispatched for this run; absent on legacy
        * runs and on TUI/workflow dispatches that name only an executor kind. */
       logicalAgentId?: string;
+      placementId?: string;
+      daemonNodeId?: string;
+      agentVersion?: number;
+      workspaceIdentity?: Record<string, unknown>;
       role?: AgentRole;
       mode: AgentTaskMode;
     }
@@ -451,6 +458,11 @@ export function materializeEvents(events: RelayEvent[]): RelaySession {
         id: event.runId,
         agent: event.agent,
         ...(event.role ? { role: event.role } : {}),
+        ...(event.logicalAgentId ? { logicalAgentId: event.logicalAgentId } : {}),
+        ...(event.placementId ? { placementId: event.placementId } : {}),
+        ...(event.daemonNodeId ? { daemonNodeId: event.daemonNodeId } : {}),
+        ...(event.agentVersion !== undefined ? { agentVersion: event.agentVersion } : {}),
+        ...(event.workspaceIdentity ? { workspaceIdentity: event.workspaceIdentity } : {}),
         mode: event.mode,
         status: "running",
         startedAt: event.timestamp,

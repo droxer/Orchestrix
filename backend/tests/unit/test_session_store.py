@@ -4,9 +4,12 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+import pytest
+from relay.persistence.session_store import DatabaseSessionStore, LocalSessionStore
+from relay.persistence.store_common import relay_event
+from relay.persistence.task_store import DatabaseTaskStore
+from relay.sessions.controller import SessionController, SessionRunInFlightError
 from sqlalchemy import text
-
-from relay.persistence.stores import DatabaseSessionStore, LocalSessionStore, relay_event
 
 
 def test_session_stores_preserve_team_provenance() -> None:
@@ -63,6 +66,102 @@ def test_session_stores_delete_session() -> None:
                 pass
             else:
                 raise AssertionError("deleted session should raise KeyError")
+
+
+def test_database_session_delete_rolls_back_task_unlinks_atomically(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    database_url = f"sqlite:///{tmp_path}/relay.db"
+    session_store = DatabaseSessionStore(database_url, create_schema=True)
+    task_store = DatabaseTaskStore(database_url, create_schema=True)
+    session = session_store.create_session(
+        {
+            "workspacePath": "/workspace",
+            "taskGoal": "delete atomically",
+            "participants": ["human"],
+        }
+    )
+    tasks = [
+        task_store.create_task({"title": "first"}),
+        task_store.create_task({"title": "second"}),
+    ]
+    for task in tasks:
+        task_store.link_session(task["id"], session["id"])
+
+    original = task_store.unlink_session_in_transaction
+    calls = 0
+
+    def fail_after_first_unlink(conn, task_id: str, session_id: str):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise RuntimeError("simulated unlink failure")
+        return original(conn, task_id, session_id)
+
+    monkeypatch.setattr(
+        task_store, "unlink_session_in_transaction", fail_after_first_unlink
+    )
+
+    with pytest.raises(RuntimeError, match="simulated unlink failure"):
+        session_store.delete_session_with_task_unlinks(session["id"], task_store)
+
+    assert session_store.get_session(session["id"])["id"] == session["id"]
+    for task in tasks:
+        assert session["id"] in task_store.get_task(task["id"])["linkedSessionIds"]
+
+
+def test_database_session_delete_rechecks_active_runs_under_lock(tmp_path: Path) -> None:
+    database_url = f"sqlite:///{tmp_path}/relay.db"
+    session_store = DatabaseSessionStore(database_url, create_schema=True)
+    task_store = DatabaseTaskStore(database_url, create_schema=True)
+    controller = SessionController(session_store, task_store=task_store)
+    session = session_store.create_session(
+        {
+            "workspacePath": "/workspace",
+            "taskGoal": "keep active run",
+            "participants": ["human", "codex"],
+        }
+    )
+    stale_snapshot = session_store.get_session(session["id"])
+    session_store.append_event(
+        session["id"],
+        relay_event(
+            "agent.started",
+            session["id"],
+            {"runId": "run_active", "agent": "codex", "mode": "action"},
+        ),
+    )
+
+    with pytest.raises(SessionRunInFlightError):
+        controller.delete_session(session["id"], snapshot=stale_snapshot)
+
+    assert session_store.get_session(session["id"])["id"] == session["id"]
+
+
+def test_database_session_store_verify_schema_rejects_missing_table(
+    tmp_path: Path,
+) -> None:
+    store = DatabaseSessionStore(
+        f"sqlite:///{tmp_path}/relay.db", create_schema=True
+    )
+    with store.engine.begin() as conn:
+        conn.execute(text("DROP TABLE session_artifacts"))
+
+    with pytest.raises(RuntimeError, match="session_artifacts"):
+        store.verify_schema()
+
+
+def test_database_session_store_verify_schema_rejects_missing_column(
+    tmp_path: Path,
+) -> None:
+    store = DatabaseSessionStore(
+        f"sqlite:///{tmp_path}/relay.db", create_schema=True
+    )
+    with store.engine.begin() as conn:
+        conn.execute(text("ALTER TABLE sessions DROP COLUMN title"))
+
+    with pytest.raises(RuntimeError, match="title"):
+        store.verify_schema()
 
 
 def test_session_store_persists_events_and_artifacts() -> None:

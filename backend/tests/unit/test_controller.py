@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from tempfile import TemporaryDirectory
 
-from relay.persistence.stores import LocalSessionStore
+from relay.persistence.session_store import LocalSessionStore
 from relay.sessions import SessionController, initial_agent_state
 
 

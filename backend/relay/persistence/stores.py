@@ -9,14 +9,13 @@ from .daemon_store import (
     node_to_row,
     row_to_command,
     row_to_node,
-    row_to_run_request,
     row_to_run,
+    row_to_run_request,
     run_request_to_row,
     run_to_row,
 )
 from .session_store import (
     DatabaseSessionStore,
-    LocalSessionStore,
     session_artifact_to_row,
     session_event_to_row,
     session_to_row,
@@ -45,7 +44,6 @@ from .store_common import (
 )
 from .task_store import (
     DatabaseTaskStore,
-    LocalTaskStore,
     task_event_to_row,
     task_to_row,
 )
@@ -57,8 +55,6 @@ __all__ = [
     "DatabaseSessionStore",
     "DatabaseTaskStore",
     "LocalDaemonStore",
-    "LocalSessionStore",
-    "LocalTaskStore",
     "_append_jsonl",
     "_format_iso",
     "_parse_iso",
@@ -68,8 +64,8 @@ __all__ = [
     "command_to_row",
     "daemon_event",
     "daemon_event_to_row",
-    "infer_node_location",
     "database_id_column",
+    "infer_node_location",
     "materialize_events",
     "materialize_task_events",
     "node_to_row",
@@ -77,8 +73,8 @@ __all__ = [
     "relay_task_event",
     "row_to_command",
     "row_to_node",
-    "row_to_run_request",
     "row_to_run",
+    "row_to_run_request",
     "run_request_to_row",
     "run_to_row",
     "safe_name",

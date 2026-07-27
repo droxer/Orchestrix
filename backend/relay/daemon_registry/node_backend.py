@@ -6,7 +6,8 @@ from typing import Any
 
 from ..core.ids import new_sandbox_id, now_iso
 from ..core.models import AGENT_NAMES, DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS
-from ..persistence.stores import LocalSessionStore, valid_agent
+from ..persistence.protocols import SessionStore
+from ..persistence.stores import valid_agent
 from ..sessions import SessionController, initial_agent_state
 from ..sessions.bridge import latest_user_turn_marker
 from .credentials import sandbox_node_auth_error, sandbox_ui_auth_error
@@ -40,14 +41,20 @@ class ServerDaemonNodeBackend:
         self.agent_placement_store = agent_placement_store
         self.registry.logical_assignment_validator = self._validate_logical_assignment
 
-    def idempotent_run(self, idempotency_key: str, actor_employee_id: str | None) -> dict[str, Any] | None:
+    def idempotent_run(
+        self, idempotency_key: str, actor_employee_id: str | None
+    ) -> dict[str, Any] | None:
         with self.registry.dispatch_lock:
-            request = self.registry.daemon_store.get_run_request(_idempotent_run_request_id(idempotency_key))
+            request = self.registry.daemon_store.get_run_request(
+                _idempotent_run_request_id(idempotency_key)
+            )
             if not request:
                 return None
             session = self.registry.store.get_session(request["sessionId"])
             if actor_employee_id:
-                assert_session_owned_by_employee(self.registry.store, session["id"], actor_employee_id)
+                assert_session_owned_by_employee(
+                    self.registry.store, session["id"], actor_employee_id
+                )
             return session
 
     def _validate_logical_assignment(self, assignment: dict[str, Any]) -> None:
@@ -57,8 +64,7 @@ class ServerDaemonNodeBackend:
         if not agent or agent.get("deletedAt") or not agent.get("enabled", True):
             raise ValueError("logical agent is disabled or missing")
         if any(
-            agent.get(field)
-            for field in ("skillPolicy", "toolPolicy", "modelPolicy")
+            agent.get(field) for field in ("skillPolicy", "toolPolicy", "modelPolicy")
         ):
             raise ValueError(
                 "agent_policy_unsupported: logical agent policy is not enforceable by this runtime"
@@ -196,7 +202,9 @@ class ServerDaemonNodeBackend:
                     "executorKind": assignment.get("executorKind")
                     or assignment.get("agent"),
                 }
-                if assignment.get("agentId") and not assignment.get("workspaceIdentity"):
+                if assignment.get("agentId") and not assignment.get(
+                    "workspaceIdentity"
+                ):
                     assignment_workspace_identity = workspace_identity_record(
                         self.registry.get(assignment.get("daemonNodeId") or sandbox_id)
                         or {}
@@ -212,9 +220,13 @@ class ServerDaemonNodeBackend:
                 else None
             )
             if run_request_id:
-                existing_request = self.registry.daemon_store.get_run_request(run_request_id)
+                existing_request = self.registry.daemon_store.get_run_request(
+                    run_request_id
+                )
                 if existing_request:
-                    session = self.registry.store.get_session(existing_request["sessionId"])
+                    session = self.registry.store.get_session(
+                        existing_request["sessionId"]
+                    )
                     actor_employee_id = request.get("actorEmployeeId")
                     if actor_employee_id:
                         assert_session_owned_by_employee(
@@ -338,8 +350,7 @@ class ServerDaemonNodeBackend:
                 owner_agent_id=owner_agent_id,
                 team_id=(
                     request.get("teamId")
-                    if isinstance(request.get("teamId"), str)
-                    and request.get("teamId")
+                    if isinstance(request.get("teamId"), str) and request.get("teamId")
                     else None
                 ),
                 daemon_node_id=sandbox_id,
@@ -458,7 +469,7 @@ def _idempotent_run_request_id(idempotency_key: str) -> str:
 
 
 def assert_session_owned_by_employee(
-    store: LocalSessionStore, session_id: str, employee_id: str
+    store: SessionStore, session_id: str, employee_id: str
 ) -> None:
     try:
         session = store.get_session(session_id)
@@ -476,7 +487,7 @@ def assert_session_owned_by_employee(
         )
 
 
-def session_owner_employee_id(store: LocalSessionStore, session_id: str) -> str:
+def session_owner_employee_id(store: SessionStore, session_id: str) -> str:
     session = store.get_session(session_id)
     owner = session.get("ownerEmployeeId")
     if not owner:

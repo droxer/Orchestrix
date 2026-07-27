@@ -4,9 +4,10 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
-def clear_storage_env(monkeypatch) -> None:
+def clear_storage_env(monkeypatch, tmp_path) -> None:
     monkeypatch.delenv("RELAY_STORAGE", raising=False)
     monkeypatch.delenv("RELAY_AUTH_STORE", raising=False)
     monkeypatch.delenv("RELAY_DAEMON_STORE", raising=False)
     monkeypatch.delenv("RELAY_DATABASE_URL", raising=False)
     monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setenv("RELAY_DATABASE_URL", f"sqlite:///{tmp_path}/relay-sessions.db")

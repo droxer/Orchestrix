@@ -6,11 +6,11 @@ import assert from "node:assert/strict";
 
 import {
   initialAgentState,
-  LocalSessionStore,
   relayEvent,
   SessionController,
   type AgentExecutor,
 } from "../src/index.js";
+import { LocalSessionStore } from "../src/session-store.js";
 
 function tempStore(): LocalSessionStore {
   return new LocalSessionStore(mkdtempSync(join(tmpdir(), "relay-session-memory-")));

@@ -11,7 +11,6 @@ from tempfile import TemporaryDirectory
 from threading import Barrier, Event
 
 import pytest
-
 from relay.daemon_registry import (
     DaemonNodeRegistry,
     ServerDaemonNodeBackend,
@@ -22,11 +21,8 @@ from relay.daemon_registry import (
 )
 from relay.persistence.agent_placement_store import LocalAgentPlacementStore
 from relay.persistence.agent_store import LocalAgentStore
-from relay.persistence.stores import (
-    DatabaseDaemonStore,
-    LocalDaemonStore,
-    LocalSessionStore,
-)
+from relay.persistence.daemon_store import DatabaseDaemonStore, LocalDaemonStore
+from relay.persistence.session_store import LocalSessionStore
 from relay.sessions import SessionController
 
 

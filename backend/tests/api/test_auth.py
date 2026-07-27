@@ -993,7 +993,7 @@ def test_relay_storage_postgres_switches_backend_stores_to_database(monkeypatch)
     with TemporaryDirectory() as root:
         database_url = f"sqlite:///{root}/relay.db"
         monkeypatch.setenv("RELAY_DATABASE_URL", database_url)
-        DatabaseSessionStore(database_url, root, create_schema=True)
+        DatabaseSessionStore(database_url, create_schema=True)
         DatabaseTaskStore(database_url, create_schema=True)
         DatabaseDaemonStore(database_url, create_schema=True)
         DatabaseUserAuthStore(database_url, create_schema=True)

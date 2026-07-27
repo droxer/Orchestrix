@@ -2,15 +2,17 @@ from __future__ import annotations
 
 import json
 import time
-from threading import RLock
+from datetime import date as _date
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from threading import RLock
 from typing import Any
 
 from loguru import logger
 from sqlalchemy import (
+    JSON,
     BigInteger,
     Boolean,
-    JSON,
     Column,
     Date,
     DateTime,
@@ -22,14 +24,15 @@ from sqlalchemy import (
     Uuid,
     case,
     create_engine,
+    delete,
     insert,
+    inspect,
     or_,
     select,
+    text,
     update,
 )
 from sqlalchemy.exc import IntegrityError
-
-from datetime import date as _date, datetime, timedelta, timezone
 
 from .store_common import (
     DEFAULT_RELAY_DATA_DIR,
@@ -52,9 +55,7 @@ class _TaskWriteConflict(RuntimeError):
     pass
 
 
-def _task_session_link_events(
-    task_id: str, session_id: str
-) -> list[dict[str, Any]]:
+def _task_session_link_events(task_id: str, session_id: str) -> list[dict[str, Any]]:
     return [
         relay_task_event("task.session_linked", task_id, {"sessionId": session_id}),
         relay_task_event(
@@ -65,6 +66,24 @@ def _task_session_link_events(
                     "id": new_relay_id("act"),
                     "createdAt": now_iso(),
                     "message": f"Linked session {session_id}.",
+                    "sessionId": session_id,
+                }
+            },
+        ),
+    ]
+
+
+def _task_session_unlink_events(task_id: str, session_id: str) -> list[dict[str, Any]]:
+    return [
+        relay_task_event("task.session_unlinked", task_id, {"sessionId": session_id}),
+        relay_task_event(
+            "task.activity",
+            task_id,
+            {
+                "activity": {
+                    "id": new_relay_id("act"),
+                    "createdAt": now_iso(),
+                    "message": f"Unlinked deleted session {session_id}.",
                     "sessionId": session_id,
                 }
             },
@@ -236,9 +255,7 @@ class LocalTaskStore:
         if task.get("deletedAt"):
             return task
         logger.info("Task deleted", task_id=task_id)
-        return self.append_event(
-            task_id, relay_task_event("task.deleted", task_id, {})
-        )
+        return self.append_event(task_id, relay_task_event("task.deleted", task_id, {}))
 
     def list_due_routines(self, today: str) -> list[dict[str, Any]]:
         tasks = [
@@ -313,8 +330,7 @@ class LocalTaskStore:
             if task.get("deletedAt"):
                 return None
             if task.get("status") != "assigned" or (
-                task.get("assignedAgent")
-                and task.get("assignedAgent") != agent
+                task.get("assignedAgent") and task.get("assignedAgent") != agent
             ):
                 return None
             if task.get("isRoutine"):
@@ -346,9 +362,7 @@ class LocalTaskStore:
     def release_dispatch_claim(self, task_id: str, claim_id: str) -> dict[str, Any]:
         return self.append_event(
             task_id,
-            relay_task_event(
-                "task.dispatch_released", task_id, {"claimId": claim_id}
-            ),
+            relay_task_event("task.dispatch_released", task_id, {"claimId": claim_id}),
         )
 
     def record_dispatch_outcome(
@@ -447,9 +461,7 @@ class LocalTaskStore:
             task_id, f"Assigned to logical agent {agent_id}.", {"agent": agent}
         )
 
-    def set_task_team_assignment(
-        self, task_id: str, team_id: str
-    ) -> dict[str, Any]:
+    def set_task_team_assignment(self, task_id: str, team_id: str) -> dict[str, Any]:
         self.append_event(
             task_id,
             relay_task_event("task.assigned", task_id, {"teamId": team_id}),
@@ -468,6 +480,14 @@ class LocalTaskStore:
         )
         logger.debug("Task linked to session", task_id=task_id, session_id=session_id)
         return task
+
+    def unlink_session(self, task_id: str, session_id: str) -> dict[str, Any]:
+        task = self.get_task(task_id)
+        if session_id not in task.get("linkedSessionIds", []):
+            return task
+        return self.append_events(
+            task_id, _task_session_unlink_events(task_id, session_id)
+        )
 
     def record_activity(
         self, task_id: str, message: str, payload: dict[str, Any] | None = None
@@ -548,6 +568,7 @@ class DatabaseTaskStore:
         Column("type", Text, nullable=False),
         Column("timestamp", DateTime(timezone=True), nullable=False),
         Column("payload", JSON, nullable=False),
+        UniqueConstraint("task_id", "sequence", name="uq_task_events_task_sequence"),
     )
     task_sessions = Table(
         "task_sessions",
@@ -570,6 +591,46 @@ class DatabaseTaskStore:
         self.engine = create_engine(database_url, future=True)
         if create_schema:
             self.metadata.create_all(self.engine)
+
+    def verify_schema(self) -> None:
+        schema = inspect(self.engine)
+        required_tables = {"tasks", "task_events", "task_sessions"}
+        missing = required_tables.difference(schema.get_table_names())
+        if missing:
+            raise RuntimeError(
+                f"Database is missing required task tables: {', '.join(sorted(missing))}."
+            )
+        required_columns = {
+            table.name: set(table.c.keys())
+            for table in (self.tasks, self.events, self.task_sessions)
+        }
+        for table_name, expected in required_columns.items():
+            actual = {column["name"] for column in schema.get_columns(table_name)}
+            absent = expected.difference(actual)
+            if absent:
+                raise RuntimeError(
+                    f"Database table {table_name} is missing required columns: "
+                    f"{', '.join(sorted(absent))}."
+                )
+        required_unique_constraints = {
+            "tasks": {("public_id",)},
+            "task_events": {("public_id",), ("task_id", "sequence")},
+            "task_sessions": {("task_id", "session_public_id")},
+        }
+        for table_name, expected in required_unique_constraints.items():
+            actual = {
+                tuple(constraint.get("column_names") or ())
+                for constraint in schema.get_unique_constraints(table_name)
+            }
+            absent = expected.difference(actual)
+            if absent:
+                rendered = ", ".join(
+                    "(" + ", ".join(item) + ")" for item in sorted(absent)
+                )
+                raise RuntimeError(
+                    f"Database table {table_name} is missing required unique "
+                    f"constraints: {rendered}."
+                )
 
     def create_task(self, payload: dict[str, Any]) -> dict[str, Any]:
         task_id = new_relay_id("task")
@@ -708,6 +769,8 @@ class DatabaseTaskStore:
         skip_linked_session_id: str | None = None,
     ) -> dict[str, Any]:
         with self.engine.begin() as conn:
+            if skip_linked_session_id:
+                self._lock_session_for_link(conn, skip_linked_session_id)
             row = (
                 conn.execute(
                     select(self.tasks.c.id, self.tasks.c.snapshot, self.tasks.c.version)
@@ -726,9 +789,7 @@ class DatabaseTaskStore:
                 "linkedSessionIds", []
             ):
                 return current
-            task = materialize_task_events(
-                [*current.get("events", []), *events]
-            )
+            task = materialize_task_events([*current.get("events", []), *events])
             claimed = conn.execute(
                 update(self.tasks)
                 .where(
@@ -755,12 +816,31 @@ class DatabaseTaskStore:
                     self._ensure_task_session(
                         conn, task_pk, event["sessionId"], event["timestamp"]
                     )
+                elif event.get("type") == "task.session_unlinked":
+                    conn.execute(
+                        delete(self.task_sessions)
+                        .where(self.task_sessions.c.task_id == task_pk)
+                        .where(
+                            self.task_sessions.c.session_public_id == event["sessionId"]
+                        )
+                    )
         logger.debug(
             "Database task events appended",
             task_id=task_id,
             event_types=[event.get("type") for event in events],
         )
         return task
+
+    def _lock_session_for_link(self, conn: Any, session_id: str) -> None:
+        lock_clause = "" if self.engine.dialect.name == "sqlite" else " FOR KEY SHARE"
+        session_pk = conn.scalar(
+            text(
+                "SELECT id FROM sessions WHERE public_id = :session_id" + lock_clause
+            ),
+            {"session_id": session_id},
+        )
+        if not session_pk:
+            raise KeyError(f"Unknown session {session_id}.")
 
     def get_task(self, task_id: str) -> dict[str, Any]:
         with self.engine.begin() as conn:
@@ -788,18 +868,14 @@ class DatabaseTaskStore:
                 .mappings()
                 .all()
             )
-        return [
-            row["snapshot"] for row in rows if not row["snapshot"].get("deletedAt")
-        ]
+        return [row["snapshot"] for row in rows if not row["snapshot"].get("deletedAt")]
 
     def delete_task(self, task_id: str) -> dict[str, Any]:
         task = self.get_task(task_id)
         if task.get("deletedAt"):
             return task
         logger.info("Database task deleted", task_id=task_id)
-        return self.append_event(
-            task_id, relay_task_event("task.deleted", task_id, {})
-        )
+        return self.append_event(task_id, relay_task_event("task.deleted", task_id, {}))
 
     def list_due_routines(self, today: str) -> list[dict[str, Any]]:
         try:
@@ -850,9 +926,7 @@ class DatabaseTaskStore:
         )
         with self.engine.begin() as conn:
             rows = conn.execute(statement).mappings().all()
-        live = [
-            row["snapshot"] for row in rows if not row["snapshot"].get("deletedAt")
-        ]
+        live = [row["snapshot"] for row in rows if not row["snapshot"].get("deletedAt")]
         return live[:limit] if limit is not None else live
 
     def update_task(self, task_id: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -941,9 +1015,7 @@ class DatabaseTaskStore:
                 claim_id=existing_claim.get("id") if existing_claim else None
             )
             events = [
-                relay_task_event(
-                    "task.dispatch_claimed", task_id, {"claim": claim}
-                ),
+                relay_task_event("task.dispatch_claimed", task_id, {"claim": claim}),
                 relay_task_event(
                     "task.activity",
                     task_id,
@@ -986,9 +1058,7 @@ class DatabaseTaskStore:
     def release_dispatch_claim(self, task_id: str, claim_id: str) -> dict[str, Any]:
         return self.append_event(
             task_id,
-            relay_task_event(
-                "task.dispatch_released", task_id, {"claimId": claim_id}
-            ),
+            relay_task_event("task.dispatch_released", task_id, {"claimId": claim_id}),
         )
 
     def record_dispatch_outcome(
@@ -1114,9 +1184,7 @@ class DatabaseTaskStore:
             task_id, f"Assigned to logical agent {agent_id}.", {"agent": agent}
         )
 
-    def set_task_team_assignment(
-        self, task_id: str, team_id: str
-    ) -> dict[str, Any]:
+    def set_task_team_assignment(self, task_id: str, team_id: str) -> dict[str, Any]:
         self.append_event(
             task_id,
             relay_task_event("task.assigned", task_id, {"teamId": team_id}),
@@ -1137,6 +1205,56 @@ class DatabaseTaskStore:
             "Database task linked to session",
             task_id=task_id,
             session_id=session_id,
+        )
+        return task
+
+    def unlink_session(self, task_id: str, session_id: str) -> dict[str, Any]:
+        task = self.get_task(task_id)
+        if session_id not in task.get("linkedSessionIds", []):
+            return task
+        return self.append_events(
+            task_id, _task_session_unlink_events(task_id, session_id)
+        )
+
+    def unlink_session_in_transaction(
+        self, conn: Any, task_id: str, session_id: str
+    ) -> dict[str, Any]:
+        row = conn.execute(
+            select(self.tasks.c.id, self.tasks.c.snapshot, self.tasks.c.version)
+            .where(self.tasks.c.public_id == task_id)
+            .with_for_update()
+        ).mappings().first()
+        if not row:
+            raise KeyError(task_id)
+        current = row["snapshot"] or {}
+        if session_id not in current.get("linkedSessionIds", []):
+            return current
+        events = _task_session_unlink_events(task_id, session_id)
+        sequence = int(row["version"] or 0)
+        task = materialize_task_events([*current.get("events", []), *events])
+        claimed = conn.execute(
+            update(self.tasks)
+            .where(self.tasks.c.id == row["id"], self.tasks.c.version == sequence)
+            .values(
+                **task_to_row(
+                    task,
+                    version=sequence + len(events),
+                    database_id=row["id"],
+                )
+            )
+        )
+        if claimed.rowcount != 1:
+            raise _TaskWriteConflict(task_id)
+        for offset, event in enumerate(events):
+            conn.execute(
+                insert(self.events).values(
+                    **task_event_to_row(row["id"], sequence + offset, event)
+                )
+            )
+        conn.execute(
+            delete(self.task_sessions)
+            .where(self.task_sessions.c.task_id == row["id"])
+            .where(self.task_sessions.c.session_public_id == session_id)
         )
         return task
 
