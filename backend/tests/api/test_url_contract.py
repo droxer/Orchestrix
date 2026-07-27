@@ -96,6 +96,35 @@ def test_legacy_routes_are_hidden_deprecated_aliases(
     assert redirect.headers["deprecation"] == "true"
 
 
+def test_legacy_daemon_can_register_and_appear_through_the_v1_api(
+    monkeypatch, tmp_path: Path
+) -> None:
+    client = _client(monkeypatch, tmp_path)
+    _bootstrap(client)
+
+    registered = client.post(
+        "/daemon-nodes/register",
+        json={
+            "sandboxId": "sbx_legacy",
+            "employeeId": "admin",
+            "token": "legacy_node_token",
+            "workspacePath": "/workspace/admin",
+            "protocolVersion": 1,
+            "supportedAgents": ["codex"],
+            "status": "ready",
+        },
+    )
+
+    assert registered.status_code == 200
+    assert registered.headers["deprecation"] == "true"
+    assert registered.headers["link"] == (
+        '</api/v1/daemon-node-registrations>; rel="successor-version"'
+    )
+    nodes = client.get(f"{API_PREFIX}/daemon-nodes")
+    assert nodes.status_code == 200
+    assert [node["id"] for node in nodes.json()["nodes"]] == ["sbx_legacy"]
+
+
 def test_thread_patch_replaces_title_and_archive_action_urls(
     monkeypatch, tmp_path: Path
 ) -> None:

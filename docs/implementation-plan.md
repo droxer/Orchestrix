@@ -841,15 +841,15 @@ The TUI in `packages/relay-tui/src/tui.tsx` accepts leading agent mentions such 
 
 Slash commands include `/approve`, `/reject`, `/cancel`, `/rerun`, `/handoff`, `/sessions`, `/open`, `/summary`, and `/quit`.
 
-The Python API in `backend/relay/app.py` exposes task/session/daemon/chat
-endpoints and starts the background task scheduler by default. Current API
+The Python API in `backend/relay/app.py` exposes canonical `/api/v1`
+task/thread/daemon/chat endpoints and starts the background task scheduler by default. Current API
 routes can create tasks (including backlog and routine metadata), create pending
 sessions, attach assignment-plan artifacts, record decisions, and expose
 historical events/artifacts. Scheduled dispatch and daemon execution still flow
 through `ServerDaemonNodeBackend.run`; the backend does not execute agent CLIs
 in-process.
 
-The web UI at `/web` adds chat, backlog, routines, MCP, skills, channels, and
+The web UI on the clean paths documented in [api.md](api.md) adds chat, backlog, routines, MCP, skills, channels, and
 the admin console on top of the same backend APIs.
 
 Future execution endpoints must call the same `SessionController` and orchestrator readiness flow used by the CLI/TUI.

@@ -68,7 +68,7 @@ RELAY_CHAT_PORT=8791
 
 Build and run `relay-chat-server` as a separate channel-plane service. It loads
 only active integration credentials through the chat-service-authenticated
-`GET /chat/integrations/runtime` endpoint, exposes provider webhook paths under
+`GET /api/v1/internal/chat/integrations/runtime` endpoint, exposes provider webhook paths under
 `/webhooks/<provider>/<integration-id>`, registers Discord's `/relay` command,
 and delivers channel messages to Relay. Telegram setup is owned by Admin
 Console -> Channels: activation registers and confirms the webhook using the
@@ -106,6 +106,10 @@ Admins configure chat clients in Relay Web:
 6. Add allowed conversations. Chat-triggered agent runs are rejected outside
    those channels, groups, chats, or threads.
 7. Run **Check Setup**, then **Activate**.
+
+The Admin Console uses `/api/v1/admin/chat-integrations`. Setup checks,
+activation, and Telegram secret rotation are modeled as the
+`health-checks`, `activations`, and `webhook-secret-rotations` subresources.
 
 The admin setup creates a backend-owned configuration contract:
 
@@ -150,7 +154,7 @@ const identities = new RelayChatIdentityResolver({
 The resolver calls:
 
 ```http
-POST /chat/identity/resolve
+POST /api/v1/internal/chat/identity/resolve
 Authorization: Bearer $RELAY_CHAT_TOKEN
 Content-Type: application/json
 

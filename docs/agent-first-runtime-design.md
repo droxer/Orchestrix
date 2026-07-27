@@ -272,18 +272,18 @@ logical agents or decide employee authorization.
 
 ### Employee agents
 
-- `GET /agents` — agents visible to the authenticated employee.
-- `POST /cp/employees/{employeeId}/agents` — create a logical agent.
-- `GET /cp/agents/{agentId}` — admin detail including placements.
-- `PATCH /cp/agents/{agentId}` — update configuration or desired state.
-- `DELETE /cp/agents/{agentId}` — disable and retire after active runs drain.
+- `GET /api/v1/agents` — agents visible to the authenticated employee.
+- `POST /api/v1/admin/employees/{employeeId}/agents` — create a logical agent.
+- `GET /api/v1/admin/agents/{agentId}` — admin detail including placements.
+- `PATCH /api/v1/admin/agents/{agentId}` — update configuration or desired state.
+- `DELETE /api/v1/admin/agents/{agentId}` — disable and retire after active runs drain.
 
 ### Placements
 
-- `POST /cp/agents/{agentId}/placements`
-- `PATCH /cp/agent-placements/{placementId}`
-- `DELETE /cp/agent-placements/{placementId}`
-- `GET /cp/agent-placements?agentId=&nodeId=`
+- `POST /api/v1/admin/agents/{agentId}/placements`
+- `PATCH /api/v1/admin/agent-placements/{placementId}`
+- `DELETE /api/v1/admin/agent-placements/{placementId}`
+- `GET /api/v1/admin/agent-placements?agentId=&nodeId=`
 
 ### Runtime nodes
 
