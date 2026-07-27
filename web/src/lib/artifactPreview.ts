@@ -1,6 +1,8 @@
+import { relayApiPath } from "relay-core";
+
 /** Raw download/streaming URL for an artifact body. */
 export function artifactRawHref(sessionId: string, artifactId: string): string {
-  return `/sessions/${encodeURIComponent(sessionId)}/artifacts/${encodeURIComponent(artifactId)}`;
+  return relayApiPath(`/threads/${encodeURIComponent(sessionId)}/artifacts/${encodeURIComponent(artifactId)}`);
 }
 
 export type WorkspaceFilePreviewMode = "image" | "pdf" | "html" | "text" | "none";

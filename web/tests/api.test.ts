@@ -1,7 +1,29 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 
-import { apiJson, deleteTask, getTeamArtifacts, getWorkspaceBrief, listAgentWorkspaceFiles, listArtifacts, listEmployeeAgents, listTaskArtifacts, readAgentWorkspaceFile, RelayApiError, runLogicalAgents, updateComputerDisplayName, updateOwnEmployeeAgent, updateUserPreferences } from "../src/api.js";
+import {
+  apiJson,
+  archiveSession,
+  assignControlPanelDaemonNode,
+  assignTask,
+  cancelRun,
+  deleteTask,
+  getTeamArtifacts,
+  getWorkspaceBrief,
+  listAgentWorkspaceFiles,
+  listArtifacts,
+  listEmployeeAgents,
+  listTaskArtifacts,
+  readAgentWorkspaceFile,
+  RelayApiError,
+  renameSession,
+  runLogicalAgents,
+  startTask,
+  updateAgentProfileImage,
+  updateComputerDisplayName,
+  updateOwnEmployeeAgent,
+  updateUserPreferences,
+} from "../src/api.js";
 
 const originalFetch = globalThis.fetch;
 
@@ -34,7 +56,7 @@ describe("apiJson", () => {
 
     const result = await updateComputerDisplayName("sbx_alice", "Office Mac");
 
-    assert.equal(requestPath, "/daemon-nodes/sbx_alice");
+    assert.equal(requestPath, "/api/v1/daemon-nodes/sbx_alice");
     assert.equal(requestInit?.method, "PATCH");
     assert.deepEqual(JSON.parse(String(requestInit?.body)), { displayName: "Office Mac" });
     assert.equal(result.node.displayName, "Office Mac");
@@ -59,10 +81,53 @@ describe("apiJson", () => {
 
     const result = await updateUserPreferences({ theme: "dark" });
 
-    assert.equal(requestPath, "/auth/preferences");
+    assert.equal(requestPath, "/api/v1/auth/preferences");
     assert.equal(requestInit?.method, "PATCH");
     assert.deepEqual(JSON.parse(String(requestInit?.body)), { theme: "dark" });
     assert.equal(result.user.theme, "dark");
+  });
+
+  it("uses canonical methods and subresources for normalized mutations", async () => {
+    const requests: Array<{ path: string; method: string; body?: unknown }> = [];
+    globalThis.fetch = (async (input, init) => {
+      requests.push({
+        path: String(input),
+        method: init?.method ?? "GET",
+        body: init?.body ? JSON.parse(String(init.body)) : undefined,
+      });
+      return new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } });
+    }) as typeof fetch;
+
+    await renameSession("thread 1", "Roadmap");
+    await archiveSession("thread 1");
+    await cancelRun("ignored-sandbox", "thread 1");
+    await assignTask("task 1", "agent 1");
+    await startTask("task 1");
+    await assignControlPanelDaemonNode({ nodeId: "node 1", employeeId: "alice" });
+
+    assert.deepEqual(requests, [
+      { path: "/api/v1/threads/thread%201", method: "PATCH", body: { title: "Roadmap" } },
+      { path: "/api/v1/threads/thread%201", method: "PATCH", body: { archived: true } },
+      { path: "/api/v1/threads/thread%201/cancellations", method: "POST", body: { reason: "Cancelled from Relay Web UI." } },
+      { path: "/api/v1/tasks/task%201/assignment", method: "PUT", body: { agentId: "agent 1" } },
+      { path: "/api/v1/tasks/task%201/runs", method: "POST", body: {} },
+      { path: "/api/v1/admin/daemon-nodes/node%201/assignment", method: "PUT", body: { employeeId: "alice" } },
+    ]);
+  });
+
+  it("keeps persisted profile media outside the versioned JSON namespace", async () => {
+    let requestedUrl = "";
+    globalThis.fetch = (async (input) => {
+      requestedUrl = String(input);
+      return new Response(JSON.stringify({ agent: {} }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    await updateAgentProfileImage("agent 1", "data:image/png;base64,AA==");
+
+    assert.equal(requestedUrl, "/profile-images/agents/agent%201");
   });
 
   it("reports an HTML fallback response instead of attempting to parse it as JSON", async () => {
@@ -72,7 +137,7 @@ describe("apiJson", () => {
     })) as typeof fetch;
 
     await assert.rejects(
-      () => apiJson("/agents/agent_1/workspace/files"),
+      () => apiJson("/api/v1/agents/agent_1/workspace/files"),
       (error: unknown) => error instanceof RelayApiError
         && error.status === 200
         && error.message.includes("HTML response"),
@@ -87,7 +152,7 @@ describe("apiJson", () => {
     })) as typeof fetch;
 
     await assert.rejects(
-      () => apiJson("/sandboxes"),
+      () => apiJson("/api/v1/sandboxes"),
       (error) => error instanceof RelayApiError
         && error.status === 401
         && error.message === "Invalid token.",
@@ -107,7 +172,7 @@ describe("apiJson", () => {
     })) as typeof fetch;
 
     await assert.rejects(
-      () => apiJson("/agent-runs"),
+      () => apiJson("/api/v1/agent-runs"),
       (error) => error instanceof RelayApiError
         && error.status === 409
         && error.message === "Agent Hawkeye has no eligible runtime placement (workspace_unavailable).",
@@ -122,7 +187,7 @@ describe("apiJson", () => {
     })) as typeof fetch;
 
     await assert.rejects(
-      () => apiJson("/sessions"),
+      () => apiJson("/api/v1/threads"),
       (error) => error instanceof RelayApiError
         && error.status === 502
         && error.message === "upstream gateway failed",
@@ -137,7 +202,7 @@ describe("apiJson", () => {
     }) as typeof fetch;
 
     assert.deepEqual(await listEmployeeAgents(), { agents: [] });
-    assert.equal(requestedUrl, "/agents");
+    assert.equal(requestedUrl, "/api/v1/agents");
   });
 
   it("updates employee-owned logical agent metadata", async () => {
@@ -160,7 +225,7 @@ describe("apiJson", () => {
       instructions: "Cite sources.",
     });
 
-    assert.equal(requestUrl, "/agents/agent_research");
+    assert.equal(requestUrl, "/api/v1/agents/agent_research");
     assert.deepEqual(requestBody, { displayName: "Analyst", instructions: "Cite sources." });
     assert.equal(result.agent.displayName, "Analyst");
   });
@@ -183,7 +248,7 @@ describe("apiJson", () => {
       decision: { kind: "handoff", targetAgent: "codex", note: "Continue here" },
     });
 
-    assert.equal(requestUrl, "/agent-runs");
+    assert.equal(requestUrl, "/api/v1/agent-runs");
     assert.deepEqual(requestBody, {
       taskGoal: "Build it",
       daemonNodeId: "node_selected",
@@ -207,7 +272,7 @@ describe("apiJson", () => {
     const result = await listArtifacts({ employeeId: "alice", workspacePath: "/workspace/alice repo" });
 
     assert.deepEqual(result, { artifacts: [] });
-    assert.equal(requestedUrl, "/artifacts?employeeId=alice&workspacePath=%2Fworkspace%2Falice+repo");
+    assert.equal(requestedUrl, "/api/v1/artifacts?employeeId=alice&workspacePath=%2Fworkspace%2Falice+repo");
   });
 
   it("lists a task's generated artifacts", async () => {
@@ -233,7 +298,7 @@ describe("apiJson", () => {
 
     const result = await listTaskArtifacts("task 1");
 
-    assert.equal(requestedUrl, "/tasks/task%201/artifacts");
+    assert.equal(requestedUrl, "/api/v1/tasks/task%201/artifacts");
     assert.equal(result.taskId, "task 1");
     assert.equal(result.artifacts.length, 1);
     assert.equal(result.artifacts[0].title, "deck.pptx");
@@ -258,7 +323,7 @@ describe("apiJson", () => {
 
     const result = await deleteTask("task 1");
 
-    assert.equal(requestedUrl, "/tasks/task%201");
+    assert.equal(requestedUrl, "/api/v1/tasks/task%201");
     assert.equal(requestedMethod, "DELETE");
     assert.equal(result.deletedAt, "2026-07-24T00:00:00Z");
   });
@@ -294,7 +359,7 @@ describe("apiJson", () => {
     const result = await getWorkspaceBrief({ employeeId: "alice" });
 
     assert.equal(result.employeeId, "alice");
-    assert.equal(requestedUrl, "/workspace/brief?employeeId=alice");
+    assert.equal(requestedUrl, "/api/v1/workspace/brief?employeeId=alice");
   });
 
   it("fetches team-scoped artifacts and activity", async () => {
@@ -302,7 +367,7 @@ describe("apiJson", () => {
     globalThis.fetch = (async (input) => {
       const url = String(input);
       requestedUrls.push(url);
-      const body = url.includes("/artifacts")
+      const body = url.includes("/api/v1/teams/")
         ? { teamId: "team delivery", artifacts: [] }
         : {
             employeeId: "alice",
@@ -332,8 +397,8 @@ describe("apiJson", () => {
     assert.deepEqual(await getTeamArtifacts("team delivery"), { teamId: "team delivery", artifacts: [] });
     assert.equal((await getWorkspaceBrief({ teamId: "team delivery" })).teamId, "team delivery");
     assert.deepEqual(requestedUrls, [
-      "/teams/team%20delivery/artifacts",
-      "/workspace/brief?teamId=team+delivery",
+      "/api/v1/teams/team%20delivery/artifacts",
+      "/api/v1/workspace/brief?teamId=team+delivery",
     ]);
   });
 
@@ -357,7 +422,7 @@ describe("apiJson", () => {
     const result = await listAgentWorkspaceFiles({ agentId: "agent_1", path: "src/ui" });
 
     assert.equal(result.agentId, "agent_1");
-    assert.equal(requestedUrl, "/agents/agent_1/workspace/files?path=src%2Fui");
+    assert.equal(requestedUrl, "/api/v1/agents/agent_1/workspace/files?path=src%2Fui");
   });
 
   it("reads a workspace file's content for the preview pane", async () => {
@@ -385,6 +450,6 @@ describe("apiJson", () => {
 
     assert.equal(result.content, "hello world\n");
     assert.equal(result.isBinary, false);
-    assert.equal(requestedUrl, "/agents/agent_1/workspace/file?path=src%2Fapp.tsx");
+    assert.equal(requestedUrl, "/api/v1/agents/agent_1/workspace/file?path=src%2Fapp.tsx");
   });
 });

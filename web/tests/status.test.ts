@@ -230,7 +230,7 @@ describe("Relay web thread status", () => {
         displayName: "Alice",
       });
 
-      assert.equal(requestPath, "/cp/employees");
+      assert.equal(requestPath, "/api/v1/admin/employees");
       assert.equal(requestInit?.method, "POST");
       assert.deepEqual(JSON.parse(String(requestInit?.body)), {
         employeeId: "alice",
@@ -272,7 +272,7 @@ describe("Relay web thread status", () => {
         workspacePath: "/workspace/shared",
       });
 
-      assert.equal(requestPath, "/cp/daemon-nodes");
+      assert.equal(requestPath, "/api/v1/admin/daemon-nodes");
       assert.equal(requestInit?.method, "POST");
       assert.deepEqual(JSON.parse(String(requestInit?.body)), {
         displayName: "Lab computer",
@@ -320,7 +320,7 @@ describe("Relay web thread status", () => {
         sandboxMode: "boxlite",
       });
 
-      assert.equal(requestPath, "/cp/managed-nodes");
+      assert.equal(requestPath, "/api/v1/admin/managed-nodes");
       assert.equal(requestInit?.method, "POST");
       assert.deepEqual(JSON.parse(String(requestInit?.body)), {
         employeeId: "alice",
@@ -353,7 +353,7 @@ describe("Relay web thread status", () => {
     }) as typeof fetch;
     try {
       await deleteManagedNode("mnode_alice");
-      assert.equal(requestPath, "/cp/managed-nodes/mnode_alice");
+      assert.equal(requestPath, "/api/v1/admin/managed-nodes/mnode_alice");
       assert.equal(requestInit?.method, "DELETE");
     } finally {
       globalThis.fetch = originalFetch;
@@ -372,7 +372,7 @@ describe("Relay web thread status", () => {
     }) as typeof fetch;
     try {
       const result = await listManagedNodes();
-      assert.equal(requestPath, "/cp/managed-nodes");
+      assert.equal(requestPath, "/api/v1/admin/managed-nodes");
       assert.deepEqual(result.nodes, []);
     } finally {
       globalThis.fetch = originalFetch;
@@ -390,7 +390,7 @@ describe("Relay web thread status", () => {
     }) as typeof fetch;
     try {
       await permanentlyDeleteManagedNode("mnode_old");
-      assert.equal(requestPath, "/cp/managed-nodes/mnode_old/permanent");
+      assert.equal(requestPath, "/api/v1/admin/managed-nodes/mnode_old/record");
       assert.equal(requestInit?.method, "DELETE");
     } finally {
       globalThis.fetch = originalFetch;
@@ -424,8 +424,8 @@ describe("Relay web thread status", () => {
         nodeId: "node_unassigned",
       });
 
-      assert.equal(requestPath, "/cp/daemon-nodes/node_unassigned/assign");
-      assert.equal(requestInit?.method, "POST");
+      assert.equal(requestPath, "/api/v1/admin/daemon-nodes/node_unassigned/assignment");
+      assert.equal(requestInit?.method, "PUT");
       assert.deepEqual(JSON.parse(String(requestInit?.body)), {
         employeeId: "alice",
       });

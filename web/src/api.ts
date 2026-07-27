@@ -1,3 +1,4 @@
+import { relayApiPath } from "relay-core";
 import type {
   AgentArtifactsResponse,
   AgentName,
@@ -73,9 +74,16 @@ function apiErrorMessage(value: unknown): string | undefined {
 
 export async function apiJson<T>(
   path: string,
-  options: { method?: string; body?: unknown; token?: string; signal?: AbortSignal; credentials?: RequestCredentials } = {},
+  options: {
+    method?: string;
+    body?: unknown;
+    token?: string;
+    signal?: AbortSignal;
+    credentials?: RequestCredentials;
+    versioned?: boolean;
+  } = {},
 ): Promise<T> {
-  const response = await fetch(path, {
+  const response = await fetch(options.versioned === false ? path : relayApiPath(path), {
     method: options.method ?? "GET",
     signal: options.signal,
     credentials: options.credentials ?? "include",
@@ -136,7 +144,7 @@ export function listEmployeeAgents(signal?: AbortSignal): Promise<EmployeeAgents
 
 export function listControlPanelAgents(employeeId?: string, signal?: AbortSignal): Promise<EmployeeAgentsResponse> {
   const query = employeeId ? `?employeeId=${encodeURIComponent(employeeId)}` : "";
-  return apiJson<EmployeeAgentsResponse>(`/cp/agents${query}`, { signal });
+  return apiJson<EmployeeAgentsResponse>(`/admin/agents${query}`, { signal });
 }
 
 export function listTeams(signal?: AbortSignal): Promise<AgentTeamsResponse> {
@@ -163,7 +171,7 @@ export function getTeamArtifacts(teamId: string, signal?: AbortSignal): Promise<
 }
 
 export function getControlPanelAgent(agentId: string, signal?: AbortSignal): Promise<{ agent: EmployeeAgent }> {
-  return apiJson<{ agent: EmployeeAgent }>(`/cp/agents/${encodeURIComponent(agentId)}`, { signal });
+  return apiJson<{ agent: EmployeeAgent }>(`/admin/agents/${encodeURIComponent(agentId)}`, { signal });
 }
 
 export type EmployeeAgentMetaPatch = {
@@ -189,14 +197,14 @@ export function updateEmployeeAgent(
   agentId: string,
   patch: EmployeeAgentAdminPatch,
 ): Promise<{ agent: EmployeeAgent }> {
-  return apiJson<{ agent: EmployeeAgent }>(`/cp/agents/${encodeURIComponent(agentId)}`, {
+  return apiJson<{ agent: EmployeeAgent }>(`/admin/agents/${encodeURIComponent(agentId)}`, {
     method: "PATCH",
     body: patch,
   });
 }
 
 export function deleteEmployeeAgent(agentId: string): Promise<{ agent: EmployeeAgent }> {
-  return apiJson<{ agent: EmployeeAgent }>(`/cp/agents/${encodeURIComponent(agentId)}`, {
+  return apiJson<{ agent: EmployeeAgent }>(`/admin/agents/${encodeURIComponent(agentId)}`, {
     method: "DELETE",
   });
 }
@@ -207,7 +215,7 @@ export function updateAgentProfileImage(
 ): Promise<{ agent: EmployeeAgent }> {
   return apiJson<{ agent: EmployeeAgent }>(
     `/profile-images/agents/${encodeURIComponent(agentId)}`,
-    { method: "PUT", body: { dataUrl } },
+    { method: "PUT", body: { dataUrl }, versioned: false },
   );
 }
 
@@ -216,7 +224,7 @@ export function deleteAgentProfileImage(
 ): Promise<{ agent: EmployeeAgent }> {
   return apiJson<{ agent: EmployeeAgent }>(
     `/profile-images/agents/${encodeURIComponent(agentId)}`,
-    { method: "DELETE" },
+    { method: "DELETE", versioned: false },
   );
 }
 
@@ -226,7 +234,7 @@ export function updateTeamProfileImage(
 ): Promise<{ team: AgentTeam }> {
   return apiJson<{ team: AgentTeam }>(
     `/profile-images/teams/${encodeURIComponent(teamId)}`,
-    { method: "PUT", body: { dataUrl } },
+    { method: "PUT", body: { dataUrl }, versioned: false },
   );
 }
 
@@ -235,28 +243,28 @@ export function deleteTeamProfileImage(
 ): Promise<{ team: AgentTeam }> {
   return apiJson<{ team: AgentTeam }>(
     `/profile-images/teams/${encodeURIComponent(teamId)}`,
-    { method: "DELETE" },
+    { method: "DELETE", versioned: false },
   );
 }
 
 export function deleteAgentPlacement(placementId: string): Promise<{ placement: AgentPlacement }> {
-  return apiJson<{ placement: AgentPlacement }>(`/cp/agent-placements/${encodeURIComponent(placementId)}`, {
+  return apiJson<{ placement: AgentPlacement }>(`/admin/agent-placements/${encodeURIComponent(placementId)}`, {
     method: "DELETE",
   });
 }
 
 export function listControlPanelDaemonNodes(signal?: AbortSignal): Promise<ControlPanelDaemonNodesResponse> {
-  return apiJson<ControlPanelDaemonNodesResponse>("/cp/daemon-nodes", { signal });
+  return apiJson<ControlPanelDaemonNodesResponse>("/admin/daemon-nodes", { signal });
 }
 
 export function listControlPanelEmployees(signal?: AbortSignal): Promise<ControlPanelEmployeesResponse> {
-  return apiJson<ControlPanelEmployeesResponse>("/cp/employees", { signal });
+  return apiJson<ControlPanelEmployeesResponse>("/admin/employees", { signal });
 }
 
 export function createControlPanelEmployee(
   input: CreateControlPanelEmployeeInput,
 ): Promise<CreateControlPanelEmployeeResponse> {
-  return apiJson<CreateControlPanelEmployeeResponse>("/cp/employees", {
+  return apiJson<CreateControlPanelEmployeeResponse>("/admin/employees", {
     method: "POST",
     body: {
       employeeId: input.employeeId,
@@ -272,8 +280,8 @@ export function createControlPanelEmployee(
 export function assignControlPanelDaemonNode(
   input: { nodeId: string; employeeId: string },
 ): Promise<AssignControlPanelDaemonNodeResponse> {
-  return apiJson<AssignControlPanelDaemonNodeResponse>(`/cp/daemon-nodes/${encodeURIComponent(input.nodeId)}/assign`, {
-    method: "POST",
+  return apiJson<AssignControlPanelDaemonNodeResponse>(`/admin/daemon-nodes/${encodeURIComponent(input.nodeId)}/assignment`, {
+    method: "PUT",
     body: { employeeId: input.employeeId },
   });
 }
@@ -281,7 +289,7 @@ export function assignControlPanelDaemonNode(
 export function createControlPanelDaemonNode(
   input: CreateControlPanelDaemonNodeInput,
 ): Promise<CreateControlPanelDaemonNodeResponse> {
-  return apiJson<CreateControlPanelDaemonNodeResponse>("/cp/daemon-nodes", {
+  return apiJson<CreateControlPanelDaemonNodeResponse>("/admin/daemon-nodes", {
     method: "POST",
     body: {
       ...(input.employeeId ? { employeeId: input.employeeId } : {}),
@@ -294,7 +302,7 @@ export function createControlPanelDaemonNode(
 }
 
 export function createManagedNode(input: CreateManagedNodeInput): Promise<CreateManagedNodeResponse> {
-  return apiJson<CreateManagedNodeResponse>("/cp/managed-nodes", {
+  return apiJson<CreateManagedNodeResponse>("/admin/managed-nodes", {
     method: "POST",
     body: {
       employeeId: input.employeeId,
@@ -314,23 +322,23 @@ export function updateManagedNodeDisplayName(
   displayName: string | null,
 ): Promise<{ node: ManagedNodeRecord }> {
   return apiJson<{ node: ManagedNodeRecord }>(
-    `/cp/managed-nodes/${encodeURIComponent(nodeId)}`,
+    `/admin/managed-nodes/${encodeURIComponent(nodeId)}`,
     { method: "PATCH", body: { displayName } },
   );
 }
 
 export function deleteManagedNode(nodeId: string): Promise<CreateManagedNodeResponse> {
-  return apiJson<CreateManagedNodeResponse>(`/cp/managed-nodes/${encodeURIComponent(nodeId)}`, {
+  return apiJson<CreateManagedNodeResponse>(`/admin/managed-nodes/${encodeURIComponent(nodeId)}`, {
     method: "DELETE",
   });
 }
 
 export function listManagedNodes(signal?: AbortSignal): Promise<ManagedNodesResponse> {
-  return apiJson<ManagedNodesResponse>("/cp/managed-nodes", { signal });
+  return apiJson<ManagedNodesResponse>("/admin/managed-nodes", { signal });
 }
 
 export function permanentlyDeleteManagedNode(nodeId: string): Promise<void> {
-  return apiJson<void>(`/cp/managed-nodes/${encodeURIComponent(nodeId)}/permanent`, {
+  return apiJson<void>(`/admin/managed-nodes/${encodeURIComponent(nodeId)}/record`, {
     method: "DELETE",
   });
 }
@@ -339,13 +347,13 @@ export function unassignControlPanelDaemonNode(
   nodeId: string,
 ): Promise<UnassignControlPanelDaemonNodeResponse> {
   return apiJson<UnassignControlPanelDaemonNodeResponse>(
-    `/cp/daemon-nodes/${encodeURIComponent(nodeId)}/unassign`,
-    { method: "POST" },
+    `/admin/daemon-nodes/${encodeURIComponent(nodeId)}/assignment`,
+    { method: "DELETE" },
   );
 }
 
 export function deleteControlPanelDaemonNode(nodeId: string): Promise<void> {
-  return apiJson<void>(`/cp/daemon-nodes/${encodeURIComponent(nodeId)}`, { method: "DELETE" });
+  return apiJson<void>(`/admin/daemon-nodes/${encodeURIComponent(nodeId)}`, { method: "DELETE" });
 }
 
 export function updateControlPanelDaemonNodeDisabledAgents(
@@ -353,7 +361,7 @@ export function updateControlPanelDaemonNodeDisabledAgents(
   disabledAgents: AgentName[],
 ): Promise<UnassignControlPanelDaemonNodeResponse> {
   return apiJson<UnassignControlPanelDaemonNodeResponse>(
-    `/cp/daemon-nodes/${encodeURIComponent(nodeId)}/disabled-agents`,
+    `/admin/daemon-nodes/${encodeURIComponent(nodeId)}/disabled-agents`,
     { method: "PATCH", body: { disabledAgents } },
   );
 }
@@ -363,7 +371,7 @@ export function updateControlPanelDaemonNodeAgentRoleDefaults(
   agentRoleDefaults: Partial<Record<AgentName, AgentRole>>,
 ): Promise<UnassignControlPanelDaemonNodeResponse> {
   return apiJson<UnassignControlPanelDaemonNodeResponse>(
-    `/cp/daemon-nodes/${encodeURIComponent(nodeId)}/agent-role-defaults`,
+    `/admin/daemon-nodes/${encodeURIComponent(nodeId)}/agent-role-defaults`,
     { method: "PATCH", body: { agentRoleDefaults } },
   );
 }
@@ -383,7 +391,7 @@ export function deleteControlPanelEmployee(
   employeeId: string,
 ): Promise<{ employee: { id: string; deletedAt: string }; unassignedNodes: string[] }> {
   return apiJson<{ employee: { id: string; deletedAt: string }; unassignedNodes: string[] }>(
-    `/cp/employees/${encodeURIComponent(employeeId)}`,
+    `/admin/employees/${encodeURIComponent(employeeId)}`,
     { method: "DELETE" },
   );
 }
@@ -422,18 +430,18 @@ export function logout(): Promise<{ ok: boolean }> {
 }
 
 export function listUsers(): Promise<{ users: CurrentUser[] }> {
-  return apiJson<{ users: CurrentUser[] }>("/cp/users");
+  return apiJson<{ users: CurrentUser[] }>("/admin/users");
 }
 
 export function createUser(input: { username: string; password: string; role?: UserRole; email?: string; employeeId?: string }): Promise<{ user: CurrentUser }> {
-  return apiJson<{ user: CurrentUser }>("/cp/users", {
+  return apiJson<{ user: CurrentUser }>("/admin/users", {
     method: "POST",
     body: input,
   });
 }
 
 export function listSessions(signal?: AbortSignal): Promise<SessionsResponse> {
-  return apiJson<SessionsResponse>("/sessions", { signal });
+  return apiJson<SessionsResponse>("/threads", { signal });
 }
 
 export function listArtifacts(
@@ -486,7 +494,7 @@ export function listNodeWorkspaceFiles(
   const params = new URLSearchParams();
   if (input.path) params.set("path", input.path);
   const query = params.toString();
-  return apiJson<NodeWorkspaceFilesResponse>(`/cp/daemon-nodes/${encodeURIComponent(input.nodeId)}/workspace/files${query ? `?${query}` : ""}`, { signal });
+  return apiJson<NodeWorkspaceFilesResponse>(`/admin/daemon-nodes/${encodeURIComponent(input.nodeId)}/workspace/files${query ? `?${query}` : ""}`, { signal });
 }
 
 export function readNodeWorkspaceFile(
@@ -494,7 +502,7 @@ export function readNodeWorkspaceFile(
   signal?: AbortSignal,
 ): Promise<NodeWorkspaceFileResponse> {
   const params = new URLSearchParams({ path: input.path });
-  return apiJson<NodeWorkspaceFileResponse>(`/cp/daemon-nodes/${encodeURIComponent(input.nodeId)}/workspace/file?${params.toString()}`, { signal });
+  return apiJson<NodeWorkspaceFileResponse>(`/admin/daemon-nodes/${encodeURIComponent(input.nodeId)}/workspace/file?${params.toString()}`, { signal });
 }
 
 export function listTasks(signal?: AbortSignal): Promise<TasksResponse> {
@@ -522,21 +530,21 @@ export function deleteTask(taskId: string): Promise<RelayTask> {
 }
 
 export function assignTask(taskId: string, agentId: string): Promise<RelayTask> {
-  return apiJson<RelayTask>(`/tasks/${encodeURIComponent(taskId)}/assign`, {
-    method: "POST",
+  return apiJson<RelayTask>(`/tasks/${encodeURIComponent(taskId)}/assignment`, {
+    method: "PUT",
     body: { agentId },
   });
 }
 
 export function assignTaskToTeam(taskId: string, teamId: string): Promise<RelayTask> {
-  return apiJson<RelayTask>(`/tasks/${encodeURIComponent(taskId)}/assign`, {
-    method: "POST",
+  return apiJson<RelayTask>(`/tasks/${encodeURIComponent(taskId)}/assignment`, {
+    method: "PUT",
     body: { teamId },
   });
 }
 
 export function startTask(taskId: string, input: { mode?: AgentTaskMode; assignments?: RunInput["assignments"] } = {}): Promise<StartTaskResponse> {
-  return apiJson<StartTaskResponse>(`/tasks/${encodeURIComponent(taskId)}/start`, {
+  return apiJson<StartTaskResponse>(`/tasks/${encodeURIComponent(taskId)}/runs`, {
     method: "POST",
     body: input,
   });
@@ -556,7 +564,7 @@ export async function readArtifactText(
   signal?: AbortSignal,
 ): Promise<string> {
   const response = await fetch(
-    `/sessions/${encodeURIComponent(sessionId)}/artifacts/${encodeURIComponent(artifactId)}`,
+    relayApiPath(`/threads/${encodeURIComponent(sessionId)}/artifacts/${encodeURIComponent(artifactId)}`),
     { credentials: "include", signal },
   );
   const text = await response.text();
@@ -597,19 +605,19 @@ export interface TokenUsageSnapshot {
 }
 
 export function getDashboardSessions(signal?: AbortSignal): Promise<DashboardSessionsResponse> {
-  return apiJson<DashboardSessionsResponse>("/cp/dashboard/sessions", { signal });
+  return apiJson<DashboardSessionsResponse>("/admin/dashboard/sessions", { signal });
 }
 
 export function getDashboardActivity(signal?: AbortSignal): Promise<{ items: DashboardActivityItem[] }> {
-  return apiJson<{ items: DashboardActivityItem[] }>("/cp/dashboard/activity?limit=20", { signal });
+  return apiJson<{ items: DashboardActivityItem[] }>("/admin/dashboard/activity?limit=20", { signal });
 }
 
 export function getDashboardTokens(signal?: AbortSignal): Promise<TokenUsageSnapshot> {
-  return apiJson<TokenUsageSnapshot>("/cp/dashboard/tokens", { signal });
+  return apiJson<TokenUsageSnapshot>("/admin/dashboard/tokens", { signal });
 }
 
 export function listChatIntegrations(signal?: AbortSignal): Promise<ChatIntegrationsResponse> {
-  return apiJson<ChatIntegrationsResponse>("/cp/chat-integrations", { signal });
+  return apiJson<ChatIntegrationsResponse>("/admin/chat-integrations", { signal });
 }
 
 export function createChatIntegration(input: {
@@ -619,7 +627,7 @@ export function createChatIntegration(input: {
   secrets?: Record<string, string>;
   config?: Record<string, string | number | boolean>;
 }): Promise<{ integration: ChatIntegration }> {
-  return apiJson<{ integration: ChatIntegration }>("/cp/chat-integrations", {
+  return apiJson<{ integration: ChatIntegration }>("/admin/chat-integrations", {
     method: "POST",
     body: input,
   });
@@ -627,7 +635,7 @@ export function createChatIntegration(input: {
 
 export function checkChatIntegration(integrationId: string): Promise<{ integration: ChatIntegration }> {
   return apiJson<{ integration: ChatIntegration }>(
-    `/cp/chat-integrations/${encodeURIComponent(integrationId)}/check`,
+    `/admin/chat-integrations/${encodeURIComponent(integrationId)}/health-checks`,
     { method: "POST" },
   );
 }
@@ -637,7 +645,7 @@ export function updateChatIntegration(
   input: { displayName?: string; tenantId?: string; secrets?: Record<string, string>; config?: Record<string, string | number | boolean> },
 ): Promise<{ integration: ChatIntegration }> {
   return apiJson<{ integration: ChatIntegration }>(
-    `/cp/chat-integrations/${encodeURIComponent(integrationId)}`,
+    `/admin/chat-integrations/${encodeURIComponent(integrationId)}`,
     { method: "PATCH", body: input },
   );
 }
@@ -646,7 +654,7 @@ export function activateChatIntegration(
   integrationId: string,
 ): Promise<{ integration: ChatIntegration; provisioning: { ok: boolean; message: string } }> {
   return apiJson<{ integration: ChatIntegration; provisioning: { ok: boolean; message: string } }>(
-    `/cp/chat-integrations/${encodeURIComponent(integrationId)}/activate`,
+    `/admin/chat-integrations/${encodeURIComponent(integrationId)}/activations`,
     { method: "POST" },
   );
 }
@@ -655,7 +663,7 @@ export function rotateTelegramWebhookSecret(
   integrationId: string,
 ): Promise<{ integration: ChatIntegration; provisioning: { ok: boolean; message: string } }> {
   return apiJson<{ integration: ChatIntegration; provisioning: { ok: boolean; message: string } }>(
-    `/cp/chat-integrations/${encodeURIComponent(integrationId)}/rotate-webhook-secret`,
+    `/admin/chat-integrations/${encodeURIComponent(integrationId)}/webhook-secret-rotations`,
     { method: "POST" },
   );
 }
@@ -665,14 +673,14 @@ export function addChatIdentityLink(
   input: { externalUserId: string; employeeId: string; displayName?: string; defaultAgentId?: string },
 ): Promise<{ integration: ChatIntegration }> {
   return apiJson<{ integration: ChatIntegration }>(
-    `/cp/chat-integrations/${encodeURIComponent(integrationId)}/identity-links`,
+    `/admin/chat-integrations/${encodeURIComponent(integrationId)}/identity-links`,
     { method: "POST", body: input },
   );
 }
 
 export function deleteChatIdentityLink(integrationId: string, linkId: string): Promise<{ integration: ChatIntegration }> {
   return apiJson<{ integration: ChatIntegration }>(
-    `/cp/chat-integrations/${encodeURIComponent(integrationId)}/identity-links/${encodeURIComponent(linkId)}`,
+    `/admin/chat-integrations/${encodeURIComponent(integrationId)}/identity-links/${encodeURIComponent(linkId)}`,
     { method: "DELETE" },
   );
 }
@@ -682,7 +690,7 @@ export function addChatAllowedConversation(
   input: { conversationId: string; threadId?: string; label?: string },
 ): Promise<{ integration: ChatIntegration }> {
   return apiJson<{ integration: ChatIntegration }>(
-    `/cp/chat-integrations/${encodeURIComponent(integrationId)}/allowed-conversations`,
+    `/admin/chat-integrations/${encodeURIComponent(integrationId)}/allowed-conversations`,
     { method: "POST", body: input },
   );
 }
@@ -692,7 +700,7 @@ export function deleteChatAllowedConversation(
   conversationRecordId: string,
 ): Promise<{ integration: ChatIntegration }> {
   return apiJson<{ integration: ChatIntegration }>(
-    `/cp/chat-integrations/${encodeURIComponent(integrationId)}/allowed-conversations/${encodeURIComponent(conversationRecordId)}`,
+    `/admin/chat-integrations/${encodeURIComponent(integrationId)}/allowed-conversations/${encodeURIComponent(conversationRecordId)}`,
     { method: "DELETE" },
   );
 }
@@ -712,7 +720,7 @@ export function provisionSandbox(employeeId: string, token?: string, nodeToken?:
 }
 
 export function createSession(input: CreateSessionInput, token?: string): Promise<RelaySession> {
-  return apiJson<RelaySession>("/sessions", {
+  return apiJson<RelaySession>("/threads", {
     method: "POST",
     token,
     body: {
@@ -753,8 +761,8 @@ export function runLogicalAgents(input: AgentRunInput): Promise<RelaySession> {
   });
 }
 
-export function cancelRun(sandboxId: string, sessionId: string, token?: string, reason?: string): Promise<RelaySession> {
-  return apiJson<RelaySession>(`/sandboxes/${encodeURIComponent(sandboxId)}/runs/${encodeURIComponent(sessionId)}/cancel`, {
+export function cancelRun(_sandboxId: string, sessionId: string, token?: string, reason?: string): Promise<RelaySession> {
+  return apiJson<RelaySession>(`/threads/${encodeURIComponent(sessionId)}/cancellations`, {
     method: "POST",
     token,
     body: { reason: reason ?? "Cancelled from Relay Web UI." },
@@ -768,7 +776,7 @@ export function recordDecision(
   token?: string,
   targetAgent?: AgentName,
 ): Promise<RelaySession> {
-  return apiJson<RelaySession>(`/sessions/${encodeURIComponent(sessionId)}/decisions`, {
+  return apiJson<RelaySession>(`/threads/${encodeURIComponent(sessionId)}/decisions`, {
     method: "POST",
     token,
     body: { kind, note, ...(targetAgent ? { targetAgent } : {}) },
@@ -780,7 +788,7 @@ export function appendAssignment(
   assignment: { agent: AgentName; mode: AgentTaskMode },
   token?: string,
 ): Promise<RelaySession> {
-  return apiJson<RelaySession>(`/sessions/${encodeURIComponent(sessionId)}/assignments`, {
+  return apiJson<RelaySession>(`/threads/${encodeURIComponent(sessionId)}/assignments`, {
     method: "POST",
     token,
     body: { assignments: [assignment] },
@@ -788,22 +796,23 @@ export function appendAssignment(
 }
 
 export function archiveSession(sessionId: string, token?: string): Promise<RelaySession> {
-  return apiJson<RelaySession>(`/sessions/${encodeURIComponent(sessionId)}/archive`, {
-    method: "POST",
+  return apiJson<RelaySession>(`/threads/${encodeURIComponent(sessionId)}`, {
+    method: "PATCH",
     token,
+    body: { archived: true },
   });
 }
 
 export function deleteSession(sessionId: string, token?: string): Promise<void> {
-  return apiJson<void>(`/sessions/${encodeURIComponent(sessionId)}`, {
+  return apiJson<void>(`/threads/${encodeURIComponent(sessionId)}`, {
     method: "DELETE",
     token,
   });
 }
 
 export function renameSession(sessionId: string, title: string, token?: string): Promise<RelaySession> {
-  return apiJson<RelaySession>(`/sessions/${encodeURIComponent(sessionId)}/title`, {
-    method: "POST",
+  return apiJson<RelaySession>(`/threads/${encodeURIComponent(sessionId)}`, {
+    method: "PATCH",
     token,
     body: { title },
   });
@@ -816,7 +825,7 @@ export function recordHandoff(
   note?: string,
   token?: string,
 ): Promise<RelaySession> {
-  return apiJson<RelaySession>(`/sessions/${encodeURIComponent(sessionId)}/handoffs`, {
+  return apiJson<RelaySession>(`/threads/${encodeURIComponent(sessionId)}/handoffs`, {
     method: "POST",
     token,
     body: { targetAgent, mode, note },
