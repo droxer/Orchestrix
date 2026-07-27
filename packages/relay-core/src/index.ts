@@ -1,4 +1,11 @@
 export {
+  RELAY_API_PREFIX,
+  RELAY_API_VERSION,
+  relayApiPath,
+  relayApiUrl,
+} from "./api-url.js";
+
+export {
   ansi,
   color,
   emitOrPrint,
