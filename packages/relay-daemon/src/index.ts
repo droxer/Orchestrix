@@ -615,9 +615,10 @@ function readyAgents(health: Partial<Record<AgentName, DaemonAgentHealth>>): Age
 }
 
 async function checkBackendReachable(fetchFn: typeof fetch, backendUrl: string, signal?: AbortSignal): Promise<void> {
-  const response = await fetchFn(`${backendUrl}/`, { signal: requestSignal(signal) });
+  const url = `${backendUrl}/api`;
+  const response = await fetchFn(url, { signal: requestSignal(signal) });
   if (!response.ok) {
-    throw new DaemonHttpError(`GET ${backendUrl}/ failed: ${response.status} ${await response.text()}`, response.status);
+    throw new DaemonHttpError(`GET ${url} failed: ${response.status} ${await response.text()}`, response.status);
   }
 }
 

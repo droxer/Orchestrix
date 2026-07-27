@@ -24,7 +24,6 @@ import { TaskDrawer } from "./task-board/TaskDrawer";
 import { PageHeader } from "./PageHeader";
 import { BoardEmpty } from "./BoardEmpty";
 import { TaskBoardHeaderActions } from "./TaskBoardHeaderActions";
-import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { Button, buttonVariants } from "./ui/button";
 import { FiltersBar } from "./FiltersBar";
 import { hrefForRoute } from "../lib/appRoute";
@@ -52,19 +51,6 @@ type RoutineView = "card" | "list";
 
 const ROUTINE_VIEW_STORAGE_KEY = "relay-web.routineView";
 const ROUTINE_VIEWS: readonly RoutineView[] = ["card", "list"];
-
-function parseRoutineFilters(value: string | null): RoutineFilters {
-  if (!value) return initialFilters;
-  try {
-    return { ...initialFilters, ...JSON.parse(value) } as RoutineFilters;
-  } catch {
-    return initialFilters;
-  }
-}
-
-function serializeRoutineFilters(value: RoutineFilters): string | null {
-  return JSON.stringify(value) === JSON.stringify(initialFilters) ? null : JSON.stringify(value);
-}
 
 function parseRoutineView(value: string | null): RoutineView {
   return ROUTINE_VIEWS.includes(value as RoutineView)
@@ -383,8 +369,8 @@ export function RoutinesPage({ tasks, sessions, nodes, currentUser, isRefreshing
     createTaskMutation,
     deleteTaskMutation,
   } = useRelayMutations();
-  const [filters, setFilters] = useUrlSearchState("routineFilters", initialFilters, parseRoutineFilters, serializeRoutineFilters);
-  const [view, setView] = useUrlSearchState("routineView", parseRoutineView(null), parseRoutineView, (value) => value);
+  const [filters, setFilters] = useState(initialFilters);
+  const [view, setView] = useState<RoutineView>(() => parseRoutineView(null));
   const [form, setForm] = useState<RoutineTaskFormState | null>(null);
   const [formBaseline, setFormBaseline] = useState<RoutineTaskFormState | null>(null);
   const [saving, setSaving] = useState(false);

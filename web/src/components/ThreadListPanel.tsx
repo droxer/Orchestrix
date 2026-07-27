@@ -1,9 +1,8 @@
-import { useEffect, type Dispatch, type SetStateAction } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 import { ActionCompose, ActionSearch } from "./icons";
 import { ThreadRow, type ThreadItem } from "./ThreadRow";
 import { groupThreads } from "../lib/threadGroups";
-import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import type { RelaySession } from "../types";
 import { Button } from "./ui/button";
 
@@ -30,21 +29,6 @@ export function ThreadListPanel({
   onCloseThread: (sessionId: string) => void;
 }) {
   const { t } = useTranslation();
-
-  // The filter is owned by the parent (it also filters the thread
-  // list), but mirrored to the URL so a refresh or shared link restores it.
-  const [urlQuery, setUrlQuery] = useUrlSearchState(
-    "threadQuery",
-    "",
-    (value) => value ?? "",
-    (value) => value || null,
-  );
-  useEffect(() => {
-    if (urlQuery !== query) setQuery(urlQuery);
-  }, [urlQuery, query, setQuery]);
-  useEffect(() => {
-    if (query !== urlQuery) setUrlQuery(query);
-  }, [query, urlQuery, setUrlQuery]);
 
   const groups = groupThreads(threads);
   const sections = [

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { RelaySession } from "../types";
 import type { AppRoute, MobileView } from "../lib/viewTypes";
 import {
+  canonicalBrowserUrl,
   hrefForRoute as buildHrefForRoute,
   legacyHashUrl,
   parseAppPath,
@@ -52,6 +53,12 @@ export function useAppRouter({
     const migrated = legacyHashUrl(window.location.hash, window.location.search);
     if (migrated) window.history.replaceState(window.history.state, "", migrated);
     else if (window.location.pathname === "/") window.history.replaceState(window.history.state, "", "/threads");
+    else {
+      const canonicalUrl = canonicalBrowserUrl(window.location.pathname, window.location.search);
+      if (`${window.location.pathname}${window.location.search}` !== canonicalUrl) {
+        window.history.replaceState(window.history.state, "", canonicalUrl);
+      }
+    }
 
     const applyCurrentLocation = () => applyLocationState(parseAppPath(window.location.pathname, window.location.search));
     applyCurrentLocation();

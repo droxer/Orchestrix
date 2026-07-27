@@ -17,7 +17,7 @@ interface AgentsPageProps {
   currentUser: CurrentUser;
   isRefreshing: boolean;
   onRefresh: () => Promise<void>;
-  /** The agent currently inspected in the detail pane, driven by the URL hash. */
+  /** The agent currently inspected in the detail pane, driven by the pathname. */
   workspaceAgent: EmployeeAgent | null;
   onOpenWorkspace: (agent: EmployeeAgent, tab?: WorkspacePageTab) => void;
   onOpenThread: (sessionId: string) => void;

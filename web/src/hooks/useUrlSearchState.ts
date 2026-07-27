@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { APP_NAVIGATION_EVENT } from "../lib/appRoute";
+import { APP_NAVIGATION_EVENT, canonicalBrowserUrl } from "../lib/appRoute";
 
 export function useUrlSearchState<T>(
   key: string,
@@ -35,7 +35,9 @@ export function useUrlSearchState<T>(
       const encoded = serialize(next);
       if (encoded === null) url.searchParams.delete(key);
       else url.searchParams.set(key, encoded);
-      window.history[historyMode === "push" ? "pushState" : "replaceState"](window.history.state, "", url);
+      const nextUrl = canonicalBrowserUrl(url.pathname, url.search);
+      window.history[historyMode === "push" ? "pushState" : "replaceState"](window.history.state, "", nextUrl);
+      window.dispatchEvent(new Event(APP_NAVIGATION_EVENT));
       return next;
     });
   }, [historyMode, key, serialize]);

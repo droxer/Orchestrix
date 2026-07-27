@@ -56,6 +56,7 @@ def test_openapi_publishes_only_the_canonical_json_contract(
 
     assert set(paths["/api/v1/threads/{session_id}"]) == {"get", "patch", "delete"}
     assert set(paths["/api/v1/tasks/{task_id}/assignment"]) == {"put"}
+    assert "201" in paths["/api/v1/tasks/{task_id}/pickups"]["post"]["responses"]
     assert set(paths["/api/v1/admin/daemon-nodes/{node_id}/assignment"]) == {
         "put",
         "delete",
@@ -94,6 +95,16 @@ def test_legacy_routes_are_hidden_deprecated_aliases(
     assert redirect.status_code == 308
     assert redirect.headers["location"] == "/admin"
     assert redirect.headers["deprecation"] == "true"
+    assert redirect.headers["link"] == '</admin>; rel="successor-version"'
+
+    retry = client.post("/cp/managed-nodes/node_1/retry")
+    assert retry.headers["link"] == (
+        '</api/v1/admin/managed-nodes/node_1/attempts>; rel="successor-version"'
+    )
+    drain = client.post("/cp/managed-nodes/node_1/drain")
+    assert drain.headers["link"] == (
+        '</api/v1/admin/managed-nodes/node_1>; rel="successor-version"'
+    )
 
 
 def test_legacy_daemon_can_register_and_appear_through_the_v1_api(
@@ -160,7 +171,24 @@ def test_spa_fallback_is_allowlisted_and_never_masks_api_typos(
     assert direct_web_route.status_code == 200
     assert direct_web_route.text == "<html>relay-spa</html>"
 
-    for path in ("/api/v1/missing", "/typoed-api/path", "/missing.js"):
+    for path in ("/agents", "/agents/agent_123", "/teams", "/teams/team_123"):
+        browser_route = client.get(path, headers={"accept": "text/html"})
+        assert browser_route.status_code == 200
+        assert browser_route.text == "<html>relay-spa</html>"
+        assert "deprecation" not in browser_route.headers
+
+    legacy_agents_api = client.get("/agents")
+    assert legacy_agents_api.status_code == 401
+    assert legacy_agents_api.headers["deprecation"] == "true"
+
+    for path in (
+        "/api/v1/missing",
+        "/typoed-api/path",
+        "/missing.js",
+        "/threads/missing.js",
+        "/agents/missing.js",
+        "/admin/missing.css",
+    ):
         response = client.get(path)
         assert response.status_code == 404
         assert response.headers["content-type"].startswith("application/json")

@@ -170,7 +170,7 @@ export function App() {
     kimi: { blurb: t("agent.kimi.blurb") },
   }), [t]);
   // The logged-in user is themselves an employee; their threads are the
-  // sessions they own. The backend already owner-scopes /sessions, so this is
+  // sessions they own. The backend already owner-scopes /api/v1/threads, so this is
   // just the non-archived sessions sorted most-recent first.
   const myThreads = useMemo(
     () => myThreadSessions(sessions, selectedEmployee),
@@ -415,7 +415,7 @@ export function App() {
     if (myEmployeeId) setSelectedEmployee(myEmployeeId);
     setHydrated(true);
   }, [authChecked, user]);
-  // Adoption reads /cp/daemon-nodes, which is admin-only: running it for every
+  // Adoption reads /api/v1/admin/daemon-nodes, which is admin-only: running it for every
   // signed-in user meant a 403 on each load whose failure was swallowed. Gate
   // it exactly like the query it depends on (useLocalDaemonNodes above).
   useEffect(() => {

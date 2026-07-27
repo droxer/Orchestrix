@@ -369,7 +369,7 @@ test("relay daemon ignores duplicate run.start commands already active", async (
     }),
     fetchFn: async (url, init) => {
       const path = new URL(String(url)).pathname;
-      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/api") return jsonResponse({ name: "Relay backend" });
       if (path === "/api/v1/daemon-node-registrations") return jsonResponse({ ok: true });
       if (path.endsWith("/commands")) {
         if (!commandBatchServed) {
@@ -429,7 +429,7 @@ test("relay daemon reports structured Codex collaboration events", async () => {
     }),
     fetchFn: async (url, init) => {
       const path = new URL(String(url)).pathname;
-      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/api") return jsonResponse({ name: "Relay backend" });
       if (path === "/api/v1/daemon-node-registrations") return jsonResponse({ ok: true });
       if (path.endsWith("/commands")) {
         if (!commandServed) {
@@ -485,7 +485,7 @@ test("relay daemon advertises active delivery leases while polling", async () =>
     fetchFn: async (url, init) => {
       const parsed = new URL(String(url));
       const path = parsed.pathname;
-      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/api") return jsonResponse({ name: "Relay backend" });
       if (path === "/api/v1/daemon-node-registrations") return jsonResponse({ ok: true });
       if (path.endsWith("/commands")) {
         commandLeaseSeconds = Number(parsed.searchParams.get("leaseSeconds") ?? "0");
@@ -542,7 +542,7 @@ test("relay daemon refreshes an active command lease from a duplicate dispatch",
     }),
     fetchFn: async (url, init) => {
       const path = new URL(String(url)).pathname;
-      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/api") return jsonResponse({ name: "Relay backend" });
       if (path === "/api/v1/daemon-node-registrations") return jsonResponse({ ok: true });
       if (path.endsWith("/commands")) {
         pollCount += 1;
@@ -590,7 +590,7 @@ test("relay daemon advertises only agents with passing capability preflight", as
     }),
     fetchFn: async (url, init) => {
       const path = new URL(String(url)).pathname;
-      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/api") return jsonResponse({ name: "Relay backend" });
       if (path === "/api/v1/daemon-node-registrations") {
         registrations.push(await jsonBody<DaemonNodeRegistration>(init));
         return jsonResponse({ ok: true });
@@ -638,7 +638,7 @@ test("local node refreshes agent availability before heartbeat registration", as
     }),
     fetchFn: async (url, init) => {
       const path = new URL(String(url)).pathname;
-      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/api") return jsonResponse({ name: "Relay backend" });
       if (path === "/api/v1/daemon-node-registrations") {
         registrations.push(await jsonBody<DaemonNodeRegistration>(init));
         if (registrations.length === 2) stop.abort();
@@ -668,7 +668,7 @@ test("relay daemon doctor reports per-agent preflight failures", async () => {
     }),
     fetchFn: async (url) => {
       const path = new URL(String(url)).pathname;
-      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/api") return jsonResponse({ name: "Relay backend" });
       if (path === "/api/v1/daemon-node-registrations") return jsonResponse({ ok: true });
       throw new Error(`unexpected URL ${url}`);
     },
@@ -697,7 +697,7 @@ test("relay daemon retries terminal event posts across backend failures", async 
     environment: fakeEnvironment(),
     fetchFn: async (url, init) => {
       const path = new URL(String(url)).pathname;
-      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/api") return jsonResponse({ name: "Relay backend" });
       if (path === "/api/v1/daemon-node-registrations") return jsonResponse({ ok: true });
       if (path.endsWith("/commands")) return jsonResponse({ commands: terminalAttempts === 0 ? [command] : [] });
       if (path.endsWith("/events")) {
@@ -741,7 +741,7 @@ test("relay daemon preserves final agent log when output event post fails", asyn
     }),
     fetchFn: async (url, init) => {
       const path = new URL(String(url)).pathname;
-      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/api") return jsonResponse({ name: "Relay backend" });
       if (path === "/api/v1/daemon-node-registrations") return jsonResponse({ ok: true });
       if (path.endsWith("/commands")) {
         if (!commandServed) {
@@ -800,7 +800,7 @@ test("relay daemon opens a circuit when the output post backlog is unbounded", a
     }),
     fetchFn: async (url, init) => {
       const path = new URL(String(url)).pathname;
-      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/api") return jsonResponse({ name: "Relay backend" });
       if (path === "/api/v1/daemon-node-registrations") return jsonResponse({ ok: true });
       if (path.endsWith("/commands")) {
         if (!commandServed) {
@@ -846,7 +846,7 @@ test("relay daemon exits startup preflight after external stop", async () => {
     },
     fetchFn: async (url, init) => {
       const path = new URL(String(url)).pathname;
-      if (path === "/") {
+      if (path === "/api") {
         const signal = init?.signal as AbortSignal | undefined;
         setTimeout(() => stop.abort(), 0);
         return await new Promise<Response>((_resolve, reject) => {
@@ -968,7 +968,7 @@ test("relay daemon removes shutdown listeners after external stop", async () => 
     environment: fakeEnvironment(),
     fetchFn: async (url) => {
       const path = new URL(String(url)).pathname;
-      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/api") return jsonResponse({ name: "Relay backend" });
       if (path === "/api/v1/daemon-node-registrations") return jsonResponse({ ok: true });
       if (path.endsWith("/commands")) {
         stop.abort();
@@ -1006,7 +1006,7 @@ test("relay daemon exits polling sleep after external stop", async () => {
     },
     fetchFn: async (url) => {
       const path = new URL(String(url)).pathname;
-      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/api") return jsonResponse({ name: "Relay backend" });
       if (path === "/api/v1/daemon-node-registrations") return jsonResponse({ ok: true });
       if (path.endsWith("/commands")) {
         commandPolls += 1;
@@ -1198,7 +1198,7 @@ test("relay daemon bounds stopped registration during shutdown", async () => {
     },
     fetchFn: async (url, init) => {
       const path = new URL(String(url)).pathname;
-      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/api") return jsonResponse({ name: "Relay backend" });
       if (path === "/api/v1/daemon-node-registrations") {
         const registration = await jsonBody<DaemonNodeRegistration>(init);
         if (registration.status !== "stopped") return jsonResponse({ ok: true });
@@ -1254,7 +1254,7 @@ test("relay daemon posts cancellation during shutdown", async () => {
     }),
     fetchFn: async (url, init) => {
       const path = new URL(String(url)).pathname;
-      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/api") return jsonResponse({ name: "Relay backend" });
       if (path === "/api/v1/daemon-node-registrations") return jsonResponse({ ok: true });
       if (path.endsWith("/commands")) {
         if (!commandServed) {
@@ -1309,7 +1309,7 @@ test("relay daemon bounds cancellation event retry during shutdown", async () =>
     },
     fetchFn: async (url, init) => {
       const path = new URL(String(url)).pathname;
-      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/api") return jsonResponse({ name: "Relay backend" });
       if (path === "/api/v1/daemon-node-registrations") return jsonResponse({ ok: true });
       if (path.endsWith("/commands")) {
         if (!commandServed) {
@@ -1377,7 +1377,7 @@ test("relay daemon retries normal run.cancel terminal event while running", asyn
     }),
     fetchFn: async (url, init) => {
       const path = new URL(String(url)).pathname;
-      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/api") return jsonResponse({ name: "Relay backend" });
       if (path === "/api/v1/daemon-node-registrations") return jsonResponse({ ok: true });
       if (path.endsWith("/commands")) {
         if (!commandServed) {
@@ -1444,7 +1444,7 @@ test("relay daemon rejects a second distinct run while busy", async () => {
     }),
     fetchFn: async (url, init) => {
       const path = new URL(String(url)).pathname;
-      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/api") return jsonResponse({ name: "Relay backend" });
       if (path === "/api/v1/daemon-node-registrations") return jsonResponse({ ok: true });
       if (path.endsWith("/commands")) {
         if (!commandServed) {
@@ -1501,7 +1501,7 @@ test("relay daemon runs concurrent ask commands within capacity", async () => {
     }),
     fetchFn: async (url, init) => {
       const path = new URL(String(url)).pathname;
-      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/api") return jsonResponse({ name: "Relay backend" });
       if (path === "/api/v1/daemon-node-registrations") return jsonResponse({ ok: true });
       if (path.endsWith("/commands")) {
         if (!commandServed) {
@@ -1562,7 +1562,7 @@ test("relay daemon stops while retrying a busy-command rejection event", async (
     },
     fetchFn: async (url, init) => {
       const path = new URL(String(url)).pathname;
-      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/api") return jsonResponse({ name: "Relay backend" });
       if (path === "/api/v1/daemon-node-registrations") return jsonResponse({ ok: true });
       if (path.endsWith("/commands")) {
         if (!commandServed) {
@@ -1802,7 +1802,7 @@ test("relay daemon reports generated workspace documents in run.completed", asyn
     }),
     fetchFn: async (url, init) => {
       const path = new URL(String(url)).pathname;
-      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/api") return jsonResponse({ name: "Relay backend" });
       if (path === "/api/v1/daemon-node-registrations") {
         registrations.push(await jsonBody<DaemonNodeRegistration>(init));
         return jsonResponse({ ok: true });
@@ -1973,7 +1973,7 @@ test("relay daemon serves agent-home workspace commands", async () => {
     environment: fakeEnvironment({ exec: async () => ({ exit_code: 0, stdout: "", stderr: "" }) }),
     fetchFn: async (url, init) => {
       const path = new URL(String(url)).pathname;
-      if (path === "/") return jsonResponse({ name: "Relay backend" });
+      if (path === "/api") return jsonResponse({ name: "Relay backend" });
       if (path === "/api/v1/daemon-node-registrations") { registration = await jsonBody<DaemonNodeRegistration>(init); return jsonResponse({ ok: true }); }
       if (path.endsWith("/commands")) {
         if (!served) { served = true; return jsonResponse({ commands: [

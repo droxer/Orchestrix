@@ -89,6 +89,58 @@ export function hrefForRoute(route: AppRoute, sessionId?: string | null): string
   });
 }
 
+const AGENT_TABS = new Set(["profile", "activities", "artifacts", "workspace"]);
+const TEAM_TABS = new Set(["profile", "activities", "artifacts"]);
+const AGENT_AVAILABILITY = new Set(["ready", "busy", "pending", "offline"]);
+
+function copyParam(source: URLSearchParams, target: URLSearchParams, key: string): void {
+  const value = source.get(key);
+  if (value) target.set(key, value);
+}
+
+/** Returns only query parameters owned by the current route and tab. */
+export function canonicalSearchForPath(pathname: string, search = ""): string {
+  const source = new URLSearchParams(search);
+  const target = new URLSearchParams();
+  const [head, entityId, ...rest] = pathSegments(pathname);
+
+  if (head === "login" && !entityId) {
+    const rawReturnTo = source.get("returnTo");
+    if (rawReturnTo) target.set("returnTo", validatedReturnTo(rawReturnTo));
+  } else if (head === "agents" && !entityId) {
+    copyParam(source, target, "q");
+    const availability = source.get("availability");
+    if (availability && AGENT_AVAILABILITY.has(availability)) {
+      target.set("availability", availability);
+    }
+  } else if (head === "agents" && entityId && rest.length === 0) {
+    const requestedTab = source.get("tab");
+    const tab = requestedTab && AGENT_TABS.has(requestedTab) ? requestedTab : "activities";
+    if (tab !== "activities") target.set("tab", tab);
+    if (tab === "workspace") {
+      if (source.get("scope") === "shared") target.set("scope", "shared");
+      copyParam(source, target, "path");
+      copyParam(source, target, "item");
+    } else if (tab === "artifacts") {
+      copyParam(source, target, "item");
+    }
+  } else if (head === "teams" && !entityId) {
+    if (source.get("dialog") === "create") target.set("dialog", "create");
+  } else if (head === "teams" && entityId && rest.length === 0) {
+    const requestedTab = source.get("tab");
+    const tab = requestedTab && TEAM_TABS.has(requestedTab) ? requestedTab : "activities";
+    if (tab !== "activities") target.set("tab", tab);
+    if (tab === "artifacts") copyParam(source, target, "artifact");
+  }
+
+  const encoded = target.toString();
+  return encoded ? `?${encoded}` : "";
+}
+
+export function canonicalBrowserUrl(pathname: string, search = ""): string {
+  return `${pathname}${canonicalSearchForPath(pathname, search)}`;
+}
+
 function legacyQuery(hash: string, search: string): URLSearchParams {
   const params = new URLSearchParams(search);
   for (const [key, value] of new URLSearchParams(hash.split("?", 2)[1] ?? "")) params.set(key, value);
@@ -133,7 +185,7 @@ export function legacyHashUrl(hash: string, search = ""): string | null {
   else return "/threads";
 
   const query = next.toString();
-  return `${pathname}${query ? `?${query}` : ""}`;
+  return canonicalBrowserUrl(pathname, query ? `?${query}` : "");
 }
 
 export function validatedReturnTo(value: string | null, origin = "http://relay.local"): string {
@@ -143,7 +195,7 @@ export function validatedReturnTo(value: string | null, origin = "http://relay.l
     if (candidate.origin !== origin) return "/threads";
     const state = parseAppPath(candidate.pathname, candidate.search);
     if (state.notFound || state.login) return "/threads";
-    return `${candidate.pathname}${candidate.search}`;
+    return canonicalBrowserUrl(candidate.pathname, candidate.search);
   } catch {
     return "/threads";
   }

@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { useDialogs } from "@/components/ui/DialogProvider";
 import { RelayEmptyState } from "@/components/RelayEmptyState";
 import type { ControlPanelDaemonNodeRecord } from "../../types";
-import { useUrlSearchState } from "../../hooks/useUrlSearchState";
 import {
   buildEmployeeSummaries,
   type EmployeeNodeSummary,
@@ -30,22 +29,6 @@ interface EmployeesViewProps {
 type EmployeeFilter = "all" | "running" | "ready" | "idle" | "failed" | "unassigned";
 
 const FILTERS: EmployeeFilter[] = ["all", "running", "ready", "idle", "failed", "unassigned"];
-
-function parseEmployeeFilter(value: string | null): EmployeeFilter {
-  return FILTERS.includes(value as EmployeeFilter) ? (value as EmployeeFilter) : "all";
-}
-
-function serializeEmployeeFilter(value: EmployeeFilter): string | null {
-  return value === "all" ? null : value;
-}
-
-function parseSearchQuery(value: string | null): string {
-  return value ?? "";
-}
-
-function serializeSearchQuery(value: string): string | null {
-  return value.trim() === "" ? null : value;
-}
 
 // Employee activity slices mirror the Nodes status chips (and the card status
 // pill). running/ready/failed overlap by design — an employee can own one
@@ -84,13 +67,8 @@ export function EmployeesView({
 }: EmployeesViewProps) {
   const { t } = useTranslation();
   const { confirm } = useDialogs();
-  const [query, setQuery] = useUrlSearchState("empQuery", "", parseSearchQuery, serializeSearchQuery);
-  const [filter, setFilter] = useUrlSearchState<EmployeeFilter>(
-    "empFilter",
-    "all",
-    parseEmployeeFilter,
-    serializeEmployeeFilter,
-  );
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<EmployeeFilter>("all");
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 

@@ -11,7 +11,7 @@ export type ThreadItem = {
 
 type Labelled = { title?: string; taskGoal: string };
 
-// The logged-in employee's own threads, newest first. /sessions is already
+// The logged-in employee's own threads, newest first. /api/v1/threads is already
 // owner-scoped by the backend, but we defensively filter by owner (and drop
 // archived/closed ones) so the list never surfaces another employee's work.
 export function myThreadSessions(

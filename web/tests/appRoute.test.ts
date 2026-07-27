@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  canonicalBrowserUrl,
   hrefForRoute,
   legacyHashUrl,
   parseAppPath,
@@ -64,10 +65,31 @@ describe("app pathname routes", () => {
   });
 
   it("accepts only recognized same-origin authentication return paths", () => {
-    assert.equal(validatedReturnTo("/threads/ses_1?tab=activity"), "/threads/ses_1?tab=activity");
+    assert.equal(validatedReturnTo("/threads/ses_1?tab=activity"), "/threads/ses_1");
     assert.equal(validatedReturnTo("https://evil.example/threads"), "/threads");
     assert.equal(validatedReturnTo("//evil.example/threads"), "/threads");
     assert.equal(validatedReturnTo("/missing"), "/threads");
     assert.equal(validatedReturnTo("/login"), "/threads");
+  });
+
+  it("keeps only query parameters owned by the route and selected tab", () => {
+    assert.equal(
+      canonicalBrowserUrl("/agents", "?q=ops&availability=ready&tab=workspace"),
+      "/agents?q=ops&availability=ready",
+    );
+    assert.equal(
+      canonicalBrowserUrl("/agents/agent-1", "?q=ops&tab=workspace&scope=shared&path=src&item=file%3Aa.ts"),
+      "/agents/agent-1?tab=workspace&scope=shared&path=src&item=file%3Aa.ts",
+    );
+    assert.equal(
+      canonicalBrowserUrl("/agents/agent-1", "?tab=profile&scope=shared&path=src&item=file%3Aa.ts"),
+      "/agents/agent-1?tab=profile",
+    );
+    assert.equal(
+      canonicalBrowserUrl("/teams/team-1", "?tab=profile&artifact=art-1&dialog=create"),
+      "/teams/team-1?tab=profile",
+    );
+    assert.equal(canonicalBrowserUrl("/teams", "?dialog=create&tab=artifacts"), "/teams?dialog=create");
+    assert.equal(canonicalBrowserUrl("/backlog", "?q=stale"), "/backlog");
   });
 });

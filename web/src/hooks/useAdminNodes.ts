@@ -16,7 +16,7 @@ export interface AdminNodes {
 
 // Admin page node snapshot (daemon nodes + employees). Node polling shares
 // CONTROL_PANEL_NODES_KEY with useLocalDaemonNodes so localhost chat + admin
-// reuse one /cp/daemon-nodes poll instead of two timers. When `live` is false the
+// reuse one /api/v1/admin/daemon-nodes poll instead of two timers. When `live` is false the
 // data is fetched once and not refreshed, which keeps the admin card view stable.
 export function useAdminNodes(enabled: boolean, live: boolean = true): {
   nodes: ControlPanelDaemonNodeRecord[];

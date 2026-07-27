@@ -34,6 +34,7 @@ from .api.contract import (
     API_REDOC_PATH,
     API_VERSION,
     LegacyApiHeadersMiddleware,
+    canonical_router_groups,
     include_canonical_router,
 )
 from .chat import (
@@ -174,15 +175,20 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
         daemon_node_routes.router,
         managed_node_routes.router,
     )
+    canonical_groups = canonical_router_groups()
     for router in api_routers:
-        include_canonical_router(app, router)
+        include_canonical_router(canonical_groups, router)
 
-    app.add_api_route(
+    canonical_groups.public.add_api_route(
         f"{API_PREFIX}/threads/{{session_id}}",
         session_routes.update_session,
         methods=["PATCH"],
         tags=["threads"],
     )
+    app.include_router(canonical_groups.public)
+    app.include_router(canonical_groups.admin)
+    app.include_router(canonical_groups.internal_chat)
+    app.include_router(canonical_groups.daemon)
 
     # Stable persisted media locators intentionally remain outside the JSON API
     # namespace. They are not compatibility aliases.
