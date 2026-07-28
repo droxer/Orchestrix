@@ -65,7 +65,7 @@ function ActivitySection({ title, count, children }: { title: string; count: num
     <section className="workspace-activity-section">
       <header className="workspace-activity-head">
         <h2>{title}</h2>
-        <span className="mono">{count}</span>
+        <span className="tnum">{count}</span>
       </header>
       {children}
     </section>
@@ -77,7 +77,7 @@ function ActivityRow({ title, meta, onClick }: { title: string; meta: string; on
   const content = (
     <>
       <span className="workspace-pick-title">{title}</span>
-      <span className="workspace-pick-meta mono">{meta}</span>
+      <span className="workspace-pick-meta tnum">{meta}</span>
     </>
   );
   return onClick
@@ -262,7 +262,7 @@ function TeamProfile({
               aria-label={team.enabled ? t("teams.enabled") : t("teams.disabled")}
               title={team.enabled ? t("teams.enabled") : t("teams.disabled")}
             />
-            <span className="workspace-dossier-runtime mono">
+            <span className="workspace-dossier-runtime tnum">
               {t("teams.ready_members", { ready: readyMembers, count: team.members.length })}
             </span>
           </div>
@@ -309,7 +309,7 @@ function TeamProfile({
           <section className="team-profile-section" aria-labelledby="team-profile-members">
             <div className="team-profile-section-head">
               <h2 id="team-profile-members" className="workspace-dossier-section-title">{t("teams.members")}</h2>
-              <span className="mono">{editing ? memberIds.length : team.members.length}</span>
+              <span className="tnum">{editing ? memberIds.length : team.members.length}</span>
             </div>
             {editing ? (
               <fieldset
@@ -470,7 +470,7 @@ function TeamArtifacts({
                   >
                     <span className={`artifact-kind-tag is-${artifact.kind}`}>{t(`artifact.kind.${artifact.kind}`, { defaultValue: artifact.kind })}</span>
                     <span className="workspace-pick-title">{artifact.title}</span>
-                    <span className="workspace-pick-meta mono">{compactDate(artifact.createdAt, i18n.language)}</span>
+                    <span className="workspace-pick-meta tnum">{compactDate(artifact.createdAt, i18n.language)}</span>
                   </button>
                 </li>
               ))}
@@ -678,8 +678,8 @@ export function TeamWorkspacePage({
                 onKeyDown={(event) => movePageTab(event, TEAM_PAGE_TABS[index - 1] ?? TEAM_PAGE_TABS.at(-1)!, TEAM_PAGE_TABS[index + 1] ?? TEAM_PAGE_TABS[0])}
               >
                 {tab === "profile" ? t("workspace.tab_profile") : tab === "artifacts" ? t("workspace.artifacts") : t("workspace.tab_activities")}
-                {tab === "artifacts" && artifacts.length ? <span className="workspace-page-tab-count mono">{artifacts.length}</span> : null}
-                {tab === "activities" && briefQuery.data?.metrics.sessionCount ? <span className="workspace-page-tab-count mono">{briefQuery.data.metrics.sessionCount}</span> : null}
+                {tab === "artifacts" && artifacts.length ? <span className="workspace-page-tab-count tnum">{artifacts.length}</span> : null}
+                {tab === "activities" && briefQuery.data?.metrics.sessionCount ? <span className="workspace-page-tab-count tnum">{briefQuery.data.metrics.sessionCount}</span> : null}
               </button>
             ))}
           </div>

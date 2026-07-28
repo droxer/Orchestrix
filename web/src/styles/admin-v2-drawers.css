@@ -457,6 +457,11 @@
   word-break: break-all;
 }
 
+/* Re-assert the code face the `font` shorthand above resets. */
+.adm-assign-node-id.code {
+  font-family: var(--font-mono);
+}
+
 .adm-assign-node-path {
   font-size: var(--fs-2);
   color: var(--ink-3);

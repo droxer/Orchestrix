@@ -172,12 +172,6 @@
   white-space: nowrap;
 }
 
-.conversation-name strong.mono {
-  font-family: var(--font-mono);
-  font-weight: 500;
-  font-size: var(--fs-3);
-}
-
 .conversation-row-actions {
   position: absolute;
   top: 50%;

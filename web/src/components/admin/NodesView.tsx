@@ -112,7 +112,7 @@ export function NodesView({ nodes, storedTokens, layout, onLayoutChange, onRevea
                 onClick={() => setFilter(id)}
               >
                 <span>{filterLabel(id, t)}</span>
-                <span className="adm-fleet-chip-count mono">{counts[id]}</span>
+                <span className="adm-fleet-chip-count tnum">{counts[id]}</span>
               </Button>
             );
           })}

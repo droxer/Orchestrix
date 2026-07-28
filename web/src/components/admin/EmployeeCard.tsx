@@ -42,7 +42,7 @@ export function EmployeeCard({
         </span>
         <div className="adm-node-card-identity">
           <span className="adm-node-card-name" translate="no">{member.displayName}</span>
-          <span className="adm-node-card-handle mono" translate="no">@{member.id}</span>
+          <span className="adm-node-card-handle code" translate="no">@{member.id}</span>
         </div>
         <div className="adm-node-card-meta-col">
           {/* "Ready" is the default healthy state — the good tone on the card
@@ -61,7 +61,7 @@ export function EmployeeCard({
 
       <div className="adm-node-card-body">
         {member.email ? (
-          <p className="adm-emp-card-email mono tone-muted" translate="no">{member.email}</p>
+          <p className="adm-emp-card-email code tone-muted" translate="no">{member.email}</p>
         ) : null}
         <div className="adm-agents adm-emp-nodes">
           <EmployeeComputers nodes={member.nodes} t={t} />
@@ -79,13 +79,13 @@ export function EmployeeCard({
         >
           <span className="adm-emp-card-metric">
             <span className="adm-emp-metric-label">{t("admin.v2.col_running")}</span>
-            <span className={`mono ${member.runningCount > 0 ? "tone-neutral" : "tone-muted"}`}>
+            <span className={`tnum ${member.runningCount > 0 ? "tone-neutral" : "tone-muted"}`}>
               {member.runningCount}
             </span>
           </span>
           <span className="adm-emp-card-metric">
             <span className="adm-emp-metric-label">{t("admin.v2.col_ready")}</span>
-            <span className="mono tone-muted">{member.readyCount}/{member.nodeCount}</span>
+            <span className="tnum tone-muted">{member.readyCount}/{member.nodeCount}</span>
           </span>
         </div>
         {onDelete ? (

@@ -237,7 +237,7 @@ export function AddNodeDrawer({
                 {initialsOf(selectedEmployee.id)}
               </span>
               <div className="adm-assign-operator-text">
-                <span className="adm-assign-operator-handle mono">
+                <span className="adm-assign-operator-handle code">
                   @{selectedEmployee.id}
                 </span>
                 {selectedEmployee.displayName &&
@@ -263,7 +263,7 @@ export function AddNodeDrawer({
               <SelectTrigger
                 ref={employeeTriggerRef}
                 data-modal-initial-focus
-                className="w-full mono"
+                className="w-full code"
                 aria-labelledby={employeeLabelId}
                 aria-invalid={Boolean(fieldErrors.employeeId) || undefined}
                 aria-describedby={fieldErrors.employeeId ? "add-node-employee-error" : undefined}

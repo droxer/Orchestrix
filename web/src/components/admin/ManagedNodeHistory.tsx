@@ -48,7 +48,7 @@ export function ManagedNodeHistory({ nodes, onDeletePermanently }: ManagedNodeHi
         <div className="adm-node-history-title-row">
           <h2 id="managed-node-history-title">{t("admin.v2.history_title")}</h2>
           <span
-            className="adm-node-history-count mono"
+            className="adm-node-history-count tnum"
             aria-label={t("admin.v2.history_count", { count: historical.length })}
           >
             {historical.length}
@@ -65,7 +65,7 @@ export function ManagedNodeHistory({ nodes, onDeletePermanently }: ManagedNodeHi
             </span>
             <span className="adm-node-history-identity">
               <strong>{node.displayName}</strong>
-              <span className="mono">{node.id}</span>
+              <span className="code">{node.id}</span>
             </span>
             <span className="adm-node-history-meta">
               {node.employeeId ? `@${node.employeeId} · ` : ""}{node.provider} · {node.profile}

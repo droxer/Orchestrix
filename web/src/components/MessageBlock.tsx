@@ -38,7 +38,7 @@ function MsgTime({ value }: { value: string }) {
   const { i18n } = useTranslation();
   const formatted = useMemo(() => formatTime(value, i18n.language || undefined), [value, i18n.language]);
   if (!formatted) return null;
-  return <time className="msg-time mono" dateTime={value}>{formatted}</time>;
+  return <time className="msg-time tnum" dateTime={value}>{formatted}</time>;
 }
 
 function formatArtifactSize(bytes: number | undefined, t: TFunction, locale: string | undefined): string {

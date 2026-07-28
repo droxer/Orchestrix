@@ -61,7 +61,7 @@ export function ThreadRow({ item, selected, onSelect, onRename, onClose }: Threa
               <strong>{label}</strong>
             </span>
             {stamp ? (
-              <span className="conversation-stamp mono">
+              <span className="conversation-stamp tnum">
                 {stamp}
               </span>
             ) : null}

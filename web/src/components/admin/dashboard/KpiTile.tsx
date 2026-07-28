@@ -24,7 +24,7 @@ export function KpiTile({ eyebrow, value, hero, enterIndex = 0, slot, delta, hin
       className={`adm-dash-tile relay-enter relay-enter-delay-${enterDelay}${hero ? " adm-dash-tile--hero" : ""}${slotClass}`}
     >
       <div className="adm-dash-tile-eyebrow">{eyebrow}</div>
-      <div className="adm-dash-tile-value mono">{value}</div>
+      <div className="adm-dash-tile-value tnum">{value}</div>
       {hasFoot ? (
         <div className="adm-dash-tile-foot">
           {delta ? (
