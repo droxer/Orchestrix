@@ -1,8 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Relay" shape-rendering="geometricPrecision">
   <title>Relay</title>
-  <rect x="4" y="4" width="56" height="56" rx="15" fill="#5b87d6"/>
-  <g fill="none" stroke="#0a1220" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M22 20 L36 32 L22 44"/>
-    <path d="M36 20 L50 32 L36 44" opacity="0.55"/>
+  <!-- Phosphor app-icon badge (dark): near-black field, live-green lead chevron.
+       Kept identical to web/public/favicon.svg — this tree had drifted to a
+       cobalt-era blue field. -->
+  <rect x="4" y="4" width="56" height="56" rx="15" fill="#101214"/>
+  <g fill="none" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M22 20 L36 32 L22 44" stroke="#3ee08a"/>
+    <path d="M36 20 L50 32 L36 44" stroke="#f2f4f6" opacity="0.45"/>
   </g>
 </svg>

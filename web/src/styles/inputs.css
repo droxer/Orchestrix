@@ -146,15 +146,15 @@
   width: 18px;
   height: 18px;
   border-radius: var(--r-full);
-  background: var(--warn);
+  background: var(--live);
   opacity: 0.35;
   z-index: 1;
-  --pulse-color: var(--warn);
+  --pulse-color: var(--live);
   animation: pulse-ring var(--t-pulse) var(--ease) infinite;
 }
 
 .employee-avatar.running::after {
-  background: var(--warn);
+  background: var(--live);
 }
 
 @media (prefers-reduced-motion: reduce) {

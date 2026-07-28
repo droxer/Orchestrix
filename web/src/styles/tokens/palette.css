@@ -1,9 +1,11 @@
-/* Monochrome palette — raw values, both registers side by side.
-   True-neutral canvas, white/black action (Linear-style), status as a
-   grey brightness hierarchy on dot/border/text only. The only file
-   allowed to originate a color.
-   Rationale: docs/superpowers/specs/2026-07-20-monochrome-tokens-design.md
-   (supersedes the color values of 2026-07-19-graphite-tokens-design.md)
+/* Phosphor palette — raw values, both registers side by side.
+   Relay is grey until something is working. True-neutral canvas, white/black
+   action (Linear-style), status as a grey brightness hierarchy on
+   dot/border/text only — and exactly one colour, --live, reserved for work an
+   agent is doing right now. The only file allowed to originate a color.
+   Rationale: docs/superpowers/specs/2026-07-28-phosphor-identity-design.md
+   (retains the monochrome ramp of 2026-07-20-monochrome-tokens-design.md,
+   replaces its typography and adds the --live role)
 
    Breakpoints (reference — custom properties can't drive @media):
    mobile 820px · tablet 1040px · login-stack 879px · admin-drawer 768px
@@ -41,6 +43,17 @@
   --ok: #7d848d;
   --warn: #b2b9c1;
   --err: #f2f4f6;
+
+  /* Live — the one colour in Relay. Reserved exclusively for work an agent is
+     doing RIGHT NOW: never an action, never a status, never decoration. Legal
+     only where --t-pulse is used; --t-pulse-calm surfaces stay grey (see
+     docs/superpowers/specs/2026-07-28-phosphor-identity-design.md §4). A
+     screen's colour density is therefore a utilisation readout — a busy
+     workforce glows, an idle one is bare.
+     10.94:1 on --surface-0, 10.36:1 on --surface-1. Do not brighten: the
+     obvious lighter green #0f8a4e measures 4.14:1 and fails AA. */
+  --live: #3ee08a;
+  --live-wash: color-mix(in srgb, var(--live) 7%, transparent);
 
   /* ----- Pinned registers -----
      Surfaces that must NOT follow the active theme: the pre-auth login
@@ -186,6 +199,11 @@ html[data-theme="light"] {
   --ok: #6b727b;
   --warn: #484f57;
   --err: #16181b;
+
+  /* Live — darkened for the light canvas: 5.08:1 on --surface-0, 5.41:1 on
+     --surface-1. Both clear AA for small text, so an elapsed timer set in
+     --live is legible rather than decorative. */
+  --live: #0b7a45;
 
   --scrim: rgba(12, 14, 16, 0.55);
 }

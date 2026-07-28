@@ -206,15 +206,15 @@
   width: 6px;
   height: 6px;
   border-radius: var(--r-full);
-  background: var(--info);
-  box-shadow: 0 0 0 0 color-mix(in srgb, var(--info) 55%, transparent);
+  background: var(--live);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--live) 55%, transparent);
   animation: header-agent-busy-pulse var(--t-pulse) var(--ease) infinite;
 }
 
 @keyframes header-agent-busy-pulse {
   0%,
   100% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--info) 45%, transparent);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--live) 45%, transparent);
     opacity: 1;
   }
   55% {
@@ -544,8 +544,8 @@
   width: 6px;
   height: 6px;
   border-radius: var(--r-full);
-  background: var(--info);
-  box-shadow: 0 0 0 0 color-mix(in srgb, var(--info) 40%, transparent);
+  background: var(--live);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--live) 40%, transparent);
   animation: pulse-ring var(--t-pulse) var(--ease) infinite;
 }
 
@@ -557,7 +557,7 @@
    transcript body is quiet between tool calls. */
 @media (prefers-reduced-motion: no-preference) {
   .msg-agent.streaming .rail-node-agent {
-    border-color: var(--info);
+    border-color: var(--live);
     animation:
       node-in var(--t-fast) var(--ease) both,
       agent-rail-pulse var(--t-pulse) var(--ease) infinite;
@@ -565,8 +565,8 @@
 }
 
 @keyframes agent-rail-pulse {
-  0%   { box-shadow: 0 0 0 2px var(--surface-0), 0 0 0 2px color-mix(in srgb, var(--info) 45%, transparent); }
-  100% { box-shadow: 0 0 0 2px var(--surface-0), 0 0 0 9px color-mix(in srgb, var(--info) 0%, transparent); }
+  0%   { box-shadow: 0 0 0 2px var(--surface-0), 0 0 0 2px color-mix(in srgb, var(--live) 45%, transparent); }
+  100% { box-shadow: 0 0 0 2px var(--surface-0), 0 0 0 9px color-mix(in srgb, var(--live) 0%, transparent); }
 }
 
 /* The user turn is a compact, content-hugging bubble — not a full-width card.

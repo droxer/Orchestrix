@@ -1,9 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Relay" shape-rendering="geometricPrecision">
   <title>Relay</title>
-  <!-- Dark-default favicon: Graphite near-black canvas + steel lead chevron. -->
+  <!-- Phosphor app icon (dark default): near-black canvas + live-green lead chevron.
+       The one non-liveness use of the accent anywhere. At 16px the icon's job is to
+       identify Relay, and a grey chevron on a grey square vanishes in a tab strip.
+       See docs/superpowers/specs/2026-07-28-phosphor-identity-design.md §5. -->
   <rect x="4" y="4" width="56" height="56" rx="15" fill="#101214"/>
   <g fill="none" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M22 20 L36 32 L22 44" stroke="#6ba1d4"/>
+    <path d="M22 20 L36 32 L22 44" stroke="#3ee08a"/>
     <path d="M36 20 L50 32 L36 44" stroke="#f2f4f6" opacity="0.45"/>
   </g>
 </svg>

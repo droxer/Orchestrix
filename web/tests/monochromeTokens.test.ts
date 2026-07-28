@@ -67,6 +67,33 @@ describe("monochrome palette tokens", () => {
     assert.match(darkRegister, /--light-ink:\s*#16181b;/);
   });
 
+  it("reserves exactly one chromatic role, --live, in both registers", () => {
+    // Phosphor: the ramp stays monochrome and colour means one thing — an agent
+    // is working right now. Both registers clear WCAG AA for small text
+    // (10.94:1 dark, 5.08:1 light) so an elapsed timer in --live is legible.
+    assert.match(darkRegister, /--live:\s*#3ee08a;/);
+    assert.match(darkRegister, /--live-wash:\s*color-mix\(in srgb, var\(--live\) 7%, transparent\);/);
+    assert.match(lightRegister, /--live:\s*#0b7a45;/);
+  });
+
+  it("originates --live only in palette.css", () => {
+    // The scope rule is enforced, not merely documented: no other token file may
+    // declare the accent, and stylelint already blocks raw hex outside palette.
+    for (const file of ["tokens/roles.css", "tokens/base.css", "tokens/shadcn-bridge.css"]) {
+      const source = readStyle(file);
+      assert.doesNotMatch(source, /--live\s*:/, `${file} must not declare --live`);
+    }
+  });
+
+  it("keeps the light-register green above the AA floor", () => {
+    // #0f8a4e is the obvious "brighter, friendlier" green and measures 4.14:1 —
+    // below AA. Guard the *declaration* only: palette.css documents the rejected
+    // value in a comment on purpose, so a substring check would fight the docs.
+    assert.doesNotMatch(palette, /--live:\s*#0f8a4e/, "light --live must not regress to the sub-AA #0f8a4e");
+    const declared = [...palette.matchAll(/--live:\s*(#[0-9a-fA-F]{6});/g)].map((m) => m[1]);
+    assert.deepEqual(declared, ["#3ee08a", "#0b7a45"], "only the two approved --live values may be declared");
+  });
+
   it("no chromatic graphite-era values remain in palette.css", () => {
     const dead = [
       "#6ba1d4", "#84b3e0", "#33689e", "#2a5786", // steel blues

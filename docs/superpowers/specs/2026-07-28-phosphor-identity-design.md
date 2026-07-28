@@ -243,27 +243,37 @@ The duo-chevron geometry is retained — it is five weeks old (`2026-06-19-relay
 and out of scope. Colour and the wordmark's face change.
 
 `relay-logo.svg` and `relay-mark.svg` exist in **two trees**, `assets/brand/` and
-`web/public/brand/`, and both copies must be updated. The duplication is noted but
-not resolved here.
+`web/public/brand/`, and the two have **diverged across rebrands** rather than
+merely duplicated: `assets/brand/` was still on cobalt-era steel
+(`#2f5fad`/`#5b87d6`), `web/public/brand/` on Graphite steel (`#33689e`), and the
+favicon on a third (`#6ba1d4`). All are brought onto Phosphor together. The
+duplication itself is noted but not resolved here.
 
-- **Bare mark** — `relay-mark.svg` and `RelayMark.tsx`: monochrome. The lead
-  chevron moves from `var(--action)` to `var(--ink-1)`. Under Phosphor `--action`
-  means "this is a button" and the logo is not a button; the rendered pixels are
-  identical today, the semantics are correct going forward. The standalone SVG
-  drops `#2f5fad`/`#5b87d6` for the ink ramp with its `prefers-color-scheme`
-  override retained.
-- **Wordmark** — `relay-logo.svg`: drops steel-blue for the ink ramp, and the
-  "Relay" lettering moves from Geist 600 to **JetBrains Mono 700 at −0.04em**.
-  This asset is what `README.md` and `docs/product.md` display, and it currently
-  advertises an identity two rebrands stale.
-- **Favicon** — `web/public/favicon.svg`: the `#101214` canvas is kept; the lead
-  chevron becomes phosphor green `#3ee08a`, replacing steel `#6ba1d4`.
+The assets divide into **app icons** (which carry the accent) and **the bare mark
+and wordmark** (which do not). Note that `relay-mark.svg` is *not* the bare mark
+despite the name — `app/layout.tsx` serves it as the `apple-touch-icon`, so both
+copies are app-icon badges and belong with the favicon.
 
-**The favicon is a deliberate, bounded exception to the colour rule.** A tab-strip
-icon is not reporting a run, so strictly it should be grey. Green is chosen because
-at 16px the icon's job is to identify Relay, a grey chevron on a grey square is
-invisible in a tab strip, and "the green one runs my agents" is the association
-worth owning. This is the only non-liveness use of the accent anywhere.
+- **Bare mark** — `RelayMark.tsx` only: monochrome. The lead chevron moves from
+  `var(--action)` to `var(--ink-1)`. Under Phosphor `--action` means "this is a
+  button" and the logo is not a button; the rendered pixels are identical today,
+  the semantics are correct going forward.
+- **Wordmark** — `relay-logo.svg` in both trees: drops steel-blue for the ink
+  ramp, and the "Relay" lettering moves from Geist 600 to **JetBrains Mono 700 at
+  −0.04em** (`letter-spacing="-1.68px"` at `font-size="42"`). This asset is what
+  `README.md` and `docs/product.md` display, and it currently advertises an
+  identity two rebrands stale. The `assets/` copy keeps its
+  `prefers-color-scheme` override; the `web/public/` copy stays light-only.
+- **App icons** — `web/public/favicon.svg` and `assets/brand/relay-mark.svg`
+  (dark): `#101214` canvas kept, lead chevron becomes `#3ee08a`.
+  `web/public/brand/relay-mark.svg` (light): paper canvas kept, lead chevron uses
+  the **light register's `#0b7a45`** — `#3ee08a` measures only ~2:1 on paper.
+
+**The app icons are a deliberate, bounded exception to the colour rule.** A
+tab-strip icon is not reporting a run, so strictly it should be grey. Green is
+chosen because at 16px the icon's job is to identify Relay, a grey chevron on a
+grey square is invisible in a tab strip, and "the green one runs my agents" is the
+association worth owning. This is the only non-liveness use of the accent anywhere.
 
 ## 6. Documentation
 
@@ -290,9 +300,14 @@ assertions and is rewritten rather than patched. It must assert:
 - both CJK blocks still resolve `--font-display: var(--font-sans)`
 - the existing sentence-case eyebrow/kicker assertions are retained
 
-One new assertion: `--live` is declared in `palette.css` in both registers and
-appears in no other file under `web/src/styles/tokens/`. This makes the scope rule
-enforced rather than merely documented.
+The `--live` assertions belong in **`web/tests/monochromeTokens.test.ts`**, not the
+typography test — that file is the palette's governance test, and Phosphor
+supersedes its "fully monochrome" intent. Three cases are added there: both
+registers declare the approved values and `--live-wash`; no other file under
+`web/src/styles/tokens/` declares `--live`; and only `#3ee08a` / `#0b7a45` may
+appear as `--live` declarations, guarding against a regression to the sub-AA
+`#0f8a4e`. That last guard matches on the *declaration*, not the raw string, since
+`palette.css` documents the rejected value in a comment on purpose.
 
 ## 8. Verification
 

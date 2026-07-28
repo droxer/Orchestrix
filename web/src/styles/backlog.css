@@ -483,7 +483,7 @@
 
 .task-status[data-status="backlog"] { --status-accent: var(--ink-4); }
 .task-status[data-status="assigned"] { --status-accent: var(--info); }
-.task-status[data-status="running"] { --status-accent: var(--info); }
+.task-status[data-status="running"] { --status-accent: var(--live); }
 .task-status[data-status="waiting_for_human"] { --status-accent: var(--warn); }
 .task-status[data-status="review"] { --status-accent: color-mix(in srgb, var(--info) 70%, var(--ink-1)); }
 .task-status[data-status="blocked"] { --status-accent: var(--err); }
@@ -1344,7 +1344,7 @@
 
 .backlog-row[data-status="backlog"] { --row-accent: var(--ink-4); }
 .backlog-row[data-status="assigned"] { --row-accent: var(--info); }
-.backlog-row[data-status="running"] { --row-accent: var(--ink-1); }
+.backlog-row[data-status="running"] { --row-accent: var(--live); }
 .backlog-row[data-status="waiting_for_human"] { --row-accent: var(--warn); }
 .backlog-row[data-status="review"] { --row-accent: color-mix(in srgb, var(--info) 70%, var(--ink-1)); }
 .backlog-row[data-status="blocked"] { --row-accent: var(--err); }
