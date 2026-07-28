@@ -66,12 +66,11 @@ export function useRelayMutations() {
 
   const cancelRunMutation = useMutation({
     mutationFn: ({
-      sandboxId,
       sessionId,
       token,
       reason,
-    }: { sandboxId: string; sessionId: string; reason?: string } & TokenArg) =>
-      cancelRun(sandboxId, sessionId, token, reason),
+    }: { sessionId: string; reason?: string } & TokenArg) =>
+      cancelRun(sessionId, token, reason),
     onSuccess: () => void invalidateRelay(),
     onError: onRelayError("Failed to cancel active run", "errors.cancel_run"),
   });

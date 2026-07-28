@@ -761,7 +761,7 @@ export function runLogicalAgents(input: AgentRunInput): Promise<RelaySession> {
   });
 }
 
-export function cancelRun(_sandboxId: string, sessionId: string, token?: string, reason?: string): Promise<RelaySession> {
+export function cancelRun(sessionId: string, token?: string, reason?: string): Promise<RelaySession> {
   return apiJson<RelaySession>(`/threads/${encodeURIComponent(sessionId)}/cancellations`, {
     method: "POST",
     token,

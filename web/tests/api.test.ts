@@ -100,7 +100,7 @@ describe("apiJson", () => {
 
     await renameSession("thread 1", "Roadmap");
     await archiveSession("thread 1");
-    await cancelRun("ignored-sandbox", "thread 1");
+    await cancelRun("thread 1");
     await assignTask("task 1", "agent 1");
     await startTask("task 1");
     await assignControlPanelDaemonNode({ nodeId: "node 1", employeeId: "alice" });

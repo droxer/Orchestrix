@@ -438,10 +438,14 @@ async def cancel_session_run(session_id: str, request: Request, ctx: AppContextD
         ),
         None,
     )
-    if not node:
+    run_request = ctx.registry.daemon_store.active_run_request_for_session_any_node(
+        session_id
+    )
+    node_id = node["id"] if node else run_request.get("nodeId") if run_request else None
+    if not node_id:
         return session
     return ctx.backend.cancel_run(
-        node["id"],
+        node_id,
         session_id,
         reason,
         actor_employee_id=None if actor.get("isAdmin") else actor["employeeId"],
