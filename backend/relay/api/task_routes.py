@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from typing import Any
 from datetime import date
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
@@ -13,15 +13,6 @@ from ..persistence.stores import (
     task_routine_type,
     task_status,
     valid_agent,
-)
-from ..sessions import SessionController
-from ..tasks import (
-    ensure_managed_capacity_for_task,
-    materialize_legacy_agent_assignment,
-    materialize_legacy_task_assignment,
-    next_routine_date,
-    ready_node_for_task,
-    task_goal_text,
 )
 from ..services.agent_routing import (
     AgentRoutingError,
@@ -36,6 +27,15 @@ from ..services.team_dispatch import (
     task_execution_employee_id,
     task_thread_assignments,
     task_thread_ownership,
+)
+from ..sessions import SessionController
+from ..tasks import (
+    ensure_managed_capacity_for_task,
+    materialize_legacy_agent_assignment,
+    materialize_legacy_task_assignment,
+    next_routine_date,
+    ready_node_for_task,
+    task_goal_text,
 )
 from .deps import AppContextDep
 from .helpers import (
@@ -935,7 +935,7 @@ async def delete_task(
     return task
 
 
-@router.post("/tasks/{task_id}/assign")
+@router.put("/tasks/{task_id}/assignment")
 async def assign_task(
     task_id: str, request: Request, ctx: AppContextDep
 ) -> dict[str, Any]:
@@ -986,7 +986,7 @@ async def assign_task(
     return task
 
 
-@router.post("/tasks/{task_id}/start", status_code=202)
+@router.post("/tasks/{task_id}/runs", status_code=202)
 async def start_task(
     task_id: str, request: Request, ctx: AppContextDep
 ) -> dict[str, Any]:
@@ -1133,16 +1133,7 @@ async def start_task(
     return result
 
 
-@router.post("/tasks/claim-next")
-async def claim_next_task(request: Request, ctx: AppContextDep) -> dict[str, Any]:
-    request_actor(request, ctx.auth_store)
-    raise HTTPException(
-        410,
-        "Executor claim-next is retired; tasks dispatch through named-agent leases.",
-    )
-
-
-@router.post("/tasks/{task_id}/pickup")
+@router.post("/tasks/{task_id}/pickups", status_code=201)
 async def pickup_task(
     task_id: str, request: Request, ctx: AppContextDep
 ) -> dict[str, Any]:

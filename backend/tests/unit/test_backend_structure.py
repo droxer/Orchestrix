@@ -36,11 +36,11 @@ def test_app_factory_wires_backend_state_and_routes() -> None:
     assert app.state.task_scheduler is not None
 
     paths = {route.path for route in app.routes}
-    assert "/auth/login" in paths
-    assert "/cp/daemon-nodes" in paths
-    assert "/tasks/{task_id}/pickup" in paths
-    assert "/sessions/{session_id}/events" in paths
-    assert "/daemon-nodes/{sandbox_id}/events" in paths
+    assert "/api/v1/auth/login" in paths
+    assert "/api/v1/admin/daemon-nodes" in paths
+    assert "/api/v1/tasks/{task_id}/pickups" in paths
+    assert "/api/v1/threads/{session_id}/events" in paths
+    assert "/api/v1/daemon-nodes/{sandbox_id}/events" in paths
 
 
 def test_app_factory_requires_database_for_thread_storage(monkeypatch) -> None:

@@ -447,28 +447,27 @@ APIs should expose Relay's canonical task/session model. Channel clients, web UI
 Minimum API groups:
 
 ```text
-/v1/tasks
-/v1/sessions
-/v1/assignments
-/v1/approvals
-/v1/artifacts
-/v1/events
-/v1/workspaces
-/v1/tools
-/v1/memory
-/v1/audit
+/api/v1/tasks
+/api/v1/threads
+/api/v1/assignments
+/api/v1/approvals
+/api/v1/artifacts
+/api/v1/events
+/api/v1/workspace
+/api/v1/tools
+/api/v1/memory
+/api/v1/audit
 ```
 
 Execution APIs:
 
 ```text
-POST /v1/sessions
-POST /v1/sessions/{id}/assignments
-POST /v1/sessions/{id}/start
-POST /v1/sessions/{id}/cancel
-POST /v1/approvals/{id}/decisions
-GET  /v1/sessions/{id}/events
-GET  /v1/sessions/{id}/artifacts/{artifact_id}
+POST /api/v1/threads
+POST /api/v1/threads/{id}/assignments
+POST /api/v1/threads/{id}/cancellations
+POST /api/v1/approvals/{id}/decisions
+GET  /api/v1/threads/{id}/events
+GET  /api/v1/threads/{id}/artifacts/{artifact_id}
 ```
 
 ### 5.2 Internal Runtime APIs
@@ -841,15 +840,15 @@ The TUI in `packages/relay-tui/src/tui.tsx` accepts leading agent mentions such 
 
 Slash commands include `/approve`, `/reject`, `/cancel`, `/rerun`, `/handoff`, `/sessions`, `/open`, `/summary`, and `/quit`.
 
-The Python API in `backend/relay/app.py` exposes task/session/daemon/chat
-endpoints and starts the background task scheduler by default. Current API
+The Python API in `backend/relay/app.py` exposes canonical `/api/v1`
+task/thread/daemon/chat endpoints and starts the background task scheduler by default. Current API
 routes can create tasks (including backlog and routine metadata), create pending
 sessions, attach assignment-plan artifacts, record decisions, and expose
 historical events/artifacts. Scheduled dispatch and daemon execution still flow
 through `ServerDaemonNodeBackend.run`; the backend does not execute agent CLIs
 in-process.
 
-The web UI at `/web` adds chat, backlog, routines, MCP, skills, channels, and
+The web UI on the clean paths documented in [api.md](api.md) adds chat, backlog, routines, MCP, skills, channels, and
 the admin console on top of the same backend APIs.
 
 Future execution endpoints must call the same `SessionController` and orchestrator readiness flow used by the CLI/TUI.

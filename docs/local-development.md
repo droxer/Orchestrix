@@ -270,7 +270,7 @@ make web
 ```
 
 The web dev server reads `web/.env.local`; set `RELAY_BACKEND_URL` there to
-change the backend proxy target. The exported UI at `/web` includes chat,
+change the backend proxy target. The exported UI at `/` includes chat,
 backlog, routines, MCP, skills, channels, and the admin page. You can also
 override the backend URL for one run:
 
@@ -319,67 +319,38 @@ make serve
 make serve PORT=9000
 ```
 
-By default, `make serve` listens on `127.0.0.1:8787`. It reads real task and
-session files from `.relay/tasks` and `.relay/sessions`; it does not seed,
-mock, or display dummy work.
+By default, `make serve` listens on `127.0.0.1:8787`. It reads real state from
+the configured database and `.relay/`; it does not seed, mock, or display dummy
+work.
 
-Core routes:
+Canonical route groups:
 
 ```text
-GET /
-GET /tasks
-POST /tasks
-GET /tasks/:id
-PATCH /tasks/:id
-POST /tasks/:id/assign
-POST /tasks/:id/pickup
-GET /tasks/:id/events
-POST /tasks/:id/start
-POST /tasks/claim-next
-GET /sessions
-POST /sessions
-GET /sessions/:id
-GET /sessions/:id/events
-GET /sessions/:id/artifacts/:artifactId
-POST /sessions/:id/assignments
-POST /sessions/:id/decisions
-POST /sessions/:id/handoffs
-GET /sandboxes
-POST /sandboxes
-POST /daemon-nodes/register
-GET /daemon-nodes/:id/commands
-POST /daemon-nodes/:id/events
-POST /chat/identity/resolve
-POST /chat/conversation/session
-POST /chat/conversation/sessions
-POST /chat/conversation/mapping
-GET /cp
-GET /cp/version
-GET /cp/dashboard/sessions
-GET /cp/dashboard/activity
-GET /cp/dashboard/tokens
-GET /cp/chat-integrations
-GET /auth/status
-POST /auth/bootstrap
-POST /auth/login
-POST /auth/logout
-GET /auth/me
-GET /cp/departments
-POST /cp/departments
-GET /cp/employees
-GET /cp/daemon-nodes
-POST /cp/daemon-nodes
-GET /web
+GET  /api
+     /api/v1/auth/...
+     /api/v1/threads/...
+     /api/v1/tasks/...
+     /api/v1/agents/...
+     /api/v1/teams/...
+     /api/v1/sandboxes/...
+     /api/v1/daemon-nodes/...
+     /api/v1/admin/...
+     /api/v1/internal/chat/...
+GET  /api/openapi.json
+GET  /api/docs
+GET  /api/redoc
 ```
 
-The backend serves the exported web UI from `web/out` at `/web`. In development,
-`make web` starts Next.js and proxies API routes to the backend. Use the backlog
-and routine pages to manage assigned work and recurring schedules; the backend
-scheduler dispatches due routines and assigned tasks when daemon nodes are ready.
+The complete operation contract is in [HTTP API and Web URL Contract](api.md).
+The backend serves the exported web UI from `web/out` on the canonical clean
+paths. In development, `make web` starts Next.js and proxies `/api/:path*` and
+`/profile-images/:path*` to the backend. Use the backlog and routine pages to
+manage assigned work and recurring schedules; the backend scheduler dispatches
+due routines and assigned tasks when daemon nodes are ready.
 
 ### Admin authentication
 
-The control panel data API (`/cp/*`) requires an admin session. For local
+The administration API (`/api/v1/admin/*`) requires an admin session. For local
 development, initialize the first admin explicitly with the helper script:
 
 ```bash
@@ -395,7 +366,7 @@ For a token-gated bootstrap instead, set `RELAY_ADMIN_TOKEN` and create the
 first admin explicitly:
 
 ```bash
-curl -X POST http://127.0.0.1:8790/auth/bootstrap \
+curl -X POST http://127.0.0.1:8790/api/v1/auth/bootstrap \
   -H "Content-Type: application/json" \
   -d '{"token":"$RELAY_ADMIN_TOKEN","username":"admin","password":"secret123"}'
 ```
@@ -403,7 +374,7 @@ curl -X POST http://127.0.0.1:8790/auth/bootstrap \
 After bootstrap, log in to receive an `httpOnly` session cookie:
 
 ```bash
-curl -X POST http://127.0.0.1:8790/auth/login \
+curl -X POST http://127.0.0.1:8790/api/v1/auth/login \
   -c cookies.txt -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"secret123"}'
 ```
@@ -411,7 +382,7 @@ curl -X POST http://127.0.0.1:8790/auth/login \
 Then use the cookie for control-panel requests:
 
 ```bash
-curl -b cookies.txt http://127.0.0.1:8790/cp/daemon-nodes
+curl -b cookies.txt http://127.0.0.1:8790/api/v1/admin/daemon-nodes
 ```
 
 ## Data Layout

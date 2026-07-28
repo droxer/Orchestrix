@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { RelayEmptyState } from "@/components/RelayEmptyState";
@@ -9,7 +9,6 @@ import type { ControlPanelDaemonNodeRecord } from "../../types";
 import { AdminNode, ActionSearch, ICON_STROKE_LARGE } from "../icons";
 import { canUseLocalControlPanel } from "../../lib/controlPanel";
 import { stableNodeOrder } from "../../lib/adminHelpers";
-import { useUrlSearchState } from "../../hooks/useUrlSearchState";
 import type { StoredNodeTokenMap } from "./helpers";
 import { visualStatus } from "./helpers";
 import { NodeCard } from "./NodeCard";
@@ -33,22 +32,6 @@ interface NodesViewProps {
 
 const FILTERS: NodeFilter[] = ["all", "ready", "running", "provisioning", "failed", "stopped", "unassigned"];
 
-function parseNodeFilter(value: string | null): NodeFilter {
-  return FILTERS.includes(value as NodeFilter) ? value as NodeFilter : "all";
-}
-
-function serializeNodeFilter(value: NodeFilter): string | null {
-  return value === "all" ? null : value;
-}
-
-function parseSearchQuery(value: string | null): string {
-  return value ?? "";
-}
-
-function serializeSearchQuery(value: string): string | null {
-  return value.trim() === "" ? null : value;
-}
-
 function matchesFilter(node: ControlPanelDaemonNodeRecord, filter: NodeFilter): boolean {
   if (filter === "all") return true;
   if (filter === "unassigned") return !node.employeeId;
@@ -70,8 +53,8 @@ function filterLabel(filter: NodeFilter, t: TFunction): string {
 
 export function NodesView({ nodes, storedTokens, layout, onLayoutChange, onRevealCredentials, onRenameNode, onManageExecutors, onDeleteNode, onAddNode }: NodesViewProps) {
   const { t } = useTranslation();
-  const [filter, setFilter] = useUrlSearchState("fleetFilter", "all" as NodeFilter, parseNodeFilter, serializeNodeFilter);
-  const [query, setQuery] = useUrlSearchState("fleetQuery", "", parseSearchQuery, serializeSearchQuery);
+  const [filter, setFilter] = useState<NodeFilter>("all");
+  const [query, setQuery] = useState("");
   const colocated = canUseLocalControlPanel();
 
   const counts = useMemo(() => {

@@ -165,9 +165,9 @@ export function AgentWorkspacePage({
 }: AgentWorkspacePageProps) {
   const { t, i18n } = useTranslation();
   const [selected, setSelected] = useState<Selection | null>(null);
-  const [filePath, setFilePath] = useUrlSearchState("workspacePath", "", parseString, (value) => value || null);
-  const [pageTab, setPageTab] = useUrlSearchState("workspaceTab", "activities" as WorkspacePageTab, parsePageTab, (value) => value === "activities" ? null : value);
-  const [selectedKey, setSelectedKey] = useUrlSearchState("workspaceItem", "", parseString, (value) => value || null);
+  const [filePath, setFilePath] = useUrlSearchState("path", "", parseString, (value) => value || null);
+  const [pageTab, setPageTab] = useUrlSearchState("tab", "activities" as WorkspacePageTab, parsePageTab, (value) => value === "activities" ? null : value, "push");
+  const [selectedKey, setSelectedKey] = useUrlSearchState("item", "", parseString, (value) => value || null);
   const [snapshotBannerDismissed, setSnapshotBannerDismissed] = useState(false);
   const previousScopeId = useRef(agent.id);
 
@@ -177,7 +177,7 @@ export function AgentWorkspacePage({
     queryFn: ({ signal }) => getWorkspaceBrief({ agentId: agent.id }, signal),
     enabled: pageTab === "activities",
   });
-  const [fileScope, setFileScope] = useUrlSearchState("workspaceScope", "personal" as WorkspaceFileScope, parseFileScope, (value) => value === "personal" ? null : value);
+  const [fileScope, setFileScope] = useUrlSearchState("scope", "personal" as WorkspaceFileScope, parseFileScope, (value) => value === "personal" ? null : value);
   const fileQuery = useQuery({
     queryKey: ["agent-workspace", agent.id, fileScope, filePath],
     queryFn: ({ signal }) => listAgentWorkspaceFiles({ agentId: agent.id, path: filePath, scope: fileScope === "shared" ? "shared" : undefined }, signal),

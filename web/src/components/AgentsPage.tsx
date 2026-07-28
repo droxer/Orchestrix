@@ -17,8 +17,9 @@ interface AgentsPageProps {
   currentUser: CurrentUser;
   isRefreshing: boolean;
   onRefresh: () => Promise<void>;
-  /** The agent currently inspected in the detail pane, driven by the URL hash. */
+  /** The agent currently inspected in the detail pane, driven by the pathname. */
   workspaceAgent: EmployeeAgent | null;
+  isDetailRoute: boolean;
   onOpenWorkspace: (agent: EmployeeAgent, tab?: WorkspacePageTab) => void;
   onOpenThread: (sessionId: string) => void;
 }
@@ -171,15 +172,16 @@ export function AgentsPage({
   isRefreshing,
   onRefresh,
   workspaceAgent,
+  isDetailRoute,
   onOpenWorkspace,
   onOpenThread,
 }: AgentsPageProps) {
   const { t } = useTranslation();
   const { agents, isFetching } = useEmployeeAgents(currentUser.employeeId);
   const descriptors = useMemo(() => agentDescriptors(t), [t]);
-  const [query, setQuery] = useUrlSearchState("agentsQ", "", (value) => value ?? "", (value) => value || null);
+  const [query, setQuery] = useUrlSearchState("q", "", (value) => value ?? "", (value) => value || null);
   const [availability, setAvailability] = useUrlSearchState(
-    "agentsFilter",
+    "availability",
     "all" as AvailabilityFilter,
     parseAvailabilityFilter,
     (value) => value === "all" ? null : value,
@@ -228,12 +230,14 @@ export function AgentsPage({
       tabIndex={-1}
     >
       <div className="agents-roster" aria-label={t("agents_page.title")}>
-        <RosterFilterBar
-          query={query}
-          availability={availability}
-          onQueryChange={setQuery}
-          onAvailabilityChange={setAvailability}
-        />
+        {isDetailRoute ? null : (
+          <RosterFilterBar
+            query={query}
+            availability={availability}
+            onQueryChange={setQuery}
+            onAvailabilityChange={setAvailability}
+          />
+        )}
 
         {loading ? (
           <div className="route-loading" role="status" aria-live="polite">

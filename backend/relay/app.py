@@ -27,6 +27,15 @@ from .api import (
     team_routes,
     web_routes,
 )
+from .api.contract import (
+    API_DOCS_PATH,
+    API_OPENAPI_PATH,
+    API_PREFIX,
+    API_REDOC_PATH,
+    API_VERSION,
+    api_router_groups,
+    include_api_router,
+)
 from .chat import (
     DatabaseChatIntegrationStore,
     LocalChatIntegrationStore,
@@ -108,7 +117,14 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
             if scheduler:
                 await scheduler.stop()
 
-    app = FastAPI(title="Relay backend", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(
+        title="Relay backend",
+        version="0.1.0",
+        lifespan=lifespan,
+        docs_url=API_DOCS_PATH,
+        openapi_url=API_OPENAPI_PATH,
+        redoc_url=API_REDOC_PATH,
+    )
     app.state.session_store = session_store
     app.state.task_store = task_store
     app.state.daemon_store = daemon_store
@@ -131,40 +147,45 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     app.state.task_scheduler = scheduler
     app.state.control_panel_version = CONTROL_PANEL_VERSION
 
-    @app.get("/api")
+    @app.get("/api", tags=["api"])
     async def api_info() -> dict[str, Any]:
         return {
             "name": "Relay backend",
-            "ui": True,
-            "uiPath": "/cp",
+            "version": API_VERSION,
+            "basePath": API_PREFIX,
+            "docsPath": API_DOCS_PATH,
+            "openapiPath": API_OPENAPI_PATH,
+            "redocPath": API_REDOC_PATH,
+            "uiPath": "/admin",
             "webUiPath": WEB_UI_PATH,
-            "endpoints": [
-                "GET /tasks",
-                "POST /tasks",
-                "GET /sessions",
-                "POST /sessions",
-                "GET /sandboxes",
-                "POST /sandboxes",
-                "GET /daemon-nodes",
-                "POST /daemon-nodes/register",
-                "GET /daemon-nodes/:sandboxId/commands",
-                "POST /daemon-nodes/:sandboxId/events",
-            ],
         }
 
-    app.include_router(auth_routes.router)
-    app.include_router(agent_routes.router)
-    app.include_router(team_routes.router)
-    app.include_router(profile_image_routes.router)
-    app.include_router(agent_workspace_routes.router)
-    app.include_router(node_workspace_routes.router)
-    app.include_router(admin_routes.router)
-    app.include_router(chat_routes.router)
-    app.include_router(task_routes.router)
-    app.include_router(session_routes.router)
-    app.include_router(sandbox_routes.router)
-    app.include_router(daemon_node_routes.router)
-    app.include_router(managed_node_routes.router)
+    api_routers = (
+        auth_routes.router,
+        agent_routes.router,
+        team_routes.router,
+        agent_workspace_routes.router,
+        node_workspace_routes.router,
+        admin_routes.router,
+        chat_routes.router,
+        task_routes.router,
+        session_routes.router,
+        sandbox_routes.router,
+        daemon_node_routes.router,
+        managed_node_routes.router,
+    )
+    canonical_groups = api_router_groups()
+    for router in api_routers:
+        include_api_router(canonical_groups, router)
+    app.include_router(canonical_groups.public)
+    app.include_router(canonical_groups.admin)
+    app.include_router(canonical_groups.internal_chat)
+    app.include_router(canonical_groups.daemon)
+
+    # Stable persisted media locators intentionally remain outside the JSON API
+    # namespace because their URLs are persisted data.
+    app.include_router(profile_image_routes.router, tags=["profile-images"])
+
     # Registered last: its root catch-all serves the exported web UI and must not
     # shadow the explicit API routes above.
     app.include_router(web_routes.router)

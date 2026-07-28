@@ -51,13 +51,13 @@ def main(argv: list[str] | None = None) -> None:
     if not auth_store.has_users():
         if admin_token:
             logger.info(
-                "No users yet. Use /auth/bootstrap with RELAY_ADMIN_TOKEN to create the first admin."
+                "No users yet. Use /api/v1/auth/bootstrap with RELAY_ADMIN_TOKEN to create the first admin."
             )
         else:
             logger.warning(
                 "No users and RELAY_ADMIN_TOKEN is not set. Login will be unavailable until a user is bootstrapped."
             )
     logger.info("Relay backend listening on http://{}:{}", args.host, args.port)
-    logger.info("Relay backend control panel: http://{}:{}/cp", args.host, args.port)
-    logger.info("Relay web UI: http://{}:{}/web", args.host, args.port)
+    logger.info("Relay backend control panel: http://{}:{}/admin", args.host, args.port)
+    logger.info("Relay web UI: http://{}:{}/", args.host, args.port)
     uvicorn.run(app, host=args.host, port=args.port, log_config=None)

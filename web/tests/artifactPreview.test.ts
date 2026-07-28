@@ -32,6 +32,6 @@ describe("workspaceFilePreviewMode", () => {
 
 describe("artifactRawHref", () => {
   it("URL-encodes both identifiers", () => {
-    assert.equal(artifactRawHref("ses 1", "art/2"), "/sessions/ses%201/artifacts/art%2F2");
+    assert.equal(artifactRawHref("ses 1", "art/2"), "/api/v1/threads/ses%201/artifacts/art%2F2");
   });
 });

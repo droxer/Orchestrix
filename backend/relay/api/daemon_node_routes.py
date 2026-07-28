@@ -135,7 +135,7 @@ async def update_daemon_node(
     return {"node": present_computer(ctx, monitor_node)}
 
 
-@router.post("/daemon-nodes/local-enrollment", status_code=201)
+@router.post("/daemon-node-enrollments/local", status_code=201)
 async def create_local_device_enrollment(
     request: Request, ctx: AppContextDep
 ) -> dict[str, Any]:
@@ -205,7 +205,7 @@ async def update_daemon_node_agent_role_overrides(sandbox_id: str, request: Requ
     return {"node": next((node for node in ctx.registry.monitor_nodes() if node["id"] == sandbox_id), public_sandbox_record(updated))}
 
 
-@router.post("/daemon-nodes/register")
+@router.post("/daemon-node-registrations")
 async def register_daemon_node(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     body = await json_body(request)
     if "token" not in body and bearer_token(request):
@@ -320,7 +320,7 @@ async def daemon_commands(sandbox_id: str, request: Request, ctx: AppContextDep)
         raise HTTPException(404, str(error))
 
 
-@router.post("/daemon-nodes/{sandbox_id}/events", status_code=202)
+@router.post("/daemon-nodes/{sandbox_id}/events")
 async def daemon_events(sandbox_id: str, request: Request, ctx: AppContextDep) -> dict[str, bool]:
     try:
         event = daemon_node_event(await json_body(request))

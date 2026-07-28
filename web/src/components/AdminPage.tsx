@@ -33,7 +33,6 @@ import { AddNodeDrawer, type AddNodeDrawerSuccess } from "./admin/AddNodeDrawer"
 import { EmployeesView } from "./admin/EmployeesView";
 import type { AdminLayout } from "./admin/AdminLayoutToggle";
 import { useAdminNodes } from "../hooks/useAdminNodes";
-import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { useRelayStore } from "../lib/store";
 import { CONTROL_PANEL_POLL_MS } from "../lib/controlPanelQueries";
 import { useDialogs } from "./ui/DialogProvider";
@@ -47,13 +46,6 @@ import {
 } from "./admin/helpers";
 
 type AuthScreen = "login" | "bootstrap";
-const ADMIN_VIEWS: AdminView[] = ["dashboard", "employees", "nodes"];
-
-function parseAdminView(value: string | null): AdminView {
-  if (value === "fleet") return "nodes";
-  return ADMIN_VIEWS.includes(value as AdminView) ? value as AdminView : "dashboard";
-}
-
 export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null }) {
   const { t } = useTranslation();
   const { prompt } = useDialogs();
@@ -70,13 +62,8 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
   const [authScreen, setAuthScreen] = useState<AuthScreen>("login");
   const [authError, setAuthError] = useState<string | null>(null);
 
-  const [view, setView] = useUrlSearchState("adminView", "dashboard" as AdminView, parseAdminView, (value) => value);
-  const [layout, setLayout] = useUrlSearchState<AdminLayout>(
-    "adminLayout",
-    "card",
-    (value) => (value === "list" ? "list" : "card"),
-    (value) => (value === "card" ? null : value),
-  );
+  const [view, setView] = useState<AdminView>("dashboard");
+  const [layout, setLayout] = useState<AdminLayout>("card");
   const { nodes, employees, pollError, mergeNodes, refetch } = useAdminNodes(
     Boolean(admin),
     view === "dashboard" || layout === "list",
@@ -90,42 +77,12 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
   const managedNodes = managedNodesQuery.data?.nodes ?? [];
   const [manualRefreshPending, setManualRefreshPending] = useState(false);
   const setAdminView = useRelayStore((state) => state.setAdminView);
-  const [addEmployeeOpen, setAddEmployeeOpen] = useUrlSearchState(
-    "adminAddEmployee",
-    false,
-    (value) => value === "1",
-    (value) => (value ? "1" : null),
-  );
-  const [addNodeOpen, setAddNodeOpen] = useUrlSearchState(
-    "adminAddNode",
-    false,
-    (value) => value === "1",
-    (value) => (value ? "1" : null),
-  );
-  const [assignTarget, setAssignTarget] = useUrlSearchState<{ employeeId?: string } | null>(
-    "adminAssign",
-    null,
-    (value) => (value === null ? null : value ? { employeeId: value } : {}),
-    (value) => (value === null ? null : value.employeeId ?? ""),
-  );
-  const [credentialsNodeId, setCredentialsNodeId] = useUrlSearchState<string | null>(
-    "adminCredentials",
-    null,
-    (value) => value,
-    (value) => value,
-  );
-  const [manageExecutorsNodeId, setManageExecutorsNodeId] = useUrlSearchState<string | null>(
-    "adminManageAgents",
-    null,
-    (value) => value,
-    (value) => value,
-  );
-  const [agentProfileId, setAgentProfileId] = useUrlSearchState<string | null>(
-    "adminAgentProfile",
-    null,
-    (value) => value,
-    (value) => value,
-  );
+  const [addEmployeeOpen, setAddEmployeeOpen] = useState(false);
+  const [addNodeOpen, setAddNodeOpen] = useState(false);
+  const [assignTarget, setAssignTarget] = useState<{ employeeId?: string } | null>(null);
+  const [credentialsNodeId, setCredentialsNodeId] = useState<string | null>(null);
+  const [manageExecutorsNodeId, setManageExecutorsNodeId] = useState<string | null>(null);
+  const [agentProfileId, setAgentProfileId] = useState<string | null>(null);
   const [highlightedEmployeeId, setHighlightedEmployeeId] = useState<string | null>(null);
   const [storedTokens, setStoredTokens] = useState<StoredNodeTokenMap>(() => readStoredNodeTokens());
 

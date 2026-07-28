@@ -6,8 +6,7 @@ import mimetypes
 import os
 import secrets
 import shlex
-from pathlib import PurePosixPath, PureWindowsPath
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
 from fastapi import HTTPException, Request, Response
@@ -15,9 +14,15 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from loguru import logger
 
 from ..core.models import AGENT_NAMES
-from ..daemon_registry import DaemonNodeRegistry, daemon_node_token_matches, sandbox_ui_token_matches, workspace_paths_match
+from ..daemon_registry import (
+    DaemonNodeRegistry,
+    daemon_node_token_matches,
+    sandbox_ui_token_matches,
+    workspace_paths_match,
+)
 from ..persistence.stores import valid_agent
 from ..security.auth import require_user_session
+from .contract import WEB_UI_ROUTE_ROOTS
 
 CHAT_SERVICE_EMPLOYEE_HEADER = "x-relay-employee-id"
 
@@ -551,7 +556,13 @@ def web_ui_asset_response(asset_path: str) -> Response:
         return HTMLResponse("Relay web UI has not been built. Run `npm run build -w web`.\n", status_code=404)
     requested = asset_path or "index.html"
     asset = (dist / requested).resolve()
-    if not str(asset).startswith(str(dist.resolve())) or not asset.exists() or not asset.is_file():
+    confined = str(asset).startswith(str(dist.resolve()))
+    if not confined or not asset.exists() or not asset.is_file():
+        root = asset_path.split("/", 1)[0]
+        # A pathname with a file suffix is an asset request, never a client
+        # route. Do not turn missing scripts/styles/images into successful HTML.
+        if root not in WEB_UI_ROUTE_ROOTS or Path(asset_path).suffix:
+            return JSONResponse({"detail": "Not found."}, status_code=404)
         asset = dist / "index.html"
     if not asset.exists():
         return JSONResponse({"error": "Web UI asset not found."}, status_code=404)

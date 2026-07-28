@@ -123,7 +123,7 @@ describe("RelayChatClient", () => {
       taskGoal: "build it",
       mode: "action",
     });
-    assert.equal(calls[0].url, "http://relay.local/agent-runs");
+    assert.equal(calls[0].url, "http://relay.local/api/v1/agent-runs");
     assert.equal((calls[0].init.headers as Record<string, string>).Authorization, "Bearer svc");
     assert.equal((calls[0].init.headers as Record<string, string>)["X-Relay-Employee-Id"], "alice");
     assert.deepEqual(JSON.parse(String(calls[0].init.body)), {
@@ -146,9 +146,9 @@ describe("RelayChatClient", () => {
     await client.getSession("sess_1", { employeeId: "alice" });
     await client.streamSessionEvents("sess_1", () => {}, { employeeId: "alice" });
 
-    assert.equal(calls[0].url, "http://relay.local/sessions/sess_1");
+    assert.equal(calls[0].url, "http://relay.local/api/v1/threads/sess_1");
     assert.equal((calls[0].init.headers as Record<string, string>)["X-Relay-Employee-Id"], "alice");
-    assert.equal(calls[1].url, "http://relay.local/sessions/sess_1/events");
+    assert.equal(calls[1].url, "http://relay.local/api/v1/threads/sess_1/events");
     assert.equal((calls[1].init.headers as Record<string, string>)["X-Relay-Employee-Id"], "alice");
   });
 
@@ -182,7 +182,7 @@ describe("RelayChatIdentityResolver", () => {
     }));
 
     assert.equal(identity?.employeeId, "alice");
-    assert.equal(calls[0].url, "http://relay.local/chat/identity/resolve");
+    assert.equal(calls[0].url, "http://relay.local/api/v1/internal/chat/identity/resolve");
     assert.equal((calls[0].init.headers as Record<string, string>).Authorization, "Bearer svc");
     assert.deepEqual(JSON.parse(String(calls[0].init.body)), {
       provider: "discord",

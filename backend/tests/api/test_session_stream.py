@@ -4,13 +4,12 @@ import json
 from tempfile import TemporaryDirectory
 
 from fastapi.testclient import TestClient
-
-from relay.app import create_app
 from relay.api.session_routes import _STREAM_POLL_SECONDS
+from relay.app import create_app
 
 
 def _bootstrap_admin(client: TestClient, token: str = "admin_token") -> None:
-    response = client.post("/auth/bootstrap", json={"token": token, "username": "admin", "password": "secret123"})
+    response = client.post("/api/v1/auth/bootstrap", json={"token": token, "username": "admin", "password": "secret123"})
     assert response.status_code == 200
 
 
@@ -48,17 +47,17 @@ def test_session_events_streams_backlog_then_closes_on_terminal(monkeypatch) -> 
         client = TestClient(create_app(root))
         _bootstrap_admin(client)
 
-        created = client.post("/sessions", json={"taskGoal": "ship it", "assignments": [{"agent": "claude"}]})
+        created = client.post("/api/v1/threads", json={"taskGoal": "ship it", "assignments": [{"agent": "claude"}]})
         assert created.status_code == 201
         session_id = created.json()["id"]
 
         # Drive the session to a terminal state so the tail-poll flushes the
         # backlog and closes instead of holding the connection open.
-        done = client.post(f"/sessions/{session_id}/decisions", json={"kind": "mark_done"})
+        done = client.post(f"/api/v1/threads/{session_id}/decisions", json={"kind": "mark_done"})
         assert done.status_code == 200
         assert done.json()["status"] == "completed"
 
-        response = client.get(f"/sessions/{session_id}/events")
+        response = client.get(f"/api/v1/threads/{session_id}/events")
         assert response.status_code == 200
         assert response.headers["content-type"].startswith("text/event-stream")
 
@@ -77,21 +76,21 @@ def test_session_events_cursor_skips_already_cached_history(monkeypatch) -> None
         client = TestClient(create_app(root))
         _bootstrap_admin(client)
 
-        created = client.post("/sessions", json={"taskGoal": "ship it", "assignments": [{"agent": "claude"}]})
+        created = client.post("/api/v1/threads", json={"taskGoal": "ship it", "assignments": [{"agent": "claude"}]})
         assert created.status_code == 201
         session_id = created.json()["id"]
 
-        done = client.post(f"/sessions/{session_id}/decisions", json={"kind": "mark_done"})
+        done = client.post(f"/api/v1/threads/{session_id}/decisions", json={"kind": "mark_done"})
         assert done.status_code == 200
         events = done.json()["events"]
 
-        after_created = client.get(f"/sessions/{session_id}/events?after={events[0]['id']}")
+        after_created = client.get(f"/api/v1/threads/{session_id}/events?after={events[0]['id']}")
         assert after_created.status_code == 200
         assert [payload["id"] for payload in _message_payloads(after_created.text)] == [
             event["id"] for event in events[1:]
         ]
 
-        after_latest = client.get(f"/sessions/{session_id}/events?after={events[-1]['id']}")
+        after_latest = client.get(f"/api/v1/threads/{session_id}/events?after={events[-1]['id']}")
         assert after_latest.status_code == 200
         assert _message_payloads(after_latest.text) == []
         assert _parse_sse(after_latest.text)[-1][0] == "done"
@@ -103,15 +102,15 @@ def test_session_events_reconnect_header_overrides_initial_query_cursor(monkeypa
         client = TestClient(create_app(root))
         _bootstrap_admin(client)
 
-        created = client.post("/sessions", json={"taskGoal": "ship it", "assignments": [{"agent": "claude"}]})
+        created = client.post("/api/v1/threads", json={"taskGoal": "ship it", "assignments": [{"agent": "claude"}]})
         assert created.status_code == 201
         session_id = created.json()["id"]
-        done = client.post(f"/sessions/{session_id}/decisions", json={"kind": "mark_done"})
+        done = client.post(f"/api/v1/threads/{session_id}/decisions", json={"kind": "mark_done"})
         assert done.status_code == 200
         events = done.json()["events"]
 
         response = client.get(
-            f"/sessions/{session_id}/events?after={events[0]['id']}",
+            f"/api/v1/threads/{session_id}/events?after={events[0]['id']}",
             headers={"Last-Event-ID": events[-1]["id"]},
         )
 
@@ -126,13 +125,13 @@ def test_session_events_cursor_falls_back_to_backlog_for_unknown_event(monkeypat
         client = TestClient(create_app(root))
         _bootstrap_admin(client)
 
-        created = client.post("/sessions", json={"taskGoal": "ship it"})
+        created = client.post("/api/v1/threads", json={"taskGoal": "ship it"})
         assert created.status_code == 201
         session_id = created.json()["id"]
-        done = client.post(f"/sessions/{session_id}/decisions", json={"kind": "mark_done"})
+        done = client.post(f"/api/v1/threads/{session_id}/decisions", json={"kind": "mark_done"})
         assert done.status_code == 200
 
-        response = client.get(f"/sessions/{session_id}/events?after=evt_missing")
+        response = client.get(f"/api/v1/threads/{session_id}/events?after=evt_missing")
         assert response.status_code == 200
         assert [payload["id"] for payload in _message_payloads(response.text)] == [
             event["id"] for event in done.json()["events"]
@@ -146,7 +145,7 @@ def test_session_events_unauthorized_is_forbidden_before_streaming(monkeypatch) 
         _bootstrap_admin(client)
         # A nonexistent session is a 404 (authorization runs before the stream
         # opens), proving errors still surface as normal responses.
-        assert client.get("/sessions/sess_missing/events").status_code == 404
+        assert client.get("/api/v1/threads/sess_missing/events").status_code == 404
 
 
 def test_session_events_accept_chat_service_actor(monkeypatch) -> None:
@@ -158,17 +157,17 @@ def test_session_events_accept_chat_service_actor(monkeypatch) -> None:
             "X-Relay-Employee-Id": "alice",
         }
 
-        created = client.post("/sessions", json={"taskGoal": "from chat"}, headers=headers)
+        created = client.post("/api/v1/threads", json={"taskGoal": "from chat"}, headers=headers)
         assert created.status_code == 201
         session_id = created.json()["id"]
 
-        done = client.post(f"/sessions/{session_id}/decisions", json={"kind": "mark_done"}, headers=headers)
+        done = client.post(f"/api/v1/threads/{session_id}/decisions", json={"kind": "mark_done"}, headers=headers)
         assert done.status_code == 200
         assert done.json()["status"] == "completed"
 
-        response = client.get(f"/sessions/{session_id}/events", headers=headers)
+        response = client.get(f"/api/v1/threads/{session_id}/events", headers=headers)
         assert response.status_code == 200
         assert response.headers["content-type"].startswith("text/event-stream")
 
-        missing_employee = client.get(f"/sessions/{session_id}/events", headers={"Authorization": "Bearer chat_token"})
+        missing_employee = client.get(f"/api/v1/threads/{session_id}/events", headers={"Authorization": "Bearer chat_token"})
         assert missing_employee.status_code == 401

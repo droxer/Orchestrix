@@ -23,7 +23,7 @@ resource. The daemon running on the resource then enrolls with Relay and
 becomes an observed daemon node.
 
 This design separates three concerns that are currently combined by
-`POST /cp/daemon-nodes` and `relay-supervisor`:
+`POST /api/v1/admin/daemon-nodes` and `relay-supervisor`:
 
 1. the durable intent to operate a node;
 2. the provider operation that creates or starts its runtime;
@@ -344,7 +344,7 @@ cloud-provider interface.
 ### Request
 
 ```http
-POST /daemon-enroll
+POST /api/v1/daemon-node-enrollments
 Authorization: Enrollment <grant-id>.<secret>
 Content-Type: application/json
 ```
@@ -399,18 +399,23 @@ idempotent without allowing a consumed grant to enroll a second runtime.
 ### Managed-node administration
 
 ```text
-POST   /cp/managed-nodes
-GET    /cp/managed-nodes
-GET    /cp/managed-nodes/{id}
-PATCH  /cp/managed-nodes/{id}
-POST   /cp/managed-nodes/{id}/retry
-POST   /cp/managed-nodes/{id}/drain
-DELETE /cp/managed-nodes/{id}
-GET    /cp/managed-nodes/{id}/attempts
+POST   /api/v1/admin/managed-nodes
+GET    /api/v1/admin/managed-nodes
+GET    /api/v1/admin/managed-nodes/{id}
+PATCH  /api/v1/admin/managed-nodes/{id}
+DELETE /api/v1/admin/managed-nodes/{id}
+POST   /api/v1/admin/managed-nodes/{id}/attempts
+GET    /api/v1/admin/managed-nodes/{id}/attempts
+DELETE /api/v1/admin/managed-nodes/{id}/record
 ```
 
 `POST` returns `202 Accepted` because infrastructure and daemon readiness are
 asynchronous. It never returns a daemon command or runtime token.
+
+Retry is represented by creating an attempt with `{ "replaceActive": true }`.
+Drain patches the managed node with `{ "desiredState": "stopped" }`. Deleting
+the managed-node resource requests managed teardown; deleting `/record` removes
+an already-terminal historical record synchronously.
 
 Example request:
 
@@ -443,11 +448,11 @@ Example response:
 
 ### Existing daemon-node API
 
-`GET /cp/daemon-nodes` remains the observed fleet view and adds the nullable
+`GET /api/v1/admin/daemon-nodes` remains the observed fleet view and adds the nullable
 `managedNodeId`. Existing heartbeat, command polling, command leases, and run
 event endpoints remain unchanged after enrollment.
 
-The current `POST /cp/daemon-nodes` is retained temporarily for manual
+The current `POST /api/v1/admin/daemon-nodes` is retained for manual
 enrollment only. It should be renamed or replaced with an explicit manual-node
 enrollment flow so the UI does not describe credential generation as managed
 provisioning.
@@ -589,7 +594,7 @@ conditions rather than only the latest `lastError`.
 ### Phase 4: Credential and compatibility cleanup
 
 - Stop persisting or recovering plaintext daemon-node tokens for managed nodes.
-- Remove supervisor dependence on `POST /cp/daemon-nodes` returning
+- Remove supervisor dependence on `POST /api/v1/admin/daemon-nodes` returning
   `daemonEnv`.
 - Deprecate ambiguous sandbox provisioning paths once TUI/web callers use the
   explicit managed or manual workflows.
@@ -607,7 +612,7 @@ During migration, Relay supports two disjoint paths:
 
 | Path | Ownership | Creation |
 | :- | :- | :- |
-| Managed | Provisioning controller | `POST /cp/managed-nodes`, followed by daemon enrollment |
+| Managed | Provisioning controller | `POST /api/v1/admin/managed-nodes`, followed by daemon enrollment |
 | Manual | Operator | Existing daemon-node registration/enrollment workflow |
 
 Existing daemon nodes remain manual. No migration should synthesize managed

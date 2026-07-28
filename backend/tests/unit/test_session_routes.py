@@ -3,7 +3,6 @@ from __future__ import annotations
 from tempfile import TemporaryDirectory
 
 from fastapi.testclient import TestClient
-
 from relay.api.session_routes import is_workspace_artifact, workspace_artifacts
 from relay.app import create_app
 
@@ -33,14 +32,14 @@ def test_session_assignment_and_handoff_preserve_ask_mode(monkeypatch) -> None:
     with TemporaryDirectory() as root:
         app = create_app(root)
         client = TestClient(app)
-        response = client.post("/auth/bootstrap", json={
+        response = client.post("/api/v1/auth/bootstrap", json={
             "token": "admin_token",
             "username": "admin",
             "password": "secret123",
         })
         assert response.status_code == 200
 
-        created = client.post("/sessions", json={
+        created = client.post("/api/v1/threads", json={
             "taskGoal": "Explain the task",
             "assignments": [{"agent": "codex", "mode": "ask"}],
         })
@@ -50,7 +49,7 @@ def test_session_assignment_and_handoff_preserve_ask_mode(monkeypatch) -> None:
         [plan] = [artifact for artifact in created.json()["artifacts"] if artifact["title"] == "Assignment plan"]
         assert '"mode": "ask"' in app.state.session_store.read_artifact(session_id, plan["id"])
 
-        handed = client.post(f"/sessions/{session_id}/handoffs", json={
+        handed = client.post(f"/api/v1/threads/{session_id}/handoffs", json={
             "targetAgent": "claude",
             "mode": "ask",
             "note": "Answer without editing files.",
@@ -73,7 +72,7 @@ def test_session_creation_persists_the_selected_computer(monkeypatch) -> None:
         app = create_app(root)
         client = TestClient(app)
         response = client.post(
-            "/auth/bootstrap",
+            "/api/v1/auth/bootstrap",
             json={
                 "token": "admin_token",
                 "username": "admin",
@@ -94,7 +93,7 @@ def test_session_creation_persists_the_selected_computer(monkeypatch) -> None:
         )
 
         created = client.post(
-            "/sessions",
+            "/api/v1/threads",
             json={"taskGoal": "Start here", "daemonNodeId": "node_a"},
         )
 

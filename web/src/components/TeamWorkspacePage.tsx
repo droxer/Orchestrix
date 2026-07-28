@@ -610,8 +610,8 @@ export function TeamWorkspacePage({
   onDeleted: () => void;
 }) {
   const { t } = useTranslation();
-  const [pageTab, setPageTab] = useUrlSearchState("teamTab", "activities" as TeamPageTab, parseTeamTab, (value) => value === "activities" ? null : value);
-  const [selectedArtifactId, setSelectedArtifactId] = useUrlSearchState("teamArtifact", "", (value) => value ?? "", (value) => value || null);
+  const [pageTab, setPageTab] = useUrlSearchState("tab", "activities" as TeamPageTab, parseTeamTab, (value) => value === "activities" ? null : value, "push");
+  const [selectedArtifactId, setSelectedArtifactId] = useUrlSearchState("artifact", "", (value) => value ?? "", (value) => value || null);
   const briefQuery = useQuery({
     queryKey: ["team-workspace-brief", team.id],
     queryFn: ({ signal }) => getWorkspaceBrief({ teamId: team.id }, signal),

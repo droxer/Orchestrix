@@ -1,4 +1,4 @@
-import type { AgentName, AgentTaskMode, RelayEvent, RelaySession } from "relay-core";
+import { relayApiUrl, type AgentName, type AgentTaskMode, type RelayEvent, type RelaySession } from "relay-core";
 import type { ChatConversationBinding, ChatConversationRef, RelayChatBackend, RelayChatRequestContext } from "./types.js";
 
 function conversationBody(ref: ChatConversationRef): Record<string, unknown> {
@@ -65,7 +65,7 @@ export class RelayChatClient implements RelayChatBackend {
     employeeId?: string;
     signal?: AbortSignal;
   }): Promise<RelaySession> {
-    return this.request<RelaySession>(`/sessions/${encodeURIComponent(input.sessionId)}/cancel`, {
+    return this.request<RelaySession>(`/threads/${encodeURIComponent(input.sessionId)}/cancellations`, {
       method: "POST",
       signal: input.signal,
       employeeId: input.employeeId,
@@ -74,7 +74,7 @@ export class RelayChatClient implements RelayChatBackend {
   }
 
   async getSession(sessionId: string, context: RelayChatRequestContext = {}): Promise<RelaySession> {
-    return this.request<RelaySession>(`/sessions/${encodeURIComponent(sessionId)}`, {
+    return this.request<RelaySession>(`/threads/${encodeURIComponent(sessionId)}`, {
       signal: context.signal,
       employeeId: context.employeeId,
     });
@@ -85,7 +85,7 @@ export class RelayChatClient implements RelayChatBackend {
     onEvent: (event: RelayEvent) => Promise<void> | void,
     context: RelayChatRequestContext = {},
   ): Promise<void> {
-    const response = await this.fetchFn(`${this.baseUrl}/sessions/${encodeURIComponent(sessionId)}/events`, {
+    const response = await this.fetchFn(relayApiUrl(this.baseUrl, `/threads/${encodeURIComponent(sessionId)}/events`), {
       method: "GET",
       signal: context.signal,
       headers: this.headers(false, context.employeeId),
@@ -115,7 +115,7 @@ export class RelayChatClient implements RelayChatBackend {
   }
 
   async resolveConversationBinding(ref: ChatConversationRef, signal?: AbortSignal): Promise<ChatConversationBinding | undefined> {
-    const body = await this.request<{ session?: RelaySession | null; mapping?: { providerMessageId?: string } | null }>("/chat/conversation/session", {
+    const body = await this.request<{ session?: RelaySession | null; mapping?: { providerMessageId?: string } | null }>("/internal/chat/conversation/session", {
       method: "POST",
       signal,
       body: conversationBody(ref),
@@ -128,7 +128,7 @@ export class RelayChatClient implements RelayChatBackend {
   }
 
   async bindConversationSession(ref: ChatConversationRef, sessionId: string, signal?: AbortSignal): Promise<void> {
-    await this.request<{ mapping?: unknown }>("/chat/conversation/mapping", {
+    await this.request<{ mapping?: unknown }>("/internal/chat/conversation/mapping", {
       method: "POST",
       signal,
       body: { ...conversationBody(ref), sessionId },
@@ -136,7 +136,7 @@ export class RelayChatClient implements RelayChatBackend {
   }
 
   async listConversationSessions(ref: ChatConversationRef, signal?: AbortSignal): Promise<RelaySession[]> {
-    const body = await this.request<{ sessions?: RelaySession[] }>("/chat/conversation/sessions", {
+    const body = await this.request<{ sessions?: RelaySession[] }>("/internal/chat/conversation/sessions", {
       method: "POST",
       signal,
       body: conversationBody(ref),
@@ -148,7 +148,7 @@ export class RelayChatClient implements RelayChatBackend {
     pathname: string,
     options: { method?: string; body?: unknown; signal?: AbortSignal; employeeId?: string } = {},
   ): Promise<T> {
-    const response = await this.fetchFn(`${this.baseUrl}${pathname}`, {
+    const response = await this.fetchFn(relayApiUrl(this.baseUrl, pathname), {
       method: options.method ?? "GET",
       signal: options.signal,
       headers: this.headers(options.body !== undefined, options.employeeId),

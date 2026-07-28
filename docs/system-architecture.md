@@ -43,6 +43,16 @@ Relay should be read in two views:
 - **Architectural planes** define trust boundaries and ownership.
 - **Runtime layers** define deployable responsibilities.
 
+### 2.0 Public HTTP boundary
+
+The implemented control plane exposes JSON resources beneath `/api/v1`, with
+administration beneath `/api/v1/admin` and chat-service calls beneath
+`/api/v1/internal/chat`. The web channel uses clean History API paths and calls
+the same versioned resources as the TUI, daemon, supervisor, and chat gateway.
+Internal `Session` models remain unchanged while the public browser and API term
+is **thread**. See [HTTP API and Web URL Contract](api.md) and
+[ADR-012](adr/012-canonical-web-and-api-urls.md).
+
 ### 2.1 Architectural Planes
 
 | Plane | Owns | Must Not Own |
@@ -110,3 +120,4 @@ For the MVP, Relay should hold strict boundaries and focus on closed-loop value 
 - **[Strengthened ADR-007](adr/007-governed-enterprise-authority.md)**: Maintain the design philosophy of "issuing an enterprise badge, not building a mechanical hand." All tasks involving writes to external systems or sensitive internal reads must enforce multi-layer permission checks and route through the Approval Service.
 - **[New ADR-009](adr/009-control-plane-outside-sandbox.md)**: Keep the durable Relay daemon and control-plane authority outside the sandbox. A sandbox may run only a minimal guest worker for approved command execution, stream forwarding, exit-status reporting, and local file operations.
 - **[New ADR-010](adr/010-leased-agent-node-delivery.md)**: Use explicit, bounded command leases and at-least-once delivery between the control plane and daemon nodes. Only daemon-reported active commands renew ownership; cancellation remains retryable until the run is terminal.
+- **[ADR-012](adr/012-canonical-web-and-api-urls.md)**: Use clean browser paths and a canonical `/api/v1` JSON boundary without pre-release compatibility aliases.

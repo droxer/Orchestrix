@@ -8,7 +8,7 @@ import { ADMIN_EMPLOYEES_KEY } from "../lib/controlPanelQueries";
  * Employee id → display name, for surfaces that show work owned by someone
  * other than the viewer (the backlog and routine Assignee columns).
  *
- * The roster only exists behind `/cp/employees`, which requires an admin
+ * The roster only exists behind `/api/v1/admin/employees`, which requires an admin
  * session, so this resolves names for admins and returns an empty map for
  * everyone else — those viewers keep the previous id fallback. Closing that
  * gap needs a non-admin directory endpoint, which is a roster-exposure

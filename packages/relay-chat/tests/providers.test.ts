@@ -51,7 +51,7 @@ describe("provider webhook handlers", () => {
     const calls: Array<{ url: string; init?: RequestInit }> = [];
     const fetchFn = async (url: string | URL | Request, init?: RequestInit) => {
       calls.push({ url: String(url), init });
-      if (String(url).endsWith("/chat/integrations/runtime")) {
+      if (String(url).endsWith("/api/v1/internal/chat/integrations/runtime")) {
         return jsonResponse({ integrations: [
           { id: "tg", provider: "telegram", config: {}, secrets: { botToken: "tg-token", webhookSecret: "hook" } },
           { id: "dc", provider: "discord", config: { applicationId: "app", publicKey: "a".repeat(64) }, secrets: { botToken: "dc-token" } },

@@ -36,7 +36,7 @@ def _shared_capable_node(ctx: Any, node_id: str) -> dict[str, Any]:
     return node
 
 
-@router.get("/cp/daemon-nodes/{node_id}/workspace/files")
+@router.get("/admin/daemon-nodes/{node_id}/workspace/files")
 async def node_workspace_files(node_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     path = _path(request.query_params.get("path"))
@@ -46,7 +46,7 @@ async def node_workspace_files(node_id: str, request: Request, ctx: AppContextDe
     return {"nodeId": node["id"], "scope": "shared", "source": "live", "path": event.get("path", path), "exists": bool(event.get("exists")), "entries": event.get("entries") or [], "generatedAt": _timestamp()}
 
 
-@router.get("/cp/daemon-nodes/{node_id}/workspace/file")
+@router.get("/admin/daemon-nodes/{node_id}/workspace/file")
 async def node_workspace_file(node_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     path = _path(request.query_params.get("path"), required=True)

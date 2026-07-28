@@ -21,7 +21,6 @@ import { TaskAssignee, TaskExecutionBadge } from "./TaskAssignee";
 import { isTaskAssigneeCurrentUser, taskAssigneeDisplayName, teamReady } from "../lib/taskAssignment";
 import { useEmployeeNames } from "../hooks/useEmployeeNames";
 import { readViewPreference, writeViewPreference } from "../lib/viewPreference";
-import { useUrlSearchState } from "../hooks/useUrlSearchState";
 import { Button } from "./ui/button";
 import { FiltersBar } from "./FiltersBar";
 
@@ -48,19 +47,6 @@ type BacklogView = "board" | "list";
 
 const VIEW_STORAGE_KEY = "relay-web.backlogView";
 const BACKLOG_VIEWS: readonly BacklogView[] = ["board", "list"];
-
-function parseBacklogFilters(value: string | null): BacklogFilters {
-  if (!value) return initialFilters;
-  try {
-    return { ...initialFilters, ...JSON.parse(value) } as BacklogFilters;
-  } catch {
-    return initialFilters;
-  }
-}
-
-function serializeBacklogFilters(value: BacklogFilters): string | null {
-  return JSON.stringify(value) === JSON.stringify(initialFilters) ? null : JSON.stringify(value);
-}
 
 function parseBacklogView(value: string | null): BacklogView {
   return BACKLOG_VIEWS.includes(value as BacklogView)
@@ -420,8 +406,8 @@ export function BacklogPage({ tasks, sessions, nodes, currentUser, isRefreshing,
     createTaskMutation,
     deleteTaskMutation,
   } = useRelayMutations();
-  const [filters, setFilters] = useUrlSearchState("backlogFilters", initialFilters, parseBacklogFilters, serializeBacklogFilters);
-  const [view, setView] = useUrlSearchState("backlogView", parseBacklogView(null), parseBacklogView, (value) => value);
+  const [filters, setFilters] = useState(initialFilters);
+  const [view, setView] = useState<BacklogView>(() => parseBacklogView(null));
   const [form, setForm] = useState<BacklogTaskFormState | null>(null);
   const [formBaseline, setFormBaseline] = useState<BacklogTaskFormState | null>(null);
   const [saving, setSaving] = useState(false);

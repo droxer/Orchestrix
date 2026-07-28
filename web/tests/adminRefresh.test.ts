@@ -14,7 +14,7 @@ describe("Admin page refresh stability", () => {
     assert.doesNotMatch(relayDataSource, /\bisFetching\b/);
     assert.match(adminPageSource, /disabled=\{manualRefreshPending\}/);
     assert.match(adminPageSource, /className=\{manualRefreshPending \? "spin" : undefined\}/);
-    assert.match(adminPageSource, /if \(value === "fleet"\) return "nodes"/);
+    assert.doesNotMatch(adminPageSource, /useUrlSearchState/);
     assert.match(relayDataSource, /const \[manualRefreshPending, setManualRefreshPending\] = useState\(false\)/);
   });
 });

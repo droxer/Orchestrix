@@ -4,24 +4,23 @@ from datetime import datetime, timedelta, timezone
 from tempfile import TemporaryDirectory
 
 from fastapi.testclient import TestClient
-
 from relay.app import create_app
 from relay.persistence.stores import relay_event
 
 
 def _bootstrap(client: TestClient) -> None:
-    response = client.post("/auth/bootstrap", json={
+    response = client.post("/api/v1/auth/bootstrap", json={
         "token": "admin_token",
         "username": "admin",
         "password": "secret123",
     })
     assert response.status_code == 200
-    response = client.post("/auth/login", json={"username": "admin", "password": "secret123"})
+    response = client.post("/api/v1/auth/login", json={"username": "admin", "password": "secret123"})
     assert response.status_code == 200
 
 
 def _create_session(client: TestClient) -> str:
-    response = client.post("/sessions", json={
+    response = client.post("/api/v1/threads", json={
         "taskGoal": "demo",
         "assignments": [{"agent": "claude", "mode": "action"}],
         "workspacePath": "/workspace",
@@ -37,7 +36,7 @@ def test_dashboard_sessions_returns_shape(monkeypatch) -> None:
         _bootstrap(client)
         _create_session(client)
 
-        response = client.get("/cp/dashboard/sessions")
+        response = client.get("/api/v1/admin/dashboard/sessions")
         assert response.status_code == 200
         body = response.json()
         assert body["total"] >= 1
@@ -55,7 +54,7 @@ def test_dashboard_activity_returns_recent_items(monkeypatch) -> None:
         _bootstrap(client)
         _create_session(client)
 
-        response = client.get("/cp/dashboard/activity?limit=5")
+        response = client.get("/api/v1/admin/dashboard/activity?limit=5")
         assert response.status_code == 200
         body = response.json()
         assert isinstance(body["items"], list)
@@ -85,7 +84,7 @@ def test_dashboard_tokens_returns_reported_usage(monkeypatch) -> None:
             "tokenUsage": {"input": 10, "output": 5, "cache": 2, "total": 17, "source": "codex"},
         }))
 
-        response = client.get("/cp/dashboard/tokens")
+        response = client.get("/api/v1/admin/dashboard/tokens")
         assert response.status_code == 200
         body = response.json()
         assert body["available"] is True
@@ -141,7 +140,7 @@ def test_dashboard_tokens_totals_only_cover_last_seven_days(monkeypatch) -> None
         app.state.session_store.append_event(old_session_id, old_started)
         app.state.session_store.append_event(old_session_id, old_completed)
 
-        response = client.get("/cp/dashboard/tokens")
+        response = client.get("/api/v1/admin/dashboard/tokens")
         assert response.status_code == 200
         body = response.json()
         assert body["totalInput"] == 10
@@ -180,7 +179,7 @@ def test_dashboard_tokens_do_not_redate_old_usage_after_unrelated_session_activi
             "decision": {"id": "dec_recent", "kind": "approve", "createdAt": datetime.now(timezone.utc).isoformat()},
         }))
 
-        response = client.get("/cp/dashboard/tokens")
+        response = client.get("/api/v1/admin/dashboard/tokens")
 
         assert response.status_code == 200
         body = response.json()
@@ -215,7 +214,7 @@ def test_dashboard_tokens_aggregate_runs_without_double_counting_sessions(monkey
                 "tokenUsage": usage,
             }))
 
-        response = client.get("/cp/dashboard/tokens")
+        response = client.get("/api/v1/admin/dashboard/tokens")
 
         assert response.status_code == 200
         body = response.json()

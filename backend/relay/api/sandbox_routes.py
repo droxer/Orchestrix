@@ -208,33 +208,3 @@ def _resolve_legacy_assignment(
         "workspaceIdentity": workspace_identity_record(node or {}),
         "workspacePolicy": placement.get("workspacePolicy"),
     }
-
-
-@router.post("/sandboxes/{sandbox_id}/runs/{session_id}/cancel", status_code=202)
-async def cancel_sandbox_run(
-    sandbox_id: str, session_id: str, request: Request, ctx: AppContextDep
-) -> dict[str, Any]:
-    sandbox = ctx.backend.get(sandbox_id)
-    if not sandbox:
-        raise HTTPException(404, "Sandbox not found.")
-    actor = require_sandbox_access(sandbox, request, ctx)
-    body = await json_body(request)
-    try:
-        result = ctx.backend.cancel_run(
-            sandbox_id,
-            session_id,
-            string_field(body, "reason") or "Cancelled by human.",
-            actor["employeeId"] if actor else None,
-        )
-        logger.info(
-            "Sandbox run cancelled", sandbox_id=sandbox_id, session_id=session_id
-        )
-        return result
-    except Exception as error:
-        logger.warning(
-            "Sandbox run cancel failed",
-            sandbox_id=sandbox_id,
-            session_id=session_id,
-            error=str(error),
-        )
-        raise HTTPException(400, str(error))

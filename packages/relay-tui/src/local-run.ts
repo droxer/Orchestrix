@@ -3,7 +3,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { hostWorkspacePath, loadPackageEnv, normalizeBaseUrl } from "relay-core";
+import { hostWorkspacePath, loadPackageEnv, normalizeBaseUrl, relayApiUrl } from "relay-core";
 import { ensureDaemonNodeToken } from "relay-core";
 
 loadPackageEnv("relay-tui");
@@ -96,7 +96,7 @@ async function main(): Promise<void> {
     const detail = error instanceof Error ? error.message : String(error);
     console.error(detail);
     if (!ownsBackend) {
-      console.error(`A backend is already listening at ${backendUrl}; check its /cp page or run make stop before retrying.`);
+      console.error(`A backend is already listening at ${backendUrl}; check its /admin page or run make stop before retrying.`);
     }
     process.exitCode = 1;
   }
@@ -205,7 +205,7 @@ export async function liveDaemonExists(
   sandboxId?: string,
 ): Promise<boolean> {
   try {
-    const response = await fetch(`${backendUrl}/daemon-nodes`, { signal: AbortSignal.timeout(1000) });
+    const response = await fetch(relayApiUrl(backendUrl, "/daemon-nodes"), { signal: AbortSignal.timeout(1000) });
     if (!response.ok) return false;
     const body = await response.json() as { nodes?: Array<{ id?: string; employeeId?: string; online?: boolean; stale?: boolean; workspacePath?: string }> };
     return (body.nodes ?? []).some((node) =>

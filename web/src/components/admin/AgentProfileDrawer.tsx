@@ -15,7 +15,7 @@ interface AgentProfileDrawerProps {
   onClose: () => void;
   agentId: string | null;
   /** Pre-loaded agent data (e.g. from the employee's own agent list). When
-   *  provided, skips the admin-only `/cp/agents/{id}` fetch entirely — needed
+   *  provided, skips the admin-only `/api/v1/admin/agents/{id}` fetch entirely — needed
    *  because non-admin employees can't call that route. */
   agent?: EmployeeAgent | null;
   employees?: EmployeeRecord[];

@@ -1,6 +1,7 @@
 import type { AgentName, AgentTaskMode } from "./state.js";
 import type { RelaySession } from "./session-store.js";
 import type { ControlPanelDaemonNodeRecord, SandboxRecord, SandboxRunAssignment } from "./daemon-protocol.js";
+import { relayApiUrl } from "./api-url.js";
 
 export type RemoteDecisionKind = "approve" | "reject" | "cancel" | "rerun" | "mark_done";
 
@@ -94,7 +95,7 @@ export class RelayDaemonClient {
   }
 
   async createSession(input: CreateSessionInput): Promise<RelaySession> {
-    return this.request<RelaySession>("/sessions", {
+    return this.request<RelaySession>("/threads", {
       method: "POST",
       signal: input.signal,
       body: {
@@ -107,17 +108,17 @@ export class RelayDaemonClient {
   }
 
   async listSessions(signal?: AbortSignal): Promise<RelaySession[]> {
-    const body = await this.request<{ sessions?: RelaySession[] }>("/sessions", { signal });
+    const body = await this.request<{ sessions?: RelaySession[] }>("/threads", { signal });
     return Array.isArray(body.sessions) ? body.sessions : [];
   }
 
   async getSession(sessionId: string, signal?: AbortSignal): Promise<RelaySession> {
-    return this.request<RelaySession>(`/sessions/${encodeURIComponent(sessionId)}`, { signal });
+    return this.request<RelaySession>(`/threads/${encodeURIComponent(sessionId)}`, { signal });
   }
 
   async renameSession(sessionId: string, title: string, signal?: AbortSignal): Promise<RelaySession> {
-    return this.request<RelaySession>(`/sessions/${encodeURIComponent(sessionId)}/title`, {
-      method: "POST",
+    return this.request<RelaySession>(`/threads/${encodeURIComponent(sessionId)}`, {
+      method: "PATCH",
       signal,
       body: { title },
     });
@@ -138,7 +139,7 @@ export class RelayDaemonClient {
 
   async recordDecision(input: RecordDecisionInput): Promise<RelaySession> {
     return this.request<RelaySession>(
-      `/sessions/${encodeURIComponent(input.sessionId)}/decisions`,
+      `/threads/${encodeURIComponent(input.sessionId)}/decisions`,
       {
         method: "POST",
         body: {
@@ -152,7 +153,7 @@ export class RelayDaemonClient {
 
   async recordHandoff(input: RecordHandoffInput): Promise<RelaySession> {
     return this.request<RelaySession>(
-      `/sessions/${encodeURIComponent(input.sessionId)}/handoffs`,
+      `/threads/${encodeURIComponent(input.sessionId)}/handoffs`,
       {
         method: "POST",
         body: {
@@ -166,7 +167,7 @@ export class RelayDaemonClient {
 
   async cancelSandboxRun(input: CancelSandboxRunInput): Promise<RelaySession> {
     return this.request<RelaySession>(
-      `/sandboxes/${encodeURIComponent(input.sandboxId)}/runs/${encodeURIComponent(input.sessionId)}/cancel`,
+      `/threads/${encodeURIComponent(input.sessionId)}/cancellations`,
       {
         method: "POST",
         body: {
@@ -180,7 +181,7 @@ export class RelayDaemonClient {
     pathname: string,
     options: { method?: string; body?: unknown; signal?: AbortSignal } = {},
   ): Promise<T> {
-    const response = await this.fetchFn(`${this.baseUrl}${pathname}`, {
+    const response = await this.fetchFn(relayApiUrl(this.baseUrl, pathname), {
       method: options.method ?? "GET",
       signal: options.signal,
       headers: {

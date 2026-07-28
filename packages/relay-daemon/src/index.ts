@@ -36,6 +36,7 @@ import {
   DAEMON_CAPABILITY_WORKSPACE_READ,
   DAEMON_CAPABILITY_WORKSPACE_READ_SHARED,
   DAEMON_NODE_PROTOCOL_VERSION,
+  relayApiUrl,
 } from "relay-core";
 import { workspaceCommandEvent } from "./workspace-read.js";
 
@@ -220,7 +221,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
     status: status ?? (activeRuns.size > 0 ? "busy" : "ready"),
   });
   const register = async (): Promise<void> => {
-    const url = `${backendUrl}/daemon-nodes/register`;
+    const url = relayApiUrl(backendUrl, "/daemon-node-registrations");
     try {
       await postJson(fetchFn, url, buildRegistration(), undefined, runtimeSignal);
     } catch (error) {
@@ -251,7 +252,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
       ]);
       await postJson(
         fetchFn,
-        `${backendUrl}/daemon-nodes/register`,
+        relayApiUrl(backendUrl, "/daemon-node-registrations"),
         buildRegistration(undefined, "stopped"),
         undefined,
         AbortSignal.timeout(SHUTDOWN_REGISTRATION_TIMEOUT_MS),
@@ -360,7 +361,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
           if (!canStartCommand(command, activeRuns, maxConcurrentRuns, runCapacityByMode)) {
             const detail = "Daemon node has no available execution slot for this run.";
             logger.warn("command rejected while daemon busy", { ...commandLogFields(sandboxId, command), error: detail });
-            await postJsonWithRetry(fetchFn, `${backendUrl}/daemon-nodes/${encodeURIComponent(sandboxId)}/events`, {
+            await postJsonWithRetry(fetchFn, relayApiUrl(backendUrl, `/daemon-nodes/${encodeURIComponent(sandboxId)}/events`), {
               type: "run.failed",
               commandId: command.id,
               ...commandLeaseEventFields(command),
@@ -392,7 +393,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
           ).catch(async (error: unknown) => {
             const message = error instanceof Error ? error.message : String(error);
             logger.error("command failed before completion", { ...commandLogFields(sandboxId, command), error: message });
-            const eventUrl = `${backendUrl}/daemon-nodes/${encodeURIComponent(sandboxId)}/events`;
+            const eventUrl = relayApiUrl(backendUrl, `/daemon-nodes/${encodeURIComponent(sandboxId)}/events`);
             const event = controller.signal.aborted
               ? {
                   type: "run.cancelled",
@@ -443,7 +444,7 @@ export async function runRelayDaemon(options: DaemonRuntimeOptions = {}): Promis
           activeRuns.get(command.commandId)?.controller.abort(command.reason);
         } else if (command.type === "workspace.list" || command.type === "workspace.read") {
           const event = workspaceCommandEvent(workspacePath, command);
-          await postJsonWithRetry(fetchFn, `${backendUrl}/daemon-nodes/${encodeURIComponent(sandboxId)}/events`, event, token, runtimeSignal).catch((error: unknown) => {
+          await postJsonWithRetry(fetchFn, relayApiUrl(backendUrl, `/daemon-nodes/${encodeURIComponent(sandboxId)}/events`), event, token, runtimeSignal).catch((error: unknown) => {
             logger.error("workspace event post failed", { sandboxId, commandId: command.id, error: error instanceof Error ? error.message : String(error) });
           });
         }
@@ -509,7 +510,7 @@ export async function runRelayDaemonDoctor(options: DaemonRuntimeOptions = {}): 
   const environment = options.environment ?? createExecutionEnvironment(sandboxMode, sandboxId, workspacePath, logger);
   const agentHealth = await discoverDaemonAgentHealth(environment, logger, sandboxId, options.signal);
   if (token) {
-    await postJson(fetchFn, `${backendUrl}/daemon-nodes/register`, {
+    await postJson(fetchFn, relayApiUrl(backendUrl, "/daemon-node-registrations"), {
       sandboxId,
       ...(configuredEmployeeId ? { employeeId } : {}),
       token,
@@ -614,9 +615,10 @@ function readyAgents(health: Partial<Record<AgentName, DaemonAgentHealth>>): Age
 }
 
 async function checkBackendReachable(fetchFn: typeof fetch, backendUrl: string, signal?: AbortSignal): Promise<void> {
-  const response = await fetchFn(`${backendUrl}/`, { signal: requestSignal(signal) });
+  const url = `${backendUrl}/api`;
+  const response = await fetchFn(url, { signal: requestSignal(signal) });
   if (!response.ok) {
-    throw new DaemonHttpError(`GET ${backendUrl}/ failed: ${response.status} ${await response.text()}`, response.status);
+    throw new DaemonHttpError(`GET ${url} failed: ${response.status} ${await response.text()}`, response.status);
   }
 }
 
@@ -638,7 +640,7 @@ async function executeCommand(
   signal?: AbortSignal,
   cancellationTerminalEventSignal?: () => AbortSignal | undefined,
 ): Promise<void> {
-  const eventUrl = `${backendUrl}/daemon-nodes/${encodeURIComponent(sandboxId)}/events`;
+  const eventUrl = relayApiUrl(backendUrl, `/daemon-nodes/${encodeURIComponent(sandboxId)}/events`);
   const state = command.state ?? initialAgentState(command.taskGoal);
   logger.info("run starting", commandLogFields(sandboxId, command));
   if (command.workspacePath && !workspacePathsMatch(command.workspacePath, nodeWorkspacePath)) {
@@ -1091,7 +1093,7 @@ function daemonCommandsUrl(
   sandboxId: string,
   input: { waitSeconds: number; leaseSeconds: number; activeCommandLeases: Array<{ commandId: string; leaseId?: string }> },
 ): string {
-  const url = new URL(`${backendUrl}/daemon-nodes/${encodeURIComponent(sandboxId)}/commands`);
+  const url = new URL(relayApiUrl(backendUrl, `/daemon-nodes/${encodeURIComponent(sandboxId)}/commands`));
   url.searchParams.set("waitSeconds", formatQueryNumber(input.waitSeconds));
   url.searchParams.set("leaseSeconds", formatQueryNumber(input.leaseSeconds));
   url.searchParams.set("leaseMode", "explicit");
@@ -1254,7 +1256,7 @@ async function enrollManagedDaemon(
   workspacePath: string,
   signal?: AbortSignal,
 ): Promise<ManagedDaemonEnrollment> {
-  const url = `${backendUrl}/daemon-enroll`;
+  const url = relayApiUrl(backendUrl, "/daemon-node-enrollments");
   const response = await fetchFn(url, {
     method: "POST",
     headers: {

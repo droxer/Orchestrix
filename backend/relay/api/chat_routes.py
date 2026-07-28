@@ -25,21 +25,21 @@ def _owned_by(session: dict[str, Any], employee_id: str) -> bool:
     return session.get("ownerEmployeeId") == employee_id
 
 
-@router.post("/chat/identity/resolve")
+@router.post("/internal/chat/identity/resolve")
 async def resolve_chat_identity(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_chat_service_request(request)
     body = await json_body(request)
     return {"identity": _resolve_owner(ctx, body)}
 
 
-@router.get("/chat/integrations/runtime")
+@router.get("/internal/chat/integrations/runtime")
 async def runtime_chat_integrations(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     """Active provider settings for the separately deployed chat webhook service."""
     require_chat_service_request(request)
     return {"integrations": ctx.chat_store.runtime_integrations()}
 
 
-@router.post("/chat/conversation/session")
+@router.post("/internal/chat/conversation/session")
 async def chat_conversation_session(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     """Resolve the live session a chat thread is currently bound to, if any."""
     require_chat_service_request(request)
@@ -58,7 +58,7 @@ async def chat_conversation_session(request: Request, ctx: AppContextDep) -> dic
     return {"session": session, "mapping": record}
 
 
-@router.post("/chat/conversation/sessions")
+@router.post("/internal/chat/conversation/sessions")
 async def chat_conversation_sessions(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     """List the owning employee's open conversations for switch/list commands."""
     require_chat_service_request(request)
@@ -72,7 +72,7 @@ async def chat_conversation_sessions(request: Request, ctx: AppContextDep) -> di
     return {"sessions": sessions}
 
 
-@router.post("/chat/conversation/mapping")
+@router.post("/internal/chat/conversation/mapping")
 async def chat_conversation_mapping(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     """Bind a chat thread to a session the resolved employee owns."""
     require_chat_service_request(request)

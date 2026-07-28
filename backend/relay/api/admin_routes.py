@@ -75,13 +75,13 @@ def _managed_node_placeholder(node: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-@router.get("/cp/users")
+@router.get("/admin/users")
 async def list_users(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     return {"users": ctx.auth_store.list_users()}
 
 
-@router.post("/cp/users", status_code=201)
+@router.post("/admin/users", status_code=201)
 async def create_user(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     body = await json_body(request)
@@ -101,7 +101,7 @@ async def create_user(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     return {"user": user}
 
 
-@router.get("/cp/departments")
+@router.get("/admin/departments")
 async def list_departments(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     if hasattr(ctx.auth_store, "list_departments"):
@@ -109,7 +109,7 @@ async def list_departments(request: Request, ctx: AppContextDep) -> dict[str, An
     return {"departments": []}
 
 
-@router.post("/cp/departments", status_code=201)
+@router.post("/admin/departments", status_code=201)
 async def create_department(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     if not hasattr(ctx.auth_store, "ensure_department"):
@@ -130,7 +130,7 @@ async def create_department(request: Request, ctx: AppContextDep) -> dict[str, A
     return {"department": department}
 
 
-@router.get("/cp/employees")
+@router.get("/admin/employees")
 async def list_employees(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     if hasattr(ctx.auth_store, "list_employees"):
@@ -153,7 +153,7 @@ async def list_employees(request: Request, ctx: AppContextDep) -> dict[str, Any]
     return {"employees": employees}
 
 
-@router.delete("/cp/employees/{employee_id}", status_code=200)
+@router.delete("/admin/employees/{employee_id}", status_code=200)
 async def soft_delete_employee(employee_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     if not hasattr(ctx.auth_store, "soft_delete_employee"):
@@ -196,7 +196,7 @@ async def soft_delete_employee(employee_id: str, request: Request, ctx: AppConte
     }
 
 
-@router.post("/cp/employees", status_code=201)
+@router.post("/admin/employees", status_code=201)
 async def create_employee(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     body = await json_body(request)
@@ -257,7 +257,7 @@ async def create_employee(request: Request, ctx: AppContextDep) -> dict[str, Any
     return {"employee": employee, "user": user, **({"node": public_node} if public_node else {})}
 
 
-@router.post("/cp/daemon-nodes/{node_id}/assign")
+@router.put("/admin/daemon-nodes/{node_id}/assignment")
 async def assign_control_panel_daemon_node(node_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     body = await json_body(request)
@@ -283,7 +283,7 @@ async def assign_control_panel_daemon_node(node_id: str, request: Request, ctx: 
     return {"employee": employee, "node": public_node}
 
 
-@router.post("/cp/daemon-nodes/{node_id}/unassign")
+@router.delete("/admin/daemon-nodes/{node_id}/assignment")
 async def unassign_control_panel_daemon_node(node_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     existing_node = ctx.registry.get(node_id)
@@ -304,7 +304,7 @@ async def unassign_control_panel_daemon_node(node_id: str, request: Request, ctx
     return {"node": public_node}
 
 
-@router.patch("/cp/daemon-nodes/{node_id}/disabled-agents")
+@router.patch("/admin/daemon-nodes/{node_id}/disabled-agents")
 async def update_control_panel_daemon_node_disabled_agents(node_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     body = await json_body(request)
@@ -323,7 +323,7 @@ async def update_control_panel_daemon_node_disabled_agents(node_id: str, request
     return {"node": public_node}
 
 
-@router.patch("/cp/daemon-nodes/{node_id}/agent-role-defaults")
+@router.patch("/admin/daemon-nodes/{node_id}/agent-role-defaults")
 async def update_control_panel_daemon_node_agent_role_defaults(node_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     body = await json_body(request)
@@ -342,7 +342,7 @@ async def update_control_panel_daemon_node_agent_role_defaults(node_id: str, req
     return {"node": public_node}
 
 
-@router.delete("/cp/daemon-nodes/{node_id}", status_code=204)
+@router.delete("/admin/daemon-nodes/{node_id}", status_code=204)
 async def delete_control_panel_daemon_node(node_id: str, request: Request, ctx: AppContextDep) -> Response:
     require_admin_session(request, ctx.auth_store)
     try:
@@ -366,7 +366,7 @@ async def delete_control_panel_daemon_node(node_id: str, request: Request, ctx: 
     return Response(status_code=204)
 
 
-@router.get("/cp/daemon-nodes")
+@router.get("/admin/daemon-nodes")
 async def control_panel_nodes(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     observed = []
@@ -390,7 +390,7 @@ async def control_panel_nodes(request: Request, ctx: AppContextDep) -> dict[str,
     return {"nodes": [*observed, *pending]}
 
 
-@router.post("/cp/daemon-nodes", status_code=201)
+@router.post("/admin/daemon-nodes", status_code=201)
 async def create_control_panel_daemon_node(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     body = await json_body(request)
@@ -448,13 +448,13 @@ def _chat_error(error: Exception) -> HTTPException:
     return HTTPException(500, "Chat integration operation failed.")
 
 
-@router.get("/cp/chat-integrations")
+@router.get("/admin/chat-integrations")
 async def list_chat_integrations(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     return {"integrations": ctx.chat_store.list_integrations()}
 
 
-@router.post("/cp/chat-integrations", status_code=201)
+@router.post("/admin/chat-integrations", status_code=201)
 async def create_chat_integration(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     user = require_admin_session(request, ctx.auth_store)
     body = await json_body(request)
@@ -465,7 +465,7 @@ async def create_chat_integration(request: Request, ctx: AppContextDep) -> dict[
     return {"integration": integration}
 
 
-@router.get("/cp/chat-integrations/{integration_id}")
+@router.get("/admin/chat-integrations/{integration_id}")
 async def get_chat_integration(integration_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     try:
@@ -475,7 +475,7 @@ async def get_chat_integration(integration_id: str, request: Request, ctx: AppCo
     return {"integration": integration}
 
 
-@router.patch("/cp/chat-integrations/{integration_id}")
+@router.patch("/admin/chat-integrations/{integration_id}")
 async def update_chat_integration(integration_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     user = require_admin_session(request, ctx.auth_store)
     body = await json_body(request)
@@ -486,7 +486,7 @@ async def update_chat_integration(integration_id: str, request: Request, ctx: Ap
     return {"integration": integration}
 
 
-@router.post("/cp/chat-integrations/{integration_id}/activate")
+@router.post("/admin/chat-integrations/{integration_id}/activations")
 async def activate_chat_integration(integration_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     user = require_admin_session(request, ctx.auth_store)
     try:
@@ -504,7 +504,7 @@ async def activate_chat_integration(integration_id: str, request: Request, ctx: 
     return {"integration": integration, "provisioning": {"ok": True, "message": message}}
 
 
-@router.post("/cp/chat-integrations/{integration_id}/check")
+@router.post("/admin/chat-integrations/{integration_id}/health-checks")
 async def check_chat_integration(integration_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     user = require_admin_session(request, ctx.auth_store)
     try:
@@ -520,7 +520,7 @@ async def check_chat_integration(integration_id: str, request: Request, ctx: App
     return {"integration": integration}
 
 
-@router.post("/cp/chat-integrations/{integration_id}/rotate-webhook-secret")
+@router.post("/admin/chat-integrations/{integration_id}/webhook-secret-rotations")
 async def rotate_telegram_webhook_secret(
     integration_id: str,
     request: Request,
@@ -567,7 +567,7 @@ async def _rotate_telegram_webhook_secret(
     return {"integration": integration, "provisioning": {"ok": True, "message": message}}
 
 
-@router.post("/cp/chat-integrations/{integration_id}/identity-links", status_code=201)
+@router.post("/admin/chat-integrations/{integration_id}/identity-links", status_code=201)
 async def add_chat_identity_link(integration_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     user = require_admin_session(request, ctx.auth_store)
     body = await json_body(request)
@@ -593,7 +593,7 @@ async def add_chat_identity_link(integration_id: str, request: Request, ctx: App
     return {"integration": integration}
 
 
-@router.delete("/cp/chat-integrations/{integration_id}/identity-links/{link_id}")
+@router.delete("/admin/chat-integrations/{integration_id}/identity-links/{link_id}")
 async def delete_chat_identity_link(integration_id: str, link_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     user = require_admin_session(request, ctx.auth_store)
     try:
@@ -603,7 +603,7 @@ async def delete_chat_identity_link(integration_id: str, link_id: str, request: 
     return {"integration": integration}
 
 
-@router.post("/cp/chat-integrations/{integration_id}/allowed-conversations", status_code=201)
+@router.post("/admin/chat-integrations/{integration_id}/allowed-conversations", status_code=201)
 async def add_chat_allowed_conversation(integration_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     user = require_admin_session(request, ctx.auth_store)
     body = await json_body(request)
@@ -614,7 +614,7 @@ async def add_chat_allowed_conversation(integration_id: str, request: Request, c
     return {"integration": integration}
 
 
-@router.delete("/cp/chat-integrations/{integration_id}/allowed-conversations/{conversation_record_id}")
+@router.delete("/admin/chat-integrations/{integration_id}/allowed-conversations/{conversation_record_id}")
 async def delete_chat_allowed_conversation(
     integration_id: str,
     conversation_record_id: str,
@@ -629,7 +629,7 @@ async def delete_chat_allowed_conversation(
     return {"integration": integration}
 
 
-@router.get("/cp/chat-integrations/{integration_id}/audit")
+@router.get("/admin/chat-integrations/{integration_id}/audit")
 async def list_chat_integration_audit(integration_id: str, request: Request, ctx: AppContextDep, limit: int = 50) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     try:
@@ -642,7 +642,7 @@ async def list_chat_integration_audit(integration_id: str, request: Request, ctx
 # ── Dashboard ────────────────────────────────────────────────────────────
 # Aggregated, read-only stats for the admin Dashboard view. Built on the
 # existing session/task event stores — no schema changes. Token-usage stats
-# (TODO: GET /cp/dashboard/tokens) will land once agent runs record token
+# (TODO: GET /api/v1/admin/dashboard/tokens) will land once agent runs record token
 # counts on their session events.
 
 _DAY_WINDOW = 14
@@ -662,7 +662,7 @@ def _parse_timestamp(value: Any) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
-@router.get("/cp/dashboard/sessions")
+@router.get("/admin/dashboard/sessions")
 async def dashboard_sessions(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     sessions = ctx.session_store.list_sessions()
@@ -721,7 +721,7 @@ async def dashboard_sessions(request: Request, ctx: AppContextDep) -> dict[str, 
     }
 
 
-@router.get("/cp/dashboard/activity")
+@router.get("/admin/dashboard/activity")
 async def dashboard_activity(
     request: Request,
     ctx: AppContextDep,
@@ -772,7 +772,7 @@ async def dashboard_activity(
     return {"items": items[:limit]}
 
 
-@router.get("/cp/dashboard/tokens")
+@router.get("/admin/dashboard/tokens")
 async def dashboard_tokens(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     usage_rows = ctx.session_store.list_token_usage() if hasattr(ctx.session_store, "list_token_usage") else [

@@ -1,4 +1,4 @@
-import type { ControlPanelDaemonNodeRecord } from "relay-core";
+import { relayApiUrl, type ControlPanelDaemonNodeRecord } from "relay-core";
 import type { EmployeeRecord, ManagedNodeBackend, ManagedNodeRecord, ProvisionedDaemonNode, ProvisioningAttemptRecord, SupervisorBackend } from "./types.js";
 
 export interface SupervisorBackendClientOptions {
@@ -31,51 +31,51 @@ export class SupervisorBackendClient implements SupervisorBackend, ManagedNodeBa
   }
 
   async listEmployees(): Promise<EmployeeRecord[]> {
-    return (await this.request<{ employees: EmployeeRecord[] }>("/cp/employees")).employees;
+    return (await this.request<{ employees: EmployeeRecord[] }>("/admin/employees")).employees;
   }
 
   async listDaemonNodes(): Promise<ControlPanelDaemonNodeRecord[]> {
-    return (await this.request<{ nodes: ControlPanelDaemonNodeRecord[] }>("/cp/daemon-nodes")).nodes
+    return (await this.request<{ nodes: ControlPanelDaemonNodeRecord[] }>("/admin/daemon-nodes")).nodes
       .filter((node) => !node.provisioningPlaceholder);
   }
 
   async provisionDaemonNode(input: { employeeId: string; workspacePath?: string }): Promise<ProvisionedDaemonNode> {
-    return await this.request<ProvisionedDaemonNode>("/cp/daemon-nodes", {
+    return await this.request<ProvisionedDaemonNode>("/admin/daemon-nodes", {
       method: "POST",
       body: JSON.stringify(input),
     });
   }
 
   async listManagedNodes(): Promise<ManagedNodeRecord[]> {
-    return (await this.request<{ nodes: ManagedNodeRecord[] }>("/cp/managed-nodes")).nodes;
+    return (await this.request<{ nodes: ManagedNodeRecord[] }>("/admin/managed-nodes")).nodes;
   }
 
   async createProvisioningAttempt(nodeId: string): Promise<{ attempt: ProvisioningAttemptRecord; enrollmentCredential: string }> {
-    return await this.request(`/cp/managed-nodes/${encodeURIComponent(nodeId)}/attempts`, { method: "POST" });
+    return await this.request(`/admin/managed-nodes/${encodeURIComponent(nodeId)}/attempts`, { method: "POST" });
   }
 
   async listProvisioningAttempts(nodeId: string): Promise<ProvisioningAttemptRecord[]> {
     return (await this.request<{ attempts: ProvisioningAttemptRecord[] }>(
-      `/cp/managed-nodes/${encodeURIComponent(nodeId)}/attempts`,
+      `/admin/managed-nodes/${encodeURIComponent(nodeId)}/attempts`,
     )).attempts;
   }
 
   async updateManagedNode(nodeId: string, patch: Record<string, unknown>): Promise<ManagedNodeRecord> {
-    return (await this.request<{ node: ManagedNodeRecord }>(`/cp/managed-nodes/${encodeURIComponent(nodeId)}`, {
+    return (await this.request<{ node: ManagedNodeRecord }>(`/admin/managed-nodes/${encodeURIComponent(nodeId)}`, {
       method: "PATCH",
       body: JSON.stringify(patch),
     })).node;
   }
 
   async retireManagedNodeRuntime(nodeId: string): Promise<void> {
-    await this.request(`/cp/managed-nodes/${encodeURIComponent(nodeId)}/runtime`, {
+    await this.request(`/admin/managed-nodes/${encodeURIComponent(nodeId)}/runtime`, {
       method: "DELETE",
     });
   }
 
   async updateProvisioningAttempt(nodeId: string, attemptId: string, patch: Record<string, unknown>): Promise<ProvisioningAttemptRecord> {
     return (await this.request<{ attempt: ProvisioningAttemptRecord }>(
-      `/cp/managed-nodes/${encodeURIComponent(nodeId)}/attempts/${encodeURIComponent(attemptId)}`,
+      `/admin/managed-nodes/${encodeURIComponent(nodeId)}/attempts/${encodeURIComponent(attemptId)}`,
       { method: "PATCH", body: JSON.stringify(patch) },
     )).attempt;
   }
@@ -84,7 +84,7 @@ export class SupervisorBackendClient implements SupervisorBackend, ManagedNodeBa
     const headers = new Headers(init.headers);
     headers.set("content-type", "application/json");
     if (this.adminToken) headers.set("authorization", `Bearer ${this.adminToken}`);
-    const response = await this.fetchFn(`${this.backendUrl}${path}`, {
+    const response = await this.fetchFn(relayApiUrl(this.backendUrl, path), {
       ...init,
       headers,
     });

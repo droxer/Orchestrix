@@ -12,7 +12,7 @@ import {
   type BacklogTaskFormState,
   type RoutineTaskFormState,
 } from "../src/lib/taskBoardForm.js";
-import { hashForAppState, parseAppHash } from "../src/lib/appRoute.js";
+import { parseAppPath, pathForAppState } from "../src/lib/appRoute.js";
 
 describe("taskBoardForm", () => {
   const user = { id: "user-alice", username: "alice", employeeId: "alice", role: "user" as const };
@@ -82,18 +82,18 @@ describe("taskBoardForm", () => {
   });
 });
 
-describe("appRoute hash parsing", () => {
-  it("maps work routes and chat sessions", () => {
-    assert.deepEqual(parseAppHash("#/backlog"), {
+describe("appRoute path parsing", () => {
+  it("maps work routes and thread sessions", () => {
+    assert.deepEqual(parseAppPath("/backlog"), {
       route: "backlog",
       mobileView: "chat",
       sessionId: null,
     });
-    assert.deepEqual(parseAppHash("#/chat/sess-1"), {
+    assert.deepEqual(parseAppPath("/threads/sess-1"), {
       route: "main",
       mobileView: "chat",
       sessionId: "sess-1",
     });
-    assert.equal(hashForAppState({ route: "routine", mobileView: "chat", sessionId: null }), "#/routine");
+    assert.equal(pathForAppState({ route: "routine", mobileView: "chat", sessionId: null }), "/routines");
   });
 });

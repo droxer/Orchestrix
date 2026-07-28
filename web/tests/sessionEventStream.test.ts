@@ -42,8 +42,8 @@ describe("session event stream helpers", () => {
   });
 
   it("builds an encoded session stream URL with an optional cursor", () => {
-    assert.equal(sessionEventsUrl("ses 1"), "/sessions/ses%201/events");
-    assert.equal(sessionEventsUrl("ses 1", "evt/2"), "/sessions/ses%201/events?after=evt%2F2");
+    assert.equal(sessionEventsUrl("ses 1"), "/api/v1/threads/ses%201/events");
+    assert.equal(sessionEventsUrl("ses 1", "evt/2"), "/api/v1/threads/ses%201/events?after=evt%2F2");
   });
 
   it("tails only sessions that can still receive events", () => {

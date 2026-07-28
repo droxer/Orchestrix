@@ -97,7 +97,7 @@ async def auth_logout(request: Request, response: Response, ctx: AppContextDep) 
     return {"ok": True}
 
 
-@router.get("/cp/version")
+@router.get("/admin/version")
 async def control_panel_version(request: Request, ctx: AppContextDep) -> dict[str, str]:
     require_admin_session(request, ctx.auth_store)
     return {"version": request.app.state.control_panel_version}

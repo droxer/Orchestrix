@@ -14,36 +14,25 @@ const nextConfig = (phase: string): NextConfig => {
           // never ships (production uses `output: "export"`), so hiding it only
           // affects local dev ergonomics.
           devIndicators: false,
-          // The app is a single-page client app (only src/app/page.tsx). In
-          // production the backend serves index.html for any unmatched path, so
-          // client-side views like /login and /channels resolve. Next dev has no
-          // SPA fallback, so redirect those direct URLs to the app home.
-          async redirects() {
-            return [
-              { source: "/login", destination: "/", permanent: false },
-              { source: "/channels", destination: "/", permanent: false },
-            ];
-          },
           async rewrites() {
             return {
               beforeFiles: [
-                { source: "/auth/:path*", destination: `${backendUrl}/auth/:path*` },
-                { source: "/agents", destination: `${backendUrl}/agents` },
-                { source: "/agents/:path*", destination: `${backendUrl}/agents/:path*` },
-                { source: "/agent-runs", destination: `${backendUrl}/agent-runs` },
-                { source: "/agent-runs/:path*", destination: `${backendUrl}/agent-runs/:path*` },
-                { source: "/artifacts", destination: `${backendUrl}/artifacts` },
-                { source: "/artifacts/:path*", destination: `${backendUrl}/artifacts/:path*` },
-                { source: "/chat/:path*", destination: `${backendUrl}/chat/:path*` },
-                { source: "/cp", destination: `${backendUrl}/cp` },
-                { source: "/cp/:path*", destination: `${backendUrl}/cp/:path*` },
-                { source: "/sandboxes/:path*", destination: `${backendUrl}/sandboxes/:path*` },
-                { source: "/sessions/:path*", destination: `${backendUrl}/sessions/:path*` },
-                { source: "/workspace/:path*", destination: `${backendUrl}/workspace/:path*` },
-                { source: "/daemon-nodes/:path*", destination: `${backendUrl}/daemon-nodes/:path*` },
-                { source: "/tasks/:path*", destination: `${backendUrl}/tasks/:path*` },
-                { source: "/teams", destination: `${backendUrl}/teams` },
-                { source: "/teams/:path*", destination: `${backendUrl}/teams/:path*` },
+                { source: "/api/:path*", destination: `${backendUrl}/api/:path*` },
+                { source: "/profile-images/:path*", destination: `${backendUrl}/profile-images/:path*` },
+              ],
+              fallback: [
+                { source: "/login", destination: "/" },
+                { source: "/threads", destination: "/" },
+                { source: "/threads/:path*", destination: "/" },
+                { source: "/backlog", destination: "/" },
+                { source: "/routines", destination: "/" },
+                { source: "/agents", destination: "/" },
+                { source: "/agents/:path*", destination: "/" },
+                { source: "/teams", destination: "/" },
+                { source: "/teams/:path*", destination: "/" },
+                { source: "/channels", destination: "/" },
+                { source: "/admin", destination: "/" },
+                { source: "/admin/:path*", destination: "/" },
               ],
             };
           },

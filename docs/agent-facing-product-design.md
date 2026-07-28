@@ -80,9 +80,9 @@ must say that no agent is configured or no placement is currently available.
 
 ## API boundaries
 
-Canonical employee APIs use `/agents`, `/agent-runs`, agent-scoped threads,
-agent-scoped work, and agent-scoped workspace resources. Direct
-`/sandboxes/{id}/runs` endpoints are compatibility-only: they are not called by
+Canonical employee APIs use `/api/v1/agents`, `/api/v1/agent-runs`,
+`/api/v1/threads`, and agent-scoped work and workspace resources. Direct
+`/api/v1/sandboxes/{id}/runs` endpoints are compatibility-only: they are not called by
 the web product, are excluded from new clients, and should be removed after the
 TUI/daemon migration.
 
