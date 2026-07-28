@@ -6,7 +6,11 @@ from fastapi import APIRouter, HTTPException, Request, Response
 
 from ..security.auth import require_admin_session
 from ..services.computer_names import normalize_computer_display_name
-from ..services.node_agents import assert_node_agent_runs_drained, remove_node_agents
+from ..services.node_agents import (
+    assert_node_agent_runs_drained,
+    remove_node_agents,
+    sync_node_agents,
+)
 from .deps import AppContextDep
 from .helpers import json_body
 
@@ -46,7 +50,9 @@ async def list_managed_nodes(request: Request, ctx: AppContextDep) -> dict[str, 
 
 
 @router.get("/admin/managed-nodes/{node_id}")
-async def get_managed_node(node_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
+async def get_managed_node(
+    node_id: str, request: Request, ctx: AppContextDep
+) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     node = ctx.managed_node_store.get_node(node_id)
     if not node:
@@ -55,7 +61,9 @@ async def get_managed_node(node_id: str, request: Request, ctx: AppContextDep) -
 
 
 @router.patch("/admin/managed-nodes/{node_id}")
-async def update_managed_node(node_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
+async def update_managed_node(
+    node_id: str, request: Request, ctx: AppContextDep
+) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     try:
         patch = await json_body(request)
@@ -82,7 +90,9 @@ async def update_managed_node(node_id: str, request: Request, ctx: AppContextDep
 
 
 @router.delete("/admin/managed-nodes/{node_id}", status_code=202)
-async def delete_managed_node(node_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
+async def delete_managed_node(
+    node_id: str, request: Request, ctx: AppContextDep
+) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     try:
         with ctx.registry.dispatch_lock:
@@ -97,7 +107,9 @@ async def delete_managed_node(node_id: str, request: Request, ctx: AppContextDep
             )
             _fence_active_runtime(ctx, node)
             daemon_node_id = node.get("activeDaemonNodeId")
-            removed_agents = remove_node_agents(ctx, daemon_node_id) if daemon_node_id else []
+            removed_agents = (
+                remove_node_agents(ctx, daemon_node_id) if daemon_node_id else []
+            )
         return {"node": node, "removedAgents": removed_agents}
     except (KeyError, ValueError) as error:
         raise _admin_error(error) from error
@@ -125,7 +137,9 @@ async def permanently_delete_managed_node(
 
 
 @router.get("/admin/managed-nodes/{node_id}/attempts")
-async def list_managed_node_attempts(node_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
+async def list_managed_node_attempts(
+    node_id: str, request: Request, ctx: AppContextDep
+) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     if not ctx.managed_node_store.get_node(node_id):
         raise HTTPException(404, "Managed node not found.")
@@ -133,7 +147,9 @@ async def list_managed_node_attempts(node_id: str, request: Request, ctx: AppCon
 
 
 @router.post("/admin/managed-nodes/{node_id}/attempts", status_code=201)
-async def create_managed_node_attempt(node_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
+async def create_managed_node_attempt(
+    node_id: str, request: Request, ctx: AppContextDep
+) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     try:
         body = await json_body(request)
@@ -151,10 +167,14 @@ async def create_managed_node_attempt(node_id: str, request: Request, ctx: AppCo
 
 
 @router.patch("/admin/managed-nodes/{node_id}/attempts/{attempt_id}")
-async def update_managed_node_attempt(node_id: str, attempt_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
+async def update_managed_node_attempt(
+    node_id: str, attempt_id: str, request: Request, ctx: AppContextDep
+) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     try:
-        attempt = ctx.managed_node_store.update_attempt(attempt_id, await json_body(request))
+        attempt = ctx.managed_node_store.update_attempt(
+            attempt_id, await json_body(request)
+        )
         if attempt["managedNodeId"] != node_id:
             raise KeyError(attempt_id)
         return {"attempt": attempt}
@@ -175,7 +195,14 @@ async def retire_managed_node_runtime(
             daemon_node_id = node.get("activeDaemonNodeId")
             if daemon_node_id and ctx.registry.get(daemon_node_id):
                 assert_node_agent_runs_drained(ctx, daemon_node_id)
-                remove_node_agents(ctx, daemon_node_id)
+                runtime = ctx.registry.get(daemon_node_id)
+                if node.get("desiredState") == "running" and runtime:
+                    # Runtime replacement preserves the stable Computer's
+                    # Logical Agents and Placements. The next incarnation will
+                    # rebind them during registration.
+                    sync_node_agents(ctx, runtime)
+                else:
+                    remove_node_agents(ctx, daemon_node_id)
                 ctx.registry.delete(daemon_node_id)
     except KeyError as error:
         raise HTTPException(404, "Managed node not found.") from error
@@ -198,13 +225,23 @@ async def enroll_managed_daemon(request: Request, ctx: AppContextDep) -> dict[st
         raise HTTPException(401, "Enrollment credential is required.")
     body = await json_body(request)
     try:
-        managed_node, attempt = ctx.managed_node_store.consume_enrollment_grant(credential)
-        daemon_node, runtime_token = ctx.registry.enroll_managed_node(managed_node, attempt, body)
-        ctx.managed_node_store.complete_enrollment(managed_node["id"], attempt["id"], daemon_node["id"])
+        managed_node, attempt = ctx.managed_node_store.consume_enrollment_grant(
+            credential
+        )
+        daemon_node, runtime_token = ctx.registry.enroll_managed_node(
+            managed_node, attempt, body
+        )
+        ctx.managed_node_store.complete_enrollment(
+            managed_node["id"], attempt["id"], daemon_node["id"]
+        )
         return {
             "sandboxId": daemon_node["id"],
             "token": runtime_token,
-            **({"employeeId": daemon_node["employeeId"]} if daemon_node.get("employeeId") else {}),
+            **(
+                {"employeeId": daemon_node["employeeId"]}
+                if daemon_node.get("employeeId")
+                else {}
+            ),
             "sandboxMode": daemon_node.get("sandboxMode") or "boxlite",
         }
     except PermissionError as error:

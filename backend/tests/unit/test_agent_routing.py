@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 from relay.persistence.agent_placement_store import LocalAgentPlacementStore
 from relay.persistence.agent_store import LocalAgentStore
 from relay.services.agent_routing import AgentRoutingError, resolve_agent_assignments
@@ -167,7 +166,9 @@ def test_legacy_nonempty_policy_blocks_dispatch(
 
     def legacy_agent(agent_id: str) -> dict | None:
         current = get_agent(agent_id)
-        return {**current, "toolPolicy": {"allowedTools": ["read"]}} if current else None
+        return (
+            {**current, "toolPolicy": {"allowedTools": ["read"]}} if current else None
+        )
 
     monkeypatch.setattr(agents, "get_agent", legacy_agent)
 

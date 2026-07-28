@@ -62,6 +62,7 @@ from .persistence.stores import (
 from .persistence.team_store import DatabaseTeamStore, LocalTeamStore
 from .security.auth import auth_store_from_env
 from .services.managed_nodes import LocalManagedNodeStore
+from .services.node_agents import sync_node_agents
 from .services.team_membership import reconcile_team_memberships
 from .services.workspace_query import WorkspaceQueryBroker
 from .tasks import TaskScheduler
@@ -146,6 +147,13 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
     app.state.workspace_query_broker = WorkspaceQueryBroker()
     app.state.task_scheduler = scheduler
     app.state.control_panel_version = CONTROL_PANEL_VERSION
+
+    # Reconcile managed Computers loaded from durable state. This migrates
+    # daemon-scoped compatibility identities to managedNodeId and collects
+    # orphaned agents left by older supervisor-driven runtime replacement.
+    for node in registry.monitor_nodes():
+        if node.get("managedNodeId") and not node.get("retiredAt"):
+            sync_node_agents(app.state, node)
 
     @app.get("/api", tags=["api"])
     async def api_info() -> dict[str, Any]:

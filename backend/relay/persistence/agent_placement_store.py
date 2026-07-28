@@ -5,11 +5,11 @@ from threading import RLock
 from typing import Any
 
 from sqlalchemy import (
+    JSON,
     BigInteger,
     Column,
     DateTime,
     ForeignKey,
-    JSON,
     MetaData,
     Table,
     Text,
@@ -34,7 +34,6 @@ from .store_common import (
     database_id_column,
     safe_name,
 )
-
 
 PLACEMENT_DESIRED_STATES = frozenset({"active", "draining", "removed"})
 
@@ -69,28 +68,52 @@ class LocalAgentPlacementStore:
             removed: list[dict[str, Any]] = []
             try:
                 for existing in active:
-                    self.update_placement(
-                        existing["id"], {"desiredState": "removed"}
-                    )
+                    self.update_placement(existing["id"], {"desiredState": "removed"})
                     removed.append(existing)
             except Exception:
                 for existing in removed:
-                    self.update_placement(
-                        existing["id"], {"desiredState": "active"}
-                    )
-                self.update_placement(
-                    placement["id"], {"desiredState": "removed"}
-                )
+                    self.update_placement(existing["id"], {"desiredState": "active"})
+                self.update_placement(placement["id"], {"desiredState": "removed"})
                 raise
             return placement
 
     def get_placement(self, placement_id: str) -> dict[str, Any] | None:
         path = self._snapshot_path(placement_id)
         return (
-            _normalized_placement_snapshot(_read_json(path))
-            if path.exists()
-            else None
+            _normalized_placement_snapshot(_read_json(path)) if path.exists() else None
         )
+
+    def rebind_placement(
+        self, placement_id: str, daemon_node_id: str
+    ) -> dict[str, Any]:
+        daemon_node_id = _required_daemon_node_id(daemon_node_id)
+        with self._lock:
+            current = self.get_placement(placement_id)
+            if not current:
+                raise KeyError(placement_id)
+            if (
+                current.get("daemonNodeId") == daemon_node_id
+                and current.get("desiredState") == "active"
+            ):
+                return current
+            conflicts = [
+                placement
+                for placement in self.list_placements(agent_id=current["agentId"])
+                if placement["id"] != placement_id
+                and placement.get("daemonNodeId") == daemon_node_id
+            ]
+            if conflicts:
+                raise ValueError(
+                    "Agent already has an active placement on this daemon node."
+                )
+            updated = {
+                **current,
+                "daemonNodeId": daemon_node_id,
+                "desiredState": "active",
+                "updatedAt": now_iso(),
+            }
+            self._append(placement_id, "placement.rebound", updated)
+            return updated
 
     def list_placements(
         self,
@@ -186,9 +209,7 @@ class LocalAgentPlacementStore:
                 raise KeyError(placement_id)
             if int(current.get("agentVersion") or 0) >= agent_version:
                 return current
-            return self.update_placement(
-                placement_id, {"agentVersion": agent_version}
-            )
+            return self.update_placement(placement_id, {"agentVersion": agent_version})
 
     def _append(
         self, placement_id: str, event_type: str, placement: dict[str, Any]
@@ -319,9 +340,7 @@ class DatabaseAgentPlacementStore:
                         )
                     )
                 )
-            event = _placement_event(
-                placement["id"], "placement.created", placement
-            )
+            event = _placement_event(placement["id"], "placement.created", placement)
             row = _placement_row(placement, event_version=1)
             conn.execute(insert(self.placements).values(**row))
             conn.execute(
@@ -338,9 +357,7 @@ class DatabaseAgentPlacementStore:
                     select(
                         self.placements.c.snapshot,
                         self.placements.c.supervisor_employee_public_id,
-                    ).where(
-                        self.placements.c.public_id == placement_id
-                    )
+                    ).where(self.placements.c.public_id == placement_id)
                 )
                 .mappings()
                 .first()
@@ -352,6 +369,73 @@ class DatabaseAgentPlacementStore:
             if row
             else None
         )
+
+    def rebind_placement(
+        self, placement_id: str, daemon_node_id: str
+    ) -> dict[str, Any]:
+        daemon_node_id = _required_daemon_node_id(daemon_node_id)
+        with self._lock, self.engine.begin() as conn:
+            row = (
+                conn.execute(
+                    select(
+                        self.placements.c.id,
+                        self.placements.c.snapshot,
+                        self.placements.c.supervisor_employee_public_id,
+                        self.placements.c.event_version,
+                    )
+                    .where(self.placements.c.public_id == placement_id)
+                    .with_for_update()
+                )
+                .mappings()
+                .first()
+            )
+            if not row:
+                raise KeyError(placement_id)
+            current = _normalized_placement_snapshot(
+                row["snapshot"], row["supervisor_employee_public_id"]
+            )
+            if (
+                current.get("daemonNodeId") == daemon_node_id
+                and current.get("desiredState") == "active"
+            ):
+                return current
+            conflict = conn.execute(
+                select(self.placements.c.id)
+                .where(self.placements.c.agent_public_id == current["agentId"])
+                .where(self.placements.c.public_id != placement_id)
+                .where(self.placements.c.daemon_node_public_id == daemon_node_id)
+                .where(self.placements.c.desired_state != "removed")
+                .with_for_update()
+            ).first()
+            if conflict:
+                raise ValueError(
+                    "Agent already has an active placement on this daemon node."
+                )
+            updated = {
+                **current,
+                "daemonNodeId": daemon_node_id,
+                "desiredState": "active",
+                "updatedAt": now_iso(),
+            }
+            sequence = int(row["event_version"] or 0)
+            event = _placement_event(placement_id, "placement.rebound", updated)
+            conn.execute(
+                insert(self.events_table).values(
+                    **_placement_event_row(row["id"], sequence, event)
+                )
+            )
+            conn.execute(
+                update(self.placements)
+                .where(self.placements.c.id == row["id"])
+                .values(
+                    **_placement_row(
+                        updated,
+                        event_version=sequence + 1,
+                        database_id=row["id"],
+                    )
+                )
+            )
+            return updated
 
     def list_placements(
         self,
@@ -580,7 +664,7 @@ def reconcile_single_active_placement(store: Any) -> list[str]:
     app builds its stores) by skipping when the table is absent."""
     try:
         active = store.list_placements()
-    except Exception as error:  # noqa: BLE001 - narrow check below
+    except Exception as error:
         if "no such table" in str(error) or "does not exist" in str(error):
             return []
         raise
@@ -593,9 +677,7 @@ def reconcile_single_active_placement(store: Any) -> list[str]:
 def _new_placement(
     agent: dict[str, Any], daemon_node_id: str, payload: dict[str, Any]
 ) -> dict[str, Any]:
-    daemon_node_id = daemon_node_id.strip()
-    if not daemon_node_id:
-        raise ValueError("daemonNodeId is required.")
+    daemon_node_id = _required_daemon_node_id(daemon_node_id)
     desired_state = payload.get("desiredState") or "active"
     if desired_state not in PLACEMENT_DESIRED_STATES:
         raise ValueError("desiredState must be active, draining, or removed.")
@@ -620,6 +702,13 @@ def _new_placement(
         "createdAt": timestamp,
         "updatedAt": timestamp,
     }
+
+
+def _required_daemon_node_id(value: str) -> str:
+    daemon_node_id = value.strip()
+    if not daemon_node_id:
+        raise ValueError("daemonNodeId is required.")
+    return daemon_node_id
 
 
 def _normalized_placement_snapshot(

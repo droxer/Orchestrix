@@ -58,10 +58,48 @@ def select_workspace_node(
         if not node or capability not in (node.get("capabilities") or []):
             continue
         if placement_status(placement, agent, node)["status"] in ("ready", "busy"):
-            candidates.append((int(placement.get("priority") or 100), placement["id"], node))
+            candidates.append(
+                (int(placement.get("priority") or 100), placement["id"], node)
+            )
     if not candidates:
         return None
     return min(candidates, key=lambda item: (item[0], item[1]))[2]
+
+
+def resolve_session_daemon_node_id(
+    session: dict[str, Any] | None,
+    placement_store: Any,
+    daemon_nodes: list[dict[str, Any]],
+) -> str | None:
+    """Resolve a thread's stable Computer affinity to its current runtime."""
+    if not session:
+        return None
+    session_node_id = session.get("daemonNodeId")
+    prior_run = next(
+        (
+            run
+            for run in reversed(session.get("agentRuns") or [])
+            if run.get("daemonNodeId")
+        ),
+        None,
+    )
+    node_id = session_node_id or (prior_run or {}).get("daemonNodeId")
+    if not prior_run or not prior_run.get("placementId"):
+        return node_id if isinstance(node_id, str) and node_id else None
+    placement = placement_store.get_placement(prior_run["placementId"])
+    rebound_node_id = (placement or {}).get("daemonNodeId")
+    if not isinstance(rebound_node_id, str) or rebound_node_id == node_id:
+        return node_id if isinstance(node_id, str) and node_id else None
+    nodes = {node["id"]: node for node in daemon_nodes}
+    rebound_node = nodes.get(rebound_node_id)
+    if not rebound_node or not rebound_node.get("managedNodeId"):
+        return node_id if isinstance(node_id, str) and node_id else None
+    previous_node = nodes.get(node_id) if isinstance(node_id, str) else None
+    if previous_node and previous_node.get("managedNodeId") != rebound_node.get(
+        "managedNodeId"
+    ):
+        return node_id
+    return rebound_node_id
 
 
 def resolve_agent_assignments(
@@ -152,14 +190,13 @@ def resolve_agent_assignments(
                 rejection_reasons.add("capacity_exhausted")
                 continue
             if (
-                (selected_node_ids or selected_workspace is not None)
-                and not _workspace_candidate_allowed(
-                    node,
-                    placement.get("workspacePolicy") or {"kind": "node-affine"},
-                    selected_node_ids,
-                    selected_workspace,
-                    selected_workspace_policy,
-                )
+                selected_node_ids or selected_workspace is not None
+            ) and not _workspace_candidate_allowed(
+                node,
+                placement.get("workspacePolicy") or {"kind": "node-affine"},
+                selected_node_ids,
+                selected_workspace,
+                selected_workspace_policy,
             ):
                 rejection_reasons.add("workspace_unavailable")
                 continue
@@ -214,9 +251,9 @@ def _agent_placements_with_managed_capacity(
 ) -> list[dict[str, Any]]:
     placements = placement_store.list_placements(agent_id=agent["id"])
     if any(
-        placement_status(
-            placement, agent, nodes.get(placement["daemonNodeId"])
-        )["status"]
+        placement_status(placement, agent, nodes.get(placement["daemonNodeId"]))[
+            "status"
+        ]
         in ("ready", "busy")
         for placement in placements
     ):
@@ -261,14 +298,13 @@ def validate_session_workspace_assignments(
                 "node_offline", "Assigned runtime node is no longer registered."
             )
         if (
-            (selected_node_ids or selected_workspace is not None)
-            and not _workspace_candidate_allowed(
-                node,
-                assignment.get("workspacePolicy") or {"kind": "node-affine"},
-                selected_node_ids,
-                selected_workspace,
-                selected_policy,
-            )
+            selected_node_ids or selected_workspace is not None
+        ) and not _workspace_candidate_allowed(
+            node,
+            assignment.get("workspacePolicy") or {"kind": "node-affine"},
+            selected_node_ids,
+            selected_workspace,
+            selected_policy,
         ):
             raise AgentRoutingError(
                 "workspace_unavailable",
@@ -301,7 +337,6 @@ def _session_affinity(
 ) -> tuple[set[str], tuple[str, str] | None, str | None]:
     if not session:
         return set(), None, None
-    session_node_id = session.get("daemonNodeId")
     prior_run = next(
         (
             run
@@ -309,6 +344,9 @@ def _session_affinity(
             if run.get("daemonNodeId")
         ),
         None,
+    )
+    session_node_id = resolve_session_daemon_node_id(
+        session, placement_store, list(nodes.values())
     )
     if not prior_run:
         if isinstance(session_node_id, str) and session_node_id:
@@ -341,9 +379,7 @@ def _session_affinity(
         if prior_run.get("placementId")
         else None
     )
-    policy = ((placement or {}).get("workspacePolicy") or {}).get(
-        "kind", "node-affine"
-    )
+    policy = ((placement or {}).get("workspacePolicy") or {}).get("kind", "node-affine")
     return {node_id}, workspace, policy
 
 

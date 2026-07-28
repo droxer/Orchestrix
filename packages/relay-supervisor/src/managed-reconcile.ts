@@ -11,6 +11,7 @@ export interface ManagedNodeReconcilerOptions {
   providers: ManagedNodeProvider[];
   backendUrl: string;
   workspacePathForNode: (node: ManagedNodeRecord) => string;
+  recoveryGraceMs?: number;
   logger?: SupervisorLogger;
 }
 
@@ -35,6 +36,7 @@ export class ManagedNodeReconciler {
   private readonly providers: Map<string, ManagedNodeProvider>;
   private readonly backendUrl: string;
   private readonly workspacePathForNode: (node: ManagedNodeRecord) => string;
+  private readonly recoveryGraceMs: number;
   private readonly logger?: SupervisorLogger;
   private readonly instances = new Map<string, { provider: ManagedNodeProvider; instance: ProviderInstance }>();
 
@@ -43,6 +45,7 @@ export class ManagedNodeReconciler {
     this.providers = new Map(options.providers.map((provider) => [provider.name, provider]));
     this.backendUrl = options.backendUrl;
     this.workspacePathForNode = options.workspacePathForNode;
+    this.recoveryGraceMs = options.recoveryGraceMs ?? 60_000;
     this.logger = options.logger;
   }
 
@@ -122,6 +125,16 @@ export class ManagedNodeReconciler {
         const attempts = await this.backend.listProvisioningAttempts(node.id);
         const instanceId = [...attempts].reverse().find((attempt) => attempt.providerInstanceId)?.providerInstanceId;
         if (instanceId && await provider.inspect(instanceId) === "running") {
+          const lastSeenAgeMs = daemon?.lastSeenAgeMs;
+          if (typeof lastSeenAgeMs === "number" && lastSeenAgeMs <= this.recoveryGraceMs) {
+            this.logger?.warn("managed node heartbeat is recovering", {
+              nodeId: node.id,
+              daemonNodeId: node.activeDaemonNodeId,
+              lastSeenAgeMs,
+            });
+            skipped += 1;
+            continue;
+          }
           await provider.stop(instanceId);
         }
         if (node.activeDaemonNodeId) {
@@ -209,9 +222,11 @@ export class ManagedNodeReconciler {
   }
 
   async stop(): Promise<void> {
-    const instances = [...this.instances.values()];
+    // The supervisor is a disposable controller, not the owner of Computer
+    // desired state. Process shutdown only drops local bookkeeping. Provider
+    // instances are stopped exclusively by durable stopped/deleted intent or
+    // an explicit replacement in reconcileOnce().
     this.instances.clear();
-    await Promise.allSettled(instances.map(({ provider, instance }) => provider.stop(instance.id)));
   }
 }
 
