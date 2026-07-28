@@ -32,7 +32,7 @@ employee's existing computer without BoxLite.
   health, command leases, and restart-safe enrollment.
 - Daemon execution for Claude Code, Codex, Pi, and Kimi, including streamed tool
   output and normalized token usage.
-- Human approval, cancellation, retry, and handoff flows in the TUI.
+- Human approval, cancellation, retry, and handoff flows in the web app.
 - A provider-neutral chat gateway with Discord, Telegram, and Lark adapters.
 - Admin views for employees, computers, fleet health, activity, and token usage.
 - Database-backed thread and task event stores, with optional file-backed
@@ -89,8 +89,7 @@ make daemon SANDBOX_ID=node_dev  # execution node connected to the backend
 make web                         # Next.js app on 127.0.0.1:5000
 ```
 
-Open <http://127.0.0.1:5000>. Run `make run` in another terminal if you also
-want the Ink TUI.
+Open <http://127.0.0.1:5000>.
 
 Useful commands:
 
@@ -98,7 +97,7 @@ Useful commands:
 make supervisor         # reconcile requested managed computers
 make backend-migrate    # apply Alembic migrations
 make pre-commit-run     # run repository checks
-make stop               # stop Relay, daemon, supervisor, TUI, and BoxLite
+make stop               # stop Relay, daemon, supervisor, and BoxLite
 ```
 
 Rebuild the BoxLite devbox with `make run-fresh` only after changing
@@ -108,7 +107,7 @@ Rebuild the BoxLite devbox with `make run-fresh` only after changing
 
 ```mermaid
 flowchart LR
-    Clients["Web, TUI, and chat adapters"] --> API["FastAPI control plane"]
+    Clients["Web and chat adapters"] --> API["FastAPI control plane"]
     API --> State["Event stores, auth, scheduler"]
     API --> Queue["Leased daemon command queue"]
     Queue --> Daemon["Relay daemon"]
@@ -136,8 +135,6 @@ provider available for external infrastructure.
   workspace access, BoxLite lifecycle, and agent execution.
 - `packages/relay-supervisor/`: managed-computer reconciliation and provider
   lifecycle.
-- `packages/relay-tui/`: Ink terminal interface and approval, retry, cancel, and
-  handoff commands.
 - `web/`: Next.js interface for threads, backlog, routines, agents, teams,
   channels, and administration.
 

@@ -21,7 +21,7 @@ SUPERVISOR_INTERVAL_MS ?=
 SUPERVISOR_ONCE ?=
 ADMIN_TOKEN ?=
 
-.PHONY: devbox-image devbox-check devbox-oci build-packages test test-python backend-install backend backend-test backend-migrate pre-commit-install pre-commit-run run tui-install tui-test tui tui-local daemon-install daemon-test daemon supervisor-install supervisor-test supervisor run-with-daemon serve web-install web-test web run-fresh stop
+.PHONY: devbox-image devbox-check devbox-oci build-packages test test-python backend-install backend backend-test backend-migrate pre-commit-install pre-commit-run daemon-install daemon-test daemon supervisor-install supervisor-test supervisor serve web-install web-test web run-fresh stop
 
 devbox-image:
 	docker build --build-arg DEVBOX_BASE_IMAGE="$(DEVBOX_BASE_IMAGE)" -t $(DEVBOX_IMAGE) -f $(DOCKERFILE) .
@@ -39,7 +39,6 @@ build-packages:
 	npm run build -w relay-core
 	npm run build -w relay-daemon
 	npm run build -w relay-supervisor
-	npm run build -w relay-tui
 
 test:
 	npm test
@@ -63,24 +62,6 @@ backend-test:
 
 backend-migrate:
 	$(if $(DATABASE_URL),RELAY_DATABASE_URL="$(DATABASE_URL)" )UV_CACHE_DIR=.uv-cache uv run --project backend --extra dev alembic -c backend/alembic.ini upgrade head
-
-tui-local:
-	$(if $(filter command line environment,$(origin RELAY_BACKEND_URL)),RELAY_BACKEND_URL="$(RELAY_BACKEND_URL)" )$(if $(filter command line environment,$(origin EMPLOYEE_ID)),RELAY_EMPLOYEE_ID="$(EMPLOYEE_ID)" )$(if $(filter command line environment,$(origin DAEMON_TOKEN)),RELAY_DAEMON_TOKEN="$(DAEMON_TOKEN)" )$(if $(filter command line environment,$(origin DAEMON_NODE_TOKEN)),RELAY_DAEMON_NODE_TOKEN="$(DAEMON_NODE_TOKEN)" )$(if $(filter command line environment,$(origin SANDBOX_MODE)),RELAY_SANDBOX_MODE="$(SANDBOX_MODE)" )$(if $(filter command line environment,$(origin WORKSPACE)),RELAY_WORKSPACE="$(WORKSPACE)" WORKSPACE="$(WORKSPACE)" )node packages/relay-tui/dist/local-run.js
-
-tui-install:
-	npm install -w relay-tui
-
-tui:
-	$(if $(filter command line environment,$(origin RELAY_BACKEND_URL)),RELAY_BACKEND_URL="$(RELAY_BACKEND_URL)" )$(if $(filter command line environment,$(origin EMPLOYEE_ID)),RELAY_EMPLOYEE_ID="$(EMPLOYEE_ID)" )$(if $(filter command line environment,$(origin DAEMON_TOKEN)),RELAY_DAEMON_TOKEN="$(DAEMON_TOKEN)" )$(if $(filter command line environment,$(origin DAEMON_NODE_TOKEN)),RELAY_DAEMON_NODE_TOKEN="$(DAEMON_NODE_TOKEN)" )$(if $(filter command line environment,$(origin SANDBOX_ID)),RELAY_SANDBOX_ID="$(SANDBOX_ID)" SANDBOX_ID="$(SANDBOX_ID)" )$(if $(filter command line environment,$(origin WORKSPACE)),RELAY_WORKSPACE="$(WORKSPACE)" WORKSPACE="$(WORKSPACE)" )node packages/relay-tui/dist/cli.js
-
-tui-test:
-	npm run build -w relay-core
-	npm run build -w relay-daemon
-	npm run build -w relay-tui
-	./node_modules/.bin/tsc -p packages/tsconfig.json
-	node --test dist/packages/relay-tui/tests/tui.test.js
-
-run: tui-local
 
 daemon-install:
 	npm install -w relay-daemon
@@ -108,8 +89,6 @@ supervisor-test:
 	./node_modules/.bin/tsc -p packages/tsconfig.json
 	node --test dist/packages/relay-supervisor/tests/supervisor.test.js
 
-run-with-daemon: run
-
 serve:
 	$(if $(filter command line environment,$(origin PORT)),BACKEND_PORT="$(PORT)" )UV_CACHE_DIR=.uv-cache uv run --project backend relay serve
 
@@ -125,16 +104,13 @@ web-test:
 	node --test dist/web/tests/status.test.js dist/web/tests/messageBlock.test.js
 
 run-fresh: devbox-oci
-	$(if $(filter command line environment,$(origin WORKSPACE)),RELAY_WORKSPACE="$(WORKSPACE)" )node packages/relay-tui/dist/local-run.js
 
 stop:
 	-pkill -f "uv run --project backend relay" 2>/dev/null
 	-pkill -f "backend --port" 2>/dev/null
 	-pkill -f "node packages/relay-daemon/dist/cli.js" 2>/dev/null
 	-pkill -f "node packages/relay-supervisor/dist/cli.js" 2>/dev/null
-	-pkill -f "node packages/relay-tui/dist/cli.js$$" 2>/dev/null
-	-pkill -f "npm run run" 2>/dev/null
 	-pkill -f "boxlite-shim" 2>/dev/null
 	-node -e "import('@boxlite-ai/boxlite').then(async ({JsBoxlite}) => { const rt = JsBoxlite.withDefaultConfig(); for (const box of await rt.listInfo()) { if ((box.name || '').startsWith('relay')) await rt.remove(box.name || box.id, true).catch(() => undefined); } }).catch(() => undefined)"
 	-rm -f $(HOME)/.boxlite/.lock
-	@echo "Stopped Relay backend, daemon, and BoxLite processes."
+	@echo "Stopped Relay backend, daemon, supervisor, and BoxLite processes."

@@ -49,7 +49,7 @@ Still pending:
 
 - verified shared mounts and artifact transfer;
 - provider-driven placement reconciliation and multi-placement failover;
-- full chat-integration and TUI named-agent selection;
+- full chat-integration named-agent selection;
 - observability dashboards, staged rollout controls, and compatibility removal.
 
 ## Delivery strategy
@@ -83,7 +83,7 @@ CLI executor kinds without changing behavior.
 
 ### Verification
 
-- [ ] Existing backend, daemon, relay-core, chat, TUI, and web tests pass.
+- [ ] Existing backend, daemon, relay-core, chat, supervisor, and web tests pass.
 - [ ] Serialized API and event fixtures are unchanged.
 
 ## Phase 1 — Logical-agent persistence and APIs
@@ -209,7 +209,7 @@ Route new work by logical agent rather than by employee node.
 
 ### Protocol and events
 
-- [ ] Add optional `agentId` to relay-core, backend, chat, TUI, and web
+- [ ] Add optional `agentId` to relay-core, backend, chat, and web
   assignment contracts.
 - [ ] Add `logicalAgentId`, `placementId`, `daemonNodeId`, `executorKind`, and
   `agentVersion` to new run events and snapshots.
@@ -326,7 +326,7 @@ Make agents primary in the product while retaining infrastructure operations.
 - [ ] Create agents independently from node provisioning.
 - [ ] Create managed nodes as capacity independently from employees.
 
-### Chat integrations and TUI
+### Chat integrations
 
 - [ ] Resolve mentions and commands to logical agent IDs.
 - [ ] Define ambiguity handling when two agents have similar names.
@@ -338,7 +338,7 @@ Make agents primary in the product while retaining infrastructure operations.
 - [ ] Accessibility and interaction tests for agent selection and failure
   states.
 - [ ] Admin placement workflows and optimistic-cache tests.
-- [ ] Chat/TUI alias compatibility tests.
+- [ ] Chat alias compatibility tests.
 
 ### Exit criteria
 

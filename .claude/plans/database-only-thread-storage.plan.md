@@ -38,7 +38,7 @@ The change also closes the thread-routing defects found during review:
 
 ```mermaid
 flowchart LR
-    UI["Web / TUI / chat"] --> API["Backend APIs"]
+    UI["Web / chat"] --> API["Backend APIs"]
     API --> Controller["SessionController"]
     Controller --> Store["DatabaseSessionStore"]
     Store --> Sessions["sessions snapshot + version"]

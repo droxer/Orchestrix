@@ -25,8 +25,6 @@ Relay uses project-local env files at each runtime boundary:
   defaults.
 - `packages/relay-daemon/.env`: daemon connection, sandbox, workspace, and
   optional agent credential overrides.
-- `packages/relay-tui/.env`: TUI and local-run connection, workspace, and
-  sandbox settings.
 - `packages/.env`: repository-wide fallback values.
 
 Create backend settings from the example:
@@ -47,7 +45,6 @@ Create package settings from the examples:
 cp packages/.env.example packages/.env
 cp packages/relay-core/.env.example packages/relay-core/.env
 cp packages/relay-daemon/.env.example packages/relay-daemon/.env
-cp packages/relay-tui/.env.example packages/relay-tui/.env
 ```
 
 Set agent credentials in `packages/.env`, `packages/relay-core/.env`,
@@ -200,22 +197,17 @@ Build and export the BoxLite devbox image:
 make devbox-oci
 ```
 
-You only need to rebuild and export the devbox image when `dockerfile` changes:
+You only need to rebuild and export the devbox image when `dockerfile` changes.
+This convenience target performs both steps:
 
 ```bash
 make run-fresh
 ```
 
-Normal source changes only need:
-
-```bash
-make run
-```
-
 To mount a specific host workspace into the Relay devbox:
 
 ```bash
-make run WORKSPACE=/path/to/workspace
+make daemon WORKSPACE=/path/to/workspace
 ```
 
 The host workspace mounts into the BoxLite guest at `/workspace`
@@ -253,16 +245,6 @@ there, pass one for a single run:
 make daemon SANDBOX_ID=sbx_local
 ```
 
-Start the TUI:
-
-```bash
-make run
-# or
-npm run run
-```
-
-The TUI and `local-run` read `packages/relay-tui/.env`.
-
 Run the web UI in dev mode:
 
 ```bash
@@ -282,31 +264,6 @@ Stop Relay and BoxLite processes:
 
 ```bash
 make stop
-```
-
-## TUI Usage
-
-Assign agents from the TUI:
-
-```text
-@claude fix auth middleware
-@claude @pi @codex add tests for upload routing
-@codex inspect the current diff
-@kimi analyze the codebase structure
-```
-
-Useful slash commands:
-
-```text
-/approve
-/reject missing tests around timeout handling
-/cancel
-/rerun codex
-/handoff claude
-/sessions
-/open <session-id>
-/summary
-/quit
 ```
 
 ## Local API And Web UI
@@ -435,12 +392,10 @@ backend/relay/daemon.py                       compatibility re-export of service
 backend/relay/stores.py                       compatibility re-export of persistence/stores
 backend/migrations/                           Alembic backend storage migrations
 packages/relay-core/src/index.ts              shared protocol and agent runtime exports
-packages/relay-core/src/daemon-client.ts      TypeScript backend HTTP client
 packages/relay-core/src/daemon-protocol.ts    TypeScript backend protocol types
 packages/relay-core/src/commands.ts           agent command builders
 packages/relay-core/src/prompts.ts            agent prompt builders
 packages/relay-core/src/renderers.ts          stream-json and JSONL renderers
-packages/relay-core/src/routing.ts            default workflow routing helpers
 packages/relay-core/src/token-usage.ts        TokenUsage type and normalizeTokenUsage
 packages/relay-chat/src/gateway.ts            RelayChatGateway — routes chat events to backend
 packages/relay-chat/src/relay-client.ts       HTTP client for chat → backend calls
@@ -454,8 +409,6 @@ packages/relay-daemon/src/index.ts            daemon runtime
 packages/relay-daemon/src/box.ts              BoxLite VM setup
 packages/relay-daemon/src/execution.ts        BoxLite execution manager
 packages/relay-daemon/src/sandbox-session.ts  sandbox session lifecycle and agent preflight
-packages/relay-tui/src/cli.ts                 TUI binary entrypoint
-packages/relay-tui/src/tui.tsx                Ink TUI and human commands
 web/src/components/BacklogPage.tsx            web task backlog view
 web/src/components/RoutinesPage.tsx           web recurring routines view
 web/                                          Next.js web frontend
@@ -464,9 +417,9 @@ web/                                          Next.js web frontend
 Keep backend runtime code in `backend/relay/` (`core/`, `persistence/`,
 `security/`, `services/`, and `api/`), TypeScript protocol/client exports in
 `packages/relay-core/src/`, daemon execution code in `packages/relay-daemon/`,
-TUI code in `packages/relay-tui/`, and frontend code in `web/`. Top-level
-backend modules such as `controller.py`, `daemon.py`, and `stores.py` are
-compatibility re-exports; prefer the nested package paths for new work.
+and frontend code in `web/`. Top-level backend modules such as `controller.py`,
+`daemon.py`, and `stores.py` are compatibility re-exports; prefer the nested
+package paths for new work.
 
 ## Testing
 
@@ -482,14 +435,12 @@ Test coverage is organized as:
 - `backend/tests/`: Python event stores, artifacts, controller behavior, linked
   task updates, daemon registry behavior, task scheduler/routine promotion, and
   HTTP API routes.
-- `packages/relay-core/tests/handoff.test.ts`: routing, prompt contracts, Codex verdict
+- `packages/relay-core/tests/handoff.test.ts`: prompt contracts, Codex verdict
   parsing, command generation, stream renderers, and BoxLite helpers.
 - `packages/relay-chat/tests/chat.test.ts`: chat gateway, provider adapters,
   command parsing, and relay-client integration.
 - `packages/relay-daemon/tests/daemon.test.ts`: daemon registration, command
   polling, and agent execution.
-- `packages/relay-tui/tests/tui.test.tsx`: TUI parsing, shortcuts, rendering,
-  cancellation, session state updates, and slash commands.
 - `web/tests/status.test.ts`: web status derivation for daemon nodes and
   conversations.
 - `web/tests/backlog.test.ts`: backlog filtering, sorting, and display helpers.

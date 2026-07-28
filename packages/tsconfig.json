@@ -3,7 +3,6 @@
     "target": "ES2024",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "jsx": "react-jsx",
     "strict": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
@@ -17,10 +16,9 @@
       "relay-core/api-url": ["packages/relay-core/src/api-url.ts"],
       "relay-chat": ["packages/relay-chat/src/index.ts"],
       "relay-daemon": ["packages/relay-daemon/src/index.ts"],
-      "relay-supervisor": ["packages/relay-supervisor/src/index.ts"],
-      "relay-tui": ["packages/relay-tui/src/tui.tsx"]
+      "relay-supervisor": ["packages/relay-supervisor/src/index.ts"]
     }
   },
-  "include": ["../packages/**/*.ts", "../packages/**/*.tsx", "../web/tests/**/*.ts", "../web/tests/**/*.tsx"],
+  "include": ["../packages/**/*.ts", "../web/tests/**/*.ts"],
   "exclude": ["../web/.next/**", "../web/src/app/**", "../web/src/components/**"]
 }

@@ -5,12 +5,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 - Install: `npm install` (npm workspaces).
-- Build packages: `make build-packages` builds `relay-core`, `relay-daemon`, and `relay-tui` only. Full build: `npm run build` (includes `relay-chat` and `web`).
+- Build packages: `make build-packages` builds `relay-core`, `relay-daemon`, and `relay-supervisor` only. Full build: `npm run build` (includes `relay-chat` and `web`).
 - Test: `npm test` (or `make test`) — runs the TypeScript suite and the Python backend suite.
 - Run a single built TypeScript test file: `node --test dist/packages/relay-core/tests/handoff.test.js` (build first).
 - Run the Python backend: `make backend` (default port `8790`). Serves the control panel at `/cp` and the exported web UI at the root path `/`. Starts the background task scheduler by default (`RELAY_TASK_SCHEDULER_ENABLED=1`); tune with `RELAY_TASK_SCHEDULER_INTERVAL_SECONDS` and `RELAY_TASK_SCHEDULER_MAX_DISPATCHES`, set the routine due-date timezone with `RELAY_TASK_SCHEDULER_TIMEZONE` (IANA name; defaults to server-local), or disable with `RELAY_TASK_SCHEDULER_ENABLED=0`.
 - Run a daemon: `make daemon` (registers against `RELAY_BACKEND_URL`, polls for commands, and runs agent CLIs inside BoxLite by default; set `SANDBOX_MODE=none` for an employee-local/manual node that should detect and run the current user's host agent installations).
-- Run the TUI: `make run` (or `npm run run`). `local-run` starts the backend and a BoxLite-sandboxed daemon if they are not already running, then connects the TUI (`RELAY_BACKEND_URL`, default `http://127.0.0.1:8790`).
 - Run the web UI in dev mode (proxies API to the backend): `make web` (serves on `http://127.0.0.1:5000`).
 - Run the read-only/API server: `make serve` (default port `8787`, override with `PORT=9000`).
 - Run database migrations: `make backend-migrate` (Alembic; pass `DATABASE_URL=<url>` to target a non-default database).
@@ -23,7 +22,7 @@ Node ≥ 22.19 is required for the TypeScript packages. Python ≥ 3.12 and `uv`
 
 ## Architecture
 
-Relay splits into a **backend** (control plane) and **daemons** (execution plane): the backend owns sessions, tasks, and the daemon registry but never executes agents; each daemon registers with the backend, owns its sandbox, and runs the Claude Code, Pi, Codex, and Kimi CLIs inside it. The backend technical stack is Python/FastAPI; the daemon, TUI, web client, and shared agent runtime remain TypeScript during the migration.
+Relay splits into a **backend** (control plane) and **daemons** (execution plane): the backend owns sessions, tasks, and the daemon registry but never executes agents; each daemon registers with the backend, owns its sandbox, and runs the Claude Code, Pi, Codex, and Kimi CLIs inside it. The backend technical stack is Python/FastAPI; the daemon, web client, and shared agent runtime remain TypeScript during the migration.
 
 ### Workspace layout
 
@@ -36,11 +35,9 @@ Relay splits into a **backend** (control plane) and **daemons** (execution plane
   - `backend/relay/security/` — auth store and JWT helpers (`auth.py` re-exports).
   - `backend/relay/services/` — runtime services: `controller.py` (session mutation), `daemon.py` (daemon registry and run dispatch), `task_scheduler.py` (routine promotion and assigned-task dispatch loop), `chat_integrations.py`, `bridge.py`, `conversation.py`. Top-level `controller.py`, `daemon.py`, and `task_scheduler.py` re-export.
   - Database migrations live under `backend/migrations/` (Alembic); run with `make backend-migrate`.
-- **`relay-core` TypeScript compatibility exports** — `daemon-client.ts`, `daemon-protocol.ts`, `session-store.ts`, `task-store.ts`, `session-controller.ts`, and `routing.ts` provide protocol types, the TUI/web HTTP client, and local TUI test helpers without a separate Node backend package.
 - **`relay-daemon`** — Execution plane. The daemon service that connects agents to the backend.
   - `index.ts` — Daemon loop: registers with the backend, polls for commands, runs agent CLIs, posts `run.output`/`run.completed`/`run.failed`/`run.cancelled` events back. Survives backend restarts by retrying with backoff and re-registering when a poll is rejected. Sandbox modes: `boxlite` (managed/default; the daemon boots a BoxLite VM lazily, keeps it for its lifetime, and runs agents inside the guest) or `none` (manual/local; agents run as processes in the daemon's current host environment, using that user's existing agent home by default). The host environment may be an employee workstation or an already-isolated agent box.
   - `box.ts` / `execution.ts` / `sandbox-session.ts` — BoxLite VM setup, `BoxLiteExecutionManager`, `startOrchestratorSession`/`withOrchestratorSession`, agent readiness preflight (`ensureAgentReady`).
-- **`relay-tui`** — Ink TUI (`tui.tsx`). Owns input parsing (`@claude`/`@pi`/`@codex`/`@kimi` mentions, `/approve` `/reject` `/cancel` `/rerun` `/handoff` `/sessions` `/open` `/summary` `/quit`), shortcut completion, transcript rendering. `RelayTuiHost` provisions a sandbox via `RelayDaemonClient` and runs assignments through the backend (`createDaemonAssignmentRunner`), polling session events for output. `local-run.ts` boots backend + daemon + TUI for `make run`.
 - **root `web/`** — Next.js web UI (static export served by the backend at the root path `/`; the backend registers the web catch-all last so explicit API routes take precedence; dev mode proxies API routes to the backend). Primary surfaces: threads, task backlog, recurring routines, agent configuration, teams, and channels. Includes the admin page (`AdminPage.tsx`) with a dashboard (`components/admin/dashboard/` — `DashboardView`, `KpiTile`, `NodeStatusCard`, `ActivityChart`, `ActivityFeed`, `TokenUsageChart`, `TopEmployees`), node management (`NodeCard`, `AssignNodeDrawer`), and executor management (`ManageExecutorsDrawer`).
 
 ### Backend / daemon / client token contract
@@ -54,42 +51,38 @@ Relay splits into a **backend** (control plane) and **daemons** (execution plane
 
 - **The backend never executes agents.** All agent execution flows through daemon commands (`ServerDaemonNodeBackend.run` → registry queue → daemon poll). Do not reintroduce in-process execution paths into the Python backend. The background `TaskScheduler` (`backend/relay/services/task_scheduler.py`) promotes due routines and dispatches assigned tasks through the same daemon path; disable it with `RELAY_TASK_SCHEDULER_ENABLED=0` when needed.
 - **Sessions and tasks carry an owner.** `RelaySession.ownerEmployeeId` / `RelayTask.ownerEmployeeId` (set from the `session.created` / `task.created` events) attribute work to the employee whose agent runs it; `HumanDecision.actorEmployeeId` records who approved/rejected/handed off. `ServerDaemonNodeBackend.run` threads the sandbox's `employeeId` into the owner, and `assertSessionOwnedByEmployee` is the authorization seam — an employee's agent may only act on sessions its employee owns (ownerless legacy sessions are allowed). This is where the future task-scope / tool-policy / approval checks belong; keep it the single checkpoint rather than scattering ownership checks.
-- **Event log is authoritative.** All session/task state changes go through `SessionStore.appendEvent` / `TaskStore.appendEvent`. Snapshots are derived. Never mutate snapshot fields directly outside the store's replay.
+- **Event log is authoritative.** All session/task state changes go through the Python `SessionStore.append_event` / `TaskStore.append_event`. Database snapshots and materialized fields are derived. Never mutate snapshot fields directly outside the store's replay.
 - **Immutability.** Session/task mutations return new objects (`mergeAgentState`, spread updates). Existing pattern; preserve it.
-- **One controller per assignment flow.** The TUI creates a fresh `SessionController` per task; the controller owns the active session id and the `AgentEventSink` wiring back to the store.
-- **TUI default-workflow is bypassed.** TUI assignments use `runStep` directly via `runAssignments`; the routing handoff narration (`routing.ts`) only fires in `relay run-workflow`.
 - **Pi CLI version skew.** Pi versions differ — use `-P` only when `pi --help` advertises `-P`/`--print-streaming`, otherwise `-p`. `commands.ts` already handles this; keep both paths working.
-- **Agent identity is registry-driven.** Four agents are recognized: `claude`, `pi`, `codex`, `kimi` (`AgentName` in `relay-core/src/state.ts`). The single source of truth is `AGENT_REGISTRY` in `relay-core/src/agents.ts` — command builder, renderer, preflight, failure budget, capabilities (only `codex` has `review`), role, and guest-auth flag. Dispatch sites use `getAgent`/`AGENT_NAMES`/`isAgentName` instead of literal switches, and per-agent failure counts live in `AgentState.agent_failures` (use `failureCount`/`withFailure`). Adding an agent = one `AGENT_REGISTRY` entry plus its CLI specifics: a command builder in `commands.ts`, a prompt in `prompts.ts`, any guest-auth file writes in the daemon (`relay-daemon/src/index.ts` `ensureHostAgentReady` + `box.ts`), and — because the web app cannot import the node-only registry — mirror the agent in `App.tsx`/`MessageBlock.tsx` literals and the `agent.<name>` i18n keys (the `Record<AgentName, …>` types enforce this). The default workflow stays Claude → Pi → Codex; extra agents are invoked through TUI `@mention` commands or explicit assignment, while web chat uses the composer agent picker. Kimi's CLI flags in `buildKimiActionCommand` are provisional — confirm against the installed Kimi CLI. Each agent supports two task modes — `action` (do the work) and `review` (`AgentTaskMode` in `relay-core/src/state.ts`).
+- **Agent identity is registry-driven.** Four agents are recognized: `claude`, `pi`, `codex`, `kimi` (`AgentName` in `relay-core/src/state.ts`). The single source of truth is `AGENT_REGISTRY` in `relay-core/src/agents.ts` — command builder, renderer, preflight, failure budget, capabilities (only `codex` has `review`), role, and guest-auth flag. Dispatch sites use `getAgent`/`AGENT_NAMES`/`isAgentName` instead of literal switches, and per-agent failure counts live in `AgentState.agent_failures` (use `failureCount`/`withFailure`). Adding an agent = one `AGENT_REGISTRY` entry plus its CLI specifics: a command builder in `commands.ts`, a prompt in `prompts.ts`, any guest-auth file writes in the daemon (`relay-daemon/src/index.ts` `ensureHostAgentReady` + `box.ts`), and — because the web app cannot import the node-only registry — mirror the agent in `App.tsx`/`MessageBlock.tsx` literals and the `agent.<name>` i18n keys (the `Record<AgentName, …>` types enforce this). Extra agents are invoked through explicit assignment, while web chat uses the composer agent picker. Kimi's CLI flags in `buildKimiActionCommand` are provisional — confirm against the installed Kimi CLI. Each agent supports two task modes — `action` (do the work) and `review` (`AgentTaskMode` in `relay-core/src/state.ts`).
 - **A turn belongs to a logical agent, not an executor kind.** Several named agents can share one `executorKind`, so `AgentName` never identifies who ran a turn. The dispatched agent id is persisted as `logicalAgentId` on the `agent.started` event and on `RelaySession.agentRuns`; web surfaces resolve names and re-dispatch (`labelForAgentRun` in `web/src/lib/agentDisplayNames.ts`, `DerivedMessage.agentId`, retry/rerun lookups) from that id, falling back to the per-executor name map only for legacy runs that carry none. Never label or route a chat turn by executor kind alone.
 - **Token usage flows through `normalizeTokenUsage`.** All agent CLI output formats (Claude, Codex, Pi, Kimi) must be normalized through `normalizeTokenUsage` in `relay-core/src/token-usage.ts` before storing on the session. The backend stores per-session token totals; the dashboard reads aggregate usage from `GET /cp/dashboard/token-usage`.
 - **Generated workspace artifacts are daemon-reported.** The daemon diffs document-type workspace files around each successful run (`relay-daemon/src/generated-files.ts`) and reports them in `run.completed` (`generatedFiles`, with inline base64 content for small files), advertising the `generated-files` capability at registration. The backend indexes them as `workspace_file` artifacts via `SessionStore.index_workspace_artifact`, keeping a content snapshot so downloads survive workspace rewrites/deletes; for daemons without the capability it falls back to a bounded backend-side walk, which requires a shared filesystem. A re-generated file gets a new artifact attributed to the producing run; `workspace_artifacts` (shared in `api/helpers.py`) dedupes the index to the newest record per file, and `GET /tasks/{id}/artifacts` rolls artifacts up to the task by aggregating its linked sessions with the same newest-per-file dedupe. Keep the extension allowlist free of ambiguous types (no `.key`).
 - **Agent home workspace.** An agent's files live in its home (`agents/agent-<b64>/` under the node mount) and are served through daemon `workspace.list`/`workspace.read` commands (capability `workspace-read`), with the artifact snapshot index as the offline fallback. The backend never walks a node workspace to browse files; artifacts are the durable record — homes do not migrate between nodes.
-- **`ensureAgentReady` is silent on success.** Preflight failures throw; do not re-add success narration — the TUI footer carries readiness state.
+- **`ensureAgentReady` is silent on success.** Preflight failures throw; do not re-add success narration.
 - **Never print raw JSONL.** Rendering is block-based: one `●` marker per agent turn, `○` + dim italic for thinking/reasoning, `⏺` for tool/command lines.
 
 ### Data layout
 
-Generated state lives under `.relay/` (repo root by default — `DEFAULT_RELAY_DATA_DIR` — for backend stores; the host workspace for daemon tokens/logs):
+Session/task events, snapshots, artifacts, links, and token usage live in the configured database. Remaining operational state lives under `.relay/` (repo root by default — `DEFAULT_RELAY_DATA_DIR` — for the daemon registry; the host workspace for daemon tokens/logs):
 
 ```
-.relay/sessions/<session-id>/events.jsonl     # append-only event log (source of truth)
-.relay/sessions/<session-id>/snapshot.json    # materialized view
-.relay/sessions/<session-id>/artifacts/*.txt  # captured agent output
-.relay/tasks/<task-id>/{events.jsonl,snapshot.json}
-.relay/daemon/{nodes,commands,runs,events}/   # persisted daemon registry state
+.relay/daemon/{nodes,commands,runs,run-requests,events}/ # persisted daemon registry state
 <workspace>/.relay/daemon-nodes/<employee>.token   # shared daemon auth token
 <workspace>/.relay/daemon-nodes/logs/*.jsonl       # daemon structured logs
 ```
+
+Legacy `.relay/sessions/` and `.relay/tasks/` trees are migration inputs only;
+the runtime does not use them as its session/task store.
 
 The host workspace mounts into the BoxLite guest at `/workspace` (`GUEST_WORKSPACE`); the guest `agent` user's UID/GID is aligned to the host owner so file ownership stays sane.
 
 ### Testing
 
 - `backend/tests/` — Python controller, event store behavior, HTTP API, backend + daemon registry (auth, persistence, revival, cancellation), task scheduler/routine promotion, dashboard endpoints, and session token usage.
-- `packages/relay-core/tests/handoff.test.ts` — routing, prompt construction, stream rendering. Must continue to prove no raw JSONL leaks through and that review prompts/commands omit verdict markers.
+- `packages/relay-core/tests/handoff.test.ts` — prompt construction and stream rendering. Must continue to prove no raw JSONL leaks through and that review prompts/commands omit verdict markers.
 - `packages/relay-chat/tests/chat.test.ts` — chat gateway, provider adapters, command parsing, and relay-client integration.
 - `packages/relay-daemon/tests/daemon.test.ts` — daemon registration, command polling, and agent execution.
-- `packages/relay-tui/tests/tui.test.tsx` — Ink rendering via `ink-testing-library`. Frame assertions are sensitive to header/footer text — when changing TUI chrome, update assertions deliberately, not reflexively.
 - `web/tests/status.test.ts` — web daemon-node status derivation and local-node claiming behavior.
 - `web/tests/agentStream.test.ts`, `web/tests/messageBlock.test.ts`, `web/tests/tokenUsage.test.ts`, `web/tests/manageAgents.test.ts`, `web/tests/workspaceHome.test.ts` — web component and utility unit tests.
 

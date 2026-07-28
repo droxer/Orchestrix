@@ -84,7 +84,7 @@ Canonical employee APIs use `/api/v1/agents`, `/api/v1/agent-runs`,
 `/api/v1/threads`, and agent-scoped work and workspace resources. Direct
 `/api/v1/sandboxes/{id}/runs` endpoints are compatibility-only: they are not called by
 the web product, are excluded from new clients, and should be removed after the
-TUI/daemon migration.
+daemon migration.
 
 The backend remains the control plane and never executes an agent. Dispatch is:
 
@@ -114,8 +114,8 @@ agent run request
    as primary UI or accepted by new employee workflows.
 3. Compatibility materialization must produce explicit agents before an
    employee can dispatch; the UI must not synthesize infrastructure.
-4. TUI and chat clients migrate from executor/sandbox options to named agent
-   options before direct sandbox run endpoints are retired.
+4. Chat clients migrate from executor/sandbox options to named agent options
+   before direct sandbox run endpoints are retired.
 5. Tests assert the boundary: deleting an employee disables its agents;
    cross-employee dispatch is forbidden; placement changes preserve agent
    history; no employee page requires a node ID.
