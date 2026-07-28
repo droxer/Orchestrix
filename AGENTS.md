@@ -1,7 +1,7 @@
 # Relay Agent Guide
 
-This repository uses TypeScript/Node.js for the core protocol, daemon, TUI, and
-web client. The host backend/control plane is now Python-first and lives at the
+This repository uses TypeScript/Node.js for the core protocol, daemon, and web
+client. The host backend/control plane is now Python-first and lives at the
 repository root in `backend/` with `pyproject.toml`; keep new backend runtime code in Python unless a
 compatibility shim must remain in TypeScript during migration.
 
@@ -70,10 +70,9 @@ ask the user whether to run `codegraph init -i`.
 
 - Workspace packages: root Python backend `backend/`,
   `packages/relay-core/`, `packages/relay-chat/`, `packages/relay-daemon/`,
-  `packages/relay-tui/`, and top-level web frontend `web/`.
+  `packages/relay-supervisor/`, and top-level web frontend `web/`.
 - Backend CLI entrypoint: `backend/relay/cli.py`.
 - Daemon CLI entrypoint: `packages/relay-daemon/src/cli.ts`.
-- TUI CLI entrypoint: `packages/relay-tui/src/cli.ts`.
 - Shared protocol and agent runtime modules: `packages/relay-core/src/`.
 - Chat gateway and provider adapters: `packages/relay-chat/src/`.
 - Python backend implementation modules: `backend/relay/` — organized as
@@ -86,7 +85,6 @@ ask the user whether to run `codegraph init -i`.
   `admin_routes.py`, `auth_routes.py`, `chat_routes.py`,
   `daemon_node_routes.py`, `sandbox_routes.py`, `session_routes.py`,
   `task_routes.py`, `web_routes.py`).
-- TUI implementation: `packages/relay-tui/src/tui.tsx`.
 - Tests: Python backend tests under `backend/tests/`, TypeScript package tests
   under `packages/*/tests/`, and web tests under `web/tests/`.
 - Package manager: npm.
@@ -99,13 +97,11 @@ Node.js 22.19 or newer is required.
 ## Commands
 
 - Install dependencies: `npm install`.
-- Build packages: `make build-packages` builds `relay-core`, `relay-daemon`, and `relay-tui` only. Full build: `npm run build` (includes `relay-chat` and `web`).
+- Build packages: `make build-packages` builds `relay-core`, `relay-daemon`, and `relay-supervisor` only. Full build: `npm run build` (includes `relay-chat` and `web`).
 - Test: `npm test` or `make test`.
 - Run one built test file: `node --test dist/packages/relay-core/tests/handoff.test.js`
   after a build.
 - Run the web UI in dev mode (proxies API to the backend): `make web` (serves on `http://127.0.0.1:5000`).
-- Run the orchestrator TUI: `make run` or `npm run run`.
-- Run the TUI against another workspace: `make run WORKSPACE=/path/to/workspace`.
 - Run the read-only API server: `make serve`; default port is `8787`, override
   with `PORT=9000`.
 - Run database migrations: `make backend-migrate` (Alembic; optionally pass `DATABASE_URL=<url>`).
@@ -119,8 +115,9 @@ Node.js 22.19 or newer is required.
 - Build/check/export devbox pieces manually: `make devbox-image`,
   `make devbox-check`, `make devbox-oci`.
 
-Use `make run` for normal execution. Do not tell users to run `make run-fresh`
-unless `dockerfile` or the devbox image changed.
+Use separate `make backend`, `make daemon`, and `make web` processes for normal
+execution. Do not tell users to run `make run-fresh` unless `dockerfile` or the
+devbox image changed.
 
 ## Architecture
 
@@ -146,9 +143,6 @@ Key modules:
 - `packages/relay-daemon/src/cli.ts`: daemon binary entrypoint.
 - `packages/relay-daemon/src/index.ts`: daemon runtime — registers with the
   backend, polls for commands, owns the sandbox, and runs agent CLIs.
-- `packages/relay-tui/src/tui.tsx`: Ink-based TUI. Owns input parsing for `@claude`, `@pi`,
-  `@codex`, `@kimi`, `/approve`, `/reject`, `/cancel`, `/rerun`, `/handoff`,
-  `/sessions`, `/open`, `/summary`, and `/quit`.
 - `packages/relay-daemon/src/sandbox-session.ts`: sandbox session lifecycle and
   agent readiness preflight (`ensureAgentReady`).
 - `backend/relay/services/controller.py`: session mutation controller
@@ -168,21 +162,17 @@ Key modules:
 - `backend/relay/api/admin_routes.py`: admin control-panel routes — users,
   departments, node assignment, agent management, and dashboard data
   (KPI tiles, fleet health, activity feed, token usage).
-- `packages/relay-core/src/session-store.ts`,
-  `packages/relay-core/src/session-controller.ts`, and
-  `packages/relay-core/src/daemon-client.ts`: TypeScript protocol/client and
-  local TUI compatibility helpers.
 - `packages/relay-core/src/nodes.ts`: single-agent execution units. Each agent CLI runs in
   BoxLite through `execStream`.
 - `packages/relay-core/src/commands.ts` and
   `packages/relay-core/src/prompts.ts`: shell argv and prompt construction for agents and modes.
-- `packages/relay-core/src/routing.ts`: default-workflow transition helpers.
 - `packages/relay-daemon/src/box.ts`,
   `packages/relay-core/src/guest.ts`, and
   `packages/relay-core/src/env.ts`: BoxLite VM setup, guest auth provisioning, and env loading.
 - `packages/relay-core/src/renderers.ts`: streaming JSONL to terminal text converters.
 - `packages/relay-core/src/format.ts`: ANSI formatting helpers.
-- `backend/relay/app.py`: FastAPI HTTP/SSE API over `.relay/`.
+- `backend/relay/app.py`: FastAPI HTTP/SSE API backed by the configured database
+  plus the remaining operational state under `.relay/`.
 
 ## Implementation Notes
 
@@ -207,28 +197,29 @@ Key modules:
   daemon commands (`ServerDaemonNodeBackend.run` → registry queue → daemon
   poll). The background `TaskScheduler` only promotes due routines and
   dispatches already-assigned tasks; it does not bypass the daemon path.
-- Event logs are authoritative. All session/task state changes go through
-  `SessionStore.appendEvent` or `TaskStore.appendEvent`; snapshots are derived.
+- Event logs are authoritative. All session/task state changes go through the
+  Python `SessionStore.append_event` or `TaskStore.append_event`; database
+  snapshots and materialized fields are derived.
 - Preserve immutable session/task updates through helpers such as
   `mergeAgentState` and object spreads.
-- TUI assignments use `SessionController.runStep` directly. Routing handoff
-  narration only applies to `relay run-workflow`.
 - Agent names are currently `claude`, `pi`, `codex`, and `kimi`. Adding another agent
-  requires parser, validation, command, prompt, routing, and renderer changes.
-- Never mock or seed data in the read-only server; it reads real files under
-  `.relay/`.
+  requires validation, command, prompt, routing, and renderer changes.
+- Never mock or seed data in the server; it reads the configured database and
+  real operational state under `.relay/`.
 
 ## Data Layout
 
-Generated state lives under `.relay/` in the host workspace:
+Session/task events, snapshots, artifacts, and links live in the configured
+database. Remaining generated operational state lives under `.relay/`:
 
 ```text
-.relay/sessions/<session-id>/events.jsonl
-.relay/sessions/<session-id>/snapshot.json
-.relay/sessions/<session-id>/artifacts/*.txt
-.relay/tasks/<task-id>/events.jsonl
-.relay/tasks/<task-id>/snapshot.json
+.relay/daemon/{nodes,commands,runs,run-requests,events}/
+.relay/daemon-nodes/<employee-id>.token
+.relay/daemon-nodes/logs/*.jsonl
 ```
+
+Legacy `.relay/sessions/` and `.relay/tasks/` trees are migration inputs only;
+the runtime does not use them as its session/task store.
 
 The host workspace mounts into the BoxLite guest at `/workspace`
 (`GUEST_WORKSPACE`). The guest `agent` user's UID/GID is aligned to the host
@@ -241,13 +232,13 @@ For behavior changes, add or update focused tests and run `npm test`.
 Before handing off, check:
 
 1. TypeScript compiles.
-2. Existing backend, handoff, provider, web, and TUI tests pass.
+2. Existing backend, handoff, provider, daemon, supervisor, and web tests pass.
 3. Terminal rendering tests still prove Claude/Codex JSONL is not printed raw.
 4. Pi command generation remains compatible with old and new Pi CLI versions.
 
 Test focus:
 
-- `packages/relay-core/tests/handoff.test.ts`: routing, prompt construction, stream rendering, and
+- `packages/relay-core/tests/handoff.test.ts`: prompt construction, stream rendering, and
   regression guards that review mode omits verdict markers and feedback injection.
 - `packages/relay-chat/tests/chat.test.ts`: chat gateway, provider adapters,
   command parsing, and relay-client integration.
@@ -255,7 +246,6 @@ Test focus:
   polling, and agent execution.
 - `backend/tests/`: Python controller, event store behavior, daemon registry,
   task scheduler/routine promotion, and HTTP API tests.
-- `packages/relay-tui/tests/tui.test.tsx`: Ink rendering through `ink-testing-library`.
 - `web/tests/status.test.ts`: web daemon-node status derivation.
 - `web/tests/agentStream.test.ts`, `web/tests/messageBlock.test.ts`,
   `web/tests/tokenUsage.test.ts`, `web/tests/manageAgents.test.ts`: web

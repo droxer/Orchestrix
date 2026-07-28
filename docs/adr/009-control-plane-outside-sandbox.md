@@ -30,4 +30,4 @@ operations.
 - Sandbox guest workers cannot grant permissions, approve actions, own memory,
   or persist canonical session state.
 - Future API execution endpoints must route through the same controller and
-  execution manager boundary used by the CLI/TUI.
+  daemon execution-manager boundary used by current API dispatch.

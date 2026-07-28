@@ -67,14 +67,13 @@ This section is organized by services and runtime responsibilities. Each compone
 
 Responsibilities:
 
-- Accept work from web app, CLI/TUI, Slack/Teams/Feishu, email, webhook, and API clients.
+- Accept work from the web app, Slack/Teams/Feishu, email, webhook, and API clients.
 - Normalize user requests into Relay tasks or sessions.
 - Present approval cards, review summaries, artifacts, and live status.
 
 Initial implementation:
 
-- Keep the local CLI/TUI as the developer MVP channel.
-- Add a web API and UI once the backend state model is stable.
+- Keep the web app as the developer MVP channel.
 - Treat chat connectors as clients of the same task/session API, not special workflow engines.
 
 ### 2.2 Control Plane API
@@ -584,7 +583,7 @@ Every session should answer:
 ### 8.1 Local MVP
 
 ```text
-Relay CLI/TUI
+Relay web app
 Relay local API
 .relay file store
 BoxLite sandbox
@@ -694,12 +693,11 @@ while the product is still local-first.
 | Entry | File | Behavior |
 | :- | :- | :- |
 | `relay-core` | `packages/relay-core/src/index.ts` | Shared protocol, agent state, prompts, command builders, renderers, guest helpers, and agent execution units. |
-| `relay-tui` | `packages/relay-tui/src/cli.ts` -> `packages/relay-tui/src/tui.tsx` | Starts the Ink TUI. |
 | `backend` | `backend/relay/cli.py` -> `backend/relay/app.py` | Starts the Python backend/control plane. |
 | `relay-daemon` | `packages/relay-daemon/src/cli.ts` -> `packages/relay-daemon/src/index.ts` | Starts the daemon node. |
-| TypeScript backend client exports | `packages/relay-core/src/index.ts` | Re-exports protocol types, HTTP client helpers, local TUI session helpers, command builders, renderers, and workflow helpers. |
+| TypeScript shared exports | `packages/relay-core/src/index.ts` | Re-exports protocol types, command builders, renderers, and agent runtime helpers. |
 
-Keep backend runtime code in `backend/`, TypeScript protocol/client
+Keep backend runtime code in `backend/`, TypeScript protocol
 exports in `packages/relay-core/src/index.ts`, and sandbox/execution exports in
 `packages/relay-daemon/src/index.ts`. Package binary wrappers should stay
 minimal.
@@ -762,9 +760,6 @@ When adding a new event type, update the materializer and tests together.
 `SessionController` in `backend/relay/services/controller.py` is the backend
 boundary between durable state and daemon execution
 (`backend/relay/controller.py` re-exports).
-`packages/relay-core/src/session-controller.ts` remains as a TypeScript TUI/test
-compatibility helper.
-
 Responsibilities:
 
 - create sessions and link them to an optional task
@@ -774,9 +769,7 @@ Responsibilities:
 - mark sessions completed or failed
 - update linked task status and activity as agent steps progress
 
-Use `runStep()` for one agent assignment and `runAssignments()` for an explicit ordered assignment list. Use `runDefaultWorkflow()` only for the built-in Claude -> Pi -> Codex routing loop.
-
-Do not bypass `SessionController` when adding writable execution controls to the TUI or API.
+Do not bypass `SessionController` when adding writable execution controls to the API.
 
 ### 10.4 Agent Execution
 
@@ -816,29 +809,10 @@ Daemon-side sandbox orchestration in `packages/relay-daemon/src/sandbox-session.
 - Codex: writes guest auth, then `codex login status`
 - Pi: writes guest auth/model config, then `buildPiPreflightCommand()`
 
-Normal execution should use `make run` or `npm run run`. Use `make run-fresh` only when `dockerfile` or the devbox image changes.
+Normal execution should use separate `make backend`, `make daemon`, and `make web`
+processes. Use `make run-fresh` only when `dockerfile` or the devbox image changes.
 
-### 10.6 Routing, TUI, and Local API
-
-The default scripted workflow is:
-
-```text
-Claude implement -> Pi implement/test follow-up -> Codex review
-```
-
-Routing helpers live in `packages/relay-core/src/routing.ts`.
-
-- Claude success routes to Pi.
-- Pi success ends the workflow (Codex review is optional via explicit assignment).
-
-The TUI in `packages/relay-tui/src/tui.tsx` accepts leading agent mentions such as:
-
-```text
-@claude fix auth middleware
-@claude @pi @codex implement and review the task
-```
-
-Slash commands include `/approve`, `/reject`, `/cancel`, `/rerun`, `/handoff`, `/sessions`, `/open`, `/summary`, and `/quit`.
+### 10.6 Local API
 
 The Python API in `backend/relay/app.py` exposes canonical `/api/v1`
 task/thread/daemon/chat endpoints and starts the background task scheduler by default. Current API
@@ -851,7 +825,8 @@ in-process.
 The web UI on the clean paths documented in [api.md](api.md) adds chat, backlog, routines, MCP, skills, channels, and
 the admin console on top of the same backend APIs.
 
-Future execution endpoints must call the same `SessionController` and orchestrator readiness flow used by the CLI/TUI.
+Future execution endpoints must call the same `SessionController` and daemon
+readiness flow used by the existing API.
 
 ### 10.7 Environment, Auth, and Testing
 
@@ -877,8 +852,7 @@ Test coverage is organized as:
 - `backend/tests/`: Python event stores, artifacts, controller behavior, linked
   task updates, daemon registry behavior, task scheduler/routine promotion, and
   HTTP API routes.
-- `packages/relay-core/tests/handoff.test.ts`: routing, prompt contracts, review-mode command generation (no verdict markers), stream renderers, BoxLite execution helpers.
-- `packages/relay-tui/tests/tui.test.tsx`: TUI parsing, shortcuts, rendering, cancellation, session state updates, slash commands.
+- `packages/relay-core/tests/handoff.test.ts`: prompt contracts, review-mode command generation (no verdict markers), stream renderers, BoxLite execution helpers.
 - `web/tests/status.test.ts`: web daemon-node status derivation.
 - `web/tests/backlog.test.ts`: backlog filtering, sorting, and display helpers.
 
@@ -886,7 +860,7 @@ Test coverage is organized as:
 
 - Keep backend/control-plane runtime code in `backend/relay/` (`core/`,
   `persistence/`, `security/`, `services/`, and `api/`). Keep shared protocol,
-  daemon execution, TUI, and web client code in TypeScript.
+  daemon execution, and web client code in TypeScript.
 - Use BoxLite's Node SDK for VM lifecycle and command execution.
 - Keep durable state append-only; add events instead of mutating history.
 - Keep snapshots derived from event logs.

@@ -48,7 +48,7 @@ Relay should be read in two views:
 The implemented control plane exposes JSON resources beneath `/api/v1`, with
 administration beneath `/api/v1/admin` and chat-service calls beneath
 `/api/v1/internal/chat`. The web channel uses clean History API paths and calls
-the same versioned resources as the TUI, daemon, supervisor, and chat gateway.
+the same versioned resources as the daemon, supervisor, and chat gateway.
 Internal `Session` models remain unchanged while the public browser and API term
 is **thread**. See [HTTP API and Web URL Contract](api.md) and
 [ADR-012](adr/012-canonical-web-and-api-urls.md).

@@ -49,8 +49,6 @@ import {
   piTaskPrompt,
   PiStreamRenderer,
   PlainTextStreamRenderer,
-  routeClaudeHandoff,
-  routePiHandoff,
   relayEvent,
   runAgentNode,
   StderrLineRenderer,
@@ -1105,20 +1103,6 @@ describe("execution manager boundary", () => {
     assert.match(script, /\/home\/agent\/\.kimi-code\/credentials\/kimi-code\.json/);
     assert.match(script, /\/home\/agent\/\.kimi-code\/oauth\/kimi-code/);
     assert.doesNotMatch(script, /\/home\/agent\/\.kimi-code\/bin\/kimi/);
-  });
-});
-
-describe("handoff routing", () => {
-  it("routes Claude success to Pi", () => {
-    assert.equal(routeClaudeHandoff(state()), "pi_implement");
-  });
-
-  it("ends after Pi success", () => {
-    assert.equal(routePiHandoff(state()), "__end__");
-  });
-
-  it("retries Pi failure", () => {
-    assert.equal(routePiHandoff(state({ last_exit_code: 1, agent_failures: { pi: 1 } })), "pi_implement");
   });
 });
 
