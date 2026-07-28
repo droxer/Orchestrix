@@ -304,7 +304,9 @@ class SessionController:
     ) -> None:
         if snapshot is None:
             snapshot = self.store.get_session(session_id)
-        if any(run.get("status") == "running" for run in snapshot.get("agentRuns", [])):
+        if snapshot.get("status") != "cancelled" and any(
+            run.get("status") == "running" for run in snapshot.get("agentRuns", [])
+        ):
             raise SessionRunInFlightError(session_id)
         atomic_delete = getattr(self.store, "delete_session_with_task_unlinks", None)
         if self.task_store and atomic_delete:

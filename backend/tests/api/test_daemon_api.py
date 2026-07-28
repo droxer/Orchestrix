@@ -7,6 +7,7 @@ from tempfile import TemporaryDirectory
 from fastapi.testclient import TestClient
 from relay.app import create_app
 from relay.services.node_agents import sync_node_agents
+from relay.sessions.controller import SessionController
 
 
 def _bootstrap_admin(client: TestClient) -> None:
@@ -1092,6 +1093,26 @@ def test_cancel_returns_terminal_session_when_run_finishes_before_request(
 
         assert cancel.status_code == 202
         assert cancel.json()["status"] == "completed"
+
+
+def test_cancel_marks_orphaned_running_session_cancelled(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _login_admin(client)
+        session = SessionController(app.state.registry.store).create_session(
+            "stop an orphaned conversation"
+        )
+
+        cancel = client.post(
+            f"/api/v1/threads/{session['id']}/cancellations",
+            json={"reason": "stop clicked"},
+        )
+
+        assert cancel.status_code == 202
+        assert cancel.json()["status"] == "cancelled"
 
 
 def test_daemon_registration_stores_agent_health_and_rejects_unready_runs(
