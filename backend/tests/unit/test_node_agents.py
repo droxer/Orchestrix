@@ -425,3 +425,68 @@ def test_reprovisioned_managed_node_retires_old_agent(tmp_path: Path) -> None:
 
     assert agents.get_agent(stale["id"]).get("deletedAt")
     assert {agent["compatibilityKey"] for agent in agents.list_agents(supervisor_employee_id="alice")} == {"alice:node_new:claude"}
+
+
+def test_reprovisioned_managed_computer_preserves_agent_and_placement_identity(
+    tmp_path: Path,
+) -> None:
+    old_node = {
+        "id": "runtime_old",
+        "employeeId": "alice",
+        "workspacePath": "/workspace",
+        "managedNodeId": "computer_one",
+        "supportedAgents": ["claude"],
+        "agents": {"claude": "ready"},
+        "online": False,
+    }
+    new_node = {
+        **old_node,
+        "id": "runtime_new",
+        "online": True,
+    }
+    nodes = [old_node]
+    ctx, agents, placements = _registry_ctx(tmp_path, nodes)
+
+    sync_node_agents(ctx, old_node)
+    original_agent = agents.list_agents(supervisor_employee_id="alice")[0]
+    original_placement = placements.list_placements(agent_id=original_agent["id"])[0]
+    nodes[:] = [new_node]
+
+    sync_node_agents(ctx, new_node)
+
+    current_agents = agents.list_agents(supervisor_employee_id="alice")
+    assert [agent["id"] for agent in current_agents] == [original_agent["id"]]
+    assert current_agents[0]["compatibilityKey"] == "alice:computer_one:claude"
+    current_placement = placements.list_placements(agent_id=original_agent["id"])[0]
+    assert current_placement["id"] == original_placement["id"]
+    assert current_placement["daemonNodeId"] == "runtime_new"
+
+
+def test_managed_reprovision_collects_agents_for_missing_old_runtimes(
+    tmp_path: Path,
+) -> None:
+    old_node = {
+        "id": "runtime_missing",
+        "employeeId": "alice",
+        "workspacePath": "/workspace",
+        "managedNodeId": "computer_one",
+        "supportedAgents": ["claude"],
+        "agents": {"claude": "ready"},
+        "online": False,
+    }
+    new_node = {
+        **old_node,
+        "id": "runtime_new",
+        "online": True,
+    }
+    nodes = [old_node]
+    ctx, agents, placements = _registry_ctx(tmp_path, nodes)
+    sync_node_agents(ctx, old_node)
+    original_agent_id = agents.list_agents(supervisor_employee_id="alice")[0]["id"]
+    nodes[:] = [new_node]
+
+    sync_node_agents(ctx, new_node)
+
+    survivors = agents.list_agents(supervisor_employee_id="alice")
+    assert [agent["id"] for agent in survivors] == [original_agent_id]
+    assert placements.list_placements(agent_id=original_agent_id)[0]["daemonNodeId"] == "runtime_new"

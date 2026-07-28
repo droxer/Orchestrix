@@ -81,15 +81,78 @@ class FakeManagedBackend implements ManagedNodeBackend {
 class FakeProvider implements ManagedNodeProvider {
   readonly name = "local-process";
   readonly calls: EnsureManagedNodeInput[] = [];
+  stopCalls = 0;
   status: "running" | "stopped" | "unknown" = "running";
   async ensure(input: EnsureManagedNodeInput): Promise<ProviderInstance> {
     this.calls.push(input);
     return { id: `${input.node.id}:${input.node.generation}` };
   }
   async inspect(): Promise<"running" | "stopped" | "unknown"> { return this.status; }
-  async stop(): Promise<void> { this.status = "stopped"; }
+  async stop(): Promise<void> { this.stopCalls += 1; this.status = "stopped"; }
   async delete(): Promise<void> { this.status = "stopped"; }
 }
+
+test("supervisor shutdown detaches without stopping managed computers", async () => {
+  const backend = new FakeManagedBackend([managedNode()]);
+  const provider = new FakeProvider();
+  const reconciler = new ManagedNodeReconciler({
+    backend,
+    providers: [provider],
+    backendUrl: "http://backend.test",
+    workspacePathForNode: () => "/workspaces/alice",
+  });
+
+  assert.equal((await reconciler.reconcileOnce()).started, 1);
+  await reconciler.stop();
+
+  assert.equal(provider.stopCalls, 0);
+  assert.equal(provider.status, "running");
+});
+
+test("recent heartbeat loss does not replace a healthy provider instance", async () => {
+  const node = { ...managedNode(), phase: "ready" as const, activeDaemonNodeId: "node_alice" };
+  const daemon = {
+    id: "node_alice",
+    managedNodeId: node.id,
+    status: "ready",
+    agents: { claude: "ready", pi: "ready", codex: "ready", kimi: "ready" },
+    createdAt: node.createdAt,
+    updatedAt: node.updatedAt,
+    lastSeenAgeMs: 20_000,
+    queuedCommandCount: 0,
+    activeRuns: [],
+    online: false,
+    stale: true,
+  } satisfies ControlPanelDaemonNodeRecord;
+  const attempt = {
+    id: "attempt_1",
+    managedNodeId: node.id,
+    generation: node.generation,
+    attemptNumber: 1,
+    status: "succeeded",
+    providerInstanceId: "mnode_alice:1",
+    startedAt: node.createdAt,
+    updatedAt: node.updatedAt,
+  } satisfies ProvisioningAttemptRecord;
+  const backend = new FakeManagedBackend([node], [daemon], [attempt]);
+  const provider = new FakeProvider();
+  const reconciler = new ManagedNodeReconciler({
+    backend,
+    providers: [provider],
+    backendUrl: "http://backend.test",
+    workspacePathForNode: () => "/workspaces/alice",
+  });
+
+  assert.deepEqual(await reconciler.reconcileOnce(), {
+    nodes: 1,
+    started: 0,
+    skipped: 1,
+    failed: 0,
+  });
+  assert.equal(provider.stopCalls, 0);
+  assert.equal(backend.retiredRuntimes, 0);
+  assert.equal(provider.calls.length, 0);
+});
 
 test("managed reconciler records an unavailable provider as failed", async () => {
   const node = { ...managedNode(), provider: "missing-provider" };
