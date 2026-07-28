@@ -1004,6 +1004,7 @@ export function App() {
             isRefreshing={isRefreshing}
             onRefresh={() => refresh()}
             workspaceAgent={activeLogicalAgent?.id === agentWorkspaceId ? activeLogicalAgent ?? null : null}
+            isDetailRoute={agentWorkspaceId !== null}
             onOpenWorkspace={openAgentWorkspace}
             onOpenThread={openThread}
           />

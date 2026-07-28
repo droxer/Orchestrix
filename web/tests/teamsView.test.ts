@@ -31,7 +31,9 @@ describe("Agent team management", () => {
     assert.match(teamWorkspaceSource, /"profile", "artifacts", "activities"/);
     assert.match(teamWorkspaceSource, /getTeamArtifacts/);
     assert.match(teamWorkspaceSource, /getWorkspaceBrief\(\{ teamId: team\.id \}/);
-    assert.match(teamsSource, /open=\{addTeam\}/);
+    assert.match(teamsSource, /actions=\{teamId \? null :/);
+    assert.match(teamsSource, /open=\{!teamId && addTeam\}/);
+    assert.match(agentsSource, /isDetailRoute \? null : \(/);
     assert.doesNotMatch(teamsSource, /editTeam/);
     assert.doesNotMatch(teamsSource, /onEdit=/);
     assert.match(teamWorkspaceSource, /className="team-profile-inline-form"/);
@@ -168,10 +170,11 @@ describe("Agent team management", () => {
     }), "busy");
   });
 
-  it("shows the first team workspace when the Teams route has no explicit selection", () => {
+  it("selects only the team addressed by the pathname", () => {
     const teams = [{ id: "team-delivery", name: "Delivery" }, { id: "team-research", name: "Research" }];
 
-    assert.equal(selectedTeamForWorkspace(teams, null)?.id, "team-delivery");
+    assert.equal(selectedTeamForWorkspace(teams, null), null);
     assert.equal(selectedTeamForWorkspace(teams, "team-research")?.id, "team-research");
+    assert.equal(selectedTeamForWorkspace(teams, "team-missing"), null);
   });
 });

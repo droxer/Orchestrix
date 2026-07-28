@@ -19,6 +19,7 @@ interface AgentsPageProps {
   onRefresh: () => Promise<void>;
   /** The agent currently inspected in the detail pane, driven by the pathname. */
   workspaceAgent: EmployeeAgent | null;
+  isDetailRoute: boolean;
   onOpenWorkspace: (agent: EmployeeAgent, tab?: WorkspacePageTab) => void;
   onOpenThread: (sessionId: string) => void;
 }
@@ -171,6 +172,7 @@ export function AgentsPage({
   isRefreshing,
   onRefresh,
   workspaceAgent,
+  isDetailRoute,
   onOpenWorkspace,
   onOpenThread,
 }: AgentsPageProps) {
@@ -228,12 +230,14 @@ export function AgentsPage({
       tabIndex={-1}
     >
       <div className="agents-roster" aria-label={t("agents_page.title")}>
-        <RosterFilterBar
-          query={query}
-          availability={availability}
-          onQueryChange={setQuery}
-          onAvailabilityChange={setAvailability}
-        />
+        {isDetailRoute ? null : (
+          <RosterFilterBar
+            query={query}
+            availability={availability}
+            onQueryChange={setQuery}
+            onAvailabilityChange={setAvailability}
+          />
+        )}
 
         {loading ? (
           <div className="route-loading" role="status" aria-live="polite">
