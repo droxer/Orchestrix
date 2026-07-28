@@ -1,7 +1,7 @@
 ---
 version: 1.0
-name: Relay-Graphite
-description: Graphite — a true-neutral, dual-register design system for an agent-orchestration control plane. A neutral graphite canvas (#101214 dark / #f7f8f9 light) with a four-step surface ladder carries the chrome; the ACTION color is pure monochrome, Linear-style — white (#f2f4f6) on dark, black (#16181b) on light — brand mark, primary CTA, focus ring, link emphasis. There are no chromatic accent colors at all: status is a grey brightness hierarchy (loud = bright, calm = dim) carried as dots, borders, and text — never fills, never actions; "info" is neutral ink. Both registers are designed side by side — neither derives from the other. Mona Sans gives display roles a precise technical voice, Geist carries dense UI and reading roles, and Geist Mono is reserved for code, IDs, and logs. Geometry is tight — 4px chips, 6px controls, 10px cards — and depth comes from hairline borders, not shadows. Motion is one ease, two speeds, no overshoot. The result reads as serious infrastructure software — a dense, calm control plane for AI agents.
+name: Relay-Phosphor
+description: Phosphor — a true-neutral, dual-register design system for an agent-orchestration control plane, built on one rule: Relay is grey until something is working. A neutral canvas (#101214 dark / #f7f8f9 light) with a four-step surface ladder carries the chrome; the ACTION color is pure monochrome, Linear-style — white (#f2f4f6) on dark, black (#16181b) on light — brand mark, primary CTA, focus ring, link emphasis. Status is a grey brightness hierarchy (loud = bright, calm = dim) carried as dots, borders, and text — never fills, never actions; "info" is neutral ink. Exactly one chromatic role exists, --live (#3ee08a dark / #0b7a45 light), and it means one thing only: an agent is doing work right now. A screen's color density is therefore a utilization readout. Both registers are designed side by side — neither derives from the other. JetBrains Mono carries the display tier and technical text, separated by weight and tracking rather than by face, while Geist carries dense UI and reading roles. Geometry is tight — 4px chips, 6px controls, 10px cards — and depth comes from hairline borders, not shadows. Motion is one ease, two speeds, no overshoot. The result reads as serious infrastructure software — a dense, calm control plane that visibly comes alive when its workforce runs.
 
 colors:
   action: "#f2f4f6"
@@ -22,26 +22,27 @@ colors:
   warn: "#b2b9c1"
   err: "#f2f4f6"
   info: "#99a0a8"
+  live: "#3ee08a"
 
 typography:
   display:
-    fontFamily: "var(--font-app-display), 'Mona Sans', sans-serif"
+    fontFamily: "var(--font-app-mono), 'JetBrains Mono', monospace"
     fontSize: 32px
-    fontWeight: 600
+    fontWeight: 700
     lineHeight: 1.15
-    letterSpacing: 0
+    letterSpacing: -0.04em
   title:
-    fontFamily: "var(--font-app-display), 'Mona Sans', sans-serif"
+    fontFamily: "var(--font-app-mono), 'JetBrains Mono', monospace"
     fontSize: 20px
-    fontWeight: 550
+    fontWeight: 700
     lineHeight: 1.2
-    letterSpacing: 0
+    letterSpacing: -0.04em
   heading:
-    fontFamily: "var(--font-app-display), 'Mona Sans', sans-serif"
+    fontFamily: "var(--font-app-mono), 'JetBrains Mono', monospace"
     fontSize: 16px
-    fontWeight: 550
+    fontWeight: 600
     lineHeight: 1.3
-    letterSpacing: 0
+    letterSpacing: -0.04em
   body:
     fontFamily: "'Geist', sans-serif"
     fontSize: 15px
@@ -73,13 +74,13 @@ typography:
     lineHeight: 1.4
     letterSpacing: 0.03em
   number:
-    fontFamily: "var(--font-app-display), 'Mona Sans', sans-serif"
+    fontFamily: "var(--font-app-mono), 'JetBrains Mono', monospace"
     fontSize: 19px
-    fontWeight: 600
+    fontWeight: 700
     lineHeight: 1.4
-    letterSpacing: 0
+    letterSpacing: -0.04em
   code:
-    fontFamily: "'Geist Mono', monospace"
+    fontFamily: "var(--font-app-mono), 'JetBrains Mono', monospace"
     fontSize: 13px
     fontWeight: 400
     lineHeight: 1.5
@@ -147,7 +148,7 @@ components:
     size: 7px
 ---
 
-# Relay Design — Graphite
+# Relay Design — Phosphor
 
 <p align="center">
   <img src="../web/public/brand/relay-logo.svg" alt="Relay logo" width="360">
@@ -155,10 +156,15 @@ components:
 
 ## Overview
 
-Relay's visual language is **Graphite**: a true-neutral canvas, a monochrome
-white/black action color, status as a grey brightness hierarchy, and two
-registers designed side by side. There is no chroma in the interface at all —
-every step of brightness is a unit of information.
+Relay's visual language is **Phosphor**, and it rests on one rule:
+
+> **Relay is grey until something is working.**
+
+A true-neutral canvas, a monochrome white/black action color, status as a grey
+brightness hierarchy, two registers designed side by side — and exactly one
+chromatic role, reserved entirely for work an agent is doing *right now*. Every
+step of brightness is a unit of information, and the single unit of color is
+liveness.
 
 - **One action color.** White on dark, black on light (`{colors.action}` —
   #f2f4f6 dark / #16181b light) carries the brand mark, primary CTAs, focus,
@@ -175,10 +181,17 @@ every step of brightness is a unit of information.
   one; each hex pair is picked for its own canvas and both live side by
   side in `palette.css`. Dark is the default register (`:root`);
   `html[data-theme="light"]` overrides it.
-- **One grotesk.** Geist carries every text role — weight and size
-  differentiate, never a family switch, and emphasis tops out at 600.
-  Geist Mono is reserved for code, IDs, and logs. There is no display
-  serif.
+- **Color means "alive", and nothing else.** `--live` (#3ee08a dark /
+  #0b7a45 light) marks work in flight — presence dot, active-row wash and
+  edge, elapsed timer, running bar. It is never an action, never a status,
+  never decoration. Because idle surfaces hold no color, a screen's color
+  density reads as a utilization gauge from across the room. Both register
+  values pass AA as small text.
+- **One mono, two jobs.** JetBrains Mono carries the display tier *and*
+  technical text; they are separated by weight, tracking, and color rather
+  than by face — 700/600 in `--ink-1` with `--track-display` for titles,
+  names, and metrics; 400 untracked in `--ink-4` for IDs, logs, and code.
+  Geist carries reading and control text.
 - **Tight geometry, hairline depth.** 4px chips, 6px controls, 10px
   cards/drawers/modals. Structure comes from 1px hairlines; the two shadow
   tokens are reserved for floating chrome.
@@ -248,6 +261,8 @@ Dark register / light register:
 | `--warn` | `#99a0a8` | `#5c636b` | attention, degraded |
 | `--err` | `#f2f4f6` | `#16181b` | failed, destructive — loud (bright) |
 | `--info` | = `--ink-3` | = `--ink-3` | neutral notice |
+| `--live` | `#3ee08a` | `#0b7a45` | an agent is working *right now* |
+| `--live-wash` | 7% live wash | 7% live wash | active-row tint |
 | `--scrim` | `rgba(0,0,0,.66)` | `rgba(12,14,16,.55)` | overlay scrim (one layer) |
 
 `--action-soft` is not a hex: it is `color-mix(in srgb, <action> 9%, transparent)`
@@ -265,37 +280,100 @@ register-invariant by design.
 Artifact chips are **monochrome** — kind is carried by the icon and the
 mono kind label, not by hue. The old per-kind rainbow is retired.
 
+### The `--live` scope rule
+
+`--live` is the only chromatic value in the system, so its scope is defined
+rather than left to judgment. **`--live` is legal exactly where `--t-pulse` is
+used, and nowhere `--t-pulse-calm` is used.** That boundary already existed:
+`--t-pulse` is documented as "active work (streaming agent, running task, busy
+header)" and `--t-pulse-calm` as "passive presence (online dot, idle node)".
+
+| takes `--live` | stays grey |
+|---|---|
+| composer running indicator | node online dot |
+| task + backlog running rows | workspace metric |
+| agent stream activity | login readiness |
+| busy header agent | any idle or merely-present state |
+| thread pulse, streaming rail node | |
+
+Two carve-outs, both deliberate:
+
+- **Login is monochrome.** It reports node readiness *before authentication*,
+  not agent work, and runs on the pinned `--lg-*` palette because no theme has
+  loaded. Pre-auth Relay shows zero green — this is not an oversight to fix.
+- **App icons carry the accent.** `favicon.svg` and both `relay-mark.svg`
+  copies use `--live` on their chevron. A tab-strip icon is not reporting a
+  run, but at 16px a grey chevron on a grey square is invisible. This is the
+  only non-liveness use of the accent anywhere; the bare mark and the wordmark
+  stay monochrome.
+
+Because every `--live` surface also pulses and is accompanied by an elapsed
+timer and status copy, color is never the sole channel (WCAG 1.4.1). Motion is
+part of that encoding, so `prefers-reduced-motion` needs checking whenever a
+liveness surface changes.
+
 ## Typography
 
-**Mona Sans** (`--font-display`) carries display, title, heading, and metric
-roles. **Geist** (`--font-sans`) carries reading and control text; **Geist
-Mono** (`--font-mono`) is reserved for code-like content. Ten roles:
+**JetBrains Mono** carries both `--font-display` (display, title, heading, and
+metric roles) and `--font-mono` (code-like content) — one family, two jobs.
+**Geist** (`--font-sans`) carries reading and control text. Ten roles:
 
 | Role | Spec | Use |
 |---|---|---|
-| `--type-display` | 600 32/1.15 | hero headline, admin metric values |
-| `--type-title` | 550 20/1.2 | page + chat titles |
-| `--type-heading` | 550 16/1.3 | section heads, list labels |
+| `--type-display` | 700 32/1.15 | hero headline, admin metric values |
+| `--type-title` | 700 20/1.2 | page + chat titles |
+| `--type-heading` | 600 16/1.3 | section heads, list labels |
 | `--type-body` | 400 15/1.5 | prose, message bodies, inputs |
 | `--type-body-sm` | 400 14/1.5 | dense prose, captions |
 | `--type-label` | 500 13/1.4 | chrome labels, nav, metadata |
 | `--type-label-strong` | 600 13/1.4 | bold chrome, button labels |
 | `--type-micro` | 500 11/1.4 | eyebrows and compact metadata |
-| `--type-number` | 600 19/1.4 | metrics (tabular-nums) |
-| `--type-code` | 400 13/1.5 mono | commands, logs, IDs |
+| `--type-number` | 700 19/1.4 | metrics (mono is already tabular) |
+| `--type-code` | 400 13/1.5 | commands, logs, IDs |
+
+Display and code share a face, so the distinction is carried by **weight,
+tracking, and color**: display is 700/600 in `--ink-1` with
+`--track-display`; `--type-code` is 400, untracked, in `--ink-4`. Keep that
+separation intact — it is the only thing preventing an agent name and a
+session ID from reading as the same kind of object.
 
 Raw sizes (`--fs-1`…`--fs-6`, rem): 11 / 13 / 14 / 15 / 22 / 32. The root
 font-size is pinned to 87.5% so the browser's font-size preference scales
 the whole UI (WCAG 1.4.4).
 
-Tracking is three tokens: `--track-tight` and `--track-0` both resolve to zero
-so Mona Sans can use optical sizing; `--track-caps` is a restrained 0.03em and
-is limited to statuses, badges, and table headers that intentionally use caps.
+Tracking is four tokens. **`--track-display` (−0.04em) must be applied to every
+display-tier rule** — a monospace title without it reads as spaced-out code, and
+the `font` shorthand cannot carry letter-spacing.
+
+Display-tier means *two* shapes, and both must be swept:
+
+1. rules using a `--type-display` / `title` / `heading` / `number` role (18), and
+2. rules that opt into `font-family: var(--font-display)` by hand (12) — login's
+   headline and wordmark, drawer titles, stat values, the mobile topbar title.
+
+Missing the second shape is how the login screen briefly shipped untracked. A
+second `letter-spacing` in the same rule silently overrides the first, so
+`typographyTokens.test.ts` sweeps every stylesheet and requires exactly one
+correct declaration per display-tier rule — 30 in total. The one deliberate
+exclusion is `.relay-bleed-mark`, a single decorative glyph with no
+inter-character spacing to track.
+
+`--track-tight` and `--track-0` both resolve to zero. `--track-tight` was kept
+rather than repurposed for display, and after the sweep it retains exactly one
+consumer — `.route-loading`, which is sans. `--track-caps` is a restrained
+0.03em, limited to statuses, badges, and table headers that intentionally use
+caps.
 
 **CJK:** `html:lang(zh-CN)` / `html:lang(zh-TW)` put a system CJK family first
 for both Latin and Han glyphs, keeping mixed-script labels internally coherent.
-Display roles join that same stack, caps tracking narrows to 0.02em, and reading
-leading loosens in `roles.css`.
+JetBrains Mono has no Han coverage, so display roles join that same sans stack —
+and `--track-display` is pinned to 0 there, or Han titles would be crushed
+together. Caps tracking narrows to 0.02em and reading leading loosens.
+
+The vendored WOFF2 is fontsource's **latin** subset of JetBrains Mono
+(`@fontsource-variable/jetbrains-mono` 5.3.0, OFL-1.1, wght 100–800). Latin
+covers U+00C0–00FF, so accented names render in-face; latin-ext glyphs fall
+through to Geist by design rather than shipping a second file.
 
 ## Geometry, elevation, motion
 
@@ -341,6 +419,10 @@ leading loosens in `roles.css`.
 - Carry status as dots/borders/text on the grey brightness hierarchy
   (loud = bright, calm = dim); use `--info` (neutral ink) for status
   without alarm.
+- Use `--live` only for work happening right now, and only where `--t-pulse`
+  is used — see the scope rule under Colors.
+- Pair `--live` with motion and text, never color alone.
+- Apply `letter-spacing: var(--track-display)` at every display-role site.
 - Disable with opacity, not a dedicated hex.
 - Carry depth with hairlines first; shadows only on floating chrome.
 - Add new raw values to `palette.css` and new roles to `roles.css` — never
@@ -348,8 +430,11 @@ leading loosens in `roles.css`.
 
 ### Don't
 - Don't use a status color as an action, or the action color as a status.
-- Don't introduce any chromatic color — there is no hue in the interface,
-  in either register; brightness is the only signal.
+- Don't introduce a second chromatic color. `--live` is the only hue in the
+  system; everywhere else brightness is the only signal.
+- Don't use `--live` for success, health, or "done" — it means *running*, not
+  *passed*. A finished task is grey.
+- Don't add green to the login screen; pre-auth is monochrome by design.
 - Don't fill backgrounds with status colors.
 - Don't tint agent avatars with vendor brand colors — glyph shape carries
   identity.
@@ -386,3 +471,13 @@ color and chromatic status hues in favor of the Linear-style white/black
 action and the grey status brightness hierarchy — a token-value-only change;
 the architecture above is unchanged. Rationale and the exact value map live
 in `docs/superpowers/specs/2026-07-20-monochrome-tokens-design.md`.
+
+**Phosphor (2026-07-28)** keeps that monochrome ramp intact and changes what
+the system is *about*. Seven identities in eight weeks had each been a palette
+swap, and each was judged "generic" within weeks — so this pass changed the
+subject instead of the hue: color was reduced to a single role, `--live`, tied
+to the product's own subject matter (agents working), and the display tier
+moved to JetBrains Mono so type and color argue the same point. Mona Sans and
+Geist Mono were retired for a net ~164 KB less font payload. Rationale,
+contrast measurements, and the scope rule live in
+`docs/superpowers/specs/2026-07-28-phosphor-identity-design.md`.

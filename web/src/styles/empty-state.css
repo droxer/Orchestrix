@@ -106,6 +106,7 @@ html[data-theme="dark"] .relay-bleed-mark {
 .relay-empty-title {
   margin: 0;
   font: var(--type-title);
+  letter-spacing: var(--track-display);
   color: var(--ink-1);
   text-wrap: balance;
 }

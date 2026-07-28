@@ -64,7 +64,7 @@
   font-family: var(--font-display);
   font-size: var(--fs-4);
   font-weight: 600;
-  letter-spacing: var(--track-tight);
+  letter-spacing: var(--track-display);
 }
 
 .login-intro {
@@ -79,7 +79,7 @@
   font-family: var(--font-display);
   font-size: var(--fs-5);
   font-weight: 550;
-  letter-spacing: var(--track-tight);
+  letter-spacing: var(--track-display);
   color: var(--lg-ink);
 }
 

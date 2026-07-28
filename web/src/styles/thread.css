@@ -29,6 +29,7 @@
   gap: var(--sp-2);
   color: var(--ink-1);
   font: var(--type-title);
+  letter-spacing: var(--track-display);
 }
 
 .conversation-heading-count {

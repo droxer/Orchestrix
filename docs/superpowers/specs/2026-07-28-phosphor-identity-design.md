@@ -72,13 +72,22 @@ web/src/app/fonts/
   MonaSans-Variable.woff2       delete  (−134 KB)
   GeistMono-Variable.woff2      delete  (−69 KB)
   OFL-MonaSans.txt              delete
-  JetBrainsMono-Variable.woff2  add     (OFL, wght 100–800)
+  JetBrainsMono-Variable.woff2  add     (+39.5 KB / 40,404 bytes, OFL, wght 100–800)
   OFL-JetBrainsMono.txt         add
 ```
 
-JetBrains Mono Variable's actual byte count must be measured once the file is in
-the tree and the real net payload delta recorded here. Do not carry an estimate
-forward. Two families ship in total, down from three.
+**Measured, not estimated: net −163.8 KB of font payload.** Two families ship in
+total, down from three.
+
+The binary is fontsource's **latin** subset (`@fontsource-variable/jetbrains-mono`
+5.3.0, OFL-1.1). Latin covers U+00C0–00FF, so accented names ("José", "Müller")
+render in-face; latin-ext glyphs fall through to Geist by design rather than
+shipping a second file or a unicode-range split, which `layout.tsx` avoids for
+Turbopack compile reasons. The font is **vendored, not depended on** — matching
+how Geist and Mona Sans were already handled, so nothing is added to
+`package.json`. (`npm install` also fails in this worktree for an unrelated
+pre-existing reason: `node_modules/shadcn` is a symlink into the parent checkout
+and npm cannot resolve its `@dotenvx/dotenvx` dependency.)
 
 ### 2.2 `layout.tsx`
 
@@ -134,25 +143,31 @@ and flipping the shared token would silently re-track all of them.
 --track-display: 0;         /* html:lang(zh-CN), html:lang(zh-TW) */
 ```
 
-There are 18 display-role call sites. Four already pair a display role with
-`letter-spacing` and switch from `--track-tight` to `--track-display`:
+**Display-tier means two shapes, and the sweep must cover both.** An audit that
+greps only for the `--type-*` shorthand is incomplete: 12 further rules opt into
+`font-family: var(--font-display)` by hand — `.login-headline`,
+`.login-wordmark`, `.adm-drawer-title`, `.conversation-heading h1`,
+`.backlog-stat-value`, `.adm-dash-stat-value`, `.mobile-topbar-title`,
+`.workspace-empty-state-title`, and others. Missing them is how the login screen
+first rendered in mono with zero tracking.
 
-- `shell.css:50`, `shell.css:57`
-- `preferences.css:57`
-- `admin-v2-views.css:1658`
+Totals: **18 role-based sites + 12 hand-rolled rules + 1 responsive override
+(`mobile-overlays.css` `.adm-drawer-title`) = 30 `--track-display`
+declarations.** Of the hand-rolled set, one is deliberately excluded —
+`.relay-bleed-mark` is a single decorative glyph, so inter-character spacing is
+meaningless.
 
-The remaining 14 gain a `letter-spacing: var(--track-display);` line:
+Sites that already declared `letter-spacing` switch from `--track-tight` or
+`--track-0` to `--track-display`; the rest gain the line. Note that several
+carried `--track-0` as an explicit opt-out (`.chat-title h2`,
+`.adm-dash-tile--hero .adm-dash-tile-value`, `.backlog-stat-value`) — that
+opt-out existed because Mona Sans's optical-size axis handled display spacing,
+a rationale that does not survive the move to mono, so those are converted too.
 
-- `admin-v2-views.css:191`, `:317`, `:1811`
-- `admin-v2-dashboard.css:70`, `:161`
-- `admin-v2-drawers.css:947`
-- `backlog.css:1101`
-- `empty-state.css:108`
-- `sidenav.css:76`
-- `thread.css:31`
-- `chat.css:69`
-- `dialog.css:71`
-- `mobile-overlays.css:130`, `:160`
+After the sweep `--track-tight` retains exactly **one** consumer:
+`.route-loading` in `atelier.css`, which is a sans rule. Keeping the token
+(rather than flipping its value) is what made that outcome safe to reach
+incrementally.
 
 ### 2.6 `.mono` — deliberately untouched
 

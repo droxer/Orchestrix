@@ -74,6 +74,7 @@
 .sidenav-brand-word {
   color: var(--ink-1);
   font: var(--type-heading);
+  letter-spacing: var(--track-display);
   opacity: 0;
   transition: opacity var(--t-fast) var(--ease) calc(var(--t-fast) * 0.75);
 }

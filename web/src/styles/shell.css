@@ -48,12 +48,12 @@
    hero scale, keeping dense workspace headers compact. */
 .page-header-title--display {
   font: var(--type-title);
-  letter-spacing: var(--track-tight);
+  letter-spacing: var(--track-display);
 }
 
 /* Inline (non-display) route titles — role-token type instead of arbitrary
    size/weight/leading utilities. */
 .page-header-title--inline {
   font: var(--type-heading);
-  letter-spacing: var(--track-tight);
+  letter-spacing: var(--track-display);
 }

@@ -141,17 +141,23 @@
   --leading-normal: 1.5;
   --leading-loose: 1.65;
 
-  /* Tracking — Mona's optical-size axis handles display spacing; caps use a
-     restrained utility value only where uppercase remains meaningful. */
+  /* Tracking — a monospace display tier needs real negative tracking to stop
+     titles reading as spaced-out code. --track-display is a NEW token applied
+     only at display-role call sites; --track-tight keeps its existing value and
+     its existing ten non-display consumers, which must not be re-tracked. Caps
+     use a restrained utility value only where uppercase remains meaningful. */
+  --track-display: -0.04em;
   --track-tight: 0;
   --track-0: 0;
   --track-caps: 0.03em;
 
-  /* Families — Mona adds display character; Geist stays calm and compact
-     for UI/body copy; Geist Mono is reserved for code, IDs, and logs. */
-  --font-display: var(--font-app-display), "Mona Sans", var(--font-app-sans), "Geist", sans-serif;
+  /* Families — one mono carries both the display tier and technical text
+     (terminal lineage, and in a terminal green means "a process is running");
+     Geist stays calm and compact for UI/body copy. Display vs. technical is
+     separated by weight, tracking, and colour, not by face — see roles.css. */
+  --font-display: var(--font-app-mono), "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
   --font-sans: var(--font-app-sans), "Geist", "Avenir Next", "Segoe UI Variable", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), "Geist Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --font-mono: var(--font-app-mono), "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
 
   /* Motion — one ease, two speeds, no overshoot.
      --t-fast: state change under the pointer (hover, press, menu open).
@@ -209,22 +215,26 @@ html[data-theme="light"] {
 }
 
 /* CJK — choose one system CJK face for both Latin and Han glyphs so mixed
-   labels remain internally coherent. Display roles join the same stack;
-   technical text keeps Geist Mono with CJK glyph fallback. */
+   labels remain internally coherent. JetBrains Mono has no Han coverage, so
+   display roles join the sans stack; technical text keeps the mono with CJK
+   glyph fallback. */
 html:lang(zh-CN) {
   --font-sans: "PingFang SC", "HarmonyOS Sans SC", "MiSans", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans SC", var(--font-app-sans), "Geist", sans-serif;
   --font-display: var(--font-sans);
-  --font-mono: var(--font-geist-mono), "Geist Mono", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", monospace;
+  --font-mono: var(--font-app-mono), "JetBrains Mono", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", monospace;
 }
 
 html:lang(zh-TW) {
   --font-sans: "PingFang TC", "Microsoft JhengHei UI", "Microsoft JhengHei", "Noto Sans TC", var(--font-app-sans), "Geist", sans-serif;
   --font-display: var(--font-sans);
-  --font-mono: var(--font-geist-mono), "Geist Mono", "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", monospace;
+  --font-mono: var(--font-app-mono), "JetBrains Mono", "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", monospace;
 }
 
 html:lang(zh-CN),
 html:lang(zh-TW) {
+  /* Display falls back to sans above, so the mono display tracking must be
+     neutralised or Han titles would be crushed together. */
+  --track-display: 0;
   --track-tight: 0;
   --track-caps: 0.02em;
   --leading-normal: 1.7;

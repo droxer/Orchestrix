@@ -67,8 +67,11 @@
   flex: 1 1 auto;
   color: var(--ink-1);
   font: var(--type-title);
+  /* Reading line-height is kept — thread names wrap — but the old --track-0
+     opt-out is dropped: it existed because Mona's optical-size axis handled
+     display spacing, which a mono face does not. */
+  letter-spacing: var(--track-display);
   line-height: var(--leading-normal);
-  letter-spacing: var(--track-0);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
