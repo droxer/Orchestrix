@@ -109,6 +109,7 @@
     "rename_computer_message": "Give this computer a memorable name. Technical ID: {{id}}",
     "computer_name_placeholder": "Office Mac Studio",
     "delete": "Delete",
+    "delete_blocked": "Cancel the active run before deleting this thread",
     "delete_confirm": "Delete thread “{{name}}”?",
     "delete_message": "This permanently removes the thread and its history. This cannot be undone.",
     "statuses": {

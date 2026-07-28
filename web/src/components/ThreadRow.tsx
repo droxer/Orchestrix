@@ -1,7 +1,7 @@
 import { ActionEdit, ActionRemove } from "./icons";
 import { useTranslation } from "react-i18next";
 import type { RelaySession } from "../types";
-import { threadLabel, type ThreadItem } from "../lib/threads";
+import { canDeleteThread, threadLabel, type ThreadItem } from "../lib/threads";
 import { Button } from "./ui/button";
 
 export type { ThreadItem };
@@ -41,6 +41,7 @@ export function ThreadRow({ item, selected, onSelect, onRename, onClose }: Threa
   const label = threadLabel(session);
   const stamp = relativeTime(session.updatedAt, i18n.language);
   const rowLabel = [label, stamp].filter(Boolean).join(" · ");
+  const deleteEnabled = canDeleteThread(item);
 
   function handleClose() {
     onClose?.(session.id);
@@ -84,8 +85,9 @@ export function ThreadRow({ item, selected, onSelect, onRename, onClose }: Threa
           <Button variant="ghost"
             className="conversation-remove-btn"
             type="button"
-            aria-label={t("thread.delete")}
-            title={t("thread.delete")}
+            aria-label={deleteEnabled ? t("thread.delete") : t("thread.delete_blocked")}
+            title={deleteEnabled ? t("thread.delete") : t("thread.delete_blocked")}
+            disabled={!deleteEnabled}
             onClick={handleClose}
           >
             <ActionRemove size={11} />

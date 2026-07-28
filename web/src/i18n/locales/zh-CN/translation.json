@@ -109,6 +109,7 @@
     "rename_computer_message": "为这台电脑设置一个容易记住的名称。技术 ID：{{id}}",
     "computer_name_placeholder": "办公室 Mac Studio",
     "delete": "删除",
+    "delete_blocked": "删除此对话前请先取消正在进行的运行",
     "delete_confirm": "删除对话“{{name}}”？",
     "delete_message": "这将永久删除该对话及其历史记录，且无法撤销。",
     "statuses": {

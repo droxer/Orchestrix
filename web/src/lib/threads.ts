@@ -9,6 +9,11 @@ export type ThreadItem = {
   runningAgent?: AgentName;
 };
 
+/** Deletion is safe only after both the session snapshot and daemon report no active run. */
+export function canDeleteThread(item: ThreadItem): boolean {
+  return item.session.status !== "running" && !item.runningAgent;
+}
+
 type Labelled = { title?: string; taskGoal: string };
 
 // The logged-in employee's own threads, newest first. /api/v1/threads is already

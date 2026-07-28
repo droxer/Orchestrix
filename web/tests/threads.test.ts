@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { matchesThreadQuery, myThreadSessions, pickActiveThreadSession, sessionAgents, threadLabel, upsertThreadSession } from "../src/lib/threads.js";
+import {
+  canDeleteThread,
+  matchesThreadQuery,
+  myThreadSessions,
+  pickActiveThreadSession,
+  sessionAgents,
+  threadLabel,
+  upsertThreadSession,
+} from "../src/lib/threads.js";
 import {
   agentsForThreadNode,
   threadNeedsRuntimeSelection,
@@ -55,6 +63,18 @@ describe("sessionAgents", () => {
 });
 
 describe("web thread helpers", () => {
+  it("blocks deletion while the session or daemon still has a run in flight", () => {
+    assert.equal(canDeleteThread({ session: session({ status: "running" }) }), false);
+    assert.equal(
+      canDeleteThread({
+        session: session({ status: "cancelled" }),
+        runningAgent: "claude",
+      }),
+      false,
+    );
+    assert.equal(canDeleteThread({ session: session({ status: "cancelled" }) }), true);
+  });
+
   it("selects a computer first and exposes only agents placed on it", () => {
     const nodes = [
       { id: "node_a", employeeId: "alice", online: true, stale: false, status: "ready" },
