@@ -5,12 +5,12 @@ from threading import RLock
 from typing import Any
 
 from sqlalchemy import (
+    JSON,
     BigInteger,
     Boolean,
     Column,
     DateTime,
     ForeignKey,
-    JSON,
     MetaData,
     Table,
     Text,
@@ -46,38 +46,88 @@ class LocalAgentStore:
         self.root.mkdir(parents=True, exist_ok=True)
         self._lock = RLock()
 
-    def create_agent(self, supervisor_employee_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    def create_agent(
+        self, supervisor_employee_id: str, payload: dict[str, Any]
+    ) -> dict[str, Any]:
         agent = _new_agent(supervisor_employee_id, payload)
         with self._lock:
-            self._ensure_unique_name(agent["supervisorEmployeeId"], agent["displayName"])
+            self._ensure_unique_name(
+                agent["supervisorEmployeeId"], agent["displayName"]
+            )
             self._append(agent["id"], "agent.created", {"agent": agent})
             return agent
 
-    def ensure_compatibility_agent(self, supervisor_employee_id: str, executor_kind: str, daemon_node_id: str) -> dict[str, Any]:
+    def ensure_compatibility_agent(
+        self,
+        supervisor_employee_id: str,
+        executor_kind: str,
+        daemon_node_id: str,
+        *,
+        computer_id: str | None = None,
+    ) -> dict[str, Any]:
         if executor_kind not in AGENT_NAMES:
             raise ValueError(f"executorKind must be one of: {', '.join(AGENT_NAMES)}.")
-        key = _compatibility_key(supervisor_employee_id, daemon_node_id, executor_kind)
+        key = _compatibility_key(
+            supervisor_employee_id, computer_id or daemon_node_id, executor_kind
+        )
+        legacy_key = _compatibility_key(
+            supervisor_employee_id, daemon_node_id, executor_kind
+        )
         with self._lock:
-            existing = next((agent for agent in self.list_agents(supervisor_employee_id=supervisor_employee_id) if agent.get("compatibilityKey") == key), None)
+            owned = self.list_agents(supervisor_employee_id=supervisor_employee_id)
+            existing = next(
+                (agent for agent in owned if agent.get("compatibilityKey") == key),
+                None,
+            )
             if existing:
-                return _migrate_compatibility_display_name(self, existing, supervisor_employee_id, executor_kind)
-            agent = self.create_agent(supervisor_employee_id, {
-                "displayName": _compatibility_display_name(self.list_agents(supervisor_employee_id=supervisor_employee_id), executor_kind),
-                "executorKind": executor_kind,
-            })
+                return _migrate_compatibility_display_name(
+                    self, existing, supervisor_employee_id, executor_kind
+                )
+            legacy = next(
+                (
+                    agent
+                    for agent in owned
+                    if key != legacy_key and agent.get("compatibilityKey") == legacy_key
+                ),
+                None,
+            )
+            if legacy:
+                migrated = self.update_agent(legacy["id"], {"compatibilityKey": key})
+                return _migrate_compatibility_display_name(
+                    self, migrated, supervisor_employee_id, executor_kind
+                )
+            agent = self.create_agent(
+                supervisor_employee_id,
+                {
+                    "displayName": _compatibility_display_name(owned, executor_kind),
+                    "executorKind": executor_kind,
+                },
+            )
             return self.update_agent(agent["id"], {"compatibilityKey": key})
 
     def get_agent(self, agent_id: str) -> dict[str, Any] | None:
         snapshot = self._snapshot_path(agent_id)
-        return _normalized_agent_snapshot(_read_json(snapshot)) if snapshot.exists() else None
+        return (
+            _normalized_agent_snapshot(_read_json(snapshot))
+            if snapshot.exists()
+            else None
+        )
 
     def list_agents(
-        self, *, supervisor_employee_id: str | None = None, employee_id: str | None = None,
+        self,
+        *,
+        supervisor_employee_id: str | None = None,
+        employee_id: str | None = None,
         include_deleted: bool = False,
     ) -> list[dict[str, Any]]:
         if employee_id is not None:
-            if supervisor_employee_id is not None and supervisor_employee_id != employee_id:
-                raise ValueError("employee_id and supervisor_employee_id must match when both are supplied.")
+            if (
+                supervisor_employee_id is not None
+                and supervisor_employee_id != employee_id
+            ):
+                raise ValueError(
+                    "employee_id and supervisor_employee_id must match when both are supplied."
+                )
             supervisor_employee_id = employee_id
         agents = [
             _normalized_agent_snapshot(_read_json(path))
@@ -85,7 +135,9 @@ class LocalAgentStore:
         ]
         if supervisor_employee_id is not None:
             agents = [
-                agent for agent in agents if agent.get("supervisorEmployeeId") == supervisor_employee_id
+                agent
+                for agent in agents
+                if agent.get("supervisorEmployeeId") == supervisor_employee_id
             ]
         if not include_deleted:
             agents = [agent for agent in agents if not agent.get("deletedAt")]
@@ -155,7 +207,9 @@ class LocalAgentStore:
                     raise ValueError("enabled must be a boolean.")
                 normalized["enabled"] = patch["enabled"]
             if "compatibilityKey" in patch:
-                normalized["compatibilityKey"] = _required_string(patch, "compatibilityKey")
+                normalized["compatibilityKey"] = _required_string(
+                    patch, "compatibilityKey"
+                )
             placement_fields = {
                 "instructions",
                 "skillPolicy",
@@ -197,12 +251,18 @@ class LocalAgentStore:
         return _read_jsonl(self._events_path(agent_id))
 
     def _ensure_unique_name(
-        self, supervisor_employee_id: str, display_name: str, *, exclude_id: str | None = None
+        self,
+        supervisor_employee_id: str,
+        display_name: str,
+        *,
+        exclude_id: str | None = None,
     ) -> None:
         duplicate = next(
             (
                 agent
-                for agent in self.list_agents(supervisor_employee_id=supervisor_employee_id)
+                for agent in self.list_agents(
+                    supervisor_employee_id=supervisor_employee_id
+                )
                 if (
                     agent["id"] != exclude_id
                     and agent.get("displayName", "").casefold()
@@ -281,7 +341,9 @@ class DatabaseAgentStore:
         if create_schema:
             self.metadata.create_all(self.engine)
 
-    def create_agent(self, supervisor_employee_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    def create_agent(
+        self, supervisor_employee_id: str, payload: dict[str, Any]
+    ) -> dict[str, Any]:
         agent = _new_agent(supervisor_employee_id, payload)
         self._ensure_unique_name(agent["supervisorEmployeeId"], agent["displayName"])
         event = _agent_event(agent["id"], "agent.created", {"agent": agent})
@@ -300,17 +362,50 @@ class DatabaseAgentStore:
             ) from error
         return agent
 
-    def ensure_compatibility_agent(self, supervisor_employee_id: str, executor_kind: str, daemon_node_id: str) -> dict[str, Any]:
+    def ensure_compatibility_agent(
+        self,
+        supervisor_employee_id: str,
+        executor_kind: str,
+        daemon_node_id: str,
+        *,
+        computer_id: str | None = None,
+    ) -> dict[str, Any]:
         if executor_kind not in AGENT_NAMES:
             raise ValueError(f"executorKind must be one of: {', '.join(AGENT_NAMES)}.")
-        key = _compatibility_key(supervisor_employee_id, daemon_node_id, executor_kind)
-        existing = next((agent for agent in self.list_agents(supervisor_employee_id=supervisor_employee_id) if agent.get("compatibilityKey") == key), None)
+        key = _compatibility_key(
+            supervisor_employee_id, computer_id or daemon_node_id, executor_kind
+        )
+        legacy_key = _compatibility_key(
+            supervisor_employee_id, daemon_node_id, executor_kind
+        )
+        owned = self.list_agents(supervisor_employee_id=supervisor_employee_id)
+        existing = next(
+            (agent for agent in owned if agent.get("compatibilityKey") == key), None
+        )
         if existing:
-            return _migrate_compatibility_display_name(self, existing, supervisor_employee_id, executor_kind)
-        agent = self.create_agent(supervisor_employee_id, {
-            "displayName": _compatibility_display_name(self.list_agents(supervisor_employee_id=supervisor_employee_id), executor_kind),
-            "executorKind": executor_kind,
-        })
+            return _migrate_compatibility_display_name(
+                self, existing, supervisor_employee_id, executor_kind
+            )
+        legacy = next(
+            (
+                agent
+                for agent in owned
+                if key != legacy_key and agent.get("compatibilityKey") == legacy_key
+            ),
+            None,
+        )
+        if legacy:
+            migrated = self.update_agent(legacy["id"], {"compatibilityKey": key})
+            return _migrate_compatibility_display_name(
+                self, migrated, supervisor_employee_id, executor_kind
+            )
+        agent = self.create_agent(
+            supervisor_employee_id,
+            {
+                "displayName": _compatibility_display_name(owned, executor_kind),
+                "executorKind": executor_kind,
+            },
+        )
         return self.update_agent(agent["id"], {"compatibilityKey": key})
 
     def get_agent(self, agent_id: str) -> dict[str, Any] | None:
@@ -320,9 +415,7 @@ class DatabaseAgentStore:
                     select(
                         self.agents.c.snapshot,
                         self.agents.c.supervisor_employee_public_id,
-                    ).where(
-                        self.agents.c.public_id == agent_id
-                    )
+                    ).where(self.agents.c.public_id == agent_id)
                 )
                 .mappings()
                 .first()
@@ -336,14 +429,19 @@ class DatabaseAgentStore:
         )
 
     def list_agents(
-        self, *, supervisor_employee_id: str | None = None, include_deleted: bool = False
+        self,
+        *,
+        supervisor_employee_id: str | None = None,
+        include_deleted: bool = False,
     ) -> list[dict[str, Any]]:
         statement = select(
             self.agents.c.snapshot,
             self.agents.c.supervisor_employee_public_id,
         )
         if supervisor_employee_id is not None:
-            statement = statement.where(self.agents.c.supervisor_employee_public_id == supervisor_employee_id)
+            statement = statement.where(
+                self.agents.c.supervisor_employee_public_id == supervisor_employee_id
+            )
         if not include_deleted:
             statement = statement.where(self.agents.c.deleted_at.is_(None))
         with self.engine.begin() as conn:
@@ -526,12 +624,18 @@ class DatabaseAgentStore:
         return agent
 
     def _ensure_unique_name(
-        self, supervisor_employee_id: str, display_name: str, *, exclude_id: str | None = None
+        self,
+        supervisor_employee_id: str,
+        display_name: str,
+        *,
+        exclude_id: str | None = None,
     ) -> None:
         duplicate = next(
             (
                 agent
-                for agent in self.list_agents(supervisor_employee_id=supervisor_employee_id)
+                for agent in self.list_agents(
+                    supervisor_employee_id=supervisor_employee_id
+                )
                 if agent["id"] != exclude_id
                 and agent.get("displayName", "").casefold() == display_name.casefold()
             ),
@@ -588,13 +692,18 @@ def _normalized_agent_snapshot(
     return {**agent, "supervisorEmployeeId": owner} if owner else agent
 
 
-def _compatibility_key(supervisor_employee_id: str, daemon_node_id: str, executor_kind: str) -> str:
-    # A compatibility agent belongs to one computer: keying by node keeps each
-    # computer's auto-materialized agents distinct (one agent = one computer).
-    return f"{supervisor_employee_id}:{daemon_node_id}:{executor_kind}"
+def _compatibility_key(
+    supervisor_employee_id: str, computer_id: str, executor_kind: str
+) -> str:
+    # A compatibility agent belongs to one stable Computer. Employee devices
+    # use their durable daemon id; managed Computers use managedNodeId so a
+    # replaceable daemon incarnation never changes Logical Agent identity.
+    return f"{supervisor_employee_id}:{computer_id}:{executor_kind}"
 
 
-def _migrate_compatibility_display_name(store: Any, agent: dict[str, Any], supervisor_employee_id: str, executor_kind: str) -> dict[str, Any]:
+def _migrate_compatibility_display_name(
+    store: Any, agent: dict[str, Any], supervisor_employee_id: str, executor_kind: str
+) -> dict[str, Any]:
     legacy_prefix = f"{executor_kind.capitalize()} · "
     if not agent.get("displayName", "").startswith(legacy_prefix):
         return agent
@@ -603,10 +712,14 @@ def _migrate_compatibility_display_name(store: Any, agent: dict[str, Any], super
         for item in store.list_agents(supervisor_employee_id=supervisor_employee_id)
         if item["id"] != agent["id"]
     ]
-    return store.update_agent(agent["id"], {"displayName": _compatibility_display_name(others, executor_kind)})
+    return store.update_agent(
+        agent["id"], {"displayName": _compatibility_display_name(others, executor_kind)}
+    )
 
 
-def _compatibility_display_name(agents: list[dict[str, Any]], executor_kind: str) -> str:
+def _compatibility_display_name(
+    agents: list[dict[str, Any]], executor_kind: str
+) -> str:
     existing_names = {agent.get("displayName", "").casefold() for agent in agents}
     base = executor_kind.capitalize()
     if base.casefold() not in existing_names:

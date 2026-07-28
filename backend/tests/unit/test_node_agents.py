@@ -2,7 +2,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-
 from relay.persistence.agent_placement_store import LocalAgentPlacementStore
 from relay.persistence.agent_store import LocalAgentStore
 from relay.persistence.team_store import LocalTeamStore
@@ -33,17 +32,36 @@ def test_each_computer_gets_its_own_compatibility_agents(tmp_path: Path) -> None
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     ctx = SimpleNamespace(agent_store=agents, agent_placement_store=placements)
-    first = {"id": "node_one", "displayName": "Box One", "employeeId": "alice", "supportedAgents": ["codex"], "agents": {"codex": "ready"}}
-    second = {"id": "node_two", "displayName": "Box Two", "employeeId": "alice", "supportedAgents": ["codex"], "agents": {"codex": "ready"}}
+    first = {
+        "id": "node_one",
+        "displayName": "Box One",
+        "employeeId": "alice",
+        "supportedAgents": ["codex"],
+        "agents": {"codex": "ready"},
+    }
+    second = {
+        "id": "node_two",
+        "displayName": "Box Two",
+        "employeeId": "alice",
+        "supportedAgents": ["codex"],
+        "agents": {"codex": "ready"},
+    }
 
     sync_node_agents(ctx, first)
     sync_node_agents(ctx, second)
 
     # One agent lives on one computer: each computer materializes its own codex
     # agent rather than sharing a single one across both.
-    codex_agents = [agent for agent in agents.list_agents(supervisor_employee_id="alice") if agent["executorKind"] == "codex"]
+    codex_agents = [
+        agent
+        for agent in agents.list_agents(supervisor_employee_id="alice")
+        if agent["executorKind"] == "codex"
+    ]
     assert len(codex_agents) == 2
-    assert {agent["compatibilityKey"] for agent in codex_agents} == {"alice:node_one:codex", "alice:node_two:codex"}
+    assert {agent["compatibilityKey"] for agent in codex_agents} == {
+        "alice:node_one:codex",
+        "alice:node_two:codex",
+    }
     for agent in codex_agents:
         agent_placements = placements.list_placements(agent_id=agent["id"])
         assert len(agent_placements) == 1
@@ -53,10 +71,18 @@ def test_existing_legacy_named_agent_is_renamed_to_runtime_name(tmp_path: Path) 
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     ctx = SimpleNamespace(agent_store=agents, agent_placement_store=placements)
-    legacy = agents.create_agent("alice", {"displayName": "Codex · node_alice", "executorKind": "codex"})
-    legacy = agents.update_agent(legacy["id"], {"compatibilityKey": "alice:node_alice:codex"})
-    renamed = agents.create_agent("alice", {"displayName": "Renamed By User", "executorKind": "claude"})
-    renamed = agents.update_agent(renamed["id"], {"compatibilityKey": "alice:node_alice:claude"})
+    legacy = agents.create_agent(
+        "alice", {"displayName": "Codex · node_alice", "executorKind": "codex"}
+    )
+    legacy = agents.update_agent(
+        legacy["id"], {"compatibilityKey": "alice:node_alice:codex"}
+    )
+    renamed = agents.create_agent(
+        "alice", {"displayName": "Renamed By User", "executorKind": "claude"}
+    )
+    renamed = agents.update_agent(
+        renamed["id"], {"compatibilityKey": "alice:node_alice:claude"}
+    )
     node = {
         "id": "node_alice",
         "employeeId": "alice",
@@ -75,8 +101,20 @@ def test_deleting_a_computer_removes_only_its_agents(tmp_path: Path) -> None:
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     ctx = SimpleNamespace(agent_store=agents, agent_placement_store=placements)
-    keep = {"id": "node_keep", "displayName": "Keep", "employeeId": "alice", "supportedAgents": ["claude"], "agents": {"claude": "ready"}}
-    doomed = {"id": "node_doomed", "displayName": "Doomed", "employeeId": "alice", "supportedAgents": ["claude", "codex"], "agents": {"claude": "ready", "codex": "ready"}}
+    keep = {
+        "id": "node_keep",
+        "displayName": "Keep",
+        "employeeId": "alice",
+        "supportedAgents": ["claude"],
+        "agents": {"claude": "ready"},
+    }
+    doomed = {
+        "id": "node_doomed",
+        "displayName": "Doomed",
+        "employeeId": "alice",
+        "supportedAgents": ["claude", "codex"],
+        "agents": {"claude": "ready", "codex": "ready"},
+    }
     sync_node_agents(ctx, keep)
     sync_node_agents(ctx, doomed)
 
@@ -84,7 +122,9 @@ def test_deleting_a_computer_removes_only_its_agents(tmp_path: Path) -> None:
 
     assert len(removed) == 2
     survivors = agents.list_agents(supervisor_employee_id="alice")
-    assert {agent["compatibilityKey"] for agent in survivors} == {"alice:node_keep:claude"}
+    assert {agent["compatibilityKey"] for agent in survivors} == {
+        "alice:node_keep:claude"
+    }
     assert placements.list_placements(daemon_node_id="node_doomed") == []
     # The surviving computer's agent and placement are untouched.
     assert len(placements.list_placements(daemon_node_id="node_keep")) == 1
@@ -94,7 +134,13 @@ def test_removing_agents_sweeps_already_unassigned_node(tmp_path: Path) -> None:
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     ctx = SimpleNamespace(agent_store=agents, agent_placement_store=placements)
-    node = {"id": "node_solo", "displayName": "Solo", "employeeId": "alice", "supportedAgents": ["claude"], "agents": {"claude": "ready"}}
+    node = {
+        "id": "node_solo",
+        "displayName": "Solo",
+        "employeeId": "alice",
+        "supportedAgents": ["claude"],
+        "agents": {"claude": "ready"},
+    }
     sync_node_agents(ctx, node)
     # Simulate an unassign that retired the placement but left the agent behind.
     (placement,) = placements.list_placements(daemon_node_id="node_solo")
@@ -174,9 +220,7 @@ def test_removing_old_node_keeps_compatibility_agent_moved_elsewhere(
         agent_store=agents,
         agent_placement_store=placements,
     )
-    agent = agents.ensure_compatibility_agent(
-        "alice", "codex", "node_old"
-    )
+    agent = agents.ensure_compatibility_agent("alice", "codex", "node_old")
     old_placement = placements.create_placement(agent, "node_old")
     new_placement = placements.create_placement(agent, "node_new")
 
@@ -222,7 +266,9 @@ def test_removing_node_waits_for_active_agent_runs(tmp_path: Path) -> None:
     assert placements.get_placement(placement["id"])["desiredState"] == "active"
 
 
-def _registry_ctx(tmp_path: Path, nodes: list[dict], active_requests: list[dict] | None = None):
+def _registry_ctx(
+    tmp_path: Path, nodes: list[dict], active_requests: list[dict] | None = None
+):
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
     ctx = SimpleNamespace(
@@ -240,7 +286,12 @@ def _registry_ctx(tmp_path: Path, nodes: list[dict], active_requests: list[dict]
 
 
 def test_reregistration_retires_superseded_compatibility_agent(tmp_path: Path) -> None:
-    old_node = {"id": "node_old", "employeeId": "alice", "workspacePath": "/home/alice/proj", "online": False}
+    old_node = {
+        "id": "node_old",
+        "employeeId": "alice",
+        "workspacePath": "/home/alice/proj",
+        "online": False,
+    }
     new_node = {
         "id": "node_new",
         "employeeId": "alice",
@@ -256,14 +307,21 @@ def test_reregistration_retires_superseded_compatibility_agent(tmp_path: Path) -
     sync_node_agents(ctx, new_node)
 
     survivors = agents.list_agents(supervisor_employee_id="alice")
-    assert {agent["compatibilityKey"] for agent in survivors} == {"alice:node_new:claude"}
+    assert {agent["compatibilityKey"] for agent in survivors} == {
+        "alice:node_new:claude"
+    }
     assert agents.get_agent(stale["id"]).get("deletedAt")
     assert placements.list_placements(daemon_node_id="node_old") == []
     assert len(placements.list_placements(daemon_node_id="node_new")) == 1
 
 
 def test_sync_keeps_agent_on_a_different_computer(tmp_path: Path) -> None:
-    other_node = {"id": "node_other", "employeeId": "alice", "workspacePath": "/home/alice/other", "online": False}
+    other_node = {
+        "id": "node_other",
+        "employeeId": "alice",
+        "workspacePath": "/home/alice/other",
+        "online": False,
+    }
     new_node = {
         "id": "node_new",
         "employeeId": "alice",
@@ -287,7 +345,12 @@ def test_sync_keeps_agent_on_a_different_computer(tmp_path: Path) -> None:
 
 
 def test_sync_keeps_agent_while_the_old_node_is_online(tmp_path: Path) -> None:
-    old_node = {"id": "node_old", "employeeId": "alice", "workspacePath": "/home/alice/proj", "online": True}
+    old_node = {
+        "id": "node_old",
+        "employeeId": "alice",
+        "workspacePath": "/home/alice/proj",
+        "online": True,
+    }
     new_node = {
         "id": "node_new",
         "employeeId": "alice",
@@ -307,7 +370,12 @@ def test_sync_keeps_agent_while_the_old_node_is_online(tmp_path: Path) -> None:
 
 
 def test_sync_keeps_agent_when_old_node_has_active_work(tmp_path: Path) -> None:
-    old_node = {"id": "node_old", "employeeId": "alice", "workspacePath": "/home/alice/proj", "online": False}
+    old_node = {
+        "id": "node_old",
+        "employeeId": "alice",
+        "workspacePath": "/home/alice/proj",
+        "online": False,
+    }
     new_node = {
         "id": "node_new",
         "employeeId": "alice",
@@ -329,7 +397,9 @@ def test_sync_keeps_agent_when_old_node_has_active_work(tmp_path: Path) -> None:
     assert not agents.get_agent(stale["id"]).get("deletedAt")
 
 
-def test_managed_nodes_share_workspace_path_without_being_the_same_computer(tmp_path: Path) -> None:
+def test_managed_nodes_share_workspace_path_without_being_the_same_computer(
+    tmp_path: Path,
+) -> None:
     old_node = {
         "id": "node_old",
         "employeeId": "alice",
@@ -367,21 +437,30 @@ def test_sync_retires_legacy_two_segment_agent_on_same_node(tmp_path: Path) -> N
         "online": True,
     }
     ctx, agents, placements = _registry_ctx(tmp_path, [node])
-    legacy = agents.create_agent("alice", {"displayName": "Captain America", "executorKind": "claude"})
+    legacy = agents.create_agent(
+        "alice", {"displayName": "Captain America", "executorKind": "claude"}
+    )
     legacy = agents.update_agent(legacy["id"], {"compatibilityKey": "alice:claude"})
     placements.create_placement(legacy, "node_local")
 
     sync_node_agents(ctx, node)
 
     survivors = agents.list_agents(supervisor_employee_id="alice")
-    assert {agent["compatibilityKey"] for agent in survivors} == {"alice:node_local:claude"}
+    assert {agent["compatibilityKey"] for agent in survivors} == {
+        "alice:node_local:claude"
+    }
     assert agents.get_agent(legacy["id"]).get("deletedAt")
 
 
 def test_sync_keeps_legacy_agent_on_a_different_node(tmp_path: Path) -> None:
     """A legacy agent placed on a different computer is not a duplicate of the
     registering node's agent and must survive."""
-    other = {"id": "node_other", "employeeId": "alice", "workspacePath": "/home/alice/other", "online": True}
+    other = {
+        "id": "node_other",
+        "employeeId": "alice",
+        "workspacePath": "/home/alice/other",
+        "online": True,
+    }
     node = {
         "id": "node_local",
         "employeeId": "alice",
@@ -391,7 +470,9 @@ def test_sync_keeps_legacy_agent_on_a_different_node(tmp_path: Path) -> None:
         "online": True,
     }
     ctx, agents, placements = _registry_ctx(tmp_path, [other, node])
-    legacy = agents.create_agent("alice", {"displayName": "Captain America", "executorKind": "claude"})
+    legacy = agents.create_agent(
+        "alice", {"displayName": "Captain America", "executorKind": "claude"}
+    )
     legacy = agents.update_agent(legacy["id"], {"compatibilityKey": "alice:claude"})
     placements.create_placement(legacy, "node_other")
 
@@ -424,7 +505,10 @@ def test_reprovisioned_managed_node_retires_old_agent(tmp_path: Path) -> None:
     sync_node_agents(ctx, new_node)
 
     assert agents.get_agent(stale["id"]).get("deletedAt")
-    assert {agent["compatibilityKey"] for agent in agents.list_agents(supervisor_employee_id="alice")} == {"alice:node_new:claude"}
+    assert {
+        agent["compatibilityKey"]
+        for agent in agents.list_agents(supervisor_employee_id="alice")
+    } == {"alice:managed_one:claude"}
 
 
 def test_reprovisioned_managed_computer_preserves_agent_and_placement_identity(
@@ -489,4 +573,7 @@ def test_managed_reprovision_collects_agents_for_missing_old_runtimes(
 
     survivors = agents.list_agents(supervisor_employee_id="alice")
     assert [agent["id"] for agent in survivors] == [original_agent_id]
-    assert placements.list_placements(agent_id=original_agent_id)[0]["daemonNodeId"] == "runtime_new"
+    assert (
+        placements.list_placements(agent_id=original_agent_id)[0]["daemonNodeId"]
+        == "runtime_new"
+    )

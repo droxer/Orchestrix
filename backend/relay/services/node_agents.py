@@ -33,19 +33,43 @@ def sync_node_agents(ctx: Any, node: dict[str, Any]) -> None:
         return
     supported = set(node.get("supportedAgents") or []) | set(node.get("agents") or {})
     disabled = set(node.get("disabledAgents") or [])
+    computer_id = node.get("managedNodeId") or node["id"]
     for executor_kind in sorted(supported - disabled):
         try:
-            agent = ctx.agent_store.ensure_compatibility_agent(employee_id, executor_kind, node["id"])
+            agent = ctx.agent_store.ensure_compatibility_agent(
+                employee_id,
+                executor_kind,
+                node["id"],
+                computer_id=computer_id,
+            )
         except Exception as error:
             if "no such table" in str(error) or "does not exist" in str(error):
-                logger.warning("Skipping agent sync during rolling upgrade", node_id=node.get("id"), error=str(error))
+                logger.warning(
+                    "Skipping agent sync during rolling upgrade",
+                    node_id=node.get("id"),
+                    error=str(error),
+                )
                 return
             raise
-        placement = next((item for item in ctx.agent_placement_store.list_placements(agent_id=agent["id"]) if item["daemonNodeId"] == node["id"]), None)
-        if placement is None:
+        placements = ctx.agent_placement_store.list_placements(
+            agent_id=agent["id"], include_removed=True
+        )
+        placement = next(
+            (item for item in placements if item["daemonNodeId"] == node["id"]),
+            None,
+        )
+        active = next(
+            (item for item in placements if item.get("desiredState") != "removed"),
+            None,
+        )
+        if placement and placement.get("desiredState") != "removed":
+            pass
+        elif active:
+            ctx.agent_placement_store.rebind_placement(active["id"], node["id"])
+        elif placement:
+            ctx.agent_placement_store.rebind_placement(placement["id"], node["id"])
+        else:
             ctx.agent_placement_store.create_placement(agent, node["id"])
-        elif placement.get("desiredState") == "removed":
-            ctx.agent_placement_store.update_placement(placement["id"], {"desiredState": "active"})
         try:
             _retire_superseded_locked(ctx, node, employee_id, executor_kind)
         except Exception as error:
@@ -57,16 +81,22 @@ def sync_node_agents(ctx: Any, node: dict[str, Any]) -> None:
             )
 
 
-def _retire_superseded_locked(ctx: Any, node: dict[str, Any], employee_id: str, executor_kind: str) -> list[str]:
+def _retire_superseded_locked(
+    ctx: Any, node: dict[str, Any], employee_id: str, executor_kind: str
+) -> list[str]:
     registry = getattr(ctx, "registry", None)
     dispatch_lock = getattr(registry, "dispatch_lock", None)
     if dispatch_lock:
         with dispatch_lock:
-            return retire_superseded_compatibility_agents(ctx, node, employee_id, executor_kind)
+            return retire_superseded_compatibility_agents(
+                ctx, node, employee_id, executor_kind
+            )
     return retire_superseded_compatibility_agents(ctx, node, employee_id, executor_kind)
 
 
-def retire_superseded_compatibility_agents(ctx: Any, node: dict[str, Any], employee_id: str, executor_kind: str) -> list[str]:
+def retire_superseded_compatibility_agents(
+    ctx: Any, node: dict[str, Any], employee_id: str, executor_kind: str
+) -> list[str]:
     """Retire duplicate compatibility agents left behind when this computer
     re-registered under a new node id.
 
@@ -89,7 +119,9 @@ def retire_superseded_compatibility_agents(ctx: Any, node: dict[str, Any], emplo
         return []
     identity = workspace_identity(node)
     nodes_by_id = {item["id"]: item for item in registry.monitor_nodes()}
-    node_scoped_key = _compatibility_key_for(employee_id, node["id"], executor_kind)
+    node_scoped_key = _compatibility_key_for(
+        employee_id, node.get("managedNodeId") or node["id"], executor_kind
+    )
     has_node_scoped_sibling = any(
         agent.get("compatibilityKey") == node_scoped_key and not agent.get("deletedAt")
         for agent in ctx.agent_store.list_agents(supervisor_employee_id=employee_id)
@@ -98,6 +130,8 @@ def retire_superseded_compatibility_agents(ctx: Any, node: dict[str, Any], emplo
     for agent in ctx.agent_store.list_agents(supervisor_employee_id=employee_id):
         key = agent.get("compatibilityKey")
         if not key or agent.get("deletedAt"):
+            continue
+        if key == node_scoped_key:
             continue
         parts = key.rsplit(":", 2)
         if len(parts) == 2:
@@ -126,12 +160,29 @@ def retire_superseded_compatibility_agents(ctx: Any, node: dict[str, Any], emplo
         if owner != employee_id or kind != executor_kind or node_id == node["id"]:
             continue
         other = nodes_by_id.get(node_id)
-        if other is None or other.get("online"):
+        if other is None:
+            if not node.get("managedNodeId") or _node_has_active_work(ctx, node_id):
+                continue
+            if _retire_compatibility_agent(ctx, agent, employee_id):
+                retired.append(agent["id"])
+                logger.info(
+                    "Retired orphaned managed compatibility agent",
+                    agent_id=agent["id"],
+                    superseded_by=node["id"],
+                    old_node_id=node_id,
+                    executor_kind=executor_kind,
+                )
+            continue
+        if other.get("online"):
             continue
         if node.get("managedNodeId") or other.get("managedNodeId"):
-            same_computer = bool(node.get("managedNodeId")) and node.get("managedNodeId") == other.get("managedNodeId")
+            same_computer = bool(node.get("managedNodeId")) and node.get(
+                "managedNodeId"
+            ) == other.get("managedNodeId")
         else:
-            same_computer = identity is not None and workspace_identity(other) == identity
+            same_computer = (
+                identity is not None and workspace_identity(other) == identity
+            )
         if not same_computer or _node_has_active_work(ctx, node_id):
             continue
         if _retire_compatibility_agent(ctx, agent, employee_id):
@@ -157,7 +208,9 @@ def _agent_placed_on_node(ctx: Any, agent_id: str, node_id: str) -> bool:
     )
 
 
-def _retire_compatibility_agent(ctx: Any, agent: dict[str, Any], employee_id: str) -> bool:
+def _retire_compatibility_agent(
+    ctx: Any, agent: dict[str, Any], employee_id: str
+) -> bool:
     """Remove an agent's live placements and delete it once it holds none.
 
     Returns False without deleting when the agent still has an active placement
@@ -165,7 +218,9 @@ def _retire_compatibility_agent(ctx: Any, agent: dict[str, Any], employee_id: st
     """
     for placement in ctx.agent_placement_store.list_placements(agent_id=agent["id"]):
         if placement.get("desiredState") != "removed":
-            ctx.agent_placement_store.update_placement(placement["id"], {"desiredState": "removed"})
+            ctx.agent_placement_store.update_placement(
+                placement["id"], {"desiredState": "removed"}
+            )
     if ctx.agent_placement_store.list_placements(agent_id=agent["id"]):
         return False
     ctx.agent_store.delete_agent(agent["id"])
@@ -217,25 +272,25 @@ def _remove_node_agents_locked(ctx: Any, node_id: str) -> list[str]:
         )
     except Exception as error:
         if "no such table" in str(error) or "does not exist" in str(error):
-            logger.warning("Skipping agent removal during rolling upgrade", node_id=node_id, error=str(error))
+            logger.warning(
+                "Skipping agent removal during rolling upgrade",
+                node_id=node_id,
+                error=str(error),
+            )
             return removed_agents
         raise
     for placement in placements:
         if placement.get("desiredState") != "removed":
-            ctx.agent_placement_store.update_placement(placement["id"], {"desiredState": "removed"})
+            ctx.agent_placement_store.update_placement(
+                placement["id"], {"desiredState": "removed"}
+            )
         agent_id = placement.get("agentId")
         if not agent_id or agent_id in seen:
             continue
         seen.add(agent_id)
         agent = ctx.agent_store.get_agent(agent_id)
-        active_elsewhere = ctx.agent_placement_store.list_placements(
-            agent_id=agent_id
-        )
-        if (
-            agent
-            and not agent.get("deletedAt")
-            and not active_elsewhere
-        ):
+        active_elsewhere = ctx.agent_placement_store.list_placements(agent_id=agent_id)
+        if agent and not agent.get("deletedAt") and not active_elsewhere:
             ctx.agent_store.delete_agent(agent_id)
             if getattr(ctx, "team_store", None):
                 remove_agent_from_teams(

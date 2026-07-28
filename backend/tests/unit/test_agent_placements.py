@@ -3,14 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 from relay.persistence.agent_placement_store import (
     DatabaseAgentPlacementStore,
     LocalAgentPlacementStore,
-    placement_status,
-    reconcile_single_active_placement,
     _new_placement,
     _placement_row,
+    placement_status,
+    reconcile_single_active_placement,
 )
 from relay.persistence.agent_store import (
     DatabaseAgentStore,
@@ -187,7 +186,9 @@ def test_reconcile_collapses_pre_invariant_multi_placements(tmp_path: Path) -> N
     assert reconcile_single_active_placement(placements) == []
 
 
-def test_database_reconcile_collapses_pre_invariant_multi_placements(tmp_path: Path) -> None:
+def test_database_reconcile_collapses_pre_invariant_multi_placements(
+    tmp_path: Path,
+) -> None:
     database_url = f"sqlite:///{tmp_path}/reconcile.db"
     agents = DatabaseAgentStore(database_url, create_schema=True)
     placements = DatabaseAgentPlacementStore(database_url, create_schema=True)
@@ -197,7 +198,11 @@ def test_database_reconcile_collapses_pre_invariant_multi_placements(tmp_path: P
     placements.create_placement(agent, "node_low", {"priority": 200})
     extra = _new_placement(agent, "node_top", {"priority": 50})
     with placements.engine.begin() as conn:
-        conn.execute(placements.placements.insert().values(**_placement_row(extra, event_version=1)))
+        conn.execute(
+            placements.placements.insert().values(
+                **_placement_row(extra, event_version=1)
+            )
+        )
     assert len(placements.list_placements(agent_id=agent["id"])) == 2
 
     reconcile_single_active_placement(placements)
@@ -282,7 +287,9 @@ def test_database_agent_placement_store_matches_local_contract(tmp_path: Path) -
     ]
 
 
-def test_database_placement_store_normalizes_legacy_owner_snapshot(tmp_path: Path) -> None:
+def test_database_placement_store_normalizes_legacy_owner_snapshot(
+    tmp_path: Path,
+) -> None:
     database_url = f"sqlite:///{tmp_path}/legacy-placements.db"
     agents = DatabaseAgentStore(database_url, create_schema=True)
     placements = DatabaseAgentPlacementStore(database_url, create_schema=True)
@@ -299,7 +306,4 @@ def test_database_placement_store_normalizes_legacy_owner_snapshot(tmp_path: Pat
             .values(snapshot=legacy)
         )
 
-    assert (
-        placements.get_placement(placement["id"])["supervisorEmployeeId"]
-        == "alice"
-    )
+    assert placements.get_placement(placement["id"])["supervisorEmployeeId"] == "alice"

@@ -7,7 +7,11 @@ from loguru import logger
 
 from ..persistence.agent_placement_store import placement_status
 from ..security.auth import require_admin_session
-from ..services.agent_routing import AgentRoutingError, resolve_agent_assignments
+from ..services.agent_routing import (
+    AgentRoutingError,
+    resolve_agent_assignments,
+    resolve_session_daemon_node_id,
+)
 from ..services.computer_names import computer_display_name
 from ..services.team_membership import remove_agent_from_teams
 from .deps import AppContextDep
@@ -287,10 +291,11 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
     requested_node_id = string_field(body, "daemonNodeId") or string_field(
         body, "daemon_node_id"
     )
-    session_node_id = (
-        session.get("daemonNodeId")
-        if session and isinstance(session.get("daemonNodeId"), str)
-        else None
+    daemon_nodes = ctx.registry.monitor_nodes()
+    session_node_id = resolve_session_daemon_node_id(
+        session,
+        ctx.agent_placement_store,
+        daemon_nodes,
     )
     if session_node_id and requested_node_id and requested_node_id != session_node_id:
         raise HTTPException(
@@ -332,7 +337,7 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
             is_admin=actor["isAdmin"],
             agent_store=ctx.agent_store,
             placement_store=ctx.agent_placement_store,
-            daemon_nodes=ctx.registry.monitor_nodes(),
+            daemon_nodes=daemon_nodes,
             session=session,
             required_node_id=required_node_id,
         )
