@@ -5,22 +5,21 @@ from tempfile import TemporaryDirectory
 from typing import Any
 
 from fastapi.testclient import TestClient
-
 from relay.app import create_app
 from relay.persistence.stores import relay_event
 
 
 def _bootstrap(client: TestClient) -> None:
-    assert client.post("/auth/bootstrap", json={
+    assert client.post("/api/v1/auth/bootstrap", json={
         "token": "admin_token",
         "username": "admin",
         "password": "secret123",
     }).status_code == 200
-    assert client.post("/auth/login", json={"username": "admin", "password": "secret123"}).status_code == 200
+    assert client.post("/api/v1/auth/login", json={"username": "admin", "password": "secret123"}).status_code == 200
 
 
 def _create_task_with_session(client: TestClient, workspace_path: str, *, title: str = "Ship the quarterly deck") -> dict[str, Any]:
-    response = client.post("/tasks", json={
+    response = client.post("/api/v1/tasks", json={
         "title": title,
         "createSession": True,
         "workspacePath": workspace_path,
@@ -62,7 +61,7 @@ def test_task_artifacts_lists_generated_files_from_linked_sessions(monkeypatch) 
         store.append_event(session_id, relay_event("artifact.created", session_id, {"artifact": deck}))
         store.append_event(session_id, relay_event("artifact.created", session_id, {"artifact": doc}))
 
-        response = client.get(f"/tasks/{task['id']}/artifacts")
+        response = client.get(f"/api/v1/tasks/{task['id']}/artifacts")
         assert response.status_code == 200, response.text
         body = response.json()
         assert body["taskId"] == task["id"]
@@ -88,10 +87,10 @@ def test_task_artifacts_dedupes_regenerated_file_across_sessions(monkeypatch) ->
 
         # A second run of the same task regenerates deck.pptx in a new session.
         pickup = client.post(
-            f"/tasks/{task['id']}/pickup",
+            f"/api/v1/tasks/{task['id']}/pickups",
             json={"agentId": agent["id"], "workspacePath": ws},
         )
-        assert pickup.status_code == 200, pickup.text
+        assert pickup.status_code == 201, pickup.text
         second_session = pickup.json()["session"]["id"]
 
         stale = _workspace_artifact(ws, "deck.pptx", artifact_id="art_v1", created_at="2026-06-29T00:00:00.000Z", content_type=PPTX_TYPE)
@@ -100,7 +99,7 @@ def test_task_artifacts_dedupes_regenerated_file_across_sessions(monkeypatch) ->
         store.append_event(first_session, relay_event("artifact.created", first_session, {"artifact": stale}))
         store.append_event(second_session, relay_event("artifact.created", second_session, {"artifact": fresh}))
 
-        response = client.get(f"/tasks/{task['id']}/artifacts")
+        response = client.get(f"/api/v1/tasks/{task['id']}/artifacts")
         assert response.status_code == 200, response.text
         artifacts = response.json()["artifacts"]
         assert len(artifacts) == 1
@@ -125,7 +124,7 @@ def test_task_artifacts_ignores_non_workspace_artifacts(monkeypatch) -> None:
         }
         app.state.session_store.append_event(session_id, relay_event("artifact.created", session_id, {"artifact": log}))
 
-        response = client.get(f"/tasks/{task['id']}/artifacts")
+        response = client.get(f"/api/v1/tasks/{task['id']}/artifacts")
         assert response.status_code == 200, response.text
         assert response.json()["artifacts"] == []
 
@@ -135,11 +134,11 @@ def test_task_artifacts_empty_for_task_without_sessions(monkeypatch) -> None:
     with TemporaryDirectory() as root:
         client = TestClient(create_app(root))
         _bootstrap(client)
-        response = client.post("/tasks", json={"title": "No sessions yet"})
+        response = client.post("/api/v1/tasks", json={"title": "No sessions yet"})
         assert response.status_code == 201, response.text
         task_id = response.json()["id"]
 
-        listing = client.get(f"/tasks/{task_id}/artifacts")
+        listing = client.get(f"/api/v1/tasks/{task_id}/artifacts")
         assert listing.status_code == 200, listing.text
         assert listing.json() == {"taskId": task_id, "artifacts": []}
 
@@ -149,7 +148,7 @@ def test_task_artifacts_unknown_task_is_404(monkeypatch) -> None:
     with TemporaryDirectory() as root:
         client = TestClient(create_app(root))
         _bootstrap(client)
-        assert client.get("/tasks/task_missing/artifacts").status_code == 404
+        assert client.get("/api/v1/tasks/task_missing/artifacts").status_code == 404
 
 
 def test_task_artifacts_denied_for_other_employee(monkeypatch) -> None:
@@ -160,13 +159,13 @@ def test_task_artifacts_denied_for_other_employee(monkeypatch) -> None:
         _bootstrap(client)
         task = _create_task_with_session(client, ws)
 
-        assert client.post("/cp/users", json={
+        assert client.post("/api/v1/admin/users", json={
             "username": "worker",
             "password": "secret123",
             "employeeId": "emp_worker",
         }).status_code == 201
         worker = TestClient(app)
-        assert worker.post("/auth/login", json={"username": "worker", "password": "secret123"}).status_code == 200
+        assert worker.post("/api/v1/auth/login", json={"username": "worker", "password": "secret123"}).status_code == 200
 
-        response = worker.get(f"/tasks/{task['id']}/artifacts")
+        response = worker.get(f"/api/v1/tasks/{task['id']}/artifacts")
         assert response.status_code == 403

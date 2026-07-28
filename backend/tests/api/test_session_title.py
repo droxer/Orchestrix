@@ -3,23 +3,22 @@ from __future__ import annotations
 from tempfile import TemporaryDirectory
 
 from fastapi.testclient import TestClient
-
 from relay.app import create_app
 
 
 def _bootstrap(client: TestClient) -> None:
-    response = client.post("/auth/bootstrap", json={
+    response = client.post("/api/v1/auth/bootstrap", json={
         "token": "admin_token",
         "username": "admin",
         "password": "secret123",
     })
     assert response.status_code == 200
-    response = client.post("/auth/login", json={"username": "admin", "password": "secret123"})
+    response = client.post("/api/v1/auth/login", json={"username": "admin", "password": "secret123"})
     assert response.status_code == 200
 
 
 def _create_session(client: TestClient) -> str:
-    response = client.post("/sessions", json={
+    response = client.post("/api/v1/threads", json={
         "taskGoal": "demo task",
         "assignments": [{"agent": "claude", "mode": "action"}],
         "workspacePath": "/workspace",
@@ -36,15 +35,15 @@ def test_rename_endpoint_sets_title(monkeypatch) -> None:
         session_id = _create_session(client)
 
         # Fresh session has no title; label falls back to taskGoal.
-        snapshot = client.get(f"/sessions/{session_id}").json()
+        snapshot = client.get(f"/api/v1/threads/{session_id}").json()
         assert snapshot.get("title") is None
 
-        response = client.post(f"/sessions/{session_id}/title", json={"title": "Auth bug"})
+        response = client.patch(f"/api/v1/threads/{session_id}", json={"title": "Auth bug"})
         assert response.status_code == 200
         assert response.json()["title"] == "Auth bug"
 
         # Title persists through replay (read back from a fresh materialization).
-        reread = client.get(f"/sessions/{session_id}").json()
+        reread = client.get(f"/api/v1/threads/{session_id}").json()
         assert reread["title"] == "Auth bug"
 
 
@@ -55,7 +54,7 @@ def test_rename_rejects_empty_title(monkeypatch) -> None:
         _bootstrap(client)
         session_id = _create_session(client)
 
-        response = client.post(f"/sessions/{session_id}/title", json={"title": "   "})
+        response = client.patch(f"/api/v1/threads/{session_id}", json={"title": "   "})
         assert response.status_code == 400
 
 
@@ -65,5 +64,5 @@ def test_rename_requires_known_session(monkeypatch) -> None:
         client = TestClient(create_app(root))
         _bootstrap(client)
 
-        response = client.post("/sessions/sess_unknown/title", json={"title": "x"})
+        response = client.patch("/api/v1/threads/sess_unknown", json={"title": "x"})
         assert response.status_code == 404

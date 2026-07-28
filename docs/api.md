@@ -73,15 +73,8 @@ Resource creation returns `201`. Runs, cancellations, and provisioning that are
 queued return `202`. A synchronous deletion returns `200` when it returns a
 representation and `204` otherwise.
 
-## Compatibility Window
+## Cutover Policy
 
-For one release, old unversioned routes, `/sessions`, `/cp`, daemon registration,
-and chat-service paths remain schema-hidden aliases. They keep their legacy
-payload and status contracts and return:
-
-```http
-Deprecation: true
-Link: </api/v1/...>; rel="successor-version"
-```
-
-Exact `/cp` redirects to `/admin`. Legacy aliases are not listed in OpenAPI.
+Only the canonical paths documented here are mounted. Relay is under active
+development, so unversioned JSON routes, `/sessions`, `/cp`, old action routes,
+and hash-based browser URLs do not have compatibility aliases or redirects.

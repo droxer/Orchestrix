@@ -95,12 +95,18 @@ async def agent_artifacts(
     agent = ctx.agent_store.get_agent(agent_id)
     if not agent or agent.get("deletedAt"):
         raise HTTPException(404, "Agent not found.")
-    if not actor["isAdmin"] and agent.get("supervisorEmployeeId") != actor["employeeId"]:
+    if (
+        not actor["isAdmin"]
+        and agent.get("supervisorEmployeeId") != actor["employeeId"]
+    ):
         raise HTTPException(403, "Cannot read another employee's agent artifacts.")
-    return {"agentId": agent_id, "artifacts": newest_agent_workspace_artifacts(ctx.session_store, agent_id)}
+    return {
+        "agentId": agent_id,
+        "artifacts": newest_agent_workspace_artifacts(ctx.session_store, agent_id),
+    }
 
 
-@router.get("/cp/agents")
+@router.get("/admin/agents")
 async def list_control_panel_agents(
     request: Request, ctx: AppContextDep
 ) -> dict[str, Any]:
@@ -120,7 +126,7 @@ async def list_control_panel_agents(
     }
 
 
-@router.post("/cp/agents", status_code=201)
+@router.post("/admin/agents", status_code=201)
 async def create_control_panel_agent(
     request: Request, ctx: AppContextDep
 ) -> dict[str, Any]:
@@ -132,24 +138,12 @@ async def create_control_panel_agent(
     try:
         return {"agent": ctx.agent_store.create_agent(employee_id, body)}
     except ValueError as error:
-        raise HTTPException(409 if "already has" in str(error) else 400, str(error)) from error
+        raise HTTPException(
+            409 if "already has" in str(error) else 400, str(error)
+        ) from error
 
 
-@router.post("/cp/employees/{employee_id}/agents", status_code=201)
-async def create_employee_agent_compat(
-    employee_id: str, request: Request, ctx: AppContextDep
-) -> dict[str, Any]:
-    """Compatibility route retained while callers move to /cp/agents."""
-    require_admin_session(request, ctx.auth_store)
-    if not _employee_exists(ctx.auth_store, employee_id):
-        raise HTTPException(404, "Employee not found.")
-    try:
-        return {"agent": ctx.agent_store.create_agent(employee_id, await json_body(request))}
-    except ValueError as error:
-        raise HTTPException(409 if "already has" in str(error) else 400, str(error)) from error
-
-
-@router.get("/cp/agents/{agent_id}")
+@router.get("/admin/agents/{agent_id}")
 async def get_control_panel_agent(
     agent_id: str, request: Request, ctx: AppContextDep
 ) -> dict[str, Any]:
@@ -160,7 +154,7 @@ async def get_control_panel_agent(
     return {"agent": _agent_with_placements(ctx, agent)}
 
 
-@router.patch("/cp/agents/{agent_id}")
+@router.patch("/admin/agents/{agent_id}")
 async def update_control_panel_agent(
     agent_id: str, request: Request, ctx: AppContextDep
 ) -> dict[str, Any]:
@@ -179,7 +173,7 @@ async def update_control_panel_agent(
         ) from error
 
 
-@router.delete("/cp/agents/{agent_id}", status_code=202)
+@router.delete("/admin/agents/{agent_id}", status_code=200)
 async def delete_control_panel_agent(
     agent_id: str, request: Request, ctx: AppContextDep
 ) -> dict[str, Any]:
@@ -189,20 +183,19 @@ async def delete_control_panel_agent(
         raise HTTPException(404, "Agent not found.")
     if _agent_has_active_run(ctx, agent_id):
         raise HTTPException(
-            409, "Agent has active work. Wait for its runs to finish before deleting it."
+            409,
+            "Agent has active work. Wait for its runs to finish before deleting it.",
         )
     try:
         deleted = ctx.agent_store.delete_agent(agent_id)
         ctx.profile_image_store.delete("agents", agent_id)
-        remove_agent_from_teams(
-            ctx.team_store, agent_id, agent["supervisorEmployeeId"]
-        )
+        remove_agent_from_teams(ctx.team_store, agent_id, agent["supervisorEmployeeId"])
         return {"agent": deleted}
     except KeyError as error:
         raise HTTPException(404, "Agent not found.") from error
 
 
-@router.get("/cp/agent-placements")
+@router.get("/admin/agent-placements")
 async def list_agent_placements(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     require_admin_session(request, ctx.auth_store)
     agent_id = request.query_params.get("agentId") or None
@@ -215,7 +208,7 @@ async def list_agent_placements(request: Request, ctx: AppContextDep) -> dict[st
     return {"placements": [_placement_view(ctx, placement) for placement in placements]}
 
 
-@router.post("/cp/agents/{agent_id}/placements", status_code=201)
+@router.post("/admin/agents/{agent_id}/placements", status_code=201)
 async def create_agent_placement(
     agent_id: str, request: Request, ctx: AppContextDep
 ) -> dict[str, Any]:
@@ -240,7 +233,7 @@ async def create_agent_placement(
     return {"placement": _placement_view(ctx, placement)}
 
 
-@router.patch("/cp/agent-placements/{placement_id}")
+@router.patch("/admin/agent-placements/{placement_id}")
 async def update_agent_placement(
     placement_id: str, request: Request, ctx: AppContextDep
 ) -> dict[str, Any]:
@@ -256,7 +249,7 @@ async def update_agent_placement(
     return {"placement": _placement_view(ctx, placement)}
 
 
-@router.delete("/cp/agent-placements/{placement_id}", status_code=202)
+@router.delete("/admin/agent-placements/{placement_id}", status_code=200)
 async def delete_agent_placement(
     placement_id: str, request: Request, ctx: AppContextDep
 ) -> dict[str, Any]:
@@ -285,9 +278,7 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
         existing = ctx.backend.idempotent_run(idempotency_key, actor["employeeId"])
         if existing:
             return existing
-    session_id = string_field(body, "sessionId") or string_field(
-        body, "session_id"
-    )
+    session_id = string_field(body, "sessionId") or string_field(body, "session_id")
     session = (
         get_session_for_actor(ctx.session_store, session_id, actor)
         if session_id
@@ -301,11 +292,7 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
         if session and isinstance(session.get("daemonNodeId"), str)
         else None
     )
-    if (
-        session_node_id
-        and requested_node_id
-        and requested_node_id != session_node_id
-    ):
+    if session_node_id and requested_node_id and requested_node_id != session_node_id:
         raise HTTPException(
             409,
             {
@@ -330,7 +317,8 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
                 "agentId": item["agentId"],
                 **(
                     {"executorKind": item["executorKind"]}
-                    if isinstance(item.get("executorKind"), str) and item["executorKind"]
+                    if isinstance(item.get("executorKind"), str)
+                    and item["executorKind"]
                     else {}
                 ),
                 "mode": agent_task_mode(item.get("mode")),
@@ -375,10 +363,17 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
                 )
             target_assignment = resolved[0]
             if target_agent != target_assignment["executorKind"]:
-                raise HTTPException(400, "decision targetAgent does not match assignment.")
+                raise HTTPException(
+                    400, "decision targetAgent does not match assignment."
+                )
             requested_target_id = decision.get("targetAgentId")
-            if requested_target_id and requested_target_id != target_assignment["agentId"]:
-                raise HTTPException(400, "decision targetAgentId does not match assignment.")
+            if (
+                requested_target_id
+                and requested_target_id != target_assignment["agentId"]
+            ):
+                raise HTTPException(
+                    400, "decision targetAgentId does not match assignment."
+                )
             parsed["decision"] = {
                 "kind": kind,
                 "targetAgent": target_assignment["executorKind"],

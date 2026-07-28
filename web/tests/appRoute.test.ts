@@ -4,7 +4,6 @@ import { describe, it } from "node:test";
 import {
   canonicalBrowserUrl,
   hrefForRoute,
-  legacyHashUrl,
   parseAppPath,
   pathForAppState,
   validatedReturnTo,
@@ -44,24 +43,6 @@ describe("app pathname routes", () => {
   it("marks unknown paths as not found instead of opening chat", () => {
     assert.equal(parseAppPath("/missing").notFound, true);
     assert.equal(parseAppPath("/threads/a/b").notFound, true);
-  });
-
-  it("migrates every supported legacy hash and its scoped query", () => {
-    assert.equal(legacyHashUrl("#/chat/ses%2F1"), "/threads/ses%2F1");
-    assert.equal(legacyHashUrl("#/threads"), "/threads");
-    assert.equal(legacyHashUrl("#/routine"), "/routines");
-    assert.equal(
-      legacyHashUrl("#/agents/agent%201/workspace?workspaceTab=workspace&workspaceScope=shared&workspacePath=src&workspaceItem=a.ts"),
-      "/agents/agent%201?tab=workspace&scope=shared&path=src&item=a.ts",
-    );
-    assert.equal(
-      legacyHashUrl("#/teams?team=team+one&teamTab=artifacts&teamArtifact=art+1"),
-      "/teams/team%20one?tab=artifacts&artifact=art+1",
-    );
-    assert.equal(
-      legacyHashUrl("#/teams", "?team=team+one&teamTab=artifacts"),
-      "/teams/team%20one?tab=artifacts",
-    );
   });
 
   it("accepts only recognized same-origin authentication return paths", () => {

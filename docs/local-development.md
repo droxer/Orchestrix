@@ -270,7 +270,7 @@ make web
 ```
 
 The web dev server reads `web/.env.local`; set `RELAY_BACKEND_URL` there to
-change the backend proxy target. The exported UI at `/web` includes chat,
+change the backend proxy target. The exported UI at `/` includes chat,
 backlog, routines, MCP, skills, channels, and the admin page. You can also
 override the backend URL for one run:
 
@@ -319,9 +319,9 @@ make serve
 make serve PORT=9000
 ```
 
-By default, `make serve` listens on `127.0.0.1:8787`. It reads real task and
-session files from `.relay/tasks` and `.relay/sessions`; it does not seed,
-mock, or display dummy work.
+By default, `make serve` listens on `127.0.0.1:8787`. It reads real state from
+the configured database and `.relay/`; it does not seed, mock, or display dummy
+work.
 
 Canonical route groups:
 

@@ -141,53 +141,6 @@ export function canonicalBrowserUrl(pathname: string, search = ""): string {
   return `${pathname}${canonicalSearchForPath(pathname, search)}`;
 }
 
-function legacyQuery(hash: string, search: string): URLSearchParams {
-  const params = new URLSearchParams(search);
-  for (const [key, value] of new URLSearchParams(hash.split("?", 2)[1] ?? "")) params.set(key, value);
-  return params;
-}
-
-/** Converts one-release hash bookmarks to their canonical pathname and query. */
-export function legacyHashUrl(hash: string, search = ""): string | null {
-  if (!hash.startsWith("#/")) return null;
-  const hashPath = hash.split("?", 1)[0]?.slice(1) ?? "";
-  const [head, second, third] = pathSegments(hashPath);
-  const old = legacyQuery(hash, search);
-  const next = new URLSearchParams();
-  let pathname: string;
-
-  if (head === "chat") pathname = second ? `/threads/${encodeURIComponent(decodeSegment(second) ?? second)}` : "/threads";
-  else if (head === "threads") pathname = "/threads";
-  else if (head === "routine" || head === "routines") pathname = "/routines";
-  else if (head === "agents" && second && third === "workspace") {
-    pathname = `/agents/${encodeURIComponent(decodeSegment(second) ?? second)}`;
-    for (const [legacy, canonical] of [["workspaceTab", "tab"], ["workspaceScope", "scope"], ["workspacePath", "path"], ["workspaceItem", "item"]]) {
-      const value = old.get(legacy);
-      if (value) next.set(canonical, value);
-    }
-  } else if (head === "agents") {
-    pathname = "/agents";
-    const query = old.get("agentsQ");
-    const availability = old.get("agentsFilter");
-    if (query) next.set("q", query);
-    if (availability) next.set("availability", availability);
-  } else if (head === "teams") {
-    const teamId = old.get("team");
-    pathname = teamId ? `/teams/${encodeURIComponent(teamId)}` : "/teams";
-    if (old.get("addTeam") === "1") next.set("dialog", "create");
-    const tab = old.get("teamTab");
-    const artifact = old.get("teamArtifact");
-    if (tab) next.set("tab", tab);
-    if (artifact) next.set("artifact", artifact);
-  } else if (head === "backlog") pathname = "/backlog";
-  else if (head === "channels") pathname = "/channels";
-  else if (head === "admin") pathname = "/admin";
-  else return "/threads";
-
-  const query = next.toString();
-  return canonicalBrowserUrl(pathname, query ? `?${query}` : "");
-}
-
 export function validatedReturnTo(value: string | null, origin = "http://relay.local"): string {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return "/threads";
   try {

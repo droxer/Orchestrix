@@ -96,7 +96,7 @@ async function main(): Promise<void> {
     const detail = error instanceof Error ? error.message : String(error);
     console.error(detail);
     if (!ownsBackend) {
-      console.error(`A backend is already listening at ${backendUrl}; check its /cp page or run make stop before retrying.`);
+      console.error(`A backend is already listening at ${backendUrl}; check its /admin page or run make stop before retrying.`);
     }
     process.exitCode = 1;
   }

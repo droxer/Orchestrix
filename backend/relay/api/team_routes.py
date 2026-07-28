@@ -8,9 +8,14 @@ from ..persistence.team_store import TeamValidationError, validate_team_payload
 from ..security.auth import require_admin_session
 from .agent_routes import _agent_with_placements, _employee_exists
 from .deps import AppContextDep
-from .helpers import json_body, request_actor, string_field
-from .helpers import artifact_index_item, workspace_artifact_key, workspace_artifacts
-
+from .helpers import (
+    artifact_index_item,
+    json_body,
+    request_actor,
+    string_field,
+    workspace_artifact_key,
+    workspace_artifacts,
+)
 
 router = APIRouter()
 
@@ -143,7 +148,7 @@ async def update_team(
     return {"team": _team_view(ctx, team)}
 
 
-@router.delete("/teams/{team_id}", status_code=202)
+@router.delete("/teams/{team_id}", status_code=200)
 async def delete_team(
     team_id: str, request: Request, ctx: AppContextDep
 ) -> dict[str, Any]:
@@ -154,7 +159,7 @@ async def delete_team(
     return {"team": _team_view(ctx, deleted)}
 
 
-@router.get("/cp/teams")
+@router.get("/admin/teams")
 async def list_control_panel_teams(
     request: Request, ctx: AppContextDep
 ) -> dict[str, Any]:
@@ -168,7 +173,7 @@ async def list_control_panel_teams(
     }
 
 
-@router.post("/cp/teams", status_code=201)
+@router.post("/admin/teams", status_code=201)
 async def create_control_panel_team(
     request: Request, ctx: AppContextDep
 ) -> dict[str, Any]:
@@ -200,7 +205,7 @@ async def create_control_panel_team(
     return {"team": _team_view(ctx, team)}
 
 
-@router.get("/cp/teams/{team_id}")
+@router.get("/admin/teams/{team_id}")
 async def get_control_panel_team(
     team_id: str, request: Request, ctx: AppContextDep
 ) -> dict[str, Any]:
@@ -208,7 +213,7 @@ async def get_control_panel_team(
     return {"team": _team_view(ctx, _active_team(ctx, team_id))}
 
 
-@router.patch("/cp/teams/{team_id}")
+@router.patch("/admin/teams/{team_id}")
 async def update_control_panel_team(
     team_id: str, request: Request, ctx: AppContextDep
 ) -> dict[str, Any]:
@@ -234,7 +239,7 @@ async def update_control_panel_team(
     return {"team": _team_view(ctx, team)}
 
 
-@router.delete("/cp/teams/{team_id}", status_code=202)
+@router.delete("/admin/teams/{team_id}", status_code=200)
 async def delete_control_panel_team(
     team_id: str, request: Request, ctx: AppContextDep
 ) -> dict[str, Any]:

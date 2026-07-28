@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
-
 from relay.app import create_app
 
 
 def _bootstrap(client: TestClient) -> None:
-    assert client.post("/auth/bootstrap", json={"token": "admin_token", "username": "admin", "password": "secret123"}).status_code == 200
+    assert client.post("/api/v1/auth/bootstrap", json={"token": "admin_token", "username": "admin", "password": "secret123"}).status_code == 200
 
 
 def _register_node(app, *, capabilities: list[str]) -> None:
@@ -37,13 +36,13 @@ def test_admin_browses_node_shared_workspace(monkeypatch, tmp_path):
         return {"type": "workspace.file", "path": "shared.md", "bytes": 5, "isBinary": False, "truncated": False, "contentBase64": "aGVsbG8="}
 
     monkeypatch.setattr("relay.api.node_workspace_routes._dispatch", dispatch)
-    listing = client.get("/cp/daemon-nodes/node_1/workspace/files")
+    listing = client.get("/api/v1/admin/daemon-nodes/node_1/workspace/files")
     assert listing.status_code == 200, listing.text
     assert listing.json()["nodeId"] == "node_1"
     assert listing.json()["scope"] == "shared"
     assert listing.json()["entries"][0]["name"] == "shared.md"
 
-    file = client.get("/cp/daemon-nodes/node_1/workspace/file?path=shared.md")
+    file = client.get("/api/v1/admin/daemon-nodes/node_1/workspace/file?path=shared.md")
     assert file.status_code == 200
     assert file.json()["content"] == "hello"
 
@@ -54,10 +53,10 @@ def test_node_workspace_requires_admin(monkeypatch, tmp_path):
     admin = TestClient(app)
     _bootstrap(admin)
     _register_node(app, capabilities=["workspace-read", "workspace-read-shared"])
-    assert admin.post("/cp/users", json={"username": "bob", "password": "userpass", "employeeId": "bob"}).status_code == 201
+    assert admin.post("/api/v1/admin/users", json={"username": "bob", "password": "userpass", "employeeId": "bob"}).status_code == 201
     bob = TestClient(app)
-    assert bob.post("/auth/login", json={"username": "bob", "password": "userpass"}).status_code == 200
-    assert bob.get("/cp/daemon-nodes/node_1/workspace/files").status_code == 403
+    assert bob.post("/api/v1/auth/login", json={"username": "bob", "password": "userpass"}).status_code == 200
+    assert bob.get("/api/v1/admin/daemon-nodes/node_1/workspace/files").status_code == 403
 
 
 def test_node_workspace_unavailable_without_shared_capability(monkeypatch, tmp_path):
@@ -67,8 +66,8 @@ def test_node_workspace_unavailable_without_shared_capability(monkeypatch, tmp_p
     _bootstrap(client)
     _register_node(app, capabilities=["workspace-read"])
 
-    response = client.get("/cp/daemon-nodes/node_1/workspace/files")
+    response = client.get("/api/v1/admin/daemon-nodes/node_1/workspace/files")
     assert response.status_code == 503
     assert response.json()["detail"] == {"reason": "placement-unavailable"}
-    assert client.get("/cp/daemon-nodes/missing/workspace/files").status_code == 404
-    assert client.get("/cp/daemon-nodes/node_1/workspace/file?path=../x").status_code == 400
+    assert client.get("/api/v1/admin/daemon-nodes/missing/workspace/files").status_code == 404
+    assert client.get("/api/v1/admin/daemon-nodes/node_1/workspace/file?path=../x").status_code == 400

@@ -159,7 +159,7 @@ PostgreSQL as well.
 - [Local Development](docs/local-development.md): setup, environment, service
   commands, data layout, and tests.
 - [HTTP API and Web URLs](docs/api.md): canonical browser paths, `/api/v1`
-  namespaces, operation semantics, and compatibility aliases.
+  namespaces, and operation semantics.
 - [Product Design](docs/product.md): product direction, users, scenarios, and
   roadmap.
 - [Architecture Design](docs/system-architecture.md): target planes, sandbox

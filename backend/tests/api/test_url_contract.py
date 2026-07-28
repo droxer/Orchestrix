@@ -55,12 +55,28 @@ def test_openapi_publishes_only_the_canonical_json_contract(
     assert len(operation_ids) == len(set(operation_ids))
 
     assert set(paths["/api/v1/threads/{session_id}"]) == {"get", "patch", "delete"}
+    assert "204" in paths["/api/v1/threads/{session_id}"]["delete"]["responses"]
     assert set(paths["/api/v1/tasks/{task_id}/assignment"]) == {"put"}
     assert "201" in paths["/api/v1/tasks/{task_id}/pickups"]["post"]["responses"]
     assert set(paths["/api/v1/admin/daemon-nodes/{node_id}/assignment"]) == {
         "put",
         "delete",
     }
+    assert (
+        "200" in paths["/api/v1/daemon-nodes/{sandbox_id}/events"]["post"]["responses"]
+    )
+    assert "200" in paths["/api/v1/teams/{team_id}"]["delete"]["responses"]
+    assert "200" in paths["/api/v1/admin/agents/{agent_id}"]["delete"]["responses"]
+    assert "200" in paths["/api/v1/admin/agent-placements/{placement_id}"][
+        "delete"
+    ]["responses"]
+    assert (
+        "202" in paths["/api/v1/admin/managed-nodes/{node_id}"]["delete"]["responses"]
+    )
+    assert (
+        "204"
+        in paths["/api/v1/admin/managed-nodes/{node_id}/record"]["delete"]["responses"]
+    )
 
 
 def test_api_discovery_is_generated_from_version_constants(
@@ -75,65 +91,26 @@ def test_api_discovery_is_generated_from_version_constants(
         "basePath": "/api/v1",
         "docsPath": "/api/docs",
         "openapiPath": "/api/openapi.json",
+        "redocPath": "/api/redoc",
         "uiPath": "/admin",
         "webUiPath": "/",
     }
 
 
-def test_legacy_routes_are_hidden_deprecated_aliases(
-    monkeypatch, tmp_path: Path
-) -> None:
+def test_unversioned_api_routes_are_not_mounted(monkeypatch, tmp_path: Path) -> None:
     client = _client(monkeypatch, tmp_path)
 
-    response = client.get("/auth/status")
-
-    assert response.status_code == 200
-    assert response.headers["deprecation"] == "true"
-    assert response.headers["link"] == '</api/v1/auth/status>; rel="successor-version"'
-
-    redirect = client.get("/cp", follow_redirects=False)
-    assert redirect.status_code == 308
-    assert redirect.headers["location"] == "/admin"
-    assert redirect.headers["deprecation"] == "true"
-    assert redirect.headers["link"] == '</admin>; rel="successor-version"'
-
-    retry = client.post("/cp/managed-nodes/node_1/retry")
-    assert retry.headers["link"] == (
-        '</api/v1/admin/managed-nodes/node_1/attempts>; rel="successor-version"'
-    )
-    drain = client.post("/cp/managed-nodes/node_1/drain")
-    assert drain.headers["link"] == (
-        '</api/v1/admin/managed-nodes/node_1>; rel="successor-version"'
-    )
-
-
-def test_legacy_daemon_can_register_and_appear_through_the_v1_api(
-    monkeypatch, tmp_path: Path
-) -> None:
-    client = _client(monkeypatch, tmp_path)
-    _bootstrap(client)
-
-    registered = client.post(
-        "/daemon-nodes/register",
-        json={
-            "sandboxId": "sbx_legacy",
-            "employeeId": "admin",
-            "token": "legacy_node_token",
-            "workspacePath": "/workspace/admin",
-            "protocolVersion": 1,
-            "supportedAgents": ["codex"],
-            "status": "ready",
-        },
-    )
-
-    assert registered.status_code == 200
-    assert registered.headers["deprecation"] == "true"
-    assert registered.headers["link"] == (
-        '</api/v1/daemon-node-registrations>; rel="successor-version"'
-    )
-    nodes = client.get(f"{API_PREFIX}/daemon-nodes")
-    assert nodes.status_code == 200
-    assert [node["id"] for node in nodes.json()["nodes"]] == ["sbx_legacy"]
+    for method, path in (
+        ("GET", "/auth/status"),
+        ("GET", "/sessions"),
+        ("GET", "/cp"),
+        ("POST", "/daemon-nodes/register"),
+        ("POST", "/chat/conversation/sessions"),
+    ):
+        response = client.request(method, path)
+        assert response.status_code == 404
+        assert "deprecation" not in response.headers
+        assert "link" not in response.headers
 
 
 def test_thread_patch_replaces_title_and_archive_action_urls(
@@ -157,10 +134,6 @@ def test_thread_patch_replaces_title_and_archive_action_urls(
     assert archived.status_code == 200
     assert archived.json()["archived"] is True
 
-    legacy = client.get(f"/sessions/{thread_id}")
-    assert legacy.status_code == 200
-    assert legacy.headers["deprecation"] == "true"
-
 
 def test_spa_fallback_is_allowlisted_and_never_masks_api_typos(
     monkeypatch, tmp_path: Path
@@ -176,10 +149,6 @@ def test_spa_fallback_is_allowlisted_and_never_masks_api_typos(
         assert browser_route.status_code == 200
         assert browser_route.text == "<html>relay-spa</html>"
         assert "deprecation" not in browser_route.headers
-
-    legacy_agents_api = client.get("/agents")
-    assert legacy_agents_api.status_code == 401
-    assert legacy_agents_api.headers["deprecation"] == "true"
 
     for path in (
         "/api/v1/missing",

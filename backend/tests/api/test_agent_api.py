@@ -3,14 +3,13 @@ from __future__ import annotations
 from tempfile import TemporaryDirectory
 
 from fastapi.testclient import TestClient
-
 from relay.app import create_app
 from relay.persistence.store_common import _write_json
 
 
 def _bootstrap_admin(client: TestClient) -> None:
     response = client.post(
-        "/auth/bootstrap",
+        "/api/v1/auth/bootstrap",
         json={"token": "admin_token", "username": "admin", "password": "secret123"},
     )
     assert response.status_code == 200
@@ -24,7 +23,7 @@ def test_admin_manages_agents_and_employee_lists_own_agents(
         client = TestClient(create_app(root))
         _bootstrap_admin(client)
         employee = client.post(
-            "/cp/employees",
+            "/api/v1/admin/employees",
             json={
                 "employeeId": "alice",
                 "username": "alice",
@@ -35,16 +34,18 @@ def test_admin_manages_agents_and_employee_lists_own_agents(
         assert employee.status_code == 201
 
         researcher = client.post(
-            "/cp/employees/alice/agents",
+            "/api/v1/admin/agents",
             json={
+                "supervisorEmployeeId": "alice",
                 "displayName": "Researcher",
                 "executorKind": "claude",
                 "defaultRole": "planner",
             },
         )
         reviewer = client.post(
-            "/cp/employees/alice/agents",
+            "/api/v1/admin/agents",
             json={
+                "supervisorEmployeeId": "alice",
                 "displayName": "Reviewer",
                 "executorKind": "claude",
                 "defaultRole": "reviewer",
@@ -52,14 +53,14 @@ def test_admin_manages_agents_and_employee_lists_own_agents(
         )
         assert researcher.status_code == reviewer.status_code == 201
 
-        assert client.post("/auth/logout").status_code == 200
+        assert client.post("/api/v1/auth/logout").status_code == 200
         assert (
             client.post(
-                "/auth/login", json={"username": "alice", "password": "userpass"}
+                "/api/v1/auth/login", json={"username": "alice", "password": "userpass"}
             ).status_code
             == 200
         )
-        own_agents = client.get("/agents")
+        own_agents = client.get("/api/v1/agents")
 
         assert own_agents.status_code == 200
         assert {agent["displayName"] for agent in own_agents.json()["agents"]} == {
@@ -73,11 +74,15 @@ def test_employee_agent_admin_routes_require_admin(monkeypatch) -> None:
     with TemporaryDirectory() as root:
         client = TestClient(create_app(root))
 
-        assert client.get("/cp/agents").status_code == 401
+        assert client.get("/api/v1/admin/agents").status_code == 401
         assert (
             client.post(
-                "/cp/employees/alice/agents",
-                json={"displayName": "Builder", "executorKind": "codex"},
+                "/api/v1/admin/agents",
+                json={
+                    "supervisorEmployeeId": "alice",
+                    "displayName": "Builder",
+                    "executorKind": "codex",
+                },
             ).status_code
             == 401
         )
@@ -91,18 +96,21 @@ def test_unprovisioned_daemon_registration_cannot_mint_logical_agents(
         app = create_app(root)
         admin_client = TestClient(app)
         _bootstrap_admin(admin_client)
-        assert admin_client.post(
-            "/cp/employees",
-            json={
-                "employeeId": "alice",
-                "username": "alice",
-                "password": "userpass",
-            },
-        ).status_code == 201
+        assert (
+            admin_client.post(
+                "/api/v1/admin/employees",
+                json={
+                    "employeeId": "alice",
+                    "username": "alice",
+                    "password": "userpass",
+                },
+            ).status_code
+            == 201
+        )
 
         daemon_client = TestClient(app)
         registered = daemon_client.post(
-            "/daemon-nodes/register",
+            "/api/v1/daemon-node-registrations",
             headers={"Authorization": "Bearer untrusted_ui_token"},
             json={
                 "sandboxId": "unprovisioned",
@@ -121,7 +129,7 @@ def test_unprovisioned_daemon_registration_cannot_mint_logical_agents(
         restarted_app = create_app(root)
         restarted_daemon = TestClient(restarted_app)
         heartbeat = restarted_daemon.post(
-            "/daemon-nodes/register",
+            "/api/v1/daemon-node-registrations",
             headers={"Authorization": "Bearer untrusted_ui_token"},
             json={
                 "sandboxId": "unprovisioned",
@@ -138,11 +146,19 @@ def test_unprovisioned_daemon_registration_cannot_mint_logical_agents(
         assert "employeeId" not in heartbeat.json()
         assert "nodeLocation" not in heartbeat.json()
         restarted_admin = TestClient(restarted_app)
-        assert restarted_admin.post(
-            "/auth/login",
-            json={"username": "admin", "password": "secret123"},
-        ).status_code == 200
-        assert restarted_admin.get("/cp/agents?employeeId=alice").json()["agents"] == []
+        assert (
+            restarted_admin.post(
+                "/api/v1/auth/login",
+                json={"username": "admin", "password": "secret123"},
+            ).status_code
+            == 200
+        )
+        assert (
+            restarted_admin.get("/api/v1/admin/agents?employeeId=alice").json()[
+                "agents"
+            ]
+            == []
+        )
 
 
 def test_control_plane_provisioned_node_materializes_compatibility_agents(
@@ -152,16 +168,19 @@ def test_control_plane_provisioned_node_materializes_compatibility_agents(
     with TemporaryDirectory() as root:
         client = TestClient(create_app(root))
         _bootstrap_admin(client)
-        assert client.post(
-            "/cp/employees",
-            json={
-                "employeeId": "alice",
-                "username": "alice",
-                "password": "userpass",
-            },
-        ).status_code == 201
+        assert (
+            client.post(
+                "/api/v1/admin/employees",
+                json={
+                    "employeeId": "alice",
+                    "username": "alice",
+                    "password": "userpass",
+                },
+            ).status_code
+            == 201
+        )
         provisioned = client.post(
-            "/cp/daemon-nodes",
+            "/api/v1/admin/daemon-nodes",
             json={
                 "employeeId": "alice",
                 "workspacePath": "/workspace/alice",
@@ -170,7 +189,7 @@ def test_control_plane_provisioned_node_materializes_compatibility_agents(
         ).json()
 
         registered = client.post(
-            "/daemon-nodes/register",
+            "/api/v1/daemon-node-registrations",
             json={
                 "sandboxId": provisioned["node"]["id"],
                 "token": provisioned["nodeToken"],
@@ -182,7 +201,7 @@ def test_control_plane_provisioned_node_materializes_compatibility_agents(
         )
 
         assert registered.status_code == 200
-        agents = client.get("/cp/agents?employeeId=alice").json()["agents"]
+        agents = client.get("/api/v1/admin/agents?employeeId=alice").json()["agents"]
         assert any(agent["executorKind"] == "codex" for agent in agents)
 
 
@@ -193,18 +212,22 @@ def test_agent_policies_are_rejected_until_runtime_enforcement_exists(
     with TemporaryDirectory() as root:
         client = TestClient(create_app(root))
         _bootstrap_admin(client)
-        assert client.post(
-            "/cp/employees",
-            json={
-                "employeeId": "alice",
-                "username": "alice",
-                "password": "userpass",
-            },
-        ).status_code == 201
+        assert (
+            client.post(
+                "/api/v1/admin/employees",
+                json={
+                    "employeeId": "alice",
+                    "username": "alice",
+                    "password": "userpass",
+                },
+            ).status_code
+            == 201
+        )
 
         rejected_create = client.post(
-            "/cp/employees/alice/agents",
+            "/api/v1/admin/agents",
             json={
+                "supervisorEmployeeId": "alice",
                 "displayName": "Restricted",
                 "executorKind": "codex",
                 "toolPolicy": {"allowedTools": ["read"]},
@@ -214,11 +237,15 @@ def test_agent_policies_are_rejected_until_runtime_enforcement_exists(
         assert "runtime enforcement" in rejected_create.json()["detail"]
 
         agent = client.post(
-            "/cp/employees/alice/agents",
-            json={"displayName": "Builder", "executorKind": "codex"},
+            "/api/v1/admin/agents",
+            json={
+                "supervisorEmployeeId": "alice",
+                "displayName": "Builder",
+                "executorKind": "codex",
+            },
         ).json()["agent"]
         rejected_update = client.patch(
-            f"/cp/agents/{agent['id']}",
+            f"/api/v1/admin/agents/{agent['id']}",
             json={"modelPolicy": {"model": "example"}},
         )
         assert rejected_update.status_code == 400
@@ -231,14 +258,17 @@ def test_legacy_sandbox_run_blocks_unenforced_agent_policy(monkeypatch) -> None:
         app = create_app(root)
         client = TestClient(app)
         _bootstrap_admin(client)
-        assert client.post(
-            "/cp/employees",
-            json={
-                "employeeId": "alice",
-                "username": "alice",
-                "password": "userpass",
-            },
-        ).status_code == 201
+        assert (
+            client.post(
+                "/api/v1/admin/employees",
+                json={
+                    "employeeId": "alice",
+                    "username": "alice",
+                    "password": "userpass",
+                },
+            ).status_code
+            == 201
+        )
         app.state.registry.register(
             {
                 "sandboxId": "node_a",
@@ -258,13 +288,16 @@ def test_legacy_sandbox_run_blocks_unenforced_agent_policy(monkeypatch) -> None:
             app.state.agent_store._snapshot_path(agent["id"]),
             {**agent, "toolPolicy": {"allowedTools": ["read"]}},
         )
-        assert client.post("/auth/logout").status_code == 200
-        assert client.post(
-            "/auth/login", json={"username": "alice", "password": "userpass"}
-        ).status_code == 200
+        assert client.post("/api/v1/auth/logout").status_code == 200
+        assert (
+            client.post(
+                "/api/v1/auth/login", json={"username": "alice", "password": "userpass"}
+            ).status_code
+            == 200
+        )
 
         response = client.post(
-            "/sandboxes/node_a/runs",
+            "/api/v1/sandboxes/node_a/runs",
             json={
                 "taskGoal": "Blocked legacy policy",
                 "assignments": [{"agent": "codex", "mode": "action"}],
@@ -281,7 +314,7 @@ def test_employee_updates_own_agent_meta(monkeypatch) -> None:
         client = TestClient(create_app(root))
         _bootstrap_admin(client)
         employee = client.post(
-            "/cp/employees",
+            "/api/v1/admin/employees",
             json={
                 "employeeId": "alice",
                 "username": "alice",
@@ -291,24 +324,25 @@ def test_employee_updates_own_agent_meta(monkeypatch) -> None:
         )
         assert employee.status_code == 201
         researcher = client.post(
-            "/cp/employees/alice/agents",
+            "/api/v1/admin/agents",
             json={
+                "supervisorEmployeeId": "alice",
                 "displayName": "Researcher",
                 "executorKind": "claude",
                 "defaultRole": "planner",
             },
         ).json()["agent"]
 
-        assert client.post("/auth/logout").status_code == 200
+        assert client.post("/api/v1/auth/logout").status_code == 200
         assert (
             client.post(
-                "/auth/login", json={"username": "alice", "password": "userpass"}
+                "/api/v1/auth/login", json={"username": "alice", "password": "userpass"}
             ).status_code
             == 200
         )
 
         updated = client.patch(
-            f"/agents/{researcher['id']}",
+            f"/api/v1/agents/{researcher['id']}",
             json={
                 "displayName": "Analyst",
                 "instructions": "Cite primary sources.",
@@ -320,20 +354,21 @@ def test_employee_updates_own_agent_meta(monkeypatch) -> None:
         assert payload["instructions"] == "Cite primary sources."
 
         forbidden_field = client.patch(
-            f"/agents/{researcher['id']}",
+            f"/api/v1/agents/{researcher['id']}",
             json={"enabled": False},
         )
         assert forbidden_field.status_code == 400
 
-        assert client.post("/auth/logout").status_code == 200
+        assert client.post("/api/v1/auth/logout").status_code == 200
         assert (
             client.post(
-                "/auth/login", json={"username": "admin", "password": "secret123"}
+                "/api/v1/auth/login",
+                json={"username": "admin", "password": "secret123"},
             ).status_code
             == 200
         )
         bob = client.post(
-            "/cp/employees",
+            "/api/v1/admin/employees",
             json={
                 "employeeId": "bob",
                 "username": "bob",
@@ -341,15 +376,15 @@ def test_employee_updates_own_agent_meta(monkeypatch) -> None:
             },
         )
         assert bob.status_code == 201
-        assert client.post("/auth/logout").status_code == 200
+        assert client.post("/api/v1/auth/logout").status_code == 200
         assert (
             client.post(
-                "/auth/login", json={"username": "bob", "password": "userpass"}
+                "/api/v1/auth/login", json={"username": "bob", "password": "userpass"}
             ).status_code
             == 200
         )
         forbidden_owner = client.patch(
-            f"/agents/{researcher['id']}",
+            f"/api/v1/agents/{researcher['id']}",
             json={"displayName": "Hijacked"},
         )
         assert forbidden_owner.status_code == 403
@@ -363,7 +398,7 @@ def test_admin_places_agents_on_different_runtime_nodes(monkeypatch) -> None:
         _bootstrap_admin(client)
         assert (
             client.post(
-                "/cp/employees",
+                "/api/v1/admin/employees",
                 json={
                     "employeeId": "alice",
                     "username": "alice",
@@ -385,22 +420,32 @@ def test_admin_places_agents_on_different_runtime_nodes(monkeypatch) -> None:
             )
 
         researcher = client.post(
-            "/cp/employees/alice/agents",
-            json={"displayName": "Researcher", "executorKind": "claude"},
+            "/api/v1/admin/agents",
+            json={
+                "supervisorEmployeeId": "alice",
+                "displayName": "Researcher",
+                "executorKind": "claude",
+            },
         ).json()["agent"]
         builder = client.post(
-            "/cp/employees/alice/agents",
-            json={"displayName": "Builder", "executorKind": "codex"},
+            "/api/v1/admin/agents",
+            json={
+                "supervisorEmployeeId": "alice",
+                "displayName": "Builder",
+                "executorKind": "codex",
+            },
         ).json()["agent"]
         first = client.post(
-            f"/cp/agents/{researcher['id']}/placements", json={"daemonNodeId": "node_a"}
+            f"/api/v1/admin/agents/{researcher['id']}/placements",
+            json={"daemonNodeId": "node_a"},
         )
         second = client.post(
-            f"/cp/agents/{builder['id']}/placements", json={"daemonNodeId": "node_b"}
+            f"/api/v1/admin/agents/{builder['id']}/placements",
+            json={"daemonNodeId": "node_b"},
         )
 
         assert first.status_code == second.status_code == 201
-        agents = client.get("/cp/agents?employeeId=alice").json()["agents"]
+        agents = client.get("/api/v1/admin/agents?employeeId=alice").json()["agents"]
         assert {agent["availability"] for agent in agents} == {"ready"}
         assert {agent["placements"][0]["daemonNodeId"] for agent in agents} == {
             "node_a",
@@ -414,16 +459,19 @@ def test_agent_placements_describe_managed_and_local_runtime_nodes(monkeypatch) 
         app = create_app(root)
         client = TestClient(app)
         _bootstrap_admin(client)
-        assert client.post(
-            "/cp/employees",
-            json={
-                "employeeId": "alice",
-                "username": "alice",
-                "password": "userpass",
-            },
-        ).status_code == 201
+        assert (
+            client.post(
+                "/api/v1/admin/employees",
+                json={
+                    "employeeId": "alice",
+                    "username": "alice",
+                    "password": "userpass",
+                },
+            ).status_code
+            == 201
+        )
         local_runtime = client.post(
-            "/cp/daemon-nodes",
+            "/api/v1/admin/daemon-nodes",
             json={
                 "employeeId": "alice",
                 "workspacePath": "/Users/alice/relay",
@@ -445,59 +493,77 @@ def test_agent_placements_describe_managed_and_local_runtime_nodes(monkeypatch) 
             }
         )
         managed = client.post(
-            "/cp/managed-nodes",
+            "/api/v1/admin/managed-nodes",
             json={"employeeId": "alice", "displayName": "Alice managed node"},
         ).json()["node"]
         attempt = client.post(
-            f"/cp/managed-nodes/{managed['id']}/attempts"
+            f"/api/v1/admin/managed-nodes/{managed['id']}/attempts"
         ).json()
         enrolled = client.post(
-            "/daemon-enroll",
+            "/api/v1/daemon-node-enrollments",
             json={"workspacePath": "/workspace/alice"},
-            headers={
-                "Authorization": f"Enrollment {attempt['enrollmentCredential']}"
-            },
+            headers={"Authorization": f"Enrollment {attempt['enrollmentCredential']}"},
         ).json()
-        assert client.post(
-            "/daemon-nodes/register",
-            json={
-                "sandboxId": enrolled["sandboxId"],
-                "token": enrolled["token"],
-                "workspacePath": "/workspace/alice",
-                "workspaceId": "employee:alice:home",
-                "sandboxMode": "boxlite",
-                "protocolVersion": 1,
-                "supportedAgents": ["codex"],
-                "status": "ready",
-            },
-        ).status_code == 200
+        assert (
+            client.post(
+                "/api/v1/daemon-node-registrations",
+                json={
+                    "sandboxId": enrolled["sandboxId"],
+                    "token": enrolled["token"],
+                    "workspacePath": "/workspace/alice",
+                    "workspaceId": "employee:alice:home",
+                    "sandboxMode": "boxlite",
+                    "protocolVersion": 1,
+                    "supportedAgents": ["codex"],
+                    "status": "ready",
+                },
+            ).status_code
+            == 200
+        )
         # One agent lives on one computer, so a managed and a local runtime are
         # described through two agents — one placed on each.
         managed_agent = client.post(
-            "/cp/employees/alice/agents",
-            json={"displayName": "Managed Builder", "executorKind": "codex"},
+            "/api/v1/admin/agents",
+            json={
+                "supervisorEmployeeId": "alice",
+                "displayName": "Managed Builder",
+                "executorKind": "codex",
+            },
         ).json()["agent"]
         local_agent = client.post(
-            "/cp/employees/alice/agents",
-            json={"displayName": "Local Builder", "executorKind": "codex"},
+            "/api/v1/admin/agents",
+            json={
+                "supervisorEmployeeId": "alice",
+                "displayName": "Local Builder",
+                "executorKind": "codex",
+            },
         ).json()["agent"]
-        assert client.post(
-            f"/cp/agents/{managed_agent['id']}/placements",
-            json={"daemonNodeId": enrolled["sandboxId"], "priority": 100},
-        ).status_code == 201
-        assert client.post(
-            f"/cp/agents/{local_agent['id']}/placements",
-            json={"daemonNodeId": local_node_id, "priority": 200},
-        ).status_code == 201
-        assert client.patch(
-            f"/daemon-nodes/{local_node_id}",
-            json={"displayName": "Alice's MacBook"},
-        ).status_code == 200
+        assert (
+            client.post(
+                f"/api/v1/admin/agents/{managed_agent['id']}/placements",
+                json={"daemonNodeId": enrolled["sandboxId"], "priority": 100},
+            ).status_code
+            == 201
+        )
+        assert (
+            client.post(
+                f"/api/v1/admin/agents/{local_agent['id']}/placements",
+                json={"daemonNodeId": local_node_id, "priority": 200},
+            ).status_code
+            == 201
+        )
+        assert (
+            client.patch(
+                f"/api/v1/daemon-nodes/{local_node_id}",
+                json={"displayName": "Alice's MacBook"},
+            ).status_code
+            == 200
+        )
 
         listed = {
             item["id"]: item
             for item in client.get(
-                "/cp/agents?supervisorEmployeeId=alice"
+                "/api/v1/admin/agents?supervisorEmployeeId=alice"
             ).json()["agents"]
         }
         managed_placement = listed[managed_agent["id"]]["placements"][0]
@@ -519,7 +585,7 @@ def test_employee_dispatches_work_by_logical_agent_id(monkeypatch) -> None:
         _bootstrap_admin(client)
         assert (
             client.post(
-                "/cp/employees",
+                "/api/v1/admin/employees",
                 json={
                     "employeeId": "alice",
                     "username": "alice",
@@ -540,33 +606,35 @@ def test_employee_dispatches_work_by_logical_agent_id(monkeypatch) -> None:
             }
         )
         agent = client.post(
-            "/cp/employees/alice/agents",
+            "/api/v1/admin/agents",
             json={
+                "supervisorEmployeeId": "alice",
                 "displayName": "Builder",
                 "executorKind": "codex",
             },
         ).json()["agent"]
         placement_response = client.post(
-            f"/cp/agents/{agent['id']}/placements", json={"daemonNodeId": "node_a"}
+            f"/api/v1/admin/agents/{agent['id']}/placements",
+            json={"daemonNodeId": "node_a"},
         )
         assert placement_response.status_code == 201
         placement = placement_response.json()["placement"]
 
-        assert client.post("/auth/logout").status_code == 200
+        assert client.post("/api/v1/auth/logout").status_code == 200
         assert (
             client.post(
-                "/auth/login", json={"username": "alice", "password": "userpass"}
+                "/api/v1/auth/login", json={"username": "alice", "password": "userpass"}
             ).status_code
             == 200
         )
         updated = client.patch(
-            f"/agents/{agent['id']}",
+            f"/api/v1/agents/{agent['id']}",
             json={"instructions": "Use the repository tests as evidence."},
         )
         assert updated.status_code == 200
         assert updated.json()["agent"]["availability"] == "ready"
         response = client.post(
-            "/agent-runs",
+            "/api/v1/agent-runs",
             json={
                 "taskGoal": "Build the feature",
                 "assignments": [{"agentId": agent["id"], "mode": "action"}],
@@ -576,7 +644,7 @@ def test_employee_dispatches_work_by_logical_agent_id(monkeypatch) -> None:
 
         assert response.status_code == 202
         duplicate = client.post(
-            "/agent-runs",
+            "/api/v1/agent-runs",
             json={
                 "taskGoal": "Build the feature",
                 "assignments": [{"agentId": agent["id"], "mode": "action"}],
@@ -594,7 +662,7 @@ def test_employee_dispatches_work_by_logical_agent_id(monkeypatch) -> None:
         }
         monitor_node = next(
             node
-            for node in client.get("/daemon-nodes").json()["nodes"]
+            for node in client.get("/api/v1/daemon-nodes").json()["nodes"]
             if node["id"] == "node_a"
         )
         active_run = next(
@@ -612,29 +680,38 @@ def test_employee_dispatches_work_by_logical_agent_id(monkeypatch) -> None:
         assert command["state"]["agent_instructions"] == (
             "Use the repository tests as evidence."
         )
-        assert client.post("/auth/logout").status_code == 200
-        assert client.post(
-            "/auth/login", json={"username": "admin", "password": "secret123"}
-        ).status_code == 200
-        deleting = client.delete(f"/cp/agents/{agent['id']}")
+        assert client.post("/api/v1/auth/logout").status_code == 200
+        assert (
+            client.post(
+                "/api/v1/auth/login",
+                json={"username": "admin", "password": "secret123"},
+            ).status_code
+            == 200
+        )
+        deleting = client.delete(f"/api/v1/admin/agents/{agent['id']}")
         assert deleting.status_code == 409
         assert not app.state.agent_store.get_agent(agent["id"]).get("deletedAt")
 
 
-def test_existing_session_dispatch_normalizes_legacy_agent_supervisor(monkeypatch) -> None:
+def test_existing_session_dispatch_normalizes_legacy_agent_supervisor(
+    monkeypatch,
+) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
         app = create_app(root)
         client = TestClient(app)
         _bootstrap_admin(client)
-        assert client.post(
-            "/cp/employees",
-            json={
-                "employeeId": "alice",
-                "username": "alice",
-                "password": "userpass",
-            },
-        ).status_code == 201
+        assert (
+            client.post(
+                "/api/v1/admin/employees",
+                json={
+                    "employeeId": "alice",
+                    "username": "alice",
+                    "password": "userpass",
+                },
+            ).status_code
+            == 201
+        )
         app.state.registry.register(
             {
                 "sandboxId": "node_a",
@@ -669,7 +746,7 @@ def test_existing_session_dispatch_normalizes_legacy_agent_supervisor(monkeypatc
         )
 
         response = client.post(
-            "/agent-runs",
+            "/api/v1/agent-runs",
             json={
                 "taskGoal": "Continue the feature",
                 "sessionId": session["id"],
@@ -686,14 +763,17 @@ def test_logical_agent_handoff_records_the_target_agent_id(monkeypatch) -> None:
         app = create_app(root)
         client = TestClient(app)
         _bootstrap_admin(client)
-        assert client.post(
-            "/cp/employees",
-            json={
-                "employeeId": "alice",
-                "username": "alice",
-                "password": "userpass",
-            },
-        ).status_code == 201
+        assert (
+            client.post(
+                "/api/v1/admin/employees",
+                json={
+                    "employeeId": "alice",
+                    "username": "alice",
+                    "password": "userpass",
+                },
+            ).status_code
+            == 201
+        )
         app.state.registry.register(
             {
                 "sandboxId": "node_a",
@@ -723,7 +803,7 @@ def test_logical_agent_handoff_records_the_target_agent_id(monkeypatch) -> None:
         )
 
         response = client.post(
-            "/agent-runs",
+            "/api/v1/agent-runs",
             json={
                 "taskGoal": session["taskGoal"],
                 "sessionId": session["id"],
@@ -744,14 +824,17 @@ def test_employee_cannot_dispatch_a_team_across_shared_workspace_nodes(
         app = create_app(root)
         client = TestClient(app)
         _bootstrap_admin(client)
-        assert client.post(
-            "/cp/employees",
-            json={
-                "employeeId": "alice",
-                "username": "alice",
-                "password": "userpass",
-            },
-        ).status_code == 201
+        assert (
+            client.post(
+                "/api/v1/admin/employees",
+                json={
+                    "employeeId": "alice",
+                    "username": "alice",
+                    "password": "userpass",
+                },
+            ).status_code
+            == 201
+        )
         for node_id, executor in (("node_a", "claude"), ("node_b", "codex")):
             app.state.registry.register(
                 {
@@ -779,13 +862,16 @@ def test_employee_cannot_dispatch_a_team_across_shared_workspace_nodes(
                 node_id,
                 {"workspacePolicy": {"kind": "shared-path"}},
             )
-        assert client.post("/auth/logout").status_code == 200
-        assert client.post(
-            "/auth/login", json={"username": "alice", "password": "userpass"}
-        ).status_code == 200
+        assert client.post("/api/v1/auth/logout").status_code == 200
+        assert (
+            client.post(
+                "/api/v1/auth/login", json={"username": "alice", "password": "userpass"}
+            ).status_code
+            == 200
+        )
 
         seeded = client.post(
-            "/agent-runs",
+            "/api/v1/agent-runs",
             json={
                 "taskGoal": "Research the feature",
                 "assignments": [{"agentId": planner["id"], "mode": "ask"}],
@@ -794,7 +880,7 @@ def test_employee_cannot_dispatch_a_team_across_shared_workspace_nodes(
         assert seeded.status_code == 202, seeded.text
 
         response = client.post(
-            "/agent-runs",
+            "/api/v1/agent-runs",
             json={
                 "taskGoal": "Plan and build the feature",
                 "assignments": [
@@ -814,14 +900,17 @@ def test_new_thread_runs_on_the_selected_computer(monkeypatch) -> None:
         app = create_app(root)
         client = TestClient(app)
         _bootstrap_admin(client)
-        assert client.post(
-            "/cp/employees",
-            json={
-                "employeeId": "alice",
-                "username": "alice",
-                "password": "userpass",
-            },
-        ).status_code == 201
+        assert (
+            client.post(
+                "/api/v1/admin/employees",
+                json={
+                    "employeeId": "alice",
+                    "username": "alice",
+                    "password": "userpass",
+                },
+            ).status_code
+            == 201
+        )
         for node_id in ("node_a", "node_b"):
             app.state.registry.register(
                 {
@@ -838,13 +927,16 @@ def test_new_thread_runs_on_the_selected_computer(monkeypatch) -> None:
             "alice", {"displayName": "Builder", "executorKind": "codex"}
         )
         app.state.agent_placement_store.create_placement(builder, "node_b")
-        assert client.post("/auth/logout").status_code == 200
-        assert client.post(
-            "/auth/login", json={"username": "alice", "password": "userpass"}
-        ).status_code == 200
+        assert client.post("/api/v1/auth/logout").status_code == 200
+        assert (
+            client.post(
+                "/api/v1/auth/login", json={"username": "alice", "password": "userpass"}
+            ).status_code
+            == 200
+        )
 
         response = client.post(
-            "/agent-runs",
+            "/api/v1/agent-runs",
             json={
                 "taskGoal": "Build on computer B",
                 "daemonNodeId": "node_b",
@@ -861,7 +953,7 @@ def test_new_thread_runs_on_the_selected_computer(monkeypatch) -> None:
         assert created["daemonNodeId"] == "node_b"
 
         conflicting = client.post(
-            "/agent-runs",
+            "/api/v1/agent-runs",
             json={
                 "taskGoal": "Try to move the existing thread",
                 "sessionId": session["id"],
@@ -882,14 +974,17 @@ def test_new_thread_rejects_an_agent_outside_the_selected_computer(
         app = create_app(root)
         client = TestClient(app)
         _bootstrap_admin(client)
-        assert client.post(
-            "/cp/employees",
-            json={
-                "employeeId": "alice",
-                "username": "alice",
-                "password": "userpass",
-            },
-        ).status_code == 201
+        assert (
+            client.post(
+                "/api/v1/admin/employees",
+                json={
+                    "employeeId": "alice",
+                    "username": "alice",
+                    "password": "userpass",
+                },
+            ).status_code
+            == 201
+        )
         for node_id in ("node_a", "node_b"):
             app.state.registry.register(
                 {
@@ -906,13 +1001,16 @@ def test_new_thread_rejects_an_agent_outside_the_selected_computer(
             "alice", {"displayName": "Builder", "executorKind": "codex"}
         )
         app.state.agent_placement_store.create_placement(builder, "node_b")
-        assert client.post("/auth/logout").status_code == 200
-        assert client.post(
-            "/auth/login", json={"username": "alice", "password": "userpass"}
-        ).status_code == 200
+        assert client.post("/api/v1/auth/logout").status_code == 200
+        assert (
+            client.post(
+                "/api/v1/auth/login", json={"username": "alice", "password": "userpass"}
+            ).status_code
+            == 200
+        )
 
         response = client.post(
-            "/agent-runs",
+            "/api/v1/agent-runs",
             json={
                 "taskGoal": "Build on computer A",
                 "daemonNodeId": "node_a",
@@ -931,14 +1029,17 @@ def test_employee_cannot_list_or_dispatch_another_employees_agent(monkeypatch) -
         client = TestClient(app)
         _bootstrap_admin(client)
         for employee_id in ("alice", "bob"):
-            assert client.post(
-                "/cp/employees",
-                json={
-                    "employeeId": employee_id,
-                    "username": employee_id,
-                    "password": "userpass",
-                },
-            ).status_code == 201
+            assert (
+                client.post(
+                    "/api/v1/admin/employees",
+                    json={
+                        "employeeId": employee_id,
+                        "username": employee_id,
+                        "password": "userpass",
+                    },
+                ).status_code
+                == 201
+            )
         app.state.registry.register(
             {
                 "sandboxId": "shared_node",
@@ -950,22 +1051,32 @@ def test_employee_cannot_list_or_dispatch_another_employees_agent(monkeypatch) -
             }
         )
         agent = client.post(
-            "/cp/employees/alice/agents",
-            json={"displayName": "Builder", "executorKind": "codex"},
+            "/api/v1/admin/agents",
+            json={
+                "supervisorEmployeeId": "alice",
+                "displayName": "Builder",
+                "executorKind": "codex",
+            },
         ).json()["agent"]
-        assert client.post(
-            f"/cp/agents/{agent['id']}/placements",
-            json={"daemonNodeId": "shared_node"},
-        ).status_code == 201
+        assert (
+            client.post(
+                f"/api/v1/admin/agents/{agent['id']}/placements",
+                json={"daemonNodeId": "shared_node"},
+            ).status_code
+            == 201
+        )
 
-        assert client.post("/auth/logout").status_code == 200
-        assert client.post(
-            "/auth/login", json={"username": "bob", "password": "userpass"}
-        ).status_code == 200
-        assert client.get("/agents").json()["agents"] == []
+        assert client.post("/api/v1/auth/logout").status_code == 200
+        assert (
+            client.post(
+                "/api/v1/auth/login", json={"username": "bob", "password": "userpass"}
+            ).status_code
+            == 200
+        )
+        assert client.get("/api/v1/agents").json()["agents"] == []
 
         denied = client.post(
-            "/agent-runs",
+            "/api/v1/agent-runs",
             json={
                 "taskGoal": "Use Alice's agent",
                 "assignments": [{"agentId": agent["id"], "mode": "action"}],
@@ -985,7 +1096,7 @@ def test_legacy_run_materializes_compatibility_agent_without_get_side_effects(
         _bootstrap_admin(client)
         assert (
             client.post(
-                "/cp/employees",
+                "/api/v1/admin/employees",
                 json={
                     "employeeId": "alice",
                     "username": "alice",
@@ -1005,17 +1116,17 @@ def test_legacy_run_materializes_compatibility_agent_without_get_side_effects(
                 "status": "ready",
             }
         )
-        assert client.post("/auth/logout").status_code == 200
+        assert client.post("/api/v1/auth/logout").status_code == 200
         assert (
             client.post(
-                "/auth/login", json={"username": "alice", "password": "userpass"}
+                "/api/v1/auth/login", json={"username": "alice", "password": "userpass"}
             ).status_code
             == 200
         )
 
-        assert client.get("/agents").json()["agents"] == []
+        assert client.get("/api/v1/agents").json()["agents"] == []
         response = client.post(
-            "/sandboxes/node_a/runs",
+            "/api/v1/sandboxes/node_a/runs",
             json={
                 "taskGoal": "Build it",
                 "assignments": [{"agent": "codex", "mode": "action"}],
@@ -1023,27 +1134,40 @@ def test_legacy_run_materializes_compatibility_agent_without_get_side_effects(
         )
 
         assert response.status_code == 202
-        [agent] = client.get("/agents").json()["agents"]
+        [agent] = client.get("/api/v1/agents").json()["agents"]
         assert agent["executorKind"] == "codex"
         assert agent["compatibilityKey"] == "alice:node_a:codex"
         assert agent["placements"][0]["daemonNodeId"] == "node_a"
         assert response.json()["agentRuns"][0]["logicalAgentId"] == agent["id"]
 
 
-def test_compatibility_agent_drops_from_roster_when_its_computer_is_gone(monkeypatch) -> None:
+def test_compatibility_agent_drops_from_roster_when_its_computer_is_gone(
+    monkeypatch,
+) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
         app = create_app(root)
         client = TestClient(app)
         _bootstrap_admin(client)
-        assert client.post(
-            "/cp/employees",
-            json={"employeeId": "alice", "username": "alice", "password": "userpass"},
-        ).status_code == 201
+        assert (
+            client.post(
+                "/api/v1/admin/employees",
+                json={
+                    "employeeId": "alice",
+                    "username": "alice",
+                    "password": "userpass",
+                },
+            ).status_code
+            == 201
+        )
         # A custom agent with no placement stays visible on the roster.
         client.post(
-            "/cp/employees/alice/agents",
-            json={"displayName": "Freelancer", "executorKind": "claude"},
+            "/api/v1/admin/agents",
+            json={
+                "supervisorEmployeeId": "alice",
+                "displayName": "Freelancer",
+                "executorKind": "claude",
+            },
         )
         app.state.registry.register(
             {
@@ -1069,33 +1193,48 @@ def test_compatibility_agent_drops_from_roster_when_its_computer_is_gone(monkeyp
             app.state.registry.get("node_a"),
         )
 
-        assert client.post("/auth/logout").status_code == 200
-        assert client.post(
-            "/auth/login", json={"username": "alice", "password": "userpass"}
-        ).status_code == 200
+        assert client.post("/api/v1/auth/logout").status_code == 200
+        assert (
+            client.post(
+                "/api/v1/auth/login", json={"username": "alice", "password": "userpass"}
+            ).status_code
+            == 200
+        )
 
-        before = client.get("/agents").json()["agents"]
+        before = client.get("/api/v1/agents").json()["agents"]
         names = {agent["displayName"] for agent in before}
         assert "Freelancer" in names
         assert "Codex" in names
 
         # Unassigning the computer retires the placement; the per-computer agent
         # must leave the roster while the placement-less custom agent remains.
-        assert client.post("/auth/logout").status_code == 200
-        assert client.post(
-            "/auth/login", json={"username": "admin", "password": "secret123"}
-        ).status_code == 200
-        assert client.post("/cp/daemon-nodes/node_a/unassign").status_code == 200
-        assert client.post("/auth/logout").status_code == 200
-        assert client.post(
-            "/auth/login", json={"username": "alice", "password": "userpass"}
-        ).status_code == 200
+        assert client.post("/api/v1/auth/logout").status_code == 200
+        assert (
+            client.post(
+                "/api/v1/auth/login",
+                json={"username": "admin", "password": "secret123"},
+            ).status_code
+            == 200
+        )
+        assert (
+            client.delete("/api/v1/admin/daemon-nodes/node_a/assignment").status_code
+            == 200
+        )
+        assert client.post("/api/v1/auth/logout").status_code == 200
+        assert (
+            client.post(
+                "/api/v1/auth/login", json={"username": "alice", "password": "userpass"}
+            ).status_code
+            == 200
+        )
 
-        after = client.get("/agents").json()["agents"]
+        after = client.get("/api/v1/agents").json()["agents"]
         assert {agent["displayName"] for agent in after} == {"Freelancer"}
 
 
-def test_compatibility_agent_drops_when_its_computer_is_deregistered(monkeypatch) -> None:
+def test_compatibility_agent_drops_when_its_computer_is_deregistered(
+    monkeypatch,
+) -> None:
     """A placement left dangling at a node that vanished from the registry must
     not linger as a struck-through, computer-less entry in the header/roster."""
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
@@ -1103,10 +1242,17 @@ def test_compatibility_agent_drops_when_its_computer_is_deregistered(monkeypatch
         app = create_app(root)
         client = TestClient(app)
         _bootstrap_admin(client)
-        assert client.post(
-            "/cp/employees",
-            json={"employeeId": "alice", "username": "alice", "password": "userpass"},
-        ).status_code == 201
+        assert (
+            client.post(
+                "/api/v1/admin/employees",
+                json={
+                    "employeeId": "alice",
+                    "username": "alice",
+                    "password": "userpass",
+                },
+            ).status_code
+            == 201
+        )
         app.state.registry.register(
             {
                 "sandboxId": "node_a",
@@ -1130,13 +1276,16 @@ def test_compatibility_agent_drops_when_its_computer_is_deregistered(monkeypatch
             app.state.registry.get("node_a"),
         )
 
-        assert client.post("/auth/logout").status_code == 200
-        assert client.post(
-            "/auth/login", json={"username": "alice", "password": "userpass"}
-        ).status_code == 200
+        assert client.post("/api/v1/auth/logout").status_code == 200
+        assert (
+            client.post(
+                "/api/v1/auth/login", json={"username": "alice", "password": "userpass"}
+            ).status_code
+            == 200
+        )
         assert any(
             agent["displayName"] == "Codex"
-            for agent in client.get("/agents").json()["agents"]
+            for agent in client.get("/api/v1/agents").json()["agents"]
         )
 
         # The computer vanishes from the registry (crash / re-enroll under a new
@@ -1144,7 +1293,7 @@ def test_compatibility_agent_drops_when_its_computer_is_deregistered(monkeypatch
         # the header. The dangling active placement must no longer surface it.
         app.state.registry.delete("node_a")
 
-        assert client.get("/agents").json()["agents"] == []
+        assert client.get("/api/v1/agents").json()["agents"] == []
 
 
 def test_task_persists_and_dispatches_a_logical_agent_assignment(monkeypatch) -> None:
@@ -1155,7 +1304,7 @@ def test_task_persists_and_dispatches_a_logical_agent_assignment(monkeypatch) ->
         _bootstrap_admin(client)
         assert (
             client.post(
-                "/cp/employees",
+                "/api/v1/admin/employees",
                 json={
                     "employeeId": "alice",
                     "username": "alice",
@@ -1176,30 +1325,32 @@ def test_task_persists_and_dispatches_a_logical_agent_assignment(monkeypatch) ->
             }
         )
         agent = client.post(
-            "/cp/employees/alice/agents",
+            "/api/v1/admin/agents",
             json={
+                "supervisorEmployeeId": "alice",
                 "displayName": "Builder",
                 "executorKind": "codex",
             },
         ).json()["agent"]
         assert (
             client.post(
-                f"/cp/agents/{agent['id']}/placements", json={"daemonNodeId": "node_a"}
+                f"/api/v1/admin/agents/{agent['id']}/placements",
+                json={"daemonNodeId": "node_a"},
             ).status_code
             == 201
         )
-        assert client.post("/auth/logout").status_code == 200
+        assert client.post("/api/v1/auth/logout").status_code == 200
         assert (
             client.post(
-                "/auth/login", json={"username": "alice", "password": "userpass"}
+                "/api/v1/auth/login", json={"username": "alice", "password": "userpass"}
             ).status_code
             == 200
         )
 
         task = client.post(
-            "/tasks", json={"title": "Build it", "assignedAgentId": agent["id"]}
+            "/api/v1/tasks", json={"title": "Build it", "assignedAgentId": agent["id"]}
         )
-        started = client.post(f"/tasks/{task.json()['id']}/start", json={})
+        started = client.post(f"/api/v1/tasks/{task.json()['id']}/runs", json={})
 
         assert task.status_code == 201
         assert task.json()["assignedAgent"] == "codex"
@@ -1210,28 +1361,37 @@ def test_task_persists_and_dispatches_a_logical_agent_assignment(monkeypatch) ->
         )
 
 
-def test_task_owner_cannot_be_reassigned_to_another_employees_agent(monkeypatch) -> None:
+def test_task_owner_cannot_be_reassigned_to_another_employees_agent(
+    monkeypatch,
+) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
         client = TestClient(create_app(root))
         _bootstrap_admin(client)
         agents = {}
         for employee_id in ("alice", "bob"):
-            assert client.post(
-                "/cp/employees",
-                json={
-                    "employeeId": employee_id,
-                    "username": employee_id,
-                    "password": "userpass",
-                },
-            ).status_code == 201
+            assert (
+                client.post(
+                    "/api/v1/admin/employees",
+                    json={
+                        "employeeId": employee_id,
+                        "username": employee_id,
+                        "password": "userpass",
+                    },
+                ).status_code
+                == 201
+            )
             agents[employee_id] = client.post(
-                f"/cp/employees/{employee_id}/agents",
-                json={"displayName": "Builder", "executorKind": "codex"},
+                "/api/v1/admin/agents",
+                json={
+                    "supervisorEmployeeId": employee_id,
+                    "displayName": "Builder",
+                    "executorKind": "codex",
+                },
             ).json()["agent"]
 
         task = client.post(
-            "/tasks",
+            "/api/v1/tasks",
             json={
                 "title": "Move ownership safely",
                 "ownerEmployeeId": "alice",
@@ -1241,12 +1401,12 @@ def test_task_owner_cannot_be_reassigned_to_another_employees_agent(monkeypatch)
         ).json()
 
         missing_agent = client.patch(
-            f"/tasks/{task['id']}", json={"assigneeEmployeeId": "bob"}
+            f"/api/v1/tasks/{task['id']}", json={"assigneeEmployeeId": "bob"}
         )
         assert missing_agent.status_code == 400
 
         reassigned = client.patch(
-            f"/tasks/{task['id']}",
+            f"/api/v1/tasks/{task['id']}",
             json={
                 "assigneeEmployeeId": "bob",
                 "assignedAgentId": agents["bob"]["id"],
@@ -1255,35 +1415,48 @@ def test_task_owner_cannot_be_reassigned_to_another_employees_agent(monkeypatch)
         assert reassigned.status_code == 403
 
 
-def test_employee_task_writes_require_named_agents_and_preserve_status(monkeypatch) -> None:
+def test_employee_task_writes_require_named_agents_and_preserve_status(
+    monkeypatch,
+) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:
         client = TestClient(create_app(root))
         _bootstrap_admin(client)
-        assert client.post(
-            "/cp/employees",
-            json={
-                "employeeId": "alice",
-                "username": "alice",
-                "password": "userpass",
-            },
-        ).status_code == 201
+        assert (
+            client.post(
+                "/api/v1/admin/employees",
+                json={
+                    "employeeId": "alice",
+                    "username": "alice",
+                    "password": "userpass",
+                },
+            ).status_code
+            == 201
+        )
         agent = client.post(
-            "/cp/employees/alice/agents",
-            json={"displayName": "Builder", "executorKind": "codex"},
+            "/api/v1/admin/agents",
+            json={
+                "supervisorEmployeeId": "alice",
+                "displayName": "Builder",
+                "executorKind": "codex",
+            },
         ).json()["agent"]
-        assert client.post("/auth/logout").status_code == 200
-        assert client.post(
-            "/auth/login", json={"username": "alice", "password": "userpass"}
-        ).status_code == 200
+        assert client.post("/api/v1/auth/logout").status_code == 200
+        assert (
+            client.post(
+                "/api/v1/auth/login", json={"username": "alice", "password": "userpass"}
+            ).status_code
+            == 200
+        )
 
         legacy = client.post(
-            "/tasks", json={"title": "Legacy assignment", "assignedAgent": "codex"}
+            "/api/v1/tasks",
+            json={"title": "Legacy assignment", "assignedAgent": "codex"},
         )
         assert legacy.status_code == 400
 
         agentless_routine = client.post(
-            "/tasks",
+            "/api/v1/tasks",
             json={
                 "title": "Unsafe routine",
                 "isRoutine": True,
@@ -1293,7 +1466,7 @@ def test_employee_task_writes_require_named_agents_and_preserve_status(monkeypat
         assert agentless_routine.status_code == 400
 
         created = client.post(
-            "/tasks",
+            "/api/v1/tasks",
             json={
                 "title": "Explicitly blocked",
                 "status": "blocked",
@@ -1305,7 +1478,7 @@ def test_employee_task_writes_require_named_agents_and_preserve_status(monkeypat
         assert created.json()["assigneeEmployeeId"] == "alice"
 
         cleared = client.patch(
-            f"/tasks/{created.json()['id']}", json={"assignedAgentId": None}
+            f"/api/v1/tasks/{created.json()['id']}", json={"assignedAgentId": None}
         )
         assert cleared.status_code == 200
         assert cleared.json()["status"] == "blocked"
@@ -1319,14 +1492,17 @@ def test_manual_start_materializes_a_legacy_task_assignment(monkeypatch) -> None
         app = create_app(root)
         client = TestClient(app)
         _bootstrap_admin(client)
-        assert client.post(
-            "/cp/employees",
-            json={
-                "employeeId": "alice",
-                "username": "alice",
-                "password": "userpass",
-            },
-        ).status_code == 201
+        assert (
+            client.post(
+                "/api/v1/admin/employees",
+                json={
+                    "employeeId": "alice",
+                    "username": "alice",
+                    "password": "userpass",
+                },
+            ).status_code
+            == 201
+        )
         app.state.registry.register(
             {
                 "sandboxId": "node_a",
@@ -1347,15 +1523,20 @@ def test_manual_start_materializes_a_legacy_task_assignment(monkeypatch) -> None
                 "status": "assigned",
             }
         )
-        assert client.post("/auth/logout").status_code == 200
-        assert client.post(
-            "/auth/login", json={"username": "alice", "password": "userpass"}
-        ).status_code == 200
+        assert client.post("/api/v1/auth/logout").status_code == 200
+        assert (
+            client.post(
+                "/api/v1/auth/login", json={"username": "alice", "password": "userpass"}
+            ).status_code
+            == 200
+        )
 
-        started = client.post(f"/tasks/{legacy['id']}/start", json={})
+        started = client.post(f"/api/v1/tasks/{legacy['id']}/runs", json={})
 
         assert started.status_code == 202
         updated = app.state.task_store.get_task(legacy["id"])
         agent = app.state.agent_store.get_agent(updated["assignedAgentId"])
         assert agent["compatibilityKey"] == "alice:node_a:codex"
-        assert started.json()["session"]["agentRuns"][0]["logicalAgentId"] == agent["id"]
+        assert (
+            started.json()["session"]["agentRuns"][0]["logicalAgentId"] == agent["id"]
+        )

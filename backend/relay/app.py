@@ -33,9 +33,8 @@ from .api.contract import (
     API_PREFIX,
     API_REDOC_PATH,
     API_VERSION,
-    LegacyApiHeadersMiddleware,
-    canonical_router_groups,
-    include_canonical_router,
+    api_router_groups,
+    include_api_router,
 )
 from .chat import (
     DatabaseChatIntegrationStore,
@@ -126,7 +125,6 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
         openapi_url=API_OPENAPI_PATH,
         redoc_url=API_REDOC_PATH,
     )
-    app.add_middleware(LegacyApiHeadersMiddleware)
     app.state.session_store = session_store
     app.state.task_store = task_store
     app.state.daemon_store = daemon_store
@@ -157,6 +155,7 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
             "basePath": API_PREFIX,
             "docsPath": API_DOCS_PATH,
             "openapiPath": API_OPENAPI_PATH,
+            "redocPath": API_REDOC_PATH,
             "uiPath": "/admin",
             "webUiPath": WEB_UI_PATH,
         }
@@ -175,29 +174,18 @@ def create_app(root_dir: str | Path = DEFAULT_RELAY_DATA_DIR) -> FastAPI:
         daemon_node_routes.router,
         managed_node_routes.router,
     )
-    canonical_groups = canonical_router_groups()
+    canonical_groups = api_router_groups()
     for router in api_routers:
-        include_canonical_router(canonical_groups, router)
-
-    canonical_groups.public.add_api_route(
-        f"{API_PREFIX}/threads/{{session_id}}",
-        session_routes.update_session,
-        methods=["PATCH"],
-        tags=["threads"],
-    )
+        include_api_router(canonical_groups, router)
     app.include_router(canonical_groups.public)
     app.include_router(canonical_groups.admin)
     app.include_router(canonical_groups.internal_chat)
     app.include_router(canonical_groups.daemon)
 
     # Stable persisted media locators intentionally remain outside the JSON API
-    # namespace. They are not compatibility aliases.
+    # namespace because their URLs are persisted data.
     app.include_router(profile_image_routes.router, tags=["profile-images"])
 
-    # One-release compatibility surface. Canonical routes above are the only
-    # operations published in OpenAPI.
-    for router in api_routers:
-        app.include_router(router, include_in_schema=False)
     # Registered last: its root catch-all serves the exported web UI and must not
     # shadow the explicit API routes above.
     app.include_router(web_routes.router)

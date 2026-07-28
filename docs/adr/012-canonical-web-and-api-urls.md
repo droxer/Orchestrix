@@ -30,21 +30,17 @@ not JSON API operations.
 - Static export must remain deployable behind both Next development rewrites and
   FastAPI's allowlisted SPA fallback.
 
-## Compatibility
+## Cutover
 
-Legacy root, `/sessions`, `/cp`, daemon, and chat-service routes remain hidden
-aliases for one release. Alias responses include `Deprecation: true` and a
-successor `Link`, and their use is rate-limited in logs. Legacy hash bookmarks
-are converted once with `history.replaceState`.
-
-Compatibility aliases are excluded from OpenAPI and may be removed only after
-first-party clients have shipped the canonical URLs and telemetry confirms that
-legacy use has stopped.
+Relay is still under active development, so the canonical contract replaces the
+previous URL shapes without a compatibility window. Unversioned JSON paths,
+`/sessions`, `/cp`, old action routes, and hash-based browser locations are not
+mounted or migrated. First-party clients and tests move with the contract.
 
 ## Consequences
 
 - First-party clients build URLs through the shared `relay-core/api-url` helper.
-- FastAPI publishes only canonical operations in its schema.
+- FastAPI mounts and publishes only canonical operations.
 - Unknown API paths and missing assets return 404 instead of SPA HTML.
 - Navigation must discard query parameters that do not belong to the next
   route; entity and tab changes push history, while filters and dialogs replace

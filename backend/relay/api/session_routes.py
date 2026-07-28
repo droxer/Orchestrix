@@ -15,19 +15,19 @@ from loguru import logger
 
 from ..core.models import AGENT_NAMES
 from ..persistence.stores import valid_agent
-from ..sessions import SessionArchivedError, SessionController, SessionRunInFlightError
 from ..services.team_dispatch import (
     TeamDispatchError,
     task_thread_assignments,
     task_thread_ownership,
 )
+from ..sessions import SessionArchivedError, SessionController, SessionRunInFlightError
 from .deps import AppContextDep
 from .helpers import (
+    agent_task_mode,
     artifact_index_item,
     assignment_list,
     get_session_for_actor,
     get_task_for_actor,
-    agent_task_mode,
     is_workspace_artifact,
     json_body,
     owner_employee_id_for_create,
@@ -150,7 +150,7 @@ def session_uses_agent(session: dict[str, Any], agent_id: str) -> bool:
     )
 
 
-@router.get("/sessions")
+@router.get("/threads")
 async def list_sessions(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
     return {"sessions": [session for session in ctx.session_store.list_sessions() if actor["isAdmin"] or session.get("ownerEmployeeId") == actor["employeeId"]]}
@@ -310,7 +310,7 @@ async def workspace_brief(request: Request, ctx: AppContextDep) -> dict[str, Any
     }
 
 
-@router.post("/sessions", status_code=201)
+@router.post("/threads", status_code=201)
 async def create_session(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
     body = await json_body(request)
@@ -387,12 +387,13 @@ async def create_session(request: Request, ctx: AppContextDep) -> dict[str, Any]
     return ctx.session_store.get_session(session["id"])
 
 
-@router.get("/sessions/{session_id}")
+@router.get("/threads/{session_id}")
 async def get_session(session_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
     return get_session_for_actor(ctx.session_store, session_id, actor)
 
 
+@router.patch("/threads/{session_id}")
 async def update_session(
     session_id: str, request: Request, ctx: AppContextDep
 ) -> dict[str, Any]:
@@ -423,7 +424,7 @@ async def update_session(
     return result
 
 
-@router.post("/sessions/{session_id}/cancel")
+@router.post("/threads/{session_id}/cancellations", status_code=202)
 async def cancel_session_run(session_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
     session = get_session_for_actor(ctx.session_store, session_id, actor)
@@ -447,7 +448,7 @@ async def cancel_session_run(session_id: str, request: Request, ctx: AppContextD
     )
 
 
-@router.post("/sessions/{session_id}/assignments")
+@router.post("/threads/{session_id}/assignments")
 async def assign_session(session_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
     get_session_for_actor(ctx.session_store, session_id, actor)
@@ -465,19 +466,7 @@ async def assign_session(session_id: str, request: Request, ctx: AppContextDep) 
     return ctx.session_store.get_session(session_id)
 
 
-@router.post("/sessions/{session_id}/archive")
-async def archive_session(session_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
-    actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
-    get_session_for_actor(ctx.session_store, session_id, actor)
-    controller = SessionController(
-        ctx.session_store,
-        task_store=ctx.task_store,
-        owner_employee_id=actor["employeeId"],
-    )
-    return controller.archive_session(session_id)
-
-
-@router.delete("/sessions/{session_id}")
+@router.delete("/threads/{session_id}", status_code=204)
 async def delete_session(session_id: str, request: Request, ctx: AppContextDep) -> Response:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
     controller = SessionController(
@@ -498,25 +487,7 @@ async def delete_session(session_id: str, request: Request, ctx: AppContextDep) 
     return Response(status_code=204)
 
 
-@router.post("/sessions/{session_id}/title")
-async def rename_session(session_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
-    actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
-    get_session_for_actor(ctx.session_store, session_id, actor)
-    body = await json_body(request)
-    title = string_field(body, "title").strip()
-    if not title:
-        raise HTTPException(400, "title is required.")
-    if len(title) > 200:
-        raise HTTPException(400, "title must be 200 characters or fewer.")
-    controller = SessionController(
-        ctx.session_store,
-        task_store=ctx.task_store,
-        owner_employee_id=actor["employeeId"],
-    )
-    return controller.rename_session(session_id, title)
-
-
-@router.post("/sessions/{session_id}/decisions")
+@router.post("/threads/{session_id}/decisions")
 async def decision(session_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
     get_session_for_actor(ctx.session_store, session_id, actor)
@@ -535,7 +506,7 @@ async def decision(session_id: str, request: Request, ctx: AppContextDep) -> dic
     return result
 
 
-@router.post("/sessions/{session_id}/handoffs")
+@router.post("/threads/{session_id}/handoffs")
 async def handoff(session_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
     get_session_for_actor(ctx.session_store, session_id, actor)
@@ -583,7 +554,7 @@ def _event_start_index(events: list[Any], after_event_id: str | None) -> int:
     return 0
 
 
-@router.get("/sessions/{session_id}/events")
+@router.get("/threads/{session_id}/events")
 async def session_events(session_id: str, request: Request, ctx: AppContextDep) -> StreamingResponse:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
     # Authorize before the stream opens so 403/404 surface as normal responses.
@@ -639,7 +610,7 @@ async def session_events(session_id: str, request: Request, ctx: AppContextDep) 
     )
 
 
-@router.get("/sessions/{session_id}/artifacts/{artifact_id}")
+@router.get("/threads/{session_id}/artifacts/{artifact_id}")
 async def read_artifact(session_id: str, artifact_id: str, request: Request, ctx: AppContextDep) -> Any:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
     session = get_session_for_actor(ctx.session_store, session_id, actor)

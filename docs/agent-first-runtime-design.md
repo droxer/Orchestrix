@@ -273,7 +273,8 @@ logical agents or decide employee authorization.
 ### Employee agents
 
 - `GET /api/v1/agents` — agents visible to the authenticated employee.
-- `POST /api/v1/admin/employees/{employeeId}/agents` — create a logical agent.
+- `POST /api/v1/admin/agents` — create a logical agent; pass
+  `supervisorEmployeeId` in the request body.
 - `GET /api/v1/admin/agents/{agentId}` — admin detail including placements.
 - `PATCH /api/v1/admin/agents/{agentId}` — update configuration or desired state.
 - `DELETE /api/v1/admin/agents/{agentId}` — disable and retire after active runs drain.
