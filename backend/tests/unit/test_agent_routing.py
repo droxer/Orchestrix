@@ -394,6 +394,56 @@ def test_node_affine_session_rejects_workspace_drift_on_same_node_id(
     assert error.value.code == "workspace_unavailable"
 
 
+def test_managed_runtime_replacement_keeps_existing_session_affinity(
+    tmp_path: Path,
+) -> None:
+    agents = LocalAgentStore(tmp_path)
+    placements = LocalAgentPlacementStore(tmp_path)
+    agent = agents.create_agent(
+        "alice", {"displayName": "Builder", "executorKind": "codex"}
+    )
+    placement = placements.create_placement(agent, "node_old")
+    session = {
+        "id": "ses_existing",
+        "daemonNodeId": "node_old",
+        "workspacePath": "/workspace",
+        "agentRuns": [
+            {
+                "logicalAgentId": agent["id"],
+                "placementId": placement["id"],
+                "daemonNodeId": "node_old",
+                "workspaceIdentity": {
+                    "kind": "id",
+                    "value": "managed:computer_one",
+                },
+            }
+        ],
+    }
+    placements.rebind_placement(placement["id"], "node_new")
+
+    resolved = resolve_agent_assignments(
+        [{"agentId": agent["id"], "mode": "action"}],
+        employee_id="alice",
+        is_admin=False,
+        agent_store=agents,
+        placement_store=placements,
+        daemon_nodes=[
+            {
+                **node(
+                    "node_new",
+                    "codex",
+                    workspace_id="managed:computer_one",
+                ),
+                "managedNodeId": "computer_one",
+                "employeeId": "alice",
+            }
+        ],
+        session=session,
+    )
+
+    assert resolved[0]["daemonNodeId"] == "node_new"
+
+
 def test_shared_path_session_rejects_followup_on_different_node(
     tmp_path: Path,
 ) -> None:
