@@ -151,7 +151,7 @@ export function AddEmployeeDrawer({
               {handlePreview ? initialsOf(handlePreview) : "?"}
             </span>
             <div className="adm-provision-preview-text">
-              <span className="adm-provision-preview-handle mono">
+              <span className="adm-provision-preview-handle code">
                 {handlePreview ? `@${handlePreview}` : t("admin.v2.provision_preview_placeholder")}
               </span>
               <span className="adm-provision-preview-name">
@@ -169,7 +169,7 @@ export function AddEmployeeDrawer({
               ref={employeeIdRef}
               data-modal-initial-focus
               name="employee-id"
-              className="mono"
+              className="code"
               value={employeeId}
               onChange={(event) => {
                 setEmployeeId(event.target.value);
@@ -209,7 +209,7 @@ export function AddEmployeeDrawer({
             </span>
             <Input
               name="email"
-              className="mono"
+              className="code"
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
@@ -235,7 +235,7 @@ export function AddEmployeeDrawer({
             <Input
               ref={usernameRef}
               name="username"
-              className="mono"
+              className="code"
               value={username}
               onChange={(event) => {
                 setUsername(event.target.value);
@@ -262,7 +262,7 @@ export function AddEmployeeDrawer({
             <Input
               ref={passwordRef}
               name="password"
-              className="mono"
+              className="code"
               type="password"
               value={password}
               onChange={(event) => {
@@ -298,7 +298,7 @@ export function AddEmployeeDrawer({
                 value={selectedNodeId || undefined}
                 onValueChange={(value) => setSelectedNodeId(value ?? "")}
               >
-                <SelectTrigger className="w-full mono">
+                <SelectTrigger className="w-full code">
                   <SelectValue placeholder={t("admin.select_node")} />
                 </SelectTrigger>
                 <SelectContent>

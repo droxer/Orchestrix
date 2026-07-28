@@ -28,7 +28,7 @@ export function ArtifactNavButton({ artifactCount, hasSession, isRefreshing, onO
       >
         <StreamAttachment size={16} />
         {artifactCount > 0 ? (
-          <span className="chat-artifacts-count mono" aria-label={t("artifact.drawer_subtitle", { count: artifactCount })}>
+          <span className="chat-artifacts-count tnum" aria-label={t("artifact.drawer_subtitle", { count: artifactCount })}>
             {artifactCount}
           </span>
         ) : null}

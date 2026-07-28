@@ -97,7 +97,7 @@ export function NodeCard({
         <div className="adm-node-card-identity">
           <span className="adm-node-card-nameline">
             <span
-              className={`adm-node-card-name${hasName ? "" : " mono"}`}
+              className={`adm-node-card-name${hasName ? "" : " code"}`}
               translate="no"
             >
               {nodeName}
@@ -105,7 +105,7 @@ export function NodeCard({
             <NodePresence node={node} t={t} withLabel />
           </span>
           <span
-            className={`adm-node-card-handle mono${showHandle ? "" : " is-placeholder"}`}
+            className={`adm-node-card-handle code${showHandle ? "" : " is-placeholder"}`}
             aria-hidden={showHandle ? undefined : true}
             translate="no"
           >
@@ -160,7 +160,7 @@ export function NodeCard({
 
       <footer className="adm-node-card-foot">
         {node.queuedCommandCount > 0 ? (
-          <span className="adm-node-card-queued mono">{node.queuedCommandCount} {t("admin.queued")}</span>
+          <span className="adm-node-card-queued tnum">{node.queuedCommandCount} {t("admin.queued")}</span>
         ) : null}
         <div className="adm-node-card-actions">
           <Button variant="ghost"

@@ -73,7 +73,7 @@ export function NodeStatusCard({ nodes, className }: NodeStatusCardProps) {
               <span className="adm-dash-stat-dot" aria-hidden="true" />
               {t(`admin.v2.dash_health_${slot.key}`)}
             </dt>
-            <dd className="adm-dash-stat-value mono">{slot.count}</dd>
+            <dd className="adm-dash-stat-value tnum">{slot.count}</dd>
           </div>
         ))}
       </dl>

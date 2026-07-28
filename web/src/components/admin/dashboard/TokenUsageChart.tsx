@@ -78,7 +78,7 @@ export function TokenUsageChart({ snapshot, compact, className }: TokenUsageChar
         <div className={`adm-dash-empty${compact ? " adm-dash-empty--compact" : ""}`}>
           <PlaceholderBars compact={compact} />
           <div className="adm-dash-empty-overlay">
-            <span className="adm-dash-empty-tag mono">{t("admin.v2.dash_coming_soon_tag")}</span>
+            <span className="adm-dash-empty-tag">{t("admin.v2.dash_coming_soon_tag")}</span>
             <p className="adm-dash-empty-copy">{t("admin.v2.dash_tokens_empty")}</p>
             {coverageNote ? <p className="adm-dash-empty-copy">{coverageNote}</p> : null}
           </div>

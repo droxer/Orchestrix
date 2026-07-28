@@ -36,7 +36,7 @@ function CredCopyRow({ label, value, copyLabel, copied, onCopy, hint }: RowProps
       <span className="adm-cred-label">{label}</span>
       {hint ? <span className="adm-cred-hint">{hint}</span> : null}
       <div className="adm-cred-value-line">
-        <code className="adm-cred-value mono">{value}</code>
+        <code className="adm-cred-value code">{value}</code>
         <Button variant="ghost"
           type="button"
           className={`adm-copy-pill ${copied ? "copied" : ""}`}
@@ -149,7 +149,7 @@ export function CredentialsDrawer({ open, onClose, node, storedToken, onUnassign
       onClose={onClose}
       title={t("admin.v2.credentials_title")}
       subtitle={
-        <span className="mono" translate="no">
+        <span className="code" translate="no">
           {employeeLabel} · {node.id}
         </span>
       }

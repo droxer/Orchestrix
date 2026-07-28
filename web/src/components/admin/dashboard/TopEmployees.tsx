@@ -46,18 +46,18 @@ export function TopEmployees({ employees, nodes, ranked, className }: TopEmploye
         <ol className="adm-dash-top-list">
           {rows.map((row, index) => (
             <li key={row.id} className="adm-dash-top-row">
-              <span className="adm-dash-top-rank mono">{index + 1}</span>
+              <span className="adm-dash-top-rank tnum">{index + 1}</span>
               <EmployeeAvatar employeeId={row.id} running={false} size={28} />
               <div className="adm-dash-top-meta">
                 <span className="adm-dash-top-name">{row.displayName}</span>
-                <span className="adm-dash-top-sub mono">
+                <span className="adm-dash-top-sub tnum">
                   {t("admin.v2.dash_top_nodes", { count: row.nodeCount })}
                 </span>
               </div>
               <div className="adm-dash-top-bar" aria-hidden="true">
                 <span style={{ width: `${Math.max(row.share * 100, 4)}%` }} />
               </div>
-              <span className="adm-dash-top-count mono">{row.sessionCount}</span>
+              <span className="adm-dash-top-count tnum">{row.sessionCount}</span>
             </li>
           ))}
         </ol>

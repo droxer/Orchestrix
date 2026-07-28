@@ -43,7 +43,7 @@ export function ThreadListPanel({
         <div className="conversation-heading">
           <h1>
             {t("nav.threads")}
-            <small className="mono conversation-heading-count">
+            <small className="tnum conversation-heading-count">
               {threads.length}
             </small>
           </h1>
@@ -76,7 +76,7 @@ export function ThreadListPanel({
             <div key={section.key} className="conversation-group" data-tone={section.tone}>
               <div className="conversation-group-label">
                 <span>{section.label}</span>
-                <span className="conversation-group-count mono">{section.items.length}</span>
+                <span className="conversation-group-count tnum">{section.items.length}</span>
               </div>
               {section.items.map((item) => (
                 <ThreadRow

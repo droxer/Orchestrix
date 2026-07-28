@@ -1,5 +1,5 @@
 /* Base — element resets, focus contract, shared utilities
-   (.mono, .eyebrow, .tone-*). Consumes tokens only. */
+   (.tnum, .code, .eyebrow, .tone-*). Consumes tokens only. */
 
 :root {
   color-scheme: dark;
@@ -136,10 +136,28 @@ select:focus-visible {
   }
 }
 
-/* Tabular numerals in the sans; elements that must stay monospace
-   (session IDs, hashes) re-specify --font-mono locally. */
-.mono {
+/* Two utilities, deliberately separate — the old single `.mono` name promised
+   a monospace face but only ever set tabular figures in the sans, so every
+   identifier wearing it silently rendered in the reading face.
+
+   `.tnum` — figures that must align in a column: counts, timestamps, ratios,
+   byte sizes. Stays in the sans on purpose. */
+.tnum {
   font-family: var(--font-sans);
+  font-feature-settings: "tnum" 1;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+/* `.code` — the code face for literal strings the operator could type, paste,
+   or diff: node ids, @handles, emails, workspace paths, credentials, tokens.
+   Family only; size and leading stay with the call site so this layers onto
+   chrome of any scale. Reach for `font: var(--type-code)` instead when you
+   want the whole code role (size + leading + weight). Note the shorthand in a
+   later-imported rule resets font-family, so a companion class using `font:`
+   needs an explicit `.<class>.code` override. */
+.code {
+  font-family: var(--font-mono);
   font-feature-settings: "tnum" 1;
   font-variant-numeric: tabular-nums;
   font-weight: 500;

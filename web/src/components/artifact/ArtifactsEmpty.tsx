@@ -18,7 +18,7 @@ export function ArtifactsEmpty({ title, hint }: { title: string; hint?: string }
           <li key={kind} className="artifacts-empty-ghost">
             <span className="artifacts-empty-tag">{t(`artifact.kind.${kind}`)}</span>
             <span className="artifacts-empty-line" />
-            <span className="artifacts-empty-date mono">··:··</span>
+            <span className="artifacts-empty-date tnum">··:··</span>
           </li>
         ))}
       </ul>

@@ -129,7 +129,7 @@ export function ManageExecutorsDrawer({ open, onClose, node, onUpdated }: Manage
       onClose={() => { void requestClose(); }}
       title={t("admin.v2.manage_executors_title")}
       subtitle={
-        <span className="mono" translate="no">
+        <span className="code" translate="no">
           {node.employeeId ? `@${node.employeeId}` : t("admin.unassigned")} · {node.id}
         </span>
       }

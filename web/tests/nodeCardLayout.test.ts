@@ -21,7 +21,7 @@ describe("node card profile layout", () => {
     assert.match(row, /<NodeProfileBadges[\s\S]*?\bhideSandbox\b[\s\S]*?\/>/);
     assert.match(badges, /aria-label=\{!showSandbox\s*\?\s*ownershipLabel/);
     assert.match(badges, /\{showSandbox\s*\?\s*\([\s\S]*?adm-node-profile-sandbox/);
-    assert.match(card, /adm-node-card-handle mono\$\{showHandle \? "" : " is-placeholder"\}/);
+    assert.match(card, /adm-node-card-handle code\$\{showHandle \? "" : " is-placeholder"\}/);
     assert.match(card, /adm-node-action--copy/);
     assert.match(actions, /adm-node-action--rename/);
     assert.match(actions, /adm-node-action--credentials/);
