@@ -62,13 +62,31 @@ def run_start_command(command_id: str, run_id: str) -> dict[str, str]:
 
 
 @pytest.mark.parametrize("daemon_store_factory", DAEMON_STORE_FACTORIES)
+def test_daemon_store_retains_managed_runtime_identity_after_delete(
+    daemon_store_factory,
+) -> None:
+    with TemporaryDirectory() as root:
+        store = daemon_store_factory(root)
+        assert store.historical_managed_runtime_ids("computer_one") == set()
+        store.register_node(
+            {
+                **store_node_payload(),
+                "id": "runtime_old",
+                "managedNodeId": "computer_one",
+            }
+        )
+
+        store.delete_node("runtime_old")
+
+        assert store.historical_managed_runtime_ids("computer_one") == {"runtime_old"}
+
+
+@pytest.mark.parametrize("daemon_store_factory", DAEMON_STORE_FACTORIES)
 def test_pending_employee_device_enrollment_rotates_token_after_restart(
     daemon_store_factory,
 ) -> None:
     with TemporaryDirectory() as root:
-        first = DaemonNodeRegistry(
-            LocalSessionStore(root), daemon_store_factory(root)
-        )
+        first = DaemonNodeRegistry(LocalSessionStore(root), daemon_store_factory(root))
         node, _, first_token = first.provision_pending(
             "alice", "/Users/alice/project", "boxlite", "employee-device"
         )
@@ -93,9 +111,10 @@ def test_pending_employee_device_enrollment_rotates_token_after_restart(
         }
         with pytest.raises(PermissionError):
             restarted.register({**registration, "token": first_token})
-        assert restarted.register(
-            {**registration, "token": replacement_token}
-        )["status"] == "ready"
+        assert (
+            restarted.register({**registration, "token": replacement_token})["status"]
+            == "ready"
+        )
 
 
 def test_explicit_sandbox_provision_targets_requested_node() -> None:
@@ -2934,9 +2953,7 @@ def test_registry_persists_computer_display_name(store_factory) -> None:
 
         registry.set_display_name("sbx_alice", "Office Mac")
 
-        restarted = DaemonNodeRegistry(
-            LocalSessionStore(root), store_factory(root)
-        )
+        restarted = DaemonNodeRegistry(LocalSessionStore(root), store_factory(root))
         assert restarted.get("sbx_alice")["displayName"] == "Office Mac"
 
 

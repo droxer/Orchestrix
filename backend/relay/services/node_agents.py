@@ -36,6 +36,13 @@ def sync_node_agents(ctx: Any, node: dict[str, Any]) -> None:
     computer_id = node.get("managedNodeId") or node["id"]
     for executor_kind in sorted(supported - disabled):
         try:
+            if node.get("managedNodeId"):
+                _migrate_managed_compatibility_agent(
+                    ctx,
+                    node,
+                    employee_id,
+                    executor_kind,
+                )
             agent = ctx.agent_store.ensure_compatibility_agent(
                 employee_id,
                 executor_kind,
@@ -81,6 +88,63 @@ def sync_node_agents(ctx: Any, node: dict[str, Any]) -> None:
             )
 
 
+def _migrate_managed_compatibility_agent(
+    ctx: Any,
+    node: dict[str, Any],
+    employee_id: str,
+    executor_kind: str,
+) -> dict[str, Any] | None:
+    """Move a prior incarnation's compatibility identity to its Computer."""
+    managed_node_id = node.get("managedNodeId")
+    if not managed_node_id:
+        return None
+    stable_key = _compatibility_key_for(employee_id, managed_node_id, executor_kind)
+    agents = ctx.agent_store.list_agents(supervisor_employee_id=employee_id)
+    stable = next(
+        (
+            agent
+            for agent in agents
+            if agent.get("compatibilityKey") == stable_key
+            and not agent.get("deletedAt")
+        ),
+        None,
+    )
+    if stable:
+        return stable
+    registry = getattr(ctx, "registry", None)
+    if not registry:
+        return None
+    incarnation_ids = {
+        runtime["id"]
+        for runtime in registry.monitor_nodes()
+        if runtime.get("managedNodeId") == managed_node_id
+    }
+    daemon_store = getattr(registry, "daemon_store", None)
+    historical_runtime_ids = getattr(
+        daemon_store, "historical_managed_runtime_ids", None
+    )
+    if historical_runtime_ids:
+        incarnation_ids.update(historical_runtime_ids(managed_node_id))
+    legacy_keys = {
+        _compatibility_key_for(employee_id, runtime_id, executor_kind)
+        for runtime_id in incarnation_ids
+    }
+    candidates = sorted(
+        (
+            agent
+            for agent in agents
+            if agent.get("compatibilityKey") in legacy_keys
+            and not agent.get("deletedAt")
+        ),
+        key=lambda agent: (agent.get("createdAt") or "", agent["id"]),
+    )
+    if not candidates:
+        return None
+    return ctx.agent_store.update_agent(
+        candidates[0]["id"], {"compatibilityKey": stable_key}
+    )
+
+
 def _retire_superseded_locked(
     ctx: Any, node: dict[str, Any], employee_id: str, executor_kind: str
 ) -> list[str]:
@@ -119,11 +183,12 @@ def retire_superseded_compatibility_agents(
         return []
     identity = workspace_identity(node)
     nodes_by_id = {item["id"]: item for item in registry.monitor_nodes()}
-    node_scoped_key = _compatibility_key_for(
+    computer_scoped_key = _compatibility_key_for(
         employee_id, node.get("managedNodeId") or node["id"], executor_kind
     )
-    has_node_scoped_sibling = any(
-        agent.get("compatibilityKey") == node_scoped_key and not agent.get("deletedAt")
+    has_computer_scoped_sibling = any(
+        agent.get("compatibilityKey") == computer_scoped_key
+        and not agent.get("deletedAt")
         for agent in ctx.agent_store.list_agents(supervisor_employee_id=employee_id)
     )
     retired: list[str] = []
@@ -131,7 +196,7 @@ def retire_superseded_compatibility_agents(
         key = agent.get("compatibilityKey")
         if not key or agent.get("deletedAt"):
             continue
-        if key == node_scoped_key:
+        if key == computer_scoped_key:
             continue
         parts = key.rsplit(":", 2)
         if len(parts) == 2:
@@ -139,7 +204,7 @@ def retire_superseded_compatibility_agents(
             if (
                 owner != employee_id
                 or kind != executor_kind
-                or not has_node_scoped_sibling
+                or not has_computer_scoped_sibling
                 or _node_has_active_work(ctx, node["id"])
                 or not _agent_placed_on_node(ctx, agent["id"], node["id"])
             ):

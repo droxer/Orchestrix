@@ -336,6 +336,11 @@ test("managed reconciler keeps an online busy daemon running", async () => {
 
 test("managed reconciler retries blocked runtime retirement without failing the cycle", async () => {
   const ready = { ...managedNode(), phase: "ready" as const, activeDaemonNodeId: "node_alice" };
+  const attempt = {
+    ...(await new FakeManagedBackend([]).createProvisioningAttempt(ready.id)).attempt,
+    status: "succeeded" as const,
+    providerInstanceId: "mnode_alice:1",
+  };
   const backend = new FakeManagedBackend([ready], [{
     id: "node_alice",
     managedNodeId: ready.id,
@@ -347,14 +352,15 @@ test("managed reconciler retries blocked runtime retirement without failing the 
     activeRuns: [],
     online: false,
     stale: true,
-  }]);
+  }], [attempt]);
   backend.runtimeRetirementError = Object.assign(
     new Error("Daemon node has active agent work."),
     { status: 409 },
   );
+  const provider = new FakeProvider();
   const reconciler = new ManagedNodeReconciler({
     backend,
-    providers: [new FakeProvider()],
+    providers: [provider],
     backendUrl: "http://backend.test",
     workspacePathForNode: () => "/workspaces/alice",
   });
@@ -367,6 +373,43 @@ test("managed reconciler retries blocked runtime retirement without failing the 
   });
   assert.equal(ready.phase, "ready");
   assert.equal(backend.retiredRuntimes, 1);
+  assert.equal(provider.stopCalls, 0);
+  assert.equal(provider.status, "running");
+});
+
+test("stopping a managed computer waits for runtime drain before provider stop", async () => {
+  const stopped = {
+    ...managedNode(),
+    desiredState: "stopped" as const,
+    phase: "draining" as const,
+    activeDaemonNodeId: "node_alice",
+  };
+  const attempt = {
+    ...(await new FakeManagedBackend([]).createProvisioningAttempt(stopped.id)).attempt,
+    status: "succeeded" as const,
+    providerInstanceId: "mnode_alice:1",
+  };
+  const backend = new FakeManagedBackend([stopped], [], [attempt]);
+  backend.runtimeRetirementError = Object.assign(
+    new Error("Daemon node has active agent work."),
+    { status: 409 },
+  );
+  const provider = new FakeProvider();
+  const reconciler = new ManagedNodeReconciler({
+    backend,
+    providers: [provider],
+    backendUrl: "http://backend.test",
+    workspacePathForNode: () => "/workspaces/alice",
+  });
+
+  assert.deepEqual(await reconciler.reconcileOnce(), {
+    nodes: 1,
+    started: 0,
+    skipped: 1,
+    failed: 0,
+  });
+  assert.equal(provider.stopCalls, 0);
+  assert.equal(provider.status, "running");
 });
 
 test("managed reconciler finalizes deleted provider cleanup once", async () => {
