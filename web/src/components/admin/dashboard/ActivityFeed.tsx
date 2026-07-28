@@ -57,7 +57,7 @@ export function ActivityFeed({ items, employees, className }: ActivityFeedProps)
                     <span className="adm-dash-feed-owner">{ownerName}</span>
                   ) : null}
                 </div>
-                <time className="adm-dash-feed-time mono" dateTime={item.timestamp}>
+                <time className="adm-dash-feed-time tnum" dateTime={item.timestamp}>
                   {relativeTime}
                 </time>
               </li>

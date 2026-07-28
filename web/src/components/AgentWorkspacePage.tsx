@@ -95,7 +95,7 @@ function PaneHeader({
   return (
     <header className="workspace-pane-head">
       <h2>{title}</h2>
-      {count !== undefined ? <span className="mono">{count}</span> : null}
+      {count !== undefined ? <span className="tnum">{count}</span> : null}
       {meta ?? null}
       {actions ? <div className="workspace-pane-head-actions">{actions}</div> : null}
     </header>
@@ -137,11 +137,11 @@ function WorkspacePathBreadcrumb({
             <li key={segment.path || "root"}>
               {index > 0 ? <span className="workspace-path-sep" aria-hidden="true">/</span> : null}
               {isCurrent ? (
-                <span className="workspace-path-segment is-current mono" title={segment.path}>{segment.label}</span>
+                <span className="workspace-path-segment is-current code" title={segment.path}>{segment.label}</span>
               ) : (
                 <button
                   type="button"
-                  className="workspace-path-segment mono"
+                  className="workspace-path-segment code"
                   title={segment.path}
                   onClick={() => onNavigate(segment.path)}
                 >
@@ -349,7 +349,7 @@ export function AgentWorkspacePage({
                   onKeyDown={(event) => movePageTab(event, event.key === "ArrowLeft" ? previous : next)}
                 >
                   {pageTabLabel(tab)}
-                  {count !== undefined ? <span className="workspace-page-tab-count mono">{count}</span> : null}
+                  {count !== undefined ? <span className="workspace-page-tab-count tnum">{count}</span> : null}
                 </button>
               );
             })}
@@ -432,7 +432,7 @@ export function AgentWorkspacePage({
                                   {t(`artifact.kind.${artifact.kind}`, { defaultValue: artifact.kind })}
                                 </span>
                                 <span className="workspace-pick-title">{artifact.title}</span>
-                                <span className="workspace-pick-meta mono">{compactDate(artifact.createdAt, i18n.language)}</span>
+                                <span className="workspace-pick-meta tnum">{compactDate(artifact.createdAt, i18n.language)}</span>
                               </button>
                             </li>
                           );
@@ -498,7 +498,7 @@ export function AgentWorkspacePage({
                       {t("workspace.open_thread")}
                     </Button>
                   ) : selected?.type === "file" ? (
-                    <span className="workspace-preview-file-type mono">{languageForFile(selected.name)}</span>
+                    <span className="workspace-preview-file-type code">{languageForFile(selected.name)}</span>
                   ) : null}
                 />
                 <div className="workspace-pane-body workspace-preview-body">
@@ -678,7 +678,7 @@ function ActivitySection({ title, count, index = 0, children }: { title: string;
     <section className="workspace-activity-section" style={{ animationDelay: `${40 + index * 80}ms` }}>
       <header className="workspace-activity-head">
         <h2>{title}</h2>
-        <span className="mono">{count}</span>
+        <span className="tnum">{count}</span>
       </header>
       {children}
     </section>
@@ -698,14 +698,14 @@ function ActivityRow({
     return (
       <div className="workspace-pick workspace-activity-pick is-static">
         <span className="workspace-pick-title">{title}</span>
-        <span className="workspace-pick-meta mono">{meta}</span>
+        <span className="workspace-pick-meta tnum">{meta}</span>
       </div>
     );
   }
   return (
     <button type="button" className="workspace-pick workspace-activity-pick" onClick={onClick}>
       <span className="workspace-pick-title">{title}</span>
-      <span className="workspace-pick-meta mono">{meta}</span>
+      <span className="workspace-pick-meta tnum">{meta}</span>
     </button>
   );
 }
@@ -808,7 +808,7 @@ function WorkspaceFileRow({
         {isDirectory ? <WorkspaceFolder size={15} /> : <WorkspaceFile size={15} />}
       </span>
       <span className="workspace-pick-title">{entry.name}</span>
-      <span className="workspace-pick-meta mono">
+      <span className="workspace-pick-meta tnum">
         {isDirectory ? entry.kind : formatBytes(entry.bytes, locale) || entry.kind} · {compactDate(entry.updatedAt, locale)}
       </span>
     </button>

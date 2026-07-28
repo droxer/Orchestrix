@@ -67,7 +67,7 @@ export function AdminLoginScreen({ onLogin, needsBootstrap, onSwitchToBootstrap 
           <span>{t("admin.username")}</span>
           <Input
             name="username"
-            className="mono"
+            className="code"
             value={username}
             onChange={(event) => setUsername(event.target.value)}
             autoComplete="username"
@@ -79,7 +79,7 @@ export function AdminLoginScreen({ onLogin, needsBootstrap, onSwitchToBootstrap 
           <span>{t("admin.password")}</span>
           <Input
             name="password"
-            className="mono"
+            className="code"
             type="password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
@@ -140,7 +140,7 @@ export function FirstAdminSetupScreen({ onBootstrapped, onSwitchToLogin }: First
           <span>{t("admin.bootstrap_token")}</span>
           <Input
             name="bootstrap-token"
-            className="mono"
+            className="code"
             type="password"
             value={token}
             onChange={(event) => setToken(event.target.value)}
@@ -153,7 +153,7 @@ export function FirstAdminSetupScreen({ onBootstrapped, onSwitchToLogin }: First
           <span>{t("admin.username")}</span>
           <Input
             name="username"
-            className="mono"
+            className="code"
             value={username}
             onChange={(event) => setUsername(event.target.value)}
             autoComplete="username"
@@ -165,7 +165,7 @@ export function FirstAdminSetupScreen({ onBootstrapped, onSwitchToLogin }: First
           <span>{t("admin.password")}</span>
           <Input
             name="password"
-            className="mono"
+            className="code"
             type="password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}

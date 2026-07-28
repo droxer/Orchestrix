@@ -1,7 +1,3 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, appendFileSync } from "node:fs";
-import { basename, join, resolve } from "node:path";
-
-import { REPO_ROOT } from "./env.js";
 import type { AgentName, AgentTaskMode } from "./state.js";
 import { mergeTokenUsage, type TokenUsage } from "./token-usage.js";
 import type { CodexCollaborationEvent } from "./codex-collaboration.js";
@@ -125,7 +121,7 @@ export type RelayEvent =
       runId: string;
       agent: AgentName;
       /** Logical (employee) agent dispatched for this run; absent on legacy
-       * runs and on TUI/workflow dispatches that name only an executor kind. */
+       * runs and workflow dispatches that name only an executor kind. */
       logicalAgentId?: string;
       placementId?: string;
       daemonNodeId?: string;
@@ -210,44 +206,6 @@ export type RelayEvent =
       title: string;
     };
 
-export interface SessionStore {
-  createSession(input: {
-    workspacePath: string;
-    daemonNodeId?: string;
-    ownerEmployeeId?: string;
-    teamId?: string;
-    taskGoal: string;
-    participants?: string[];
-    status?: SessionStatus;
-    pendingDecision?: RelaySession["pendingDecision"];
-  }): Promise<RelaySession>;
-  appendEvent(sessionId: string, event: RelayEvent): Promise<RelaySession>;
-  getSession(sessionId: string): Promise<RelaySession>;
-  listSessions(): Promise<RelaySession[]>;
-  writeArtifact(sessionId: string, input: {
-    kind: RelayArtifactKind;
-    title: string;
-    body: string;
-    extension?: string;
-    agentRunId?: string;
-  }): Promise<RelayArtifact>;
-  createArtifact?(sessionId: string, input: {
-    kind: RelayArtifactKind;
-    title: string;
-    body: string;
-    extension?: string;
-    agentRunId?: string;
-  }): Promise<{ artifact: RelayArtifact; session: RelaySession }>;
-  artifactPath(sessionId: string, artifactId: string): Promise<string>;
-  readArtifact(sessionId: string, artifactId: string): Promise<string>;
-}
-
-export interface AgentEventSink {
-  agentOutput(runId: string, agent: AgentName, stream: "stdout" | "stderr", text: string): void | Promise<void>;
-}
-
-export const DEFAULT_RELAY_DATA_DIR = resolve(REPO_ROOT, ".relay");
-
 export function nowIso(): string {
   return new Date().toISOString();
 }
@@ -255,154 +213,6 @@ export function nowIso(): string {
 export function newRelayId(prefix: string): string {
   const random = Math.random().toString(36).slice(2, 8);
   return `${prefix}_${Date.now().toString(36)}_${random}`;
-}
-
-export class LocalSessionStore implements SessionStore {
-  private readonly sessionsDir: string;
-
-  constructor(public readonly rootDir = DEFAULT_RELAY_DATA_DIR) {
-    this.sessionsDir = join(this.rootDir, "sessions");
-    mkdirSync(this.sessionsDir, { recursive: true });
-  }
-
-  async createSession(input: {
-    workspacePath: string;
-    daemonNodeId?: string;
-    ownerEmployeeId?: string;
-    teamId?: string;
-    taskGoal: string;
-    participants?: string[];
-    status?: SessionStatus;
-    pendingDecision?: RelaySession["pendingDecision"];
-  }): Promise<RelaySession> {
-    const sessionId = newRelayId("ses");
-    const dir = this.sessionDir(sessionId);
-    mkdirSync(join(dir, "artifacts"), { recursive: true });
-    const event = relayEvent("session.created", sessionId, {
-      workspacePath: input.workspacePath,
-      ...(input.daemonNodeId ? { daemonNodeId: input.daemonNodeId } : {}),
-      ...(input.ownerEmployeeId ? { ownerEmployeeId: input.ownerEmployeeId } : {}),
-      ...(input.teamId ? { teamId: input.teamId } : {}),
-      taskGoal: input.taskGoal,
-      participants: input.participants ?? ["human"],
-    });
-    const events: RelayEvent[] = [event];
-    if (input.status || input.pendingDecision) {
-      events.push(relayEvent("session.status", sessionId, {
-        status: input.status ?? "running",
-        phase: input.pendingDecision ? `waiting:${input.pendingDecision}` : "created",
-        pendingDecision: input.pendingDecision,
-      }));
-    }
-    const session = materializeEvents(events);
-    writeFileSync(this.eventsPath(sessionId), events.map((item) => JSON.stringify(item)).join("\n") + "\n");
-    writeFileSync(this.snapshotPath(sessionId), `${JSON.stringify(session, null, 2)}\n`);
-    return session;
-  }
-
-  async appendEvent(sessionId: string, event: RelayEvent): Promise<RelaySession> {
-    mkdirSync(this.sessionDir(sessionId), { recursive: true });
-    appendFileSync(this.eventsPath(sessionId), `${JSON.stringify(event)}\n`);
-    const session = materializeEvents(this.readEvents(sessionId));
-    writeFileSync(this.snapshotPath(sessionId), `${JSON.stringify(session, null, 2)}\n`);
-    return session;
-  }
-
-  async getSession(sessionId: string): Promise<RelaySession> {
-    const snapshot = this.snapshotPath(sessionId);
-    if (existsSync(snapshot)) {
-      return JSON.parse(readFileSync(snapshot, "utf8")) as RelaySession;
-    }
-    return materializeEvents(this.readEvents(sessionId));
-  }
-
-  async listSessions(): Promise<RelaySession[]> {
-    if (!existsSync(this.sessionsDir)) return [];
-    return readdirSync(this.sessionsDir, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => this.getSessionSync(entry.name))
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  }
-
-  async writeArtifact(sessionId: string, input: {
-    kind: RelayArtifactKind;
-    title: string;
-    body: string;
-    extension?: string;
-    agentRunId?: string;
-  }): Promise<RelayArtifact> {
-    const artifactId = newRelayId("art");
-    const extension = input.extension ?? "txt";
-    const artifactDir = join(this.sessionDir(sessionId), "artifacts");
-    mkdirSync(artifactDir, { recursive: true });
-    const path = join(artifactDir, `${artifactId}.${extension}`);
-    writeFileSync(path, input.body);
-    return {
-      id: artifactId,
-      kind: input.kind,
-      title: input.title,
-      path,
-      createdAt: nowIso(),
-      agentRunId: input.agentRunId,
-      bytes: Buffer.byteLength(input.body),
-    };
-  }
-
-  async createArtifact(sessionId: string, input: {
-    kind: RelayArtifactKind;
-    title: string;
-    body: string;
-    extension?: string;
-    agentRunId?: string;
-  }): Promise<{ artifact: RelayArtifact; session: RelaySession }> {
-    const artifact = await this.writeArtifact(sessionId, input);
-    try {
-      const session = await this.appendEvent(sessionId, relayEvent("artifact.created", sessionId, { artifact }));
-      return { artifact, session };
-    } catch (error) {
-      rmSync(artifact.path, { force: true });
-      throw error;
-    }
-  }
-
-  async artifactPath(sessionId: string, artifactId: string): Promise<string> {
-    const artifact = this.getSessionSync(sessionId).artifacts.find((item) => item.id === artifactId);
-    if (!artifact) throw new Error(`Unknown artifact ${artifactId} in session ${sessionId}.`);
-    return artifact.path;
-  }
-
-  async readArtifact(sessionId: string, artifactId: string): Promise<string> {
-    return readFileSync(await this.artifactPath(sessionId, artifactId), "utf8");
-  }
-
-  private getSessionSync(sessionId: string): RelaySession {
-    const snapshot = this.snapshotPath(sessionId);
-    if (existsSync(snapshot)) {
-      return JSON.parse(readFileSync(snapshot, "utf8")) as RelaySession;
-    }
-    return materializeEvents(this.readEvents(sessionId));
-  }
-
-  private readEvents(sessionId: string): RelayEvent[] {
-    const path = this.eventsPath(sessionId);
-    if (!existsSync(path)) throw new Error(`Unknown Relay session ${sessionId}.`);
-    return readFileSync(path, "utf8")
-      .split(/\r?\n/)
-      .filter(Boolean)
-      .map((line) => JSON.parse(line) as RelayEvent);
-  }
-
-  private sessionDir(sessionId: string): string {
-    return join(this.sessionsDir, basename(sessionId));
-  }
-
-  private eventsPath(sessionId: string): string {
-    return join(this.sessionDir(sessionId), "events.jsonl");
-  }
-
-  private snapshotPath(sessionId: string): string {
-    return join(this.sessionDir(sessionId), "snapshot.json");
-  }
 }
 
 export function relayEvent<T extends RelayEvent["type"]>(

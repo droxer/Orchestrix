@@ -44,26 +44,11 @@ export interface AgentRunOptions {
   eventSink?: AgentEventSink;
   runId?: string;
   agent?: AgentName;
-  sessionController?: SessionStepRunner;
-  sessionId?: string;
 }
 
 export interface AgentEventSink {
   agentOutput(runId: string, agent: AgentName, stream: "stdout" | "stderr", text: string): void | Promise<void>;
   agentCollaboration?(runId: string, agent: AgentName, event: CodexCollaborationEvent): void | Promise<void>;
-}
-
-export interface SessionStepRunner {
-  store: {
-    appendEvent(sessionId: string, event: unknown): unknown | Promise<unknown>;
-  };
-  createSession(taskGoal: string): Promise<{ id: string }>;
-  runStep(
-    sessionId: string,
-    state: AgentState,
-    step: { agent: AgentName; mode: AgentTaskMode; role?: string },
-    options?: Pick<AgentRunOptions, "signal" | "sink" | "execStream">,
-  ): Promise<AgentState>;
 }
 
 export interface StreamExecResult {

@@ -191,7 +191,7 @@ export function AssignNodeDrawer({
                 {initialsOf(selectedEmployee.id)}
               </span>
               <div className="adm-assign-operator-text">
-                <span className="adm-assign-operator-handle mono">
+                <span className="adm-assign-operator-handle code">
                   {displayHandle}
                 </span>
                 {selectedEmployee.displayName &&
@@ -218,7 +218,7 @@ export function AssignNodeDrawer({
                 <SelectTrigger
                   ref={employeeTriggerRef}
                   data-modal-initial-focus
-                  className="w-full mono"
+                  className="w-full code"
                   aria-labelledby={employeeLabelId}
                   aria-invalid={Boolean(fieldErrors.employeeId) || undefined}
                   aria-describedby={fieldErrors.employeeId ? "assign-node-employee-error" : undefined}
@@ -256,7 +256,7 @@ export function AssignNodeDrawer({
             <span className="adm-assign-section-eyebrow">
               {t("admin.assign_node")}
             </span>
-            <span className="adm-assign-nodes-count mono">
+            <span className="adm-assign-nodes-count tnum">
               {unassignedNodes.length}
             </span>
           </header>
@@ -292,11 +292,11 @@ export function AssignNodeDrawer({
                       <span className={`adm-assign-node ${isSelected ? "selected" : ""}`}>
                         <NodePresence node={node} t={t} withLabel />
                         <span className="adm-assign-node-body">
-                          <span className="adm-assign-node-id mono" translate="no">
+                          <span className="adm-assign-node-id code" translate="no">
                             {node.displayName || node.id}
                           </span>
                           {node.workspacePath ? (
-                            <span className="adm-assign-node-path mono" translate="no">
+                            <span className="adm-assign-node-path code" translate="no">
                               {node.workspacePath}
                             </span>
                           ) : (

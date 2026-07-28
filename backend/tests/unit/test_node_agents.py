@@ -267,7 +267,10 @@ def test_removing_node_waits_for_active_agent_runs(tmp_path: Path) -> None:
 
 
 def _registry_ctx(
-    tmp_path: Path, nodes: list[dict], active_requests: list[dict] | None = None
+    tmp_path: Path,
+    nodes: list[dict],
+    active_requests: list[dict] | None = None,
+    historical_runtime_ids: set[str] | None = None,
 ):
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
@@ -278,7 +281,10 @@ def _registry_ctx(
             monitor_nodes=lambda: nodes,
             dispatch_lock=None,
             daemon_store=SimpleNamespace(
-                list_active_run_requests=lambda: active_requests or []
+                list_active_run_requests=lambda: active_requests or [],
+                historical_managed_runtime_ids=lambda _managed_node_id: (
+                    historical_runtime_ids or set()
+                ),
             ),
         ),
     )
@@ -481,7 +487,7 @@ def test_sync_keeps_legacy_agent_on_a_different_node(tmp_path: Path) -> None:
     assert not agents.get_agent(legacy["id"]).get("deletedAt")
 
 
-def test_reprovisioned_managed_node_retires_old_agent(tmp_path: Path) -> None:
+def test_reprovisioned_managed_node_migrates_old_agent_identity(tmp_path: Path) -> None:
     old_node = {
         "id": "node_old",
         "employeeId": "alice",
@@ -498,17 +504,21 @@ def test_reprovisioned_managed_node_retires_old_agent(tmp_path: Path) -> None:
         "agents": {"claude": "ready"},
         "online": True,
     }
-    ctx, agents, placements = _registry_ctx(tmp_path, [old_node, new_node])
+    ctx, agents, placements = _registry_ctx(
+        tmp_path,
+        [new_node],
+        historical_runtime_ids={"node_old", "node_new"},
+    )
     stale = agents.ensure_compatibility_agent("alice", "claude", "node_old")
     placements.create_placement(stale, "node_old")
 
     sync_node_agents(ctx, new_node)
 
-    assert agents.get_agent(stale["id"]).get("deletedAt")
-    assert {
-        agent["compatibilityKey"]
-        for agent in agents.list_agents(supervisor_employee_id="alice")
-    } == {"alice:managed_one:claude"}
+    [migrated] = agents.list_agents(supervisor_employee_id="alice")
+    assert migrated["id"] == stale["id"]
+    assert migrated["compatibilityKey"] == "alice:managed_one:claude"
+    [placement] = placements.list_placements(agent_id=stale["id"])
+    assert placement["daemonNodeId"] == "node_new"
 
 
 def test_reprovisioned_managed_computer_preserves_agent_and_placement_identity(

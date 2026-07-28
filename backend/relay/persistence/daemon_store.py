@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import fcntl
 from collections import defaultdict
 from contextlib import contextmanager
 from datetime import timedelta
-import fcntl
 from pathlib import Path
 from threading import RLock
 from typing import Any, Iterator
@@ -34,15 +34,15 @@ from .store_common import (
     _format_iso,
     _parse_iso,
     _read_json,
+    _read_jsonl,
     _write_json,
-    database_id_column,
     daemon_event,
+    database_id_column,
     new_database_id,
     new_relay_id,
     now_iso,
     safe_name,
 )
-
 
 TERMINAL_DAEMON_STATUSES = frozenset({"completed", "failed", "cancelled"})
 ACTIVE_RUN_REQUEST_STATUSES = frozenset({"running", "dispatching", "finalizing"})
@@ -838,6 +838,19 @@ class LocalDaemonStore:
 
     def append_daemon_event(self, event: dict[str, Any]) -> None:
         _append_jsonl(self.events_dir / "events.jsonl", event)
+
+    def historical_managed_runtime_ids(self, managed_node_id: str) -> set[str]:
+        events_path = self.events_dir / "events.jsonl"
+        if not events_path.exists():
+            return set()
+        return {
+            node["id"]
+            for event in _read_jsonl(events_path)
+            if event.get("type") == "daemon.node.registered"
+            and isinstance((node := event.get("node")), dict)
+            and node.get("managedNodeId") == managed_node_id
+            and isinstance(node.get("id"), str)
+        }
 
     def _mark_command_terminal(
         self,
@@ -2180,6 +2193,22 @@ class DatabaseDaemonStore:
         with self.engine.begin() as conn:
             self._append_daemon_event(conn, event)
 
+    def historical_managed_runtime_ids(self, managed_node_id: str) -> set[str]:
+        with self.engine.begin() as conn:
+            payloads = conn.scalars(
+                select(self.events.c.payload).where(
+                    self.events.c.type == "daemon.node.registered"
+                )
+            ).all()
+        return {
+            node["id"]
+            for event in payloads
+            if isinstance(event, dict)
+            and isinstance((node := event.get("node")), dict)
+            and node.get("managedNodeId") == managed_node_id
+            and isinstance(node.get("id"), str)
+        }
+
     def _mark_command_terminal(
         self,
         node_id: str,
@@ -2365,11 +2394,7 @@ def row_to_node(row: Any) -> dict[str, Any]:
         ),
         **({"workspaceId": row["workspace_id"]} if row.get("workspace_id") else {}),
         **({"sandboxMode": row["sandbox_mode"]} if row.get("sandbox_mode") else {}),
-        **(
-            {"nodeLocation": row["node_location"]}
-            if row.get("node_location")
-            else {}
-        ),
+        **({"nodeLocation": row["node_location"]} if row.get("node_location") else {}),
         **(
             {"managedNodeId": row["managed_node_id"]}
             if row.get("managed_node_id")

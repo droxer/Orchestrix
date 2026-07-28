@@ -596,7 +596,7 @@ conditions rather than only the latest `lastError`.
 - Stop persisting or recovering plaintext daemon-node tokens for managed nodes.
 - Remove supervisor dependence on `POST /api/v1/admin/daemon-nodes` returning
   `daemonEnv`.
-- Deprecate ambiguous sandbox provisioning paths once TUI/web callers use the
+- Deprecate ambiguous sandbox provisioning paths once web callers use the
   explicit managed or manual workflows.
 
 ### Phase 5: Remote provider

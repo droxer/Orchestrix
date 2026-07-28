@@ -12,7 +12,6 @@ export {
   keyValue,
   section,
   status,
-  stripAnsi,
   type AgentOutputSink,
 } from "./format.js";
 
@@ -62,7 +61,6 @@ export {
   type AgentRunOptions,
   type AgentState,
   type AgentTaskMode,
-  type SessionStepRunner,
   type StreamExecResult,
 } from "./state.js";
 
@@ -227,7 +225,6 @@ export {
   type RelayEvent,
   type RelaySession,
   type SessionStatus,
-  type SessionStore,
 } from "./session-store.js";
 
 export {
@@ -244,34 +241,7 @@ export {
   type TaskRoutineCadence,
   type TaskRoutineType,
   type TaskStatus,
-  type TaskStore,
 } from "./task-store.js";
-
-export {
-  SessionController,
-  assignmentFailureOutcome,
-  assignmentSucceeded,
-  type SessionControllerOptions,
-  type WorkflowStep,
-} from "./session-controller.js";
-
-export {
-  RelayDaemonClient,
-  normalizeBaseUrl,
-  type CancelSandboxRunInput,
-  type CreateSessionInput,
-  type ProvisionSandboxInput,
-  type RecordDecisionInput,
-  type RecordHandoffInput,
-  type RelayDaemonClientOptions,
-  type RunSandboxInput,
-} from "./daemon-client.js";
-
-export {
-  routeClaudeHandoff,
-  routePiHandoff,
-  type Route,
-} from "./routing.js";
 
 export type {
   ControlPanelDaemonNodeRecord,

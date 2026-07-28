@@ -55,7 +55,7 @@ export function PageHeader({
             {title}
           </h1>
           {count != null ? (
-            <span className="mono truncate text-xs font-medium text-muted-foreground">{count}</span>
+            <span className="tnum truncate text-xs font-medium text-muted-foreground">{count}</span>
           ) : null}
         </div>
         {subtitle ? <p className="page-header-subtitle">{subtitle}</p> : null}

@@ -223,7 +223,17 @@ there):
    aliases (hover surface / outline color), which is why the action family
    is named `--action`, not `--accent`.
 4. **`base.css`** — html/body reset, the `:focus-visible` contract, and the
-   shared utilities (`.mono`, `.eyebrow`, `.tone-*`).
+   shared utilities (`.tnum`, `.code`, `.eyebrow`, `.tone-*`).
+
+   `.tnum` and `.code` are deliberately two names, not one. `.tnum` gives
+   tabular figures in the reading face — counts, timestamps, ratios, sizes.
+   `.code` gives the mono face to literal strings the operator could type,
+   paste, or diff — node ids, `@handles`, emails, workspace paths,
+   credentials. They replace a single `.mono` utility that named a monospace
+   face while only ever setting tabular figures, so every identifier wearing
+   it silently rendered in the sans. Because `.code` sets `font-family`
+   alone, a companion rule using the `font` shorthand resets it; those sites
+   carry an explicit `.<class>.code` override.
 
 **Naming rule:** component CSS only ever references a palette token
 (`--surface-*`, `--ink-*`, `--line-*`, `--action*`, `--ok/--warn/--err/--info`,

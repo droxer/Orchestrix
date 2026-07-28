@@ -83,7 +83,7 @@ export function buildLogicalAgentNameMap(
 
 /** Name the agent behind one run. The run's logical agent id wins; the
  * per-executor map is the fallback for runs that carry no logical identity
- * (legacy sessions, TUI/workflow dispatches) or whose agent no longer exists. */
+ * (legacy sessions or workflow dispatches) or whose agent no longer exists. */
 export function labelForAgentRun(
   run: { agent: AgentName; agentId?: string },
   logicalAgentNames?: Record<string, string>,

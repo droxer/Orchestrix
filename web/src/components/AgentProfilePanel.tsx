@@ -305,7 +305,7 @@ export function AgentProfilePanel({
               aria-label={t(`admin.v2.placement_status.${agent.availability}`, { defaultValue: agent.availability })}
               title={t(`admin.v2.placement_status.${agent.availability}`, { defaultValue: agent.availability })}
             />
-            <span className="workspace-dossier-runtime mono" translate="no">{agentLabel(agent.executorKind)}</span>
+            <span className="workspace-dossier-runtime code" translate="no">{agentLabel(agent.executorKind)}</span>
           </div>
         </header>
 
@@ -474,7 +474,7 @@ export function AgentProfilePanel({
 
   return (
     <div className="workspace-profile-panel">
-      <p className="workspace-profile-id mono" translate="no">
+      <p className="workspace-profile-id code" translate="no">
         @{agent.employeeId} · {agent.id}
       </p>
 
@@ -550,12 +550,12 @@ export function AgentProfilePanel({
 
       <div className="adm-cred-row">
         <span className="adm-cred-label">{t("admin.v2.agent_runtime")}</span>
-        <span className="adm-cred-value mono" translate="no">{agentLabel(agent.executorKind)}</span>
+        <span className="adm-cred-value code" translate="no">{agentLabel(agent.executorKind)}</span>
       </div>
 
       <div className="adm-cred-row">
         <span className="adm-cred-label">{t("admin.v2.agent_owner_label")}</span>
-        <span className="adm-cred-value mono" translate="no">@{ownerLabel}</span>
+        <span className="adm-cred-value code" translate="no">@{ownerLabel}</span>
       </div>
 
       <div className="adm-cred-row">

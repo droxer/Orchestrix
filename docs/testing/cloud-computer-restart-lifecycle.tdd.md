@@ -16,7 +16,7 @@ The journeys and implementation plan were derived during this TDD run from the r
 ### Disposable supervisor lifecycle
 
 - RED: `node --test --test-name-pattern="supervisor shutdown|recent heartbeat" dist/packages/relay-supervisor/tests/managed-reconcile.test.js` failed 2 tests because shutdown called `provider.stop()` and recent heartbeat loss reprovisioned the instance.
-- GREEN: `node --test dist/packages/relay-supervisor/tests/managed-reconcile.test.js` passed all 17 tests.
+- GREEN: `node --test dist/packages/relay-supervisor/tests/managed-reconcile.test.js` passed all 18 tests.
 - Guarantee: supervisor process shutdown only detaches local bookkeeping; durable stopped/deleted intent and explicit replacement remain the provider-stop paths. A running instance receives a 60-second heartbeat recovery grace period.
 
 ### Stable computer-scoped agents and placements
@@ -33,19 +33,21 @@ The journeys and implementation plan were derived during this TDD run from the r
 
 ### Repository compatibility
 
-- `npm test` passed after rerunning outside the filesystem sandbox because Turbopack needs to bind an internal build port: 699 TypeScript tests and 485 Python tests passed.
+- `npm test` passed after rerunning outside the filesystem sandbox because Turbopack needs to bind an internal build port: 700 TypeScript tests passed. After the final durable-history review fix, `npm run test:py` passed all 489 Python tests.
 - `git diff --check` passed.
 
 ## Test specification
 
 | # | What is guaranteed | Test file or command | Test type | Result | Evidence |
 |---|---|---|---|---|---|
-| 1 | Supervisor shutdown does not terminate cloud computers | `packages/relay-supervisor/tests/managed-reconcile.test.ts` | unit | PASS | 17/17 supervisor tests |
-| 2 | Recent heartbeat loss does not replace a healthy provider instance | `packages/relay-supervisor/tests/managed-reconcile.test.ts` | unit | PASS | 17/17 supervisor tests |
+| 1 | Supervisor shutdown does not terminate cloud computers | `packages/relay-supervisor/tests/managed-reconcile.test.ts` | unit | PASS | 18/18 supervisor tests |
+| 2 | Recent heartbeat loss does not replace a healthy provider instance | `packages/relay-supervisor/tests/managed-reconcile.test.ts` | unit | PASS | 18/18 supervisor tests |
 | 3 | Local and database placements retain their IDs across daemon replacement | `backend/tests/unit/test_agent_placements.py` | unit | PASS | focused Python suite |
 | 4 | Managed computers retain one logical agent and one placement across reprovisioning | `backend/tests/unit/test_node_agents.py` | unit | PASS | focused Python suite |
 | 5 | Existing sessions follow a managed computer's replacement daemon | `backend/tests/unit/test_agent_routing.py` | unit | PASS | 15/15 routing tests |
-| 6 | The full repository remains compatible | `npm test` | build + integration | PASS | 699 TS + 485 Python tests |
+| 6 | Runtime drain conflicts never stop the provider first | `packages/relay-supervisor/tests/managed-reconcile.test.ts` | unit | PASS | 18/18 supervisor tests |
+| 7 | Runtime retirement and backend restart preserve managed identities | `backend/tests/api/test_daemon_api.py` | integration | PASS | focused 59-test gate |
+| 8 | The full repository remains compatible | `npm test`; `npm run test:py` | build + integration | PASS | 700 TS + 489 Python tests |
 
 ## Coverage and known gaps
 
@@ -57,4 +59,5 @@ The journeys and implementation plan were derived during this TDD run from the r
 
 - RED checkpoint `e0fd76d`: supervisor shutdown/recovery and stable computer agent/placement failures captured.
 - RED checkpoint `aef83ee`: managed-session runtime rebinding failure captured.
-- GREEN checkpoint: recorded in the implementation commit that includes this report.
+- GREEN checkpoint `6c068bb`: restart-safe lifecycle implementation and evidence report.
+- Review-fix checkpoint: records drain-before-stop ordering, legacy identity migration, and the missing route/startup integration tests.

@@ -82,7 +82,7 @@ export function NodeRow({ node, storedTokens, colocated, onReveal, onRename, onM
               </span>
             ) : null}
           </span>
-          <span className="adm-node-card-handle mono" translate="no">{node.id}</span>
+          <span className="adm-node-card-handle code" translate="no">{node.id}</span>
           <NodeProfileBadges
             node={node}
             storedTokens={storedTokens}

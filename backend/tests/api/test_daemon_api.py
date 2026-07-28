@@ -6,6 +6,7 @@ from tempfile import TemporaryDirectory
 
 from fastapi.testclient import TestClient
 from relay.app import create_app
+from relay.services.node_agents import sync_node_agents
 
 
 def _bootstrap_admin(client: TestClient) -> None:
@@ -319,6 +320,130 @@ def test_managed_node_runtime_cannot_be_drained_or_retired_during_active_run(
             app.state.managed_node_store.get_node(managed["id"])["desiredState"]
             == "running"
         )
+
+
+def test_running_managed_runtime_retirement_preserves_agent_and_placement(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _login_admin(client)
+        managed = app.state.managed_node_store.create_node({"employeeId": "alice"})
+        attempt, _credential = app.state.managed_node_store.create_attempt(
+            managed["id"]
+        )
+        runtime, runtime_token = app.state.registry.enroll_managed_node(
+            managed,
+            attempt,
+            {"workspacePath": "/workspace"},
+        )
+        app.state.managed_node_store.complete_enrollment(
+            managed["id"], attempt["id"], runtime["id"]
+        )
+        runtime = app.state.registry.register(
+            {
+                "sandboxId": runtime["id"],
+                "token": runtime_token,
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }
+        )
+        sync_node_agents(app.state, runtime)
+        agent = next(
+            item
+            for item in app.state.agent_store.list_agents(
+                supervisor_employee_id="alice"
+            )
+            if item["executorKind"] == "codex"
+        )
+        [placement] = app.state.agent_placement_store.list_placements(
+            agent_id=agent["id"]
+        )
+
+        response = client.delete(f"/api/v1/admin/managed-nodes/{managed['id']}/runtime")
+
+        assert response.status_code == 204, response.text
+        assert app.state.registry.get(runtime["id"]) is None
+        assert not app.state.agent_store.get_agent(agent["id"]).get("deletedAt")
+        [preserved] = app.state.agent_placement_store.list_placements(
+            agent_id=agent["id"]
+        )
+        assert preserved["id"] == placement["id"]
+        assert preserved["daemonNodeId"] == runtime["id"]
+
+
+def test_backend_startup_migrates_managed_agent_identity(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        original = create_app(root)
+        managed = original.state.managed_node_store.create_node({"employeeId": "alice"})
+        attempt, _credential = original.state.managed_node_store.create_attempt(
+            managed["id"]
+        )
+        runtime, runtime_token = original.state.registry.enroll_managed_node(
+            managed,
+            attempt,
+            {"workspacePath": "/workspace"},
+        )
+        original.state.managed_node_store.complete_enrollment(
+            managed["id"], attempt["id"], runtime["id"]
+        )
+        runtime = original.state.registry.register(
+            {
+                "sandboxId": runtime["id"],
+                "token": runtime_token,
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }
+        )
+        legacy = original.state.agent_store.ensure_compatibility_agent(
+            "alice", "codex", runtime["id"]
+        )
+        original.state.agent_placement_store.create_placement(legacy, runtime["id"])
+        old_runtime_id = runtime["id"]
+        original.state.registry.delete(old_runtime_id)
+        replacement_attempt, _credential = (
+            original.state.managed_node_store.create_attempt(managed["id"])
+        )
+        replacement, replacement_token = original.state.registry.enroll_managed_node(
+            original.state.managed_node_store.get_node(managed["id"]),
+            replacement_attempt,
+            {"workspacePath": "/workspace"},
+        )
+        original.state.managed_node_store.complete_enrollment(
+            managed["id"], replacement_attempt["id"], replacement["id"]
+        )
+        replacement = original.state.registry.register(
+            {
+                "sandboxId": replacement["id"],
+                "token": replacement_token,
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }
+        )
+
+        restarted = create_app(root)
+
+        migrated = next(
+            item
+            for item in restarted.state.agent_store.list_agents(
+                supervisor_employee_id="alice"
+            )
+            if item["executorKind"] == "codex"
+        )
+        assert migrated["id"] == legacy["id"]
+        assert migrated["compatibilityKey"] == f"alice:{managed['id']}:codex"
+        [placement] = restarted.state.agent_placement_store.list_placements(
+            agent_id=legacy["id"]
+        )
+        assert placement["daemonNodeId"] == replacement["id"]
+        assert placement["daemonNodeId"] != old_runtime_id
 
 
 def test_failed_managed_node_is_visible_as_failed(monkeypatch) -> None:

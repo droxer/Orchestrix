@@ -576,6 +576,12 @@
   font: var(--type-micro);
 }
 
+/* The identity span carries the retired node's id — re-assert the code face
+   the `font` shorthand above resets. */
+.adm-node-history-identity span.code {
+  font-family: var(--font-mono);
+}
+
 /* Meta truncates so a long employee id can't wrap and break row rhythm.
    The delete button's danger ink comes from the destructive Button variant. */
 .adm-node-history-meta {
@@ -664,7 +670,7 @@
   gap: var(--sp-2);
 }
 
-.adm-emp-card-metric .mono {
+.adm-emp-card-metric .tnum {
   font: var(--type-label-strong);
   font-variant-numeric: tabular-nums;
 }
@@ -988,6 +994,12 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* An unnamed node falls back to printing its raw id here. The `font`
+   shorthand above resets family, so .code needs to be re-asserted. */
+.adm-node-card-name.code {
+  font-family: var(--font-mono);
 }
 
 /* Name + presence pill share one line so the online/offline readout sits

@@ -43,7 +43,7 @@ export function TaskDrawerArtifacts({ taskId }: { taskId: string }) {
       <h3 className="task-drawer-artifacts-title">
         {t("backlog.artifacts")}
         {artifacts && artifacts.length > 0 ? (
-          <span className="task-drawer-artifacts-count mono">{artifacts.length}</span>
+          <span className="task-drawer-artifacts-count tnum">{artifacts.length}</span>
         ) : null}
       </h3>
       {failed ? (
@@ -66,7 +66,7 @@ export function TaskDrawerArtifacts({ taskId }: { taskId: string }) {
                   {t(`artifact.kind.${artifact.kind}`, { defaultValue: artifact.kind })}
                 </span>
                 <span className="task-drawer-artifact-name">{artifact.title}</span>
-                <span className="task-drawer-artifact-meta mono">
+                <span className="task-drawer-artifact-meta tnum">
                   {taskArtifactDate(artifact.createdAt, i18n.language)}
                 </span>
               </Button>

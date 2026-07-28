@@ -505,7 +505,7 @@ export function ensureLocalDevboxOci(sink?: AgentOutputSink, options: DevboxOciO
   if (existsSync(ociLayout) && previousDockerfileMtime !== dockerfileMtime && previousImageId === imageId) {
     throw new Error(
       "The devbox dockerfile changed, but the Docker image has not been rebuilt. " +
-        "Run make run-fresh once, or run make devbox-image before make run.",
+        "Run make run-fresh once, or run make devbox-image before starting the daemon.",
     );
   }
 

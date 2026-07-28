@@ -163,7 +163,7 @@ export function EmployeesView({
                 onClick={() => setFilter(id)}
               >
                 <span>{filterLabel(id, t)}</span>
-                <span className="adm-fleet-chip-count mono">{counts[id]}</span>
+                <span className="adm-fleet-chip-count tnum">{counts[id]}</span>
               </Button>
             );
           })}
@@ -232,7 +232,7 @@ export function EmployeesView({
                         {t(`admin.v2.emp_state_${key}`, { defaultValue: key })}
                       </span>
                     </div>
-                    <p className="adm-emp-meta mono">
+                    <p className="adm-emp-meta code">
                       <span translate="no">@{member.id}</span>
                       {member.email ? <span translate="no">{member.email}</span> : null}
                       {member.departmentName ? <span>{member.departmentName}</span> : null}
@@ -252,13 +252,13 @@ export function EmployeesView({
                   >
                     <div className="adm-emp-metric">
                       <span className="adm-emp-metric-label">{t("admin.v2.col_running")}</span>
-                      <span className={`adm-emp-running mono ${member.runningCount > 0 ? "tone-neutral" : "tone-muted"}`}>
+                      <span className={`adm-emp-running tnum ${member.runningCount > 0 ? "tone-neutral" : "tone-muted"}`}>
                         {member.runningCount}
                       </span>
                     </div>
                     <div className="adm-emp-metric">
                       <span className="adm-emp-metric-label">{t("admin.v2.col_ready")}</span>
-                      <span className="adm-emp-ratio mono tone-muted">
+                      <span className="adm-emp-ratio tnum tone-muted">
                         {member.readyCount}/{member.nodeCount}
                       </span>
                     </div>

@@ -1079,6 +1079,13 @@
   font: var(--type-label);
 }
 
+/* This slot carries a count phrase on a team and an executor-kind identifier
+   on an agent. Only the identifier takes the code face, and the `font`
+   shorthand above resets family, so it has to be re-asserted here. */
+.workspace-dossier-runtime.code {
+  font-family: var(--font-mono);
+}
+
 /* The profile's durable inner character. Its slightly editorial treatment
    keeps identity separate from runtime configuration. */
 .agent-personality-card {

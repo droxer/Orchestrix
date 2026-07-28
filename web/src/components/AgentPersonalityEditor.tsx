@@ -134,7 +134,7 @@ export function AgentPersonalityEditor({
           </div>
           <Textarea
             ref={textareaRef}
-            className="agent-personality-textarea mono"
+            className="agent-personality-textarea code"
             name="agent-personality"
             aria-label={t("agents_page.personality_title")}
             aria-describedby={helpId}
@@ -154,7 +154,7 @@ export function AgentPersonalityEditor({
             placeholder={t("agents_page.personality_placeholder")}
           />
           <div className="agent-personality-editor-foot">
-            <span className="agent-personality-count mono">
+            <span className="agent-personality-count tnum">
               {t("agents_page.personality_characters", { count: draft.length })}
             </span>
             <span className="agent-personality-save-hint">

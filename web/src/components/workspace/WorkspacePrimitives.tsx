@@ -77,7 +77,7 @@ export function MetricItem({
     .join(" ");
   return (
     <div className={classes}>
-      <strong className="mono">{value}</strong>
+      <strong className="tnum">{value}</strong>
       <span>{label}</span>
     </div>
   );

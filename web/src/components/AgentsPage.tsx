@@ -149,7 +149,7 @@ function RosterRow({
                 because that is a defect rather than a repeat. */}
             {computer ? null : (
               <span className="agents-roster-row-meta">
-                <span className="mono">{t("agents_page.no_placements")}</span>
+                <span>{t("agents_page.no_placements")}</span>
               </span>
             )}
           </span>

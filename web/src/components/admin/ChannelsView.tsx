@@ -737,7 +737,7 @@ export function ChannelsView({
                   <ProviderAvatar provider={integration.provider} />
                   <span className="adm-chat-integration-main">
                     <strong>{integration.displayName}</strong>
-                    <span className="mono">
+                    <span className="code">
                       {providerLabel(integration.provider)}
                       {integration.tenantId ? ` · ${integration.tenantId}` : ""}
                     </span>
@@ -923,7 +923,7 @@ export function ChannelsView({
                       <li key={link.id}>
                         <span>
                           <strong translate="no">@{link.employeeId}</strong>
-                          <small className="mono" translate="no">{link.externalUserId}</small>
+                          <small className="code" translate="no">{link.externalUserId}</small>
                         </span>
                         <Button
                           variant="ghost"
@@ -986,7 +986,7 @@ export function ChannelsView({
                       <li key={conversation.id}>
                         <span>
                           <strong>{conversation.label}</strong>
-                          <small className="mono" translate="no">{conversation.conversationId}</small>
+                          <small className="code" translate="no">{conversation.conversationId}</small>
                         </span>
                         <Button
                           variant="ghost"

@@ -95,18 +95,18 @@ export class ManagedNodeReconciler {
           skipped += 1;
           continue;
         }
+        if (node.activeDaemonNodeId) {
+          if (!await this.retireRuntimeWhenDrained(node)) {
+            skipped += 1;
+            continue;
+          }
+        }
         const attempts = await this.backend.listProvisioningAttempts(node.id);
         const instanceId = [...attempts].reverse().find((attempt) => attempt.providerInstanceId)?.providerInstanceId;
         if (instanceId) {
           if (node.desiredState === "deleted") await provider.delete(instanceId);
           else await provider.stop(instanceId);
           if (await provider.inspect(instanceId) === "running") {
-            skipped += 1;
-            continue;
-          }
-        }
-        if (node.activeDaemonNodeId) {
-          if (!await this.retireRuntimeWhenDrained(node)) {
             skipped += 1;
             continue;
           }
@@ -124,7 +124,10 @@ export class ManagedNodeReconciler {
         }
         const attempts = await this.backend.listProvisioningAttempts(node.id);
         const instanceId = [...attempts].reverse().find((attempt) => attempt.providerInstanceId)?.providerInstanceId;
-        if (instanceId && await provider.inspect(instanceId) === "running") {
+        const instanceRunning = Boolean(
+          instanceId && await provider.inspect(instanceId) === "running"
+        );
+        if (instanceRunning) {
           const lastSeenAgeMs = daemon?.lastSeenAgeMs;
           if (typeof lastSeenAgeMs === "number" && lastSeenAgeMs <= this.recoveryGraceMs) {
             this.logger?.warn("managed node heartbeat is recovering", {
@@ -135,7 +138,6 @@ export class ManagedNodeReconciler {
             skipped += 1;
             continue;
           }
-          await provider.stop(instanceId);
         }
         if (node.activeDaemonNodeId) {
           if (!await this.retireRuntimeWhenDrained(node)) {
@@ -143,6 +145,7 @@ export class ManagedNodeReconciler {
             continue;
           }
         }
+        if (instanceId && instanceRunning) await provider.stop(instanceId);
         this.instances.delete(node.id);
         await this.backend.updateManagedNode(node.id, { phase: "requested" });
       }
