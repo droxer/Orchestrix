@@ -4,6 +4,7 @@ from tempfile import TemporaryDirectory
 
 from fastapi.testclient import TestClient
 from relay.app import create_app
+from relay.sessions.controller import SessionController
 
 
 def _bootstrap(client: TestClient) -> None:
@@ -69,9 +70,36 @@ def test_delete_rejects_session_with_active_daemon_run_request(monkeypatch) -> N
                 "state": {},
             }
         )
+        SessionController(app.state.registry.store).cancel_session(
+            session_id, "stop requested"
+        )
 
         response = client.delete(f"/api/v1/threads/{session_id}")
 
         assert response.status_code == 409
         assert response.json()["detail"] == "Session has a run in flight."
         assert client.get(f"/api/v1/threads/{session_id}").status_code == 200
+
+
+def test_delete_removes_cancelled_session_with_orphaned_agent_run(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap(client)
+        session_id = _create_session(client)
+        SessionController(app.state.registry.store).record_agent_started(
+            session_id,
+            {"runId": "run_orphaned", "agent": "claude", "mode": "action"},
+        )
+        cancelled = client.post(
+            f"/api/v1/threads/{session_id}/cancellations",
+            json={"reason": "stop clicked"},
+        )
+        assert cancelled.status_code == 202
+        assert cancelled.json()["status"] == "cancelled"
+
+        response = client.delete(f"/api/v1/threads/{session_id}")
+
+        assert response.status_code == 204
+        assert client.get(f"/api/v1/threads/{session_id}").status_code == 404

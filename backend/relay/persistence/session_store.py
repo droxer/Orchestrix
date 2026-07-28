@@ -709,9 +709,10 @@ class DatabaseSessionStore:
             )
             if not session_row:
                 raise KeyError(session_id)
-            if any(
+            snapshot = session_row["snapshot"] or {}
+            if snapshot.get("status") != "cancelled" and any(
                 run.get("status") == "running"
-                for run in (session_row["snapshot"] or {}).get("agentRuns", [])
+                for run in snapshot.get("agentRuns", [])
             ):
                 return False
             session_pk = session_row["id"]

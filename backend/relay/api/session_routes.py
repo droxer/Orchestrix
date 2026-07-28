@@ -443,7 +443,14 @@ async def cancel_session_run(session_id: str, request: Request, ctx: AppContextD
     )
     node_id = node["id"] if node else run_request.get("nodeId") if run_request else None
     if not node_id:
-        return session
+        if session.get("status") in ("completed", "failed", "cancelled"):
+            return session
+        return SessionController(
+            ctx.session_store,
+            task_store=ctx.task_store,
+            task_id=session.get("taskId"),
+            owner_employee_id=actor["employeeId"],
+        ).cancel_session(session_id, reason)
     return ctx.backend.cancel_run(
         node_id,
         session_id,
