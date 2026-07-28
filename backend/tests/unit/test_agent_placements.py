@@ -85,6 +85,30 @@ def test_database_store_moves_an_agent_between_computers(tmp_path: Path) -> None
     assert [placement["daemonNodeId"] for placement in active] == ["node_b"]
 
 
+@pytest.mark.parametrize("database", [False, True])
+def test_runtime_rebind_preserves_placement_identity(
+    tmp_path: Path, database: bool
+) -> None:
+    if database:
+        database_url = f"sqlite:///{tmp_path}/rebind.db"
+        agents = DatabaseAgentStore(database_url, create_schema=True)
+        placements = DatabaseAgentPlacementStore(database_url, create_schema=True)
+    else:
+        agents = LocalAgentStore(tmp_path)
+        placements = LocalAgentPlacementStore(tmp_path)
+    agent = agents.create_agent(
+        "alice", {"displayName": "Builder", "executorKind": "codex"}
+    )
+    original = placements.create_placement(agent, "runtime_old")
+
+    rebound = placements.rebind_placement(original["id"], "runtime_new")
+
+    assert rebound["id"] == original["id"]
+    assert rebound["daemonNodeId"] == "runtime_new"
+    assert rebound["desiredState"] == "active"
+    assert placements.list_placements(agent_id=agent["id"]) == [rebound]
+
+
 def test_database_move_keeps_old_placement_when_insert_fails(tmp_path: Path) -> None:
     database_url = f"sqlite:///{tmp_path}/atomic-move.db"
     agents = DatabaseAgentStore(database_url, create_schema=True)
