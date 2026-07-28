@@ -81,7 +81,7 @@
   font-family: var(--font-display);
   font-size: var(--fs-5);
   font-weight: 550;
-  letter-spacing: var(--track-tight);
+  letter-spacing: var(--track-display);
   line-height: 1.1;
   color: var(--ink-1);
   overflow-wrap: anywhere;
@@ -950,6 +950,7 @@
 .adm-auth-title {
   margin: 0;
   font: var(--type-display);
+  letter-spacing: var(--track-display);
   color: var(--ink-1);
 }
 

@@ -189,6 +189,7 @@
 .adm-emp-name {
   margin: 0;
   font: var(--type-title);
+  letter-spacing: var(--track-display);
   color: var(--ink-1);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -315,6 +316,7 @@
 
 .adm-emp-running {
   font: var(--type-number);
+  letter-spacing: var(--track-display);
 }
 
 .adm-emp-ratio {
@@ -1668,7 +1670,7 @@
 
 .adm-chat-stage-empty .relay-empty-title {
   font: var(--type-title);
-  letter-spacing: var(--track-tight);
+  letter-spacing: var(--track-display);
 }
 
 .adm-chat-stage-form {
@@ -1821,6 +1823,7 @@
   margin: 0;
   color: var(--ink-1);
   font: var(--type-heading);
+  letter-spacing: var(--track-display);
 }
 
 .adm-chat-section {

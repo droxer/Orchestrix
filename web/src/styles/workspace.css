@@ -877,7 +877,7 @@
   font-family: var(--font-display);
   font-size: var(--fs-5);
   font-weight: 550;
-  letter-spacing: var(--track-tight);
+  letter-spacing: var(--track-display);
   line-height: 1.2;
 }
 

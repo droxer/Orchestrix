@@ -6,9 +6,17 @@ import "../styles.css";
 
 import { Providers } from "./providers";
 
-// Mona Sans gives display roles a distinctive technical voice; Geist stays
-// quieter for dense UI and body copy, while Geist Mono remains reserved for
-// code-like content. All three are local variable fonts to avoid layout drift.
+// Phosphor typography: one mono family carries both the display tier and
+// technical text, and Geist stays quieter for dense UI and body copy. Display
+// vs. technical is separated by weight, tracking, and colour rather than by
+// face — 700 tight-tracked in --ink-1 for titles, names, and metrics; 400
+// untracked in --ink-4 for session IDs, logs, and code. Both are local
+// variable fonts to avoid layout drift.
+//
+// The vendored WOFF2 is fontsource's latin subset of JetBrains Mono
+// (@fontsource-variable/jetbrains-mono 5.3.0, OFL-1.1, wght 100–800). Latin
+// covers U+00C0–00FF, so accented names render in-face; latin-ext glyphs fall
+// through to Geist by design rather than shipping a second file.
 //
 // CJK stays system-first (PingFang / YaHei / etc. in palette.css). We do
 // not load Noto Sans SC/TC through next/font — those unicode-range chunks
@@ -21,19 +29,11 @@ const appSans = localFont({
   style: "normal",
 });
 
-const appDisplay = localFont({
-  src: "./fonts/MonaSans-Variable.woff2",
-  variable: "--font-app-display",
+const appMono = localFont({
+  src: "./fonts/JetBrainsMono-Variable.woff2",
+  variable: "--font-app-mono",
   display: "swap",
-  weight: "200 900",
-  style: "normal",
-});
-
-const geistMono = localFont({
-  src: "./fonts/GeistMono-Variable.woff2",
-  variable: "--font-geist-mono",
-  display: "swap",
-  weight: "100 900",
+  weight: "100 800",
   style: "normal",
 });
 
@@ -85,7 +85,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
       lang="en"
-      className={`${appDisplay.variable} ${appSans.variable} ${geistMono.variable}`}
+      className={`${appMono.variable} ${appSans.variable}`}
       suppressHydrationWarning
     >
       <head>

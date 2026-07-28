@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Relay Design System — Graphite</title>
+<title>Relay Design System — Phosphor</title>
 <style>
   /* =====================================================
-     Relay — Graphite token demo
+     Relay — Phosphor token demo
      Two registers, designed side by side. Light is the
      :root default; dark redefines the same tokens under
      the media query; explicit data-theme wins both ways.
@@ -31,6 +31,8 @@
     --ok: #6b727b;
     --warn: #484f57;
     --err: #16181b;
+    --live: #0b7a45;
+    --live-wash: color-mix(in srgb, var(--live) 7%, transparent);
     --info: var(--ink-3);
     --scrim: rgba(12, 14, 16, 0.55);
     --shadow-1: none;
@@ -55,7 +57,9 @@
     --rise-sm: 4px;       /* entrance travel — rows */
     --rise: 8px;          /* entrance travel — panes, views */
     --font-sans: "Geist", ui-sans-serif, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
-    --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --font-display: var(--font-mono);
+    --track-display: -0.04em;
     --focus-ring: 0 0 0 2px var(--action), 0 0 0 5px color-mix(in srgb, var(--action) 22%, transparent);
     --focus-ring-danger: 0 0 0 2px var(--err), 0 0 0 5px color-mix(in srgb, var(--err) 22%, transparent);
   }
@@ -79,6 +83,8 @@
       --ok: #7d848d;
       --warn: #b2b9c1;
       --err: #f2f4f6;
+      --live: #3ee08a;
+      --live-wash: color-mix(in srgb, var(--live) 7%, transparent);
       --scrim: rgba(0, 0, 0, 0.66);
       --shadow-1: none;
       --shadow-2: 0 0 0 1px var(--line-1);
@@ -103,6 +109,8 @@
     --ok: #7d848d;
     --warn: #b2b9c1;
     --err: #f2f4f6;
+    --live: #3ee08a;
+    --live-wash: color-mix(in srgb, var(--live) 7%, transparent);
     --scrim: rgba(0, 0, 0, 0.66);
     --shadow-1: none;
     --shadow-2: 0 0 0 1px var(--line-1);
@@ -126,21 +134,23 @@
     --ok: #6b727b;
     --warn: #484f57;
     --err: #16181b;
+    --live: #0b7a45;
+    --live-wash: color-mix(in srgb, var(--live) 7%, transparent);
     --scrim: rgba(12, 14, 16, 0.55);
     --shadow-1: none;
     --shadow-2: 0 0 0 1px var(--line-1);
   }
 
   /* ---- Type roles (the 10) ---- */
-  .type-display      { font: 600 32px/1.15 var(--font-sans); letter-spacing: var(--track-tight); }
-  .type-title        { font: 600 22px/1.2  var(--font-sans); letter-spacing: var(--track-tight); }
-  .type-heading      { font: 600 16px/1.3  var(--font-sans); }
+  .type-display      { font: 700 32px/1.15 var(--font-display); letter-spacing: var(--track-display); }
+  .type-title        { font: 700 20px/1.2  var(--font-display); letter-spacing: var(--track-display); }
+  .type-heading      { font: 600 16px/1.3  var(--font-display); letter-spacing: var(--track-display); }
   .type-body         { font: 400 15px/1.5  var(--font-sans); }
   .type-body-sm      { font: 400 14px/1.5  var(--font-sans); }
   .type-label        { font: 500 13px/1.4  var(--font-sans); }
   .type-label-strong { font: 600 13px/1.4  var(--font-sans); }
   .type-micro        { font: 500 11px/1.4  var(--font-sans); letter-spacing: var(--track-caps); text-transform: uppercase; }
-  .type-number       { font: 600 19px/1.4  var(--font-sans); font-variant-numeric: tabular-nums; }
+  .type-number       { font: 700 19px/1.4  var(--font-display); letter-spacing: var(--track-display); font-variant-numeric: tabular-nums; }
   .type-code         { font: 400 13px/1.5  var(--font-mono); }
 
   /* ---- Page chrome ---- */
@@ -418,8 +428,8 @@
   <header class="masthead">
     <div>
       <p class="eyebrow">Relay · design tokens · specimen</p>
-      <h1 class="type-display">Graphite</h1>
-      <p class="sub type-body-sm">True-neutral canvas · monochrome white/black action · status as a grey brightness hierarchy — dots, borders, text, never fills. Two registers, designed side by side.</p>
+      <h1 class="type-display">Phosphor</h1>
+      <p class="sub type-body-sm">Relay is grey until something is working. True-neutral canvas · monochrome white/black action · status as a grey brightness hierarchy — dots, borders, text, never fills · one chromatic role, <code class="type-code">--live</code>, reserved for an agent working right now. Two registers, designed side by side.</p>
     </div>
     <div class="register-toggle" role="group" aria-label="Register">
       <button type="button" id="btn-dark" aria-pressed="false">Dark</button>
@@ -477,24 +487,26 @@
       <div class="swatch-row"><span class="swatch-chip" style="background: var(--warn)"></span><span class="swatch-name">--warn</span><span class="swatch-hex">#99a0a8</span><span class="swatch-hex">#5c636b</span><span class="swatch-role">attention, degraded</span></div>
       <div class="swatch-row"><span class="swatch-chip" style="background: var(--err)"></span><span class="swatch-name">--err</span><span class="swatch-hex">#f2f4f6</span><span class="swatch-hex">#16181b</span><span class="swatch-role">failed, destructive — loud (bright)</span></div>
       <div class="swatch-row"><span class="swatch-chip" style="background: var(--info)"></span><span class="swatch-name">--info</span><span class="swatch-hex">= --ink-3</span><span class="swatch-hex">= --ink-3</span><span class="swatch-role">neutral notice</span></div>
+      <div class="swatch-row"><span class="swatch-chip" style="background: var(--live)"></span><span class="swatch-name">--live</span><span class="swatch-hex">#3ee08a</span><span class="swatch-hex">#0b7a45</span><span class="swatch-role">an agent is working right now — the only hue</span></div>
     </div>
+    <p class="section-note type-body-sm"><strong>--live is scoped, not decorative.</strong> It is legal exactly where <code class="type-code">--t-pulse</code> is used (streaming agent, running task, busy header) and never where <code class="type-code">--t-pulse-calm</code> is (online dot, idle node). Login is monochrome — it reports readiness before auth, not agent work. It never means success or "done": a finished task is grey. Both register values pass AA as small text (10.94:1 dark, 5.08:1 light); <code class="type-code">#0f8a4e</code> is the tempting lighter green and fails at 4.14:1.</p>
   </section>
 
   <!-- Typography -->
   <section>
     <p class="eyebrow">02 · Typography</p>
     <h2 class="type-title section-title">Two families, ten roles</h2>
-    <p class="section-note type-body-sm">Geist carries every text role — weight and size differentiate, never a family switch. Geist Mono is reserved for code, IDs, and logs. The serif is gone. (This demo falls back to your system sans if Geist isn't installed locally.)</p>
+    <p class="section-note type-body-sm">JetBrains Mono carries the display tier <em>and</em> technical text; Geist carries reading and control text. Display and code share a face, so they are separated by weight, tracking, and colour — 700/600 in <code class="type-code">--ink-1</code> with <code class="type-code">--track-display</code> for titles, names, and metrics; 400 untracked in <code class="type-code">--ink-4</code> for IDs, logs, and code. That gap is what stops an agent name and a session ID reading as the same kind of object. (This demo falls back to your system mono and sans if the families aren't installed locally.)</p>
     <div class="type-list">
-      <div class="type-row"><span class="type-spec">display · 600 32/1.15</span><span class="type-sample type-display">Fleet is ready</span></div>
-      <div class="type-row"><span class="type-spec">title · 600 22/1.2</span><span class="type-sample type-title">Node assignments</span></div>
+      <div class="type-row"><span class="type-spec">display · 700 32/1.15</span><span class="type-sample type-display">Fleet is ready</span></div>
+      <div class="type-row"><span class="type-spec">title · 700 20/1.2</span><span class="type-sample type-title">Node assignments</span></div>
       <div class="type-row"><span class="type-spec">heading · 600 16/1.3</span><span class="type-sample type-heading">Recent sessions</span></div>
       <div class="type-row"><span class="type-spec">body · 400 15/1.5</span><span class="type-sample type-body">The daemon registers with the backend, polls for commands, and runs agent CLIs inside its sandbox.</span></div>
       <div class="type-row"><span class="type-spec">body-sm · 400 14/1.5</span><span class="type-sample type-body-sm">Assigned tasks dispatch through the same daemon path as manual runs.</span></div>
       <div class="type-row"><span class="type-spec">label · 500 13/1.4</span><span class="type-sample type-label">Last active 4 minutes ago</span></div>
       <div class="type-row"><span class="type-spec">label-strong · 600 13/1.4</span><span class="type-sample type-label-strong">Approve run</span></div>
       <div class="type-row"><span class="type-spec">micro · 500 11/1.4 caps</span><span class="type-sample type-micro">Execution plane</span></div>
-      <div class="type-row"><span class="type-spec">number · 600 19/1.4 tnum</span><span class="type-sample type-number">1,284 / 1,300</span></div>
+      <div class="type-row"><span class="type-spec">number · 700 19/1.4 tnum</span><span class="type-sample type-number">1,284 / 1,300</span></div>
       <div class="type-row"><span class="type-spec">code · 400 13/1.5 mono</span><span class="type-sample type-code">relay-daemon --sandbox boxlite --employee fei</span></div>
     </div>
   </section>
@@ -601,8 +613,8 @@
   </section>
 
   <footer class="colophon">
-    <span>Relay · Graphite — monochrome specimen (2026-07-20 remap)</span>
-    <span class="type-code">~24 color tokens / register · 10 type roles · 4 radii · 1 ease</span>
+    <span>Relay · Phosphor — grey until something is working (2026-07-28)</span>
+    <span class="type-code">~26 color tokens / register · 1 hue · 10 type roles · 4 radii · 1 ease</span>
   </footer>
 </div>
 

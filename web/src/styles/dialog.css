@@ -69,6 +69,7 @@
   margin: 0;
   min-width: 0;
   font: var(--type-title);
+  letter-spacing: var(--track-display);
   color: var(--ink-1);
   overflow-wrap: anywhere;
 }
