@@ -2967,6 +2967,33 @@ def test_registry_restart_does_not_recover_plaintext_node_token(store_factory) -
 
 
 @pytest.mark.parametrize("store_factory", DAEMON_STORE_FACTORIES)
+def test_registry_restart_keeps_agents_ready_when_live_daemon_resumes_polling(
+    store_factory,
+) -> None:
+    with TemporaryDirectory() as root:
+        registry = DaemonNodeRegistry(LocalSessionStore(root), store_factory(root))
+        registry.register(
+            {
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            },
+            "ui_token",
+        )
+
+        restarted = DaemonNodeRegistry(LocalSessionStore(root), store_factory(root))
+        restarted.renew_active_command_leases("sbx_alice", "node_token", [])
+        node = restarted.monitor_nodes()[0]
+
+        assert node["online"] is True
+        assert node["agents"]["codex"] == "ready"
+
+
+@pytest.mark.parametrize("store_factory", DAEMON_STORE_FACTORIES)
 def test_registry_persists_computer_display_name(store_factory) -> None:
     with TemporaryDirectory() as root:
         registry = DaemonNodeRegistry(LocalSessionStore(root), store_factory(root))
