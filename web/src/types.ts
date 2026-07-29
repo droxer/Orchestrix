@@ -89,6 +89,7 @@ export interface WorkspaceBriefSession {
   status?: RelaySession["status"];
   phase?: string;
   daemonNodeId?: string;
+  managedNodeId?: string;
   workspacePath?: string;
   ownerEmployeeId?: string;
   ownerAgentId?: string;
@@ -331,6 +332,7 @@ export interface AgentPlacement {
   agentId: string;
   employeeId: string;
   daemonNodeId: string;
+  managedNodeId?: string;
   nodeDisplayName?: string;
   nodeOwnership?: "managed" | "employee-device" | "unknown";
   nodeSandboxMode?: "boxlite" | "none";

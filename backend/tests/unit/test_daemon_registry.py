@@ -79,6 +79,10 @@ def test_daemon_store_retains_managed_runtime_identity_after_delete(
         store.delete_node("runtime_old")
 
         assert store.historical_managed_runtime_ids("computer_one") == {"runtime_old"}
+        assert store.historical_managed_node_id("runtime_old") == "computer_one"
+        assert store.historical_managed_node_ids(
+            {"runtime_old", "runtime_missing"}
+        ) == {"runtime_old": "computer_one"}
 
 
 @pytest.mark.parametrize("daemon_store_factory", DAEMON_STORE_FACTORIES)

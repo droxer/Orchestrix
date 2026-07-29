@@ -59,6 +59,7 @@ class SessionController:
         owner_agent_id: str | None = None,
         team_id: str | None = None,
         daemon_node_id: str | None = None,
+        managed_node_id: str | None = None,
     ):
         self.store = store
         self.task_store = task_store
@@ -68,6 +69,7 @@ class SessionController:
         self.owner_agent_id = owner_agent_id
         self.team_id = team_id
         self.daemon_node_id = daemon_node_id
+        self.managed_node_id = managed_node_id
         self.active_session_id = ""
 
     def create_session(
@@ -90,6 +92,11 @@ class SessionController:
                 **({"teamId": self.team_id} if self.team_id else {}),
                 **(
                     {"daemonNodeId": self.daemon_node_id} if self.daemon_node_id else {}
+                ),
+                **(
+                    {"managedNodeId": self.managed_node_id}
+                    if self.managed_node_id
+                    else {}
                 ),
                 "taskGoal": task_goal,
                 "participants": participants or ["human"],
@@ -299,6 +306,24 @@ class SessionController:
         logger.info("Session archived", session_id=session_id)
         return self.store.get_session(session_id)
 
+    def record_runtime_affinity(
+        self, session_id: str, managed_node_id: str
+    ) -> dict[str, Any]:
+        current = self.store.get_session(session_id)
+        existing = current.get("managedNodeId")
+        if existing:
+            if existing != managed_node_id:
+                raise ValueError("Session already belongs to another managed Computer.")
+            return current
+        return self._append(
+            session_id,
+            relay_event(
+                "session.runtime_affinity",
+                session_id,
+                {"managedNodeId": managed_node_id},
+            ),
+        )
+
     def delete_session(
         self, session_id: str, snapshot: dict[str, Any] | None = None
     ) -> None:
@@ -433,6 +458,11 @@ class SessionController:
                     **(
                         {"daemonNodeId": step["daemonNodeId"]}
                         if step.get("daemonNodeId")
+                        else {}
+                    ),
+                    **(
+                        {"managedNodeId": step["managedNodeId"]}
+                        if step.get("managedNodeId")
                         else {}
                     ),
                     **(

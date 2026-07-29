@@ -99,3 +99,51 @@ def test_session_creation_persists_the_selected_computer(monkeypatch) -> None:
 
         assert created.status_code == 201, created.text
         assert created.json()["daemonNodeId"] == "node_a"
+
+
+def test_session_read_backfills_managed_affinity_from_deleted_runtime_history(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        response = client.post(
+            "/api/v1/auth/bootstrap",
+            json={
+                "token": "admin_token",
+                "username": "admin",
+                "password": "secret123",
+            },
+        )
+        assert response.status_code == 200
+        app.state.registry.daemon_store.register_node(
+            {
+                "id": "runtime_old",
+                "employeeId": "admin",
+                "managedNodeId": "computer_admin",
+                "workspacePath": "/workspace/admin",
+                "sandboxMode": "boxlite",
+                "nodeLocation": "managed",
+                "status": "ready",
+                "agents": {"codex": "ready"},
+            }
+        )
+        app.state.registry.daemon_store.delete_node("runtime_old")
+        session = app.state.session_store.create_session(
+            {
+                "workspacePath": "/workspace/admin",
+                "daemonNodeId": "runtime_old",
+                "ownerEmployeeId": "admin",
+                "taskGoal": "continue after replacement",
+                "participants": ["human", "codex"],
+            }
+        )
+
+        fetched = client.get(f"/api/v1/threads/{session['id']}")
+
+        assert fetched.status_code == 200, fetched.text
+        assert fetched.json()["managedNodeId"] == "computer_admin"
+        persisted = app.state.session_store.get_session(session["id"])
+        assert persisted["managedNodeId"] == "computer_admin"
+        assert persisted["events"][-1]["type"] == "session.runtime_affinity"

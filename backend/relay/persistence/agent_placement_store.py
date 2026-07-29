@@ -84,9 +84,14 @@ class LocalAgentPlacementStore:
         )
 
     def rebind_placement(
-        self, placement_id: str, daemon_node_id: str
+        self,
+        placement_id: str,
+        daemon_node_id: str,
+        *,
+        managed_node_id: str | None = None,
     ) -> dict[str, Any]:
         daemon_node_id = _required_daemon_node_id(daemon_node_id)
+        managed_node_id = _optional_managed_node_id(managed_node_id)
         with self._lock:
             current = self.get_placement(placement_id)
             if not current:
@@ -94,6 +99,10 @@ class LocalAgentPlacementStore:
             if (
                 current.get("daemonNodeId") == daemon_node_id
                 and current.get("desiredState") == "active"
+                and (
+                    managed_node_id is None
+                    or current.get("managedNodeId") == managed_node_id
+                )
             ):
                 return current
             conflicts = [
@@ -110,6 +119,11 @@ class LocalAgentPlacementStore:
                 **current,
                 "daemonNodeId": daemon_node_id,
                 "desiredState": "active",
+                **(
+                    {"managedNodeId": managed_node_id}
+                    if managed_node_id is not None
+                    else {}
+                ),
                 "updatedAt": now_iso(),
             }
             self._append(placement_id, "placement.rebound", updated)
@@ -371,9 +385,14 @@ class DatabaseAgentPlacementStore:
         )
 
     def rebind_placement(
-        self, placement_id: str, daemon_node_id: str
+        self,
+        placement_id: str,
+        daemon_node_id: str,
+        *,
+        managed_node_id: str | None = None,
     ) -> dict[str, Any]:
         daemon_node_id = _required_daemon_node_id(daemon_node_id)
+        managed_node_id = _optional_managed_node_id(managed_node_id)
         with self._lock, self.engine.begin() as conn:
             row = (
                 conn.execute(
@@ -397,6 +416,10 @@ class DatabaseAgentPlacementStore:
             if (
                 current.get("daemonNodeId") == daemon_node_id
                 and current.get("desiredState") == "active"
+                and (
+                    managed_node_id is None
+                    or current.get("managedNodeId") == managed_node_id
+                )
             ):
                 return current
             conflict = conn.execute(
@@ -415,6 +438,11 @@ class DatabaseAgentPlacementStore:
                 **current,
                 "daemonNodeId": daemon_node_id,
                 "desiredState": "active",
+                **(
+                    {"managedNodeId": managed_node_id}
+                    if managed_node_id is not None
+                    else {}
+                ),
                 "updatedAt": now_iso(),
             }
             sequence = int(row["event_version"] or 0)
@@ -687,6 +715,7 @@ def _new_placement(
     workspace_policy = payload.get("workspacePolicy") or {"kind": "node-affine"}
     if not isinstance(workspace_policy, dict):
         raise ValueError("workspacePolicy must be an object.")
+    managed_node_id = _optional_managed_node_id(payload.get("managedNodeId"))
     timestamp = now_iso()
     return {
         "id": new_relay_id("placement"),
@@ -698,6 +727,7 @@ def _new_placement(
         "priority": priority,
         "agentVersion": agent["version"],
         "workspacePolicy": workspace_policy,
+        **({"managedNodeId": managed_node_id} if managed_node_id else {}),
         "conditions": [],
         "createdAt": timestamp,
         "updatedAt": timestamp,
@@ -709,6 +739,33 @@ def _required_daemon_node_id(value: str) -> str:
     if not daemon_node_id:
         raise ValueError("daemonNodeId is required.")
     return daemon_node_id
+
+
+def _optional_managed_node_id(value: Any) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("managedNodeId must be a non-empty string.")
+    return value.strip()
+
+
+def create_node_placement(
+    placement_store: Any,
+    agent: dict[str, Any],
+    node: dict[str, Any],
+    payload: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Create a placement stamped with its stable managed Computer identity."""
+    placement_payload = {
+        key: value for key, value in (payload or {}).items() if key != "managedNodeId"
+    }
+    if node.get("managedNodeId"):
+        placement_payload["managedNodeId"] = node["managedNodeId"]
+    return placement_store.create_placement(
+        agent,
+        node["id"],
+        placement_payload or None,
+    )
 
 
 def _normalized_placement_snapshot(

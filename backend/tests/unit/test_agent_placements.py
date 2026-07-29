@@ -100,10 +100,13 @@ def test_runtime_rebind_preserves_placement_identity(
     )
     original = placements.create_placement(agent, "runtime_old")
 
-    rebound = placements.rebind_placement(original["id"], "runtime_new")
+    rebound = placements.rebind_placement(
+        original["id"], "runtime_new", managed_node_id="computer_one"
+    )
 
     assert rebound["id"] == original["id"]
     assert rebound["daemonNodeId"] == "runtime_new"
+    assert rebound["managedNodeId"] == "computer_one"
     assert rebound["desiredState"] == "active"
     assert placements.list_placements(agent_id=agent["id"]) == [rebound]
 

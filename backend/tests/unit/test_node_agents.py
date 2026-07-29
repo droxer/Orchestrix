@@ -28,6 +28,30 @@ def test_node_capabilities_materialize_agents_and_placements(tmp_path: Path) -> 
     assert len(placements.list_placements(daemon_node_id="node_alice")) == 2
 
 
+def test_managed_agent_sync_tolerates_missing_placement_table(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    agents = LocalAgentStore(tmp_path)
+    placements = LocalAgentPlacementStore(tmp_path)
+    ctx = SimpleNamespace(agent_store=agents, agent_placement_store=placements)
+    node = {
+        "id": "runtime_alice",
+        "managedNodeId": "computer_alice",
+        "employeeId": "alice",
+        "supportedAgents": ["codex"],
+        "agents": {"codex": "ready"},
+    }
+
+    def missing_table(*_args, **_kwargs):
+        raise RuntimeError("no such table: agent_placements")
+
+    monkeypatch.setattr(placements, "list_placements", missing_table)
+
+    sync_node_agents(ctx, node)
+
+    assert agents.list_agents(supervisor_employee_id="alice") == []
+
+
 def test_each_computer_gets_its_own_compatibility_agents(tmp_path: Path) -> None:
     agents = LocalAgentStore(tmp_path)
     placements = LocalAgentPlacementStore(tmp_path)
@@ -488,13 +512,6 @@ def test_sync_keeps_legacy_agent_on_a_different_node(tmp_path: Path) -> None:
 
 
 def test_reprovisioned_managed_node_migrates_old_agent_identity(tmp_path: Path) -> None:
-    old_node = {
-        "id": "node_old",
-        "employeeId": "alice",
-        "workspacePath": "/workspace",
-        "managedNodeId": "managed_one",
-        "online": False,
-    }
     new_node = {
         "id": "node_new",
         "employeeId": "alice",
@@ -554,6 +571,76 @@ def test_reprovisioned_managed_computer_preserves_agent_and_placement_identity(
     current_placement = placements.list_placements(agent_id=original_agent["id"])[0]
     assert current_placement["id"] == original_placement["id"]
     assert current_placement["daemonNodeId"] == "runtime_new"
+
+
+def test_reprovisioned_managed_computer_rebinds_custom_agent_placement(
+    tmp_path: Path,
+) -> None:
+    old_node = {
+        "id": "runtime_old",
+        "employeeId": "alice",
+        "workspacePath": "/workspace",
+        "managedNodeId": "computer_one",
+        "supportedAgents": ["codex"],
+        "agents": {"codex": "ready"},
+        "online": False,
+    }
+    new_node = {**old_node, "id": "runtime_new", "online": True}
+    nodes = [old_node]
+    ctx, agents, placements = _registry_ctx(
+        tmp_path,
+        nodes,
+        historical_runtime_ids={"runtime_old", "runtime_new"},
+    )
+    custom = agents.create_agent(
+        "alice", {"displayName": "Release Builder", "executorKind": "codex"}
+    )
+    original = placements.create_placement(custom, "runtime_old")
+
+    sync_node_agents(ctx, old_node)
+    nodes[:] = [new_node]
+    sync_node_agents(ctx, new_node)
+
+    assert not agents.get_agent(custom["id"]).get("deletedAt")
+    [rebound] = placements.list_placements(agent_id=custom["id"])
+    assert rebound["id"] == original["id"]
+    assert rebound["daemonNodeId"] == "runtime_new"
+    assert rebound["managedNodeId"] == "computer_one"
+
+
+def test_managed_sync_does_not_retire_agent_from_another_managed_computer(
+    tmp_path: Path,
+) -> None:
+    current = {
+        "id": "runtime_current",
+        "employeeId": "alice",
+        "workspacePath": "/workspace/current",
+        "managedNodeId": "computer_current",
+        "supportedAgents": ["codex"],
+        "agents": {"codex": "ready"},
+        "online": True,
+    }
+    ctx, agents, placements = _registry_ctx(
+        tmp_path,
+        [current],
+        historical_runtime_ids={"runtime_current"},
+    )
+    other = agents.ensure_compatibility_agent(
+        "alice",
+        "codex",
+        "runtime_other",
+        computer_id="computer_other",
+    )
+    other_placement = placements.create_placement(
+        other,
+        "runtime_other",
+        {"managedNodeId": "computer_other"},
+    )
+
+    sync_node_agents(ctx, current)
+
+    assert not agents.get_agent(other["id"]).get("deletedAt")
+    assert placements.get_placement(other_placement["id"])["desiredState"] == "active"
 
 
 def test_managed_reprovision_collects_agents_for_missing_old_runtimes(

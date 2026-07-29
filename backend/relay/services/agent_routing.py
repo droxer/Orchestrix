@@ -7,7 +7,7 @@ from ..daemon_registry.scheduling import (
     workspace_identity,
     workspace_identity_record,
 )
-from ..persistence.agent_placement_store import placement_status
+from ..persistence.agent_placement_store import create_node_placement, placement_status
 
 
 class AgentRoutingError(ValueError):
@@ -70,11 +70,45 @@ def resolve_session_daemon_node_id(
     session: dict[str, Any] | None,
     placement_store: Any,
     daemon_nodes: list[dict[str, Any]],
+    daemon_store: Any | None = None,
 ) -> str | None:
     """Resolve a thread's stable Computer affinity to its current runtime."""
     if not session:
         return None
     session_node_id = session.get("daemonNodeId")
+    nodes = {node["id"]: node for node in daemon_nodes}
+    managed_node_id = session.get("managedNodeId")
+    if (
+        not managed_node_id
+        and isinstance(session_node_id, str)
+        and session_node_id
+    ):
+        managed_node_id = (nodes.get(session_node_id) or {}).get("managedNodeId")
+        if not managed_node_id:
+            historical_managed_node_id = getattr(
+                daemon_store, "historical_managed_node_id", None
+            )
+            if historical_managed_node_id:
+                managed_node_id = historical_managed_node_id(session_node_id)
+    if isinstance(managed_node_id, str) and managed_node_id:
+        candidates = [
+            node
+            for node in daemon_nodes
+            if node.get("managedNodeId") == managed_node_id
+            and not node.get("retiredAt")
+        ]
+        if candidates:
+            return min(
+                candidates,
+                key=lambda node: (
+                    0
+                    if node.get("online")
+                    and not node.get("stale")
+                    and node.get("status") in ("ready", "busy", "running")
+                    else 1,
+                    node["id"],
+                ),
+            )["id"]
     prior_run = next(
         (
             run
@@ -90,7 +124,6 @@ def resolve_session_daemon_node_id(
     rebound_node_id = (placement or {}).get("daemonNodeId")
     if not isinstance(rebound_node_id, str) or rebound_node_id == node_id:
         return node_id if isinstance(node_id, str) and node_id else None
-    nodes = {node["id"]: node for node in daemon_nodes}
     rebound_node = nodes.get(rebound_node_id)
     if not rebound_node or not rebound_node.get("managedNodeId"):
         return node_id if isinstance(node_id, str) and node_id else None
@@ -112,6 +145,7 @@ def resolve_agent_assignments(
     daemon_nodes: list[dict[str, Any]],
     session: dict[str, Any] | None = None,
     required_node_id: str | None = None,
+    daemon_store: Any | None = None,
 ) -> list[dict[str, Any]]:
     nodes = {node["id"]: node for node in daemon_nodes}
     resolved: list[dict[str, Any]] = []
@@ -119,7 +153,7 @@ def resolve_agent_assignments(
         selected_node_ids,
         selected_workspace,
         selected_workspace_policy,
-    ) = _session_affinity(session, placement_store, nodes)
+    ) = _session_affinity(session, placement_store, nodes, daemon_store)
     if required_node_id:
         required_node = nodes.get(required_node_id)
         if not required_node:
@@ -258,12 +292,29 @@ def _agent_placements_with_managed_capacity(
         for placement in placements
     ):
         return placements
+    managed_node_ids = {
+        managed_node_id
+        for placement in placements
+        if (
+            managed_node_id := placement.get("managedNodeId")
+            or (nodes.get(placement["daemonNodeId"]) or {}).get("managedNodeId")
+        )
+    }
+    if len(managed_node_ids) > 1:
+        # Conflicting stable Computer identities cannot be repaired safely by
+        # routing. Administrators can place the agent explicitly instead.
+        return placements
+    required_managed_node_id = next(iter(managed_node_ids), None)
     placed_node_ids = {placement["daemonNodeId"] for placement in placements}
     managed_candidate = min(
         (
             node
             for node in nodes.values()
             if node.get("managedNodeId")
+            and (
+                required_managed_node_id is None
+                or node.get("managedNodeId") == required_managed_node_id
+            )
             and node.get("employeeId") == agent.get("supervisorEmployeeId")
             and node.get("status") in ("ready", "running")
             and agent["executorKind"]
@@ -275,7 +326,7 @@ def _agent_placements_with_managed_capacity(
         default=None,
     )
     if managed_candidate:
-        placement_store.create_placement(agent, managed_candidate["id"])
+        create_node_placement(placement_store, agent, managed_candidate)
         return placement_store.list_placements(agent_id=agent["id"])
     return placements
 
@@ -334,6 +385,7 @@ def _session_affinity(
     session: dict[str, Any] | None,
     placement_store: Any,
     nodes: dict[str, dict[str, Any]],
+    daemon_store: Any | None = None,
 ) -> tuple[set[str], tuple[str, str] | None, str | None]:
     if not session:
         return set(), None, None
@@ -346,7 +398,7 @@ def _session_affinity(
         None,
     )
     session_node_id = resolve_session_daemon_node_id(
-        session, placement_store, list(nodes.values())
+        session, placement_store, list(nodes.values()), daemon_store
     )
     if not prior_run:
         if isinstance(session_node_id, str) and session_node_id:

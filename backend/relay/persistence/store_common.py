@@ -151,6 +151,8 @@ def materialize_events(events: list[dict[str, Any]]) -> dict[str, Any]:
         session["teamId"] = created["teamId"]
     if created.get("daemonNodeId"):
         session["daemonNodeId"] = created["daemonNodeId"]
+    if created.get("managedNodeId"):
+        session["managedNodeId"] = created["managedNodeId"]
     for event in events:
         session["events"].append(event)
         session["updatedAt"] = event["timestamp"]
@@ -173,6 +175,8 @@ def materialize_events(events: list[dict[str, Any]]) -> dict[str, Any]:
                 # stamped session.created) adopt the computer their first
                 # stamped run executed on.
                 session["daemonNodeId"] = event["daemonNodeId"]
+            if event.get("managedNodeId") and not session.get("managedNodeId"):
+                session["managedNodeId"] = event["managedNodeId"]
             if not any(run["id"] == event["runId"] for run in session["agentRuns"]):
                 session["status"] = "running"
                 session["phase"] = f"{event['agent']}:{event['mode']}"
@@ -268,6 +272,9 @@ def materialize_events(events: list[dict[str, Any]]) -> dict[str, Any]:
             session.pop("pendingDecision", None)
         elif event_type == "session.archived":
             session["archived"] = True
+        elif event_type == "session.runtime_affinity":
+            if not session.get("managedNodeId"):
+                session["managedNodeId"] = event["managedNodeId"]
         elif event_type == "session.renamed":
             session["title"] = event["title"]
     return session

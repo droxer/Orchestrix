@@ -38,6 +38,28 @@ def test_session_stores_preserve_team_provenance() -> None:
             assert store.list_sessions()[0]["teamId"] == "team_delivery"
 
 
+def test_session_stores_preserve_managed_computer_affinity() -> None:
+    with TemporaryDirectory() as root:
+        stores = (
+            LocalSessionStore(Path(root) / "local"),
+            DatabaseSessionStore(f"sqlite:///{root}/relay.db", create_schema=True),
+        )
+        for store in stores:
+            created = store.create_session(
+                {
+                    "workspacePath": "/workspace/alice",
+                    "daemonNodeId": "runtime_old",
+                    "managedNodeId": "computer_alice",
+                    "taskGoal": "ship the release",
+                    "participants": ["human", "codex"],
+                }
+            )
+
+            persisted = store.get_session(created["id"])
+            assert persisted["managedNodeId"] == "computer_alice"
+            assert persisted["events"][0]["managedNodeId"] == "computer_alice"
+
+
 def test_session_stores_delete_session() -> None:
     with TemporaryDirectory() as root:
         stores = (

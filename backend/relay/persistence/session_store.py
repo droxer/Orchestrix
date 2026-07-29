@@ -88,6 +88,11 @@ class LocalSessionStore:
                         if payload.get("daemonNodeId")
                         else {}
                     ),
+                    **(
+                        {"managedNodeId": payload["managedNodeId"]}
+                        if payload.get("managedNodeId")
+                        else {}
+                    ),
                     "taskGoal": payload["taskGoal"],
                     "participants": payload.get("participants", ["human"]),
                 },
@@ -479,6 +484,11 @@ class DatabaseSessionStore:
                     **(
                         {"daemonNodeId": payload["daemonNodeId"]}
                         if payload.get("daemonNodeId")
+                        else {}
+                    ),
+                    **(
+                        {"managedNodeId": payload["managedNodeId"]}
+                        if payload.get("managedNodeId")
                         else {}
                     ),
                     "taskGoal": payload["taskGoal"],

@@ -5,7 +5,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
 
-from ..persistence.agent_placement_store import placement_status
+from ..persistence.agent_placement_store import create_node_placement, placement_status
 from ..security.auth import require_admin_session
 from ..services.agent_routing import (
     AgentRoutingError,
@@ -14,6 +14,7 @@ from ..services.agent_routing import (
 )
 from ..services.computer_names import computer_display_name
 from ..services.team_membership import remove_agent_from_teams
+from ..sessions.controller import SessionController
 from .deps import AppContextDep
 from .helpers import (
     agent_task_mode,
@@ -224,11 +225,12 @@ async def create_agent_placement(
     daemon_node_id = body.get("daemonNodeId")
     if not isinstance(daemon_node_id, str) or not daemon_node_id.strip():
         raise HTTPException(400, "daemonNodeId is required.")
-    if not ctx.registry.get(daemon_node_id):
+    node = ctx.registry.get(daemon_node_id)
+    if not node:
         raise HTTPException(404, "Daemon node not found.")
     try:
-        placement = ctx.agent_placement_store.create_placement(
-            agent, daemon_node_id, body
+        placement = create_node_placement(
+            ctx.agent_placement_store, agent, node, body
         )
     except ValueError as error:
         raise HTTPException(
@@ -288,6 +290,14 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
         if session_id
         else None
     )
+    if session and not session.get("managedNodeId") and session.get("daemonNodeId"):
+        managed_node_id = ctx.registry.daemon_store.historical_managed_node_id(
+            session["daemonNodeId"]
+        )
+        if managed_node_id:
+            session = SessionController(ctx.session_store).record_runtime_affinity(
+                session["id"], managed_node_id
+            )
     requested_node_id = string_field(body, "daemonNodeId") or string_field(
         body, "daemon_node_id"
     )
@@ -296,8 +306,19 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
         session,
         ctx.agent_placement_store,
         daemon_nodes,
+        ctx.registry.daemon_store,
     )
-    if session_node_id and requested_node_id and requested_node_id != session_node_id:
+    requested_original_runtime = bool(
+        session
+        and session.get("managedNodeId")
+        and requested_node_id == session.get("daemonNodeId")
+    )
+    if (
+        session_node_id
+        and requested_node_id
+        and requested_node_id != session_node_id
+        and not requested_original_runtime
+    ):
         raise HTTPException(
             409,
             {
@@ -340,6 +361,7 @@ async def run_logical_agents(request: Request, ctx: AppContextDep) -> dict[str, 
             daemon_nodes=daemon_nodes,
             session=session,
             required_node_id=required_node_id,
+            daemon_store=ctx.registry.daemon_store,
         )
         parsed: dict[str, Any] = {
             "taskGoal": task_goal,

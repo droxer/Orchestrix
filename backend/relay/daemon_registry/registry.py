@@ -1717,6 +1717,11 @@ class DaemonNodeRegistry:
                 ),
                 "daemonNodeId": command["_nodeId"],
                 **(
+                    {"managedNodeId": sandbox["managedNodeId"]}
+                    if sandbox.get("managedNodeId")
+                    else {}
+                ),
+                **(
                     {"agentVersion": command["agentVersion"]}
                     if command.get("agentVersion")
                     else {}
@@ -2129,6 +2134,8 @@ class DaemonNodeRegistry:
             task_id=task_id,
             workspace_path=sandbox.get("workspacePath") or "/workspace",
             owner_employee_id=sandbox.get("employeeId"),
+            daemon_node_id=sandbox.get("id"),
+            managed_node_id=sandbox.get("managedNodeId"),
         )
 
     def _age_ms(self, iso_timestamp: str) -> int:

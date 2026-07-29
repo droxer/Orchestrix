@@ -5,6 +5,7 @@ from typing import Any
 from loguru import logger
 
 from ..daemon_registry.scheduling import workspace_identity
+from ..persistence.agent_placement_store import create_node_placement
 from .team_membership import remove_agent_from_teams
 
 
@@ -34,6 +35,18 @@ def sync_node_agents(ctx: Any, node: dict[str, Any]) -> None:
     supported = set(node.get("supportedAgents") or []) | set(node.get("agents") or {})
     disabled = set(node.get("disabledAgents") or [])
     computer_id = node.get("managedNodeId") or node["id"]
+    if node.get("managedNodeId"):
+        try:
+            _rebind_managed_node_placements(ctx, node, employee_id)
+        except Exception as error:
+            if _missing_agent_table(error):
+                logger.warning(
+                    "Skipping agent sync during rolling upgrade",
+                    node_id=node.get("id"),
+                    error=str(error),
+                )
+                return
+            raise
     for executor_kind in sorted(supported - disabled):
         try:
             if node.get("managedNodeId"):
@@ -50,7 +63,7 @@ def sync_node_agents(ctx: Any, node: dict[str, Any]) -> None:
                 computer_id=computer_id,
             )
         except Exception as error:
-            if "no such table" in str(error) or "does not exist" in str(error):
+            if _missing_agent_table(error):
                 logger.warning(
                     "Skipping agent sync during rolling upgrade",
                     node_id=node.get("id"),
@@ -72,11 +85,19 @@ def sync_node_agents(ctx: Any, node: dict[str, Any]) -> None:
         if placement and placement.get("desiredState") != "removed":
             pass
         elif active:
-            ctx.agent_placement_store.rebind_placement(active["id"], node["id"])
+            ctx.agent_placement_store.rebind_placement(
+                active["id"],
+                node["id"],
+                managed_node_id=node.get("managedNodeId"),
+            )
         elif placement:
-            ctx.agent_placement_store.rebind_placement(placement["id"], node["id"])
+            ctx.agent_placement_store.rebind_placement(
+                placement["id"],
+                node["id"],
+                managed_node_id=node.get("managedNodeId"),
+            )
         else:
-            ctx.agent_placement_store.create_placement(agent, node["id"])
+            create_node_placement(ctx.agent_placement_store, agent, node)
         try:
             _retire_superseded_locked(ctx, node, employee_id, executor_kind)
         except Exception as error:
@@ -86,6 +107,59 @@ def sync_node_agents(ctx: Any, node: dict[str, Any]) -> None:
                 executor_kind=executor_kind,
                 error=str(error),
             )
+
+
+def _missing_agent_table(error: Exception) -> bool:
+    message = str(error)
+    return "no such table" in message or "does not exist" in message
+
+
+def _managed_runtime_ids(ctx: Any, managed_node_id: str) -> set[str]:
+    registry = getattr(ctx, "registry", None)
+    if not registry:
+        return set()
+    runtime_ids = {
+        runtime["id"]
+        for runtime in registry.monitor_nodes()
+        if runtime.get("managedNodeId") == managed_node_id
+    }
+    daemon_store = getattr(registry, "daemon_store", None)
+    historical_runtime_ids = getattr(
+        daemon_store, "historical_managed_runtime_ids", None
+    )
+    if historical_runtime_ids:
+        runtime_ids.update(historical_runtime_ids(managed_node_id))
+    return runtime_ids
+
+
+def _rebind_managed_node_placements(
+    ctx: Any,
+    node: dict[str, Any],
+    employee_id: str,
+) -> None:
+    """Move every logical agent on a managed Computer to its current runtime."""
+    managed_node_id = node.get("managedNodeId")
+    if not managed_node_id:
+        return
+    runtime_ids = _managed_runtime_ids(ctx, managed_node_id) | {node["id"]}
+    for placement in ctx.agent_placement_store.list_placements():
+        if (
+            placement.get("managedNodeId") != managed_node_id
+            and placement.get("daemonNodeId") not in runtime_ids
+        ):
+            continue
+        agent = ctx.agent_store.get_agent(placement.get("agentId"))
+        if (
+            not agent
+            or agent.get("deletedAt")
+            or agent.get("supervisorEmployeeId") != employee_id
+        ):
+            continue
+        ctx.agent_placement_store.rebind_placement(
+            placement["id"],
+            node["id"],
+            managed_node_id=managed_node_id,
+        )
 
 
 def _migrate_managed_compatibility_agent(
@@ -114,17 +188,7 @@ def _migrate_managed_compatibility_agent(
     registry = getattr(ctx, "registry", None)
     if not registry:
         return None
-    incarnation_ids = {
-        runtime["id"]
-        for runtime in registry.monitor_nodes()
-        if runtime.get("managedNodeId") == managed_node_id
-    }
-    daemon_store = getattr(registry, "daemon_store", None)
-    historical_runtime_ids = getattr(
-        daemon_store, "historical_managed_runtime_ids", None
-    )
-    if historical_runtime_ids:
-        incarnation_ids.update(historical_runtime_ids(managed_node_id))
+    incarnation_ids = _managed_runtime_ids(ctx, managed_node_id)
     legacy_keys = {
         _compatibility_key_for(employee_id, runtime_id, executor_kind)
         for runtime_id in incarnation_ids
@@ -183,6 +247,10 @@ def retire_superseded_compatibility_agents(
         return []
     identity = workspace_identity(node)
     nodes_by_id = {item["id"]: item for item in registry.monitor_nodes()}
+    managed_node_id = node.get("managedNodeId")
+    managed_runtime_ids = (
+        _managed_runtime_ids(ctx, managed_node_id) if managed_node_id else set()
+    )
     computer_scoped_key = _compatibility_key_for(
         employee_id, node.get("managedNodeId") or node["id"], executor_kind
     )
@@ -226,7 +294,11 @@ def retire_superseded_compatibility_agents(
             continue
         other = nodes_by_id.get(node_id)
         if other is None:
-            if not node.get("managedNodeId") or _node_has_active_work(ctx, node_id):
+            if (
+                not managed_node_id
+                or node_id not in managed_runtime_ids
+                or _node_has_active_work(ctx, node_id)
+            ):
                 continue
             if _retire_compatibility_agent(ctx, agent, employee_id):
                 retired.append(agent["id"])

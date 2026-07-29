@@ -1,5 +1,7 @@
 type ThreadComputer = {
   id: string;
+  managedNodeId?: string;
+  retiredAt?: string;
   employeeId?: string;
   online: boolean;
   stale: boolean;
@@ -8,6 +10,7 @@ type ThreadComputer = {
 
 type ThreadRuntimeSession = {
   daemonNodeId?: string;
+  managedNodeId?: string;
   agentRuns: ReadonlyArray<{ agent: string; daemonNodeId?: string; logicalAgentId?: string }>;
 };
 
@@ -80,9 +83,37 @@ export function agentsForThreadNode<T extends ThreadAgent>(
 export function threadRuntimeNodeId(
   session: ThreadRuntimeSession | undefined,
   agents: readonly ThreadAgent[] = [],
+  nodes: readonly ThreadComputer[] = [],
 ): string | undefined {
-  if (session?.daemonNodeId) return session.daemonNodeId;
+  const originalNode = nodes.find((node) => node.id === session?.daemonNodeId);
+  const managedNodeId = session?.managedNodeId ?? originalNode?.managedNodeId;
+  if (managedNodeId) {
+    const candidates = nodes.filter(
+      (node) => node.managedNodeId === managedNodeId && !node.retiredAt,
+    );
+    const current = candidates.find(
+      (node) => node.managedNodeId === managedNodeId
+        && node.online
+        && !node.stale
+        && ["ready", "running", "busy"].includes(node.status),
+    ) ?? candidates[0];
+    if (current) return current.id;
+  }
   const runs = [...(session?.agentRuns ?? [])].reverse();
+  if (session?.daemonNodeId) {
+    for (const run of runs) {
+      if (!run.logicalAgentId) continue;
+      const agent = agents.find((item) => item.id === run.logicalAgentId);
+      const placement = agent?.placements.find((item) => item.desiredState === "active");
+      if (!placement || placement.daemonNodeId === session.daemonNodeId) continue;
+      const reboundNode = nodes.find((node) => node.id === placement.daemonNodeId);
+      if (
+        reboundNode?.managedNodeId
+        && (!originalNode || originalNode.managedNodeId === reboundNode.managedNodeId)
+      ) return placement.daemonNodeId;
+    }
+    return session.daemonNodeId;
+  }
   const stamped = runs.find((run) => run.daemonNodeId)?.daemonNodeId;
   if (stamped) return stamped;
   // Threads that predate node stamping name no computer anywhere — but the
@@ -101,6 +132,7 @@ export function threadNeedsRuntimeSelection(
   session: ThreadRuntimeSession | undefined,
   composingNew: boolean,
   agents: readonly ThreadAgent[] = [],
+  nodes: readonly ThreadComputer[] = [],
 ): boolean {
-  return composingNew || !threadRuntimeNodeId(session, agents);
+  return composingNew || !threadRuntimeNodeId(session, agents, nodes);
 }

@@ -377,6 +377,60 @@ def test_running_managed_runtime_retirement_preserves_agent_and_placement(
         assert preserved["daemonNodeId"] == runtime["id"]
 
 
+def test_stopped_managed_runtime_preserves_agent_for_restart(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _login_admin(client)
+        managed = app.state.managed_node_store.create_node({"employeeId": "alice"})
+        attempt, _credential = app.state.managed_node_store.create_attempt(
+            managed["id"]
+        )
+        runtime, runtime_token = app.state.registry.enroll_managed_node(
+            managed,
+            attempt,
+            {"workspacePath": "/workspace"},
+        )
+        app.state.managed_node_store.complete_enrollment(
+            managed["id"], attempt["id"], runtime["id"]
+        )
+        runtime = app.state.registry.register(
+            {
+                "sandboxId": runtime["id"],
+                "token": runtime_token,
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }
+        )
+        sync_node_agents(app.state, runtime)
+        agent = next(
+            item
+            for item in app.state.agent_store.list_agents(
+                supervisor_employee_id="alice"
+            )
+            if item["executorKind"] == "codex"
+        )
+        [placement] = app.state.agent_placement_store.list_placements(
+            agent_id=agent["id"]
+        )
+        app.state.managed_node_store.update_node(
+            managed["id"], {"desiredState": "stopped"}
+        )
+
+        response = client.delete(f"/api/v1/admin/managed-nodes/{managed['id']}/runtime")
+
+        assert response.status_code == 204, response.text
+        assert not app.state.agent_store.get_agent(agent["id"]).get("deletedAt")
+        [preserved] = app.state.agent_placement_store.list_placements(
+            agent_id=agent["id"]
+        )
+        assert preserved["id"] == placement["id"]
+        assert preserved["managedNodeId"] == managed["id"]
+
+
 def test_backend_startup_migrates_managed_agent_identity(monkeypatch) -> None:
     monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
     with TemporaryDirectory() as root:

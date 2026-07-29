@@ -196,10 +196,10 @@ async def retire_managed_node_runtime(
             if daemon_node_id and ctx.registry.get(daemon_node_id):
                 assert_node_agent_runs_drained(ctx, daemon_node_id)
                 runtime = ctx.registry.get(daemon_node_id)
-                if node.get("desiredState") == "running" and runtime:
+                if node.get("desiredState") != "deleted" and runtime:
                     # Runtime replacement preserves the stable Computer's
-                    # Logical Agents and Placements. The next incarnation will
-                    # rebind them during registration.
+                    # Logical Agents and Placements, including while stopped.
+                    # The next incarnation will rebind them during registration.
                     sync_node_agents(ctx, runtime)
                 else:
                     remove_node_agents(ctx, daemon_node_id)
