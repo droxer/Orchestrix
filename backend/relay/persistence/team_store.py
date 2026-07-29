@@ -12,13 +12,13 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
-    MetaData,
+    Index,
     Table,
     Text,
     UniqueConstraint,
-    create_engine,
     insert,
     select,
+    text,
     update,
 )
 from sqlalchemy.exc import IntegrityError
@@ -34,6 +34,11 @@ from .store_common import (
     _write_json,
     database_id_column,
     entity_uuid_type,
+    create_all_tables,
+    json_type,
+    shared_engine,
+    store_transaction,
+    metadata as shared_metadata,
     safe_name,
 )
 
@@ -237,26 +242,41 @@ class LocalTeamStore:
 
 
 class DatabaseTeamStore:
-    metadata = MetaData()
+    metadata = shared_metadata
     teams = Table(
         "teams",
         metadata,
         database_id_column(),
-        Column("owner_employee_id", Text, nullable=False, index=True),
+        Column(
+            "owner_employee_id",
+            entity_uuid_type(),
+            ForeignKey(
+                "employees.id",
+                ondelete="RESTRICT",
+                name="fk_teams_owner_employee",
+            ),
+            nullable=False,
+            index=True,
+        ),
         Column("name", Text, nullable=False),
         Column("name_key", Text, nullable=True),
         Column("lead_agent_id", entity_uuid_type(), nullable=True),
-        Column("member_agent_ids", JSON, nullable=False),
+        Column("member_agent_ids", json_type(), nullable=False),
         Column("enabled", Boolean, nullable=False),
-        Column("snapshot", JSON, nullable=False),
+        Column("snapshot", json_type(), nullable=False),
         Column("event_version", BigInteger, nullable=False),
         Column("created_at", DateTime(timezone=True), nullable=False),
         Column("updated_at", DateTime(timezone=True), nullable=False),
         Column("deleted_at", DateTime(timezone=True), nullable=True),
-        UniqueConstraint(
+        # Uniqueness applies to an owner's *live* teams; see agent_store for
+        # why the casefolded key column is kept rather than an expression index.
+        Index(
+            "uq_teams_live_owner_name",
             "owner_employee_id",
             "name_key",
-            name="uq_teams_owner_name_key",
+            unique=True,
+            postgresql_where=text("deleted_at IS NULL"),
+            sqlite_where=text("deleted_at IS NULL"),
         ),
     )
     events_table = Table(
@@ -272,14 +292,14 @@ class DatabaseTeamStore:
         Column("sequence", BigInteger, nullable=False),
         Column("type", Text, nullable=False),
         Column("timestamp", DateTime(timezone=True), nullable=False),
-        Column("payload", JSON, nullable=False),
+        Column("payload", json_type(), nullable=False),
         UniqueConstraint("team_id", "sequence", name="uq_team_events_sequence"),
     )
 
     def __init__(self, database_url: str, *, create_schema: bool = False):
-        self.engine = create_engine(database_url, future=True)
+        self.engine = shared_engine(database_url)
         if create_schema:
-            self.metadata.create_all(self.engine)
+            create_all_tables(self.engine)
 
     def create_team(
         self, owner_employee_id: str, payload: dict[str, Any]
@@ -289,7 +309,7 @@ class DatabaseTeamStore:
         event = _team_event(team["id"], "team.created", {"team": team})
         row = _team_row(team, event_version=1)
         try:
-            with self.engine.begin() as conn:
+            with store_transaction(self.engine) as conn:
                 conn.execute(insert(self.teams).values(**row))
                 conn.execute(
                     insert(self.events_table).values(
@@ -303,7 +323,7 @@ class DatabaseTeamStore:
         return team
 
     def get_team(self, team_id: str) -> dict[str, Any] | None:
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             row = (
                 conn.execute(
                     select(
@@ -339,7 +359,7 @@ class DatabaseTeamStore:
             )
         if not include_deleted:
             statement = statement.where(self.teams.c.deleted_at.is_(None))
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             rows = conn.execute(statement).mappings().all()
         teams = [
             _normalized_team_snapshot(
@@ -409,7 +429,7 @@ class DatabaseTeamStore:
         return self._mutate(team_id, "team.updated", remove_from_snapshot)
 
     def events(self, team_id: str) -> list[dict[str, Any]]:
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             rows = (
                 conn.execute(
                     select(
@@ -455,7 +475,7 @@ class DatabaseTeamStore:
     ) -> dict[str, Any]:
         for attempt in range(3):
             try:
-                with self.engine.begin() as conn:
+                with store_transaction(self.engine) as conn:
                     row = (
                         conn.execute(
                             select(
@@ -651,7 +671,7 @@ def _team_row(
         "id": database_id or team["id"],
         "owner_employee_id": team["ownerEmployeeId"],
         "name": team["name"],
-        "name_key": None if team.get("deletedAt") else team["name"].casefold(),
+        "name_key": team["name"].casefold(),
         "lead_agent_id": team.get("leadAgentId"),
         "member_agent_ids": team.get("memberAgentIds", []),
         "enabled": team.get("enabled", True),

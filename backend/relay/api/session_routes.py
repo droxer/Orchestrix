@@ -483,21 +483,27 @@ async def cancel_session_run(session_id: str, request: Request, ctx: AppContextD
         session_id
     )
     node_id = node["id"] if node else run_request.get("nodeId") if run_request else None
-    if not node_id:
-        if session.get("status") in ("completed", "failed", "cancelled"):
-            return session
-        return SessionController(
-            ctx.session_store,
-            task_store=ctx.task_store,
-            task_id=session.get("taskId"),
-            owner_employee_id=actor["employeeId"],
-        ).cancel_session(session_id, reason)
-    return ctx.backend.cancel_run(
-        node_id,
-        session_id,
-        reason,
-        actor_employee_id=None if actor.get("isAdmin") else actor["employeeId"],
-    )
+    if node_id:
+        cancelled = ctx.backend.cancel_run(
+            node_id,
+            session_id,
+            reason,
+            actor_employee_id=None if actor.get("isAdmin") else actor["employeeId"],
+        )
+        if cancelled is not None:
+            return cancelled
+        # The node had no cancellable run — it finished moments ago, or its run
+        # request is parked in a state list_active_runs never reports, such as
+        # finalizing. Cancel the thread itself rather than failing: Stop must
+        # never be a dead end that leaves a thread stuck running forever.
+    if session.get("status") in ("completed", "failed", "cancelled"):
+        return session
+    return SessionController(
+        ctx.session_store,
+        task_store=ctx.task_store,
+        task_id=session.get("taskId"),
+        owner_employee_id=actor["employeeId"],
+    ).cancel_session(session_id, reason)
 
 
 @router.post("/threads/{session_id}/assignments")

@@ -11,13 +11,13 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
-    MetaData,
+    Index,
     Table,
     Text,
     UniqueConstraint,
-    create_engine,
     insert,
     select,
+    text,
     update,
 )
 from sqlalchemy.exc import IntegrityError
@@ -34,6 +34,11 @@ from .store_common import (
     _write_json,
     database_id_column,
     entity_uuid_type,
+    create_all_tables,
+    json_type,
+    shared_engine,
+    store_transaction,
+    metadata as shared_metadata,
     safe_name,
 )
 
@@ -247,7 +252,6 @@ class LocalAgentStore:
                 "deletedAt": now_iso(),
                 "updatedAt": now_iso(),
             }
-            updated.pop("compatibilityKey", None)
             self._append(agent_id, "agent.deleted", {"agent": updated})
             return updated
 
@@ -299,27 +303,53 @@ class LocalAgentStore:
 
 
 class DatabaseAgentStore:
-    metadata = MetaData()
+    metadata = shared_metadata
     agents = Table(
         "agents",
         metadata,
         database_id_column(),
-        Column("supervisor_employee_id", Text, nullable=False, index=True),
+        Column(
+            "supervisor_employee_id",
+            entity_uuid_type(),
+            ForeignKey(
+                "employees.id",
+                ondelete="RESTRICT",
+                name="fk_agents_supervisor_employee",
+            ),
+            nullable=False,
+            index=True,
+        ),
         Column("display_name", Text, nullable=False),
         Column("display_name_key", Text, nullable=True),
         Column("executor_kind", Text, nullable=False),
-        Column("compatibility_key", Text, nullable=True, unique=True),
+        Column("compatibility_key", Text, nullable=True),
         Column("enabled", Boolean, nullable=False),
         Column("agent_version", BigInteger, nullable=False),
-        Column("snapshot", JSON, nullable=False),
+        Column("snapshot", json_type(), nullable=False),
         Column("event_version", BigInteger, nullable=False),
         Column("created_at", DateTime(timezone=True), nullable=False),
         Column("updated_at", DateTime(timezone=True), nullable=False),
         Column("deleted_at", DateTime(timezone=True), nullable=True),
-        UniqueConstraint(
+        # Uniqueness applies to an employee's *live* agents. Deleting used to
+        # mean nulling display_name_key and dropping compatibility_key so the
+        # row escaped a whole-table constraint; the predicate says it directly,
+        # so both key columns are now written unconditionally.
+        Index(
+            "uq_agents_live_supervisor_display_name",
             "supervisor_employee_id",
             "display_name_key",
-            name="uq_agents_supervisor_display_name_key",
+            unique=True,
+            postgresql_where=text("deleted_at IS NULL"),
+            sqlite_where=text("deleted_at IS NULL"),
+        ),
+        Index(
+            "uq_agents_live_compatibility_key",
+            "compatibility_key",
+            unique=True,
+            postgresql_where=text(
+                "deleted_at IS NULL AND compatibility_key IS NOT NULL"
+            ),
+            sqlite_where=text("deleted_at IS NULL AND compatibility_key IS NOT NULL"),
         ),
     )
     events_table = Table(
@@ -335,13 +365,16 @@ class DatabaseAgentStore:
         Column("sequence", BigInteger, nullable=False),
         Column("type", Text, nullable=False),
         Column("timestamp", DateTime(timezone=True), nullable=False),
-        Column("payload", JSON, nullable=False),
+        Column("payload", json_type(), nullable=False),
+        UniqueConstraint(
+            "agent_id", "sequence", name="uq_employee_agent_events_sequence"
+        ),
     )
 
     def __init__(self, database_url: str, *, create_schema: bool = False):
-        self.engine = create_engine(database_url, future=True)
+        self.engine = shared_engine(database_url)
         if create_schema:
-            self.metadata.create_all(self.engine)
+            create_all_tables(self.engine)
 
     def create_agent(
         self, supervisor_employee_id: str, payload: dict[str, Any]
@@ -353,7 +386,7 @@ class DatabaseAgentStore:
         self._ensure_unique_name(agent["supervisorEmployeeId"], agent["displayName"])
         event = _agent_event(agent["id"], "agent.created", {"agent": agent})
         try:
-            with self.engine.begin() as conn:
+            with store_transaction(self.engine) as conn:
                 row = _agent_row(agent, event_version=1)
                 conn.execute(insert(self.agents).values(**row))
                 conn.execute(
@@ -414,7 +447,7 @@ class DatabaseAgentStore:
         return self._create_agent({**agent, "compatibilityKey": key})
 
     def get_agent(self, agent_id: str) -> dict[str, Any] | None:
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             row = (
                 conn.execute(
                     select(
@@ -449,7 +482,7 @@ class DatabaseAgentStore:
             )
         if not include_deleted:
             statement = statement.where(self.agents.c.deleted_at.is_(None))
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             rows = conn.execute(statement).mappings().all()
         return sorted(
             (
@@ -552,11 +585,10 @@ class DatabaseAgentStore:
             "deletedAt": timestamp,
             "updatedAt": timestamp,
         }
-        updated.pop("compatibilityKey", None)
         return self._append(agent_id, "agent.deleted", updated, {"agent": updated})
 
     def events(self, agent_id: str) -> list[dict[str, Any]]:
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             rows = (
                 conn.execute(
                     select(
@@ -594,7 +626,7 @@ class DatabaseAgentStore:
     ) -> dict[str, Any]:
         event = _agent_event(agent_id, event_type, payload)
         try:
-            with self.engine.begin() as conn:
+            with store_transaction(self.engine) as conn:
                 row = (
                     conn.execute(
                         select(self.agents.c.id, self.agents.c.event_version)
@@ -707,6 +739,19 @@ def _compatibility_key(
     return f"{supervisor_employee_id}:{computer_id}:{executor_kind}"
 
 
+def compatibility_computer_id(agent: dict[str, Any]) -> str | None:
+    """The Computer a compatibility agent stands in for, if it is scoped to one.
+
+    Returns None for ordinary agents and for legacy two-segment keys that
+    predate Computer scoping, both of which are free to be placed anywhere.
+    """
+    key = agent.get("compatibilityKey")
+    if not isinstance(key, str):
+        return None
+    segments = key.split(":")
+    return segments[1] if len(segments) == 3 else None
+
+
 def _migrate_compatibility_display_name(
     store: Any, agent: dict[str, Any], supervisor_employee_id: str, executor_kind: str
 ) -> dict[str, Any]:
@@ -755,9 +800,9 @@ def _agent_row(
         "id": database_id or agent["id"],
         "supervisor_employee_id": agent["supervisorEmployeeId"],
         "display_name": agent["displayName"],
-        "display_name_key": (
-            None if agent.get("deletedAt") else agent["displayName"].strip().casefold()
-        ),
+        # Written unconditionally: uniqueness is scoped to live agents by the
+        # partial index, so a soft delete no longer has to erase its own keys.
+        "display_name_key": agent["displayName"].strip().casefold(),
         "executor_kind": agent["executorKind"],
         "compatibility_key": agent.get("compatibilityKey"),
         "enabled": agent.get("enabled", True),

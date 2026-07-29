@@ -11,19 +11,20 @@ from typing import Any
 
 from sqlalchemy import (
     JSON,
+    Boolean,
     Column,
     DateTime,
     ForeignKey,
     Index,
     Integer,
-    MetaData,
+    PrimaryKeyConstraint,
     Table,
     Text,
-    create_engine,
     delete,
     func,
     insert,
     select,
+    text,
     update,
 )
 from sqlalchemy.exc import IntegrityError
@@ -41,6 +42,11 @@ from .store_common import (
     daemon_event,
     database_id_column,
     entity_uuid_type,
+    create_all_tables,
+    json_type,
+    shared_engine,
+    store_transaction,
+    metadata as shared_metadata,
     new_database_id,
     now_iso,
     safe_name,
@@ -1071,38 +1077,88 @@ class LocalDaemonStore:
 
 
 class DatabaseDaemonStore:
-    metadata = MetaData()
+    metadata = shared_metadata
 
     nodes = Table(
         "daemon_nodes",
         metadata,
         database_id_column(),
-        Column("employee_id", Text, nullable=True),
+        Column(
+            "employee_id",
+            entity_uuid_type(),
+            ForeignKey(
+                "employees.id",
+                ondelete="SET NULL",
+                name="fk_daemon_nodes_employee",
+            ),
+            nullable=True,
+        ),
         Column("display_name", Text, nullable=True),
         Column("workspace_path", Text, nullable=True),
         Column("workspace_id", Text, nullable=True),
         Column("sandbox_mode", Text, nullable=True),
         Column("node_location", Text, nullable=True),
-        Column("managed_node_id", Text, nullable=True),
+        Column("managed_node_id", entity_uuid_type(), nullable=True),
         Column("provisioning_attempt_id", Text, nullable=True),
         Column("credential_version", Integer, nullable=False, default=1),
         Column("retired_at", DateTime(timezone=True), nullable=True),
         Column("status", Text, nullable=False),
-        Column("agents", JSON, nullable=False),
-        Column("agent_details", JSON, nullable=False, default=dict),
         Column("max_concurrent_runs", Integer, nullable=False, default=1),
-        Column("run_capacity_by_mode", JSON, nullable=False, default=dict),
-        Column("disabled_agents", JSON, nullable=False, default=list),
-        Column("agent_role_defaults", JSON, nullable=False, default=dict),
-        Column("agent_role_overrides", JSON, nullable=False, default=dict),
+        Column("run_capacity_by_mode", json_type(), nullable=False, default=dict),
         Column("ui_token_hash", Text, nullable=True),
         Column("node_token_hash", Text, nullable=True),
-        Column("node_token", Text, nullable=True),
-        Column("token_hash", Text, nullable=True),
         Column("last_error", Text, nullable=True),
         Column("created_at", DateTime(timezone=True), nullable=False),
         Column("updated_at", DateTime(timezone=True), nullable=False),
         Column("last_seen_at", DateTime(timezone=True), nullable=True),
+        Index("ix_daemon_nodes_employee_id", "employee_id"),
+        Index("ix_daemon_nodes_updated_at", "updated_at"),
+        Index("ix_daemon_nodes_last_seen_at", "last_seen_at"),
+        Index("ix_daemon_nodes_managed_node_id", "managed_node_id"),
+        Index("ix_daemon_nodes_workspace_id", "workspace_id"),
+        Index("ix_daemon_nodes_retired_at", "retired_at"),
+        # A Computer is (employee_id, workspace_id) for an employee device and
+        # managed_node_id for a managed one -- never the daemon's own id, which
+        # changes every time the daemon process is replaced.
+        Index(
+            "uq_daemon_nodes_computer",
+            "employee_id",
+            "workspace_id",
+            unique=True,
+            postgresql_where=text("managed_node_id IS NULL AND retired_at IS NULL"),
+            sqlite_where=text("managed_node_id IS NULL AND retired_at IS NULL"),
+        ),
+        Index(
+            "uq_daemon_nodes_managed_runtime",
+            "managed_node_id",
+            unique=True,
+            postgresql_where=text(
+                "managed_node_id IS NOT NULL AND retired_at IS NULL"
+            ),
+            sqlite_where=text("managed_node_id IS NOT NULL AND retired_at IS NULL"),
+        ),
+    )
+    # One row per agent a node knows about, replacing five parallel JSON maps
+    # (agents, agent_details, disabled_agents, agent_role_defaults,
+    # agent_role_overrides) that all keyed off the same agent name and had to be
+    # kept aligned by convention. `run_capacity_by_mode` stays on the node: it
+    # is keyed by run mode, not by agent.
+    node_agents = Table(
+        "daemon_node_agents",
+        metadata,
+        Column(
+            "node_id",
+            entity_uuid_type(),
+            ForeignKey("daemon_nodes.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        Column("agent", Text, nullable=False),
+        Column("status", Text, nullable=False),
+        Column("details", json_type(), nullable=True),
+        Column("disabled", Boolean, nullable=False),
+        Column("role_default", Text, nullable=True),
+        Column("role_override", Text, nullable=True),
+        PrimaryKeyConstraint("node_id", "agent", name="pk_daemon_node_agents"),
     )
     commands = Table(
         "daemon_commands",
@@ -1116,7 +1172,7 @@ class DatabaseDaemonStore:
         ),
         Column("type", Text, nullable=False),
         Column("status", Text, nullable=False),
-        Column("command", JSON, nullable=False),
+        Column("command", json_type(), nullable=False),
         Column("exit_code", Integer, nullable=True),
         Column("error", Text, nullable=True),
         Column("created_at", DateTime(timezone=True), nullable=False),
@@ -1126,6 +1182,9 @@ class DatabaseDaemonStore:
         Column("lease_expires_at", DateTime(timezone=True), nullable=True),
         Column("attempt", Integer, nullable=False, default=0),
         Column("completed_at", DateTime(timezone=True), nullable=True),
+        Index("ix_daemon_commands_node_status", "node_id", "status"),
+        Index("ix_daemon_commands_created_at", "created_at"),
+        Index("ix_daemon_commands_lease_expires_at", "lease_expires_at"),
     )
     runs = Table(
         "daemon_runs",
@@ -1146,7 +1205,7 @@ class DatabaseDaemonStore:
         Column("session_id", entity_uuid_type(), nullable=False),
         Column("agent", Text, nullable=False),
         Column("logical_agent_id", entity_uuid_type(), nullable=True),
-        Column("placement_id", Text, nullable=True),
+        Column("placement_id", entity_uuid_type(), nullable=True),
         Column("mode", Text, nullable=False),
         Column("task_goal", Text, nullable=False),
         Column("workspace_path", Text, nullable=True),
@@ -1155,6 +1214,8 @@ class DatabaseDaemonStore:
         Column("error", Text, nullable=True),
         Column("started_at", DateTime(timezone=True), nullable=False),
         Column("completed_at", DateTime(timezone=True), nullable=True),
+        Index("ix_daemon_runs_node_status", "node_id", "status"),
+        Index("ix_daemon_runs_session_id", "session_id"),
     )
     run_requests = Table(
         "daemon_run_requests",
@@ -1167,14 +1228,14 @@ class DatabaseDaemonStore:
             nullable=False,
         ),
         Column("session_id", entity_uuid_type(), nullable=False),
-        Column("task_id", Text, nullable=True),
+        Column("task_id", entity_uuid_type(), nullable=True),
         Column("task_goal", Text, nullable=False),
-        Column("assignments", JSON, nullable=False),
+        Column("assignments", json_type(), nullable=False),
         Column("current_index", Integer, nullable=False),
-        Column("state", JSON, nullable=False),
+        Column("state", json_type(), nullable=False),
         Column("status", Text, nullable=False),
-        Column("current_command_id", Text, nullable=True),
-        Column("current_run_id", Text, nullable=True),
+        Column("current_command_id", entity_uuid_type(), nullable=True),
+        Column("current_run_id", entity_uuid_type(), nullable=True),
         Column("current_agent", Text, nullable=True),
         Column("current_mode", Text, nullable=True),
         Column("current_started_at", DateTime(timezone=True), nullable=True),
@@ -1182,6 +1243,10 @@ class DatabaseDaemonStore:
         Column("created_at", DateTime(timezone=True), nullable=False),
         Column("updated_at", DateTime(timezone=True), nullable=False),
         Column("completed_at", DateTime(timezone=True), nullable=True),
+        Index("ix_daemon_run_requests_status", "status"),
+        Index("ix_daemon_run_requests_node_status", "node_id", "status"),
+        Index("ix_daemon_run_requests_session_id", "session_id"),
+        Index("ix_daemon_run_requests_task_id", "task_id"),
     )
     Index(
         "uq_daemon_run_requests_active_session",
@@ -1199,29 +1264,50 @@ class DatabaseDaemonStore:
         Column("run_id", entity_uuid_type(), nullable=True),
         Column("type", Text, nullable=False),
         Column("timestamp", DateTime(timezone=True), nullable=False),
-        Column("payload", JSON, nullable=False),
+        Column("payload", json_type(), nullable=False),
+        Index("ix_daemon_events_node_id", "node_id"),
+        Index("ix_daemon_events_timestamp", "timestamp"),
     )
 
     def __init__(self, database_url: str, *, create_schema: bool = False):
-        self.engine = create_engine(database_url, future=True)
+        self.engine = shared_engine(database_url)
         if create_schema:
-            self.metadata.create_all(self.engine)
+            create_all_tables(self.engine)
+
+    def _write_node_agents(self, conn: Any, node_pk: str, node: dict[str, Any]) -> None:
+        """Replace a node's daemon_node_agents rows.
+
+        Delete-then-insert rather than a merge: the five maps are always written as
+        a complete set, so an agent dropped from the payload must disappear.
+        """
+        conn.execute(
+            delete(self.node_agents).where(self.node_agents.c.node_id == node_pk)
+        )
+        rows = node_agent_rows(node, node_pk)
+        if rows:
+            conn.execute(insert(self.node_agents), rows)
+
+    def _save_node(
+        self, conn: Any, node: dict[str, Any], *, database_id: str | None = None
+    ) -> None:
+        """Write a node row and its per-agent rows together."""
+        node_pk = database_id or node["id"]
+        values = node_to_row(node, database_id=node_pk)
+        existing = conn.scalar(
+            select(self.nodes.c.id).where(self.nodes.c.id == node_pk)
+        )
+        if existing:
+            conn.execute(
+                update(self.nodes).where(self.nodes.c.id == existing).values(**values)
+            )
+        else:
+            conn.execute(insert(self.nodes).values(**values))
+        self._write_node_agents(conn, node_pk, node)
 
     def register_node(self, sandbox: dict[str, Any]) -> dict[str, Any]:
         node = _node_for_storage(sandbox)
-        values = node_to_row(node)
-        with self.engine.begin() as conn:
-            existing = conn.scalar(
-                select(self.nodes.c.id).where(self.nodes.c.id == node["id"])
-            )
-            if existing:
-                conn.execute(
-                    update(self.nodes)
-                    .where(self.nodes.c.id == existing)
-                    .values(**node_to_row(node, database_id=existing))
-                )
-            else:
-                conn.execute(insert(self.nodes).values(**values))
+        with store_transaction(self.engine) as conn:
+            self._save_node(conn, node)
             self._append_daemon_event(
                 conn, daemon_event("daemon.node.registered", {"node": node})
             )
@@ -1243,13 +1329,9 @@ class DatabaseDaemonStore:
         }
         if patch.get("lastError") is None and "lastError" in patch:
             updated.pop("lastError", None)
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             node_pk = self._node_pk(conn, node_id)
-            conn.execute(
-                update(self.nodes)
-                .where(self.nodes.c.id == node_pk)
-                .values(**node_to_row(updated, database_id=node_pk))
-            )
+            self._save_node(conn, updated, database_id=node_pk)
             # Deliberately not logged as a daemon event: heartbeats arrive
             # several times per second per node, and `lastSeenAt` on the node
             # record is the only thing anything reads.
@@ -1263,13 +1345,9 @@ class DatabaseDaemonStore:
             raise ValueError("Daemon node is already assigned.")
         updated = {**node, "employeeId": employee_id, "updatedAt": now_iso()}
         updated["nodeLocation"] = assigned_node_location(updated)
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             node_pk = self._node_pk(conn, node_id)
-            conn.execute(
-                update(self.nodes)
-                .where(self.nodes.c.id == node_pk)
-                .values(**node_to_row(updated, database_id=node_pk))
-            )
+            self._save_node(conn, updated, database_id=node_pk)
             self._append_daemon_event(
                 conn,
                 daemon_event(
@@ -1290,13 +1368,9 @@ class DatabaseDaemonStore:
             updated["disabledAgents"] = list(disabled_agents)
         else:
             updated.pop("disabledAgents", None)
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             node_pk = self._node_pk(conn, node_id)
-            conn.execute(
-                update(self.nodes)
-                .where(self.nodes.c.id == node_pk)
-                .values(**node_to_row(updated, database_id=node_pk))
-            )
+            self._save_node(conn, updated, database_id=node_pk)
             self._append_daemon_event(
                 conn,
                 daemon_event(
@@ -1320,13 +1394,9 @@ class DatabaseDaemonStore:
             updated["displayName"] = display_name
         else:
             updated.pop("displayName", None)
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             node_pk = self._node_pk(conn, node_id)
-            conn.execute(
-                update(self.nodes)
-                .where(self.nodes.c.id == node_pk)
-                .values(**node_to_row(updated, database_id=node_pk))
-            )
+            self._save_node(conn, updated, database_id=node_pk)
             self._append_daemon_event(
                 conn,
                 daemon_event(
@@ -1347,13 +1417,9 @@ class DatabaseDaemonStore:
             updated["agentRoleDefaults"] = dict(role_defaults)
         else:
             updated.pop("agentRoleDefaults", None)
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             node_pk = self._node_pk(conn, node_id)
-            conn.execute(
-                update(self.nodes)
-                .where(self.nodes.c.id == node_pk)
-                .values(**node_to_row(updated, database_id=node_pk))
-            )
+            self._save_node(conn, updated, database_id=node_pk)
             self._append_daemon_event(
                 conn,
                 daemon_event(
@@ -1377,13 +1443,9 @@ class DatabaseDaemonStore:
             updated["agentRoleOverrides"] = dict(role_overrides)
         else:
             updated.pop("agentRoleOverrides", None)
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             node_pk = self._node_pk(conn, node_id)
-            conn.execute(
-                update(self.nodes)
-                .where(self.nodes.c.id == node_pk)
-                .values(**node_to_row(updated, database_id=node_pk))
-            )
+            self._save_node(conn, updated, database_id=node_pk)
             self._append_daemon_event(
                 conn,
                 daemon_event(
@@ -1407,13 +1469,11 @@ class DatabaseDaemonStore:
             if k not in ("employeeId", "agentRoleOverrides")
         }
         updated["updatedAt"] = now_iso()
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             node_pk = self._node_pk(conn, node_id)
-            row = node_to_row(updated, database_id=node_pk)
-            row["employee_id"] = None
-            conn.execute(
-                update(self.nodes).where(self.nodes.c.id == node_pk).values(**row)
-            )
+            # `updated` drops employeeId entirely, so node_to_row would leave the
+            # column untouched rather than clearing it.
+            self._save_node(conn, {**updated, "employeeId": None}, database_id=node_pk)
             self._append_daemon_event(
                 conn,
                 daemon_event(
@@ -1424,7 +1484,7 @@ class DatabaseDaemonStore:
         return updated
 
     def delete_node(self, node_id: str) -> None:
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             node_pk = conn.scalar(
                 select(self.nodes.c.id).where(self.nodes.c.id == node_id)
             )
@@ -1442,8 +1502,27 @@ class DatabaseDaemonStore:
                 conn, daemon_event("daemon.node.deleted", {"nodeId": node_id})
             )
 
+    def _node_agents_by_node(
+        self, conn: Any, node_pks: list[str]
+    ) -> dict[str, list[Any]]:
+        if not node_pks:
+            return {}
+        rows = (
+            conn.execute(
+                select(self.node_agents)
+                .where(self.node_agents.c.node_id.in_(node_pks))
+                .order_by(self.node_agents.c.node_id, self.node_agents.c.agent)
+            )
+            .mappings()
+            .all()
+        )
+        grouped: dict[str, list[Any]] = {}
+        for row in rows:
+            grouped.setdefault(str(row["node_id"]), []).append(row)
+        return grouped
+
     def get_node(self, node_id: str) -> dict[str, Any] | None:
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             row = (
                 conn.execute(
                     select(self.nodes).where(self.nodes.c.id == node_id)
@@ -1451,15 +1530,22 @@ class DatabaseDaemonStore:
                 .mappings()
                 .first()
             )
-        return row_to_node(row) if row else None
+            if not row:
+                return None
+            agents = self._node_agents_by_node(conn, [str(row["id"])])
+        return apply_node_agents(row_to_node(row), agents.get(str(row["id"]), []))
 
     def list_nodes(self) -> list[dict[str, Any]]:
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             rows = conn.execute(select(self.nodes)).mappings().all()
-        return [row_to_node(row) for row in rows]
+            agents = self._node_agents_by_node(conn, [str(row["id"]) for row in rows])
+        return [
+            apply_node_agents(row_to_node(row), agents.get(str(row["id"]), []))
+            for row in rows
+        ]
 
     def get_command(self, command_id: str) -> dict[str, Any] | None:
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             row = (
                 conn.execute(
                     select(self.commands).where(self.commands.c.id == command_id)
@@ -1490,7 +1576,7 @@ class DatabaseDaemonStore:
             "createdAt": now,
             "updatedAt": now,
         }
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             if request_id is not None:
                 request_row = (
                     conn.execute(
@@ -1551,7 +1637,7 @@ class DatabaseDaemonStore:
 
     def publish_command(self, command_id: str) -> dict[str, Any]:
         now = now_iso()
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             row = (
                 conn.execute(
                     select(self.commands)
@@ -1594,7 +1680,7 @@ class DatabaseDaemonStore:
         return updated
 
     def discard_staged_command(self, command_id: str) -> None:
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             row = (
                 conn.execute(
                     select(self.commands)
@@ -1615,7 +1701,7 @@ class DatabaseDaemonStore:
         self, command_id: str, command: dict[str, Any]
     ) -> dict[str, Any] | None:
         now = now_iso()
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             row = (
                 conn.execute(
                     select(self.commands)
@@ -1646,7 +1732,7 @@ class DatabaseDaemonStore:
     ) -> list[dict[str, Any]]:
         now = now_iso()
         now_dt = _parse_iso(now)
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             node_pk = self._node_pk(conn, node_id)
             available_condition = (self.commands.c.status == "queued") | (
                 (self.commands.c.status == "dispatched")
@@ -1702,7 +1788,7 @@ class DatabaseDaemonStore:
     def queued_command_count(self, node_id: str) -> int:
         now = now_iso()
         now_dt = _parse_iso(now)
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             node_pk = self._node_pk(conn, node_id)
             return len(
                 conn.execute(
@@ -1721,7 +1807,7 @@ class DatabaseDaemonStore:
     def queued_command_counts(self) -> dict[str, int]:
         now = now_iso()
         now_dt = _parse_iso(now)
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             rows = conn.execute(
                 select(self.commands.c.node_id, func.count(self.commands.c.id))
                 .where(
@@ -1745,7 +1831,7 @@ class DatabaseDaemonStore:
             return
         now = now_iso()
         requested = dict(command_leases)
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             node_pk = self._node_pk(conn, node_id)
             rows = (
                 conn.execute(
@@ -1796,7 +1882,7 @@ class DatabaseDaemonStore:
         statement = select(self.runs).where(self.runs.c.status == "running")
         if node_id is not None:
             statement = statement.where(self.runs.c.node_id == node_id)
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             rows = conn.execute(statement).mappings().all()
         return [row_to_run(row) for row in rows]
 
@@ -1811,7 +1897,7 @@ class DatabaseDaemonStore:
             **request,
         }
         try:
-            with self.engine.begin() as conn:
+            with store_transaction(self.engine) as conn:
                 node_pk = self._node_pk(conn, record["nodeId"])
                 conn.execute(
                     insert(self.run_requests).values(
@@ -1838,7 +1924,7 @@ class DatabaseDaemonStore:
         return record
 
     def get_run_request(self, request_id: str) -> dict[str, Any] | None:
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             row = (
                 conn.execute(
                     select(self.run_requests).where(
@@ -1858,7 +1944,7 @@ class DatabaseDaemonStore:
         )
         if node_id is not None:
             statement = statement.where(self.run_requests.c.node_id == node_id)
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             rows = conn.execute(statement).mappings().all()
         return [row_to_run_request(row) for row in rows]
 
@@ -1887,7 +1973,7 @@ class DatabaseDaemonStore:
         )
 
     def run_request_for_command(self, command_id: str) -> dict[str, Any] | None:
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             row = (
                 conn.execute(
                     select(self.run_requests)
@@ -1900,7 +1986,7 @@ class DatabaseDaemonStore:
         return row_to_run_request(row) if row else None
 
     def pending_command_for_run_request(self, request_id: str) -> dict[str, Any] | None:
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             rows = (
                 conn.execute(
                     select(self.commands).where(self.commands.c.status == "pending")
@@ -1926,7 +2012,7 @@ class DatabaseDaemonStore:
         lease_seconds: float,
     ) -> dict[str, Any] | None:
         now = now_iso()
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             row = (
                 conn.execute(
                     select(self.run_requests)
@@ -1989,7 +2075,7 @@ class DatabaseDaemonStore:
         self, request_id: str, claim_id: str, lease_seconds: float
     ) -> dict[str, Any] | None:
         now = now_iso()
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             row = (
                 conn.execute(
                     select(self.run_requests)
@@ -2058,7 +2144,7 @@ class DatabaseDaemonStore:
         updated = {**current, **patch, "updatedAt": now}
         if patch.get("status") in ("completed", "failed", "cancelled"):
             updated["completedAt"] = now
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             node_pk = self._node_pk(conn, updated["nodeId"])
             conn.execute(
                 update(self.run_requests)
@@ -2090,7 +2176,7 @@ class DatabaseDaemonStore:
         patch: dict[str, Any],
     ) -> dict[str, Any] | None:
         now = now_iso()
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             row = (
                 conn.execute(
                     select(self.run_requests)
@@ -2152,7 +2238,7 @@ class DatabaseDaemonStore:
         self, node_id: str, target_command_id: str
     ) -> None:
         now = now_iso()
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             node_pk = self._node_pk(conn, node_id)
             rows = (
                 conn.execute(
@@ -2191,7 +2277,7 @@ class DatabaseDaemonStore:
         deleted_commands = 0
         deleted_runs = 0
         deleted_events = 0
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             command_rows = (
                 conn.execute(
                     select(self.commands).where(
@@ -2246,11 +2332,11 @@ class DatabaseDaemonStore:
         }
 
     def append_daemon_event(self, event: dict[str, Any]) -> None:
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             self._append_daemon_event(conn, event)
 
     def historical_managed_runtime_ids(self, managed_node_id: str) -> set[str]:
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             payloads = conn.scalars(
                 select(self.events.c.payload).where(
                     self.events.c.type == "daemon.node.registered"
@@ -2270,7 +2356,7 @@ class DatabaseDaemonStore:
     def historical_managed_node_ids(
         self, runtime_ids: set[str]
     ) -> dict[str, str]:
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             payloads = conn.scalars(
                 select(self.events.c.payload).where(
                     self.events.c.type == "daemon.node.registered"
@@ -2292,7 +2378,7 @@ class DatabaseDaemonStore:
         error: str | None,
     ) -> bool:
         now = now_iso()
-        with self.engine.begin() as conn:
+        with store_transaction(self.engine) as conn:
             node_pk = self._node_pk(conn, node_id)
             row = (
                 conn.execute(
@@ -2431,23 +2517,76 @@ def node_to_row(
         "credential_version": int(node.get("credentialVersion") or 1),
         "retired_at": _parse_iso(node.get("retiredAt")),
         "status": node["status"],
-        "agents": node.get("agents") or {},
-        "agent_details": node.get("agentDetails") or {},
+        # The per-agent maps live in daemon_node_agents; see node_agent_rows.
         "max_concurrent_runs": int(node.get("maxConcurrentRuns") or 1),
         "run_capacity_by_mode": node.get("runCapacityByMode") or {},
-        "disabled_agents": list(node.get("disabledAgents") or []),
-        "agent_role_defaults": node.get("agentRoleDefaults") or {},
-        "agent_role_overrides": node.get("agentRoleOverrides") or {},
+        # Only hashes are persisted; plaintext node tokens stay process-local.
         "ui_token_hash": node.get("uiTokenHash"),
         "node_token_hash": node.get("nodeTokenHash"),
-        # Legacy column kept for migrations/backward compatibility. Plaintext
-        # node tokens are intentionally process-local and must not be persisted.
-        "node_token": None,
-        "token_hash": node.get("tokenHash"),
         "last_error": node.get("lastError"),
         "created_at": _parse_iso(node["createdAt"]),
         "updated_at": _parse_iso(node["updatedAt"]),
         "last_seen_at": _parse_iso(node.get("lastSeenAt")),
+    }
+
+
+def node_agent_rows(node: dict[str, Any], node_pk: str) -> list[dict[str, Any]]:
+    """Flatten a node's five per-agent maps into daemon_node_agents rows."""
+    statuses = node.get("agents") or {}
+    details = node.get("agentDetails") or {}
+    disabled = set(node.get("disabledAgents") or [])
+    role_defaults = node.get("agentRoleDefaults") or {}
+    role_overrides = node.get("agentRoleOverrides") or {}
+    names = (
+        set(statuses)
+        | set(details)
+        | disabled
+        | set(role_defaults)
+        | set(role_overrides)
+    )
+    return [
+        {
+            "node_id": node_pk,
+            "agent": agent,
+            "status": statuses.get(agent) or "unknown",
+            "details": details.get(agent),
+            "disabled": agent in disabled,
+            "role_default": role_defaults.get(agent),
+            "role_override": role_overrides.get(agent),
+        }
+        for agent in sorted(names)
+    ]
+
+
+def apply_node_agents(node: dict[str, Any], rows: list[Any]) -> dict[str, Any]:
+    """Rebuild the per-agent keys on a node from its daemon_node_agents rows.
+
+    Keys stay absent rather than empty, matching what the JSON columns produced,
+    so callers and stored payloads keep the same shape.
+    """
+    statuses: dict[str, Any] = {}
+    details: dict[str, Any] = {}
+    disabled: list[str] = []
+    role_defaults: dict[str, str] = {}
+    role_overrides: dict[str, str] = {}
+    for row in rows:
+        agent = row["agent"]
+        statuses[agent] = row["status"]
+        if row.get("details") is not None:
+            details[agent] = row["details"]
+        if row.get("disabled"):
+            disabled.append(agent)
+        if row.get("role_default"):
+            role_defaults[agent] = row["role_default"]
+        if row.get("role_override"):
+            role_overrides[agent] = row["role_override"]
+    return {
+        **node,
+        "agents": statuses,
+        **({"agentDetails": details} if details else {}),
+        **({"disabledAgents": sorted(disabled)} if disabled else {}),
+        **({"agentRoleDefaults": role_defaults} if role_defaults else {}),
+        **({"agentRoleOverrides": role_overrides} if role_overrides else {}),
     }
 
 
@@ -2481,27 +2620,12 @@ def row_to_node(row: Any) -> dict[str, Any]:
             else {}
         ),
         "status": row["status"],
-        "agents": row["agents"] or {},
-        **({"agentDetails": row["agent_details"]} if row.get("agent_details") else {}),
         "maxConcurrentRuns": int(row.get("max_concurrent_runs") or 1),
         "runCapacityByMode": row.get("run_capacity_by_mode") or {},
-        **(
-            {"disabledAgents": list(row["disabled_agents"])}
-            if row.get("disabled_agents")
-            else {}
-        ),
-        **(
-            {"agentRoleDefaults": dict(row["agent_role_defaults"])}
-            if row.get("agent_role_defaults")
-            else {}
-        ),
-        **(
-            {"agentRoleOverrides": dict(row["agent_role_overrides"])}
-            if row.get("agent_role_overrides")
-            else {}
-        ),
+        # `agents` and the other per-agent keys are merged in by
+        # `apply_node_agents` from the daemon_node_agents rows.
+        "agents": {},
         "token": None,
-        **({"tokenHash": row["token_hash"]} if row.get("token_hash") else {}),
         **({"uiTokenHash": row["ui_token_hash"]} if row.get("ui_token_hash") else {}),
         **(
             {"nodeTokenHash": row["node_token_hash"]}

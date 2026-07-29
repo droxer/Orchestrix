@@ -310,3 +310,81 @@ def test_database_placement_store_normalizes_legacy_owner_snapshot(
         )
 
     assert placements.get_placement(placement["id"])["supervisorEmployeeId"] == "alice"
+
+
+@pytest.mark.parametrize("database", [False, True])
+def test_rebinding_to_an_unmanaged_node_clears_the_computer_identity(
+    tmp_path: Path, database: bool
+) -> None:
+    if database:
+        database_url = f"sqlite:///{tmp_path}/clear-managed.db"
+        agents = DatabaseAgentStore(database_url, create_schema=True)
+        placements = DatabaseAgentPlacementStore(database_url, create_schema=True)
+    else:
+        agents = LocalAgentStore(tmp_path)
+        placements = LocalAgentPlacementStore(tmp_path)
+    agent = agents.create_agent(
+        "alice", {"displayName": "Builder", "executorKind": "codex"}
+    )
+    original = placements.create_placement(agent, "runtime_old")
+    managed = placements.rebind_placement(
+        original["id"], "runtime_managed", managed_node_id="computer_one"
+    )
+    assert managed["managedNodeId"] == "computer_one"
+
+    # A placement bound to an employee device belongs to no managed Computer.
+    # Leaving computer_one behind would let that Computer's sync reclaim it.
+    device = placements.rebind_placement(original["id"], "device_node")
+
+    assert device["daemonNodeId"] == "device_node"
+    assert "managedNodeId" not in device
+    assert placements.get_placement(original["id"]).get("managedNodeId") is None
+
+
+@pytest.mark.parametrize("database", [False, True])
+def test_rebind_repairs_a_stale_computer_identity_on_the_same_node(
+    tmp_path: Path, database: bool
+) -> None:
+    if database:
+        database_url = f"sqlite:///{tmp_path}/repair-managed.db"
+        agents = DatabaseAgentStore(database_url, create_schema=True)
+        placements = DatabaseAgentPlacementStore(database_url, create_schema=True)
+    else:
+        agents = LocalAgentStore(tmp_path)
+        placements = LocalAgentPlacementStore(tmp_path)
+    agent = agents.create_agent(
+        "alice", {"displayName": "Builder", "executorKind": "codex"}
+    )
+    original = placements.create_placement(agent, "device_node")
+    placements.rebind_placement(
+        original["id"], "device_node", managed_node_id="computer_one"
+    )
+
+    repaired = placements.rebind_placement(original["id"], "device_node")
+
+    assert repaired.get("managedNodeId") is None
+
+
+@pytest.mark.parametrize("store_kind", ["local", "database"])
+def test_placement_denormalized_agent_fields_cannot_drift(
+    tmp_path: Path, store_kind: str
+) -> None:
+    """Placements copy supervisorEmployeeId and executorKind from the agent and
+    never refresh them. That is only safe while neither is patchable, so pin it
+    here: making either mutable must fail this test, not silently leave every
+    placement pointing at the wrong employee or executor."""
+    store = (
+        LocalAgentStore(tmp_path / "local")
+        if store_kind == "local"
+        else DatabaseAgentStore(f"sqlite:///{tmp_path}/agents.db", create_schema=True)
+    )
+    agent = store.create_agent(
+        "alice", {"displayName": "Planner", "executorKind": "claude"}
+    )
+
+    for field, value in (
+        ("supervisorEmployeeId", "bob"),
+        ("executorKind", "codex"),
+    ):
+        with pytest.raises(ValueError, match="Unsupported agent field"):
+            store.update_agent(agent["id"], {field: value})

@@ -998,6 +998,7 @@
     "started": "{{agent}} · {{mode}} 已启动",
     "artifact": "产物 · {{kind}}",
     "decision": "你 · {{kind}}",
+    "cancelled": "请求已取消。",
     "agent_completed": "{{agent}} · {{status}}",
     "exit_code": "退出码 {{exitCode}}",
     "session_status": "状态 · {{phase}}",

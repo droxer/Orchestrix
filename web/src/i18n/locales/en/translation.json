@@ -999,6 +999,7 @@
     "started": "{{agent}} · {{mode}} started",
     "artifact": "Artifact · {{kind}}",
     "decision": "You · {{kind}}",
+    "cancelled": "Request cancelled.",
     "agent_completed": "{{agent}} · {{status}}",
     "exit_code": "Exit {{exitCode}}",
     "session_status": "Status · {{phase}}",

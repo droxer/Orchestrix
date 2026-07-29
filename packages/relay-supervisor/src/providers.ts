@@ -90,14 +90,7 @@ export class LocalProcessProvider implements ManagedNodeProvider {
       "--sandbox", input.node.sandboxMode,
     ], {
       cwd: input.workspacePath,
-      env: {
-        ...process.env,
-        RELAY_BACKEND_URL: input.backendUrl,
-        RELAY_ENROLLMENT_TOKEN: input.enrollmentCredential,
-        RELAY_WORKSPACE: input.workspacePath,
-        RELAY_WORKSPACE_ID: input.workspaceId,
-        RELAY_SANDBOX_MODE: input.node.sandboxMode,
-      },
+      env: managedDaemonEnv(input),
       stdio: "inherit",
     });
     await waitForSpawn(child);
@@ -213,6 +206,32 @@ export class LocalProcessProvider implements ManagedNodeProvider {
       await delay(this.stopPollIntervalMs);
     } while (true);
   }
+}
+
+// The daemon resolves its identity from the environment before it looks at the
+// enrollment credential, so any of these inherited from the supervisor's shell
+// (or from a .env that relay-core auto-loads into this process) would silently
+// win over the grant: RELAY_SANDBOX_ID skips enrollment entirely and binds the
+// managed node's process to an unrelated node, and a stale daemon token loses
+// registration with a 401. Drop them so enrollment is the only identity source.
+const MANAGED_DAEMON_ENV_DENY = [
+  "RELAY_DAEMON_NODE_TOKEN",
+  "RELAY_DAEMON_TOKEN",
+  "RELAY_EMPLOYEE_ID",
+  "RELAY_SANDBOX_ID",
+] as const;
+
+export function managedDaemonEnv(input: EnsureManagedNodeInput): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  for (const key of MANAGED_DAEMON_ENV_DENY) delete env[key];
+  return {
+    ...env,
+    RELAY_BACKEND_URL: input.backendUrl,
+    RELAY_ENROLLMENT_TOKEN: input.enrollmentCredential,
+    RELAY_WORKSPACE: input.workspacePath,
+    RELAY_WORKSPACE_ID: input.workspaceId,
+    RELAY_SANDBOX_MODE: input.node.sandboxMode,
+  };
 }
 
 interface ProviderState {

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from hashlib import sha256
 from typing import Any
+from uuid import UUID, uuid5
 
 from ..core.ids import new_sandbox_id, now_iso
 from ..core.models import AGENT_NAMES, DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS
@@ -448,7 +448,15 @@ class ServerDaemonNodeBackend:
         session_id: str,
         reason: str,
         actor_employee_id: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
+        """Cancel the session's active daemon run.
+
+        Returns None when the node had nothing to cancel and the thread is not
+        already terminal — the run finished between discovery and cancellation,
+        or its run request is parked in a non-running state such as finalizing,
+        which never appears in list_active_runs. That is not an error: the
+        caller still owns the thread and cancels it directly.
+        """
         sandbox = self.registry.get(sandbox_id)
         if not sandbox:
             raise KeyError(f"Sandbox {sandbox_id} has no registered daemon node.")
@@ -461,12 +469,24 @@ class ServerDaemonNodeBackend:
             session = self.registry.store.get_session(session_id)
             if session.get("status") in ("completed", "failed", "cancelled"):
                 return session
-            raise KeyError(f"Session {session_id} has no active daemon node run.")
+            return None
         return self.registry.store.get_session(session_id)
 
 
+# Fixed namespace for deriving idempotent run-request ids. Changing it would
+# make in-flight keys resolve to a different request and dispatch twice.
+_IDEMPOTENT_RUN_REQUEST_NAMESPACE = UUID("6f5c9d2e-1a47-4b8e-9c30-5d7ab1e84f62")
+
+
 def _idempotent_run_request_id(idempotency_key: str) -> str:
-    return f"drun_idem_{sha256(idempotency_key.encode()).hexdigest()}"
+    """Derive the run request's primary key from a caller's idempotency key.
+
+    ``daemon_run_requests.id`` is a native uuid column, so this must be a real
+    uuid: a prefixed digest makes Postgres reject every lookup and insert with
+    InvalidTextRepresentation, failing the dispatch outright. uuid5 keeps the
+    property that matters — the same key always resolves to the same request.
+    """
+    return str(uuid5(_IDEMPOTENT_RUN_REQUEST_NAMESPACE, idempotency_key))
 
 
 def assert_session_owned_by_employee(

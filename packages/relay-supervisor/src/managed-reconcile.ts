@@ -3,6 +3,7 @@ import type {
   ManagedNodeProvider,
   ManagedNodeRecord,
   ProviderInstance,
+  ProvisioningAttemptRecord,
   SupervisorLogger,
 } from "./types.js";
 
@@ -12,6 +13,9 @@ export interface ManagedNodeReconcilerOptions {
   backendUrl: string;
   workspacePathForNode: (node: ManagedNodeRecord) => string;
   recoveryGraceMs?: number;
+  retryBaseMs?: number;
+  retryMaxMs?: number;
+  now?: () => number;
   logger?: SupervisorLogger;
 }
 
@@ -31,12 +35,47 @@ export function workspaceIdForManagedNode(node: ManagedNodeRecord): string {
   return `managed-node:${node.id}`;
 }
 
+const DEFAULT_RETRY_BASE_MS = 10_000;
+const DEFAULT_RETRY_MAX_MS = 3_600_000;
+
+/** Capped exponential backoff, so a permanently failing node stops hot-looping. */
+export function provisioningRetryDelayMs(
+  attemptNumber: number,
+  baseMs = DEFAULT_RETRY_BASE_MS,
+  maxMs = DEFAULT_RETRY_MAX_MS,
+): number {
+  const exponent = Math.min(Math.max(attemptNumber, 1) - 1, 20);
+  return Math.min(baseMs * 2 ** exponent, maxMs);
+}
+
+/**
+ * The latest retry deadline recorded for the node's current generation.
+ * Changing provider config bumps the generation, which resets the backoff so an
+ * admin fixing a misconfiguration is not left waiting out the previous delay.
+ */
+export function provisioningRetryAt(
+  attempts: ProvisioningAttemptRecord[],
+  generation: number,
+): number | undefined {
+  let latest: number | undefined;
+  for (const attempt of attempts) {
+    if (attempt.generation !== generation || !attempt.retryAt) continue;
+    const deadline = Date.parse(attempt.retryAt);
+    if (Number.isNaN(deadline)) continue;
+    if (latest === undefined || deadline > latest) latest = deadline;
+  }
+  return latest;
+}
+
 export class ManagedNodeReconciler {
   private readonly backend: ManagedNodeBackend;
   private readonly providers: Map<string, ManagedNodeProvider>;
   private readonly backendUrl: string;
   private readonly workspacePathForNode: (node: ManagedNodeRecord) => string;
   private readonly recoveryGraceMs: number;
+  private readonly retryBaseMs: number;
+  private readonly retryMaxMs: number;
+  private readonly now: () => number;
   private readonly logger?: SupervisorLogger;
   private readonly instances = new Map<string, { provider: ManagedNodeProvider; instance: ProviderInstance }>();
 
@@ -46,6 +85,9 @@ export class ManagedNodeReconciler {
     this.backendUrl = options.backendUrl;
     this.workspacePathForNode = options.workspacePathForNode;
     this.recoveryGraceMs = options.recoveryGraceMs ?? 60_000;
+    this.retryBaseMs = options.retryBaseMs ?? DEFAULT_RETRY_BASE_MS;
+    this.retryMaxMs = options.retryMaxMs ?? DEFAULT_RETRY_MAX_MS;
+    this.now = options.now ?? Date.now;
     this.logger = options.logger;
   }
 
@@ -157,8 +199,8 @@ export class ManagedNodeReconciler {
         }
         this.instances.delete(node.id);
       }
+      const attempts = await this.backend.listProvisioningAttempts(node.id);
       if (node.activeAttemptId) {
-        const attempts = await this.backend.listProvisioningAttempts(node.id);
         const active = attempts.find((attempt) => attempt.id === node.activeAttemptId);
         if (active?.providerInstanceId && await provider.inspect(active.providerInstanceId) === "running") {
           skipped += 1;
@@ -171,6 +213,16 @@ export class ManagedNodeReconciler {
             errorMessage: "The controller could not recover the provider instance; a new attempt will be created.",
           });
         }
+      }
+      const retryAt = provisioningRetryAt(attempts, node.generation);
+      if (retryAt !== undefined && retryAt > this.now()) {
+        this.logger?.warn("managed node provisioning is backing off", {
+          nodeId: node.id,
+          provider: node.provider,
+          retryInMs: retryAt - this.now(),
+        });
+        skipped += 1;
+        continue;
       }
       let created: Awaited<ReturnType<ManagedNodeBackend["createProvisioningAttempt"]>> | undefined;
       try {
@@ -192,16 +244,23 @@ export class ManagedNodeReconciler {
         started += 1;
       } catch (error) {
         failed += 1;
+        const retryDelayMs = provisioningRetryDelayMs(
+          created?.attempt.attemptNumber ?? 1,
+          this.retryBaseMs,
+          this.retryMaxMs,
+        );
         if (created) {
           await this.backend.updateProvisioningAttempt(node.id, created.attempt.id, {
             status: "failed",
             errorCode: "provider_ensure_failed",
             errorMessage: error instanceof Error ? error.message : String(error),
+            retryAt: new Date(this.now() + retryDelayMs).toISOString(),
           }).catch(() => undefined);
         }
         this.logger?.error("managed node reconcile failed", {
           nodeId: node.id,
           provider: node.provider,
+          retryDelayMs,
           error: error instanceof Error ? error.message : String(error),
         });
       }

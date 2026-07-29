@@ -253,3 +253,55 @@ def test_successful_enrollment_links_observed_daemon(tmp_path: Path) -> None:
     assert updated["activeDaemonNodeId"] == "sbx_alice"
     assert updated["phase"] == "registering"
     assert store.mark_ready("sbx_alice")["phase"] == "ready"
+
+
+def test_repeated_failed_attempts_do_not_grow_history_without_bound(
+    tmp_path: Path,
+) -> None:
+    store = LocalManagedNodeStore(tmp_path)
+    node = store.create_node({"employeeId": "alice"})
+
+    for _ in range(managed_nodes_module.ATTEMPT_HISTORY_LIMIT + 10):
+        attempt, _credential = store.create_attempt(node["id"])
+        store.update_attempt(attempt["id"], {"status": "failed"})
+
+    retained = store.list_attempts(node["id"])
+    assert len(retained) <= managed_nodes_module.ATTEMPT_HISTORY_LIMIT + 1
+    assert len(list(store.grants_dir.glob("*.json"))) <= len(retained)
+
+
+def test_expired_grants_are_swept_when_new_attempts_are_created(tmp_path: Path) -> None:
+    store = LocalManagedNodeStore(tmp_path)
+    node = store.create_node({"employeeId": "alice"})
+    expired, credential = store.create_attempt(node["id"], grant_ttl_seconds=-1)
+    store.update_attempt(expired["id"], {"status": "failed"})
+
+    store.create_attempt(node["id"])
+
+    assert len(list(store.grants_dir.glob("*.json"))) == 1
+    with pytest.raises(PermissionError, match="Invalid enrollment credential"):
+        store.consume_enrollment_grant(credential)
+
+
+def test_consumed_grant_still_reports_why_it_was_refused(tmp_path: Path) -> None:
+    store = LocalManagedNodeStore(tmp_path)
+    node = store.create_node({"employeeId": "alice"})
+    attempt, credential = store.create_attempt(node["id"])
+    store.consume_enrollment_grant(credential)
+    store.update_attempt(attempt["id"], {"status": "cancelled"})
+
+    store.create_attempt(node["id"])
+
+    with pytest.raises(PermissionError, match="already been consumed"):
+        store.consume_enrollment_grant(credential)
+
+
+def test_blank_provider_is_rejected(tmp_path: Path) -> None:
+    store = LocalManagedNodeStore(tmp_path)
+
+    with pytest.raises(ValueError, match="provider must be a non-empty string"):
+        store.create_node({"employeeId": "alice", "provider": "   "})
+
+    node = store.create_node({"employeeId": "alice"})
+    with pytest.raises(ValueError, match="provider must be a non-empty string"):
+        store.update_node(node["id"], {"provider": 7})

@@ -1151,3 +1151,42 @@ def test_task_delete_hides_task_from_list_and_get(monkeypatch) -> None:
             "/api/v1/tasks/11111111-1111-4111-8111-111111111111"
         )
         assert missing.status_code == 404
+
+
+def test_blocked_dispatch_reports_the_recorded_failure_not_progress(
+    monkeypatch,
+) -> None:
+    """A held claim after a failed dispatch must not read as work in progress.
+
+    An unclassified failure keeps its claim on purpose, so the retry used to be
+    told "dispatch in progress" for a dispatch that had already failed and
+    created no thread — sending the operator looking for a thread that does not
+    exist. The recorded outcome is what they need instead.
+    """
+    from relay.api.task_routes import _unclaimable_dispatch
+
+    failed = {
+        "status": "assigned",
+        "isRoutine": False,
+        "dispatchOutcome": {
+            "state": "queued",
+            "code": "agent_offline",
+            "message": "Agent Black Panther has no eligible runtime placement.",
+        },
+    }
+    blocked = _unclaimable_dispatch(failed, "claude")
+    assert blocked["code"] == "agent_offline"
+    assert "no thread was created" in blocked["message"]
+    assert "Black Panther" in blocked["message"]
+
+    running = {"status": "assigned", "isRoutine": False}
+    assert _unclaimable_dispatch(running, "claude")["code"] == "dispatch_in_progress"
+
+    routine = {"status": "assigned", "isRoutine": True}
+    assert _unclaimable_dispatch(routine, "claude")["code"] == "routine_not_dispatchable"
+
+    mismatched = {"status": "assigned", "isRoutine": False, "assignedAgent": "codex"}
+    assert _unclaimable_dispatch(mismatched, "claude")["code"] == "agent_mismatch"
+
+    backlog = {"status": "backlog", "isRoutine": False}
+    assert _unclaimable_dispatch(backlog, "claude")["code"] == "task_not_assigned"

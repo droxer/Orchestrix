@@ -117,6 +117,7 @@ def test_managed_node_provisioning_enrolls_runtime_with_single_use_grant(
         client = TestClient(app)
         _bootstrap_admin(client)
         _login_admin(client)
+        _create_user(client, "alice", employee_id="alice")
 
         rejected_local = client.post(
             "/api/v1/admin/managed-nodes",
@@ -248,6 +249,7 @@ def test_admin_can_recover_deleted_managed_node(monkeypatch) -> None:
         client = TestClient(app)
         _bootstrap_admin(client)
         _login_admin(client)
+        _create_user(client, "alice", employee_id="alice")
 
         created = client.post(
             "/api/v1/admin/managed-nodes",
@@ -280,6 +282,78 @@ def test_admin_can_recover_deleted_managed_node(monkeypatch) -> None:
         assert missing.status_code == 404
 
 
+def test_recovered_managed_node_can_register_replacement_agents(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _login_admin(client)
+
+        managed = app.state.managed_node_store.create_node({"employeeId": "alice"})
+        attempt, _credential = app.state.managed_node_store.create_attempt(
+            managed["id"]
+        )
+        runtime, token = app.state.registry.enroll_managed_node(
+            managed, attempt, {"workspacePath": "/workspace"}
+        )
+        app.state.managed_node_store.complete_enrollment(
+            managed["id"], attempt["id"], runtime["id"]
+        )
+        registered = client.post(
+            "/api/v1/daemon-node-registrations",
+            json={
+                "sandboxId": runtime["id"],
+                "token": token,
+                "protocolVersion": 1,
+                "supportedAgents": ["claude"],
+                "status": "ready",
+            },
+        )
+        assert registered.status_code == 200, registered.text
+
+        deleted = client.delete(f"/api/v1/admin/managed-nodes/{managed['id']}")
+        assert deleted.status_code == 202, deleted.text
+        app.state.managed_node_store.update_node(managed["id"], {"phase": "deleted"})
+        recovered = client.post(f"/api/v1/admin/managed-nodes/{managed['id']}/recover")
+        assert recovered.status_code == 202, recovered.text
+
+        replacement_attempt, _credential = (
+            app.state.managed_node_store.create_attempt(managed["id"])
+        )
+        replacement, replacement_token = app.state.registry.enroll_managed_node(
+            app.state.managed_node_store.get_node(managed["id"]),
+            replacement_attempt,
+            {"workspacePath": "/workspace"},
+        )
+        app.state.managed_node_store.complete_enrollment(
+            managed["id"], replacement_attempt["id"], replacement["id"]
+        )
+
+        re_registered = client.post(
+            "/api/v1/daemon-node-registrations",
+            json={
+                "sandboxId": replacement["id"],
+                "token": replacement_token,
+                "protocolVersion": 1,
+                "supportedAgents": ["claude"],
+                "status": "ready",
+            },
+        )
+
+        assert re_registered.status_code == 200, re_registered.text
+        live_claude = [
+            agent
+            for agent in app.state.agent_store.list_agents(
+                supervisor_employee_id="alice"
+            )
+            if agent["executorKind"] == "claude"
+        ]
+        assert [agent["compatibilityKey"] for agent in live_claude] == [
+            f"alice:{managed['id']}:claude"
+        ]
+
+
 def test_recovered_managed_node_conflicts_with_replacement_policy_slot(
     monkeypatch,
 ) -> None:
@@ -289,6 +363,7 @@ def test_recovered_managed_node_conflicts_with_replacement_policy_slot(
         client = TestClient(app)
         _bootstrap_admin(client)
         _login_admin(client)
+        _create_user(client, "alice", employee_id="alice")
 
         created = client.post(
             "/api/v1/admin/managed-nodes",
@@ -318,6 +393,7 @@ def test_admin_can_permanently_delete_terminal_managed_node_record(
         client = TestClient(app)
         _bootstrap_admin(client)
         _login_admin(client)
+        _create_user(client, "alice", employee_id="alice")
 
         created = client.post(
             "/api/v1/admin/managed-nodes",
@@ -662,6 +738,7 @@ def test_failed_managed_node_is_visible_as_failed(monkeypatch) -> None:
         client = TestClient(create_app(root))
         _bootstrap_admin(client)
         _login_admin(client)
+        _create_user(client, "alice", employee_id="alice")
         managed = client.post(
             "/api/v1/admin/managed-nodes",
             json={"employeeId": "alice", "sandboxMode": "boxlite"},
@@ -3033,3 +3110,98 @@ def test_run_completed_generated_files_flow_over_http(monkeypatch) -> None:
         assert download.status_code == 200
         assert download.content == b"pdf bytes"
         assert download.headers["content-type"].startswith("application/pdf")
+
+
+def test_managed_node_requires_an_existing_employee(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _login_admin(client)
+
+        missing = client.post(
+            "/api/v1/admin/managed-nodes",
+            json={"employeeId": "ghost", "sandboxMode": "boxlite"},
+        )
+        assert missing.status_code == 404
+        assert app.state.managed_node_store.list_nodes() == []
+
+        _create_user(client, "alice", employee_id="alice")
+        created = client.post(
+            "/api/v1/admin/managed-nodes",
+            json={"employeeId": "alice", "sandboxMode": "boxlite"},
+        )
+        assert created.status_code == 202
+
+        reassigned = client.patch(
+            f"/api/v1/admin/managed-nodes/{created.json()['node']['id']}",
+            json={"employeeId": "ghost"},
+        )
+        assert reassigned.status_code == 404
+
+
+def test_cancel_recovers_a_session_whose_run_request_is_stuck_finalizing(
+    monkeypatch,
+) -> None:
+    """Stop must not dead-end on a run request parked outside `running`.
+
+    ACTIVE_RUN_REQUEST_STATUSES counts `finalizing` as active, so the route
+    resolves a node for it, but `list_active_runs` only reports `running` runs
+    so the registry finds nothing to cancel. That combination used to raise and
+    surface as a 500, leaving the thread permanently stuck at `running` with no
+    way to stop it from the UI.
+    """
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _login_admin(client)
+        registration = client.post(
+            "/api/v1/daemon-node-registrations",
+            json={
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            },
+            headers={"Authorization": "Bearer ui_token"},
+        )
+        assert registration.status_code == 200
+
+        run = client.post(
+            "/api/v1/sandboxes/sbx_alice/runs",
+            json={
+                "taskGoal": "stop a thread wedged in finalizing",
+                "assignments": [{"agent": "codex", "mode": "action"}],
+            },
+            headers={"Authorization": "Bearer ui_token"},
+        )
+        assert run.status_code == 202
+        session_id = run.json()["id"]
+        client.get(
+            "/api/v1/daemon-nodes/sbx_alice/commands"
+            "?leaseMode=explicit&leaseSeconds=10",
+            headers={"Authorization": "Bearer node_token"},
+        )
+
+        # The request stays active-looking while no run is cancellable.
+        store = app.state.registry.daemon_store
+        request = store.active_run_request_for_session_any_node(session_id)
+        assert request is not None
+        store.update_run_request(request["id"], {"status": "finalizing"})
+        monkeypatch.setattr(store, "list_active_runs", lambda node_id=None: [])
+        monkeypatch.setattr(app.state.registry, "active_commands", {})
+
+        cancel = client.post(
+            f"/api/v1/threads/{session_id}/cancellations",
+            json={"reason": "stop clicked"},
+            headers={"Authorization": "Bearer ui_token"},
+        )
+
+        assert cancel.status_code == 202
+        assert cancel.json()["status"] == "cancelled"

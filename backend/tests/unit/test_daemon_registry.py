@@ -4158,3 +4158,104 @@ def test_register_without_inventory_omits_field() -> None:
         )
         node = next(n for n in registry.control_panel_nodes() if n["id"] == "sbx_none")
         assert "agentInventory" not in node
+
+
+@pytest.mark.parametrize("store_factory", DAEMON_STORE_FACTORIES)
+def test_reregistering_a_computer_retires_the_previous_daemon_incarnation(
+    store_factory,
+) -> None:
+    """A Computer is (employeeId, workspaceId), not a daemon process id.
+
+    A daemon that restarts with a fresh sandboxId used to leave its previous row
+    behind as a live node, which is how stale duplicates -- and duplicate
+    compatibility agents -- accumulated.
+    """
+    with TemporaryDirectory() as root:
+        registry = DaemonNodeRegistry(LocalSessionStore(root), store_factory(root))
+        for sandbox_id in ("sbx_first", "sbx_second"):
+            registry.register(
+                {
+                    "sandboxId": sandbox_id,
+                    "employeeId": "alice",
+                    "token": f"token_{sandbox_id}",
+                    "workspaceId": "mch_alice",
+                    "protocolVersion": 1,
+                    "supportedAgents": ["codex"],
+                    "status": "ready",
+                },
+                f"ui_{sandbox_id}",
+            )
+
+        first = registry.get("sbx_first")
+        second = registry.get("sbx_second")
+        assert first["retiredAt"]
+        assert first["status"] == "stopped"
+        assert not second.get("retiredAt")
+        assert second["status"] == "ready"
+
+
+@pytest.mark.parametrize("store_factory", DAEMON_STORE_FACTORIES)
+def test_reregistering_a_computer_keeps_other_computers_live(store_factory) -> None:
+    with TemporaryDirectory() as root:
+        registry = DaemonNodeRegistry(LocalSessionStore(root), store_factory(root))
+        for sandbox_id, workspace_id, employee in (
+            ("sbx_laptop", "mch_laptop", "alice"),
+            ("sbx_desktop", "mch_desktop", "alice"),
+            ("sbx_bob", "mch_laptop", "bob"),
+        ):
+            registry.register(
+                {
+                    "sandboxId": sandbox_id,
+                    "employeeId": employee,
+                    "token": f"token_{sandbox_id}",
+                    "workspaceId": workspace_id,
+                    "protocolVersion": 1,
+                    "supportedAgents": ["codex"],
+                    "status": "ready",
+                },
+                f"ui_{sandbox_id}",
+            )
+
+        # Different workspace, and same workspace under a different employee,
+        # are different Computers.
+        assert not registry.get("sbx_laptop").get("retiredAt")
+        assert not registry.get("sbx_desktop").get("retiredAt")
+        assert not registry.get("sbx_bob").get("retiredAt")
+
+
+@pytest.mark.parametrize("store_factory", DAEMON_STORE_FACTORIES)
+def test_reregistering_the_same_daemon_does_not_retire_itself(store_factory) -> None:
+    with TemporaryDirectory() as root:
+        registry = DaemonNodeRegistry(LocalSessionStore(root), store_factory(root))
+        payload = {
+            "sandboxId": "sbx_alice",
+            "employeeId": "alice",
+            "token": "node_token",
+            "workspaceId": "mch_alice",
+            "protocolVersion": 1,
+            "supportedAgents": ["codex"],
+            "status": "ready",
+        }
+        registry.register(dict(payload), "ui_token")
+        registry.register(dict(payload), "ui_token")
+
+        node = registry.get("sbx_alice")
+        assert not node.get("retiredAt")
+        assert node["status"] == "ready"
+
+
+def test_idempotent_run_request_id_is_a_uuid() -> None:
+    """``daemon_run_requests.id`` is a native uuid column, so this must be one.
+
+    A non-uuid id is rejected with InvalidTextRepresentation on every lookup
+    and insert, so the dispatch fails and no thread is ever created. Asserted
+    on the value itself: a store round-trip would only prove whatever the
+    store under test happens to accept.
+    """
+    from relay.daemon_registry.node_backend import _idempotent_run_request_id
+
+    derived = _idempotent_run_request_id("claim_ms64xmg1_j1r8cs")
+
+    assert str(UUID(derived)) == derived
+    assert derived == _idempotent_run_request_id("claim_ms64xmg1_j1r8cs")
+    assert derived != _idempotent_run_request_id("claim_other")

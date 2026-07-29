@@ -7,6 +7,7 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from relay.core.environment import load_backend_env
+from relay.persistence.schema import metadata as relay_metadata
 
 load_backend_env()
 
@@ -15,7 +16,7 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-target_metadata = None
+target_metadata = relay_metadata
 
 
 def database_url() -> str:

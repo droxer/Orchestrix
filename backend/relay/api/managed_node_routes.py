@@ -12,9 +12,23 @@ from ..services.node_agents import (
     sync_node_agents,
 )
 from .deps import AppContextDep
-from .helpers import json_body
+from .helpers import employee_record, json_body
 
 router = APIRouter()
+
+
+def _assert_employee_exists(ctx: Any, employee_id: Any) -> None:
+    """Reject a managed node bound to an employee that does not exist.
+
+    Without this the reconciler provisions capacity forever for a typo'd id,
+    and the resulting Computer can never be assigned any work.
+    """
+    if employee_id is None:
+        return
+    if not isinstance(employee_id, str) or not employee_id.strip():
+        raise HTTPException(400, "employeeId must be a non-empty string.")
+    if not employee_record(ctx.auth_store, employee_id.strip()):
+        raise HTTPException(404, "Employee not found.")
 
 
 def _admin_error(error: Exception) -> HTTPException:
@@ -34,6 +48,7 @@ async def create_managed_node(request: Request, ctx: AppContextDep) -> dict[str,
             payload["displayName"] = normalize_computer_display_name(
                 payload["displayName"]
             )
+        _assert_employee_exists(ctx, payload.get("employeeId"))
         return {"node": ctx.managed_node_store.create_node(payload)}
     except (KeyError, ValueError) as error:
         if isinstance(error, ValueError) and "displayName" in str(error):
@@ -73,6 +88,8 @@ async def update_managed_node(
                 patch["displayName"] = display_name or node_id
             except ValueError as error:
                 raise HTTPException(400, str(error)) from error
+        if "employeeId" in patch:
+            _assert_employee_exists(ctx, patch["employeeId"])
         with ctx.registry.dispatch_lock:
             if patch.get("desiredState") in ("stopped", "deleted"):
                 existing = ctx.managed_node_store.get_node(node_id)
