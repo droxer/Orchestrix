@@ -112,6 +112,31 @@ def test_database_agent_store_matches_local_contract(tmp_path: Path) -> None:
     ]
 
 
+@pytest.mark.parametrize("store_kind", ["local", "database"])
+def test_deleted_agent_releases_compatibility_identity(
+    tmp_path: Path, store_kind: str
+) -> None:
+    store = (
+        LocalAgentStore(tmp_path / "local")
+        if store_kind == "local"
+        else DatabaseAgentStore(
+            f"sqlite:///{tmp_path}/agents.db", create_schema=True
+        )
+    )
+    original = store.ensure_compatibility_agent(
+        "alice", "claude", "runtime-1", computer_id="computer-1"
+    )
+
+    deleted = store.delete_agent(original["id"])
+    replacement = store.ensure_compatibility_agent(
+        "alice", "claude", "runtime-2", computer_id="computer-1"
+    )
+
+    assert "compatibilityKey" not in deleted
+    assert replacement["id"] != original["id"]
+    assert replacement["compatibilityKey"] == "alice:computer-1:claude"
+
+
 def test_database_agent_store_normalizes_legacy_owner_snapshot(tmp_path: Path) -> None:
     database_url = f"sqlite:///{tmp_path}/legacy-agents.db"
     store = DatabaseAgentStore(database_url, create_schema=True)

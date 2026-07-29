@@ -50,6 +50,9 @@ class LocalAgentStore:
         self, supervisor_employee_id: str, payload: dict[str, Any]
     ) -> dict[str, Any]:
         agent = _new_agent(supervisor_employee_id, payload)
+        return self._create_agent(agent)
+
+    def _create_agent(self, agent: dict[str, Any]) -> dict[str, Any]:
         with self._lock:
             self._ensure_unique_name(
                 agent["supervisorEmployeeId"], agent["displayName"]
@@ -96,14 +99,14 @@ class LocalAgentStore:
                 return _migrate_compatibility_display_name(
                     self, migrated, supervisor_employee_id, executor_kind
                 )
-            agent = self.create_agent(
+            agent = _new_agent(
                 supervisor_employee_id,
                 {
                     "displayName": _compatibility_display_name(owned, executor_kind),
                     "executorKind": executor_kind,
                 },
             )
-            return self.update_agent(agent["id"], {"compatibilityKey": key})
+            return self._create_agent({**agent, "compatibilityKey": key})
 
     def get_agent(self, agent_id: str) -> dict[str, Any] | None:
         snapshot = self._snapshot_path(agent_id)
@@ -244,6 +247,7 @@ class LocalAgentStore:
                 "deletedAt": now_iso(),
                 "updatedAt": now_iso(),
             }
+            updated.pop("compatibilityKey", None)
             self._append(agent_id, "agent.deleted", {"agent": updated})
             return updated
 
@@ -343,6 +347,9 @@ class DatabaseAgentStore:
         self, supervisor_employee_id: str, payload: dict[str, Any]
     ) -> dict[str, Any]:
         agent = _new_agent(supervisor_employee_id, payload)
+        return self._create_agent(agent)
+
+    def _create_agent(self, agent: dict[str, Any]) -> dict[str, Any]:
         self._ensure_unique_name(agent["supervisorEmployeeId"], agent["displayName"])
         event = _agent_event(agent["id"], "agent.created", {"agent": agent})
         try:
@@ -397,14 +404,14 @@ class DatabaseAgentStore:
             return _migrate_compatibility_display_name(
                 self, migrated, supervisor_employee_id, executor_kind
             )
-        agent = self.create_agent(
+        agent = _new_agent(
             supervisor_employee_id,
             {
                 "displayName": _compatibility_display_name(owned, executor_kind),
                 "executorKind": executor_kind,
             },
         )
-        return self.update_agent(agent["id"], {"compatibilityKey": key})
+        return self._create_agent({**agent, "compatibilityKey": key})
 
     def get_agent(self, agent_id: str) -> dict[str, Any] | None:
         with self.engine.begin() as conn:
@@ -545,6 +552,7 @@ class DatabaseAgentStore:
             "deletedAt": timestamp,
             "updatedAt": timestamp,
         }
+        updated.pop("compatibilityKey", None)
         return self._append(agent_id, "agent.deleted", updated, {"agent": updated})
 
     def events(self, agent_id: str) -> list[dict[str, Any]]:
