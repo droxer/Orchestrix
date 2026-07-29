@@ -10,9 +10,12 @@ import { RelayEmptyState } from "@/components/RelayEmptyState";
 import type { ControlPanelDaemonNodeRecord } from "../../types";
 import {
   buildEmployeeSummaries,
-  type EmployeeNodeSummary,
+  employeeEmptyStateTranslationKey,
+  employeeSummaryStatus,
+  matchesEmployeeQuickFilter,
+  type EmployeeQuickFilter,
 } from "./helpers";
-import { EmployeeCard, summaryTone } from "./EmployeeCard";
+import { EmployeeCard } from "./EmployeeCard";
 import { EmployeeComputers } from "./EmployeeComputers";
 import { AdminLayoutToggle, type AdminLayout } from "./AdminLayoutToggle";
 
@@ -26,9 +29,7 @@ interface EmployeesViewProps {
   highlightedEmployeeId: string | null;
 }
 
-type EmployeeFilter = "all" | "running" | "ready" | "idle" | "failed" | "unassigned";
-
-const FILTERS: EmployeeFilter[] = ["all", "running", "ready", "idle", "failed", "unassigned"];
+const FILTERS: EmployeeQuickFilter[] = ["all", "running", "ready", "idle", "failed", "unassigned"];
 
 // Employee activity slices mirror the Nodes status chips (and the card status
 // pill). running/ready/failed overlap by design — an employee can own one
@@ -36,18 +37,7 @@ const FILTERS: EmployeeFilter[] = ["all", "running", "ready", "idle", "failed", 
 // the Nodes view. "idle" is the quiet remainder: has nodes, but none are
 // running, ready, or failed (e.g. provisioning/stopped), so a broken node
 // surfaces under "failed" instead of hiding as idle.
-function matchesEmployeeFilter(member: EmployeeNodeSummary, filter: EmployeeFilter): boolean {
-  if (filter === "all") return true;
-  if (filter === "running") return member.runningCount > 0;
-  if (filter === "ready") return member.readyCount > 0;
-  if (filter === "failed") return member.failedCount > 0;
-  if (filter === "idle") {
-    return member.nodeCount > 0 && member.runningCount === 0 && member.readyCount === 0 && member.failedCount === 0;
-  }
-  return member.nodeCount === 0;
-}
-
-function filterLabel(filter: EmployeeFilter, t: TFunction): string {
+function filterLabel(filter: EmployeeQuickFilter, t: TFunction): string {
   if (filter === "all") return t("admin.v2.filter_all");
   // "unassigned" here means the employee owns no computer — distinct from the
   // Nodes view, where it means a node has no employee. Use dedicated copy.
@@ -68,7 +58,7 @@ export function EmployeesView({
   const { t } = useTranslation();
   const { confirm } = useDialogs();
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<EmployeeFilter>("all");
+  const [filter, setFilter] = useState<EmployeeQuickFilter>("all");
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -99,13 +89,13 @@ export function EmployeesView({
   const summaries = useMemo(() => buildEmployeeSummaries(employees, nodes), [employees, nodes]);
 
   const counts = useMemo(() => {
-    const result: Record<EmployeeFilter, number> = { all: summaries.length, running: 0, ready: 0, idle: 0, failed: 0, unassigned: 0 };
+    const result: Record<EmployeeQuickFilter, number> = { all: summaries.length, running: 0, ready: 0, idle: 0, failed: 0, unassigned: 0 };
     for (const member of summaries) {
-      if (matchesEmployeeFilter(member, "running")) result.running += 1;
-      if (matchesEmployeeFilter(member, "ready")) result.ready += 1;
-      if (matchesEmployeeFilter(member, "idle")) result.idle += 1;
-      if (matchesEmployeeFilter(member, "failed")) result.failed += 1;
-      if (matchesEmployeeFilter(member, "unassigned")) result.unassigned += 1;
+      if (matchesEmployeeQuickFilter(member, "running")) result.running += 1;
+      if (matchesEmployeeQuickFilter(member, "ready")) result.ready += 1;
+      if (matchesEmployeeQuickFilter(member, "idle")) result.idle += 1;
+      if (matchesEmployeeQuickFilter(member, "failed")) result.failed += 1;
+      if (matchesEmployeeQuickFilter(member, "unassigned")) result.unassigned += 1;
     }
     return result;
   }, [summaries]);
@@ -113,7 +103,7 @@ export function EmployeesView({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return summaries.filter((item) => {
-      if (!matchesEmployeeFilter(item, filter)) return false;
+      if (!matchesEmployeeQuickFilter(item, filter)) return false;
       if (!q) return true;
       // Computers are what the row shows, so they are what search matches —
       // both the display name and the node id, since either can be on screen.
@@ -191,7 +181,7 @@ export function EmployeesView({
       ) : null}
 
       {filtered.length === 0 ? (
-        <p className="adm-empty-body">{t("admin.v2.no_match")}</p>
+        <p className="adm-empty-body">{t(employeeEmptyStateTranslationKey(query, filter))}</p>
       ) : layout === "card" ? (
         <div className="adm-fleet-grid">
           {filtered.map((member) => (
@@ -216,7 +206,7 @@ export function EmployeesView({
           <ul className="adm-emp-list" role="rowgroup">
             {filtered.map((member) => {
               const highlight = highlightedEmployeeId === member.id;
-              const { tone, key } = summaryTone(member);
+              const { tone, key } = employeeSummaryStatus(member);
               return (
                 <li
                   key={member.id}

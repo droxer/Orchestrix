@@ -8,15 +8,16 @@ import { Button } from "@/components/ui/button";
 import type { ControlPanelDaemonNodeRecord } from "../../types";
 import { AdminNode, ActionSearch, ICON_STROKE_LARGE } from "../icons";
 import { canUseLocalControlPanel } from "../../lib/controlPanel";
-import { stableNodeOrder } from "../../lib/adminHelpers";
+import {
+  matchesNodeQuickFilter,
+  stableNodeOrder,
+  type NodeQuickFilter,
+} from "../../lib/adminHelpers";
 import type { StoredNodeTokenMap } from "./helpers";
-import { visualStatus } from "./helpers";
 import { NodeCard } from "./NodeCard";
 import { NodeRow } from "./NodeRow";
 import { NodeProfileBadges } from "./NodeProfileBadges";
 import { AdminLayoutToggle, type AdminLayout } from "./AdminLayoutToggle";
-
-type NodeFilter = "all" | "ready" | "running" | "provisioning" | "failed" | "stopped" | "unassigned";
 
 interface NodesViewProps {
   nodes: ControlPanelDaemonNodeRecord[];
@@ -30,21 +31,9 @@ interface NodesViewProps {
   onAddNode?: () => void;
 }
 
-const FILTERS: NodeFilter[] = ["all", "ready", "running", "provisioning", "failed", "stopped", "unassigned"];
+const FILTERS: NodeQuickFilter[] = ["all", "ready", "running", "provisioning", "failed", "stopped", "unassigned"];
 
-function matchesFilter(node: ControlPanelDaemonNodeRecord, filter: NodeFilter): boolean {
-  if (filter === "all") return true;
-  if (filter === "unassigned") return !node.employeeId;
-  const status = visualStatus(node);
-  if (filter === "failed") return status === "failed" || status === "stale";
-  if (filter === "ready") return status === "ready";
-  if (filter === "running") return status === "running";
-  if (filter === "provisioning") return status === "provisioning";
-  if (filter === "stopped") return status === "stopped";
-  return false;
-}
-
-function filterLabel(filter: NodeFilter, t: TFunction): string {
+function filterLabel(filter: NodeQuickFilter, t: TFunction): string {
   if (filter === "all") return t("admin.v2.filter_all");
   if (filter === "unassigned") return t("admin.unassigned");
   if (filter === "failed") return t("admin.v2.filter_failed");
@@ -53,12 +42,12 @@ function filterLabel(filter: NodeFilter, t: TFunction): string {
 
 export function NodesView({ nodes, storedTokens, layout, onLayoutChange, onRevealCredentials, onRenameNode, onManageExecutors, onDeleteNode, onAddNode }: NodesViewProps) {
   const { t } = useTranslation();
-  const [filter, setFilter] = useState<NodeFilter>("all");
+  const [filter, setFilter] = useState<NodeQuickFilter>("all");
   const [query, setQuery] = useState("");
   const colocated = canUseLocalControlPanel();
 
   const counts = useMemo(() => {
-    const result: Record<NodeFilter, number> = {
+    const result: Record<NodeQuickFilter, number> = {
       all: nodes.length,
       ready: 0,
       running: 0,
@@ -68,11 +57,11 @@ export function NodesView({ nodes, storedTokens, layout, onLayoutChange, onRevea
       unassigned: 0,
     };
     for (const node of nodes) {
-      if (matchesFilter(node, "ready")) result.ready += 1;
-      if (matchesFilter(node, "running")) result.running += 1;
-      if (matchesFilter(node, "provisioning")) result.provisioning += 1;
-      if (matchesFilter(node, "failed")) result.failed += 1;
-      if (matchesFilter(node, "stopped")) result.stopped += 1;
+      if (matchesNodeQuickFilter(node, "ready")) result.ready += 1;
+      if (matchesNodeQuickFilter(node, "running")) result.running += 1;
+      if (matchesNodeQuickFilter(node, "provisioning")) result.provisioning += 1;
+      if (matchesNodeQuickFilter(node, "failed")) result.failed += 1;
+      if (matchesNodeQuickFilter(node, "stopped")) result.stopped += 1;
       if (!node.employeeId) result.unassigned += 1;
     }
     return result;
@@ -81,7 +70,7 @@ export function NodesView({ nodes, storedTokens, layout, onLayoutChange, onRevea
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return stableNodeOrder(nodes).filter((node) => {
-      if (!matchesFilter(node, filter)) return false;
+      if (!matchesNodeQuickFilter(node, filter)) return false;
       if (!q) return true;
       const haystack = [
         node.id,

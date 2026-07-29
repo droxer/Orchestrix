@@ -4,8 +4,12 @@ import { describe, it } from "node:test";
 import {
   agentsForEmployee,
   buildEmployeeSummaries,
+  employeeEmptyStateTranslationKey,
+  employeeSummaryStatus,
   initialsOf,
   isStale,
+  matchesEmployeeQuickFilter,
+  matchesNodeQuickFilter,
   stableNodeOrder,
   statusTone,
   truncateId,
@@ -134,6 +138,8 @@ describe("buildEmployeeSummaries", () => {
     assert.equal(alice.failedCount, 2);
     assert.equal(alice.readyCount, 0);
     assert.equal(alice.runningCount, 0);
+    assert.equal(matchesEmployeeQuickFilter(alice, "failed"), true);
+    assert.deepEqual(employeeSummaryStatus(alice), { tone: "bad", key: "failed" });
   });
 
   it("includes employees that have no nodes", () => {
@@ -148,6 +154,48 @@ describe("buildEmployeeSummaries", () => {
     assert.ok(phantom, "phantom missing");
     assert.equal(phantom.displayName, "phantom");
     assert.equal(phantom.nodeCount, 1);
+  });
+});
+
+describe("admin quick filters", () => {
+  it("keeps a stale stopped record in the failed slice", () => {
+    const staleStopped = node({ id: "stale-stopped", status: "stopped", online: false, stale: true });
+
+    assert.equal(visualStatus(staleStopped), "stale");
+    assert.equal(matchesNodeQuickFilter(staleStopped, "stopped"), false);
+    assert.equal(matchesNodeQuickFilter(staleStopped, "failed"), true);
+
+    const [employeeSummary] = buildEmployeeSummaries(
+      [employee({ id: "alice" })],
+      [{ ...staleStopped, employeeId: "alice" }],
+    );
+    assert.equal(employeeSummary.failedCount, 1);
+    assert.equal(matchesEmployeeQuickFilter(employeeSummary, "failed"), true);
+  });
+
+  it("keeps an authoritative non-stale stopped placeholder in the stopped slice", () => {
+    const stoppedPlaceholder = node({
+      id: "stopped-placeholder",
+      status: "stopped",
+      online: false,
+      stale: false,
+      provisioningPlaceholder: true,
+    });
+
+    assert.equal(visualStatus(stoppedPlaceholder), "stopped");
+    assert.equal(matchesNodeQuickFilter(stoppedPlaceholder, "stopped"), true);
+    assert.equal(matchesNodeQuickFilter(stoppedPlaceholder, "failed"), false);
+  });
+
+  it("uses filter-oriented employee empty copy when there is no search query", () => {
+    assert.equal(
+      employeeEmptyStateTranslationKey("", "failed"),
+      "admin.v2.no_employees_for_filter",
+    );
+    assert.equal(
+      employeeEmptyStateTranslationKey("alice", "failed"),
+      "admin.v2.no_match",
+    );
   });
 });
 
