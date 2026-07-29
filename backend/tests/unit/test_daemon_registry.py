@@ -2994,6 +2994,35 @@ def test_registry_restart_keeps_agents_ready_when_live_daemon_resumes_polling(
 
 
 @pytest.mark.parametrize("store_factory", DAEMON_STORE_FACTORIES)
+def test_registry_restart_does_not_revive_retired_daemon_on_poll(
+    store_factory,
+) -> None:
+    with TemporaryDirectory() as root:
+        registry = DaemonNodeRegistry(LocalSessionStore(root), store_factory(root))
+        registry.register(
+            {
+                "sandboxId": "sbx_retired",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            },
+            "ui_token",
+        )
+        registry.fence_managed_node("sbx_retired")
+
+        restarted = DaemonNodeRegistry(LocalSessionStore(root), store_factory(root))
+        restarted.renew_active_command_leases("sbx_retired", "node_token", [])
+        node = restarted.monitor_nodes()[0]
+
+        assert node["status"] == "stopped"
+        assert node["online"] is False
+        assert node["agents"]["codex"] == "unknown"
+
+
+@pytest.mark.parametrize("store_factory", DAEMON_STORE_FACTORIES)
 def test_registry_persists_computer_display_name(store_factory) -> None:
     with TemporaryDirectory() as root:
         registry = DaemonNodeRegistry(LocalSessionStore(root), store_factory(root))
