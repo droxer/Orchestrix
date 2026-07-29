@@ -16,6 +16,7 @@ import {
   nodeLocalityKinds,
   resolveNodeCredentials,
   upsertStoredCredentialsFromNodes,
+  visualStatus,
 } from "../src/lib/adminHelpers.js";
 import type {
   ControlPanelDaemonNodeRecord,
@@ -437,6 +438,27 @@ describe("Relay web thread status", () => {
 });
 
 describe("Relay web admin node helpers", () => {
+  it("keeps a provisioning placeholder's stored status so quick filters match the lifecycle", () => {
+    const placeholder = controlPanelNode({
+      id: "mnode_alice",
+      employeeId: "alice",
+      status: "provisioning",
+      online: false,
+      stale: false,
+      provisioningPlaceholder: true,
+    });
+    assert.equal(visualStatus(placeholder), "provisioning");
+
+    const stopped = controlPanelNode({
+      id: "mnode_bob",
+      employeeId: "bob",
+      status: "stopped",
+      online: false,
+      stale: false,
+      provisioningPlaceholder: true,
+    });
+    assert.equal(visualStatus(stopped), "stopped");
+  });
   it("builds a daemon start command from cached node metadata", () => {
     const command = buildDaemonStartCommand({
       id: "sbx_alice",

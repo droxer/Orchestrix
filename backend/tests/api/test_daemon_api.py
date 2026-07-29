@@ -145,6 +145,8 @@ def test_managed_node_provisioning_enrolls_runtime_with_single_use_grant(
         assert placeholder["managedNodeId"] == managed_node["id"]
         assert placeholder["provisioningPlaceholder"] is True
         assert placeholder["status"] == "provisioning"
+        assert placeholder["online"] is False
+        assert placeholder["stale"] is False
 
         attempt_response = client.post(
             f"/api/v1/admin/managed-nodes/{managed_node['id']}/attempts"

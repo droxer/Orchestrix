@@ -50,6 +50,7 @@ import {
   selectableThreadComputers,
   threadComputerSignature,
   threadNeedsRuntimeSelection,
+  threadNodeOffline,
   threadRuntimeNodeId,
 } from "./lib/threadRuntime";
 import { useStableValue } from "./hooks/useStableValue";
@@ -360,8 +361,12 @@ export function App() {
 
   const threadItems = useMemo<ThreadItem[]>(() => {
     const runningBy = new Map(visibleNodes.flatMap((node) => node.activeRuns.map((run) => [run.sessionId, run.agent] as const)));
-    return myThreads.map((session) => ({ session, runningAgent: runningBy.get(session.id) }));
-  }, [myThreads, visibleNodes]);
+    return myThreads.map((session) => ({
+      session,
+      runningAgent: runningBy.get(session.id),
+      nodeOffline: threadNodeOffline(session, logicalAgents, runtimeNodes),
+    }));
+  }, [myThreads, visibleNodes, logicalAgents, runtimeNodes]);
   const filteredThreads = useMemo(
     () => threadItems.filter((item) => matchesThreadQuery(item.session, threadQuery)),
     [threadItems, threadQuery],

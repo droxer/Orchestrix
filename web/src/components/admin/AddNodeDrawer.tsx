@@ -241,7 +241,12 @@ export function AddNodeDrawer({
                 <SelectValue
                   placeholder={employees.length === 0 ? t("admin.no_employees") : t("admin.select_employee")}
                 >
-                  {(value: string) => {
+                  {(value: string | null) => {
+                    if (!value) {
+                      return employees.length === 0
+                        ? t("admin.no_employees")
+                        : t("admin.select_employee");
+                    }
                     const employee = employees.find((e) => e.id === value);
                     if (!employee) return `@${value}`;
                     return employee.displayName && employee.displayName !== employee.id

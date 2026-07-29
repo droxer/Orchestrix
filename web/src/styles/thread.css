@@ -173,6 +173,15 @@
   white-space: nowrap;
 }
 
+/* Badges a thread whose computer is unreachable. Sits inside the name line
+   so it survives the hover swap that hides the timestamp. */
+.conversation-offline {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  color: var(--err);
+}
+
 .conversation-row-actions {
   position: absolute;
   top: 50%;

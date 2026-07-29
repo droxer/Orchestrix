@@ -95,6 +95,7 @@
     "group_needs_you": "Needs you",
     "group_running": "Running",
     "group_idle": "Idle",
+    "node_offline": "Computer offline",
     "agent_working": "{{agent}} is working",
     "open_workspace": "Open agent workspace",
     "no_agent_yet": "No agent yet",

@@ -62,6 +62,7 @@ import {
   Terminal,
   Trash2,
   Users,
+  WifiOff,
   Zap,
   TriangleAlert,
   UserCog,
@@ -155,6 +156,7 @@ export const ActionImage = withStandardStroke(ImagePlus, "ActionImage");
 export const NodeManaged = withStandardStroke(Cloud, "NodeManaged");
 export const NodeLocal = withStandardStroke(Laptop, "NodeLocal");
 export const NodePending = withStandardStroke(CircleDashed, "NodePending");
+export const NodeOffline = withStandardStroke(WifiOff, "NodeOffline");
 
 // Agent mode (智能体): a zap glyph reads as "execute work" without reusing
 // the Bot mark reserved for preferences and artifact output types.

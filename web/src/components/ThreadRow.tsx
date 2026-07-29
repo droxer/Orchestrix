@@ -1,4 +1,4 @@
-import { ActionEdit, ActionRemove } from "./icons";
+import { ActionEdit, ActionRemove, NodeOffline } from "./icons";
 import { useTranslation } from "react-i18next";
 import type { RelaySession } from "../types";
 import { canDeleteThread, threadLabel, type ThreadItem } from "../lib/threads";
@@ -40,7 +40,8 @@ export function ThreadRow({ item, selected, onSelect, onRename, onClose }: Threa
   const { session } = item;
   const label = threadLabel(session);
   const stamp = relativeTime(session.updatedAt, i18n.language);
-  const rowLabel = [label, stamp].filter(Boolean).join(" · ");
+  const offlineLabel = item.nodeOffline ? t("thread.node_offline") : "";
+  const rowLabel = [label, offlineLabel, stamp].filter(Boolean).join(" · ");
   const deleteEnabled = canDeleteThread(item);
 
   function handleClose() {
@@ -60,6 +61,16 @@ export function ThreadRow({ item, selected, onSelect, onRename, onClose }: Threa
           <span className="conversation-topline">
             <span className="conversation-name">
               <strong>{label}</strong>
+              {item.nodeOffline ? (
+                <span
+                  className="conversation-offline"
+                  role="img"
+                  aria-label={offlineLabel}
+                  title={offlineLabel}
+                >
+                  <NodeOffline size={12} />
+                </span>
+              ) : null}
             </span>
             {stamp ? (
               <span className="conversation-stamp tnum">

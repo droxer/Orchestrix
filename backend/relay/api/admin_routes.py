@@ -69,7 +69,9 @@ def _managed_node_placeholder(node: dict[str, Any]) -> dict[str, Any]:
         "queuedCommandCount": 0,
         "activeRuns": [],
         "online": False,
-        "stale": True,
+        # Never seen a heartbeat, so staleness does not apply — the placeholder
+        # status (provisioning/stopped/failed) must survive visualStatus.
+        "stale": False,
         "provisioningPlaceholder": True,
         **({"lastError": last_error} if last_error else {}),
     }

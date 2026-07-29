@@ -7,6 +7,8 @@ export type ThreadItem = {
   session: RelaySession;
   /** Agent of an in-flight run for this thread, if any. */
   runningAgent?: AgentName;
+  /** The computer this thread is pinned to is unreachable. */
+  nodeOffline?: boolean;
 };
 
 /** Deletion is safe only after both the session snapshot and daemon report no active run. */
