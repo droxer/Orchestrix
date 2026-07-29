@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -173,128 +174,139 @@ def materialize_events(events: list[dict[str, Any]]) -> dict[str, Any]:
     for event in events:
         session["events"].append(event)
         session["updatedAt"] = event["timestamp"]
-        event_type = event.get("type")
-        if event_type == "session.status":
-            session["status"] = event["status"]
-            session["phase"] = event["phase"]
-            if event.get("pendingDecision"):
-                session["pendingDecision"] = event["pendingDecision"]
-            else:
-                session.pop("pendingDecision", None)
-            if event["status"] not in ("completed", "failed"):
-                session.pop("finalOutcome", None)
-        elif event_type == "agent.started":
-            # A staged daemon command can be recovered by another backend
-            # replica. Replaying its start must not duplicate the run or move a
-            # terminal session back to running.
-            if event.get("daemonNodeId") and not session.get("daemonNodeId"):
-                # Threads created before node pinning (or via paths that never
-                # stamped session.created) adopt the computer their first
-                # stamped run executed on.
-                session["daemonNodeId"] = event["daemonNodeId"]
-            if event.get("managedNodeId") and not session.get("managedNodeId"):
-                session["managedNodeId"] = event["managedNodeId"]
-            if not any(run["id"] == event["runId"] for run in session["agentRuns"]):
-                session["status"] = "running"
-                session["phase"] = f"{event['agent']}:{event['mode']}"
-                session["currentAgent"] = event["agent"]
-                session["agentRuns"].append(
-                    {
-                        "id": event["runId"],
-                        "agent": event["agent"],
-                        **({"role": event["role"]} if event.get("role") else {}),
-                        "mode": event["mode"],
-                        "status": "running",
-                        "startedAt": event["timestamp"],
-                        "artifactIds": [],
-                        **(
-                            {"logicalAgentId": event["logicalAgentId"]}
-                            if event.get("logicalAgentId")
-                            else {}
-                        ),
-                        **(
-                            {"placementId": event["placementId"]}
-                            if event.get("placementId")
-                            else {}
-                        ),
-                        **(
-                            {"daemonNodeId": event["daemonNodeId"]}
-                            if event.get("daemonNodeId")
-                            else {}
-                        ),
-                        **(
-                            {"agentVersion": event["agentVersion"]}
-                            if event.get("agentVersion")
-                            else {}
-                        ),
-                        **(
-                            {"workspaceIdentity": event["workspaceIdentity"]}
-                            if event.get("workspaceIdentity")
-                            else {}
-                        ),
-                    }
-                )
-        elif event_type == "agent.completed":
-            for run in session["agentRuns"]:
-                if run["id"] == event["runId"]:
-                    run["status"] = event["status"]
-                    run["completedAt"] = event["timestamp"]
-                    run["exitCode"] = event["exitCode"]
-                    if "agentLog" in event:
-                        run["agentLog"] = event["agentLog"]
-                    if event.get("tokenUsage"):
-                        run["tokenUsage"] = event["tokenUsage"]
-            token_usage = merge_token_usage(
-                [run.get("tokenUsage") for run in session["agentRuns"]]
-            )
-            if token_usage:
-                session["tokenUsage"] = token_usage
-            else:
-                session.pop("tokenUsage", None)
-            session.pop("currentAgent", None)
-            session["phase"] = (
-                "agent_completed"
-                if event["status"] == "completed"
-                else "cancelled"
-                if event["status"] == "cancelled"
-                else "agent_failed"
-            )
-        elif event_type == "artifact.created":
-            artifact = event["artifact"]
-            session["artifacts"].append(artifact)
-            if artifact.get("agentRunId"):
-                for run in session["agentRuns"]:
-                    if run["id"] == artifact["agentRunId"]:
-                        run.setdefault("artifactIds", []).append(artifact["id"])
-        elif event_type == "human.decision":
-            decision = event["decision"]
-            session["decisions"].append(decision)
-            if decision["kind"] == "handoff" and decision.get("targetAgent"):
-                session["currentAgent"] = decision["targetAgent"]
-            if decision["kind"] == "cancel":
-                session["status"] = "cancelled"
-                session["phase"] = "cancelled"
-                session.pop("pendingDecision", None)
-        elif event_type == "session.completed":
-            session["status"] = "completed"
-            session["phase"] = "completed"
-            session["finalOutcome"] = event["outcome"]
-            session.pop("currentAgent", None)
-            session.pop("pendingDecision", None)
-        elif event_type == "session.failed":
-            session["status"] = "failed"
-            session["phase"] = "failed"
-            session["finalOutcome"] = event["outcome"]
-            session.pop("currentAgent", None)
-            session.pop("pendingDecision", None)
-        elif event_type == "session.archived":
-            session["archived"] = True
-        elif event_type == "session.runtime_affinity":
-            if not session.get("managedNodeId"):
-                session["managedNodeId"] = event["managedNodeId"]
-        elif event_type == "session.renamed":
-            session["title"] = event["title"]
+        handler = SESSION_EVENT_HANDLERS.get(event.get("type"))
+        if handler:
+            handler(session, event)
     return session
+
+
+def _apply_session_status(session: dict[str, Any], event: dict[str, Any]) -> None:
+    session["status"] = event["status"]
+    session["phase"] = event["phase"]
+    if event.get("pendingDecision"):
+        session["pendingDecision"] = event["pendingDecision"]
+    else:
+        session.pop("pendingDecision", None)
+    if event["status"] not in ("completed", "failed"):
+        session.pop("finalOutcome", None)
+
+
+def _apply_agent_started(session: dict[str, Any], event: dict[str, Any]) -> None:
+    if event.get("daemonNodeId") and not session.get("daemonNodeId"):
+        session["daemonNodeId"] = event["daemonNodeId"]
+    if event.get("managedNodeId") and not session.get("managedNodeId"):
+        session["managedNodeId"] = event["managedNodeId"]
+    if any(run["id"] == event["runId"] for run in session["agentRuns"]):
+        return
+    run = {
+        "id": event["runId"],
+        "agent": event["agent"],
+        "mode": event["mode"],
+        "status": "running",
+        "startedAt": event["timestamp"],
+        "artifactIds": [],
+    }
+    for key in (
+        "role",
+        "logicalAgentId",
+        "placementId",
+        "daemonNodeId",
+        "agentVersion",
+        "workspaceIdentity",
+    ):
+        if event.get(key):
+            run[key] = event[key]
+    session["status"] = "running"
+    session["phase"] = f"{event['agent']}:{event['mode']}"
+    session["currentAgent"] = event["agent"]
+    session["agentRuns"].append(run)
+
+
+def _apply_agent_completed(session: dict[str, Any], event: dict[str, Any]) -> None:
+    for run in session["agentRuns"]:
+        if run["id"] != event["runId"]:
+            continue
+        run["status"] = event["status"]
+        run["completedAt"] = event["timestamp"]
+        run["exitCode"] = event["exitCode"]
+        if "agentLog" in event:
+            run["agentLog"] = event["agentLog"]
+        if event.get("tokenUsage"):
+            run["tokenUsage"] = event["tokenUsage"]
+    token_usage = merge_token_usage(
+        [run.get("tokenUsage") for run in session["agentRuns"]]
+    )
+    if token_usage:
+        session["tokenUsage"] = token_usage
+    else:
+        session.pop("tokenUsage", None)
+    session.pop("currentAgent", None)
+    if event["status"] == "completed":
+        session["phase"] = "agent_completed"
+    elif event["status"] == "cancelled":
+        session["phase"] = "cancelled"
+    else:
+        session["phase"] = "agent_failed"
+
+
+def _apply_artifact_created(session: dict[str, Any], event: dict[str, Any]) -> None:
+    artifact = event["artifact"]
+    session["artifacts"].append(artifact)
+    if not artifact.get("agentRunId"):
+        return
+    for run in session["agentRuns"]:
+        if run["id"] == artifact["agentRunId"]:
+            run.setdefault("artifactIds", []).append(artifact["id"])
+
+
+def _apply_human_decision(session: dict[str, Any], event: dict[str, Any]) -> None:
+    decision = event["decision"]
+    session["decisions"].append(decision)
+    if decision["kind"] == "handoff" and decision.get("targetAgent"):
+        session["currentAgent"] = decision["targetAgent"]
+    if decision["kind"] == "cancel":
+        session["status"] = "cancelled"
+        session["phase"] = "cancelled"
+        session.pop("pendingDecision", None)
+
+
+def _apply_session_terminal(session: dict[str, Any], event: dict[str, Any]) -> None:
+    status = "completed" if event["type"] == "session.completed" else "failed"
+    session["status"] = status
+    session["phase"] = status
+    session["finalOutcome"] = event["outcome"]
+    session.pop("currentAgent", None)
+    session.pop("pendingDecision", None)
+
+
+def _apply_session_archived(session: dict[str, Any], _event: dict[str, Any]) -> None:
+    session["archived"] = True
+
+
+def _apply_session_runtime_affinity(
+    session: dict[str, Any], event: dict[str, Any]
+) -> None:
+    if not session.get("managedNodeId"):
+        session["managedNodeId"] = event["managedNodeId"]
+
+
+def _apply_session_renamed(session: dict[str, Any], event: dict[str, Any]) -> None:
+    session["title"] = event["title"]
+
+
+SessionEventHandler = Callable[[dict[str, Any], dict[str, Any]], None]
+SESSION_EVENT_HANDLERS: dict[str, SessionEventHandler] = {
+    "session.status": _apply_session_status,
+    "agent.started": _apply_agent_started,
+    "agent.completed": _apply_agent_completed,
+    "artifact.created": _apply_artifact_created,
+    "human.decision": _apply_human_decision,
+    "session.completed": _apply_session_terminal,
+    "session.failed": _apply_session_terminal,
+    "session.archived": _apply_session_archived,
+    "session.runtime_affinity": _apply_session_runtime_affinity,
+    "session.renamed": _apply_session_renamed,
+}
 
 
 def materialize_task_events(events: list[dict[str, Any]]) -> dict[str, Any]:
@@ -332,64 +344,102 @@ def materialize_task_events(events: list[dict[str, Any]]) -> dict[str, Any]:
     for event in events:
         task["events"].append(event)
         task["updatedAt"] = event["timestamp"]
-        event_type = event.get("type")
-        if event_type == "task.updated":
-            for key in (
-                "title",
-                "description",
-                "priority",
-                "assigneeEmployeeId",
-                "dueDate",
-            ):
-                if key in event and event[key] is not None:
-                    if key in ("assigneeEmployeeId", "dueDate") and event[key] == "":
-                        task.pop(key, None)
-                    else:
-                        task[key] = event[key]
-            _apply_task_routine_fields(task, event)
-        elif event_type == "task.assigned":
-            if event.get("teamId"):
-                task["assignedTeamId"] = event["teamId"]
-                task.pop("assignedAgent", None)
-                task.pop("assignedAgentId", None)
-            else:
-                task["assignedAgent"] = event["agent"]
-                if event.get("agentId"):
-                    task["assignedAgentId"] = event["agentId"]
-                else:
-                    task.pop("assignedAgentId", None)
-                task.pop("assignedTeamId", None)
-        elif event_type == "task.unassigned":
-            task.pop("assignedAgent", None)
-            task.pop("assignedAgentId", None)
-            task.pop("assignedTeamId", None)
-        elif event_type == "task.dispatch_claimed":
-            task["dispatchClaim"] = event["claim"]
-        elif event_type == "task.dispatch_released":
-            if task.get("dispatchClaim", {}).get("id") == event.get("claimId"):
-                task.pop("dispatchClaim", None)
-        elif event_type == "task.dispatch_outcome":
-            task["dispatchOutcome"] = event["outcome"]
-        elif event_type == "task.occurrence_created":
-            occurrence_id = event["occurrenceId"]
-            if occurrence_id not in task["occurrenceIds"]:
-                task["occurrenceIds"].append(occurrence_id)
-        elif event_type == "task.status":
-            task["status"] = event["status"]
-        elif event_type == "task.deleted":
-            task["deletedAt"] = event["timestamp"]
-        elif event_type == "task.session_linked":
-            if event["sessionId"] not in task["linkedSessionIds"]:
-                task["linkedSessionIds"].append(event["sessionId"])
-        elif event_type == "task.session_unlinked":
-            task["linkedSessionIds"] = [
-                session_id
-                for session_id in task["linkedSessionIds"]
-                if session_id != event["sessionId"]
-            ]
-        elif event_type == "task.activity":
-            task["activity"].append(event["activity"])
+        handler = TASK_EVENT_HANDLERS.get(event.get("type"))
+        if handler:
+            handler(task, event)
     return task
+
+
+def _apply_task_updated(task: dict[str, Any], event: dict[str, Any]) -> None:
+    for key in ("title", "description", "priority", "assigneeEmployeeId", "dueDate"):
+        if key not in event or event[key] is None:
+            continue
+        if key in ("assigneeEmployeeId", "dueDate") and event[key] == "":
+            task.pop(key, None)
+        else:
+            task[key] = event[key]
+    _apply_task_routine_fields(task, event)
+
+
+def _apply_task_assigned(task: dict[str, Any], event: dict[str, Any]) -> None:
+    if event.get("teamId"):
+        task["assignedTeamId"] = event["teamId"]
+        task.pop("assignedAgent", None)
+        task.pop("assignedAgentId", None)
+        return
+    task["assignedAgent"] = event["agent"]
+    if event.get("agentId"):
+        task["assignedAgentId"] = event["agentId"]
+    else:
+        task.pop("assignedAgentId", None)
+    task.pop("assignedTeamId", None)
+
+
+def _apply_task_unassigned(task: dict[str, Any], _event: dict[str, Any]) -> None:
+    task.pop("assignedAgent", None)
+    task.pop("assignedAgentId", None)
+    task.pop("assignedTeamId", None)
+
+
+def _apply_task_dispatch_claimed(task: dict[str, Any], event: dict[str, Any]) -> None:
+    task["dispatchClaim"] = event["claim"]
+
+
+def _apply_task_dispatch_released(task: dict[str, Any], event: dict[str, Any]) -> None:
+    if task.get("dispatchClaim", {}).get("id") == event.get("claimId"):
+        task.pop("dispatchClaim", None)
+
+
+def _apply_task_dispatch_outcome(task: dict[str, Any], event: dict[str, Any]) -> None:
+    task["dispatchOutcome"] = event["outcome"]
+
+
+def _apply_task_occurrence_created(task: dict[str, Any], event: dict[str, Any]) -> None:
+    occurrence_id = event["occurrenceId"]
+    if occurrence_id not in task["occurrenceIds"]:
+        task["occurrenceIds"].append(occurrence_id)
+
+
+def _apply_task_status(task: dict[str, Any], event: dict[str, Any]) -> None:
+    task["status"] = event["status"]
+
+
+def _apply_task_deleted(task: dict[str, Any], event: dict[str, Any]) -> None:
+    task["deletedAt"] = event["timestamp"]
+
+
+def _apply_task_session_linked(task: dict[str, Any], event: dict[str, Any]) -> None:
+    if event["sessionId"] not in task["linkedSessionIds"]:
+        task["linkedSessionIds"].append(event["sessionId"])
+
+
+def _apply_task_session_unlinked(task: dict[str, Any], event: dict[str, Any]) -> None:
+    task["linkedSessionIds"] = [
+        session_id
+        for session_id in task["linkedSessionIds"]
+        if session_id != event["sessionId"]
+    ]
+
+
+def _apply_task_activity(task: dict[str, Any], event: dict[str, Any]) -> None:
+    task["activity"].append(event["activity"])
+
+
+TaskEventHandler = Callable[[dict[str, Any], dict[str, Any]], None]
+TASK_EVENT_HANDLERS: dict[str, TaskEventHandler] = {
+    "task.updated": _apply_task_updated,
+    "task.assigned": _apply_task_assigned,
+    "task.unassigned": _apply_task_unassigned,
+    "task.dispatch_claimed": _apply_task_dispatch_claimed,
+    "task.dispatch_released": _apply_task_dispatch_released,
+    "task.dispatch_outcome": _apply_task_dispatch_outcome,
+    "task.occurrence_created": _apply_task_occurrence_created,
+    "task.status": _apply_task_status,
+    "task.deleted": _apply_task_deleted,
+    "task.session_linked": _apply_task_session_linked,
+    "task.session_unlinked": _apply_task_session_unlinked,
+    "task.activity": _apply_task_activity,
+}
 
 
 def _apply_task_routine_fields(task: dict[str, Any], event: dict[str, Any]) -> None:

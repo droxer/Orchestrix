@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from threading import RLock
-from typing import Any
+from typing import Any, Callable
 
 from sqlalchemy import (
     JSON,
@@ -35,6 +35,23 @@ from .store_common import (
     database_id_column,
     entity_uuid_type,
     safe_name,
+)
+
+AGENT_PATCH_FIELDS = frozenset(
+    {
+        "displayName",
+        "profileImageUrl",
+        "defaultRole",
+        "instructions",
+        "skillPolicy",
+        "toolPolicy",
+        "modelPolicy",
+        "enabled",
+        "compatibilityKey",
+    }
+)
+PLACEMENT_RELEVANT_AGENT_FIELDS = frozenset(
+    {"instructions", "skillPolicy", "toolPolicy", "modelPolicy"}
 )
 
 
@@ -151,85 +168,13 @@ class LocalAgentStore:
         )
 
     def update_agent(self, agent_id: str, patch: dict[str, Any]) -> dict[str, Any]:
-        allowed = {
-            "displayName",
-            "profileImageUrl",
-            "defaultRole",
-            "instructions",
-            "skillPolicy",
-            "toolPolicy",
-            "modelPolicy",
-            "enabled",
-            "compatibilityKey",
-        }
-        unknown = set(patch) - allowed
-        if unknown:
-            raise ValueError(
-                f"Unsupported agent field(s): {', '.join(sorted(unknown))}."
-            )
         with self._lock:
             current = self.get_agent(agent_id)
             if not current or current.get("deletedAt"):
                 raise KeyError(agent_id)
-            normalized: dict[str, Any] = {}
-            if "displayName" in patch:
-                display_name = _required_string(patch, "displayName")
-                self._ensure_unique_name(
-                    current["supervisorEmployeeId"], display_name, exclude_id=agent_id
-                )
-                normalized["displayName"] = display_name
-            if "profileImageUrl" in patch:
-                image_url = patch["profileImageUrl"]
-                if image_url is not None and (
-                    not isinstance(image_url, str)
-                    or not image_url.startswith(f"/profile-images/agents/{agent_id}?v=")
-                ):
-                    raise ValueError("profileImageUrl is invalid.")
-                normalized["profileImageUrl"] = image_url
-            if "defaultRole" in patch:
-                role = _required_string(patch, "defaultRole")
-                if role not in AGENT_ROLES:
-                    raise ValueError(
-                        f"defaultRole must be one of: {', '.join(AGENT_ROLES)}."
-                    )
-                normalized["defaultRole"] = role
-            if "instructions" in patch:
-                normalized["instructions"] = (
-                    patch["instructions"].strip()
-                    if isinstance(patch["instructions"], str)
-                    else ""
-                )
-            for field in ("skillPolicy", "toolPolicy", "modelPolicy"):
-                if field in patch:
-                    normalized[field] = _policy(patch, field)
-            if "enabled" in patch:
-                if not isinstance(patch["enabled"], bool):
-                    raise ValueError("enabled must be a boolean.")
-                normalized["enabled"] = patch["enabled"]
-            if "compatibilityKey" in patch:
-                normalized["compatibilityKey"] = _required_string(
-                    patch, "compatibilityKey"
-                )
-            placement_fields = {
-                "instructions",
-                "skillPolicy",
-                "toolPolicy",
-                "modelPolicy",
-            }
-            version = int(current.get("version") or 1) + (
-                1 if placement_fields.intersection(normalized) else 0
+            updated, normalized, event_type = _updated_agent(
+                agent_id, current, patch, self._ensure_unique_name
             )
-            updated = {
-                **current,
-                **normalized,
-                "version": version,
-                "updatedAt": now_iso(),
-            }
-            event_type = "agent.updated"
-            if normalized.get("enabled") is False:
-                event_type = "agent.disabled"
-            elif normalized.get("enabled") is True and not current.get("enabled", True):
-                event_type = "agent.enabled"
             self._append(agent_id, event_type, {"patch": normalized, "agent": updated})
             return updated
 
@@ -419,9 +364,7 @@ class DatabaseAgentStore:
                 .first()
             )
         return (
-            _normalized_agent_snapshot(
-                row["snapshot"], row["supervisor_employee_id"]
-            )
+            _normalized_agent_snapshot(row["snapshot"], row["supervisor_employee_id"])
             if row
             else None
         )
@@ -459,76 +402,11 @@ class DatabaseAgentStore:
         )
 
     def update_agent(self, agent_id: str, patch: dict[str, Any]) -> dict[str, Any]:
-        allowed = {
-            "displayName",
-            "profileImageUrl",
-            "defaultRole",
-            "instructions",
-            "skillPolicy",
-            "toolPolicy",
-            "modelPolicy",
-            "enabled",
-            "compatibilityKey",
-        }
-        unknown = set(patch) - allowed
-        if unknown:
-            raise ValueError(
-                f"Unsupported agent field(s): {', '.join(sorted(unknown))}."
-            )
         current = self.get_agent(agent_id)
         if not current or current.get("deletedAt"):
             raise KeyError(agent_id)
-        normalized: dict[str, Any] = {}
-        if "displayName" in patch:
-            display_name = _required_string(patch, "displayName")
-            self._ensure_unique_name(
-                current["supervisorEmployeeId"], display_name, exclude_id=agent_id
-            )
-            normalized["displayName"] = display_name
-        if "profileImageUrl" in patch:
-            image_url = patch["profileImageUrl"]
-            if image_url is not None and (
-                not isinstance(image_url, str)
-                or not image_url.startswith(f"/profile-images/agents/{agent_id}?v=")
-            ):
-                raise ValueError("profileImageUrl is invalid.")
-            normalized["profileImageUrl"] = image_url
-        if "defaultRole" in patch:
-            role = _required_string(patch, "defaultRole")
-            if role not in AGENT_ROLES:
-                raise ValueError(
-                    f"defaultRole must be one of: {', '.join(AGENT_ROLES)}."
-                )
-            normalized["defaultRole"] = role
-        if "instructions" in patch:
-            normalized["instructions"] = (
-                patch["instructions"].strip()
-                if isinstance(patch["instructions"], str)
-                else ""
-            )
-        for field in ("skillPolicy", "toolPolicy", "modelPolicy"):
-            if field in patch:
-                normalized[field] = _policy(patch, field)
-        if "enabled" in patch:
-            if not isinstance(patch["enabled"], bool):
-                raise ValueError("enabled must be a boolean.")
-            normalized["enabled"] = patch["enabled"]
-        if "compatibilityKey" in patch:
-            normalized["compatibilityKey"] = _required_string(patch, "compatibilityKey")
-        placement_fields = {"instructions", "skillPolicy", "toolPolicy", "modelPolicy"}
-        updated = {
-            **current,
-            **normalized,
-            "version": int(current.get("version") or 1)
-            + (1 if placement_fields.intersection(normalized) else 0),
-            "updatedAt": now_iso(),
-        }
-        event_type = (
-            "agent.disabled"
-            if normalized.get("enabled") is False
-            else "agent.enabled"
-            if normalized.get("enabled") is True and not current.get("enabled", True)
-            else "agent.updated"
+        updated, normalized, event_type = _updated_agent(
+            agent_id, current, patch, self._ensure_unique_name
         )
         return self._append(
             agent_id, event_type, updated, {"patch": normalized, "agent": updated}
@@ -677,6 +555,85 @@ def _new_agent(supervisor_employee_id: str, payload: dict[str, Any]) -> dict[str
         "createdAt": timestamp,
         "updatedAt": timestamp,
     }
+
+
+def _updated_agent(
+    agent_id: str,
+    current: dict[str, Any],
+    patch: dict[str, Any],
+    ensure_unique_name: Callable[..., None],
+) -> tuple[dict[str, Any], dict[str, Any], str]:
+    unknown = set(patch) - AGENT_PATCH_FIELDS
+    if unknown:
+        raise ValueError(f"Unsupported agent field(s): {', '.join(sorted(unknown))}.")
+
+    normalized = _normalize_agent_identity_patch(
+        agent_id, current, patch, ensure_unique_name
+    )
+    normalized.update(_normalize_agent_runtime_patch(patch))
+
+    updated = {
+        **current,
+        **normalized,
+        "version": int(current.get("version") or 1)
+        + (1 if PLACEMENT_RELEVANT_AGENT_FIELDS.intersection(normalized) else 0),
+        "updatedAt": now_iso(),
+    }
+    event_type = "agent.updated"
+    if normalized.get("enabled") is False:
+        event_type = "agent.disabled"
+    elif normalized.get("enabled") is True and not current.get("enabled", True):
+        event_type = "agent.enabled"
+    return updated, normalized, event_type
+
+
+def _normalize_agent_identity_patch(
+    agent_id: str,
+    current: dict[str, Any],
+    patch: dict[str, Any],
+    ensure_unique_name: Callable[..., None],
+) -> dict[str, Any]:
+    normalized: dict[str, Any] = {}
+    if "displayName" in patch:
+        display_name = _required_string(patch, "displayName")
+        ensure_unique_name(
+            current["supervisorEmployeeId"], display_name, exclude_id=agent_id
+        )
+        normalized["displayName"] = display_name
+    if "profileImageUrl" in patch:
+        image_url = patch["profileImageUrl"]
+        if image_url is not None and (
+            not isinstance(image_url, str)
+            or not image_url.startswith(f"/profile-images/agents/{agent_id}?v=")
+        ):
+            raise ValueError("profileImageUrl is invalid.")
+        normalized["profileImageUrl"] = image_url
+    if "defaultRole" in patch:
+        role = _required_string(patch, "defaultRole")
+        if role not in AGENT_ROLES:
+            raise ValueError(f"defaultRole must be one of: {', '.join(AGENT_ROLES)}.")
+        normalized["defaultRole"] = role
+    if "compatibilityKey" in patch:
+        normalized["compatibilityKey"] = _required_string(patch, "compatibilityKey")
+    return normalized
+
+
+def _normalize_agent_runtime_patch(patch: dict[str, Any]) -> dict[str, Any]:
+    normalized: dict[str, Any] = {}
+    if "instructions" in patch:
+        normalized["instructions"] = (
+            patch["instructions"].strip()
+            if isinstance(patch["instructions"], str)
+            else ""
+        )
+    for field in ("skillPolicy", "toolPolicy", "modelPolicy"):
+        if field in patch:
+            normalized[field] = _policy(patch, field)
+    if "enabled" in patch:
+        if not isinstance(patch["enabled"], bool):
+            raise ValueError("enabled must be a boolean.")
+        normalized["enabled"] = patch["enabled"]
+    return normalized
 
 
 def _normalized_agent_snapshot(

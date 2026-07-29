@@ -1,9 +1,33 @@
 from __future__ import annotations
 
+import os
+import time
 from tempfile import TemporaryDirectory
 
 from relay.security.auth import DatabaseUserAuthStore, hash_session_token
 from sqlalchemy import create_engine, text
+
+
+def test_database_auth_store_preserves_utc_timestamps_outside_utc() -> None:
+    previous_timezone = os.environ.get("TZ")
+    os.environ["TZ"] = "Asia/Shanghai"
+    time.tzset()
+    try:
+        with TemporaryDirectory() as root:
+            store = DatabaseUserAuthStore(
+                f"sqlite:///{root}/auth.db", create_schema=True
+            )
+            created = store.create_user("alice", "secret123")
+            persisted = store.get_user_by_id(created["id"])
+
+            assert persisted is not None
+            assert persisted["createdAt"] == created["createdAt"]
+    finally:
+        if previous_timezone is None:
+            os.environ.pop("TZ", None)
+        else:
+            os.environ["TZ"] = previous_timezone
+        time.tzset()
 
 
 def test_database_auth_store_persists_users_and_hashes_session_tokens() -> None:
@@ -11,7 +35,9 @@ def test_database_auth_store_persists_users_and_hashes_session_tokens() -> None:
         database_url = f"sqlite:///{root}/auth.db"
         store = DatabaseUserAuthStore(database_url, create_schema=True)
 
-        user = store.create_user(" Alice ", "secret123", role="admin", email="alice@example.com")
+        user = store.create_user(
+            " Alice ", "secret123", role="admin", email="alice@example.com"
+        )
         assert user["username"] == "alice"
         assert user["role"] == "admin"
         assert user["employeeId"]
@@ -25,12 +51,24 @@ def test_database_auth_store_persists_users_and_hashes_session_tokens() -> None:
 
         engine = create_engine(database_url, future=True)
         with engine.begin() as conn:
-            row = conn.execute(text("select token_hash from auth_sessions")).mappings().one()
-            employee = conn.execute(text("select id, display_name, email from employees")).mappings().one()
+            row = (
+                conn.execute(text("select token_hash from auth_sessions"))
+                .mappings()
+                .one()
+            )
+            employee = (
+                conn.execute(text("select id, display_name, email from employees"))
+                .mappings()
+                .one()
+            )
 
         assert row["token_hash"] == hash_session_token(session["token"])
         assert row["token_hash"] != session["token"]
-        assert dict(employee) == {"id": user["employeeId"], "display_name": "alice", "email": "alice@example.com"}
+        assert dict(employee) == {
+            "id": user["employeeId"],
+            "display_name": "alice",
+            "email": "alice@example.com",
+        }
         assert store.delete_session(session["token"]) is True
         assert store.get_session_by_token(session["token"]) is None
 
@@ -45,7 +83,9 @@ def test_database_auth_store_enforces_unique_normalized_usernames() -> None:
         except ValueError as error:
             assert str(error) == "username already exists."
         else:
-            raise AssertionError("Expected duplicate normalized username to be rejected.")
+            raise AssertionError(
+                "Expected duplicate normalized username to be rejected."
+            )
 
 
 def test_database_auth_store_persists_user_preferences() -> None:
