@@ -99,7 +99,9 @@ export function TokenUsageChart({ snapshot, compact, className }: TokenUsageChar
   const maxTotal = Math.max(1, ...points.map((point) => point.total));
   const innerW = WIDTH - PADDING.left - PADDING.right;
   const innerH = HEIGHT - PADDING.top - PADDING.bottom;
-  const gap = compact ? 10 : 6;
+  // Wider gutters than the placeholder: airy bars keep this card supporting
+  // evidence rather than the heaviest mass on the dashboard.
+  const gap = compact ? 22 : 12;
   const barW = Math.max(4, (innerW - gap * Math.max(0, points.length - 1)) / Math.max(1, points.length));
 
   return (
@@ -132,10 +134,13 @@ export function TokenUsageChart({ snapshot, compact, className }: TokenUsageChar
         {points.map((point, i) => {
           const x = PADDING.left + i * (barW + gap);
           let y = PADDING.top + innerH;
+          // Stacked dimmest-at-the-base so the bar reads as one brightness
+          // ramp: cache (bulk, least interesting) → input → output (the
+          // product of the work). See the fills in admin-v2-dashboard.css.
           const segments = [
+            ["cache", point.cache] as const,
             ["input", point.input] as const,
             ["output", point.output] as const,
-            ["cache", point.cache] as const,
           ];
           return segments.map(([kind, value]) => {
             const h = value <= 0 ? 0 : Math.max(2, (value / maxTotal) * innerH);
@@ -162,8 +167,8 @@ export function TokenUsageChart({ snapshot, compact, className }: TokenUsageChar
         ))}
       </ul>
       <div className="adm-token-legend" role="group" aria-label={t("admin.v2.dash_tokens_legend")}>
-        <span><i className="adm-token-dot adm-token-dot--input" aria-hidden="true" />{t("admin.v2.dash_tokens_input")}</span>
         <span><i className="adm-token-dot adm-token-dot--output" aria-hidden="true" />{t("admin.v2.dash_tokens_output")}</span>
+        <span><i className="adm-token-dot adm-token-dot--input" aria-hidden="true" />{t("admin.v2.dash_tokens_input")}</span>
         <span><i className="adm-token-dot adm-token-dot--cache" aria-hidden="true" />{t("admin.v2.dash_tokens_cache")}</span>
       </div>
       {coverageNote ? <p className="adm-dash-card-hint">{coverageNote}</p> : null}

@@ -542,7 +542,7 @@
       "dash_sessions_hint": "Peak {{count}} in one day.",
       "dash_tokens_title": "Token usage",
       "dash_tokens_empty": "No token usage reported yet.",
-      "dash_tokens_summary": "Input {{input}} · Output {{output}} · Cache {{cache}}",
+      "dash_tokens_summary": "Output {{output}} · Input {{input}} · Cache {{cache}}",
       "dash_tokens_unsupported": "Usage unavailable for {{agents}} because its CLI does not report token counts.",
       "dash_tokens_legend": "Token usage breakdown",
       "dash_tokens_input": "Input",

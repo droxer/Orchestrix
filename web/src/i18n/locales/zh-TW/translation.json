@@ -542,7 +542,7 @@
       "dash_sessions_hint": "單日峰值 {{count}}。",
       "dash_tokens_title": "Token 用量",
       "dash_tokens_empty": "尚無 Token 用量回報。",
-      "dash_tokens_summary": "輸入 {{input}} · 輸出 {{output}} · 快取 {{cache}}",
+      "dash_tokens_summary": "輸出 {{output}} · 輸入 {{input}} · 快取 {{cache}}",
       "dash_tokens_unsupported": "{{agents}} 的 CLI 不回報 Token 計數，因此無法統計其用量。",
       "dash_tokens_legend": "Token 用量明細",
       "dash_tokens_input": "輸入",

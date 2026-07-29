@@ -91,22 +91,29 @@ export function DashboardView({ nodes, employees, metrics }: DashboardViewProps)
         </section>
       </div>
 
-      <div className={`adm-dash-belt${showTokens ? "" : " adm-dash-belt--lean"}`}>
-        <ActivityChart
-          daily={sessions.dailyCounts}
-          ready={sessionsReady}
-          className="relay-enter relay-enter-delay-5"
-        />
-        <NodeStatusCard nodes={nodes} className="relay-enter relay-enter-delay-6" />
-        <TopEmployees
-          employees={employees}
-          nodes={nodes}
-          ranked={sessions.topEmployees}
-          className="relay-enter relay-enter-delay-7"
-        />
-        {showTokens ? (
-          <TokenUsageChart snapshot={tokens} compact className="relay-enter relay-enter-delay-8" />
-        ) : null}
+      {/* 2:1 editorial split — time-series in the wide column, rosters in the
+          rail. The two stacks are independent, so a short card cannot drag a
+          hole through the row beside it the way the old three-across belt did. */}
+      <div className="adm-dash-grid">
+        <div className="adm-dash-col">
+          <ActivityChart
+            daily={sessions.dailyCounts}
+            ready={sessionsReady}
+            className="relay-enter relay-enter-delay-5"
+          />
+          {showTokens ? (
+            <TokenUsageChart snapshot={tokens} compact className="relay-enter relay-enter-delay-7" />
+          ) : null}
+        </div>
+        <div className="adm-dash-col">
+          <NodeStatusCard nodes={nodes} className="relay-enter relay-enter-delay-6" />
+          <TopEmployees
+            employees={employees}
+            nodes={nodes}
+            ranked={sessions.topEmployees}
+            className="relay-enter relay-enter-delay-8"
+          />
+        </div>
       </div>
 
       <ActivityFeed items={activity.items} employees={employees} className="relay-enter relay-enter-delay-9" />
@@ -135,6 +142,13 @@ function compareTrend(current: number, prior: number): Trend {
   };
 }
 
+// Compact notation earns its keep on token counts (2.7M) but throws away
+// precision on the numbers an operator actually reads back — 1,041 threads
+// became "1K". Group below 100k, compact above.
+const COMPACT_THRESHOLD = 100_000;
+
 function formatCompact(value: number, locale: string): string {
-  return new Intl.NumberFormat(locale, { notation: "compact", maximumFractionDigits: 1 }).format(value);
+  return value < COMPACT_THRESHOLD
+    ? new Intl.NumberFormat(locale).format(value)
+    : new Intl.NumberFormat(locale, { notation: "compact", maximumFractionDigits: 1 }).format(value);
 }

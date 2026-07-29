@@ -10,7 +10,14 @@ interface NodeStatusCardProps {
   className?: string;
 }
 
-type Tone = "good" | "info" | "bad" | "warn" | "muted";
+// Five states have to be distinguishable in an 8px bar. The Phosphor grey
+// ramp alone cannot do it — ready and unknown are one step apart — so each
+// tone is double-encoded by brightness and texture (see
+// admin-v2-dashboard.css). "running" takes --live: a node running an agent is
+// the one thing in Relay that is working right now, which is exactly what the
+// accent is reserved for. There is no "info" tone left; running used to carry
+// it and nothing else did.
+type Tone = "live" | "good" | "bad" | "warn" | "muted";
 type Slot = { key: string; tone: Tone; count: number; share: number };
 
 // One tone per state. `stale` used to share `bad` with `failed`, which rendered
@@ -18,8 +25,8 @@ type Slot = { key: string; tone: Tone; count: number; share: number };
 // in both the meter and the dots. Stale is a warning (last-seen has lapsed), not
 // a failure, so it takes the --warn step that the dashboard was not yet using.
 const ORDER: Array<{ key: string; tone: Tone }> = [
+  { key: "running", tone: "live" },
   { key: "ready", tone: "good" },
-  { key: "running", tone: "info" },
   { key: "failed", tone: "bad" },
   { key: "stale", tone: "warn" },
   { key: "unknown", tone: "muted" },
@@ -72,7 +79,12 @@ export function NodeStatusCard({ nodes, className }: NodeStatusCardProps) {
 
       <dl className="adm-dash-stat-grid">
         {grid.map((slot) => (
-          <div key={slot.key} className={`adm-dash-stat tone-${slot.tone}`}>
+          // An idle fleet stays fully grey: --live means work in flight, so a
+          // zero running count must not glow.
+          <div
+            key={slot.key}
+            className={`adm-dash-stat tone-${slot.tone === "live" && slot.count === 0 ? "muted" : slot.tone}`}
+          >
             <dt className="adm-dash-stat-label">
               <span className="adm-dash-stat-dot" aria-hidden="true" />
               {t(`admin.v2.dash_health_${slot.key}`)}

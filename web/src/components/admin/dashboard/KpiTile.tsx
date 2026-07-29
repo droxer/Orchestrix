@@ -29,7 +29,7 @@ export function KpiTile({ eyebrow, value, hero, enterIndex = 0, slot, delta, hin
         <div className="adm-dash-tile-foot">
           {delta ? (
             <span className={`adm-dash-delta tone-${delta.direction}`}>
-              <span aria-hidden="true">
+              <span className="adm-dash-delta-glyph" aria-hidden="true">
                 {delta.direction === "up" ? "▲" : delta.direction === "down" ? "▼" : "—"}
               </span>
               <span>{delta.label}</span>
