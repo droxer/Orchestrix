@@ -3,11 +3,17 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from threading import Barrier
+from uuid import UUID
 
 import pytest
 import relay.services.managed_nodes as managed_nodes_module
-
 from relay.services.managed_nodes import LocalManagedNodeStore
+
+
+def test_managed_nodes_use_uuid_ids(tmp_path: Path) -> None:
+    node = LocalManagedNodeStore(tmp_path).create_node({"employeeId": "alice"})
+
+    assert str(UUID(node["id"])) == node["id"]
 
 
 def test_managed_node_attempt_uses_single_use_enrollment_grant(tmp_path: Path) -> None:

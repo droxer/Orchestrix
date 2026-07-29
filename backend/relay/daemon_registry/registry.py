@@ -807,7 +807,7 @@ class DaemonNodeRegistry:
                     None,
                     node_token,
                 )
-        sandbox_id = new_sandbox_id(employee_id or "node")
+        sandbox_id = new_sandbox_id()
         ui_token = new_daemon_node_token()
         node_token = new_daemon_node_token()
         now = now_iso()
@@ -853,7 +853,7 @@ class DaemonNodeRegistry:
         payload: dict[str, Any],
     ) -> tuple[dict[str, Any], str]:
         """Create the observed daemon identity for a consumed enrollment grant."""
-        sandbox_id = new_sandbox_id(managed_node.get("employeeId") or "managed")
+        sandbox_id = new_sandbox_id()
         node_token = new_daemon_node_token()
         now = now_iso()
         sandbox = {

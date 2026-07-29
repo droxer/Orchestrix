@@ -3,6 +3,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from uuid import UUID
 
 import pytest
 from relay.persistence.session_store import DatabaseSessionStore, LocalSessionStore
@@ -10,6 +11,26 @@ from relay.persistence.store_common import relay_event
 from relay.persistence.task_store import DatabaseTaskStore
 from relay.sessions.controller import SessionController, SessionRunInFlightError
 from sqlalchemy import text
+
+
+def test_session_stores_create_uuid_thread_ids() -> None:
+    with TemporaryDirectory() as root:
+        stores = (
+            LocalSessionStore(Path(root) / "local"),
+            DatabaseSessionStore(
+                f"sqlite:///{root}/relay.db", create_schema=True
+            ),
+        )
+        for store in stores:
+            created = store.create_session(
+                {
+                    "workspacePath": "/workspace/alice",
+                    "taskGoal": "ship the release",
+                    "participants": ["human"],
+                }
+            )
+
+            assert str(UUID(created["id"])) == created["id"]
 
 
 def test_session_stores_preserve_team_provenance() -> None:
@@ -344,8 +365,10 @@ def test_database_session_store_persists_events_and_artifacts() -> None:
         assert usage["completedAt"] == completed_event["timestamp"]
         assert usage["total"] == 10
         with store.engine.begin() as conn:
-            row = conn.execute(text("select session_public_id, run_id, total_tokens from session_run_token_usage")).mappings().one()
-        assert row["session_public_id"] == session["id"]
+            row = conn.execute(
+                store.run_token_usage.select()
+            ).mappings().one()
+        assert row["session_id"] == session["id"]
         assert row["run_id"] == "run_1"
         assert row["total_tokens"] == 10
 

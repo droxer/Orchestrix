@@ -121,7 +121,7 @@ def test_database_move_keeps_old_placement_when_insert_fails(tmp_path: Path) -> 
             """
             CREATE TRIGGER reject_node_b
             BEFORE INSERT ON agent_placements
-            WHEN NEW.daemon_node_public_id = 'node_b'
+            WHEN NEW.daemon_node_id = 'node_b'
             BEGIN
                 SELECT RAISE(ABORT, 'node_b rejected');
             END

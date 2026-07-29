@@ -31,8 +31,6 @@ def new_database_id() -> str:
     return str(uuid.uuid4())
 
 
-def new_sandbox_id(employee_id: str) -> str:
-    safe = "".join(ch if ch.isalnum() else "-" for ch in employee_id.lower()).strip("-")
-    while "--" in safe:
-        safe = safe.replace("--", "-")
-    return f"sbx_{safe or 'employee'}_{_base36(int(time.time() * 1000))}_{new_relay_id('x').split('_')[-1]}"
+def new_sandbox_id() -> str:
+    """Return the canonical identifier for a daemon node."""
+    return str(uuid.uuid4())

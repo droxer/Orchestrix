@@ -138,7 +138,7 @@ class ServerDaemonNodeBackend:
             raise PermissionError("Sandbox token is required.")
         if not payload.get("nodeToken"):
             raise PermissionError("Daemon node token is required.")
-        sandbox_id = requested_sandbox_id or new_sandbox_id(payload["employeeId"])
+        sandbox_id = requested_sandbox_id or new_sandbox_id()
         now = now_iso()
         sandbox = {
             "id": sandbox_id,

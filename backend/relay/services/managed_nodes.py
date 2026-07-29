@@ -1,20 +1,26 @@
 from __future__ import annotations
 
-from contextlib import contextmanager, nullcontext
-from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
 import fcntl
 import hashlib
 import hmac
 import json
-from pathlib import Path
 import secrets
+from collections.abc import Iterator
+from contextlib import contextmanager, nullcontext
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from threading import RLock
-from typing import Any, Iterator
+from typing import Any
 from uuid import uuid4
 
-from ..persistence.store_common import DEFAULT_RELAY_DATA_DIR, _read_json, _write_json, now_iso, safe_name
-
+from ..persistence.store_common import (
+    DEFAULT_RELAY_DATA_DIR,
+    _read_json,
+    _write_json,
+    now_iso,
+    safe_name,
+)
 
 MANAGED_NODE_DESIRED_STATES = frozenset({"running", "stopped", "deleted"})
 # "pooled" and "shared" are reserved for future multi-employee node sharing;
@@ -116,7 +122,7 @@ class LocalManagedNodeStore:
         with self._lock, slot_lock:
             now = now_iso()
             node = {
-                "id": _new_id("mnode"),
+                "id": str(uuid4()),
                 "displayName": payload.get("displayName") or f"Managed node for {employee_id or 'pool'}",
                 **({"employeeId": employee_id} if employee_id else {}),
                 "assignmentMode": assignment_mode,

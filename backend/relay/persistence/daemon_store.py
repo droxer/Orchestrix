@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import fcntl
 from collections import defaultdict
+from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import timedelta
 from pathlib import Path
 from threading import RLock
-from typing import Any, Iterator
+from typing import Any
 
 from sqlalchemy import (
     JSON,
@@ -18,7 +19,6 @@ from sqlalchemy import (
     MetaData,
     Table,
     Text,
-    Uuid,
     create_engine,
     delete,
     func,
@@ -38,6 +38,7 @@ from .store_common import (
     _write_json,
     daemon_event,
     database_id_column,
+    entity_uuid_type,
     new_database_id,
     new_relay_id,
     now_iso,
@@ -121,7 +122,7 @@ def terminal_database_ids_to_prune(
 ) -> list[str]:
     records_by_node: dict[str, list[Any]] = defaultdict(list)
     for row in rows:
-        records_by_node[row["node_public_id"]].append(row)
+        records_by_node[row["node_id"]].append(row)
     database_ids: list[str] = []
     for records in records_by_node.values():
         records.sort(key=_database_terminal_timestamp, reverse=True)
@@ -1018,7 +1019,6 @@ class DatabaseDaemonStore:
         "daemon_nodes",
         metadata,
         database_id_column(),
-        Column("public_id", Text, nullable=False, unique=True),
         Column("employee_id", Text, nullable=True),
         Column("display_name", Text, nullable=True),
         Column("workspace_path", Text, nullable=True),
@@ -1053,11 +1053,10 @@ class DatabaseDaemonStore:
         Column("public_id", Text, nullable=False, unique=True),
         Column(
             "node_id",
-            Uuid(as_uuid=False),
+            entity_uuid_type(),
             ForeignKey("daemon_nodes.id", ondelete="CASCADE"),
             nullable=False,
         ),
-        Column("node_public_id", Text, nullable=False),
         Column("type", Text, nullable=False),
         Column("status", Text, nullable=False),
         Column("command", JSON, nullable=False),
@@ -1078,21 +1077,20 @@ class DatabaseDaemonStore:
         Column("public_id", Text, nullable=False, unique=True),
         Column(
             "node_id",
-            Uuid(as_uuid=False),
+            entity_uuid_type(),
             ForeignKey("daemon_nodes.id", ondelete="CASCADE"),
             nullable=False,
         ),
-        Column("node_public_id", Text, nullable=False),
         Column(
             "command_id",
-            Uuid(as_uuid=False),
+            entity_uuid_type(),
             ForeignKey("daemon_commands.id", ondelete="SET NULL"),
             nullable=True,
         ),
         Column("command_public_id", Text, nullable=True),
-        Column("session_public_id", Text, nullable=False),
+        Column("session_id", entity_uuid_type(), nullable=False),
         Column("agent", Text, nullable=False),
-        Column("logical_agent_id", Text, nullable=True),
+        Column("logical_agent_id", entity_uuid_type(), nullable=True),
         Column("placement_id", Text, nullable=True),
         Column("mode", Text, nullable=False),
         Column("task_goal", Text, nullable=False),
@@ -1110,12 +1108,11 @@ class DatabaseDaemonStore:
         Column("public_id", Text, nullable=False, unique=True),
         Column(
             "node_id",
-            Uuid(as_uuid=False),
+            entity_uuid_type(),
             ForeignKey("daemon_nodes.id", ondelete="CASCADE"),
             nullable=False,
         ),
-        Column("node_public_id", Text, nullable=False),
-        Column("session_public_id", Text, nullable=False),
+        Column("session_id", entity_uuid_type(), nullable=False),
         Column("task_public_id", Text, nullable=True),
         Column("task_goal", Text, nullable=False),
         Column("assignments", JSON, nullable=False),
@@ -1134,7 +1131,7 @@ class DatabaseDaemonStore:
     )
     Index(
         "uq_daemon_run_requests_active_session",
-        run_requests.c.session_public_id,
+        run_requests.c.session_id,
         unique=True,
         postgresql_where=run_requests.c.status.in_(ACTIVE_RUN_REQUEST_STATUSES),
         sqlite_where=run_requests.c.status.in_(ACTIVE_RUN_REQUEST_STATUSES),
@@ -1144,11 +1141,10 @@ class DatabaseDaemonStore:
         metadata,
         database_id_column(),
         Column("public_id", Text, nullable=False, unique=True),
-        Column("node_id", Uuid(as_uuid=False), nullable=True),
-        Column("node_public_id", Text, nullable=True),
-        Column("command_id", Uuid(as_uuid=False), nullable=True),
+        Column("node_id", entity_uuid_type(), nullable=True),
+        Column("command_id", entity_uuid_type(), nullable=True),
         Column("command_public_id", Text, nullable=True),
-        Column("run_id", Uuid(as_uuid=False), nullable=True),
+        Column("run_id", entity_uuid_type(), nullable=True),
         Column("run_public_id", Text, nullable=True),
         Column("type", Text, nullable=False),
         Column("timestamp", DateTime(timezone=True), nullable=False),
@@ -1165,7 +1161,7 @@ class DatabaseDaemonStore:
         values = node_to_row(node)
         with self.engine.begin() as conn:
             existing = conn.scalar(
-                select(self.nodes.c.id).where(self.nodes.c.public_id == node["id"])
+                select(self.nodes.c.id).where(self.nodes.c.id == node["id"])
             )
             if existing:
                 conn.execute(
@@ -1383,7 +1379,7 @@ class DatabaseDaemonStore:
     def delete_node(self, node_id: str) -> None:
         with self.engine.begin() as conn:
             node_pk = conn.scalar(
-                select(self.nodes.c.id).where(self.nodes.c.public_id == node_id)
+                select(self.nodes.c.id).where(self.nodes.c.id == node_id)
             )
             if not node_pk:
                 raise KeyError(node_id)
@@ -1403,7 +1399,7 @@ class DatabaseDaemonStore:
         with self.engine.begin() as conn:
             row = (
                 conn.execute(
-                    select(self.nodes).where(self.nodes.c.public_id == node_id)
+                    select(self.nodes).where(self.nodes.c.id == node_id)
                 )
                 .mappings()
                 .first()
@@ -1682,7 +1678,7 @@ class DatabaseDaemonStore:
         now_dt = _parse_iso(now)
         with self.engine.begin() as conn:
             rows = conn.execute(
-                select(self.commands.c.node_public_id, func.count(self.commands.c.id))
+                select(self.commands.c.node_id, func.count(self.commands.c.id))
                 .where(
                     (self.commands.c.status == "queued")
                     | (
@@ -1690,7 +1686,7 @@ class DatabaseDaemonStore:
                         & (self.commands.c.lease_expires_at <= now_dt)
                     )
                 )
-                .group_by(self.commands.c.node_public_id)
+                .group_by(self.commands.c.node_id)
             ).all()
         return {row[0]: row[1] for row in rows}
 
@@ -1754,7 +1750,7 @@ class DatabaseDaemonStore:
     def list_active_runs(self, node_id: str | None = None) -> list[dict[str, Any]]:
         statement = select(self.runs).where(self.runs.c.status == "running")
         if node_id is not None:
-            statement = statement.where(self.runs.c.node_public_id == node_id)
+            statement = statement.where(self.runs.c.node_id == node_id)
         with self.engine.begin() as conn:
             rows = conn.execute(statement).mappings().all()
         return [row_to_run(row) for row in rows]
@@ -1816,7 +1812,7 @@ class DatabaseDaemonStore:
             self.run_requests.c.status.in_(ACTIVE_RUN_REQUEST_STATUSES)
         )
         if node_id is not None:
-            statement = statement.where(self.run_requests.c.node_public_id == node_id)
+            statement = statement.where(self.run_requests.c.node_id == node_id)
         with self.engine.begin() as conn:
             rows = conn.execute(statement).mappings().all()
         return [row_to_run_request(row) for row in rows]
@@ -2338,7 +2334,7 @@ class DatabaseDaemonStore:
 
     def _node_pk(self, conn: Any, node_id: str) -> str:
         node_pk = conn.scalar(
-            select(self.nodes.c.id).where(self.nodes.c.public_id == node_id)
+            select(self.nodes.c.id).where(self.nodes.c.id == node_id)
         )
         if not node_pk:
             raise KeyError(node_id)
@@ -2349,8 +2345,7 @@ def node_to_row(
     node: dict[str, Any], *, database_id: str | None = None
 ) -> dict[str, Any]:
     return {
-        "id": database_id or new_database_id(),
-        "public_id": node["id"],
+        "id": database_id or node["id"],
         "employee_id": node.get("employeeId"),
         "display_name": node.get("displayName"),
         "workspace_path": node.get("workspacePath"),
@@ -2384,7 +2379,7 @@ def node_to_row(
 
 def row_to_node(row: Any) -> dict[str, Any]:
     return {
-        "id": row["public_id"],
+        "id": row["id"],
         **({"employeeId": row["employee_id"]} if row.get("employee_id") else {}),
         **({"displayName": row["display_name"]} if row.get("display_name") else {}),
         **(
@@ -2460,7 +2455,6 @@ def command_to_row(
         "id": database_id or record.get("databaseId") or new_database_id(),
         "public_id": record["id"],
         "node_id": node_pk or record.get("nodeDatabaseId"),
-        "node_public_id": record["nodeId"],
         "type": record["command"]["type"],
         "status": record["status"],
         "command": record["command"],
@@ -2480,7 +2474,7 @@ def row_to_command(row: Any) -> dict[str, Any]:
     return {
         "databaseId": row["id"],
         "id": row["public_id"],
-        "nodeId": row["node_public_id"],
+        "nodeId": row["node_id"],
         "command": row["command"],
         "status": row["status"],
         "createdAt": _format_iso(row["created_at"]),
@@ -2531,10 +2525,9 @@ def run_to_row(
         "id": database_id or run.get("databaseId") or new_database_id(),
         "public_id": run["runId"],
         "node_id": run["nodeDatabaseId"],
-        "node_public_id": run["nodeId"],
         "command_id": run.get("commandDatabaseId"),
         "command_public_id": run.get("commandId"),
-        "session_public_id": run["sessionId"],
+        "session_id": run["sessionId"],
         "agent": run["agent"],
         "logical_agent_id": run.get("logicalAgentId"),
         "placement_id": run.get("placementId"),
@@ -2552,7 +2545,7 @@ def run_to_row(
 def row_to_run(row: Any, *, include_database: bool = False) -> dict[str, Any]:
     return {
         **({"databaseId": row["id"]} if include_database else {}),
-        "nodeId": row["node_public_id"],
+        "nodeId": row["node_id"],
         **({"nodeDatabaseId": row["node_id"]} if include_database else {}),
         **(
             {"commandId": row["command_public_id"]}
@@ -2564,7 +2557,7 @@ def row_to_run(row: Any, *, include_database: bool = False) -> dict[str, Any]:
             if include_database and row.get("command_id")
             else {}
         ),
-        "sessionId": row["session_public_id"],
+        "sessionId": row["session_id"],
         "runId": row["public_id"],
         "agent": row["agent"],
         **(
@@ -2602,8 +2595,7 @@ def run_request_to_row(
         "id": database_id or record.get("databaseId") or new_database_id(),
         "public_id": record["id"],
         "node_id": node_pk or record.get("nodeDatabaseId"),
-        "node_public_id": record["nodeId"],
-        "session_public_id": record["sessionId"],
+        "session_id": record["sessionId"],
         "task_public_id": record.get("taskId"),
         "task_goal": record["taskGoal"],
         "assignments": record["assignments"],
@@ -2625,10 +2617,10 @@ def run_request_to_row(
 def row_to_run_request(row: Any) -> dict[str, Any]:
     return {
         "databaseId": row["id"],
-        "nodeId": row["node_public_id"],
+        "nodeId": row["node_id"],
         "nodeDatabaseId": row["node_id"],
         "id": row["public_id"],
-        "sessionId": row["session_public_id"],
+        "sessionId": row["session_id"],
         **({"taskId": row["task_public_id"]} if row.get("task_public_id") else {}),
         "taskGoal": row["task_goal"],
         "assignments": row["assignments"] or [],
@@ -2673,11 +2665,10 @@ def daemon_event_to_row(
         "id": new_database_id(),
         "public_id": event["id"],
         "node_id": conn.scalar(
-            select(store.nodes.c.id).where(store.nodes.c.public_id == node_id)
+            select(store.nodes.c.id).where(store.nodes.c.id == node_id)
         )
         if node_id
         else None,
-        "node_public_id": node_id,
         "command_id": conn.scalar(
             select(store.commands.c.id).where(store.commands.c.public_id == command_id)
         )

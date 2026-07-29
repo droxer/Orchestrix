@@ -21,7 +21,6 @@ from sqlalchemy import (
     Table,
     Text,
     UniqueConstraint,
-    Uuid,
     case,
     create_engine,
     delete,
@@ -43,6 +42,7 @@ from .store_common import (
     _read_jsonl,
     _write_json,
     database_id_column,
+    entity_uuid_type,
     materialize_task_events,
     new_database_id,
     new_relay_id,
@@ -538,7 +538,7 @@ class DatabaseTaskStore:
         Column("priority", Text, nullable=False),
         Column("status", Text, nullable=False),
         Column("assigned_agent", Text, nullable=True),
-        Column("assigned_agent_id", Text, nullable=True),
+        Column("assigned_agent_id", entity_uuid_type(), nullable=True),
         Column("assigned_team_id", Text, nullable=True),
         Column("owner_employee_id", Text, nullable=True),
         Column("assignee_employee_id", Text, nullable=True),
@@ -560,7 +560,7 @@ class DatabaseTaskStore:
         Column("public_id", Text, nullable=False, unique=True),
         Column(
             "task_id",
-            Uuid(as_uuid=False),
+            entity_uuid_type(),
             ForeignKey("tasks.id", ondelete="CASCADE"),
             nullable=False,
         ),
@@ -576,14 +576,14 @@ class DatabaseTaskStore:
         database_id_column(),
         Column(
             "task_id",
-            Uuid(as_uuid=False),
+            entity_uuid_type(),
             ForeignKey("tasks.id", ondelete="CASCADE"),
             nullable=False,
         ),
-        Column("session_public_id", Text, nullable=False),
+        Column("session_id", entity_uuid_type(), nullable=False),
         Column("created_at", DateTime(timezone=True), nullable=False),
         UniqueConstraint(
-            "task_id", "session_public_id", name="uq_task_sessions_task_session_public"
+            "task_id", "session_id", name="uq_task_sessions_task_session"
         ),
     )
 
@@ -615,7 +615,7 @@ class DatabaseTaskStore:
         required_unique_constraints = {
             "tasks": {("public_id",)},
             "task_events": {("public_id",), ("task_id", "sequence")},
-            "task_sessions": {("task_id", "session_public_id")},
+            "task_sessions": {("task_id", "session_id")},
         }
         for table_name, expected in required_unique_constraints.items():
             actual = {
@@ -821,7 +821,7 @@ class DatabaseTaskStore:
                         delete(self.task_sessions)
                         .where(self.task_sessions.c.task_id == task_pk)
                         .where(
-                            self.task_sessions.c.session_public_id == event["sessionId"]
+                            self.task_sessions.c.session_id == event["sessionId"]
                         )
                     )
         logger.debug(
@@ -835,7 +835,7 @@ class DatabaseTaskStore:
         lock_clause = "" if self.engine.dialect.name == "sqlite" else " FOR KEY SHARE"
         session_pk = conn.scalar(
             text(
-                "SELECT id FROM sessions WHERE public_id = :session_id" + lock_clause
+                "SELECT id FROM sessions WHERE id = :session_id" + lock_clause
             ),
             {"session_id": session_id},
         )
@@ -1254,7 +1254,7 @@ class DatabaseTaskStore:
         conn.execute(
             delete(self.task_sessions)
             .where(self.task_sessions.c.task_id == row["id"])
-            .where(self.task_sessions.c.session_public_id == session_id)
+            .where(self.task_sessions.c.session_id == session_id)
         )
         return task
 
@@ -1313,14 +1313,14 @@ class DatabaseTaskStore:
         existing = conn.execute(
             select(self.task_sessions.c.task_id)
             .where(self.task_sessions.c.task_id == task_pk)
-            .where(self.task_sessions.c.session_public_id == session_id)
+            .where(self.task_sessions.c.session_id == session_id)
         ).first()
         if not existing:
             conn.execute(
                 insert(self.task_sessions).values(
                     id=new_database_id(),
                     task_id=task_pk,
-                    session_public_id=session_id,
+                    session_id=session_id,
                     created_at=_parse_iso(timestamp),
                 )
             )

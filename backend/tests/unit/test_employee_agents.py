@@ -1,14 +1,31 @@
 from __future__ import annotations
 
 from pathlib import Path
+from uuid import UUID
 
 import pytest
-from sqlalchemy import UniqueConstraint
-
 from relay.persistence.agent_store import (
     DatabaseAgentStore,
     LocalAgentStore,
 )
+from sqlalchemy import UniqueConstraint
+
+
+@pytest.mark.parametrize("store_kind", ["local", "database"])
+def test_agent_stores_create_uuid_agent_ids(tmp_path: Path, store_kind: str) -> None:
+    store = (
+        LocalAgentStore(tmp_path / "local")
+        if store_kind == "local"
+        else DatabaseAgentStore(
+            f"sqlite:///{tmp_path}/agents.db", create_schema=True
+        )
+    )
+
+    agent = store.create_agent(
+        "alice", {"displayName": "Researcher", "executorKind": "claude"}
+    )
+
+    assert str(UUID(agent["id"])) == agent["id"]
 
 
 def test_employee_can_own_multiple_agents_of_the_same_executor_kind(
@@ -106,7 +123,7 @@ def test_database_agent_store_normalizes_legacy_owner_snapshot(tmp_path: Path) -
     with store.engine.begin() as conn:
         conn.execute(
             store.agents.update()
-            .where(store.agents.c.public_id == agent["id"])
+            .where(store.agents.c.id == agent["id"])
             .values(snapshot=legacy)
         )
 

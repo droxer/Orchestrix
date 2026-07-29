@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import Column, Uuid
+from sqlalchemy import Column, Text, Uuid
 
 from ..core.ids import new_database_id, new_relay_id, now_iso
 from ..core.models import (
@@ -22,8 +22,13 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_RELAY_DATA_DIR = REPO_ROOT / ".relay"
 
 
+def entity_uuid_type() -> Any:
+    """Native UUID in PostgreSQL, with TEXT retained for SQLite test stores."""
+    return Uuid(as_uuid=False).with_variant(Text(), "sqlite")
+
+
 def database_id_column() -> Column[Any]:
-    return Column("id", Uuid(as_uuid=False), primary_key=True, default=new_database_id)
+    return Column("id", entity_uuid_type(), primary_key=True, default=new_database_id)
 
 
 def _parse_iso(value: str | None) -> datetime | None:

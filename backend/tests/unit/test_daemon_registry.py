@@ -9,6 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from threading import Barrier, Event
+from uuid import UUID
 
 import pytest
 from relay.daemon_registry import (
@@ -31,6 +32,20 @@ def database_daemon_store(root: str) -> DatabaseDaemonStore:
 
 
 DAEMON_STORE_FACTORIES = [LocalDaemonStore, database_daemon_store]
+
+
+@pytest.mark.parametrize("daemon_store_factory", DAEMON_STORE_FACTORIES)
+def test_provisioned_daemon_nodes_use_uuid_ids(daemon_store_factory) -> None:
+    with TemporaryDirectory() as root:
+        registry = DaemonNodeRegistry(
+            LocalSessionStore(root), daemon_store_factory(root)
+        )
+
+        node, _, _ = registry.provision_pending(
+            "alice", "/Users/alice/project", "boxlite", "employee-device"
+        )
+
+        assert str(UUID(node["id"])) == node["id"]
 
 
 def store_node_payload() -> dict[str, object]:
