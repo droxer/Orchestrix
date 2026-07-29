@@ -127,6 +127,8 @@ class LocalSessionStore:
 
     def append_event(self, session_id: str, event: dict[str, Any]) -> dict[str, Any]:
         with self._lock:
+            if self._tombstone_path(session_id).exists():
+                raise KeyError(session_id)
             self._session_dir(session_id).mkdir(parents=True, exist_ok=True)
             _append_jsonl(self._events_path(session_id), event)
             logger.debug(
@@ -147,15 +149,33 @@ class LocalSessionStore:
 
     def get_session(self, session_id: str) -> dict[str, Any]:
         with self._lock:
+            if self._tombstone_path(session_id).exists():
+                raise KeyError(session_id)
             if self._snapshot_path(session_id).exists():
                 return _read_json(self._snapshot_path(session_id))
             return materialize_events(_read_jsonl(self._events_path(session_id)))
 
-    def delete_session(self, session_id: str) -> None:
+    def delete_session(self, session_id: str, *, deleted_by: str | None = None) -> None:
         with self._lock:
             session_dir = self._session_dir(session_id)
             if not session_dir.is_dir():
                 raise KeyError(session_id)
+            snapshot = self.get_session(session_id)
+            # Retain per-run token usage so dashboard history survives the
+            # deletion of the originating thread.
+            for row in session_run_token_usage_rows(snapshot):
+                _append_jsonl(self._token_usage_ledger_path(), row)
+            _write_json(
+                self._tombstone_path(session_id),
+                {
+                    "id": session_id,
+                    "taskGoal": snapshot.get("taskGoal"),
+                    "title": snapshot.get("title"),
+                    "ownerEmployeeId": snapshot.get("ownerEmployeeId"),
+                    "deletedBy": deleted_by,
+                    "deletedAt": now_iso(),
+                },
+            )
             shutil.rmtree(session_dir)
 
     def list_sessions(self) -> list[dict[str, Any]]:
@@ -174,6 +194,15 @@ class LocalSessionStore:
             for session in self.list_sessions()
             for row in session_run_token_usage_rows(session)
         ]
+        seen = {(row["sessionId"], row["runId"]) for row in rows}
+        ledger_path = self._token_usage_ledger_path()
+        if ledger_path.exists():
+            for row in _read_jsonl(ledger_path):
+                key = (row.get("sessionId"), row.get("runId"))
+                if key in seen:
+                    continue
+                seen.add(key)
+                rows.append(row)
         return sorted(rows, key=lambda item: item["completedAt"], reverse=True)
 
     def write_artifact(
@@ -294,9 +323,15 @@ class LocalSessionStore:
     def _snapshot_path(self, session_id: str) -> Path:
         return self._session_dir(session_id) / "snapshot.json"
 
+    def _tombstone_path(self, session_id: str) -> Path:
+        return self.sessions_dir / f"{Path(session_id).name}.deleted.json"
+
+    def _token_usage_ledger_path(self) -> Path:
+        return self.sessions_dir / "token-usage.jsonl"
+
 
 class DatabaseSessionStore:
-    REQUIRED_SCHEMA_REVISION = "20260729_0042"
+    REQUIRED_SCHEMA_REVISION = "20260729_0043"
     metadata = MetaData()
 
     sessions = Table(
@@ -360,14 +395,12 @@ class DatabaseSessionStore:
         "session_run_token_usage",
         metadata,
         database_id_column(),
-        Column(
-            "session_id",
-            entity_uuid_type(),
-            ForeignKey("sessions.id", ondelete="CASCADE"),
-            nullable=False,
-        ),
+        # No FK to sessions: rows are retained after the originating thread
+        # is permanently deleted so token-usage history survives.
+        Column("session_id", entity_uuid_type(), nullable=False),
         Column("run_id", Text, nullable=False),
         Column("owner_employee_id", Text, nullable=True),
+        Column("task_goal", Text, nullable=True),
         Column("input_tokens", BigInteger, nullable=False),
         Column("output_tokens", BigInteger, nullable=False),
         Column("cache_tokens", BigInteger, nullable=False),
@@ -378,6 +411,18 @@ class DatabaseSessionStore:
         ),
         Index("ix_session_run_token_usage_completed_at", "completed_at"),
         Index("ix_session_run_token_usage_owner_employee_id", "owner_employee_id"),
+    )
+    tombstones = Table(
+        "session_tombstones",
+        metadata,
+        database_id_column(),
+        Column("session_id", entity_uuid_type(), nullable=False),
+        Column("task_goal", Text, nullable=False),
+        Column("title", Text, nullable=True),
+        Column("owner_employee_id", Text, nullable=True),
+        Column("deleted_by", Text, nullable=True),
+        Column("deleted_at", DateTime(timezone=True), nullable=False),
+        UniqueConstraint("session_id", name="uq_session_tombstones_session"),
     )
 
     def __init__(
@@ -398,6 +443,7 @@ class DatabaseSessionStore:
             "session_events",
             "session_artifacts",
             "session_run_token_usage",
+            "session_tombstones",
         }
         missing = required_tables.difference(schema.get_table_names())
         if missing:
@@ -411,6 +457,7 @@ class DatabaseSessionStore:
                 self.events,
                 self.artifacts,
                 self.run_token_usage,
+                self.tombstones,
             )
         }
         for table_name, expected in required_columns.items():
@@ -675,14 +722,21 @@ class DatabaseSessionStore:
                 raise KeyError(session_id)
         return row["snapshot"]
 
-    def delete_session(self, session_id: str) -> None:
+    def delete_session(self, session_id: str, *, deleted_by: str | None = None) -> None:
         with self.engine.begin() as conn:
-            session_pk = self._session_pk(conn, session_id, lock=True)
-            conn.execute(
-                delete(self.run_token_usage).where(
-                    self.run_token_usage.c.session_id == session_pk
+            row = (
+                conn.execute(
+                    select(self.sessions.c.id, self.sessions.c.snapshot)
+                    .where(self.sessions.c.id == session_id)
+                    .with_for_update()
                 )
+                .mappings()
+                .first()
             )
+            if not row:
+                raise KeyError(session_id)
+            session_pk = row["id"]
+            self._insert_tombstone(conn, session_pk, row["snapshot"] or {}, deleted_by)
             conn.execute(
                 delete(self.artifacts).where(self.artifacts.c.session_id == session_pk)
             )
@@ -691,8 +745,30 @@ class DatabaseSessionStore:
             )
             conn.execute(delete(self.sessions).where(self.sessions.c.id == session_pk))
 
+    def _insert_tombstone(
+        self,
+        conn: Any,
+        session_pk: str,
+        snapshot: dict[str, Any],
+        deleted_by: str | None,
+    ) -> None:
+        conn.execute(
+            delete(self.tombstones).where(self.tombstones.c.session_id == session_pk)
+        )
+        conn.execute(
+            insert(self.tombstones).values(
+                id=new_database_id(),
+                session_id=session_pk,
+                task_goal=snapshot.get("taskGoal") or "",
+                title=snapshot.get("title"),
+                owner_employee_id=snapshot.get("ownerEmployeeId"),
+                deleted_by=deleted_by,
+                deleted_at=_parse_iso(now_iso()),
+            )
+        )
+
     def delete_session_with_task_unlinks(
-        self, session_id: str, task_store: Any
+        self, session_id: str, task_store: Any, *, deleted_by: str | None = None
     ) -> bool:
         if str(self.engine.url) != str(task_store.engine.url):
             raise RuntimeError("Session and task stores must use the same database.")
@@ -741,11 +817,7 @@ class DatabaseSessionStore:
                     task_store.unlink_session_in_transaction(
                         conn, task["id"], session_id
                     )
-            conn.execute(
-                delete(self.run_token_usage).where(
-                    self.run_token_usage.c.session_id == session_pk
-                )
-            )
+            self._insert_tombstone(conn, session_pk, snapshot, deleted_by)
             conn.execute(
                 delete(self.artifacts).where(self.artifacts.c.session_id == session_pk)
             )
@@ -770,9 +842,12 @@ class DatabaseSessionStore:
         with self.engine.begin() as conn:
             rows = (
                 conn.execute(
-                    select(self.run_token_usage, self.sessions.c.task_goal)
+                    select(
+                        self.run_token_usage,
+                        self.sessions.c.task_goal.label("session_task_goal"),
+                    )
                     .select_from(
-                        self.run_token_usage.join(
+                        self.run_token_usage.outerjoin(
                             self.sessions,
                             self.run_token_usage.c.session_id == self.sessions.c.id,
                         )
@@ -787,7 +862,7 @@ class DatabaseSessionStore:
                 "sessionId": row["session_id"],
                 "runId": row["run_id"],
                 "ownerEmployeeId": row["owner_employee_id"],
-                "taskGoal": row["task_goal"],
+                "taskGoal": row["task_goal"] or row["session_task_goal"],
                 "input": int(row["input_tokens"] or 0),
                 "output": int(row["output_tokens"] or 0),
                 "cache": int(row["cache_tokens"] or 0),
@@ -1110,6 +1185,7 @@ def session_run_token_usage_to_row(
         "session_id": session_pk,
         "run_id": run_id,
         "owner_employee_id": session.get("ownerEmployeeId"),
+        "task_goal": session.get("taskGoal"),
         "input_tokens": int(usage.get("input") or 0),
         "output_tokens": int(usage.get("output") or 0),
         "cache_tokens": int(usage.get("cache") or 0),

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -467,3 +469,67 @@ def test_database_session_store_workspace_artifact_snapshot_roundtrip() -> None:
 
         no_content, _updated = store.index_workspace_artifact(session["id"], {**_workspace_file_artifact(session["id"]), "id": "33333333-3333-4333-8333-333333333333"}, None)
         assert store.read_artifact_content(session["id"], no_content["id"]) is None
+
+
+def test_deleted_session_stays_deleted_and_retains_token_usage() -> None:
+    with TemporaryDirectory() as root:
+        stores = (
+            LocalSessionStore(Path(root) / "local"),
+            DatabaseSessionStore(f"sqlite:///{root}/relay.db", create_schema=True),
+        )
+        for store in stores:
+            session = store.create_session(
+                {
+                    "workspacePath": "/workspace/alice",
+                    "ownerEmployeeId": "alice",
+                    "taskGoal": "ship the release",
+                    "participants": ["human"],
+                }
+            )
+            store.append_event(session["id"], relay_event("agent.started", session["id"], {
+                "runId": "run_1",
+                "agent": "codex",
+                "mode": "action",
+            }))
+            store.append_event(session["id"], relay_event("agent.completed", session["id"], {
+                "runId": "run_1",
+                "agent": "codex",
+                "status": "completed",
+                "exitCode": 0,
+                "tokenUsage": {"input": 4, "output": 5, "cache": 1, "total": 10, "source": "codex"},
+            }))
+
+            store.delete_session(session["id"], deleted_by="alice")
+
+            with pytest.raises(KeyError):
+                store.get_session(session["id"])
+            # A late event flush (e.g. a daemon finishing after the delete)
+            # must not resurrect the thread.
+            with pytest.raises(KeyError):
+                store.append_event(session["id"], relay_event("agent.output", session["id"], {
+                    "runId": "run_1",
+                    "stream": "stdout",
+                    "chunk": "late output",
+                }))
+            assert all(item["id"] != session["id"] for item in store.list_sessions())
+
+            [usage] = store.list_token_usage()
+            assert usage["runId"] == "run_1"
+            assert usage["taskGoal"] == "ship the release"
+            assert usage["total"] == 10
+
+            if isinstance(store, DatabaseSessionStore):
+                with store.engine.begin() as conn:
+                    tombstone = conn.execute(store.tombstones.select()).mappings().one()
+                assert tombstone["session_id"] == session["id"]
+                assert tombstone["task_goal"] == "ship the release"
+                assert tombstone["deleted_by"] == "alice"
+            else:
+                tombstone = json.loads(
+                    (store.sessions_dir / f"{session['id']}.deleted.json").read_text(
+                        encoding="utf-8"
+                    )
+                )
+                assert tombstone["id"] == session["id"]
+                assert tombstone["taskGoal"] == "ship the release"
+                assert tombstone["deletedBy"] == "alice"

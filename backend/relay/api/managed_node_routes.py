@@ -92,13 +92,23 @@ async def update_managed_node(
 @router.delete("/admin/managed-nodes/{node_id}", status_code=202)
 async def delete_managed_node(
     node_id: str, request: Request, ctx: AppContextDep
-) -> dict[str, Any]:
+) -> Any:
     require_admin_session(request, ctx.auth_store)
     try:
         with ctx.registry.dispatch_lock:
             existing = ctx.managed_node_store.get_node(node_id)
             if not existing:
-                raise KeyError(node_id)
+                orphaned_runtime_ids = [
+                    runtime["id"]
+                    for runtime in ctx.registry.control_panel_nodes()
+                    if runtime.get("managedNodeId") == node_id
+                ]
+                for runtime_id in orphaned_runtime_ids:
+                    assert_node_agent_runs_drained(ctx, runtime_id)
+                for runtime_id in orphaned_runtime_ids:
+                    remove_node_agents(ctx, runtime_id)
+                    ctx.registry.delete(runtime_id)
+                return Response(status_code=204)
             daemon_node_id = existing.get("activeDaemonNodeId")
             if daemon_node_id:
                 assert_node_agent_runs_drained(ctx, daemon_node_id)
@@ -115,6 +125,30 @@ async def delete_managed_node(
         raise _admin_error(error) from error
 
 
+@router.post("/admin/managed-nodes/{node_id}/recover", status_code=202)
+async def recover_managed_node(
+    node_id: str, request: Request, ctx: AppContextDep
+) -> dict[str, Any]:
+    require_admin_session(request, ctx.auth_store)
+    try:
+        with ctx.registry.dispatch_lock:
+            existing = ctx.managed_node_store.get_node(node_id)
+            if not existing:
+                raise KeyError(node_id)
+            if existing.get("desiredState") != "deleted":
+                raise ValueError("Only a deleted managed node can be recovered.")
+            if existing.get("phase") != "deleted":
+                raise ValueError(
+                    "Managed node is still being deleted; recover it once deletion finishes."
+                )
+            node = ctx.managed_node_store.update_node(
+                node_id, {"desiredState": "running"}
+            )
+        return {"node": node}
+    except (KeyError, ValueError) as error:
+        raise _admin_error(error) from error
+
+
 @router.delete("/admin/managed-nodes/{node_id}/record", status_code=204)
 async def permanently_delete_managed_node(
     node_id: str, request: Request, ctx: AppContextDep
@@ -127,9 +161,9 @@ async def permanently_delete_managed_node(
                 raise KeyError(node_id)
             daemon_node_id = node.get("activeDaemonNodeId")
             if daemon_node_id and ctx.registry.get(daemon_node_id):
-                raise ValueError(
-                    "Managed node runtime must be retired before its record can be permanently deleted."
-                )
+                assert_node_agent_runs_drained(ctx, daemon_node_id)
+                remove_node_agents(ctx, daemon_node_id)
+                ctx.registry.delete(daemon_node_id)
             ctx.managed_node_store.purge_node(node_id)
     except (KeyError, ValueError) as error:
         raise _admin_error(error) from error

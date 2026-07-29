@@ -56,6 +56,7 @@ export function useRelayMutations() {
       );
       return { previous };
     },
+    onSuccess: () => void invalidateRelay(),
     onError: (error, _input, context) => {
       if (context?.previous) {
         queryClient.setQueryData(SESSIONS_QUERY_KEY, context.previous);

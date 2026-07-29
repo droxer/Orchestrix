@@ -51,7 +51,6 @@ export function AssignNodeDrawer({
   const [createNew, setCreateNew] = useState(false);
   const [nodeLocation, setNodeLocation] = useState<RunLocation>("managed");
   const [displayName, setDisplayName] = useState("");
-  const [sandboxMode, setSandboxMode] = useState<"boxlite" | "none">("boxlite");
   const [workspacePath, setWorkspacePath] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{
@@ -71,7 +70,6 @@ export function AssignNodeDrawer({
       setCreateNew(false);
       setNodeLocation("managed");
       setDisplayName("");
-      setSandboxMode("boxlite");
       setWorkspacePath("");
       setError(null);
       setFieldErrors({});
@@ -129,7 +127,7 @@ export function AssignNodeDrawer({
             employeeId: nextEmployeeId,
             displayName: displayName.trim() || undefined,
             workspacePath: workspacePath.trim(),
-            sandboxMode,
+            sandboxMode: "boxlite",
             nodeLocation: "employee-device",
           });
           onCreateNodeSuccess({ kind: "manual", result });
@@ -190,17 +188,17 @@ export function AssignNodeDrawer({
               <span className="adm-assign-avatar" aria-hidden="true">
                 {initialsOf(selectedEmployee.id)}
               </span>
-              <div className="adm-assign-operator-text">
-                <span className="adm-assign-operator-handle code">
-                  {displayHandle}
-                </span>
-                {selectedEmployee.displayName &&
-                selectedEmployee.displayName !== selectedEmployee.id ? (
-                  <span className="adm-assign-operator-name">
-                    {selectedEmployee.displayName}
+                <div className="adm-assign-operator-text">
+                  {selectedEmployee.displayName &&
+                  selectedEmployee.displayName !== selectedEmployee.id ? (
+                    <span className="adm-assign-operator-name">
+                      {selectedEmployee.displayName}
+                    </span>
+                  ) : null}
+                  <span className="adm-assign-operator-handle code">
+                    {displayHandle}
                   </span>
-                ) : null}
-              </div>
+                </div>
             </div>
           </section>
         ) : (
@@ -208,7 +206,7 @@ export function AssignNodeDrawer({
             <div className="adm-field">
               <span id={employeeLabelId}>{t("admin.employee")}</span>
               <Select
-                value={employeeId || undefined}
+                value={employeeId || null}
                 onValueChange={(value) => {
                   setEmployeeId(value ?? "");
                   clearFieldError("employeeId");
@@ -229,15 +227,23 @@ export function AssignNodeDrawer({
                         ? t("admin.no_employees")
                         : t("admin.select_employee")
                     }
-                  />
+                  >
+                    {(value: string) => {
+                      const employee = employees.find((e) => e.id === value);
+                      if (!employee) return `@${value}`;
+                      return employee.displayName && employee.displayName !== employee.id
+                        ? `${employee.displayName} / @${employee.id}`
+                        : `@${employee.id}`;
+                    }}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {employees.map((employee) => (
                     <SelectItem key={employee.id} value={employee.id}>
-                      @{employee.id}
                       {employee.displayName && employee.displayName !== employee.id
-                        ? ` / ${employee.displayName}`
+                        ? `${employee.displayName} / `
                         : ""}
+                      <span className="text-muted-foreground">@{employee.id}</span>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -387,7 +393,7 @@ export function AssignNodeDrawer({
                 autoComplete="off"
                 value={displayName}
                 onChange={(event) => setDisplayName(event.target.value)}
-                placeholder={t("admin.v2.computer_name_placeholder")}
+                placeholder={t(isManaged ? "admin.v2.computer_name_placeholder_managed" : "admin.v2.computer_name_placeholder_local")}
                 maxLength={64}
                 disabled={isBusy}
               />
@@ -397,47 +403,37 @@ export function AssignNodeDrawer({
               value={nodeLocation}
               onChange={(location) => {
                 setNodeLocation(location);
-                if (location === "managed") setSandboxMode("boxlite");
                 setError(null);
               }}
               name="assign-node-location"
               disabled={isBusy}
             />
             {!isManaged ? (
-              <>
-                <label className="adm-field">
-                  <span>{t("admin.v2.runtime_isolation")}</span>
-                  <select name="assign-node-sandbox" value={sandboxMode} onChange={(event) => setSandboxMode(event.target.value as "boxlite" | "none")} disabled={isBusy}>
-                    <option value="boxlite">{t("admin.v2.node_sandbox_boxlite")}</option>
-                    <option value="none">{t("admin.v2.node_sandbox_host")}</option>
-                  </select>
-                </label>
-                <label className="adm-field">
-                  <span>{t("workspace_label")}</span>
-                  <input
-                    ref={workspacePathRef}
-                    name="assign-node-workspace-path"
-                    autoComplete="off"
-                    value={workspacePath}
-                    onChange={(event) => {
-                      setWorkspacePath(event.target.value);
-                      clearFieldError("workspacePath");
-                    }}
-                    placeholder="/Users/alice/project"
-                    disabled={isBusy}
-                    aria-invalid={Boolean(fieldErrors.workspacePath) || undefined}
-                    aria-describedby={fieldErrors.workspacePath ? "assign-node-workspace-path-error" : undefined}
-                  />
-                  {fieldErrors.workspacePath ? (
-                    <span id="assign-node-workspace-path-error" className="text-sm text-danger" role="alert">
-                      {fieldErrors.workspacePath}
-                    </span>
-                  ) : null}
-                </label>
-              </>
+              <label className="adm-field">
+                <span>{t("workspace_label")}</span>
+                <input
+                  ref={workspacePathRef}
+                  name="assign-node-workspace-path"
+                  autoComplete="off"
+                  value={workspacePath}
+                  onChange={(event) => {
+                    setWorkspacePath(event.target.value);
+                    clearFieldError("workspacePath");
+                  }}
+                  placeholder="/Users/alice/project"
+                  disabled={isBusy}
+                  aria-invalid={Boolean(fieldErrors.workspacePath) || undefined}
+                  aria-describedby={fieldErrors.workspacePath ? "assign-node-workspace-path-error" : undefined}
+                />
+                {fieldErrors.workspacePath ? (
+                  <span id="assign-node-workspace-path-error" className="text-sm text-danger" role="alert">
+                    {fieldErrors.workspacePath}
+                  </span>
+                ) : null}
+              </label>
             ) : null}
             <p className="adm-form-hint">
-              {sandboxMode === "boxlite" ? t("admin.v2.node_help_managed") : t("admin.v2.node_help_local")}
+              {t("admin.v2.node_help_managed")}
             </p>
           </fieldset>
         ) : null}

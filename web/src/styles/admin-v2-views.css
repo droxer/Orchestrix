@@ -668,11 +668,23 @@
   display: inline-flex;
   align-items: baseline;
   gap: var(--sp-2);
+  /* CJK labels can break at any character, and as flex items their
+     min-content is one glyph — without nowrap a tight footer splits
+     "运行中"/"就绪" mid-word. */
+  white-space: nowrap;
 }
 
 .adm-emp-card-metric .tnum {
   font: var(--type-label-strong);
   font-variant-numeric: tabular-nums;
+}
+
+/* Employee cards carry only the delete action — collapse the fixed 5-slot
+   node grid (an unslotted button would auto-place into column 1 and leave
+   four empty 28px tracks) and pin the button to the footer edge. */
+.adm-emp-card .adm-node-card-actions {
+  display: flex;
+  margin-left: auto;
 }
 
 .adm-node-card.is-pulse::after {

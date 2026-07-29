@@ -49,6 +49,7 @@ import {
   Plus,
   Power,
   RefreshCw,
+  RotateCcw,
   ScanEye,
   Search,
   Server,
@@ -204,6 +205,7 @@ export const ActionToggle = withStandardStroke(Power, "ActionToggle");
 export const AdminNode = withStandardStroke(Server, "AdminNode");
 export const AdminManageExecutors = withStandardStroke(Settings2, "AdminManageExecutors");
 export const AdminDelete = withStandardStroke(Trash2, "AdminDelete");
+export const AdminRestore = withStandardStroke(RotateCcw, "AdminRestore");
 export const AdminDashboard = withStandardStroke(LayoutDashboard, "AdminDashboard");
 export const AdminEmployees = withStandardStroke(Users, "AdminEmployees");
 export const AdminConnect = withStandardStroke(Link2, "AdminConnect");

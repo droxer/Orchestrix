@@ -325,7 +325,11 @@ class SessionController:
         )
 
     def delete_session(
-        self, session_id: str, snapshot: dict[str, Any] | None = None
+        self,
+        session_id: str,
+        snapshot: dict[str, Any] | None = None,
+        *,
+        deleted_by: str | None = None,
     ) -> None:
         if snapshot is None:
             snapshot = self.store.get_session(session_id)
@@ -335,7 +339,7 @@ class SessionController:
             raise SessionRunInFlightError(session_id)
         atomic_delete = getattr(self.store, "delete_session_with_task_unlinks", None)
         if self.task_store and atomic_delete:
-            if not atomic_delete(session_id, self.task_store):
+            if not atomic_delete(session_id, self.task_store, deleted_by=deleted_by):
                 raise SessionRunInFlightError(session_id)
             logger.info("Session deleted", session_id=session_id)
             return
@@ -343,7 +347,7 @@ class SessionController:
             for task in self.task_store.list_tasks():
                 if session_id in task.get("linkedSessionIds", []):
                     self.task_store.unlink_session(task["id"], session_id)
-        self.store.delete_session(session_id)
+        self.store.delete_session(session_id, deleted_by=deleted_by)
         logger.info("Session deleted", session_id=session_id)
 
     def rename_session(self, session_id: str, title: str) -> dict[str, Any]:

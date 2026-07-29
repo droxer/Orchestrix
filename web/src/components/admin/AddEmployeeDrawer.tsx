@@ -295,7 +295,7 @@ export function AddEmployeeDrawer({
             <label className="adm-field">
               <span>{t("admin.assign_node")}</span>
               <Select
-                value={selectedNodeId || undefined}
+                value={selectedNodeId || null}
                 onValueChange={(value) => setSelectedNodeId(value ?? "")}
               >
                 <SelectTrigger className="w-full code">

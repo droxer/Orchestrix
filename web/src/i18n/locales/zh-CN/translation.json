@@ -35,6 +35,7 @@
     "task_action": "无法更新任务。请刷新看板后重试。",
     "admin_unassign_node": "无法取消分配节点。请检查连接后重试。",
     "admin_delete_node": "无法删除节点。请检查连接后重试。",
+    "admin_recover_node": "无法恢复节点。请检查连接后重试。",
     "admin_delete_employee": "无法删除员工。请检查连接后重试。",
     "copy_message": "无法复制消息。请手动选中文字复制。",
     "delete_task": "无法删除任务。请检查连接后重试。",
@@ -744,6 +745,10 @@
       "history_deleting": "正在删除…",
       "history_delete_confirm": "永久删除 {{name}}（{{id}}）？",
       "history_delete_warning": "这将永久移除电脑记录、配置尝试和注册历史，且无法撤销。",
+      "history_recover_action": "恢复",
+      "history_recovering": "正在恢复…",
+      "history_recover_confirm": "恢复 {{name}}（{{id}}）？",
+      "history_recover_message": "电脑将重新回到节点列表并重新配置，此前的运行时不会被还原。",
       "danger_zone": "危险操作",
       "action_failed": "操作失败：{{message}}",
       "delete_employee_action": "删除员工",
@@ -833,7 +838,9 @@
       "chat_delete_link_message": "来自此身份的消息将不再路由到关联员工。",
       "chat_delete_allow_confirm": "删除允许的会话 {{id}}？",
       "chat_delete_allow_message": "此会话将无法再使用该集成。",
-      "chat_rotate_message": "当前 Webhook 密钥将立即失效。"
+      "chat_rotate_message": "当前 Webhook 密钥将立即失效。",
+      "computer_name_placeholder_managed": "云端计算节点",
+      "computer_name_placeholder_local": "办公室 Mac Studio"
     },
     "signing_in": "登录中…"
   },

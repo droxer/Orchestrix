@@ -31,6 +31,7 @@ from .helpers import (
     is_workspace_artifact,
     json_body,
     owner_employee_id_for_create,
+    request_actor,
     request_actor_or_sandbox,
     role_name,
     string_field,
@@ -519,7 +520,7 @@ async def assign_session(session_id: str, request: Request, ctx: AppContextDep) 
 
 @router.delete("/threads/{session_id}", status_code=204)
 async def delete_session(session_id: str, request: Request, ctx: AppContextDep) -> Response:
-    actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
+    actor = request_actor(request, ctx.auth_store)
     controller = SessionController(
         ctx.session_store,
         task_store=ctx.task_store,
@@ -532,9 +533,12 @@ async def delete_session(session_id: str, request: Request, ctx: AppContextDep) 
                 session_id
             ):
                 raise SessionRunInFlightError(session_id)
-            controller.delete_session(session_id, snapshot=snapshot)
+            controller.delete_session(
+                session_id, snapshot=snapshot, deleted_by=actor["employeeId"]
+            )
     except SessionRunInFlightError:
         raise HTTPException(409, "Session has a run in flight.")
+    ctx.chat_store.clear_conversation_sessions(session_id)
     return Response(status_code=204)
 
 

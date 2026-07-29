@@ -17,4 +17,18 @@ describe("Admin page refresh stability", () => {
     assert.doesNotMatch(adminPageSource, /useUrlSearchState/);
     assert.match(relayDataSource, /const \[manualRefreshPending, setManualRefreshPending\] = useState\(false\)/);
   });
+
+  it("refreshes the visible node list after permanently deleting managed-node history", async () => {
+    const adminPageSource = await readFile(resolve("web/src/components/AdminPage.tsx"), "utf8");
+
+    const permanentDeleteHandler = adminPageSource.match(
+      /async function handlePermanentlyDeleteManagedNode[\s\S]*?\n  }/,
+    )?.[0] ?? "";
+
+    assert.match(permanentDeleteHandler, /permanentlyDeleteManagedNode\(node\.id\)/);
+    assert.match(
+      permanentDeleteHandler,
+      /Promise\.all\(\[managedNodesQuery\.refetch\(\), refetch\(\)\]\)/,
+    );
+  });
 });

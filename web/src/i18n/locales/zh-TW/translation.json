@@ -35,6 +35,7 @@
     "task_action": "無法更新任務。請重新整理看板後重試。",
     "admin_unassign_node": "無法取消指派節點。請檢查連線後重試。",
     "admin_delete_node": "無法刪除節點。請檢查連線後重試。",
+    "admin_recover_node": "無法復原節點。請檢查連線後重試。",
     "admin_delete_employee": "無法刪除員工。請檢查連線後重試。",
     "copy_message": "無法複製訊息。請手動選取文字複製。",
     "delete_task": "無法刪除任務。請檢查連線後重試。",
@@ -744,6 +745,10 @@
       "history_deleting": "正在刪除…",
       "history_delete_confirm": "永久刪除 {{name}}（{{id}}）？",
       "history_delete_warning": "這將永久移除電腦記錄、佈建嘗試和註冊歷史，且無法復原。",
+      "history_recover_action": "復原",
+      "history_recovering": "正在復原…",
+      "history_recover_confirm": "復原 {{name}}（{{id}}）？",
+      "history_recover_message": "電腦將重新回到節點列表並重新佈建，此前的運行時不會被還原。",
       "danger_zone": "危險操作",
       "action_failed": "操作失敗：{{message}}",
       "delete_employee_action": "刪除員工",
@@ -833,7 +838,9 @@
       "chat_delete_link_message": "來自此身分的訊息將不再路由到連結的員工。",
       "chat_delete_allow_confirm": "刪除允許的對話 {{id}}？",
       "chat_delete_allow_message": "此對話將無法再使用該整合。",
-      "chat_rotate_message": "目前的 Webhook 密鑰將立即失效。"
+      "chat_rotate_message": "目前的 Webhook 密鑰將立即失效。",
+      "computer_name_placeholder_managed": "雲端運算節點",
+      "computer_name_placeholder_local": "辦公室 Mac Studio"
     },
     "signing_in": "登入中…"
   },

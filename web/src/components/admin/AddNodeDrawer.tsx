@@ -3,7 +3,6 @@
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { createControlPanelDaemonNode, createManagedNode } from "../../api";
-import { initialsOf } from "../../lib/adminHelpers";
 import type {
   CreateControlPanelDaemonNodeResponse,
   CreateManagedNodeResponse,
@@ -12,6 +11,7 @@ import type {
 import { Drawer } from "../ui/Drawer";
 import { RunModeField, type RunLocation } from "./RunModeField";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import {
   Select,
@@ -45,7 +45,6 @@ export function AddNodeDrawer({
 
   const [nodeLocation, setNodeLocation] = useState<RunLocation>("managed");
   const [displayName, setDisplayName] = useState("");
-  const [sandboxMode, setSandboxMode] = useState<"boxlite" | "none">("boxlite");
   const [workspacePath, setWorkspacePath] = useState("");
   const [employeeId, setEmployeeId] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -69,7 +68,6 @@ export function AddNodeDrawer({
     if (!open) {
       setNodeLocation("managed");
       setDisplayName("");
-      setSandboxMode("boxlite");
       setWorkspacePath("");
       setEmployeeId("");
       setError(null);
@@ -114,7 +112,7 @@ export function AddNodeDrawer({
           employeeId: employeeId || undefined,
           displayName: displayName.trim() || undefined,
           workspacePath: workspacePath.trim(),
-          sandboxMode,
+          sandboxMode: "boxlite",
           nodeLocation: "employee-device",
         });
         onSuccess({ kind: "manual", result });
@@ -152,12 +150,12 @@ export function AddNodeDrawer({
           </header>
           <label className="adm-field">
             <span>{t("admin.v2.computer_name")}</span>
-            <input
+            <Input
               name="add-node-display-name"
               autoComplete="off"
               value={displayName}
               onChange={(event) => setDisplayName(event.target.value)}
-              placeholder={t("admin.v2.computer_name_placeholder")}
+              placeholder={t(isManaged ? "admin.v2.computer_name_placeholder_managed" : "admin.v2.computer_name_placeholder_local")}
               maxLength={64}
               disabled={isBusy}
             />
@@ -167,7 +165,6 @@ export function AddNodeDrawer({
             value={nodeLocation}
             onChange={(location) => {
               setNodeLocation(location);
-              if (location === "managed") setSandboxMode("boxlite");
               setError(null);
             }}
             name="add-node-location"
@@ -176,15 +173,8 @@ export function AddNodeDrawer({
           {!isManaged ? (
             <>
               <label className="adm-field">
-                <span>{t("admin.v2.runtime_isolation")}</span>
-                <select name="add-node-sandbox" value={sandboxMode} onChange={(event) => setSandboxMode(event.target.value as "boxlite" | "none")} disabled={isBusy}>
-                  <option value="boxlite">{t("admin.v2.node_sandbox_boxlite")}</option>
-                  <option value="none">{t("admin.v2.node_sandbox_host")}</option>
-                </select>
-              </label>
-              <label className="adm-field">
                 <span>{t("workspace_label")}</span>
-                <input
+                <Input
                   ref={workspacePathRef}
                   name="add-node-workspace-path"
                   autoComplete="off"
@@ -230,30 +220,10 @@ export function AddNodeDrawer({
             </span>
           </header>
 
-          {selectedEmployee ? (
-            <div className="adm-assign-operator-card">
-              <span className="sr-only">{t("admin.v2.selected_employee")}</span>
-              <span className="adm-assign-avatar">
-                {initialsOf(selectedEmployee.id)}
-              </span>
-              <div className="adm-assign-operator-text">
-                <span className="adm-assign-operator-handle code">
-                  @{selectedEmployee.id}
-                </span>
-                {selectedEmployee.displayName &&
-                selectedEmployee.displayName !== selectedEmployee.id ? (
-                  <span className="adm-assign-operator-name">
-                    {selectedEmployee.displayName}
-                  </span>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
-
           <div className="adm-field">
             <span id={employeeLabelId}>{t("admin.employee")}</span>
             <Select
-              value={employeeId || undefined}
+              value={employeeId || null}
               onValueChange={(value) => {
                 setEmployeeId(value ?? "");
                 clearFieldError("employeeId");
@@ -270,15 +240,23 @@ export function AddNodeDrawer({
               >
                 <SelectValue
                   placeholder={employees.length === 0 ? t("admin.no_employees") : t("admin.select_employee")}
-                />
+                >
+                  {(value: string) => {
+                    const employee = employees.find((e) => e.id === value);
+                    if (!employee) return `@${value}`;
+                    return employee.displayName && employee.displayName !== employee.id
+                      ? `${employee.displayName} / @${employee.id}`
+                      : `@${employee.id}`;
+                  }}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {employees.map((employee) => (
                   <SelectItem key={employee.id} value={employee.id}>
-                    @{employee.id}
                     {employee.displayName && employee.displayName !== employee.id
-                      ? ` / ${employee.displayName}`
+                      ? `${employee.displayName} / `
                       : ""}
+                    <span className="text-muted-foreground">@{employee.id}</span>
                   </SelectItem>
                 ))}
               </SelectContent>

@@ -239,6 +239,74 @@ def test_legacy_managed_node_with_retired_policy_can_be_deleted(monkeypatch) -> 
         assert deleted.json()["node"]["desiredState"] == "deleted"
 
 
+def test_admin_can_recover_deleted_managed_node(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _login_admin(client)
+
+        created = client.post(
+            "/api/v1/admin/managed-nodes",
+            json={"employeeId": "alice", "sandboxMode": "boxlite"},
+        ).json()["node"]
+
+        active = client.post(f"/api/v1/admin/managed-nodes/{created['id']}/recover")
+        assert active.status_code == 409
+        assert "deleted" in active.json()["detail"]
+
+        app.state.managed_node_store.update_node(
+            created["id"], {"desiredState": "deleted"}
+        )
+        deleting = client.post(f"/api/v1/admin/managed-nodes/{created['id']}/recover")
+        assert deleting.status_code == 409
+        assert "still being deleted" in deleting.json()["detail"]
+
+        app.state.managed_node_store.update_node(created["id"], {"phase": "deleted"})
+
+        recovered = client.post(f"/api/v1/admin/managed-nodes/{created['id']}/recover")
+
+        assert recovered.status_code == 202
+        node = recovered.json()["node"]
+        assert node["desiredState"] == "running"
+        assert node["phase"] == "requested"
+        assert node["generation"] == created["generation"] + 2
+        assert "activeAttemptId" not in node
+
+        missing = client.post("/api/v1/admin/managed-nodes/nodes_missing/recover")
+        assert missing.status_code == 404
+
+
+def test_recovered_managed_node_conflicts_with_replacement_policy_slot(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _login_admin(client)
+
+        created = client.post(
+            "/api/v1/admin/managed-nodes",
+            json={"employeeId": "alice", "sandboxMode": "boxlite"},
+        ).json()["node"]
+        app.state.managed_node_store.update_node(
+            created["id"], {"desiredState": "deleted"}
+        )
+        app.state.managed_node_store.update_node(created["id"], {"phase": "deleted"})
+        client.post(
+            "/api/v1/admin/managed-nodes",
+            json={"employeeId": "alice", "sandboxMode": "boxlite"},
+        )
+
+        recovered = client.post(f"/api/v1/admin/managed-nodes/{created['id']}/recover")
+
+        assert recovered.status_code == 409
+        assert "policy slot" in recovered.json()["detail"]
+
+
 def test_admin_can_permanently_delete_terminal_managed_node_record(
     monkeypatch,
 ) -> None:
@@ -270,6 +338,88 @@ def test_admin_can_permanently_delete_terminal_managed_node_record(
             client.get(f"/api/v1/admin/managed-nodes/{created['id']}").status_code
             == 404
         )
+
+
+def test_permanent_delete_retires_leftover_managed_runtime(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _login_admin(client)
+
+        managed = app.state.managed_node_store.create_node({"employeeId": "alice"})
+        attempt, _credential = app.state.managed_node_store.create_attempt(
+            managed["id"]
+        )
+        runtime, runtime_token = app.state.registry.enroll_managed_node(
+            managed,
+            attempt,
+            {"workspacePath": "/workspace"},
+        )
+        app.state.managed_node_store.complete_enrollment(
+            managed["id"], attempt["id"], runtime["id"]
+        )
+        app.state.registry.register(
+            {
+                "sandboxId": runtime["id"],
+                "token": runtime_token,
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }
+        )
+        deleted = client.delete(f"/api/v1/admin/managed-nodes/{managed['id']}")
+        assert deleted.status_code == 202, deleted.text
+        app.state.managed_node_store.update_node(managed["id"], {"phase": "deleted"})
+
+        purged = client.delete(f"/api/v1/admin/managed-nodes/{managed['id']}/record")
+
+        assert purged.status_code == 204, purged.text
+        assert app.state.registry.get(runtime["id"]) is None
+        assert app.state.managed_node_store.get_node(managed["id"]) is None
+
+
+def test_delete_managed_node_cleans_orphaned_runtime(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        _login_admin(client)
+
+        managed = app.state.managed_node_store.create_node({"employeeId": "alice"})
+        attempt, _credential = app.state.managed_node_store.create_attempt(
+            managed["id"]
+        )
+        runtime, runtime_token = app.state.registry.enroll_managed_node(
+            managed,
+            attempt,
+            {"workspacePath": "/workspace"},
+        )
+        app.state.managed_node_store.complete_enrollment(
+            managed["id"], attempt["id"], runtime["id"]
+        )
+        app.state.registry.register(
+            {
+                "sandboxId": runtime["id"],
+                "token": runtime_token,
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }
+        )
+        app.state.managed_node_store.update_node(
+            managed["id"], {"desiredState": "deleted"}
+        )
+        app.state.managed_node_store.update_node(managed["id"], {"phase": "deleted"})
+        app.state.managed_node_store.purge_node(managed["id"])
+
+        deleted = client.delete(f"/api/v1/admin/managed-nodes/{managed['id']}")
+
+        assert deleted.status_code == 204, deleted.text
+        assert app.state.registry.get(runtime["id"]) is None
+        assert client.get("/api/v1/admin/daemon-nodes").json()["nodes"] == []
 
 
 def test_managed_node_runtime_cannot_be_drained_or_retired_during_active_run(

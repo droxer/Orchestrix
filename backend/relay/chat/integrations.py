@@ -335,6 +335,20 @@ class LocalChatIntegrationStore:
                     return record
             return None
 
+    def clear_conversation_sessions(self, session_id: str) -> int:
+        """Drop bindings that point at a permanently deleted session."""
+        with self._lock:
+            records = self._read_conversations()
+            remaining = [
+                record
+                for record in records
+                if record.get("sessionId") != session_id
+            ]
+            removed = len(records) - len(remaining)
+            if removed:
+                self._write_conversations(remaining)
+            return removed
+
     def set_conversation_session(self, payload: dict[str, Any], session_id: str, owner_employee_id: str) -> dict[str, Any]:
         """Bind a conversation thread to a Relay session (upsert by thread key)."""
         with self._lock:
@@ -571,6 +585,13 @@ class DatabaseChatIntegrationStore(LocalChatIntegrationStore):
         return self._atomic(
             lambda: super(DatabaseChatIntegrationStore, self).set_conversation_session(
                 payload, session_id, owner_employee_id
+            )
+        )
+
+    def clear_conversation_sessions(self, session_id: str) -> int:
+        return self._atomic(
+            lambda: super(DatabaseChatIntegrationStore, self).clear_conversation_sessions(
+                session_id
             )
         )
 

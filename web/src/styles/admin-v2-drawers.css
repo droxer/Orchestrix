@@ -343,16 +343,16 @@
 }
 
 .adm-assign-operator-handle {
-  font-size: var(--fs-5);
-  font-weight: 500;
-  color: var(--ink-1);
+  font-size: var(--fs-2);
+  color: var(--ink-3);
   line-height: 1.1;
   word-break: break-all;
 }
 
 .adm-assign-operator-name {
-  font-size: var(--fs-2);
-  color: var(--ink-3);
+  font-size: var(--fs-5);
+  font-weight: 500;
+  color: var(--ink-1);
 }
 
 .adm-assign-nodes {

@@ -8,7 +8,7 @@ import { useTranslation } from "react-i18next";
 import { useMutationError } from "../hooks/useMutationError";
 import { Button } from "@/components/ui/button";
 import { ActionAddPerson, AdminNode, NavRefresh } from "./icons";
-import { deleteControlPanelDaemonNode, deleteControlPanelEmployee, deleteManagedNode, getAuthStatus, getMe, listManagedNodes, permanentlyDeleteManagedNode, unassignControlPanelDaemonNode, updateComputerDisplayName, updateManagedNodeDisplayName } from "../api";
+import { deleteControlPanelDaemonNode, deleteControlPanelEmployee, deleteManagedNode, getAuthStatus, getMe, listManagedNodes, permanentlyDeleteManagedNode, recoverManagedNode, unassignControlPanelDaemonNode, updateComputerDisplayName, updateManagedNodeDisplayName } from "../api";
 import type {
   AssignControlPanelDaemonNodeResponse,
   ControlPanelDaemonNodeRecord,
@@ -241,10 +241,20 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
     }
   }
 
+  async function handleRecoverManagedNode(node: ManagedNodeRecord) {
+    try {
+      await recoverManagedNode(node.id);
+      await Promise.all([managedNodesQuery.refetch(), refetch()]);
+    } catch (error) {
+      reportMutationError("Failed to recover managed node", error, t("errors.admin_recover_node"));
+      throw error;
+    }
+  }
+
   async function handlePermanentlyDeleteManagedNode(node: ManagedNodeRecord) {
     try {
       await permanentlyDeleteManagedNode(node.id);
-      await managedNodesQuery.refetch();
+      await Promise.all([managedNodesQuery.refetch(), refetch()]);
     } catch (error) {
       reportMutationError("Failed to permanently delete managed-node record", error, t("errors.admin_delete_node"));
       throw error;
@@ -492,6 +502,7 @@ export function AdminPage({ currentUser }: { currentUser?: CurrentUser | null })
                   />
                   <ManagedNodeHistory
                     nodes={managedNodes}
+                    onRecover={handleRecoverManagedNode}
                     onDeletePermanently={handlePermanentlyDeleteManagedNode}
                   />
                 </>

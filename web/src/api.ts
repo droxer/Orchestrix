@@ -327,14 +327,21 @@ export function updateManagedNodeDisplayName(
   );
 }
 
-export function deleteManagedNode(nodeId: string): Promise<CreateManagedNodeResponse> {
-  return apiJson<CreateManagedNodeResponse>(`/admin/managed-nodes/${encodeURIComponent(nodeId)}`, {
+export function deleteManagedNode(nodeId: string): Promise<CreateManagedNodeResponse | void> {
+  return apiJson<CreateManagedNodeResponse | void>(`/admin/managed-nodes/${encodeURIComponent(nodeId)}`, {
     method: "DELETE",
   });
 }
 
 export function listManagedNodes(signal?: AbortSignal): Promise<ManagedNodesResponse> {
   return apiJson<ManagedNodesResponse>("/admin/managed-nodes", { signal });
+}
+
+export function recoverManagedNode(nodeId: string): Promise<{ node: ManagedNodeRecord }> {
+  return apiJson<{ node: ManagedNodeRecord }>(
+    `/admin/managed-nodes/${encodeURIComponent(nodeId)}/recover`,
+    { method: "POST" },
+  );
 }
 
 export function permanentlyDeleteManagedNode(nodeId: string): Promise<void> {

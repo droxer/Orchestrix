@@ -103,3 +103,53 @@ def test_delete_removes_cancelled_session_with_orphaned_agent_run(monkeypatch) -
 
         assert response.status_code == 204
         assert client.get(f"/api/v1/threads/{session_id}").status_code == 404
+
+
+def test_delete_rejects_daemon_node_token(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap(client)
+        session_id = _create_session(client)
+        app.state.registry.register(
+            {
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "protocolVersion": 1,
+                "supportedAgents": ["claude"],
+                "status": "ready",
+            }
+        )
+
+        # A node token authenticates a daemon runtime, not a person; it must
+        # not be able to permanently delete threads.
+        anonymous = TestClient(app)
+        response = anonymous.delete(
+            f"/api/v1/threads/{session_id}",
+            headers={"Authorization": "Bearer node_token"},
+        )
+
+        assert response.status_code == 401
+        assert client.get(f"/api/v1/threads/{session_id}").status_code == 200
+
+
+def test_delete_clears_chat_conversation_binding(monkeypatch) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap(client)
+        session_id = _create_session(client)
+        conversation = {"provider": "telegram", "conversationId": "conv_1"}
+        app.state.chat_store.set_conversation_session(conversation, session_id, "admin")
+        assert (
+            app.state.chat_store.get_conversation_session(conversation)["sessionId"]
+            == session_id
+        )
+
+        response = client.delete(f"/api/v1/threads/{session_id}")
+
+        assert response.status_code == 204
+        assert app.state.chat_store.get_conversation_session(conversation) is None
