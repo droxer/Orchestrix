@@ -3,17 +3,8 @@
 import type { TFunction } from "i18next";
 import { Button } from "../ui/button";
 import { AdminDelete, AdminEmployees } from "../icons";
-import { type EmployeeNodeSummary } from "./helpers";
+import { employeeSummaryStatus, type EmployeeNodeSummary } from "./helpers";
 import { EmployeeComputers } from "./EmployeeComputers";
-
-// Employee node state, collapsed to the same tone vocabulary the node status
-// pill uses so the two cards read as one system.
-export function summaryTone(member: EmployeeNodeSummary): { tone: string; key: string } {
-  if (member.runningCount > 0) return { tone: "info", key: "running" };
-  if (member.readyCount > 0) return { tone: "good", key: "ready" };
-  if (member.nodeCount > 0) return { tone: "muted", key: "idle" };
-  return { tone: "muted", key: "no_nodes" };
-}
 
 interface EmployeeCardProps {
   member: EmployeeNodeSummary;
@@ -30,7 +21,7 @@ export function EmployeeCard({
   deletePending,
   t,
 }: EmployeeCardProps) {
-  const { tone, key } = summaryTone(member);
+  const { tone, key } = employeeSummaryStatus(member);
   return (
     <article
       className={`adm-node-card adm-emp-card tone-${tone}${highlight ? " is-pulse" : ""}`}

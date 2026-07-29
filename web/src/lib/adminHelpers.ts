@@ -80,6 +80,21 @@ export function visualStatus(node: ControlPanelDaemonNodeRecord): string {
   return isStale(node) ? "stale" : node.status;
 }
 
+export type NodeQuickFilter = "all" | "ready" | "running" | "provisioning" | "failed" | "stopped" | "unassigned";
+
+/** Match the fleet lifecycle slices while keeping an intentional stop distinct
+ * from a lost heartbeat. Assignment remains an overlapping facet. */
+export function matchesNodeQuickFilter(
+  node: ControlPanelDaemonNodeRecord,
+  filter: NodeQuickFilter,
+): boolean {
+  if (filter === "all") return true;
+  if (filter === "unassigned") return !node.employeeId;
+  const status = visualStatus(node);
+  if (filter === "failed") return status === "failed" || status === "stale";
+  return status === filter;
+}
+
 /** A computer is "online" when its daemon is connected and its heartbeat is fresh. */
 export function isNodeOnline(node: ControlPanelDaemonNodeRecord): boolean {
   return Boolean(node.online) && !isStale(node);
@@ -142,6 +157,46 @@ export interface EmployeeNodeSummary {
   nodes: ControlPanelDaemonNodeRecord[];
 }
 
+export type EmployeeQuickFilter = "all" | "running" | "ready" | "idle" | "failed" | "unassigned";
+export type EmployeeSummaryStatusKey = "running" | "ready" | "failed" | "idle" | "no_nodes";
+type EmployeeSummaryTone = Tone | "muted";
+
+export function matchesEmployeeQuickFilter(
+  member: EmployeeNodeSummary,
+  filter: EmployeeQuickFilter,
+): boolean {
+  if (filter === "all") return true;
+  if (filter === "running") return member.runningCount > 0;
+  if (filter === "ready") return member.readyCount > 0;
+  if (filter === "failed") return member.failedCount > 0;
+  if (filter === "idle") {
+    return member.nodeCount > 0
+      && member.runningCount === 0
+      && member.readyCount === 0
+      && member.failedCount === 0;
+  }
+  return member.nodeCount === 0;
+}
+
+export function employeeSummaryStatus(
+  member: EmployeeNodeSummary,
+): { tone: EmployeeSummaryTone; key: EmployeeSummaryStatusKey } {
+  if (member.runningCount > 0) return { tone: "info", key: "running" };
+  if (member.readyCount > 0) return { tone: "good", key: "ready" };
+  if (member.failedCount > 0) return { tone: "bad", key: "failed" };
+  if (member.nodeCount > 0) return { tone: "muted", key: "idle" };
+  return { tone: "muted", key: "no_nodes" };
+}
+
+export function employeeEmptyStateTranslationKey(
+  query: string,
+  filter: EmployeeQuickFilter,
+): "admin.v2.no_match" | "admin.v2.no_employees_for_filter" {
+  return query.trim() || filter === "all"
+    ? "admin.v2.no_match"
+    : "admin.v2.no_employees_for_filter";
+}
+
 export function buildEmployeeSummaries(
   employees: EmployeeRecord[],
   nodes: ControlPanelDaemonNodeRecord[],
@@ -162,12 +217,9 @@ export function buildEmployeeSummaries(
   return [...ids].sort().map((id) => {
     const employee = employeeById.get(id);
     const employeeNodes = nodesByEmployee.get(id) ?? [];
-    const readyCount = employeeNodes.filter((node) => visualStatus(node) === "ready").length;
-    const runningCount = employeeNodes.filter((node) => !isStale(node) && node.status === "running").length;
-    const failedCount = employeeNodes.filter((node) => {
-      const status = visualStatus(node);
-      return status === "failed" || status === "stale";
-    }).length;
+    const readyCount = employeeNodes.filter((node) => matchesNodeQuickFilter(node, "ready")).length;
+    const runningCount = employeeNodes.filter((node) => matchesNodeQuickFilter(node, "running")).length;
+    const failedCount = employeeNodes.filter((node) => matchesNodeQuickFilter(node, "failed")).length;
     return {
       id,
       displayName: employee?.displayName || id,
