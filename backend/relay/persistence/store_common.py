@@ -80,6 +80,18 @@ def _append_jsonl(path: Path, value: Any) -> None:
         handle.write("\n")
 
 
+def _write_jsonl(path: Path, values: list[Any]) -> None:
+    """Atomically replace a JSONL file. Used by retention passes that rewrite a
+    log in place; appends should use `_append_jsonl`."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    with tmp.open("w", encoding="utf-8") as handle:
+        for value in values:
+            handle.write(json.dumps(value, separators=(",", ":")))
+            handle.write("\n")
+    tmp.replace(path)
+
+
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         raise KeyError(path)

@@ -36,6 +36,7 @@ from .store_common import (
     _read_json,
     _read_jsonl,
     _write_json,
+    _write_jsonl,
     daemon_event,
     database_id_column,
     entity_uuid_type,
@@ -46,6 +47,12 @@ from .store_common import (
 )
 
 TERMINAL_DAEMON_STATUSES = frozenset({"completed", "failed", "cancelled"})
+# Command-lifecycle events describe records that `prune_terminal_records`
+# deletes, so they are pruned on the same retention cutoff. Node-lifecycle
+# events are kept indefinitely: `delete_node` hard-deletes the node row, which
+# makes the event log the only surviving record of a node incarnation (see
+# `historical_managed_runtime_ids`).
+PRUNABLE_DAEMON_EVENT_PREFIX = "daemon.command."
 ACTIVE_RUN_REQUEST_STATUSES = frozenset({"running", "dispatching", "finalizing"})
 DISPATCH_CLAIM_ID_STATE_KEY = "_relay_dispatch_claim_id"
 DISPATCH_CLAIM_EXPIRES_STATE_KEY = "_relay_dispatch_claim_expires_at"
@@ -188,12 +195,9 @@ class LocalDaemonStore:
             if patch.get("lastError") is None and "lastError" in patch:
                 updated.pop("lastError", None)
             self._write_node(updated)
-            self.append_daemon_event(
-                daemon_event(
-                    "daemon.node.seen",
-                    {"nodeId": node_id, "patch": {**patch, "lastSeenAt": now}},
-                )
-            )
+            # Deliberately not logged as a daemon event: heartbeats arrive
+            # several times per second per node, and `lastSeenAt` on the node
+            # record is the only thing anything reads.
             return updated
 
     def assign_node_employee(self, node_id: str, employee_id: str) -> dict[str, Any]:
@@ -835,7 +839,30 @@ class LocalDaemonStore:
                 cutoff=cutoff,
                 per_node_limit=per_node_limit,
             )
-        return {"commands": deleted_commands, "runs": deleted_runs}
+            deleted_events = self._prune_command_events(cutoff)
+        return {
+            "commands": deleted_commands,
+            "runs": deleted_runs,
+            "events": deleted_events,
+        }
+
+    def _prune_command_events(self, cutoff: str) -> int:
+        events_path = self.events_dir / "events.jsonl"
+        if not events_path.exists():
+            return 0
+        events = _read_jsonl(events_path)
+        retained = [
+            event
+            for event in events
+            if not (
+                str(event.get("type", "")).startswith(PRUNABLE_DAEMON_EVENT_PREFIX)
+                and str(event.get("timestamp", "")) <= cutoff
+            )
+        ]
+        deleted = len(events) - len(retained)
+        if deleted:
+            _write_jsonl(events_path, retained)
+        return deleted
 
     def append_daemon_event(self, event: dict[str, Any]) -> None:
         _append_jsonl(self.events_dir / "events.jsonl", event)
@@ -1199,13 +1226,9 @@ class DatabaseDaemonStore:
                 .where(self.nodes.c.id == node_pk)
                 .values(**node_to_row(updated, database_id=node_pk))
             )
-            self._append_daemon_event(
-                conn,
-                daemon_event(
-                    "daemon.node.seen",
-                    {"nodeId": node_id, "patch": {**patch, "lastSeenAt": now}},
-                ),
-            )
+            # Deliberately not logged as a daemon event: heartbeats arrive
+            # several times per second per node, and `lastSeenAt` on the node
+            # record is the only thing anything reads.
         return updated
 
     def assign_node_employee(self, node_id: str, employee_id: str) -> dict[str, Any]:
@@ -2145,6 +2168,7 @@ class DatabaseDaemonStore:
         per_node_limit = max(0, per_node_limit)
         deleted_commands = 0
         deleted_runs = 0
+        deleted_events = 0
         with self.engine.begin() as conn:
             command_rows = (
                 conn.execute(
@@ -2183,7 +2207,21 @@ class DatabaseDaemonStore:
                     ).rowcount
                     or 0
                 )
-        return {"commands": deleted_commands, "runs": deleted_runs}
+
+            deleted_events = (
+                conn.execute(
+                    delete(self.events).where(
+                        self.events.c.type.startswith(PRUNABLE_DAEMON_EVENT_PREFIX),
+                        self.events.c.timestamp <= _parse_iso(cutoff),
+                    )
+                ).rowcount
+                or 0
+            )
+        return {
+            "commands": deleted_commands,
+            "runs": deleted_runs,
+            "events": deleted_events,
+        }
 
     def append_daemon_event(self, event: dict[str, Any]) -> None:
         with self.engine.begin() as conn:

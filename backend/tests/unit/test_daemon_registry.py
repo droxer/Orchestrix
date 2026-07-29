@@ -24,7 +24,9 @@ from relay.persistence.agent_placement_store import LocalAgentPlacementStore
 from relay.persistence.agent_store import LocalAgentStore
 from relay.persistence.daemon_store import DatabaseDaemonStore, LocalDaemonStore
 from relay.persistence.session_store import LocalSessionStore
+from relay.persistence.store_common import _read_jsonl
 from relay.sessions import SessionController
+from sqlalchemy import select
 
 
 def database_daemon_store(root: str) -> DatabaseDaemonStore:
@@ -32,6 +34,17 @@ def database_daemon_store(root: str) -> DatabaseDaemonStore:
 
 
 DAEMON_STORE_FACTORIES = [LocalDaemonStore, database_daemon_store]
+
+
+def stored_daemon_event_types(store: object) -> list[str]:
+    events_dir = getattr(store, "events_dir", None)
+    if events_dir is not None:
+        events_path = events_dir / "events.jsonl"
+        if not events_path.exists():
+            return []
+        return [event["type"] for event in _read_jsonl(events_path)]
+    with store.engine.begin() as conn:
+        return list(conn.scalars(select(store.events.c.type)))
 
 
 @pytest.mark.parametrize("daemon_store_factory", DAEMON_STORE_FACTORIES)
@@ -3312,7 +3325,8 @@ def test_daemon_store_prunes_terminal_records_but_keeps_active_records(
         pruned_by_cap = store.prune_terminal_records(
             retention_seconds=365 * 24 * 60 * 60, per_node_limit=1
         )
-        assert pruned_by_cap == {"commands": 2, "runs": 2}
+        assert pruned_by_cap["commands"] == 2
+        assert pruned_by_cap["runs"] == 2
         assert store.queued_command_count("sbx_alice") == 1
         assert [run["runId"] for run in store.list_active_runs("sbx_alice")] == [
             "run_active"
@@ -3321,9 +3335,109 @@ def test_daemon_store_prunes_terminal_records_but_keeps_active_records(
         pruned_by_age = store.prune_terminal_records(
             retention_seconds=0, per_node_limit=100
         )
-        assert pruned_by_age == {"commands": 1, "runs": 1}
+        assert pruned_by_age["commands"] == 1
+        assert pruned_by_age["runs"] == 1
         [command] = store.take_queued_commands("sbx_alice")
         assert command["id"] == "cmd_active"
+
+
+@pytest.mark.parametrize("store_factory", DAEMON_STORE_FACTORIES)
+def test_daemon_store_does_not_log_node_heartbeats(store_factory) -> None:
+    """Heartbeats are already materialized on the node row; logging them as
+    events costs one insert per daemon poll and nothing ever reads them."""
+    with TemporaryDirectory() as root:
+        store = store_factory(root)
+        store.register_node(store_node_payload())
+
+        for _ in range(5):
+            updated = store.mark_node_seen("sbx_alice")
+
+        assert updated["lastSeenAt"]
+        assert store.get_node("sbx_alice")["lastSeenAt"] == updated["lastSeenAt"]
+        assert "daemon.node.seen" not in stored_daemon_event_types(store)
+
+
+@pytest.mark.parametrize("store_factory", DAEMON_STORE_FACTORIES)
+def test_daemon_store_prunes_command_events_but_keeps_node_lifecycle(
+    store_factory,
+) -> None:
+    with TemporaryDirectory() as root:
+        store = store_factory(root)
+        store.register_node(store_node_payload())
+        command = run_start_command("cmd_done", "run_done")
+        store.enqueue_command("sbx_alice", command)
+        store.mark_command_completed(
+            "sbx_alice",
+            {
+                "type": "run.completed",
+                "commandId": command["id"],
+                "sessionId": command["sessionId"],
+                "runId": command["runId"],
+                "agent": "codex",
+                "mode": "action",
+                "exitCode": 0,
+            },
+        )
+        store.unassign_node_employee("sbx_alice")
+
+        before = stored_daemon_event_types(store)
+        assert any(event.startswith("daemon.command.") for event in before)
+
+        pruned = store.prune_terminal_records(retention_seconds=0, per_node_limit=0)
+
+        assert pruned["events"] > 0
+        after = stored_daemon_event_types(store)
+        assert not any(event.startswith("daemon.command.") for event in after)
+        assert "daemon.node.registered" in after
+        assert "daemon.node.unassigned" in after
+
+
+def test_daemon_poll_heartbeats_are_throttled_before_reaching_the_store() -> None:
+    """An idle long poll touches the registry several times per second; only a
+    bounded fraction of those may reach the durable node row."""
+
+    class CountingLocalDaemonStore(LocalDaemonStore):
+        def __init__(self, root: str):
+            super().__init__(root)
+            self.mark_seen_calls = 0
+
+        def mark_node_seen(self, node_id, patch=None):
+            self.mark_seen_calls += 1
+            return super().mark_node_seen(node_id, patch)
+
+    with TemporaryDirectory() as root:
+        session_store = LocalSessionStore(root)
+        daemon_store = CountingLocalDaemonStore(root)
+        registry = DaemonNodeRegistry(session_store, daemon_store)
+        registry.register(
+            {
+                "sandboxId": "sbx_alice",
+                "employeeId": "alice",
+                "token": "node_token",
+                "workspacePath": "/workspace/alice",
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            },
+            "ui_token",
+        )
+        daemon_store.mark_seen_calls = 0
+
+        for _ in range(20):
+            registry.available_command_count("sbx_alice", "node_token")
+
+        assert daemon_store.mark_seen_calls == 1
+        # This replica's own liveness view stays fresh on every poll.
+        assert registry.sandboxes["sbx_alice"]["lastSeenAt"]
+
+        # A status transition must persist immediately, throttle or not.
+        registry.sandboxes["sbx_alice"] = {
+            **registry.sandboxes["sbx_alice"],
+            "status": "stopped",
+        }
+        registry.available_command_count("sbx_alice", "node_token")
+        assert daemon_store.mark_seen_calls == 2
+        assert registry.sandboxes["sbx_alice"]["status"] == "ready"
 
 
 def test_node_monitoring_and_selection_use_grouped_store_queries() -> None:
