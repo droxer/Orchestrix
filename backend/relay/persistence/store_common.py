@@ -8,7 +8,7 @@ from typing import Any
 
 from sqlalchemy import Column, Text, Uuid
 
-from ..core.ids import new_database_id, new_relay_id, now_iso
+from ..core.ids import new_database_id, now_iso
 from ..core.models import (
     AGENT_NAMES,
     AgentName,
@@ -106,7 +106,7 @@ def relay_event(
     event_type: str, session_id: str, payload: dict[str, Any]
 ) -> dict[str, Any]:
     return {
-        "id": new_relay_id("evt"),
+        "id": new_database_id(),
         "type": event_type,
         "sessionId": session_id,
         "timestamp": now_iso(),
@@ -118,7 +118,7 @@ def relay_task_event(
     event_type: str, task_id: str, payload: dict[str, Any]
 ) -> dict[str, Any]:
     return {
-        "id": new_relay_id("evt"),
+        "id": new_database_id(),
         "type": event_type,
         "taskId": task_id,
         "timestamp": now_iso(),
@@ -411,7 +411,7 @@ def _apply_task_routine_fields(task: dict[str, Any], event: dict[str, Any]) -> N
 
 def daemon_event(event_type: str, payload: dict[str, Any]) -> dict[str, Any]:
     return {
-        "id": new_relay_id("devt"),
+        "id": new_database_id(),
         "type": event_type,
         "timestamp": now_iso(),
         **payload,

@@ -22,7 +22,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.exc import IntegrityError
 
-from ..core.ids import new_database_id, new_relay_id, now_iso
+from ..core.ids import new_database_id, now_iso
 from ..core.models import AGENT_NAMES, AGENT_ROLES
 from .store_common import (
     DEFAULT_RELAY_DATA_DIR,
@@ -278,7 +278,7 @@ class LocalAgentStore:
 
     def _append(self, agent_id: str, event_type: str, payload: dict[str, Any]) -> None:
         event = {
-            "id": new_relay_id("evt"),
+            "id": new_database_id(),
             "type": event_type,
             "agentId": agent_id,
             "timestamp": now_iso(),
@@ -300,7 +300,7 @@ class DatabaseAgentStore:
         "agents",
         metadata,
         database_id_column(),
-        Column("supervisor_employee_public_id", Text, nullable=False, index=True),
+        Column("supervisor_employee_id", Text, nullable=False, index=True),
         Column("display_name", Text, nullable=False),
         Column("display_name_key", Text, nullable=True),
         Column("executor_kind", Text, nullable=False),
@@ -313,7 +313,7 @@ class DatabaseAgentStore:
         Column("updated_at", DateTime(timezone=True), nullable=False),
         Column("deleted_at", DateTime(timezone=True), nullable=True),
         UniqueConstraint(
-            "supervisor_employee_public_id",
+            "supervisor_employee_id",
             "display_name_key",
             name="uq_agents_supervisor_display_name_key",
         ),
@@ -322,7 +322,6 @@ class DatabaseAgentStore:
         "agent_events",
         metadata,
         database_id_column(),
-        Column("public_id", Text, nullable=False, unique=True),
         Column(
             "agent_id",
             entity_uuid_type(),
@@ -413,7 +412,7 @@ class DatabaseAgentStore:
                 conn.execute(
                     select(
                         self.agents.c.snapshot,
-                        self.agents.c.supervisor_employee_public_id,
+                        self.agents.c.supervisor_employee_id,
                     ).where(self.agents.c.id == agent_id)
                 )
                 .mappings()
@@ -421,7 +420,7 @@ class DatabaseAgentStore:
             )
         return (
             _normalized_agent_snapshot(
-                row["snapshot"], row["supervisor_employee_public_id"]
+                row["snapshot"], row["supervisor_employee_id"]
             )
             if row
             else None
@@ -435,11 +434,11 @@ class DatabaseAgentStore:
     ) -> list[dict[str, Any]]:
         statement = select(
             self.agents.c.snapshot,
-            self.agents.c.supervisor_employee_public_id,
+            self.agents.c.supervisor_employee_id,
         )
         if supervisor_employee_id is not None:
             statement = statement.where(
-                self.agents.c.supervisor_employee_public_id == supervisor_employee_id
+                self.agents.c.supervisor_employee_id == supervisor_employee_id
             )
         if not include_deleted:
             statement = statement.where(self.agents.c.deleted_at.is_(None))
@@ -448,7 +447,7 @@ class DatabaseAgentStore:
         return sorted(
             (
                 _normalized_agent_snapshot(
-                    row["snapshot"], row["supervisor_employee_public_id"]
+                    row["snapshot"], row["supervisor_employee_id"]
                 )
                 for row in rows
             ),
@@ -553,7 +552,7 @@ class DatabaseAgentStore:
             rows = (
                 conn.execute(
                     select(
-                        self.events_table.c.public_id,
+                        self.events_table.c.id,
                         self.events_table.c.type,
                         self.events_table.c.timestamp,
                         self.events_table.c.payload,
@@ -569,7 +568,7 @@ class DatabaseAgentStore:
             raise KeyError(agent_id)
         return [
             {
-                "id": row["public_id"],
+                "id": str(row["id"]),
                 "type": row["type"],
                 "agentId": agent_id,
                 "timestamp": _format_iso(row["timestamp"]),
@@ -733,7 +732,7 @@ def _agent_event(
     agent_id: str, event_type: str, payload: dict[str, Any]
 ) -> dict[str, Any]:
     return {
-        "id": new_relay_id("evt"),
+        "id": new_database_id(),
         "type": event_type,
         "agentId": agent_id,
         "timestamp": now_iso(),
@@ -746,7 +745,7 @@ def _agent_row(
 ) -> dict[str, Any]:
     return {
         "id": database_id or agent["id"],
-        "supervisor_employee_public_id": agent["supervisorEmployeeId"],
+        "supervisor_employee_id": agent["supervisorEmployeeId"],
         "display_name": agent["displayName"],
         "display_name_key": (
             None if agent.get("deletedAt") else agent["displayName"].strip().casefold()
@@ -767,7 +766,7 @@ def _agent_event_row(
     agent_database_id: str, sequence: int, event: dict[str, Any]
 ) -> dict[str, Any]:
     return {
-        "public_id": event["id"],
+        "id": event["id"],
         "agent_id": agent_database_id,
         "sequence": sequence,
         "type": event["type"],

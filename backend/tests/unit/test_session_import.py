@@ -4,10 +4,11 @@ import json
 from pathlib import Path
 
 import pytest
+from sqlalchemy import update
+
 from relay.persistence.session_import import migrate_local_sessions
 from relay.persistence.session_store import DatabaseSessionStore, LocalSessionStore
 from relay.persistence.store_common import now_iso, relay_event
-from sqlalchemy import update
 
 
 def test_import_uses_event_log_and_is_idempotent(tmp_path: Path) -> None:
@@ -251,28 +252,28 @@ def test_import_dry_run_executes_database_constraints(tmp_path: Path) -> None:
 def test_import_reserves_ids_from_sessions_that_fail_later(tmp_path: Path) -> None:
     source = tmp_path / "legacy"
     sessions_dir = source / "sessions"
-    first_dir = sessions_dir / "ses_a"
-    second_dir = sessions_dir / "ses_b"
+    first_dir = sessions_dir / "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    second_dir = sessions_dir / "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
     first_dir.mkdir(parents=True)
     second_dir.mkdir(parents=True)
     timestamp = "2026-07-27T00:00:00.000Z"
     first_events = [
         {
-            "id": "evt_shared",
+            "id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
             "type": "session.created",
-            "sessionId": "ses_a",
+            "sessionId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
             "timestamp": timestamp,
             "workspacePath": "/workspace",
             "taskGoal": "broken artifact",
             "participants": ["human"],
         },
         {
-            "id": "evt_artifact",
+            "id": "ffffffff-ffff-4fff-8fff-ffffffffffff",
             "type": "artifact.created",
-            "sessionId": "ses_a",
+            "sessionId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
             "timestamp": timestamp,
             "artifact": {
-                "id": "art_missing",
+                "id": "44444444-4444-4444-8444-444444444444",
                 "kind": "review",
                 "title": "missing.md",
                 "path": str(first_dir / "artifacts" / "missing.md"),
@@ -283,9 +284,9 @@ def test_import_reserves_ids_from_sessions_that_fail_later(tmp_path: Path) -> No
     ]
     second_events = [
         {
-            "id": "evt_shared",
+            "id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
             "type": "session.created",
-            "sessionId": "ses_b",
+            "sessionId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
             "timestamp": timestamp,
             "workspacePath": "/workspace",
             "taskGoal": "reused id",

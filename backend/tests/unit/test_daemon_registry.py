@@ -3199,10 +3199,10 @@ def test_database_daemon_store_claims_queued_commands_once() -> None:
         store.enqueue_command(
             "sbx_alice",
             {
-                "id": "cmd_once",
+                "id": "00000000-0000-4000-8000-000000000001",
                 "type": "run.start",
                 "sessionId": "ses_1",
-                "runId": "run_1",
+                "runId": "00000000-0000-4000-8000-000000000002",
                 "agent": "codex",
                 "mode": "action",
                 "taskGoal": "fix auth",
@@ -3215,7 +3215,9 @@ def test_database_daemon_store_claims_queued_commands_once() -> None:
             )
 
         claimed = [command for commands in results for command in commands]
-        assert [command["id"] for command in claimed] == ["cmd_once"]
+        assert [command["id"] for command in claimed] == [
+            "00000000-0000-4000-8000-000000000001"
+        ]
         assert store.queued_command_count("sbx_alice") == 0
 
 
@@ -3249,8 +3251,8 @@ def test_database_daemon_store_preserves_artifact_snapshot_state() -> None:
         updated = store.update_run_request(
             request["id"],
             {
-                "currentCommandId": "cmd_1",
-                "currentRunId": "run_1",
+                "currentCommandId": "00000000-0000-4000-8000-000000000003",
+                "currentRunId": "00000000-0000-4000-8000-000000000004",
                 "currentAgent": "codex",
                 "currentMode": "action",
                 "currentStartedAt": "2026-06-30T00:00:00.000Z",
@@ -3269,9 +3271,9 @@ def test_database_daemon_store_preserves_artifact_snapshot_state() -> None:
             ]["bytes"]
             == 10
         )
-        assert store.run_request_for_command("cmd_1")["state"][
-            "_relay_artifact_snapshot"
-        ]
+        assert store.run_request_for_command("00000000-0000-4000-8000-000000000003")[
+            "state"
+        ]["_relay_artifact_snapshot"]
 
 
 @pytest.mark.parametrize("store_factory", DAEMON_STORE_FACTORIES)
@@ -3282,7 +3284,10 @@ def test_active_runs_carry_logical_agent_and_placement(store_factory) -> None:
         store.enqueue_command(
             "sbx_alice",
             {
-                **run_start_command("cmd_1", "run_1"),
+                **run_start_command(
+                    "00000000-0000-4000-8000-000000000005",
+                    "00000000-0000-4000-8000-000000000006",
+                ),
                 "logicalAgentId": "agent_builder",
                 "placementId": "placement_1",
             },
@@ -3305,7 +3310,10 @@ def test_daemon_store_prunes_terminal_records_but_keeps_active_records(
         store = store_factory(root)
         store.register_node(store_node_payload())
         for index in range(3):
-            command = run_start_command(f"cmd_done_{index}", f"run_done_{index}")
+            command = run_start_command(
+                f"00000000-0000-4000-8000-00000000001{index}",
+                f"00000000-0000-4000-8000-00000000002{index}",
+            )
             store.enqueue_command("sbx_alice", command)
             store.mark_command_completed(
                 "sbx_alice",
@@ -3319,7 +3327,10 @@ def test_daemon_store_prunes_terminal_records_but_keeps_active_records(
                     "exitCode": 0,
                 },
             )
-        active = run_start_command("cmd_active", "run_active")
+        active = run_start_command(
+            "00000000-0000-4000-8000-000000000030",
+            "00000000-0000-4000-8000-000000000031",
+        )
         store.enqueue_command("sbx_alice", active)
 
         pruned_by_cap = store.prune_terminal_records(
@@ -3329,7 +3340,7 @@ def test_daemon_store_prunes_terminal_records_but_keeps_active_records(
         assert pruned_by_cap["runs"] == 2
         assert store.queued_command_count("sbx_alice") == 1
         assert [run["runId"] for run in store.list_active_runs("sbx_alice")] == [
-            "run_active"
+            "00000000-0000-4000-8000-000000000031"
         ]
 
         pruned_by_age = store.prune_terminal_records(
@@ -3338,7 +3349,7 @@ def test_daemon_store_prunes_terminal_records_but_keeps_active_records(
         assert pruned_by_age["commands"] == 1
         assert pruned_by_age["runs"] == 1
         [command] = store.take_queued_commands("sbx_alice")
-        assert command["id"] == "cmd_active"
+        assert command["id"] == "00000000-0000-4000-8000-000000000030"
 
 
 @pytest.mark.parametrize("store_factory", DAEMON_STORE_FACTORIES)
@@ -3585,10 +3596,10 @@ def test_daemon_store_reclaims_expired_command_leases(store_factory) -> None:
         store.enqueue_command(
             "sbx_alice",
             {
-                "id": "cmd_retry",
+                "id": "00000000-0000-4000-8000-000000000040",
                 "type": "run.start",
                 "sessionId": "ses_1",
-                "runId": "run_1",
+                "runId": "00000000-0000-4000-8000-000000000041",
                 "agent": "codex",
                 "mode": "action",
                 "taskGoal": "fix auth",
@@ -3596,7 +3607,7 @@ def test_daemon_store_reclaims_expired_command_leases(store_factory) -> None:
         )
 
         [first] = store.take_queued_commands("sbx_alice", lease_seconds=0.05)
-        assert first["id"] == "cmd_retry"
+        assert first["id"] == "00000000-0000-4000-8000-000000000040"
         assert first["status"] == "dispatched"
         assert first["attempt"] == 1
         assert first["leaseId"].startswith("lease_")
@@ -3606,7 +3617,7 @@ def test_daemon_store_reclaims_expired_command_leases(store_factory) -> None:
         time.sleep(0.08)
 
         [second] = store.take_queued_commands("sbx_alice", lease_seconds=0.05)
-        assert second["id"] == "cmd_retry"
+        assert second["id"] == "00000000-0000-4000-8000-000000000040"
         assert second["attempt"] == 2
         assert second["leaseId"] != first["leaseId"]
 
@@ -3642,11 +3653,11 @@ def test_daemon_store_retries_cancel_until_target_run_is_terminal(
         store.enqueue_command(
             "sbx_alice",
             {
-                "id": "cmd_cancel",
+                "id": "00000000-0000-4000-8000-000000000050",
                 "type": "run.cancel",
-                "commandId": "cmd_run",
+                "commandId": "00000000-0000-4000-8000-000000000051",
                 "sessionId": "ses_1",
-                "runId": "run_1",
+                "runId": "00000000-0000-4000-8000-000000000052",
                 "agent": "codex",
                 "mode": "action",
                 "reason": "no longer needed",
@@ -3662,7 +3673,9 @@ def test_daemon_store_retries_cancel_until_target_run_is_terminal(
         [second] = store.take_queued_commands("sbx_alice", lease_seconds=0.05)
         assert second["id"] == first["id"]
         assert second["attempt"] == 2
-        store.mark_cancel_commands_completed("sbx_alice", "cmd_run")
+        store.mark_cancel_commands_completed(
+            "sbx_alice", "00000000-0000-4000-8000-000000000051"
+        )
         assert store.take_queued_commands("sbx_alice") == []
 
 
@@ -3695,10 +3708,10 @@ def test_daemon_store_renews_active_command_leases(store_factory) -> None:
         store.enqueue_command(
             "sbx_alice",
             {
-                "id": "cmd_long",
+                "id": "00000000-0000-4000-8000-000000000060",
                 "type": "run.start",
                 "sessionId": "ses_1",
-                "runId": "run_1",
+                "runId": "00000000-0000-4000-8000-000000000061",
                 "agent": "codex",
                 "mode": "action",
                 "taskGoal": "fix auth",
@@ -3743,10 +3756,10 @@ def test_daemon_store_does_not_renew_a_superseded_delivery(store_factory) -> Non
         store.enqueue_command(
             "sbx_alice",
             {
-                "id": "cmd_long",
+                "id": "00000000-0000-4000-8000-000000000070",
                 "type": "run.start",
                 "sessionId": "ses_1",
-                "runId": "run_1",
+                "runId": "00000000-0000-4000-8000-000000000071",
                 "agent": "codex",
                 "mode": "action",
                 "taskGoal": "fix auth",

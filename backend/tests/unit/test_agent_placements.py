@@ -302,7 +302,7 @@ def test_database_placement_store_normalizes_legacy_owner_snapshot(
     with placements.engine.begin() as conn:
         conn.execute(
             placements.placements.update()
-            .where(placements.placements.c.public_id == placement["id"])
+            .where(placements.placements.c.id == placement["id"])
             .values(snapshot=legacy)
         )
 

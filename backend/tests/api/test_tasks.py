@@ -1147,5 +1147,7 @@ def test_task_delete_hides_task_from_list_and_get(monkeypatch) -> None:
         assert listed.status_code == 200
         assert all(task["id"] != task_id for task in listed.json()["tasks"])
 
-        missing = client.delete("/api/v1/tasks/task_missing")
+        missing = client.delete(
+            "/api/v1/tasks/11111111-1111-4111-8111-111111111111"
+        )
         assert missing.status_code == 404

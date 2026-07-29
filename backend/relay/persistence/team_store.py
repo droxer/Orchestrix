@@ -23,7 +23,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.exc import IntegrityError
 
-from ..core.ids import new_database_id, new_relay_id, now_iso
+from ..core.ids import new_database_id, now_iso
 from .store_common import (
     DEFAULT_RELAY_DATA_DIR,
     _append_jsonl,
@@ -242,8 +242,7 @@ class DatabaseTeamStore:
         "teams",
         metadata,
         database_id_column(),
-        Column("public_id", Text, nullable=False, unique=True),
-        Column("owner_employee_public_id", Text, nullable=False, index=True),
+        Column("owner_employee_id", Text, nullable=False, index=True),
         Column("name", Text, nullable=False),
         Column("name_key", Text, nullable=True),
         Column("lead_agent_id", entity_uuid_type(), nullable=True),
@@ -255,7 +254,7 @@ class DatabaseTeamStore:
         Column("updated_at", DateTime(timezone=True), nullable=False),
         Column("deleted_at", DateTime(timezone=True), nullable=True),
         UniqueConstraint(
-            "owner_employee_public_id",
+            "owner_employee_id",
             "name_key",
             name="uq_teams_owner_name_key",
         ),
@@ -264,7 +263,6 @@ class DatabaseTeamStore:
         "team_events",
         metadata,
         database_id_column(),
-        Column("public_id", Text, nullable=False, unique=True),
         Column(
             "team_id",
             entity_uuid_type(),
@@ -310,15 +308,15 @@ class DatabaseTeamStore:
                 conn.execute(
                     select(
                         self.teams.c.snapshot,
-                        self.teams.c.owner_employee_public_id,
-                    ).where(self.teams.c.public_id == team_id)
+                        self.teams.c.owner_employee_id,
+                    ).where(self.teams.c.id == team_id)
                 )
                 .mappings()
                 .first()
             )
         return (
             _normalized_team_snapshot(
-                row["snapshot"], row["owner_employee_public_id"]
+                row["snapshot"], row["owner_employee_id"]
             )
             if row
             else None
@@ -332,11 +330,11 @@ class DatabaseTeamStore:
     ) -> list[dict[str, Any]]:
         statement = select(
             self.teams.c.snapshot,
-            self.teams.c.owner_employee_public_id,
+            self.teams.c.owner_employee_id,
         )
         if owner_employee_id is not None:
             statement = statement.where(
-                self.teams.c.owner_employee_public_id
+                self.teams.c.owner_employee_id
                 == owner_employee_id
             )
         if not include_deleted:
@@ -345,7 +343,7 @@ class DatabaseTeamStore:
             rows = conn.execute(statement).mappings().all()
         teams = [
             _normalized_team_snapshot(
-                row["snapshot"], row["owner_employee_public_id"]
+                row["snapshot"], row["owner_employee_id"]
             )
             for row in rows
         ]
@@ -415,13 +413,13 @@ class DatabaseTeamStore:
             rows = (
                 conn.execute(
                     select(
-                        self.events_table.c.public_id,
+                        self.events_table.c.id,
                         self.events_table.c.type,
                         self.events_table.c.timestamp,
                         self.events_table.c.payload,
                     )
                     .join(self.teams, self.events_table.c.team_id == self.teams.c.id)
-                    .where(self.teams.c.public_id == team_id)
+                    .where(self.teams.c.id == team_id)
                     .order_by(self.events_table.c.sequence)
                 )
                 .mappings()
@@ -431,7 +429,7 @@ class DatabaseTeamStore:
             raise KeyError(team_id)
         return [
             {
-                "id": row["public_id"],
+                "id": str(row["id"]),
                 "type": row["type"],
                 "teamId": team_id,
                 "timestamp": _format_iso(row["timestamp"]),
@@ -463,10 +461,10 @@ class DatabaseTeamStore:
                             select(
                                 self.teams.c.id,
                                 self.teams.c.snapshot,
-                                self.teams.c.owner_employee_public_id,
+                                self.teams.c.owner_employee_id,
                                 self.teams.c.event_version,
                             )
-                            .where(self.teams.c.public_id == team_id)
+                            .where(self.teams.c.id == team_id)
                             .with_for_update()
                         )
                         .mappings()
@@ -475,7 +473,7 @@ class DatabaseTeamStore:
                     if not row:
                         raise KeyError(team_id)
                     current = _normalized_team_snapshot(
-                        row["snapshot"] or {}, row["owner_employee_public_id"]
+                        row["snapshot"] or {}, row["owner_employee_id"]
                     )
                     if current.get("deletedAt"):
                         raise KeyError(team_id)
@@ -548,7 +546,7 @@ def _new_team(
         raise TeamValidationError("team_lead_not_member")
     timestamp = now_iso()
     return {
-        "id": new_relay_id("team"),
+        "id": new_database_id(),
         "ownerEmployeeId": owner_employee_id,
         "name": name,
         "leadAgentId": lead,
@@ -638,7 +636,7 @@ def _team_event(
     team_id: str, event_type: str, payload: dict[str, Any]
 ) -> dict[str, Any]:
     return {
-        "id": new_relay_id("evt"),
+        "id": new_database_id(),
         "type": event_type,
         "teamId": team_id,
         "timestamp": now_iso(),
@@ -650,9 +648,8 @@ def _team_row(
     team: dict[str, Any], *, event_version: int, database_id: str | None = None
 ) -> dict[str, Any]:
     return {
-        "id": database_id or new_database_id(),
-        "public_id": team["id"],
-        "owner_employee_public_id": team["ownerEmployeeId"],
+        "id": database_id or team["id"],
+        "owner_employee_id": team["ownerEmployeeId"],
         "name": team["name"],
         "name_key": None if team.get("deletedAt") else team["name"].casefold(),
         "lead_agent_id": team.get("leadAgentId"),
@@ -670,7 +667,7 @@ def _team_event_row(
     team_database_id: str, sequence: int, event: dict[str, Any]
 ) -> dict[str, Any]:
     return {
-        "public_id": event["id"],
+        "id": event["id"],
         "team_id": team_database_id,
         "sequence": sequence,
         "type": event["type"],

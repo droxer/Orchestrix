@@ -42,7 +42,6 @@ from .store_common import (
     entity_uuid_type,
     materialize_events,
     new_database_id,
-    new_relay_id,
     now_iso,
     relay_event,
     safe_name,
@@ -176,7 +175,7 @@ class LocalSessionStore:
         self, session_id: str, payload: dict[str, Any]
     ) -> dict[str, Any]:
         with self._lock:
-            artifact_id = new_relay_id("art")
+            artifact_id = new_database_id()
             extension = payload.get("extension") or "txt"
             artifact_dir = self._session_dir(session_id) / "artifacts"
             artifact_dir.mkdir(parents=True, exist_ok=True)
@@ -292,7 +291,7 @@ class LocalSessionStore:
 
 
 class DatabaseSessionStore:
-    REQUIRED_SCHEMA_REVISION = "20260729_0041"
+    REQUIRED_SCHEMA_REVISION = "20260729_0042"
     metadata = MetaData()
 
     sessions = Table(
@@ -318,7 +317,6 @@ class DatabaseSessionStore:
         "session_events",
         metadata,
         database_id_column(),
-        Column("public_id", Text, nullable=False, unique=True),
         Column(
             "session_id",
             entity_uuid_type(),
@@ -337,7 +335,6 @@ class DatabaseSessionStore:
         "session_artifacts",
         metadata,
         database_id_column(),
-        Column("public_id", Text, nullable=False, unique=True),
         Column(
             "session_id",
             entity_uuid_type(),
@@ -420,8 +417,7 @@ class DatabaseSessionStore:
                     f"{', '.join(sorted(absent))}."
                 )
         required_unique_constraints = {
-            "session_events": {("public_id",), ("session_id", "sequence")},
-            "session_artifacts": {("public_id",)},
+            "session_events": {("session_id", "sequence")},
             "session_run_token_usage": {("session_id", "run_id")},
         }
         for table_name, expected in required_unique_constraints.items():
@@ -443,9 +439,9 @@ class DatabaseSessionStore:
                 raise RuntimeError("Database is missing the Alembic migration version.")
             with self.engine.connect() as conn:
                 revision = conn.scalar(text("SELECT version_num FROM alembic_version"))
-            if revision != self.REQUIRED_SCHEMA_REVISION:
+            if revision is None or revision < self.REQUIRED_SCHEMA_REVISION:
                 raise RuntimeError(
-                    "Database migration is not at the required revision "
+                    "Database migration is behind the required revision "
                     f"{self.REQUIRED_SCHEMA_REVISION} (found {revision or 'none'})."
                 )
 
@@ -712,7 +708,7 @@ class DatabaseSessionStore:
             tasks = (
                 conn.execute(
                     select(
-                        task_store.tasks.c.public_id,
+                        task_store.tasks.c.id,
                         task_store.tasks.c.snapshot,
                     )
                     .select_from(
@@ -733,7 +729,7 @@ class DatabaseSessionStore:
             for task in tasks:
                 if session_id in (task["snapshot"] or {}).get("linkedSessionIds", []):
                     task_store.unlink_session_in_transaction(
-                        conn, task["public_id"], session_id
+                        conn, task["id"], session_id
                     )
             conn.execute(
                 delete(self.run_token_usage).where(
@@ -794,7 +790,7 @@ class DatabaseSessionStore:
     def _new_artifact_record(
         self, session_id: str, payload: dict[str, Any]
     ) -> tuple[dict[str, Any], str, str]:
-        artifact_id = new_relay_id("art")
+        artifact_id = new_database_id()
         extension = payload.get("extension") or "txt"
         body = payload["body"]
         artifact = {
@@ -940,7 +936,7 @@ class DatabaseSessionStore:
                 conn.execute(
                     select(self.artifacts.c.content, self.artifacts.c.metadata)
                     .where(self.artifacts.c.session_id == session_pk)
-                    .where(self.artifacts.c.public_id == artifact_id)
+                    .where(self.artifacts.c.id == artifact_id)
                 )
                 .mappings()
                 .first()
@@ -961,7 +957,7 @@ class DatabaseSessionStore:
                 conn.execute(
                     select(self.artifacts.c.content)
                     .where(self.artifacts.c.session_id == session_pk)
-                    .where(self.artifacts.c.public_id == artifact_id)
+                    .where(self.artifacts.c.id == artifact_id)
                 )
                 .mappings()
                 .first()
@@ -1044,7 +1040,6 @@ def session_event_to_row(
 ) -> dict[str, Any]:
     return {
         "id": new_database_id(),
-        "public_id": event["id"],
         "session_id": session_pk,
         "sequence": sequence,
         "type": event["type"],
@@ -1072,8 +1067,7 @@ def session_artifact_to_row(
     content: str | None = None,
 ) -> dict[str, Any]:
     return {
-        "id": new_database_id(),
-        "public_id": artifact["id"],
+        "id": artifact["id"],
         "session_id": session_pk,
         "agent_run_id": artifact.get("agentRunId"),
         "kind": artifact["kind"],

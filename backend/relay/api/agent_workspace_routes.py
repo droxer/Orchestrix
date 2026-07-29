@@ -9,7 +9,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
-from ..core.ids import new_relay_id
+from ..core.ids import new_database_id
 from ..services.agent_routing import select_workspace_node
 from ..services.agent_workspace_snapshot import snapshot_file, snapshot_listing
 from ..services.workspace_query import WORKSPACE_COMMAND_TIMEOUT_SECONDS
@@ -87,7 +87,7 @@ async def agent_workspace_files(agent_id: str, request: Request, ctx: AppContext
     path = _path(request.query_params.get("path"))
     node = _select_node(ctx, agent, scope)
     if node:
-        event = await _dispatch(ctx, node, {"id": new_relay_id("cmd"), "type": "workspace.list", **_scope_command(scope, agent_id), "path": path})
+        event = await _dispatch(ctx, node, {"id": new_database_id(), "type": "workspace.list", **_scope_command(scope, agent_id), "path": path})
         _workspace_error(event)
         return {"agentId": agent_id, "scope": scope, "source": "live", "nodeId": node["id"], "path": event.get("path", path), "exists": bool(event.get("exists")), "entries": event.get("entries") or [], "generatedAt": _timestamp()}
     if scope == "shared":
@@ -104,7 +104,7 @@ async def agent_workspace_file(agent_id: str, request: Request, ctx: AppContextD
     path = _path(request.query_params.get("path"), required=True)
     node = _select_node(ctx, agent, scope)
     if node:
-        event = await _dispatch(ctx, node, {"id": new_relay_id("cmd"), "type": "workspace.read", **_scope_command(scope, agent_id), "path": path})
+        event = await _dispatch(ctx, node, {"id": new_database_id(), "type": "workspace.read", **_scope_command(scope, agent_id), "path": path})
         _workspace_error(event)
         raw = event.get("contentBase64")
         content = base64.b64decode(raw).decode("utf-8", errors="replace") if isinstance(raw, str) else None

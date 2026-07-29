@@ -33,6 +33,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.exc import IntegrityError
 
+from ..core.ids import new_relay_id
 from .store_common import (
     DEFAULT_RELAY_DATA_DIR,
     AgentName,
@@ -45,7 +46,6 @@ from .store_common import (
     entity_uuid_type,
     materialize_task_events,
     new_database_id,
-    new_relay_id,
     now_iso,
     relay_task_event,
 )
@@ -100,7 +100,7 @@ class LocalTaskStore:
 
     def create_task(self, payload: dict[str, Any]) -> dict[str, Any]:
         with self._lock:
-            task_id = new_relay_id("task")
+            task_id = new_database_id()
             self._task_dir(task_id).mkdir(parents=True, exist_ok=True)
             logger.debug("Creating task", task_id=task_id, title=payload.get("title"))
             events = [
@@ -532,7 +532,6 @@ class DatabaseTaskStore:
         "tasks",
         metadata,
         database_id_column(),
-        Column("public_id", Text, nullable=False, unique=True),
         Column("title", Text, nullable=False),
         Column("description", Text, nullable=False),
         Column("priority", Text, nullable=False),
@@ -557,7 +556,6 @@ class DatabaseTaskStore:
         "task_events",
         metadata,
         database_id_column(),
-        Column("public_id", Text, nullable=False, unique=True),
         Column(
             "task_id",
             entity_uuid_type(),
@@ -613,8 +611,7 @@ class DatabaseTaskStore:
                     f"{', '.join(sorted(absent))}."
                 )
         required_unique_constraints = {
-            "tasks": {("public_id",)},
-            "task_events": {("public_id",), ("task_id", "sequence")},
+            "task_events": {("task_id", "sequence")},
             "task_sessions": {("task_id", "session_id")},
         }
         for table_name, expected in required_unique_constraints.items():
@@ -633,7 +630,7 @@ class DatabaseTaskStore:
                 )
 
     def create_task(self, payload: dict[str, Any]) -> dict[str, Any]:
-        task_id = new_relay_id("task")
+        task_id = new_database_id()
         logger.debug(
             "Creating database task", task_id=task_id, title=payload.get("title")
         )
@@ -774,7 +771,7 @@ class DatabaseTaskStore:
             row = (
                 conn.execute(
                     select(self.tasks.c.id, self.tasks.c.snapshot, self.tasks.c.version)
-                    .where(self.tasks.c.public_id == task_id)
+                    .where(self.tasks.c.id == task_id)
                     .with_for_update()
                 )
                 .mappings()
@@ -847,7 +844,7 @@ class DatabaseTaskStore:
             row = (
                 conn.execute(
                     select(self.tasks.c.snapshot).where(
-                        self.tasks.c.public_id == task_id
+                        self.tasks.c.id == task_id
                     )
                 )
                 .mappings()
@@ -984,7 +981,7 @@ class DatabaseTaskStore:
             row = (
                 conn.execute(
                     select(self.tasks.c.id, self.tasks.c.snapshot, self.tasks.c.version)
-                    .where(self.tasks.c.public_id == task_id)
+                    .where(self.tasks.c.id == task_id)
                     .with_for_update()
                 )
                 .mappings()
@@ -1086,7 +1083,7 @@ class DatabaseTaskStore:
             row = (
                 conn.execute(
                     select(self.tasks.c.id, self.tasks.c.snapshot, self.tasks.c.version)
-                    .where(self.tasks.c.public_id == task_id)
+                    .where(self.tasks.c.id == task_id)
                     .with_for_update()
                 )
                 .mappings()
@@ -1221,7 +1218,7 @@ class DatabaseTaskStore:
     ) -> dict[str, Any]:
         row = conn.execute(
             select(self.tasks.c.id, self.tasks.c.snapshot, self.tasks.c.version)
-            .where(self.tasks.c.public_id == task_id)
+            .where(self.tasks.c.id == task_id)
             .with_for_update()
         ).mappings().first()
         if not row:
@@ -1287,7 +1284,7 @@ class DatabaseTaskStore:
         )
 
     def _task_pk(self, conn: Any, task_id: str, *, lock: bool = False) -> str:
-        statement = select(self.tasks.c.id).where(self.tasks.c.public_id == task_id)
+        statement = select(self.tasks.c.id).where(self.tasks.c.id == task_id)
         if lock:
             statement = statement.with_for_update()
         task_pk = conn.scalar(statement)
@@ -1330,8 +1327,7 @@ def task_to_row(
     task: dict[str, Any], *, version: int, database_id: str | None = None
 ) -> dict[str, Any]:
     return {
-        "id": database_id or new_database_id(),
-        "public_id": task["id"],
+        "id": database_id or task["id"],
         "title": task["title"],
         "description": task.get("description", ""),
         "priority": task.get("priority", "normal"),
@@ -1359,7 +1355,6 @@ def task_event_to_row(
 ) -> dict[str, Any]:
     return {
         "id": new_database_id(),
-        "public_id": event["id"],
         "task_id": task_pk,
         "sequence": sequence,
         "type": event["type"],
@@ -1422,7 +1417,7 @@ def routine_due_for_promotion(routine: dict[str, Any], today: str) -> bool:
 def routine_occurrence_events(
     routine: dict[str, Any], agent: AgentName | None
 ) -> list[dict[str, Any]]:
-    occurrence_id = new_relay_id("task")
+    occurrence_id = new_database_id()
     events = [
         relay_task_event(
             "task.created",

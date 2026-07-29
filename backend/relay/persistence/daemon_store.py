@@ -28,6 +28,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.exc import IntegrityError
 
+from ..core.ids import new_relay_id
 from .store_common import (
     DEFAULT_RELAY_DATA_DIR,
     _append_jsonl,
@@ -41,7 +42,6 @@ from .store_common import (
     database_id_column,
     entity_uuid_type,
     new_database_id,
-    new_relay_id,
     now_iso,
     safe_name,
 )
@@ -589,7 +589,7 @@ class LocalDaemonStore:
     def create_run_request(self, request: dict[str, Any]) -> dict[str, Any]:
         now = now_iso()
         record = {
-            "id": request.get("id") or new_relay_id("drun"),
+            "id": request.get("id") or new_database_id(),
             "status": "running",
             "currentIndex": 0,
             "createdAt": now,
@@ -1077,7 +1077,6 @@ class DatabaseDaemonStore:
         "daemon_commands",
         metadata,
         database_id_column(),
-        Column("public_id", Text, nullable=False, unique=True),
         Column(
             "node_id",
             entity_uuid_type(),
@@ -1101,7 +1100,6 @@ class DatabaseDaemonStore:
         "daemon_runs",
         metadata,
         database_id_column(),
-        Column("public_id", Text, nullable=False, unique=True),
         Column(
             "node_id",
             entity_uuid_type(),
@@ -1114,7 +1112,6 @@ class DatabaseDaemonStore:
             ForeignKey("daemon_commands.id", ondelete="SET NULL"),
             nullable=True,
         ),
-        Column("command_public_id", Text, nullable=True),
         Column("session_id", entity_uuid_type(), nullable=False),
         Column("agent", Text, nullable=False),
         Column("logical_agent_id", entity_uuid_type(), nullable=True),
@@ -1132,7 +1129,6 @@ class DatabaseDaemonStore:
         "daemon_run_requests",
         metadata,
         database_id_column(),
-        Column("public_id", Text, nullable=False, unique=True),
         Column(
             "node_id",
             entity_uuid_type(),
@@ -1140,14 +1136,14 @@ class DatabaseDaemonStore:
             nullable=False,
         ),
         Column("session_id", entity_uuid_type(), nullable=False),
-        Column("task_public_id", Text, nullable=True),
+        Column("task_id", Text, nullable=True),
         Column("task_goal", Text, nullable=False),
         Column("assignments", JSON, nullable=False),
         Column("current_index", Integer, nullable=False),
         Column("state", JSON, nullable=False),
         Column("status", Text, nullable=False),
-        Column("current_command_public_id", Text, nullable=True),
-        Column("current_run_public_id", Text, nullable=True),
+        Column("current_command_id", Text, nullable=True),
+        Column("current_run_id", Text, nullable=True),
         Column("current_agent", Text, nullable=True),
         Column("current_mode", Text, nullable=True),
         Column("current_started_at", DateTime(timezone=True), nullable=True),
@@ -1167,12 +1163,9 @@ class DatabaseDaemonStore:
         "daemon_events",
         metadata,
         database_id_column(),
-        Column("public_id", Text, nullable=False, unique=True),
         Column("node_id", entity_uuid_type(), nullable=True),
         Column("command_id", entity_uuid_type(), nullable=True),
-        Column("command_public_id", Text, nullable=True),
         Column("run_id", entity_uuid_type(), nullable=True),
-        Column("run_public_id", Text, nullable=True),
         Column("type", Text, nullable=False),
         Column("timestamp", DateTime(timezone=True), nullable=False),
         Column("payload", JSON, nullable=False),
@@ -1438,7 +1431,7 @@ class DatabaseDaemonStore:
         with self.engine.begin() as conn:
             row = (
                 conn.execute(
-                    select(self.commands).where(self.commands.c.public_id == command_id)
+                    select(self.commands).where(self.commands.c.id == command_id)
                 )
                 .mappings()
                 .first()
@@ -1471,7 +1464,7 @@ class DatabaseDaemonStore:
                 request_row = (
                     conn.execute(
                         select(self.run_requests)
-                        .where(self.run_requests.c.public_id == request_id)
+                        .where(self.run_requests.c.id == request_id)
                         .with_for_update()
                     )
                     .mappings()
@@ -1491,9 +1484,7 @@ class DatabaseDaemonStore:
                     conn,
                     {
                         "nodeId": node_id,
-                        "nodeDatabaseId": node_pk,
                         "commandId": command["id"],
-                        "commandDatabaseId": command_row["id"],
                         "sessionId": command["sessionId"],
                         "runId": command["runId"],
                         "agent": command["agent"],
@@ -1533,7 +1524,7 @@ class DatabaseDaemonStore:
             row = (
                 conn.execute(
                     select(self.commands)
-                    .where(self.commands.c.public_id == command_id)
+                    .where(self.commands.c.id == command_id)
                     .with_for_update()
                 )
                 .mappings()
@@ -1547,18 +1538,18 @@ class DatabaseDaemonStore:
             updated = {**record, "status": "queued", "updatedAt": now}
             conn.execute(
                 update(self.commands)
-                .where(self.commands.c.id == record["databaseId"])
+                .where(self.commands.c.id == record["id"])
                 .values(
                     **command_to_row(
                         updated,
-                        database_id=record["databaseId"],
+                        database_id=record["id"],
                         node_pk=row["node_id"],
                     )
                 )
             )
             conn.execute(
                 update(self.runs)
-                .where(self.runs.c.command_public_id == command_id)
+                .where(self.runs.c.command_id == command_id)
                 .where(self.runs.c.status == "pending")
                 .values(status="running")
             )
@@ -1576,7 +1567,7 @@ class DatabaseDaemonStore:
             row = (
                 conn.execute(
                     select(self.commands)
-                    .where(self.commands.c.public_id == command_id)
+                    .where(self.commands.c.id == command_id)
                     .where(self.commands.c.status == "pending")
                 )
                 .mappings()
@@ -1585,7 +1576,7 @@ class DatabaseDaemonStore:
             if not row:
                 return
             conn.execute(
-                delete(self.runs).where(self.runs.c.command_public_id == command_id)
+                delete(self.runs).where(self.runs.c.command_id == command_id)
             )
             conn.execute(delete(self.commands).where(self.commands.c.id == row["id"]))
 
@@ -1597,7 +1588,7 @@ class DatabaseDaemonStore:
             row = (
                 conn.execute(
                     select(self.commands)
-                    .where(self.commands.c.public_id == command_id)
+                    .where(self.commands.c.id == command_id)
                     .where(self.commands.c.status == "pending")
                     .with_for_update()
                 )
@@ -1657,11 +1648,11 @@ class DatabaseDaemonStore:
                 }
                 claimed = conn.execute(
                     update(self.commands)
-                    .where(self.commands.c.id == record["databaseId"])
+                    .where(self.commands.c.id == record["id"])
                     .where(available_condition)
                     .values(
                         **command_to_row(
-                            updated, database_id=record["databaseId"], node_pk=node_pk
+                            updated, database_id=record["id"], node_pk=node_pk
                         )
                     )
                 )
@@ -1729,7 +1720,7 @@ class DatabaseDaemonStore:
                 conn.execute(
                     select(self.commands)
                     .where(self.commands.c.node_id == node_pk)
-                    .where(self.commands.c.public_id.in_(requested.keys()))
+                    .where(self.commands.c.id.in_(requested.keys()))
                     .where(self.commands.c.status == "dispatched")
                 )
                 .mappings()
@@ -1750,10 +1741,10 @@ class DatabaseDaemonStore:
                 }
                 conn.execute(
                     update(self.commands)
-                    .where(self.commands.c.id == record["databaseId"])
+                    .where(self.commands.c.id == record["id"])
                     .values(
                         **command_to_row(
-                            updated, database_id=record["databaseId"], node_pk=node_pk
+                            updated, database_id=record["id"], node_pk=node_pk
                         )
                     )
                 )
@@ -1781,7 +1772,7 @@ class DatabaseDaemonStore:
     def create_run_request(self, request: dict[str, Any]) -> dict[str, Any]:
         now = now_iso()
         record = {
-            "id": request.get("id") or new_relay_id("drun"),
+            "id": request.get("id") or new_database_id(),
             "status": "running",
             "currentIndex": 0,
             "createdAt": now,
@@ -1820,7 +1811,7 @@ class DatabaseDaemonStore:
             row = (
                 conn.execute(
                     select(self.run_requests).where(
-                        self.run_requests.c.public_id == request_id
+                        self.run_requests.c.id == request_id
                     )
                 )
                 .mappings()
@@ -1870,7 +1861,7 @@ class DatabaseDaemonStore:
                 conn.execute(
                     select(self.run_requests)
                     .where(self.run_requests.c.status.in_(ACTIVE_RUN_REQUEST_STATUSES))
-                    .where(self.run_requests.c.current_command_public_id == command_id)
+                    .where(self.run_requests.c.current_command_id == command_id)
                 )
                 .mappings()
                 .first()
@@ -1908,7 +1899,7 @@ class DatabaseDaemonStore:
             row = (
                 conn.execute(
                     select(self.run_requests)
-                    .where(self.run_requests.c.current_command_public_id == command_id)
+                    .where(self.run_requests.c.current_command_id == command_id)
                     .where(self.run_requests.c.status.in_(ACTIVE_RUN_REQUEST_STATUSES))
                     .with_for_update()
                 )
@@ -1971,9 +1962,9 @@ class DatabaseDaemonStore:
             row = (
                 conn.execute(
                     select(self.run_requests)
-                    .where(self.run_requests.c.public_id == request_id)
+                    .where(self.run_requests.c.id == request_id)
                     .where(self.run_requests.c.status.in_(("running", "dispatching")))
-                    .where(self.run_requests.c.current_command_public_id.is_(None))
+                    .where(self.run_requests.c.current_command_id.is_(None))
                     .with_for_update()
                 )
                 .mappings()
@@ -2005,7 +1996,7 @@ class DatabaseDaemonStore:
                 update(self.run_requests)
                 .where(self.run_requests.c.id == row["id"])
                 .where(self.run_requests.c.updated_at == row["updated_at"])
-                .where(self.run_requests.c.current_command_public_id.is_(None))
+                .where(self.run_requests.c.current_command_id.is_(None))
                 .values(
                     **run_request_to_row(
                         updated, database_id=row["id"], node_pk=row["node_id"]
@@ -2040,10 +2031,10 @@ class DatabaseDaemonStore:
             node_pk = self._node_pk(conn, updated["nodeId"])
             conn.execute(
                 update(self.run_requests)
-                .where(self.run_requests.c.public_id == request_id)
+                .where(self.run_requests.c.id == request_id)
                 .values(
                     **run_request_to_row(
-                        updated, database_id=current.get("databaseId"), node_pk=node_pk
+                        updated, database_id=current["id"], node_pk=node_pk
                     )
                 )
             )
@@ -2072,7 +2063,7 @@ class DatabaseDaemonStore:
             row = (
                 conn.execute(
                     select(self.run_requests)
-                    .where(self.run_requests.c.public_id == request_id)
+                    .where(self.run_requests.c.id == request_id)
                     .with_for_update()
                 )
                 .mappings()
@@ -2150,10 +2141,10 @@ class DatabaseDaemonStore:
                 updated, completion_event = completed_cancel_record(record, now)
                 conn.execute(
                     update(self.commands)
-                    .where(self.commands.c.id == record["databaseId"])
+                    .where(self.commands.c.id == record["id"])
                     .values(
                         **command_to_row(
-                            updated, database_id=record["databaseId"], node_pk=node_pk
+                            updated, database_id=record["id"], node_pk=node_pk
                         )
                     )
                 )
@@ -2257,7 +2248,7 @@ class DatabaseDaemonStore:
             row = (
                 conn.execute(
                     select(self.commands).where(
-                        self.commands.c.public_id == event["commandId"]
+                        self.commands.c.id == event["commandId"]
                     )
                 )
                 .mappings()
@@ -2276,7 +2267,7 @@ class DatabaseDaemonStore:
                 return False
             conn.execute(
                 update(self.commands)
-                .where(self.commands.c.id == command["databaseId"])
+                .where(self.commands.c.id == command["id"])
                 .values(
                     **command_to_row(
                         {
@@ -2293,26 +2284,24 @@ class DatabaseDaemonStore:
                             ),
                             **({"error": error} if error else {}),
                         },
-                        database_id=command["databaseId"],
+                        database_id=command["id"],
                         node_pk=node_pk,
                     )
                 )
             )
             run_row = (
                 conn.execute(
-                    select(self.runs).where(self.runs.c.public_id == event["runId"])
+                    select(self.runs).where(self.runs.c.id == event["runId"])
                 )
                 .mappings()
                 .first()
             )
             run = (
-                row_to_run(run_row, include_database=True)
+                row_to_run(run_row)
                 if run_row
                 else {
                     "nodeId": node_id,
-                    "nodeDatabaseId": node_pk,
                     "commandId": event["commandId"],
-                    **({"commandDatabaseId": row["id"]} if row else {}),
                     "sessionId": event["sessionId"],
                     "runId": event["runId"],
                     "agent": event["agent"],
@@ -2354,7 +2343,7 @@ class DatabaseDaemonStore:
     def _write_run(self, conn: Any, run: dict[str, Any]) -> None:
         values = run_to_row(run)
         existing = conn.scalar(
-            select(self.runs.c.id).where(self.runs.c.public_id == run["runId"])
+            select(self.runs.c.id).where(self.runs.c.id == run["runId"])
         )
         if existing:
             conn.execute(
@@ -2366,9 +2355,7 @@ class DatabaseDaemonStore:
             conn.execute(insert(self.runs).values(**values))
 
     def _append_daemon_event(self, conn: Any, event: dict[str, Any]) -> None:
-        conn.execute(
-            insert(self.events).values(**daemon_event_to_row(conn, self, event))
-        )
+        conn.execute(insert(self.events).values(**daemon_event_to_row(event)))
 
     def _node_pk(self, conn: Any, node_id: str) -> str:
         node_pk = conn.scalar(
@@ -2417,7 +2404,7 @@ def node_to_row(
 
 def row_to_node(row: Any) -> dict[str, Any]:
     return {
-        "id": row["id"],
+        "id": str(row["id"]),
         **({"employeeId": row["employee_id"]} if row.get("employee_id") else {}),
         **({"displayName": row["display_name"]} if row.get("display_name") else {}),
         **(
@@ -2490,8 +2477,7 @@ def command_to_row(
     node_pk: str | None = None,
 ) -> dict[str, Any]:
     return {
-        "id": database_id or record.get("databaseId") or new_database_id(),
-        "public_id": record["id"],
+        "id": database_id or record["id"],
         "node_id": node_pk or record.get("nodeDatabaseId"),
         "type": record["command"]["type"],
         "status": record["status"],
@@ -2510,8 +2496,7 @@ def command_to_row(
 
 def row_to_command(row: Any) -> dict[str, Any]:
     return {
-        "databaseId": row["id"],
-        "id": row["public_id"],
+        "id": str(row["id"]),
         "nodeId": row["node_id"],
         "command": row["command"],
         "status": row["status"],
@@ -2560,11 +2545,9 @@ def run_to_row(
     run: dict[str, Any], *, database_id: str | None = None
 ) -> dict[str, Any]:
     return {
-        "id": database_id or run.get("databaseId") or new_database_id(),
-        "public_id": run["runId"],
-        "node_id": run["nodeDatabaseId"],
-        "command_id": run.get("commandDatabaseId"),
-        "command_public_id": run.get("commandId"),
+        "id": database_id or run["runId"],
+        "node_id": run["nodeId"],
+        "command_id": run.get("commandId"),
         "session_id": run["sessionId"],
         "agent": run["agent"],
         "logical_agent_id": run.get("logicalAgentId"),
@@ -2580,23 +2563,16 @@ def run_to_row(
     }
 
 
-def row_to_run(row: Any, *, include_database: bool = False) -> dict[str, Any]:
+def row_to_run(row: Any) -> dict[str, Any]:
     return {
-        **({"databaseId": row["id"]} if include_database else {}),
         "nodeId": row["node_id"],
-        **({"nodeDatabaseId": row["node_id"]} if include_database else {}),
         **(
-            {"commandId": row["command_public_id"]}
-            if row.get("command_public_id")
-            else {}
-        ),
-        **(
-            {"commandDatabaseId": row["command_id"]}
-            if include_database and row.get("command_id")
+            {"commandId": row["command_id"]}
+            if row.get("command_id")
             else {}
         ),
         "sessionId": row["session_id"],
-        "runId": row["public_id"],
+        "runId": str(row["id"]),
         "agent": row["agent"],
         **(
             {"logicalAgentId": row["logical_agent_id"]}
@@ -2630,18 +2606,17 @@ def run_request_to_row(
     node_pk: str | None = None,
 ) -> dict[str, Any]:
     return {
-        "id": database_id or record.get("databaseId") or new_database_id(),
-        "public_id": record["id"],
+        "id": database_id or record["id"],
         "node_id": node_pk or record.get("nodeDatabaseId"),
         "session_id": record["sessionId"],
-        "task_public_id": record.get("taskId"),
+        "task_id": record.get("taskId"),
         "task_goal": record["taskGoal"],
         "assignments": record["assignments"],
         "current_index": record.get("currentIndex", 0),
         "state": record.get("state") or {},
         "status": record["status"],
-        "current_command_public_id": record.get("currentCommandId"),
-        "current_run_public_id": record.get("currentRunId"),
+        "current_command_id": record.get("currentCommandId"),
+        "current_run_id": record.get("currentRunId"),
         "current_agent": record.get("currentAgent"),
         "current_mode": record.get("currentMode"),
         "current_started_at": _parse_iso(record.get("currentStartedAt")),
@@ -2654,25 +2629,23 @@ def run_request_to_row(
 
 def row_to_run_request(row: Any) -> dict[str, Any]:
     return {
-        "databaseId": row["id"],
         "nodeId": row["node_id"],
-        "nodeDatabaseId": row["node_id"],
-        "id": row["public_id"],
+        "id": str(row["id"]),
         "sessionId": row["session_id"],
-        **({"taskId": row["task_public_id"]} if row.get("task_public_id") else {}),
+        **({"taskId": row["task_id"]} if row.get("task_id") else {}),
         "taskGoal": row["task_goal"],
         "assignments": row["assignments"] or [],
         "currentIndex": row["current_index"],
         "state": row["state"] or {},
         "status": row["status"],
         **(
-            {"currentCommandId": row["current_command_public_id"]}
-            if row.get("current_command_public_id")
+            {"currentCommandId": row["current_command_id"]}
+            if row.get("current_command_id")
             else {}
         ),
         **(
-            {"currentRunId": row["current_run_public_id"]}
-            if row.get("current_run_public_id")
+            {"currentRunId": row["current_run_id"]}
+            if row.get("current_run_id")
             else {}
         ),
         **({"currentAgent": row["current_agent"]} if row.get("current_agent") else {}),
@@ -2693,32 +2666,12 @@ def row_to_run_request(row: Any) -> dict[str, Any]:
     }
 
 
-def daemon_event_to_row(
-    conn: Any, store: DatabaseDaemonStore, event: dict[str, Any]
-) -> dict[str, Any]:
-    node_id = event.get("nodeId")
-    command_id = event.get("commandId")
-    run_id = event.get("runId")
+def daemon_event_to_row(event: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": new_database_id(),
-        "public_id": event["id"],
-        "node_id": conn.scalar(
-            select(store.nodes.c.id).where(store.nodes.c.id == node_id)
-        )
-        if node_id
-        else None,
-        "command_id": conn.scalar(
-            select(store.commands.c.id).where(store.commands.c.public_id == command_id)
-        )
-        if command_id
-        else None,
-        "command_public_id": command_id,
-        "run_id": conn.scalar(
-            select(store.runs.c.id).where(store.runs.c.public_id == run_id)
-        )
-        if run_id
-        else None,
-        "run_public_id": run_id,
+        "node_id": event.get("nodeId"),
+        "command_id": event.get("commandId"),
+        "run_id": event.get("runId"),
         "type": event["type"],
         "timestamp": _parse_iso(event["timestamp"]),
         "payload": event,

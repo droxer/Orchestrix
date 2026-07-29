@@ -37,10 +37,12 @@ def test_init_users_script_creates_database_admin(capsys, monkeypatch) -> None:
         user = store.authenticate("admin", "admin")
         assert user is not None
         assert user["role"] == "admin"
-        assert user["employeeId"] == "admin"
-        assert store.list_departments()[0]["id"] == "administration"
-        assert store.list_employees()[0]["id"] == "admin"
-        assert store.list_employees()[0]["departmentId"] == "administration"
+        departments = store.list_departments()
+        assert departments[0]["name"] == "Administration"
+        employees = store.list_employees()
+        assert employees[0]["id"] == user["employeeId"]
+        assert employees[0]["displayName"] == "admin"
+        assert employees[0]["departmentId"] == departments[0]["id"]
 
 
 def test_init_users_script_can_skip_when_users_exist(capsys, monkeypatch) -> None:

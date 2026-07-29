@@ -731,7 +731,7 @@ def test_database_task_store_rejects_link_to_unknown_session(tmp_path: Path) -> 
     task = store.create_task({"title": "Reject dangling link"})
 
     with pytest.raises(KeyError, match="Unknown session"):
-        store.link_session(task["id"], "ses_missing")
+        store.link_session(task["id"], "22222222-2222-4222-8222-222222222222")
 
     assert store.get_task(task["id"])["linkedSessionIds"] == []
 

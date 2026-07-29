@@ -19,7 +19,7 @@ from sqlalchemy import (
     update,
 )
 
-from ..core.ids import new_database_id, new_relay_id, now_iso
+from ..core.ids import new_database_id, now_iso
 from ..core.models import AGENT_NAMES
 from .agent_store import DatabaseAgentStore
 from .store_common import (
@@ -215,7 +215,7 @@ class LocalAgentPlacementStore:
         self, placement_id: str, event_type: str, placement: dict[str, Any]
     ) -> None:
         event = {
-            "id": new_relay_id("evt"),
+            "id": new_database_id(),
             "type": event_type,
             "placementId": placement_id,
             "timestamp": now_iso(),
@@ -237,9 +237,8 @@ class DatabaseAgentPlacementStore:
         "agent_placements",
         metadata,
         database_id_column(),
-        Column("public_id", Text, nullable=False, unique=True),
         Column("agent_id", entity_uuid_type(), nullable=False, index=True),
-        Column("supervisor_employee_public_id", Text, nullable=False, index=True),
+        Column("supervisor_employee_id", Text, nullable=False, index=True),
         Column("daemon_node_id", entity_uuid_type(), nullable=False, index=True),
         Column("executor_kind", Text, nullable=False),
         Column("desired_state", Text, nullable=False),
@@ -254,7 +253,6 @@ class DatabaseAgentPlacementStore:
         "agent_placement_events",
         metadata,
         database_id_column(),
-        Column("public_id", Text, nullable=False, unique=True),
         Column(
             "placement_id",
             entity_uuid_type(),
@@ -294,7 +292,7 @@ class DatabaseAgentPlacementStore:
                     select(
                         self.placements.c.id,
                         self.placements.c.snapshot,
-                        self.placements.c.supervisor_employee_public_id,
+                        self.placements.c.supervisor_employee_id,
                         self.placements.c.event_version,
                     )
                     .where(self.placements.c.agent_id == agent["id"])
@@ -306,7 +304,7 @@ class DatabaseAgentPlacementStore:
             )
             active = [
                 _normalized_placement_snapshot(
-                    row["snapshot"], row["supervisor_employee_public_id"]
+                    row["snapshot"], row["supervisor_employee_id"]
                 )
                 for row in rows
             ]
@@ -356,15 +354,15 @@ class DatabaseAgentPlacementStore:
                 conn.execute(
                     select(
                         self.placements.c.snapshot,
-                        self.placements.c.supervisor_employee_public_id,
-                    ).where(self.placements.c.public_id == placement_id)
+                        self.placements.c.supervisor_employee_id,
+                    ).where(self.placements.c.id == placement_id)
                 )
                 .mappings()
                 .first()
             )
         return (
             _normalized_placement_snapshot(
-                row["snapshot"], row["supervisor_employee_public_id"]
+                row["snapshot"], row["supervisor_employee_id"]
             )
             if row
             else None
@@ -380,10 +378,10 @@ class DatabaseAgentPlacementStore:
                     select(
                         self.placements.c.id,
                         self.placements.c.snapshot,
-                        self.placements.c.supervisor_employee_public_id,
+                        self.placements.c.supervisor_employee_id,
                         self.placements.c.event_version,
                     )
-                    .where(self.placements.c.public_id == placement_id)
+                    .where(self.placements.c.id == placement_id)
                     .with_for_update()
                 )
                 .mappings()
@@ -392,7 +390,7 @@ class DatabaseAgentPlacementStore:
             if not row:
                 raise KeyError(placement_id)
             current = _normalized_placement_snapshot(
-                row["snapshot"], row["supervisor_employee_public_id"]
+                row["snapshot"], row["supervisor_employee_id"]
             )
             if (
                 current.get("daemonNodeId") == daemon_node_id
@@ -402,7 +400,7 @@ class DatabaseAgentPlacementStore:
             conflict = conn.execute(
                 select(self.placements.c.id)
                 .where(self.placements.c.agent_id == current["agentId"])
-                .where(self.placements.c.public_id != placement_id)
+                .where(self.placements.c.id != placement_id)
                 .where(self.placements.c.daemon_node_id == daemon_node_id)
                 .where(self.placements.c.desired_state != "removed")
                 .with_for_update()
@@ -446,7 +444,7 @@ class DatabaseAgentPlacementStore:
     ) -> list[dict[str, Any]]:
         statement = select(
             self.placements.c.snapshot,
-            self.placements.c.supervisor_employee_public_id,
+            self.placements.c.supervisor_employee_id,
         )
         if agent_id is not None:
             statement = statement.where(self.placements.c.agent_id == agent_id)
@@ -461,7 +459,7 @@ class DatabaseAgentPlacementStore:
         return sorted(
             (
                 _normalized_placement_snapshot(
-                    row["snapshot"], row["supervisor_employee_public_id"]
+                    row["snapshot"], row["supervisor_employee_id"]
                 )
                 for row in rows
             ),
@@ -519,7 +517,7 @@ class DatabaseAgentPlacementStore:
             row = (
                 conn.execute(
                     select(self.placements.c.id, self.placements.c.event_version)
-                    .where(self.placements.c.public_id == placement_id)
+                    .where(self.placements.c.id == placement_id)
                     .with_for_update()
                 )
                 .mappings()
@@ -549,7 +547,7 @@ class DatabaseAgentPlacementStore:
             rows = (
                 conn.execute(
                     select(
-                        self.events_table.c.public_id,
+                        self.events_table.c.id,
                         self.events_table.c.type,
                         self.events_table.c.timestamp,
                         self.events_table.c.payload,
@@ -558,7 +556,7 @@ class DatabaseAgentPlacementStore:
                         self.placements,
                         self.events_table.c.placement_id == self.placements.c.id,
                     )
-                    .where(self.placements.c.public_id == placement_id)
+                    .where(self.placements.c.id == placement_id)
                     .order_by(self.events_table.c.sequence)
                 )
                 .mappings()
@@ -568,7 +566,7 @@ class DatabaseAgentPlacementStore:
             raise KeyError(placement_id)
         return [
             {
-                "id": row["public_id"],
+                "id": str(row["id"]),
                 "type": row["type"],
                 "placementId": placement_id,
                 "timestamp": _format_iso(row["timestamp"]),
@@ -587,10 +585,10 @@ class DatabaseAgentPlacementStore:
                     select(
                         self.placements.c.id,
                         self.placements.c.snapshot,
-                        self.placements.c.supervisor_employee_public_id,
+                        self.placements.c.supervisor_employee_id,
                         self.placements.c.event_version,
                     )
-                    .where(self.placements.c.public_id == placement_id)
+                    .where(self.placements.c.id == placement_id)
                     .with_for_update()
                 )
                 .mappings()
@@ -599,7 +597,7 @@ class DatabaseAgentPlacementStore:
             if not row:
                 raise KeyError(placement_id)
             current = _normalized_placement_snapshot(
-                row["snapshot"], row["supervisor_employee_public_id"]
+                row["snapshot"], row["supervisor_employee_id"]
             )
             if int(current.get("agentVersion") or 0) >= agent_version:
                 return current
@@ -689,7 +687,7 @@ def _new_placement(
         raise ValueError("workspacePolicy must be an object.")
     timestamp = now_iso()
     return {
-        "id": new_relay_id("placement"),
+        "id": new_database_id(),
         "agentId": agent["id"],
         "supervisorEmployeeId": agent["supervisorEmployeeId"],
         "daemonNodeId": daemon_node_id,
@@ -726,7 +724,7 @@ def _placement_event(
     placement_id: str, event_type: str, placement: dict[str, Any]
 ) -> dict[str, Any]:
     return {
-        "id": new_relay_id("evt"),
+        "id": new_database_id(),
         "type": event_type,
         "placementId": placement_id,
         "timestamp": now_iso(),
@@ -738,10 +736,9 @@ def _placement_row(
     placement: dict[str, Any], *, event_version: int, database_id: str | None = None
 ) -> dict[str, Any]:
     return {
-        "id": database_id or new_database_id(),
-        "public_id": placement["id"],
+        "id": database_id or placement["id"],
         "agent_id": placement["agentId"],
-        "supervisor_employee_public_id": placement["supervisorEmployeeId"],
+        "supervisor_employee_id": placement["supervisorEmployeeId"],
         "daemon_node_id": placement["daemonNodeId"],
         "executor_kind": placement["executorKind"],
         "desired_state": placement["desiredState"],
@@ -758,7 +755,7 @@ def _placement_event_row(
     placement_database_id: str, sequence: int, event: dict[str, Any]
 ) -> dict[str, Any]:
     return {
-        "public_id": event["id"],
+        "id": event["id"],
         "placement_id": placement_database_id,
         "sequence": sequence,
         "type": event["type"],

@@ -11,7 +11,7 @@ from typing import Any
 from loguru import logger
 
 from ..core.environment import load_backend_env
-from ..core.ids import new_relay_id, new_sandbox_id, now_iso
+from ..core.ids import new_database_id, new_relay_id, new_sandbox_id, now_iso
 from ..core.models import (
     AGENT_NAMES,
     DAEMON_NODE_SUPPORTED_PROTOCOL_VERSIONS,
@@ -1194,7 +1194,7 @@ class DaemonNodeRegistry:
         self.enqueue(
             sandbox_id,
             {
-                "id": new_relay_id("cmd"),
+                "id": new_database_id(),
                 "type": "run.cancel",
                 "commandId": active["commandId"],
                 "sessionId": active["sessionId"],
@@ -1553,7 +1553,7 @@ class DaemonNodeRegistry:
                 run_request["id"], {"nodeId": node_id}
             )
         mode = assignment.get("mode") or "action"
-        run_id = new_relay_id("run")
+        run_id = new_database_id()
         sandbox = self.sandboxes.get(node_id)
         if not sandbox:
             self._fail_run_request(
@@ -1616,7 +1616,7 @@ class DaemonNodeRegistry:
         if assignment.get("agentInstructions"):
             state["agent_instructions"] = assignment["agentInstructions"]
         command = {
-            "id": new_relay_id("cmd"),
+            "id": new_database_id(),
             "type": "run.start",
             "sessionId": run_request["sessionId"],
             "runId": run_id,
@@ -1992,7 +1992,7 @@ class DaemonNodeRegistry:
                 continue
             seen_relative_paths.add(relative_path)
             artifact = {
-                "id": new_relay_id("art"),
+                "id": new_database_id(),
                 "kind": "workspace_file",
                 "title": item["title"],
                 "path": path,

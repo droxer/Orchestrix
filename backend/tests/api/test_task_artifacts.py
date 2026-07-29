@@ -5,6 +5,7 @@ from tempfile import TemporaryDirectory
 from typing import Any
 
 from fastapi.testclient import TestClient
+
 from relay.app import create_app
 from relay.persistence.stores import relay_event
 
@@ -55,8 +56,8 @@ def test_task_artifacts_lists_generated_files_from_linked_sessions(monkeypatch) 
         task = _create_task_with_session(client, ws)
         session_id = task["linkedSessionIds"][0]
 
-        deck = _workspace_artifact(ws, "deck.pptx", artifact_id="art_deck", created_at="2026-06-30T00:00:00.000Z", content_type=PPTX_TYPE)
-        doc = _workspace_artifact(ws, "notes.docx", artifact_id="art_doc", created_at="2026-07-01T00:00:00.000Z", content_type=DOCX_TYPE)
+        deck = _workspace_artifact(ws, "deck.pptx", artifact_id="20000000-0000-4000-8000-000000000001", created_at="2026-06-30T00:00:00.000Z", content_type=PPTX_TYPE)
+        doc = _workspace_artifact(ws, "notes.docx", artifact_id="20000000-0000-4000-8000-000000000002", created_at="2026-07-01T00:00:00.000Z", content_type=DOCX_TYPE)
         store = app.state.session_store
         store.append_event(session_id, relay_event("artifact.created", session_id, {"artifact": deck}))
         store.append_event(session_id, relay_event("artifact.created", session_id, {"artifact": doc}))
@@ -65,7 +66,7 @@ def test_task_artifacts_lists_generated_files_from_linked_sessions(monkeypatch) 
         assert response.status_code == 200, response.text
         body = response.json()
         assert body["taskId"] == task["id"]
-        assert [item["id"] for item in body["artifacts"]] == ["art_doc", "art_deck"]
+        assert [item["id"] for item in body["artifacts"]] == ["20000000-0000-4000-8000-000000000002", "20000000-0000-4000-8000-000000000001"]
         item = body["artifacts"][1]
         assert item["sessionId"] == session_id
         assert item["taskId"] == task["id"]
@@ -93,8 +94,8 @@ def test_task_artifacts_dedupes_regenerated_file_across_sessions(monkeypatch) ->
         assert pickup.status_code == 201, pickup.text
         second_session = pickup.json()["session"]["id"]
 
-        stale = _workspace_artifact(ws, "deck.pptx", artifact_id="art_v1", created_at="2026-06-29T00:00:00.000Z", content_type=PPTX_TYPE)
-        fresh = _workspace_artifact(ws, "deck.pptx", artifact_id="art_v2", created_at="2026-07-02T00:00:00.000Z", content_type=PPTX_TYPE)
+        stale = _workspace_artifact(ws, "deck.pptx", artifact_id="20000000-0000-4000-8000-000000000003", created_at="2026-06-29T00:00:00.000Z", content_type=PPTX_TYPE)
+        fresh = _workspace_artifact(ws, "deck.pptx", artifact_id="20000000-0000-4000-8000-000000000004", created_at="2026-07-02T00:00:00.000Z", content_type=PPTX_TYPE)
         store = app.state.session_store
         store.append_event(first_session, relay_event("artifact.created", first_session, {"artifact": stale}))
         store.append_event(second_session, relay_event("artifact.created", second_session, {"artifact": fresh}))
@@ -103,7 +104,7 @@ def test_task_artifacts_dedupes_regenerated_file_across_sessions(monkeypatch) ->
         assert response.status_code == 200, response.text
         artifacts = response.json()["artifacts"]
         assert len(artifacts) == 1
-        assert artifacts[0]["id"] == "art_v2"
+        assert artifacts[0]["id"] == "20000000-0000-4000-8000-000000000004"
         assert artifacts[0]["sessionId"] == second_session
 
 
@@ -116,7 +117,7 @@ def test_task_artifacts_ignores_non_workspace_artifacts(monkeypatch) -> None:
         task = _create_task_with_session(client, ws)
         session_id = task["linkedSessionIds"][0]
         log = {
-            "id": "art_log",
+            "id": "20000000-0000-4000-8000-000000000005",
             "kind": "agent_output",
             "title": "claude output",
             "path": str(Path(ws) / "output.txt"),
@@ -148,7 +149,12 @@ def test_task_artifacts_unknown_task_is_404(monkeypatch) -> None:
     with TemporaryDirectory() as root:
         client = TestClient(create_app(root))
         _bootstrap(client)
-        assert client.get("/api/v1/tasks/task_missing/artifacts").status_code == 404
+        assert (
+            client.get(
+                "/api/v1/tasks/11111111-1111-4111-8111-111111111111/artifacts"
+            ).status_code
+            == 404
+        )
 
 
 def test_task_artifacts_denied_for_other_employee(monkeypatch) -> None:

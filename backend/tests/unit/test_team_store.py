@@ -68,7 +68,7 @@ def test_team_store_normalizes_legacy_supervisor_owner(team_store) -> None:
         with team_store.engine.begin() as conn:
             conn.execute(
                 update(team_store.teams)
-                .where(team_store.teams.c.public_id == created["id"])
+                .where(team_store.teams.c.id == created["id"])
                 .values(snapshot=legacy)
             )
     else:

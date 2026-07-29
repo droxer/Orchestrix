@@ -137,4 +137,4 @@ def test_database_enforces_employee_scoped_normalized_agent_names() -> None:
         if isinstance(constraint, UniqueConstraint)
     }
 
-    assert ("display_name_key", "supervisor_employee_public_id") in unique_columns
+    assert ("display_name_key", "supervisor_employee_id") in unique_columns

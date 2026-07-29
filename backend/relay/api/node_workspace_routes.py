@@ -13,7 +13,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
-from ..core.ids import new_relay_id
+from ..core.ids import new_database_id
 from ..security.auth import require_admin_session
 from .agent_workspace_routes import (
     WORKSPACE_FILE_PREVIEW_LIMIT,
@@ -41,7 +41,7 @@ async def node_workspace_files(node_id: str, request: Request, ctx: AppContextDe
     require_admin_session(request, ctx.auth_store)
     path = _path(request.query_params.get("path"))
     node = _shared_capable_node(ctx, node_id)
-    event = await _dispatch(ctx, node, {"id": new_relay_id("cmd"), "type": "workspace.list", "scope": "shared", "path": path})
+    event = await _dispatch(ctx, node, {"id": new_database_id(), "type": "workspace.list", "scope": "shared", "path": path})
     _workspace_error(event)
     return {"nodeId": node["id"], "scope": "shared", "source": "live", "path": event.get("path", path), "exists": bool(event.get("exists")), "entries": event.get("entries") or [], "generatedAt": _timestamp()}
 
@@ -51,7 +51,7 @@ async def node_workspace_file(node_id: str, request: Request, ctx: AppContextDep
     require_admin_session(request, ctx.auth_store)
     path = _path(request.query_params.get("path"), required=True)
     node = _shared_capable_node(ctx, node_id)
-    event = await _dispatch(ctx, node, {"id": new_relay_id("cmd"), "type": "workspace.read", "scope": "shared", "path": path})
+    event = await _dispatch(ctx, node, {"id": new_database_id(), "type": "workspace.read", "scope": "shared", "path": path})
     _workspace_error(event)
     raw = event.get("contentBase64")
     content = base64.b64decode(raw).decode("utf-8", errors="replace") if isinstance(raw, str) else None

@@ -6,11 +6,12 @@ from tempfile import TemporaryDirectory
 from uuid import UUID
 
 import pytest
+from sqlalchemy import text
+
 from relay.persistence.session_store import DatabaseSessionStore, LocalSessionStore
 from relay.persistence.store_common import relay_event
 from relay.persistence.task_store import DatabaseTaskStore
 from relay.sessions.controller import SessionController, SessionRunInFlightError
-from sqlalchemy import text
 
 
 def test_session_stores_create_uuid_thread_ids() -> None:
@@ -214,6 +215,7 @@ def test_session_store_create_artifact_indexes_artifact() -> None:
         })
         artifact, updated = store.create_artifact(session["id"], {"kind": "review", "title": "Agent review", "body": "  Looks good.\n\n", "extension": "md"})
 
+        assert str(UUID(artifact["id"])) == artifact["id"]
         assert updated["artifacts"][0]["id"] == artifact["id"]
         assert store.read_artifact(session["id"], artifact["id"]) == "  Looks good.\n\n"
 
@@ -357,7 +359,7 @@ def test_database_session_store_persists_events_and_artifacts() -> None:
         assert store.read_artifact(session["id"], artifact["id"]) == "Looks good."
         assert not (Path(root) / "session-artifacts").exists()
         with store.engine.begin() as conn:
-            content = conn.execute(text("select content from session_artifacts where public_id = :artifact_id"), {"artifact_id": artifact["id"]}).scalar_one()
+            content = conn.execute(text("select content from session_artifacts where id = :artifact_id"), {"artifact_id": artifact["id"]}).scalar_one()
         assert content == "Looks good."
         usage = store.list_token_usage()[0]
         assert usage["taskGoal"] == "fix auth"
@@ -383,6 +385,7 @@ def test_database_session_store_create_artifact_indexes_artifact() -> None:
         })
         artifact, updated = store.create_artifact(session["id"], {"kind": "review", "title": "Agent review", "body": "  Looks good.\n\n", "extension": "md"})
 
+        assert str(UUID(artifact["id"])) == artifact["id"]
         assert updated["artifacts"][0]["id"] == artifact["id"]
         assert store.read_artifact(session["id"], artifact["id"]) == "  Looks good.\n\n"
         assert not (Path(root) / "session-artifacts").exists()
@@ -390,7 +393,7 @@ def test_database_session_store_create_artifact_indexes_artifact() -> None:
 
 def _workspace_file_artifact(session_id: str) -> dict:
     return {
-        "id": "art_deck",
+        "id": "22222222-2222-4222-8222-222222222222",
         "kind": "workspace_file",
         "title": "deck.pptx",
         "path": f"/workspace/{session_id}/deck.pptx",
@@ -418,7 +421,7 @@ def test_local_session_store_workspace_artifact_snapshot_roundtrip() -> None:
         assert store.read_artifact_content(session["id"], artifact["id"]) == b"pptx binary \x00 bytes"
 
         # Metadata-only indexing (no snapshot) still records the artifact.
-        no_content, _updated = store.index_workspace_artifact(session["id"], {**_workspace_file_artifact(session["id"]), "id": "art_big"}, None)
+        no_content, _updated = store.index_workspace_artifact(session["id"], {**_workspace_file_artifact(session["id"]), "id": "33333333-3333-4333-8333-333333333333"}, None)
         assert "snapshotPath" not in no_content
         assert store.read_artifact_content(session["id"], no_content["id"]) is None
 
@@ -437,8 +440,8 @@ def test_database_session_store_workspace_artifact_snapshot_roundtrip() -> None:
         assert artifact["bytes"] == len(b"pptx binary \x00 bytes")
         assert store.read_artifact_content(session["id"], artifact["id"]) == b"pptx binary \x00 bytes"
         with store.engine.begin() as conn:
-            row = conn.execute(text("select kind, metadata from session_artifacts where public_id = :artifact_id"), {"artifact_id": artifact["id"]}).mappings().one()
+            row = conn.execute(text("select kind, metadata from session_artifacts where id = :artifact_id"), {"artifact_id": artifact["id"]}).mappings().one()
         assert row["kind"] == "workspace_file"
 
-        no_content, _updated = store.index_workspace_artifact(session["id"], {**_workspace_file_artifact(session["id"]), "id": "art_big"}, None)
+        no_content, _updated = store.index_workspace_artifact(session["id"], {**_workspace_file_artifact(session["id"]), "id": "33333333-3333-4333-8333-333333333333"}, None)
         assert store.read_artifact_content(session["id"], no_content["id"]) is None

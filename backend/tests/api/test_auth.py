@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+import uuid
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from fastapi.testclient import TestClient
+
 from relay.app import create_app
 from relay.persistence.stores import (
     DatabaseDaemonStore,
@@ -44,7 +46,7 @@ def _create_user(client: TestClient, username: str, *, employee_id: str | None =
 
 def _add_workspace_file_artifact(app, session_id: str, title: str, path: str) -> None:
     artifact = {
-        "id": f"art_{Path(path).stem.replace('-', '_')}",
+        "id": str(uuid.uuid5(uuid.NAMESPACE_URL, path)),
         "kind": "workspace_file",
         "title": title,
         "path": path,
@@ -930,6 +932,8 @@ def test_app_can_use_database_backed_auth_store(monkeypatch) -> None:
             "password": "secret123",
         })
         assert response.status_code == 200
+        admin_employee_id = response.json()["user"]["employeeId"]
+        assert admin_employee_id
 
         response = client.get("/api/v1/auth/me")
         assert response.status_code == 200
@@ -950,7 +954,8 @@ def test_app_can_use_database_backed_auth_store(monkeypatch) -> None:
             "name": "Engineering",
         })
         assert response.status_code == 201
-        assert response.json()["department"]["id"] == "engineering"
+        engineering_id = response.json()["department"]["id"]
+        assert engineering_id
 
         response = second_client.get("/api/v1/admin/departments")
         assert response.status_code == 200
@@ -961,17 +966,20 @@ def test_app_can_use_database_backed_auth_store(monkeypatch) -> None:
             "password": "secret123",
             "role": "user",
             "employeeId": "eng-user",
-            "departmentId": "engineering",
+            "departmentId": engineering_id,
             "departmentName": "Engineering",
         })
         assert response.status_code == 201
+        eng_employee_id = response.json()["user"]["employeeId"]
+        assert eng_employee_id
 
         response = second_client.get("/api/v1/admin/employees")
         assert response.status_code == 200
-        assert response.json()["employees"][0]["id"] == "admin"
+        assert response.json()["employees"][0]["id"] == admin_employee_id
         employees_by_id = {employee["id"]: employee for employee in response.json()["employees"]}
-        assert employees_by_id["eng-user"]["departmentId"] == "engineering"
-        assert employees_by_id["eng-user"]["departmentName"] == "Engineering"
+        assert employees_by_id[eng_employee_id]["displayName"] == "eng-user"
+        assert employees_by_id[eng_employee_id]["departmentId"] == engineering_id
+        assert employees_by_id[eng_employee_id]["departmentName"] == "Engineering"
 
         response = second_client.post("/api/v1/admin/daemon-nodes", json={
             "employeeId": "alice",
@@ -981,8 +989,9 @@ def test_app_can_use_database_backed_auth_store(monkeypatch) -> None:
 
         response = second_client.get("/api/v1/admin/employees")
         assert response.status_code == 200
-        employee_ids = {employee["id"] for employee in response.json()["employees"]}
-        assert {"admin", "alice"}.issubset(employee_ids)
+        employees = response.json()["employees"]
+        assert {admin_employee_id, eng_employee_id}.issubset({employee["id"] for employee in employees})
+        assert any(employee["displayName"] == "alice" for employee in employees)
 
 
 def test_relay_storage_postgres_switches_backend_stores_to_database(monkeypatch) -> None:
@@ -1037,4 +1046,5 @@ def test_relay_storage_postgres_switches_backend_stores_to_database(monkeypatch)
             "nodeId": "sbx_unassigned",
         })
         assert response.status_code == 201
-        assert app.state.registry.daemon_store.get_node("sbx_unassigned")["employeeId"] == "db-user"
+        employee_id = response.json()["employee"]["id"]
+        assert app.state.registry.daemon_store.get_node("sbx_unassigned")["employeeId"] == employee_id

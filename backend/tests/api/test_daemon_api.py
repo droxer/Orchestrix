@@ -83,7 +83,7 @@ def test_workspace_event_is_authorized_and_resolves_query_broker(monkeypatch) ->
         app.state.workspace_query_broker = Broker()
         event = {
             "type": "workspace.listing",
-            "commandId": "cmd_1",
+            "commandId": "00000000-0000-4000-8000-000000000080",
             "agentId": "agent_1",
             "path": "",
             "exists": True,
@@ -95,7 +95,9 @@ def test_workspace_event_is_authorized_and_resolves_query_broker(monkeypatch) ->
             headers={"Authorization": "Bearer node_token"},
         )
         assert response.status_code == 200
-        assert received == [("cmd_1", "sbx_workspace", event)]
+        assert received == [
+            ("00000000-0000-4000-8000-000000000080", "sbx_workspace", event)
+        ]
         assert (
             client.post(
                 "/api/v1/daemon-nodes/sbx_workspace/events",

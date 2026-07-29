@@ -235,7 +235,9 @@ async def create_employee(request: Request, ctx: AppContextDep) -> dict[str, Any
         status = 409 if "already exists" in message else 400
         raise HTTPException(status, message) from error
     if hasattr(ctx.auth_store, "ensure_employee"):
-        employee = ctx.auth_store.ensure_employee(employee_id, display_name=display_name, email=email)
+        employee = ctx.auth_store.ensure_employee(
+            user.get("employeeId") or employee_id, display_name=display_name, email=email
+        )
     else:
         employee = {
             "id": employee_id,
@@ -247,7 +249,7 @@ async def create_employee(request: Request, ctx: AppContextDep) -> dict[str, Any
     public_node: dict[str, Any] | None = None
     if node_id:
         try:
-            assigned_node = ctx.registry.assign_employee(node_id, employee_id)
+            assigned_node = ctx.registry.assign_employee(node_id, employee["id"])
             sync_node_agents(ctx, assigned_node)
         except KeyError as error:
             raise HTTPException(404, "Daemon node not found.") from error

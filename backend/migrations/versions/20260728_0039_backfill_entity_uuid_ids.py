@@ -7,6 +7,8 @@ Revises: 20260726_0038
 from __future__ import annotations
 
 import json
+import logging
+import re
 from typing import Any
 
 import sqlalchemy as sa
@@ -16,6 +18,8 @@ revision = "20260728_0039"
 down_revision = "20260726_0038"
 branch_labels = None
 depends_on = None
+
+logger = logging.getLogger(__name__)
 
 ENTITY_TABLES = ("sessions", "agents", "daemon_nodes")
 
@@ -62,6 +66,9 @@ JSON_COLUMNS = (
 
 BATCH_SIZE = 500
 
+MAPPING_TABLE = "uuid_id_map"
+STAGING_PREFIX = "uuid_migration_"
+
 
 def upgrade() -> None:
     connection = op.get_bind()
@@ -76,31 +83,66 @@ def upgrade() -> None:
         for table in ENTITY_TABLES
         if table in table_names and {"id", "public_id"}.issubset(columns[table])
     }
-
-    for entity_table, references in REFERENCE_COLUMNS.items():
-        mapping = mappings.get(entity_table, {})
-        for table, column in references:
-            if table in table_names and column in columns[table]:
-                _replace_column_values(connection, table, column, mapping)
-
-    if "agents" in table_names and "compatibility_key" in columns["agents"]:
-        _replace_embedded_column_values(
-            connection, "agents", "compatibility_key", mappings.get("daemon_nodes", {})
-        )
-
-    combined_mapping = {
-        old_id: new_id for mapping in mappings.values() for old_id, new_id in mapping.items()
+    combined = {
+        old_id: new_id
+        for mapping in mappings.values()
+        for old_id, new_id in mapping.items()
     }
-    for table, column in JSON_COLUMNS:
-        if (
-            table in table_names
-            and "id" in columns[table]
-            and column in columns[table]
-        ):
-            _replace_json_values(connection, table, column, combined_mapping)
+    if not combined:
+        logger.info("0039 backfill: no legacy public ids found, skipping")
+        return
 
-    for table, mapping in mappings.items():
-        _replace_public_ids(connection, table, mapping)
+    logger.info(
+        "0039 backfill: rewriting %d legacy public ids across %d entity tables",
+        len(combined),
+        len(mappings),
+    )
+    _create_mapping_table(connection, combined)
+    try:
+        for entity_table, references in REFERENCE_COLUMNS.items():
+            if not mappings.get(entity_table):
+                continue
+            for table, column in references:
+                if table in table_names and column in columns[table]:
+                    updated = _replace_column_values(connection, table, column)
+                    logger.info(
+                        "0039 backfill: %s.%s updated %d rows",
+                        table,
+                        column,
+                        updated,
+                    )
+
+        if "agents" in table_names and "compatibility_key" in columns["agents"]:
+            _replace_embedded_column_values(
+                connection,
+                "agents",
+                "compatibility_key",
+                mappings.get("daemon_nodes", {}),
+            )
+
+        pattern = _build_pattern(combined)
+        for table, column in JSON_COLUMNS:
+            if (
+                table in table_names
+                and "id" in columns[table]
+                and column in columns[table]
+            ):
+                updated = _replace_json_values(
+                    connection, table, column, pattern, combined
+                )
+                logger.info(
+                    "0039 backfill: %s.%s rewrote %d rows",
+                    table,
+                    column,
+                    updated,
+                )
+
+        for table in ENTITY_TABLES:
+            if mappings.get(table):
+                _replace_public_ids(connection, table)
+                logger.info("0039 backfill: %s.public_id backfilled", table)
+    finally:
+        connection.execute(sa.text(f"DROP TABLE IF EXISTS {MAPPING_TABLE}"))
 
 
 def downgrade() -> None:
@@ -116,37 +158,41 @@ def _entity_mapping(connection: Any, table: str) -> dict[str, str]:
     return {
         str(row["public_id"]): str(row["id"])
         for row in rows
-        if str(row["public_id"]) != str(row["id"])
+        if row["public_id"] is not None
+        and row["id"] is not None
+        and str(row["public_id"]) != str(row["id"])
     }
 
 
-def _replace_column_values(
-    connection: Any, table: str, column: str, mapping: dict[str, str]
-) -> None:
-    statement = sa.text(
-        f'UPDATE "{table}" SET "{column}" = :new_id WHERE "{column}" = :old_id'
+def _create_mapping_table(connection: Any, mapping: dict[str, str]) -> None:
+    connection.execute(
+        sa.text(
+            f"CREATE TEMPORARY TABLE {MAPPING_TABLE} ("
+            "old_id TEXT PRIMARY KEY, new_id TEXT NOT NULL)"
+        )
     )
-    for old_id, new_id in mapping.items():
-        connection.execute(statement, {"old_id": old_id, "new_id": new_id})
+    statement = sa.text(
+        f"INSERT INTO {MAPPING_TABLE} (old_id, new_id) "
+        "VALUES (:old_id, :new_id)"
+    )
+    items = [
+        {"old_id": old_id, "new_id": new_id}
+        for old_id, new_id in mapping.items()
+    ]
+    for start in range(0, len(items), BATCH_SIZE):
+        connection.execute(statement, items[start : start + BATCH_SIZE])
 
 
-def _replace_public_ids(
-    connection: Any, table: str, mapping: dict[str, str]
-) -> None:
-    statement = sa.text(
-        f'UPDATE "{table}" SET public_id = :new_id WHERE public_id = :old_id'
+def _replace_column_values(connection: Any, table: str, column: str) -> int:
+    result = connection.execute(
+        sa.text(
+            f'UPDATE "{table}" SET "{column}" = ('
+            f"SELECT new_id FROM {MAPPING_TABLE} "
+            f'WHERE old_id = "{table}"."{column}") '
+            f'WHERE "{column}" IN (SELECT old_id FROM {MAPPING_TABLE})'
+        )
     )
-    staged: dict[str, str] = {}
-    for old_id, new_id in mapping.items():
-        temporary_id = f"uuid_migration_{new_id.replace('-', '')}"
-        connection.execute(
-            statement, {"old_id": old_id, "new_id": temporary_id}
-        )
-        staged[temporary_id] = new_id
-    for temporary_id, new_id in staged.items():
-        connection.execute(
-            statement, {"old_id": temporary_id, "new_id": new_id}
-        )
+    return result.rowcount
 
 
 def _replace_embedded_column_values(
@@ -164,11 +210,51 @@ def _replace_embedded_column_values(
         )
 
 
+def _build_pattern(mapping: dict[str, str]) -> re.Pattern[str]:
+    ordered = sorted(mapping, key=len, reverse=True)
+    return re.compile("|".join(re.escape(key) for key in ordered))
+
+
+def _replace_public_ids(connection: Any, table: str) -> None:
+    quoted = f'"{table}"'
+    connection.execute(
+        sa.text(
+            f"UPDATE {quoted} SET public_id = '{STAGING_PREFIX}' || replace(("
+            f"SELECT new_id FROM {MAPPING_TABLE} "
+            f"WHERE old_id = {quoted}.public_id), '-', '') "
+            f"WHERE public_id IN (SELECT old_id FROM {MAPPING_TABLE})"
+        )
+    )
+    connection.execute(
+        sa.text(
+            f"UPDATE {quoted} SET public_id = ("
+            f"SELECT new_id FROM {MAPPING_TABLE} "
+            f"WHERE '{STAGING_PREFIX}' || replace(new_id, '-', '') = "
+            f"{quoted}.public_id) "
+            f"WHERE public_id IN ("
+            f"SELECT '{STAGING_PREFIX}' || replace(new_id, '-', '') "
+            f"FROM {MAPPING_TABLE})"
+        )
+    )
+
+
 def _replace_json_values(
-    connection: Any, table: str, column: str, mapping: dict[str, str]
-) -> None:
-    if not mapping:
-        return
+    connection: Any,
+    table: str,
+    column: str,
+    pattern: re.Pattern[str],
+    mapping: dict[str, str],
+) -> int:
+    value_expression = (
+        "CAST(:value AS JSONB)"
+        if connection.dialect.name == "postgresql"
+        else ":value"
+    )
+    update = sa.text(
+        f'UPDATE "{table}" SET "{column}" = {value_expression} '
+        "WHERE id = :row_id"
+    )
+    updated = 0
     after_id: Any = None
     while True:
         where = "" if after_id is None else "WHERE id > :after_id"
@@ -180,38 +266,39 @@ def _replace_json_values(
             {} if after_id is None else {"after_id": after_id},
         ).mappings().all()
         if not rows:
-            return
+            return updated
+        replacements = []
         for row in rows:
             raw_value = row[column]
+            if raw_value is None:
+                continue
             decoded = json.loads(raw_value) if isinstance(raw_value, str) else raw_value
-            replaced = _replace_json_scalars(decoded, mapping)
+            replaced = _replace_json_scalars(decoded, pattern, mapping)
             if replaced == decoded:
                 continue
-            encoded = json.dumps(replaced, separators=(",", ":"))
-            value_expression = (
-                "CAST(:value AS JSONB)"
-                if connection.dialect.name == "postgresql"
-                else ":value"
+            replacements.append(
+                {
+                    "row_id": row["id"],
+                    "value": json.dumps(replaced, separators=(",", ":")),
+                }
             )
-            connection.execute(
-                sa.text(
-                    f'UPDATE "{table}" SET "{column}" = {value_expression} '
-                    "WHERE id = :row_id"
-                ),
-                {"row_id": row["id"], "value": encoded},
-            )
+        if replacements:
+            connection.execute(update, replacements)
+            updated += len(replacements)
         after_id = rows[-1]["id"]
 
 
-def _replace_json_scalars(value: Any, mapping: dict[str, str]) -> Any:
+def _replace_json_scalars(
+    value: Any, pattern: re.Pattern[str], mapping: dict[str, str]
+) -> Any:
     if isinstance(value, str):
-        for old_id, new_id in mapping.items():
-            value = value.replace(old_id, new_id)
-        return value
+        replaced, count = pattern.subn(lambda match: mapping[match.group(0)], value)
+        return replaced if count else value
     if isinstance(value, list):
-        return [_replace_json_scalars(item, mapping) for item in value]
+        return [_replace_json_scalars(item, pattern, mapping) for item in value]
     if isinstance(value, dict):
         return {
-            key: _replace_json_scalars(item, mapping) for key, item in value.items()
+            key: _replace_json_scalars(item, pattern, mapping)
+            for key, item in value.items()
         }
     return value
