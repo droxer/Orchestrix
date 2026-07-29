@@ -624,22 +624,22 @@
   display: none;
 }
 
-/* Token usage rides as a non-interactive twin of the copy/retry pills — same
-   height, padding, fill, and type so the three read as one footer group. */
+/* Token usage reads like a CLI status line (Codex/Claude style) — flat,
+   muted, no pill chrome; it visually recedes behind the copy/retry actions. */
 .msg-tokens {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   height: 26px;
-  padding: 0 var(--sp-3);
-  border: 1px solid transparent;
-  border-radius: var(--r-2);
-  background: var(--surface-3);
-  color: var(--ink-3);
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--ink-4);
   font: var(--type-label);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   cursor: default;
+  opacity: 0.75;
 }
 
 .msg-turn-actions {

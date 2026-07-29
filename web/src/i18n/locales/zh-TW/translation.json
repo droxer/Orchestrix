@@ -101,7 +101,7 @@
     "remove": "移除 @{{id}}",
     "remove_confirm": "從此瀏覽器移除 @{{id}}？",
     "agent_running_aria": "Agent 運作中",
-    "tokens_short": "tok",
+    "tokens_short": "tokens",
     "token_usage_title": "輸入 {{input}} · 輸出 {{output}} · 快取 {{cache}}",
     "no_sessions": "—",
     "rename": "重新命名",

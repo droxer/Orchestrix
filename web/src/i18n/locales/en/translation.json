@@ -101,7 +101,7 @@
     "remove": "Remove @{{id}}",
     "remove_confirm": "Remove @{{id}} from this browser?",
     "agent_running_aria": "Agent running",
-    "tokens_short": "tok",
+    "tokens_short": "tokens",
     "token_usage_title": "Input {{input}} · Output {{output}} · Cache {{cache}}",
     "no_sessions": "—",
     "rename": "Rename",
