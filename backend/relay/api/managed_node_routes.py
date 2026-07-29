@@ -11,7 +11,7 @@ from ..services.node_agents import (
     remove_node_agents,
     sync_node_agents,
 )
-from .deps import AppContextDep
+from .deps import AppContext, AppContextDep
 from .helpers import json_body
 
 router = APIRouter()
@@ -245,7 +245,7 @@ async def retire_managed_node_runtime(
     return Response(status_code=204)
 
 
-def _fence_active_runtime(ctx: Any, node: dict[str, Any]) -> None:
+def _fence_active_runtime(ctx: AppContext, node: dict[str, Any]) -> None:
     daemon_node_id = node.get("activeDaemonNodeId")
     if daemon_node_id and ctx.registry.get(daemon_node_id):
         ctx.registry.fence_managed_node(daemon_node_id)

@@ -17,7 +17,6 @@ from sqlalchemy import (
     MetaData,
     Table,
     Text,
-    Uuid,
     create_engine,
     delete,
     insert,
@@ -28,6 +27,14 @@ from sqlalchemy.exc import IntegrityError
 
 from ..core.ids import new_database_id, now_iso
 from ..core.storage_config import database_url_from_env, use_postgres_storage
+from ..persistence.store_common import (
+    _format_iso,
+    _parse_iso,
+    _read_json,
+    _write_json,
+    database_id_column,
+    entity_uuid_type,
+)
 
 DEFAULT_SESSION_TTL_SECONDS = 7 * 24 * 60 * 60  # 1 week
 USER_COOKIE_NAME = "relay_session"
@@ -42,54 +49,11 @@ DEFAULT_USER_THEME: UserTheme = "system"
 DEFAULT_USER_LANGUAGE: UserLanguage = "en"
 
 
-def entity_uuid_type() -> Any:
-    """Native UUID in PostgreSQL, with TEXT retained for SQLite test stores."""
-    return Uuid(as_uuid=False).with_variant(Text(), "sqlite")
-
-
-def database_id_column() -> Column[Any]:
-    return Column("id", entity_uuid_type(), primary_key=True, default=new_database_id)
-
-
-def _parse_iso(value: str | None) -> datetime | None:
-    if not value:
-        return None
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
-
-
-def _format_iso(value: datetime | None) -> str | None:
-    if value is None:
-        return None
-    return value.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
-
-
-def _read_json(path: Path) -> Any:
-    import json
-
-    with path.open("r", encoding="utf-8") as handle:
-        return json.load(handle)
-
-
-def _write_json(path: Path, value: Any, mode: int | None = 0o600) -> None:
-    import json
-
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    if mode is None:
-        with tmp.open("w", encoding="utf-8") as handle:
-            json.dump(value, handle, indent=2)
-            handle.write("\n")
-    else:
-        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            json.dump(value, handle, indent=2)
-            handle.write("\n")
-    tmp.replace(path)
-
-
 def hash_password(password: str) -> str:
     salt = secrets.token_hex(16)
-    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), PW_HASH_ITERATIONS).hex()
+    digest = hashlib.pbkdf2_hmac(
+        "sha256", password.encode("utf-8"), salt.encode("utf-8"), PW_HASH_ITERATIONS
+    ).hex()
     return f"{PW_HASH_ALGORITHM}${PW_HASH_ITERATIONS}${salt}${digest}"
 
 
@@ -104,7 +68,9 @@ def verify_password(password: str, hashed: str) -> bool:
         iterations = int(iterations)
     except ValueError:
         return False
-    expected = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), iterations).hex()
+    expected = hashlib.pbkdf2_hmac(
+        "sha256", password.encode("utf-8"), salt.encode("utf-8"), iterations
+    ).hex()
     return secrets.compare_digest(expected, digest)
 
 
@@ -117,7 +83,12 @@ def hash_session_token(token: str) -> str:
 
 
 class UserAuthStore:
-    def __init__(self, root_dir: str | Path, *, session_ttl_seconds: int = DEFAULT_SESSION_TTL_SECONDS):
+    def __init__(
+        self,
+        root_dir: str | Path,
+        *,
+        session_ttl_seconds: int = DEFAULT_SESSION_TTL_SECONDS,
+    ):
         self.root_dir = Path(root_dir)
         self.auth_dir = self.root_dir / "auth"
         self.users_path = self.auth_dir / "users.json"
@@ -191,7 +162,11 @@ class UserAuthStore:
         users.append(user)
         self._write_users(users)
         if user.get("employeeId") and self.deleted_employees_path.exists():
-            entries = [entry for entry in _read_json(self.deleted_employees_path) if entry.get("id") != user["employeeId"]]
+            entries = [
+                entry
+                for entry in _read_json(self.deleted_employees_path)
+                if entry.get("id") != user["employeeId"]
+            ]
             _write_json(self.deleted_employees_path, entries)
         logger.info("User created", user_id=user["id"], username=username, role=role)
         return self._public_user(user)
@@ -219,20 +194,30 @@ class UserAuthStore:
     def authenticate(self, username: str, password: str) -> dict[str, Any] | None:
         username = username.strip().lower()
         for user in self._read_users():
-            if user["username"] == username and verify_password(password, user["passwordHash"]):
+            if user["username"] == username and verify_password(
+                password, user["passwordHash"]
+            ):
                 if user.get("employeeId") in self.deleted_employee_ids():
                     return None
                 return user
         return None
 
-    def bootstrap_with_token(self, token: str, username: str, password: str) -> dict[str, Any]:
+    def bootstrap_with_token(
+        self, token: str, username: str, password: str
+    ) -> dict[str, Any]:
         expected = os.environ.get("RELAY_ADMIN_TOKEN", "").strip()
         if not expected:
             raise HTTPException(503, "RELAY_ADMIN_TOKEN is not configured.")
-        if not token or len(token) != len(expected) or not secrets.compare_digest(token, expected):
+        if (
+            not token
+            or len(token) != len(expected)
+            or not secrets.compare_digest(token, expected)
+        ):
             raise HTTPException(401, "Invalid admin token.")
         if self.has_users():
-            raise HTTPException(409, "Bootstrap is only allowed before the first user is created.")
+            raise HTTPException(
+                409, "Bootstrap is only allowed before the first user is created."
+            )
         return self.create_user(username, password, role="admin")
 
     def create_session(self, user_id: str) -> dict[str, Any]:
@@ -243,7 +228,9 @@ class UserAuthStore:
             "token": token,
             "userId": user_id,
             "createdAt": _format_iso(now),
-            "expiresAt": _format_iso(datetime.fromtimestamp(expires_at, tz=timezone.utc)),
+            "expiresAt": _format_iso(
+                datetime.fromtimestamp(expires_at, tz=timezone.utc)
+            ),
         }
         sessions = self._read_sessions()
         sessions.append(session)
@@ -264,7 +251,9 @@ class UserAuthStore:
         return None
 
     def get_user_by_id(self, user_id: str) -> dict[str, Any] | None:
-        user = next((user for user in self._read_users() if user["id"] == user_id), None)
+        user = next(
+            (user for user in self._read_users() if user["id"] == user_id), None
+        )
         if user and user.get("employeeId") in self.deleted_employee_ids():
             return None
         return user
@@ -281,7 +270,13 @@ class UserAuthStore:
     def cleanup_expired_sessions(self) -> int:
         sessions = self._read_sessions()
         now = datetime.now(timezone.utc)
-        kept = [s for s in sessions if not (_parse_iso(s.get("expiresAt")) and _parse_iso(s.get("expiresAt")) <= now)]
+        kept = [
+            s
+            for s in sessions
+            if not (
+                _parse_iso(s.get("expiresAt")) and _parse_iso(s.get("expiresAt")) <= now
+            )
+        ]
         removed = len(sessions) - len(kept)
         if removed:
             self._write_sessions(kept)
@@ -325,7 +320,12 @@ class DatabaseUserAuthStore:
         metadata,
         database_id_column(),
         Column("name", Text, nullable=False),
-        Column("parent_department_id", entity_uuid_type(), ForeignKey("departments.id", ondelete="SET NULL"), nullable=True),
+        Column(
+            "parent_department_id",
+            entity_uuid_type(),
+            ForeignKey("departments.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
         Column("created_at", DateTime(timezone=True), nullable=False),
         Column("updated_at", DateTime(timezone=True), nullable=False),
     )
@@ -335,7 +335,12 @@ class DatabaseUserAuthStore:
         database_id_column(),
         Column("display_name", Text, nullable=False),
         Column("email", Text, nullable=True),
-        Column("department_id", entity_uuid_type(), ForeignKey("departments.id", ondelete="SET NULL"), nullable=True),
+        Column(
+            "department_id",
+            entity_uuid_type(),
+            ForeignKey("departments.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
         Column("created_at", DateTime(timezone=True), nullable=False),
         Column("updated_at", DateTime(timezone=True), nullable=False),
         Column("deleted_at", DateTime(timezone=True), nullable=True),
@@ -347,7 +352,12 @@ class DatabaseUserAuthStore:
         Column("username", Text, nullable=False, unique=True),
         Column("email", Text, nullable=True),
         Column("role", Text, nullable=False),
-        Column("employee_id", entity_uuid_type(), ForeignKey("employees.id", ondelete="SET NULL"), nullable=True),
+        Column(
+            "employee_id",
+            entity_uuid_type(),
+            ForeignKey("employees.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
         Column("theme", Text, nullable=False, server_default=DEFAULT_USER_THEME),
         Column("language", Text, nullable=False, server_default=DEFAULT_USER_LANGUAGE),
         Column("password_hash", Text, nullable=False),
@@ -360,7 +370,12 @@ class DatabaseUserAuthStore:
         metadata,
         database_id_column(),
         Column("token_hash", Text, nullable=False, unique=True),
-        Column("user_id", entity_uuid_type(), ForeignKey("auth_users.id", ondelete="CASCADE"), nullable=False),
+        Column(
+            "user_id",
+            entity_uuid_type(),
+            ForeignKey("auth_users.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         Column("created_at", DateTime(timezone=True), nullable=False),
         Column("expires_at", DateTime(timezone=True), nullable=False),
     )
@@ -420,9 +435,20 @@ class DatabaseUserAuthStore:
         }
         try:
             with self.engine.begin() as conn:
-                employee = self._ensure_employee(conn, employee_id, display_name=display_name, email=email, department_id=department_id, department_name=department_name)
+                employee = self._ensure_employee(
+                    conn,
+                    employee_id,
+                    display_name=display_name,
+                    email=email,
+                    department_id=department_id,
+                    department_name=department_name,
+                )
                 user["employeeId"] = employee["id"]
-                conn.execute(insert(self.users).values(**database_user_to_row(user, employee_pk=employee["id"])))
+                conn.execute(
+                    insert(self.users).values(
+                        **database_user_to_row(user, employee_pk=employee["id"])
+                    )
+                )
         except IntegrityError as error:
             raise ValueError("username already exists.") from error
         logger.info("User created", user_id=user["id"], username=username, role=role)
@@ -443,27 +469,42 @@ class DatabaseUserAuthStore:
             patch["language"] = language
         with self.engine.begin() as conn:
             result = conn.execute(
-                update(self.users)
-                .where(self.users.c.id == user_id)
-                .values(**patch)
+                update(self.users).where(self.users.c.id == user_id).values(**patch)
             )
             if result.rowcount == 0:
                 raise KeyError(user_id)
-            row = conn.execute(
-                select(self.users).where(self.users.c.id == user_id)
-            ).mappings().one()
+            row = (
+                conn.execute(select(self.users).where(self.users.c.id == user_id))
+                .mappings()
+                .one()
+            )
         return UserAuthStore._public_user(row_to_database_user(row))
 
-    def ensure_department(self, department_id: str, *, name: str | None = None, parent_department_id: str | None = None) -> dict[str, Any]:
+    def ensure_department(
+        self,
+        department_id: str,
+        *,
+        name: str | None = None,
+        parent_department_id: str | None = None,
+    ) -> dict[str, Any]:
         department_id = department_id.strip()
         if not department_id:
             raise ValueError("departmentId is required.")
         with self.engine.begin() as conn:
-            return self._ensure_department(conn, department_id, name=name, parent_department_id=parent_department_id)
+            return self._ensure_department(
+                conn,
+                department_id,
+                name=name,
+                parent_department_id=parent_department_id,
+            )
 
     def list_departments(self) -> list[dict[str, Any]]:
         with self.engine.begin() as conn:
-            rows = conn.execute(select(self.departments).order_by(self.departments.c.name)).mappings().all()
+            rows = (
+                conn.execute(select(self.departments).order_by(self.departments.c.name))
+                .mappings()
+                .all()
+            )
         return [row_to_department(row) for row in rows]
 
     def ensure_employee(
@@ -479,18 +520,33 @@ class DatabaseUserAuthStore:
         if not employee_id:
             raise ValueError("employeeId is required.")
         with self.engine.begin() as conn:
-            return self._ensure_employee(conn, employee_id, display_name=display_name, email=email, department_id=department_id, department_name=department_name)
+            return self._ensure_employee(
+                conn,
+                employee_id,
+                display_name=display_name,
+                email=email,
+                department_id=department_id,
+                department_name=department_name,
+            )
 
     def list_employees(self) -> list[dict[str, Any]]:
         with self.engine.begin() as conn:
             department_rows = conn.execute(select(self.departments)).mappings().all()
-            departments = {str(row["id"]): row_to_department(row) for row in department_rows}
-            rows = conn.execute(
-                select(self.employees)
-                .where(self.employees.c.deleted_at.is_(None))
-                .order_by(self.employees.c.created_at, self.employees.c.id)
-            ).mappings().all()
-        return [employee_with_department(row_to_employee(row), departments) for row in rows]
+            departments = {
+                str(row["id"]): row_to_department(row) for row in department_rows
+            }
+            rows = (
+                conn.execute(
+                    select(self.employees)
+                    .where(self.employees.c.deleted_at.is_(None))
+                    .order_by(self.employees.c.created_at, self.employees.c.id)
+                )
+                .mappings()
+                .all()
+            )
+        return [
+            employee_with_department(row_to_employee(row), departments) for row in rows
+        ]
 
     def soft_delete_employee(self, employee_id: str) -> dict[str, Any]:
         employee_id = (employee_id or "").strip()
@@ -498,7 +554,13 @@ class DatabaseUserAuthStore:
             raise ValueError("employeeId is required.")
         now = datetime.now(timezone.utc)
         with self.engine.begin() as conn:
-            row = conn.execute(select(self.employees).where(self.employees.c.id == employee_id)).mappings().first()
+            row = (
+                conn.execute(
+                    select(self.employees).where(self.employees.c.id == employee_id)
+                )
+                .mappings()
+                .first()
+            )
             if not row:
                 raise KeyError(employee_id)
             if row.get("deleted_at"):
@@ -514,16 +576,22 @@ class DatabaseUserAuthStore:
     def authenticate(self, username: str, password: str) -> dict[str, Any] | None:
         username = username.strip().lower()
         with self.engine.begin() as conn:
-            row = conn.execute(select(self.users).where(self.users.c.username == username)).mappings().first()
+            row = (
+                conn.execute(
+                    select(self.users).where(self.users.c.username == username)
+                )
+                .mappings()
+                .first()
+            )
             user = row_to_database_user(row) if row else None
             if user and verify_password(password, user["passwordHash"]):
                 employee_id = user.get("employeeId")
                 employee = (
                     conn.execute(
-                        select(self.employees).where(
-                            self.employees.c.id == employee_id
-                        )
-                    ).mappings().first()
+                        select(self.employees).where(self.employees.c.id == employee_id)
+                    )
+                    .mappings()
+                    .first()
                     if employee_id
                     else None
                 )
@@ -531,20 +599,30 @@ class DatabaseUserAuthStore:
                     return user
         return None
 
-    def bootstrap_with_token(self, token: str, username: str, password: str) -> dict[str, Any]:
+    def bootstrap_with_token(
+        self, token: str, username: str, password: str
+    ) -> dict[str, Any]:
         expected = os.environ.get("RELAY_ADMIN_TOKEN", "").strip()
         if not expected:
             raise HTTPException(503, "RELAY_ADMIN_TOKEN is not configured.")
-        if not token or len(token) != len(expected) or not secrets.compare_digest(token, expected):
+        if (
+            not token
+            or len(token) != len(expected)
+            or not secrets.compare_digest(token, expected)
+        ):
             raise HTTPException(401, "Invalid admin token.")
         if self.has_users():
-            raise HTTPException(409, "Bootstrap is only allowed before the first user is created.")
+            raise HTTPException(
+                409, "Bootstrap is only allowed before the first user is created."
+            )
         return self.create_user(username, password, role="admin")
 
     def create_session(self, user_id: str) -> dict[str, Any]:
         token = new_session_token()
         now = datetime.now(timezone.utc)
-        expires_at = datetime.fromtimestamp(now.timestamp() + self.session_ttl_seconds, tz=timezone.utc)
+        expires_at = datetime.fromtimestamp(
+            now.timestamp() + self.session_ttl_seconds, tz=timezone.utc
+        )
         session = {
             "id": new_database_id(),
             "token": token,
@@ -553,63 +631,120 @@ class DatabaseUserAuthStore:
             "expiresAt": _format_iso(expires_at),
         }
         with self.engine.begin() as conn:
-            conn.execute(insert(self.sessions).values(**database_session_to_row(session, user_pk=self._user_pk(conn, user_id))))
+            conn.execute(
+                insert(self.sessions).values(
+                    **database_session_to_row(
+                        session, user_pk=self._user_pk(conn, user_id)
+                    )
+                )
+            )
         return session
 
     def get_session_by_token(self, token: str | None) -> dict[str, Any] | None:
         if not token:
             return None
         with self.engine.begin() as conn:
-            row = conn.execute(select(self.sessions).where(self.sessions.c.token_hash == hash_session_token(token))).mappings().first()
+            row = (
+                conn.execute(
+                    select(self.sessions).where(
+                        self.sessions.c.token_hash == hash_session_token(token)
+                    )
+                )
+                .mappings()
+                .first()
+            )
             if not row:
                 return None
             session = row_to_database_session(row, token)
             expires_at = _parse_iso(session.get("expiresAt"))
             if expires_at and expires_at <= datetime.now(timezone.utc):
-                conn.execute(delete(self.sessions).where(self.sessions.c.token_hash == hash_session_token(token)))
+                conn.execute(
+                    delete(self.sessions).where(
+                        self.sessions.c.token_hash == hash_session_token(token)
+                    )
+                )
                 return None
         return session
 
     def get_user_by_id(self, user_id: str) -> dict[str, Any] | None:
         with self.engine.begin() as conn:
-            row = conn.execute(select(self.users).where(self.users.c.id == user_id)).mappings().first()
+            row = (
+                conn.execute(select(self.users).where(self.users.c.id == user_id))
+                .mappings()
+                .first()
+            )
             user = row_to_database_user(row) if row else None
             if not user or not user.get("employeeId"):
                 return user
-            employee = conn.execute(
-                select(self.employees).where(
-                    self.employees.c.id == user["employeeId"]
+            employee = (
+                conn.execute(
+                    select(self.employees).where(
+                        self.employees.c.id == user["employeeId"]
+                    )
                 )
-            ).mappings().first()
+                .mappings()
+                .first()
+            )
             return user if employee and not employee.get("deleted_at") else None
 
     def delete_session(self, token: str) -> bool:
         with self.engine.begin() as conn:
-            result = conn.execute(delete(self.sessions).where(self.sessions.c.token_hash == hash_session_token(token)))
+            result = conn.execute(
+                delete(self.sessions).where(
+                    self.sessions.c.token_hash == hash_session_token(token)
+                )
+            )
         return result.rowcount > 0
 
     def cleanup_expired_sessions(self) -> int:
         with self.engine.begin() as conn:
-            result = conn.execute(delete(self.sessions).where(self.sessions.c.expires_at <= datetime.now(timezone.utc)))
+            result = conn.execute(
+                delete(self.sessions).where(
+                    self.sessions.c.expires_at <= datetime.now(timezone.utc)
+                )
+            )
         return result.rowcount
 
     def list_users(self) -> list[dict[str, Any]]:
         with self.engine.begin() as conn:
-            rows = conn.execute(select(self.users).order_by(self.users.c.created_at)).mappings().all()
+            rows = (
+                conn.execute(select(self.users).order_by(self.users.c.created_at))
+                .mappings()
+                .all()
+            )
         return [UserAuthStore._public_user(row_to_database_user(row)) for row in rows]
 
     @staticmethod
     def _public_user(user: dict[str, Any]) -> dict[str, Any]:
         return UserAuthStore._public_user(user)
 
-    def _ensure_department(self, conn: Any, department_id: str, *, name: str | None = None, parent_department_id: str | None = None) -> dict[str, Any]:
+    def _ensure_department(
+        self,
+        conn: Any,
+        department_id: str,
+        *,
+        name: str | None = None,
+        parent_department_id: str | None = None,
+    ) -> dict[str, Any]:
         department_id = department_id.strip()
         name = name.strip() if name else department_id
-        parent_department_id = parent_department_id.strip() if parent_department_id else None
+        parent_department_id = (
+            parent_department_id.strip() if parent_department_id else None
+        )
         now = datetime.now(timezone.utc)
-        parent = self._ensure_department(conn, parent_department_id) if parent_department_id else None
+        parent = (
+            self._ensure_department(conn, parent_department_id)
+            if parent_department_id
+            else None
+        )
         parent_department_pk = parent["id"] if parent else None
-        row = conn.execute(select(self.departments).where(self.departments.c.id == department_id)).mappings().first()
+        row = (
+            conn.execute(
+                select(self.departments).where(self.departments.c.id == department_id)
+            )
+            .mappings()
+            .first()
+        )
         if row:
             department_pk = row["id"]
             patch: dict[str, Any] = {"updated_at": now}
@@ -618,13 +753,19 @@ class DatabaseUserAuthStore:
             if parent_department_pk:
                 patch["parent_department_id"] = parent_department_pk
             if len(patch) > 1:
-                conn.execute(update(self.departments).where(self.departments.c.id == department_pk).values(**patch))
+                conn.execute(
+                    update(self.departments)
+                    .where(self.departments.c.id == department_pk)
+                    .values(**patch)
+                )
                 return {
                     **row_to_department(row),
                     "name": patch.get("name", row["name"]),
                     "parentDepartmentId": patch.get(
                         "parent_department_id",
-                        str(row["parent_department_id"]) if row["parent_department_id"] else None,
+                        str(row["parent_department_id"])
+                        if row["parent_department_id"]
+                        else None,
                     ),
                     "updatedAt": _format_iso(now),
                 }
@@ -637,7 +778,13 @@ class DatabaseUserAuthStore:
             "createdAt": _format_iso(now),
             "updatedAt": _format_iso(now),
         }
-        conn.execute(insert(self.departments).values(**department_to_row(department, parent_department_pk=parent_department_pk)))
+        conn.execute(
+            insert(self.departments).values(
+                **department_to_row(
+                    department, parent_department_pk=parent_department_pk
+                )
+            )
+        )
         return department
 
     def _ensure_employee(
@@ -652,9 +799,19 @@ class DatabaseUserAuthStore:
     ) -> dict[str, Any]:
         now = datetime.now(timezone.utc)
         department_id = department_id.strip() if department_id else None
-        department = self._ensure_department(conn, department_id, name=department_name) if department_id else None
+        department = (
+            self._ensure_department(conn, department_id, name=department_name)
+            if department_id
+            else None
+        )
         department_pk = department["id"] if department else None
-        row = conn.execute(select(self.employees).where(self.employees.c.id == employee_id)).mappings().first()
+        row = (
+            conn.execute(
+                select(self.employees).where(self.employees.c.id == employee_id)
+            )
+            .mappings()
+            .first()
+        )
         if row:
             employee_pk = row["id"]
             patch: dict[str, Any] = {"updated_at": now}
@@ -667,7 +824,11 @@ class DatabaseUserAuthStore:
             if department_pk:
                 patch["department_id"] = department_pk
             if len(patch) > 1:
-                conn.execute(update(self.employees).where(self.employees.c.id == employee_pk).values(**patch))
+                conn.execute(
+                    update(self.employees)
+                    .where(self.employees.c.id == employee_pk)
+                    .values(**patch)
+                )
                 return {
                     **row_to_employee(row),
                     **({"displayName": display_name} if display_name else {}),
@@ -685,7 +846,11 @@ class DatabaseUserAuthStore:
             "createdAt": _format_iso(now),
             "updatedAt": _format_iso(now),
         }
-        conn.execute(insert(self.employees).values(**employee_to_row(employee, department_pk=department_pk)))
+        conn.execute(
+            insert(self.employees).values(
+                **employee_to_row(employee, department_pk=department_pk)
+            )
+        )
         return employee
 
     def _user_pk(self, conn: Any, user_id: str) -> str:
@@ -699,12 +864,21 @@ def auth_store_from_env(root_dir: str | Path) -> Any:
     auth_store = os.environ.get("RELAY_AUTH_STORE", "").strip().lower()
     if auth_store != "database" and not use_postgres_storage():
         return UserAuthStore(root_dir)
-    setting = "RELAY_AUTH_STORE=database" if auth_store == "database" else "RELAY_STORAGE=postgres"
+    setting = (
+        "RELAY_AUTH_STORE=database"
+        if auth_store == "database"
+        else "RELAY_STORAGE=postgres"
+    )
     database_url = database_url_from_env(setting=setting)
     return DatabaseUserAuthStore(database_url)
 
 
-def database_user_to_row(user: dict[str, Any], *, employee_pk: str | None = None, database_id: str | None = None) -> dict[str, Any]:
+def database_user_to_row(
+    user: dict[str, Any],
+    *,
+    employee_pk: str | None = None,
+    database_id: str | None = None,
+) -> dict[str, Any]:
     return {
         "id": database_id or user["id"],
         "username": user["username"],
@@ -719,7 +893,12 @@ def database_user_to_row(user: dict[str, Any], *, employee_pk: str | None = None
     }
 
 
-def employee_to_row(employee: dict[str, Any], *, department_pk: str | None = None, database_id: str | None = None) -> dict[str, Any]:
+def employee_to_row(
+    employee: dict[str, Any],
+    *,
+    department_pk: str | None = None,
+    database_id: str | None = None,
+) -> dict[str, Any]:
     return {
         "id": database_id or employee["id"],
         "display_name": employee["displayName"],
@@ -730,7 +909,12 @@ def employee_to_row(employee: dict[str, Any], *, department_pk: str | None = Non
     }
 
 
-def department_to_row(department: dict[str, Any], *, parent_department_pk: str | None = None, database_id: str | None = None) -> dict[str, Any]:
+def department_to_row(
+    department: dict[str, Any],
+    *,
+    parent_department_pk: str | None = None,
+    database_id: str | None = None,
+) -> dict[str, Any]:
     return {
         "id": database_id or department["id"],
         "name": department["name"],
@@ -744,7 +928,9 @@ def row_to_department(row: Any) -> dict[str, Any]:
     return {
         "id": str(row["id"]),
         "name": row["name"],
-        "parentDepartmentId": str(row["parent_department_id"]) if row["parent_department_id"] else None,
+        "parentDepartmentId": str(row["parent_department_id"])
+        if row["parent_department_id"]
+        else None,
         "createdAt": _format_iso(row["created_at"]),
         "updatedAt": _format_iso(row["updated_at"]),
     }
@@ -761,7 +947,9 @@ def row_to_employee(row: Any) -> dict[str, Any]:
     }
 
 
-def employee_with_department(employee: dict[str, Any], departments: dict[str, dict[str, Any]]) -> dict[str, Any]:
+def employee_with_department(
+    employee: dict[str, Any], departments: dict[str, dict[str, Any]]
+) -> dict[str, Any]:
     department = departments.get(employee.get("departmentId") or "")
     if not department:
         return employee
@@ -794,7 +982,9 @@ def _validate_user_preferences(
         raise ValueError("language must be en, zh-CN, or zh-TW.")
 
 
-def database_session_to_row(session: dict[str, Any], *, user_pk: str, database_id: str | None = None) -> dict[str, Any]:
+def database_session_to_row(
+    session: dict[str, Any], *, user_pk: str, database_id: str | None = None
+) -> dict[str, Any]:
     return {
         "id": database_id or session["id"],
         "token_hash": hash_session_token(session["token"]),
@@ -831,10 +1021,17 @@ def require_user_session(request: Request, auth_store: UserAuthStore) -> dict[st
     return user
 
 
-def require_admin_session(request: Request, auth_store: UserAuthStore) -> dict[str, Any]:
+def require_admin_session(
+    request: Request, auth_store: UserAuthStore
+) -> dict[str, Any]:
     bearer = _bearer_token(request)
     expected = os.environ.get("RELAY_ADMIN_TOKEN", "").strip()
-    if bearer and expected and len(bearer) == len(expected) and secrets.compare_digest(bearer, expected):
+    if (
+        bearer
+        and expected
+        and len(bearer) == len(expected)
+        and secrets.compare_digest(bearer, expected)
+    ):
         return {
             "id": "admin-token",
             "username": "admin-token",
@@ -853,7 +1050,9 @@ def _bearer_token(request: Request) -> str | None:
     return parts[1] if len(parts) == 2 and parts[0].lower() == "bearer" else None
 
 
-def user_session_cookie_attrs(*, max_age_seconds: int, secure: bool | None = None) -> dict[str, Any]:
+def user_session_cookie_attrs(
+    *, max_age_seconds: int, secure: bool | None = None
+) -> dict[str, Any]:
     attrs: dict[str, Any] = {
         "key": USER_COOKIE_NAME,
         "httponly": True,

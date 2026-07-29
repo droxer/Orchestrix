@@ -4,10 +4,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
 
-
 AgentName = Literal["claude", "pi", "codex", "kimi"]
 AgentTaskMode = Literal["action", "review", "ask"]
-AgentRole = Literal["implementer", "reviewer", "planner", "tester", "fixer"]
 SessionStatus = Literal[
     "running", "waiting_for_human", "completed", "failed", "cancelled"
 ]
@@ -45,20 +43,6 @@ class RelayModel(BaseModel):
         return self.model_dump(by_alias=True, exclude_none=True)
 
 
-class Assignment(RelayModel):
-    agent_id: str | None = None
-    agent: AgentName
-    mode: AgentTaskMode = "action"
-    role: AgentRole | None = None
-
-
-class SandboxRunRequest(RelayModel):
-    task_goal: str
-    assignments: list[Assignment]
-    session_id: str | None = None
-    decision: dict[str, Any] | None = None
-
-
 class DaemonNodeRegistration(RelayModel):
     sandbox_id: str
     employee_id: str | None = None
@@ -73,29 +57,3 @@ class DaemonNodeRegistration(RelayModel):
     max_concurrent_runs: int | None = None
     run_capacity_by_mode: dict[AgentTaskMode, int] | None = None
     status: Literal["ready", "busy", "stopped"] = "ready"
-
-
-class DaemonNodeRunCommand(RelayModel):
-    id: str
-    type: Literal["run.start"]
-    session_id: str
-    run_id: str
-    task_goal: str
-    agent: AgentName
-    mode: AgentTaskMode
-    workspace_path: str | None = None
-    state: dict[str, Any] | None = None
-
-
-class DaemonNodeCancelCommand(RelayModel):
-    id: str
-    type: Literal["run.cancel"]
-    command_id: str
-    session_id: str
-    run_id: str
-    agent: AgentName
-    mode: AgentTaskMode
-    reason: str
-
-
-DaemonNodeCommand = DaemonNodeRunCommand | DaemonNodeCancelCommand

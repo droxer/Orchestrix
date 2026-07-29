@@ -1,28 +1,41 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import Depends, Request
 
 from ..daemon_registry import DaemonNodeRegistry, ServerDaemonNodeBackend
+from ..persistence.protocols import (
+    AgentPlacementStore,
+    AgentStore,
+    AuthStore,
+    ChatStore,
+    DaemonStore,
+    ManagedNodeStore,
+    ProfileImageStore,
+    SessionStore,
+    TaskStore,
+    TeamStore,
+)
+from ..services.workspace_query import WorkspaceQueryBroker
 
 
 @dataclass(frozen=True)
 class AppContext:
-    session_store: Any
-    task_store: Any
-    daemon_store: Any
-    chat_store: Any
+    session_store: SessionStore
+    task_store: TaskStore
+    daemon_store: DaemonStore
+    chat_store: ChatStore
     registry: DaemonNodeRegistry
     backend: ServerDaemonNodeBackend
-    auth_store: Any
-    managed_node_store: Any
-    agent_store: Any
-    team_store: Any
-    agent_placement_store: Any
-    profile_image_store: Any
-    workspace_query_broker: Any
+    auth_store: AuthStore
+    managed_node_store: ManagedNodeStore
+    agent_store: AgentStore
+    team_store: TeamStore
+    agent_placement_store: AgentPlacementStore
+    profile_image_store: ProfileImageStore
+    workspace_query_broker: WorkspaceQueryBroker
 
 
 def app_context(request: Request) -> AppContext:

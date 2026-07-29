@@ -36,6 +36,9 @@ from .store_common import (
 )
 
 PLACEMENT_DESIRED_STATES = frozenset({"active", "draining", "removed"})
+PLACEMENT_PATCH_FIELDS = frozenset(
+    {"desiredState", "priority", "workspacePolicy", "agentVersion", "conditions"}
+)
 
 
 class LocalAgentPlacementStore:
@@ -165,48 +168,11 @@ class LocalAgentPlacementStore:
     def update_placement(
         self, placement_id: str, patch: dict[str, Any]
     ) -> dict[str, Any]:
-        allowed = {
-            "desiredState",
-            "priority",
-            "workspacePolicy",
-            "agentVersion",
-            "conditions",
-        }
-        unknown = set(patch) - allowed
-        if unknown:
-            raise ValueError(
-                f"Unsupported placement field(s): {', '.join(sorted(unknown))}."
-            )
         with self._lock:
             current = self.get_placement(placement_id)
             if not current:
                 raise KeyError(placement_id)
-            normalized = dict(patch)
-            if (
-                "desiredState" in normalized
-                and normalized["desiredState"] not in PLACEMENT_DESIRED_STATES
-            ):
-                raise ValueError("desiredState must be active, draining, or removed.")
-            if "priority" in normalized and not isinstance(normalized["priority"], int):
-                raise ValueError("priority must be an integer.")
-            if "agentVersion" in normalized and not isinstance(
-                normalized["agentVersion"], int
-            ):
-                raise ValueError("agentVersion must be an integer.")
-            if "workspacePolicy" in normalized and not isinstance(
-                normalized["workspacePolicy"], dict
-            ):
-                raise ValueError("workspacePolicy must be an object.")
-            if "conditions" in normalized and not isinstance(
-                normalized["conditions"], list
-            ):
-                raise ValueError("conditions must be an array.")
-            updated = {**current, **normalized, "updatedAt": now_iso()}
-            event_type = "placement.updated"
-            if normalized.get("desiredState") == "draining":
-                event_type = "placement.draining"
-            elif normalized.get("desiredState") == "removed":
-                event_type = "placement.removed"
+            updated, event_type = _updated_placement(current, patch)
             self._append(placement_id, event_type, updated)
             return updated
 
@@ -497,49 +463,10 @@ class DatabaseAgentPlacementStore:
     def update_placement(
         self, placement_id: str, patch: dict[str, Any]
     ) -> dict[str, Any]:
-        allowed = {
-            "desiredState",
-            "priority",
-            "workspacePolicy",
-            "agentVersion",
-            "conditions",
-        }
-        unknown = set(patch) - allowed
-        if unknown:
-            raise ValueError(
-                f"Unsupported placement field(s): {', '.join(sorted(unknown))}."
-            )
         current = self.get_placement(placement_id)
         if not current:
             raise KeyError(placement_id)
-        normalized = dict(patch)
-        if (
-            "desiredState" in normalized
-            and normalized["desiredState"] not in PLACEMENT_DESIRED_STATES
-        ):
-            raise ValueError("desiredState must be active, draining, or removed.")
-        if "priority" in normalized and not isinstance(normalized["priority"], int):
-            raise ValueError("priority must be an integer.")
-        if "agentVersion" in normalized and not isinstance(
-            normalized["agentVersion"], int
-        ):
-            raise ValueError("agentVersion must be an integer.")
-        if "workspacePolicy" in normalized and not isinstance(
-            normalized["workspacePolicy"], dict
-        ):
-            raise ValueError("workspacePolicy must be an object.")
-        if "conditions" in normalized and not isinstance(
-            normalized["conditions"], list
-        ):
-            raise ValueError("conditions must be an array.")
-        updated = {**current, **normalized, "updatedAt": now_iso()}
-        event_type = (
-            "placement.draining"
-            if normalized.get("desiredState") == "draining"
-            else "placement.removed"
-            if normalized.get("desiredState") == "removed"
-            else "placement.updated"
-        )
+        updated, event_type = _updated_placement(current, patch)
         event = _placement_event(placement_id, event_type, updated)
         with self.engine.begin() as conn:
             row = (
@@ -730,6 +657,37 @@ def _new_placement(
         "createdAt": timestamp,
         "updatedAt": timestamp,
     }
+
+
+def _updated_placement(
+    current: dict[str, Any], patch: dict[str, Any]
+) -> tuple[dict[str, Any], str]:
+    unknown = set(patch) - PLACEMENT_PATCH_FIELDS
+    if unknown:
+        raise ValueError(
+            f"Unsupported placement field(s): {', '.join(sorted(unknown))}."
+        )
+    if (
+        "desiredState" in patch
+        and patch["desiredState"] not in PLACEMENT_DESIRED_STATES
+    ):
+        raise ValueError("desiredState must be active, draining, or removed.")
+    if "priority" in patch and not isinstance(patch["priority"], int):
+        raise ValueError("priority must be an integer.")
+    if "agentVersion" in patch and not isinstance(patch["agentVersion"], int):
+        raise ValueError("agentVersion must be an integer.")
+    if "workspacePolicy" in patch and not isinstance(patch["workspacePolicy"], dict):
+        raise ValueError("workspacePolicy must be an object.")
+    if "conditions" in patch and not isinstance(patch["conditions"], list):
+        raise ValueError("conditions must be an array.")
+
+    updated = {**current, **patch, "updatedAt": now_iso()}
+    event_type = "placement.updated"
+    if patch.get("desiredState") == "draining":
+        event_type = "placement.draining"
+    elif patch.get("desiredState") == "removed":
+        event_type = "placement.removed"
+    return updated, event_type
 
 
 def _required_daemon_node_id(value: str) -> str:
