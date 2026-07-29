@@ -88,7 +88,7 @@ def test_import_dry_run_checks_database_conflicts(tmp_path: Path) -> None:
     with database.engine.begin() as conn:
         conn.execute(
             update(database.sessions)
-            .where(database.sessions.c.public_id == created["id"])
+            .where(database.sessions.c.id == created["id"])
             .values(snapshot=local.get_session(created["id"]))
         )
 

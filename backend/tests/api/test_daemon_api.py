@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import time
 from tempfile import TemporaryDirectory
+from uuid import UUID
 
 from fastapi.testclient import TestClient
 from relay.app import create_app
@@ -1729,7 +1730,7 @@ def test_control_panel_creates_unassigned_pending_daemon_node(monkeypatch) -> No
         assert response.status_code == 201
         body = response.json()
         node = body["node"]
-        assert node["id"].startswith("sbx_node_")
+        assert str(UUID(node["id"])) == node["id"]
         assert "employeeId" not in node
         assert node["workspacePath"] == "/workspace/shared"
         assert node["status"] == "provisioning"

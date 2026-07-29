@@ -20,7 +20,6 @@ from sqlalchemy import (
     Table,
     Text,
     UniqueConstraint,
-    Uuid,
     create_engine,
     delete,
     insert,
@@ -40,6 +39,7 @@ from .store_common import (
     _read_jsonl,
     _write_json,
     database_id_column,
+    entity_uuid_type,
     materialize_events,
     new_database_id,
     new_relay_id,
@@ -58,7 +58,7 @@ class LocalSessionStore:
 
     def create_session(self, payload: dict[str, Any]) -> dict[str, Any]:
         with self._lock:
-            session_id = new_relay_id("ses")
+            session_id = new_database_id()
             (self._session_dir(session_id) / "artifacts").mkdir(
                 parents=True, exist_ok=True
             )
@@ -292,14 +292,13 @@ class LocalSessionStore:
 
 
 class DatabaseSessionStore:
-    REQUIRED_SCHEMA_REVISION = "20260726_0038"
+    REQUIRED_SCHEMA_REVISION = "20260729_0041"
     metadata = MetaData()
 
     sessions = Table(
         "sessions",
         metadata,
         database_id_column(),
-        Column("public_id", Text, nullable=False, unique=True),
         Column("workspace_path", Text, nullable=False),
         Column("owner_employee_id", Text, nullable=True),
         Column("title", Text, nullable=True),
@@ -322,7 +321,7 @@ class DatabaseSessionStore:
         Column("public_id", Text, nullable=False, unique=True),
         Column(
             "session_id",
-            Uuid(as_uuid=False),
+            entity_uuid_type(),
             ForeignKey("sessions.id", ondelete="CASCADE"),
             nullable=False,
         ),
@@ -341,7 +340,7 @@ class DatabaseSessionStore:
         Column("public_id", Text, nullable=False, unique=True),
         Column(
             "session_id",
-            Uuid(as_uuid=False),
+            entity_uuid_type(),
             ForeignKey("sessions.id", ondelete="CASCADE"),
             nullable=False,
         ),
@@ -361,11 +360,10 @@ class DatabaseSessionStore:
         database_id_column(),
         Column(
             "session_id",
-            Uuid(as_uuid=False),
+            entity_uuid_type(),
             ForeignKey("sessions.id", ondelete="CASCADE"),
             nullable=False,
         ),
-        Column("session_public_id", Text, nullable=False),
         Column("run_id", Text, nullable=False),
         Column("owner_employee_id", Text, nullable=True),
         Column("input_tokens", BigInteger, nullable=False),
@@ -422,7 +420,6 @@ class DatabaseSessionStore:
                     f"{', '.join(sorted(absent))}."
                 )
         required_unique_constraints = {
-            "sessions": {("public_id",)},
             "session_events": {("public_id",), ("session_id", "sequence")},
             "session_artifacts": {("public_id",)},
             "session_run_token_usage": {("session_id", "run_id")},
@@ -453,7 +450,7 @@ class DatabaseSessionStore:
                 )
 
     def create_session(self, payload: dict[str, Any]) -> dict[str, Any]:
-        session_id = new_relay_id("ses")
+        session_id = new_database_id()
         logger.debug(
             "Creating database session",
             session_id=session_id,
@@ -559,9 +556,7 @@ class DatabaseSessionStore:
     ) -> str | None:
         existing = (
             conn.execute(
-                select(self.sessions.c.id).where(
-                    self.sessions.c.public_id == session_id
-                )
+                select(self.sessions.c.id).where(self.sessions.c.id == session_id)
             )
             .mappings()
             .first()
@@ -623,7 +618,7 @@ class DatabaseSessionStore:
                         self.sessions.c.snapshot,
                         self.sessions.c.version,
                     )
-                    .where(self.sessions.c.public_id == session_id)
+                    .where(self.sessions.c.id == session_id)
                     .with_for_update()
                 )
                 .mappings()
@@ -665,9 +660,7 @@ class DatabaseSessionStore:
         with self.engine.begin() as conn:
             row = (
                 conn.execute(
-                    select(self.sessions.c.snapshot).where(
-                        self.sessions.c.public_id == session_id
-                    )
+                    select(self.sessions.c.snapshot).where(self.sessions.c.id == session_id)
                 )
                 .mappings()
                 .first()
@@ -701,7 +694,7 @@ class DatabaseSessionStore:
             session_row = (
                 conn.execute(
                     select(self.sessions.c.id, self.sessions.c.snapshot)
-                    .where(self.sessions.c.public_id == session_id)
+                    .where(self.sessions.c.id == session_id)
                     .with_for_update()
                 )
                 .mappings()
@@ -730,7 +723,7 @@ class DatabaseSessionStore:
                         )
                     )
                     .where(
-                        task_store.task_sessions.c.session_public_id == session_id
+                        task_store.task_sessions.c.session_id == session_id
                     )
                     .with_for_update(of=task_store.tasks)
                 )
@@ -785,7 +778,7 @@ class DatabaseSessionStore:
             )
         return [
             {
-                "sessionId": row["session_public_id"],
+                "sessionId": row["session_id"],
                 "runId": row["run_id"],
                 "ownerEmployeeId": row["owner_employee_id"],
                 "taskGoal": row["task_goal"],
@@ -903,7 +896,7 @@ class DatabaseSessionStore:
                         self.sessions.c.snapshot,
                         self.sessions.c.version,
                     )
-                    .where(self.sessions.c.public_id == session_id)
+                    .where(self.sessions.c.id == session_id)
                     .with_for_update()
                 )
                 .mappings()
@@ -978,9 +971,7 @@ class DatabaseSessionStore:
         raise KeyError(f"Unknown artifact {artifact_id} in session {session_id}.")
 
     def _session_pk(self, conn: Any, session_id: str, *, lock: bool = False) -> str:
-        statement = select(self.sessions.c.id).where(
-            self.sessions.c.public_id == session_id
-        )
+        statement = select(self.sessions.c.id).where(self.sessions.c.id == session_id)
         if lock:
             statement = statement.with_for_update()
         session_pk = conn.scalar(statement)
@@ -1030,8 +1021,7 @@ def session_to_row(
     session: dict[str, Any], *, version: int, database_id: str | None = None
 ) -> dict[str, Any]:
     return {
-        "id": database_id or new_database_id(),
-        "public_id": session["id"],
+        "id": database_id or session["id"],
         "workspace_path": session["workspacePath"],
         "owner_employee_id": session.get("ownerEmployeeId"),
         "title": session.get("title"),
@@ -1114,7 +1104,6 @@ def session_run_token_usage_to_row(
     return {
         "id": new_database_id(),
         "session_id": session_pk,
-        "session_public_id": session["id"],
         "run_id": run_id,
         "owner_employee_id": session.get("ownerEmployeeId"),
         "input_tokens": int(usage.get("input") or 0),

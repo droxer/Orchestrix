@@ -749,12 +749,12 @@ def test_database_task_store_verify_schema_rejects_missing_constraint(
                 CREATE TABLE task_sessions (
                     id TEXT PRIMARY KEY,
                     task_id TEXT NOT NULL,
-                    session_public_id TEXT NOT NULL,
+                    session_id TEXT NOT NULL,
                     created_at DATETIME NOT NULL
                 )
                 """
             )
         )
 
-    with pytest.raises(RuntimeError, match="task_id, session_public_id"):
+    with pytest.raises(RuntimeError, match="task_id, session_id"):
         store.verify_schema()

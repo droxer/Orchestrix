@@ -1,21 +1,21 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from threading import RLock
-from typing import Any, Callable
+from typing import Any
 
 from sqlalchemy import (
+    JSON,
     BigInteger,
     Boolean,
     Column,
     DateTime,
     ForeignKey,
-    JSON,
     MetaData,
     Table,
     Text,
     UniqueConstraint,
-    Uuid,
     create_engine,
     insert,
     select,
@@ -33,6 +33,7 @@ from .store_common import (
     _read_jsonl,
     _write_json,
     database_id_column,
+    entity_uuid_type,
     safe_name,
 )
 
@@ -245,7 +246,7 @@ class DatabaseTeamStore:
         Column("owner_employee_public_id", Text, nullable=False, index=True),
         Column("name", Text, nullable=False),
         Column("name_key", Text, nullable=True),
-        Column("lead_agent_id", Text, nullable=True),
+        Column("lead_agent_id", entity_uuid_type(), nullable=True),
         Column("member_agent_ids", JSON, nullable=False),
         Column("enabled", Boolean, nullable=False),
         Column("snapshot", JSON, nullable=False),
@@ -266,7 +267,7 @@ class DatabaseTeamStore:
         Column("public_id", Text, nullable=False, unique=True),
         Column(
             "team_id",
-            Uuid(as_uuid=False),
+            entity_uuid_type(),
             ForeignKey("teams.id", ondelete="CASCADE"),
             nullable=False,
         ),

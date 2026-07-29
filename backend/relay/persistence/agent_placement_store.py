@@ -13,7 +13,6 @@ from sqlalchemy import (
     MetaData,
     Table,
     Text,
-    Uuid,
     create_engine,
     insert,
     select,
@@ -32,6 +31,7 @@ from .store_common import (
     _read_jsonl,
     _write_json,
     database_id_column,
+    entity_uuid_type,
     safe_name,
 )
 
@@ -238,9 +238,9 @@ class DatabaseAgentPlacementStore:
         metadata,
         database_id_column(),
         Column("public_id", Text, nullable=False, unique=True),
-        Column("agent_public_id", Text, nullable=False, index=True),
+        Column("agent_id", entity_uuid_type(), nullable=False, index=True),
         Column("supervisor_employee_public_id", Text, nullable=False, index=True),
-        Column("daemon_node_public_id", Text, nullable=False, index=True),
+        Column("daemon_node_id", entity_uuid_type(), nullable=False, index=True),
         Column("executor_kind", Text, nullable=False),
         Column("desired_state", Text, nullable=False),
         Column("priority", BigInteger, nullable=False),
@@ -257,7 +257,7 @@ class DatabaseAgentPlacementStore:
         Column("public_id", Text, nullable=False, unique=True),
         Column(
             "placement_id",
-            Uuid(as_uuid=False),
+            entity_uuid_type(),
             ForeignKey("agent_placements.id", ondelete="CASCADE"),
             nullable=False,
         ),
@@ -286,7 +286,7 @@ class DatabaseAgentPlacementStore:
             # agent currently has no placement rows to lock.
             conn.execute(
                 select(DatabaseAgentStore.agents.c.id)
-                .where(DatabaseAgentStore.agents.c.public_id == agent["id"])
+                .where(DatabaseAgentStore.agents.c.id == agent["id"])
                 .with_for_update()
             ).first()
             rows = (
@@ -297,7 +297,7 @@ class DatabaseAgentPlacementStore:
                         self.placements.c.supervisor_employee_public_id,
                         self.placements.c.event_version,
                     )
-                    .where(self.placements.c.agent_public_id == agent["id"])
+                    .where(self.placements.c.agent_id == agent["id"])
                     .where(self.placements.c.desired_state != "removed")
                     .with_for_update()
                 )
@@ -401,9 +401,9 @@ class DatabaseAgentPlacementStore:
                 return current
             conflict = conn.execute(
                 select(self.placements.c.id)
-                .where(self.placements.c.agent_public_id == current["agentId"])
+                .where(self.placements.c.agent_id == current["agentId"])
                 .where(self.placements.c.public_id != placement_id)
-                .where(self.placements.c.daemon_node_public_id == daemon_node_id)
+                .where(self.placements.c.daemon_node_id == daemon_node_id)
                 .where(self.placements.c.desired_state != "removed")
                 .with_for_update()
             ).first()
@@ -449,10 +449,10 @@ class DatabaseAgentPlacementStore:
             self.placements.c.supervisor_employee_public_id,
         )
         if agent_id is not None:
-            statement = statement.where(self.placements.c.agent_public_id == agent_id)
+            statement = statement.where(self.placements.c.agent_id == agent_id)
         if daemon_node_id is not None:
             statement = statement.where(
-                self.placements.c.daemon_node_public_id == daemon_node_id
+                self.placements.c.daemon_node_id == daemon_node_id
             )
         if not include_removed:
             statement = statement.where(self.placements.c.desired_state != "removed")
@@ -740,9 +740,9 @@ def _placement_row(
     return {
         "id": database_id or new_database_id(),
         "public_id": placement["id"],
-        "agent_public_id": placement["agentId"],
+        "agent_id": placement["agentId"],
         "supervisor_employee_public_id": placement["supervisorEmployeeId"],
-        "daemon_node_public_id": placement["daemonNodeId"],
+        "daemon_node_id": placement["daemonNodeId"],
         "executor_kind": placement["executorKind"],
         "desired_state": placement["desiredState"],
         "priority": int(placement.get("priority") or 100),

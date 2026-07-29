@@ -15,7 +15,6 @@ from sqlalchemy import (
     Table,
     Text,
     UniqueConstraint,
-    Uuid,
     create_engine,
     insert,
     select,
@@ -34,6 +33,7 @@ from .store_common import (
     _read_jsonl,
     _write_json,
     database_id_column,
+    entity_uuid_type,
     safe_name,
 )
 
@@ -300,7 +300,6 @@ class DatabaseAgentStore:
         "agents",
         metadata,
         database_id_column(),
-        Column("public_id", Text, nullable=False, unique=True),
         Column("supervisor_employee_public_id", Text, nullable=False, index=True),
         Column("display_name", Text, nullable=False),
         Column("display_name_key", Text, nullable=True),
@@ -326,7 +325,7 @@ class DatabaseAgentStore:
         Column("public_id", Text, nullable=False, unique=True),
         Column(
             "agent_id",
-            Uuid(as_uuid=False),
+            entity_uuid_type(),
             ForeignKey("agents.id", ondelete="CASCADE"),
             nullable=False,
         ),
@@ -415,7 +414,7 @@ class DatabaseAgentStore:
                     select(
                         self.agents.c.snapshot,
                         self.agents.c.supervisor_employee_public_id,
-                    ).where(self.agents.c.public_id == agent_id)
+                    ).where(self.agents.c.id == agent_id)
                 )
                 .mappings()
                 .first()
@@ -560,7 +559,7 @@ class DatabaseAgentStore:
                         self.events_table.c.payload,
                     )
                     .join(self.agents, self.events_table.c.agent_id == self.agents.c.id)
-                    .where(self.agents.c.public_id == agent_id)
+                    .where(self.agents.c.id == agent_id)
                     .order_by(self.events_table.c.sequence)
                 )
                 .mappings()
@@ -592,7 +591,7 @@ class DatabaseAgentStore:
                 row = (
                     conn.execute(
                         select(self.agents.c.id, self.agents.c.event_version)
-                        .where(self.agents.c.public_id == agent_id)
+                        .where(self.agents.c.id == agent_id)
                         .with_for_update()
                     )
                     .mappings()
@@ -660,7 +659,7 @@ def _new_agent(supervisor_employee_id: str, payload: dict[str, Any]) -> dict[str
         raise ValueError(f"defaultRole must be one of: {', '.join(AGENT_ROLES)}.")
     timestamp = now_iso()
     return {
-        "id": new_relay_id("agent"),
+        "id": new_database_id(),
         "supervisorEmployeeId": supervisor_employee_id,
         "displayName": display_name,
         "executorKind": executor_kind,
@@ -746,8 +745,7 @@ def _agent_row(
     agent: dict[str, Any], *, event_version: int, database_id: str | None = None
 ) -> dict[str, Any]:
     return {
-        "id": database_id or new_database_id(),
-        "public_id": agent["id"],
+        "id": database_id or agent["id"],
         "supervisor_employee_public_id": agent["supervisorEmployeeId"],
         "display_name": agent["displayName"],
         "display_name_key": (
