@@ -60,6 +60,8 @@ export interface RelaySession {
   workspacePath: string;
   /** Daemon node selected as this thread's immutable runtime boundary. */
   daemonNodeId?: string;
+  /** Stable managed Computer identity; survives daemon runtime replacement. */
+  managedNodeId?: string;
   /** Employee who owns this session; their agent runs the work on their behalf. */
   ownerEmployeeId?: string;
   /** Named Team that originated this session, retained as immutable provenance. */
@@ -91,6 +93,7 @@ export type RelayEvent =
       timestamp: string;
       workspacePath: string;
       daemonNodeId?: string;
+      managedNodeId?: string;
       ownerEmployeeId?: string;
       teamId?: string;
       taskGoal: string;
@@ -125,6 +128,7 @@ export type RelayEvent =
       logicalAgentId?: string;
       placementId?: string;
       daemonNodeId?: string;
+      managedNodeId?: string;
       agentVersion?: number;
       workspaceIdentity?: Record<string, unknown>;
       role?: AgentRole;
@@ -200,6 +204,13 @@ export type RelayEvent =
     }
   | {
       id: string;
+      type: "session.runtime_affinity";
+      sessionId: string;
+      timestamp: string;
+      managedNodeId: string;
+    }
+  | {
+      id: string;
       type: "session.renamed";
       sessionId: string;
       timestamp: string;
@@ -236,6 +247,7 @@ export function materializeEvents(events: RelayEvent[]): RelaySession {
     id: created.sessionId,
     workspacePath: created.workspacePath,
     ...(created.daemonNodeId ? { daemonNodeId: created.daemonNodeId } : {}),
+    ...(created.managedNodeId ? { managedNodeId: created.managedNodeId } : {}),
     ...(created.ownerEmployeeId ? { ownerEmployeeId: created.ownerEmployeeId } : {}),
     ...(created.teamId ? { teamId: created.teamId } : {}),
     taskGoal: created.taskGoal,
@@ -264,6 +276,7 @@ export function materializeEvents(events: RelayEvent[]): RelaySession {
       // Threads created before node pinning adopt the computer their first
       // stamped run executed on.
       if (event.daemonNodeId && !session.daemonNodeId) session.daemonNodeId = event.daemonNodeId;
+      if (event.managedNodeId && !session.managedNodeId) session.managedNodeId = event.managedNodeId;
       session.status = "running";
       session.phase = `${event.agent}:${event.mode}`;
       session.currentAgent = event.agent;
@@ -327,6 +340,8 @@ export function materializeEvents(events: RelayEvent[]): RelaySession {
       delete session.pendingDecision;
     } else if (event.type === "session.archived") {
       session.archived = true;
+    } else if (event.type === "session.runtime_affinity") {
+      if (!session.managedNodeId) session.managedNodeId = event.managedNodeId;
     } else if (event.type === "session.renamed") {
       session.title = event.title;
     }

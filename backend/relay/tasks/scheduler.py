@@ -10,6 +10,7 @@ from loguru import logger
 
 from ..core.models import AgentName
 from ..daemon_registry import node_accepts_run
+from ..persistence.agent_placement_store import create_node_placement
 from ..persistence.stores import valid_agent
 from ..persistence.task_store import routine_due_sort_key, task_claim_sort_key
 from ..services.agent_routing import (
@@ -66,6 +67,7 @@ def materialize_legacy_agent_assignment(
         employee_id,
         executor_kind,
         node["id"],
+        computer_id=node.get("managedNodeId") or node["id"],
     )
     placement = next(
         (
@@ -76,7 +78,7 @@ def materialize_legacy_agent_assignment(
         None,
     )
     if placement is None:
-        placement_store.create_placement(agent, node["id"])
+        create_node_placement(placement_store, agent, node)
     return {"agent": executor_kind, "agentId": agent["id"]}
 
 

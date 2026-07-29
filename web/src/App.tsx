@@ -197,8 +197,13 @@ export function App() {
     selectableComputers,
     threadComputerSignature(selectableComputers),
   );
-  const activeThreadNodeId = threadRuntimeNodeId(activeSession, logicalAgents);
-  const initializingThread = threadNeedsRuntimeSelection(activeSession, composingNew, logicalAgents);
+  const activeThreadNodeId = threadRuntimeNodeId(activeSession, logicalAgents, runtimeNodes);
+  const initializingThread = threadNeedsRuntimeSelection(
+    activeSession,
+    composingNew,
+    logicalAgents,
+    runtimeNodes,
+  );
   const selectedThreadNodeId = initializingThread
     ? newThreadNodeId
     : activeThreadNodeId ?? null;

@@ -97,6 +97,52 @@ describe("web thread helpers", () => {
       ["agent_a"],
     );
     assert.equal(threadRuntimeNodeId(session({ daemonNodeId: "node_a" })), "node_a");
+    assert.equal(
+      threadRuntimeNodeId(
+        session({
+          daemonNodeId: "node_old",
+          managedNodeId: "computer_a",
+        }),
+        agents,
+        [
+          {
+            id: "node_new",
+            managedNodeId: "computer_a",
+            employeeId: "alice",
+            online: true,
+            stale: false,
+            status: "ready",
+          },
+        ],
+      ),
+      "node_new",
+    );
+    assert.equal(
+      threadRuntimeNodeId(
+        session({
+          daemonNodeId: "node_old",
+          agentRuns: [{
+            id: "run_a",
+            agent: "codex",
+            logicalAgentId: "agent_a",
+            mode: "action",
+            status: "completed",
+            startedAt: "2026-06-20T00:00:00.000Z",
+            artifactIds: [],
+          } as AgentRuns[number]],
+        }),
+        agents,
+        [{
+          id: "node_a",
+          managedNodeId: "computer_a",
+          employeeId: "alice",
+          online: true,
+          stale: false,
+          status: "ready",
+        }],
+      ),
+      "node_a",
+    );
     assert.equal(threadNeedsRuntimeSelection(session({ daemonNodeId: "node_a" }), false), false);
     assert.equal(threadNeedsRuntimeSelection(session({}), false), true);
     assert.equal(threadNeedsRuntimeSelection(session({ daemonNodeId: "node_a" }), true), true);

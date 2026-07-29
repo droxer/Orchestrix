@@ -354,6 +354,7 @@ class ServerDaemonNodeBackend:
                     else None
                 ),
                 daemon_node_id=sandbox_id,
+                managed_node_id=sandbox.get("managedNodeId"),
             )
             decision = (
                 request.get("decision")

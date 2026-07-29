@@ -140,6 +140,22 @@ def terminal_database_ids_to_prune(
     return database_ids
 
 
+def _managed_runtime_identity_map(
+    events: list[dict[str, Any]],
+) -> dict[str, str]:
+    identities: dict[str, str] = {}
+    for event in events:
+        node = event.get("node") if isinstance(event, dict) else None
+        if (
+            event.get("type") == "daemon.node.registered"
+            and isinstance(node, dict)
+            and isinstance(node.get("id"), str)
+            and isinstance(node.get("managedNodeId"), str)
+        ):
+            identities[node["id"]] = node["managedNodeId"]
+    return identities
+
+
 class LocalDaemonStore:
     """File-backed daemon store for a single backend process.
 
@@ -872,12 +888,27 @@ class LocalDaemonStore:
         if not events_path.exists():
             return set()
         return {
-            node["id"]
-            for event in _read_jsonl(events_path)
-            if event.get("type") == "daemon.node.registered"
-            and isinstance((node := event.get("node")), dict)
-            and node.get("managedNodeId") == managed_node_id
-            and isinstance(node.get("id"), str)
+            runtime_id
+            for runtime_id, current_managed_node_id in _managed_runtime_identity_map(
+                _read_jsonl(events_path)
+            ).items()
+            if current_managed_node_id == managed_node_id
+        }
+
+    def historical_managed_node_id(self, runtime_id: str) -> str | None:
+        return self.historical_managed_node_ids({runtime_id}).get(runtime_id)
+
+    def historical_managed_node_ids(
+        self, runtime_ids: set[str]
+    ) -> dict[str, str]:
+        events_path = self.events_dir / "events.jsonl"
+        if not events_path.exists():
+            return {}
+        identities = _managed_runtime_identity_map(_read_jsonl(events_path))
+        return {
+            current_runtime_id: managed_node_id
+            for current_runtime_id, managed_node_id in identities.items()
+            if current_runtime_id in runtime_ids
         }
 
     def _mark_command_terminal(
@@ -2226,12 +2257,30 @@ class DatabaseDaemonStore:
                 )
             ).all()
         return {
-            node["id"]
-            for event in payloads
-            if isinstance(event, dict)
-            and isinstance((node := event.get("node")), dict)
-            and node.get("managedNodeId") == managed_node_id
-            and isinstance(node.get("id"), str)
+            runtime_id
+            for runtime_id, current_managed_node_id in _managed_runtime_identity_map(
+                payloads
+            ).items()
+            if current_managed_node_id == managed_node_id
+        }
+
+    def historical_managed_node_id(self, runtime_id: str) -> str | None:
+        return self.historical_managed_node_ids({runtime_id}).get(runtime_id)
+
+    def historical_managed_node_ids(
+        self, runtime_ids: set[str]
+    ) -> dict[str, str]:
+        with self.engine.begin() as conn:
+            payloads = conn.scalars(
+                select(self.events.c.payload).where(
+                    self.events.c.type == "daemon.node.registered"
+                )
+            ).all()
+        identities = _managed_runtime_identity_map(payloads)
+        return {
+            current_runtime_id: managed_node_id
+            for current_runtime_id, managed_node_id in identities.items()
+            if current_runtime_id in runtime_ids
         }
 
     def _mark_command_terminal(

@@ -76,6 +76,7 @@ def session_brief_item(session: dict[str, Any]) -> dict[str, Any]:
         "status": session.get("status"),
         "phase": session.get("phase"),
         "daemonNodeId": session.get("daemonNodeId"),
+        "managedNodeId": session.get("managedNodeId"),
         "workspacePath": session.get("workspacePath"),
         "ownerEmployeeId": session.get("ownerEmployeeId"),
         "ownerAgentId": session.get("ownerAgentId"),
@@ -150,10 +151,43 @@ def session_uses_agent(session: dict[str, Any], agent_id: str) -> bool:
     )
 
 
+def ensure_sessions_managed_affinity(
+    ctx: Any, sessions: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    unresolved_runtime_ids = {
+        session["daemonNodeId"]
+        for session in sessions
+        if not session.get("managedNodeId")
+        and isinstance(session.get("daemonNodeId"), str)
+    }
+    if not unresolved_runtime_ids:
+        return sessions
+    identities = ctx.registry.daemon_store.historical_managed_node_ids(
+        unresolved_runtime_ids
+    )
+    if not identities:
+        return sessions
+    controller = SessionController(ctx.session_store)
+    return [
+        controller.record_runtime_affinity(
+            session["id"], identities[session["daemonNodeId"]]
+        )
+        if not session.get("managedNodeId")
+        and session.get("daemonNodeId") in identities
+        else session
+        for session in sessions
+    ]
+
+
+def ensure_session_managed_affinity(ctx: Any, session: dict[str, Any]) -> dict[str, Any]:
+    return ensure_sessions_managed_affinity(ctx, [session])[0]
+
+
 @router.get("/threads")
 async def list_sessions(request: Request, ctx: AppContextDep) -> dict[str, Any]:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
-    return {"sessions": [session for session in ctx.session_store.list_sessions() if actor["isAdmin"] or session.get("ownerEmployeeId") == actor["employeeId"]]}
+    visible = [session for session in ctx.session_store.list_sessions() if actor["isAdmin"] or session.get("ownerEmployeeId") == actor["employeeId"]]
+    return {"sessions": ensure_sessions_managed_affinity(ctx, visible)}
 
 
 ARTIFACT_INDEX_DEFAULT_LIMIT = 200
@@ -225,6 +259,7 @@ async def workspace_brief(request: Request, ctx: AppContextDep) -> dict[str, Any
         and (not agent or session_uses_agent(session, agent["id"]))
         and (not team or session.get("teamId") == team["id"])
     ]
+    sessions = ensure_sessions_managed_affinity(ctx, sessions)
     team_session_ids = {session["id"] for session in sessions} if team else set()
     placement_node_ids: set[str] | None = None
     if agent:
@@ -323,6 +358,7 @@ async def create_session(request: Request, ctx: AppContextDep) -> dict[str, Any]
     daemon_node_id = string_field(body, "daemonNodeId") or string_field(
         body, "daemon_node_id"
     )
+    managed_node_id = None
     task_id = body.get("taskId") if isinstance(body.get("taskId"), str) else None
     task = get_task_for_actor(ctx.task_store, task_id, actor) if task_id else None
     owner = owner_employee_id_for_create(actor, body)
@@ -369,12 +405,14 @@ async def create_session(request: Request, ctx: AppContextDep) -> dict[str, Any]
             )
         if owner and node.get("employeeId") != owner:
             raise HTTPException(403, "The selected computer belongs to another employee.")
+        managed_node_id = node.get("managedNodeId")
     controller = SessionController(
         ctx.session_store,
         task_store=ctx.task_store,
         task_id=task_id,
         workspace_path=workspace_path,
         daemon_node_id=daemon_node_id,
+        managed_node_id=managed_node_id,
         **thread_ownership,
     )
     session = controller.create_session(
@@ -390,7 +428,9 @@ async def create_session(request: Request, ctx: AppContextDep) -> dict[str, Any]
 @router.get("/threads/{session_id}")
 async def get_session(session_id: str, request: Request, ctx: AppContextDep) -> dict[str, Any]:
     actor = request_actor_or_sandbox(request, ctx.auth_store, ctx.registry)
-    return get_session_for_actor(ctx.session_store, session_id, actor)
+    return ensure_session_managed_affinity(
+        ctx, get_session_for_actor(ctx.session_store, session_id, actor)
+    )
 
 
 @router.patch("/threads/{session_id}")

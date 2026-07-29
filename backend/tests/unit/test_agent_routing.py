@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from relay.persistence.agent_placement_store import LocalAgentPlacementStore
@@ -151,6 +152,47 @@ def test_managed_capacity_does_not_replace_a_healthy_local_placement(
     assert resolved["daemonNodeId"] == "node_local"
     active = placements.list_placements(agent_id=agent["id"])
     assert [placement["id"] for placement in active] == [local_placement["id"]]
+
+
+def test_managed_capacity_does_not_move_an_offline_agent_to_another_computer(
+    tmp_path: Path,
+) -> None:
+    agents = LocalAgentStore(tmp_path)
+    placements = LocalAgentPlacementStore(tmp_path)
+    agent = agents.create_agent(
+        "alice", {"displayName": "Builder", "executorKind": "codex"}
+    )
+    original = placements.create_placement(
+        agent, "runtime_a", {"managedNodeId": "computer_a"}
+    )
+    offline = {
+        **node("runtime_a", "codex"),
+        "employeeId": "alice",
+        "managedNodeId": "computer_a",
+        "online": False,
+        "stale": True,
+        "status": "stopped",
+    }
+    other = {
+        **node("runtime_b", "codex"),
+        "employeeId": "alice",
+        "managedNodeId": "computer_b",
+    }
+
+    with pytest.raises(AgentRoutingError) as error:
+        resolve_agent_assignments(
+            [{"agentId": agent["id"], "mode": "action"}],
+            employee_id="alice",
+            is_admin=False,
+            agent_store=agents,
+            placement_store=placements,
+            daemon_nodes=[offline, other],
+        )
+
+    assert error.value.code == "node_offline"
+    [preserved] = placements.list_placements(agent_id=agent["id"])
+    assert preserved["id"] == original["id"]
+    assert preserved["daemonNodeId"] == "runtime_a"
 
 
 def test_legacy_nonempty_policy_blocks_dispatch(
@@ -440,6 +482,91 @@ def test_managed_runtime_replacement_keeps_existing_session_affinity(
             }
         ],
         session=session,
+    )
+
+    assert resolved[0]["daemonNodeId"] == "node_new"
+
+
+def test_managed_runtime_replacement_keeps_pre_run_session_affinity(
+    tmp_path: Path,
+) -> None:
+    agents = LocalAgentStore(tmp_path)
+    placements = LocalAgentPlacementStore(tmp_path)
+    agent = agents.create_agent(
+        "alice", {"displayName": "Builder", "executorKind": "codex"}
+    )
+    placements.create_placement(
+        agent,
+        "node_new",
+        {"managedNodeId": "computer_one"},
+    )
+    session = {
+        "id": "ses_existing",
+        "daemonNodeId": "node_old",
+        "managedNodeId": "computer_one",
+        "workspacePath": "/workspace",
+        "agentRuns": [],
+    }
+
+    resolved = resolve_agent_assignments(
+        [{"agentId": agent["id"], "mode": "action"}],
+        employee_id="alice",
+        is_admin=False,
+        agent_store=agents,
+        placement_store=placements,
+        daemon_nodes=[
+            {
+                **node(
+                    "node_new",
+                    "codex",
+                    workspace_id="managed:computer_one",
+                ),
+                "managedNodeId": "computer_one",
+                "employeeId": "alice",
+            }
+        ],
+        session=session,
+    )
+
+    assert resolved[0]["daemonNodeId"] == "node_new"
+
+
+def test_legacy_pre_run_session_follows_managed_runtime_history(
+    tmp_path: Path,
+) -> None:
+    agents = LocalAgentStore(tmp_path)
+    placements = LocalAgentPlacementStore(tmp_path)
+    agent = agents.create_agent(
+        "alice", {"displayName": "Builder", "executorKind": "codex"}
+    )
+    placements.create_placement(
+        agent, "node_new", {"managedNodeId": "computer_one"}
+    )
+    session = {
+        "id": "ses_legacy",
+        "daemonNodeId": "node_old",
+        "workspacePath": "/workspace",
+        "agentRuns": [],
+    }
+    new_node = {
+        **node("node_new", "codex"),
+        "managedNodeId": "computer_one",
+        "employeeId": "alice",
+    }
+
+    resolved = resolve_agent_assignments(
+        [{"agentId": agent["id"], "mode": "action"}],
+        employee_id="alice",
+        is_admin=False,
+        agent_store=agents,
+        placement_store=placements,
+        daemon_nodes=[new_node],
+        session=session,
+        daemon_store=SimpleNamespace(
+            historical_managed_node_id=lambda runtime_id: (
+                "computer_one" if runtime_id == "node_old" else None
+            )
+        ),
     )
 
     assert resolved[0]["daemonNodeId"] == "node_new"

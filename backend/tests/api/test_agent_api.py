@@ -5,6 +5,7 @@ from tempfile import TemporaryDirectory
 from fastapi.testclient import TestClient
 from relay.app import create_app
 from relay.persistence.store_common import _write_json
+from relay.services.node_agents import sync_node_agents
 
 
 def _bootstrap_admin(client: TestClient) -> None:
@@ -691,6 +692,96 @@ def test_employee_dispatches_work_by_logical_agent_id(monkeypatch) -> None:
         deleting = client.delete(f"/api/v1/admin/agents/{agent['id']}")
         assert deleting.status_code == 409
         assert not app.state.agent_store.get_agent(agent["id"]).get("deletedAt")
+
+
+def test_existing_thread_resumes_after_managed_runtime_replacement_without_read(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("RELAY_ADMIN_TOKEN", "admin_token")
+    with TemporaryDirectory() as root:
+        app = create_app(root)
+        client = TestClient(app)
+        _bootstrap_admin(client)
+        managed = app.state.managed_node_store.create_node({"employeeId": "admin"})
+        attempt, _credential = app.state.managed_node_store.create_attempt(managed["id"])
+        runtime, runtime_token = app.state.registry.enroll_managed_node(
+            managed,
+            attempt,
+            {"workspacePath": "/workspace/admin"},
+        )
+        app.state.managed_node_store.complete_enrollment(
+            managed["id"], attempt["id"], runtime["id"]
+        )
+        runtime = app.state.registry.register(
+            {
+                "sandboxId": runtime["id"],
+                "token": runtime_token,
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }
+        )
+        sync_node_agents(app.state, runtime)
+        agent = next(
+            item
+            for item in app.state.agent_store.list_agents(
+                supervisor_employee_id="admin"
+            )
+            if item["executorKind"] == "codex"
+        )
+        old_runtime_id = runtime["id"]
+        session = app.state.session_store.create_session(
+            {
+                "daemonNodeId": old_runtime_id,
+                "workspacePath": "/workspace/admin",
+                "ownerEmployeeId": "admin",
+                "ownerAgentId": agent["id"],
+                "taskGoal": "Keep working",
+            }
+        )
+
+        app.state.registry.delete(old_runtime_id)
+        replacement_attempt, _credential = (
+            app.state.managed_node_store.create_attempt(managed["id"])
+        )
+        replacement, replacement_token = app.state.registry.enroll_managed_node(
+            app.state.managed_node_store.get_node(managed["id"]),
+            replacement_attempt,
+            {"workspacePath": "/workspace/admin"},
+        )
+        app.state.managed_node_store.complete_enrollment(
+            managed["id"], replacement_attempt["id"], replacement["id"]
+        )
+        replacement = app.state.registry.register(
+            {
+                "sandboxId": replacement["id"],
+                "token": replacement_token,
+                "protocolVersion": 1,
+                "supportedAgents": ["codex"],
+                "status": "ready",
+            }
+        )
+        sync_node_agents(app.state, replacement)
+
+        response = client.post(
+            "/api/v1/agent-runs",
+            json={
+                "taskGoal": "Continue immediately",
+                "sessionId": session["id"],
+                "daemonNodeId": old_runtime_id,
+                "assignments": [{"agentId": agent["id"], "mode": "action"}],
+            },
+        )
+
+        assert response.status_code == 202, response.text
+        assert response.json()["managedNodeId"] == managed["id"]
+        assert response.json()["agentRuns"][-1]["daemonNodeId"] == replacement["id"]
+        persisted = app.state.session_store.get_session(session["id"])
+        assert persisted["managedNodeId"] == managed["id"]
+        assert any(
+            event["type"] == "session.runtime_affinity"
+            for event in persisted["events"]
+        )
 
 
 def test_existing_session_dispatch_normalizes_legacy_agent_supervisor(
