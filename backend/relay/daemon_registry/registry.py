@@ -2292,7 +2292,15 @@ class DaemonNodeRegistry:
                 **sandbox,
                 **({"nodeLocation": node_location} if node_location else {}),
                 "status": waiting_status,
-                "agents": {agent: "unknown" for agent in AGENT_NAMES},
+                # A successful authenticated command poll proves that the same
+                # daemon identity is live again. Keep its last registered
+                # capability state during backend recovery so liveness cannot
+                # become ready while every Logical Agent stays unavailable
+                # until the daemon's next periodic registration.
+                "agents": {
+                    agent: (sandbox.get("agents") or {}).get(agent, "unknown")
+                    for agent in AGENT_NAMES
+                },
                 "updatedAt": now_iso(),
                 "lastError": sandbox.get("lastError")
                 or "Waiting for daemon node registration.",
