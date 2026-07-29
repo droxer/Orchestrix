@@ -2248,7 +2248,11 @@ class DaemonNodeRegistry:
             sandbox = self.sandboxes.get(sandbox_id)
             if not sandbox:
                 return
-            revived = sandbox["status"] in ("stopped", "provisioning", "failed")
+            revived = not sandbox.get("retiredAt") and sandbox["status"] in (
+                "stopped",
+                "provisioning",
+                "failed",
+            )
             patch = {"status": "ready", "lastError": None} if revived else {}
             now = now_iso()
             updated = {
@@ -2282,7 +2286,9 @@ class DaemonNodeRegistry:
         for sandbox in nodes:
             node_location = infer_node_location(sandbox)
             waiting_status = (
-                "running"
+                "stopped"
+                if sandbox.get("retiredAt")
+                else "running"
                 if sandbox["id"] in active_node_ids
                 else "provisioning"
                 if sandbox.get("status") == "provisioning"
@@ -2297,10 +2303,14 @@ class DaemonNodeRegistry:
                 # capability state during backend recovery so liveness cannot
                 # become ready while every Logical Agent stays unavailable
                 # until the daemon's next periodic registration.
-                "agents": {
-                    agent: (sandbox.get("agents") or {}).get(agent, "unknown")
-                    for agent in AGENT_NAMES
-                },
+                "agents": (
+                    {agent: "unknown" for agent in AGENT_NAMES}
+                    if sandbox.get("retiredAt")
+                    else {
+                        agent: (sandbox.get("agents") or {}).get(agent, "unknown")
+                        for agent in AGENT_NAMES
+                    }
+                ),
                 "updatedAt": now_iso(),
                 "lastError": sandbox.get("lastError")
                 or "Waiting for daemon node registration.",
